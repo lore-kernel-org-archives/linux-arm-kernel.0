@@ -1,23 +1,93 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 14 Mar 2018 17:59:31 +0100
-Subject: [PATCH 0/2] coresight: next v4.16-rc5
-In-Reply-To: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180314165931.GA26516@kroah.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 14 Mar 2018 17:58:26 +0100
+Subject: [PATCH v6 16/25] drivers: firmware: psci: Announce support for OS
+ initiated suspend mode
+In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1521046715-30683-17-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 11:24:29AM -0600, Mathieu Poirier wrote:
-> Hi Greg,
-> 
-> These two patches came in last week and are confined to Coresight.  Given
-> the late(ish) time in the cycle I would have normally waited for the
-> next one but the changes are small and trivial.
-> 
-> Please consider - if you think it's too late they'll simply go in later.
+PSCI firmware v1.0+, supports two different modes for CPU_SUSPEND. The
+Platform Coordinated mode, which is the default and mandatory mode, while
+support for the OS initiated mode is optional.
 
-They aren't bugfixes, I'll queue them up now for 4.17-rc1.
+This change introduces initial support for the OS initiated mode, in way
+that it adds the related PSCI bits from the spec and prints a message in
+the log to inform whether the mode is supported by the PSCI FW.
 
-thanks,
+Cc: Lina Iyer <ilina@codeaurora.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/firmware/psci.c   | 21 ++++++++++++++++++++-
+ include/uapi/linux/psci.h |  5 +++++
+ 2 files changed, 25 insertions(+), 1 deletion(-)
 
-greg k-h
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 3888100..e8f4f84 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -95,6 +95,11 @@ static inline bool psci_has_ext_power_state(void)
+ 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+ }
+ 
++static inline bool psci_has_osi_support(void)
++{
++	return psci_cpu_suspend_feature & PSCI_1_0_OS_INITIATED;
++}
++
+ static inline bool psci_power_state_loses_context(u32 state)
+ {
+ 	const u32 mask = psci_has_ext_power_state() ?
+@@ -658,10 +663,24 @@ static int __init psci_0_1_init(struct device_node *np)
+ 	return 0;
+ }
+ 
++static int __init psci_1_0_init(struct device_node *np)
++{
++	int err;
++
++	err = psci_0_2_init(np);
++	if (err)
++		return err;
++
++	if (psci_has_osi_support())
++		pr_info("OSI mode supported.\n");
++
++	return 0;
++}
++
+ static const struct of_device_id psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+-	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
++	{ .compatible = "arm,psci-1.0",	.data = psci_1_0_init},
+ 	{},
+ };
+ 
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index b3bcabe..581f720 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -49,6 +49,7 @@
+ 
+ #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
+ #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
++#define PSCI_1_0_FN_SET_SUSPEND_MODE		PSCI_0_2_FN(15)
+ 
+ #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
+ 
+@@ -97,6 +98,10 @@
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
+ 			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
+ 
++#define PSCI_1_0_OS_INITIATED			BIT(0)
++#define PSCI_1_0_SUSPEND_MODE_PC		0
++#define PSCI_1_0_SUSPEND_MODE_OSI		1
++
+ /* PSCI return values (inclusive of all PSCI versions) */
+ #define PSCI_RET_SUCCESS			0
+ #define PSCI_RET_NOT_SUPPORTED			-1
+-- 
+2.7.4
