@@ -1,77 +1,31 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Wed, 14 Mar 2018 17:02:33 +0530
-Subject: [PATCH v1 4/4] Revert "arm64: Enforce BBM for huge IO/VMAP
- mappings"
-In-Reply-To: <bdcc02a1-cf1b-4887-06e9-4867415ca214@arm.com>
-References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
- <1521017305-28518-5-git-send-email-cpandya@codeaurora.org>
- <bdcc02a1-cf1b-4887-06e9-4867415ca214@arm.com>
-Message-ID: <d7d8fe7c-e313-67ac-3793-6a300d61923f@codeaurora.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 14 Mar 2018 12:32:26 +0100
+Subject: [PATCH] clk: samsung: Add fout=196608001 Hz EPLL rate entry for
+ exynos4412
+References: <CGME20180314113237epcas2p15a4a9304f6b69e9bca7556d910d3b861@epcas2p1.samsung.com>
+Message-ID: <20180314113226.1807-1-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This additional frequency is required for HDMI audio support
+on Odroid U3 board.
 
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-On 3/14/2018 4:16 PM, Marc Zyngier wrote:
-> On 14/03/18 08:48, Chintan Pandya wrote:
->> This commit 15122ee2c515a ("arm64: Enforce BBM for huge
->> IO/VMAP mappings") is a temporary work-around until the
->> issues with CONFIG_HAVE_ARCH_HUGE_VMAP gets fixed.
->>
->> Revert this change as we have fixes for the issue.
->>
->> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
->> ---
->>   arch/arm64/mm/mmu.c | 8 --------
->>   1 file changed, 8 deletions(-)
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index c0df264..19116c6 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -935,10 +935,6 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
->>   	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
->>   					pgprot_val(mk_sect_prot(prot)));
->>   
->> -	/* ioremap_page_range doesn't honour BBM */
->> -	if (pud_present(READ_ONCE(*pudp)))
->> -		return 0;
->> -
->>   	BUG_ON(phys & ~PUD_MASK);
->>   	if (pud_val(*pud) && !pud_huge(*pud))
->>   		free_page((unsigned long)__va(pud_val(*pud)));
->> @@ -952,10 +948,6 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
->>   	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
->>   					pgprot_val(mk_sect_prot(prot)));
->>   
->> -	/* ioremap_page_range doesn't honour BBM */
->> -	if (pmd_present(READ_ONCE(*pmdp)))
->> -		return 0;
->> -
->>   	BUG_ON(phys & ~PMD_MASK);
->>   	if (pmd_val(*pmd) && !pmd_huge(*pmd))
->>   		free_page((unsigned long)__va(pmd_val(*pmd)));
->>
-> 
-> But you're still not doing a BBM, right? What prevents a speculative
-> access from using the (now freed) entry? The TLB invalidation you've
-> introduce just narrows the window where bad things can happen.
-Valid point. I will rework on these patches.
-
-Thanks Marc.
-
-> 
-> My gut feeling is that this series introduces more bugs than it fixes...
-> If you're going to fix it, please fix it by correctly implementing BBM
-> for huge mappings.
-> 
-> Or am I missing something terribly obvious?
-> 
-> 	M.
-> 
-
-Chintan
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index edf125525a36..0421960eb963 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1319,6 +1319,7 @@ static const struct samsung_pll_rate_table exynos4x12_apll_rates[] __initconst =
+ };
+ 
+ static const struct samsung_pll_rate_table exynos4x12_epll_rates[] __initconst = {
++	PLL_36XX_RATE(24 * MHZ, 196608001, 197, 3, 3, -25690),
+ 	PLL_36XX_RATE(24 * MHZ, 192000000, 48, 3, 1,     0),
+ 	PLL_36XX_RATE(24 * MHZ, 180633605, 45, 3, 1, 10381),
+ 	PLL_36XX_RATE(24 * MHZ, 180000000, 45, 3, 1,     0),
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+2.14.2
