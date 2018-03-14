@@ -1,9 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 13 Mar 2018 23:20:26 -0400
-Subject: [PATCH 5/7] igb: eliminate duplicate barriers on weakly-ordered archs
+Date: Tue, 13 Mar 2018 23:20:27 -0400
+Subject: [PATCH 6/7] e1000: eliminate duplicate barriers on weakly-ordered
+ archs
 In-Reply-To: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
 References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1520997629-17361-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <1520997629-17361-6-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,19 +19,28 @@ writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/intel/igb/igb_main.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/intel/e1000/e1000_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
-index b88fae7..ba8ccb5 100644
---- a/drivers/net/ethernet/intel/igb/igb_main.c
-+++ b/drivers/net/ethernet/intel/igb/igb_main.c
-@@ -8072,7 +8072,7 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
+diff --git a/drivers/net/ethernet/intel/e1000/e1000_main.c b/drivers/net/ethernet/intel/e1000/e1000_main.c
+index 3dd4aeb..e0e583a 100644
+--- a/drivers/net/ethernet/intel/e1000/e1000_main.c
++++ b/drivers/net/ethernet/intel/e1000/e1000_main.c
+@@ -4573,7 +4573,7 @@ e1000_alloc_jumbo_rx_buffers(struct e1000_adapter *adapter,
  		 * such as IA-64).
  		 */
  		wmb();
--		writel(i, rx_ring->tail);
-+		writel_relaxed(i, rx_ring->tail);
+-		writel(i, adapter->hw.hw_addr + rx_ring->rdt);
++		writel_relaxed(i, adapter->hw.hw_addr + rx_ring->rdt);
+ 	}
+ }
+ 
+@@ -4688,7 +4688,7 @@ static void e1000_alloc_rx_buffers(struct e1000_adapter *adapter,
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		writel(i, hw->hw_addr + rx_ring->rdt);
++		writel_relaxed(i, hw->hw_addr + rx_ring->rdt);
  	}
  }
  
