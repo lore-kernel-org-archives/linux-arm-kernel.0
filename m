@@ -1,67 +1,39 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 14 Mar 2018 10:41:36 -0500
-Subject: [PATCH v2] media: omap3isp: fix unbalanced dma_iommu_mapping
-Message-ID: <20180314154136.16468-1-s-anna@ti.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 14 Mar 2018 16:45:20 +0100
+Subject: [RFC PATCH 3/6] mm, arm64: untag user addresses in memory syscalls
+In-Reply-To: <CAFKCwrgPEhBEbXn95ugxVuxHw7UTiQWuo3+HJ_t7UBG69fbUcw@mail.gmail.com>
+References: <cover.1520600533.git.andreyknvl@google.com>
+ <beea8ac394bfae3c7c949645fb887ceacc3f3bb3.1520600533.git.andreyknvl@google.com>
+ <20180309155315.4x44sbp3darractt@armageddon.cambridge.arm.com>
+ <CAAeHK+xF0X-SQuPVmZF--VnmvYrbpDkznSwYTh_3LHq1H2V=9Q@mail.gmail.com>
+ <CAFKCwrgPEhBEbXn95ugxVuxHw7UTiQWuo3+HJ_t7UBG69fbUcw@mail.gmail.com>
+Message-ID: <CAAeHK+y3hJ4jAByvfGDYyNb_RZ3_As4r-FCyZL9u69Vv_HS2AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
-ARM DMA backend. The current code creates a dma_iommu_mapping and
-attaches this to the ISP device, but never detaches the mapping in
-either the probe failure paths or the driver remove path resulting
-in an unbalanced mapping refcount and a memory leak. Fix this properly.
+On Fri, Mar 9, 2018 at 6:42 PM, Evgenii Stepanov <eugenis@google.com> wrote:
+> On Fri, Mar 9, 2018 at 9:31 AM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>> On Fri, Mar 9, 2018 at 4:53 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>> I'm not yet convinced these functions need to allow tagged pointers.
+>>> They are not doing memory accesses but rather dealing with the memory
+>>> range, hence an untagged pointer is better suited. There is probably a
+>>> reason why the "start" argument is "unsigned long" vs "void __user *"
+>>> (in the kernel, not the man page).
+>>
+>> So that would make the user to untag pointers before passing to these syscalls.
+>>
+>> Evgeniy, would that be possible to untag pointers in HWASan before
+>> using memory subsystem syscalls? Is there a reason for untagging them
+>> in the kernel?
+>
+> Generally, no. It's possible to intercept a libc call using symbol
+> interposition, but I don't know how to rewrite arguments of a raw
+> system call other than through ptrace, and that creates more problems
+> than it solves.
+>
+> AFAIU, it's valid for a program to pass an address obtained from
+> malloc or, better, posix_memalign to an mm syscall like mprotect().
+> These arguments are pointers from the userspace point of view.
 
-Reported-by: Pavel Machek <pavel@ucw.cz>
-Signed-off-by: Suman Anna <s-anna@ti.com>
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
----
-v2 Changes:
- - Dropped the error_attach label, and returned directly from the
-   first error path (comments from Sakari)
- - Added Sakari's Acked-by
-v1: https://patchwork.kernel.org/patch/10276759/
-
-Pavel,
-I dropped your Tested-by from v2 since I modified the patch, can you
-recheck the new patch again? Thanks.
-
-regards
-Suman
-
- drivers/media/platform/omap3isp/isp.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
-index 8eb000e3d8fd..f2db5128d786 100644
---- a/drivers/media/platform/omap3isp/isp.c
-+++ b/drivers/media/platform/omap3isp/isp.c
-@@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device *isp)
- 
- static void isp_detach_iommu(struct isp_device *isp)
- {
-+	arm_iommu_detach_device(isp->dev);
- 	arm_iommu_release_mapping(isp->mapping);
- 	isp->mapping = NULL;
- }
-@@ -1961,8 +1962,7 @@ static int isp_attach_iommu(struct isp_device *isp)
- 	mapping = arm_iommu_create_mapping(&platform_bus_type, SZ_1G, SZ_2G);
- 	if (IS_ERR(mapping)) {
- 		dev_err(isp->dev, "failed to create ARM IOMMU mapping\n");
--		ret = PTR_ERR(mapping);
--		goto error;
-+		return PTR_ERR(mapping);
- 	}
- 
- 	isp->mapping = mapping;
-@@ -1977,7 +1977,8 @@ static int isp_attach_iommu(struct isp_device *isp)
- 	return 0;
- 
- error:
--	isp_detach_iommu(isp);
-+	arm_iommu_release_mapping(isp->mapping);
-+	isp->mapping = NULL;
- 	return ret;
- }
- 
--- 
-2.16.2
+Catalin, do you think this is a good reason to have the untagging done
+in the kernel?
