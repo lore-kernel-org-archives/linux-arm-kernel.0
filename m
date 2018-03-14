@@ -1,160 +1,142 @@
 From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 14 Mar 2018 13:44:31 +0530
-Subject: [PATCH v10 2/5] iommu/arm-smmu: Add pm_runtime/sleep ops
+Date: Wed, 14 Mar 2018 13:44:34 +0530
+Subject: [PATCH v10 5/5] iommu/arm-smmu: Add support for qcom,smmu-v2 variant
 In-Reply-To: <20180314081434.30875-1-vivek.gautam@codeaurora.org>
 References: <20180314081434.30875-1-vivek.gautam@codeaurora.org>
-Message-ID: <20180314081434.30875-3-vivek.gautam@codeaurora.org>
+Message-ID: <20180314081434.30875-6-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sricharan R <sricharan@codeaurora.org>
+qcom,smmu-v2 is an arm,smmu-v2 implementation with specific
+clock and power requirements. This smmu core is used with
+multiple masters on msm8996, viz. mdss, video, etc.
+Add bindings for the same.
 
-The smmu needs to be functional only when the respective
-master's using it are active. The device_link feature
-helps to track such functional dependencies, so that the
-iommu gets powered when the master device enables itself
-using pm_runtime. So by adapting the smmu driver for
-runtime pm, above said dependency can be addressed.
-
-This patch adds the pm runtime/sleep callbacks to the
-driver and also the functions to parse the smmu clocks
-from DT and enable them in resume/suspend.
-
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-Signed-off-by: Archit Taneja <architt@codeaurora.org>
-[vivek: Clock rework to request bulk of clocks]
 Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 ---
 
  - No change since v9.
 
- drivers/iommu/arm-smmu.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 58 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/iommu/arm,smmu.txt         | 42 ++++++++++++++++++++++
+ drivers/iommu/arm-smmu.c                           | 14 ++++++++
+ 2 files changed, 56 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 8a6ffce12af5..7c71a6ed465a 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -17,10 +17,19 @@ conditions.
+                         "arm,mmu-401"
+                         "arm,mmu-500"
+                         "cavium,smmu-v2"
++                        "qcom,<soc>-smmu-v2", "qcom,smmu-v2"
+ 
+                   depending on the particular implementation and/or the
+                   version of the architecture implemented.
+ 
++                  A number of Qcom SoCs use qcom,smmu-v2 version of the IP.
++                  "qcom,<soc>-smmu-v2" represents a soc specific compatible
++                  string that should be present along with the "qcom,smmu-v2"
++                  to facilitate SoC specific clocks/power connections and to
++                  address specific bug fixes.
++                  An example string would be -
++                  "qcom,msm8996-smmu-v2", "qcom,smmu-v2".
++
+ - reg           : Base address and size of the SMMU.
+ 
+ - #global-interrupts : The number of global interrupts exposed by the
+@@ -71,6 +80,22 @@ conditions.
+                   or using stream matching with #iommu-cells = <2>, and
+                   may be ignored if present in such cases.
+ 
++- clock-names:    List of the names of clocks input to the device. The
++                  required list depends on particular implementation and
++                  is as follows:
++                  - for "qcom,smmu-v2":
++                    - "bus": clock required for downstream bus access and
++                             for the smmu ptw,
++                    - "iface": clock required to access smmu's registers
++                               through the TCU's programming interface.
++                  - unspecified for other implementations.
++
++- clocks:         Specifiers for all clocks listed in the clock-names property,
++                  as per generic clock bindings.
++
++- power-domains:  Specifiers for power domains required to be powered on for
++                  the SMMU to operate, as per generic power domain bindings.
++
+ ** Deprecated properties:
+ 
+ - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+@@ -137,3 +162,20 @@ conditions.
+                 iommu-map = <0 &smmu3 0 0x400>;
+                 ...
+         };
++
++	/* Qcom's arm,smmu-v2 implementation */
++	smmu4: iommu {
++		compatible = "qcom,msm8996-smmu-v2", "qcom,smmu-v2";
++		reg = <0xd00000 0x10000>;
++
++		#global-interrupts = <1>;
++		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH>;
++		#iommu-cells = <1>;
++		power-domains = <&mmcc MDSS_GDSC>;
++
++		clocks = <&mmcc SMMU_MDP_AXI_CLK>,
++			 <&mmcc SMMU_MDP_AHB_CLK>;
++		clock-names = "bus", "iface";
++	};
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 69e7c60792a8..d5873d545024 100644
+index 4cf270ffd449..03750ba15224 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -48,6 +48,7 @@
- #include <linux/of_iommu.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- 
-@@ -205,6 +206,8 @@ struct arm_smmu_device {
- 	u32				num_global_irqs;
- 	u32				num_context_irqs;
- 	unsigned int			*irqs;
-+	struct clk_bulk_data		*clks;
-+	int				num_clks;
- 
- 	u32				cavium_id_base; /* Specific to Cavium */
- 
-@@ -1897,10 +1900,12 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- struct arm_smmu_match_data {
- 	enum arm_smmu_arch_version version;
- 	enum arm_smmu_implementation model;
-+	const char * const *clks;
-+	int num_clks;
+@@ -119,6 +119,7 @@ enum arm_smmu_implementation {
+ 	GENERIC_SMMU,
+ 	ARM_MMU500,
+ 	CAVIUM_SMMUV2,
++	QCOM_SMMUV2,
  };
  
- #define ARM_SMMU_MATCH_DATA(name, ver, imp)	\
--static struct arm_smmu_match_data name = { .version = ver, .model = imp }
-+static const struct arm_smmu_match_data name = { .version = ver, .model = imp }
+ struct arm_smmu_s2cr {
+@@ -1995,6 +1996,17 @@ ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
+ ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
+ ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
  
- ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
- ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
-@@ -1919,6 +1924,23 @@ static const struct of_device_id arm_smmu_of_match[] = {
++static const char * const qcom_smmuv2_clks[] = {
++	"bus", "iface",
++};
++
++static const struct arm_smmu_match_data qcom_smmuv2 = {
++	.version = ARM_SMMU_V2,
++	.model = QCOM_SMMUV2,
++	.clks = qcom_smmuv2_clks,
++	.num_clks = ARRAY_SIZE(qcom_smmuv2_clks),
++};
++
+ static const struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
+ 	{ .compatible = "arm,smmu-v2", .data = &smmu_generic_v2 },
+@@ -2002,6 +2014,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,mmu-401", .data = &arm_mmu401 },
+ 	{ .compatible = "arm,mmu-500", .data = &arm_mmu500 },
+ 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
++	{ .compatible = "qcom,smmu-v2", .data = &qcom_smmuv2 },
+ 	{ },
  };
  MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+@@ -2376,6 +2389,7 @@ IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400");
+ IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401");
+ IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500");
+ IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2");
++IOMMU_OF_DECLARE(qcom_smmuv2, "qcom,smmu-v2");
  
-+static void arm_smmu_fill_clk_data(struct arm_smmu_device *smmu,
-+				   const char * const *clks)
-+{
-+	int i;
-+
-+	if (smmu->num_clks < 1)
-+		return;
-+
-+	smmu->clks = devm_kcalloc(smmu->dev, smmu->num_clks,
-+				  sizeof(*smmu->clks), GFP_KERNEL);
-+	if (!smmu->clks)
-+		return;
-+
-+	for (i = 0; i < smmu->num_clks; i++)
-+		smmu->clks[i].id = clks[i];
-+}
-+
- #ifdef CONFIG_ACPI
- static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
- {
-@@ -2001,6 +2023,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
- 	data = of_device_get_match_data(dev);
- 	smmu->version = data->version;
- 	smmu->model = data->model;
-+	smmu->num_clks = data->num_clks;
-+
-+	arm_smmu_fill_clk_data(smmu, data->clks);
- 
- 	parse_driver_options(smmu);
- 
-@@ -2099,6 +2124,14 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 		smmu->irqs[i] = irq;
- 	}
- 
-+	err = devm_clk_bulk_get(smmu->dev, smmu->num_clks, smmu->clks);
-+	if (err)
-+		return err;
-+
-+	err = clk_bulk_prepare(smmu->num_clks, smmu->clks);
-+	if (err)
-+		return err;
-+
- 	err = arm_smmu_device_cfg_probe(smmu);
- 	if (err)
- 		return err;
-@@ -2181,6 +2214,9 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 
- 	/* Turn the thing off */
- 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
-+
-+	clk_bulk_unprepare(smmu->num_clks, smmu->clks);
-+
- 	return 0;
- }
- 
-@@ -2197,7 +2233,27 @@ static int __maybe_unused arm_smmu_pm_resume(struct device *dev)
- 	return 0;
- }
- 
--static SIMPLE_DEV_PM_OPS(arm_smmu_pm_ops, NULL, arm_smmu_pm_resume);
-+static int __maybe_unused arm_smmu_runtime_resume(struct device *dev)
-+{
-+	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-+
-+	return clk_bulk_enable(smmu->num_clks, smmu->clks);
-+}
-+
-+static int __maybe_unused arm_smmu_runtime_suspend(struct device *dev)
-+{
-+	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-+
-+	clk_bulk_disable(smmu->num_clks, smmu->clks);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops arm_smmu_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(NULL, arm_smmu_pm_resume)
-+	SET_RUNTIME_PM_OPS(arm_smmu_runtime_suspend,
-+			   arm_smmu_runtime_resume, NULL)
-+};
- 
- static struct platform_driver arm_smmu_driver = {
- 	.driver	= {
+ MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
+ MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
