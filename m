@@ -1,70 +1,106 @@
-From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Wed, 14 Mar 2018 08:37:28 -0500
-Subject: [PATCH 1/5] soc/fsl/qbman: fix issue in qman_delete_cgr_safe()
-In-Reply-To: <20180314133732.24068-1-madalin.bucur@nxp.com>
-References: <20180314133732.24068-1-madalin.bucur@nxp.com>
-Message-ID: <20180314133732.24068-2-madalin.bucur@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 14 Mar 2018 13:44:31 +0000
+Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+Message-ID: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wait_for_completion() call in qman_delete_cgr_safe()
-was triggering a scheduling while atomic bug, replacing the
-kthread with a smp_call_function_single() call to fix it.
+This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
 
-Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+It breaks the boot on my Socionext SynQuacer based system, because
+it enters an infinite loop iterating over the pfns.
+
+Adding the following debug output to memmap_init_zone()
+
+  --- a/mm/page_alloc.c
+  +++ b/mm/page_alloc.c
+  @@ -5365,6 +5365,11 @@
+   			 * the valid region but still depends on correct page
+   			 * metadata.
+   			 */
+  +			pr_err("pfn:%lx oldnext:%lx newnext:%lx\n", pfn,
+  +				memblock_next_valid_pfn(pfn, end_pfn) - 1,
+  +				(memblock_next_valid_pfn(pfn, end_pfn) &
+  +					~(pageblock_nr_pages-1)) - 1);
+  +
+   			pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
+   					~(pageblock_nr_pages-1)) - 1;
+   #endif
+
+results in
+
+   Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+   Linux version 4.16.0-rc5-00004-gfc6eabbbf8ef-dirty (ard at dogfood) ...
+   Machine model: Socionext Developer Box
+   earlycon: pl11 at MMIO 0x000000002a400000 (options '')
+   bootconsole [pl11] enabled
+   efi: Getting EFI parameters from FDT:
+   efi: EFI v2.70 by Linaro
+   efi:  SMBIOS 3.0=0xff580000  ESRT=0xf9948198  MEMATTR=0xf83b1a98  RNG=0xff7ac898
+   random: fast init done
+   efi: seeding entropy pool
+   esrt: Reserving ESRT space from 0x00000000f9948198 to 0x00000000f99481d0.
+   cma: Reserved 16 MiB at 0x00000000fd800000
+   NUMA: No NUMA configuration found
+   NUMA: Faking a node at [mem 0x0000000000000000-0x0000000fffffffff]
+   NUMA: NODE_DATA [mem 0xffffd8d80-0xffffda87f]
+   Zone ranges:
+     DMA32    [mem 0x0000000080000000-0x00000000ffffffff]
+     Normal   [mem 0x0000000100000000-0x0000000fffffffff]
+   Movable zone start for each node
+   Early memory node ranges
+     node   0: [mem 0x0000000080000000-0x00000000febeffff]
+     node   0: [mem 0x00000000febf0000-0x00000000fefcffff]
+     node   0: [mem 0x00000000fefd0000-0x00000000ff43ffff]
+     node   0: [mem 0x00000000ff440000-0x00000000ff7affff]
+     node   0: [mem 0x00000000ff7b0000-0x00000000ffffffff]
+     node   0: [mem 0x0000000880000000-0x0000000fffffffff]
+   Initmem setup node 0 [mem 0x0000000080000000-0x0000000fffffffff]
+   pfn:febf0 oldnext:febf0 newnext:fe9ff
+   pfn:febf0 oldnext:febf0 newnext:fe9ff
+   pfn:febf0 oldnext:febf0 newnext:fe9ff
+   etc etc
+
+and the boot never proceeds after this point.
+
+So the logic is obviously flawed, and so it is best to revert this at
+the current -rc stage (unless someone can fix the logic instead)
+
+Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
+Cc: Daniel Vacek <neelx@redhat.com>
+Cc: Mel Gorman <mgorman@techsingularity.net>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: Paul Burton <paul.burton@imgtec.com>
+Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
+Cc: Vlastimil Babka <vbabka@suse.cz>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/soc/fsl/qbman/qman.c | 28 +++++-----------------------
- 1 file changed, 5 insertions(+), 23 deletions(-)
+ mm/page_alloc.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index e4f5bb0..ba3cfa8 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -2443,39 +2443,21 @@ struct cgr_comp {
- 	struct completion completion;
- };
- 
--static int qman_delete_cgr_thread(void *p)
-+static void qman_delete_cgr_smp_call(void *p)
- {
--	struct cgr_comp *cgr_comp = (struct cgr_comp *)p;
--	int ret;
--
--	ret = qman_delete_cgr(cgr_comp->cgr);
--	complete(&cgr_comp->completion);
--
--	return ret;
-+	qman_delete_cgr((struct qman_cgr *)p);
- }
- 
- void qman_delete_cgr_safe(struct qman_cgr *cgr)
- {
--	struct task_struct *thread;
--	struct cgr_comp cgr_comp;
--
- 	preempt_disable();
- 	if (qman_cgr_cpus[cgr->cgrid] != smp_processor_id()) {
--		init_completion(&cgr_comp.completion);
--		cgr_comp.cgr = cgr;
--		thread = kthread_create(qman_delete_cgr_thread, &cgr_comp,
--					"cgr_del");
--
--		if (IS_ERR(thread))
--			goto out;
--
--		kthread_bind(thread, qman_cgr_cpus[cgr->cgrid]);
--		wake_up_process(thread);
--		wait_for_completion(&cgr_comp.completion);
-+		smp_call_function_single(qman_cgr_cpus[cgr->cgrid],
-+					 qman_delete_cgr_smp_call, cgr, true);
- 		preempt_enable();
- 		return;
- 	}
--out:
-+
- 	qman_delete_cgr(cgr);
- 	preempt_enable();
- }
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 3d974cb2a1a1..cb416723538f 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5359,14 +5359,9 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
+ 			/*
+ 			 * Skip to the pfn preceding the next valid one (or
+ 			 * end_pfn), such that we hit a valid pfn (or end_pfn)
+-			 * on our next iteration of the loop. Note that it needs
+-			 * to be pageblock aligned even when the region itself
+-			 * is not. move_freepages_block() can shift ahead of
+-			 * the valid region but still depends on correct page
+-			 * metadata.
++			 * on our next iteration of the loop.
+ 			 */
+-			pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
+-					~(pageblock_nr_pages-1)) - 1;
++			pfn = memblock_next_valid_pfn(pfn, end_pfn) - 1;
+ #endif
+ 			continue;
+ 		}
 -- 
-2.1.0
+2.15.1
