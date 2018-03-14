@@ -1,70 +1,78 @@
-From: ldv@altlinux.org (Dmitry V. Levin)
-Date: Wed, 14 Mar 2018 02:58:50 +0300
-Subject: ARM: Call syscall_trace_exit even when system call skipped
-In-Reply-To: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
-References: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
-Message-ID: <20180313235850.GA18373@altlinux.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 13 Mar 2018 19:50:01 -0500
+Subject: [PATCH] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is observed
+ before enabling
+Message-ID: <1520988601-16705-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+The definition of the GICR_CTLR.RWP control bit was expanded to indicate
+status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
+or completed. Software must observe GICR_CTLR.RWP==0 after clearing
+GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
+GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
 
-As you probably know, ptracing of processes affected by SECCOMP_RET_TRAP
-is broken on ARM since your commit v3.7-rc1-11-gad75b51459ae.
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 30 +++++++++++++++++++++++-------
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 2 files changed, 24 insertions(+), 7 deletions(-)
 
-Could you review the proposed fix, please?
-
-P.S. There is a test for this kernel bug in strace test suite,
-you might find it useful:
-https://github.com/strace/strace/compare/ldv/SECCOMP_RET_TRAP
-
-On Sat, Feb 03, 2018 at 03:21:12PM +0000, Timothy E Baldwin wrote:
-> On at least x86 and ARM64, and as documented in the ptrace man page
-> a skipped system call will still cause a syscall exit ptrace stop.
-> 
-> Previous to this commit 32-bit ARM did not, resulting in strace
-> being confused when seccomp skips system calls.
-> 
-> This change also impacts programs that use ptrace to skip system calls.
-> 
-> Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
-> Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
-> ---
->  arch/arm/kernel/entry-common.S | 9 ++++-----
->  1 file changed, 4 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 99c908226065..88a65157307d 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -288,16 +288,15 @@ __sys_trace:
->  	cmp	scno, #-1			@ skip the syscall?
->  	bne	2b
->  	add	sp, sp, #S_OFF			@ restore stack
-> -	b	ret_slow_syscall
->  
-> -__sys_trace_return:
-> -	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-> +__sys_trace_return_nosave:
-> +	enable_irq_notrace
->  	mov	r0, sp
->  	bl	syscall_trace_exit
->  	b	ret_slow_syscall
->  
-> -__sys_trace_return_nosave:
-> -	enable_irq_notrace
-> +__sys_trace_return:
-> +	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
->  	mov	r0, sp
->  	bl	syscall_trace_exit
->  	b	ret_slow_syscall
-
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 1d3056f..85cd158 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1875,15 +1875,31 @@ static void its_cpu_init_lpis(void)
+ 		gic_data_rdist()->pend_page = pend_page;
+ 	}
+ 
+-	/* Disable LPIs */
+ 	val = readl_relaxed(rbase + GICR_CTLR);
+-	val &= ~GICR_CTLR_ENABLE_LPIS;
+-	writel_relaxed(val, rbase + GICR_CTLR);
+ 
+-	/*
+-	 * Make sure any change to the table is observable by the GIC.
+-	 */
+-	dsb(sy);
++	/* Make sure LPIs are disabled before programming PEND/PROP registers */
++	if (val & GICR_CTLR_ENABLE_LPIS) {
++		u32 count = 1000000; /* 1s! */
++
++		/* Disable LPIs */
++		val &= ~GICR_CTLR_ENABLE_LPIS;
++		writel_relaxed(val, rbase + GICR_CTLR);
++
++		/* Make sure any change to GICR_CTLR is observable by the GIC */
++		dsb(sy);
++
++		/* Wait for GICR_CTLR.RWP==0 or timeout */
++		while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
++			if (!count) {
++				pr_err("CPU%d: Failed to disable LPIs\n",
++				       smp_processor_id());
++				return;
++			}
++			cpu_relax();
++			udelay(1);
++			count--;
++		};
++	}
+ 
+ 	/* set PROPBASE */
+ 	val = (page_to_phys(gic_rdists->prop_page) |
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index c00c4c33..4d5fb60 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -106,6 +106,7 @@
+ #define GICR_PIDR2			GICD_PIDR2
+ 
+ #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
++#define GICR_CTLR_RWP			(1UL << 3)
+ 
+ #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
+ 
 -- 
-ldv
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180314/f540b10f/attachment.sig>
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
