@@ -1,108 +1,79 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 14 Mar 2018 17:53:03 -0500
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <20180314222530.GA6300@wintermute>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
- <20180314222530.GA6300@wintermute>
-Message-ID: <4c31c5ed-9f68-10c3-c73f-5b6f34dd82c9@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 14 Mar 2018 18:57:40 -0400
+Subject: [PATCH 7/7] ixgbevf: eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <CAKgT0UcriMiyV0q6y_x9r3-HJRAWp5_CpsK2jTqh3qvOV=Kkzw@mail.gmail.com>
+References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
+ <1520997629-17361-7-git-send-email-okaya@codeaurora.org>
+ <12150aa0-77ba-878e-31f4-d4f8d6a28ccb@codeaurora.org>
+ <2a4f4dec64b7462ae64152f6c2df9754@codeaurora.org>
+ <CAKgT0UcriMiyV0q6y_x9r3-HJRAWp5_CpsK2jTqh3qvOV=Kkzw@mail.gmail.com>
+Message-ID: <d565406d-1bc7-6fb0-3f36-87a28ac69070@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Alexander,
 
-Hi Ard,
+On 3/14/2018 5:49 PM, Alexander Duyck wrote:
+> On Wed, Mar 14, 2018 at 5:13 AM,  <okaya@codeaurora.org> wrote:
+>> On 2018-03-14 01:08, Timur Tabi wrote:
+>>>
+>>> On 3/13/18 10:20 PM, Sinan Kaya wrote:
 
-On 03/14/2018 05:25 PM, Jan Glauber wrote:
-> On Wed, Mar 14, 2018 at 07:29:37PM +0000, Ard Biesheuvel wrote:
->> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
+> Actually I would argue this whole patch set is pointless. For starters
+> why is it we are only updating the Intel Ethernet drivers here? 
+
+I did a regex search for wmb() followed by writel() in each drivers directory.
+I scrubbed the ones I care about and posted this series. Note also that
+I have one Infiniband patch in the series. 
+
+I considered "ease of change", "popular usage" and "performance critical
+path" as the determining criteria for my filtering. 
+
+
+> This
+> seems like something that is going to impact the whole kernel tree
+> since many of us have been writing drivers for some time assuming x86
+> style behavior.
+
+That's true. We used relaxed API heavily on ARM for a long time but
+it did not exist on other architectures. For this reason, relaxed
+architectures have been paying double penalty in order to use the common
+drivers. 
+
+Now that relaxed API is present on all architectures, we can go and scrub
+all drivers to see what needs to change and what can remain.
+
 > 
-> FWIW, the revert fixes the boot hang I'm seeing on ThunderX1.
+> It doesn't make sense to be optimizing the drivers for one subset of
+> architectures. The scope of the work needed to update the drivers for
+> this would be ridiculous. Also I don't see how this could be expected
+> to work on any other architecture when we pretty much need to have a
+> wmb() before calling the writel on x86 to deal with accesses between
+> coherent and non-coherent memory. It seems to me more like somebody
+> added what they considered to be an optimization somewhere that is a
+> workaround for a poorly written driver. Either that or the barrier is
+> serving a different purpose then the one we were using.
+
+Is there a semantic problem with the definition of wmb() vs. writel() vs.
+writel_relaxed()? I thought everything is well described in barriers
+document about what to expect from these APIs.
+
+AFAIK, writel() is equal to writel_relaxed() on x86 architecture.
+It doesn't really change anything for x86 but it saves barriers on
+other architectures.
+
 > 
-> --Jan
+> It would make more sense to put in the effort making writel and
+> writel_relaxed consistent between architectures before we go through
+> and start modifying driver code to support different architectures.
 > 
 
-Thanks for this patch, it fixes the boot hang on QDF2400 platform.
+Is there an arch problem that I'm not seeing?
 
-
->> Commit 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock
->> alignment") modified the logic in memmap_init_zone() to initialize
->> struct pages associated with invalid PFNs, to appease a VM_BUG_ON()
->> in move_freepages(), which is redundant by its own admission, and
->> dereferences struct page fields to obtain the zone without checking
->> whether the struct pages in question are valid to begin with.
->>
->> Commit 864b75f9d6b0 only makes it worse, since the rounding it does
->> may cause pfn assume the same value it had in a prior iteration of
->> the loop, resulting in an infinite loop and a hang very early in the
->> boot. Also, since it doesn't perform the same rounding on start_pfn
->> itself but only on intermediate values following an invalid PFN, we
->> may still hit the same VM_BUG_ON() as before.
->>
->> So instead, let's fix this at the core, and ensure that the BUG
->> check doesn't dereference struct page fields of invalid pages.
->>
->> Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
->> Cc: Daniel Vacek <neelx@redhat.com>
->> Cc: Mel Gorman <mgorman@techsingularity.net>
->> Cc: Michal Hocko <mhocko@suse.com>
->> Cc: Paul Burton <paul.burton@imgtec.com>
->> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
->> Cc: Vlastimil Babka <vbabka@suse.cz>
->> Cc: Andrew Morton <akpm@linux-foundation.org>
->> Cc: Linus Torvalds <torvalds@linux-foundation.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  mm/page_alloc.c | 13 +++++--------
->>  1 file changed, 5 insertions(+), 8 deletions(-)
->>
->> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->> index 3d974cb2a1a1..635d7dd29d7f 100644
->> --- a/mm/page_alloc.c
->> +++ b/mm/page_alloc.c
->> @@ -1910,7 +1910,9 @@ static int move_freepages(struct zone *zone,
->>  	 * Remove at a later date when no bug reports exist related to
->>  	 * grouping pages by mobility
->>  	 */
->> -	VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
->> +	VM_BUG_ON(pfn_valid(page_to_pfn(start_page)) &&
->> +	          pfn_valid(page_to_pfn(end_page)) &&
->> +	          page_zone(start_page) != page_zone(end_page));
->>  #endif
->>  
->>  	if (num_movable)
->> @@ -5359,14 +5361,9 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
->>  			/*
->>  			 * Skip to the pfn preceding the next valid one (or
->>  			 * end_pfn), such that we hit a valid pfn (or end_pfn)
->> -			 * on our next iteration of the loop. Note that it needs
->> -			 * to be pageblock aligned even when the region itself
->> -			 * is not. move_freepages_block() can shift ahead of
->> -			 * the valid region but still depends on correct page
->> -			 * metadata.
->> +			 * on our next iteration of the loop.
->>  			 */
->> -			pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
->> -					~(pageblock_nr_pages-1)) - 1;
->> +			pfn = memblock_next_valid_pfn(pfn, end_pfn) - 1;
->>  #endif
->>  			continue;
->>  		}
->> -- 
->> 2.15.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Sinan
 
 -- 
-Shanker Donthineni
+Sinan Kaya
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
