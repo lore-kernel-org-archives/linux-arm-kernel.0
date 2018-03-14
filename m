@@ -1,83 +1,43 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Wed, 14 Mar 2018 11:31:28 +0530
-Subject: [PATCH v5 08/36] drm/bridge: analogix_dp: Check AUX_EN status
- when doing AUX transfer
-In-Reply-To: <20180309222327.18689-9-enric.balletbo@collabora.com>
-References: <20180309222327.18689-1-enric.balletbo@collabora.com>
- <20180309222327.18689-9-enric.balletbo@collabora.com>
-Message-ID: <def00ec1-3c4d-62c0-fe1f-f695c5e84b47@codeaurora.org>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 14 Mar 2018 14:02:35 +0800
+Subject: [PATCH] Add Apple Carplay driver 
+Message-ID: <1521007356-12306-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>From bf48dcd9cb254576cfea373c9a5d2ab996408895 Mon Sep 17 00:00:00 2001
+From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Date: Tue, 13 Mar 2018 11:47:38 +0800
+Subject: [PATCH] Add Apple Carplay driver
 
+Some Apple devices which support Carplay can enter USB Host Mode from USB
+Device Mode after receiving a specific USB Vendor Request. There is a
+requirement apply to accesssories that support the USB dual role switch
+feature, and must have a USB-A receptacle that is capable of functioning
+in both USB Host and USB Device roles.
+It means that the driver should supports manual Dual-Role switch, due to
+no IDDIG pin is avaliable.
 
-On Saturday 10 March 2018 03:52 AM, Enric Balletbo i Serra wrote:
-> From: Lin Huang <hl@rock-chips.com>
-> 
-> We should check AUX_EN bit to confirm the AUX CH operation is completed.
-> 
+There is no suitable place to add this spicific USB Vendor Request, so
+here I extract a single driver which allow user force to send it by a debug
+interface when need it, and keep it independent on USB Dual-Role Controller
+Drivers.
+But to implement carplay feature, there are some requirments for USB Dual-Role
+Driver:
+1. supports manual dual-role switch, such as, by a debug interface;
+2. keep vbus alive even when switch host into device mode;
 
-Reviewed-by: Archit Taneja <architt@codeaurora.org>
+More information please refer to "Chapter 46. USB Role Switch" in
+MFI Accessroy Interface Specification.pdf
 
-Thanks,
-Archit
+Chunfeng Yun (1):
+  usb: misc: supports Apple Carplay driver
 
-> Cc: St?phane Marchesin <marcheu@chromium.org>
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> Signed-off-by: zain wang <wzz@rock-chips.com>
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
-> 
->   drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 25 +++++++++++++----------
->   1 file changed, 14 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> index 9df2f3ef000c..e78c861b9e06 100644
-> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-> @@ -1073,9 +1073,9 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
->   {
->   	u32 reg;
->   	u8 *buffer = msg->buffer;
-> -	int timeout_loop = 0;
->   	unsigned int i;
->   	int num_transferred = 0;
-> +	int ret;
->   
->   	/* Buffer size of AUX CH is 16 bytes */
->   	if (WARN_ON(msg->size > 16))
-> @@ -1139,17 +1139,20 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
->   
->   	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2);
->   
-> -	/* Is AUX CH command reply received? */
-> +	ret = readx_poll_timeout(readl, dp->reg_base + ANALOGIX_DP_AUX_CH_CTL_2,
-> +				 reg, !(reg & AUX_EN), 25, 500 * 1000);
-> +	if (ret) {
-> +		dev_err(dp->dev, "AUX CH enable timeout!\n");
-> +		return -ETIMEDOUT;
-> +	}
-> +
->   	/* TODO: Wait for an interrupt instead of looping? */
-> -	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
-> -	while (!(reg & RPLY_RECEIV)) {
-> -		timeout_loop++;
-> -		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
-> -			dev_err(dp->dev, "AUX CH command reply failed!\n");
-> -			return -ETIMEDOUT;
-> -		}
-> -		reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
-> -		usleep_range(10, 11);
-> +	/* Is AUX CH command reply received? */
-> +	ret = readx_poll_timeout(readl, dp->reg_base + ANALOGIX_DP_INT_STA,
-> +				 reg, reg & RPLY_RECEIV, 10, 20 * 1000);
-> +	if (ret) {
-> +		dev_err(dp->dev, "AUX CH cmd reply timeout!\n");
-> +		return -ETIMEDOUT;
->   	}
->   
->   	/* Clear interrupt source for AUX CH command reply */
-> 
+ drivers/usb/misc/Kconfig   |    9 +++
+ drivers/usb/misc/Makefile  |    1 +
+ drivers/usb/misc/carplay.c |  193 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 203 insertions(+)
+ create mode 100644 drivers/usb/misc/carplay.c
+
+-- 
+1.7.9.5
