@@ -1,51 +1,72 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Mar 2018 10:53:43 +0000
-Subject: [PATCH v1 3/4] arm64: Fix the page leak in pud/pmd_set_huge
-In-Reply-To: <1521017305-28518-4-git-send-email-cpandya@codeaurora.org>
-References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
- <1521017305-28518-4-git-send-email-cpandya@codeaurora.org>
-Message-ID: <20180314105343.nxw2mwkm4pao3hur@lakrids.cambridge.arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 14 Mar 2018 11:02:06 +0000
+Subject: [PATCH v6 01/26] ARM: shmobile: Add watchdog support
+In-Reply-To: <CAMuHMdVRxTCG0vCEEmhHm4XsZeJaPM1b_LOeZxqNdhRqsH0oZw@mail.gmail.com>
+References: <CAMuHMdUx3A_8MeZmrwiBRqUS0oGjwrg13fy1QMsA2SUw+dR0Hg@mail.gmail.com>
+ <1519839622-6109-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdVRxTCG0vCEEmhHm4XsZeJaPM1b_LOeZxqNdhRqsH0oZw@mail.gmail.com>
+Message-ID: <TY1PR01MB1770D3BF20F440AAD9A1E5E5C0D10@TY1PR01MB1770.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 02:18:24PM +0530, Chintan Pandya wrote:
-> While setting huge page, we need to take care of
-> previously existing next level mapping. Since,
-> we are going to overrite previous mapping, the
-> only reference to next level page table will get
-> lost and the next level page table will be zombie,
-> occupying space forever. So, free it before
-> overriding.
+Hi Geert,
 
-> @@ -939,6 +940,9 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
->  		return 0;
->  
->  	BUG_ON(phys & ~PUD_MASK);
-> +	if (pud_val(*pud) && !pud_huge(*pud))
-> +		free_page((unsigned long)__va(pud_val(*pud)));
-> +
->  	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
->  	return 1;
->  }
-> @@ -953,6 +957,9 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
->  		return 0;
->  
->  	BUG_ON(phys & ~PMD_MASK);
-> +	if (pmd_val(*pmd) && !pmd_huge(*pmd))
-> +		free_page((unsigned long)__va(pmd_val(*pmd)));
-> +
+> Subject: Re: [PATCH v6 01/26] ARM: shmobile: Add watchdog support
+>
+> Hi Fabrizio,
+>
+> On Wed, Feb 28, 2018 at 6:40 PM, Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+> > On R-Car Gen2 and RZ/G1 platforms, we use the SBAR registers to make non
+> > boot CPUs run a routine designed to bring up SMP and deal with hot plug.
+> > The value contained in the SBAR registers is not initialized by a WDT
+> > triggered reset, which means that after a WDT triggered reset we jump
+> > to the SMP bring up routine, preventing the system from executing the
+> > bootrom code.
+> >
+> > The purpose of this patch is to jump to the bootrom code in case of a
+> > WDT triggered reset, and keep the SMP functionality untouched.
+> > In order to tell if the code had been called due to the WDT overflowing
+> > we are testing WOVF from register RWTCSRA.
+> >
+> > The new function shmobile_boot_vector_gen2 isn't replacing
+> > shmobile_boot_vector for backward compatibility reasons. The kernel
+> > will install the best option (either shmobile_boot_vector or
+> > shmobile_boot_vector_gen2) to ICRAM1 after parsing the device tree,
+> > according to the amount of memory available.
+> >
+> > Since shmobile_boot_vector has become bigger, "reg" property of nodes
+> > compatible with "renesas,smp-sram" now need to be set to a value
+> > greater or equal to "<0 0x60>".
+> >
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> > v5->v6:
+> > * taken ifdefs out as per Geert's suggestion.
+>
+> My intention was to remove the #ifdefs from the header file only, not
+> from arch/arm/mach-shmobile/headsmp.S, as the latter is used for
+> other SoC families, too.
 
-As Marc noted, (assuming the subsequent revert is applied) in both of
-these cases, these tables are still live, and thus it is not safe to
-free them.
-
-Consider that immediately after freeing the pages, they may get
-re-allocated elsewhere, where they may be modified. If this happens
-before TLB invalidation, page table walks may allocate junk into TLBs,
-resulting in a number of problems.
-
-It is *never* safe to free a live page table, therefore NAK to this
-patch.
+Ah ok, I'll send another version to restore the ifdef within headsmp.S then.
 
 Thanks,
-Mark.
+Fab
+
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
