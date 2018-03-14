@@ -1,107 +1,35 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 14 Mar 2018 08:33:16 -0500
-Subject: [PATCH] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is observed
- before enabling
-In-Reply-To: <86bmfrayts.wl-marc.zyngier@arm.com>
-References: <1520988601-16705-1-git-send-email-shankerd@codeaurora.org>
- <86bmfrayts.wl-marc.zyngier@arm.com>
-Message-ID: <cc2a59b5-e514-3336-67c7-7ae8fb80c5fe@codeaurora.org>
+From: madalin.bucur@nxp.com (Madalin Bucur)
+Date: Wed, 14 Mar 2018 08:37:27 -0500
+Subject: [PATCH 0/5] DPAA Ethernet fixes
+Message-ID: <20180314133732.24068-1-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
 
-On 03/14/2018 02:41 AM, Marc Zyngier wrote:
-> Hi Shanker,
-> 
-> On Wed, 14 Mar 2018 00:50:01 +0000,
-> Shanker Donthineni wrote:
->>
->> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
->> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
->> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
->> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
->> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
->>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->>  drivers/irqchip/irq-gic-v3-its.c   | 30 +++++++++++++++++++++++-------
->>  include/linux/irqchip/arm-gic-v3.h |  1 +
->>  2 files changed, 24 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 1d3056f..85cd158 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -1875,15 +1875,31 @@ static void its_cpu_init_lpis(void)
->>  		gic_data_rdist()->pend_page = pend_page;
->>  	}
->>  
->> -	/* Disable LPIs */
->>  	val = readl_relaxed(rbase + GICR_CTLR);
->> -	val &= ~GICR_CTLR_ENABLE_LPIS;
->> -	writel_relaxed(val, rbase + GICR_CTLR);
->>  
->> -	/*
->> -	 * Make sure any change to the table is observable by the GIC.
->> -	 */
->> -	dsb(sy);
->> +	/* Make sure LPIs are disabled before programming PEND/PROP registers */
->> +	if (val & GICR_CTLR_ENABLE_LPIS) {
->> +		u32 count = 1000000; /* 1s! */
->> +
->> +		/* Disable LPIs */
->> +		val &= ~GICR_CTLR_ENABLE_LPIS;
->> +		writel_relaxed(val, rbase + GICR_CTLR);
->> +
->> +		/* Make sure any change to GICR_CTLR is observable by the GIC */
->> +		dsb(sy);
->> +
->> +		/* Wait for GICR_CTLR.RWP==0 or timeout */
->> +		while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
->> +			if (!count) {
->> +				pr_err("CPU%d: Failed to disable LPIs\n",
->> +				       smp_processor_id());
->> +				return;
->> +			}
->> +			cpu_relax();
->> +			udelay(1);
->> +			count--;
->> +		};
->> +	}
-> 
-> I can see a couple of issues with this patch:
-> 
-> - Entering the kernel with GICR_CTLR.EnableLPIs set is a recipe for
->   memory corruption and is likely to lead to Bad Things(tm). A loud
->   warning would be in order, I believe.
-> 
+This patch set is addressing several issues in the DPAA Ethernet
+driver suite:
 
-I agree with you entering kernel with GICR_CTLR.EnableLPI=1 causes many
-issues. Unfortunately this is happening with KDUMP/KEXEC case. We don't
-disable GICD, GICRs and ITSs before loading the 2nd kernel. 
+ - module unload crash caused by wrong reference to device being left
+   in the cleanup code after the DSA related changes
+ - scheduling wile atomic bug in QMan code revealed during dpaa_eth
+   module unload
+ - a couple of error counter fixes, a duplicated init in dpaa_eth.
 
-> - If you're on a system that doesn't allow GICR_CTLR.Enable_LPIs to be
->   cleared, we end-up going down the polling path for nothing. It'd be
->   worth checking that the bit can be cleared the first place (and
->   shout again if it cannot).
-> 
+Madalin
 
-This tells the bug in hardware but not in software, as per per spec it
-should be able to cleared by software. Any suggestions how software knows
-GICR_CTLR.EnableLPI bit can be cleared from enabled state.
+Camelia Groza (3):
+  dpaa_eth: remove duplicate initialization
+  dpaa_eth: increment the RX dropped counter when needed
+  dpaa_eth: remove duplicate increment of the tx_errors counter
 
-> - From a cosmetic PoV, please move this to a redist_disable_lpis()
->   function.
-> 
-Sure, I'll move.
+Madalin Bucur (2):
+  soc/fsl/qbman: fix issue in qman_delete_cgr_safe()
+  dpaa_eth: fix error in dpaa_remove()
 
-> Thanks,
-> 
-> 	M.
-> 
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c |  8 ++++----
+ drivers/soc/fsl/qbman/qman.c                   | 28 +++++---------------------
+ 2 files changed, 9 insertions(+), 27 deletions(-)
 
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.1.0
