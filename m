@@ -1,132 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Mar 2018 10:01:20 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Disallow Active+Pending for level
- interrupts
-In-Reply-To: <c0ac2636-4143-98d3-5eb3-1e9098d0e056@redhat.com>
-References: <20180314183744.30889-1-marc.zyngier@arm.com>
- <c0ac2636-4143-98d3-5eb3-1e9098d0e056@redhat.com>
-Message-ID: <64703cb4-96c8-abd0-8e75-6e65b6721e5c@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 15 Mar 2018 15:32:30 +0530
+Subject: [PATCH v3 00/11] mmc: sdhci-omap: Add UHS/HS200 mode support
+In-Reply-To: <1b7e25b2-4949-5427-1c36-0b253c79ff8d@intel.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <CAPDyKFrnPQs3B2QN7tf3UH0JYjqkpS1YDhq0s3scads3exPCCg@mail.gmail.com>
+ <1b7e25b2-4949-5427-1c36-0b253c79ff8d@intel.com>
+Message-ID: <d6009c30-112f-eff9-4afe-5dd4c3a61baa@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On 15/03/18 09:31, Auger Eric wrote:
-> Hi Marc,
-> On 14/03/18 19:37, Marc Zyngier wrote:
->> It was recently reported that VFIO mediated devices, and anything
->> that VFIO exposes as level interrupts, do no strictly follow the
->> expected logic of such interrupts as it only lowers the input
->> line when the guest has EOId the interrupt at the GIC level, rather
->> than when it Acked the interrupt at the device level.
+
+On Thursday 15 March 2018 02:22 PM, Adrian Hunter wrote:
+> On 15/03/18 10:47, Ulf Hansson wrote:
+>> On 7 March 2018 at 14:20, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Add UHS/HS200 mode support in sdhci-omap. The programming sequence
+>>> for voltage switching, tuning is followed from AM572x TRM
+>>> http://www.ti.com/lit/ug/spruhz6i/spruhz6i.pdf
+>>> (Similar to all AM57x/DRA7x SoCs). The patch series also implements
+>>> workaround for errata published in
+>>> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
+>>>
+>>> patches are created on top of
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
+>>>
+>>> Patches in v2 already applied to mmc -next are dropped from the
+>>> series.
+>>>
+>>> Changes from v2:
+>>> *) Changed SW timeout logic as per Adrians's suggestion
+>>> *) Validated SDIO with the current patches (added a couple of fixes
+>>>    found while adding SDIO support).
+>>> *) Used soc_device_match() instead of pdata-quirks as per Tony's
+>>>    suggestions.
+>>>
+>>> Changes from v1:
+>>> *) Only poll on DAT0 and DATI for card_busy status
+>>> *) Cleanup iodelay patch as suggested by Tony.
+>>> *) Added quirk to disable HW timeout
+>>> *) Use the existing data timer but program a relatively accurate
+>>>    SW timeout value (Impacts all platforms)
+>>> *) Fix a bug in sdhci which was using data_timer for non data line
+>>>    commands
+>>>
+>>> Kishon Vijay Abraham I (11):
+>>>   mmc: sdhci-omap: Fix when capabilities are obtained from
+>>>     SDHCI_CAPABILITIES reg
+>>>   mmc: sdhci-omap: Remove setting ADMA capability in driver
+>>>   mmc: sdhci-omap: Workaround for Errata i843
+>>>   mmc: sdhci-omap: Invoke sdhci_get_of_property to read sdhci dt
+>>>     properties
+>>>   mmc: sdhci: Disable HS200 mode if controller can't support 1.8v
+>>>   mmc: sdhci: Add quirk to disable HW timeout
+>>>   mmc: sdhci: Program a relatively accurate SW timeout value
+>>>   mmc: sdhci-omap: Workaround for Errata i834
+>>>   dt-bindings: sdhci-omap: Add K2G specific binding
+>>>   mmc: sdhci-omap: Add support for MMC/SD controller in k2g SoC
+>>>   mmc: sdhci-omap: Add sdhci_omap specific ops for enable_sdio_irq
+>>>
+>>>  .../devicetree/bindings/mmc/sdhci-omap.txt         |  2 +
+>>>  drivers/mmc/host/sdhci-omap.c                      | 78 +++++++++++++++++++---
+>>>  drivers/mmc/host/sdhci.c                           | 75 +++++++++++++++++----
+>>>  drivers/mmc/host/sdhci.h                           | 15 +++++
+>>>  4 files changed, 148 insertions(+), 22 deletions(-)
+>>>
+>>> --
+>>> 2.11.0
+>>>
 >>
->> THe GIC's Active+Pending state is fundamentally incompatible with
->> this behaviour, as it prevents KVM from observing the EOI, and in
->> turn results in VFIO never dropping the line. This results in an
->> interrupt storm in the guest, which it really never expected.
+>> Overall this looks good to me, however it seems like we need to give
+>> Adrian a little more time to comment.
 >>
->> As we cannot really change VFIO to follow the strict rules of level
->> signalling, let's forbid the A+P state altogether, as it is in the
->> end only an optimization. It ensures that we will transition via
->> an invalid state, which we can use to notify VFIO of the EOI.
->>
->> Reported-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
->> Tested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-v2.c | 47 +++++++++++++++++++++++++++------------------
->>  virt/kvm/arm/vgic/vgic-v3.c | 47 +++++++++++++++++++++++++++------------------
->>  2 files changed, 56 insertions(+), 38 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->> index 29556f71b691..9356d749da1d 100644
->> --- a/virt/kvm/arm/vgic/vgic-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->> @@ -153,8 +153,35 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->>  void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->>  {
->>  	u32 val = irq->intid;
->> +	bool allow_pending = true;
->>  
->> -	if (irq_is_pending(irq)) {
->> +	if (irq->active)
->> +		val |= GICH_LR_ACTIVE_BIT;
->> +
->> +	if (irq->hw) {
->> +		val |= GICH_LR_HW;
->> +		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
->> +		/*
->> +		 * Never set pending+active on a HW interrupt, as the
->> +		 * pending state is kept at the physical distributor
->> +		 * level.
->> +		 */
->> +		if (irq->active)
->> +			allow_pending = false;
->> +	} else {
->> +		if (irq->config == VGIC_CONFIG_LEVEL) {
->> +			val |= GICH_LR_EOI;
->> +
->> +			/*
->> +			 * Software resampling doesn't work very well
->> +			 * if we allow P+A, so let's not do that.
->> +			 */
->> +			if (irq->active)
->> +				allow_pending = false;
->> +		}
->> +	}
->> +
->> +	if (allow_pending && irq_is_pending(irq)) {
->>  		val |= GICH_LR_PENDING_BIT;
-> Can't we have this no luck unlikely scenario where soft_pending and LR
-> state A on flush? In such case, on fold we are going to reset the
-> pending_latch as we considered disappearance of LR P meant the
-> soft_pending was acked. But P now is no more logged in LR concurrently
-> with A.
+> 
+> I will try to look at it today.
 
-Good point. We can now only clear the latch when we're back to an
-invalid state. How about this (untested):
+sure, thanks!
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 9356d749da1d..8427586760fc 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -105,12 +105,9 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 
- 		/*
- 		 * Clear soft pending state when level irqs have been acked.
--		 * Always regenerate the pending state.
- 		 */
--		if (irq->config == VGIC_CONFIG_LEVEL) {
--			if (!(val & GICH_LR_PENDING_BIT))
--				irq->pending_latch = false;
--		}
-+		if (irq->config == VGIC_CONFIG_LEVEL && !(val & GICH_LR_STATE))
-+			irq->pending_latch = false;
- 
- 		/*
- 		 * Level-triggered mapped IRQs are special because we only
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6b484575cafb..dd984f726805 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -96,12 +96,9 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 
- 		/*
- 		 * Clear soft pending state when level irqs have been acked.
--		 * Always regenerate the pending state.
- 		 */
--		if (irq->config == VGIC_CONFIG_LEVEL) {
--			if (!(val & ICH_LR_PENDING_BIT))
--				irq->pending_latch = false;
--		}
-+		if (irq->config == VGIC_CONFIG_LEVEL && !(val & ICH_LR_STATE))
-+			irq->pending_latch = false;
- 
- 		/*
- 		 * Level-triggered mapped IRQs are special because we only
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Kishon
