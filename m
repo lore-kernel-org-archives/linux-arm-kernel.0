@@ -1,129 +1,86 @@
-From: jitendra.bhivare@broadcom.com (Jitendra Bhivare)
-Date: Thu, 15 Mar 2018 17:33:28 +0530
-Subject: [RFC 2/5] dt-bindings: brcm: Add reserved-dma-region for iPROC
-In-Reply-To: <a4a27e3c-4e7b-4850-ebf7-bd2b8f6f0d97@arm.com>
-References: <1520312368-7068-1-git-send-email-jitendra.bhivare@broadcom.com>
- <1520312368-7068-3-git-send-email-jitendra.bhivare@broadcom.com>
- <c2f30c0c-ff5e-2904-11f4-5351749381a9@arm.com>
- <CAOA9gs32BqGiXD7R2v7=Xkv-PVLTzuU3VmG1dAm6HNd4=w-qQg@mail.gmail.com>
- <a4a27e3c-4e7b-4850-ebf7-bd2b8f6f0d97@arm.com>
-Message-ID: <CAOA9gs1XE1RkumEkYafO5f+b1YjGCFTYzxSSB-U4JcsR6=QdQg@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 15 Mar 2018 13:04:13 +0100
+Subject: [PATCH v2 8/8] mmc: sunxi: Add runtime_pm support
+In-Reply-To: <CAPDyKFpzi2fbSHPUaJRnBmb7YLCzwD0fTFStXgY1eB136m2gEw@mail.gmail.com>
+References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
+ <052c21c000f64c28fd6b64c4db11e4b706bebf79.1520520655.git-series.maxime.ripard@bootlin.com>
+ <CAPDyKFoJ0KftG1VxzdM97ubFJ25M+X0EjgOPc6HxewgyZMPipg@mail.gmail.com>
+ <20180315100411.iqcnwqws623ws6yn@flea>
+ <CAPDyKFpzi2fbSHPUaJRnBmb7YLCzwD0fTFStXgY1eB136m2gEw@mail.gmail.com>
+Message-ID: <20180315120413.yafkee4wgf4pyulq@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 12:15 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 12/03/18 07:03, Jitendra Bhivare wrote:
->>
->> On Tue, Mar 6, 2018 at 5:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->>>
->>> On 06/03/18 04:59, Jitendra Bhivare wrote:
->>>>
->>>>
->>>> With SoC wide DMA mask of 40-bit, the mappings for entire IOVA space
->>>> can't
->>>> be specified in the PAXBv2 PCIe RC of SoC. The holes in IOVA space needs
->>>> to
->>>> be reserved to prevent any IOVA allocations in those spaces.
->>>
->>>
->>>
->>> Can you clarify why? If this is the PCI inbound window thing again, let
->>> me
->>> say once again that "dma-ranges" is the appropriate way for DT to
->>> describe
->>> the hardware.
->>>
->>> Robin.
->>
->> dma-ranges = < \
->> 0x43000000 0x00 0x00000000 0x00 0x80000000 0x00 0x80000000 \
->> 0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000 \
->> 0x43000000 0x80 0x00000000 0x80 0x00000000 0x80 0x00000000>
->>
->> Yes, its for PCI inbound windows. In our HW, they are limited by sizes
->> specified in
->> ARM memory maps which was done for non-IOMMU cases to catch any transfer
->> outside the ranges.
->> dma-ranges are already being used to program these inbound windows and SoC
->> wide DMA mask is already specified but IOMMU code can still allocate IOVAs
->> in the gaps for which translation will fail in PCIe RC.
->
->
-> Right, so make iommu-dma reserve the gaps. No need to clutter up the DT with
-> redundant information which gets handled pretty much identically anyway.
->
-> Robin.
-There was a mistake in pasting dma-ranges mentioned. This is what we use it in
-IOMMU case.
-#define PCIE_DMA_RANGES dma-ranges = < \
-0x43000000 0x00 0x00000000 0x00 0x00000000 0x04 0x00000000 \
-0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000 \
-0x43000000 0x80 0x00000000 0x80 0x00000000 0x80 0x00000000>
+Hi,
 
-#define PCIE_RESERVED_DMA_REGION reserved-dma-region = < \
-0x0 0x0 0x04 0x0 0x04 0x0 \
-0x0 0x0 0x10 0x0 0x70 0x0>
+On Thu, Mar 15, 2018 at 11:24:36AM +0100, Ulf Hansson wrote:
+> >> > +static int sunxi_mmc_runtime_resume(struct device *dev)
+> >> > +{
+> >> > +       struct mmc_host *mmc = dev_get_drvdata(dev);
+> >> > +       struct sunxi_mmc_host *host = mmc_priv(mmc);
+> >> > +       int ret;
+> >> > +
+> >> > +       ret = sunxi_mmc_enable(host);
+> >> > +       if (ret)
+> >> > +               return ret;
+> >> > +
+> >> > +       sunxi_mmc_power_up(mmc, &mmc->ios);
+> >>
+> >> Instead of doing power up, you may need restore some ios settings,
+> >> such as the clock rate for example.
+> >>
+> >> You may also need to restore some registers in sunxi device, in case
+> >> it's possible that the controller loses context at runtime suspend.
+> >
+> > The thing I was precisely trying to avoid was this :)
+> >
+> > I could save and restore registers when the MMC controller is put into
+> > suspend, but that's pretty much exactly the same sequence than what is
+> > done in the MMC_POWER_UP sequence in .set_ios.
+> 
+> Well, there may be some overlap.
+> 
+> >
+> > So it just felt cleaner to just do the power_up sequence at resume
+> > time. It avoids having to maintain the list of registers to save and
+> > restore, and it involves less code overall.
+> 
+> I understand.
+> 
+> >
+> > It suprised me a bit that the core will not call .set_ios with
+> > MMC_POWER_UP at resume by itself, but I guess there's a good reason
+> > for that :)
+> 
+> It does that when it runtime PM manages the mmc/sd/sdio card, don't
+> confuse that with the mmc host. That's because it needs to follow the
+> (e)MMC/SD/SDIO spec, which don't allows you to just cut the power to
+> card without first informing (sending commands) the card about it.
 
-This is non-iommu case which is per ARM memory map.
-#define PCIE_DMA_RANGES dma-ranges = < \
-0x43000000 0x00 0x80000000 0x00 0x80000000 0x00 0x80000000 \
-0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000 \
-0x43000000 0x80 0x00000000 0x80 0x00000000 0x40 0x00000000>
+Ok. So this might sound a bit trivial, but I'm confused now about what
+set_ios is supposed to be doing.
 
-In IOMMU case, we had to increase first in-bound window i.e.
-dma-ranges first entry
-from 2GB-4GB (in non-iommu case) to 0-16GB because out-bound window specified
-from 2GB-4GB implicitly gets reserved by the PCI iommu code. This allowed IOVA
-allocations from 0-2GB and 4-16GB mapped through in-bound windows.
+I thought this was about the MMC controller itself, but from what
+you're saying, it seems that it is used for both the MMC controller
+and the MMC card itself, with the powermode being about the MMC card,
+and the rest about the MMC controller.
 
-Basically, my point is that dma-ranges specified is being used to
-program our in-bound
-windows and defines PCI space to CPU address space supported mappings of HW.
-In the same way, it would be better to explicitly specify
-reserved-dma-region to clarify
-this as HW hole than implicity reserving the regions.
+I guess we're mixing the two then, especially the power off part that
+will also reset the controller, or the controller that is initialised
+only at power on. Other MMC controller drivers I could find were doing
+the MMC controller setup unconditionally, so I guess we have room for
+improvements here.
 
-We can at least have single property 'reserved-dma-window' for MSI
-region and DMA regions
-to help describe the holes in the HW than let SW compute it.
+Maxime
 
->>>
->>>
->>>> reserved-dma-region property is added to specify the ranges which should
->>>> never be mapped and given to devices sitting behind.
->>>>
->>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->>>> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
->>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>> Signed-off-by: Jitendra Bhivare <jitendra.bhivare@broadcom.com>
->>>> ---
->>>>    Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt | 3 +++
->>>>    1 file changed, 3 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->>>> b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->>>> index b8e48b4..3be0fe3 100644
->>>> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->>>> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
->>>> @@ -30,6 +30,9 @@ Optional properties:
->>>>    - dma-ranges: Some PAXB-based root complexes do not have inbound
->>>> mapping
->>>> done
->>>>      by the ASIC after power on reset.  In this case, SW is required to
->>>> configure
->>>>    the mapping, based on inbound memory regions specified by this
->>>> property.
->>>> +- reserved-dma-region: PAXBv2 with IOMMU enabled cannot provide
->>>> mappings
->>>> for
->>>> +  entire IOVA space specified by DMA mask. Hence this is used to
->>>> reserve
->>>> the
->>>> +  gaps in dma-ranges.
->>>>      - brcm,pcie-ob: Some iProc SoCs do not have the outbound address
->>>> mapping done
->>>>    by the ASIC after power on reset. In this case, SW needs to configure
->>>> it
->>>>
->>>
->
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180315/139fa093/attachment.sig>
