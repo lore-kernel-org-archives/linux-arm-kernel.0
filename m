@@ -1,76 +1,39 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Thu, 15 Mar 2018 14:06:25 -0500
-Subject: coresight dummy funnel question
-In-Reply-To: <CANLsYkxsratEdiQaRO14hNrzWoQ1LKfWWjjieeeDJ6y=mnGedQ@mail.gmail.com>
-References: <CAHrpEqRwwMRUBGa_BYasiondhQALZtMcZC8tUfUYyuQMN47uoQ@mail.gmail.com>
- <CANLsYkzdGSbSSXsCDGUzbYNKHKy7YiWft5JdT5b3RN+aqn+nGQ@mail.gmail.com>
- <CAHrpEqQ8OHKB3gbE6tB0hg-Hz9SCU+wCWsk7QgRwcembvH9aFQ@mail.gmail.com>
- <CANLsYkxsratEdiQaRO14hNrzWoQ1LKfWWjjieeeDJ6y=mnGedQ@mail.gmail.com>
-Message-ID: <CAHrpEqQeJdZG8CNN5728B7E6fE7PEZ08S=Ka8FtXKsftu+JMyQ@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 15 Mar 2018 13:13:41 -0500
+Subject: [PATCH] ARM: davinci: DA8XX: simplify CFGCHIP regmap_config
+Message-ID: <1521137621-6491-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 10:46 AM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 9 March 2018 at 15:07, Zhi Li <lznuaa@gmail.com> wrote:
->> On Fri, Mar 9, 2018 at 12:03 PM, Mathieu Poirier
->> <mathieu.poirier@linaro.org> wrote:
->>> Hi Zhi,
->>>
->>> On 7 March 2018 at 08:57, Zhi Li <lznuaa@gmail.com> wrote:
->>>> Mathieu:
->>>>
->>>>            I am working one enable coresight in our SOC.
->>>>
->>>>            But our SOC's cluster funnel have not export program interface.
->>>>            Our cluster included 4 A53.
->>>>
->>>>            4 ETM of A53 connect to funnel, which have NOT program
->>>> interface. Funnel is default enabled.
->>>>
->>>>            Do you have suggest how to bypass or use dummy funnel in dts file?
->>>
->>> Is the funnel discoverable on the AMBA bus or is it like the original
->>> version of replicators?
->>
->> No, No any program interface at all. Look like replicators
->
-> The best way to proceed is probably to allow entry in the funnel
-> driver from the platform bus as well.  There is a very good example
-> here [1].
+Since commit 8253bb3f8255 ("regmap: potentially duplicate the name
+string stored in regmap"), the name field of struct regmap_config
+is copied in __regmap_init(), so we no longer need to worry about
+keeping our own copy of the name.
 
-But our funnel have not export register program interface.
-Do I use a dummy funnel driver for that?
+Just use a string literal in the initialization of da8xx_cfgchip_config
+instead of creating a separate variable for the name.
 
-static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
-   base = devm_ioremap_resource(dev, res);
-        if (IS_ERR(base))
-                return PTR_ERR(base);
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/mach-davinci/devices-da8xx.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-
-Allowed base is null.
-
-check drvdata->base in funnel_enable()
-if(drvdata->base )
-            funnel_enable_hw(drvdata, inport);
-
-Is it okay overall?
-
-best regards
-Frank Li
-
->
-> Thanks,
-> Mathieu
->
-> [1]. https://elixir.bootlin.com/linux/v4.16-rc5/source/drivers/tty/serial/amba-pl011.c
->
->>
->> best regards
->> Frank Li
->>
->>>
->>>>
->>>>
->>>> best regards
->>>> Frank Li
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 273b6c2..1fd3619 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -1095,11 +1095,8 @@ int __init da850_register_sata(unsigned long refclkpn)
+ 
+ static struct regmap *da8xx_cfgchip;
+ 
+-/* regmap doesn't make a copy of this, so we need to keep the pointer around */
+-static const char da8xx_cfgchip_name[] = "cfgchip";
+-
+ static const struct regmap_config da8xx_cfgchip_config __initconst = {
+-	.name		= da8xx_cfgchip_name,
++	.name		= "cfgchip",
+ 	.reg_bits	= 32,
+ 	.val_bits	= 32,
+ 	.reg_stride	= 4,
+-- 
+2.7.4
