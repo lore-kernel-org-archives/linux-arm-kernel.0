@@ -1,63 +1,123 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Mar 2018 19:41:29 +0800
-Subject: [PATCH 1/8] drm/sun4i: Add compatible strings for A80 TCONs
+Date: Thu, 15 Mar 2018 19:41:36 +0800
+Subject: [PATCH 8/8] ARM: dts: sun9i: cubieboard4: Enable VGA display output
 In-Reply-To: <20180315114136.24747-1-wens@csie.org>
 References: <20180315114136.24747-1-wens@csie.org>
-Message-ID: <20180315114136.24747-2-wens@csie.org>
+Message-ID: <20180315114136.24747-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A80 has 2 or 3 TCONs. The documentation and vendor kernel are very
-vague about the third TCON, to the point that it might not exist.
+The Cubieboard4 has a dumb VGA DAC connected to the output of LCD0,
+providing VGA output through the onboard VGA connector. The DDC lines
+are connected to i2c3.
 
-In the documentation, the first TCON is missing channel 1, and the
-second is missing channel 0. However the vendor kernel seems to be
-able to use them regardless. Here we model them like the old TCONs.
+The VGA DAC is a GM7123, which is compatible with Analog Devices'
+ADV7123, except it only takes 3.3V power, and has a lower standby power
+consumption. The datasheet found online lists "Chengdu GoldTel Electronical
+Technology Co., Ltd." as its designer. The company changed its name in
+2014 to "Chengdu Corpro Technology Co., Ltd.". Their website lists similar
+ICs, but not actually the GM7123.
 
-An oddity is that TCON0 requires the reset control for the eDP block
-to be deasserted, for any register access to stick.
-
-This patch adds compatible strings for TCON0 and TCON1, with TCON0
-requiring an extra "edp" reset control.
+Enable the display pipeline with the VGA DAC and connector, and i2c3
+for DDC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 68 +++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 8bdef4920edc..c05cbcdde4d7 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -146,13 +146,16 @@ Required properties:
-    * allwinner,sun8i-a83t-tcon-lcd
-    * allwinner,sun8i-a83t-tcon-tv
-    * allwinner,sun8i-v3s-tcon
-+   * allwinner,sun9i-a80-tcon-lcd
-+   * allwinner,sun9i-a80-tcon-tv
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
-    - 'ahb': the interface clocks
--   - 'tcon-ch0': The clock driving the TCON channel 0, except for A83T TV TCON
-+   - 'tcon-ch0': The clock driving the TCON channel 0, if supported
-  - resets: phandles to the reset controllers driving the encoder
--   - "lcd": the reset line for the TCON channel 0
-+   - "lcd": the reset line for the TCON
-+   - "edp": the reset line for the eDP block (A80 only)
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 31b06ecbc306..85da85faf869 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -74,6 +74,52 @@
+ 		};
+ 	};
  
-  - clock-names: the clock names mentioned above
-  - reset-names: the reset names mentioned above
-@@ -171,7 +174,9 @@ Required properties:
-   channel the endpoint is associated to. If that property is not
-   present, the endpoint number will be used as the channel number.
++	vga-connector {
++		compatible = "vga-connector";
++		label = "vga";
++		ddc-i2c-bus = <&i2c3>;
++
++		port {
++			vga_con_in: endpoint {
++				remote-endpoint = <&vga_dac_out>;
++			};
++		};
++	};
++
++	vga-dac {
++		compatible = "corpro,gm7123", "adi,adv7123", "dumb-vga-dac";
++		vdd-supply = <&reg_dcdc1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++
++				vga_dac_in: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&tcon0_out_vga>;
++				};
++			};
++
++			port at 1 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <1>;
++
++				vga_dac_out: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vga_con_in>;
++				};
++			};
++		};
++	};
++
+ 	wifi_pwrseq: wifi-pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		clocks = <&ac100_rtc 1>;
+@@ -83,6 +129,16 @@
+ 	};
+ };
  
--On SoCs other than the A33 and V3s, there is one more clock required:
-+For TCONs with channel 0, there is one more clock required:
-+   - 'tcon-ch0': The clock driving the TCON channel 0
-+For TCONs with channel 1, there is one more clock required:
-    - 'tcon-ch1': The clock driving the TCON channel 1
++&de {
++	status = "okay";
++};
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins>;
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+@@ -402,6 +458,18 @@
  
- When TCON support LVDS (all TCONs except TV TCON on A83T and those found
+ #include "axp809.dtsi"
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd0_rgb888_pins>;
++};
++
++&tcon0_out {
++	tcon0_out_vga: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&vga_dac_in>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_ph_pins>;
 -- 
 2.16.2
