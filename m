@@ -1,156 +1,124 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Mar 2018 15:07:02 +0000
-Subject: [PATCH RFC 1/2] drivers/edac: Add L1 and L2 error detection for
- A53 and A57
-In-Reply-To: <1521073067-24348-1-git-send-email-york.sun@nxp.com>
-References: <1521073067-24348-1-git-send-email-york.sun@nxp.com>
-Message-ID: <20180315150702.5yqauxj3z6exdl65@lakrids.cambridge.arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 15 Mar 2018 16:06:41 +0100
+Subject: [PATCH 00/36] use SPDX-License-Identifier for 32 bits Armada SoCs and
+ boards
+Message-ID: <20180315150717.10588-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi York,
+Hi,
 
-On Wed, Mar 14, 2018 at 05:17:46PM -0700, York Sun wrote:
-> Add error detection for A53 and A57 cores. Hardware error injection
-> is supported on A53. Software error injection is supported on both.
-> For hardware error injection on A53 to work, proper access to
-> L2ACTLR_EL1, CPUACTLR_EL1 needs to be granted by EL3 firmware. This
-> is done by making an SMC call in the driver. Failure to enable access
-> disables hardware error injection. For error interrupt to work,
-> another SMC call enables access to L2ECTLR_EL1. Failure to enable
-> access disables interrupt for error reporting.
+this series follow the recent trend for the license description to use
+the SPDX-License-Identifier.
 
-Further to James's comments, I'm very wary of the prospect of using
-IMPLEMENTATION DEFINED functionality in the kernel, since by definition
-this varies from CPU to CPU, and we have no architected guarantees to
-rely upon.
+Gregory
 
-I'm concerned that allowing the Non-secure world to access these
-IMPLEMENTATION DEFINED registers poses a security risk (as it allows the
-Non-secure world to change properties that the secure world may be
-relying upon, among other things).
+Gregory CLEMENT (36):
+  arm: dts: armada-370-xp: use SPDX-License-Identifier for Armada 370/XP
+    SoCs
+  arm: dts: armada-375: use SPDX-License-Identifier for Armada 375 SoCs
+  arm: dts: armada-38x: use SPDX-License-Identifier for Armada 38x SoCs
+  arm: dts: armada-39x: use SPDX-License-Identifier for Armada 39x SoCs
+  arm: dts: armada-xp-98dx: use SPDX-License-Identifier for prestara 98d
+    SoCs
+  arm: dts: armada-370-db: use SPDX-License-Identifier
+  arm: dts: armada-370-dlink-dns327l: use SPDX-License-Identifier
+  arm: dts: armada-370-mirabox: use SPDX-License-Identifier
+  arm: dts: armada-370-netgear-rn*: use SPDX-License-Identifier
+  arm: dts: armada-370-rd: use SPDX-License-Identifier
+  arm: dts: armada-370-synology-ds213j: use SPDX-License-Identifier
+  arm: dts: armada-375-db: use SPDX-License-Identifier
+  arm: dts: armada-388-db: use SPDX-License-Identifier
+  arm: dts: armada-388-rd: use SPDX-License-Identifier
+  arm: dts: armada-390-db: use SPDX-License-Identifier
+  arm: dts: armada-398-db: use SPDX-License-Identifier
+  arm: dts: armada-xp-axpwifiap: use SPDX-License-Identifier
+  arm: dts: armada-xp-db-dxbc2: use SPDX-License-Identifier
+  arm: dts: armada-xp-db-xc3-24g4xg: use SPDX-License-Identifier
+  arm: dts: armada-xp-db: use SPDX-License-Identifier
+  arm: dts: armada-xp-gp: use SPDX-License-Identifier
+  arm: dts: armada-xp-lenovo-ix4-300d: use SPDX-License-Identifier
+  arm: dts: armada-xp-matrix: use SPDX-License-Identifier
+  arm: dts: armada-xp-netgear-rn2120: use SPDX-License-Identifier
+  arm: dts: armada-xp-openblocks-ax3-4: use SPDX-License-Identifier
+  arm: dts: armada-xp-synology-ds414: use SPDX-License-Identifier
+  arm: dts: armada-385-db-ap: use SPDX-License-Identifier
+  arm: dts: armada-385-linksys*: use SPDX-License-Identifier for Linksys
+    boards
+  arm: dts: armada-385-synology-ds116: use SPDX-License-Identifier
+  arm: dts: armada-385-turris-omnia: use SPDX-License-Identifier
+  arm: dts: armada-388-clearfog*: use SPDX-License-Identifier for
+    clearfog and microsom
+  arm: dts: armada-388-gp: use SPDX-License-Identifier
+  arm: dts: armada-395-gp: use SPDX-License-Identifier
+  arm: dts: armada-xp-linksys-mamba: use SPDX-License-Identifier
+  arm: dts: armada-370-seagate-nas-*: use SPDX-License-Identifier
+  arm: dts: armada-370-seagate-personal-cloud*: use
+    SPDX-License-Identifier
 
-I'm also concerned by the SMC interface, which uses a SIP-specific ID
-(i.e. it's NXP-specific). Thus, this driver can only possibly work on
-particular CPUs as integrated by NXP.
+ arch/arm/boot/dts/armada-370-db.dts                | 39 +---------------------
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts     | 39 +---------------------
+ arch/arm/boot/dts/armada-370-mirabox.dts           | 39 +---------------------
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 39 +---------------------
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 39 +---------------------
+ arch/arm/boot/dts/armada-370-rd.dts                | 39 +---------------------
+ arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts  |  5 +--
+ arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  |  5 +--
+ arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |  5 +--
+ .../dts/armada-370-seagate-personal-cloud-2bay.dts |  5 +--
+ .../boot/dts/armada-370-seagate-personal-cloud.dts |  5 +--
+ .../dts/armada-370-seagate-personal-cloud.dtsi     |  5 +--
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts   | 39 +---------------------
+ arch/arm/boot/dts/armada-370-xp.dtsi               | 39 +---------------------
+ arch/arm/boot/dts/armada-370.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-375-db.dts                | 39 +---------------------
+ arch/arm/boot/dts/armada-375.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-380.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-385-db-ap.dts             | 33 +-----------------
+ arch/arm/boot/dts/armada-385-linksys-caiman.dts    | 34 +------------------
+ arch/arm/boot/dts/armada-385-linksys-cobra.dts     | 34 +------------------
+ arch/arm/boot/dts/armada-385-linksys-rango.dts     | 34 +------------------
+ arch/arm/boot/dts/armada-385-linksys-shelby.dts    | 34 +------------------
+ arch/arm/boot/dts/armada-385-linksys.dtsi          | 34 +------------------
+ arch/arm/boot/dts/armada-385-synology-ds116.dts    | 33 +-----------------
+ arch/arm/boot/dts/armada-385-turris-omnia.dts      | 35 +------------------
+ arch/arm/boot/dts/armada-385.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-388-clearfog-base.dts     | 38 +--------------------
+ arch/arm/boot/dts/armada-388-clearfog-pro.dts      | 38 +--------------------
+ arch/arm/boot/dts/armada-388-clearfog.dts          | 38 +--------------------
+ arch/arm/boot/dts/armada-388-clearfog.dtsi         | 38 +--------------------
+ arch/arm/boot/dts/armada-388-db.dts                | 39 +---------------------
+ arch/arm/boot/dts/armada-388-gp.dts                | 33 +-----------------
+ arch/arm/boot/dts/armada-388-rd.dts                | 39 +---------------------
+ arch/arm/boot/dts/armada-388.dtsi                  | 34 +------------------
+ .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 38 +--------------------
+ arch/arm/boot/dts/armada-38x.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-390-db.dts                | 39 +---------------------
+ arch/arm/boot/dts/armada-390.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-395-gp.dts                | 33 +-----------------
+ arch/arm/boot/dts/armada-395.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-398-db.dts                | 39 +---------------------
+ arch/arm/boot/dts/armada-398.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-39x.dtsi                  | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-98dx3336.dtsi          | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-98dx4251.dtsi          | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts          | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-db-dxbc2.dts           | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-db.dts                 | 38 +--------------------
+ arch/arm/boot/dts/armada-xp-gp.dts                 | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts      | 33 +-----------------
+ arch/arm/boot/dts/armada-xp-matrix.dts             | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   | 39 +---------------------
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts     | 39 +---------------------
+ arch/arm/boot/dts/armada-xp.dtsi                   | 39 +---------------------
+ 62 files changed, 62 insertions(+), 2082 deletions(-)
 
-The general expectation is that IMPLEMENTATION DEFINED functionality is
-for the use of firmware, which can provide common abstract interfaces.
-
->From ARMv8.2 onwards, EDAC functionality is architected as part of the
-RAS extensions, and in future, that's what I'd expect we'd support in
-the kernel.
-
-Given all that, I don't think that we should be poking this
-functionality directly within Linux, and I think that firmware should be
-in charge of managing EDAC errors on these systems.
-
-I've left some general comments below, but the above stands regardless.
-
-[...]
-
-> +/*
-> + *	Flush L1 dcache by way, using physical address to find sets
-> + *
-> + *	__flush_l1_dcache_way(ptr)
-> + *	- ptr	- physical address to be flushed
-> + */
-> +ENTRY(__flush_l1_dcache_way)
-> +	msr	csselr_el1, xzr		/* select cache level 1 */
-> +	isb
-> +	mrs	x6, ccsidr_el1
-> +	and	x2, x6, #7
-> +	add	x2, x2, #4		/* x2 has log2(cache line size) */
-> +	mov	x3, #0x3ff
-> +	and	x3, x3, x6, lsr #3	/* x3 has number of ways - 1 */
-> +	clz	w5, w3			/* bit position of ways */
-> +	mov	x4, #0x7fff
-> +	and	x4, x4, x6, lsr #13	/* x4 has number of sets - 1 */
-> +	clz	x7, x4
-> +	lsr	x0, x0, x2
-> +	lsl	x0, x0, x7
-> +	lsr	x0, x0, x7		/* x0 has the set for ptr */
-> +
-> +	mov	x6, x3
-> +loop_way:
-> +	lsl	x9, x3, x5
-> +	lsl	x7, x0, x2
-> +	orr	x9, x9, x7
-> +	dc	cisw, x9
-> +	subs	x6, x6, #1
-> +	b.ge	loop_way
-> +	dsb	ish
-> +	ret
-> +
-> +ENDPIPROC(__flush_l1_dcache_way)
-
-Generally, Set/Way maintenance doesn't provide guarantees people expect
-from it, so I would very strongly prefer to avoid it entirely within
-Linux, as we currently do. I do not wish to see it return.
-
-[...]
-
-> +config EDAC_CORTEX_ARM64_L1_L2
-> +	tristate "ARM Cortex A57/A53"
-> +	depends on ARM64
-> +	help
-> +	  Support for error detection on ARM Cortex A57 and A53.
-> +
-
-... as integrated by NXP, with NXP firmware.
-
-[...]
-
-> +static inline void write_l2actlr(int *mem)
-> +{
-> +	u64 val;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&cortex_edac_lock, flags);
-> +	__flush_dcache_area(mem, 8);
-> +	__flush_l1_dcache_way(virt_to_phys(mem));
-
-I don't follow why this Set/Way maintenance is necessary.
-
-[...]
-
-> +	arm_smccc_smc(SIP_ALLOW_L1L2_ERR_32, 0, 0, 0, 0, 0, 0, 0, &res);
-
-> +	arm_smccc_smc(SIP_ALLOW_L2_CLR_32, 0, 0, 0, 0, 0, 0, 0, &res);
-
-These are NXP-specific, and have nothing to do with Cortex-A53. These
-will clash with other SIP-specific SMC calls.
-
-The DT binding did not mention NXP at all.
-
-[...]
-
-> +	of_for_each_phandle(&it, rc, dn, "cpus", NULL, 0) {
-> +		np = it.node;
-> +		cell = of_get_property(np, "reg", NULL);
-> +		if (!cell) {
-> +			pr_err("%pOF: missing reg property\n", np);
-> +			continue;
-> +		}
-> +		mpidr = of_read_number(cell, of_n_addr_cells(np));
-> +		cpu = get_logical_index(mpidr);
-> +		if (cpu < 0) {
-> +			pr_err("Bad CPU number for mpidr 0x%llx", mpidr);
-> +			continue;
-> +		}
-> +		cpumask_set_cpu(cpu, &compat_mask);
-> +	}
-
-In future, please don't parse the CPU nodes like this. We have
-of_cpu_node_to_id() to go from a CPU node to its Linux logical ID.
-
-[...]
-
-> +#define SIP_ALLOW_L1L2_ERR_32		0x8200FF15
-> +#define SIP_ALLOW_L2_CLR_32		0x8200FF16
-
-In future, please encode _which_ SIP in the mnemonic name. i.e. use
-NXP_SIP_* for NXP-specific SIP calls.
-
-Thanks,
-Mark.
+-- 
+2.16.1
