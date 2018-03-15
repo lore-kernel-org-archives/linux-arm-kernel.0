@@ -1,28 +1,32 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 15 Mar 2018 15:39:53 +0100
-Subject: [PATCH v6 19/26] arm64: KVM: Move stashing of x0/x1 into the
- vector code itself
-In-Reply-To: <20180314165049.30105-20-marc.zyngier@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180314165049.30105-20-marc.zyngier@arm.com>
-Message-ID: <20180315143953.gaz6z4uamzleyper@kamzik.brq.redhat.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 15 Mar 2018 08:41:15 -0600
+Subject: [PATCH 0/2] coresight: next v4.16-rc5
+In-Reply-To: <20180314165931.GA26516@kroah.com>
+References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
+ <20180314165931.GA26516@kroah.com>
+Message-ID: <CANLsYkxpeGdZPEH0MxBTTA8KpynzKuvFyH3qMcUqeN_tqT1vog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 04:50:42PM +0000, Marc Zyngier wrote:
-> All our useful entry points into the hypervisor are starting by
-> saving x0 and x1 on the stack. Let's move those into the vectors
-> by introducing macros that annotate whether a vector is valid or
-> not, thus indicating whether we want to stash registers or not.
-> 
-> The only drawback is that we now also stash registers for el2_error,
-> but this should never happen, and we pop them back right at the
-> start of the handling sequence.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/hyp-entry.S | 56 ++++++++++++++++++++++++------------------
->  1 file changed, 32 insertions(+), 24 deletions(-)
+On 14 March 2018 at 10:59, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Tue, Mar 13, 2018 at 11:24:29AM -0600, Mathieu Poirier wrote:
+>> Hi Greg,
+>>
+>> These two patches came in last week and are confined to Coresight.  Given
+>> the late(ish) time in the cycle I would have normally waited for the
+>> next one but the changes are small and trivial.
+>>
+>> Please consider - if you think it's too late they'll simply go in later.
 >
+> They aren't bugfixes, I'll queue them up now for 4.17-rc1.
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Perfect - that's what I was hoping.  When reading my initial email I
+realise it wasn't exactly clear.
+
+Thanks,
+Mathieu
+
+>
+> thanks,
+>
+> greg k-h
