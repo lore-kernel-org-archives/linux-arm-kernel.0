@@ -1,9 +1,9 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:06:53 +0100
-Subject: [PATCH 12/36] arm: dts: armada-375-db: use SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 16:07:04 +0100
+Subject: [PATCH 23/36] arm: dts: armada-xp-matrix: use SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-13-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-24-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,25 +17,24 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Cc: Lior Amsalem <alior@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-375-db.dts | 39 +------------------------------------
+ arch/arm/boot/dts/armada-xp-matrix.dts | 39 +---------------------------------
  1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index bcdbb8ba1d65..e4ecd7e75644 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -1,3 +1,4 @@
+diff --git a/arch/arm/boot/dts/armada-xp-matrix.dts b/arch/arm/boot/dts/armada-xp-matrix.dts
+index 977f6b3fc1f8..1395cea12759 100644
+--- a/arch/arm/boot/dts/armada-xp-matrix.dts
++++ b/arch/arm/boot/dts/armada-xp-matrix.dts
+@@ -1,47 +1,10 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for Marvell Armada 375 evaluation board
-  * (DB-88F6720)
-@@ -6,44 +7,6 @@
+  * Device Tree file for Marvell Armada XP Matrix board
   *
-  * Gregory CLEMENT <gregory.clement@free-electrons.com>
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  * Copyright (C) 2013 Marvell
+  *
+  * Lior Amsalem <alior@marvell.com>
 - *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
