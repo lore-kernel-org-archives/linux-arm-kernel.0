@@ -1,56 +1,28 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 15 Mar 2018 21:21:37 +0100
-Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
-In-Reply-To: <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
-References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
- <20180315165516.GA9519@kroah.com>
- <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
-Message-ID: <20180315212137.57ca7c65@xps13>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 15 Mar 2018 20:24:15 +0000
+Subject: [PATCH 05/36] arm: dts: armada-xp-98dx: use
+ SPDX-License-Identifier for prestara 98d SoCs
+References: <20180315150717.10588-1-gregory.clement@bootlin.com>
+ <20180315150717.10588-6-gregory.clement@bootlin.com>
+Message-ID: <dc66b89bd0c4427da8801ccd39681966@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
-
-On Thu, 15 Mar 2018 18:55:25 +0000, Gabriel Matni
-<gabriel.matni@exfo.com> wrote:
-
-> From: Gabriel Matni <gabriel.matni@exfo.com>
+On 16/03/18 04:08, Gregory CLEMENT wrote:
+> Follow the recent trend for the license description, and also fix the
+> wrongly stated X11 to MIT.
 > 
-> Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
-> that the transmitter holding register (THR) is ready to receive a new byte.
+> As already pointed on the DT ML, the X11 license text [1] is explicitly
+> for the X Consortium and has a couple of extra clauses. The MIT
+> license text [2] is actually what the current DT files claim.
 > 
-> TX_EMP tells us when it is possible to send a break sequence via
-> SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-> empty, it does not guarantee that a new byte can be written just yet.
+> [1] https://spdx.org/licenses/X11.html
+> [2] https://spdx.org/licenses/MIT.html
 > 
-> Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
->       serial port")
-> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
-> Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
-> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
-> 
+> Cc: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 > ---
->  drivers/tty/serial/mvebu-uart.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index a100e98259d7..400e1bc558b2 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
->  	u32 val;
->  
->  	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-> -				  (val & STAT_TX_EMP), 1, 10000);
-> +             (val & STAT_TX_RDY(port)), 1, 10000);
 
-I think this line should be indented like the one you replaced.
+Looks good to me. Same for 18/36 and 19/36.
 
-Thanks,
-Miqu?l
-
--- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Acked-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
