@@ -1,45 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 15 Mar 2018 11:15:04 -0400 (EDT)
-Subject: [PATCH 0/5] DPAA Ethernet fixes
-In-Reply-To: <AM5PR04MB3267BC402A80D9E772BC8903ECD00@AM5PR04MB3267.eurprd04.prod.outlook.com>
-References: <20180314133732.24068-1-madalin.bucur@nxp.com>
- <1521052994.4790.148.camel@infinera.com>
- <AM5PR04MB3267BC402A80D9E772BC8903ECD00@AM5PR04MB3267.eurprd04.prod.outlook.com>
-Message-ID: <20180315.111504.399791580409893462.davem@davemloft.net>
+From: york.sun@nxp.com (York Sun)
+Date: Thu, 15 Mar 2018 15:15:14 +0000
+Subject: [PATCH RFC 1/2] drivers/edac: Add L1 and L2 error detection for
+ A53 and A57
+References: <1521073067-24348-1-git-send-email-york.sun@nxp.com>
+ <20180315150702.5yqauxj3z6exdl65@lakrids.cambridge.arm.com>
+Message-ID: <VI1PR04MB20786EE9B3FB70B7FCCA88789AD00@VI1PR04MB2078.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Madalin-cristian Bucur <madalin.bucur@nxp.com>
-Date: Thu, 15 Mar 2018 09:32:35 +0000
-
->> -----Original Message-----
->> From: Joakim Tjernlund [mailto:Joakim.Tjernlund at infinera.com]
->> Sent: Wednesday, March 14, 2018 8:43 PM
->> To: davem at davemloft.net; Madalin-cristian Bucur
->> <madalin.bucur@nxp.com>
->> 
->> On Wed, 2018-03-14 at 08:37 -0500, Madalin Bucur wrote:
->> > Hi,
->> >
->> > This patch set is addressing several issues in the DPAA Ethernet
->> > driver suite:
->> >
->> >  - module unload crash caused by wrong reference to device being left
->> >    in the cleanup code after the DSA related changes
->> >  - scheduling wile atomic bug in QMan code revealed during dpaa_eth
->> >    module unload
->> >  - a couple of error counter fixes, a duplicated init in dpaa_eth.
->> 
->> hmm, some of these(all?) bugs are in stable too, CC: stable perhaps?
+On 03/15/2018 08:07 AM, Mark Rutland wrote:
+> Hi York,
 > 
-> Hi Jocke,
+> On Wed, Mar 14, 2018 at 05:17:46PM -0700, York Sun wrote:
+>> Add error detection for A53 and A57 cores. Hardware error injection
+>> is supported on A53. Software error injection is supported on both.
+>> For hardware error injection on A53 to work, proper access to
+>> L2ACTLR_EL1, CPUACTLR_EL1 needs to be granted by EL3 firmware. This
+>> is done by making an SMC call in the driver. Failure to enable access
+>> disables hardware error injection. For error interrupt to work,
+>> another SMC call enables access to L2ECTLR_EL1. Failure to enable
+>> access disables interrupt for error reporting.
 > 
-> I did not check that, they should be added.
+> Further to James's comments, I'm very wary of the prospect of using
+> IMPLEMENTATION DEFINED functionality in the kernel, since by definition
+> this varies from CPU to CPU, and we have no architected guarantees to
+> rely upon.
+> 
+> I'm concerned that allowing the Non-secure world to access these
+> IMPLEMENTATION DEFINED registers poses a security risk (as it allows the
+> Non-secure world to change properties that the secure world may be
+> relying upon, among other things).
+> 
+> I'm also concerned by the SMC interface, which uses a SIP-specific ID
+> (i.e. it's NXP-specific). Thus, this driver can only possibly work on
+> particular CPUs as integrated by NXP.
+> 
+> The general expectation is that IMPLEMENTATION DEFINED functionality is
+> for the use of firmware, which can provide common abstract interfaces.
+> 
+> From ARMv8.2 onwards, EDAC functionality is architected as part of the
+> RAS extensions, and in future, that's what I'd expect we'd support in
+> the kernel.
+> 
+> Given all that, I don't think that we should be poking this
+> functionality directly within Linux, and I think that firmware should be
+> in charge of managing EDAC errors on these systems.
+> 
+> I've left some general comments below, but the above stands regardless.
+> 
 
-Networking patches are not queued to stable by CC:'ing stable.
+Points taken. I only made this driver under our customer's request.
+Even this may meet our customer's need in short term, it doesn't look
+like a generic solution for the architecture. Let's stop here.
 
-Instead you just simply need to ask me explicitly for -stable submission
-which I will do at the appropriate time after the fixes have been able
-to cook in Linus's tree for a little while.
+I really appreciate your other comments in this thread.
 
-I've queued this series up for that purpose, thanks.
+York
