@@ -1,102 +1,64 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Mar 2018 19:42:56 +0000
-Subject: [RFC 3/5] dt-bindings: arm-smmu: Add reserved-msi-region
-In-Reply-To: <CAOA9gs0_mUJcuthxon5Ru1B7FFK=_XuCh4E4D98DzPih8dey8w@mail.gmail.com>
-References: <1520312368-7068-1-git-send-email-jitendra.bhivare@broadcom.com>
- <1520312368-7068-4-git-send-email-jitendra.bhivare@broadcom.com>
- <9aeb8e14-2a14-d71b-7970-055ed04a131c@arm.com>
- <CAOA9gs0_mUJcuthxon5Ru1B7FFK=_XuCh4E4D98DzPih8dey8w@mail.gmail.com>
-Message-ID: <d2e1d6fa-05ec-ac4a-7db4-2adc756369d1@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 15 Mar 2018 19:52:17 +0000
+Subject: [PATCH] arm64: rename the function arm64_is_ras_serror() to avoid
+ confusion
+In-Reply-To: <CAMj-D2Cd7_fCwMuHKr-UQ3i4LEDkktxcg_GtO-QCqnj52mHyKA@mail.gmail.com>
+References: <1519322552-7374-1-git-send-email-gengdongjiu@huawei.com>
+ <5A90563E.4020608@arm.com>
+ <CAMj-D2Cd7_fCwMuHKr-UQ3i4LEDkktxcg_GtO-QCqnj52mHyKA@mail.gmail.com>
+Message-ID: <5AAACEF1.1060701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/18 07:19, Jitendra Bhivare wrote:
-> On Tue, Mar 6, 2018 at 5:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> On 06/03/18 04:59, Jitendra Bhivare wrote:
->>>
->>> iPROC SoC has a special device window to treat GICv3 ITS MSI.
->>
->>
->> Ugh, really? After preferably printing out 100 copies of the SBSA, binding
->> them all together and dropping the lot onto the hardware designers from a
->> great height, could you clarify what exactly the special behaviour is here?
->>
->> Robin.
->>
-> The special device window needs to programmed so that writes to
-> specified address
-> region helps for specific ordering of traffic prior to it.
+Hi gengdongjiu,
 
-OK, I know of PCIe root complexes having address matching to give the 
-MSI write the appropriate AXI memory type attributes when the SMMU is 
-bypassed, but ordering is a new one. I guess you have some glue logic on 
-the root complex master interface which injects an ACE barrier 
-transaction in front of any write to the ITS doorbell address?
->>> Current code maps MSI to IOVA space. Add SMMU node property to use
->>> direct mappings for MSI region.
->>>
->>> This property is read and reserved when arm_smmu_get_resv_regions
->>> gets called.
-
-Either way, this should be a generic, not SMMU-specific, property - 
-there are other platforms that would also make use of it to describe a 
-similar hardware situation (which we currently only support via ACPI). 
-The big question is where to put it: hardware-wise, the property of 
-"MSIs won't work properly if the doorbell is remapped to a different 
-address" belongs firmly to the root complex, not the IOMMU, while the 
-address itself is already a property of the MSI controller. The IOMMU is 
-just the innocent guy in the middle who has to discover and respect the 
-constraints.
-
-I'd like to think we could just have some flag to say "you can't remap 
-my MSIs!" then go and chase the msi-parent/msi-map phandle to the MSI 
-controller to get the address from its reg property, which is more or 
-less the equivalent of what the current ACPI workaround does - see 
-commit 8b4282e6b8e2 ("ACPI/IORT: Add msi address regions reservation 
-helper") in linux-next - but I can already think of ways in which that 
-might not work. For one, there's not necessarily any guarantee that the 
-MSI controller's programming interface and doorbell are in the same 
-place, so we probably do need to describe the specific MSI address(es) 
-that the root complex cares about, from the root complex end :/
-
-Robin.
-
->>>
->>> Signed-off-by: Jitendra Bhivare <jitendra.bhivare@broadcom.com>
->>> ---
->>>    Documentation/devicetree/bindings/iommu/arm,smmu.txt | 12 ++++++++++++
->>>    1 file changed, 12 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> index 8a6ffce..13fa2b9 100644
->>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> @@ -71,6 +71,15 @@ conditions.
->>>                      or using stream matching with #iommu-cells = <2>, and
->>>                      may be ignored if present in such cases.
->>>    +- reserved-msi-region: MSI region to be reserved with specific prot in
->>> IOVA
->>> +                 space for direct mapping. The region is specified in
->>> tuple
->>> +                 of (busno,prot,bus_addr,size).
->>> +
->>> +- #region-address-cells: specifies number of cells needed to encode
->>> bus_addr
->>> +
->>> +- #region-size-cells: specifies number of cells needed to encode size
->>> +
->>> +
->>>    ** Deprecated properties:
->>>      - mmu-masters (deprecated in favour of the generic "iommus" binding) :
->>> @@ -95,6 +104,9 @@ conditions.
->>>                                 <0 36 4>,
->>>                                 <0 37 4>;
->>>                    #iommu-cells = <1>;
->>> +               #region-address-cells = <1>;
->>> +               #region-size-cells = <1>;
->>> +               reserved-msi-region = <0x0 0x1a 0x63c3000 0x8000>;
->>>            };
->>>              /* device with two stream IDs, 0 and 7 */
->>>
+On 26/02/18 16:13, gengdongjiu wrote:
+> 2018-02-24 1:58 GMT+08:00 James Morse <james.morse@arm.com>:
+>> On 22/02/18 18:02, Dongjiu Geng wrote:
+>>> The RAS SError Syndrome can be Implementation-Defined,
+>>> arm64_is_ras_serror() is used to judge whether it is RAS SError,
+>>> but arm64_is_ras_serror() does not include this judgement. In order
+>>> to avoid function name confusion, we rename the arm64_is_ras_serror()
+>>> to arm64_is_categorized_ras_serror(), this function is used to
+>>> judge whether it is categorized RAS Serror.
 >>
+>> I don't see how 'categorized' is relevant. The most significant ISS bit is used
+>> to determine if this is an IMP-DEF ESR, or one that uses the architected layout.
+> 
+> From the name arm64_is_ras_serror(), it used to judge whether this is
+> RAS Serror,
+> but arm64_is_ras_serror() think the IMP-DEF SError is not RAS SError,
+> as shown the code note and code in[1].
+
+> In fact the IMP-DEF SError is also RAS SError, so when I read the
+> code, it looks like
+
+This is just you then. No-one else has your imp-def:RAS error ESR values.
+
+This would be like me adding some impdef branch instruction, then claiming
+aarch64_insn_is_branch() doesn't take account of my private additions.
+
+I agree the name is assuming all architected ESR are RAS-errors, and that impdef
+ESR are just that: impdef, that's all we know about them. Unless this causes us
+to do the wrong thing, I don't think it matters.
+Obviously we would need to change it if a new architected ESR is added.
+
+
+> confusion, so I rename it to arm64_is_categorized_ras_serror(), then
+
+This is actually worse, because there is an architected ESR for 'uncategorized',
+that the helper papers-over and treats as uncontained. Calling it 'categorized'
+means we now have three states, not two.
+
+
+> this function is only used to
+> judge whether this is categorized RAS SError,
+> if it is categorized, the code will continue judge its Asynchronous Error Type.
+> if it is uncategorized, the code will panic(this is the original code
+> logic) or not panic when we support kernel-first or can isolate the
+> SError
+
+
+Thanks,
+
+James
