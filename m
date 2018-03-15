@@ -1,171 +1,30 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 15 Mar 2018 13:26:10 +0200
-Subject: [PATCH v3 06/11] mmc: sdhci: Add quirk to disable HW timeout
-In-Reply-To: <20180307132020.30951-7-kishon@ti.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <20180307132020.30951-7-kishon@ti.com>
-Message-ID: <e98930eb-aaca-c193-1e5a-185195e71de5@intel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 15 Mar 2018 19:36:35 +0800
+Subject: [GIT PULL 1/6] i.MX drivers updates for 4.17
+Message-ID: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
-> Add quirk to disable HW timeout if the requested timeout is more than
-> the maximum obtainable timeout.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/mmc/host/sdhci.c | 27 +++++++++++++++++++++------
->  drivers/mmc/host/sdhci.h |  5 +++++
->  2 files changed, 26 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index aa8b5ca0d1b0..1dd117cbeb6e 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -767,12 +767,6 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
->  			break;
->  	}
->  
-> -	if (count >= 0xF) {
-> -		DBG("Too large timeout 0x%x requested for CMD%d!\n",
-> -		    count, cmd->opcode);
-> -		count = 0xE;
-> -	}
-> -
->  	return count;
->  }
->  
-> @@ -790,6 +784,16 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
->  	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
->  }
->  
-> +static void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
-> +{
-> +	if (enable)
-> +		host->ier |= SDHCI_INT_DATA_TIMEOUT;
-> +	else
-> +		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
-> +	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-> +	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
-> +}
-> +
->  static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
->  {
->  	u8 count;
-> @@ -798,6 +802,17 @@ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
->  		host->ops->set_timeout(host, cmd);
->  	} else {
->  		count = sdhci_calc_timeout(host, cmd);
-> +		if (count >= 0xF &&
-> +		    host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT)
-> +			sdhci_set_data_timeout_irq(host, false);
-> +		else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT))
-> +			sdhci_set_data_timeout_irq(host, true);
-> +
-> +		if (count >= 0xF) {
-> +			DBG("Too large timeout 0x%x requested for CMD%d!\n",
-> +			    count, cmd->opcode);
-> +			count = 0xE;
-> +		}
->  		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
->  	}
->  }
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-I guess I misunderstood you, but we need to cater for
-open-ended busy timeouts (i.e. busy_timeout==0) and broken
-timeout (i.e. SDHCI_QUIRK_BROKEN_TIMEOUT_VAL and
-SDHCI_QUIRK2_DISABLE_HW_TIMEOUT together mean never use the
-HW timeout)
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-So maybe like this:
+are available in the git repository at:
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index aa8b5ca0d1b0..a358eb5c5f98 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -709,12 +709,15 @@ static u32 sdhci_sdma_address(struct sdhci_host *host)
- 		return sg_dma_address(host->data->sg);
- }
- 
--static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
-+static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd,
-+			     bool *too_big)
- {
- 	u8 count;
- 	struct mmc_data *data = cmd->data;
- 	unsigned target_timeout, current_timeout;
- 
-+	*too_big = true;
-+
- 	/*
- 	 * If the host controller provides us with an incorrect timeout
- 	 * value, just skip the check and use 0xE.  The hardware may take
-@@ -768,9 +771,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- 	}
- 
- 	if (count >= 0xF) {
--		DBG("Too large timeout 0x%x requested for CMD%d!\n",
--		    count, cmd->opcode);
-+		if (!(host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT))
-+			DBG("Too large timeout 0x%x requested for CMD%d!\n",
-+			    count, cmd->opcode);
- 		count = 0xE;
-+	} else {
-+		*too_big = false;
- 	}
- 
- 	return count;
-@@ -790,6 +796,16 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
- 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
- }
- 
-+static void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
-+{
-+	if (enable)
-+		host->ier |= SDHCI_INT_DATA_TIMEOUT;
-+	else
-+		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
-+	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
-+	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
-+}
-+
- static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- {
- 	u8 count;
-@@ -797,7 +813,17 @@ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
- 	if (host->ops->set_timeout) {
- 		host->ops->set_timeout(host, cmd);
- 	} else {
--		count = sdhci_calc_timeout(host, cmd);
-+		bool too_big = false;
-+
-+		count = sdhci_calc_timeout(host, cmd, &too_big);
-+
-+		if (too_big &&
-+		    host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
-+			sdhci_set_data_timeout_irq(host, false);
-+		} else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT)) {
-+			sdhci_set_data_timeout_irq(host, true);
-+		}
-+
- 		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
- 	}
- }
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.17
 
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index c95b0a4a7594..ff283ee08854 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -437,6 +437,11 @@ struct sdhci_host {
->  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
->  /* Controller has CRC in 136 bit Command Response */
->  #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
-> +/*
-> + * Disable HW timeout if the requested timeout is more than the maximum
-> + * obtainable timeout
-> + */
-> +#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
->  
->  	int irq;		/* Device IRQ */
->  	void __iomem *ioaddr;	/* Mapped address */
-> 
+for you to fetch changes up to f40a1e3705be23e845fbeec66acf3a6582524145:
+
+  soc: imx: gpc: ARM power domain should be always-on (2018-02-12 13:07:48 +0800)
+
+----------------------------------------------------------------
+i.MX drivers update for 4.17:
+ - Set GENPD_FLAG_ALWAYS_ON flag for ARM power domain to avoid incorrect
+   power state in sysfs pm_genpd_summary output.
+
+----------------------------------------------------------------
+Anson Huang (1):
+      soc: imx: gpc: ARM power domain should be always-on
+
+ drivers/soc/imx/gpc.c | 1 +
+ 1 file changed, 1 insertion(+)
