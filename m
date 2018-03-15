@@ -1,21 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 16:41:15 +0100
-Subject: [PATCH] serial: stm32: fix initialization of RS485 mode
-In-Reply-To: <1521103480-6940-1-git-send-email-bich.hemon@st.com>
-References: <1521103480-6940-1-git-send-email-bich.hemon@st.com>
-Message-ID: <CAK8P3a3sn4Z70VHXQmLV344uCX-a1=H=6m-yTy1HxFQMQRiHrg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 15 Mar 2018 09:46:45 -0600
+Subject: coresight dummy funnel question
+In-Reply-To: <CAHrpEqQ8OHKB3gbE6tB0hg-Hz9SCU+wCWsk7QgRwcembvH9aFQ@mail.gmail.com>
+References: <CAHrpEqRwwMRUBGa_BYasiondhQALZtMcZC8tUfUYyuQMN47uoQ@mail.gmail.com>
+ <CANLsYkzdGSbSSXsCDGUzbYNKHKy7YiWft5JdT5b3RN+aqn+nGQ@mail.gmail.com>
+ <CAHrpEqQ8OHKB3gbE6tB0hg-Hz9SCU+wCWsk7QgRwcembvH9aFQ@mail.gmail.com>
+Message-ID: <CANLsYkxsratEdiQaRO14hNrzWoQ1LKfWWjjieeeDJ6y=mnGedQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 9:44 AM, Bich HEMON <bich.hemon@st.com> wrote:
-> Configure RS485 mode during port initialization.
+On 9 March 2018 at 15:07, Zhi Li <lznuaa@gmail.com> wrote:
+> On Fri, Mar 9, 2018 at 12:03 PM, Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
+>> Hi Zhi,
+>>
+>> On 7 March 2018 at 08:57, Zhi Li <lznuaa@gmail.com> wrote:
+>>> Mathieu:
+>>>
+>>>            I am working one enable coresight in our SOC.
+>>>
+>>>            But our SOC's cluster funnel have not export program interface.
+>>>            Our cluster included 4 A53.
+>>>
+>>>            4 ETM of A53 connect to funnel, which have NOT program
+>>> interface. Funnel is default enabled.
+>>>
+>>>            Do you have suggest how to bypass or use dummy funnel in dts file?
+>>
+>> Is the funnel discoverable on the AMBA bus or is it like the original
+>> version of replicators?
 >
-> Fixes: 1bcda09d291081a7732fcaa9d1745312404a4e36 ("serial: stm32: add
-> support for RS485 hardware control mode")
+> No, No any program interface at all. Look like replicators
+
+The best way to proceed is probably to allow entry in the funnel
+driver from the platform bus as well.  There is a very good example
+here [1].
+
+Thanks,
+Mathieu
+
+[1]. https://elixir.bootlin.com/linux/v4.16-rc5/source/drivers/tty/serial/amba-pl011.c
+
 >
-> Signed-off-by: Bich Hemon <bich.hemon@st.com>
-
-I noticed the unused-function warning from the original patch, and the
-patch also fixes that (besides looking like it does the right thing).
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> best regards
+> Frank Li
+>
+>>
+>>>
+>>>
+>>> best regards
+>>> Frank Li
