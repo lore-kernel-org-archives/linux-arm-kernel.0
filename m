@@ -1,77 +1,140 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 Mar 2018 11:59:54 +0530
-Subject: [PATCH] phy: allwinner: sun4i-usb: poll vbus changes on A23/A33
- when driving VBUS
-In-Reply-To: <CAGb2v66e+2wHGyZU+gAxho2-EiLX87VnV0E_xybbAv0FKvzToA@mail.gmail.com>
-References: <20180119092541.7508-1-wens@csie.org>
- <20180119144512.dqqbywavhwsyma2f@flea.lan>
- <a38e269f-abe9-0560-1542-c115c5a64605@ti.com>
- <CAGb2v66e+2wHGyZU+gAxho2-EiLX87VnV0E_xybbAv0FKvzToA@mail.gmail.com>
-Message-ID: <09638ac4-6a3b-3ece-2e3f-00b8f148ce9e@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Mar 2018 06:39:53 +0000
+Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+In-Reply-To: <CACjP9X9feHuQTZhGw9XbPkTZLWuQjZ9z_O9=6xga7Sw1LC_r+Q@mail.gmail.com>
+References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
+ <20180314141323.GD23100@dhcp22.suse.cz>
+ <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
+ <20180314145450.GI23100@dhcp22.suse.cz>
+ <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+ <CAKv+Gu8U9U1ThYxXWU6AuoF5s4uAGps_-T+2tksjc4nGNdX2_w@mail.gmail.com>
+ <CAKv+Gu_ubc0RomckZbH5-fEUYeOOqziAQM96uCecoKfWy_mCfQ@mail.gmail.com>
+ <CACjP9X9feHuQTZhGw9XbPkTZLWuQjZ9z_O9=6xga7Sw1LC_r+Q@mail.gmail.com>
+Message-ID: <CAKv+Gu8R0yxjRRtRo0_o1eUHpnaNichzyfGLEZw=k9w+LDGBwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 15 March 2018 11:47 AM, Chen-Yu Tsai wrote:
-> Hi Kishon,
-> 
-> On Fri, Feb 16, 2018 at 7:20 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>
->>
->> On Friday 19 January 2018 08:15 PM, Maxime Ripard wrote:
->>> On Fri, Jan 19, 2018 at 05:25:41PM +0800, Chen-Yu Tsai wrote:
->>>> The AXP223 PMIC, like the AXP221, does not generate VBUS change
->>>> interrupts when N_VBUSEN is used to drive VBUS for the OTG port
->>>> on the board.
+On 15 March 2018 at 02:32, Daniel Vacek <neelx@redhat.com> wrote:
+> On Wed, Mar 14, 2018 at 6:36 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 14 March 2018 at 16:41, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>> On 14 March 2018 at 15:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
+>>>>> On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
+>>>>>> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
+>>>>>> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
+>>>>>> > fix your issue? From the debugging info you provided it should because
+>>>>>> > the patch prevents jumping backwards.
+>>>>>> >
+>>>>>>
+>>>>>> The patch does fix the boot hang.
+>>>>>>
+>>>>>> But I am concerned that we are papering over a fundamental flaw in
+>>>>>> memblock_next_valid_pfn().
+>>>>>
+>>>>> It seems that memblock_next_valid_pfn is doing the right thing here. It
+>>>>> is the alignment which moves the pfn back AFAICS. I am not really
+>>>>> impressed about the original patch either, to be completely honest.
+>>>>> It just looks awfully tricky. I still didn't manage to wrap my head
+>>>>> around the original issue though so I do not have much better ideas to
+>>>>> be honest.
 >>>>
->>>> This was not noticed until recently, as most A23/A33 boards use
->>>> a GPIO pin that does not support interrupts for OTG ID detection.
->>>> This forces the driver to use polling. However the A33-OlinuXino
->>>> uses a pin that does support interrupts, so the driver uses them.
->>>> However the VBUS interrupt never fires, and the driver never gets
->>>> to update the VBUS status. This results in musb timing out waiting
->>>> for VBUS to rise.
+>>>> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
+>>>> argument, which is odd nut easily fixed.
+>>>> Then, the whole idea of substracting one so that the pfn++ will
+>>>> produce the expected value is rather hacky,
 >>>>
->>>> This was worked around for the AXP221 by resorting to polling
->>>> changes in commit 91d96f06a760 ("phy-sun4i-usb: Add workaround for
->>>> missing Vbus det interrupts on A31"). This patch adds the A23 and
->>>> A33 to the list of SoCs that need the workaround.
+>>>> But the real problem is that rounding down pfn for the next iteration
+>>>> is dodgy, because early_pfn_valid() isn't guaranteed to return true
+>>>> for the rounded down value. I know it is probably fine in reality, but
+>>>> dodgy as hell. The same applies to the call to early_pfn_in_nid() btw
 >>>>
->>>> Fixes: fc1f45ed3043 ("phy-sun4i-usb: Add support for the usb-phys on the
->>>>                    sun8i-a33 SoC")
->>>> Fixes: 123dfdbcfaf5 ("phy-sun4i-usb: Add support for the usb-phys on the
->>>>                    sun8i-a23 SoC")
->>>> Cc: <stable@vger.kernel.org> # 4.3.x: 68dbc2ce77bb phy-sun4i-usb:
->>>>              Use of_match_node to get model specific config data
->>>> Cc: <stable@vger.kernel.org> # 4.3.x: 5cf700ac9d50 phy: phy-sun4i-usb:
->>>>              Fix optional gpios failing probe
->>>> Cc: <stable@vger.kernel.org> # 4.3.x: 04e59a0211ff phy-sun4i-usb:
->>>>              Fix irq free conditions to match request conditions
->>>> Cc: <stable@vger.kernel.org> # 4.3.x: 91d96f06a760 phy-sun4i-usb:
->>>>              Add workaround for missing Vbus det interrupts on A31
->>>> Cc: <stable@vger.kernel.org> # 4.3.x
->>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>> ---
+>>>> So how about something like this (apologies on Gmail's behalf for the
+>>>> whitespace damage, I can resend it as a proper patch)
 >>>>
->>>> This list might get longer if the newer AXP8xx PMICs also have this
->>>> behavior. We could switch to a boolean in the per-compatible data,
->>>> or just always use polling. The yet-merged R40 support will have this
->>>> issue as well, as the R40 is paired with the AXP221. But for now,
->>>> I'd like to have something that is easier to backport to stable, so
->>>> we can at least fix this for the A23 and A33.
 >>>>
->>>> Also, checkpatch.pl doesn't like the stable kernel prerequisite lines.
+>>>> ---------8<-----------
+>>>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+>>>> index 3d974cb2a1a1..b89ca999ee3b 100644
+>>>> --- a/mm/page_alloc.c
+>>>> +++ b/mm/page_alloc.c
+>>>> @@ -5352,28 +5352,29 @@
+>>>>                  * function.  They do not exist on hotplugged memory.
+>>>>                  */
+>>>>                 if (context != MEMMAP_EARLY)
+>>>>                         goto not_early;
+>>>>
+>>>> -               if (!early_pfn_valid(pfn)) {
+>>>> +               if (!early_pfn_valid(pfn) || !early_pfn_in_nid(pfn, nid)) {
+>>>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>>>>                         /*
+>>>>                          * Skip to the pfn preceding the next valid one (or
+>>>>                          * end_pfn), such that we hit a valid pfn (or end_pfn)
+>>>>                          * on our next iteration of the loop. Note that it needs
+>>>>                          * to be pageblock aligned even when the region itself
+>>>>                          * is not. move_freepages_block() can shift ahead of
+>>>>                          * the valid region but still depends on correct page
+>>>>                          * metadata.
+>>>>                          */
+>>>> -                       pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
+>>>> -                                       ~(pageblock_nr_pages-1)) - 1;
+>>>> -#endif
+>>>> +                       pfn = memblock_next_valid_pfn(pfn, end_pfn);
+>>>> +                       if (pfn >= end_pfn)
+>>>> +                               break;
+>>>> +                       pfn &= ~(pageblock_nr_pages - 1);
+>>>> +#else
+>>>>                         continue;
+>>>> +#endif
+>>>>                 }
+>>>> -               if (!early_pfn_in_nid(pfn, nid))
+>>>> -                       continue;
+>>>>                 if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
+>>>>                         break;
+>>>>
+>>>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>>>>                 /*
+>>>> ---------8<-----------
+>>>>
+>>>> This ensures that we enter the remainder of the loop with a properly
+>>>> aligned pfn, rather than tweaking the value of pfn so it assumes the
+>>>> expected value after 'pfn++'
 >>>
->>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> Um, this does not actually solve the issue. I guess this is due to the
+>>> fact that a single pageblock size chunk could have both valid and
+>>> invalid PFNs, and so rounding down the first PFN of the second valid
+>>> chunk moves you back to the first chunk.
 >>
->> merged, thanks!
-> 
-> I see you moved this patch from your fixes branch to your -next branch.
-> Is there any problem with the patch? Merge issues?
+>> OK, so the original patch attempted to ensure that of each pageblock,
+>> at least the first struct page gets initialized, even though the PFN
+>> may not be valid. Unfortunately, this code is not complete, given that
+>> start_pfn itself may be misaligned, and so the issue it attempts to
+>> solve may still occur.
+>
+> You're wrong here.
+>
 
-Decided to keep in -next since this is not a regression introduced in 4.16
-kernel and stable kernels will anyways be updated.
+You only align down after encountering an invalid PFN. If start_pfn
+itself is not pageblock aligned, how do you initialize the first
+struct page of the pageblock?
 
-Thanks
-Kishon
+>> Then, I think it is absolutely dodgy to settle for only initializing
+>> the first struct page, rather than all of them, only because a
+>> specific VM_BUG_ON() references the flag field of the first struct
+>> page.
+>> IMO, we should fix this by initializing all struct page entries for
+>> each pageblock sized chunk that has any valid PFNs.
+>
+> That's precisely what my patch does. At least with
+> CONFIG_HAVE_ARCH_PFN_VALID disabled. And it looks only arm implements
+> arch pfn_valid() which I was not testing with and I am not sure it's
+> correct. Check my other email
+>
+
+No, your patch only initializes the first struct page of a pageblock.
+If the next one is invalid, we will skip to the next valid one.
+
+You are making the assumption that pfn_valid() will return true for
+all pages in a pageblock if it returns true for one of them, and this
+does not hold on other architectures.
