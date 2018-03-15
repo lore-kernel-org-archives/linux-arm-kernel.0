@@ -1,55 +1,94 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 14:17:20 -0500
-Subject: [PATCH v2] ARM: davinci: DA8XX: fix oops in USB PHY driver due to
- stack allocated platform platform_data
-Message-ID: <1521141440-16418-1-git-send-email-david@lechnology.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 15 Mar 2018 19:15:37 +0000
+Subject: [PATCH v6 04/26] arm64: KVM: Dynamically patch the kernel/hyp
+ VA mask
+In-Reply-To: <20180314165049.30105-5-marc.zyngier@arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-5-marc.zyngier@arm.com>
+Message-ID: <5AAAC659.70403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a possible kernel oops due to using stack allocated platform
-data for the USB PHY driver on DA8XX devices. If the platform device
-probe is deferred, then we get a corrupt pointer for the platform data.
+Hi Marc,
 
-We now use a global static struct for the platform data so that the
-platform data pointer does not get written over.
+On 14/03/18 16:50, Marc Zyngier wrote:
+> So far, we're using a complicated sequence of alternatives to
+> patch the kernel/hyp VA mask on non-VHE, and NOP out the
+> masking altogether when on VHE.
+> 
+> The newly introduced dynamic patching gives us the opportunity
+> to simplify that code by patching a single instruction with
+> the correct mask (instead of the mind bending cummulative masking
 
-Fixes: 9b504750923cb ("ARM: davinci: da8xx: Add USB PHY platform device")
-Signed-off-by: David Lechner <david@lechnology.com>
----
- arch/arm/mach-davinci/usb-da8xx.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+(Nit: cumulative)
 
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index 4d89d86..67d634b 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -26,6 +26,8 @@
- 
- static struct clk *usb20_clk;
- 
-+static struct da8xx_usb_phy_platform_data da8xx_usb_phy_pdata;
-+
- static struct platform_device da8xx_usb_phy = {
- 	.name		= "da8xx-usb-phy",
- 	.id		= -1,
-@@ -37,14 +39,14 @@ static struct platform_device da8xx_usb_phy = {
- 		 */
- 		.init_name	= "da8xx-usb-phy",
- 	},
-+	.dev		= {
-+		.platform_data	= &da8xx_usb_phy_pdata,
-+	},
- };
- 
- int __init da8xx_register_usb_phy(void)
- {
--	struct da8xx_usb_phy_platform_data pdata;
--
--	pdata.cfgchip = da8xx_get_cfgchip();
--	da8xx_usb_phy.dev.platform_data = &pdata;
-+	da8xx_usb_phy_pdata.cfgchip = da8xx_get_cfgchip();
- 
- 	return platform_device_register(&da8xx_usb_phy);
- }
--- 
-2.7.4
+(so this series removes mind bending code?)
+
+> we have at the moment) or even a single NOP on VHE. This also
+> adds some initial code that will allow the patching callback
+> to switch to a more complex patching.
+
+> diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
+> new file mode 100644
+> index 000000000000..45e7802328d4
+> --- /dev/null
+> +++ b/arch/arm64/kvm/va_layout.c
+
+> +void __init kvm_update_va_mask(struct alt_instr *alt,
+> +			       __le32 *origptr, __le32 *updptr, int nr_inst)
+> +{
+> +	int i;
+> +
+> +	/* We only expect a single instruction in the alternative sequence */
+> +	BUG_ON(nr_inst != 1);
+> +
+> +	if (!has_vhe() && !va_mask)
+> +		compute_layout();
+> +
+> +	for (i = 0; i < nr_inst; i++) {
+> +		u32 rd, rn, insn, oinsn;
+> +
+> +		/*
+> +		 * VHE doesn't need any address translation, let's NOP
+> +		 * everything.
+> +		 */
+> +		if (has_vhe()) {
+> +			updptr[i] = aarch64_insn_gen_nop();
+
+cpu_to_le32()? (I'm not going to try an boot a BE VHE model...)
+
+aarch64_insn_gen_nop() returns:
+| aarch64_insn_get_hint_value() | AARCH64_INSN_HINT_NOP;
+
+It doesn't look like these aarch64_insn_get_XXX_value() helpers are forcing a
+particular endianness. ftrace uses this, via ftrace_modify_code() ->
+aarch64_insn_patch_text_nosync() -> aarch64_insn_write(), which does:
+| return  __aarch64_insn_write(addr, cpu_to_le32(insn));
+
+So it looks like the conversion is required. Patch 16 looks fine for this.
+
+(and, I ran the teardown code on Juno big-endian...)
+
+
+> +			continue;
+> +		}
+> +
+> +		oinsn = le32_to_cpu(origptr[i]);
+> +		rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
+> +		rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
+> +
+> +		insn = compute_instruction(i, rd, rn);
+> +		BUG_ON(insn == AARCH64_BREAK_FAULT);
+> +
+> +		updptr[i] = cpu_to_le32(insn);
+> +	}
+> +}
+
+With that,
+
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
