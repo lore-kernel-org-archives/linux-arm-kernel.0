@@ -1,56 +1,28 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Thu, 15 Mar 2018 14:38:27 +0000
-Subject: [PATCH v1 0/4] Fix issues with huge mapping in ioremap
-In-Reply-To: <9954bd28-0457-b80e-8af7-6259b63533f2@codeaurora.org>
-References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
- <1521038277.2693.131.camel@hpe.com>
- <9954bd28-0457-b80e-8af7-6259b63533f2@codeaurora.org>
-Message-ID: <1521124702.2693.145.camel@hpe.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 15 Mar 2018 15:39:53 +0100
+Subject: [PATCH v6 19/26] arm64: KVM: Move stashing of x0/x1 into the
+ vector code itself
+In-Reply-To: <20180314165049.30105-20-marc.zyngier@arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-20-marc.zyngier@arm.com>
+Message-ID: <20180315143953.gaz6z4uamzleyper@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-03-15 at 12:47 +0530, Chintan Pandya wrote:
+On Wed, Mar 14, 2018 at 04:50:42PM +0000, Marc Zyngier wrote:
+> All our useful entry points into the hypervisor are starting by
+> saving x0 and x1 on the stack. Let's move those into the vectors
+> by introducing macros that annotate whether a vector is valid or
+> not, thus indicating whether we want to stash registers or not.
 > 
-> On 3/14/2018 8:08 PM, Kani, Toshi wrote:
-> > On Wed, 2018-03-14 at 14:18 +0530, Chintan Pandya wrote:
-> > > Note: I was working on these patches for quite sometime
-> > > and realized that Toshi Kani has shared some patches
-> > > addressing the same isssue with subject
-> > > "[PATCH 0/2] fix memory leak / panic in ioremap huge pages".
-> > > I've taken slightly different approach here, so sending
-> > > to the list, finally.
-> > 
-> > Hi Chintan,
+> The only drawback is that we now also stash registers for el2_error,
+> but this should never happen, and we pop them back right at the
+> start of the handling sequence.
 > 
-> Hi Toshi
-> > 
-> > Do you have any issue in my patchset?  If so, can you please comment on
-> 
-> Not functional issues. But I didn't see issues you mentioned in your
-> commit text being solved for ARM64 in your patches. It is just being
-> masked which they were already by Will's patch. In my approach, end
-> goal was to get benefits of huge mapping back for ARM64.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/hyp-entry.S | 56 ++++++++++++++++++++++++------------------
+>  1 file changed, 32 insertions(+), 24 deletions(-)
+>
 
-Right, my patchset does not implement the fix for arm64.  The stub
-version is only a workaround and is meant to be replaced by the fix.
-
-> > them?  It complicates the thing when you send a different approach
-> > without telling why a different approach is needed.  Your approach
-> 
-> See my reply above. I just had my original patches and I sent it.
-> 
-> > purges TLB after updating pmd/pud, which I think is broken.  Can you
-> 
-> Yes, they are broken. I understood the issues after Mark and Marc's
-> review comments.
-> 
-> > work on top of my patchset and properly implement pXd_free_pte_page()
-> 
-> I have realized that if I address Mark's comments, my new patch will
-> look similar to what you have done. So, I will work on top of your
-> patches.
-
-Sounds great.
-
-Thanks,
--Toshi
+Reviewed-by: Andrew Jones <drjones@redhat.com>
