@@ -1,36 +1,33 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:52 +0100
-Subject: [PATCH 50/60] arm: dts: kirkwood-netgear_readynas_duo_v2: use
- SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 17:50:48 +0100
+Subject: [PATCH 46/60] arm: dts: kirkwood-rs411: use SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-51-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-47-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Follow the recent trend for the license description
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Ben Peddell <klightspeed@killerwolves.net>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/boot/dts/kirkwood-rs411.dts | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index c0413b63cf2e..cb564c3bcdc4 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -1,12 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0+
+diff --git a/arch/arm/boot/dts/kirkwood-rs411.dts b/arch/arm/boot/dts/kirkwood-rs411.dts
+index 02852b0c809f..41fa63cec839 100644
+--- a/arch/arm/boot/dts/kirkwood-rs411.dts
++++ b/arch/arm/boot/dts/kirkwood-rs411.dts
+@@ -1,10 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
  /*
-  * Device Tree file for NETGEAR ReadyNAS Duo v2
+  * Andrew Lunn <andrew@lunn.ch>
+  * Ben Peddell <klightspeed@killerwolves.net>
   *
-  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
   */
  
  /dts-v1/;
