@@ -1,10 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:07:00 +0100
-Subject: [PATCH 19/36] arm: dts: armada-xp-db-xc3-24g4xg: use
+Date: Thu, 15 Mar 2018 16:06:58 +0100
+Subject: [PATCH 17/36] arm: dts: armada-xp-axpwifiap: use
  SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-20-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-18-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,25 +18,26 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Chris Packham <chris.packham@alliedtelesis.co.nz>
+Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 39 +--------------------------
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts | 39 +------------------------------
  1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
-index 06fce35d7491..a0ebb52683f1 100644
---- a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
-+++ b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+index d0c6a01f48a6..606fd3476a59 100644
+--- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
++++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
 @@ -1,3 +1,4 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for DB-XC3-24G4XG board
+  * Device Tree file for Marvell RD-AXPWiFiAP.
   *
-@@ -5,44 +6,6 @@
+@@ -9,44 +10,6 @@
+  * Copyright (C) 2013 Marvell
   *
-  * Based on armada-xp-db.dts
-  *
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+- *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
@@ -74,9 +75,8 @@ index 06fce35d7491..a0ebb52683f1 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
-- *
-  * Note: this Device Tree assumes that the bootloader has remapped the
-  * internal registers to 0xf1000000 (instead of the default
-  * 0xd0000000). The 0xf1000000 is the default used by the recent,
+  */
+ 
+ /dts-v1/;
 -- 
 2.16.1
