@@ -1,193 +1,84 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 15 Mar 2018 15:13:27 +0200
-Subject: [PATCH v3 07/11] mmc: sdhci: Program a relatively accurate SW
- timeout value
-In-Reply-To: <20180307132020.30951-8-kishon@ti.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <20180307132020.30951-8-kishon@ti.com>
-Message-ID: <1e87e5f9-13e1-765b-f077-26a55359b2c3@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Mar 2018 13:18:46 +0000
+Subject: [PATCH v2 3/4] arm64: Implement page table free interfaces
+In-Reply-To: <1521117906-20107-4-git-send-email-cpandya@codeaurora.org>
+References: <1521117906-20107-1-git-send-email-cpandya@codeaurora.org>
+ <1521117906-20107-4-git-send-email-cpandya@codeaurora.org>
+Message-ID: <20180315131846.sfpxg3xlpjii3nju@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
-> sdhci has a 10 second timeout to catch devices that stop responding.
-> Instead of programming 10 second arbitrary value, calculate the total time
-> it would take for the entire transfer to happen and program the timeout
-> value accordingly.
+On Thu, Mar 15, 2018 at 06:15:05PM +0530, Chintan Pandya wrote:
+> Implement pud_free_pmd_page() and pmd_free_pte_page().
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Make sure, that they are indeed a page table before
+> taking them to free.
+
+As mentioned on the prior patch, if the tables we're freeing contain
+valid entries, then we need additional TLB maintenance to ensure that
+all of these entries have been removed from TLBs.
+
+Either, we always invalidate the entire range, or we walk the tables
+and invalidate as we remove them.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
 > ---
->  drivers/mmc/host/sdhci.c | 47 ++++++++++++++++++++++++++++++++++++++++-------
->  drivers/mmc/host/sdhci.h | 10 ++++++++++
->  2 files changed, 50 insertions(+), 7 deletions(-)
+>  arch/arm64/mm/mmu.c | 20 ++++++++++++++++++--
+>  1 file changed, 18 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 1dd117cbeb6e..baab67bfa39b 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -709,6 +709,36 @@ static u32 sdhci_sdma_address(struct sdhci_host *host)
->  		return sg_dma_address(host->data->sg);
->  }
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 2dbb2c9..6f21a65 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/io.h>
+>  #include <linux/mm.h>
+>  #include <linux/vmalloc.h>
+> +#include <linux/hugetlb.h>
 >  
-> +static void sdhci_calc_sw_timeout(struct sdhci_host *host,
-> +				  struct mmc_command *cmd,
-> +				  unsigned int target_timeout)
-> +{
-> +	struct mmc_data *data = cmd->data;
-> +	struct mmc_host *mmc = host->mmc;
-> +	u64 transfer_time;
-> +	struct mmc_ios *ios = &mmc->ios;
-> +	unsigned char bus_width = 1 << ios->bus_width;
-> +	unsigned int blksz;
-> +	unsigned int freq;
-> +
-> +	if (data) {
-> +		blksz = data->blksz;
-> +		freq = host->mmc->actual_clock ? : host->clock;
-> +		transfer_time = (u64)blksz * NSEC_PER_SEC * (8 / bus_width);
-> +		do_div(transfer_time, freq);
-> +		/* multiply by '2' to account for any unknowns */
-> +		transfer_time = transfer_time * 2;
-> +		/* calculate timeout for the entire data */
-> +		host->data_timeout = (data->blocks * ((target_timeout *
-> +						       NSEC_PER_USEC) +
-> +						       transfer_time));
-
-(target_timeout * NSEC_PER_USEC) might be 32-bit and therefore overflow
-for timeouts greater than about 4 seconds.
-
-> +	} else {
-> +		host->data_timeout = (u64)target_timeout * NSEC_PER_USEC;
-> +	}
-> +
-> +	host->data_timeout += MMC_CMD_TRANSFER_TIME;
-
-Need to allow for target_timeout == 0 so:
-
-	if (host->data_timeout)
-		host->data_timeout += MMC_CMD_TRANSFER_TIME;
-
-> +}
-> +
->  static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  #include <asm/barrier.h>
+>  #include <asm/cputype.h>
+> @@ -45,6 +46,7 @@
+>  #include <asm/memblock.h>
+>  #include <asm/mmu_context.h>
+>  #include <asm/ptdump.h>
+> +#include <asm/page.h>
+>  
+>  #define NO_BLOCK_MAPPINGS	BIT(0)
+>  #define NO_CONT_MAPPINGS	BIT(1)
+> @@ -975,10 +977,24 @@ int pmd_clear_huge(pmd_t *pmdp)
+>  
+>  int pud_free_pmd_page(pud_t *pud)
 >  {
->  	u8 count;
-> @@ -766,6 +796,7 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
->  		if (count >= 0xF)
->  			break;
->  	}
-> +	sdhci_calc_sw_timeout(host, cmd, target_timeout);
-
-If you make the changes I suggest for patch 6, then this would
-move sdhci_calc_sw_timeout() into sdhci_set_timeout().
-
-I suggest you factor out the target_timeout calculation e.g.
-
-static unsigned int sdhci_target_timeout(struct sdhci_host *host,
-					 struct mmc_command *cmd,
-					 struct mmc_data *data)
-{
-	unsigned int target_timeout;
-
-	/* timeout in us */
-	if (!data)
-		target_timeout = cmd->busy_timeout * 1000;
-	else {
-		target_timeout = DIV_ROUND_UP(data->timeout_ns, 1000);
-		if (host->clock && data->timeout_clks) {
-			unsigned long long val;
-
-			/*
-			 * data->timeout_clks is in units of clock cycles.
-			 * host->clock is in Hz.  target_timeout is in us.
-			 * Hence, us = 1000000 * cycles / Hz.  Round up.
-			 */
-			val = 1000000ULL * data->timeout_clks;
-			if (do_div(val, host->clock))
-				target_timeout++;
-			target_timeout += val;
-		}
-	}
-
-	return target_timeout;
-}
-
-And call it from sdhci_calc_sw_timeout()
-
->  
->  	return count;
->  }
-> @@ -1175,13 +1206,6 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
->  		mdelay(1);
->  	}
->  
-> -	timeout = jiffies;
-> -	if (!cmd->data && cmd->busy_timeout > 9000)
-> -		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
-> -	else
-> -		timeout += 10 * HZ;
-> -	sdhci_mod_timer(host, cmd->mrq, timeout);
-> -
->  	host->cmd = cmd;
->  	if (sdhci_data_line_cmd(cmd)) {
->  		WARN_ON(host->data_cmd);
-> @@ -1221,6 +1245,15 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
->  	    cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200)
->  		flags |= SDHCI_CMD_DATA;
->  
-> +	timeout = jiffies;
-> +	if (host->data_timeout > 0) {
-
-This can be just:
-
-	if (host->data_timeout) {
-
-> +		timeout += nsecs_to_jiffies(host->data_timeout);
-> +		host->data_timeout = 0;
-
-It would be better to initialize host->data_timeout = 0 at the top of
-sdhci_prepare_data().
-
-Also still need:
-
-	else if (!cmd->data && cmd->busy_timeout > 9000) {
-		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
-
-
-> +	} else {
-> +		timeout += 10 * HZ;
+> -	return pud_none(*pud);
+> +	pmd_t *pmd;
+> +	int i;
+> +
+> +	pmd = __va(pud_val(*pud));
+> +	if (pud_val(*pud) && !pud_huge(*pud)) {
+> +		for (i = 0; i < PTRS_PER_PMD; i++)
+> +			pmd_free_pte_page(&pmd[i]);
+> +
+> +		free_page((unsigned long)pmd);
 > +	}
-> +	sdhci_mod_timer(host, cmd->mrq, timeout);
 > +
->  	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+> +	return 1;
 >  }
->  EXPORT_SYMBOL_GPL(sdhci_send_command);
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index ff283ee08854..29b242fd17de 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -332,6 +332,14 @@ struct sdhci_adma2_64_desc {
->  /* Allow for a a command request and a data request at the same time */
->  #define SDHCI_MAX_MRQS		2
 >  
-> +/*
-> + * 48bit command and 136 bit response in 100KHz clock could take upto 2.48ms.
-> + * However since the start time of the command, the time between
-> + * command and response, and the time between response and start of data is
-> + * not known, set the command transfer time to 10ms.
-> + */
-> +#define MMC_CMD_TRANSFER_TIME	(10 * NSEC_PER_MSEC) /* max 10 ms */
+>  int pmd_free_pte_page(pmd_t *pmd)
+>  {
+> -	return pmd_none(*pmd);
+> +	if (pmd_val(*pmd) && !pmd_huge(*pmd))
+> +		free_page((unsigned long)__va(pmd_val(*pmd)));
 > +
->  enum sdhci_cookie {
->  	COOKIE_UNMAPPED,
->  	COOKIE_PRE_MAPPED,	/* mapped by sdhci_pre_req() */
-> @@ -555,6 +563,8 @@ struct sdhci_host {
->  	/* Host SDMA buffer boundary. */
->  	u32			sdma_boundary;
->  
-> +	u64			data_timeout;
-> +
->  	unsigned long private[0] ____cacheline_aligned;
->  };
->  
+> +	return 1;
+>  }
+> -- 
+> Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+> Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+> Collaborative Project
 > 
