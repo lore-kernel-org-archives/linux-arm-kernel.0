@@ -1,40 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 Mar 2018 15:29:29 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6ul-isiot: Pass the required
- '#sound-dai-cells'
-In-Reply-To: <1521138569-8125-1-git-send-email-festevam@gmail.com>
-References: <1521138569-8125-1-git-send-email-festevam@gmail.com>
-Message-ID: <1521138569-8125-2-git-send-email-festevam@gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 15 Mar 2018 19:35:06 +0100
+Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+In-Reply-To: <CA+55aFy0+EP14zjnYh1x_Aw3y-wCp2COpw9D-OfmhA9YFfsQiA@mail.gmail.com>
+References: <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
+ <CAKv+Gu-NfXm5YLWXAPsf6zycPs7Ti9qPLQ7FvpOrjdPz5hEP7Q@mail.gmail.com>
+ <CACjP9X_xjyvQD_b1XNAZi=vjX0wGUmQuGJN8HahBmXx55OUE6A@mail.gmail.com>
+ <CAKv+Gu8aVr_u4o8QR2Nquo9it54nSbvPMj4vcZ+CQa3uoOakrA@mail.gmail.com>
+ <CACjP9X_bKJNeSwbPURmJ8bwDZ5BW2ZrykhT-cNapzKjddeWStQ@mail.gmail.com>
+ <CAKv+Gu8dvCRUnS5KxDWa4GP2vMPo9cUWVNybx+tGY_Y8T67Uvw@mail.gmail.com>
+ <CACjP9X9w-zruS8uj6j+ZRc7EUZ80MAwbvWOh=gRJZu7gAqU7hg@mail.gmail.com>
+ <CAKv+Gu83VtB+ff6H88UMF9kiz5923U8tXhQoERdErYE4pQg94Q@mail.gmail.com>
+ <20180315182110.GR23100@dhcp22.suse.cz>
+ <CA+55aFy0+EP14zjnYh1x_Aw3y-wCp2COpw9D-OfmhA9YFfsQiA@mail.gmail.com>
+Message-ID: <20180315183506.GT23100@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Thu 15-03-18 11:28:27, Linus Torvalds wrote:
+> On Thu, Mar 15, 2018 at 11:21 AM, Michal Hocko <mhocko@kernel.org> wrote:
+> >
+> > Well, pfn_valid says that a given pfn is backed by a real memory and it
+> > has a valid struct page backing it.
+> 
+> No, it really just says the latter. There should be a "struct page" for it.
 
-DTC now warns about missing #sound-dai-cells:
-    
-/sound/simple-audio-card,codec: Missing property '#sound-dai-cells' in
-node /soc/aips-bus at 2100000/i2c at 21a0000/codec at a or bad phandle
-(referred from sound-dai[0])
-
-Pass the required '#sound-dai-cells' property to fix it.
-
-Reported-by: Arnd Bergmann <arnd@arndb.de> 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6ul-isiot.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index b0ecebb..921e12c 100644
---- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -142,6 +142,7 @@
- 	sgtl5000: codec at a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
-+		#sound-dai-cells = <0>;
- 		clocks = <&clks IMX6UL_CLK_OSC>;
- 		clock-names = "mclk";
- 		VDDA-supply = <&reg_3p3v>;
+You are right! A simple example could be non volatile memory. That is
+certainly not RAM but it has pfn_valid memory. Sorry about the
+confusion.
 -- 
-2.7.4
+Michal Hocko
+SUSE Labs
