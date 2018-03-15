@@ -1,131 +1,72 @@
-From: zsm@chromium.org (Zubin Mithra)
-Date: Thu, 15 Mar 2018 17:08:58 +0000
-Subject: [RFC 2/3] arm: make cpu a percpu variable
-In-Reply-To: <20180315170859.93893-1-zsm@chromium.org>
-References: <20180315170859.93893-1-zsm@chromium.org>
-Message-ID: <20180315170859.93893-3-zsm@chromium.org>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 15 Mar 2018 18:08:15 +0100
+Subject: [PATCH v6 25/26] arm64: KVM: Allow mapping of vectors outside of
+ the RAM region
+In-Reply-To: <941a937f-6466-4c8f-6952-d26c3142102d@arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-26-marc.zyngier@arm.com>
+ <20180315155436.vgmd772scihojwz4@kamzik.brq.redhat.com>
+ <941a937f-6466-4c8f-6952-d26c3142102d@arm.com>
+Message-ID: <20180315170815.vl53dw5hqr5agmuo@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without CONFIG_THREAD_INFO_IN_TASK, core code maintains thread_info::cpu
-and arch specific code can use this to build raw_smp_processor_id().
-With CONFIG_THREAD_INFO_IN_TASK, core code maintains task_struct::cpu,
-and arch specific code cannot access this due to header file circular
-dependency.
+On Thu, Mar 15, 2018 at 04:17:53PM +0000, Marc Zyngier wrote:
+> On 15/03/18 15:54, Andrew Jones wrote:
+> > On Wed, Mar 14, 2018 at 04:50:48PM +0000, Marc Zyngier wrote:
+> >>  static inline void *kvm_get_hyp_vector(void)
+> >>  {
+> >>  	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
+> >> -	void *vect = kvm_ksym_ref(__kvm_hyp_vector);
+> >> +	void *vect = kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
+> >> +	int slot = -1;
+> >>  
+> >> -	if (data->fn) {
+> >> -		vect = __bp_harden_hyp_vecs_start +
+> >> -		       data->hyp_vectors_slot * SZ_2K;
+> >> +	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR) && data->fn) {
+> > 
+> > Now that I'm trying to consider heterogeneous systems, I'm wondering why
+> > harden BP isn't checked with this_cpu_has_cap() like harden EL2 vectors.
+> > I'm also wondering if it's even possible for CPUs to come up without all
+> > of them having harden EL2 vectors if the boot CPU has it. Won't
+> > verify_local_cpu_errata_workarounds() require it? I'm probably just
+> > getting lost in all the capability stuff...
+> 
+> Checking harden BP on this particular CPU will only tell you if this CPU
+> is affected, but won't give you any additional information (i.e. you'd
+> still need to check obtain the stuff pointed to by data).
+> 
+> Checking for *all* CPUs in one go has some advantages: it is a static
+> key, which means that unaffected platforms will fly (this is a hot path
+> on VHE), and you can check data if you're affected.
 
-Instead, we can maintain a percpu variable containing the cpu number.
+Is there a problem with using the static key to check
+ARM64_HARDEN_EL2_VECTORS below? (Sorry, I'm still confused why we're not
+using the same functions for both.) If we can't use the static key
+below, then should we swap the check with !has_vhe() to ensure the
+compiler will avoid emitting the this_cpu_has_cap() call on VHE's fast
+path?
 
-This also means that cpu numbers obtained using smp_processor_id cannot
-be used to set_my_cpu_offset. Use task_cpu(current) instead to get the
-cpu in those cases.
+I also noticed that calling this_cpu_has_cap() puts a constraint on
+kvm_get_hyp_vector() that it must never be called without preemption
+disabled. It's not, but it's one more thing to think about. If there's
+no reason not to use the static key with cpus_have_const_cap() then
+maybe we should?
 
-Earlier raw_smp_processor_id() was current_thread_info()->cpu :-
-	mov	r3, sp
-	bic     r3, r3, #8128
-	bic     r3, r3, #63
-	ldr     r0, [r3, #16]
+> 
+> > 
+> >> +		vect = __bp_harden_hyp_vecs_start;
+> >> +		slot = data->hyp_vectors_slot;
+> >> +	}
+> >>  
+> >> -		if (!has_vhe())
+> >> -			vect = lm_alias(vect);
+> >> +	if (this_cpu_has_cap(ARM64_HARDEN_EL2_VECTORS) && !has_vhe()) {
+> >> +		vect = __kvm_bp_vect_base;
+> >> +		if (slot == -1)
+> >> +			slot = __kvm_harden_el2_vector_slot;
+> >>  	}
 
-Now it is *raw_cpu_ptr(&cpu_number) :-
-	movw	r3, #57344
-	movt	r3, #32917
-	mrc	15, 0, r0, cr13, cr0, {4}
-	ldr	r0, [r3, r0]
-
-Signed-off-by: Zubin Mithra <zsm@chromium.org>
----
- arch/arm/include/asm/cputype.h | 3 +++
- arch/arm/include/asm/smp.h     | 3 ++-
- arch/arm/kernel/setup.c        | 2 +-
- arch/arm/kernel/smp.c          | 5 +++--
- arch/arm/kernel/topology.c     | 5 +++++
- 5 files changed, 14 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cb546425da8a..10148c7af12f 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -2,6 +2,9 @@
- #ifndef __ASM_ARM_CPUTYPE_H
- #define __ASM_ARM_CPUTYPE_H
- 
-+#include <asm/percpu.h>
-+DECLARE_PER_CPU(int, cpu_number);
-+
- #include <linux/stringify.h>
- #include <linux/kernel.h>
- 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 709a55989cb0..7e7b198174d6 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -18,7 +18,8 @@
- # error "<asm/smp.h> included in non-SMP build"
- #endif
- 
--#define raw_smp_processor_id() (current_thread_info()->cpu)
-+#include <asm/cputype.h>
-+#define raw_smp_processor_id() (*raw_cpu_ptr(&cpu_number))
- 
- struct seq_file;
- 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index fc40a2b40595..6323b4d80306 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -521,7 +521,7 @@ static void __init elf_hwcap_fixup(void)
- void notrace cpu_init(void)
- {
- #ifndef CONFIG_CPU_V7M
--	unsigned int cpu = smp_processor_id();
-+	unsigned int cpu = task_cpu(current);
- 	struct stack *stk = &stacks[cpu];
- 
- 	if (cpu >= NR_CPUS) {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 2da087926ebe..9584a52eb156 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -372,7 +372,8 @@ asmlinkage void secondary_start_kernel(void)
- 	 * All kernel threads share the same mm context; grab a
- 	 * reference and switch to it.
- 	 */
--	cpu = smp_processor_id();
-+	cpu = task_cpu(current);
-+	set_my_cpu_offset(per_cpu_offset(cpu));
- 	mmgrab(mm);
- 	current->active_mm = mm;
- 	cpumask_set_cpu(cpu, mm_cpumask(mm));
-@@ -436,7 +437,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
- 
- void __init smp_prepare_boot_cpu(void)
- {
--	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
-+	set_my_cpu_offset(per_cpu_offset(task_cpu(current)));
- }
- 
- void __init smp_prepare_cpus(unsigned int max_cpus)
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 24ac3cab411d..34b2136deab6 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -30,6 +30,9 @@
- #include <asm/cputype.h>
- #include <asm/topology.h>
- 
-+DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
-+EXPORT_PER_CPU_SYMBOL(cpu_number);
-+
- /*
-  * cpu capacity scale management
-  */
-@@ -310,6 +313,8 @@ void __init init_cpu_topology(void)
- 	for_each_possible_cpu(cpu) {
- 		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
- 
-+		per_cpu(cpu_number, cpu) = cpu;
-+
- 		cpu_topo->thread_id = -1;
- 		cpu_topo->core_id =  -1;
- 		cpu_topo->socket_id = -1;
--- 
-2.16.2.804.g6dcf76e118-goog
+Thanks,
+drew
