@@ -1,62 +1,121 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 15 Mar 2018 15:19:43 +0100
-Subject: [PATCH v6 00/25] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM)
-In-Reply-To: <20180314171914.tdwtppsvjsgxiqlv@lakrids.cambridge.arm.com>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
- <20180314171914.tdwtppsvjsgxiqlv@lakrids.cambridge.arm.com>
-Message-ID: <CAPDyKFq5kZ5j-kBN=YyjGmn=_AEUEwe+QbSguEEAvsP87A0Kng@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 15 Mar 2018 16:24:53 +0200
+Subject: [PATCH v3 03/11] mmc: sdhci-omap: Workaround for Errata i843
+In-Reply-To: <20180307132020.30951-4-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <20180307132020.30951-4-kishon@ti.com>
+Message-ID: <5410610d-4874-9e66-0d5a-966a73422457@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 March 2018 at 18:19, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ulf,
->
-> On Wed, Mar 14, 2018 at 05:58:10PM +0100, Ulf Hansson wrote:
->> For ARM, the PSCI firmware interface may be managing the power to the CPUs.
->> Depending on the SoC, CPUs may also be arranged in hierarchical manner, which
->> could add another level of complexity from a CPU idle management point of view.
->>
->> PSCI v1.0+ adds support for the so called OS initiated CPU suspend mode, which
->> enables a more fine grained method, allowing Linux to get more control, in
->> regards to being energy efficient. This is typically useful for these kind of
->> complex battery driven platforms.
->
->> The series is based on v4.16-rc5, but applies also as of today to Rafael's
->> linux-pm.git next branch. The code has been tested on a QCOM 410c dragonboard
->> and I except that test coverage should be increased by some more boards
->> shortly (for ARM64 with PSCI OSI support - only a few DT changes are needed).
->
-> Do we have any numbers to show how this affects energy efficiency?
+On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
+> Errata i843 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
+> (SPRZ429K July 2014?Revised March 2017 [1]) mentions
+> PG 1.0/1.1 silicon has limitations w.r.t frequencies at which MMC1/2/3
+> can operate.
+> 
+> Use soc_device_match() to identify rev 1.0/1.1 silicon and
+> override mmc->f_max according to the errata workaround.
+> "max-frequency" dt property cannot be used since the device
+> tree is added for rev 2.0 silicon.
+> 
+> soc_device_match() is also used in order to get the IODelay values
+> for rev 1.0/1.1 silicon.
+> 
+> [1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-What kind of numbers are you looking for?
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-I don't have fresh energy numbers at hand, but of course I can run
-some use cases and trying to get some data from the ARM energy probe.
-
-What I have done recently, is of course to verify the solution using
-trace_printk(). That in way by checking statistics from it, to for
-example find out how often we enter an idle state for the CPU cluster
-(and how long we stay in it).
-
-However, as I have been working on the QCOM 410c, which currently uses
-a proprietary ATF binary and which has the PSCI OSI mode supported.
-Just leaving it in the Platform Coordinated mode and test to get a
-comparison, won't actually say us much - because we don't know, in
-what way QCOM implemented the PC mode (if at all), but of course I can
-ask.
-
->
-> Are there any other platforms with OSI support?
-
-Our goal is to implement OSI support in the upstream version of ATF,
-so anybody that want it can pick it for their ARM SoC.
-
-We have so far played with a few hacks in ATF to enable OSI mode, as
-to test this on a few other ARM SoCs (Hikey and a MTK developer board
-for example).
-
-Thanks for reviewing!
-
-Kind regards
-Uffe
+> ---
+>  drivers/mmc/host/sdhci-omap.c | 35 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 34 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+> index 0c40b13fb67d..fbc20a4fbb23 100644
+> --- a/drivers/mmc/host/sdhci-omap.c
+> +++ b/drivers/mmc/host/sdhci-omap.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/pinctrl/consumer.h>
+> +#include <linux/sys_soc.h>
+>  
+>  #include "sdhci-pltfm.h"
+>  
+> @@ -100,6 +101,7 @@ struct sdhci_omap_data {
+>  };
+>  
+>  struct sdhci_omap_host {
+> +	char			*version;
+>  	void __iomem		*base;
+>  	struct device		*dev;
+>  	struct	regulator	*pbias;
+> @@ -733,12 +735,21 @@ static struct pinctrl_state
+>  				  u32 *caps, u32 capmask)
+>  {
+>  	struct device *dev = omap_host->dev;
+> +	char *version = omap_host->version;
+>  	struct pinctrl_state *pinctrl_state = ERR_PTR(-ENODEV);
+> +	char str[20];
+>  
+>  	if (!(*caps & capmask))
+>  		goto ret;
+>  
+> -	pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
+> +	if (version) {
+> +		snprintf(str, 20, "%s-%s", mode, version);
+> +		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, str);
+> +	}
+> +
+> +	if (IS_ERR(pinctrl_state))
+> +		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
+> +
+>  	if (IS_ERR(pinctrl_state)) {
+>  		dev_err(dev, "no pinctrl state for %s mode", mode);
+>  		*caps &= ~capmask;
+> @@ -830,6 +841,16 @@ static int sdhci_omap_config_iodelay_pinctrl_state(struct sdhci_omap_host
+>  	return 0;
+>  }
+>  
+> +static const struct soc_device_attribute sdhci_omap_soc_devices[] = {
+> +	{
+> +		.machine = "DRA7[45]*",
+> +		.revision = "ES1.[01]",
+> +	},
+> +	{
+> +		/* sentinel */
+> +	}
+> +};
+> +
+>  static int sdhci_omap_probe(struct platform_device *pdev)
+>  {
+>  	int ret;
+> @@ -841,6 +862,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+>  	struct mmc_host *mmc;
+>  	const struct of_device_id *match;
+>  	struct sdhci_omap_data *data;
+> +	const struct soc_device_attribute *soc;
+>  
+>  	match = of_match_device(omap_sdhci_match, dev);
+>  	if (!match)
+> @@ -875,6 +897,17 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_pltfm_free;
+>  
+> +	soc = soc_device_match(sdhci_omap_soc_devices);
+> +	if (soc) {
+> +		omap_host->version = "rev11";
+> +		if (!strcmp(dev_name(dev), "4809c000.mmc"))
+> +			mmc->f_max = 96000000;
+> +		if (!strcmp(dev_name(dev), "480b4000.mmc"))
+> +			mmc->f_max = 48000000;
+> +		if (!strcmp(dev_name(dev), "480ad000.mmc"))
+> +			mmc->f_max = 48000000;
+> +	}
+> +
+>  	pltfm_host->clk = devm_clk_get(dev, "fck");
+>  	if (IS_ERR(pltfm_host->clk)) {
+>  		ret = PTR_ERR(pltfm_host->clk);
+> 
