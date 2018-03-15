@@ -1,140 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Mar 2018 06:39:53 +0000
-Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <CACjP9X9feHuQTZhGw9XbPkTZLWuQjZ9z_O9=6xga7Sw1LC_r+Q@mail.gmail.com>
-References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
- <20180314141323.GD23100@dhcp22.suse.cz>
- <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
- <20180314145450.GI23100@dhcp22.suse.cz>
- <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
- <CAKv+Gu8U9U1ThYxXWU6AuoF5s4uAGps_-T+2tksjc4nGNdX2_w@mail.gmail.com>
- <CAKv+Gu_ubc0RomckZbH5-fEUYeOOqziAQM96uCecoKfWy_mCfQ@mail.gmail.com>
- <CACjP9X9feHuQTZhGw9XbPkTZLWuQjZ9z_O9=6xga7Sw1LC_r+Q@mail.gmail.com>
-Message-ID: <CAKv+Gu8R0yxjRRtRo0_o1eUHpnaNichzyfGLEZw=k9w+LDGBwA@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 15 Mar 2018 17:12:09 +1030
+Subject: [GIT PULL] ARM: aspeed: dts changes for 4.17
+Message-ID: <CACPK8Xfv2XnhGo9cmJC69suOu9+caOp5QoXuD5Xw-gznGP61Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 02:32, Daniel Vacek <neelx@redhat.com> wrote:
-> On Wed, Mar 14, 2018 at 6:36 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 14 March 2018 at 16:41, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>> On 14 March 2018 at 15:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>>> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
->>>>> On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
->>>>>> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
->>>>>> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
->>>>>> > fix your issue? From the debugging info you provided it should because
->>>>>> > the patch prevents jumping backwards.
->>>>>> >
->>>>>>
->>>>>> The patch does fix the boot hang.
->>>>>>
->>>>>> But I am concerned that we are papering over a fundamental flaw in
->>>>>> memblock_next_valid_pfn().
->>>>>
->>>>> It seems that memblock_next_valid_pfn is doing the right thing here. It
->>>>> is the alignment which moves the pfn back AFAICS. I am not really
->>>>> impressed about the original patch either, to be completely honest.
->>>>> It just looks awfully tricky. I still didn't manage to wrap my head
->>>>> around the original issue though so I do not have much better ideas to
->>>>> be honest.
->>>>
->>>> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
->>>> argument, which is odd nut easily fixed.
->>>> Then, the whole idea of substracting one so that the pfn++ will
->>>> produce the expected value is rather hacky,
->>>>
->>>> But the real problem is that rounding down pfn for the next iteration
->>>> is dodgy, because early_pfn_valid() isn't guaranteed to return true
->>>> for the rounded down value. I know it is probably fine in reality, but
->>>> dodgy as hell. The same applies to the call to early_pfn_in_nid() btw
->>>>
->>>> So how about something like this (apologies on Gmail's behalf for the
->>>> whitespace damage, I can resend it as a proper patch)
->>>>
->>>>
->>>> ---------8<-----------
->>>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->>>> index 3d974cb2a1a1..b89ca999ee3b 100644
->>>> --- a/mm/page_alloc.c
->>>> +++ b/mm/page_alloc.c
->>>> @@ -5352,28 +5352,29 @@
->>>>                  * function.  They do not exist on hotplugged memory.
->>>>                  */
->>>>                 if (context != MEMMAP_EARLY)
->>>>                         goto not_early;
->>>>
->>>> -               if (!early_pfn_valid(pfn)) {
->>>> +               if (!early_pfn_valid(pfn) || !early_pfn_in_nid(pfn, nid)) {
->>>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
->>>>                         /*
->>>>                          * Skip to the pfn preceding the next valid one (or
->>>>                          * end_pfn), such that we hit a valid pfn (or end_pfn)
->>>>                          * on our next iteration of the loop. Note that it needs
->>>>                          * to be pageblock aligned even when the region itself
->>>>                          * is not. move_freepages_block() can shift ahead of
->>>>                          * the valid region but still depends on correct page
->>>>                          * metadata.
->>>>                          */
->>>> -                       pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
->>>> -                                       ~(pageblock_nr_pages-1)) - 1;
->>>> -#endif
->>>> +                       pfn = memblock_next_valid_pfn(pfn, end_pfn);
->>>> +                       if (pfn >= end_pfn)
->>>> +                               break;
->>>> +                       pfn &= ~(pageblock_nr_pages - 1);
->>>> +#else
->>>>                         continue;
->>>> +#endif
->>>>                 }
->>>> -               if (!early_pfn_in_nid(pfn, nid))
->>>> -                       continue;
->>>>                 if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
->>>>                         break;
->>>>
->>>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
->>>>                 /*
->>>> ---------8<-----------
->>>>
->>>> This ensures that we enter the remainder of the loop with a properly
->>>> aligned pfn, rather than tweaking the value of pfn so it assumes the
->>>> expected value after 'pfn++'
->>>
->>> Um, this does not actually solve the issue. I guess this is due to the
->>> fact that a single pageblock size chunk could have both valid and
->>> invalid PFNs, and so rounding down the first PFN of the second valid
->>> chunk moves you back to the first chunk.
->>
->> OK, so the original patch attempted to ensure that of each pageblock,
->> at least the first struct page gets initialized, even though the PFN
->> may not be valid. Unfortunately, this code is not complete, given that
->> start_pfn itself may be misaligned, and so the issue it attempts to
->> solve may still occur.
->
-> You're wrong here.
->
+Hello ARM maintainers,
 
-You only align down after encountering an invalid PFN. If start_pfn
-itself is not pageblock aligned, how do you initialize the first
-struct page of the pageblock?
+Here are the ASPEED device tree updates for 4.17.
 
->> Then, I think it is absolutely dodgy to settle for only initializing
->> the first struct page, rather than all of them, only because a
->> specific VM_BUG_ON() references the flag field of the first struct
->> page.
->> IMO, we should fix this by initializing all struct page entries for
->> each pageblock sized chunk that has any valid PFNs.
->
-> That's precisely what my patch does. At least with
-> CONFIG_HAVE_ARCH_PFN_VALID disabled. And it looks only arm implements
-> arch pfn_valid() which I was not testing with and I am not sure it's
-> correct. Check my other email
->
+Thanks!
 
-No, your patch only initializes the first struct page of a pageblock.
-If the next one is invalid, we will skip to the next valid one.
+The following changes since commit 91ab883eb21325ad80f3473633f794c78ac87f51:
 
-You are making the assumption that pfn_valid() will return true for
-all pages in a pageblock if it returns true for one of them, and this
-does not hold on other architectures.
+  Linux 4.16-rc2 (2018-02-18 17:29:42 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+tags/aspeed-4.17-devicetree
+
+for you to fetch changes up to 3719a1b130566cf91c3b3ec4707e1ed61bff6d54:
+
+  ARM: dts: aspeed: Add Qualcomm Centriq 2400 REP BMC (2018-03-14
+16:30:43 +1030)
+
+----------------------------------------------------------------
+ASPEED device tree updates for 4.17
+
+Updates to OpenPower BMC systems:
+
+ A number of updates to use recently merged drivers, including moving to
+ upstreamed IPMI BT nodes, a temp sensor for Romulus, and adding
+ simple-reset for UARTs.
+
+ This includes more of Palmetto's device tree, so that it's ever so
+ close to booting the host with an upstream kernel.
+
+New machines:
+
+ Add Qualcomm Centriq ARM64 server reference platform, which will run
+ OpenBMC on an AST2500.
+
+----------------------------------------------------------------
+Andrew Jeffery (1):
+      ARM: dts: palmetto: Request mux as per strapping configuration
+
+Joel Stanley (9):
+      ARM: dts: aspeed: Add IPMI BT node
+      ARM: dts: aspeed: Enable IPMI BT node on OpenPower machines
+      ARM: dts: aspeed-g5: Update LPC node
+      ARM: dts: aspeed: Add LPC clock phandles
+      ARM: dts: palmetto: Add LEDs and GPIO keys
+      ARM: dts: aspeed: Add Palmetto GPIO hogs
+      ARM: dts: aspeed: Add LPC reset controller node
+      ARM: dts: palmetto: Enable rear UART
+      ARM: dts: romulus: Remove MAX31785 device
+
+Ken Chen (1):
+      ARM: dts: aspeed: Add Qualcomm Centriq 2400 REP BMC
+
+Lei YU (2):
+      ARM: dts: aspeed: romulus: hog GPIOS7
+      ARM: dts: aspeed: romulus: Add w83773g temp sensor
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../boot/dts/aspeed-bmc-arm-centriq2400-rep.dts    | 225 +++++++++++++++++++++
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts      | 206 +++++++++++++++++++
+ arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts       |  16 +-
+ arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts   |   4 +
+ arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts         |   4 +
+ arch/arm/boot/dts/aspeed-g4.dtsi                   |  18 ++
+ arch/arm/boot/dts/aspeed-g5.dtsi                   |  25 ++-
+ 8 files changed, 492 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
