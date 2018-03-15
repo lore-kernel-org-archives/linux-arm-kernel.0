@@ -1,66 +1,40 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 15 Mar 2018 15:55:09 -0700
-Subject: [PATCH 1/8] clk: Add clk_bulk_alloc functions
-In-Reply-To: <f13fb12b-54e6-104b-4ec0-192d1bb72cc8@samsung.com>
-References: <1519055046-2399-1-git-send-email-m.purski@samsung.com>
- <CGME20180219154456eucas1p15f4073beaf61312238f142f217a8bb3c@eucas1p1.samsung.com>
- <1519055046-2399-2-git-send-email-m.purski@samsung.com>
- <b67b5043-f5e5-826a-f0b8-f7cf722c61e6@arm.com>
- <f13fb12b-54e6-104b-4ec0-192d1bb72cc8@samsung.com>
-Message-ID: <152115450981.111154.2342657732967302796@swboyd.mtv.corp.google.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 15 Mar 2018 20:06:02 -0300
+Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.17
+In-Reply-To: <CAOMZO5B+ofiSZFbNLczCLsBAcaNMe9PRS1S2N9nkFx87msHSbA@mail.gmail.com>
+References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
+ <1521113800-16401-6-git-send-email-shawnguo@kernel.org>
+ <CAK8P3a2mUiAQRUZSvTwX=9ukEY6LWPTFqj=9WwWf2=OO3L-q7g@mail.gmail.com>
+ <CAOMZO5B+ofiSZFbNLczCLsBAcaNMe9PRS1S2N9nkFx87msHSbA@mail.gmail.com>
+Message-ID: <CAOMZO5D8-O2uEfpzkmSo_E0Wdc_yJ7CixF=vw6CWBwTZz1O37g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Marek Szyprowski (2018-02-20 01:36:03)
-> Hi Robin,
-> 
-> On 2018-02-19 17:29, Robin Murphy wrote:
-> >
-> > Seeing how every subsequent patch ends up with the roughly this same 
-> > stanza:
-> >
-> > ????x = devm_clk_bulk_alloc(dev, num, names);
-> > ????if (IS_ERR(x)
-> > ??????? return PTR_ERR(x);
-> > ????ret = devm_clk_bulk_get(dev, x, num);
-> >
-> > I wonder if it might be better to simply implement:
-> >
-> > ????int devm_clk_bulk_alloc_get(dev, &x, num, names)
-> >
-> > that does the whole lot in one go, and let drivers that want to do 
-> > more fiddly things continue to open-code the allocation.
-> >
-> > But perhaps that's an abstraction too far... I'm not all that familiar 
-> > with the lie of the land here.
-> 
-> Hmmm. This patchset clearly shows, that it would be much simpler if we
-> get rid of clk_bulk_data structure at all and let clk_bulk_* functions
-> to operate on struct clk *array[]. Typically the list of clock names
-> is already in some kind of array (taken from driver data or statically
-> embedded into driver), so there is little benefit from duplicating it
-> in clk_bulk_data. Sadly, I missed clk_bulk_* api discussion and maybe
-> there are other benefits from this approach.
-> 
-> If not, I suggest simplifying clk_bulk_* api by dropping clk_bulk_data
-> structure and switching to clock ptr array:
-> 
-> int clk_bulk_get(struct device *dev, int num_clock, struct clk *clocks[],
->  ??? ??? ??? ???? const char *clk_names[]);
-> int clk_bulk_prepare(int num_clks, struct clk *clks[]);
-> int clk_bulk_enable(int num_clks, struct clk *clks[]);
-> ...
-> 
+On Thu, Mar 15, 2018 at 7:48 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Arnd,
+>
+> On Thu, Mar 15, 2018 at 12:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>> I didn't pull this one, it seems to remove some config symbols without
+>> an explanation what happened to them:
+>>
+>> -CONFIG_FHANDLE=y
+>> -# CONFIG_ARM_THUMB is not set
+>> -CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+>> -# CONFIG_DEVKMEM is not set
+>> -CONFIG_NVMEM=y
+>> -CONFIG_LOCKUP_DETECTOR=y
+>> -CONFIG_TIMER_STATS=y
+>>
+>> Can you have another look? I want to be sure that we don't
+>> accidentally turn off something important when the respective
+>> Kconfig symbol got renamed or it gained a dependency that
+>> is no longer met.
+>
+> I can take a look.
+>
+> Which specific patch are you talking about?
 
-If you have an array of pointers to names of clks then we can put the
-struct clk pointers adjacent to them at the same time. I suppose the
-problem there is that some drivers want to mark that array of pointers
-to names as const. And then we can't update the clk pointers next to
-them.
+I assume it is "ARM: mxs_defconfig: Re-sync defconfig".
 
-This is the same design that regulators has done so that's why it's
-written like this for clks. Honestly, we're talking about a handful of
-pointers here so I'm not sure it really matters much. Just duplicate the
-pointer and be done if you want to mark the array of names as const or
-have your const 'setup' structure point to the bulk_data array that you
-define statically non-const somewhere globally.
+Will generate a new version tomorrow.
