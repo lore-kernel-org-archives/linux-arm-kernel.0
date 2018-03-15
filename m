@@ -1,55 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Mar 2018 16:19:56 +0000
-Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
- mitigation)
-In-Reply-To: <20180315155741.7syqjajb77kh5vx2@kamzik.brq.redhat.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180315155741.7syqjajb77kh5vx2@kamzik.brq.redhat.com>
-Message-ID: <1a57727e-d4b8-f0e8-e910-ee1bc136ac0f@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 15 Mar 2018 12:21:17 -0400
+Subject: [PATCH 7/7] ixgbevf: eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <CAKgT0UcBQRoSPPZ73bdu1oEBGqBA8_c3ZAjti20=+9UwEqpXbw@mail.gmail.com>
+References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
+ <1520997629-17361-7-git-send-email-okaya@codeaurora.org>
+ <12150aa0-77ba-878e-31f4-d4f8d6a28ccb@codeaurora.org>
+ <2a4f4dec64b7462ae64152f6c2df9754@codeaurora.org>
+ <CAKgT0UcriMiyV0q6y_x9r3-HJRAWp5_CpsK2jTqh3qvOV=Kkzw@mail.gmail.com>
+ <d565406d-1bc7-6fb0-3f36-87a28ac69070@codeaurora.org>
+ <CAKgT0UeBHGDmr0uXfuPQJKOomiH9uvXRVYpyDwMOzjkxAZMSYg@mail.gmail.com>
+ <53bf7dfe-32ee-1861-e6ea-81f667590a43@codeaurora.org>
+ <CAKgT0UcBQRoSPPZ73bdu1oEBGqBA8_c3ZAjti20=+9UwEqpXbw@mail.gmail.com>
+Message-ID: <eee8269d-b711-828c-ab84-5933bf86d024@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/18 15:57, Andrew Jones wrote:
-> On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
->> Whilst KVM benefits from the kernel randomisation via KASLR, there is
->> no additional randomisation when the kernel is running at EL1, as we
->> directly use a fixed offset from the linear mapping. This is not
->> necessarily a problem, but we could do a bit better by independently
->> randomizing the HYP placement.
->>
->> This series proposes to randomise the offset by inserting a few random
->> bits between the MSB of the RAM linear mapping and the top of the HYP
->> VA (VA_BITS - 2). That's not a lot of random bits (on my Mustang, I
->> get 13 bits), but that's better than nothing.
->>
->> In order to achieve this, we need to be able to patch dynamic values
->> in the kernel text. This results in a bunch of changes to the
->> alternative framework, the insn library, and a few more hacks in KVM
->> itself (we get a new way to map the GIC at EL2).
->>
->> Another (and more recent) goal of this series is to work around what
->> has been described as "variant 3a", which covers speculative reads of
->> privileged system registers. Randomizing the location of the
->> hypervisor would be pointless if one could simply obtain VBAR_EL2. In
->> order to work around this, we place the vectors at a fairly static
->> location (next to the idmap), independently of the hypervisor's own
->> mappings. This ensures that we can leak VBAR_EL2 without disclosing
->> much about HYP itself (and is similar to what the rest of the kernel
->> does with KPTI). This is only enabled at runtime for Cortex-A57 and
->> Cortex-A72.
->>
->> This has been tested on the FVP model, Seattle (both 39 and 48bit VA),
->> Mustang and Thunder-X. I've also done a sanity check on 32bit (which
->> is only impacted by the HYP IO VA stuff).
->>
+On 3/15/2018 10:32 AM, Alexander Duyck wrote:
+> We tend to do something like:
+>   update tx_buffer_info
+>   update tx_desc
+>   wmb()
+>   point first tx_buffer_info next_to_watch value at last tx_desc
+>   update next_to_use
+>   notify device via writel
 > 
-> I've smoke tested this series on a seattle with several busy VMs running
-> simultaneously. My host kernel configures 64K pages. I didn't see any
-> problems.
+> We do it this way because we have to synchronize between the Tx
+> cleanup path and the hardware so we basically lump the two barriers
+> together. instead of invoking both a smp_wmb and a wmb. Now that I
+> look at the pseudocode though I wonder if we shouldn't move the
+> next_to_use update before the wmb, but that might be material for
+> another patch. Anyway, in the Tx cleanup path we should have an
+> smp_rmb() after we read the next_to_watch values so that we avoid
+> reading any of the other fields in the buffer_info if either the field
+> is NULL or the descriptor pointed to has not been written back.
 
-Excellent, thanks for testing. Out of curiosity: do you have a firmware
-that implements the SMCCC_ARCH_WORKAROUND_1 call or not?
+How do you feel about keeping wmb() very close to writel_relaxed() like this?
 
-	M.
+   update tx_buffer_info
+   update tx_desc
+   point first tx_buffer_info next_to_watch value at last tx_desc
+   update next_to_use
+   wmb()
+   notify device via writel_relaxed()
+
+I'm afraid that if the order of wmb() and writel() is not very
+obvious or hidden in multiple functions, somebody can introduce a very nasty
+bug in the future.
+
+We also have to think about code maintenance.
+
 -- 
-Jazz is not dead. It just smells funny...
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
