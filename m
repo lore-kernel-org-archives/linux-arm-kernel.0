@@ -1,10 +1,9 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:06:48 +0100
-Subject: [PATCH 07/36] arm: dts: armada-370-dlink-dns327l: use
- SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 16:06:51 +0100
+Subject: [PATCH 10/36] arm: dts: armada-370-rd: use SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-8-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-11-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,23 +17,25 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Andrew Andrianov <andrew@ncrmnt.org>
+Cc: Florian Fainelli <florian@openwrt.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-370-dlink-dns327l.dts | 39 +-------------------------
+ arch/arm/boot/dts/armada-370-rd.dts | 39 +------------------------------------
  1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-index db7f3aa38670..8e46f63cbaa1 100644
---- a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-+++ b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
-@@ -1,45 +1,8 @@
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 8b2fa9a49967..54ee9fa6b58e 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -1,3 +1,4 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for D-Link DNS-327L
+  * Device Tree file for Marvell Armada 370 Reference Design board
+  * (RD-88F6710-A1)
+@@ -6,44 +7,6 @@
   *
-  * Copyright (C) 2015, Andrew Andrianov <andrew@ncrmnt.org>
-- *
+  *  Copyright (C) 2013 Florian Fainelli <florian@openwrt.org>
+  *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
@@ -72,8 +73,9 @@ index db7f3aa38670..8e46f63cbaa1 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /* Remaining unsolved:
+- *
+  * Note: this Device Tree assumes that the bootloader has remapped the
+  * internal registers to 0xf1000000 (instead of the default
+  * 0xd0000000). The 0xf1000000 is the default used by the recent,
 -- 
 2.16.1
