@@ -1,49 +1,98 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 15 Mar 2018 16:57:41 +0100
-Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
- mitigation)
-In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180315155741.7syqjajb77kh5vx2@kamzik.brq.redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Mar 2018 15:59:32 +0000
+Subject: [PATCH 3/3] irqchip/gic-v3: Allow LPIs to be disabled from the
+ command line
+In-Reply-To: <f3fee732-2c07-e303-4ec2-2d79668b868e@codeaurora.org>
+References: <20180313172103.24281-1-marc.zyngier@arm.com>
+ <20180313172103.24281-4-marc.zyngier@arm.com>
+ <f3fee732-2c07-e303-4ec2-2d79668b868e@codeaurora.org>
+Message-ID: <0418813e-9837-32b0-d1df-2b5d52c83d8e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
-> Whilst KVM benefits from the kernel randomisation via KASLR, there is
-> no additional randomisation when the kernel is running at EL1, as we
-> directly use a fixed offset from the linear mapping. This is not
-> necessarily a problem, but we could do a bit better by independently
-> randomizing the HYP placement.
+On 15/03/18 14:58, Shanker Donthineni wrote:
 > 
-> This series proposes to randomise the offset by inserting a few random
-> bits between the MSB of the RAM linear mapping and the top of the HYP
-> VA (VA_BITS - 2). That's not a lot of random bits (on my Mustang, I
-> get 13 bits), but that's better than nothing.
+> Hi Marc,
 > 
-> In order to achieve this, we need to be able to patch dynamic values
-> in the kernel text. This results in a bunch of changes to the
-> alternative framework, the insn library, and a few more hacks in KVM
-> itself (we get a new way to map the GIC at EL2).
+> On 03/13/2018 12:21 PM, Marc Zyngier wrote:
+>> For most GICv3 implementations, enabling LPIs is a one way switch.
+>> Once they're on, there is no turning back, which completely kills
+>> kexec (pending tables will always be live, and we can't tell the
+>> secondary kernel where they are).
+>>
+>> This is really annoying if you plan to use Linux as a bootloader,
+>> as it pretty much guarantees that the secondary kernel won't be
+>> able to use MSIs, and may even see some memory corruption. Bad.
+>>
+>> A workaround for this unfortunate situation is to allow the kernel
+>> not to enable LPIs, even if the feature is present in the HW. This
+>> would allow Linux-as-a-bootloader to leave LPIs alone, and let the
+>> secondary kernel to do whatever it wants with them.
+>>
+>> Let's introduce a boolean "irqchip.gicv3_nolpi" command line option
+>> that serves that purpose.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  Documentation/admin-guide/kernel-parameters.txt |  8 ++++++++
+>>  drivers/irqchip/irq-gic-v3.c                    | 10 +++++++++-
+>>  2 files changed, 17 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+>> index 1d1d53f85ddd..60130231db3b 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -1743,6 +1743,14 @@
+>>  			of a GICv2 controller even if the memory range
+>>  			exposed by the device tree is too small.
+>>  
+>> +	irqchip.gicv3_nolpi=
+>> +			[ARM, ARM64]
+>> +			Force the kernel to ignore the availability of
+>> +			LPIs (and by consequence ITSs). Intended for system
+>> +			that use the kernel as a bootloader, and thus want
+>> +			to let secondary kernels in charge of setting up
+>> +			LPIs.
+>> +
+>>  	irqfixup	[HW]
+>>  			When an interrupt is not handled search all handlers
+>>  			for it. Intended to get systems with badly broken
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 0ea02504115d..3e9eeb6cb294 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -613,9 +613,17 @@ static void gic_cpu_sys_reg_init(void)
+>>  		pr_crit_once("RSS is required but GICD doesn't support it\n");
+>>  }
+>>  
+>> +static bool gicv3_nolpi;
+>> +
+>> +static int __init gicv3_nolpi_cfg(char *buf)
+>> +{
+>> +	return strtobool(buf, &gicv3_nolpi);
+>> +}
+>> +early_param("irqchip.gicv3_nolpi", gicv3_nolpi_cfg);
+>> +
+>>  static int gic_dist_supports_lpis(void)
+>>  {
+>> -	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
+>> +	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS) && !gicv3_nolpi;
 > 
-> Another (and more recent) goal of this series is to work around what
-> has been described as "variant 3a", which covers speculative reads of
-> privileged system registers. Randomizing the location of the
-> hypervisor would be pointless if one could simply obtain VBAR_EL2. In
-> order to work around this, we place the vectors at a fairly static
-> location (next to the idmap), independently of the hypervisor's own
-> mappings. This ensures that we can leak VBAR_EL2 without disclosing
-> much about HYP itself (and is similar to what the rest of the kernel
-> does with KPTI). This is only enabled at runtime for Cortex-A57 and
-> Cortex-A72.
-> 
-> This has been tested on the FVP model, Seattle (both 39 and 48bit VA),
-> Mustang and Thunder-X. I've also done a sanity check on 32bit (which
-> is only impacted by the HYP IO VA stuff).
->
+> Thanks for this patch series especially for KDUMP case. It would be nice if we disable GIC-ITS and
+> GICR-LPI functionality completely to avoid in flight LPIs which were triggered by first kernel.
 
-I've smoke tested this series on a seattle with several busy VMs running
-simultaneously. My host kernel configures 64K pages. I didn't see any
-problems.
+For kdump, it doesn't really matter much. The kdump kernel lives in its
+own memory space, and is unaffected by LPIs being triggered. You just
+need to make sure that if you can't reset EnableLPIs, you still carry on
+using wired interrupts. The ITS doesn't really matter, as long as the
+redistributors have their EnableLPIs zeroed.
+
+It really is for kexec that it matters a lot, because the secondary
+kernel expects to find a sane environment, which it cannot have if LPIs
+are still on.
 
 Thanks,
-drew
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
