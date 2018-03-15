@@ -1,44 +1,57 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 15 Mar 2018 17:57:30 +0000
-Subject: [PATCH v5 2/4] drivers: firmware: xilinx: Add ZynqMP firmware
- driver
-In-Reply-To: <DM2PR0201MB0767229750776EF2AF8455F3B8D00@DM2PR0201MB0767.namprd02.prod.outlook.com>
-References: <1519154467-2896-1-git-send-email-jollys@xilinx.com>
- <1519154467-2896-3-git-send-email-jollys@xilinx.com>
- <dab419e8-3afe-5bfe-240e-e9ee4f2300f2@arm.com>
- <DM2PR0201MB076735E33069DC6F0C84EFDCB8D80@DM2PR0201MB0767.namprd02.prod.outlook.com>
- <2fb8ee8c-35ac-b7e6-e691-84464b0c8745@arm.com>
- <DM2PR0201MB07673298E409D07F0F748316B8D30@DM2PR0201MB0767.namprd02.prod.outlook.com>
- <4cff1193-5345-0531-d81e-0dd6e0633b19@arm.com>
- <DM2PR0201MB0767229750776EF2AF8455F3B8D00@DM2PR0201MB0767.namprd02.prod.outlook.com>
-Message-ID: <0a63e5d5-17b6-0be3-88e2-c8e56bcdfeb0@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 15 Mar 2018 17:57:23 +0000
+Subject: [PATCH v2] KVM: arm: reserve bit in KVM_REG_ARM encoding for
+ secure/nonsecure
+In-Reply-To: <20180306194741.30395-1-peter.maydell@linaro.org>
+References: <20180306194741.30395-1-peter.maydell@linaro.org>
+Message-ID: <CAFEAcA-p-N6eF4LpDVfXOM4niBZTEyZi+Xg6RnjM7a5RQk+WCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6 March 2018 at 19:47, Peter Maydell <peter.maydell@linaro.org> wrote:
+> We have a KVM_REG_ARM encoding that we use to expose KVM guest registers
+> to userspace. Define that bit 28 in this encoding indicates secure vs
+> nonsecure, so we can distinguish the secure and nonsecure banked versions
+> of a banked AArch32 register.
+>
+> For KVM currently, all guest registers are nonsecure, but defining
+> the bit is useful for userspace. In particular, QEMU uses this
+> encoding as part of its on-the-wire migration format, and needs to be
+> able to describe secure-bank registers when it is migrating (fully
+> emulated) EL3-enabled CPUs.
+>
+> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
+> ---
+> v1->v2: expanded comment
 
+Ping -- is this version OK, Marc?
 
-On 15/03/18 17:53, Jolly Shah wrote:
-> Hi Sudeep,
-> 
+> ---
+>  arch/arm/include/uapi/asm/kvm.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index 6edd177bb1c7..2ba95d6fe852 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -135,6 +135,15 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM_CRM_SHIFT          7
+>  #define KVM_REG_ARM_32_CRN_MASK                0x0000000000007800
+>  #define KVM_REG_ARM_32_CRN_SHIFT       11
+> +/*
+> + * For KVM currently all guest registers are nonsecure, but we reserve a bit
+> + * in the encoding to distinguish secure from nonsecure for AArch32 system
+> + * registers that are banked by security. This is 1 for the secure banked
+> + * register, and 0 for the nonsecure banked register or if the register is
+> + * not banked by security.
+> + */
+> +#define KVM_REG_ARM_SECURE_MASK        0x0000000010000000
+> +#define KVM_REG_ARM_SECURE_SHIFT       28
+>
+>  #define ARM_CP15_REG_SHIFT_MASK(x,n) \
+>         (((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
+> --
+> 2.16.2
 
-[...]
-
->>
->> It's opposite, you are just adding whole lot of functions/APIs here with out the
->> users of those APIs. I am unable to visualise how they are getting used. So for
->> me even if you just add handful of above APIs with drivers making call to each
->> one of them along with it, I can better understand it. Without any usage of these
->> APIs in this series, I fail to understand the need of it.
->> So NACK to this patch without the users of the APIs introduced here.
->>
-> 
-> Ok. I will break series with users in next version.
-> 
-
-Thanks. Don't add any APIs which are not used by drivers in the series.
-We don't want the whole set of APIs in that structure lying around in
-the kernel without users.
-
--- 
-Regards,
-Sudeep
+thanks
+-- PMM
