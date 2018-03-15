@@ -1,53 +1,70 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Thu, 15 Mar 2018 15:22:24 +0000
-Subject: [GIT PULL] STi DT update for v4.17 round 2
-In-Reply-To: <CAK8P3a1R6CwHC4+0GXKevmgM9QqgbGGZCtLsccn2AYTpuHZ7uw@mail.gmail.com>
-References: <af473935-7cb6-e59a-3b52-055d8492248c@st.com>
- <CAK8P3a1R6CwHC4+0GXKevmgM9QqgbGGZCtLsccn2AYTpuHZ7uw@mail.gmail.com>
-Message-ID: <36e374f8-cfc9-06bb-f496-296a145d5b6d@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Mar 2018 15:20:45 +0000
+Subject: [PATCH v2 2/4] ioremap: Implement TLB_INV before huge mapping
+In-Reply-To: <b6c7622d-9676-5584-d52b-10ece6a3877c@codeaurora.org>
+References: <1521117906-20107-1-git-send-email-cpandya@codeaurora.org>
+ <1521117906-20107-3-git-send-email-cpandya@codeaurora.org>
+ <20180315133157.ucbdg25jo5ew3t2h@lakrids.cambridge.arm.com>
+ <b6c7622d-9676-5584-d52b-10ece6a3877c@codeaurora.org>
+Message-ID: <20180315152045.uajoedfvdcynhus5@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
-
-On 03/15/2018 03:59 PM, Arnd Bergmann wrote:
-> On Thu, Mar 15, 2018 at 10:06 AM, Patrice CHOTARD
-> <patrice.chotard@st.com> wrote:
->> Hi Arnd, Kevin, Olof
->>
->> PLease consider this second round of STi dts update for v4.17
->>
->> The following changes since commit 0e04ce02e6a2ac30d21294d8bb2aeceb8489e52b:
->>
->>     ARM: dts: STi: Remove unused clk_ext2f_a9 clock (2018-02-13 13:31:38
->> +0100)
->>
->> are available in the git repository at:
->>
->>     git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
->>
->> for you to fetch changes up to 9a5f4879cd8de167e82f335317c63f2ffdc80129:
->>
->>     ARM: dts: stih4xx: Add missing #sound-dai-cells (2018-03-15 09:52:25
->> +0100)
->>
->> ----------------------------------------------------------------
->>
->> STi DT update:
->>
->> Add missing #sound-dai-cells which fix DT dtc warnings when building
->> with W=1
+On Thu, Mar 15, 2018 at 07:49:01PM +0530, Chintan Pandya wrote:
+> On 3/15/2018 7:01 PM, Mark Rutland wrote:
+> > On Thu, Mar 15, 2018 at 06:15:04PM +0530, Chintan Pandya wrote:
+> > > @@ -91,10 +93,15 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
+> > >   		if (ioremap_pmd_enabled() &&
+> > >   		    ((next - addr) == PMD_SIZE) &&
+> > > -		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+> > > -		    pmd_free_pte_page(pmd)) {
+> > > -			if (pmd_set_huge(pmd, phys_addr + addr, prot))
+> > > +		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
+> > > +			old_pmd = *pmd;
+> > > +			pmd_clear(pmd);
+> > > +			flush_tlb_pgtable(&init_mm, addr);
+> > > +			if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
+> > > +				pmd_free_pte_page(&old_pmd);
+> > >   				continue;
+> > > +			} else
+> > > +				set_pmd(pmd, old_pmd);
+> > >   		}
+> > 
+> > Can we have something like a pmd_can_set_huge() helper? Then we could
+> > avoid pointless modification and TLB invalidation work when
+> > pmd_set_huge() will fail.
 > 
-> You missed a tag name for this one, but I found tags/sti-dt-for-v4.17-round2
-> to be the one that matches the commit ID above and pulled that.
-> 
->        Arnd
-> 
+> Actually, pmd_set_huge() will never fail because, if
+> CONFIG_HAVE_ARCH_HUGE_VMAP is disabled, ioremap_pmd_enabled()
+> will fail and if enabled (i.e. ARM64 & x86), they don't fail
+> in their implementation. So, rather we can do the following.
 
-Sorry for that.
-I will check that point, i noticed that i got the same issue with the 
-previous pull request for STi DT.
+AFAICT, that's not true. The x86 pmd_set_huge() can fail under certain
+conditions:
 
-Thanks
+int pmd_set_huge(pmd_t *pmd, phys_addr_t addr, pgprot_t prot)
+{
+	u8 mtrr, uniform;
 
-Patrice
+	mtrr = mtrr_type_lookup(addr, addr + PMD_SIZE, &uniform);
+	if ((mtrr != MTRR_TYPE_INVALID) && (!uniform) &&
+	    (mtrr != MTRR_TYPE_WRBACK)) {
+		pr_warn_once("%s: Cannot satisfy [mem %#010llx-%#010llx] with a huge-page mapping due to MTRR override.\n",
+			     __func__, addr, addr + PMD_SIZE);
+		return 0;
+	}
+
+	prot = pgprot_4k_2_large(prot);
+
+	set_pte((pte_t *)pmd, pfn_pte(
+		(u64)addr >> PAGE_SHIFT,
+		__pgprot(pgprot_val(prot) | _PAGE_PSE)));
+
+	return 1;
+}
+
+... perhaps that can never happen in this particular case, but that's
+not clear to me.
+
+Thanks,
+Mark.
