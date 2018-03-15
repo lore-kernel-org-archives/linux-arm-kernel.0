@@ -1,96 +1,63 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Thu, 15 Mar 2018 13:09:10 +0530
-Subject: [PATCH v2 2/2] x86/mm: implement free pmd/pte page interfaces
-In-Reply-To: <20180314180155.19492-3-toshi.kani@hpe.com>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-3-toshi.kani@hpe.com>
-Message-ID: <14cb9fdf-25de-6519-2200-43f585b64cdd@codeaurora.org>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 15 Mar 2018 15:40:35 +0800
+Subject: [PATCH v7 1/3] dt-bindings: dmaengine: Add MediaTek High-Speed DMA
+ controller bindings
+In-Reply-To: <cover.1521098171.git.sean.wang@mediatek.com>
+References: <cover.1521098171.git.sean.wang@mediatek.com>
+Message-ID: <59f25e9e710c129c4aec98ccc8d2d4661e593112.1521098171.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sean Wang <sean.wang@mediatek.com>
 
+Document the devicetree bindings for MediaTek High-Speed DMA controller
+which could be found on MT7623 SoC or other similar Mediatek SoCs.
 
-On 3/14/2018 11:31 PM, Toshi Kani wrote:
-> Implement pud_free_pmd_page() and pmd_free_pte_page() on x86, which
-> clear a given pud/pmd entry and free up lower level page table(s).
-> Address range associated with the pud/pmd entry must have been purged
-> by INVLPG.
-> 
-> fixes: e61ce6ade404e ("mm: change ioremap to set up huge I/O mappings")
-> Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-> Cc: Michal Hocko <mhocko@suse.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: "H. Peter Anvin" <hpa@zytor.com>
-> Cc: Borislav Petkov <bp@suse.de>
-> Cc: Matthew Wilcox <willy@infradead.org>
-> Cc: <stable@vger.kernel.org>
-> ---
->   arch/x86/mm/pgtable.c |   28 ++++++++++++++++++++++++++--
->   1 file changed, 26 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/x86/mm/pgtable.c b/arch/x86/mm/pgtable.c
-> index 1eed7ed518e6..34cda7e0551b 100644
-> --- a/arch/x86/mm/pgtable.c
-> +++ b/arch/x86/mm/pgtable.c
-> @@ -712,7 +712,22 @@ int pmd_clear_huge(pmd_t *pmd)
->    */
->   int pud_free_pmd_page(pud_t *pud)
->   {
-> -	return pud_none(*pud);
-> +	pmd_t *pmd;
-> +	int i;
-> +
-> +	if (pud_none(*pud))
-> +		return 1;
-> +
-> +	pmd = (pmd_t *)pud_page_vaddr(*pud);
-> +
-> +	for (i = 0; i < PTRS_PER_PMD; i++)
-> +		if (!pmd_free_pte_page(&pmd[i]))
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/dma/mtk-hsdma.txt          | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/mtk-hsdma.txt
 
-This is forced action and no optional. Also, pmd_free_pte_page()
-doesn't return 0 in any case. So, you may remove _if_ ?
-
-> +			return 0;
-> +
-> +	pud_clear(pud);
-> +	free_page((unsigned long)pmd);
-> +
-> +	return 1;
->   }
->   
->   /**
-> @@ -724,6 +739,15 @@ int pud_free_pmd_page(pud_t *pud)
->    */
->   int pmd_free_pte_page(pmd_t *pmd)
->   {
-> -	return pmd_none(*pmd);
-> +	pte_t *pte;
-> +
-> +	if (pmd_none(*pmd))
-
-This should also check if pmd is already huge. Same for pud ?
-
-> +		return 1;
-> +
-> +	pte = (pte_t *)pmd_page_vaddr(*pmd);
-> +	pmd_clear(pmd);
-> +	free_page((unsigned long)pte);
-> +
-> +	return 1;
->   }
->   #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-Chintan
+diff --git a/Documentation/devicetree/bindings/dma/mtk-hsdma.txt b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+new file mode 100644
+index 0000000..4bb31735
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/mtk-hsdma.txt
+@@ -0,0 +1,33 @@
++MediaTek High-Speed DMA Controller
++==================================
++
++This device follows the generic DMA bindings defined in dma/dma.txt.
++
++Required properties:
++
++- compatible:	Must be one of
++		  "mediatek,mt7622-hsdma": for MT7622 SoC
++		  "mediatek,mt7623-hsdma": for MT7623 SoC
++- reg:		Should contain the register's base address and length.
++- interrupts:	Should contain a reference to the interrupt used by this
++		device.
++- clocks:	Should be the clock specifiers corresponding to the entry in
++		clock-names property.
++- clock-names:	Should contain "hsdma" entries.
++- power-domains: Phandle to the power domain that the device is part of
++- #dma-cells: 	The length of the DMA specifier, must be <1>. This one cell
++		in dmas property of a client device represents the channel
++		number.
++Example:
++
++        hsdma: dma-controller at 1b007000 {
++		compatible = "mediatek,mt7623-hsdma";
++		reg = <0 0x1b007000 0 0x1000>;
++		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&ethsys CLK_ETHSYS_HSDMA>;
++		clock-names = "hsdma";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
++		#dma-cells = <1>;
++	};
++
++DMA clients must use the format described in dma/dma.txt file.
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+2.7.4
