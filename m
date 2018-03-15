@@ -1,57 +1,137 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 15 Mar 2018 17:57:23 +0000
-Subject: [PATCH v2] KVM: arm: reserve bit in KVM_REG_ARM encoding for
- secure/nonsecure
-In-Reply-To: <20180306194741.30395-1-peter.maydell@linaro.org>
-References: <20180306194741.30395-1-peter.maydell@linaro.org>
-Message-ID: <CAFEAcA-p-N6eF4LpDVfXOM4niBZTEyZi+Xg6RnjM7a5RQk+WCw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Mar 2018 17:58:08 +0000
+Subject: [RFC 1/3] arm: factor out current_stack_pointer
+In-Reply-To: <20180315170859.93893-2-zsm@chromium.org>
+References: <20180315170859.93893-1-zsm@chromium.org>
+ <20180315170859.93893-2-zsm@chromium.org>
+Message-ID: <20180315175808.qgigb24owmdupvu4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 March 2018 at 19:47, Peter Maydell <peter.maydell@linaro.org> wrote:
-> We have a KVM_REG_ARM encoding that we use to expose KVM guest registers
-> to userspace. Define that bit 28 in this encoding indicates secure vs
-> nonsecure, so we can distinguish the secure and nonsecure banked versions
-> of a banked AArch32 register.
->
-> For KVM currently, all guest registers are nonsecure, but defining
-> the bit is useful for userspace. In particular, QEMU uses this
-> encoding as part of its on-the-wire migration format, and needs to be
-> able to describe secure-bank registers when it is migrating (fully
-> emulated) EL3-enabled CPUs.
->
-> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
-> ---
-> v1->v2: expanded comment
+On Thu, Mar 15, 2018 at 05:08:57PM +0000, Zubin Mithra wrote:
+> Multiple header files that rely on current_stack_pointer do not have the
+> necessary include <asm/thread_info.h>, and are thus fragile to changes
+> in the header soup.
+> 
+> Subsequent patches will affect the header soup such that including
+> <asm/thread_info.h> will result in a circular header include. Factor
+> current_thread_info into its own header and have all the users include
+> this header explicitely.
 
-Ping -- is this version OK, Marc?
+Nit: s/explicitely/explicitly/
+
+> Signed-off-by: Zubin Mithra <zsm@chromium.org>
+
+I can't remember precisely what the circular include dependency was that
+necessitated this for arm64, but regardless this looks reasonable to me.
+FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+... though we'll need the rest of the THREAD_INFO_IN_TASK patches for
+this to be a worthwhile change.
+
+Thanks,
+Mark.
 
 > ---
->  arch/arm/include/uapi/asm/kvm.h | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 6edd177bb1c7..2ba95d6fe852 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -135,6 +135,15 @@ struct kvm_arch_memory_slot {
->  #define KVM_REG_ARM_CRM_SHIFT          7
->  #define KVM_REG_ARM_32_CRN_MASK                0x0000000000007800
->  #define KVM_REG_ARM_32_CRN_SHIFT       11
+>  arch/arm/include/asm/percpu.h        | 2 ++
+>  arch/arm/include/asm/stack_pointer.h | 9 +++++++++
+>  arch/arm/include/asm/thread_info.h   | 6 +-----
+>  arch/arm/kernel/return_address.c     | 1 +
+>  arch/arm/kernel/stacktrace.c         | 1 +
+>  arch/arm/kernel/unwind.c             | 1 +
+>  6 files changed, 15 insertions(+), 5 deletions(-)
+>  create mode 100644 arch/arm/include/asm/stack_pointer.h
+> 
+> diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+> index a89b4076cde4..6a19e634d0cf 100644
+> --- a/arch/arm/include/asm/percpu.h
+> +++ b/arch/arm/include/asm/percpu.h
+> @@ -16,6 +16,8 @@
+>  #ifndef _ASM_ARM_PERCPU_H_
+>  #define _ASM_ARM_PERCPU_H_
+>  
+> +#include <asm/stack_pointer.h>
+> +
+>  /*
+>   * Same as asm-generic/percpu.h, except that we store the per cpu offset
+>   * in the TPIDRPRW. TPIDRPRW only exists on V6K and V7
+> diff --git a/arch/arm/include/asm/stack_pointer.h b/arch/arm/include/asm/stack_pointer.h
+> new file mode 100644
+> index 000000000000..5a6a8c6d9208
+> --- /dev/null
+> +++ b/arch/arm/include/asm/stack_pointer.h
+> @@ -0,0 +1,9 @@
+> +#ifndef __ASM_STACK_POINTER_H
+> +#define __ASM_STACK_POINTER_H
+> +
 > +/*
-> + * For KVM currently all guest registers are nonsecure, but we reserve a bit
-> + * in the encoding to distinguish secure from nonsecure for AArch32 system
-> + * registers that are banked by security. This is 1 for the secure banked
-> + * register, and 0 for the nonsecure banked register or if the register is
-> + * not banked by security.
+> + * how to get the current stack pointer in C
 > + */
-> +#define KVM_REG_ARM_SECURE_MASK        0x0000000010000000
-> +#define KVM_REG_ARM_SECURE_SHIFT       28
->
->  #define ARM_CP15_REG_SHIFT_MASK(x,n) \
->         (((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
-> --
-> 2.16.2
-
-thanks
--- PMM
+> +register unsigned long current_stack_pointer asm ("sp");
+> +
+> +#endif
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index e71cc35de163..56317024d221 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -25,6 +25,7 @@
+>  struct task_struct;
+>  
+>  #include <asm/types.h>
+> +#include <asm/stack_pointer.h>
+>  
+>  typedef unsigned long mm_segment_t;
+>  
+> @@ -75,11 +76,6 @@ struct thread_info {
+>  	.addr_limit	= KERNEL_DS,					\
+>  }
+>  
+> -/*
+> - * how to get the current stack pointer in C
+> - */
+> -register unsigned long current_stack_pointer asm ("sp");
+> -
+>  /*
+>   * how to get the thread information struct from C
+>   */
+> diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+> index 36ed35073289..d76e64250816 100644
+> --- a/arch/arm/kernel/return_address.c
+> +++ b/arch/arm/kernel/return_address.c
+> @@ -14,6 +14,7 @@
+>  #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
+>  #include <linux/sched.h>
+>  
+> +#include <asm/stack_pointer.h>
+>  #include <asm/stacktrace.h>
+>  
+>  struct return_address_data {
+> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> index a56e7c856ab5..d519b8e0797f 100644
+> --- a/arch/arm/kernel/stacktrace.c
+> +++ b/arch/arm/kernel/stacktrace.c
+> @@ -4,6 +4,7 @@
+>  #include <linux/stacktrace.h>
+>  
+>  #include <asm/sections.h>
+> +#include <asm/stack_pointer.h>
+>  #include <asm/stacktrace.h>
+>  #include <asm/traps.h>
+>  
+> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> index 0bee233fef9a..860f8ac187e0 100644
+> --- a/arch/arm/kernel/unwind.c
+> +++ b/arch/arm/kernel/unwind.c
+> @@ -45,6 +45,7 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/list.h>
+>  
+> +#include <asm/stack_pointer.h>
+>  #include <asm/stacktrace.h>
+>  #include <asm/traps.h>
+>  #include <asm/unwind.h>
+> -- 
+> 2.16.2.804.g6dcf76e118-goog
+> 
