@@ -1,79 +1,112 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 15 Mar 2018 10:23:15 +0100
-Subject: [PATCH v2 2/8] mmc: sunxi: Move the power off action in a
- separate function
-In-Reply-To: <bd3c692c488e0e3ee8f4cc169980a74384717ec2.1520520655.git-series.maxime.ripard@bootlin.com>
-References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
- <bd3c692c488e0e3ee8f4cc169980a74384717ec2.1520520655.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAPDyKFpdX5Xg_S0daFeFWE-4CQFRa=MC-qdmzqNyCaipyxAj3Q@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 15 Mar 2018 10:29:49 +0100
+Subject: [PATCH 2/2] cec: stm32: add suspend/resume functions
+In-Reply-To: <20180315092949.9895-1-benjamin.gaignard@st.com>
+References: <20180315092949.9895-1-benjamin.gaignard@st.com>
+Message-ID: <20180315092949.9895-3-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 March 2018 at 15:52, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> We'll need to have the power off behaviour in order to implement
-> runtime_pm. Move it outside of the .set_ios callback for an easier access.
+From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 
-This isn't correct. To implement runtime PM for the sunxi device,
-which I think is what your goal is, you should not disable/enable
-regulators to the (e)MMC/SD/SDIO card.
+If wake up irq is defined in device-tree cec adapter
+could be used has wake up source.
 
-If you also want runtime PM deployment for the card, that is managed
-by the mmc core already. All you have to do is to set
-MMC_CAP_AGGRESSIVE_PM for your mmc host, if you want that.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+---
+ drivers/media/platform/stm32/stm32-cec.c | 44 +++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
->
-> And it improves readibility as a bonus.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 25 +++++++++++++++++--------
->  1 file changed, 17 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index f9723797a9f8..a53e39d8b07e 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -855,6 +855,22 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->         return 0;
->  }
->
-> +static void sunxi_mmc_power_off(struct mmc_host *mmc, struct mmc_ios *ios)
-> +{
-> +       struct sunxi_mmc_host *host = mmc_priv(mmc);
-> +
-> +       dev_dbg(mmc_dev(mmc), "Powering off\n");
-> +
-> +       sunxi_mmc_reset_host(host);
-> +       if (!IS_ERR(mmc->supply.vmmc))
-> +               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +
-> +       if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
-> +               regulator_disable(mmc->supply.vqmmc);
-> +
-> +       host->vqmmc_enabled = false;
-> +}
-> +
->  static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  {
->         struct sunxi_mmc_host *host = mmc_priv(mmc);
-> @@ -892,14 +908,7 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                 break;
->
->         case MMC_POWER_OFF:
-> -               dev_dbg(mmc_dev(mmc), "power off!\n");
-> -               sunxi_mmc_reset_host(host);
-> -               if (!IS_ERR(mmc->supply.vmmc))
-> -                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> -
-> -               if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
-> -                       regulator_disable(mmc->supply.vqmmc);
-> -               host->vqmmc_enabled = false;
-> +               sunxi_mmc_power_off(mmc, ios);
->                 break;
->         }
->
-> --
-> git-series 0.9.1
-
-Kind regards
-Uffe
+diff --git a/drivers/media/platform/stm32/stm32-cec.c b/drivers/media/platform/stm32/stm32-cec.c
+index 35cc2ffd6b96..68e18ee6655b 100644
+--- a/drivers/media/platform/stm32/stm32-cec.c
++++ b/drivers/media/platform/stm32/stm32-cec.c
+@@ -11,8 +11,11 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_irq.h>
+ #include <linux/platform_device.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/pm_runtime.h>
++#include <linux/pm_wakeirq.h>
+ #include <linux/regmap.h>
+ 
+ #include <media/cec.h>
+@@ -243,7 +246,7 @@ static int stm32_cec_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct stm32_cec *cec;
+ 	void __iomem *mmio;
+-	int ret;
++	int ret, wakeirq;
+ 
+ 	cec = devm_kzalloc(&pdev->dev, sizeof(*cec), GFP_KERNEL);
+ 	if (!cec)
+@@ -274,6 +277,12 @@ static int stm32_cec_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	wakeirq = of_irq_get_byname(pdev->dev.of_node, "wakeup");
++	if (wakeirq > 0) {
++		device_init_wakeup(&pdev->dev, true);
++		dev_pm_set_dedicated_wake_irq(&pdev->dev, wakeirq);
++	}
++
+ 	cec->clk_cec = devm_clk_get(&pdev->dev, "cec");
+ 	if (IS_ERR(cec->clk_cec)) {
+ 		dev_err(&pdev->dev, "Cannot get cec clock\n");
+@@ -312,12 +321,44 @@ static int stm32_cec_remove(struct platform_device *pdev)
+ {
+ 	struct stm32_cec *cec = platform_get_drvdata(pdev);
+ 
++	dev_pm_clear_wake_irq(&pdev->dev);
++	device_init_wakeup(&pdev->dev, false);
++
+ 	cec_unregister_adapter(cec->adap);
+ 
+ 	pm_runtime_disable(&pdev->dev);
+ 
+ 	return 0;
+ }
++
++static int __maybe_unused stm32_cec_suspend(struct device *dev)
++{
++	struct stm32_cec *cec = dev_get_drvdata(dev);
++
++	pm_runtime_force_suspend(dev);
++
++	if (device_may_wakeup(dev))
++		enable_irq_wake(cec->irq);
++
++	pinctrl_pm_select_sleep_state(dev);
++
++	return 0;
++}
++
++static int __maybe_unused stm32_cec_resume(struct device *dev)
++{
++	struct stm32_cec *cec = dev_get_drvdata(dev);
++
++	pinctrl_pm_select_default_state(dev);
++
++	if (device_may_wakeup(dev))
++		disable_irq_wake(cec->irq);
++
++	pm_runtime_force_resume(dev);
++
++	return 0;
++}
++
+ static int __maybe_unused stm32_cec_runtime_suspend(struct device *dev)
+ {
+ 	struct stm32_cec *cec = dev_get_drvdata(dev);
+@@ -341,6 +382,7 @@ static int __maybe_unused stm32_cec_runtime_resume(struct device *dev)
+ static const struct dev_pm_ops stm32_cec_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(stm32_cec_runtime_suspend, stm32_cec_runtime_resume,
+ 			   NULL)
++	SET_SYSTEM_SLEEP_PM_OPS(stm32_cec_suspend, stm32_cec_resume)
+ };
+ 
+ static const struct of_device_id stm32_cec_of_match[] = {
+-- 
+2.15.0
