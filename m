@@ -1,56 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 15 Mar 2018 12:21:17 -0400
-Subject: [PATCH 7/7] ixgbevf: eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <CAKgT0UcBQRoSPPZ73bdu1oEBGqBA8_c3ZAjti20=+9UwEqpXbw@mail.gmail.com>
-References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
- <1520997629-17361-7-git-send-email-okaya@codeaurora.org>
- <12150aa0-77ba-878e-31f4-d4f8d6a28ccb@codeaurora.org>
- <2a4f4dec64b7462ae64152f6c2df9754@codeaurora.org>
- <CAKgT0UcriMiyV0q6y_x9r3-HJRAWp5_CpsK2jTqh3qvOV=Kkzw@mail.gmail.com>
- <d565406d-1bc7-6fb0-3f36-87a28ac69070@codeaurora.org>
- <CAKgT0UeBHGDmr0uXfuPQJKOomiH9uvXRVYpyDwMOzjkxAZMSYg@mail.gmail.com>
- <53bf7dfe-32ee-1861-e6ea-81f667590a43@codeaurora.org>
- <CAKgT0UcBQRoSPPZ73bdu1oEBGqBA8_c3ZAjti20=+9UwEqpXbw@mail.gmail.com>
-Message-ID: <eee8269d-b711-828c-ab84-5933bf86d024@codeaurora.org>
+From: harald@ccbib.org (Harald Geyer)
+Date: Thu, 15 Mar 2018 16:25:06 +0000
+Subject: [PATCHv2 1/5] arm64: dts: allwinner: a64: Add i2c0 pins
+In-Reply-To: <20180315162510.11669-1-harald@ccbib.org>
+References: <20180315162510.11669-1-harald@ccbib.org>
+Message-ID: <20180315162510.11669-2-harald@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2018 10:32 AM, Alexander Duyck wrote:
-> We tend to do something like:
->   update tx_buffer_info
->   update tx_desc
->   wmb()
->   point first tx_buffer_info next_to_watch value at last tx_desc
->   update next_to_use
->   notify device via writel
-> 
-> We do it this way because we have to synchronize between the Tx
-> cleanup path and the hardware so we basically lump the two barriers
-> together. instead of invoking both a smp_wmb and a wmb. Now that I
-> look at the pseudocode though I wonder if we shouldn't move the
-> next_to_use update before the wmb, but that might be material for
-> another patch. Anyway, in the Tx cleanup path we should have an
-> smp_rmb() after we read the next_to_watch values so that we avoid
-> reading any of the other fields in the buffer_info if either the field
-> is NULL or the descriptor pointed to has not been written back.
+Add the proper pin group node to reference in board files.
 
-How do you feel about keeping wmb() very close to writel_relaxed() like this?
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Harald Geyer <harald@ccbib.org>
+---
+changes since v1: none
 
-   update tx_buffer_info
-   update tx_desc
-   point first tx_buffer_info next_to_watch value at last tx_desc
-   update next_to_use
-   wmb()
-   notify device via writel_relaxed()
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-I'm afraid that if the order of wmb() and writel() is not very
-obvious or hidden in multiple functions, somebody can introduce a very nasty
-bug in the future.
-
-We also have to think about code maintenance.
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1b6dc31e7d91..64e452a758fa 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -309,6 +309,11 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+ 
++			i2c0_pins: i2c0_pins {
++				pins = "PH0", "PH1";
++				function = "i2c0";
++			};
++
+ 			i2c1_pins: i2c1_pins {
+ 				pins = "PH2", "PH3";
+ 				function = "i2c1";
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
