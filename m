@@ -1,56 +1,269 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 Mar 2018 14:22:57 -0300
-Subject: [GIT PULL 4/6] i.MX device tree updates for 4.17
-In-Reply-To: <CAK8P3a09BjAnRWitNbfMFvPr7nwmqcVNi28VK1pRMUu0VUL90w@mail.gmail.com>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
- <1521113800-16401-4-git-send-email-shawnguo@kernel.org>
- <CAK8P3a3NXL_0z+Qm1O5Giz3SstGeHd1ghB320b6OSZPOeY1uuA@mail.gmail.com>
- <CAK8P3a09BjAnRWitNbfMFvPr7nwmqcVNi28VK1pRMUu0VUL90w@mail.gmail.com>
-Message-ID: <CAOMZO5BHn+rF5uvJ9Vp7wDSvyVOCAf_kkbR3Lr2EqTX+FFKLvA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Mar 2018 17:16:47 +0000
+Subject: [PATCH v2 5/6] KVM: arm/arm64: vgic: Don't populate multiple LRs with
+ the same vintid
+In-Reply-To: <20180315171648.19501-1-marc.zyngier@arm.com>
+References: <20180315171648.19501-1-marc.zyngier@arm.com>
+Message-ID: <20180315171648.19501-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The vgic code is trying to be clever when injecting GICv2 SGIs,
+and will happily populate LRs with the same interrupt number if
+they come from multiple vcpus (after all, they are distinct
+interrupt sources).
 
-On Thu, Mar 15, 2018 at 1:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thu, Mar 15, 2018 at 4:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
->>>  - A bunch of patches from Fabio and Marco to fix DTC warnings seen with
->>>    W=1 switch.
->>>  - Add missing '#sound-dai-cells' for sgtl5000 codec which is complained
->>>    by DTC.
->
-> I still get a bunch of warnings in linux-next with your patches:
->
-> arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dtb: Warning
-> (chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-> 'stdout-path' instead
-> arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dtb: Warning
-> (chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-> 'stdout-path' instead
-> arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dtb: Warning
-> (chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-> 'stdout-path' instead
-> arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dtb: Warning
-> (chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-> 'stdout-path' instead
-> arch/arm/boot/dts/imx6ul-isiot-emmc.dtb: Warning (sound_dai_property):
-> /sound/simple-audio-card,codec: Missing property '#sound-dai-cells' in
-> node /soc/aips-bus at 2100000/i2c at 21a0000/codec at a or bad phandle
-> (referred from sound-dai[0])
-> arch/arm/boot/dts/imx6ul-isiot-nand.dtb: Warning (sound_dai_property):
-> /sound/simple-audio-card,codec: Missing property '#sound-dai-cells' in
-> node /soc/aips-bus at 2100000/i2c at 21a0000/codec at a or bad phandle
-> (referred from sound-dai[0])
->
-> I hoped that they would be fixed with the pull request, but something
-> is still missing. Can you have another look? It should be related to
-> the fixes you already have.
+Unfortunately, this is against the letter of the architecture,
+and the GICv2 architecture spec says "Each valid interrupt stored
+in the List registers must have a unique VirtualID for that
+virtual CPU interface.". GICv3 has similar (although slightly
+ambiguous) restrictions.
 
-My DTC warning patches were generated against Shaw's tree, which is
-based on 4.16-rc1.
+This results in guests locking up when using GICv2-on-GICv3, for
+example. The obvious fix is to stop trying so hard, and inject
+a single vcpu per SGI per guest entry. After all, pending SGIs
+with multiple source vcpus are pretty rare, and are mostly seen
+in scenario where the physical CPUs are severely overcomitted.
 
-In his trees these warnings do not appear, so I haven't fixed them yet.
+But as we now only inject a single instance of a multi-source SGI per
+vcpu entry, we may delay those interrupts for longer than strictly
+necessary, and run the risk of injecting lower priority interrupts
+in the meantime.
 
-I can send more patches to fix the remaining i.MX DTC warnings against
-linux-next, but that will probably be for 4.18.
+In order to address this, we adopt a three stage strategy:
+- If we encounter a multi-source SGI in the AP list while computing
+  its depth, we force the list to be sorted
+- When populating the LRs, we prevent the injection of any interrupt
+  of lower priority than that of the first multi-source SGI we've
+  injected.
+- Finally, the injection of a multi-source SGI triggers the request
+  of a maintenance interrupt when there will be no pending interrupt
+  in the LRs (HCR_NPIE).
+
+At the point where the last pending interrupt in the LRs switches
+from Pending to Active, the maintenance interrupt will be delivered,
+allowing us to add the remaining SGIs using the same process.
+
+Cc: stable at vger.kernel.org
+Fixes: 0919e84c0fc1 ("KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework")
+Acked-by: Christoffer Dall <cdall@kernel.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ include/linux/irqchip/arm-gic.h    |  1 +
+ virt/kvm/arm/vgic/vgic-v2.c        |  9 +++++-
+ virt/kvm/arm/vgic/vgic-v3.c        |  9 +++++-
+ virt/kvm/arm/vgic/vgic.c           | 61 +++++++++++++++++++++++++++++---------
+ virt/kvm/arm/vgic/vgic.h           |  2 ++
+ 6 files changed, 67 insertions(+), 16 deletions(-)
+
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index c00c4c33e432..b26eccc78fb1 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -503,6 +503,7 @@
+ 
+ #define ICH_HCR_EN			(1 << 0)
+ #define ICH_HCR_UIE			(1 << 1)
++#define ICH_HCR_NPIE			(1 << 3)
+ #define ICH_HCR_TC			(1 << 10)
+ #define ICH_HCR_TALL0			(1 << 11)
+ #define ICH_HCR_TALL1			(1 << 12)
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index d3453ee072fc..68d8b1f73682 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -84,6 +84,7 @@
+ 
+ #define GICH_HCR_EN			(1 << 0)
+ #define GICH_HCR_UIE			(1 << 1)
++#define GICH_HCR_NPIE			(1 << 3)
+ 
+ #define GICH_LR_VIRTUALID		(0x3ff << 0)
+ #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index e9d840a75e7b..29556f71b691 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -37,6 +37,13 @@ void vgic_v2_init_lrs(void)
+ 		vgic_v2_write_lr(i, 0);
+ }
+ 
++void vgic_v2_set_npie(struct kvm_vcpu *vcpu)
++{
++	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
++
++	cpuif->vgic_hcr |= GICH_HCR_NPIE;
++}
++
+ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+@@ -64,7 +71,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 	int lr;
+ 	unsigned long flags;
+ 
+-	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
++	cpuif->vgic_hcr &= ~(GICH_HCR_UIE | GICH_HCR_NPIE);
+ 
+ 	for (lr = 0; lr < vgic_cpu->used_lrs; lr++) {
+ 		u32 val = cpuif->vgic_lr[lr];
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 6b329414e57a..0ff2006f3781 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -26,6 +26,13 @@ static bool group1_trap;
+ static bool common_trap;
+ static bool gicv4_enable;
+ 
++void vgic_v3_set_npie(struct kvm_vcpu *vcpu)
++{
++	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
++
++	cpuif->vgic_hcr |= ICH_HCR_NPIE;
++}
++
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v3_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v3;
+@@ -47,7 +54,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 	int lr;
+ 	unsigned long flags;
+ 
+-	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
++	cpuif->vgic_hcr &= ~(ICH_HCR_UIE | ICH_HCR_NPIE);
+ 
+ 	for (lr = 0; lr < vgic_cpu->used_lrs; lr++) {
+ 		u64 val = cpuif->vgic_lr[lr];
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 0001858a2c23..8201899126f6 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -710,22 +710,37 @@ static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
+ 		vgic_v3_set_underflow(vcpu);
+ }
+ 
++static inline void vgic_set_npie(struct kvm_vcpu *vcpu)
++{
++	if (kvm_vgic_global_state.type == VGIC_V2)
++		vgic_v2_set_npie(vcpu);
++	else
++		vgic_v3_set_npie(vcpu);
++}
++
+ /* Requires the ap_list_lock to be held. */
+-static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
++static int compute_ap_list_depth(struct kvm_vcpu *vcpu,
++				 bool *multi_sgi)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_irq *irq;
+ 	int count = 0;
+ 
++	*multi_sgi = false;
++
+ 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
+ 
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+ 		spin_lock(&irq->irq_lock);
+ 		/* GICv2 SGIs can count for more than one... */
+-		if (vgic_irq_is_sgi(irq->intid) && irq->source)
+-			count += hweight8(irq->source);
+-		else
++		if (vgic_irq_is_sgi(irq->intid) && irq->source) {
++			int w = hweight8(irq->source);
++
++			count += w;
++			*multi_sgi |= (w > 1);
++		} else {
+ 			count++;
++		}
+ 		spin_unlock(&irq->irq_lock);
+ 	}
+ 	return count;
+@@ -736,28 +751,43 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_irq *irq;
+-	int count = 0;
++	int count;
++	bool npie = false;
++	bool multi_sgi;
++	u8 prio = 0xff;
+ 
+ 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
+ 
+-	if (compute_ap_list_depth(vcpu) > kvm_vgic_global_state.nr_lr)
++	count = compute_ap_list_depth(vcpu, &multi_sgi);
++	if (count > kvm_vgic_global_state.nr_lr || multi_sgi)
+ 		vgic_sort_ap_list(vcpu);
+ 
++	count = 0;
++
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+ 		spin_lock(&irq->irq_lock);
+ 
+-		if (unlikely(vgic_target_oracle(irq) != vcpu))
+-			goto next;
+-
+ 		/*
+-		 * If we get an SGI with multiple sources, try to get
+-		 * them in all at once.
++		 * If we have multi-SGIs in the pipeline, we need to
++		 * guarantee that they are all seen before any IRQ of
++		 * lower priority. In that case, we need to filter out
++		 * these interrupts by exiting early. This is easy as
++		 * the AP list has been sorted already.
+ 		 */
+-		do {
++		if (multi_sgi && irq->priority > prio) {
++			spin_unlock(&irq->irq_lock);
++			break;
++		}
++
++		if (likely(vgic_target_oracle(irq) == vcpu)) {
+ 			vgic_populate_lr(vcpu, irq, count++);
+-		} while (irq->source && count < kvm_vgic_global_state.nr_lr);
+ 
+-next:
++			if (irq->source) {
++				npie = true;
++				prio = irq->priority;
++			}
++		}
++
+ 		spin_unlock(&irq->irq_lock);
+ 
+ 		if (count == kvm_vgic_global_state.nr_lr) {
+@@ -768,6 +798,9 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ 		}
+ 	}
+ 
++	if (npie)
++		vgic_set_npie(vcpu);
++
+ 	vcpu->arch.vgic_cpu.used_lrs = count;
+ 
+ 	/* Nuke remaining LRs */
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 5b11859a1a1e..f5b8519e5546 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -160,6 +160,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
+ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
+ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
++void vgic_v2_set_npie(struct kvm_vcpu *vcpu);
+ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val);
+@@ -189,6 +190,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
+ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
++void vgic_v3_set_npie(struct kvm_vcpu *vcpu);
+ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+-- 
+2.14.2
