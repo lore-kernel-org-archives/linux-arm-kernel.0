@@ -1,82 +1,174 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Mar 2018 07:45:21 +0000
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+Date: Thu, 15 Mar 2018 07:59:16 +0000
+Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
  alignment"
-In-Reply-To: <CACjP9X_xjyvQD_b1XNAZi=vjX0wGUmQuGJN8HahBmXx55OUE6A@mail.gmail.com>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
- <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
- <CAKv+Gu-NfXm5YLWXAPsf6zycPs7Ti9qPLQ7FvpOrjdPz5hEP7Q@mail.gmail.com>
- <CACjP9X_xjyvQD_b1XNAZi=vjX0wGUmQuGJN8HahBmXx55OUE6A@mail.gmail.com>
-Message-ID: <CAKv+Gu8aVr_u4o8QR2Nquo9it54nSbvPMj4vcZ+CQa3uoOakrA@mail.gmail.com>
+In-Reply-To: <CACjP9X9Fbfh2geGWefgv4_UbRFurWeugcBzcLmNVQnmqpZSwfg@mail.gmail.com>
+References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
+ <20180314141323.GD23100@dhcp22.suse.cz>
+ <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
+ <20180314145450.GI23100@dhcp22.suse.cz>
+ <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+ <CAKv+Gu8U9U1ThYxXWU6AuoF5s4uAGps_-T+2tksjc4nGNdX2_w@mail.gmail.com>
+ <CAKv+Gu_ubc0RomckZbH5-fEUYeOOqziAQM96uCecoKfWy_mCfQ@mail.gmail.com>
+ <CACjP9X9feHuQTZhGw9XbPkTZLWuQjZ9z_O9=6xga7Sw1LC_r+Q@mail.gmail.com>
+ <CAKv+Gu8R0yxjRRtRo0_o1eUHpnaNichzyfGLEZw=k9w+LDGBwA@mail.gmail.com>
+ <CACjP9X9Fbfh2geGWefgv4_UbRFurWeugcBzcLmNVQnmqpZSwfg@mail.gmail.com>
+Message-ID: <CAKv+Gu_6jPk-ick4Pw8e-EbwT_yLof-MmNrwpJveVXxEqn4m_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 07:44, Daniel Vacek <neelx@redhat.com> wrote:
-> On Thu, Mar 15, 2018 at 8:36 AM, Ard Biesheuvel
+On 15 March 2018 at 07:42, Daniel Vacek <neelx@redhat.com> wrote:
+> On Thu, Mar 15, 2018 at 7:39 AM, Ard Biesheuvel
 > <ard.biesheuvel@linaro.org> wrote:
->> On 15 March 2018 at 02:23, Daniel Vacek <neelx@redhat.com> wrote:
->>> On Wed, Mar 14, 2018 at 8:29 PM, Ard Biesheuvel
+>> On 15 March 2018 at 02:32, Daniel Vacek <neelx@redhat.com> wrote:
+>>> On Wed, Mar 14, 2018 at 6:36 PM, Ard Biesheuvel
 >>> <ard.biesheuvel@linaro.org> wrote:
->>>> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
+>>>> On 14 March 2018 at 16:41, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>> On 14 March 2018 at 15:54, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>>> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
+>>>>>>> On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
+>>>>>>>> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
+>>>>>>>> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
+>>>>>>>> > fix your issue? From the debugging info you provided it should because
+>>>>>>>> > the patch prevents jumping backwards.
+>>>>>>>> >
+>>>>>>>>
+>>>>>>>> The patch does fix the boot hang.
+>>>>>>>>
+>>>>>>>> But I am concerned that we are papering over a fundamental flaw in
+>>>>>>>> memblock_next_valid_pfn().
+>>>>>>>
+>>>>>>> It seems that memblock_next_valid_pfn is doing the right thing here. It
+>>>>>>> is the alignment which moves the pfn back AFAICS. I am not really
+>>>>>>> impressed about the original patch either, to be completely honest.
+>>>>>>> It just looks awfully tricky. I still didn't manage to wrap my head
+>>>>>>> around the original issue though so I do not have much better ideas to
+>>>>>>> be honest.
+>>>>>>
+>>>>>> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
+>>>>>> argument, which is odd nut easily fixed.
+>>>>>> Then, the whole idea of substracting one so that the pfn++ will
+>>>>>> produce the expected value is rather hacky,
+>>>>>>
+>>>>>> But the real problem is that rounding down pfn for the next iteration
+>>>>>> is dodgy, because early_pfn_valid() isn't guaranteed to return true
+>>>>>> for the rounded down value. I know it is probably fine in reality, but
+>>>>>> dodgy as hell. The same applies to the call to early_pfn_in_nid() btw
+>>>>>>
+>>>>>> So how about something like this (apologies on Gmail's behalf for the
+>>>>>> whitespace damage, I can resend it as a proper patch)
+>>>>>>
+>>>>>>
+>>>>>> ---------8<-----------
+>>>>>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+>>>>>> index 3d974cb2a1a1..b89ca999ee3b 100644
+>>>>>> --- a/mm/page_alloc.c
+>>>>>> +++ b/mm/page_alloc.c
+>>>>>> @@ -5352,28 +5352,29 @@
+>>>>>>                  * function.  They do not exist on hotplugged memory.
+>>>>>>                  */
+>>>>>>                 if (context != MEMMAP_EARLY)
+>>>>>>                         goto not_early;
+>>>>>>
+>>>>>> -               if (!early_pfn_valid(pfn)) {
+>>>>>> +               if (!early_pfn_valid(pfn) || !early_pfn_in_nid(pfn, nid)) {
+>>>>>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>>>>>>                         /*
+>>>>>>                          * Skip to the pfn preceding the next valid one (or
+>>>>>>                          * end_pfn), such that we hit a valid pfn (or end_pfn)
+>>>>>>                          * on our next iteration of the loop. Note that it needs
+>>>>>>                          * to be pageblock aligned even when the region itself
+>>>>>>                          * is not. move_freepages_block() can shift ahead of
+>>>>>>                          * the valid region but still depends on correct page
+>>>>>>                          * metadata.
+>>>>>>                          */
+>>>>>> -                       pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
+>>>>>> -                                       ~(pageblock_nr_pages-1)) - 1;
+>>>>>> -#endif
+>>>>>> +                       pfn = memblock_next_valid_pfn(pfn, end_pfn);
+>>>>>> +                       if (pfn >= end_pfn)
+>>>>>> +                               break;
+>>>>>> +                       pfn &= ~(pageblock_nr_pages - 1);
+>>>>>> +#else
+>>>>>>                         continue;
+>>>>>> +#endif
+>>>>>>                 }
+>>>>>> -               if (!early_pfn_in_nid(pfn, nid))
+>>>>>> -                       continue;
+>>>>>>                 if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
+>>>>>>                         break;
+>>>>>>
+>>>>>>  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+>>>>>>                 /*
+>>>>>> ---------8<-----------
+>>>>>>
+>>>>>> This ensures that we enter the remainder of the loop with a properly
+>>>>>> aligned pfn, rather than tweaking the value of pfn so it assumes the
+>>>>>> expected value after 'pfn++'
+>>>>>
+>>>>> Um, this does not actually solve the issue. I guess this is due to the
+>>>>> fact that a single pageblock size chunk could have both valid and
+>>>>> invalid PFNs, and so rounding down the first PFN of the second valid
+>>>>> chunk moves you back to the first chunk.
 >>>>
->>>> Commit 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock
->>>> alignment") modified the logic in memmap_init_zone() to initialize
->>>> struct pages associated with invalid PFNs, to appease a VM_BUG_ON()
->>>> in move_freepages(), which is redundant by its own admission, and
->>>> dereferences struct page fields to obtain the zone without checking
->>>> whether the struct pages in question are valid to begin with.
->>>>
->>>> Commit 864b75f9d6b0 only makes it worse, since the rounding it does
->>>> may cause pfn assume the same value it had in a prior iteration of
->>>> the loop, resulting in an infinite loop and a hang very early in the
->>>> boot. Also, since it doesn't perform the same rounding on start_pfn
->>>> itself but only on intermediate values following an invalid PFN, we
->>>> may still hit the same VM_BUG_ON() as before.
->>>>
->>>> So instead, let's fix this at the core, and ensure that the BUG
->>>> check doesn't dereference struct page fields of invalid pages.
->>>>
->>>> Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
->>>> Cc: Daniel Vacek <neelx@redhat.com>
->>>> Cc: Mel Gorman <mgorman@techsingularity.net>
->>>> Cc: Michal Hocko <mhocko@suse.com>
->>>> Cc: Paul Burton <paul.burton@imgtec.com>
->>>> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
->>>> Cc: Vlastimil Babka <vbabka@suse.cz>
->>>> Cc: Andrew Morton <akpm@linux-foundation.org>
->>>> Cc: Linus Torvalds <torvalds@linux-foundation.org>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> ---
->>>>  mm/page_alloc.c | 13 +++++--------
->>>>  1 file changed, 5 insertions(+), 8 deletions(-)
->>>>
->>>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->>>> index 3d974cb2a1a1..635d7dd29d7f 100644
->>>> --- a/mm/page_alloc.c
->>>> +++ b/mm/page_alloc.c
->>>> @@ -1910,7 +1910,9 @@ static int move_freepages(struct zone *zone,
->>>>          * Remove at a later date when no bug reports exist related to
->>>>          * grouping pages by mobility
->>>>          */
->>>> -       VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
->>>> +       VM_BUG_ON(pfn_valid(page_to_pfn(start_page)) &&
->>>> +                 pfn_valid(page_to_pfn(end_page)) &&
->>>> +                 page_zone(start_page) != page_zone(end_page));
+>>>> OK, so the original patch attempted to ensure that of each pageblock,
+>>>> at least the first struct page gets initialized, even though the PFN
+>>>> may not be valid. Unfortunately, this code is not complete, given that
+>>>> start_pfn itself may be misaligned, and so the issue it attempts to
+>>>> solve may still occur.
 >>>
->>> Hi, I am on vacation this week and I didn't have a chance to test this
->>> yet but I am not sure this is correct. Generic pfn_valid() unlike the
->>> arm{,64} arch specific versions returns true for all pfns in a section
->>> if there is at least some memory mapped in that section. So I doubt
->>> this prevents the crash I was targeting. I believe pfn_valid() does
->>> not change a thing here :(
+>>> You're wrong here.
 >>>
 >>
->> If this is the case, memblock_next_valid_pfn() is broken since it
->> skips valid PFNs, and we should be fixing that instead.
+>> You only align down after encountering an invalid PFN. If start_pfn
+>> itself is not pageblock aligned, how do you initialize the first
+>> struct page of the pageblock?
+>>
+>>>> Then, I think it is absolutely dodgy to settle for only initializing
+>>>> the first struct page, rather than all of them, only because a
+>>>> specific VM_BUG_ON() references the flag field of the first struct
+>>>> page.
+>>>> IMO, we should fix this by initializing all struct page entries for
+>>>> each pageblock sized chunk that has any valid PFNs.
+>>>
+>>> That's precisely what my patch does. At least with
+>>> CONFIG_HAVE_ARCH_PFN_VALID disabled. And it looks only arm implements
+>>> arch pfn_valid() which I was not testing with and I am not sure it's
+>>> correct. Check my other email
+>>>
+>>
+>> No, your patch only initializes the first struct page of a pageblock.
+>> If the next one is invalid, we will skip to the next valid one.
 >
-> How do you define valid pfn? Maybe the generic version of pfn_valid()
-> should be fixed???
+> I believe you're pretty puzzled here.
 >
 
-memblock_next_valid_pfn() skips PFNs for which pfn_valid() returns
-true. That is clearly a bug.
+It depends on your implementation of early_pfn_valid().
+
+You keep making the assumption that your architecture's interpretation
+of pfn_valid() is in some way more correct, and so it is justified to
+make assumptions about its implementation, i.e., to round down to the
+start of a pageblock since pfn_valid() is known to return the same
+result for all PFNs covered by the same pageblock.
+
+early_pfn_valid() may return false for the rounded down PFN value, and
+for any subsequent ones. So whether the rounding has the desired
+effect (or any effect at all, other than hanging the box) is
+uncertain.
+
+As I said, if memblock_next_valid_pfn() skips PFNs for which
+pfn_valid() returns true, we should fix that instead.
+
+>> You are making the assumption that pfn_valid() will return true for
+>> all pages in a pageblock if it returns true for one of them, and this
+>> does not hold on other architectures.
+>
+> It does. At least the generic version defined in
+> include/linux/mmzone.h. And this seems to be used by all arches but
+> arm with CONFIG_HAVE_ARCH_PFN_VALID. With that config disabled I guess
+> even arm behaves the same. Though I could be wrong.
+>
+
+None of that matters. It is not part of the contract of pfn_valid()
+that you may infer that arbitrary PFNs in the vicinity of the pfn
+value you gave it are valid as well.
