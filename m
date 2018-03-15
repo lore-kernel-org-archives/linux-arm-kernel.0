@@ -1,54 +1,41 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Thu, 15 Mar 2018 12:47:25 +0530
-Subject: [PATCH v1 0/4] Fix issues with huge mapping in ioremap
-In-Reply-To: <1521038277.2693.131.camel@hpe.com>
-References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
- <1521038277.2693.131.camel@hpe.com>
-Message-ID: <9954bd28-0457-b80e-8af7-6259b63533f2@codeaurora.org>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Thu, 15 Mar 2018 15:17:14 +0800
+Subject: [PATCH] ARM: dts: rockchip: fix uart4 pin-num for rk3288
+Message-ID: <20180315071714.11589-1-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+According to TRM, uart4 tx/rx should be 14/15
 
+Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-On 3/14/2018 8:08 PM, Kani, Toshi wrote:
-> On Wed, 2018-03-14 at 14:18 +0530, Chintan Pandya wrote:
->> Note: I was working on these patches for quite sometime
->> and realized that Toshi Kani has shared some patches
->> addressing the same isssue with subject
->> "[PATCH 0/2] fix memory leak / panic in ioremap huge pages".
->> I've taken slightly different approach here, so sending
->> to the list, finally.
-> 
-> Hi Chintan,
-Hi Toshi
-> 
-> Do you have any issue in my patchset?  If so, can you please comment on
-Not functional issues. But I didn't see issues you mentioned in your
-commit text being solved for ARM64 in your patches. It is just being
-masked which they were already by Will's patch. In my approach, end
-goal was to get benefits of huge mapping back for ARM64.
-
-> them?  It complicates the thing when you send a different approach
-> without telling why a different approach is needed.  Your approach
-See my reply above. I just had my original patches and I sent it.
-
-> purges TLB after updating pmd/pud, which I think is broken.  Can you
-Yes, they are broken. I understood the issues after Mark and Marc's
-review comments.
-
-> work on top of my patchset and properly implement pXd_free_pte_page()
-I have realized that if I address Mark's comments, my new patch will
-look similar to what you have done. So, I will work on top of your
-patches.
-
-> for arm64?  I will send out my v2 today.
->    
-> Thanks,
-> -Toshi
-> 
-
-Chintan
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index ed05f3d77358..40327c764385 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -1938,16 +1938,16 @@
+ 
+ 		uart4 {
+ 			uart4_xfer: uart4-xfer {
+-				rockchip,pins = <5 12 3 &pcfg_pull_up>,
+-						<5 13 3 &pcfg_pull_none>;
++				rockchip,pins = <5 15 3 &pcfg_pull_up>,
++						<5 14 3 &pcfg_pull_none>;
+ 			};
+ 
+ 			uart4_cts: uart4-cts {
+-				rockchip,pins = <5 14 3 &pcfg_pull_up>;
++				rockchip,pins = <5 12 3 &pcfg_pull_up>;
+ 			};
+ 
+ 			uart4_rts: uart4-rts {
+-				rockchip,pins = <5 15 3 &pcfg_pull_none>;
++				rockchip,pins = <5 13 3 &pcfg_pull_none>;
+ 			};
+ 		};
+ 
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+2.16.1
