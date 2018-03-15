@@ -1,80 +1,34 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:05 +0100
-Subject: [PATCH 03/60] arm: dts: kirkwood-linkstation-lsqvl: use
+Date: Thu, 15 Mar 2018 17:50:17 +0100
+Subject: [PATCH 15/60] arm: dts: kirkwood-ds110jv10: use
  SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-4-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-16-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the recent trend for the license description, and also fix the
-wrongly stated X11 to MIT.
+Follow the recent trend for the license description
 
-As already pointed on the DT ML, the X11 license text [1] is explicitly
-for the X Consortium and has a couple of extra clauses. The MIT
-license text [2] is actually what the current DT files claim.
-
-[1] https://spdx.org/licenses/X11.html
-[2] https://spdx.org/licenses/MIT.html
-
-Cc: Mario Lange <mario_lange@gmx.net>
+Cc: Ben Peddell <klightspeed@killerwolves.net>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts | 39 +-----------------------
- 1 file changed, 1 insertion(+), 38 deletions(-)
+ arch/arm/boot/dts/kirkwood-ds110jv10.dts | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-index 9cc05203baee..8bb381088910 100644
---- a/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-+++ b/arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+diff --git a/arch/arm/boot/dts/kirkwood-ds110jv10.dts b/arch/arm/boot/dts/kirkwood-ds110jv10.dts
+index 95bf83b91b4a..d68c616e9309 100644
+--- a/arch/arm/boot/dts/kirkwood-ds110jv10.dts
++++ b/arch/arm/boot/dts/kirkwood-ds110jv10.dts
+@@ -1,10 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
  /*
-  * Device Tree file for Buffalo Linkstation LS-QVL
+  * Andrew Lunn <andrew@lunn.ch>
+  * Ben Peddell <klightspeed@killerwolves.net>
   *
-@@ -6,44 +7,6 @@
-  * Based on kirkwood-linkstation-lswvl.dts,
-  * Copyright (C) 2015, 2016
-  * Roger Shimizu <rogershimizu@gmail.com>
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License, or (at your option) any later version.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
   */
  
  /dts-v1/;
