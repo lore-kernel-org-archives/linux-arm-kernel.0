@@ -1,40 +1,80 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 15 Mar 2018 17:48:36 +0100
-Subject: [PATCHv2 3/7] driver, misc: add Intel Stratix10 service layer
- driver
-In-Reply-To: <1519949975-13548-4-git-send-email-richard.gong@linux.intel.com>
-References: <1519949975-13548-1-git-send-email-richard.gong@linux.intel.com>
- <1519949975-13548-4-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <20180315164836.GB4060@kroah.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 15 Mar 2018 17:50:06 +0100
+Subject: [PATCH 04/60] arm: dts: kirkwood-linkstation-lsvl: use
+ SPDX-License-Identifier
+In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
+References: <20180315165102.27160-1-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-5-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 01, 2018 at 06:19:31PM -0600, richard.gong at linux.intel.com wrote:
-> +EXPORT_SYMBOL_GPL(request_svc_channel_byname);
+Follow the recent trend for the license description, and also fix the
+wrongly stated X11 to MIT.
 
-All of your global symbols should have the same prefix, not a verb.  So
-this should be:
-	svc_channel_request_by_name(), right?
+As already pointed on the DT ML, the X11 license text [1] is explicitly
+for the X Consortium and has a couple of extra clauses. The MIT
+license text [2] is actually what the current DT files claim.
 
-> +EXPORT_SYMBOL_GPL(free_svc_channel);
+[1] https://spdx.org/licenses/X11.html
+[2] https://spdx.org/licenses/MIT.html
 
-svc_channel_free()?
+Cc: Roger Shimizu <rogershimizu@gmail.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts | 39 +------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
-> +EXPORT_SYMBOL_GPL(intel_svc_send);
-
-Wait, why doesn't the first ones have "intel_svc" in them?
-
-What is the difference here?
-
-Should they all just have "intel_svc_" as the prefix?
-
-Stick to one thing for all exported functions/variables please, it's the
-only way we can attempt to keep our namespace "sane".
-
-Also, why would a 'misc' driver be exporting things that something else
-uses?  Why not just put this in the fpga directory next to the users of
-this code?
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
+index ff37e76ab551..3f2a0bfe03ed 100644
+--- a/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
++++ b/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
+@@ -1,46 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree file for Buffalo Linkstation LS-VL
+  *
+  * Copyright (C) 2015, 2016
+  * Roger Shimizu <rogershimizu@gmail.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+ /dts-v1/;
+-- 
+2.16.1
