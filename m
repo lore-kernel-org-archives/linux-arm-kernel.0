@@ -1,76 +1,54 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 15 Mar 2018 17:12:09 +1030
-Subject: [GIT PULL] ARM: aspeed: dts changes for 4.17
-Message-ID: <CACPK8Xfv2XnhGo9cmJC69suOu9+caOp5QoXuD5Xw-gznGP61Og@mail.gmail.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Thu, 15 Mar 2018 12:47:25 +0530
+Subject: [PATCH v1 0/4] Fix issues with huge mapping in ioremap
+In-Reply-To: <1521038277.2693.131.camel@hpe.com>
+References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
+ <1521038277.2693.131.camel@hpe.com>
+Message-ID: <9954bd28-0457-b80e-8af7-6259b63533f2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ARM maintainers,
 
-Here are the ASPEED device tree updates for 4.17.
 
-Thanks!
+On 3/14/2018 8:08 PM, Kani, Toshi wrote:
+> On Wed, 2018-03-14 at 14:18 +0530, Chintan Pandya wrote:
+>> Note: I was working on these patches for quite sometime
+>> and realized that Toshi Kani has shared some patches
+>> addressing the same isssue with subject
+>> "[PATCH 0/2] fix memory leak / panic in ioremap huge pages".
+>> I've taken slightly different approach here, so sending
+>> to the list, finally.
+> 
+> Hi Chintan,
+Hi Toshi
+> 
+> Do you have any issue in my patchset?  If so, can you please comment on
+Not functional issues. But I didn't see issues you mentioned in your
+commit text being solved for ARM64 in your patches. It is just being
+masked which they were already by Will's patch. In my approach, end
+goal was to get benefits of huge mapping back for ARM64.
 
-The following changes since commit 91ab883eb21325ad80f3473633f794c78ac87f51:
+> them?  It complicates the thing when you send a different approach
+> without telling why a different approach is needed.  Your approach
+See my reply above. I just had my original patches and I sent it.
 
-  Linux 4.16-rc2 (2018-02-18 17:29:42 -0800)
+> purges TLB after updating pmd/pud, which I think is broken.  Can you
+Yes, they are broken. I understood the issues after Mark and Marc's
+review comments.
 
-are available in the Git repository at:
+> work on top of my patchset and properly implement pXd_free_pte_page()
+I have realized that if I address Mark's comments, my new patch will
+look similar to what you have done. So, I will work on top of your
+patches.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
-tags/aspeed-4.17-devicetree
+> for arm64?  I will send out my v2 today.
+>    
+> Thanks,
+> -Toshi
+> 
 
-for you to fetch changes up to 3719a1b130566cf91c3b3ec4707e1ed61bff6d54:
-
-  ARM: dts: aspeed: Add Qualcomm Centriq 2400 REP BMC (2018-03-14
-16:30:43 +1030)
-
-----------------------------------------------------------------
-ASPEED device tree updates for 4.17
-
-Updates to OpenPower BMC systems:
-
- A number of updates to use recently merged drivers, including moving to
- upstreamed IPMI BT nodes, a temp sensor for Romulus, and adding
- simple-reset for UARTs.
-
- This includes more of Palmetto's device tree, so that it's ever so
- close to booting the host with an upstream kernel.
-
-New machines:
-
- Add Qualcomm Centriq ARM64 server reference platform, which will run
- OpenBMC on an AST2500.
-
-----------------------------------------------------------------
-Andrew Jeffery (1):
-      ARM: dts: palmetto: Request mux as per strapping configuration
-
-Joel Stanley (9):
-      ARM: dts: aspeed: Add IPMI BT node
-      ARM: dts: aspeed: Enable IPMI BT node on OpenPower machines
-      ARM: dts: aspeed-g5: Update LPC node
-      ARM: dts: aspeed: Add LPC clock phandles
-      ARM: dts: palmetto: Add LEDs and GPIO keys
-      ARM: dts: aspeed: Add Palmetto GPIO hogs
-      ARM: dts: aspeed: Add LPC reset controller node
-      ARM: dts: palmetto: Enable rear UART
-      ARM: dts: romulus: Remove MAX31785 device
-
-Ken Chen (1):
-      ARM: dts: aspeed: Add Qualcomm Centriq 2400 REP BMC
-
-Lei YU (2):
-      ARM: dts: aspeed: romulus: hog GPIOS7
-      ARM: dts: aspeed: romulus: Add w83773g temp sensor
-
- arch/arm/boot/dts/Makefile                         |   1 +
- .../boot/dts/aspeed-bmc-arm-centriq2400-rep.dts    | 225 +++++++++++++++++++++
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts      | 206 +++++++++++++++++++
- arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts       |  16 +-
- arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts   |   4 +
- arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts         |   4 +
- arch/arm/boot/dts/aspeed-g4.dtsi                   |  18 ++
- arch/arm/boot/dts/aspeed-g5.dtsi                   |  25 ++-
- 8 files changed, 492 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-arm-centriq2400-rep.dts
+Chintan
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
