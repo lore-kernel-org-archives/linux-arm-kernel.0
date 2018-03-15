@@ -1,60 +1,71 @@
-From: k.marinushkin@gmail.com (Kirill Marinushkin)
-Date: Thu, 15 Mar 2018 06:57:21 +0100
-Subject: [PATCH v2] staging: bcm2835-audio: Release resources on
- module_exit()
-In-Reply-To: <CAHp75Ve9MRAgSu74Mzr2defd84umyeKpfvX51-Qhk4SvLx3Qng@mail.gmail.com>
-References: <63ee611d-9fd7-a67a-45aa-229cc4a83ed2@gmail.com>
- <20180313193414.11535-1-k.marinushkin@gmail.com>
- <CAHp75Ve9MRAgSu74Mzr2defd84umyeKpfvX51-Qhk4SvLx3Qng@mail.gmail.com>
-Message-ID: <1a59a938-0381-49f4-dfd9-c7a52bdb0eae@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 15 Mar 2018 14:17:51 +0800
+Subject: [PATCH] phy: allwinner: sun4i-usb: poll vbus changes on A23/A33
+ when driving VBUS
+In-Reply-To: <a38e269f-abe9-0560-1542-c115c5a64605@ti.com>
+References: <20180119092541.7508-1-wens@csie.org>
+ <20180119144512.dqqbywavhwsyma2f@flea.lan>
+ <a38e269f-abe9-0560-1542-c115c5a64605@ti.com>
+Message-ID: <CAGb2v66e+2wHGyZU+gAxho2-EiLX87VnV0E_xybbAv0FKvzToA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/18 22:23, Andy Shevchenko wrote:
-> On Tue, Mar 13, 2018 at 9:34 PM, Kirill Marinushkin
-> <k.marinushkin@gmail.com> wrote:
->> In the current implementation, `rmmod snd_bcm2835` does not release
->> resources properly. It causes an oops when trying to list sound devices.
+Hi Kishon,
+
+On Fri, Feb 16, 2018 at 7:20 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>
+>
+> On Friday 19 January 2018 08:15 PM, Maxime Ripard wrote:
+>> On Fri, Jan 19, 2018 at 05:25:41PM +0800, Chen-Yu Tsai wrote:
+>>> The AXP223 PMIC, like the AXP221, does not generate VBUS change
+>>> interrupts when N_VBUSEN is used to drive VBUS for the OTG port
+>>> on the board.
+>>>
+>>> This was not noticed until recently, as most A23/A33 boards use
+>>> a GPIO pin that does not support interrupts for OTG ID detection.
+>>> This forces the driver to use polling. However the A33-OlinuXino
+>>> uses a pin that does support interrupts, so the driver uses them.
+>>> However the VBUS interrupt never fires, and the driver never gets
+>>> to update the VBUS status. This results in musb timing out waiting
+>>> for VBUS to rise.
+>>>
+>>> This was worked around for the AXP221 by resorting to polling
+>>> changes in commit 91d96f06a760 ("phy-sun4i-usb: Add workaround for
+>>> missing Vbus det interrupts on A31"). This patch adds the A23 and
+>>> A33 to the list of SoCs that need the workaround.
+>>>
+>>> Fixes: fc1f45ed3043 ("phy-sun4i-usb: Add support for the usb-phys on the
+>>>                    sun8i-a33 SoC")
+>>> Fixes: 123dfdbcfaf5 ("phy-sun4i-usb: Add support for the usb-phys on the
+>>>                    sun8i-a23 SoC")
+>>> Cc: <stable@vger.kernel.org> # 4.3.x: 68dbc2ce77bb phy-sun4i-usb:
+>>>              Use of_match_node to get model specific config data
+>>> Cc: <stable@vger.kernel.org> # 4.3.x: 5cf700ac9d50 phy: phy-sun4i-usb:
+>>>              Fix optional gpios failing probe
+>>> Cc: <stable@vger.kernel.org> # 4.3.x: 04e59a0211ff phy-sun4i-usb:
+>>>              Fix irq free conditions to match request conditions
+>>> Cc: <stable@vger.kernel.org> # 4.3.x: 91d96f06a760 phy-sun4i-usb:
+>>>              Add workaround for missing Vbus det interrupts on A31
+>>> Cc: <stable@vger.kernel.org> # 4.3.x
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
+>>>
+>>> This list might get longer if the newer AXP8xx PMICs also have this
+>>> behavior. We could switch to a boolean in the per-compatible data,
+>>> or just always use polling. The yet-merged R40 support will have this
+>>> issue as well, as the R40 is paired with the AXP221. But for now,
+>>> I'd like to have something that is easier to backport to stable, so
+>>> we can at least fix this for the A23 and A33.
+>>>
+>>> Also, checkpatch.pl doesn't like the stable kernel prerequisite lines.
 >>
->> This commit fixes it.
-> Nice catch!
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 >
-> See my comments below.
->
->>  static void snd_devm_unregister_child(struct device *dev, void *res)
->>  {
->>         struct device *childdev = *(struct device **)res;
->> +       struct bcm2835_chip *chip = dev_get_drvdata(childdev);
->> +       struct snd_card *card = chip->card;
->> +
->> +       snd_card_free(card);
->> +       dev_set_drvdata(childdev, NULL);
-> AFAIU this is done by device core.
+> merged, thanks!
 
-Maybe you are right. But I don't know, which function in the device core does it.
-It is safe to have this line. So, I suggest to keep it.
+I see you moved this patch from your fixes branch to your -next branch.
+Is there any problem with the patch? Merge issues?
 
->
->>         device_unregister(childdev);
->>  }
->> +static void snd_devm_release(struct device *dev)
->> +{
->> +       struct bcm2835_chip *chip = dev_get_drvdata(dev);
->> +
->> +       kfree(chip);
->> +}
->
->>  /* chip-specific constructor
->> @@ -122,7 +136,7 @@ static int snd_bcm2835_create(struct snd_card *card,
->>
->>         err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
->>         if (err) {
->> -               snd_bcm2835_free(chip);
->> +               kfree(chip);
-> Do you call device_register() inside snd_device_new()?
-> In this case you might need put_device() here instead of simple kfree().
 
-No, from what I see, device_register() does not happen inside snd_device_new().
-
->>                 return err;
->>         }
+Thanks
+ChenYu
