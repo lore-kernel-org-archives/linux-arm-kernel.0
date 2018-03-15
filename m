@@ -1,132 +1,112 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 15 Mar 2018 11:04:11 +0100
-Subject: [PATCH v2 8/8] mmc: sunxi: Add runtime_pm support
-In-Reply-To: <CAPDyKFoJ0KftG1VxzdM97ubFJ25M+X0EjgOPc6HxewgyZMPipg@mail.gmail.com>
-References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
- <052c21c000f64c28fd6b64c4db11e4b706bebf79.1520520655.git-series.maxime.ripard@bootlin.com>
- <CAPDyKFoJ0KftG1VxzdM97ubFJ25M+X0EjgOPc6HxewgyZMPipg@mail.gmail.com>
-Message-ID: <20180315100411.iqcnwqws623ws6yn@flea>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 15 Mar 2018 10:06:23 +0000
+Subject: [PATCH] KVM: arm/arm64: VGIC MMIO: add missing irq_lock
+In-Reply-To: <20180313010045.GC16740@lvm>
+References: <20180306092106.13044-1-andre.przywara@arm.com>
+ <20180313010045.GC16740@lvm>
+Message-ID: <d0453520-a27b-7efe-83ee-ad96ac16d061@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi,
 
-On Thu, Mar 15, 2018 at 10:30:54AM +0100, Ulf Hansson wrote:
-> On 8 March 2018 at 15:52, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > So far, even if our card was not in use, we didn't shut down our main
-> > clock, which meant that it was still output on the MMC bus.
-> >
-> > While this obviously means that we could save some power there, it also
-> > created issues when it comes with EMC control since we'll have a perfect
-> > peak at the card clock rate.
-> >
-> > Let's implement runtime_pm with autosuspend so that we will shut down the
-> > clock when it's not been in use for quite some time.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > ---
-> >  drivers/mmc/host/sunxi-mmc.c | 46 +++++++++++++++++++++++++++++++++++++-
-> >  1 file changed, 46 insertions(+)
-> >
-> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> > index f6374066081b..0f98a5fcaade 100644
-> > --- a/drivers/mmc/host/sunxi-mmc.c
-> > +++ b/drivers/mmc/host/sunxi-mmc.c
-> > @@ -35,6 +35,7 @@
-> >  #include <linux/of_gpio.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/pm_runtime.h>
-> >  #include <linux/regulator/consumer.h>
-> >  #include <linux/reset.h>
-> >  #include <linux/scatterlist.h>
-> > @@ -973,6 +974,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> >         unsigned long flags;
-> >         u32 imask;
-> >
-> > +       if (enable)
-> > +               pm_runtime_get_noresume(host->dev);
-> > +
-> >         spin_lock_irqsave(&host->lock, flags);
-> >
-> >         imask = mmc_readl(host, REG_IMASK);
-> > @@ -985,6 +989,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> >         }
-> >         mmc_writel(host, REG_IMASK, imask);
-> >         spin_unlock_irqrestore(&host->lock, flags);
-> > +
-> > +       if (!enable)
-> > +               pm_runtime_put_noidle(host->mmc->parent);
-> >  }
-> >
-> >  static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
-> > @@ -1398,6 +1405,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
-> >         if (ret)
-> >                 goto error_free_dma;
-> >
-> > +       pm_runtime_set_active(&pdev->dev);
-> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> > +       pm_runtime_use_autosuspend(&pdev->dev);
-> > +       pm_runtime_enable(&pdev->dev);
-> > +
-> >         ret = mmc_add_host(mmc);
-> >         if (ret)
-> >                 goto error_free_dma;
-> > @@ -1418,6 +1430,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
-> >         struct sunxi_mmc_host *host = mmc_priv(mmc);
-> >
-> >         mmc_remove_host(mmc);
-> > +       pm_runtime_force_suspend(&pdev->dev);
-> >         disable_irq(host->irq);
-> >         sunxi_mmc_disable(host);
-> >         dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-> > @@ -1426,10 +1439,43 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >
-> > +static int sunxi_mmc_runtime_resume(struct device *dev)
-> > +{
-> > +       struct mmc_host *mmc = dev_get_drvdata(dev);
-> > +       struct sunxi_mmc_host *host = mmc_priv(mmc);
-> > +       int ret;
-> > +
-> > +       ret = sunxi_mmc_enable(host);
-> > +       if (ret)
-> > +               return ret;
-> > +
-> > +       sunxi_mmc_power_up(mmc, &mmc->ios);
+(sorry for the delay, forgot this in my draft folder)
+
+On 13/03/18 01:00, Christoffer Dall wrote:
+> On Tue, Mar 06, 2018 at 09:21:06AM +0000, Andre Przywara wrote:
+>> Our irq_is_pending() helper function accesses multiple members of the
+>> vgic_irq struct, so we need to hold the lock when calling it.
 > 
-> Instead of doing power up, you may need restore some ios settings,
-> such as the clock rate for example.
+> For the record I don't think this is necessarily a completely valid
+> conclusion.  The fact that you access multiple members of a struct is a
+> good indication that it might be a good idea to hold a lock, but it's
+> not as simple as that.
 > 
-> You may also need to restore some registers in sunxi device, in case
-> it's possible that the controller loses context at runtime suspend.
+> I think the only thing that could happen here is that a caller
+> mistakenly evaluates line_level when it shouldn't, but that would only
+> happen when changing the configuration of an irq from level to edge,
+> while the line_level is high, expecting the line_level to go down, and
+> the pending state to be subsequently reported as false, but we only
+> support changing the configuration of an interrupt when it's disabled,
+> and as a result this can only affect reads of the PENDR registers.
+> 
+>> Add that requirement as a comment to the definition and take the lock
+>> around the call in vgic_mmio_read_pending(), where we were missing it
+>> before.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> 
+> Note, I'm fine with this change, but I don't agree with the rationale.
+> The rationale is to take the lock on every use for consistency and to
+> make the code easier to reason about, but it's possible that some future
+> analysis in the future would relax this requirement if essential for
+> performance.
 
-The thing I was precisely trying to avoid was this :)
+  ^^^^^^^^^^^   vgic_mmio_read_pending  ;-)
 
-I could save and restore registers when the MMC controller is put into
-suspend, but that's pretty much exactly the same sequence than what is
-done in the MMC_POWER_UP sequence in .set_ios.
+So while I agree that one can build a case on why the *current* code
+might be actually safe without the lock, I think this is a very fragile
+approach. As documented, the lock protects the consistency of the
+members of the data structure. Full stop. So whenever we access
+multiple members, we should take the lock.
+If - and only if - we:
+- get a lot of contention on the lock, and
+- we care about this, and
+- we can prove that it's safe without the lock
+*then* it would be fine to remove this. And it would need to be heavily
+documented, possibly even with BUG()s.
 
-So it just felt cleaner to just do the power_up sequence at resume
-time. It avoids having to maintain the list of registers to save and
-restore, and it involves less code overall.
+Everything else looks like premature optimisation that even might break
+in the future once we for instance extend irq_is_pending() for whatever
+reason. Even today I am not sure that just reading
+"irq->pending_latch || irq->line_level" is safe without a lock,
+regardless of the configuration state.
 
-It suprised me a bit that the core will not call .set_ios with
-MMC_POWER_UP at resume by itself, but I guess there's a good reason
-for that :)
+In this particular case all other users take the lock, so this looked
+like a case where we have just forgotten this.
+And as hinted above, ISPENDR in a guest is probably not a frequently
+accessed register.
 
-Thanks!
-Maxime
+I believe we don't disagree on the matter, actually, but I'd be cautious
+and rather take the lock than avoid it, if in doubt.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180315/f635bd7a/attachment-0001.sig>
+Cheers,
+Andre.
+
+>> ---
+>>  virt/kvm/arm/vgic/vgic-mmio.c | 3 +++
+>>  virt/kvm/arm/vgic/vgic.h      | 1 +
+>>  2 files changed, 4 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+>> index 83d82bd7dc4e..dbe99d635c80 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+>> @@ -113,9 +113,12 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+>>  	/* Loop over all IRQs affected by this read */
+>>  	for (i = 0; i < len * 8; i++) {
+>>  		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>> +		unsigned long flags;
+>>  
+>> +		spin_lock_irqsave(&irq->irq_lock, flags);
+>>  		if (irq_is_pending(irq))
+>>  			value |= (1U << i);
+>> +		spin_unlock_irqrestore(&irq->irq_lock, flags);
+>>  
+>>  		vgic_put_irq(vcpu->kvm, irq);
+>>  	}
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 12c37b89f7a3..5b11859a1a1e 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -96,6 +96,7 @@
+>>  /* we only support 64 kB translation table page size */
+>>  #define KVM_ITS_L1E_ADDR_MASK		GENMASK_ULL(51, 16)
+>>  
+>> +/* Requires the irq_lock to be held by the caller. */
+>>  static inline bool irq_is_pending(struct vgic_irq *irq)
+>>  {
+>>  	if (irq->config == VGIC_CONFIG_EDGE)
+>> -- 
+>> 2.14.1
+>>
