@@ -1,40 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 Mar 2018 20:06:02 -0300
-Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.17
-In-Reply-To: <CAOMZO5B+ofiSZFbNLczCLsBAcaNMe9PRS1S2N9nkFx87msHSbA@mail.gmail.com>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
- <1521113800-16401-6-git-send-email-shawnguo@kernel.org>
- <CAK8P3a2mUiAQRUZSvTwX=9ukEY6LWPTFqj=9WwWf2=OO3L-q7g@mail.gmail.com>
- <CAOMZO5B+ofiSZFbNLczCLsBAcaNMe9PRS1S2N9nkFx87msHSbA@mail.gmail.com>
-Message-ID: <CAOMZO5D8-O2uEfpzkmSo_E0Wdc_yJ7CixF=vw6CWBwTZz1O37g@mail.gmail.com>
+From: tmaimon77@gmail.com (Tomer Maimon)
+Date: Fri, 16 Mar 2018 01:10:12 +0200
+Subject: [PATCH v1 2/2] arm: npcm: Enable L2 Cache in NPCM7xx
+In-Reply-To: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
+References: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
+Message-ID: <1521155412-29229-3-git-send-email-tmaimon77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 7:48 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Arnd,
->
-> On Thu, Mar 15, 2018 at 12:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
->> I didn't pull this one, it seems to remove some config symbols without
->> an explanation what happened to them:
->>
->> -CONFIG_FHANDLE=y
->> -# CONFIG_ARM_THUMB is not set
->> -CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
->> -# CONFIG_DEVKMEM is not set
->> -CONFIG_NVMEM=y
->> -CONFIG_LOCKUP_DETECTOR=y
->> -CONFIG_TIMER_STATS=y
->>
->> Can you have another look? I want to be sure that we don't
->> accidentally turn off something important when the respective
->> Kconfig symbol got renamed or it gained a dependency that
->> is no longer met.
->
-> I can take a look.
->
-> Which specific patch are you talking about?
+Enable L2 Cache in Nuvoton NPCM7xx BMC.
 
-I assume it is "ARM: mxs_defconfig: Re-sync defconfig".
+Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+---
+ arch/arm/mach-npcm/npcm7xx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Will generate a new version tomorrow.
+diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
+index 5f7cd88103ef..c5f77d854c4f 100644
+--- a/arch/arm/mach-npcm/npcm7xx.c
++++ b/arch/arm/mach-npcm/npcm7xx.c
+@@ -17,4 +17,6 @@ static const char *const npcm7xx_dt_match[] = {
+ DT_MACHINE_START(NPCM7XX_DT, "NPCM7XX Chip family")
+ 	.atag_offset	= 0x100,
+ 	.dt_compat	= npcm7xx_dt_match,
++	.l2c_aux_val	= 0x0,
++	.l2c_aux_mask	= ~0x0,
+ MACHINE_END
+-- 
+2.14.1
