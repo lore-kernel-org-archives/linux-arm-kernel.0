@@ -1,71 +1,171 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 15 Mar 2018 11:06:09 +0000
-Subject: [PATCH v1 15/16] kvm: arm64: Allow configuring physical address
- space size
-In-Reply-To: <20180209081606.GC7339@cbox>
-References: <20180109190414.4017-1-suzuki.poulose@arm.com>
- <20180109190414.4017-16-suzuki.poulose@arm.com> <20180208111414.GM29286@cbox>
- <31e5bf40-4fcb-934e-6036-ff2670f793df@arm.com> <20180209081606.GC7339@cbox>
-Message-ID: <b4cfa88c-a630-23bc-18f2-42400042ce4f@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 15 Mar 2018 13:26:10 +0200
+Subject: [PATCH v3 06/11] mmc: sdhci: Add quirk to disable HW timeout
+In-Reply-To: <20180307132020.30951-7-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <20180307132020.30951-7-kishon@ti.com>
+Message-ID: <e98930eb-aaca-c193-1e5a-185195e71de5@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/18 08:16, Christoffer Dall wrote:
-> On Thu, Feb 08, 2018 at 05:53:17PM +0000, Suzuki K Poulose wrote:
->> On 08/02/18 11:14, Christoffer Dall wrote:
->>> On Tue, Jan 09, 2018 at 07:04:10PM +0000, Suzuki K Poulose wrote:
->>>> Allow the guests to choose a larger physical address space size.
->>>> The default and minimum size is 40bits. A guest can change this
->>>> right after the VM creation, but before the stage2 entry page
->>>> tables are allocated (i.e, before it registers a memory range
->>>> or maps a device address). The size is restricted to the maximum
->>>> supported by the host. Also, the guest can only increase the PA size,
->>> >from the existing value, as reducing it could break the devices which
->>>> may have verified their physical address for validity and may do a
->>>> lazy mapping(e.g, VGIC).
->>>>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Cc: Christoffer Dall <cdall@linaro.org>
->>>> Cc: Peter Maydell <peter.maydell@linaro.org>
->>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
->>>> +
->>>> +4.109 KVM_ARM_SET_PHYS_SHIFT
->>>> +
->>>> +Capability: KVM_CAP_ARM_CONFIG_PHYS_SHIFT
->>>> +Architectures: arm64
->>>> +Type: vm ioctl
->>>> +Parameters: __u32 (in)
->>>> +Returns: 0 on success, a negative value on error
->>>> +
->>>> +This ioctl is used to set the maximum physical address size for
->>>> +the VM. The value is Log2(Maximum_Physical_Address). The value can only
->>>> +be increased from the existing setting. The value cannot be changed
->>>> +after the stage-2 page tables are allocated and will return an error.
->>>> +
->>>
->>> Is there a way for userspace to discover what the underlying hardware
->>> can actually support, beyond trial-and-error on this ioctl?
->>
->> Unfortunately, there is none. We don't expose ID_AA64MMFR0 via mrs emulation.
->>
+On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
+> Add quirk to disable HW timeout if the requested timeout is more than
+> the maximum obtainable timeout.
 > 
-> We should probably think about that.  Perhaps it could be tied to the
-> return value of KVM_CAP_ARM_CONFIG_PHYS_SHIFT ?
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 27 +++++++++++++++++++++------
+>  drivers/mmc/host/sdhci.h |  5 +++++
+>  2 files changed, 26 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index aa8b5ca0d1b0..1dd117cbeb6e 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -767,12 +767,6 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  			break;
+>  	}
+>  
+> -	if (count >= 0xF) {
+> -		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+> -		    count, cmd->opcode);
+> -		count = 0xE;
+> -	}
+> -
+>  	return count;
+>  }
+>  
+> @@ -790,6 +784,16 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
+>  	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>  }
+>  
+> +static void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
+> +{
+> +	if (enable)
+> +		host->ier |= SDHCI_INT_DATA_TIMEOUT;
+> +	else
+> +		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
+> +	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+> +	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+> +}
+> +
+>  static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  {
+>  	u8 count;
+> @@ -798,6 +802,17 @@ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  		host->ops->set_timeout(host, cmd);
+>  	} else {
+>  		count = sdhci_calc_timeout(host, cmd);
+> +		if (count >= 0xF &&
+> +		    host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT)
+> +			sdhci_set_data_timeout_irq(host, false);
+> +		else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT))
+> +			sdhci_set_data_timeout_irq(host, true);
+> +
+> +		if (count >= 0xF) {
+> +			DBG("Too large timeout 0x%x requested for CMD%d!\n",
+> +			    count, cmd->opcode);
+> +			count = 0xE;
+> +		}
+>  		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
+>  	}
+>  }
 
-See below.
+I guess I misunderstood you, but we need to cater for
+open-ended busy timeouts (i.e. busy_timeout==0) and broken
+timeout (i.e. SDHCI_QUIRK_BROKEN_TIMEOUT_VAL and
+SDHCI_QUIRK2_DISABLE_HW_TIMEOUT together mean never use the
+HW timeout)
 
->>>
->>> Have you considered making this capability a generic capability and
->>> encoding this in the 'type' argument to KVM_CREATE_VM?  This would
->>> significantly simplify all the above and would allow you to drop patch 8
->>> and 9 I think.
->>>> No. I will take a look.
+So maybe like this:
 
-We could add a KVM dev capability hooked to the kvm_arch_dev_ioctl() for ARM
-to give out the maximum supported physical shift. And then the user could request
-the physical shift via the type argument (of course, encoded to allow future uses)
-to KVM_CREATE_VM.
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index aa8b5ca0d1b0..a358eb5c5f98 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -709,12 +709,15 @@ static u32 sdhci_sdma_address(struct sdhci_host *host)
+ 		return sg_dma_address(host->data->sg);
+ }
+ 
+-static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
++static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd,
++			     bool *too_big)
+ {
+ 	u8 count;
+ 	struct mmc_data *data = cmd->data;
+ 	unsigned target_timeout, current_timeout;
+ 
++	*too_big = true;
++
+ 	/*
+ 	 * If the host controller provides us with an incorrect timeout
+ 	 * value, just skip the check and use 0xE.  The hardware may take
+@@ -768,9 +771,12 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ 	}
+ 
+ 	if (count >= 0xF) {
+-		DBG("Too large timeout 0x%x requested for CMD%d!\n",
+-		    count, cmd->opcode);
++		if (!(host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT))
++			DBG("Too large timeout 0x%x requested for CMD%d!\n",
++			    count, cmd->opcode);
+ 		count = 0xE;
++	} else {
++		*too_big = false;
+ 	}
+ 
+ 	return count;
+@@ -790,6 +796,16 @@ static void sdhci_set_transfer_irqs(struct sdhci_host *host)
+ 	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+ }
+ 
++static void sdhci_set_data_timeout_irq(struct sdhci_host *host, bool enable)
++{
++	if (enable)
++		host->ier |= SDHCI_INT_DATA_TIMEOUT;
++	else
++		host->ier &= ~SDHCI_INT_DATA_TIMEOUT;
++	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
++}
++
+ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ {
+ 	u8 count;
+@@ -797,7 +813,17 @@ static void sdhci_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+ 	if (host->ops->set_timeout) {
+ 		host->ops->set_timeout(host, cmd);
+ 	} else {
+-		count = sdhci_calc_timeout(host, cmd);
++		bool too_big = false;
++
++		count = sdhci_calc_timeout(host, cmd, &too_big);
++
++		if (too_big &&
++		    host->quirks2 & SDHCI_QUIRK2_DISABLE_HW_TIMEOUT) {
++			sdhci_set_data_timeout_irq(host, false);
++		} else if (!(host->ier & SDHCI_INT_DATA_TIMEOUT)) {
++			sdhci_set_data_timeout_irq(host, true);
++		}
++
+ 		sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
+ 	}
+ }
 
-Cheers
-Suzuki
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index c95b0a4a7594..ff283ee08854 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -437,6 +437,11 @@ struct sdhci_host {
+>  #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
+>  /* Controller has CRC in 136 bit Command Response */
+>  #define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+> +/*
+> + * Disable HW timeout if the requested timeout is more than the maximum
+> + * obtainable timeout
+> + */
+> +#define SDHCI_QUIRK2_DISABLE_HW_TIMEOUT			(1<<17)
+>  
+>  	int irq;		/* Device IRQ */
+>  	void __iomem *ioaddr;	/* Mapped address */
+> 
