@@ -1,81 +1,68 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 15 Mar 2018 12:43:12 +0100
-Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <CAKv+Gu_f9mNQ37GzfZybcUfanSAx1zH0ifSNfDE0EWACGH-GCg@mail.gmail.com>
-References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
- <20180314141323.GD23100@dhcp22.suse.cz>
- <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
- <20180314145450.GI23100@dhcp22.suse.cz>
- <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
- <20180315101411.GA23100@dhcp22.suse.cz>
- <CAKv+Gu_f9mNQ37GzfZybcUfanSAx1zH0ifSNfDE0EWACGH-GCg@mail.gmail.com>
-Message-ID: <20180315114312.GC23100@dhcp22.suse.cz>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 15 Mar 2018 11:46:16 +0000
+Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <12da0d00-9ab3-3752-793b-e487666f35a3@ti.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
+ <20180227071134.28063-2-a.hajda@samsung.com>
+ <ed0ce43c-3c81-b027-2eb1-30e49156c3ac@ti.com>
+ <b588527d-2ca2-9e88-9e27-e09e5b52f8d6@samsung.com>
+ <12da0d00-9ab3-3752-793b-e487666f35a3@ti.com>
+Message-ID: <1c3f8cde-4f9a-306f-b4f9-c0bdc76caf1f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 15-03-18 10:17:24, Ard Biesheuvel wrote:
-> On 15 March 2018 at 10:14, Michal Hocko <mhocko@kernel.org> wrote:
-> > On Wed 14-03-18 15:54:16, Ard Biesheuvel wrote:
-> >> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
-> >> > On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
-> >> >> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
-> >> >> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
-> >> >> > fix your issue? From the debugging info you provided it should because
-> >> >> > the patch prevents jumping backwards.
-> >> >> >
-> >> >>
-> >> >> The patch does fix the boot hang.
-> >> >>
-> >> >> But I am concerned that we are papering over a fundamental flaw in
-> >> >> memblock_next_valid_pfn().
-> >> >
-> >> > It seems that memblock_next_valid_pfn is doing the right thing here. It
-> >> > is the alignment which moves the pfn back AFAICS. I am not really
-> >> > impressed about the original patch either, to be completely honest.
-> >> > It just looks awfully tricky. I still didn't manage to wrap my head
-> >> > around the original issue though so I do not have much better ideas to
-> >> > be honest.
-> >>
-> >> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
-> >> argument, which is odd nut easily fixed.
-> >
-> > There is a patch to remove that parameter sitting in the mmotm tree.
-> >
-> >> Then, the whole idea of substracting one so that the pfn++ will
-> >> produce the expected value is rather hacky,
-> >
-> > Absolutely agreed!
-> >
-> >> But the real problem is that rounding down pfn for the next iteration
-> >> is dodgy, because early_pfn_valid() isn't guaranteed to return true
-> >> for the rounded down value. I know it is probably fine in reality, but
-> >> dodgy as hell.
-> >
-> > Yes, that is what I meant when saying I was not impressed... I am always
-> > nervous when a loop makes jumps back and forth. I _think_ the main
-> > problem here is that we try to initialize a partial pageblock even
-> > though a part of it is invalid. We should simply ignore struct pages
-> > for those pfns. We don't do that and that is mostly because of the
-> > disconnect between what the page allocator and early init code refers to
-> > as a unit of memory to care about. I do not remember exactly why but I
-> > strongly suspect this is mostly a performance optimization on the page
-> > allocator side so that we do not have to check each and every pfn. Maybe
-> > we should signal partial pageblocks from an early code and drop the
-> > optimization in the page allocator init code.
-> >
-> >> The same applies to the call to early_pfn_in_nid() btw
-> >
-> > Why?
+On 12/03/18 10:41, Roger Quadros wrote:
+[...]
+>>>> @@ -0,0 +1,75 @@
+>>>> +USB Connector
+>>>> +=============
+>>>> +
+>>>> +USB connector node represents physical USB connector. It should be
+>>>> +a child of USB interface controller.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: describes type of the connector, must be one of:
+>>>> +    "usb-a-connector",
+>>>> +    "usb-b-connector",
+>>>> +    "usb-c-connector".
+>>> compatible should be just "usb-connector"
+>>>
+>>> Type should be a property
+>>>
+>>> type: type of usb connector "A", "B", "AB", "C"
+>>> AB is for dual-role connectors.
+>>
+>> I have proposed such property (and size also) in my first RFC [1]. Rod
+>> did not like it :)
+>>
+>> [1]: https://marc.info/?l=devicetree&m=150660411515233&w=2
+>>
 > 
-> By 'the same' I mean it isn't guaranteed to return true for the
-> rounded down value *at the API level*. I understand it will be mostly
-> fine in reality, but juggling (in)valid PFNs like this is likely to
-> end badly.
+> This is what Rob says here https://patchwork.kernel.org/patch/9976043/
+> "We did "type" for hdmi-connector, but I think I'd really prefer
+> compatible be used to distinguish as least where it may matter to s/w.
+> In the HDMI case, they all are pretty much the same, just different
+> physical size."
+> 
+> So the question is. Does it matter to this particular software implementation
+> if it is type A,B,C connector?
+> If yes, how?
+> 
+> Type A will never have any alternate function. It is always dedicated to USB.
 
-OK, I see your point now. I can really imagine that sub-pageblocks would
-be splitted into different NUMA nodes but that should be really rare.
+In USB spec terms, at least. In reality there are things like the cool 
+trick Rockchip SoCs do whereby they can expose the debug UART Rx/Tx 
+through the OTG port's D+/D- pins, and that is on a type A connector in 
+many products. I'm guessing that's probably beyond the scope of this 
+binding, though.
 
--- 
-Michal Hocko
-SUSE Labs
+> Also does the size "full", "micro", "mini" matter to software?
+
+If it means the user can look in sysfs to easily correlate logical ports 
+with physical connectors that's certainly handy (e.g. on something like 
+Odroid-XU where the two USB3 ports are brought out to an A and a 
+micro-AB connector respectively).
+
+Robin.
