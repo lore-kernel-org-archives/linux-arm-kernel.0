@@ -1,9 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:06:57 +0100
-Subject: [PATCH 16/36] arm: dts: armada-398-db: use SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 16:07:03 +0100
+Subject: [PATCH 22/36] arm: dts: armada-xp-lenovo-ix4-300d: use
+ SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-17-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-23-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,24 +18,22 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Cc: Benoit Masson <yahoo@perenite.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-398-db.dts | 39 +------------------------------------
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts | 39 +------------------------
  1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-398-db.dts b/arch/arm/boot/dts/armada-398-db.dts
-index f0e0379f7619..2337f24784f7 100644
---- a/arch/arm/boot/dts/armada-398-db.dts
-+++ b/arch/arm/boot/dts/armada-398-db.dts
-@@ -1,47 +1,10 @@
+diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+index ce0afba1ce58..def62e9e835b 100644
+--- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
++++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+@@ -1,45 +1,8 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree Include file for Marvell Armada 398 Development Board
+  * Device Tree file for Lenovo Iomega ix4-300d
   *
-  * Copyright (C) 2015 Marvell
-  *
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  * Copyright (C) 2014, Benoit Masson <yahoo@perenite.com>
 - *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
