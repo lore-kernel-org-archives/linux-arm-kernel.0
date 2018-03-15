@@ -1,105 +1,131 @@
-From: gabriel.matni@exfo.com (Gabriel Matni)
-Date: Thu, 15 Mar 2018 18:55:25 +0000
-Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
-In-Reply-To: <20180315165516.GA9519@kroah.com>
-References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
- <20180315165516.GA9519@kroah.com>
-Message-ID: <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Thu, 15 Mar 2018 11:57:22 -0700
+Subject: [PATCH] ARM: dts: qcom: Add apq8064 Dragon Board 600c support
+In-Reply-To: <20180315144841.16144-1-srinivas.kandagatla@linaro.org>
+References: <20180315144841.16144-1-srinivas.kandagatla@linaro.org>
+Message-ID: <152114024246.111154.2712387658941057310@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Matni <gabriel.matni@exfo.com>
+Quoting srinivas.kandagatla at linaro.org (2018-03-15 07:48:41)
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-db600c.dts
+> new file mode 100644
+> index 000000000000..6a3250151038
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-apq8064-db600c.dts
+> @@ -0,0 +1,547 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +#include "qcom-apq8064-v2.0.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+> +#include <dt-bindings/pinctrl/qcom,pmic-mpp.h>
+> +#include <dt-bindings/mfd/qcom-rpm.h>
+> +
+> +/ {
+> +       model = "Qualcomm Technologies, Inc. DB600c";
+> +       compatible = "arrow,apq8064-db600c", "qcom,apq8064";
+> +
+> +       aliases {
+> +               serial0 = &gsbi7_serial;
+> +               serial1 = &gsbi1_serial;
+> +               i2c0 = &gsbi2_i2c;
+> +               i2c1 = &gsbi3_i2c;
+> +               i2c2 = &gsbi4_i2c;
+> +               i2c3 = &gsbi7_i2c;
+> +               spi0 = &gsbi5_spi;
+> +       };
 
-Fixes missing characters on kernel console at low baud rates (i.e.9600).
-The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
-that the transmitter holding register (THR) is ready to receive a new byte.
+Can you also add a chosen node for the stdout-path? Or maybe
+that's contentious because there are two serial ports that could
+possibly be used for serial console?
 
-TX_EMP tells us when it is possible to send a break sequence via
-SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-empty, it does not guarantee that a new byte can be written just yet.
+> +
+> +       regulators {
+> +               compatible = "simple-bus";
+> +               vph: regulator-fixed at 1 {
 
-Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
-      serial port")
-Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
-Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
-Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
+Drop @1?
 
----
- drivers/tty/serial/mvebu-uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> +                       compatible = "regulator-fixed";
+> +                       regulator-min-microvolt = <4500000>;
+> +                       regulator-max-microvolt = <4500000>;
+> +                       regulator-name = "VPH";
+> +                       regulator-type = "voltage";
+> +                       regulator-boot-on;
+> +               };
+> +
+> +               /* on board fixed 3.3v supply */
+> +               vcc3v3: vcc3v3 {
+> +                       compatible = "regulator-fixed";
+> +                       regulator-name = "VCC3V3";
+> +                       regulator-min-microvolt = <3300000>;
+> +                       regulator-max-microvolt = <3300000>;
+> +                       regulator-always-on;
+> +               };
+> +
+> +       };
+> +
+> +       hdmi-out {
+> +               compatible = "hdmi-connector";
+> +               type = "a";
+> +
+> +               port {
+> +                       hdmi_con: endpoint {
+> +                               remote-endpoint = <&hdmi_out>;
+> +                       };
+> +               };
+> +       };
 
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index a100e98259d7..400e1bc558b2 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
- 	u32 val;
- 
- 	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
--				  (val & STAT_TX_EMP), 1, 10000);
-+             (val & STAT_TX_RDY(port)), 1, 10000);
- }
- 
- static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
--- 
-2.7.4
+Cool!
 
+> +
+> +       soc {
+> +               pinctrl at 800000 {
+> +                       card_detect: card_detect {
+> +                               mux {
+> +                                       pins = "gpio26";
+> +                                       function = "gpio";
+> +                                       bias-disable;
+> +                               };
+> +                       };
+[...]
+> +                                       regulator-min-microvolt = <1000000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       bias-pull-down;
+> +                               };
+> +
+> +                               l5 {
+> +                                       regulator-min-microvolt = <2750000>;
+> +                                       regulator-max-microvolt = <3000000>;
+> +                                       bias-pull-down;
+> +                                       regulator-boot-on;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               l6 {
+> +                                       regulator-min-microvolt = <2950000>;
+> +                                       regulator-max-microvolt = <2950000>;
+> +                                       bias-pull-down;
+> +                               };
+> +
+> +                               l7 {
+> +                                       regulator-min-microvolt = <2950000>;
+> +                                       regulator-max-microvolt = <2950000>;
+> +                                       regulator-boot-on;
+> +                                       regulator-always-on;
+> +                               };
+> +
+> +                               /**
+> +                               /**
 
-> -----Original Message-----
-> From: gregkh at linuxfoundation.org <gregkh@linuxfoundation.org>
-> Sent: March 15, 2018 12:55 PM
-> To: Gabriel Matni <gabriel.matni@exfo.com>
-> Cc: linux-arm-kernel at lists.infradead.org; stable at vger.kernel.org; Miquel
-> Raynal <miquel.raynal@bootlin.com>; Gr?gory Clement
-> <gregory.clement@bootlin.com>; Thomas Petazzoni
-> <thomas.petazzoni@bootlin.com>
-> Subject: Re: [PATCH] serial: mvebu-uart: fix tx lost characters
-> 
-> On Tue, Mar 06, 2018 at 03:47:03PM +0000, Gabriel Matni wrote:
-> > From: Gabriel Matni <gabriel.matni@exfo.com>
-> >
-> > Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> > The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to
-> ensure
-> > that the transmitter holding register (THR) is ready to receive a new byte.
-> >
-> > TX_EMP tells us when it is possible to send a break sequence via
-> > SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-> > empty, it does not guarantee that a new byte can be written just yet.
-> >
-> > Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
-> serial port")
-> > Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> > Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
-> > ---
-> > drivers/tty/serial/mvebu-uart.c | 2 +-
-> > 1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-
-> uart.c
-> > index a100e98259d7..f0df0640208e 100644
-> > --- a/drivers/tty/serial/mvebu-uart.c
-> > +++ b/drivers/tty/serial/mvebu-uart.c
-> > @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
-> >    u32 val;
-> >
-> >    readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-> > -             (val & STAT_TX_EMP), 1, 10000);
-> > +             (val & STAT_TX_RDY(port)), 1, 10000);
-> > }
-> >
-> > static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
-> > --
-> > 2.7.4
-> 
-> Patch is corrupted and can not be applied :(
-> 
-> Please fix up and resend.
-> 
-> Also be sure to cc: the linux-serial mailing list,
-> scripts/get_maintainer.pl is your friend...
-> 
-> thanks,
-> 
-> greg k-h
+Weird double comment here.
+
+> +                                * 1.8v required on LS expansion
+> +                                * for mezzanine boards
+> +                                */
+> +                               l15 {
+> +                                       regulator-min-microvolt = <1800000>;
+> +                                       regulator-max-microvolt = <1800000>;
+> +                                       regulator-always-on;
+> +                               };
+> +
