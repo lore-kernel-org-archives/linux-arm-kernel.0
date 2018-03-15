@@ -1,81 +1,53 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:07:06 +0100
-Subject: [PATCH 25/36] arm: dts: armada-xp-openblocks-ax3-4: use
- SPDX-License-Identifier
-In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
-References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-26-gregory.clement@bootlin.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Thu, 15 Mar 2018 15:22:24 +0000
+Subject: [GIT PULL] STi DT update for v4.17 round 2
+In-Reply-To: <CAK8P3a1R6CwHC4+0GXKevmgM9QqgbGGZCtLsccn2AYTpuHZ7uw@mail.gmail.com>
+References: <af473935-7cb6-e59a-3b52-055d8492248c@st.com>
+ <CAK8P3a1R6CwHC4+0GXKevmgM9QqgbGGZCtLsccn2AYTpuHZ7uw@mail.gmail.com>
+Message-ID: <36e374f8-cfc9-06bb-f496-296a145d5b6d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the recent trend for the license description, and also fix the
-wrongly stated X11 to MIT.
+Hi Arnd
 
-As already pointed on the DT ML, the X11 license text [1] is explicitly
-for the X Consortium and has a couple of extra clauses. The MIT
-license text [2] is actually what the current DT files claim.
+On 03/15/2018 03:59 PM, Arnd Bergmann wrote:
+> On Thu, Mar 15, 2018 at 10:06 AM, Patrice CHOTARD
+> <patrice.chotard@st.com> wrote:
+>> Hi Arnd, Kevin, Olof
+>>
+>> PLease consider this second round of STi dts update for v4.17
+>>
+>> The following changes since commit 0e04ce02e6a2ac30d21294d8bb2aeceb8489e52b:
+>>
+>>     ARM: dts: STi: Remove unused clk_ext2f_a9 clock (2018-02-13 13:31:38
+>> +0100)
+>>
+>> are available in the git repository at:
+>>
+>>     git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
+>>
+>> for you to fetch changes up to 9a5f4879cd8de167e82f335317c63f2ffdc80129:
+>>
+>>     ARM: dts: stih4xx: Add missing #sound-dai-cells (2018-03-15 09:52:25
+>> +0100)
+>>
+>> ----------------------------------------------------------------
+>>
+>> STi DT update:
+>>
+>> Add missing #sound-dai-cells which fix DT dtc warnings when building
+>> with W=1
+> 
+> You missed a tag name for this one, but I found tags/sti-dt-for-v4.17-round2
+> to be the one that matches the commit ID above and pulled that.
+> 
+>        Arnd
+> 
 
-[1] https://spdx.org/licenses/X11.html
-[2] https://spdx.org/licenses/MIT.html
+Sorry for that.
+I will check that point, i noticed that i got the same issue with the 
+previous pull request for STi DT.
 
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 39 +-----------------------
- 1 file changed, 1 insertion(+), 38 deletions(-)
+Thanks
 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 66b78131a038..0efcc166dabf 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -1,47 +1,10 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Device Tree file for OpenBlocks AX3-4 board
-  *
-  * Copyright (C) 2012 Marvell
-  *
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License, or (at your option) any later version.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
--- 
-2.16.1
+Patrice
