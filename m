@@ -1,212 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Mar 2018 15:53:44 +0000
-Subject: [PATCH v6 23/26] arm/arm64: KVM: Introduce EL2-specific
- executable mappings
-In-Reply-To: <20180315150320.tfx35o6yaaln4rzg@kamzik.brq.redhat.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180314165049.30105-24-marc.zyngier@arm.com>
- <20180315150320.tfx35o6yaaln4rzg@kamzik.brq.redhat.com>
-Message-ID: <1adb50ba-da20-9418-3143-b13d18526b49@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 15 Mar 2018 16:07:02 +0100
+Subject: [PATCH 21/36] arm: dts: armada-xp-gp: use SPDX-License-Identifier
+In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
+References: <20180315150717.10588-1-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-22-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/18 15:03, Andrew Jones wrote:
-> On Wed, Mar 14, 2018 at 04:50:46PM +0000, Marc Zyngier wrote:
->> Until now, all EL2 executable mappings were derived from their
->> EL1 VA. Since we want to decouple the vectors mapping from
->> the rest of the hypervisor, we need to be able to map some
->> text somewhere else.
->>
->> The "idmap" region (for lack of a better name) is ideally suited
->> for this, as we have a huge range that hardly has anything in it.
->>
->> Let's extend the IO allocator to also deal with executable mappings,
->> thus providing the required feature.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/kvm_mmu.h   |  2 +
->>  arch/arm64/include/asm/kvm_mmu.h |  2 +
->>  virt/kvm/arm/mmu.c               | 80 +++++++++++++++++++++++++++++-----------
->>  3 files changed, 63 insertions(+), 21 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index 26eb6b1cec9b..1b7f592eae57 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -56,6 +56,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
->>  int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
->>  			   void __iomem **kaddr,
->>  			   void __iomem **haddr);
->> +int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
->> +			     void **haddr);
->>  void free_hyp_pgds(void);
->>  
->>  void stage2_unmap_vm(struct kvm *kvm);
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index c2beb2d25170..97af11065bbd 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -151,6 +151,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
->>  int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
->>  			   void __iomem **kaddr,
->>  			   void __iomem **haddr);
->> +int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
->> +			     void **haddr);
->>  void free_hyp_pgds(void);
->>  
->>  void stage2_unmap_vm(struct kvm *kvm);
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index b4d1948c8dd6..554ad5493e7d 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -737,30 +737,13 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
->>  	return 0;
->>  }
->>  
->> -/**
->> - * create_hyp_io_mappings - Map IO into both kernel and HYP
->> - * @phys_addr:	The physical start address which gets mapped
->> - * @size:	Size of the region being mapped
->> - * @kaddr:	Kernel VA for this mapping
->> - * @haddr:	HYP VA for this mapping
->> - */
->> -int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
->> -			   void __iomem **kaddr,
->> -			   void __iomem **haddr)
->> +static int __create_hyp_private_mapping(phys_addr_t phys_addr, size_t size,
->> +					unsigned long *haddr, pgprot_t prot)
->>  {
->>  	pgd_t *pgd = hyp_pgd;
->>  	unsigned long base;
->>  	int ret;
->>  
->> -	*kaddr = ioremap(phys_addr, size);
->> -	if (!*kaddr)
->> -		return -ENOMEM;
->> -
->> -	if (is_kernel_in_hyp_mode()) {
->> -		*haddr = *kaddr;
->> -		return 0;
->> -	}
->> -
->>  	mutex_lock(&io_map_lock);
->>  
->>  	/*
->> @@ -789,22 +772,77 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
->>  
->>  	ret = __create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
->>  				    base, base + size,
->> -				    __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
->> +				    __phys_to_pfn(phys_addr), prot);
->>  	if (ret)
->>  		goto out;
->>  
->> -	*haddr = (void __iomem *)base + offset_in_page(phys_addr);
->> +	*haddr = base + offset_in_page(phys_addr);
->>  	io_map_base = base;
->>  
->>  out:
->>  	mutex_unlock(&io_map_lock);
->>  
->> +	return ret;
->> +}
->> +
->> +/**
->> + * create_hyp_io_mappings - Map IO into both kernel and HYP
->> + * @phys_addr:	The physical start address which gets mapped
->> + * @size:	Size of the region being mapped
->> + * @kaddr:	Kernel VA for this mapping
->> + * @haddr:	HYP VA for this mapping
->> + */
->> +int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
->> +			   void __iomem **kaddr,
->> +			   void __iomem **haddr)
->> +{
->> +	unsigned long addr;
->> +	int ret;
->> +
->> +	*kaddr = ioremap(phys_addr, size);
->> +	if (!*kaddr)
->> +		return -ENOMEM;
->> +
->> +	if (is_kernel_in_hyp_mode()) {
->> +		*haddr = *kaddr;
->> +		return 0;
->> +	}
->> +
->> +	ret = __create_hyp_private_mapping(phys_addr, size,
->> +					   &addr, PAGE_HYP_DEVICE);
->>  	if (ret) {
->>  		iounmap(*kaddr);
->>  		*kaddr = NULL;
->> +		*haddr = NULL;
->> +		return ret;
->> +	}
->> +
->> +	*haddr = (void __iomem *)addr;
->> +	return 0;
->> +}
->> +
->> +/**
->> + * create_hyp_exec_mappings - Map an executable range into into HYP
-> 
-> s/into into/into/
-> 
->> + * @phys_addr:	The physical start address which gets mapped
->> + * @size:	Size of the region being mapped
->> + * @haddr:	HYP VA for this mapping
->> + */
->> +int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
->> +			     void **haddr)
->> +{
->> +	unsigned long addr;
->> +	int ret;
->> +
->> +	BUG_ON(is_kernel_in_hyp_mode());
-> 
-> Why BUG_ON instead of just giving the caller the same address, similar
-> to what create_hyp_io_mappings() does?
+Follow the recent trend for the license description, and also fix the
+wrongly stated X11 to MIT.
 
-Because we just don't have that information on VHE:
+As already pointed on the DT ML, the X11 license text [1] is explicitly
+for the X Consortium and has a couple of extra clauses. The MIT
+license text [2] is actually what the current DT files claim.
 
-- create_hyp_io_mapping does an ioremap, and return the same address for
-both
-- create_hyp_exec_mapping doesn't have a mapping at all to return. It
-just has a PA. We could convert it to a VA, but then which one? Linear
-mapping, or kernel mapping?
+[1] https://spdx.org/licenses/X11.html
+[2] https://spdx.org/licenses/MIT.html
 
-The real problem is that this makes no sense on VHE, because we don't
-have an alternative address space similar to !VHE. And if you call this
-on VHE, you're doing something very wrong.
+Cc: Gregory CLEMENT <gregory.clement@bootlin.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ arch/arm/boot/dts/armada-xp-gp.dts | 39 +-------------------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
-In all honesty, the real issue is create_hyp_io_mapping(), because it
-gives you a false sense of security and hides the distinction between
-VHE and !VHE.
-
-> 
->> +
->> +	ret = __create_hyp_private_mapping(phys_addr, size,
->> +					   &addr, PAGE_HYP_EXEC);
->> +	if (ret) {
->> +		*haddr = NULL;
->>  		return ret;
->>  	}
->>  
->> +	*haddr = (void *)addr;
->>  	return 0;
->>  }
->>  
->> -- 
->> 2.14.2
->>
-> 
-> Otherwise
-> 
-> Reviewed-by: Andrew Jones <drjones@redhat.com>
-
-Thanks!
-
-	M.
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index ac9eab8ac186..c143556bbb7b 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree file for Marvell Armada XP development board
+  * (DB-MV784MP-GP)
+@@ -8,44 +9,6 @@
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- *
+  * Note: this Device Tree assumes that the bootloader has remapped the
+  * internal registers to 0xf1000000 (instead of the default
+  * 0xd0000000). The 0xf1000000 is the default used by the recent,
 -- 
-Jazz is not dead. It just smells funny...
+2.16.1
