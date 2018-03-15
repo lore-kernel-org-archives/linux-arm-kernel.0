@@ -1,71 +1,120 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Mar 2018 14:17:51 +0800
-Subject: [PATCH] phy: allwinner: sun4i-usb: poll vbus changes on A23/A33
- when driving VBUS
-In-Reply-To: <a38e269f-abe9-0560-1542-c115c5a64605@ti.com>
-References: <20180119092541.7508-1-wens@csie.org>
- <20180119144512.dqqbywavhwsyma2f@flea.lan>
- <a38e269f-abe9-0560-1542-c115c5a64605@ti.com>
-Message-ID: <CAGb2v66e+2wHGyZU+gAxho2-EiLX87VnV0E_xybbAv0FKvzToA@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 15 Mar 2018 17:28:58 +1100
+Subject: linux-next: manual merge of the tty tree with the arm-soc tree
+Message-ID: <20180315172858.7928ed93@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hi Greg,
 
-On Fri, Feb 16, 2018 at 7:20 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->
->
-> On Friday 19 January 2018 08:15 PM, Maxime Ripard wrote:
->> On Fri, Jan 19, 2018 at 05:25:41PM +0800, Chen-Yu Tsai wrote:
->>> The AXP223 PMIC, like the AXP221, does not generate VBUS change
->>> interrupts when N_VBUSEN is used to drive VBUS for the OTG port
->>> on the board.
->>>
->>> This was not noticed until recently, as most A23/A33 boards use
->>> a GPIO pin that does not support interrupts for OTG ID detection.
->>> This forces the driver to use polling. However the A33-OlinuXino
->>> uses a pin that does support interrupts, so the driver uses them.
->>> However the VBUS interrupt never fires, and the driver never gets
->>> to update the VBUS status. This results in musb timing out waiting
->>> for VBUS to rise.
->>>
->>> This was worked around for the AXP221 by resorting to polling
->>> changes in commit 91d96f06a760 ("phy-sun4i-usb: Add workaround for
->>> missing Vbus det interrupts on A31"). This patch adds the A23 and
->>> A33 to the list of SoCs that need the workaround.
->>>
->>> Fixes: fc1f45ed3043 ("phy-sun4i-usb: Add support for the usb-phys on the
->>>                    sun8i-a33 SoC")
->>> Fixes: 123dfdbcfaf5 ("phy-sun4i-usb: Add support for the usb-phys on the
->>>                    sun8i-a23 SoC")
->>> Cc: <stable@vger.kernel.org> # 4.3.x: 68dbc2ce77bb phy-sun4i-usb:
->>>              Use of_match_node to get model specific config data
->>> Cc: <stable@vger.kernel.org> # 4.3.x: 5cf700ac9d50 phy: phy-sun4i-usb:
->>>              Fix optional gpios failing probe
->>> Cc: <stable@vger.kernel.org> # 4.3.x: 04e59a0211ff phy-sun4i-usb:
->>>              Fix irq free conditions to match request conditions
->>> Cc: <stable@vger.kernel.org> # 4.3.x: 91d96f06a760 phy-sun4i-usb:
->>>              Add workaround for missing Vbus det interrupts on A31
->>> Cc: <stable@vger.kernel.org> # 4.3.x
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>>
->>> This list might get longer if the newer AXP8xx PMICs also have this
->>> behavior. We could switch to a boolean in the per-compatible data,
->>> or just always use polling. The yet-merged R40 support will have this
->>> issue as well, as the R40 is paired with the AXP221. But for now,
->>> I'd like to have something that is easier to backport to stable, so
->>> we can at least fix this for the A23 and A33.
->>>
->>> Also, checkpatch.pl doesn't like the stable kernel prerequisite lines.
->>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->
-> merged, thanks!
+Today's linux-next merge of the tty tree got conflicts in:
 
-I see you moved this patch from your fixes branch to your -next branch.
-Is there any problem with the patch? Merge issues?
+  arch/arm/boot/dts/stih407-b2120.dts
+  arch/arm/boot/dts/stih410-b2120.dts
+  arch/arm/boot/dts/stih410-b2260.dts
+  arch/arm/boot/dts/stih418-b2199.dts
 
+between commit:
 
-Thanks
-ChenYu
+  db5430663017 ("arm: dts: replace 'linux,stdout-path' with 'stdout-path'")
+
+from the arm-soc tree and commit:
+
+  dbb3fb45edff ("ARM: dts: STi: Remove "console=ttyASN" from bootargs for STi boards")
+
+from the tty tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
+
+diff --cc arch/arm/boot/dts/stih407-b2120.dts
+index de3c8bf129b5,a7a0f76e9cbc..000000000000
+--- a/arch/arm/boot/dts/stih407-b2120.dts
++++ b/arch/arm/boot/dts/stih407-b2120.dts
+@@@ -14,11 -14,11 +14,11 @@@
+  	compatible = "st,stih407-b2120", "st,stih407";
+  
+  	chosen {
+- 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++ 		bootargs = "clk_ignore_unused";
+ -		linux,stdout-path = &sbc_serial0;
+ +		stdout-path = &sbc_serial0;
+  	};
+  
+ -	memory {
+ +	memory at 40000000 {
+  		device_type = "memory";
+  		reg = <0x40000000 0x80000000>;
+  	};
+diff --cc arch/arm/boot/dts/stih410-b2120.dts
+index 0a59b7b0f4b2,6c6b4cc37e97..000000000000
+--- a/arch/arm/boot/dts/stih410-b2120.dts
++++ b/arch/arm/boot/dts/stih410-b2120.dts
+@@@ -14,11 -14,11 +14,11 @@@
+  	compatible = "st,stih410-b2120", "st,stih410";
+  
+  	chosen {
+- 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++ 		bootargs = "clk_ignore_unused";
+ -		linux,stdout-path = &sbc_serial0;
+ +		stdout-path = &sbc_serial0;
+  	};
+  
+ -	memory {
+ +	memory at 40000000 {
+  		device_type = "memory";
+  		reg = <0x40000000 0x80000000>;
+  	};
+diff --cc arch/arm/boot/dts/stih410-b2260.dts
+index feb8834478fa,50d36758391c..000000000000
+--- a/arch/arm/boot/dts/stih410-b2260.dts
++++ b/arch/arm/boot/dts/stih410-b2260.dts
+@@@ -15,11 -15,11 +15,11 @@@
+  	compatible = "st,stih410-b2260", "st,stih410";
+  
+  	chosen {
+- 		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
++ 		bootargs = "clk_ignore_unused";
+ -		linux,stdout-path = &uart1;
+ +		stdout-path = &uart1;
+  	};
+  
+ -	memory {
+ +	memory at 40000000 {
+  		device_type = "memory";
+  		reg = <0x40000000 0x40000000>;
+  	};
+diff --cc arch/arm/boot/dts/stih418-b2199.dts
+index 39b4db2e3507,7f5f3252bfc7..000000000000
+--- a/arch/arm/boot/dts/stih418-b2199.dts
++++ b/arch/arm/boot/dts/stih418-b2199.dts
+@@@ -14,11 -14,11 +14,11 @@@
+  	compatible = "st,stih418-b2199", "st,stih418";
+  
+  	chosen {
+- 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
++ 		bootargs = "clk_ignore_unused";
+ -		linux,stdout-path = &sbc_serial0;
+ +		stdout-path = &sbc_serial0;
+  	};
+  
+ -	memory {
+ +	memory at 40000000 {
+  		device_type = "memory";
+  		reg = <0x40000000 0xc0000000>;
+  	};
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180315/130c9ca6/attachment.sig>
