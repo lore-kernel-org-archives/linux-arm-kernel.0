@@ -1,164 +1,193 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 15 Mar 2018 14:14:40 +0100
-Subject: [PATCH v6 00/25] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM)
-In-Reply-To: <CAMuHMdXUNVBTi9n9+LQyv8o7e-z_ck-gSWsq-hi+ANgUnnTKjA@mail.gmail.com>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
- <CAMuHMdXUNVBTi9n9+LQyv8o7e-z_ck-gSWsq-hi+ANgUnnTKjA@mail.gmail.com>
-Message-ID: <CAPDyKFp7a=oLNJ7N1=NY0D9ZwNeth9Wrb3yact_OTJ6pSPOT_A@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 15 Mar 2018 15:13:27 +0200
+Subject: [PATCH v3 07/11] mmc: sdhci: Program a relatively accurate SW
+ timeout value
+In-Reply-To: <20180307132020.30951-8-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <20180307132020.30951-8-kishon@ti.com>
+Message-ID: <1e87e5f9-13e1-765b-f077-26a55359b2c3@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 12:00, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Ulf,
->
-> On Wed, Mar 14, 2018 at 5:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> This series is a re-worked version from Lina Iyer's two series [1] that got
->> posted more than a year ago by now. I have picked up the series and done a
->> significant re-work of it and here's the result. All patches have been changed,
->> some have been dropped, some are entirely new. For this reason I decided to not
->> include a version history, as I think people need a fresh start anyway.
->
-> Thanks for your series!
->
-> I gave it a try on a few Renesas boards and SoCs, without adding any new DT
-> descriptions.  On all of them it triggers
+On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
+> sdhci has a 10 second timeout to catch devices that stop responding.
+> Instead of programming 10 second arbitrary value, calculate the total time
+> it would take for the entire transfer to happen and program the timeout
+> value accordingly.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 47 ++++++++++++++++++++++++++++++++++++++++-------
+>  drivers/mmc/host/sdhci.h | 10 ++++++++++
+>  2 files changed, 50 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 1dd117cbeb6e..baab67bfa39b 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -709,6 +709,36 @@ static u32 sdhci_sdma_address(struct sdhci_host *host)
+>  		return sg_dma_address(host->data->sg);
+>  }
+>  
+> +static void sdhci_calc_sw_timeout(struct sdhci_host *host,
+> +				  struct mmc_command *cmd,
+> +				  unsigned int target_timeout)
+> +{
+> +	struct mmc_data *data = cmd->data;
+> +	struct mmc_host *mmc = host->mmc;
+> +	u64 transfer_time;
+> +	struct mmc_ios *ios = &mmc->ios;
+> +	unsigned char bus_width = 1 << ios->bus_width;
+> +	unsigned int blksz;
+> +	unsigned int freq;
+> +
+> +	if (data) {
+> +		blksz = data->blksz;
+> +		freq = host->mmc->actual_clock ? : host->clock;
+> +		transfer_time = (u64)blksz * NSEC_PER_SEC * (8 / bus_width);
+> +		do_div(transfer_time, freq);
+> +		/* multiply by '2' to account for any unknowns */
+> +		transfer_time = transfer_time * 2;
+> +		/* calculate timeout for the entire data */
+> +		host->data_timeout = (data->blocks * ((target_timeout *
+> +						       NSEC_PER_USEC) +
+> +						       transfer_time));
 
-Thanks a lot for testing!
+(target_timeout * NSEC_PER_USEC) might be 32-bit and therefore overflow
+for timeouts greater than about 4 seconds.
 
->
->     BUG: sleeping function called from invalid context at
-> drivers/base/power/runtime.c:1057
->
-> during system suspend (s2ram).
->
-> On R-Car Gen2 and SH-Mobile AG5 (arm32, no PSCI):
->
-> Disabling non-boot CPUs ...
-> BUG: sleeping function called from invalid context at
-> drivers/base/power/runtime.c:1057
-> in_atomic(): 0, irqs_disabled(): 128, pid: 1725, name: s2ram
-> CPU: 0 PID: 1725 Comm: s2ram Not tainted
-> 4.16.0-rc5-koelsch-00475-gaa69fc46cc44c3d7 #4001
-> Hardware name: Generic R-Car Gen2 (Flattened Device Tree)
-> [<c020f6a0>] (unwind_backtrace) from [<c020b324>] (show_stack+0x10/0x14)
-> [<c020b324>] (show_stack) from [<c07693c8>] (dump_stack+0x7c/0x9c)
-> [<c07693c8>] (dump_stack) from [<c02422ec>] (___might_sleep+0x128/0x164)
-> [<c02422ec>] (___might_sleep) from [<c0508efc>] (__pm_runtime_suspend+0x70/0xa8)
-> [<c0508efc>] (__pm_runtime_suspend) from [<c0299144>] (cpu_pm_enter+0x78/0x9c)
-> [<c0299144>] (cpu_pm_enter) from [<c0299170>] (cpu_pm_suspend+0x8/0x18)
-> [<c0299170>] (cpu_pm_suspend) from [<c04ff8c4>] (syscore_suspend+0x88/0x138)
-> [<c04ff8c4>] (syscore_suspend) from [<c0263010>]
-> (suspend_devices_and_enter+0x21c/0x564)
-> [<c0263010>] (suspend_devices_and_enter) from [<c02635a8>]
-> (pm_suspend+0x250/0x2c8)
-> [<c02635a8>] (pm_suspend) from [<c0262054>] (state_store+0xac/0xcc)
-> [<c0262054>] (state_store) from [<c035f238>] (kernfs_fop_write+0x170/0x1b0)
-> [<c035f238>] (kernfs_fop_write) from [<c02f8a5c>] (__vfs_write+0x2c/0x140)
-> [<c02f8a5c>] (__vfs_write) from [<c02f8ce4>] (vfs_write+0xb8/0x144)
-> [<c02f8ce4>] (vfs_write) from [<c02f8ea4>] (SyS_write+0x54/0xac)
-> [<c02f8ea4>] (SyS_write) from [<c0201000>] (ret_fast_syscall+0x0/0x4c)
-> Exception stack(0xeabcbfa8 to 0xeabcbff0)
-> bfa0:                   00000004 000ce408 00000001 000ce408 00000004 00000000
-> bfc0: 00000004 000ce408 b6e80b50 00000004 00000004 00000000 000c5758 00000000
-> bfe0: 00000000 be866754 b6de3c85 b6e1ef26
->
->
-> On R-Car Gen3 (arm64, PSCI):
->
-> Disabling non-boot CPUs ...
-> CPU1: shutdown
-> psci: CPU1 killed.
-> CPU2: shutdown
-> psci: CPU2 killed.
-> CPU3: shutdown
-> psci: CPU3 killed.
-> CPU4: shutdown
-> psci: CPU4 killed.
-> CPU5: shutdown
-> psci: CPU5 killed.
-> CPU6: shutdown
-> psci: CPU6 killed.
-> CPU7: shutdown
-> psci: CPU7 killed.
-> BUG: sleeping function called from invalid context at
-> drivers/base/power/runtime.c:1057
-> in_atomic(): 0, irqs_disabled(): 128, pid: 2592, name: s2ram
-> 4 locks held by s2ram/2592:
->  #0:  (sb_writers#7){.+.+}, at: [<00000000cae1f0e5>] vfs_write+0xb0/0x164
->  #1:  (&of->mutex){+.+.}, at: [<000000003002e527>] kernfs_fop_write+0x114/0x1bc
->  #2:  (kn->count#71){.+.+}, at: [<000000008c0217e1>]
-> kernfs_fop_write+0x11c/0x1bc
->  #3:  (pm_mutex){+.+.}, at: [<000000009a6c23e2>] pm_suspend+0x194/0xb10
-> irq event stamp: 69308
-> hardirqs last  enabled at (69307): [<00000000e9d09767>]
-> _raw_spin_unlock_irq+0x2c/0x4c
-> hardirqs last disabled at (69308): [<00000000619169c4>]
-> arch_suspend_disable_irqs+0x10/0x18
-> softirqs last  enabled at (69246): [<00000000b8a7706e>]
-> hrtimers_dead_cpu+0x2b8/0x2f0
-> softirqs last disabled at (69242): [<000000004dee0c40>]
-> hrtimers_dead_cpu+0x48/0x2f0
-> CPU: 0 PID: 2592 Comm: s2ram Not tainted
-> 4.16.0-rc5-salvator-x-00470-g319cfb3643965f46 #1685
-> Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
-> Call trace:
->  dump_backtrace+0x0/0x140
->  show_stack+0x14/0x1c
->  dump_stack+0xb4/0xf0
->  ___might_sleep+0x1fc/0x218
->  __might_sleep+0x70/0x80
->  __pm_runtime_suspend+0x6c/0xac
->  cpu_pm_enter+0x74/0x9c
->  cpu_pm_suspend+0xc/0x1c
->  syscore_suspend+0x1b8/0x410
->  suspend_devices_and_enter+0x210/0xd9c
->  pm_suspend+0x9a4/0xb10
->  state_store+0xd4/0xf8
->  kobj_attr_store+0x18/0x28
->  sysfs_kf_write+0x50/0x5c
->  kernfs_fop_write+0x178/0x1bc
->  __vfs_write+0x38/0x140
->  vfs_write+0xc4/0x164
->  SyS_write+0x54/0xa4
->  el0_svc_naked+0x30/0x34
->
->
-> I've bisected this to "[PATCH v6 09/25] kernel/cpu_pm: Manage runtime PM
-> in the idle path for CPUs".
+> +	} else {
+> +		host->data_timeout = (u64)target_timeout * NSEC_PER_USEC;
+> +	}
+> +
+> +	host->data_timeout += MMC_CMD_TRANSFER_TIME;
 
-Thanks for the report, very much appreciated!
+Need to allow for target_timeout == 0 so:
 
-I realized that pm_runtime_irq_safe() won't be called for CPU devices
-that hasn't been hooked up to a genpd - as of_genpd_attach_cpu()
-hasn't been called for them.
+	if (host->data_timeout)
+		host->data_timeout += MMC_CMD_TRANSFER_TIME;
 
-I figure something out for the next version on how to address this
-properly, until then you may test with the following change:
+> +}
+> +
+>  static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  {
+>  	u8 count;
+> @@ -766,6 +796,7 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>  		if (count >= 0xF)
+>  			break;
+>  	}
+> +	sdhci_calc_sw_timeout(host, cmd, target_timeout);
 
-diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
-index 71317ff..57250ee 100644
---- a/kernel/cpu_pm.c
-+++ b/kernel/cpu_pm.c
-@@ -103,7 +103,7 @@ int cpu_pm_enter(void)
-                 */
-                cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
+If you make the changes I suggest for patch 6, then this would
+move sdhci_calc_sw_timeout() into sdhci_set_timeout().
 
--       if (!ret && dev)
-+       if (!ret && dev && pm_runtime_enabled(dev))
-                pm_runtime_put_sync_suspend(dev);
+I suggest you factor out the target_timeout calculation e.g.
 
-        return ret;
-@@ -126,7 +126,7 @@ int cpu_pm_exit(void)
- {
-        struct device *dev = get_cpu_device(smp_processor_id());
+static unsigned int sdhci_target_timeout(struct sdhci_host *host,
+					 struct mmc_command *cmd,
+					 struct mmc_data *data)
+{
+	unsigned int target_timeout;
 
--       if (dev)
-+       if (dev && pm_runtime_enabled(dev))
-                pm_runtime_get_sync(dev);
+	/* timeout in us */
+	if (!data)
+		target_timeout = cmd->busy_timeout * 1000;
+	else {
+		target_timeout = DIV_ROUND_UP(data->timeout_ns, 1000);
+		if (host->clock && data->timeout_clks) {
+			unsigned long long val;
 
-        return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
--- 
+			/*
+			 * data->timeout_clks is in units of clock cycles.
+			 * host->clock is in Hz.  target_timeout is in us.
+			 * Hence, us = 1000000 * cycles / Hz.  Round up.
+			 */
+			val = 1000000ULL * data->timeout_clks;
+			if (do_div(val, host->clock))
+				target_timeout++;
+			target_timeout += val;
+		}
+	}
 
-Kind regards
-Uffe
+	return target_timeout;
+}
+
+And call it from sdhci_calc_sw_timeout()
+
+>  
+>  	return count;
+>  }
+> @@ -1175,13 +1206,6 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+>  		mdelay(1);
+>  	}
+>  
+> -	timeout = jiffies;
+> -	if (!cmd->data && cmd->busy_timeout > 9000)
+> -		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
+> -	else
+> -		timeout += 10 * HZ;
+> -	sdhci_mod_timer(host, cmd->mrq, timeout);
+> -
+>  	host->cmd = cmd;
+>  	if (sdhci_data_line_cmd(cmd)) {
+>  		WARN_ON(host->data_cmd);
+> @@ -1221,6 +1245,15 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+>  	    cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200)
+>  		flags |= SDHCI_CMD_DATA;
+>  
+> +	timeout = jiffies;
+> +	if (host->data_timeout > 0) {
+
+This can be just:
+
+	if (host->data_timeout) {
+
+> +		timeout += nsecs_to_jiffies(host->data_timeout);
+> +		host->data_timeout = 0;
+
+It would be better to initialize host->data_timeout = 0 at the top of
+sdhci_prepare_data().
+
+Also still need:
+
+	else if (!cmd->data && cmd->busy_timeout > 9000) {
+		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
+
+
+> +	} else {
+> +		timeout += 10 * HZ;
+> +	}
+> +	sdhci_mod_timer(host, cmd->mrq, timeout);
+> +
+>  	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+>  }
+>  EXPORT_SYMBOL_GPL(sdhci_send_command);
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index ff283ee08854..29b242fd17de 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -332,6 +332,14 @@ struct sdhci_adma2_64_desc {
+>  /* Allow for a a command request and a data request at the same time */
+>  #define SDHCI_MAX_MRQS		2
+>  
+> +/*
+> + * 48bit command and 136 bit response in 100KHz clock could take upto 2.48ms.
+> + * However since the start time of the command, the time between
+> + * command and response, and the time between response and start of data is
+> + * not known, set the command transfer time to 10ms.
+> + */
+> +#define MMC_CMD_TRANSFER_TIME	(10 * NSEC_PER_MSEC) /* max 10 ms */
+> +
+>  enum sdhci_cookie {
+>  	COOKIE_UNMAPPED,
+>  	COOKIE_PRE_MAPPED,	/* mapped by sdhci_pre_req() */
+> @@ -555,6 +563,8 @@ struct sdhci_host {
+>  	/* Host SDMA buffer boundary. */
+>  	u32			sdma_boundary;
+>  
+> +	u64			data_timeout;
+> +
+>  	unsigned long private[0] ____cacheline_aligned;
+>  };
+>  
+> 
