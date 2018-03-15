@@ -1,9 +1,9 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:07:08 +0100
-Subject: [PATCH 27/36] arm: dts: armada-385-db-ap: use SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 16:07:13 +0100
+Subject: [PATCH 32/36] arm: dts: armada-388-gp: use SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-28-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-33-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,25 +17,25 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-385-db-ap.dts | 33 +--------------------------------
+ arch/arm/boot/dts/armada-388-gp.dts | 33 +--------------------------------
  1 file changed, 1 insertion(+), 32 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-index 678aa023335d..d294f24281a5 100644
---- a/arch/arm/boot/dts/armada-385-db-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+index 51b4ee6df130..9d873257ac45 100644
+--- a/arch/arm/boot/dts/armada-388-gp.dts
++++ b/arch/arm/boot/dts/armada-388-gp.dts
 @@ -1,3 +1,4 @@
 +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
  /*
-  * Device Tree file for Marvell Armada 385 Access Point Development board
-  * (DB-88F6820-AP)
+  * Device Tree file for Marvell Armada 385 development board
+  * (RD-88F6820-GP)
 @@ -5,38 +6,6 @@
-  *  Copyright (C) 2014 Marvell
+  * Copyright (C) 2014 Marvell
   *
-  * Nadav Haklai <nadavh@marvell.com>
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
 - *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
