@@ -1,112 +1,68 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 15 Mar 2018 10:06:23 +0000
-Subject: [PATCH] KVM: arm/arm64: VGIC MMIO: add missing irq_lock
-In-Reply-To: <20180313010045.GC16740@lvm>
-References: <20180306092106.13044-1-andre.przywara@arm.com>
- <20180313010045.GC16740@lvm>
-Message-ID: <d0453520-a27b-7efe-83ee-ad96ac16d061@arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 15 Mar 2018 11:14:11 +0100
+Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+In-Reply-To: <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
+ <20180314141323.GD23100@dhcp22.suse.cz>
+ <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
+ <20180314145450.GI23100@dhcp22.suse.cz>
+ <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
+Message-ID: <20180315101411.GA23100@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-(sorry for the delay, forgot this in my draft folder)
-
-On 13/03/18 01:00, Christoffer Dall wrote:
-> On Tue, Mar 06, 2018 at 09:21:06AM +0000, Andre Przywara wrote:
->> Our irq_is_pending() helper function accesses multiple members of the
->> vgic_irq struct, so we need to hold the lock when calling it.
+On Wed 14-03-18 15:54:16, Ard Biesheuvel wrote:
+> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
+> > On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
+> >> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
+> >> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
+> >> > fix your issue? From the debugging info you provided it should because
+> >> > the patch prevents jumping backwards.
+> >> >
+> >>
+> >> The patch does fix the boot hang.
+> >>
+> >> But I am concerned that we are papering over a fundamental flaw in
+> >> memblock_next_valid_pfn().
+> >
+> > It seems that memblock_next_valid_pfn is doing the right thing here. It
+> > is the alignment which moves the pfn back AFAICS. I am not really
+> > impressed about the original patch either, to be completely honest.
+> > It just looks awfully tricky. I still didn't manage to wrap my head
+> > around the original issue though so I do not have much better ideas to
+> > be honest.
 > 
-> For the record I don't think this is necessarily a completely valid
-> conclusion.  The fact that you access multiple members of a struct is a
-> good indication that it might be a good idea to hold a lock, but it's
-> not as simple as that.
-> 
-> I think the only thing that could happen here is that a caller
-> mistakenly evaluates line_level when it shouldn't, but that would only
-> happen when changing the configuration of an irq from level to edge,
-> while the line_level is high, expecting the line_level to go down, and
-> the pending state to be subsequently reported as false, but we only
-> support changing the configuration of an interrupt when it's disabled,
-> and as a result this can only affect reads of the PENDR registers.
-> 
->> Add that requirement as a comment to the definition and take the lock
->> around the call in vgic_mmio_read_pending(), where we were missing it
->> before.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> 
-> Note, I'm fine with this change, but I don't agree with the rationale.
-> The rationale is to take the lock on every use for consistency and to
-> make the code easier to reason about, but it's possible that some future
-> analysis in the future would relax this requirement if essential for
-> performance.
+> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
+> argument, which is odd nut easily fixed.
 
-  ^^^^^^^^^^^   vgic_mmio_read_pending  ;-)
+There is a patch to remove that parameter sitting in the mmotm tree.
 
-So while I agree that one can build a case on why the *current* code
-might be actually safe without the lock, I think this is a very fragile
-approach. As documented, the lock protects the consistency of the
-members of the data structure. Full stop. So whenever we access
-multiple members, we should take the lock.
-If - and only if - we:
-- get a lot of contention on the lock, and
-- we care about this, and
-- we can prove that it's safe without the lock
-*then* it would be fine to remove this. And it would need to be heavily
-documented, possibly even with BUG()s.
+> Then, the whole idea of substracting one so that the pfn++ will
+> produce the expected value is rather hacky,
 
-Everything else looks like premature optimisation that even might break
-in the future once we for instance extend irq_is_pending() for whatever
-reason. Even today I am not sure that just reading
-"irq->pending_latch || irq->line_level" is safe without a lock,
-regardless of the configuration state.
+Absolutely agreed!
 
-In this particular case all other users take the lock, so this looked
-like a case where we have just forgotten this.
-And as hinted above, ISPENDR in a guest is probably not a frequently
-accessed register.
+> But the real problem is that rounding down pfn for the next iteration
+> is dodgy, because early_pfn_valid() isn't guaranteed to return true
+> for the rounded down value. I know it is probably fine in reality, but
+> dodgy as hell.
 
-I believe we don't disagree on the matter, actually, but I'd be cautious
-and rather take the lock than avoid it, if in doubt.
+Yes, that is what I meant when saying I was not impressed... I am always
+nervous when a loop makes jumps back and forth. I _think_ the main
+problem here is that we try to initialize a partial pageblock even
+though a part of it is invalid. We should simply ignore struct pages
+for those pfns. We don't do that and that is mostly because of the
+disconnect between what the page allocator and early init code refers to
+as a unit of memory to care about. I do not remember exactly why but I
+strongly suspect this is mostly a performance optimization on the page
+allocator side so that we do not have to check each and every pfn. Maybe
+we should signal partial pageblocks from an early code and drop the
+optimization in the page allocator init code.
 
-Cheers,
-Andre.
+> The same applies to the call to early_pfn_in_nid() btw
 
->> ---
->>  virt/kvm/arm/vgic/vgic-mmio.c | 3 +++
->>  virt/kvm/arm/vgic/vgic.h      | 1 +
->>  2 files changed, 4 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->> index 83d82bd7dc4e..dbe99d635c80 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->> @@ -113,9 +113,12 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
->>  	/* Loop over all IRQs affected by this read */
->>  	for (i = 0; i < len * 8; i++) {
->>  		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +		unsigned long flags;
->>  
->> +		spin_lock_irqsave(&irq->irq_lock, flags);
->>  		if (irq_is_pending(irq))
->>  			value |= (1U << i);
->> +		spin_unlock_irqrestore(&irq->irq_lock, flags);
->>  
->>  		vgic_put_irq(vcpu->kvm, irq);
->>  	}
->> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->> index 12c37b89f7a3..5b11859a1a1e 100644
->> --- a/virt/kvm/arm/vgic/vgic.h
->> +++ b/virt/kvm/arm/vgic/vgic.h
->> @@ -96,6 +96,7 @@
->>  /* we only support 64 kB translation table page size */
->>  #define KVM_ITS_L1E_ADDR_MASK		GENMASK_ULL(51, 16)
->>  
->> +/* Requires the irq_lock to be held by the caller. */
->>  static inline bool irq_is_pending(struct vgic_irq *irq)
->>  {
->>  	if (irq->config == VGIC_CONFIG_EDGE)
->> -- 
->> 2.14.1
->>
+Why?
+-- 
+Michal Hocko
+SUSE Labs
