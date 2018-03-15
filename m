@@ -1,98 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 15 Mar 2018 15:59:32 +0000
-Subject: [PATCH 3/3] irqchip/gic-v3: Allow LPIs to be disabled from the
- command line
-In-Reply-To: <f3fee732-2c07-e303-4ec2-2d79668b868e@codeaurora.org>
-References: <20180313172103.24281-1-marc.zyngier@arm.com>
- <20180313172103.24281-4-marc.zyngier@arm.com>
- <f3fee732-2c07-e303-4ec2-2d79668b868e@codeaurora.org>
-Message-ID: <0418813e-9837-32b0-d1df-2b5d52c83d8e@arm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 16 Mar 2018 00:07:35 +0800
+Subject: [PATCH v7 0/3] Add support for Hi3660 mailbox driver
+Message-ID: <1521130058-24796-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/18 14:58, Shanker Donthineni wrote:
-> 
-> Hi Marc,
-> 
-> On 03/13/2018 12:21 PM, Marc Zyngier wrote:
->> For most GICv3 implementations, enabling LPIs is a one way switch.
->> Once they're on, there is no turning back, which completely kills
->> kexec (pending tables will always be live, and we can't tell the
->> secondary kernel where they are).
->>
->> This is really annoying if you plan to use Linux as a bootloader,
->> as it pretty much guarantees that the secondary kernel won't be
->> able to use MSIs, and may even see some memory corruption. Bad.
->>
->> A workaround for this unfortunate situation is to allow the kernel
->> not to enable LPIs, even if the feature is present in the HW. This
->> would allow Linux-as-a-bootloader to leave LPIs alone, and let the
->> secondary kernel to do whatever it wants with them.
->>
->> Let's introduce a boolean "irqchip.gicv3_nolpi" command line option
->> that serves that purpose.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  Documentation/admin-guide/kernel-parameters.txt |  8 ++++++++
->>  drivers/irqchip/irq-gic-v3.c                    | 10 +++++++++-
->>  2 files changed, 17 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
->> index 1d1d53f85ddd..60130231db3b 100644
->> --- a/Documentation/admin-guide/kernel-parameters.txt
->> +++ b/Documentation/admin-guide/kernel-parameters.txt
->> @@ -1743,6 +1743,14 @@
->>  			of a GICv2 controller even if the memory range
->>  			exposed by the device tree is too small.
->>  
->> +	irqchip.gicv3_nolpi=
->> +			[ARM, ARM64]
->> +			Force the kernel to ignore the availability of
->> +			LPIs (and by consequence ITSs). Intended for system
->> +			that use the kernel as a bootloader, and thus want
->> +			to let secondary kernels in charge of setting up
->> +			LPIs.
->> +
->>  	irqfixup	[HW]
->>  			When an interrupt is not handled search all handlers
->>  			for it. Intended to get systems with badly broken
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index 0ea02504115d..3e9eeb6cb294 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -613,9 +613,17 @@ static void gic_cpu_sys_reg_init(void)
->>  		pr_crit_once("RSS is required but GICD doesn't support it\n");
->>  }
->>  
->> +static bool gicv3_nolpi;
->> +
->> +static int __init gicv3_nolpi_cfg(char *buf)
->> +{
->> +	return strtobool(buf, &gicv3_nolpi);
->> +}
->> +early_param("irqchip.gicv3_nolpi", gicv3_nolpi_cfg);
->> +
->>  static int gic_dist_supports_lpis(void)
->>  {
->> -	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
->> +	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS) && !gicv3_nolpi;
-> 
-> Thanks for this patch series especially for KDUMP case. It would be nice if we disable GIC-ITS and
-> GICR-LPI functionality completely to avoid in flight LPIs which were triggered by first kernel.
+Hi3660 mailbox controller is used to send message within multiple
+processors, MCU, HIFI, etc. This patch series is to implement an
+initial version for Hi3660 mailbox driver with "automatic
+acknowledge" mode.
 
-For kdump, it doesn't really matter much. The kdump kernel lives in its
-own memory space, and is unaffected by LPIs being triggered. You just
-need to make sure that if you can't reset EnableLPIs, you still carry on
-using wired interrupts. The ITS doesn't really matter, as long as the
-redistributors have their EnableLPIs zeroed.
+The patch set have been verified with Hi3660 stub clock driver, so
+we can send message to MCU to execute CPU frequency scaling. This is
+tested on 96boards Hikey960.
 
-It really is for kexec that it matters a lot, because the secondary
-kernel expects to find a sane environment, which it cannot have if LPIs
-are still on.
+Changes from v6:
+* Rebased patches on latest mainline kernel: commit 0aa3fdb8b3a6
+  ("Merge branch 'percpu_ref-rcu-audit-fixes' of git://git.kernel.org/
+   pub/scm/linux/kernel/git/tj/misc")
 
-Thanks,
+Changes from v5:
+* Changed to use writel()/readl() to replace {writel|readl}_relaxed()
+  to make safe for memory ordering;
 
-	M.
+Changes from v4:
+* According to Jassi suggestion, refactored mailbox driver and removed
+  "inline" for function declaration;
+
+Changes from v3:
+* According to Jassi suggestion, refined structure name to
+  "struct hi3660_chan_info";
+* According to Jassi suggestion, moved channel 'lock'+'acquire'
+  operations into .startup();
+
+Changes from v2:
+* According to Mark Rutland suggestions, removed sev()/wfe() from
+  driver, the system has no two masters sharing the same channel for
+  data transferring so we don't need these instructions;
+* Refined DT binding and doc according to Rob suggestions;
+* Refined driver according to Julien suggestions;
+
+Changes from v1:
+* Added cover letter to track the changelog;
+* Added document for DT binding;
+* Refactored and simplized mailbox driver with "automatic ack" mode;
+* Refined commit logs for patches;
+
+
+Kaihua Zhong (2):
+  mailbox: Add support for Hi3660 mailbox
+  dts: arm64: Add mailbox binding for hi3660
+
+Leo Yan (1):
+  dt-bindings: mailbox: Introduce Hi3660 controller binding
+
+ .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  |  51 ++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |   8 +
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/hi3660-mailbox.c                   | 312 +++++++++++++++++++++
+ 5 files changed, 381 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
+ create mode 100644 drivers/mailbox/hi3660-mailbox.c
+
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
