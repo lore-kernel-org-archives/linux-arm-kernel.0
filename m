@@ -1,72 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Mar 2018 10:17:24 +0000
-Subject: [PATCH] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <20180315101411.GA23100@dhcp22.suse.cz>
-References: <20180314134431.13241-1-ard.biesheuvel@linaro.org>
- <20180314141323.GD23100@dhcp22.suse.cz>
- <CAKv+Gu9hrZnX6pmiCaT=S30KQ11tY4kv=qvdSPPZ2nYDC7P7eQ@mail.gmail.com>
- <20180314145450.GI23100@dhcp22.suse.cz>
- <CAKv+Gu8qguR0tFWZxecQDTPS3_Eyt_E6_YA1ivyAAqNuaaR9-g@mail.gmail.com>
- <20180315101411.GA23100@dhcp22.suse.cz>
-Message-ID: <CAKv+Gu_f9mNQ37GzfZybcUfanSAx1zH0ifSNfDE0EWACGH-GCg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Mar 2018 11:23:26 +0100
+Subject: [PATCH] mmc: dw_mmc-rockchip: correct property names in debug
+In-Reply-To: <20180301103625.7285-1-john@metanate.com>
+References: <20180301103625.7285-1-john@metanate.com>
+Message-ID: <CAPDyKFro5hvuEKuiPHCg9WEf7Ysmj_9GJ_bykquq9+okA2Sk_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 10:14, Michal Hocko <mhocko@kernel.org> wrote:
-> On Wed 14-03-18 15:54:16, Ard Biesheuvel wrote:
->> On 14 March 2018 at 14:54, Michal Hocko <mhocko@kernel.org> wrote:
->> > On Wed 14-03-18 14:35:12, Ard Biesheuvel wrote:
->> >> On 14 March 2018 at 14:13, Michal Hocko <mhocko@kernel.org> wrote:
->> >> > Does http://lkml.kernel.org/r/20180313224240.25295-1-neelx at redhat.com
->> >> > fix your issue? From the debugging info you provided it should because
->> >> > the patch prevents jumping backwards.
->> >> >
->> >>
->> >> The patch does fix the boot hang.
->> >>
->> >> But I am concerned that we are papering over a fundamental flaw in
->> >> memblock_next_valid_pfn().
->> >
->> > It seems that memblock_next_valid_pfn is doing the right thing here. It
->> > is the alignment which moves the pfn back AFAICS. I am not really
->> > impressed about the original patch either, to be completely honest.
->> > It just looks awfully tricky. I still didn't manage to wrap my head
->> > around the original issue though so I do not have much better ideas to
->> > be honest.
->>
->> So first of all, memblock_next_valid_pfn() never refers to its max_pfn
->> argument, which is odd nut easily fixed.
+On 1 March 2018 at 11:36, John Keeping <john@metanate.com> wrote:
+> Following up the device tree fixed in commits e78c637127ee ("ARM: dts:
+> rockchip: Fix DWMMC clocks") and ca9eee95a2de ("arm64: dts: rockchip:
+> Fix DWMMC clocks", 2018-02-15), avoid confusion by using the correct
+> property name in the debug output if clocks are not found.
 >
-> There is a patch to remove that parameter sitting in the mmotm tree.
->
->> Then, the whole idea of substracting one so that the pfn++ will
->> produce the expected value is rather hacky,
->
-> Absolutely agreed!
->
->> But the real problem is that rounding down pfn for the next iteration
->> is dodgy, because early_pfn_valid() isn't guaranteed to return true
->> for the rounded down value. I know it is probably fine in reality, but
->> dodgy as hell.
->
-> Yes, that is what I meant when saying I was not impressed... I am always
-> nervous when a loop makes jumps back and forth. I _think_ the main
-> problem here is that we try to initialize a partial pageblock even
-> though a part of it is invalid. We should simply ignore struct pages
-> for those pfns. We don't do that and that is mostly because of the
-> disconnect between what the page allocator and early init code refers to
-> as a unit of memory to care about. I do not remember exactly why but I
-> strongly suspect this is mostly a performance optimization on the page
-> allocator side so that we do not have to check each and every pfn. Maybe
-> we should signal partial pageblocks from an early code and drop the
-> optimization in the page allocator init code.
->
->> The same applies to the call to early_pfn_in_nid() btw
->
-> Why?
+> Signed-off-by: John Keeping <john@metanate.com>
 
-By 'the same' I mean it isn't guaranteed to return true for the
-rounded down value *at the API level*. I understand it will be mostly
-fine in reality, but juggling (in)valid PFNs like this is likely to
-end badly.
+Thanks, applied for next!
+
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/dw_mmc-rockchip.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/dw_mmc-rockchip.c b/drivers/mmc/host/dw_mmc-rockchip.c
+> index 339295212935..40d7de2eea12 100644
+> --- a/drivers/mmc/host/dw_mmc-rockchip.c
+> +++ b/drivers/mmc/host/dw_mmc-rockchip.c
+> @@ -282,11 +282,11 @@ static int dw_mci_rk3288_parse_dt(struct dw_mci *host)
+>
+>         priv->drv_clk = devm_clk_get(host->dev, "ciu-drive");
+>         if (IS_ERR(priv->drv_clk))
+> -               dev_dbg(host->dev, "ciu_drv not available\n");
+> +               dev_dbg(host->dev, "ciu-drive not available\n");
+>
+>         priv->sample_clk = devm_clk_get(host->dev, "ciu-sample");
+>         if (IS_ERR(priv->sample_clk))
+> -               dev_dbg(host->dev, "ciu_sample not available\n");
+> +               dev_dbg(host->dev, "ciu-sample not available\n");
+>
+>         host->priv = priv;
+>
+> --
+> 2.16.2
+>
