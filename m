@@ -1,134 +1,234 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 15 Mar 2018 12:00:57 +0100
-Subject: [PATCH v6 00/25] PM / Domains: Support hierarchical CPU
- arrangement (PSCI/ARM)
-In-Reply-To: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAMuHMdXUNVBTi9n9+LQyv8o7e-z_ck-gSWsq-hi+ANgUnnTKjA@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 15 Mar 2018 12:02:57 +0100
+Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <12da0d00-9ab3-3752-793b-e487666f35a3@ti.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
+ <20180227071134.28063-2-a.hajda@samsung.com>
+ <ed0ce43c-3c81-b027-2eb1-30e49156c3ac@ti.com>
+ <b588527d-2ca2-9e88-9e27-e09e5b52f8d6@samsung.com>
+ <12da0d00-9ab3-3752-793b-e487666f35a3@ti.com>
+Message-ID: <0e53a355-cb9f-bab0-997d-207f683a4fbc@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On 12.03.2018 11:41, Roger Quadros wrote:
+> Andrezej,
+>
+> Why don't you have any of the USB maintainers in to/cc?
+>
+> Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:USB SUBSYSTEM)
+> Felipe Balbi <balbi@kernel.org> (maintainer:USB GADGET/PERIPHERAL SUBSYSTEM)
 
-On Wed, Mar 14, 2018 at 5:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> This series is a re-worked version from Lina Iyer's two series [1] that got
-> posted more than a year ago by now. I have picked up the series and done a
-> significant re-work of it and here's the result. All patches have been changed,
-> some have been dropped, some are entirely new. For this reason I decided to not
-> include a version history, as I think people need a fresh start anyway.
+Serious omission, sorry for that.
 
-Thanks for your series!
-
-I gave it a try on a few Renesas boards and SoCs, without adding any new DT
-descriptions.  On all of them it triggers
-
-    BUG: sleeping function called from invalid context at
-drivers/base/power/runtime.c:1057
-
-during system suspend (s2ram).
-
-On R-Car Gen2 and SH-Mobile AG5 (arm32, no PSCI):
-
-Disabling non-boot CPUs ...
-BUG: sleeping function called from invalid context at
-drivers/base/power/runtime.c:1057
-in_atomic(): 0, irqs_disabled(): 128, pid: 1725, name: s2ram
-CPU: 0 PID: 1725 Comm: s2ram Not tainted
-4.16.0-rc5-koelsch-00475-gaa69fc46cc44c3d7 #4001
-Hardware name: Generic R-Car Gen2 (Flattened Device Tree)
-[<c020f6a0>] (unwind_backtrace) from [<c020b324>] (show_stack+0x10/0x14)
-[<c020b324>] (show_stack) from [<c07693c8>] (dump_stack+0x7c/0x9c)
-[<c07693c8>] (dump_stack) from [<c02422ec>] (___might_sleep+0x128/0x164)
-[<c02422ec>] (___might_sleep) from [<c0508efc>] (__pm_runtime_suspend+0x70/0xa8)
-[<c0508efc>] (__pm_runtime_suspend) from [<c0299144>] (cpu_pm_enter+0x78/0x9c)
-[<c0299144>] (cpu_pm_enter) from [<c0299170>] (cpu_pm_suspend+0x8/0x18)
-[<c0299170>] (cpu_pm_suspend) from [<c04ff8c4>] (syscore_suspend+0x88/0x138)
-[<c04ff8c4>] (syscore_suspend) from [<c0263010>]
-(suspend_devices_and_enter+0x21c/0x564)
-[<c0263010>] (suspend_devices_and_enter) from [<c02635a8>]
-(pm_suspend+0x250/0x2c8)
-[<c02635a8>] (pm_suspend) from [<c0262054>] (state_store+0xac/0xcc)
-[<c0262054>] (state_store) from [<c035f238>] (kernfs_fop_write+0x170/0x1b0)
-[<c035f238>] (kernfs_fop_write) from [<c02f8a5c>] (__vfs_write+0x2c/0x140)
-[<c02f8a5c>] (__vfs_write) from [<c02f8ce4>] (vfs_write+0xb8/0x144)
-[<c02f8ce4>] (vfs_write) from [<c02f8ea4>] (SyS_write+0x54/0xac)
-[<c02f8ea4>] (SyS_write) from [<c0201000>] (ret_fast_syscall+0x0/0x4c)
-Exception stack(0xeabcbfa8 to 0xeabcbff0)
-bfa0:                   00000004 000ce408 00000001 000ce408 00000004 00000000
-bfc0: 00000004 000ce408 b6e80b50 00000004 00000004 00000000 000c5758 00000000
-bfe0: 00000000 be866754 b6de3c85 b6e1ef26
-
-
-On R-Car Gen3 (arm64, PSCI):
-
-Disabling non-boot CPUs ...
-CPU1: shutdown
-psci: CPU1 killed.
-CPU2: shutdown
-psci: CPU2 killed.
-CPU3: shutdown
-psci: CPU3 killed.
-CPU4: shutdown
-psci: CPU4 killed.
-CPU5: shutdown
-psci: CPU5 killed.
-CPU6: shutdown
-psci: CPU6 killed.
-CPU7: shutdown
-psci: CPU7 killed.
-BUG: sleeping function called from invalid context at
-drivers/base/power/runtime.c:1057
-in_atomic(): 0, irqs_disabled(): 128, pid: 2592, name: s2ram
-4 locks held by s2ram/2592:
- #0:  (sb_writers#7){.+.+}, at: [<00000000cae1f0e5>] vfs_write+0xb0/0x164
- #1:  (&of->mutex){+.+.}, at: [<000000003002e527>] kernfs_fop_write+0x114/0x1bc
- #2:  (kn->count#71){.+.+}, at: [<000000008c0217e1>]
-kernfs_fop_write+0x11c/0x1bc
- #3:  (pm_mutex){+.+.}, at: [<000000009a6c23e2>] pm_suspend+0x194/0xb10
-irq event stamp: 69308
-hardirqs last  enabled at (69307): [<00000000e9d09767>]
-_raw_spin_unlock_irq+0x2c/0x4c
-hardirqs last disabled at (69308): [<00000000619169c4>]
-arch_suspend_disable_irqs+0x10/0x18
-softirqs last  enabled at (69246): [<00000000b8a7706e>]
-hrtimers_dead_cpu+0x2b8/0x2f0
-softirqs last disabled at (69242): [<000000004dee0c40>]
-hrtimers_dead_cpu+0x48/0x2f0
-CPU: 0 PID: 2592 Comm: s2ram Not tainted
-4.16.0-rc5-salvator-x-00470-g319cfb3643965f46 #1685
-Hardware name: Renesas Salvator-X 2nd version board based on r8a7795 ES2.0+ (DT)
-Call trace:
- dump_backtrace+0x0/0x140
- show_stack+0x14/0x1c
- dump_stack+0xb4/0xf0
- ___might_sleep+0x1fc/0x218
- __might_sleep+0x70/0x80
- __pm_runtime_suspend+0x6c/0xac
- cpu_pm_enter+0x74/0x9c
- cpu_pm_suspend+0xc/0x1c
- syscore_suspend+0x1b8/0x410
- suspend_devices_and_enter+0x210/0xd9c
- pm_suspend+0x9a4/0xb10
- state_store+0xd4/0xf8
- kobj_attr_store+0x18/0x28
- sysfs_kf_write+0x50/0x5c
- kernfs_fop_write+0x178/0x1bc
- __vfs_write+0x38/0x140
- vfs_write+0xc4/0x164
- SyS_write+0x54/0xa4
- el0_svc_naked+0x30/0x34
+>
+> On 12/03/18 09:02, Andrzej Hajda wrote:
+>> On 09.03.2018 11:24, Roger Quadros wrote:
+>>> Hi,
+>>>
+>>> On 27/02/18 09:11, Andrzej Hajda wrote:
+>>>> These bindings allow to describe most known standard USB connectors
+>>>> and it should be possible to extend it if necessary.
+>>>> USB connectors, beside USB can be used to route other protocols,
+>>>> for example UART, Audio, MHL. In such case every device passing data
+>>>> through the connector should have appropriate graph bindings.
+>>>>
+>>>> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+>>>> ---
+>>>> v4:
+>>>> - improved 'type' description (Rob),
+>>>> - improved description of 2nd example (Rob).
+>>>> v3:
+>>>> - removed MHL port (samsung connector will have separate bindings),
+>>>> - added 2nd example for USB-C,
+>>>> - improved formatting.
+>>>> v2:
+>>>> - moved connector type(A,B,C) to compatible string (Rob),
+>>>> - renamed size property to type (Rob),
+>>>> - changed type description to be less confusing (Laurent),
+>>>> - removed vendor specific compatibles (implied by graph port number),
+>>>> - added requirement of connector being a child of IC (Rob),
+>>>> - removed max-mode (subtly suggested by Rob, it should be detected anyway
+>>>>   by USB Controller in runtime, downside is that device is not able to
+>>>>   report its real capabilities, maybe better would be to make it optional(?)),
+>>>> - assigned port numbers to data buses (Rob).
+>>>>
+>>>> Regards
+>>>> Andrzej
+>>>> ---
+>>>>  .../bindings/connector/usb-connector.txt           | 75 ++++++++++++++++++++++
+>>>>  1 file changed, 75 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/connector/usb-connector.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/connector/usb-connector.txt b/Documentation/devicetree/bindings/connector/usb-connector.txt
+>>>> new file mode 100644
+>>>> index 000000000000..e1463f14af38
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/connector/usb-connector.txt
+> Should this lie in  bindings/usb/connector?
 
 
-I've bisected this to "[PATCH v6 09/25] kernel/cpu_pm: Manage runtime PM
-in the idle path for CPUs".
+I guess this is question for DT people. For me both locations are OK.
 
-Gr{oetje,eeting}s,
+>
+>>>> @@ -0,0 +1,75 @@
+>>>> +USB Connector
+>>>> +=============
+>>>> +
+>>>> +USB connector node represents physical USB connector. It should be
+>>>> +a child of USB interface controller.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: describes type of the connector, must be one of:
+>>>> +    "usb-a-connector",
+>>>> +    "usb-b-connector",
+>>>> +    "usb-c-connector".
+>>> compatible should be just "usb-connector"
+>>>
+>>> Type should be a property
+>>>
+>>> type: type of usb connector "A", "B", "AB", "C"
+>>> AB is for dual-role connectors.
+>> I have proposed such property (and size also) in my first RFC [1]. Rod
+>> did not like it :)
+>>
+>> [1]: https://marc.info/?l=devicetree&m=150660411515233&w=2
+>>
+> This is what Rob says here https://patchwork.kernel.org/patch/9976043/
+> "We did "type" for hdmi-connector, but I think I'd really prefer 
+> compatible be used to distinguish as least where it may matter to s/w. 
+> In the HDMI case, they all are pretty much the same, just different 
+> physical size."
+>
+> So the question is. Does it matter to this particular software implementation
+> if it is type A,B,C connector?
+> If yes, how?
 
-                        Geert
+IMHO both approaches can work from S/W POV. As I understood it moving
+usb type to compatible was rather matter of devicetree guidelines I am
+not aware of. Again question to Rob.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> Type A will never have any alternate function. It is always dedicated to USB.
+>
+> Also does the size "full", "micro", "mini" matter to software?
+>
+>>> micro super-speed and high-speed connectors are different. How do you differentiate that?
+>> I am aware of it, and property differentiating it was also in my earlier
+>> iterations.
+>> If there will be need to differentiate such connectors, adding property
+>> max-speed or max-mode would do the thing.
+> USB controller binding (bindings/usb/generic.txt) has the speed.
+> I don't think there is any value for replicating it for the connector. Maybe it could
+> be added later if needed.
+>
+>>>> +
+>>>> +Optional properties:
+>>>> +- label: symbolic name for the connector,
+>>> Why do you need label? We can't maintain consistency as people will put creative names there.
+>>> Device/bus driver could generate a valid label.
+>> It follows convention for other connectors: HDMI, DVI, ....
+>>
+>>>> +- type: size of the connector, should be specified in case of USB-A, USB-B
+>>>> +  non-fullsize connectors: "mini", "micro".
+>>> type is misleading. Type is usually A/B/C. It should be size here instead.
+>> As you can see in discussion for previous iterations it follows
+>> convention already established for other connectors.
+>>
+>>> size: size of the connector if not standard size. "mini", "micro"
+>>>
+>>> If not specified it is treated as standard sized connector.
+>>> e.g. for Type-C there is no mini/micro. so size doesn't have to be specificed
+>> Few lines above it is described: should be specified in case of USB-A,
+>> USB-B non-fullsize connectors.
+>>
+>>> What about Type-C connector?
+>>>> +
+>>>> +Required nodes:
+>>>> +- any data bus to the connector should be modeled using the OF graph bindings
+>>> s/modeled/modelled
+>>>> +  specified in bindings/graph.txt, unless the bus is between parent node and
+>>>> +  the connector. Since single connector can have multpile data buses every bus
+>>> s/multpile/multiple
+>> OK, I will fix both typos.
+>>
+>>>> +  has assigned OF graph port number as follows:
+>>>> +    0: High Speed (HS), present in all connectors,
+>>>> +    1: Super Speed (SS), present in SS capable connectors,
+>>>> +    2: Sideband use (SBU), present in USB-C.
+>>>> +
+>>>> +Examples
+>>>> +--------
+>>>> +
+>>>> +1. Micro-USB connector with HS lines routed via controller (MUIC):
+>>>> +
+>>>> +muic-max77843 at 66 {
+>>>> +	...
+>>>> +	usb_con: connector {
+>>>> +		compatible = "usb-b-connector";
+>>>> +		label = "micro-USB";
+>>>> +		type = "micro";
+>>>> +	};
+>>>> +};
+>>>> +
+>>>> +2. USB-C connector attached to CC controller (s2mm005), HS lines routed
+>>>> +to companion PMIC (max77865), SS lines to USB3 PHY and SBU to DisplayPort.
+>>>> +DisplayPort video lines are routed to the connector via SS mux in USB3 PHY.
+>>>> +
+>>>> +ccic: s2mm005 at 33 {
+>>>> +	...
+>>>> +	usb_con: connector {
+>>>> +		compatible = "usb-c-connector";
+>>>> +		label = "USB-C";
+>>> The label is not consistent with the earlier example.
+>> Why?
+> Because 1st example is "<size>-USB" and second one is "USB-<type>".
+>
+> How is label going to be used? Is it being presented to end user?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I suppose it could be presented to user, and not-interpreted by S/W.
+
+> If yes it should indicate what's important to the user. i.e. its function. e.g. "USB-MHL"
+> or "USB-DisplayPort"
+
+Good idea, to emphasize ports capabilities. I guess it could be most
+useful in case of multiple USB ports, they could be then named according
+to their visible properties/labels, for example: Front-USB, Green-USB,
+USB-1.
+
+Regards
+Andrzej
+
+>
+>> Regards
+>> Andrzej
+>>
+>>>> +
+>>>> +		ports {
+>>>> +			#address-cells = <1>;
+>>>> +			#size-cells = <0>;
+>>>> +
+>>>> +			port at 0 {
+>>>> +				reg = <0>;
+>>>> +				usb_con_hs: endpoint {
+>>>> +					remote-endpoint = <&max77865_usbc_hs>;
+>>>> +				};
+>>>> +			};
+>>>> +			port at 1 {
+>>>> +				reg = <1>;
+>>>> +				usb_con_ss: endpoint {
+>>>> +					remote-endpoint = <&usbdrd_phy_ss>;
+>>>> +				};
+>>>> +			};
+>>>> +			port at 2 {
+>>>> +				reg = <2>;
+>>>> +				usb_con_sbu: endpoint {
+>>>> +					remote-endpoint = <&dp_aux>;
+>>>> +				};
+>>>> +			};
+>>>> +		};
+>>>> +	};
+>>>> +};
+>>>>
