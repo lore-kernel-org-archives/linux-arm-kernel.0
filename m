@@ -1,38 +1,47 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 15 Mar 2018 15:25:12 +0000
-Subject: [PATCH 3/3] arm64: dts: update the cpu idle node
-In-Reply-To: <20180208075436.38443-3-ran.wang_1@nxp.com>
-References: <20180208075436.38443-1-ran.wang_1@nxp.com>
- <20180208075436.38443-3-ran.wang_1@nxp.com>
-Message-ID: <346ad3d2-04e4-7df3-5187-36124b3c717b@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2018 16:29:12 +0100
+Subject: [GIT PULL 5/6] Freescale arm64 device tree updates for 4.17
+In-Reply-To: <1521113800-16401-5-git-send-email-shawnguo@kernel.org>
+References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
+ <1521113800-16401-5-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAK8P3a1RZjpSj=6eWAJ7Y=6=N9PPXkVcHN84LFBFJROyN0d0iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(sorry for replying so late, just found this by accident when clearing
- old emails)
+On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.17
+>
+> for you to fetch changes up to 4e017f1419397473cf3db6e9fa020013998b1aa4:
+>
+>   dt-bindings: ifc: Fix the unit address format in the examples (2018-03-12 15:38:49 +0800)
+>
+> ----------------------------------------------------------------
+> Freescale arm64 device tree updates for 4.17:
+>  - Move cpu_thermal device out of bus node to fix DTC simple_bus_reg
+>    warning seen with W=1 switch.
+>  - Fix IFC child nodes' unit-address to eliminate DTC simple_bus_reg
+>    warnings.
+>  - Add a dummy size memory 'reg' property for LS1046A device tree to
+>    avoid unit_address_vs_reg DTC warning, and the real size will be
+>    filled by bootloader.
+>  - Update ls208xa-qds board device tree to fix unit_address_vs_reg
+>    warnings with DSPI device.
+>  - Add idle-states for LS1012A and LS1043A, and correct
+>    arm,psci-suspend-param setting for already added idle-states.
+>  - DPAA QBMan portal and watchdog device addition.
 
-On 08/02/18 07:54, Ran Wang wrote:
-> From: Yuantian Tang <andy.tang@nxp.com>
-> 
-> According to PSCI standard v0.2, for CPU_SUSPEND call, which is
-> used by cpu idle framework, bit[16] of state parameter must be 0.
-> So update bit[16] of property 'arm,psci-suspend-param', which is
-> used as state parameter, to 0.
-> 
-This changelog makes zero sense to me.
+Pulled into next/dt
 
-1. PSCI specification makes no reference to "cpu idle framework".
-   It's not a Linux specification to reference anything specific to
-   Linux CPUIdle framework.
+What's the status of the imx8 support? Do you plan to send another
+pull request for that for 4.17, or are you still waiting for some
+dependencies?
 
-2. "for CPU_SUSPEND call,...bit[16] of state parameter must be 0."
-   Where exactly to you see that ? Specification tells what value of
-   0 or 1 in bit[16] means.
+Thanks,
 
-3. Is this retention state and doesn't need any save restore ? If not
-   this change is wrong and will break if and when we use
-   CPU_PM_CPU_IDLE_ENTER_RETENTION if this bit is not set.
-
--- 
-Regards,
-Sudeep
+       Arnd
