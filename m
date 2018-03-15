@@ -1,44 +1,59 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 11:35:21 -0500
-Subject: [v2] ARM: davinci: fix the GPIO lookup for omapl138-hawk
-In-Reply-To: <20180301103448.27233-1-brgl@bgdev.pl>
-References: <20180301103448.27233-1-brgl@bgdev.pl>
-Message-ID: <2641a421-9823-c0bb-93d9-ca0c64060c51@lechnology.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 15 Mar 2018 17:40:58 +0100
+Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
+ mitigation)
+In-Reply-To: <1a57727e-d4b8-f0e8-e910-ee1bc136ac0f@arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180315155741.7syqjajb77kh5vx2@kamzik.brq.redhat.com>
+ <1a57727e-d4b8-f0e8-e910-ee1bc136ac0f@arm.com>
+Message-ID: <20180315164058.xmx3ap37o4gazptn@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2018 04:34 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Thu, Mar 15, 2018 at 04:19:56PM +0000, Marc Zyngier wrote:
+> On 15/03/18 15:57, Andrew Jones wrote:
+> > On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
+> >> Whilst KVM benefits from the kernel randomisation via KASLR, there is
+> >> no additional randomisation when the kernel is running at EL1, as we
+> >> directly use a fixed offset from the linear mapping. This is not
+> >> necessarily a problem, but we could do a bit better by independently
+> >> randomizing the HYP placement.
+> >>
+> >> This series proposes to randomise the offset by inserting a few random
+> >> bits between the MSB of the RAM linear mapping and the top of the HYP
+> >> VA (VA_BITS - 2). That's not a lot of random bits (on my Mustang, I
+> >> get 13 bits), but that's better than nothing.
+> >>
+> >> In order to achieve this, we need to be able to patch dynamic values
+> >> in the kernel text. This results in a bunch of changes to the
+> >> alternative framework, the insn library, and a few more hacks in KVM
+> >> itself (we get a new way to map the GIC at EL2).
+> >>
+> >> Another (and more recent) goal of this series is to work around what
+> >> has been described as "variant 3a", which covers speculative reads of
+> >> privileged system registers. Randomizing the location of the
+> >> hypervisor would be pointless if one could simply obtain VBAR_EL2. In
+> >> order to work around this, we place the vectors at a fairly static
+> >> location (next to the idmap), independently of the hypervisor's own
+> >> mappings. This ensures that we can leak VBAR_EL2 without disclosing
+> >> much about HYP itself (and is similar to what the rest of the kernel
+> >> does with KPTI). This is only enabled at runtime for Cortex-A57 and
+> >> Cortex-A72.
+> >>
+> >> This has been tested on the FVP model, Seattle (both 39 and 48bit VA),
+> >> Mustang and Thunder-X. I've also done a sanity check on 32bit (which
+> >> is only impacted by the HYP IO VA stuff).
+> >>
+> > 
+> > I've smoke tested this series on a seattle with several busy VMs running
+> > simultaneously. My host kernel configures 64K pages. I didn't see any
+> > problems.
 > 
-> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
-> mmc can correctly lookup the wp and cp gpios.
-> 
-> Fixes: c69f43fb4f26 ("ARM: davinci: hawk: use gpio descriptor for mmc pins")
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-> v1 -> v2:
-> - added the Fixes: tag
-> 
->   arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-> index a3e78074be70..62eb7d668890 100644
-> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-> @@ -127,8 +127,8 @@ static struct gpiod_lookup_table mmc_gpios_table = {
->   	.dev_id = "da830-mmc.0",
->   	.table = {
->   		/* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
-> -		GPIO_LOOKUP("davinci_gpio.1", 28, "cd", GPIO_ACTIVE_LOW),
-> -		GPIO_LOOKUP("davinci_gpio.1", 29, "wp", GPIO_ACTIVE_LOW),
-> +		GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
-> +		GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
->   	},
->   };
->   
-> 
+> Excellent, thanks for testing. Out of curiosity: do you have a firmware
+> that implements the SMCCC_ARCH_WORKAROUND_1 call or not?
 
-Does board-da830-evm.c need the same fix? It also uses "davinci_gpio.1".
+Unfortunately not, so I guess that means I was testing the
+__kvm_bp_vect_base base with the __kvm_harden_el2_vector_slot slot.
+
+Thanks,
+drew
