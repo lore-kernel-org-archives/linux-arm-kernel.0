@@ -1,144 +1,73 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 15 Mar 2018 22:37:10 +0530
-Subject: [PATCH 3/3] ARM: dts: imx6dl-mamoj: Add PFUZE100 support
-In-Reply-To: <20180315170710.9551-1-jagan@amarulasolutions.com>
-References: <20180315170710.9551-1-jagan@amarulasolutions.com>
-Message-ID: <20180315170710.9551-3-jagan@amarulasolutions.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 15 Mar 2018 19:08:32 +0200
+Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical
+ connector
+In-Reply-To: <1c3f8cde-4f9a-306f-b4f9-c0bdc76caf1f@arm.com>
+References: <20180227071134.28063-1-a.hajda@samsung.com>
+ <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
+ <20180227071134.28063-2-a.hajda@samsung.com>
+ <ed0ce43c-3c81-b027-2eb1-30e49156c3ac@ti.com>
+ <b588527d-2ca2-9e88-9e27-e09e5b52f8d6@samsung.com>
+ <12da0d00-9ab3-3752-793b-e487666f35a3@ti.com>
+ <1c3f8cde-4f9a-306f-b4f9-c0bdc76caf1f@arm.com>
+Message-ID: <a470c2e0-09ea-fc3a-2eef-bba2af18b33f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX6DL Mamoj boards has Freescale PFUZE100 PMIC, so add support for it.
+On 15/03/18 13:46, Robin Murphy wrote:
+> On 12/03/18 10:41, Roger Quadros wrote:
+> [...]
+>>>>> @@ -0,0 +1,75 @@
+>>>>> +USB Connector
+>>>>> +=============
+>>>>> +
+>>>>> +USB connector node represents physical USB connector. It should be
+>>>>> +a child of USB interface controller.
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible: describes type of the connector, must be one of:
+>>>>> +??? "usb-a-connector",
+>>>>> +??? "usb-b-connector",
+>>>>> +??? "usb-c-connector".
+>>>> compatible should be just "usb-connector"
+>>>>
+>>>> Type should be a property
+>>>>
+>>>> type: type of usb connector "A", "B", "AB", "C"
+>>>> AB is for dual-role connectors.
+>>>
+>>> I have proposed such property (and size also) in my first RFC [1]. Rod
+>>> did not like it :)
+>>>
+>>> [1]: https://marc.info/?l=devicetree&m=150660411515233&w=2
+>>>
+>>
+>> This is what Rob says here https://patchwork.kernel.org/patch/9976043/
+>> "We did "type" for hdmi-connector, but I think I'd really prefer
+>> compatible be used to distinguish as least where it may matter to s/w.
+>> In the HDMI case, they all are pretty much the same, just different
+>> physical size."
+>>
+>> So the question is. Does it matter to this particular software implementation
+>> if it is type A,B,C connector?
+>> If yes, how?
+>>
+>> Type A will never have any alternate function. It is always dedicated to USB.
+> 
+> In USB spec terms, at least. In reality there are things like the cool trick Rockchip SoCs do whereby they can expose the debug UART Rx/Tx through the OTG port's D+/D- pins, and that is on a type A connector in many products. I'm guessing that's probably beyond the scope of this binding, though.
+> 
+>> Also does the size "full", "micro", "mini" matter to software?
+> 
+> If it means the user can look in sysfs to easily correlate logical ports with physical connectors that's certainly handy (e.g. on something like Odroid-XU where the two USB3 ports are brought out to an A and a micro-AB connector respectively).
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Signed-off-by: Simone CIANNI <simone.cianni@bticino.it>
-Signed-off-by: Raffaele RECALCATI <raffaele.recalcati@bticino.it>
----
- arch/arm/boot/dts/imx6dl-mamoj.dts | 113 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 113 insertions(+)
+But this logic fails if both connectors are the same type/size.
+This is where the label comes in handy. The labels can be unique and end user can identify the port using that.
 
-diff --git a/arch/arm/boot/dts/imx6dl-mamoj.dts b/arch/arm/boot/dts/imx6dl-mamoj.dts
-index 53e85c7f06b4..c4a0583c71cc 100644
---- a/arch/arm/boot/dts/imx6dl-mamoj.dts
-+++ b/arch/arm/boot/dts/imx6dl-mamoj.dts
-@@ -32,6 +32,119 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c4>;
- 	status = "okay";
-+
-+	pmic: pfuze100 at 8 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			/* CPU vdd_arm core */
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			/* SOC vdd_soc */
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			/* I/O power GEN_3V3 */
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* DDR memory */
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* DDR memory */
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* not used */
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			/* not used */
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			/* PMIC vsnvs. EX boot mode */
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* not used */
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			/* not used */
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			/* not used */
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			/* 1v8 general power */
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			/* 2v8 general power IMX6 */
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			/* 3v3 Ethernet */
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
- };
- 
- &uart3 {
+> 
+> Robin.
+
 -- 
-2.14.3
+cheers,
+-roger
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
