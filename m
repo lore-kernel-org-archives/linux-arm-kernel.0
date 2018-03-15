@@ -1,25 +1,33 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 15 Mar 2018 14:24:03 -0700
-Subject: [PATCH v2 14/15] clk: stm32: Add clk entry for SDMMC2 on stm32F769
-In-Reply-To: <CACRpkdbd-Zz-JRC-_OfKtx28OvDcf0af93pqraP=XPpAN-geVg@mail.gmail.com>
-References: <1516105859-3525-1-git-send-email-patrice.chotard@st.com>
- <1516105859-3525-15-git-send-email-patrice.chotard@st.com>
- <fb3b26e8-0102-122b-1386-68a661139706@st.com>
- <CACRpkdbd-Zz-JRC-_OfKtx28OvDcf0af93pqraP=XPpAN-geVg@mail.gmail.com>
-Message-ID: <152114904300.111154.16697790469167766472@swboyd.mtv.corp.google.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 15 Mar 2018 22:33:04 +0100
+Subject: [PATCH v2 4/4] clk: imx: add clock driver for i.MX8MQ CCM
+In-Reply-To: <20180201175412.9480-4-l.stach@pengutronix.de>
+References: <20180201175412.9480-1-l.stach@pengutronix.de>
+ <20180201175412.9480-4-l.stach@pengutronix.de>
+Message-ID: <20180315213304.ejvgpkhxtblr6xb3@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2018-03-01 01:12:30)
-> On Mon, Feb 26, 2018 at 9:41 AM, Patrice CHOTARD <patrice.chotard@st.com> wrote:
+On Thu, Feb 01, 2018 at 06:54:12PM +0100, Lucas Stach wrote:
+> Add driver for the Clock Control Module found on i.MX8MQ.
 > 
-> > Hi Stephen, Michael
-> >
-> > It's a gentle reminder as this patch is present on mailing list and
-> > acked-by since 01/12/2018
+> This is largely based on the downstream driver from Anson Huang and
+> Bai Ping at NXP, with only some small adaptions to mainline from me.
 > 
-> You need Stephen's new kernel.org mail address to reach him.
-> (Added on TO:)
-> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-Thanks. Both work now after I've setup filters to catch everything.
+A general thought: The i.MX8M finally has a consistent clock tree. We
+have for example 70 Peripheral clock slices consisting of a mux, a gate
+and two dividers, all 70 looking the same.
+For these it might make sense to create a more complex clock type
+providing mux, gate and set rate functionality in one clock. This would
+drastically reduce the number of clocks we have to handle.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
