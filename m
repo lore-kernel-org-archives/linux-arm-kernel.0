@@ -1,77 +1,40 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Thu, 15 Mar 2018 19:49:01 +0530
-Subject: [PATCH v2 2/4] ioremap: Implement TLB_INV before huge mapping
-In-Reply-To: <20180315133157.ucbdg25jo5ew3t2h@lakrids.cambridge.arm.com>
-References: <1521117906-20107-1-git-send-email-cpandya@codeaurora.org>
- <1521117906-20107-3-git-send-email-cpandya@codeaurora.org>
- <20180315133157.ucbdg25jo5ew3t2h@lakrids.cambridge.arm.com>
-Message-ID: <b6c7622d-9676-5584-d52b-10ece6a3877c@codeaurora.org>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 15 Mar 2018 16:18:49 +0200
+Subject: [PATCH v3 02/11] mmc: sdhci-omap: Remove setting ADMA capability
+ in driver
+In-Reply-To: <20180307132020.30951-3-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <20180307132020.30951-3-kishon@ti.com>
+Message-ID: <a867eebf-2c32-4a0f-713a-766d81d52c4c@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 3/15/2018 7:01 PM, Mark Rutland wrote:
-> On Thu, Mar 15, 2018 at 06:15:04PM +0530, Chintan Pandya wrote:
->> @@ -91,10 +93,15 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
->>   
->>   		if (ioremap_pmd_enabled() &&
->>   		    ((next - addr) == PMD_SIZE) &&
->> -		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
->> -		    pmd_free_pte_page(pmd)) {
->> -			if (pmd_set_huge(pmd, phys_addr + addr, prot))
->> +		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
->> +			old_pmd = *pmd;
->> +			pmd_clear(pmd);
->> +			flush_tlb_pgtable(&init_mm, addr);
->> +			if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
->> +				pmd_free_pte_page(&old_pmd);
->>   				continue;
->> +			} else
->> +				set_pmd(pmd, old_pmd);
->>   		}
->>   
+On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
+> sdhci can directly get ADMA capability from MMCHS_CAPA register.
+> Remove explicitly setting ADMA here as some instances might not have
+> ADMA enabled. (sdhci_read_caps() is also removed from here since
+> sdhci_setup_host() invokes it).
 > 
-> Can we have something like a pmd_can_set_huge() helper? Then we could
-> avoid pointless modification and TLB invalidation work when
-> pmd_set_huge() will fail.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Actually, pmd_set_huge() will never fail because, if
-CONFIG_HAVE_ARCH_HUGE_VMAP is disabled, ioremap_pmd_enabled()
-will fail and if enabled (i.e. ARM64 & x86), they don't fail
-in their implementation. So, rather we can do the following.
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
--                       if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
--                               pmd_free_pte_page(&old_pmd);
--                               continue;
--                       } else
--                               set_pmd(pmd, old_pmd);
-+                       pmd_set_huge(pmd, phys_addr + addr, prot)
-+                       pmd_free_pte_page(&old_pmd);
-+                       continue;
-
+> ---
+>  drivers/mmc/host/sdhci-omap.c | 3 ---
+>  1 file changed, 3 deletions(-)
 > 
-> 	if (ioremap_pmd_enabled() &&
-> 	    ((next - addr) == PMD_SIZE) &&
-> 	    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
-> 	    pmd_can_set_huge(pmd, phys_addr + addr, prot)) {
-> 	    	// clear entries, invalidate TLBs, and free tables
-> 		...
-> 		continue;
+> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+> index 3cce30584d2f..0c40b13fb67d 100644
+> --- a/drivers/mmc/host/sdhci-omap.c
+> +++ b/drivers/mmc/host/sdhci-omap.c
+> @@ -923,9 +923,6 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+>  	host->mmc_host_ops.card_busy = sdhci_omap_card_busy;
+>  	host->mmc_host_ops.execute_tuning = sdhci_omap_execute_tuning;
+>  
+> -	sdhci_read_caps(host);
+> -	host->caps |= SDHCI_CAN_DO_ADMA2;
+> -
+>  	ret = sdhci_setup_host(host);
+>  	if (ret)
+>  		goto err_put_sync;
 > 
-> 	}
-> 
-> Thanks,
-> MArk.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-Chintan
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
