@@ -1,121 +1,93 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 15 Mar 2018 18:34:14 +0100
-Subject: linux-next: manual merge of the tty tree with the arm-soc tree
-In-Reply-To: <20180315172858.7928ed93@canb.auug.org.au>
-References: <20180315172858.7928ed93@canb.auug.org.au>
-Message-ID: <20180315173414.GB29986@kroah.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 15 Mar 2018 17:43:29 +0000
+Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
+ device tree parsing
+In-Reply-To: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+Message-ID: <20180315174329.GB22176@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 05:28:58PM +1100, Stephen Rothwell wrote:
-> Hi Greg,
+On Wed, Jan 31, 2018 at 03:41:49PM +0800, Ryder Lee wrote:
+> A root complex usually consist of a host bridge and multiple P2P bridges,
+> and someone may express that in the form of a root node with many subnodes
+> and list all four interrupts for each slot (child node) in the root node
+> like this:
 > 
-> Today's linux-next merge of the tty tree got conflicts in:
+> 	pcie-controller {
+> 		...
+> 		interrupt-map-mask = <0xf800 0 0 7>;
+> 		interrupt-map = <0x0000 0 0 {INTx} &{interrupt parent} ...>
+> 				 0x0800 0 0 {INTx} &{interrupt parent} ...>;
 > 
->   arch/arm/boot/dts/stih407-b2120.dts
->   arch/arm/boot/dts/stih410-b2120.dts
->   arch/arm/boot/dts/stih410-b2260.dts
->   arch/arm/boot/dts/stih418-b2199.dts
+> 		pcie at 0,0 {
+> 			reg = <0x0000 0 0 0 0>;
+> 			...
+> 		};
 > 
-> between commit:
+> 		pcie at 1,0 {
+> 			reg = <0x0800 0 0 0 0>;
+> 			...
+> 		};
+> 	};
 > 
->   db5430663017 ("arm: dts: replace 'linux,stdout-path' with 'stdout-path'")
+> As shown above, we'd like to propagate IRQs from a root port to the devices
+> in the hierarchy below it in this way.  However, it seems that the current
+> parser couldn't handle such cases and will get something unexpected below:
 > 
-> from the arm-soc tree and commit:
+> 	pcieport 0000:00:01.0: assign IRQ: got 213
+> 	igb 0000:01:00.0: assign IRQ: got 212
 > 
->   dbb3fb45edff ("ARM: dts: STi: Remove "console=ttyASN" from bootargs for STi boards")
+> There is a device which is connected to 2nd slot, but the port doesn't share
+> the same IRQ with its downstream devices.  The problem here is that, if the
+> loop found a P2P bridge, it wouldn't check whether the reg property exists
+> in ppnode or not but just pass the subordinate devfn to of_irq_parse_raw(),
+> thus the subsequent flow couldn't correctly resolve them.
 > 
-> from the tty tree.
+> Fix this by adding a check to fallback to standard device tree parsing.
 > 
-> I fixed it up (see below) and can carry the fix as necessary. This
-> is now fixed as far as linux-next is concerned, but any non trivial
-> conflicts should be mentioned to your upstream maintainer when your tree
-> is submitted for merging.  You may also want to consider cooperating
-> with the maintainer of the conflicting tree to minimise any particularly
-> complex conflicts.
-> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+> Please refer to the previous discussion thread: https://patchwork.ozlabs.org/patch/829108/
+> ---
+>  drivers/of/of_pci_irq.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+
+Hi Ryder,
+
+from the thread discussion I gather I can drop this series from the PCI
+queue and you will update the DT as agreed with Ben, that looks like
+the most reasonable solution to the problem you are facing, please
+let me know if there is anything I am missing.
+
+Thanks,
+Lorenzo
+
+> diff --git a/drivers/of/of_pci_irq.c b/drivers/of/of_pci_irq.c
+> index 3a05568..e445866 100644
+> --- a/drivers/of/of_pci_irq.c
+> +++ b/drivers/of/of_pci_irq.c
+> @@ -86,8 +86,18 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
+>  	out_irq->np = ppnode;
+>  	out_irq->args_count = 1;
+>  	out_irq->args[0] = pin;
+> -	laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
+> -	laddr[1] = laddr[2] = cpu_to_be32(0);
+> +
+> +	if (!dn && ppnode) {
+> +		const __be32 *addr;
+> +
+> +		addr = of_get_property(ppnode, "reg", NULL);
+> +		if (addr)
+> +			memcpy(laddr, addr, 3);
+> +	} else {
+> +		laddr[0] = cpu_to_be32((pdev->bus->number << 16) | (pdev->devfn << 8));
+> +		laddr[1] = laddr[2] = cpu_to_be32(0);
+> +	}
+> +
+>  	rc = of_irq_parse_raw(laddr, out_irq);
+>  	if (rc)
+>  		goto err;
 > -- 
-> Cheers,
-> Stephen Rothwell
+> 1.9.1
 > 
-> diff --cc arch/arm/boot/dts/stih407-b2120.dts
-> index de3c8bf129b5,a7a0f76e9cbc..000000000000
-> --- a/arch/arm/boot/dts/stih407-b2120.dts
-> +++ b/arch/arm/boot/dts/stih407-b2120.dts
-> @@@ -14,11 -14,11 +14,11 @@@
->   	compatible = "st,stih407-b2120", "st,stih407";
->   
->   	chosen {
-> - 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-> + 		bootargs = "clk_ignore_unused";
->  -		linux,stdout-path = &sbc_serial0;
->  +		stdout-path = &sbc_serial0;
->   	};
->   
->  -	memory {
->  +	memory at 40000000 {
->   		device_type = "memory";
->   		reg = <0x40000000 0x80000000>;
->   	};
-> diff --cc arch/arm/boot/dts/stih410-b2120.dts
-> index 0a59b7b0f4b2,6c6b4cc37e97..000000000000
-> --- a/arch/arm/boot/dts/stih410-b2120.dts
-> +++ b/arch/arm/boot/dts/stih410-b2120.dts
-> @@@ -14,11 -14,11 +14,11 @@@
->   	compatible = "st,stih410-b2120", "st,stih410";
->   
->   	chosen {
-> - 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-> + 		bootargs = "clk_ignore_unused";
->  -		linux,stdout-path = &sbc_serial0;
->  +		stdout-path = &sbc_serial0;
->   	};
->   
->  -	memory {
->  +	memory at 40000000 {
->   		device_type = "memory";
->   		reg = <0x40000000 0x80000000>;
->   	};
-> diff --cc arch/arm/boot/dts/stih410-b2260.dts
-> index feb8834478fa,50d36758391c..000000000000
-> --- a/arch/arm/boot/dts/stih410-b2260.dts
-> +++ b/arch/arm/boot/dts/stih410-b2260.dts
-> @@@ -15,11 -15,11 +15,11 @@@
->   	compatible = "st,stih410-b2260", "st,stih410";
->   
->   	chosen {
-> - 		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
-> + 		bootargs = "clk_ignore_unused";
->  -		linux,stdout-path = &uart1;
->  +		stdout-path = &uart1;
->   	};
->   
->  -	memory {
->  +	memory at 40000000 {
->   		device_type = "memory";
->   		reg = <0x40000000 0x40000000>;
->   	};
-> diff --cc arch/arm/boot/dts/stih418-b2199.dts
-> index 39b4db2e3507,7f5f3252bfc7..000000000000
-> --- a/arch/arm/boot/dts/stih418-b2199.dts
-> +++ b/arch/arm/boot/dts/stih418-b2199.dts
-> @@@ -14,11 -14,11 +14,11 @@@
->   	compatible = "st,stih418-b2199", "st,stih418";
->   
->   	chosen {
-> - 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
-> + 		bootargs = "clk_ignore_unused";
->  -		linux,stdout-path = &sbc_serial0;
->  +		stdout-path = &sbc_serial0;
->   	};
->   
->  -	memory {
->  +	memory at 40000000 {
->   		device_type = "memory";
->   		reg = <0x40000000 0xc0000000>;
->   	};
-
-
-Ugh, messy, thanks for the merge fixup.
-
-greg k-h
