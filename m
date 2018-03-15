@@ -1,124 +1,81 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:06:41 +0100
-Subject: [PATCH 00/36] use SPDX-License-Identifier for 32 bits Armada SoCs and
- boards
-Message-ID: <20180315150717.10588-1-gregory.clement@bootlin.com>
+Date: Thu, 15 Mar 2018 16:06:43 +0100
+Subject: [PATCH 02/36] arm: dts: armada-375: use SPDX-License-Identifier for
+ Armada 375 SoCs
+In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
+References: <20180315150717.10588-1-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-3-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Follow the recent trend for the license description, and also fix the
+wrongly stated X11 to MIT.
 
-this series follow the recent trend for the license description to use
-the SPDX-License-Identifier.
+As already pointed on the DT ML, the X11 license text [1] is explicitly
+for the X Consortium and has a couple of extra clauses. The MIT
+license text [2] is actually what the current DT files claim.
 
-Gregory
+[1] https://spdx.org/licenses/X11.html
+[2] https://spdx.org/licenses/MIT.html
 
-Gregory CLEMENT (36):
-  arm: dts: armada-370-xp: use SPDX-License-Identifier for Armada 370/XP
-    SoCs
-  arm: dts: armada-375: use SPDX-License-Identifier for Armada 375 SoCs
-  arm: dts: armada-38x: use SPDX-License-Identifier for Armada 38x SoCs
-  arm: dts: armada-39x: use SPDX-License-Identifier for Armada 39x SoCs
-  arm: dts: armada-xp-98dx: use SPDX-License-Identifier for prestara 98d
-    SoCs
-  arm: dts: armada-370-db: use SPDX-License-Identifier
-  arm: dts: armada-370-dlink-dns327l: use SPDX-License-Identifier
-  arm: dts: armada-370-mirabox: use SPDX-License-Identifier
-  arm: dts: armada-370-netgear-rn*: use SPDX-License-Identifier
-  arm: dts: armada-370-rd: use SPDX-License-Identifier
-  arm: dts: armada-370-synology-ds213j: use SPDX-License-Identifier
-  arm: dts: armada-375-db: use SPDX-License-Identifier
-  arm: dts: armada-388-db: use SPDX-License-Identifier
-  arm: dts: armada-388-rd: use SPDX-License-Identifier
-  arm: dts: armada-390-db: use SPDX-License-Identifier
-  arm: dts: armada-398-db: use SPDX-License-Identifier
-  arm: dts: armada-xp-axpwifiap: use SPDX-License-Identifier
-  arm: dts: armada-xp-db-dxbc2: use SPDX-License-Identifier
-  arm: dts: armada-xp-db-xc3-24g4xg: use SPDX-License-Identifier
-  arm: dts: armada-xp-db: use SPDX-License-Identifier
-  arm: dts: armada-xp-gp: use SPDX-License-Identifier
-  arm: dts: armada-xp-lenovo-ix4-300d: use SPDX-License-Identifier
-  arm: dts: armada-xp-matrix: use SPDX-License-Identifier
-  arm: dts: armada-xp-netgear-rn2120: use SPDX-License-Identifier
-  arm: dts: armada-xp-openblocks-ax3-4: use SPDX-License-Identifier
-  arm: dts: armada-xp-synology-ds414: use SPDX-License-Identifier
-  arm: dts: armada-385-db-ap: use SPDX-License-Identifier
-  arm: dts: armada-385-linksys*: use SPDX-License-Identifier for Linksys
-    boards
-  arm: dts: armada-385-synology-ds116: use SPDX-License-Identifier
-  arm: dts: armada-385-turris-omnia: use SPDX-License-Identifier
-  arm: dts: armada-388-clearfog*: use SPDX-License-Identifier for
-    clearfog and microsom
-  arm: dts: armada-388-gp: use SPDX-License-Identifier
-  arm: dts: armada-395-gp: use SPDX-License-Identifier
-  arm: dts: armada-xp-linksys-mamba: use SPDX-License-Identifier
-  arm: dts: armada-370-seagate-nas-*: use SPDX-License-Identifier
-  arm: dts: armada-370-seagate-personal-cloud*: use
-    SPDX-License-Identifier
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ arch/arm/boot/dts/armada-375.dtsi | 39 +--------------------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
- arch/arm/boot/dts/armada-370-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-370-dlink-dns327l.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-370-mirabox.dts           | 39 +---------------------
- arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-370-rd.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts  |  5 +--
- arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  |  5 +--
- arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |  5 +--
- .../dts/armada-370-seagate-personal-cloud-2bay.dts |  5 +--
- .../boot/dts/armada-370-seagate-personal-cloud.dts |  5 +--
- .../dts/armada-370-seagate-personal-cloud.dtsi     |  5 +--
- arch/arm/boot/dts/armada-370-synology-ds213j.dts   | 39 +---------------------
- arch/arm/boot/dts/armada-370-xp.dtsi               | 39 +---------------------
- arch/arm/boot/dts/armada-370.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-375-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-375.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-380.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-385-db-ap.dts             | 33 +-----------------
- arch/arm/boot/dts/armada-385-linksys-caiman.dts    | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys-cobra.dts     | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys-rango.dts     | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys-shelby.dts    | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys.dtsi          | 34 +------------------
- arch/arm/boot/dts/armada-385-synology-ds116.dts    | 33 +-----------------
- arch/arm/boot/dts/armada-385-turris-omnia.dts      | 35 +------------------
- arch/arm/boot/dts/armada-385.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-388-clearfog-base.dts     | 38 +--------------------
- arch/arm/boot/dts/armada-388-clearfog-pro.dts      | 38 +--------------------
- arch/arm/boot/dts/armada-388-clearfog.dts          | 38 +--------------------
- arch/arm/boot/dts/armada-388-clearfog.dtsi         | 38 +--------------------
- arch/arm/boot/dts/armada-388-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-388-gp.dts                | 33 +-----------------
- arch/arm/boot/dts/armada-388-rd.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-388.dtsi                  | 34 +------------------
- .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 38 +--------------------
- arch/arm/boot/dts/armada-38x.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-390-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-390.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-395-gp.dts                | 33 +-----------------
- arch/arm/boot/dts/armada-395.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-398-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-398.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-39x.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-98dx3336.dtsi          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-98dx4251.dtsi          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-axpwifiap.dts          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-db-dxbc2.dts           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      | 39 +---------------------
- arch/arm/boot/dts/armada-xp-db.dts                 | 38 +--------------------
- arch/arm/boot/dts/armada-xp-gp.dts                 | 39 +---------------------
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    | 39 +---------------------
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts      | 33 +-----------------
- arch/arm/boot/dts/armada-xp-matrix.dts             | 39 +---------------------
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   | 39 +---------------------
- arch/arm/boot/dts/armada-xp-synology-ds414.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-xp.dtsi                   | 39 +---------------------
- 62 files changed, 62 insertions(+), 2082 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 2cb1bcd30976..53ead6f26a0e 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Device Tree Include file for Marvell Armada 375 family SoC
+  *
+@@ -5,44 +6,6 @@
+  *
+  * Gregory CLEMENT <gregory.clement@free-electrons.com>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
 -- 
 2.16.1
