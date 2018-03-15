@@ -1,38 +1,39 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:53 +0100
-Subject: [PATCH 51/60] arm: dts: kirkwood-netgear_readynas_nv+_v2: use
+Date: Thu, 15 Mar 2018 17:50:31 +0100
+Subject: [PATCH 29/60] arm: dts: kirkwood-mv88f6281gtw-ge: use
  SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-52-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-30-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Follow the recent trend for the license description
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-index 2bfc6cfa151d..8cc8550242ef 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-@@ -1,12 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0+
+diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+index 327023a477b8..86d532916d56 100644
+--- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
++++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+@@ -1,13 +1,10 @@
++// SPDX-License-Identifier: GPL-2.0
  /*
-  * Device Tree file for NETGEAR ReadyNAS NV+ v2
+  * Marvell 88F6281 GTW GE Board
   *
-  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+  * Lennert Buytenhek <buytenh@marvell.com>
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
 - *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
+  * This file contains the definitions that are common between the 6281
+  * and 6282 variants of the Marvell Kirkwood Development Board.
   */
- 
- /dts-v1/;
 -- 
 2.16.1
