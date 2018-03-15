@@ -1,10 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:06:52 +0100
-Subject: [PATCH 11/36] arm: dts: armada-370-synology-ds213j: use
+Date: Thu, 15 Mar 2018 16:06:48 +0100
+Subject: [PATCH 07/36] arm: dts: armada-370-dlink-dns327l: use
  SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-12-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-8-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,23 +18,23 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Arnaud Ebalard <arno@natisbad.org>
+Cc: Andrew Andrianov <andrew@ncrmnt.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-370-synology-ds213j.dts | 39 +-----------------------
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts | 39 +-------------------------
  1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-index 95040810c094..64f2ce254fb6 100644
---- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-+++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-@@ -1,46 +1,9 @@
+diff --git a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
+index db7f3aa38670..8e46f63cbaa1 100644
+--- a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
++++ b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
+@@ -1,45 +1,8 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for Synology DS213j
+  * Device Tree file for D-Link DNS-327L
   *
-  * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
-  *
+  * Copyright (C) 2015, Andrew Andrianov <andrew@ncrmnt.org>
+- *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
@@ -72,9 +72,8 @@ index 95040810c094..64f2ce254fb6 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
-- *
-  * Note: this Device Tree assumes that the bootloader has remapped the
-  * internal registers to 0xf1000000 (instead of the old 0xd0000000).
-  * The 0xf1000000 is the default used by the recent, DT-capable, U-Boot
+  */
+ 
+ /* Remaining unsolved:
 -- 
 2.16.1
