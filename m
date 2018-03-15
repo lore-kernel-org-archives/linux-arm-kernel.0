@@ -1,31 +1,79 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 15 Mar 2018 11:28:27 -0700
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <20180315182110.GR23100@dhcp22.suse.cz>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
- <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
- <CAKv+Gu-NfXm5YLWXAPsf6zycPs7Ti9qPLQ7FvpOrjdPz5hEP7Q@mail.gmail.com>
- <CACjP9X_xjyvQD_b1XNAZi=vjX0wGUmQuGJN8HahBmXx55OUE6A@mail.gmail.com>
- <CAKv+Gu8aVr_u4o8QR2Nquo9it54nSbvPMj4vcZ+CQa3uoOakrA@mail.gmail.com>
- <CACjP9X_bKJNeSwbPURmJ8bwDZ5BW2ZrykhT-cNapzKjddeWStQ@mail.gmail.com>
- <CAKv+Gu8dvCRUnS5KxDWa4GP2vMPo9cUWVNybx+tGY_Y8T67Uvw@mail.gmail.com>
- <CACjP9X9w-zruS8uj6j+ZRc7EUZ80MAwbvWOh=gRJZu7gAqU7hg@mail.gmail.com>
- <CAKv+Gu83VtB+ff6H88UMF9kiz5923U8tXhQoERdErYE4pQg94Q@mail.gmail.com>
- <20180315182110.GR23100@dhcp22.suse.cz>
-Message-ID: <CA+55aFy0+EP14zjnYh1x_Aw3y-wCp2COpw9D-OfmhA9YFfsQiA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 15 Mar 2018 15:29:28 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6-phytec: Use the standard 'stdout-path'
+ property
+Message-ID: <1521138569-8125-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 11:21 AM, Michal Hocko <mhocko@kernel.org> wrote:
->
-> Well, pfn_valid says that a given pfn is backed by a real memory and it
-> has a valid struct page backing it.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-No, it really just says the latter. There should be a "struct page" for it.
+Use the standard 'stdout-path' property to fix the following DTC warnings:
 
-It may not be "real memory". The struct page might have it marked
-reserved or something. But at least you should be able to get to the
-"struct page" and look at it.
+arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dtb: Warning
+(chosen_node_stdout_path): /chosen:linux,stdout-path: Use
+'stdout-path' instead
 
-                   Linus
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts | 2 +-
+ arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts  | 2 +-
+ arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts  | 2 +-
+ arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+index a8adcb2..9f7f9f9 100644
+--- a/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
++++ b/arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts
+@@ -15,7 +15,7 @@
+ 		     "phytec,imx6qdl-pcm058", "fsl,imx6dl";
+ 
+ 	chosen {
+-		linux,stdout-path = &uart2;
++		stdout-path = &uart2;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
+index 8fdce3c..2e70ea5 100644
+--- a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
++++ b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts
+@@ -15,7 +15,7 @@
+ 		     "phytec,imx6qdl-pcm058", "fsl,imx6q";
+ 
+ 	chosen {
+-		linux,stdout-path = &uart2;
++		stdout-path = &uart2;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
+index 8afa5ce..65d2e48 100644
+--- a/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
++++ b/arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts
+@@ -15,7 +15,7 @@
+ 		     "phytec,imx6qdl-pcm058", "fsl,imx6q";
+ 
+ 	chosen {
+-		linux,stdout-path = &uart2;
++		stdout-path = &uart2;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
+index 3618e53..f27d7ab 100644
+--- a/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
++++ b/arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts
+@@ -15,7 +15,7 @@
+ 		     "phytec,imx6qdl-pcm058", "fsl,imx6qp";
+ 
+ 	chosen {
+-		linux,stdout-path = &uart2;
++		stdout-path = &uart2;
+ 	};
+ };
+ 
+-- 
+2.7.4
