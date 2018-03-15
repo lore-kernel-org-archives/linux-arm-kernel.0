@@ -1,41 +1,52 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 15 Mar 2018 11:08:06 +0800
-Subject: [PATCH v2 1/2] soc: imx: gpcv2: Do not pass static memory as
- platform data
-In-Reply-To: <20180208064709.GB31910@dragon>
-References: <20180122150748.1742-1-andrew.smirnov@gmail.com>
- <20180208064709.GB31910@dragon>
-Message-ID: <20180315030804.GI26859@dragon>
+Date: Thu, 15 Mar 2018 11:13:18 +0800
+Subject: [PATCH] soc: imx: gpc: Use kemdup() function
+In-Reply-To: <1520810382-13341-1-git-send-email-festevam@gmail.com>
+References: <1520810382-13341-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180315031317.GJ26859@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 08, 2018 at 02:47:10PM +0800, Shawn Guo wrote:
-> On Mon, Jan 22, 2018 at 07:07:47AM -0800, Andrey Smirnov wrote:
-> > Platform device core assumes the ownership of dev.platform_data as
-> > well as that it is dynamically allocated and it will try to kfree it
-> > as a part of platform_device_release(). Change the code to pass
-> > kzalloc'ed chunk of memory instead of a pointer to a static memory to
-> > avoid causing a BUG() when calling platform_device_put().
-> > 
-> > The problem can be reproduced by artificially enabling the error path
-> > of platform_device_add() call (around line 357).
-> > 
-> > Note that this change also allows us to constify imx7_pgc_domains,
-> > since we no longer need to be able to modify it.
-> > 
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Stefan Agner <stefan@agner.ch>
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> 
-> Applied both, thanks.
+Hi Fabio,
 
-I decided to drop these two patches.  Triggered by Fabio's patch on top
-of you changes, I just took another look at them, and found that
-platform_device_add_data() can help us do the same thing in a nicer way.
+On Sun, Mar 11, 2018 at 08:19:42PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Use kmemdup() rather than duplicating its implementation.
+> 
+> Detected with Coccinelle script.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+I copied you on my reply to Andrey Smirnov, in which I requested to
+use platform_device_add_data() for his patches.  That said, your patches
+will be dropped as well.
 
 Shawn
 
-[1] https://patchwork.kernel.org/patch/10274969/
+> ---
+>  drivers/soc/imx/gpc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+> index 196f17b..cc3bad8 100644
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -444,12 +444,12 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  			if (domain_index >= of_id_data->num_domains)
+>  				continue;
+>  
+> -			domain = kmalloc(sizeof(*domain), GFP_KERNEL);
+> +			domain = kmemdup(&imx_gpc_domains[domain_index],
+> +					 sizeof(*domain), GFP_KERNEL);
+>  			if (!domain) {
+>  				of_node_put(np);
+>  				return -ENOMEM;
+>  			}
+> -			memcpy(domain, &imx_gpc_domains[domain_index], sizeof(*domain));
+>  			domain->regmap = regmap;
+>  			domain->ipg_rate_mhz = ipg_rate_mhz;
+>  
+> -- 
+> 2.7.4
+> 
