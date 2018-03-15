@@ -1,37 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 16:13:19 +0100
-Subject: [PATCH 2/2] ARM: imx: select ARM_CPU_SUSPEND for CPU_IDLE as well
-In-Reply-To: <20180315151345.3089601-1-arnd@arndb.de>
-References: <20180315151345.3089601-1-arnd@arndb.de>
-Message-ID: <20180315151345.3089601-2-arnd@arndb.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 15 Mar 2018 11:15:04 -0400 (EDT)
+Subject: [PATCH 0/5] DPAA Ethernet fixes
+In-Reply-To: <AM5PR04MB3267BC402A80D9E772BC8903ECD00@AM5PR04MB3267.eurprd04.prod.outlook.com>
+References: <20180314133732.24068-1-madalin.bucur@nxp.com>
+ <1521052994.4790.148.camel@infinera.com>
+ <AM5PR04MB3267BC402A80D9E772BC8903ECD00@AM5PR04MB3267.eurprd04.prod.outlook.com>
+Message-ID: <20180315.111504.399791580409893462.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpuidle support calls cpu_suspend(), which is compiled conditionally,
-and fails to link unless something selects CONFIG_ARM_CPU_SUSPEND.
+From: Madalin-cristian Bucur <madalin.bucur@nxp.com>
+Date: Thu, 15 Mar 2018 09:32:35 +0000
 
-arch/arm/mach-imx/cpuidle-imx6sx.o: In function `imx6sx_enter_wait':
-cpuidle-imx6sx.c:(.text+0x6c): undefined reference to `cpu_suspend'
+>> -----Original Message-----
+>> From: Joakim Tjernlund [mailto:Joakim.Tjernlund at infinera.com]
+>> Sent: Wednesday, March 14, 2018 8:43 PM
+>> To: davem at davemloft.net; Madalin-cristian Bucur
+>> <madalin.bucur@nxp.com>
+>> 
+>> On Wed, 2018-03-14 at 08:37 -0500, Madalin Bucur wrote:
+>> > Hi,
+>> >
+>> > This patch set is addressing several issues in the DPAA Ethernet
+>> > driver suite:
+>> >
+>> >  - module unload crash caused by wrong reference to device being left
+>> >    in the cleanup code after the DSA related changes
+>> >  - scheduling wile atomic bug in QMan code revealed during dpaa_eth
+>> >    module unload
+>> >  - a couple of error counter fixes, a duplicated init in dpaa_eth.
+>> 
+>> hmm, some of these(all?) bugs are in stable too, CC: stable perhaps?
+> 
+> Hi Jocke,
+> 
+> I did not check that, they should be added.
 
-This adds an explicit select statement here.
+Networking patches are not queued to stable by CC:'ing stable.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-imx/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Instead you just simply need to ask me explicitly for -stable submission
+which I will do at the appropriate time after the fixes have been able
+to cook in Linus's tree for a little while.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index f53ec31c9f5a..e47fa13f4b0c 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -469,7 +469,7 @@ config	SOC_IMX53
- 
- config SOC_IMX6
- 	bool
--	select ARM_CPU_SUSPEND if PM
-+	select ARM_CPU_SUSPEND if (PM || CPU_IDLE)
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_775420
- 	select ARM_GIC
--- 
-2.9.0
+I've queued this series up for that purpose, thanks.
