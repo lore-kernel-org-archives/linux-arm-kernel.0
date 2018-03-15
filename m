@@ -1,10 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:06 +0100
-Subject: [PATCH 04/60] arm: dts: kirkwood-linkstation-lsvl: use
+Date: Thu, 15 Mar 2018 17:50:03 +0100
+Subject: [PATCH 01/60] arm: dts: kirkwood-linkstation-6282: use
  SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-5-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-2-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,17 +21,17 @@ license text [2] is actually what the current DT files claim.
 Cc: Roger Shimizu <rogershimizu@gmail.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts | 39 +------------------------
+ arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi | 39 +-----------------------
  1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
-index ff37e76ab551..3f2a0bfe03ed 100644
---- a/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
-+++ b/arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts
+diff --git a/arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi b/arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi
+index b9125e5ed076..377b6e970259 100644
+--- a/arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi
++++ b/arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi
 @@ -1,46 +1,9 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for Buffalo Linkstation LS-VL
+  * Device Tree common file for kirkwood-6282 based Buffalo Linkstation
   *
   * Copyright (C) 2015, 2016
   * Roger Shimizu <rogershimizu@gmail.com>
@@ -75,6 +75,6 @@ index ff37e76ab551..3f2a0bfe03ed 100644
 - *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
- /dts-v1/;
+ #include "kirkwood.dtsi"
 -- 
 2.16.1
