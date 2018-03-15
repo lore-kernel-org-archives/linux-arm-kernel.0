@@ -1,29 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 22:06:29 +0100
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <20180316075629.019b6560@canb.auug.org.au>
-References: <20180316075629.019b6560@canb.auug.org.au>
-Message-ID: <CAK8P3a2-fUi0nnsLVJ6h_UuJCgwoNs2OEroYed2ofLd=FiPG0g@mail.gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Thu, 15 Mar 2018 16:13:02 -0500
+Subject: [PATCH v2 2/3] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <20180309142557.GT32331@e103592.cambridge.arm.com> (Dave Martin's
+ message of "Fri, 9 Mar 2018 14:25:57 +0000")
+References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
+ <1519926248-12591-3-git-send-email-Dave.Martin@arm.com>
+ <20180308171153.GD14918@arm.com> <87o9jymbsj.fsf@xmission.com>
+ <20180309131017.GB20370@arm.com>
+ <20180309142557.GT32331@e103592.cambridge.arm.com>
+Message-ID: <87vadxyrdt.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 9:56 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
+Dave Martin <Dave.Martin@arm.com> writes:
+
+> On Fri, Mar 09, 2018 at 01:10:18PM +0000, Will Deacon wrote:
+>> Hi Eric,
+>> 
+>> On Thu, Mar 08, 2018 at 04:40:12PM -0600, Eric W. Biederman wrote:
+>> > Will Deacon <will.deacon@arm.com> writes:
+>> > > Happy to take this patch once the dependency on FPE_FLTUNK in core code is
+>> > > resolved.
+>> > 
+>> > Would it help for me to take the FPE_FLTUNK patch into my siginfo-next
+>> > branch?   So that there is a common branch with the code so we don't
+>> > need to worry about conflicts.  If so I will look at that on Monday.
+>> 
+>> Yes please, that would be helpful actually. I can then pull that into
+>> arm64 if you give me a stable branch or tag. Alternatively, I can define
+>> FPE_FLTUNK locally and remove it at -rc1.
 >
-> Commit
->
->   9a5f4879cd8d ("ARM: dts: stih4xx: Add missing #sound-dai-cells")
->
-> is missing a Signed-off-by from its committer.
+> OK Eric, let me know if you need me to rebase anything for the first 2
+> patches.
 
-Thanks for the report.
+The first patch is now in my siginfo-next tree and avialable at:
 
-What script do you use to find those? I guess I should check for
-missing signoffs as well when pulling a branch.
+git://git.kernel.org/pub/scm/linux/kernel/git/ebiederm/user-namespace.git siginfo-next
+HEAD: 266da65e9156d93e1126e185259a4aae68188d0e signal: Add FPE_FLTUNK si_code for undiagnosable fp exceptions
 
-Patrice, I've dropped the merge now, and picked up the one
-patch in it directly, with my signoff. This should fix the issue this
-time, but please make sure you always sign off patches when
-you apply them from the list.
+I will not rebase this branch, so please fee free to merge it into other
+trees.
 
-        Arnd
+Eric
