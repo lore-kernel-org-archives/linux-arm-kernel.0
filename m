@@ -1,107 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Mar 2018 15:17:19 +0000
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <CACjP9X_bKJNeSwbPURmJ8bwDZ5BW2ZrykhT-cNapzKjddeWStQ@mail.gmail.com>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
- <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
- <CAKv+Gu-NfXm5YLWXAPsf6zycPs7Ti9qPLQ7FvpOrjdPz5hEP7Q@mail.gmail.com>
- <CACjP9X_xjyvQD_b1XNAZi=vjX0wGUmQuGJN8HahBmXx55OUE6A@mail.gmail.com>
- <CAKv+Gu8aVr_u4o8QR2Nquo9it54nSbvPMj4vcZ+CQa3uoOakrA@mail.gmail.com>
- <CACjP9X_bKJNeSwbPURmJ8bwDZ5BW2ZrykhT-cNapzKjddeWStQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8dvCRUnS5KxDWa4GP2vMPo9cUWVNybx+tGY_Y8T67Uvw@mail.gmail.com>
+From: harveyhuntnexus@gmail.com (Harvey Hunt)
+Date: Thu, 15 Mar 2018 15:40:25 +0000
+Subject: [PATCH 21/52] mtd: rawnand: jz4780: convert driver to nand_scan()
+In-Reply-To: <20180302170400.6712-22-miquel.raynal@bootlin.com>
+References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
+ <20180302170400.6712-22-miquel.raynal@bootlin.com>
+Message-ID: <d57f95d3-03d0-5905-835f-c278df578b1e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 15:12, Daniel Vacek <neelx@redhat.com> wrote:
-> On Thu, Mar 15, 2018 at 8:45 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 15 March 2018 at 07:44, Daniel Vacek <neelx@redhat.com> wrote:
->>> On Thu, Mar 15, 2018 at 8:36 AM, Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
->>>> On 15 March 2018 at 02:23, Daniel Vacek <neelx@redhat.com> wrote:
->>>>> On Wed, Mar 14, 2018 at 8:29 PM, Ard Biesheuvel
->>>>> <ard.biesheuvel@linaro.org> wrote:
->>>>>> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
->>>>>>
->>>>>> Commit 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock
->>>>>> alignment") modified the logic in memmap_init_zone() to initialize
->>>>>> struct pages associated with invalid PFNs, to appease a VM_BUG_ON()
->>>>>> in move_freepages(), which is redundant by its own admission, and
->>>>>> dereferences struct page fields to obtain the zone without checking
->>>>>> whether the struct pages in question are valid to begin with.
->>>>>>
->>>>>> Commit 864b75f9d6b0 only makes it worse, since the rounding it does
->>>>>> may cause pfn assume the same value it had in a prior iteration of
->>>>>> the loop, resulting in an infinite loop and a hang very early in the
->>>>>> boot. Also, since it doesn't perform the same rounding on start_pfn
->>>>>> itself but only on intermediate values following an invalid PFN, we
->>>>>> may still hit the same VM_BUG_ON() as before.
->>>>>>
->>>>>> So instead, let's fix this at the core, and ensure that the BUG
->>>>>> check doesn't dereference struct page fields of invalid pages.
->>>>>>
->>>>>> Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
->>>>>> Cc: Daniel Vacek <neelx@redhat.com>
->>>>>> Cc: Mel Gorman <mgorman@techsingularity.net>
->>>>>> Cc: Michal Hocko <mhocko@suse.com>
->>>>>> Cc: Paul Burton <paul.burton@imgtec.com>
->>>>>> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
->>>>>> Cc: Vlastimil Babka <vbabka@suse.cz>
->>>>>> Cc: Andrew Morton <akpm@linux-foundation.org>
->>>>>> Cc: Linus Torvalds <torvalds@linux-foundation.org>
->>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>> ---
->>>>>>  mm/page_alloc.c | 13 +++++--------
->>>>>>  1 file changed, 5 insertions(+), 8 deletions(-)
->>>>>>
->>>>>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->>>>>> index 3d974cb2a1a1..635d7dd29d7f 100644
->>>>>> --- a/mm/page_alloc.c
->>>>>> +++ b/mm/page_alloc.c
->>>>>> @@ -1910,7 +1910,9 @@ static int move_freepages(struct zone *zone,
->>>>>>          * Remove at a later date when no bug reports exist related to
->>>>>>          * grouping pages by mobility
->>>>>>          */
->>>>>> -       VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
->>>>>> +       VM_BUG_ON(pfn_valid(page_to_pfn(start_page)) &&
->>>>>> +                 pfn_valid(page_to_pfn(end_page)) &&
->>>>>> +                 page_zone(start_page) != page_zone(end_page));
->>>>>
->>>>> Hi, I am on vacation this week and I didn't have a chance to test this
->>>>> yet but I am not sure this is correct. Generic pfn_valid() unlike the
->>>>> arm{,64} arch specific versions returns true for all pfns in a section
->>>>> if there is at least some memory mapped in that section. So I doubt
->>>>> this prevents the crash I was targeting. I believe pfn_valid() does
->>>>> not change a thing here :(
->>>>>
->>>>
->>>> If this is the case, memblock_next_valid_pfn() is broken since it
->>>> skips valid PFNs, and we should be fixing that instead.
->>>
->>> How do you define valid pfn? Maybe the generic version of pfn_valid()
->>> should be fixed???
->>>
->>
->> memblock_next_valid_pfn() skips PFNs for which pfn_valid() returns
->> true. That is clearly a bug.
->
-> So pfn_valid() does not mean this frame is usable memory?
->
+Hi Miquel,
 
-Who cares what it *means*?
+Sorry it's taken me a little while to review your changes, a few
+comments below:
 
-memblock_next_valid_pfn() has 'valid_pfn' in its name, so if passing
-pfn A returns B, and there exists a C such that A < C < B and
-pfn_valid(C) returns true, memblock_next_valid_pfn doesn't do what it
-says on the tin and should be fixed.
+On 03/02/2018 05:03 PM, Miquel Raynal wrote:
+> Two helpers have been added to the core to make ECC-related
+> configuration between the detection phase and the final NAND scan. Use
+> these hooks and convert the driver to just use nand_scan() instead of
+> both nand_scan_ident() and nand_scan_tail().
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/mtd/nand/raw/jz4780_nand.c | 30 ++++++++++++------------------
+>  1 file changed, 12 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/jz4780_nand.c b/drivers/mtd/nand/raw/jz4780_nand.c
+> index e69f6ae4c539..fd5dc9d9b0c6 100644
+> --- a/drivers/mtd/nand/raw/jz4780_nand.c
+> +++ b/drivers/mtd/nand/raw/jz4780_nand.c
+> @@ -157,9 +157,8 @@ static int jz4780_nand_ecc_correct(struct mtd_info *mtd, u8 *dat,
+>  	return jz4780_bch_correct(nfc->bch, &params, dat, read_ecc);
+>  }
+>  
+> -static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *dev)
+> +static int jz4780_nand_attach_chip(struct nand_chip *chip)
+>  {
+> -	struct nand_chip *chip = &nand->chip;
+>  	struct mtd_info *mtd = nand_to_mtd(chip);
+>  	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(chip->controller);
+>  	int eccbytes;
+> @@ -170,7 +169,8 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>  	switch (chip->ecc.mode) {
+>  	case NAND_ECC_HW:
+>  		if (!nfc->bch) {
+> -			dev_err(dev, "HW BCH selected, but BCH controller not found\n");
+> +			dev_err(nfc->dev,
+> +				"HW BCH selected, but BCH controller not found\n");
+>  			return -ENODEV;
+>  		}
+>  
+> @@ -179,15 +179,16 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>  		chip->ecc.correct = jz4780_nand_ecc_correct;
+>  		/* fall through */
+>  	case NAND_ECC_SOFT:
+> -		dev_info(dev, "using %s (strength %d, size %d, bytes %d)\n",
+> -			(nfc->bch) ? "hardware BCH" : "software ECC",
+> -			chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
+> +		dev_info(nfc->dev, "using %s (strength %d, size %d, bytes %d)\n",
+> +			 (nfc->bch) ? "hardware BCH" : "software ECC",
+> +			 chip->ecc.strength, chip->ecc.size, chip->ecc.bytes)>  		break;
+>  	case NAND_ECC_NONE:
+> -		dev_info(dev, "not using ECC\n");
+> +		dev_info(nfc->dev, "not using ECC\n");
+>  		break;
+>  	default:
+> -		dev_err(dev, "ECC mode %d not supported\n", chip->ecc.mode);
+> +		dev_err(nfc->dev, "ECC mode %d not supported\n",
+> +			chip->ecc.mode);
+>  		return -EINVAL;
+>  	}
+These changes seem redundant as dev is passed into the function,
+although you could remove it from the function defintion.
 
-You keep going on about how pfn_valid() does or does not do what you
-think, but that is really irrelevant.
+>  
+> @@ -199,7 +200,7 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>  	eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
+>  
+>  	if (eccbytes > mtd->oobsize - 2) {
+> -		dev_err(dev,
+> +		dev_err(nfc->dev,
+>  			"invalid ECC config: required %d ECC bytes, but only %d are available",
+>  			eccbytes, mtd->oobsize - 2);
+>  		return -EINVAL;
+> @@ -279,15 +280,8 @@ static int jz4780_nand_init_chip(struct platform_device *pdev,
+>  	chip->controller = &nfc->controller;
+>  	nand_set_flash_node(chip, np);
+>  
+> -	ret = nand_scan_ident(mtd, 1, NULL);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = jz4780_nand_init_ecc(nand, dev)
 
-> OK, in that case we need to fix or revert memblock_next_valid_pfn().
-> That works for me.
->
+You've removed this call, but without it the ECC won't be initialised...
 
-OK. You can add my ack to a patch that reverts it, and we can revisit
-it for the next cycle.
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = nand_scan_tail(mtd);
+> +	chip->ecc.attach_chip = jz4780_nand_attach_chip;
+
+This function doesn't exist.
+
+> +	ret = nand_scan(mtd, 1);
+>  	if (ret)
+>  		return ret;
+>  
+> 
+
+Thanks,
+
+Harvey
