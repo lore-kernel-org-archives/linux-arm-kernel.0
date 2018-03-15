@@ -1,57 +1,42 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Mar 2018 19:41:30 +0800
-Subject: [PATCH 2/8] drm/sun4i: Add DT binding for Detail Enhancement Unit in
- Allwinner A80 SoC
+Date: Thu, 15 Mar 2018 19:41:35 +0800
+Subject: [PATCH 7/8] ARM: dts: sun9i: Add pinmux settings for LCD0 RGB888
+ output.
 In-Reply-To: <20180315114136.24747-1-wens@csie.org>
 References: <20180315114136.24747-1-wens@csie.org>
-Message-ID: <20180315114136.24747-3-wens@csie.org>
+Message-ID: <20180315114136.24747-8-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display pipeline on the A80 SoC has what is called the Detail
-Enhancement Unit, or DEU for short, block in between the display
-frontend and backend. This unit can sharpen images in both luma
-and chroma channels. It seems to also do colorspace conversion.
-
-This patch adds the device tree binding for this hardware block.
+The A80 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
+for the needed pins.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../bindings/display/sunxi/sun4i-drm.txt           | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/sun9i-a80.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index c05cbcdde4d7..671d75c76ad0 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -248,6 +248,28 @@ On the A33, some additional properties are required:
-   - resets and reset-names need to have a phandle to the SAT bus
-     resets, whose name will be "sat"
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 6fdb4eaa2e04..25591d6883ef 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -953,6 +953,17 @@
+ 				function = "i2c3";
+ 			};
  
-+DEU
-+---
++			lcd0_rgb888_pins: lcd0-rgb888-pins {
++				pins = "PD0", "PD1", "PD2", "PD3",
++				       "PD4", "PD5", "PD6", "PD7",
++				       "PD8", "PD9", "PD10", "PD11",
++				       "PD12", "PD13", "PD14", "PD15",
++				       "PD16", "PD17", "PD18", "PD19",
++				       "PD20", "PD21", "PD22", "PD23",
++				       "PD24", "PD25", "PD26", "PD27";
++				function = "lcd0";
++			};
 +
-+The DEU (Detail Enhancement Unit), found in the Allwinner A80 SoC,
-+can sharpen the display content in both luma and chroma channels.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun9i-a80-deu
-+  - reg: base address and size of the memory-mapped region.
-+  - interrupts: interrupt associated to this IP
-+  - clocks: phandles to the clocks feeding the DEU
-+    * ahb: the DEU interface clock
-+    * mod: the DEU module clock
-+    * ram: the DEU DRAM clock
-+  - clock-names: the clock names mentioned above
-+  - resets: phandles to the reset line driving the DEU
-+
-+- ports: A ports node with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt. The
-+  first port should be the input endpoints, the second one the outputs
-+
- Display Engine Frontend
- -----------------------
- 
+ 			mmc0_pins: mmc0-pins {
+ 				pins = "PF0", "PF1" ,"PF2", "PF3",
+ 				       "PF4", "PF5";
 -- 
 2.16.2
