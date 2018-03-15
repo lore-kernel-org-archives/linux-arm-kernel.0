@@ -1,29 +1,25 @@
 From: tmaimon77@gmail.com (Tomer Maimon)
-Date: Fri, 16 Mar 2018 01:10:12 +0200
-Subject: [PATCH v1 2/2] arm: npcm: Enable L2 Cache in NPCM7xx
-In-Reply-To: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
-References: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
-Message-ID: <1521155412-29229-3-git-send-email-tmaimon77@gmail.com>
+Date: Fri, 16 Mar 2018 01:10:10 +0200
+Subject: [PATCH v1 0/2] arm: npcm: Modify NPCM7XX machine code
+Message-ID: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable L2 Cache in Nuvoton NPCM7xx BMC.
+Addressed patches from:
+Arnd Bergmann: https://www.spinics.net/lists/arm-kernel/msg639250.html
+			   https://www.spinics.net/lists/arm-kernel/msg639249.html
+			   
+Modify the NPCM and NPCM7XX configuration and enable L2 cache in 
+the DT_MACHINE_START.
 
-Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
----
- arch/arm/mach-npcm/npcm7xx.c | 2 ++
- 1 file changed, 2 insertions(+)
+Tomer Maimon (2):
+  arm: npcm: modify configuration for the NPCM7xx BMC.
+  arm: npcm: Enable L2 Cache in NPCM7xx
 
-diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
-index 5f7cd88103ef..c5f77d854c4f 100644
---- a/arch/arm/mach-npcm/npcm7xx.c
-+++ b/arch/arm/mach-npcm/npcm7xx.c
-@@ -17,4 +17,6 @@ static const char *const npcm7xx_dt_match[] = {
- DT_MACHINE_START(NPCM7XX_DT, "NPCM7XX Chip family")
- 	.atag_offset	= 0x100,
- 	.dt_compat	= npcm7xx_dt_match,
-+	.l2c_aux_val	= 0x0,
-+	.l2c_aux_mask	= ~0x0,
- MACHINE_END
+ arch/arm/mach-npcm/Kconfig   | 40 +++++++++++-----------------------------
+ arch/arm/mach-npcm/Makefile  |  4 +++-
+ arch/arm/mach-npcm/npcm7xx.c |  2 ++
+ 3 files changed, 16 insertions(+), 30 deletions(-)
+
 -- 
 2.14.1
