@@ -1,38 +1,90 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:43 +0100
-Subject: [PATCH 41/60] arm: dts: kirkwood-rd88f6281-a: use
- SPDX-License-Identifier
-In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
-References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-42-gregory.clement@bootlin.com>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Thu, 15 Mar 2018 09:58:05 -0700
+Subject: [PATCH 7/7] ixgbevf: eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <0175e460-3424-9838-1064-9f63dab3304f@codeaurora.org>
+References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
+ <1520997629-17361-7-git-send-email-okaya@codeaurora.org>
+ <12150aa0-77ba-878e-31f4-d4f8d6a28ccb@codeaurora.org>
+ <2a4f4dec64b7462ae64152f6c2df9754@codeaurora.org>
+ <CAKgT0UcriMiyV0q6y_x9r3-HJRAWp5_CpsK2jTqh3qvOV=Kkzw@mail.gmail.com>
+ <d565406d-1bc7-6fb0-3f36-87a28ac69070@codeaurora.org>
+ <CAKgT0UeBHGDmr0uXfuPQJKOomiH9uvXRVYpyDwMOzjkxAZMSYg@mail.gmail.com>
+ <53bf7dfe-32ee-1861-e6ea-81f667590a43@codeaurora.org>
+ <CAKgT0UcBQRoSPPZ73bdu1oEBGqBA8_c3ZAjti20=+9UwEqpXbw@mail.gmail.com>
+ <eee8269d-b711-828c-ab84-5933bf86d024@codeaurora.org>
+ <0175e460-3424-9838-1064-9f63dab3304f@codeaurora.org>
+Message-ID: <CAKgT0UfqueJNq3cL3P=uWZ3xsJ1PXTMHSKTMgZO9uKmTUUCGPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the recent trend for the license description
+On Thu, Mar 15, 2018 at 9:27 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 3/15/2018 12:21 PM, Sinan Kaya wrote:
+>> On 3/15/2018 10:32 AM, Alexander Duyck wrote:
+>>> We tend to do something like:
+>>>   update tx_buffer_info
+>>>   update tx_desc
+>>>   wmb()
+>>>   point first tx_buffer_info next_to_watch value at last tx_desc
+>>>   update next_to_use
+>>>   notify device via writel
+>>>
+>>> We do it this way because we have to synchronize between the Tx
+>>> cleanup path and the hardware so we basically lump the two barriers
+>>> together. instead of invoking both a smp_wmb and a wmb. Now that I
+>>> look at the pseudocode though I wonder if we shouldn't move the
+>>> next_to_use update before the wmb, but that might be material for
+>>> another patch. Anyway, in the Tx cleanup path we should have an
+>>> smp_rmb() after we read the next_to_watch values so that we avoid
+>>> reading any of the other fields in the buffer_info if either the field
+>>> is NULL or the descriptor pointed to has not been written back.
+>>
+>> How do you feel about keeping wmb() very close to writel_relaxed() like this?
+>>
+>>    update tx_buffer_info
+>>    update tx_desc
+>>    point first tx_buffer_info next_to_watch value at last tx_desc
+>>    update next_to_use
+>>    wmb()
+>>    notify device via writel_relaxed()
+>>
+>> I'm afraid that if the order of wmb() and writel() is not very
+>> obvious or hidden in multiple functions, somebody can introduce a very nasty
+>> bug in the future.
+>>
+>> We also have to think about code maintenance.
+>>
+>
+> Now that I read your email again, I think this is the reason if I understood you
+> correctly.
+>
+> "instead of invoking both a smp_wmb and a wmb"
+>
+> You'd need something like
+>
+>     update tx_buffer_info
+>     update tx_desc
+>     smp_wmb()
+>     point first tx_buffer_info next_to_watch value at last tx_desc
+>     update next_to_use
+>     wmb()
+>     notify device via writel_relaxed()
+>
+> Let me work on your comments.
 
-Cc: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- arch/arm/boot/dts/kirkwood-rd88f6281-a.dts | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+Yes, we would be doing something like that, but we are using just a
+single wmb() to cover both cases since hardware will never look at the
+tx_buffer_info and software will never read that descriptor ring as
+long as the next_to_watch is NULL. By doing it this way we should have
+both cases covered and not need to worry
 
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts b/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
-index 9ec5a65561e9..5da163591bbf 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
-@@ -1,12 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Marvell RD88F6181 A Board descrition
-  *
-  * Andrew Lunn <andrew@lunn.ch>
-  *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- *
-  * This file contains the definitions for the board with the A0 or
-  * higher stepping of the SoC. The ethernet switch does not have a
-  * "wan" port.
--- 
-2.16.1
+The only other bit still remaining is the "maybe_stop_tx" logic which
+lives between the wmb and writel_relaxed. That logic has a smp_mb
+living in it that is triggered if we have to stop the queue. Once
+again though that is only viewed by software so it existing between
+the wmb and the writel_relaxed should not be an issue.
+
+Starting to understand why I was a bit hesitant to have us start
+taking on these changes now? :-)
+
+- Alex
