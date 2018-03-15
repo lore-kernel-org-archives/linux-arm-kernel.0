@@ -1,191 +1,109 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 15 Mar 2018 07:33:45 +0000
-Subject: [RFC] arm64: extra entries in /proc/iomem for kexec
-In-Reply-To: <20180315044109.GN25863@linaro.org>
-References: <20180314082941.GM25863@linaro.org>
- <CAKv+Gu9AMS4sGoRsw0KNv6+3WZPXCJRfbxBnjaqnZugiZe4o9w@mail.gmail.com>
- <20180315044109.GN25863@linaro.org>
-Message-ID: <CAKv+Gu8-T84wExeMvJZyVCyY6vsEwWZ3Mhc1v+dRA7yqxxUOsQ@mail.gmail.com>
+Date: Thu, 15 Mar 2018 07:36:57 +0000
+Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
+ alignment"
+In-Reply-To: <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
+References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
+ <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
+Message-ID: <CAKv+Gu-NfXm5YLWXAPsf6zycPs7Ti9qPLQ7FvpOrjdPz5hEP7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 04:41, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> On Wed, Mar 14, 2018 at 08:39:23AM +0000, Ard Biesheuvel wrote:
->> On 14 March 2018 at 08:29, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->> > In the last couples of months, there were some problems reported [1],[2]
->> > around arm64 kexec/kdump. Where those phenomenon look different,
->> > the root cause would be that kexec/kdump doesn't take into account
->> > crucial "reserved" regions of system memory and unintentionally corrupts
->> > them.
->> >
->> > Given that kexec-tools looks for all the information by seeking the file,
->> > /proc/iomem, the first step to address said problems is to expand this file's
->> > format so that it will have enough information about system memory and
->> > its usage.
->> >
->> > Attached is my experimental code: With this patch applied, /proc/iomem sees
->> > something like the below:
->> >
->> > (format A)
->> > 40000000-5871ffff : System RAM
->> >   40080000-40f1ffff : Kernel code
->> >   41040000-411e8fff : Kernel data
->> >   54400000-583fffff : Crash kernel
->> >   58590000-585effff : EFI Resources
->> >   58700000-5871ffff : EFI Resources
->> > 58720000-58b5ffff : System RAM
->> >   58720000-58b5ffff : EFI Resources
->> > 58b60000-5be3ffff : System RAM
->> >   58b61018-58b61947 : EFI Memory Map
->> >   59a7b118-59a7b667 : EFI Configuration Tables
->> > 5be40000-5becffff : System RAM                  <== (A-1)
->> >   5be40000-5becffff : EFI Resources
->> > 5bed0000-5bedffff : System RAM
->> > 5bee0000-5bffffff : System RAM
->> >   5bee0000-5bffffff : EFI Resources
->> > 5c000000-5fffffff : System RAM
->> > 8000000000-ffffffffff : PCI Bus 0000:00
->> >
->> > Meanwhile, the workaround I suggested in [3] gave us a simpler view:
->> >
->> > (format B)
->> > 40000000-5871ffff : System RAM
->> >   40080000-40f1ffff : Kernel code
->> >   41040000-411e9fff : Kernel data
->> >   54400000-583fffff : Crash kernel
->> >   58590000-585effff : reserved
->> >   58700000-5871ffff : reserved
->> > 58720000-58b5ffff : reserved
->> > 58b60000-5be3ffff : System RAM
->> >   58b61000-58b61fff : reserved
->> >   59a7b318-59a7b867 : reserved
->> > 5be40000-5becffff : reserved                    <== (B-1)
->> > 5bed0000-5bedffff : System RAM
->> > 5bee0000-5bffffff : reserved
->> > 5c000000-5fffffff : System RAM
->> >   5ec00000-5edfffff : reserved
->> > 8000000000-ffffffffff : PCI Bus 0000:00
->> >
->> > Here all the regions to be protected are named just "reserved" whether
->> > they are NOMAP regions or simply-memblock_reserve'd. They are not very
->> > useful for anything but kexec/kdump which knows what they mean.
->> >
->> > Alternatively, we may want to give them more specific names, based on
->> > related efi memory map descriptors and else, that will characterize
->> > their contents:
->> >
->> > (format C)
->> > 40000000-5871ffff : System RAM
->> >   40080000-40f1ffff : Kernel code
->> >   41040000-411e9fff : Kernel data
->> >   54400000-583fffff : Crash kernel
->> >   58590000-585effff : ACPI Reclaim Memory
->> >   58700000-5871ffff : ACPI Reclaim Memory
->> > 58720000-58b5ffff : System RAM
->> >   58720000-5878ffff : Runtime Data
->> >   58790000-587dffff : Runtime Code
->> >   587e0000-5882ffff : Runtime Data
->> >   58830000-5887ffff : Runtime Code
->> >   58880000-588cffff : Runtime Data
->> >   588d0000-5891ffff : Runtime Code
->> >   58920000-5896ffff : Runtime Data
->> >   58970000-589bffff : Runtime Code
->> >   589c0000-58a5ffff : Runtime Data
->> >   58a60000-58abffff : Runtime Code
->> >   58ac0000-58b0ffff : Runtime Data
->> >   58b10000-58b5ffff : Runtime Code
->> > 58b60000-5be3ffff : System RAM
->> >   58b61000-58b61fff : EFI Memory Map
->> >   59a7b118-59a7b667 : EFI Memory Attributes Table
->> > 5be40000-5becffff : System RAM
->> >   5be40000-5becffff : Runtime Code
->> > 5bed0000-5bedffff : System RAM
->> > 5bee0000-5bffffff : System RAM
->> >   5bee0000-5bffffff : Runtime Data
->> > 5c000000-5fffffff : System RAM
->> > 8000000000-ffffffffff : PCI Bus 0000:00
->> >
->> > I once created a patch for this format, but it looks quite noisy and
->> > names are a sort of mixture of memory attributes( ACPI Reclaim memory,
->> > Conventional Memory, Persistent Memory etc.) vs.
->> > function/usages ([Loader|Boot Service|Runtime] Code/Data).
->> > (As a matter of fact, (C-1) consists of various ACPI tables.)
->> > Anyhow, they seem not so useful for most of other applications.
->> >
->> > Those observations lead to format A, where some entries with the same
->> > attributes are squeezed into a single entry under a simple name if they
->> > are neighbouring.
->> >
->> >
->> > So my questions here are:
->> >
->> > 1. Which format, A, B, or C, is the most appropriate for the moment?
->> >    or any other suggestions?
->> >
+On 15 March 2018 at 02:23, Daniel Vacek <neelx@redhat.com> wrote:
+> On Wed, Mar 14, 2018 at 8:29 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
 >>
->> I think some variant of B should be sufficient. The only meaningful
->> distinction between these reserved regions at a general level is
->> whether they are NOMAP or not, so perhaps we can incorporate that.
->
-> I would definitely like to give your opinion the first priority,
-> but also hear from other guys.
->
-> Can you tell my why you think that the distinction, NOMAP or not,
-> is meaningful?
->
-
-For diagnostic purposes, it may be useful to know whether a certain
-address is covered by the linear mapping or not.
-
->> As for identifying things like EFI configuration tables: this is a
->> moving target, and we also define our own config tables for the TPM
->> log, screeninfo on ARM etc. Also, for EFI memory types, you can boot
->> with efi=debug and look at the entire memory map. So I think adding
->> all that information may be overkill.
->
-> No doubt I agree.
-> The reason why I gave specific names to EFI configuration tables
-> is that all such tables are unambiguously listed in 'efi' structure,
-> while "screen info" seems to be arm-specific.
-> As for EFI memory types, I admit that they are inadequate for a source
-> of naming.
-> Nevertheless, I still have a sense that "reserved" sounds sloppy :)
->
-
-I don't think that sounds sloppy at all.
-
->> > Currently, there is a inconsistent view between (A) and the mainline's:
->> > see (A-1) and (B-1). If this is really a matter, I can fix it.
->> > Kexec-tools can be easily modified to accept both formats, though.
->> >
->> >
->> > 2. How should we determine which regions be exported in /proc/iomem?
->> >
->> >  a. Trust all the memblock_reserve'd regions as my previous patch [3] does.
->> >
->> >     As I said, it's a kind of "overkill." Some of regions, say fdt, are
->> >     not required to be preserved across kexec.
->> >
+>> Commit 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock
+>> alignment") modified the logic in memmap_init_zone() to initialize
+>> struct pages associated with invalid PFNs, to appease a VM_BUG_ON()
+>> in move_freepages(), which is redundant by its own admission, and
+>> dereferences struct page fields to obtain the zone without checking
+>> whether the struct pages in question are valid to begin with.
 >>
->> I don't think there is anything wrong with listing all
->> memblock_reserve()'d regions here, even if kexec has other means of
->> ensuring that they are not touched.
+>> Commit 864b75f9d6b0 only makes it worse, since the rounding it does
+>> may cause pfn assume the same value it had in a prior iteration of
+>> the loop, resulting in an infinite loop and a hang very early in the
+>> boot. Also, since it doesn't perform the same rounding on start_pfn
+>> itself but only on intermediate values following an invalid PFN, we
+>> may still hit the same VM_BUG_ON() as before.
+>>
+>> So instead, let's fix this at the core, and ensure that the BUG
+>> check doesn't dereference struct page fields of invalid pages.
+>>
+>> Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
+>> Cc: Daniel Vacek <neelx@redhat.com>
+>> Cc: Mel Gorman <mgorman@techsingularity.net>
+>> Cc: Michal Hocko <mhocko@suse.com>
+>> Cc: Paul Burton <paul.burton@imgtec.com>
+>> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
+>> Cc: Vlastimil Babka <vbabka@suse.cz>
+>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>> Cc: Linus Torvalds <torvalds@linux-foundation.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  mm/page_alloc.c | 13 +++++--------
+>>  1 file changed, 5 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+>> index 3d974cb2a1a1..635d7dd29d7f 100644
+>> --- a/mm/page_alloc.c
+>> +++ b/mm/page_alloc.c
+>> @@ -1910,7 +1910,9 @@ static int move_freepages(struct zone *zone,
+>>          * Remove at a later date when no bug reports exist related to
+>>          * grouping pages by mobility
+>>          */
+>> -       VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
+>> +       VM_BUG_ON(pfn_valid(page_to_pfn(start_page)) &&
+>> +                 pfn_valid(page_to_pfn(end_page)) &&
+>> +                 page_zone(start_page) != page_zone(end_page));
 >
-> I initially thought that one downside in this approach is that we might
-> not able to re-use a reserved region for fdt, as well as others also
-> dynamically reserved by "/reserved-memory/" nodes, after kexec and that
-> it would end up more or less a memory leak eventually after iterating
-> kexec()'s. But
-> after thinking twice, I now don't believe it is a problem anymore.
-> In kexec case, we won't have to hand over a list of reserved regions to
-> secondary kernel. Kdump, on the other hand, will be triggered only once
-> for its nature anyway.
->
->> But as I said, I think it would be
->> useful to distinguish them from NOMAP regions (even if the nesting
->> below System RAM already shows that as well)
->
-> Something like "reserved (no map)"?
+> Hi, I am on vacation this week and I didn't have a chance to test this
+> yet but I am not sure this is correct. Generic pfn_valid() unlike the
+> arm{,64} arch specific versions returns true for all pfns in a section
+> if there is at least some memory mapped in that section. So I doubt
+> this prevents the crash I was targeting. I believe pfn_valid() does
+> not change a thing here :(
 >
 
-Works for me
+If this is the case, memblock_next_valid_pfn() is broken since it
+skips valid PFNs, and we should be fixing that instead.
+
+> ------------------------
+> include/linux/mmzone.h:
+> pfn_valid(pfn)
+>   valid_section(__nr_to_section(pfn_to_section_nr(pfn)))
+>     return (section && (section->section_mem_map & SECTION_HAS_MEM_MAP))
+>
+> arch/arm64/mm/init.c:
+> #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+> int pfn_valid(unsigned long pfn)
+> {
+>     return memblock_is_map_memory(pfn << PAGE_SHIFT);
+> }
+> EXPORT_SYMBOL(pfn_valid);
+> #endif
+> ------------------------
+>
+> Also I already sent a fix to Andrew yesterday which was reported to
+> fix the loop.
+>
+> Moreover, you also reported this:
+>
+>>    Early memory node ranges
+>>      node   0: [mem 0x0000000080000000-0x00000000febeffff]
+>>      node   0: [mem 0x00000000febf0000-0x00000000fefcffff]
+>>      node   0: [mem 0x00000000fefd0000-0x00000000ff43ffff]
+>>      node   0: [mem 0x00000000ff440000-0x00000000ff7affff]
+>>      node   0: [mem 0x00000000ff7b0000-0x00000000ffffffff]
+>>      node   0: [mem 0x0000000880000000-0x0000000fffffffff]
+>>    Initmem setup node 0 [mem 0x0000000080000000-0x0000000fffffffff]
+>>    pfn:febf0 oldnext:febf0 newnext:fe9ff
+>>    pfn:febf0 oldnext:febf0 newnext:fe9ff
+>>    pfn:febf0 oldnext:febf0 newnext:fe9ff
+>>    etc etc
+>
+> I am wondering how come pfn_valid(0xfebf0) returns false here. Should
+> it be true or do I miss something?
+>
+> --nX
