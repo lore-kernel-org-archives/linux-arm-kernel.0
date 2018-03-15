@@ -1,15 +1,14 @@
-From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
-Date: Thu, 15 Mar 2018 22:18:35 +0100
-Subject: [PATCH 30/36] arm: dts: armada-385-turris-omnia: use
- SPDX-License-Identifier
-In-Reply-To: <20180315150717.10588-31-gregory.clement@bootlin.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 15 Mar 2018 14:21:58 -0700
+Subject: [PATCH 10/36] arm: dts: armada-370-rd: use SPDX-License-Identifier
+In-Reply-To: <20180315150717.10588-11-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
- <20180315150717.10588-31-gregory.clement@bootlin.com>
-Message-ID: <90123740-83dc-1a21-2245-19d6e9f82bca@kleine-koenig.org>
+ <20180315150717.10588-11-gregory.clement@bootlin.com>
+Message-ID: <3a173c5d-96c5-6cb0-5ba4-c64fec6f02f0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/15/2018 04:07 PM, Gregory CLEMENT wrote:
+On 03/15/2018 08:06 AM, Gregory CLEMENT wrote:
 > Follow the recent trend for the license description, and also fix the
 > wrongly stated X11 to MIT.
 > 
@@ -20,17 +19,10 @@ On 03/15/2018 04:07 PM, Gregory CLEMENT wrote:
 > [1] https://spdx.org/licenses/X11.html
 > [2] https://spdx.org/licenses/MIT.html
 > 
-> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> Cc: Florian Fainelli <florian@openwrt.org>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 
-Acked-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Best regards
-Uwe
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180315/c0f7caec/attachment.sig>
+-- 
+Florian
