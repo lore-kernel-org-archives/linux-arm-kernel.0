@@ -1,34 +1,69 @@
-From: bich.hemon@st.com (Bich HEMON)
-Date: Thu, 15 Mar 2018 08:44:46 +0000
-Subject: [PATCH] serial: stm32: fix initialization of RS485 mode
-Message-ID: <1521103480-6940-1-git-send-email-bich.hemon@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Mar 2018 09:47:10 +0100
+Subject: [PATCH v3 00/11] mmc: sdhci-omap: Add UHS/HS200 mode support
+In-Reply-To: <20180307132020.30951-1-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+Message-ID: <CAPDyKFrnPQs3B2QN7tf3UH0JYjqkpS1YDhq0s3scads3exPCCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure RS485 mode during port initialization.
+On 7 March 2018 at 14:20, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Add UHS/HS200 mode support in sdhci-omap. The programming sequence
+> for voltage switching, tuning is followed from AM572x TRM
+> http://www.ti.com/lit/ug/spruhz6i/spruhz6i.pdf
+> (Similar to all AM57x/DRA7x SoCs). The patch series also implements
+> workaround for errata published in
+> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
+>
+> patches are created on top of
+> git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
+>
+> Patches in v2 already applied to mmc -next are dropped from the
+> series.
+>
+> Changes from v2:
+> *) Changed SW timeout logic as per Adrians's suggestion
+> *) Validated SDIO with the current patches (added a couple of fixes
+>    found while adding SDIO support).
+> *) Used soc_device_match() instead of pdata-quirks as per Tony's
+>    suggestions.
+>
+> Changes from v1:
+> *) Only poll on DAT0 and DATI for card_busy status
+> *) Cleanup iodelay patch as suggested by Tony.
+> *) Added quirk to disable HW timeout
+> *) Use the existing data timer but program a relatively accurate
+>    SW timeout value (Impacts all platforms)
+> *) Fix a bug in sdhci which was using data_timer for non data line
+>    commands
+>
+> Kishon Vijay Abraham I (11):
+>   mmc: sdhci-omap: Fix when capabilities are obtained from
+>     SDHCI_CAPABILITIES reg
+>   mmc: sdhci-omap: Remove setting ADMA capability in driver
+>   mmc: sdhci-omap: Workaround for Errata i843
+>   mmc: sdhci-omap: Invoke sdhci_get_of_property to read sdhci dt
+>     properties
+>   mmc: sdhci: Disable HS200 mode if controller can't support 1.8v
+>   mmc: sdhci: Add quirk to disable HW timeout
+>   mmc: sdhci: Program a relatively accurate SW timeout value
+>   mmc: sdhci-omap: Workaround for Errata i834
+>   dt-bindings: sdhci-omap: Add K2G specific binding
+>   mmc: sdhci-omap: Add support for MMC/SD controller in k2g SoC
+>   mmc: sdhci-omap: Add sdhci_omap specific ops for enable_sdio_irq
+>
+>  .../devicetree/bindings/mmc/sdhci-omap.txt         |  2 +
+>  drivers/mmc/host/sdhci-omap.c                      | 78 +++++++++++++++++++---
+>  drivers/mmc/host/sdhci.c                           | 75 +++++++++++++++++----
+>  drivers/mmc/host/sdhci.h                           | 15 +++++
+>  4 files changed, 148 insertions(+), 22 deletions(-)
+>
+> --
+> 2.11.0
+>
 
-Fixes: 1bcda09d291081a7732fcaa9d1745312404a4e36 ("serial: stm32: add
-support for RS485 hardware control mode")
+Overall this looks good to me, however it seems like we need to give
+Adrian a little more time to comment.
 
-Signed-off-by: Bich Hemon <bich.hemon@st.com>
----
- drivers/tty/serial/stm32-usart.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index 345fbf3..e8d7a7b 100644
---- a/drivers/tty/serial/stm32-usart.c
-+++ b/drivers/tty/serial/stm32-usart.c
-@@ -809,6 +809,10 @@ static int stm32_init_port(struct stm32_port *stm32port,
- 	port->ops	= &stm32_uart_ops;
- 	port->dev	= &pdev->dev;
- 	port->irq	= platform_get_irq(pdev, 0);
-+	port->rs485_config = stm32_config_rs485;
-+
-+	stm32_init_rs485(port, pdev);
-+
- 	stm32port->wakeirq = platform_get_irq(pdev, 1);
- 	stm32port->fifoen = stm32port->info->cfg.has_fifo;
- 
--- 
-1.9.1
+Kind regards
+Uffe
