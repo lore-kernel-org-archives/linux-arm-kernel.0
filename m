@@ -1,10 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:06:46 +0100
-Subject: [PATCH 05/36] arm: dts: armada-xp-98dx: use SPDX-License-Identifier
- for prestara 98d SoCs
+Date: Thu, 15 Mar 2018 16:06:50 +0100
+Subject: [PATCH 09/36] arm: dts: armada-370-netgear-rn*: use
+ SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-6-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-10-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,25 +18,24 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Chris Packham <chris.packham@alliedtelesis.co.nz>
+Cc: Arnaud Ebalard <arno@natisbad.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 39 +------------------------------
- arch/arm/boot/dts/armada-xp-98dx3336.dtsi | 39 +------------------------------
- arch/arm/boot/dts/armada-xp-98dx4251.dtsi | 39 +------------------------------
- 3 files changed, 3 insertions(+), 114 deletions(-)
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 39 +-------------------------
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts | 39 +-------------------------
+ 2 files changed, 2 insertions(+), 76 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-index bdd4c7a45fbf..a5da44fb35ed 100644
---- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-@@ -1,46 +1,9 @@
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index d2225bd4a76f..56634803e16b 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -1,45 +1,8 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree Include file for Marvell 98dx3236 family SoC
+  * Device Tree file for NETGEAR ReadyNAS 102
   *
-  * Copyright (C) 2016 Allied Telesis Labs
-  *
+  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+- *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
@@ -74,21 +73,20 @@ index bdd4c7a45fbf..a5da44fb35ed 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
-- *
-  * Contains definitions specific to the 98dx3236 SoC that are not
-  * common to all Armada XP SoCs.
   */
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3336.dtsi b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
-index a0d81bd7312b..2f5fc67dd6dc 100644
---- a/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
-@@ -1,46 +1,9 @@
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn104.dts b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+index b73cae836bc1..16d0307f786a 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn104.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn104.dts
+@@ -1,45 +1,8 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree Include file for Marvell 98dx3336 family SoC
+  * Device Tree file for NETGEAR ReadyNAS 104
   *
-  * Copyright (C) 2016 Allied Telesis Labs
-  *
+  * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+- *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
@@ -126,61 +124,8 @@ index a0d81bd7312b..2f5fc67dd6dc 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
-- *
-  * Contains definitions specific to the 98dx3236 SoC that are not
-  * common to all Armada XP SoCs.
   */
-diff --git a/arch/arm/boot/dts/armada-xp-98dx4251.dtsi b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
-index bc9f824020eb..7a9e8839880b 100644
---- a/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
-@@ -1,46 +1,9 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Device Tree Include file for Marvell 98dx4521 family SoC
-  *
-  * Copyright (C) 2016 Allied Telesis Labs
-  *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License, or (at your option) any later version.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-- *
-  * Contains definitions specific to the 98dx4521 SoC that are not
-  * common to all Armada XP SoCs.
-  */
+ 
+ /dts-v1/;
 -- 
 2.16.1
