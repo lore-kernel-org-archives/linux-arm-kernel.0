@@ -1,29 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 15:56:28 +0100
-Subject: [GIT PULL] ARM: aspeed: dts changes for 4.17
-In-Reply-To: <CACPK8Xfv2XnhGo9cmJC69suOu9+caOp5QoXuD5Xw-gznGP61Og@mail.gmail.com>
-References: <CACPK8Xfv2XnhGo9cmJC69suOu9+caOp5QoXuD5Xw-gznGP61Og@mail.gmail.com>
-Message-ID: <CAK8P3a1DiNgdLhAYKf2gjHCzW_6v8Kv9FNHXZ8KeBti8hycVuA@mail.gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 15 Mar 2018 09:58:07 -0500
+Subject: [PATCH 3/3] irqchip/gic-v3: Allow LPIs to be disabled from the
+ command line
+In-Reply-To: <20180313172103.24281-4-marc.zyngier@arm.com>
+References: <20180313172103.24281-1-marc.zyngier@arm.com>
+ <20180313172103.24281-4-marc.zyngier@arm.com>
+Message-ID: <f3fee732-2c07-e303-4ec2-2d79668b868e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 7:42 AM, Joel Stanley <joel@jms.id.au> wrote:
-> ASPEED device tree updates for 4.17
->
-> Updates to OpenPower BMC systems:
->
->  A number of updates to use recently merged drivers, including moving to
->  upstreamed IPMI BT nodes, a temp sensor for Romulus, and adding
->  simple-reset for UARTs.
->
->  This includes more of Palmetto's device tree, so that it's ever so
->  close to booting the host with an upstream kernel.
->
-> New machines:
->
->  Add Qualcomm Centriq ARM64 server reference platform, which will run
->  OpenBMC on an AST2500.
 
-Pulled into next/dt, thanks!
+Hi Marc,
 
-        Arnd
+On 03/13/2018 12:21 PM, Marc Zyngier wrote:
+> For most GICv3 implementations, enabling LPIs is a one way switch.
+> Once they're on, there is no turning back, which completely kills
+> kexec (pending tables will always be live, and we can't tell the
+> secondary kernel where they are).
+> 
+> This is really annoying if you plan to use Linux as a bootloader,
+> as it pretty much guarantees that the secondary kernel won't be
+> able to use MSIs, and may even see some memory corruption. Bad.
+> 
+> A workaround for this unfortunate situation is to allow the kernel
+> not to enable LPIs, even if the feature is present in the HW. This
+> would allow Linux-as-a-bootloader to leave LPIs alone, and let the
+> secondary kernel to do whatever it wants with them.
+> 
+> Let's introduce a boolean "irqchip.gicv3_nolpi" command line option
+> that serves that purpose.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  Documentation/admin-guide/kernel-parameters.txt |  8 ++++++++
+>  drivers/irqchip/irq-gic-v3.c                    | 10 +++++++++-
+>  2 files changed, 17 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index 1d1d53f85ddd..60130231db3b 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -1743,6 +1743,14 @@
+>  			of a GICv2 controller even if the memory range
+>  			exposed by the device tree is too small.
+>  
+> +	irqchip.gicv3_nolpi=
+> +			[ARM, ARM64]
+> +			Force the kernel to ignore the availability of
+> +			LPIs (and by consequence ITSs). Intended for system
+> +			that use the kernel as a bootloader, and thus want
+> +			to let secondary kernels in charge of setting up
+> +			LPIs.
+> +
+>  	irqfixup	[HW]
+>  			When an interrupt is not handled search all handlers
+>  			for it. Intended to get systems with badly broken
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 0ea02504115d..3e9eeb6cb294 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -613,9 +613,17 @@ static void gic_cpu_sys_reg_init(void)
+>  		pr_crit_once("RSS is required but GICD doesn't support it\n");
+>  }
+>  
+> +static bool gicv3_nolpi;
+> +
+> +static int __init gicv3_nolpi_cfg(char *buf)
+> +{
+> +	return strtobool(buf, &gicv3_nolpi);
+> +}
+> +early_param("irqchip.gicv3_nolpi", gicv3_nolpi_cfg);
+> +
+>  static int gic_dist_supports_lpis(void)
+>  {
+> -	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS);
+> +	return !!(readl_relaxed(gic_data.dist_base + GICD_TYPER) & GICD_TYPER_LPIS) && !gicv3_nolpi;
+
+Thanks for this patch series especially for KDUMP case. It would be nice if we disable GIC-ITS and
+GICR-LPI functionality completely to avoid in flight LPIs which were triggered by first kernel.
+
+  
+>  }
+>  
+>  static void gic_cpu_init(void)
+> 
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
