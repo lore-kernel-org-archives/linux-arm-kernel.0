@@ -1,260 +1,191 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Thu, 15 Mar 2018 08:18:47 +0100
-Subject: [PATCH] ARM: dts: stm32: Enable stm32mp1 clock driver on stm32mp157c
-Message-ID: <1521098327-13958-1-git-send-email-gabriel.fernandez@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 15 Mar 2018 07:33:45 +0000
+Subject: [RFC] arm64: extra entries in /proc/iomem for kexec
+In-Reply-To: <20180315044109.GN25863@linaro.org>
+References: <20180314082941.GM25863@linaro.org>
+ <CAKv+Gu9AMS4sGoRsw0KNv6+3WZPXCJRfbxBnjaqnZugiZe4o9w@mail.gmail.com>
+ <20180315044109.GN25863@linaro.org>
+Message-ID: <CAKv+Gu8-T84wExeMvJZyVCyY6vsEwWZ3Mhc1v+dRA7yqxxUOsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 15 March 2018 at 04:41, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> On Wed, Mar 14, 2018 at 08:39:23AM +0000, Ard Biesheuvel wrote:
+>> On 14 March 2018 at 08:29, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+>> > In the last couples of months, there were some problems reported [1],[2]
+>> > around arm64 kexec/kdump. Where those phenomenon look different,
+>> > the root cause would be that kexec/kdump doesn't take into account
+>> > crucial "reserved" regions of system memory and unintentionally corrupts
+>> > them.
+>> >
+>> > Given that kexec-tools looks for all the information by seeking the file,
+>> > /proc/iomem, the first step to address said problems is to expand this file's
+>> > format so that it will have enough information about system memory and
+>> > its usage.
+>> >
+>> > Attached is my experimental code: With this patch applied, /proc/iomem sees
+>> > something like the below:
+>> >
+>> > (format A)
+>> > 40000000-5871ffff : System RAM
+>> >   40080000-40f1ffff : Kernel code
+>> >   41040000-411e8fff : Kernel data
+>> >   54400000-583fffff : Crash kernel
+>> >   58590000-585effff : EFI Resources
+>> >   58700000-5871ffff : EFI Resources
+>> > 58720000-58b5ffff : System RAM
+>> >   58720000-58b5ffff : EFI Resources
+>> > 58b60000-5be3ffff : System RAM
+>> >   58b61018-58b61947 : EFI Memory Map
+>> >   59a7b118-59a7b667 : EFI Configuration Tables
+>> > 5be40000-5becffff : System RAM                  <== (A-1)
+>> >   5be40000-5becffff : EFI Resources
+>> > 5bed0000-5bedffff : System RAM
+>> > 5bee0000-5bffffff : System RAM
+>> >   5bee0000-5bffffff : EFI Resources
+>> > 5c000000-5fffffff : System RAM
+>> > 8000000000-ffffffffff : PCI Bus 0000:00
+>> >
+>> > Meanwhile, the workaround I suggested in [3] gave us a simpler view:
+>> >
+>> > (format B)
+>> > 40000000-5871ffff : System RAM
+>> >   40080000-40f1ffff : Kernel code
+>> >   41040000-411e9fff : Kernel data
+>> >   54400000-583fffff : Crash kernel
+>> >   58590000-585effff : reserved
+>> >   58700000-5871ffff : reserved
+>> > 58720000-58b5ffff : reserved
+>> > 58b60000-5be3ffff : System RAM
+>> >   58b61000-58b61fff : reserved
+>> >   59a7b318-59a7b867 : reserved
+>> > 5be40000-5becffff : reserved                    <== (B-1)
+>> > 5bed0000-5bedffff : System RAM
+>> > 5bee0000-5bffffff : reserved
+>> > 5c000000-5fffffff : System RAM
+>> >   5ec00000-5edfffff : reserved
+>> > 8000000000-ffffffffff : PCI Bus 0000:00
+>> >
+>> > Here all the regions to be protected are named just "reserved" whether
+>> > they are NOMAP regions or simply-memblock_reserve'd. They are not very
+>> > useful for anything but kexec/kdump which knows what they mean.
+>> >
+>> > Alternatively, we may want to give them more specific names, based on
+>> > related efi memory map descriptors and else, that will characterize
+>> > their contents:
+>> >
+>> > (format C)
+>> > 40000000-5871ffff : System RAM
+>> >   40080000-40f1ffff : Kernel code
+>> >   41040000-411e9fff : Kernel data
+>> >   54400000-583fffff : Crash kernel
+>> >   58590000-585effff : ACPI Reclaim Memory
+>> >   58700000-5871ffff : ACPI Reclaim Memory
+>> > 58720000-58b5ffff : System RAM
+>> >   58720000-5878ffff : Runtime Data
+>> >   58790000-587dffff : Runtime Code
+>> >   587e0000-5882ffff : Runtime Data
+>> >   58830000-5887ffff : Runtime Code
+>> >   58880000-588cffff : Runtime Data
+>> >   588d0000-5891ffff : Runtime Code
+>> >   58920000-5896ffff : Runtime Data
+>> >   58970000-589bffff : Runtime Code
+>> >   589c0000-58a5ffff : Runtime Data
+>> >   58a60000-58abffff : Runtime Code
+>> >   58ac0000-58b0ffff : Runtime Data
+>> >   58b10000-58b5ffff : Runtime Code
+>> > 58b60000-5be3ffff : System RAM
+>> >   58b61000-58b61fff : EFI Memory Map
+>> >   59a7b118-59a7b667 : EFI Memory Attributes Table
+>> > 5be40000-5becffff : System RAM
+>> >   5be40000-5becffff : Runtime Code
+>> > 5bed0000-5bedffff : System RAM
+>> > 5bee0000-5bffffff : System RAM
+>> >   5bee0000-5bffffff : Runtime Data
+>> > 5c000000-5fffffff : System RAM
+>> > 8000000000-ffffffffff : PCI Bus 0000:00
+>> >
+>> > I once created a patch for this format, but it looks quite noisy and
+>> > names are a sort of mixture of memory attributes( ACPI Reclaim memory,
+>> > Conventional Memory, Persistent Memory etc.) vs.
+>> > function/usages ([Loader|Boot Service|Runtime] Code/Data).
+>> > (As a matter of fact, (C-1) consists of various ACPI tables.)
+>> > Anyhow, they seem not so useful for most of other applications.
+>> >
+>> > Those observations lead to format A, where some entries with the same
+>> > attributes are squeezed into a single entry under a simple name if they
+>> > are neighbouring.
+>> >
+>> >
+>> > So my questions here are:
+>> >
+>> > 1. Which format, A, B, or C, is the most appropriate for the moment?
+>> >    or any other suggestions?
+>> >
+>>
+>> I think some variant of B should be sufficient. The only meaningful
+>> distinction between these reserved regions at a general level is
+>> whether they are NOMAP or not, so perhaps we can incorporate that.
+>
+> I would definitely like to give your opinion the first priority,
+> but also hear from other guys.
+>
+> Can you tell my why you think that the distinction, NOMAP or not,
+> is meaningful?
+>
 
-This patch enables stm32mp1 clock driver.
+For diagnostic purposes, it may be useful to know whether a certain
+address is covered by the linear mapping or not.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 24 ++++++++--------
- arch/arm/boot/dts/stm32mp157c.dtsi        | 48 +++++++++++--------------------
- 2 files changed, 28 insertions(+), 44 deletions(-)
+>> As for identifying things like EFI configuration tables: this is a
+>> moving target, and we also define our own config tables for the TPM
+>> log, screeninfo on ARM etc. Also, for EFI memory types, you can boot
+>> with efi=debug and look at the entire memory map. So I think adding
+>> all that information may be overkill.
+>
+> No doubt I agree.
+> The reason why I gave specific names to EFI configuration tables
+> is that all such tables are unambiguously listed in 'efi' structure,
+> while "screen info" seems to be arm-specific.
+> As for EFI memory types, I admit that they are inadequate for a source
+> of naming.
+> Nevertheless, I still have a sense that "reserved" sounds sloppy :)
+>
 
-diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-index c0743305..6f044100 100644
---- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-@@ -20,7 +20,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x0 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOA>;
- 				st,bank-name = "GPIOA";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 0 16>;
-@@ -32,7 +32,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x1000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOB>;
- 				st,bank-name = "GPIOB";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 16 16>;
-@@ -44,7 +44,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x2000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOC>;
- 				st,bank-name = "GPIOC";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 32 16>;
-@@ -56,7 +56,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x3000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOD>;
- 				st,bank-name = "GPIOD";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 48 16>;
-@@ -68,7 +68,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x4000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOE>;
- 				st,bank-name = "GPIOE";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 64 16>;
-@@ -80,7 +80,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x5000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOF>;
- 				st,bank-name = "GPIOF";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 80 16>;
-@@ -92,7 +92,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x6000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOG>;
- 				st,bank-name = "GPIOG";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 96 16>;
-@@ -104,7 +104,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x7000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOH>;
- 				st,bank-name = "GPIOH";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 112 16>;
-@@ -116,7 +116,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x8000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOI>;
- 				st,bank-name = "GPIOI";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 128 16>;
-@@ -128,7 +128,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0x9000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOJ>;
- 				st,bank-name = "GPIOJ";
- 				ngpios = <16>;
- 				gpio-ranges = <&pinctrl 0 144 16>;
-@@ -140,7 +140,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0xa000 0x400>;
--				clocks = <&clk_pll3_p>;
-+				clocks = <&rcc GPIOK>;
- 				st,bank-name = "GPIOK";
- 				ngpios = <8>;
- 				gpio-ranges = <&pinctrl 0 160 8>;
-@@ -174,7 +174,7 @@
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
- 				reg = <0 0x400>;
--				clocks = <&clk_pll2_p>;
-+				clocks = <&rcc GPIOZ>;
- 				st,bank-name = "GPIOZ";
- 				st,bank-ioport = <11>;
- 				ngpios = <8>;
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 9e17e42..bc3eddc 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -4,6 +4,7 @@
-  * Author: Ludovic Barre <ludovic.barre@st.com> for STMicroelectronics.
-  */
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/stm32mp1-clks.h>
- 
- / {
- 	#address-cells = <1>;
-@@ -71,12 +72,6 @@
- 			clock-frequency = <24000000>;
- 		};
- 
--		clk_pll_per: clk-pll-per {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <64000000>;
--		};
--
- 		clk_hsi: clk-hsi {
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
-@@ -100,24 +95,6 @@
- 			compatible = "fixed-clock";
- 			clock-frequency = <4000000>;
- 		};
--
--		clk_pclk1: clk-pclk1 {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <86000000>;
--		};
--
--		clk_pll3_p: clk-pll3_p {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <172000000>;
--		};
--
--		clk_pll2_p: clk-pll2_p {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <264000000>;
--		};
- 	};
- 
- 	soc {
-@@ -131,7 +108,7 @@
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x4000e000 0x400>;
- 			interrupts = <GIC_SPI 38 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc USART2_K>;
- 			status = "disabled";
- 		};
- 
-@@ -139,7 +116,7 @@
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x4000f000 0x400>;
- 			interrupts = <GIC_SPI 39 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc USART3_K>;
- 			status = "disabled";
- 		};
- 
-@@ -147,7 +124,7 @@
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x40010000 0x400>;
- 			interrupts = <GIC_SPI 52 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc UART4_K>;
- 			status = "disabled";
- 		};
- 
-@@ -155,7 +132,7 @@
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x40011000 0x400>;
- 			interrupts = <GIC_SPI 53 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc UART5_K>;
- 			status = "disabled";
- 		};
- 
-@@ -163,7 +140,7 @@
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x40018000 0x400>;
- 			interrupts = <GIC_SPI 82 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc UART7_K>;
- 			status = "disabled";
- 		};
- 
-@@ -171,7 +148,7 @@
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x40019000 0x400>;
- 			interrupts = <GIC_SPI 83 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc UART8_K>;
- 			status = "disabled";
- 		};
- 
-@@ -179,15 +156,22 @@
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x44003000 0x400>;
- 			interrupts = <GIC_SPI 71 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc USART6_K>;
- 			status = "disabled";
- 		};
- 
-+		rcc: rcc at 50000000 {
-+			compatible = "st,stm32mp1-rcc", "syscon";
-+			reg = <0x50000000 0x1000>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
- 		usart1: serial at 5c000000 {
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x5c000000 0x400>;
- 			interrupts = <GIC_SPI 37 IRQ_TYPE_NONE>;
--			clocks = <&clk_pclk1>;
-+			clocks = <&rcc USART1_K>;
- 			status = "disabled";
- 		};
- 	};
--- 
-1.9.1
+I don't think that sounds sloppy at all.
+
+>> > Currently, there is a inconsistent view between (A) and the mainline's:
+>> > see (A-1) and (B-1). If this is really a matter, I can fix it.
+>> > Kexec-tools can be easily modified to accept both formats, though.
+>> >
+>> >
+>> > 2. How should we determine which regions be exported in /proc/iomem?
+>> >
+>> >  a. Trust all the memblock_reserve'd regions as my previous patch [3] does.
+>> >
+>> >     As I said, it's a kind of "overkill." Some of regions, say fdt, are
+>> >     not required to be preserved across kexec.
+>> >
+>>
+>> I don't think there is anything wrong with listing all
+>> memblock_reserve()'d regions here, even if kexec has other means of
+>> ensuring that they are not touched.
+>
+> I initially thought that one downside in this approach is that we might
+> not able to re-use a reserved region for fdt, as well as others also
+> dynamically reserved by "/reserved-memory/" nodes, after kexec and that
+> it would end up more or less a memory leak eventually after iterating
+> kexec()'s. But
+> after thinking twice, I now don't believe it is a problem anymore.
+> In kexec case, we won't have to hand over a list of reserved regions to
+> secondary kernel. Kdump, on the other hand, will be triggered only once
+> for its nature anyway.
+>
+>> But as I said, I think it would be
+>> useful to distinguish them from NOMAP regions (even if the nesting
+>> below System RAM already shows that as well)
+>
+> Something like "reserved (no map)"?
+>
+
+Works for me
