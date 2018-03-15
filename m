@@ -1,106 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Mar 2018 18:06:12 +0000
-Subject: [RFC 2/3] arm: make cpu a percpu variable
-In-Reply-To: <20180315170859.93893-3-zsm@chromium.org>
-References: <20180315170859.93893-1-zsm@chromium.org>
- <20180315170859.93893-3-zsm@chromium.org>
-Message-ID: <20180315180612.vpae3c5k4msc2tz3@lakrids.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Mar 2018 17:16:46 +0000
+Subject: [PATCH v2 4/6] KVM: arm/arm64: Reduce verbosity of KVM init log
+In-Reply-To: <20180315171648.19501-1-marc.zyngier@arm.com>
+References: <20180315171648.19501-1-marc.zyngier@arm.com>
+Message-ID: <20180315171648.19501-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 05:08:58PM +0000, Zubin Mithra wrote:
-> Without CONFIG_THREAD_INFO_IN_TASK, core code maintains thread_info::cpu
-> and arch specific code can use this to build raw_smp_processor_id().
-> With CONFIG_THREAD_INFO_IN_TASK, core code maintains task_struct::cpu,
-> and arch specific code cannot access this due to header file circular
-> dependency.
-> 
-> Instead, we can maintain a percpu variable containing the cpu number.
-> 
-> This also means that cpu numbers obtained using smp_processor_id cannot
-> be used to set_my_cpu_offset. Use task_cpu(current) instead to get the
-> cpu in those cases.
-> 
-> Earlier raw_smp_processor_id() was current_thread_info()->cpu :-
-> 	mov	r3, sp
-> 	bic     r3, r3, #8128
-> 	bic     r3, r3, #63
-> 	ldr     r0, [r3, #16]
-> 
-> Now it is *raw_cpu_ptr(&cpu_number) :-
-> 	movw	r3, #57344
-> 	movt	r3, #32917
-> 	mrc	15, 0, r0, cr13, cr0, {4}
-> 	ldr	r0, [r3, r0]
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-It's probably worth noting that with the thread_info moved off of the
-stack, were we to use that to get at the cpu number, this would require
-a similar sequence to the raw_cpu_ptr() code here.
+On my GICv3 system, the following is printed to the kernel log at boot:
 
-This might make more sense after a patch using a register for the
-thread_info (which would also allow for having separate IRQ stacks).
+   kvm [1]: 8-bit VMID
+   kvm [1]: IDMAP page: d20e35000
+   kvm [1]: HYP VA range: 800000000000:ffffffffffff
+   kvm [1]: vgic-v2 at 2c020000
+   kvm [1]: GIC system register CPU interface enabled
+   kvm [1]: vgic interrupt IRQ1
+   kvm [1]: virtual timer IRQ4
+   kvm [1]: Hyp mode initialized successfully
 
-> 
-> Signed-off-by: Zubin Mithra <zsm@chromium.org>
-> ---
->  arch/arm/include/asm/cputype.h | 3 +++
->  arch/arm/include/asm/smp.h     | 3 ++-
->  arch/arm/kernel/setup.c        | 2 +-
->  arch/arm/kernel/smp.c          | 5 +++--
->  arch/arm/kernel/topology.c     | 5 +++++
->  5 files changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index cb546425da8a..10148c7af12f 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -2,6 +2,9 @@
->  #ifndef __ASM_ARM_CPUTYPE_H
->  #define __ASM_ARM_CPUTYPE_H
->  
-> +#include <asm/percpu.h>
-> +DECLARE_PER_CPU(int, cpu_number);
-> +
+The KVM IDMAP is a mapping of a statically allocated kernel structure,
+and so printing its physical address leaks the physical placement of
+the kernel when physical KASLR in effect. So change the kvm_info() to
+kvm_debug() to remove it from the log output.
 
-Why isn't this defined in <asm/smp.h>, as we do on arm64?
+While at it, trim the output a bit more: IRQ numbers can be found in
+/proc/interrupts, and the HYP VA and vgic-v2 lines are not highly
+informational either.
 
-> --- a/arch/arm/include/asm/smp.h
-> +++ b/arch/arm/include/asm/smp.h
-> @@ -18,7 +18,8 @@
->  # error "<asm/smp.h> included in non-SMP build"
->  #endif
->  
-> -#define raw_smp_processor_id() (current_thread_info()->cpu)
-> +#include <asm/cputype.h>
-> +#define raw_smp_processor_id() (*raw_cpu_ptr(&cpu_number))
+Cc: <stable@vger.kernel.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Christoffer Dall <cdall@kernel.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/arch_timer.c   | 2 +-
+ virt/kvm/arm/mmu.c          | 6 +++---
+ virt/kvm/arm/vgic/vgic-v2.c | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-It might be worth dragging the comment along from arm64, explaining why
-we must use *raw_cpu_ptr(), and not this_cpu_read(), etc.
-
-> --- a/arch/arm/kernel/topology.c
-> +++ b/arch/arm/kernel/topology.c
-> @@ -30,6 +30,9 @@
->  #include <asm/cputype.h>
->  #include <asm/topology.h>
->  
-> +DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
-> +EXPORT_PER_CPU_SYMBOL(cpu_number);
-
-Why not in smp.c, as with arm64?
-
-> +
->  /*
->   * cpu capacity scale management
->   */
-> @@ -310,6 +313,8 @@ void __init init_cpu_topology(void)
->  	for_each_possible_cpu(cpu) {
->  		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
->  
-> +		per_cpu(cpu_number, cpu) = cpu;
-
-Likewise, why isn't this in smp_prepare_cpus() in smp.c?
-
-This isn't toplogy related, so it would be better placed there.
-
-Thanks,
-Mark.
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 3945021510a9..282389eb204f 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -771,7 +771,7 @@ int kvm_timer_hyp_init(bool has_gic)
+ 		static_branch_enable(&has_gic_active_state);
+ 	}
+ 
+-	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
++	kvm_debug("virtual timer IRQ%d\n", host_vtimer_irq);
+ 
+ 	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
+ 			  "kvm/arm/timer:starting", kvm_timer_starting_cpu,
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index ec62d1cccab7..b960acdd0c05 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1810,9 +1810,9 @@ int kvm_mmu_init(void)
+ 	 */
+ 	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
+ 
+-	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
+-	kvm_info("HYP VA range: %lx:%lx\n",
+-		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
++	kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
++	kvm_debug("HYP VA range: %lx:%lx\n",
++		  kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
+ 
+ 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
+ 	    hyp_idmap_start <  kern_hyp_va(~0UL) &&
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index c32d7b93ffd1..e9d840a75e7b 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -410,7 +410,7 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 	kvm_vgic_global_state.type = VGIC_V2;
+ 	kvm_vgic_global_state.max_gic_vcpus = VGIC_V2_MAX_CPUS;
+ 
+-	kvm_info("vgic-v2@%llx\n", info->vctrl.start);
++	kvm_debug("vgic-v2@%llx\n", info->vctrl.start);
+ 
+ 	return 0;
+ out:
+-- 
+2.14.2
