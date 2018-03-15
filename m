@@ -1,35 +1,54 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:22 +0100
-Subject: [PATCH 20/60] arm: dts: kirkwood-ds212: use SPDX-License-Identifier
-In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
-References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-21-gregory.clement@bootlin.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Thu, 15 Mar 2018 17:55:16 +0100
+Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
+In-Reply-To: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
+References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
+Message-ID: <20180315165516.GA9519@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the recent trend for the license description
+On Tue, Mar 06, 2018 at 03:47:03PM +0000, Gabriel Matni wrote:
+> From: Gabriel Matni <gabriel.matni@exfo.com>
+> 
+> Fixes missing characters on kernel console at low baud rates (i.e.9600).
+> The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
+> that the transmitter holding register (THR) is ready to receive a new byte.
+> 
+> TX_EMP tells us when it is possible to send a break sequence via
+> SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+> empty, it does not guarantee that a new byte can be written just yet.
+> 
+> Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700 serial port")
+> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
+> Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
+> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
+> ---
+> drivers/tty/serial/mvebu-uart.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+> index a100e98259d7..f0df0640208e 100644
+> --- a/drivers/tty/serial/mvebu-uart.c
+> +++ b/drivers/tty/serial/mvebu-uart.c
+> @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+>    u32 val;
+> 
+>    readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+> -             (val & STAT_TX_EMP), 1, 10000);
+> +             (val & STAT_TX_RDY(port)), 1, 10000);
+> }
+> 
+> static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+> --
+> 2.7.4
 
-Cc: Ben Peddell <klightspeed@killerwolves.net>
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- arch/arm/boot/dts/kirkwood-ds212.dts | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Patch is corrupted and can not be applied :(
 
-diff --git a/arch/arm/boot/dts/kirkwood-ds212.dts b/arch/arm/boot/dts/kirkwood-ds212.dts
-index 7f32e7abffac..416bab50d170 100644
---- a/arch/arm/boot/dts/kirkwood-ds212.dts
-+++ b/arch/arm/boot/dts/kirkwood-ds212.dts
-@@ -1,10 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Andrew Lunn <andrew@lunn.ch>
-  * Ben Peddell <klightspeed@killerwolves.net>
-  *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-  */
- 
- /dts-v1/;
--- 
-2.16.1
+Please fix up and resend.
+
+Also be sure to cc: the linux-serial mailing list,
+scripts/get_maintainer.pl is your friend...
+
+thanks,
+
+greg k-h
