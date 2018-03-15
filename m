@@ -1,46 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 17:58:33 +0100
-Subject: [GIT PULL 4/6] i.MX device tree updates for 4.17
-In-Reply-To: <CAK8P3a3NXL_0z+Qm1O5Giz3SstGeHd1ghB320b6OSZPOeY1uuA@mail.gmail.com>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
- <1521113800-16401-4-git-send-email-shawnguo@kernel.org>
- <CAK8P3a3NXL_0z+Qm1O5Giz3SstGeHd1ghB320b6OSZPOeY1uuA@mail.gmail.com>
-Message-ID: <CAK8P3a09BjAnRWitNbfMFvPr7nwmqcVNi28VK1pRMUu0VUL90w@mail.gmail.com>
+From: afzal.mohd.ma@gmail.com (afzal mohammed)
+Date: Thu, 15 Mar 2018 22:36:06 +0530
+Subject: arm64: allwinner: Add support for TERES I laptop
+In-Reply-To: <20180312161050.7647-1-harald@ccbib.org>
+References: <20180312161050.7647-1-harald@ccbib.org>
+Message-ID: <20180315170606.GA3635@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 4:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
->>  - A bunch of patches from Fabio and Marco to fix DTC warnings seen with
->>    W=1 switch.
->>  - Add missing '#sound-dai-cells' for sgtl5000 codec which is complained
->>    by DTC.
+Hi,
 
-I still get a bunch of warnings in linux-next with your patches:
+On Mon, Mar 12, 2018 at 04:10:45PM +0000, Harald Geyer wrote:
+> This series adds support for the TERES I open hardware laptop produced
+> by olimex. With these patches and a bootloader capable of setting up
+> simple framebuffer the laptop is quite useable.
 
-arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dtb: Warning
-(chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-'stdout-path' instead
-arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dtb: Warning
-(chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-'stdout-path' instead
-arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dtb: Warning
-(chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-'stdout-path' instead
-arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dtb: Warning
-(chosen_node_stdout_path): /chosen:linux,stdout-path: Use
-'stdout-path' instead
-arch/arm/boot/dts/imx6ul-isiot-emmc.dtb: Warning (sound_dai_property):
-/sound/simple-audio-card,codec: Missing property '#sound-dai-cells' in
-node /soc/aips-bus at 2100000/i2c at 21a0000/codec at a or bad phandle
-(referred from sound-dai[0])
-arch/arm/boot/dts/imx6ul-isiot-nand.dtb: Warning (sound_dai_property):
-/sound/simple-audio-card,codec: Missing property '#sound-dai-cells' in
-node /soc/aips-bus at 2100000/i2c at 21a0000/codec at a or bad phandle
-(referred from sound-dai[0])
+Thanks for the patches
 
-I hoped that they would be fixed with the pull request, but something
-is still missing. Can you have another look? It should be related to
-the fixes you already have.
+w/ defconfig could reach to prompt via serial console using audio
+jack.
 
-       Arnd
+And just by enabling PWM_SUN4I & FB_SIMPLE, laptop could function
+standalone as well.
+
+Suggestions (feel free to ignore):
+
+1. seems currently only review comment pending is on simple
+framebuffer, perhaps you can proceed removing just that so that a
+basic bootable system can be achieved at the earliest (iiuc, anyway
+drm would be the final solution for display)
+
+2. in next revision (if), may be you can put keywords DIY and/or Open
+Hardware (irrespective of whatever exactly that means) Laptop in the
+subject itself, that might bring more interest/eyeballs, especially at
+this time of ME & so on.
+
+Regards
+afzal
