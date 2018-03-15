@@ -1,54 +1,66 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 15 Mar 2018 17:55:16 +0100
-Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
-In-Reply-To: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
-References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
-Message-ID: <20180315165516.GA9519@kroah.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Mar 2018 16:52:20 +0000
+Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
+ mitigation)
+In-Reply-To: <20180315164058.xmx3ap37o4gazptn@kamzik.brq.redhat.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180315155741.7syqjajb77kh5vx2@kamzik.brq.redhat.com>
+ <1a57727e-d4b8-f0e8-e910-ee1bc136ac0f@arm.com>
+ <20180315164058.xmx3ap37o4gazptn@kamzik.brq.redhat.com>
+Message-ID: <8bf3d76a-3811-c6f8-06f5-0ca40510baaa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 03:47:03PM +0000, Gabriel Matni wrote:
-> From: Gabriel Matni <gabriel.matni@exfo.com>
+On 15/03/18 16:40, Andrew Jones wrote:
+> On Thu, Mar 15, 2018 at 04:19:56PM +0000, Marc Zyngier wrote:
+>> On 15/03/18 15:57, Andrew Jones wrote:
+>>> On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
+>>>> Whilst KVM benefits from the kernel randomisation via KASLR, there is
+>>>> no additional randomisation when the kernel is running at EL1, as we
+>>>> directly use a fixed offset from the linear mapping. This is not
+>>>> necessarily a problem, but we could do a bit better by independently
+>>>> randomizing the HYP placement.
+>>>>
+>>>> This series proposes to randomise the offset by inserting a few random
+>>>> bits between the MSB of the RAM linear mapping and the top of the HYP
+>>>> VA (VA_BITS - 2). That's not a lot of random bits (on my Mustang, I
+>>>> get 13 bits), but that's better than nothing.
+>>>>
+>>>> In order to achieve this, we need to be able to patch dynamic values
+>>>> in the kernel text. This results in a bunch of changes to the
+>>>> alternative framework, the insn library, and a few more hacks in KVM
+>>>> itself (we get a new way to map the GIC at EL2).
+>>>>
+>>>> Another (and more recent) goal of this series is to work around what
+>>>> has been described as "variant 3a", which covers speculative reads of
+>>>> privileged system registers. Randomizing the location of the
+>>>> hypervisor would be pointless if one could simply obtain VBAR_EL2. In
+>>>> order to work around this, we place the vectors at a fairly static
+>>>> location (next to the idmap), independently of the hypervisor's own
+>>>> mappings. This ensures that we can leak VBAR_EL2 without disclosing
+>>>> much about HYP itself (and is similar to what the rest of the kernel
+>>>> does with KPTI). This is only enabled at runtime for Cortex-A57 and
+>>>> Cortex-A72.
+>>>>
+>>>> This has been tested on the FVP model, Seattle (both 39 and 48bit VA),
+>>>> Mustang and Thunder-X. I've also done a sanity check on 32bit (which
+>>>> is only impacted by the HYP IO VA stuff).
+>>>>
+>>>
+>>> I've smoke tested this series on a seattle with several busy VMs running
+>>> simultaneously. My host kernel configures 64K pages. I didn't see any
+>>> problems.
+>>
+>> Excellent, thanks for testing. Out of curiosity: do you have a firmware
+>> that implements the SMCCC_ARCH_WORKAROUND_1 call or not?
 > 
-> Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
-> that the transmitter holding register (THR) is ready to receive a new byte.
-> 
-> TX_EMP tells us when it is possible to send a break sequence via
-> SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-> empty, it does not guarantee that a new byte can be written just yet.
-> 
-> Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700 serial port")
-> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
-> Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
-> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
-> ---
-> drivers/tty/serial/mvebu-uart.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index a100e98259d7..f0df0640208e 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
->    u32 val;
-> 
->    readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-> -             (val & STAT_TX_EMP), 1, 10000);
-> +             (val & STAT_TX_RDY(port)), 1, 10000);
-> }
-> 
-> static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
-> --
-> 2.7.4
+> Unfortunately not, so I guess that means I was testing the
+> __kvm_bp_vect_base base with the __kvm_harden_el2_vector_slot slot.
 
-Patch is corrupted and can not be applied :(
+Indeed. That's a good data point nonetheless, and a good complement to
+my own setup where the workaround is implemented. Getting full coverage
+is pretty mind-boggling...
 
-Please fix up and resend.
-
-Also be sure to cc: the linux-serial mailing list,
-scripts/get_maintainer.pl is your friend...
-
-thanks,
-
-greg k-h
+	M.
+-- 
+Jazz is not dead. It just smells funny...
