@@ -1,65 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 Mar 2018 15:02:10 -0300
-Subject: [PATCH] ARM: dts: imx7: Move tempmon node out of bus
-Message-ID: <1521136930-14660-1-git-send-email-festevam@gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 15 Mar 2018 13:02:56 -0500
+Subject: [PATCH] ARM: davinci: DA8XX: fix oops in USB PHY driver due to stack
+ allocated platform platform_data
+Message-ID: <1521136976-32730-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+This fixes a possible kernel oops due to using stack allocated platform
+data for the USB PHY driver on DA8XX devices. If the platform device
+probe is deferred, then we get a corrupt pointer for the platform data.
 
-Move tempmon node from soc node to root node.
-    
-tempmon node does not have any register properties and thus
-shouldn't be placed on the bus.
-    
-This fixes the following build warning with W=1:
+We now use a global static struct for the platform data so that the
+platform data pointer does not get written over.
 
-arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30000000/tempmon missing or empty reg/ranges property
+Tested on OMAP-L138 LCDK board using legacy board file.
 
-Fixes: de25b9bb4a40 ("ARM: dts: imx7s: add temperature monitor support")
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Fixes: 9b504750923cb ("ARM: davinci: da8xx: Add USB PHY platform device")
+Signed-off-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/boot/dts/imx7s.dtsi | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ arch/arm/mach-davinci/usb-da8xx.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 4d42335..c9b56dc 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -173,6 +173,17 @@
- 		};
- 	};
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index b1e53e31..9ff9624 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -23,17 +23,20 @@
+ #define DA8XX_USB0_BASE		0x01e00000
+ #define DA8XX_USB1_BASE		0x01e25000
  
-+	tempmon: tempmon {
-+		compatible = "fsl,imx7d-tempmon";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+		fsl,tempmon =<&anatop>;
-+		nvmem-cells = <&tempmon_calib>,
-+			<&tempmon_temp_grade>;
-+		nvmem-cell-names = "calib", "temp_grade";
-+		clocks = <&clks IMX7D_PLL_SYS_MAIN_CLK>;
-+	};
++static struct da8xx_usb_phy_platform_data da8xx_usb_phy_pdata;
 +
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupt-parent = <&intc>;
-@@ -540,16 +551,6 @@
- 				};
- 			};
+ static struct platform_device da8xx_usb_phy = {
+ 	.name		= "da8xx-usb-phy",
+ 	.id		= -1,
++	.dev		= {
++		.platform_data	= &da8xx_usb_phy_pdata,
++	},
+ };
  
--			tempmon: tempmon {
--				compatible = "fsl,imx7d-tempmon";
--				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
--				fsl,tempmon =<&anatop>;
--				nvmem-cells = <&tempmon_calib>,
--					<&tempmon_temp_grade>;
--				nvmem-cell-names = "calib", "temp_grade";
--				clocks = <&clks IMX7D_PLL_SYS_MAIN_CLK>;
--			};
++
+ int __init da8xx_register_usb_phy(void)
+ {
+-	struct da8xx_usb_phy_platform_data pdata;
 -
- 			anatop: anatop at 30360000 {
- 				compatible = "fsl,imx7d-anatop", "fsl,imx6q-anatop",
- 					"syscon", "simple-bus";
+-	pdata.cfgchip = da8xx_get_cfgchip();
+-	da8xx_usb_phy.dev.platform_data = &pdata;
++	da8xx_usb_phy_pdata.cfgchip = da8xx_get_cfgchip();
+ 
+ 	return platform_device_register(&da8xx_usb_phy);
+ }
 -- 
 2.7.4
