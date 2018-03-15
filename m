@@ -1,33 +1,60 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 15 Mar 2018 07:12:34 -0700
-Subject: [PATCH v2 1/2] soc: imx: gpcv2: Do not pass static memory as
- platform data
-In-Reply-To: <20180315135225.GK26859@dragon>
-References: <20180122150748.1742-1-andrew.smirnov@gmail.com>
- <20180208064709.GB31910@dragon> <20180315030804.GI26859@dragon>
- <CAHQ1cqHdtN7xjmAcQvKDknnGKAP0pRgk6pcFrzOiSew9=Z9GQg@mail.gmail.com>
- <20180315135225.GK26859@dragon>
-Message-ID: <CAHQ1cqGh0gmgCcFmc-sx7FzumnsObgzJTWm40ExuVo_o8EwCZw@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 15 Mar 2018 16:17:25 +0200
+Subject: [PATCH v3 01/11] mmc: sdhci-omap: Fix when capabilities are
+ obtained from SDHCI_CAPABILITIES reg
+In-Reply-To: <20180307132020.30951-2-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <20180307132020.30951-2-kishon@ti.com>
+Message-ID: <e9ac3f68-2d75-6648-7774-786c20f6746c@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 6:52 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Thu, Mar 15, 2018 at 06:00:06AM -0700, Andrey Smirnov wrote:
->> I am slightly confused by your phrasing. Are you:
->>
->> a) saying that you dropped my patches in favor of your own that use
->> platform_device_add_data()
->>
->> or
->>
->> b) asking me to convert my patches to use platform_device_add_data()?
->>
->> Just trying to figure out if any action on my part is necessary.
->
-> Sorry for the blur.  I'm asking you to repost your patches with using
-> platform_device_add_data().  In other word, that's b).
+On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
+> sdhci_omap_config_iodelay_pinctrl_state() requires caps and caps2 to be
+> initialized (speed mode capabilities like UHS/HS200) before it is
+> invoked. While mmc_of_parse() initializes caps/caps2 if capabilities is
+> populated in device tree, it will remain uninitialized for capabilities
+> obtained from SDHCI_CAPABILITIES register.
+> Fix sdhci_omap_config_iodelay_pinctrl_state() to be used even while
+> getting the capabilities from SDHCI_CAPABILITIES register by invoking
+> sdhci_setup_host() before sdhci_omap_config_iodelay_pinctrl_state().
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/mmc/host/sdhci-omap.c | 14 +++++++++-----
+>  1 file changed, 9 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+> index 1456abd5eeb9..3cce30584d2f 100644
+> --- a/drivers/mmc/host/sdhci-omap.c
+> +++ b/drivers/mmc/host/sdhci-omap.c
+> @@ -916,10 +916,6 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+>  		goto err_put_sync;
+>  	}
+>  
+> -	ret = sdhci_omap_config_iodelay_pinctrl_state(omap_host);
+> -	if (ret)
+> -		goto err_put_sync;
+> -
+>  	host->mmc_host_ops.get_ro = mmc_gpio_get_ro;
+>  	host->mmc_host_ops.start_signal_voltage_switch =
+>  					sdhci_omap_start_signal_voltage_switch;
+> @@ -930,7 +926,15 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+>  	sdhci_read_caps(host);
+>  	host->caps |= SDHCI_CAN_DO_ADMA2;
+>  
+> -	ret = sdhci_add_host(host);
+> +	ret = sdhci_setup_host(host);
+> +	if (ret)
+> +		goto err_put_sync;
+> +
+> +	ret = sdhci_omap_config_iodelay_pinctrl_state(omap_host);
+> +	if (ret)
+> +		goto err_put_sync;
+> +
+> +	ret = __sdhci_add_host(host);
+>  	if (ret)
+>  		goto err_put_sync;
 
-OK, cool, will do.
-
-Thanks,
-Andrey Smirnov
+if __sdhci_add_host() fails, then sdhci_cleanup_host() needs to be called to
+free resources allocated by sdhci_setup_host().
