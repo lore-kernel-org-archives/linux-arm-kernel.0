@@ -1,75 +1,46 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:07:13 +0100
-Subject: [PATCH 32/36] arm: dts: armada-388-gp: use SPDX-License-Identifier
-In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
-References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-33-gregory.clement@bootlin.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2018 16:21:40 +0100
+Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.17
+In-Reply-To: <1521113800-16401-6-git-send-email-shawnguo@kernel.org>
+References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
+ <1521113800-16401-6-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAK8P3a2mUiAQRUZSvTwX=9ukEY6LWPTFqj=9WwWf2=OO3L-q7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the recent trend for the license description, and also fix the
-wrongly stated X11 to MIT.
+On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.17
+>
+> for you to fetch changes up to e3e583e7a293ae3fddfe010ed30d80046ba87c86:
+>
+>   ARM: mxs_defconfig: Re-sync defconfig (2018-03-08 16:46:11 +0800)
+>
+> ----------------------------------------------------------------
+> i.MX defconfig updates for 4.17:
+>  - Re-sync defconfig files by running savedefconfig.
 
-As already pointed on the DT ML, the X11 license text [1] is explicitly
-for the X Consortium and has a couple of extra clauses. The MIT
-license text [2] is actually what the current DT files claim.
+I didn't pull this one, it seems to remove some config symbols without
+an explanation what happened to them:
 
-[1] https://spdx.org/licenses/X11.html
-[2] https://spdx.org/licenses/MIT.html
+-CONFIG_FHANDLE=y
+-# CONFIG_ARM_THUMB is not set
+-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
+-# CONFIG_DEVKMEM is not set
+-CONFIG_NVMEM=y
+-CONFIG_LOCKUP_DETECTOR=y
+-CONFIG_TIMER_STATS=y
 
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- arch/arm/boot/dts/armada-388-gp.dts | 33 +--------------------------------
- 1 file changed, 1 insertion(+), 32 deletions(-)
+Can you have another look? I want to be sure that we don't
+accidentally turn off something important when the respective
+Kconfig symbol got renamed or it gained a dependency that
+is no longer met.
 
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 51b4ee6df130..9d873257ac45 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
- /*
-  * Device Tree file for Marvell Armada 385 development board
-  * (RD-88F6820-GP)
-@@ -5,38 +6,6 @@
-  * Copyright (C) 2014 Marvell
-  *
-  * Gregory CLEMENT <gregory.clement@free-electrons.com>
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is licensed under the terms of the GNU General Public
-- *     License version 2.  This program is licensed "as is" without
-- *     any warranty of any kind, whether express or implied.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
--- 
-2.16.1
+Thanks,
+
+         Arnd
