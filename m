@@ -1,9 +1,9 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:19 +0100
-Subject: [PATCH 17/60] arm: dts: kirkwood-ds112: use SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 17:50:21 +0100
+Subject: [PATCH 19/60] arm: dts: kirkwood-ds210: use SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-18-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-20-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,13 +12,13 @@ Follow the recent trend for the license description
 Cc: Ben Peddell <klightspeed@killerwolves.net>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-ds112.dts | 4 +---
+ arch/arm/boot/dts/kirkwood-ds210.dts | 4 +---
  1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-ds112.dts b/arch/arm/boot/dts/kirkwood-ds112.dts
-index 6cef4bdbc01b..f48609e95afe 100644
---- a/arch/arm/boot/dts/kirkwood-ds112.dts
-+++ b/arch/arm/boot/dts/kirkwood-ds112.dts
+diff --git a/arch/arm/boot/dts/kirkwood-ds210.dts b/arch/arm/boot/dts/kirkwood-ds210.dts
+index 2f1933efcac1..729f959a7838 100644
+--- a/arch/arm/boot/dts/kirkwood-ds210.dts
++++ b/arch/arm/boot/dts/kirkwood-ds210.dts
 @@ -1,10 +1,8 @@
 +// SPDX-License-Identifier: GPL-2.0
  /*
