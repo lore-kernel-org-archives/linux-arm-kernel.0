@@ -1,68 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 15 Mar 2018 11:46:16 +0000
-Subject: [PATCH v5 1/6] dt-bindings: add bindings for USB physical
- connector
-In-Reply-To: <12da0d00-9ab3-3752-793b-e487666f35a3@ti.com>
-References: <20180227071134.28063-1-a.hajda@samsung.com>
- <CGME20180227071138eucas1p17e1e16f13f6d3e3b15a57dc93eb8cf3f@eucas1p1.samsung.com>
- <20180227071134.28063-2-a.hajda@samsung.com>
- <ed0ce43c-3c81-b027-2eb1-30e49156c3ac@ti.com>
- <b588527d-2ca2-9e88-9e27-e09e5b52f8d6@samsung.com>
- <12da0d00-9ab3-3752-793b-e487666f35a3@ti.com>
-Message-ID: <1c3f8cde-4f9a-306f-b4f9-c0bdc76caf1f@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 15 Mar 2018 12:55:41 +0100
+Subject: [PATCH 0/4] ARM64: dts: meson: hhi syscon and clock controllers
+Message-ID: <20180315115545.1884-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/18 10:41, Roger Quadros wrote:
-[...]
->>>> @@ -0,0 +1,75 @@
->>>> +USB Connector
->>>> +=============
->>>> +
->>>> +USB connector node represents physical USB connector. It should be
->>>> +a child of USB interface controller.
->>>> +
->>>> +Required properties:
->>>> +- compatible: describes type of the connector, must be one of:
->>>> +    "usb-a-connector",
->>>> +    "usb-b-connector",
->>>> +    "usb-c-connector".
->>> compatible should be just "usb-connector"
->>>
->>> Type should be a property
->>>
->>> type: type of usb connector "A", "B", "AB", "C"
->>> AB is for dual-role connectors.
->>
->> I have proposed such property (and size also) in my first RFC [1]. Rod
->> did not like it :)
->>
->> [1]: https://marc.info/?l=devicetree&m=150660411515233&w=2
->>
-> 
-> This is what Rob says here https://patchwork.kernel.org/patch/9976043/
-> "We did "type" for hdmi-connector, but I think I'd really prefer
-> compatible be used to distinguish as least where it may matter to s/w.
-> In the HDMI case, they all are pretty much the same, just different
-> physical size."
-> 
-> So the question is. Does it matter to this particular software implementation
-> if it is type A,B,C connector?
-> If yes, how?
-> 
-> Type A will never have any alternate function. It is always dedicated to USB.
+The HHI register region provides more than just clocks. Several drivers may
+need to access this region, such as the clock controllers and the display
+driver.
 
-In USB spec terms, at least. In reality there are things like the cool 
-trick Rockchip SoCs do whereby they can expose the debug UART Rx/Tx 
-through the OTG port's D+/D- pins, and that is on a type A connector in 
-many products. I'm guessing that's probably beyond the scope of this 
-binding, though.
+Meson-gx clock controllers has been developed and merged before we knew the
+hhi could be needed elsewhere, which is why it requests the region directly.
+Meson-axg was built following the model of meson-gx.
 
-> Also does the size "full", "micro", "mini" matter to software?
+To fix this situation, the clock controller should be a child of the hhi
+system controllers. The hhi system controller node already exists on meson-gx.
+It needs to be added on the axg.
 
-If it means the user can look in sysfs to easily correlate logical ports 
-with physical connectors that's certainly handy (e.g. on something like 
-Odroid-XU where the two USB3 ports are brought out to an A and a 
-micro-AB connector respectively).
+This changeset depends on [0]. This dependency has been merged in
+clk-next. A topic branch is available here [1]
 
-Robin.
+[0]: https://lkml.kernel.org/r/20180212145846.19380-1-jbrunet at baylibre.com
+[1]: https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git/log/?h=clk-amlogic
+
+Jerome Brunet (4):
+  dt-bindings: clock: meson: update documentation with hhi syscon
+  ARM64: dts: meson-gx: sysctrl is the parent of the clock controller
+  ARM64: dts: meson-axg: use hhi syscon for the clock controller
+  ARM64: dts: meson-gx: fix gxl clock controller compatible
+
+ .../devicetree/bindings/clock/amlogic,gxbb-clkc.txt      | 16 +++++++++++-----
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi               | 12 ++++++++----
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi              |  5 ++---
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi               |  7 +++----
+ 4 files changed, 24 insertions(+), 16 deletions(-)
+
+-- 
+2.14.3
