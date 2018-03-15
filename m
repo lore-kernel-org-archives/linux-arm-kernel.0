@@ -1,33 +1,99 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 15 Mar 2018 19:35:06 +0100
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <CA+55aFy0+EP14zjnYh1x_Aw3y-wCp2COpw9D-OfmhA9YFfsQiA@mail.gmail.com>
-References: <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
- <CAKv+Gu-NfXm5YLWXAPsf6zycPs7Ti9qPLQ7FvpOrjdPz5hEP7Q@mail.gmail.com>
- <CACjP9X_xjyvQD_b1XNAZi=vjX0wGUmQuGJN8HahBmXx55OUE6A@mail.gmail.com>
- <CAKv+Gu8aVr_u4o8QR2Nquo9it54nSbvPMj4vcZ+CQa3uoOakrA@mail.gmail.com>
- <CACjP9X_bKJNeSwbPURmJ8bwDZ5BW2ZrykhT-cNapzKjddeWStQ@mail.gmail.com>
- <CAKv+Gu8dvCRUnS5KxDWa4GP2vMPo9cUWVNybx+tGY_Y8T67Uvw@mail.gmail.com>
- <CACjP9X9w-zruS8uj6j+ZRc7EUZ80MAwbvWOh=gRJZu7gAqU7hg@mail.gmail.com>
- <CAKv+Gu83VtB+ff6H88UMF9kiz5923U8tXhQoERdErYE4pQg94Q@mail.gmail.com>
- <20180315182110.GR23100@dhcp22.suse.cz>
- <CA+55aFy0+EP14zjnYh1x_Aw3y-wCp2COpw9D-OfmhA9YFfsQiA@mail.gmail.com>
-Message-ID: <20180315183506.GT23100@dhcp22.suse.cz>
+From: fkan@apm.com (Feng Kan)
+Date: Thu, 15 Mar 2018 11:41:33 -0700
+Subject: [PATCH V3] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <1520274579-30492-1-git-send-email-fkan@apm.com>
+References: <1520274579-30492-1-git-send-email-fkan@apm.com>
+Message-ID: <CAL85gmAAVoCCXoLH+c0ROSBy4mS3z86tnbX+7Avh5oGT=fHcfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 15-03-18 11:28:27, Linus Torvalds wrote:
-> On Thu, Mar 15, 2018 at 11:21 AM, Michal Hocko <mhocko@kernel.org> wrote:
-> >
-> > Well, pfn_valid says that a given pfn is backed by a real memory and it
-> > has a valid struct page backing it.
-> 
-> No, it really just says the latter. There should be a "struct page" for it.
-
-You are right! A simple example could be non volatile memory. That is
-certainly not RAM but it has pfn_valid memory. Sorry about the
-confusion.
--- 
-Michal Hocko
-SUSE Labs
+On Mon, Mar 5, 2018 at 10:29 AM, Feng Kan <fkan@apm.com> wrote:
+> When bridge and its endpoint is enumerated the devices are added to the
+> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+> This causes the bridge to be moved to the end of the dpm list when
+> deferred probe kicks in. The order of the dpm list for bridge and
+> endpoint is reversed.
+>
+> Add reordering code to move the bridge and its children and consumers to
+> the end of the pm list so the order for suspend and resume is not altered.
+> The code also move device and its children and consumers to the tail of
+> device_kset list if it is registered.
+>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Toan Le <toanle@apm.com>
+> ---
+>  V3:
+>         1. additional code comment changes
+>  V2:
+>         1. change patch title from "move device and its children..."
+>         2. move define based on Bjorn's comment
+>         3. rename function name and comment content
+>
+>  drivers/base/base.h |  3 +++
+>  drivers/base/core.c | 20 ++++++++++++++++++++
+>  drivers/base/dd.c   |  4 +---
+>  3 files changed, 24 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/base/base.h b/drivers/base/base.h
+> index d800de6..a75c302 100644
+> --- a/drivers/base/base.h
+> +++ b/drivers/base/base.h
+> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
+>  extern void device_links_no_driver(struct device *dev);
+>  extern bool device_links_busy(struct device *dev);
+>  extern void device_links_unbind_consumers(struct device *dev);
+> +
+> +/* device pm support */
+> +void device_pm_move_to_tail(struct device *dev);
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index 110230d..3b37906 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
+>  }
+>
+>  /**
+> + * device_pm_move_to_tail - Move set of devices to the end of device lists
+> + * @dev: current device pointer
+> + *
+> + * This is a device_reorder_to_tail() wrapper taking the requisite locks.
+> + *
+> + * It moves the device along with all of its children and all of its consumers
+> + * to the ends of the device_kset and dpm_list, recursively.
+> + */
+> +void device_pm_move_to_tail(struct device *dev)
+> +{
+> +       int idx;
+> +
+> +       idx = device_links_read_lock();
+> +       device_pm_lock();
+> +       device_reorder_to_tail(dev, NULL);
+> +       device_pm_unlock();
+> +       device_links_read_unlock(idx);
+> +}
+> +
+> +/**
+>   * device_link_add - Create a link between two devices.
+>   * @consumer: Consumer end of the link.
+>   * @supplier: Supplier end of the link.
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+> index 2c964f5..96fab29 100644
+> --- a/drivers/base/dd.c
+> +++ b/drivers/base/dd.c
+> @@ -123,9 +123,7 @@ static void deferred_probe_work_func(struct work_struct *work)
+>                  * the list is a good order for suspend but deferred
+>                  * probe makes that very unsafe.
+>                  */
+> -               device_pm_lock();
+> -               device_pm_move_last(dev);
+> -               device_pm_unlock();
+> +               device_pm_move_to_tail(dev);
+>
+>                 dev_dbg(dev, "Retrying from deferred list\n");
+>                 if (initcall_debug && !initcalls_done)
+> --
+> 1.8.3.1
+>
+Hi, just wanted to check if there is anything else I need to change on
+this. Thanks.
