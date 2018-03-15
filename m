@@ -1,69 +1,56 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 15 Mar 2018 16:34:28 +0200
-Subject: [PATCH v3 11/11] mmc: sdhci-omap: Add sdhci_omap specific ops for
- enable_sdio_irq
-In-Reply-To: <20180307132020.30951-12-kishon@ti.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <20180307132020.30951-12-kishon@ti.com>
-Message-ID: <bac91c3b-9e67-0686-002f-a8547321504d@intel.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 15 Mar 2018 14:38:27 +0000
+Subject: [PATCH v1 0/4] Fix issues with huge mapping in ioremap
+In-Reply-To: <9954bd28-0457-b80e-8af7-6259b63533f2@codeaurora.org>
+References: <1521017305-28518-1-git-send-email-cpandya@codeaurora.org>
+ <1521038277.2693.131.camel@hpe.com>
+ <9954bd28-0457-b80e-8af7-6259b63533f2@codeaurora.org>
+Message-ID: <1521124702.2693.145.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
-> Add sdhci_omap_enable_sdio_irq to set CTPL and CLKEXTFREE bits in
-> MMCHS_CON register required to detect asynchronous card interrupt
-> on DAT[1].
+On Thu, 2018-03-15 at 12:47 +0530, Chintan Pandya wrote:
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> On 3/14/2018 8:08 PM, Kani, Toshi wrote:
+> > On Wed, 2018-03-14 at 14:18 +0530, Chintan Pandya wrote:
+> > > Note: I was working on these patches for quite sometime
+> > > and realized that Toshi Kani has shared some patches
+> > > addressing the same isssue with subject
+> > > "[PATCH 0/2] fix memory leak / panic in ioremap huge pages".
+> > > I've taken slightly different approach here, so sending
+> > > to the list, finally.
+> > 
+> > Hi Chintan,
+> 
+> Hi Toshi
+> > 
+> > Do you have any issue in my patchset?  If so, can you please comment on
+> 
+> Not functional issues. But I didn't see issues you mentioned in your
+> commit text being solved for ARM64 in your patches. It is just being
+> masked which they were already by Will's patch. In my approach, end
+> goal was to get benefits of huge mapping back for ARM64.
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+Right, my patchset does not implement the fix for arm64.  The stub
+version is only a workaround and is meant to be replaced by the fix.
 
-> ---
->  drivers/mmc/host/sdhci-omap.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> > them?  It complicates the thing when you send a different approach
+> > without telling why a different approach is needed.  Your approach
 > 
-> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-> index 14dd51b51b41..8ceb3956b211 100644
-> --- a/drivers/mmc/host/sdhci-omap.c
-> +++ b/drivers/mmc/host/sdhci-omap.c
-> @@ -36,6 +36,7 @@
->  #define CON_DDR			BIT(19)
->  #define CON_CLKEXTFREE		BIT(16)
->  #define CON_PADEN		BIT(15)
-> +#define CON_CTPL		BIT(11)
->  #define CON_INIT		BIT(1)
->  #define CON_OD			BIT(0)
->  
-> @@ -226,6 +227,23 @@ static void sdhci_omap_conf_bus_power(struct sdhci_omap_host *omap_host,
->  	}
->  }
->  
-> +static void sdhci_omap_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> +{
-> +	struct sdhci_host *host = mmc_priv(mmc);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_omap_host *omap_host = sdhci_pltfm_priv(pltfm_host);
-> +	u32 reg;
-> +
-> +	reg = sdhci_omap_readl(omap_host, SDHCI_OMAP_CON);
-> +	if (enable)
-> +		reg |= (CON_CTPL | CON_CLKEXTFREE);
-> +	else
-> +		reg &= ~(CON_CTPL | CON_CLKEXTFREE);
-> +	sdhci_omap_writel(omap_host, SDHCI_OMAP_CON, reg);
-> +
-> +	sdhci_enable_sdio_irq(mmc, enable);
-> +}
-> +
->  static inline void sdhci_omap_set_dll(struct sdhci_omap_host *omap_host,
->  				      int count)
->  {
-> @@ -962,6 +980,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  	host->mmc_host_ops.set_ios = sdhci_omap_set_ios;
->  	host->mmc_host_ops.card_busy = sdhci_omap_card_busy;
->  	host->mmc_host_ops.execute_tuning = sdhci_omap_execute_tuning;
-> +	host->mmc_host_ops.enable_sdio_irq = sdhci_omap_enable_sdio_irq;
->  
->  	ret = sdhci_setup_host(host);
->  	if (ret)
+> See my reply above. I just had my original patches and I sent it.
 > 
+> > purges TLB after updating pmd/pud, which I think is broken.  Can you
+> 
+> Yes, they are broken. I understood the issues after Mark and Marc's
+> review comments.
+> 
+> > work on top of my patchset and properly implement pXd_free_pte_page()
+> 
+> I have realized that if I address Mark's comments, my new patch will
+> look similar to what you have done. So, I will work on top of your
+> patches.
+
+Sounds great.
+
+Thanks,
+-Toshi
