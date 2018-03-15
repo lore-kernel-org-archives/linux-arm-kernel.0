@@ -1,9 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:07:14 +0100
-Subject: [PATCH 33/36] arm: dts: armada-395-gp: use SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 16:07:11 +0100
+Subject: [PATCH 30/36] arm: dts: armada-385-turris-omnia: use
+ SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-34-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-31-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,25 +18,24 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Grzegorz Jaszczyk <jaz@semihalf.com>
+Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-395-gp.dts | 33 +--------------------------------
- 1 file changed, 1 insertion(+), 32 deletions(-)
+ arch/arm/boot/dts/armada-385-turris-omnia.dts | 35 +--------------------------
+ 1 file changed, 1 insertion(+), 34 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-395-gp.dts b/arch/arm/boot/dts/armada-395-gp.dts
-index ef491b524fd6..2a9de192b423 100644
---- a/arch/arm/boot/dts/armada-395-gp.dts
-+++ b/arch/arm/boot/dts/armada-395-gp.dts
-@@ -1,41 +1,10 @@
+diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+index 06831e1e3f80..768b6c5d2129 100644
+--- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
++++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
+@@ -1,43 +1,10 @@
 +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
  /*
-  * Device Tree file for Marvell Armada 395 GP board
+  * Device Tree file for the Turris Omnia
   *
-  * Copyright (C) 2016 Marvell
+  * Copyright (C) 2016 Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+  * Copyright (C) 2016 Tomas Hlavacek <tmshlvkc@gmail.com>
   *
-  * Grzegorz Jaszczyk <jaz@semihalf.com>
-- *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
@@ -67,8 +67,11 @@ index ef491b524fd6..2a9de192b423 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
+- */
+-
+-/*
+  * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
   */
  
- /dts-v1/;
 -- 
 2.16.1
