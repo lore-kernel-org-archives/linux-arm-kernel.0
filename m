@@ -1,32 +1,36 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Thu, 15 Mar 2018 14:27:10 +0000
-Subject: [PATCH v2 1/2] mm/vmalloc: Add interfaces to free unmapped page
- table
-In-Reply-To: <20180314153835.68e75da3fdc18b27ad0e290c@linux-foundation.org>
-References: <20180314180155.19492-1-toshi.kani@hpe.com>
- <20180314180155.19492-2-toshi.kani@hpe.com>
- <20180314153835.68e75da3fdc18b27ad0e290c@linux-foundation.org>
-Message-ID: <1521124026.2693.141.camel@hpe.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 15 Mar 2018 16:27:19 +0200
+Subject: [PATCH v3 04/11] mmc: sdhci-omap: Invoke sdhci_get_of_property to
+ read sdhci dt properties
+In-Reply-To: <20180307132020.30951-5-kishon@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <20180307132020.30951-5-kishon@ti.com>
+Message-ID: <e7c61727-0ff5-edb5-b3eb-679f07afbce6@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-03-14 at 15:38 -0700, Andrew Morton wrote:
-> On Wed, 14 Mar 2018 12:01:54 -0600 Toshi Kani <toshi.kani@hpe.com> wrote:
- :
+On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
+> Invoke sdhci_get_of_property defined in sdhci-pltfm.c to read
+> sdhci specific properties from dt node.
 > 
-> whoops.
-> 
-> --- a/include/asm-generic/pgtable.h~mm-vmalloc-add-interfaces-to-free-unmapped-page-table-fix
-> +++ a/include/asm-generic/pgtable.h
-> @@ -1014,7 +1014,7 @@ static inline int pud_free_pmd_page(pud_
->  {
->  	return 0;
->  }
-> -static inline int pmd_free_pte_page(pud_t *pmd)
-> +static inline int pmd_free_pte_page(pmd_t *pmd)
->  {
->  	return 0;
->  }
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Thanks Andrew for catching this!!
--Toshi
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+> ---
+>  drivers/mmc/host/sdhci-omap.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
+> index fbc20a4fbb23..314dbe4d7412 100644
+> --- a/drivers/mmc/host/sdhci-omap.c
+> +++ b/drivers/mmc/host/sdhci-omap.c
+> @@ -893,6 +893,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
+>  	host->ioaddr += offset;
+>  
+>  	mmc = host->mmc;
+> +	sdhci_get_of_property(pdev);
+>  	ret = mmc_of_parse(mmc);
+>  	if (ret)
+>  		goto err_pltfm_free;
+> 
