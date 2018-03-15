@@ -1,35 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 16:13:18 +0100
-Subject: [PATCH 1/2] ARM: imx: fix imx6sll-only build
-Message-ID: <20180315151345.3089601-1-arnd@arndb.de>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 15 Mar 2018 16:24:25 +0100
+Subject: [PATCH 01/52] mtd: rawnand: add hooks that may be called during
+ nand_scan()
+In-Reply-To: <20180302170400.6712-2-miquel.raynal@bootlin.com>
+References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
+ <20180302170400.6712-2-miquel.raynal@bootlin.com>
+Message-ID: <20180315162425.04b98745@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When selecting SOC_IMX6SLL but not SOC_IMX6SL, we get a link error:
+On Fri,  2 Mar 2018 18:03:09 +0100
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
-mach-imx6sl.c:(.init.text+0x14): undefined reference to `imx6sl_cpuidle_init'
+> In order to remove the limitation that forbids dynamic allocation in
+> nand_scan_ident(), we must create a path that will be the same for all
+> controller drivers. The idea is to use nand_scan() instead of the widely
+> implemented nand_scan_ident()/nand_scan_tail() couple. In order to
+> achieve this, controller drivers will need to adjust some parameters
+> between these two functions depending on the NAND chip wired on them.
+> 
+> For that, a hook called ->attach_chip() is created in the
+> nand_hw_control structure (called *controller in struct nand_chip) of
+> the NAND chip structure.
+> 
+> Another hook, ->detach_chip() is also introduced in order to clean the
+> controller driver's potential allocations in case of failure of
+> nand_scan_tail(). There is no need for the controller driver to call the
+> ->detach_chip() hook directly upon error after a successful nand_scan().  
+> In this situation, calling nand_release() as before is enough.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/mtd/nand/raw/nand_base.c | 21 +++++++++++++++++++--
+>  include/linux/mtd/rawnand.h      |  6 ++++++
+>  2 files changed, 25 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+> index ef0a44a8c3d5..182904b2fc07 100644
+> --- a/drivers/mtd/nand/raw/nand_base.c
+> +++ b/drivers/mtd/nand/raw/nand_base.c
+> @@ -6647,11 +6647,23 @@ EXPORT_SYMBOL(nand_scan_tail);
+>   */
+>  int nand_scan(struct mtd_info *mtd, int maxchips)
+>  {
+> +	struct nand_chip *chip = mtd_to_nand(mtd);
+>  	int ret;
+>  
+>  	ret = nand_scan_ident(mtd, maxchips, NULL);
+> -	if (!ret)
+> -		ret = nand_scan_tail(mtd);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (chip->ecc.attach_chip) {
+> +		ret = chip->ecc.attach_chip(chip);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	ret = nand_scan_tail(mtd);
+> +	if (ret && chip->ecc.detach_chip)
+> +		chip->ecc.detach_chip(chip);
+> +
+>  	return ret;
+>  }
+>  EXPORT_SYMBOL(nand_scan);
+> @@ -6679,7 +6691,12 @@ void nand_cleanup(struct nand_chip *chip)
+>  
+>  	/* Free manufacturer priv data. */
+>  	nand_manufacturer_cleanup(chip);
+> +
+> +	/* Free controller specific allocations after chip identification */
+> +	if (chip->ecc.detach_chip)
+> +		chip->ecc.detach_chip(chip);
+>  }
+> +
+>  EXPORT_SYMBOL_GPL(nand_cleanup);
+>  
+>  /**
+> diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
+> index 348f2aba0b9e..53bb6ef1a7c2 100644
+> --- a/include/linux/mtd/rawnand.h
+> +++ b/include/linux/mtd/rawnand.h
+> @@ -576,6 +576,10 @@ static const struct nand_ecc_caps __name = {			\
+>   * @read_oob_raw:	function to read chip OOB data without ECC
+>   * @read_oob:	function to read chip OOB data
+>   * @write_oob:	function to write chip OOB data
+> + * @attach_chip:	Callback that may be called between nand_detec() and
+> + *			nand_scan_tail() during nand_scan() (optional).
+> + * @detach_chip:	Callback that may be called if nand_scan_tail() fails
+> + *			(optional).
+>   */
+>  struct nand_ecc_ctrl {
+>  	nand_ecc_modes_t mode;
+> @@ -616,6 +620,8 @@ struct nand_ecc_ctrl {
+>  	int (*read_oob)(struct mtd_info *mtd, struct nand_chip *chip, int page);
+>  	int (*write_oob)(struct mtd_info *mtd, struct nand_chip *chip,
+>  			int page);
+> +	int (*attach_chip)(struct nand_chip *chip);
+> +	void (*detach_chip)(struct nand_chip *chip);
 
-This adds the missing line to the Makefile to also build the cpuidle
-support that we need here.
+As said in my reply to the cover letter, I'd prefer to have these hooks
+in nand_hw_ctrl.
 
-Fixes: dee5dee2a5b2 ("ARM: imx: Add basic msl support for imx6sll")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-imx/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+>  };
+>  
+>  /**
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 78fa86aedf34..2327e3e876d8 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -26,6 +26,7 @@ ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_SOC_IMX5) += cpuidle-imx5.o
- obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
- obj-$(CONFIG_SOC_IMX6SL) += cpuidle-imx6sl.o
-+obj-$(CONFIG_SOC_IMX6SLL) += cpuidle-imx6sl.o
- obj-$(CONFIG_SOC_IMX6SX) += cpuidle-imx6sx.o
- obj-$(CONFIG_SOC_IMX6UL) += cpuidle-imx6sx.o
- endif
+
+
 -- 
-2.9.0
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
