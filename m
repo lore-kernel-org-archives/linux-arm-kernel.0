@@ -1,36 +1,33 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:56 +0100
-Subject: [PATCH 54/60] arm: dts: kirkwood-ts419-6281: use
- SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 17:50:24 +0100
+Subject: [PATCH 22/60] arm: dts: kirkwood-ds409: use SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-55-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-23-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Follow the recent trend for the license description
 
-Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Ben Peddell <klightspeed@killerwolves.net>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-ts419-6281.dts | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/boot/dts/kirkwood-ds409.dts | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-ts419-6281.dts b/arch/arm/boot/dts/kirkwood-ts419-6281.dts
-index aa22aa862857..4a42ebcca4f0 100644
---- a/arch/arm/boot/dts/kirkwood-ts419-6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-ts419-6281.dts
-@@ -1,12 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0+
+diff --git a/arch/arm/boot/dts/kirkwood-ds409.dts b/arch/arm/boot/dts/kirkwood-ds409.dts
+index e80a962ebba0..a8650f9e3eb7 100644
+--- a/arch/arm/boot/dts/kirkwood-ds409.dts
++++ b/arch/arm/boot/dts/kirkwood-ds409.dts
+@@ -1,10 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
  /*
-  * Device Tree file for QNAP TS41X with 6281 SoC
+  * Andrew Lunn <andrew@lunn.ch>
+  * Ben Peddell <klightspeed@killerwolves.net>
   *
-  * Copyright (C) 2013, Andrew Lunn <andrew@lunn.ch>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version
-- * 2 of the License, or (at your option) any later version.
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
   */
  
  /dts-v1/;
