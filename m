@@ -1,77 +1,87 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 16 Mar 2018 08:38:34 +1100
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <CAK8P3a2-fUi0nnsLVJ6h_UuJCgwoNs2OEroYed2ofLd=FiPG0g@mail.gmail.com>
-References: <20180316075629.019b6560@canb.auug.org.au>
- <CAK8P3a2-fUi0nnsLVJ6h_UuJCgwoNs2OEroYed2ofLd=FiPG0g@mail.gmail.com>
-Message-ID: <20180316083834.3aa0c438@canb.auug.org.au>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 15 Mar 2018 15:49:48 -0600
+Subject: coresight dummy funnel question
+In-Reply-To: <CAHrpEqQeJdZG8CNN5728B7E6fE7PEZ08S=Ka8FtXKsftu+JMyQ@mail.gmail.com>
+References: <CAHrpEqRwwMRUBGa_BYasiondhQALZtMcZC8tUfUYyuQMN47uoQ@mail.gmail.com>
+ <CANLsYkzdGSbSSXsCDGUzbYNKHKy7YiWft5JdT5b3RN+aqn+nGQ@mail.gmail.com>
+ <CAHrpEqQ8OHKB3gbE6tB0hg-Hz9SCU+wCWsk7QgRwcembvH9aFQ@mail.gmail.com>
+ <CANLsYkxsratEdiQaRO14hNrzWoQ1LKfWWjjieeeDJ6y=mnGedQ@mail.gmail.com>
+ <CAHrpEqQeJdZG8CNN5728B7E6fE7PEZ08S=Ka8FtXKsftu+JMyQ@mail.gmail.com>
+Message-ID: <CANLsYkx0PqmBJgAFuBxAzCZxrREo9sfA2CCo1OjMDRPpySxCDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Thu, 15 Mar 2018 22:06:29 +0100 Arnd Bergmann <arnd@arndb.de> wrote:
+On 15 March 2018 at 13:06, Zhi Li <lznuaa@gmail.com> wrote:
+> On Thu, Mar 15, 2018 at 10:46 AM, Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
+>> On 9 March 2018 at 15:07, Zhi Li <lznuaa@gmail.com> wrote:
+>>> On Fri, Mar 9, 2018 at 12:03 PM, Mathieu Poirier
+>>> <mathieu.poirier@linaro.org> wrote:
+>>>> Hi Zhi,
+>>>>
+>>>> On 7 March 2018 at 08:57, Zhi Li <lznuaa@gmail.com> wrote:
+>>>>> Mathieu:
+>>>>>
+>>>>>            I am working one enable coresight in our SOC.
+>>>>>
+>>>>>            But our SOC's cluster funnel have not export program interface.
+>>>>>            Our cluster included 4 A53.
+>>>>>
+>>>>>            4 ETM of A53 connect to funnel, which have NOT program
+>>>>> interface. Funnel is default enabled.
+>>>>>
+>>>>>            Do you have suggest how to bypass or use dummy funnel in dts file?
+>>>>
+>>>> Is the funnel discoverable on the AMBA bus or is it like the original
+>>>> version of replicators?
+>>>
+>>> No, No any program interface at all. Look like replicators
+>>
+>> The best way to proceed is probably to allow entry in the funnel
+>> driver from the platform bus as well.  There is a very good example
+>> here [1].
 >
-> What script do you use to find those? I guess I should check for
-> missing signoffs as well when pulling a branch.
+> But our funnel have not export register program interface.
+> Do I use a dummy funnel driver for that?
 
-See below.  You can give it any commit range you would give e.g. gitk.
-I run this using he ranges reported by the "git fetch" for each tree
-each day.
--- 
-Cheers,
-Stephen Rothwell
+Exactly
 
-#!/bin/bash
+>
+> static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+>    base = devm_ioremap_resource(dev, res);
+>         if (IS_ERR(base))
+>                 return PTR_ERR(base);
+>
+>
+> Allowed base is null.
+>
+> check drvdata->base in funnel_enable()
+> if(drvdata->base )
+>             funnel_enable_hw(drvdata, inport);
 
-if [ "$#" -lt 1 ]; then
-	printf "Usage: %s <commit range>\n", "$0" 1>&2
-	exit 1
-fi
+Please look at what is being done for the replicators and enact the
+same for your new funnel.  Looking at the code I think it will be
+cleaner to keep the probe routines for the platform driver and AMBA
+driver separate.
 
-commits=$(git rev-list --no-merges "$@")
-if [ -z "$commits" ]; then
-	printf "No commits\n"
-	exit 0
-fi
-
-for c in $commits; do
-	ae=$(git log -1 --format='%ae' "$c")
-	aE=$(git log -1 --format='%aE' "$c")
-	an=$(git log -1 --format='%an' "$c")
-	aN=$(git log -1 --format='%aN' "$c")
-	ce=$(git log -1 --format='%ce' "$c")
-	cE=$(git log -1 --format='%cE' "$c")
-	cn=$(git log -1 --format='%cn' "$c")
-	cN=$(git log -1 --format='%cN' "$c")
-	sob=$(git log -1 --format='%b' "$c" | grep -i '^[[:space:]]*Signed-off-by:')
-
-	am=false
-	cm=false
-	grep -i -q "<$ae>" <<<"$sob" ||
-		grep -i -q "<$aE>" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$an[[:space:]]*<" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$aN[[:space:]]*<" <<<"$sob" ||
-		am=true
-	grep -i -q "<$ce>" <<<"$sob" ||
-		grep -i -q "<$cE>" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$cn[[:space:]]*<" <<<"$sob" ||
-		grep -i -q ":[[:space:]]*$cN[[:space:]]*<" <<<"$sob" ||
-		cm=true
-
-	if "$am" || "$cm"; then
-		printf "Commit %s\n" "$c"
-		"$am" && printf "\tauthor SOB missing\n"
-		"$cm" && printf "\tcommitter SOB missing\n"
-		printf "%s %s\n%s\n" "$ae" "$ce" "$sob"
-	fi
-done
-
-exec gitk "$@"
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180316/996e9229/attachment.sig>
+>
+> Is it okay overall?
+>
+> best regards
+> Frank Li
+>
+>>
+>> Thanks,
+>> Mathieu
+>>
+>> [1]. https://elixir.bootlin.com/linux/v4.16-rc5/source/drivers/tty/serial/amba-pl011.c
+>>
+>>>
+>>> best regards
+>>> Frank Li
+>>>
+>>>>
+>>>>>
+>>>>>
+>>>>> best regards
+>>>>> Frank Li
