@@ -1,95 +1,68 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Mar 2018 19:41:33 +0800
-Subject: [PATCH 5/8] drm/sun4i: Add driver support for A80 display pipeline
-In-Reply-To: <20180315114136.24747-1-wens@csie.org>
-References: <20180315114136.24747-1-wens@csie.org>
-Message-ID: <20180315114136.24747-6-wens@csie.org>
+Date: Thu, 15 Mar 2018 19:41:28 +0800
+Subject: [PATCH 0/8] ARM: sun9i: a80: Add display support
+Message-ID: <20180315114136.24747-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the compatible strings of the A80 display
-pipeline.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/gpu/drm/sun4i/sun4i_backend.c |  7 +++++++
- drivers/gpu/drm/sun4i/sun4i_drv.c     | 12 ++++++++++--
- drivers/gpu/drm/sun4i/sun6i_drc.c     |  1 +
- 3 files changed, 18 insertions(+), 2 deletions(-)
+This series adds basic support for the display pipelines found on the
+Allwinner A80 SoC. Currently only parallel RGB output via TCON0 is
+supported. TCON1 drives the HDMI encoder, which I've not been able to
+get working yet.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 092ade4ff6a5..ed36240048d5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -793,6 +793,9 @@ static const struct sun4i_backend_quirks sun7i_backend_quirks = {
- static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
- };
- 
-+static const struct sun4i_backend_quirks sun9i_backend_quirks = {
-+};
-+
- static const struct of_device_id sun4i_backend_of_table[] = {
- 	{
- 		.compatible = "allwinner,sun4i-a10-display-backend",
-@@ -814,6 +817,10 @@ static const struct of_device_id sun4i_backend_of_table[] = {
- 		.compatible = "allwinner,sun8i-a33-display-backend",
- 		.data = &sun8i_a33_backend_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun9i-a80-display-backend",
-+		.data = &sun9i_backend_quirks,
-+	},
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_backend_of_table);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index a0f43b81c64c..7f0705ef9f4e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -176,7 +176,13 @@ static bool sun4i_drv_node_is_frontend(struct device_node *node)
- 		of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun7i-a20-display-frontend") ||
--		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
-+		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend") ||
-+		of_device_is_compatible(node, "allwinner,sun9i-a80-display-frontend");
-+}
-+
-+static bool sun4i_drv_node_is_deu(struct device_node *node)
-+{
-+	return of_device_is_compatible(node, "allwinner,sun9i-a80-deu");
- }
- 
- static bool sun4i_drv_node_is_supported_frontend(struct device_node *node)
-@@ -257,7 +263,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 	 * enabled frontend supported by the driver, we add it to our
- 	 * component list.
- 	 */
--	if (!sun4i_drv_node_is_frontend(node) ||
-+	if (!(sun4i_drv_node_is_frontend(node) ||
-+	      sun4i_drv_node_is_deu(node)) ||
- 	    (sun4i_drv_node_is_supported_frontend(node) &&
- 	     of_device_is_available(node))) {
- 		/* Add current component */
-@@ -361,6 +368,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
- 	{ .compatible = "allwinner,sun8i-h3-display-engine" },
- 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
-+	{ .compatible = "allwinner,sun9i-a80-display-engine" },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_drv_of_table);
-diff --git a/drivers/gpu/drm/sun4i/sun6i_drc.c b/drivers/gpu/drm/sun4i/sun6i_drc.c
-index 09bba853e2a4..b5e071a49045 100644
---- a/drivers/gpu/drm/sun4i/sun6i_drc.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_drc.c
-@@ -101,6 +101,7 @@ static const struct of_device_id sun6i_drc_of_table[] = {
- 	{ .compatible = "allwinner,sun6i-a31-drc" },
- 	{ .compatible = "allwinner,sun6i-a31s-drc" },
- 	{ .compatible = "allwinner,sun8i-a33-drc" },
-+	{ .compatible = "allwinner,sun9i-a80-drc" },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun6i_drc_of_table);
+Patch 1 adds device tree bindings for the TCONs on the A80. In
+particular, TCON0 requires the eDP reset control in addition to its own.
+
+Patch 2 adds a device tree binding for the Detail Enhancement Unit found
+only on the A80.
+
+Patch 3 adds driver support for the TCONs.
+
+Patch 4 adds compatible strings to the device tree bindings for all the 
+remaining peripherals covered by this series.
+
+Patch 5 adds support for the compatible strings from the previous patch
+to the sun4i-drm driver.
+
+Patch 6 adds the display pipeline device nodes to the A80 .dtsi file.
+
+Patch 7 adds a pinmux setting for RGB888 output for TCON0.
+
+Patch 8 enables VGA output on the Cubieboard4 via an external DAC and
+an I2C bus from the SoC for DDC.
+
+
+I've had these patches for quite some time now, rebasing them as more
+features were added to sun4i-drm. Please have a look.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (8):
+  drm/sun4i: Add compatible strings for A80 TCONs
+  drm/sun4i: Add DT binding for Detail Enhancement Unit in Allwinner A80
+    SoC
+  drm/sun4i: Add support for A80 TCONs
+  drm/sun4i: Add compatible strings for the A80 display pipeline
+  drm/sun4i: Add driver support for A80 display pipeline
+  ARM: dts: sun9i: Add device nodes for documented display pipelines for
+    A80
+  ARM: dts: sun9i: Add pinmux settings for LCD0 RGB888 output.
+  ARM: dts: sun9i: cubieboard4: Enable VGA display output
+
+ .../bindings/display/sunxi/sun4i-drm.txt           |  39 +-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        |  68 ++++
+ arch/arm/boot/dts/sun9i-a80.dtsi                   | 392 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_backend.c              |   7 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |  12 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  27 ++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   1 +
+ drivers/gpu/drm/sun4i/sun6i_drc.c                  |   1 +
+ 8 files changed, 541 insertions(+), 6 deletions(-)
+
 -- 
 2.16.2
