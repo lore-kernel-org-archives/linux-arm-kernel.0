@@ -1,201 +1,29 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 15 Mar 2018 23:54:55 +0900
-Subject: [PATCH] ARM: dts: uniphier: add sound node for UniPhier PXs2
-In-Reply-To: <20180314052658.6244-1-suzuki.katsuhiro@socionext.com>
-References: <20180314052658.6244-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNASMNpC1BzFTi3rQe2bVPaFwb3gjCdKBPGnM9OpCD48Q9g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2018 15:56:28 +0100
+Subject: [GIT PULL] ARM: aspeed: dts changes for 4.17
+In-Reply-To: <CACPK8Xfv2XnhGo9cmJC69suOu9+caOp5QoXuD5Xw-gznGP61Og@mail.gmail.com>
+References: <CACPK8Xfv2XnhGo9cmJC69suOu9+caOp5QoXuD5Xw-gznGP61Og@mail.gmail.com>
+Message-ID: <CAK8P3a1DiNgdLhAYKf2gjHCzW_6v8Kv9FNHXZ8KeBti8hycVuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-14 14:26 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> This patch adds audio controller, external codec and simple card node
-> of UniPhier AIO sound system for PXs2 SoCs.
+On Thu, Mar 15, 2018 at 7:42 AM, Joel Stanley <joel@jms.id.au> wrote:
+> ASPEED device tree updates for 4.17
 >
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
+> Updates to OpenPower BMC systems:
+>
+>  A number of updates to use recently merged drivers, including moving to
+>  upstreamed IPMI BT nodes, a temp sensor for Romulus, and adding
+>  simple-reset for UARTs.
+>
+>  This includes more of Palmetto's device tree, so that it's ever so
+>  close to booting the host with an upstream kernel.
+>
+> New machines:
+>
+>  Add Qualcomm Centriq ARM64 server reference platform, which will run
+>  OpenBMC on an AST2500.
 
+Pulled into next/dt, thanks!
 
-Applied to linux-uniphier. Thanks!
-
-
->  arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 24 +++++++++++++
->  arch/arm/boot/dts/uniphier-pxs2-vodka.dts  | 37 ++++++++++++++++++++
->  arch/arm/boot/dts/uniphier-pxs2.dtsi       | 54 ++++++++++++++++++++++++++++++
->  3 files changed, 115 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-> index d09acb8e59a1..782962749bbf 100644
-> --- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-> +++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
-> @@ -34,6 +34,12 @@
->                 device_type = "memory";
->                 reg = <0x80000000 0x80000000>;
->         };
-> +
-> +       sound {
-> +               compatible = "audio-graph-card";
-> +               label = "UniPhier PXs2";
-> +               dais = <&i2s_port2>;
-> +       };
->  };
->
->  &serial2 {
-> @@ -52,6 +58,19 @@
->
->  &i2c2 {
->         status = "okay";
-> +
-> +       wm8960 at 1a {
-> +               compatible = "wlf,wm8960";
-> +               reg = <0x1a>;
-> +               #sound-dai-cells = <0>;
-> +
-> +               port at 0 {
-> +                       wm_speaker: endpoint {
-> +                               dai-format = "i2s";
-> +                               remote-endpoint = <&i2s_aux>;
-> +                       };
-> +               };
-> +       };
->  };
->
->  &eth {
-> @@ -64,3 +83,8 @@
->                 reg = <1>;
->         };
->  };
-> +
-> +&i2s_aux {
-> +       dai-format = "i2s";
-> +       remote-endpoint = <&wm_speaker>;
-> +};
-> diff --git a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-> index 6f13a25b935f..33bcd98c8653 100644
-> --- a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-> +++ b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
-> @@ -32,6 +32,35 @@
->                 device_type = "memory";
->                 reg = <0x80000000 0x80000000>;
->         };
-> +
-> +       sound {
-> +               compatible = "audio-graph-card";
-> +               label = "UniPhier PXs2";
-> +               dais = <&spdif_port0
-> +                       &comp_spdif_port0>;
-> +       };
-> +
-> +       spdif-out {
-> +               compatible = "linux,spdif-dit";
-> +               #sound-dai-cells = <0>;
-> +
-> +               port at 0 {
-> +                       spdif_tx: endpoint {
-> +                               remote-endpoint = <&spdif_hiecout1>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       comp-spdif-out {
-> +               compatible = "linux,spdif-dit";
-> +               #sound-dai-cells = <0>;
-> +
-> +               port at 0 {
-> +                       comp_spdif_tx: endpoint {
-> +                               remote-endpoint = <&comp_spdif_hiecout1>;
-> +                       };
-> +               };
-> +       };
->  };
->
->  &serial2 {
-> @@ -52,3 +81,11 @@
->                 reg = <1>;
->         };
->  };
-> +
-> +&spdif_hiecout1 {
-> +       remote-endpoint = <&spdif_tx>;
-> +};
-> +
-> +&comp_spdif_hiecout1 {
-> +       remote-endpoint = <&comp_spdif_tx>;
-> +};
-> diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> index 18f336e64036..d64ca9d0aef1 100644
-> --- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> +++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> @@ -227,6 +227,60 @@
->                                                      <21 217 3>;
->                 };
->
-> +               audio at 56000000 {
-> +                       compatible = "socionext,uniphier-pxs2-aio";
-> +                       reg = <0x56000000 0x80000>;
-> +                       interrupts = <0 144 4>;
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&pinctrl_ain1>,
-> +                                   <&pinctrl_ain2>,
-> +                                   <&pinctrl_ainiec1>,
-> +                                   <&pinctrl_aout2>,
-> +                                   <&pinctrl_aout3>,
-> +                                   <&pinctrl_aoutiec1>,
-> +                                   <&pinctrl_aoutiec2>;
-> +                       clock-names = "aio";
-> +                       clocks = <&sys_clk 40>;
-> +                       reset-names = "aio";
-> +                       resets = <&sys_rst 40>;
-> +                       #sound-dai-cells = <1>;
-> +
-> +                       i2s_port0: port at 0 {
-> +                               i2s_hdmi: endpoint {
-> +                               };
-> +                       };
-> +
-> +                       i2s_port1: port at 1 {
-> +                               i2s_line: endpoint {
-> +                               };
-> +                       };
-> +
-> +                       i2s_port2: port at 2 {
-> +                               i2s_aux: endpoint {
-> +                               };
-> +                       };
-> +
-> +                       spdif_port0: port at 3 {
-> +                               spdif_hiecout1: endpoint {
-> +                               };
-> +                       };
-> +
-> +                       spdif_port1: port at 4 {
-> +                               spdif_iecout1: endpoint {
-> +                               };
-> +                       };
-> +
-> +                       comp_spdif_port0: port at 5 {
-> +                               comp_spdif_hiecout1: endpoint {
-> +                               };
-> +                       };
-> +
-> +                       comp_spdif_port1: port at 6 {
-> +                               comp_spdif_iecout1: endpoint {
-> +                               };
-> +                       };
-> +               };
-> +
->                 i2c0: i2c at 58780000 {
->                         compatible = "socionext,uniphier-fi2c";
->                         status = "disabled";
-> --
-> 2.16.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+        Arnd
