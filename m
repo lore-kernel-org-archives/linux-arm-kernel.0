@@ -1,79 +1,132 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 15 Mar 2018 15:32:30 +0530
-Subject: [PATCH v3 00/11] mmc: sdhci-omap: Add UHS/HS200 mode support
-In-Reply-To: <1b7e25b2-4949-5427-1c36-0b253c79ff8d@intel.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <CAPDyKFrnPQs3B2QN7tf3UH0JYjqkpS1YDhq0s3scads3exPCCg@mail.gmail.com>
- <1b7e25b2-4949-5427-1c36-0b253c79ff8d@intel.com>
-Message-ID: <d6009c30-112f-eff9-4afe-5dd4c3a61baa@ti.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 15 Mar 2018 11:04:11 +0100
+Subject: [PATCH v2 8/8] mmc: sunxi: Add runtime_pm support
+In-Reply-To: <CAPDyKFoJ0KftG1VxzdM97ubFJ25M+X0EjgOPc6HxewgyZMPipg@mail.gmail.com>
+References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
+ <052c21c000f64c28fd6b64c4db11e4b706bebf79.1520520655.git-series.maxime.ripard@bootlin.com>
+ <CAPDyKFoJ0KftG1VxzdM97ubFJ25M+X0EjgOPc6HxewgyZMPipg@mail.gmail.com>
+Message-ID: <20180315100411.iqcnwqws623ws6yn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulf,
 
-
-On Thursday 15 March 2018 02:22 PM, Adrian Hunter wrote:
-> On 15/03/18 10:47, Ulf Hansson wrote:
->> On 7 March 2018 at 14:20, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Add UHS/HS200 mode support in sdhci-omap. The programming sequence
->>> for voltage switching, tuning is followed from AM572x TRM
->>> http://www.ti.com/lit/ug/spruhz6i/spruhz6i.pdf
->>> (Similar to all AM57x/DRA7x SoCs). The patch series also implements
->>> workaround for errata published in
->>> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
->>>
->>> patches are created on top of
->>> git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
->>>
->>> Patches in v2 already applied to mmc -next are dropped from the
->>> series.
->>>
->>> Changes from v2:
->>> *) Changed SW timeout logic as per Adrians's suggestion
->>> *) Validated SDIO with the current patches (added a couple of fixes
->>>    found while adding SDIO support).
->>> *) Used soc_device_match() instead of pdata-quirks as per Tony's
->>>    suggestions.
->>>
->>> Changes from v1:
->>> *) Only poll on DAT0 and DATI for card_busy status
->>> *) Cleanup iodelay patch as suggested by Tony.
->>> *) Added quirk to disable HW timeout
->>> *) Use the existing data timer but program a relatively accurate
->>>    SW timeout value (Impacts all platforms)
->>> *) Fix a bug in sdhci which was using data_timer for non data line
->>>    commands
->>>
->>> Kishon Vijay Abraham I (11):
->>>   mmc: sdhci-omap: Fix when capabilities are obtained from
->>>     SDHCI_CAPABILITIES reg
->>>   mmc: sdhci-omap: Remove setting ADMA capability in driver
->>>   mmc: sdhci-omap: Workaround for Errata i843
->>>   mmc: sdhci-omap: Invoke sdhci_get_of_property to read sdhci dt
->>>     properties
->>>   mmc: sdhci: Disable HS200 mode if controller can't support 1.8v
->>>   mmc: sdhci: Add quirk to disable HW timeout
->>>   mmc: sdhci: Program a relatively accurate SW timeout value
->>>   mmc: sdhci-omap: Workaround for Errata i834
->>>   dt-bindings: sdhci-omap: Add K2G specific binding
->>>   mmc: sdhci-omap: Add support for MMC/SD controller in k2g SoC
->>>   mmc: sdhci-omap: Add sdhci_omap specific ops for enable_sdio_irq
->>>
->>>  .../devicetree/bindings/mmc/sdhci-omap.txt         |  2 +
->>>  drivers/mmc/host/sdhci-omap.c                      | 78 +++++++++++++++++++---
->>>  drivers/mmc/host/sdhci.c                           | 75 +++++++++++++++++----
->>>  drivers/mmc/host/sdhci.h                           | 15 +++++
->>>  4 files changed, 148 insertions(+), 22 deletions(-)
->>>
->>> --
->>> 2.11.0
->>>
->>
->> Overall this looks good to me, however it seems like we need to give
->> Adrian a little more time to comment.
->>
+On Thu, Mar 15, 2018 at 10:30:54AM +0100, Ulf Hansson wrote:
+> On 8 March 2018 at 15:52, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > So far, even if our card was not in use, we didn't shut down our main
+> > clock, which meant that it was still output on the MMC bus.
+> >
+> > While this obviously means that we could save some power there, it also
+> > created issues when it comes with EMC control since we'll have a perfect
+> > peak at the card clock rate.
+> >
+> > Let's implement runtime_pm with autosuspend so that we will shut down the
+> > clock when it's not been in use for quite some time.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  drivers/mmc/host/sunxi-mmc.c | 46 +++++++++++++++++++++++++++++++++++++-
+> >  1 file changed, 46 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> > index f6374066081b..0f98a5fcaade 100644
+> > --- a/drivers/mmc/host/sunxi-mmc.c
+> > +++ b/drivers/mmc/host/sunxi-mmc.c
+> > @@ -35,6 +35,7 @@
+> >  #include <linux/of_gpio.h>
+> >  #include <linux/of_platform.h>
+> >  #include <linux/platform_device.h>
+> > +#include <linux/pm_runtime.h>
+> >  #include <linux/regulator/consumer.h>
+> >  #include <linux/reset.h>
+> >  #include <linux/scatterlist.h>
+> > @@ -973,6 +974,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+> >         unsigned long flags;
+> >         u32 imask;
+> >
+> > +       if (enable)
+> > +               pm_runtime_get_noresume(host->dev);
+> > +
+> >         spin_lock_irqsave(&host->lock, flags);
+> >
+> >         imask = mmc_readl(host, REG_IMASK);
+> > @@ -985,6 +989,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+> >         }
+> >         mmc_writel(host, REG_IMASK, imask);
+> >         spin_unlock_irqrestore(&host->lock, flags);
+> > +
+> > +       if (!enable)
+> > +               pm_runtime_put_noidle(host->mmc->parent);
+> >  }
+> >
+> >  static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
+> > @@ -1398,6 +1405,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+> >         if (ret)
+> >                 goto error_free_dma;
+> >
+> > +       pm_runtime_set_active(&pdev->dev);
+> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> > +       pm_runtime_use_autosuspend(&pdev->dev);
+> > +       pm_runtime_enable(&pdev->dev);
+> > +
+> >         ret = mmc_add_host(mmc);
+> >         if (ret)
+> >                 goto error_free_dma;
+> > @@ -1418,6 +1430,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+> >         struct sunxi_mmc_host *host = mmc_priv(mmc);
+> >
+> >         mmc_remove_host(mmc);
+> > +       pm_runtime_force_suspend(&pdev->dev);
+> >         disable_irq(host->irq);
+> >         sunxi_mmc_disable(host);
+> >         dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
+> > @@ -1426,10 +1439,43 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+> >         return 0;
+> >  }
+> >
+> > +static int sunxi_mmc_runtime_resume(struct device *dev)
+> > +{
+> > +       struct mmc_host *mmc = dev_get_drvdata(dev);
+> > +       struct sunxi_mmc_host *host = mmc_priv(mmc);
+> > +       int ret;
+> > +
+> > +       ret = sunxi_mmc_enable(host);
+> > +       if (ret)
+> > +               return ret;
+> > +
+> > +       sunxi_mmc_power_up(mmc, &mmc->ios);
 > 
-> I will try to look at it today.
+> Instead of doing power up, you may need restore some ios settings,
+> such as the clock rate for example.
+> 
+> You may also need to restore some registers in sunxi device, in case
+> it's possible that the controller loses context at runtime suspend.
 
-sure, thanks!
+The thing I was precisely trying to avoid was this :)
 
--Kishon
+I could save and restore registers when the MMC controller is put into
+suspend, but that's pretty much exactly the same sequence than what is
+done in the MMC_POWER_UP sequence in .set_ios.
+
+So it just felt cleaner to just do the power_up sequence at resume
+time. It avoids having to maintain the list of registers to save and
+restore, and it involves less code overall.
+
+It suprised me a bit that the core will not call .set_ios with
+MMC_POWER_UP at resume by itself, but I guess there's a good reason
+for that :)
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180315/f635bd7a/attachment-0001.sig>
