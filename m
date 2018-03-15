@@ -1,10 +1,10 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:07:11 +0100
-Subject: [PATCH 30/36] arm: dts: armada-385-turris-omnia: use
+Date: Thu, 15 Mar 2018 16:07:07 +0100
+Subject: [PATCH 26/36] arm: dts: armada-xp-synology-ds414: use
  SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-31-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-27-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,32 +18,37 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+Cc: Arnaud Ebalard <arno@natisbad.org>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 35 +--------------------------
- 1 file changed, 1 insertion(+), 34 deletions(-)
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts | 39 +-------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-index 06831e1e3f80..768b6c5d2129 100644
---- a/arch/arm/boot/dts/armada-385-turris-omnia.dts
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -1,43 +1,10 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+index d7228a5461c8..809e821d7399 100644
+--- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
++++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+@@ -1,46 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for the Turris Omnia
+  * Device Tree file for Synology DS414
   *
-  * Copyright (C) 2016 Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-  * Copyright (C) 2016 Tomas Hlavacek <tmshlvkc@gmail.com>
+  * Copyright (C) 2014, Arnaud EBALARD <arno@natisbad.org>
   *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
 - * whole.
 - *
-- *  a) This file is licensed under the terms of the GNU General Public
-- *     License version 2.  This program is licensed "as is" without
-- *     any warranty of any kind, whether express or implied.
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
 - *
 - * Or, alternatively,
 - *
@@ -67,11 +72,9 @@ index 06831e1e3f80..768b6c5d2129 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
-- */
--
--/*
-  * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
-  */
- 
+- *
+  * Note: this Device Tree assumes that the bootloader has remapped the
+  * internal registers to 0xf1000000 (instead of the old 0xd0000000).
+  * The 0xf1000000 is the default used by the recent, DT-capable, U-Boot
 -- 
 2.16.1
