@@ -1,45 +1,36 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Thu, 15 Mar 2018 16:13:02 -0500
-Subject: [PATCH v2 2/3] arm64: fpsimd: Fix bad si_code for undiagnosed
- SIGFPE
-In-Reply-To: <20180309142557.GT32331@e103592.cambridge.arm.com> (Dave Martin's
- message of "Fri, 9 Mar 2018 14:25:57 +0000")
-References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
- <1519926248-12591-3-git-send-email-Dave.Martin@arm.com>
- <20180308171153.GD14918@arm.com> <87o9jymbsj.fsf@xmission.com>
- <20180309131017.GB20370@arm.com>
- <20180309142557.GT32331@e103592.cambridge.arm.com>
-Message-ID: <87vadxyrdt.fsf@xmission.com>
+From: uwe@kleine-koenig.org (=?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?=)
+Date: Thu, 15 Mar 2018 22:18:35 +0100
+Subject: [PATCH 30/36] arm: dts: armada-385-turris-omnia: use
+ SPDX-License-Identifier
+In-Reply-To: <20180315150717.10588-31-gregory.clement@bootlin.com>
+References: <20180315150717.10588-1-gregory.clement@bootlin.com>
+ <20180315150717.10588-31-gregory.clement@bootlin.com>
+Message-ID: <90123740-83dc-1a21-2245-19d6e9f82bca@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin <Dave.Martin@arm.com> writes:
+On 03/15/2018 04:07 PM, Gregory CLEMENT wrote:
+> Follow the recent trend for the license description, and also fix the
+> wrongly stated X11 to MIT.
+> 
+> As already pointed on the DT ML, the X11 license text [1] is explicitly
+> for the X Consortium and has a couple of extra clauses. The MIT
+> license text [2] is actually what the current DT files claim.
+> 
+> [1] https://spdx.org/licenses/X11.html
+> [2] https://spdx.org/licenses/MIT.html
+> 
+> Cc: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 
-> On Fri, Mar 09, 2018 at 01:10:18PM +0000, Will Deacon wrote:
->> Hi Eric,
->> 
->> On Thu, Mar 08, 2018 at 04:40:12PM -0600, Eric W. Biederman wrote:
->> > Will Deacon <will.deacon@arm.com> writes:
->> > > Happy to take this patch once the dependency on FPE_FLTUNK in core code is
->> > > resolved.
->> > 
->> > Would it help for me to take the FPE_FLTUNK patch into my siginfo-next
->> > branch?   So that there is a common branch with the code so we don't
->> > need to worry about conflicts.  If so I will look at that on Monday.
->> 
->> Yes please, that would be helpful actually. I can then pull that into
->> arm64 if you give me a stable branch or tag. Alternatively, I can define
->> FPE_FLTUNK locally and remove it at -rc1.
->
-> OK Eric, let me know if you need me to rebase anything for the first 2
-> patches.
+Acked-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 
-The first patch is now in my siginfo-next tree and avialable at:
+Best regards
+Uwe
 
-git://git.kernel.org/pub/scm/linux/kernel/git/ebiederm/user-namespace.git siginfo-next
-HEAD: 266da65e9156d93e1126e185259a4aae68188d0e signal: Add FPE_FLTUNK si_code for undiagnosable fp exceptions
-
-I will not rebase this branch, so please fee free to merge it into other
-trees.
-
-Eric
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180315/c0f7caec/attachment.sig>
