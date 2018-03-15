@@ -1,99 +1,92 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 15 Mar 2018 11:41:33 -0700
-Subject: [PATCH V3] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <1520274579-30492-1-git-send-email-fkan@apm.com>
-References: <1520274579-30492-1-git-send-email-fkan@apm.com>
-Message-ID: <CAL85gmAAVoCCXoLH+c0ROSBy4mS3z86tnbX+7Avh5oGT=fHcfA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Mar 2018 18:47:22 +0000
+Subject: [PATCH v6 25/26] arm64: KVM: Allow mapping of vectors outside of
+ the RAM region
+In-Reply-To: <20180315170815.vl53dw5hqr5agmuo@kamzik.brq.redhat.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-26-marc.zyngier@arm.com>
+ <20180315155436.vgmd772scihojwz4@kamzik.brq.redhat.com>
+ <941a937f-6466-4c8f-6952-d26c3142102d@arm.com>
+ <20180315170815.vl53dw5hqr5agmuo@kamzik.brq.redhat.com>
+Message-ID: <c2da044e-f2b4-6981-33b4-7362f3182f04@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 5, 2018 at 10:29 AM, Feng Kan <fkan@apm.com> wrote:
-> When bridge and its endpoint is enumerated the devices are added to the
-> dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-> This causes the bridge to be moved to the end of the dpm list when
-> deferred probe kicks in. The order of the dpm list for bridge and
-> endpoint is reversed.
->
-> Add reordering code to move the bridge and its children and consumers to
-> the end of the pm list so the order for suspend and resume is not altered.
-> The code also move device and its children and consumers to the tail of
-> device_kset list if it is registered.
->
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Toan Le <toanle@apm.com>
-> ---
->  V3:
->         1. additional code comment changes
->  V2:
->         1. change patch title from "move device and its children..."
->         2. move define based on Bjorn's comment
->         3. rename function name and comment content
->
->  drivers/base/base.h |  3 +++
->  drivers/base/core.c | 20 ++++++++++++++++++++
->  drivers/base/dd.c   |  4 +---
->  3 files changed, 24 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/base/base.h b/drivers/base/base.h
-> index d800de6..a75c302 100644
-> --- a/drivers/base/base.h
-> +++ b/drivers/base/base.h
-> @@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
->  extern void device_links_no_driver(struct device *dev);
->  extern bool device_links_busy(struct device *dev);
->  extern void device_links_unbind_consumers(struct device *dev);
-> +
-> +/* device pm support */
-> +void device_pm_move_to_tail(struct device *dev);
-> diff --git a/drivers/base/core.c b/drivers/base/core.c
-> index 110230d..3b37906 100644
-> --- a/drivers/base/core.c
-> +++ b/drivers/base/core.c
-> @@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
->  }
->
->  /**
-> + * device_pm_move_to_tail - Move set of devices to the end of device lists
-> + * @dev: current device pointer
-> + *
-> + * This is a device_reorder_to_tail() wrapper taking the requisite locks.
-> + *
-> + * It moves the device along with all of its children and all of its consumers
-> + * to the ends of the device_kset and dpm_list, recursively.
-> + */
-> +void device_pm_move_to_tail(struct device *dev)
-> +{
-> +       int idx;
-> +
-> +       idx = device_links_read_lock();
-> +       device_pm_lock();
-> +       device_reorder_to_tail(dev, NULL);
-> +       device_pm_unlock();
-> +       device_links_read_unlock(idx);
-> +}
-> +
-> +/**
->   * device_link_add - Create a link between two devices.
->   * @consumer: Consumer end of the link.
->   * @supplier: Supplier end of the link.
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 2c964f5..96fab29 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -123,9 +123,7 @@ static void deferred_probe_work_func(struct work_struct *work)
->                  * the list is a good order for suspend but deferred
->                  * probe makes that very unsafe.
->                  */
-> -               device_pm_lock();
-> -               device_pm_move_last(dev);
-> -               device_pm_unlock();
-> +               device_pm_move_to_tail(dev);
->
->                 dev_dbg(dev, "Retrying from deferred list\n");
->                 if (initcall_debug && !initcalls_done)
-> --
-> 1.8.3.1
->
-Hi, just wanted to check if there is anything else I need to change on
-this. Thanks.
+On 15/03/18 17:08, Andrew Jones wrote:
+> On Thu, Mar 15, 2018 at 04:17:53PM +0000, Marc Zyngier wrote:
+>> On 15/03/18 15:54, Andrew Jones wrote:
+>>> On Wed, Mar 14, 2018 at 04:50:48PM +0000, Marc Zyngier wrote:
+>>>>  static inline void *kvm_get_hyp_vector(void)
+>>>>  {
+>>>>  	struct bp_hardening_data *data = arm64_get_bp_hardening_data();
+>>>> -	void *vect = kvm_ksym_ref(__kvm_hyp_vector);
+>>>> +	void *vect = kern_hyp_va(kvm_ksym_ref(__kvm_hyp_vector));
+>>>> +	int slot = -1;
+>>>>  
+>>>> -	if (data->fn) {
+>>>> -		vect = __bp_harden_hyp_vecs_start +
+>>>> -		       data->hyp_vectors_slot * SZ_2K;
+>>>> +	if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR) && data->fn) {
+>>>
+>>> Now that I'm trying to consider heterogeneous systems, I'm wondering why
+>>> harden BP isn't checked with this_cpu_has_cap() like harden EL2 vectors.
+>>> I'm also wondering if it's even possible for CPUs to come up without all
+>>> of them having harden EL2 vectors if the boot CPU has it. Won't
+>>> verify_local_cpu_errata_workarounds() require it? I'm probably just
+>>> getting lost in all the capability stuff...
+>>
+>> Checking harden BP on this particular CPU will only tell you if this CPU
+>> is affected, but won't give you any additional information (i.e. you'd
+>> still need to check obtain the stuff pointed to by data).
+>>
+>> Checking for *all* CPUs in one go has some advantages: it is a static
+>> key, which means that unaffected platforms will fly (this is a hot path
+>> on VHE), and you can check data if you're affected.
+> 
+> Is there a problem with using the static key to check
+> ARM64_HARDEN_EL2_VECTORS below? (Sorry, I'm still confused why we're not
+> using the same functions for both.) 
+
+Consider the following case: heterogeneous system with CPU0 that has
+HBP, and CPU1 that has HEL. CPU0 is using its own vector slot, and CPU1
+should be using an extra one (it doesn't have a dedicated slot).
+
+When CPU0 claims its vectors, it will get the "normal" version of the
+mapping. And then, if we're using cpus_have_cap, we turn that into an
+out-of-line mapping. That's not completely wrong (the system still runs
+fine), but that's not the expected behaviour. If we restrict the second
+phase to this_cpu_has_cap(), we get the expected CPU0 using the normal
+mapping, and CPU1 does the exact opposite (which we also want).
+
+> If we can't use the static key
+> below, then should we swap the check with !has_vhe() to ensure the
+> compiler will avoid emitting the this_cpu_has_cap() call on VHE's fast
+> path?
+
+Fair enough, that's a good point.
+
+> I also noticed that calling this_cpu_has_cap() puts a constraint on
+> kvm_get_hyp_vector() that it must never be called without preemption
+> disabled. It's not, but it's one more thing to think about. If there's
+> no reason not to use the static key with cpus_have_const_cap() then
+> maybe we should?
+
+We're definitely in a non-preemptible section at this stage. On !VHE,
+we're in IPI context (cpu_init_hyp_mode), and on VHE we are in the
+switch code, having disabled interrupts a long time ago.
+
+> 
+>>
+>>>
+>>>> +		vect = __bp_harden_hyp_vecs_start;
+
+Nit: massive buglet here, which I thought I had squashed in the series,
+and obviously didn't (still have it as a fixup). It should read:
+
+vect = kern_hyp_va(kvm_ksym_ref(__bp_harden_hyp_vecs_start));
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
