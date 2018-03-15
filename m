@@ -1,133 +1,152 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 15 Mar 2018 11:24:36 +0100
-Subject: [PATCH v2 8/8] mmc: sunxi: Add runtime_pm support
-In-Reply-To: <20180315100411.iqcnwqws623ws6yn@flea>
-References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
- <052c21c000f64c28fd6b64c4db11e4b706bebf79.1520520655.git-series.maxime.ripard@bootlin.com>
- <CAPDyKFoJ0KftG1VxzdM97ubFJ25M+X0EjgOPc6HxewgyZMPipg@mail.gmail.com>
- <20180315100411.iqcnwqws623ws6yn@flea>
-Message-ID: <CAPDyKFpzi2fbSHPUaJRnBmb7YLCzwD0fTFStXgY1eB136m2gEw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 15 Mar 2018 10:36:30 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: Disallow Active+Pending for level
+ interrupts
+In-Reply-To: <7bd9dd38-f3a6-aef4-7fcd-015ef79a49ae@redhat.com>
+References: <20180314183744.30889-1-marc.zyngier@arm.com>
+ <c0ac2636-4143-98d3-5eb3-1e9098d0e056@redhat.com>
+ <64703cb4-96c8-abd0-8e75-6e65b6721e5c@arm.com>
+ <7bd9dd38-f3a6-aef4-7fcd-015ef79a49ae@redhat.com>
+Message-ID: <e01a6a87-d42f-bddf-be71-a4fc1b21ebf4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 11:04, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> Hi Ulf,
->
-> On Thu, Mar 15, 2018 at 10:30:54AM +0100, Ulf Hansson wrote:
->> On 8 March 2018 at 15:52, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->> > So far, even if our card was not in use, we didn't shut down our main
->> > clock, which meant that it was still output on the MMC bus.
->> >
->> > While this obviously means that we could save some power there, it also
->> > created issues when it comes with EMC control since we'll have a perfect
->> > peak at the card clock rate.
->> >
->> > Let's implement runtime_pm with autosuspend so that we will shut down the
->> > clock when it's not been in use for quite some time.
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
->> > ---
->> >  drivers/mmc/host/sunxi-mmc.c | 46 +++++++++++++++++++++++++++++++++++++-
->> >  1 file changed, 46 insertions(+)
->> >
->> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->> > index f6374066081b..0f98a5fcaade 100644
->> > --- a/drivers/mmc/host/sunxi-mmc.c
->> > +++ b/drivers/mmc/host/sunxi-mmc.c
->> > @@ -35,6 +35,7 @@
->> >  #include <linux/of_gpio.h>
->> >  #include <linux/of_platform.h>
->> >  #include <linux/platform_device.h>
->> > +#include <linux/pm_runtime.h>
->> >  #include <linux/regulator/consumer.h>
->> >  #include <linux/reset.h>
->> >  #include <linux/scatterlist.h>
->> > @@ -973,6 +974,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
->> >         unsigned long flags;
->> >         u32 imask;
->> >
->> > +       if (enable)
->> > +               pm_runtime_get_noresume(host->dev);
->> > +
->> >         spin_lock_irqsave(&host->lock, flags);
->> >
->> >         imask = mmc_readl(host, REG_IMASK);
->> > @@ -985,6 +989,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
->> >         }
->> >         mmc_writel(host, REG_IMASK, imask);
->> >         spin_unlock_irqrestore(&host->lock, flags);
->> > +
->> > +       if (!enable)
->> > +               pm_runtime_put_noidle(host->mmc->parent);
->> >  }
->> >
->> >  static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
->> > @@ -1398,6 +1405,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
->> >         if (ret)
->> >                 goto error_free_dma;
->> >
->> > +       pm_runtime_set_active(&pdev->dev);
->> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
->> > +       pm_runtime_use_autosuspend(&pdev->dev);
->> > +       pm_runtime_enable(&pdev->dev);
->> > +
->> >         ret = mmc_add_host(mmc);
->> >         if (ret)
->> >                 goto error_free_dma;
->> > @@ -1418,6 +1430,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
->> >         struct sunxi_mmc_host *host = mmc_priv(mmc);
->> >
->> >         mmc_remove_host(mmc);
->> > +       pm_runtime_force_suspend(&pdev->dev);
->> >         disable_irq(host->irq);
->> >         sunxi_mmc_disable(host);
->> >         dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
->> > @@ -1426,10 +1439,43 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
->> >         return 0;
->> >  }
->> >
->> > +static int sunxi_mmc_runtime_resume(struct device *dev)
->> > +{
->> > +       struct mmc_host *mmc = dev_get_drvdata(dev);
->> > +       struct sunxi_mmc_host *host = mmc_priv(mmc);
->> > +       int ret;
->> > +
->> > +       ret = sunxi_mmc_enable(host);
->> > +       if (ret)
->> > +               return ret;
->> > +
->> > +       sunxi_mmc_power_up(mmc, &mmc->ios);
+On 15/03/18 10:24, Auger Eric wrote:
+> Hi Marc,
+> 
+> On 15/03/18 11:01, Marc Zyngier wrote:
+>> Hi Eric,
 >>
->> Instead of doing power up, you may need restore some ios settings,
->> such as the clock rate for example.
+>> On 15/03/18 09:31, Auger Eric wrote:
+>>> Hi Marc,
+>>> On 14/03/18 19:37, Marc Zyngier wrote:
+>>>> It was recently reported that VFIO mediated devices, and anything
+>>>> that VFIO exposes as level interrupts, do no strictly follow the
+>>>> expected logic of such interrupts as it only lowers the input
+>>>> line when the guest has EOId the interrupt at the GIC level, rather
+>>>> than when it Acked the interrupt at the device level.
+>>>>
+>>>> THe GIC's Active+Pending state is fundamentally incompatible with
+>>>> this behaviour, as it prevents KVM from observing the EOI, and in
+>>>> turn results in VFIO never dropping the line. This results in an
+>>>> interrupt storm in the guest, which it really never expected.
+>>>>
+>>>> As we cannot really change VFIO to follow the strict rules of level
+>>>> signalling, let's forbid the A+P state altogether, as it is in the
+>>>> end only an optimization. It ensures that we will transition via
+>>>> an invalid state, which we can use to notify VFIO of the EOI.
+>>>>
+>>>> Reported-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+>>>> Tested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  virt/kvm/arm/vgic/vgic-v2.c | 47 +++++++++++++++++++++++++++------------------
+>>>>  virt/kvm/arm/vgic/vgic-v3.c | 47 +++++++++++++++++++++++++++------------------
+>>>>  2 files changed, 56 insertions(+), 38 deletions(-)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+>>>> index 29556f71b691..9356d749da1d 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-v2.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+>>>> @@ -153,8 +153,35 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+>>>>  void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+>>>>  {
+>>>>  	u32 val = irq->intid;
+>>>> +	bool allow_pending = true;
+>>>>  
+>>>> -	if (irq_is_pending(irq)) {
+>>>> +	if (irq->active)
+>>>> +		val |= GICH_LR_ACTIVE_BIT;
+>>>> +
+>>>> +	if (irq->hw) {
+>>>> +		val |= GICH_LR_HW;
+>>>> +		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+>>>> +		/*
+>>>> +		 * Never set pending+active on a HW interrupt, as the
+>>>> +		 * pending state is kept at the physical distributor
+>>>> +		 * level.
+>>>> +		 */
+>>>> +		if (irq->active)
+>>>> +			allow_pending = false;
+>>>> +	} else {
+>>>> +		if (irq->config == VGIC_CONFIG_LEVEL) {
+>>>> +			val |= GICH_LR_EOI;
+>>>> +
+>>>> +			/*
+>>>> +			 * Software resampling doesn't work very well
+>>>> +			 * if we allow P+A, so let's not do that.
+>>>> +			 */
+>>>> +			if (irq->active)
+>>>> +				allow_pending = false;
+>>>> +		}
+>>>> +	}
+>>>> +
+>>>> +	if (allow_pending && irq_is_pending(irq)) {
+>>>>  		val |= GICH_LR_PENDING_BIT;
+>>> Can't we have this no luck unlikely scenario where soft_pending and LR
+>>> state A on flush? In such case, on fold we are going to reset the
+>>> pending_latch as we considered disappearance of LR P meant the
+>>> soft_pending was acked. But P now is no more logged in LR concurrently
+>>> with A.
 >>
->> You may also need to restore some registers in sunxi device, in case
->> it's possible that the controller loses context at runtime suspend.
->
-> The thing I was precisely trying to avoid was this :)
->
-> I could save and restore registers when the MMC controller is put into
-> suspend, but that's pretty much exactly the same sequence than what is
-> done in the MMC_POWER_UP sequence in .set_ios.
+>> Good point. We can now only clear the latch when we're back to an
+>> invalid state. How about this (untested):
+> 
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+>> index 9356d749da1d..8427586760fc 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v2.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+>> @@ -105,12 +105,9 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+>>  
+>>  		/*
+>>  		 * Clear soft pending state when level irqs have been acked.
+>> -		 * Always regenerate the pending state.
+>>  		 */
+>> -		if (irq->config == VGIC_CONFIG_LEVEL) {
+>> -			if (!(val & GICH_LR_PENDING_BIT))
+>> -				irq->pending_latch = false;
+>> -		}
+>> +		if (irq->config == VGIC_CONFIG_LEVEL && !(val & GICH_LR_STATE))
+>> +			irq->pending_latch = false;
+>>  
+>>  		/*
+>>  		 * Level-triggered mapped IRQs are special because we only
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> index 6b484575cafb..dd984f726805 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -96,12 +96,9 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+>>  
+>>  		/*
+>>  		 * Clear soft pending state when level irqs have been acked.
+>> -		 * Always regenerate the pending state.
+>>  		 */
+>> -		if (irq->config == VGIC_CONFIG_LEVEL) {
+>> -			if (!(val & ICH_LR_PENDING_BIT))
+>> -				irq->pending_latch = false;
+>> -		}
+>> +		if (irq->config == VGIC_CONFIG_LEVEL && !(val & ICH_LR_STATE))
+>> +			irq->pending_latch = false;
+> when deactivating the IRQ, we both lower the line and remove the A state
+> at the same time. However isn't the pending_latch supposed to stay,
+> independently on the line level, as long as we don't CPENDR or handle
+> its P->A->invalid usual cycle?
 
-Well, there may be some overlap.
+That's not what we decided to implement initially. The main problem is
+that you cannot distinguish between a pending state because the line is
+high, or a pending level because the latch is high.
 
->
-> So it just felt cleaner to just do the power_up sequence at resume
-> time. It avoids having to maintain the list of registers to save and
-> restore, and it involves less code overall.
+You effectively OR the two signals on injection. On exit, you can only
+clear the latch because you don't know which of the two inputs you
+really considered. In short, the latch is only a separate interrupt if
+it doesn't coincide with a "real" interrupt.
 
-I understand.
+I believe this behaviour is consistent with what we have before this
+patch. Or am I missing something?
 
->
-> It suprised me a bit that the core will not call .set_ios with
-> MMC_POWER_UP at resume by itself, but I guess there's a good reason
-> for that :)
+Thanks,
 
-It does that when it runtime PM manages the mmc/sd/sdio card, don't
-confuse that with the mmc host. That's because it needs to follow the
-(e)MMC/SD/SDIO spec, which don't allows you to just cut the power to
-card without first informing (sending commands) the card about it.
-
-Kind regards
-Uffe
+	M.
+-- 
+Jazz is not dead. It just smells funny...
