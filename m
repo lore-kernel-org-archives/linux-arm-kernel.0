@@ -1,40 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 16:12:33 +0100
-Subject: [GIT PULL 2/6] i.MX SoC changes for 4.17
-In-Reply-To: <1521113800-16401-2-git-send-email-shawnguo@kernel.org>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
- <1521113800-16401-2-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a1vNZf9uk+u+mnot37TuKYfN-P_xxXm+uG6p0oyPjZTEw@mail.gmail.com>
+Date: Thu, 15 Mar 2018 16:13:19 +0100
+Subject: [PATCH 2/2] ARM: imx: select ARM_CPU_SUSPEND for CPU_IDLE as well
+In-Reply-To: <20180315151345.3089601-1-arnd@arndb.de>
+References: <20180315151345.3089601-1-arnd@arndb.de>
+Message-ID: <20180315151345.3089601-2-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
->
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.17
->
-> for you to fetch changes up to dee5dee2a5b285d20f55a4758d3a51349691eeea:
->
->   ARM: imx: Add basic msl support for imx6sll (2018-03-09 09:22:06 +0800)
->
-> ----------------------------------------------------------------
-> i.MX SoC changes for 4.17:
->  - Add i.MX 6SoloLiteLite (i.MX6SLL) SoC support on top of the existing
->    i.MX6SL platform code.
->  - Improve the SoC revision mapping by utilizing the MAJOR field of
->    ANATOP DIGPROG register.
->  - Add CPUIDLE_FLAG_TIMER_STOP flag for cpuidle ARM power off state,
->    so that we can use ARM generic timer for some i.MX6 SoC.
->  - Set low-power interrupt mask for i.MX25 to support STOP mode.
->  - Drop EPIT driver as there is no user of it.
->  - Simplify the error path of imx6_pm_get_base() a bit.
+The cpuidle support calls cpu_suspend(), which is compiled conditionally,
+and fails to link unless something selects CONFIG_ARM_CPU_SUSPEND.
 
-Pulled into next/soc. However, I need two fixups for bugs I ran into during
-linux-next randconfig testing. Sending them out now, please Ack so
-I can apply them directly.
+arch/arm/mach-imx/cpuidle-imx6sx.o: In function `imx6sx_enter_wait':
+cpuidle-imx6sx.c:(.text+0x6c): undefined reference to `cpu_suspend'
 
-       Arnd
+This adds an explicit select statement here.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-imx/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index f53ec31c9f5a..e47fa13f4b0c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -469,7 +469,7 @@ config	SOC_IMX53
+ 
+ config SOC_IMX6
+ 	bool
+-	select ARM_CPU_SUSPEND if PM
++	select ARM_CPU_SUSPEND if (PM || CPU_IDLE)
+ 	select ARM_ERRATA_754322
+ 	select ARM_ERRATA_775420
+ 	select ARM_GIC
+-- 
+2.9.0
