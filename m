@@ -1,60 +1,77 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 15 Mar 2018 16:17:25 +0200
-Subject: [PATCH v3 01/11] mmc: sdhci-omap: Fix when capabilities are
- obtained from SDHCI_CAPABILITIES reg
-In-Reply-To: <20180307132020.30951-2-kishon@ti.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <20180307132020.30951-2-kishon@ti.com>
-Message-ID: <e9ac3f68-2d75-6648-7774-786c20f6746c@intel.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Thu, 15 Mar 2018 19:49:01 +0530
+Subject: [PATCH v2 2/4] ioremap: Implement TLB_INV before huge mapping
+In-Reply-To: <20180315133157.ucbdg25jo5ew3t2h@lakrids.cambridge.arm.com>
+References: <1521117906-20107-1-git-send-email-cpandya@codeaurora.org>
+ <1521117906-20107-3-git-send-email-cpandya@codeaurora.org>
+ <20180315133157.ucbdg25jo5ew3t2h@lakrids.cambridge.arm.com>
+Message-ID: <b6c7622d-9676-5584-d52b-10ece6a3877c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
-> sdhci_omap_config_iodelay_pinctrl_state() requires caps and caps2 to be
-> initialized (speed mode capabilities like UHS/HS200) before it is
-> invoked. While mmc_of_parse() initializes caps/caps2 if capabilities is
-> populated in device tree, it will remain uninitialized for capabilities
-> obtained from SDHCI_CAPABILITIES register.
-> Fix sdhci_omap_config_iodelay_pinctrl_state() to be used even while
-> getting the capabilities from SDHCI_CAPABILITIES register by invoking
-> sdhci_setup_host() before sdhci_omap_config_iodelay_pinctrl_state().
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/mmc/host/sdhci-omap.c | 14 +++++++++-----
->  1 file changed, 9 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-> index 1456abd5eeb9..3cce30584d2f 100644
-> --- a/drivers/mmc/host/sdhci-omap.c
-> +++ b/drivers/mmc/host/sdhci-omap.c
-> @@ -916,10 +916,6 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  		goto err_put_sync;
->  	}
->  
-> -	ret = sdhci_omap_config_iodelay_pinctrl_state(omap_host);
-> -	if (ret)
-> -		goto err_put_sync;
-> -
->  	host->mmc_host_ops.get_ro = mmc_gpio_get_ro;
->  	host->mmc_host_ops.start_signal_voltage_switch =
->  					sdhci_omap_start_signal_voltage_switch;
-> @@ -930,7 +926,15 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  	sdhci_read_caps(host);
->  	host->caps |= SDHCI_CAN_DO_ADMA2;
->  
-> -	ret = sdhci_add_host(host);
-> +	ret = sdhci_setup_host(host);
-> +	if (ret)
-> +		goto err_put_sync;
-> +
-> +	ret = sdhci_omap_config_iodelay_pinctrl_state(omap_host);
-> +	if (ret)
-> +		goto err_put_sync;
-> +
-> +	ret = __sdhci_add_host(host);
->  	if (ret)
->  		goto err_put_sync;
 
-if __sdhci_add_host() fails, then sdhci_cleanup_host() needs to be called to
-free resources allocated by sdhci_setup_host().
+
+On 3/15/2018 7:01 PM, Mark Rutland wrote:
+> On Thu, Mar 15, 2018 at 06:15:04PM +0530, Chintan Pandya wrote:
+>> @@ -91,10 +93,15 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
+>>   
+>>   		if (ioremap_pmd_enabled() &&
+>>   		    ((next - addr) == PMD_SIZE) &&
+>> -		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+>> -		    pmd_free_pte_page(pmd)) {
+>> -			if (pmd_set_huge(pmd, phys_addr + addr, prot))
+>> +		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
+>> +			old_pmd = *pmd;
+>> +			pmd_clear(pmd);
+>> +			flush_tlb_pgtable(&init_mm, addr);
+>> +			if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
+>> +				pmd_free_pte_page(&old_pmd);
+>>   				continue;
+>> +			} else
+>> +				set_pmd(pmd, old_pmd);
+>>   		}
+>>   
+> 
+> Can we have something like a pmd_can_set_huge() helper? Then we could
+> avoid pointless modification and TLB invalidation work when
+> pmd_set_huge() will fail.
+
+Actually, pmd_set_huge() will never fail because, if
+CONFIG_HAVE_ARCH_HUGE_VMAP is disabled, ioremap_pmd_enabled()
+will fail and if enabled (i.e. ARM64 & x86), they don't fail
+in their implementation. So, rather we can do the following.
+
+-                       if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
+-                               pmd_free_pte_page(&old_pmd);
+-                               continue;
+-                       } else
+-                               set_pmd(pmd, old_pmd);
++                       pmd_set_huge(pmd, phys_addr + addr, prot)
++                       pmd_free_pte_page(&old_pmd);
++                       continue;
+
+> 
+> 	if (ioremap_pmd_enabled() &&
+> 	    ((next - addr) == PMD_SIZE) &&
+> 	    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+> 	    pmd_can_set_huge(pmd, phys_addr + addr, prot)) {
+> 	    	// clear entries, invalidate TLBs, and free tables
+> 		...
+> 		continue;
+> 
+> 	}
+> 
+> Thanks,
+> MArk.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+Chintan
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
