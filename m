@@ -1,86 +1,16 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 14 Mar 2018 17:44:19 -0700
-Subject: ARM: Call syscall_trace_exit even when system call skipped
-In-Reply-To: <20180313235850.GA18373@altlinux.org>
-References: <20180203152112.2449-1-T.E.Baldwin99@members.leeds.ac.uk>
- <20180313235850.GA18373@altlinux.org>
-Message-ID: <CAGXu5jKY+uqi53YPhuptwb72zm=mpAaZ1YgCHN7BAGgXWyvqbw@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Wed, 14 Mar 2018 17:51:42 -0700
+Subject: [PATCH V6 2/2] thermal: imx: add i.MX7 thermal sensor support
+In-Reply-To: <1520923865.3766.4.camel@intel.com>
+References: <1519955970-11365-1-git-send-email-Anson.Huang@nxp.com>
+ <1519955970-11365-2-git-send-email-Anson.Huang@nxp.com>
+ <AM3PR04MB13158EE8C129D6AEC605A106F5D20@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <1520923865.3766.4.camel@intel.com>
+Message-ID: <20180315005140.GB12096@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 4:58 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> Hi Kees,
->
-> As you probably know, ptracing of processes affected by SECCOMP_RET_TRAP
-> is broken on ARM since your commit v3.7-rc1-11-gad75b51459ae.
+On Tue, Mar 13, 2018 at 02:51:05PM +0800, Zhang Rui wrote:
+> yeah, will review it and get back to you later.
 
-Hi!
-
-Well that's no good. I hadn't seen this problem; the seccomp selftests
-don't trip over this.
-
-> Could you review the proposed fix, please?
-
-The seccomp selftests still pass with the proposed fix, so that's all
-fine by me. :)
-
-> P.S. There is a test for this kernel bug in strace test suite,
-> you might find it useful:
-> https://github.com/strace/strace/compare/ldv/SECCOMP_RET_TRAP
->
-> On Sat, Feb 03, 2018 at 03:21:12PM +0000, Timothy E Baldwin wrote:
->> On at least x86 and ARM64, and as documented in the ptrace man page
->> a skipped system call will still cause a syscall exit ptrace stop.
->>
->> Previous to this commit 32-bit ARM did not, resulting in strace
->> being confused when seccomp skips system calls.
->>
->> This change also impacts programs that use ptrace to skip system calls.
->>
->> Fixes: ad75b51459ae ("ARM: 7579/1: arch/allow a scno of -1 to not cause a SIGILL")
->> Signed-off-by: Timothy E Baldwin <T.E.Baldwin99@members.leeds.ac.uk>
->> ---
->>  arch/arm/kernel/entry-common.S | 9 ++++-----
->>  1 file changed, 4 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
->> index 99c908226065..88a65157307d 100644
->> --- a/arch/arm/kernel/entry-common.S
->> +++ b/arch/arm/kernel/entry-common.S
->> @@ -288,16 +288,15 @@ __sys_trace:
->>       cmp     scno, #-1                       @ skip the syscall?
->>       bne     2b
->>       add     sp, sp, #S_OFF                  @ restore stack
->> -     b       ret_slow_syscall
->>
->> -__sys_trace_return:
->> -     str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
->> +__sys_trace_return_nosave:
->> +     enable_irq_notrace
-
-Why is __sys_trace_return_nosave the correct destination here? The
-original handle set up for lr a few lines above is for
-__sys_trace_return. It's not clear to me why this change is made?
-
->>       mov     r0, sp
->>       bl      syscall_trace_exit
->>       b       ret_slow_syscall
->>
->> -__sys_trace_return_nosave:
->> -     enable_irq_notrace
->> +__sys_trace_return:
->> +     str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
->>       mov     r0, sp
->>       bl      syscall_trace_exit
->>       b       ret_slow_syscall
->
-> --
-> ldv
-
-Otherwise, I think this looks good.
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+This is in my tree now.
