@@ -1,40 +1,84 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 16 Mar 2018 00:07:38 +0800
-Subject: [PATCH v7 3/3] dts: arm64: Add mailbox binding for hi3660
-In-Reply-To: <1521130058-24796-1-git-send-email-leo.yan@linaro.org>
-References: <1521130058-24796-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1521130058-24796-4-git-send-email-leo.yan@linaro.org>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 15 Mar 2018 16:12:52 +0000
+Subject: [PATCH v2 2/4] ioremap: Implement TLB_INV before huge mapping
+In-Reply-To: <1521117906-20107-3-git-send-email-cpandya@codeaurora.org>
+References: <1521117906-20107-1-git-send-email-cpandya@codeaurora.org>
+ <1521117906-20107-3-git-send-email-cpandya@codeaurora.org>
+Message-ID: <1521130368.2693.177.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kaihua Zhong <zhongkaihua@huawei.com>
+On Thu, 2018-03-15 at 18:15 +0530, Chintan Pandya wrote:
+> Huge mapping changes PMD/PUD which could have
+> valid previous entries. This requires proper
+> TLB maintanance on some architectures, like
+> ARM64.
+> 
+> Implent BBM (break-before-make) safe TLB
+> invalidation.
+> 
+> Here, I've used flush_tlb_pgtable() instead
+> of flush_kernel_range() because invalidating
+> intermediate page_table entries could have
+> been optimized for specific arch. That's the
+> case with ARM64 at least.
+> 
+> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+> ---
+>  lib/ioremap.c | 25 +++++++++++++++++++------
+>  1 file changed, 19 insertions(+), 6 deletions(-)
+> 
+> diff --git a/lib/ioremap.c b/lib/ioremap.c
+> index 54e5bba..55f8648 100644
+> --- a/lib/ioremap.c
+> +++ b/lib/ioremap.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/export.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/pgtable.h>
+> +#include <asm-generic/tlb.h>
+>  
+>  #ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
+>  static int __read_mostly ioremap_p4d_capable;
+> @@ -80,6 +81,7 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
+>  		unsigned long end, phys_addr_t phys_addr, pgprot_t prot)
+>  {
+>  	pmd_t *pmd;
+> +	pmd_t old_pmd;
+>  	unsigned long next;
+>  
+>  	phys_addr -= addr;
+> @@ -91,10 +93,15 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
+>  
+>  		if (ioremap_pmd_enabled() &&
+>  		    ((next - addr) == PMD_SIZE) &&
+> -		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+> -		    pmd_free_pte_page(pmd)) {
+> -			if (pmd_set_huge(pmd, phys_addr + addr, prot))
+> +		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
+> +			old_pmd = *pmd;
+> +			pmd_clear(pmd);
 
-Add DT binding for mailbox driver.
+pmd_clear() is one of the operations pmd_free_pte_page() needs to do.
+See the x86 version.
 
-Signed-off-by: Ruyi Wang <wangruyi@huawei.com>
-Signed-off-by: Kaihua Zhong <zhongkaihua@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> +			flush_tlb_pgtable(&init_mm, addr);
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 63d4f9d..3788448 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -298,6 +298,14 @@
- 			#reset-cells = <2>;
- 		};
- 
-+		mailbox: mailbox at e896b000 {
-+			compatible = "hisilicon,hi3660-mbox";
-+			reg = <0x0 0xe896b000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
-+			#mbox-cells = <3>;
-+		};
-+
- 		dual_timer0: timer at fff14000 {
- 			compatible = "arm,sp804", "arm,primecell";
- 			reg = <0x0 0xfff14000 0x0 0x1000>;
--- 
-1.9.1
+You can call it in pmd_free_pte_page() on arm64 as well. 
+
+> +			if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
+> +				pmd_free_pte_page(&old_pmd);
+>  				continue;
+> +			} else
+> +				set_pmd(pmd, old_pmd);
+
+I do not understand why you needed to make this change. 
+pmd_free_pte_page() is defined as an arch-specific function so that you
+can additionally perform TLB purges on arm64.  Please try to make proper
+arm64 implementation of this interface.  And if you find any issue in
+this interface, please let me know.
+
+Same for pud.
+
+Thanks,
+-Toshi
