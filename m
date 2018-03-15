@@ -1,119 +1,131 @@
 From: zsm@chromium.org (Zubin Mithra)
-Date: Thu, 15 Mar 2018 17:08:57 +0000
-Subject: [RFC 1/3] arm: factor out current_stack_pointer
+Date: Thu, 15 Mar 2018 17:08:58 +0000
+Subject: [RFC 2/3] arm: make cpu a percpu variable
 In-Reply-To: <20180315170859.93893-1-zsm@chromium.org>
 References: <20180315170859.93893-1-zsm@chromium.org>
-Message-ID: <20180315170859.93893-2-zsm@chromium.org>
+Message-ID: <20180315170859.93893-3-zsm@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiple header files that rely on current_stack_pointer do not have the
-necessary include <asm/thread_info.h>, and are thus fragile to changes
-in the header soup.
+Without CONFIG_THREAD_INFO_IN_TASK, core code maintains thread_info::cpu
+and arch specific code can use this to build raw_smp_processor_id().
+With CONFIG_THREAD_INFO_IN_TASK, core code maintains task_struct::cpu,
+and arch specific code cannot access this due to header file circular
+dependency.
 
-Subsequent patches will affect the header soup such that including
-<asm/thread_info.h> will result in a circular header include. Factor
-current_thread_info into its own header and have all the users include
-this header explicitely.
+Instead, we can maintain a percpu variable containing the cpu number.
+
+This also means that cpu numbers obtained using smp_processor_id cannot
+be used to set_my_cpu_offset. Use task_cpu(current) instead to get the
+cpu in those cases.
+
+Earlier raw_smp_processor_id() was current_thread_info()->cpu :-
+	mov	r3, sp
+	bic     r3, r3, #8128
+	bic     r3, r3, #63
+	ldr     r0, [r3, #16]
+
+Now it is *raw_cpu_ptr(&cpu_number) :-
+	movw	r3, #57344
+	movt	r3, #32917
+	mrc	15, 0, r0, cr13, cr0, {4}
+	ldr	r0, [r3, r0]
 
 Signed-off-by: Zubin Mithra <zsm@chromium.org>
 ---
- arch/arm/include/asm/percpu.h        | 2 ++
- arch/arm/include/asm/stack_pointer.h | 9 +++++++++
- arch/arm/include/asm/thread_info.h   | 6 +-----
- arch/arm/kernel/return_address.c     | 1 +
- arch/arm/kernel/stacktrace.c         | 1 +
- arch/arm/kernel/unwind.c             | 1 +
- 6 files changed, 15 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/include/asm/stack_pointer.h
+ arch/arm/include/asm/cputype.h | 3 +++
+ arch/arm/include/asm/smp.h     | 3 ++-
+ arch/arm/kernel/setup.c        | 2 +-
+ arch/arm/kernel/smp.c          | 5 +++--
+ arch/arm/kernel/topology.c     | 5 +++++
+ 5 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-index a89b4076cde4..6a19e634d0cf 100644
---- a/arch/arm/include/asm/percpu.h
-+++ b/arch/arm/include/asm/percpu.h
-@@ -16,6 +16,8 @@
- #ifndef _ASM_ARM_PERCPU_H_
- #define _ASM_ARM_PERCPU_H_
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cb546425da8a..10148c7af12f 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -2,6 +2,9 @@
+ #ifndef __ASM_ARM_CPUTYPE_H
+ #define __ASM_ARM_CPUTYPE_H
  
-+#include <asm/stack_pointer.h>
++#include <asm/percpu.h>
++DECLARE_PER_CPU(int, cpu_number);
 +
- /*
-  * Same as asm-generic/percpu.h, except that we store the per cpu offset
-  * in the TPIDRPRW. TPIDRPRW only exists on V6K and V7
-diff --git a/arch/arm/include/asm/stack_pointer.h b/arch/arm/include/asm/stack_pointer.h
-new file mode 100644
-index 000000000000..5a6a8c6d9208
---- /dev/null
-+++ b/arch/arm/include/asm/stack_pointer.h
-@@ -0,0 +1,9 @@
-+#ifndef __ASM_STACK_POINTER_H
-+#define __ASM_STACK_POINTER_H
-+
-+/*
-+ * how to get the current stack pointer in C
-+ */
-+register unsigned long current_stack_pointer asm ("sp");
-+
-+#endif
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index e71cc35de163..56317024d221 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -25,6 +25,7 @@
- struct task_struct;
+ #include <linux/stringify.h>
+ #include <linux/kernel.h>
  
- #include <asm/types.h>
-+#include <asm/stack_pointer.h>
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 709a55989cb0..7e7b198174d6 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -18,7 +18,8 @@
+ # error "<asm/smp.h> included in non-SMP build"
+ #endif
  
- typedef unsigned long mm_segment_t;
+-#define raw_smp_processor_id() (current_thread_info()->cpu)
++#include <asm/cputype.h>
++#define raw_smp_processor_id() (*raw_cpu_ptr(&cpu_number))
  
-@@ -75,11 +76,6 @@ struct thread_info {
- 	.addr_limit	= KERNEL_DS,					\
+ struct seq_file;
+ 
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index fc40a2b40595..6323b4d80306 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -521,7 +521,7 @@ static void __init elf_hwcap_fixup(void)
+ void notrace cpu_init(void)
+ {
+ #ifndef CONFIG_CPU_V7M
+-	unsigned int cpu = smp_processor_id();
++	unsigned int cpu = task_cpu(current);
+ 	struct stack *stk = &stacks[cpu];
+ 
+ 	if (cpu >= NR_CPUS) {
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 2da087926ebe..9584a52eb156 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -372,7 +372,8 @@ asmlinkage void secondary_start_kernel(void)
+ 	 * All kernel threads share the same mm context; grab a
+ 	 * reference and switch to it.
+ 	 */
+-	cpu = smp_processor_id();
++	cpu = task_cpu(current);
++	set_my_cpu_offset(per_cpu_offset(cpu));
+ 	mmgrab(mm);
+ 	current->active_mm = mm;
+ 	cpumask_set_cpu(cpu, mm_cpumask(mm));
+@@ -436,7 +437,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_boot_cpu(void)
+ {
+-	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
++	set_my_cpu_offset(per_cpu_offset(task_cpu(current)));
  }
  
--/*
-- * how to get the current stack pointer in C
-- */
--register unsigned long current_stack_pointer asm ("sp");
--
+ void __init smp_prepare_cpus(unsigned int max_cpus)
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 24ac3cab411d..34b2136deab6 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -30,6 +30,9 @@
+ #include <asm/cputype.h>
+ #include <asm/topology.h>
+ 
++DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
++EXPORT_PER_CPU_SYMBOL(cpu_number);
++
  /*
-  * how to get the thread information struct from C
+  * cpu capacity scale management
   */
-diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
-index 36ed35073289..d76e64250816 100644
---- a/arch/arm/kernel/return_address.c
-+++ b/arch/arm/kernel/return_address.c
-@@ -14,6 +14,7 @@
- #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
- #include <linux/sched.h>
+@@ -310,6 +313,8 @@ void __init init_cpu_topology(void)
+ 	for_each_possible_cpu(cpu) {
+ 		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
  
-+#include <asm/stack_pointer.h>
- #include <asm/stacktrace.h>
- 
- struct return_address_data {
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index a56e7c856ab5..d519b8e0797f 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -4,6 +4,7 @@
- #include <linux/stacktrace.h>
- 
- #include <asm/sections.h>
-+#include <asm/stack_pointer.h>
- #include <asm/stacktrace.h>
- #include <asm/traps.h>
- 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index 0bee233fef9a..860f8ac187e0 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -45,6 +45,7 @@
- #include <linux/spinlock.h>
- #include <linux/list.h>
- 
-+#include <asm/stack_pointer.h>
- #include <asm/stacktrace.h>
- #include <asm/traps.h>
- #include <asm/unwind.h>
++		per_cpu(cpu_number, cpu) = cpu;
++
+ 		cpu_topo->thread_id = -1;
+ 		cpu_topo->core_id =  -1;
+ 		cpu_topo->socket_id = -1;
 -- 
 2.16.2.804.g6dcf76e118-goog
