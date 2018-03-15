@@ -1,121 +1,32 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 15 Mar 2018 16:24:53 +0200
-Subject: [PATCH v3 03/11] mmc: sdhci-omap: Workaround for Errata i843
-In-Reply-To: <20180307132020.30951-4-kishon@ti.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <20180307132020.30951-4-kishon@ti.com>
-Message-ID: <5410610d-4874-9e66-0d5a-966a73422457@intel.com>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 15 Mar 2018 14:27:10 +0000
+Subject: [PATCH v2 1/2] mm/vmalloc: Add interfaces to free unmapped page
+ table
+In-Reply-To: <20180314153835.68e75da3fdc18b27ad0e290c@linux-foundation.org>
+References: <20180314180155.19492-1-toshi.kani@hpe.com>
+ <20180314180155.19492-2-toshi.kani@hpe.com>
+ <20180314153835.68e75da3fdc18b27ad0e290c@linux-foundation.org>
+Message-ID: <1521124026.2693.141.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
-> Errata i843 in AM572x Sitara Processors Silicon Revision 2.0, 1.1
-> (SPRZ429K July 2014?Revised March 2017 [1]) mentions
-> PG 1.0/1.1 silicon has limitations w.r.t frequencies at which MMC1/2/3
-> can operate.
+On Wed, 2018-03-14 at 15:38 -0700, Andrew Morton wrote:
+> On Wed, 14 Mar 2018 12:01:54 -0600 Toshi Kani <toshi.kani@hpe.com> wrote:
+ :
 > 
-> Use soc_device_match() to identify rev 1.0/1.1 silicon and
-> override mmc->f_max according to the errata workaround.
-> "max-frequency" dt property cannot be used since the device
-> tree is added for rev 2.0 silicon.
+> whoops.
 > 
-> soc_device_match() is also used in order to get the IODelay values
-> for rev 1.0/1.1 silicon.
-> 
-> [1] -> http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
-> ---
->  drivers/mmc/host/sdhci-omap.c | 35 ++++++++++++++++++++++++++++++++++-
->  1 file changed, 34 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-> index 0c40b13fb67d..fbc20a4fbb23 100644
-> --- a/drivers/mmc/host/sdhci-omap.c
-> +++ b/drivers/mmc/host/sdhci-omap.c
-> @@ -26,6 +26,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/sys_soc.h>
->  
->  #include "sdhci-pltfm.h"
->  
-> @@ -100,6 +101,7 @@ struct sdhci_omap_data {
->  };
->  
->  struct sdhci_omap_host {
-> +	char			*version;
->  	void __iomem		*base;
->  	struct device		*dev;
->  	struct	regulator	*pbias;
-> @@ -733,12 +735,21 @@ static struct pinctrl_state
->  				  u32 *caps, u32 capmask)
+> --- a/include/asm-generic/pgtable.h~mm-vmalloc-add-interfaces-to-free-unmapped-page-table-fix
+> +++ a/include/asm-generic/pgtable.h
+> @@ -1014,7 +1014,7 @@ static inline int pud_free_pmd_page(pud_
 >  {
->  	struct device *dev = omap_host->dev;
-> +	char *version = omap_host->version;
->  	struct pinctrl_state *pinctrl_state = ERR_PTR(-ENODEV);
-> +	char str[20];
->  
->  	if (!(*caps & capmask))
->  		goto ret;
->  
-> -	pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
-> +	if (version) {
-> +		snprintf(str, 20, "%s-%s", mode, version);
-> +		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, str);
-> +	}
-> +
-> +	if (IS_ERR(pinctrl_state))
-> +		pinctrl_state = pinctrl_lookup_state(omap_host->pinctrl, mode);
-> +
->  	if (IS_ERR(pinctrl_state)) {
->  		dev_err(dev, "no pinctrl state for %s mode", mode);
->  		*caps &= ~capmask;
-> @@ -830,6 +841,16 @@ static int sdhci_omap_config_iodelay_pinctrl_state(struct sdhci_omap_host
 >  	return 0;
 >  }
->  
-> +static const struct soc_device_attribute sdhci_omap_soc_devices[] = {
-> +	{
-> +		.machine = "DRA7[45]*",
-> +		.revision = "ES1.[01]",
-> +	},
-> +	{
-> +		/* sentinel */
-> +	}
-> +};
-> +
->  static int sdhci_omap_probe(struct platform_device *pdev)
+> -static inline int pmd_free_pte_page(pud_t *pmd)
+> +static inline int pmd_free_pte_page(pmd_t *pmd)
 >  {
->  	int ret;
-> @@ -841,6 +862,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  	struct mmc_host *mmc;
->  	const struct of_device_id *match;
->  	struct sdhci_omap_data *data;
-> +	const struct soc_device_attribute *soc;
->  
->  	match = of_match_device(omap_sdhci_match, dev);
->  	if (!match)
-> @@ -875,6 +897,17 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto err_pltfm_free;
->  
-> +	soc = soc_device_match(sdhci_omap_soc_devices);
-> +	if (soc) {
-> +		omap_host->version = "rev11";
-> +		if (!strcmp(dev_name(dev), "4809c000.mmc"))
-> +			mmc->f_max = 96000000;
-> +		if (!strcmp(dev_name(dev), "480b4000.mmc"))
-> +			mmc->f_max = 48000000;
-> +		if (!strcmp(dev_name(dev), "480ad000.mmc"))
-> +			mmc->f_max = 48000000;
-> +	}
-> +
->  	pltfm_host->clk = devm_clk_get(dev, "fck");
->  	if (IS_ERR(pltfm_host->clk)) {
->  		ret = PTR_ERR(pltfm_host->clk);
-> 
+>  	return 0;
+>  }
+
+Thanks Andrew for catching this!!
+-Toshi
