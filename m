@@ -1,92 +1,40 @@
-From: neelx@redhat.com (Daniel Vacek)
-Date: Thu, 15 Mar 2018 16:12:20 +0100
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <CAKv+Gu8aVr_u4o8QR2Nquo9it54nSbvPMj4vcZ+CQa3uoOakrA@mail.gmail.com>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
- <CACjP9X_A1VsprX20XfEi31XVrySkScZDJsxUTh3Lf_6xr70Mug@mail.gmail.com>
- <CAKv+Gu-NfXm5YLWXAPsf6zycPs7Ti9qPLQ7FvpOrjdPz5hEP7Q@mail.gmail.com>
- <CACjP9X_xjyvQD_b1XNAZi=vjX0wGUmQuGJN8HahBmXx55OUE6A@mail.gmail.com>
- <CAKv+Gu8aVr_u4o8QR2Nquo9it54nSbvPMj4vcZ+CQa3uoOakrA@mail.gmail.com>
-Message-ID: <CACjP9X_bKJNeSwbPURmJ8bwDZ5BW2ZrykhT-cNapzKjddeWStQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Mar 2018 16:12:33 +0100
+Subject: [GIT PULL 2/6] i.MX SoC changes for 4.17
+In-Reply-To: <1521113800-16401-2-git-send-email-shawnguo@kernel.org>
+References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
+ <1521113800-16401-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAK8P3a1vNZf9uk+u+mnot37TuKYfN-P_xxXm+uG6p0oyPjZTEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 8:45 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 15 March 2018 at 07:44, Daniel Vacek <neelx@redhat.com> wrote:
->> On Thu, Mar 15, 2018 at 8:36 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> On 15 March 2018 at 02:23, Daniel Vacek <neelx@redhat.com> wrote:
->>>> On Wed, Mar 14, 2018 at 8:29 PM, Ard Biesheuvel
->>>> <ard.biesheuvel@linaro.org> wrote:
->>>>> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
->>>>>
->>>>> Commit 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock
->>>>> alignment") modified the logic in memmap_init_zone() to initialize
->>>>> struct pages associated with invalid PFNs, to appease a VM_BUG_ON()
->>>>> in move_freepages(), which is redundant by its own admission, and
->>>>> dereferences struct page fields to obtain the zone without checking
->>>>> whether the struct pages in question are valid to begin with.
->>>>>
->>>>> Commit 864b75f9d6b0 only makes it worse, since the rounding it does
->>>>> may cause pfn assume the same value it had in a prior iteration of
->>>>> the loop, resulting in an infinite loop and a hang very early in the
->>>>> boot. Also, since it doesn't perform the same rounding on start_pfn
->>>>> itself but only on intermediate values following an invalid PFN, we
->>>>> may still hit the same VM_BUG_ON() as before.
->>>>>
->>>>> So instead, let's fix this at the core, and ensure that the BUG
->>>>> check doesn't dereference struct page fields of invalid pages.
->>>>>
->>>>> Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
->>>>> Cc: Daniel Vacek <neelx@redhat.com>
->>>>> Cc: Mel Gorman <mgorman@techsingularity.net>
->>>>> Cc: Michal Hocko <mhocko@suse.com>
->>>>> Cc: Paul Burton <paul.burton@imgtec.com>
->>>>> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
->>>>> Cc: Vlastimil Babka <vbabka@suse.cz>
->>>>> Cc: Andrew Morton <akpm@linux-foundation.org>
->>>>> Cc: Linus Torvalds <torvalds@linux-foundation.org>
->>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>> ---
->>>>>  mm/page_alloc.c | 13 +++++--------
->>>>>  1 file changed, 5 insertions(+), 8 deletions(-)
->>>>>
->>>>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->>>>> index 3d974cb2a1a1..635d7dd29d7f 100644
->>>>> --- a/mm/page_alloc.c
->>>>> +++ b/mm/page_alloc.c
->>>>> @@ -1910,7 +1910,9 @@ static int move_freepages(struct zone *zone,
->>>>>          * Remove at a later date when no bug reports exist related to
->>>>>          * grouping pages by mobility
->>>>>          */
->>>>> -       VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
->>>>> +       VM_BUG_ON(pfn_valid(page_to_pfn(start_page)) &&
->>>>> +                 pfn_valid(page_to_pfn(end_page)) &&
->>>>> +                 page_zone(start_page) != page_zone(end_page));
->>>>
->>>> Hi, I am on vacation this week and I didn't have a chance to test this
->>>> yet but I am not sure this is correct. Generic pfn_valid() unlike the
->>>> arm{,64} arch specific versions returns true for all pfns in a section
->>>> if there is at least some memory mapped in that section. So I doubt
->>>> this prevents the crash I was targeting. I believe pfn_valid() does
->>>> not change a thing here :(
->>>>
->>>
->>> If this is the case, memblock_next_valid_pfn() is broken since it
->>> skips valid PFNs, and we should be fixing that instead.
->>
->> How do you define valid pfn? Maybe the generic version of pfn_valid()
->> should be fixed???
->>
+On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 >
-> memblock_next_valid_pfn() skips PFNs for which pfn_valid() returns
-> true. That is clearly a bug.
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.17
+>
+> for you to fetch changes up to dee5dee2a5b285d20f55a4758d3a51349691eeea:
+>
+>   ARM: imx: Add basic msl support for imx6sll (2018-03-09 09:22:06 +0800)
+>
+> ----------------------------------------------------------------
+> i.MX SoC changes for 4.17:
+>  - Add i.MX 6SoloLiteLite (i.MX6SLL) SoC support on top of the existing
+>    i.MX6SL platform code.
+>  - Improve the SoC revision mapping by utilizing the MAJOR field of
+>    ANATOP DIGPROG register.
+>  - Add CPUIDLE_FLAG_TIMER_STOP flag for cpuidle ARM power off state,
+>    so that we can use ARM generic timer for some i.MX6 SoC.
+>  - Set low-power interrupt mask for i.MX25 to support STOP mode.
+>  - Drop EPIT driver as there is no user of it.
+>  - Simplify the error path of imx6_pm_get_base() a bit.
 
-So pfn_valid() does not mean this frame is usable memory?
+Pulled into next/soc. However, I need two fixups for bugs I ran into during
+linux-next randconfig testing. Sending them out now, please Ack so
+I can apply them directly.
 
-OK, in that case we need to fix or revert memblock_next_valid_pfn().
-That works for me.
-
---nX
+       Arnd
