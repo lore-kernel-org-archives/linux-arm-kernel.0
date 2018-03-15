@@ -1,38 +1,56 @@
 From: harald@ccbib.org (Harald Geyer)
-Date: Thu, 15 Mar 2018 16:25:05 +0000
-Subject: [PATCHv2 0/5] arm64: allwinner: Add support for TERES-I laptop
-Message-ID: <20180315162510.11669-1-harald@ccbib.org>
+Date: Thu, 15 Mar 2018 16:25:08 +0000
+Subject: [PATCHv2 3/5] arm64: dts: allwinner: a64: add simplefb for A64 SoC
+In-Reply-To: <20180315162510.11669-1-harald@ccbib.org>
+References: <20180315162510.11669-1-harald@ccbib.org>
+Message-ID: <20180315162510.11669-4-harald@ccbib.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the TERES I open hardware laptop produced
-by olimex. With these patches and a bootloader capable of setting up
-simple framebuffer the laptop is quite useable.
+The A64 SoC features two display pipelines, one has a LCD output, the
+other has a HDMI output.
 
-Patches 1-4 add some pin descriptions and devices in the A64 dtsi, which
-are useful to have on the teres.
-Patch 5 finally adds the board dts itself.
+Add support for simplefb for the LCD output. Tested on Teres I.
 
-Changes to the previous version are listed along the individual patches.
+This patch was inspired by work of Icenowy Zheng.
 
-best regards,
-Harald
+Signed-off-by: Harald Geyer <harald@ccbib.org>
+---
+changes since v1: none
 
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Harald Geyer (5):
-  arm64: dts: allwinner: a64: Add i2c0 pins
-  arm64: dts: allwinner: a64: Add watchdog
-  arm64: dts: allwinner: a64: add simplefb for A64 SoC
-  arm64: dts: allwinner: a64: Add pwm device
-  arm64: allwinner: a64: Add support for TERES-I laptop
-
- .../devicetree/bindings/pwm/pwm-sun4i.txt          |   1 +
- .../devicetree/bindings/watchdog/sunxi-wdt.txt     |   6 +-
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-a64-teres-i.dts      | 279 +++++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      |  46 ++++
- 5 files changed, 331 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 8401e7f887ff..1b2ef28c42bd 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -52,6 +52,26 @@
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+ 
++	chosen {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++/*
++ * The pipeline mixer0-lcd0 depends on clock CLK_MIXER0 from DE2 CCU.
++ * However there is no support for this clock on A64 yet, so we depend
++ * on the upstream clocks here to keep them (and thus CLK_MIXER0) up.
++ */
++		simplefb_lcd: framebuffer-lcd {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "mixer0-lcd0";
++			clocks = <&ccu CLK_TCON0>,
++				 <&ccu CLK_DE>, <&ccu CLK_BUS_DE>;
++			status = "disabled";
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 2.11.0
