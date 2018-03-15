@@ -1,36 +1,133 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 15 Mar 2018 16:27:19 +0200
-Subject: [PATCH v3 04/11] mmc: sdhci-omap: Invoke sdhci_get_of_property to
- read sdhci dt properties
-In-Reply-To: <20180307132020.30951-5-kishon@ti.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <20180307132020.30951-5-kishon@ti.com>
-Message-ID: <e7c61727-0ff5-edb5-b3eb-679f07afbce6@intel.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 15 Mar 2018 09:31:27 -0500
+Subject: [PATCH v2] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is observed
+ before enabling
+Message-ID: <1521124287-25009-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
-> Invoke sdhci_get_of_property defined in sdhci-pltfm.c to read
-> sdhci specific properties from dt node.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+The definition of the GICR_CTLR.RWP control bit was expanded to indicate
+status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
+or completed. Software must observe GICR_CTLR.RWP==0 after clearing
+GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
+GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Changes since v1:
+  -Moved LPI disable code to a seperate function as Marc suggested.
+  -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
+  
+ drivers/irqchip/irq-gic-v3-its.c   | 66 ++++++++++++++++++++++++++++++--------
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 2 files changed, 53 insertions(+), 14 deletions(-)
 
-> ---
->  drivers/mmc/host/sdhci-omap.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-> index fbc20a4fbb23..314dbe4d7412 100644
-> --- a/drivers/mmc/host/sdhci-omap.c
-> +++ b/drivers/mmc/host/sdhci-omap.c
-> @@ -893,6 +893,7 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  	host->ioaddr += offset;
->  
->  	mmc = host->mmc;
-> +	sdhci_get_of_property(pdev);
->  	ret = mmc_of_parse(mmc);
->  	if (ret)
->  		goto err_pltfm_free;
-> 
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 1d3056f..cba71a7 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -33,6 +33,8 @@
+ #include <linux/of_platform.h>
+ #include <linux/percpu.h>
+ #include <linux/slab.h>
++#include <linux/time64.h>
++#include <linux/iopoll.h>
+ 
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic-v3.h>
+@@ -1875,16 +1877,6 @@ static void its_cpu_init_lpis(void)
+ 		gic_data_rdist()->pend_page = pend_page;
+ 	}
+ 
+-	/* Disable LPIs */
+-	val = readl_relaxed(rbase + GICR_CTLR);
+-	val &= ~GICR_CTLR_ENABLE_LPIS;
+-	writel_relaxed(val, rbase + GICR_CTLR);
+-
+-	/*
+-	 * Make sure any change to the table is observable by the GIC.
+-	 */
+-	dsb(sy);
+-
+ 	/* set PROPBASE */
+ 	val = (page_to_phys(gic_rdists->prop_page) |
+ 	       GICR_PROPBASER_InnerShareable |
+@@ -3288,13 +3280,59 @@ static bool gic_rdists_supports_plpis(void)
+ 	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
+ }
+ 
++static int redist_disable_lpis(void)
++{
++	void __iomem *rbase = gic_data_rdist_rd_base();
++	u64 val;
++	int ret;
++
++	if (!gic_rdists_supports_plpis()) {
++		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
++		return -ENXIO;
++	}
++
++	val = readl_relaxed(rbase + GICR_CTLR);
++	if (!(val & GICR_CTLR_ENABLE_LPIS))
++		return 0;
++
++	/* Disable LPIs */
++	val &= ~GICR_CTLR_ENABLE_LPIS;
++	writel_relaxed(val, rbase + GICR_CTLR);
++
++	/* Make sure any change to GICR_CTLR is observable by the GIC */
++	dsb(sy);
++
++	/* Wait for GICR_CTLR.GICR_CTLR_ENABLE_LPIS==0 or timeout */
++	ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
++					 !(val & GICR_CTLR_ENABLE_LPIS), 1,
++					 USEC_PER_SEC);
++	if (ret) {
++		pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
++		return -EBUSY;
++	}
++
++	/* Wait for GICR_CTLR.RWP==0 or timeout */
++	ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
++					 !(val & GICR_CTLR_RWP), 1,
++					 USEC_PER_SEC);
++	if (ret) {
++		pr_err("CPU%d: Failed to observe RWP==0 after enabling LPIs\n",
++		       smp_processor_id());
++		return -EBUSY;
++	}
++
++	return 0;
++}
++
+ int its_cpu_init(void)
+ {
++	int ret;
++
+ 	if (!list_empty(&its_nodes)) {
+-		if (!gic_rdists_supports_plpis()) {
+-			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+-			return -ENXIO;
+-		}
++		ret = redist_disable_lpis();
++		if (ret)
++			return ret;
++
+ 		its_cpu_init_lpis();
+ 		its_cpu_init_collection();
+ 	}
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index c00c4c33..4d5fb60 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -106,6 +106,7 @@
+ #define GICR_PIDR2			GICD_PIDR2
+ 
+ #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
++#define GICR_CTLR_RWP			(1UL << 3)
+ 
+ #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
