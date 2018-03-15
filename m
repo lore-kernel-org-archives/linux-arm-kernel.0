@@ -1,36 +1,78 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:12 +0100
-Subject: [PATCH 10/60] arm: dts: kirkwood-db-88f6281: use
+Date: Thu, 15 Mar 2018 17:50:08 +0100
+Subject: [PATCH 06/60] arm: dts: kirkwood-linkstation-lswvl: use
  SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-11-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-7-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the recent trend for the license description
+Follow the recent trend for the license description, and also fix the
+wrongly stated X11 to MIT.
 
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+As already pointed on the DT ML, the X11 license text [1] is explicitly
+for the X Consortium and has a couple of extra clauses. The MIT
+license text [2] is actually what the current DT files claim.
+
+[1] https://spdx.org/licenses/X11.html
+[2] https://spdx.org/licenses/MIT.html
+
+Cc: Roger Shimizu <rogershimizu@gmail.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-db-88f6281.dts | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts | 39 +-----------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-db-88f6281.dts b/arch/arm/boot/dts/kirkwood-db-88f6281.dts
-index aee6f02b1c80..2adb17c955aa 100644
---- a/arch/arm/boot/dts/kirkwood-db-88f6281.dts
-+++ b/arch/arm/boot/dts/kirkwood-db-88f6281.dts
-@@ -1,12 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
+diff --git a/arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts b/arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts
+index ef8fc1a077f8..e0f62adc0d5d 100644
+--- a/arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts
++++ b/arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts
+@@ -1,46 +1,9 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Marvell DB-88F6281-BP Development Board Setup
+  * Device Tree file for Buffalo Linkstation LS-WVL
   *
-  * Saeed Bishara <saeed@marvell.com>
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-  *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
+  * Copyright (C) 2015, 2016
+  * Roger Shimizu <rogershimizu@gmail.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
   */
  
  /dts-v1/;
