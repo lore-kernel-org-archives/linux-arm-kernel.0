@@ -1,54 +1,106 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 13:02:56 -0500
-Subject: [PATCH] ARM: davinci: DA8XX: fix oops in USB PHY driver due to stack
- allocated platform platform_data
-Message-ID: <1521136976-32730-1-git-send-email-david@lechnology.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Mar 2018 18:06:12 +0000
+Subject: [RFC 2/3] arm: make cpu a percpu variable
+In-Reply-To: <20180315170859.93893-3-zsm@chromium.org>
+References: <20180315170859.93893-1-zsm@chromium.org>
+ <20180315170859.93893-3-zsm@chromium.org>
+Message-ID: <20180315180612.vpae3c5k4msc2tz3@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a possible kernel oops due to using stack allocated platform
-data for the USB PHY driver on DA8XX devices. If the platform device
-probe is deferred, then we get a corrupt pointer for the platform data.
+On Thu, Mar 15, 2018 at 05:08:58PM +0000, Zubin Mithra wrote:
+> Without CONFIG_THREAD_INFO_IN_TASK, core code maintains thread_info::cpu
+> and arch specific code can use this to build raw_smp_processor_id().
+> With CONFIG_THREAD_INFO_IN_TASK, core code maintains task_struct::cpu,
+> and arch specific code cannot access this due to header file circular
+> dependency.
+> 
+> Instead, we can maintain a percpu variable containing the cpu number.
+> 
+> This also means that cpu numbers obtained using smp_processor_id cannot
+> be used to set_my_cpu_offset. Use task_cpu(current) instead to get the
+> cpu in those cases.
+> 
+> Earlier raw_smp_processor_id() was current_thread_info()->cpu :-
+> 	mov	r3, sp
+> 	bic     r3, r3, #8128
+> 	bic     r3, r3, #63
+> 	ldr     r0, [r3, #16]
+> 
+> Now it is *raw_cpu_ptr(&cpu_number) :-
+> 	movw	r3, #57344
+> 	movt	r3, #32917
+> 	mrc	15, 0, r0, cr13, cr0, {4}
+> 	ldr	r0, [r3, r0]
 
-We now use a global static struct for the platform data so that the
-platform data pointer does not get written over.
+It's probably worth noting that with the thread_info moved off of the
+stack, were we to use that to get at the cpu number, this would require
+a similar sequence to the raw_cpu_ptr() code here.
 
-Tested on OMAP-L138 LCDK board using legacy board file.
+This might make more sense after a patch using a register for the
+thread_info (which would also allow for having separate IRQ stacks).
 
-Fixes: 9b504750923cb ("ARM: davinci: da8xx: Add USB PHY platform device")
-Signed-off-by: David Lechner <david@lechnology.com>
----
- arch/arm/mach-davinci/usb-da8xx.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+> 
+> Signed-off-by: Zubin Mithra <zsm@chromium.org>
+> ---
+>  arch/arm/include/asm/cputype.h | 3 +++
+>  arch/arm/include/asm/smp.h     | 3 ++-
+>  arch/arm/kernel/setup.c        | 2 +-
+>  arch/arm/kernel/smp.c          | 5 +++--
+>  arch/arm/kernel/topology.c     | 5 +++++
+>  5 files changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index cb546425da8a..10148c7af12f 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -2,6 +2,9 @@
+>  #ifndef __ASM_ARM_CPUTYPE_H
+>  #define __ASM_ARM_CPUTYPE_H
+>  
+> +#include <asm/percpu.h>
+> +DECLARE_PER_CPU(int, cpu_number);
+> +
 
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index b1e53e31..9ff9624 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -23,17 +23,20 @@
- #define DA8XX_USB0_BASE		0x01e00000
- #define DA8XX_USB1_BASE		0x01e25000
- 
-+static struct da8xx_usb_phy_platform_data da8xx_usb_phy_pdata;
-+
- static struct platform_device da8xx_usb_phy = {
- 	.name		= "da8xx-usb-phy",
- 	.id		= -1,
-+	.dev		= {
-+		.platform_data	= &da8xx_usb_phy_pdata,
-+	},
- };
- 
-+
- int __init da8xx_register_usb_phy(void)
- {
--	struct da8xx_usb_phy_platform_data pdata;
--
--	pdata.cfgchip = da8xx_get_cfgchip();
--	da8xx_usb_phy.dev.platform_data = &pdata;
-+	da8xx_usb_phy_pdata.cfgchip = da8xx_get_cfgchip();
- 
- 	return platform_device_register(&da8xx_usb_phy);
- }
--- 
-2.7.4
+Why isn't this defined in <asm/smp.h>, as we do on arm64?
+
+> --- a/arch/arm/include/asm/smp.h
+> +++ b/arch/arm/include/asm/smp.h
+> @@ -18,7 +18,8 @@
+>  # error "<asm/smp.h> included in non-SMP build"
+>  #endif
+>  
+> -#define raw_smp_processor_id() (current_thread_info()->cpu)
+> +#include <asm/cputype.h>
+> +#define raw_smp_processor_id() (*raw_cpu_ptr(&cpu_number))
+
+It might be worth dragging the comment along from arm64, explaining why
+we must use *raw_cpu_ptr(), and not this_cpu_read(), etc.
+
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -30,6 +30,9 @@
+>  #include <asm/cputype.h>
+>  #include <asm/topology.h>
+>  
+> +DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
+> +EXPORT_PER_CPU_SYMBOL(cpu_number);
+
+Why not in smp.c, as with arm64?
+
+> +
+>  /*
+>   * cpu capacity scale management
+>   */
+> @@ -310,6 +313,8 @@ void __init init_cpu_topology(void)
+>  	for_each_possible_cpu(cpu) {
+>  		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
+>  
+> +		per_cpu(cpu_number, cpu) = cpu;
+
+Likewise, why isn't this in smp_prepare_cpus() in smp.c?
+
+This isn't toplogy related, so it would be better placed there.
+
+Thanks,
+Mark.
