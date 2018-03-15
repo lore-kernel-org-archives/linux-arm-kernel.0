@@ -1,50 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 15 Mar 2018 20:20:25 +0000
-Subject: [PATCH 00/60] use SPDX-License-Identifier for Kirkwood boards
-In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
-References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315202025.GJ17115@io.lakedaemon.net>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Thu, 15 Mar 2018 21:21:37 +0100
+Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
+In-Reply-To: <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
+References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
+ <20180315165516.GA9519@kroah.com>
+ <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
+Message-ID: <20180315212137.57ca7c65@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hi Gabriel,
 
-On Thu, Mar 15, 2018 at 05:50:02PM +0100, Gregory CLEMENT wrote:
-> Hi,
-> 
-> this series follow the recent trend for the license description to use
-> the SPDX-License-Identifier.
+On Thu, 15 Mar 2018 18:55:25 +0000, Gabriel Matni
+<gabriel.matni@exfo.com> wrote:
 
-As there is no attempt to change any licenses at this time,
+> From: Gabriel Matni <gabriel.matni@exfo.com>
+> 
+> Fixes missing characters on kernel console at low baud rates (i.e.9600).
+> The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
+> that the transmitter holding register (THR) is ready to receive a new byte.
+> 
+> TX_EMP tells us when it is possible to send a break sequence via
+> SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+> empty, it does not guarantee that a new byte can be written just yet.
+> 
+> Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
+>       serial port")
+> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
+> Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
+> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
+> 
+> ---
+>  drivers/tty/serial/mvebu-uart.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+> index a100e98259d7..400e1bc558b2 100644
+> --- a/drivers/tty/serial/mvebu-uart.c
+> +++ b/drivers/tty/serial/mvebu-uart.c
+> @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+>  	u32 val;
+>  
+>  	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+> -				  (val & STAT_TX_EMP), 1, 10000);
+> +             (val & STAT_TX_RDY(port)), 1, 10000);
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+I think this line should be indented like the one you replaced.
 
-> 
-> The device tree for the SoCs were already converted because they
-> didn't have any licenses, so they were attributed a GPLv2.0 one.
-> 
-> In the end for kirkwood we have:
-> 
-> - 89 files under GPL2.0 (including the ones that initially didn't have
->   any license)
-> 
-> - 8 files under GPL2.0+
-> 
-> - 8 files under dual license GPL2.0+/MIT (improperly called X11)
-> 
-> For the Armada we already switched all the file under a dual license
-> GPL2.0/MIT or GPL2.0+/MIT, allowing other project to reuse the same
-> device tree file. Maybe we should do the same for kirkwood, at least
-> for the device tree describing the SoCs.
-> 
-> But I know it is not so easy because in this case we need to contact
-> all the author in order to modify the license.
+Thanks,
+Miqu?l
 
-iirc, there was an explicit objection.  I don't recall who though.  Has
-anyone from *BSD been asking for a license change, or not supporting a
-board because of this?  I have a softspot for kirkwood boards, but they
-are getting a bit long in the tooth...
-
-thx,
-
-Jason.
+-- 
+Miquel Raynal, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
