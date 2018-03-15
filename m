@@ -1,9 +1,9 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 16:07:02 +0100
-Subject: [PATCH 21/36] arm: dts: armada-xp-gp: use SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 16:06:57 +0100
+Subject: [PATCH 16/36] arm: dts: armada-398-db: use SPDX-License-Identifier
 In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com>
 References: <20180315150717.10588-1-gregory.clement@bootlin.com>
-Message-ID: <20180315150717.10588-22-gregory.clement@bootlin.com>
+Message-ID: <20180315150717.10588-17-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,25 +17,25 @@ license text [2] is actually what the current DT files claim.
 [1] https://spdx.org/licenses/X11.html
 [2] https://spdx.org/licenses/MIT.html
 
-Cc: Gregory CLEMENT <gregory.clement@bootlin.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/armada-xp-gp.dts | 39 +-------------------------------------
+ arch/arm/boot/dts/armada-398-db.dts | 39 +------------------------------------
  1 file changed, 1 insertion(+), 38 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index ac9eab8ac186..c143556bbb7b 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -1,3 +1,4 @@
+diff --git a/arch/arm/boot/dts/armada-398-db.dts b/arch/arm/boot/dts/armada-398-db.dts
+index f0e0379f7619..2337f24784f7 100644
+--- a/arch/arm/boot/dts/armada-398-db.dts
++++ b/arch/arm/boot/dts/armada-398-db.dts
+@@ -1,47 +1,10 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
  /*
-  * Device Tree file for Marvell Armada XP development board
-  * (DB-MV784MP-GP)
-@@ -8,44 +9,6 @@
-  * Gregory CLEMENT <gregory.clement@free-electrons.com>
-  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  * Device Tree Include file for Marvell Armada 398 Development Board
   *
+  * Copyright (C) 2015 Marvell
+  *
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+- *
 - * This file is dual-licensed: you can use it either under the terms
 - * of the GPL or the X11 license, at your option. Note that this dual
 - * licensing only applies to this file, and not this project as a
@@ -73,9 +73,8 @@ index ac9eab8ac186..c143556bbb7b 100644
 - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - *     OTHER DEALINGS IN THE SOFTWARE.
-- *
-  * Note: this Device Tree assumes that the bootloader has remapped the
-  * internal registers to 0xf1000000 (instead of the default
-  * 0xd0000000). The 0xf1000000 is the default used by the recent,
+  */
+ 
+ /dts-v1/;
 -- 
 2.16.1
