@@ -1,11 +1,11 @@
 From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Wed, 14 Mar 2018 18:45:47 -0700
-Subject: [PATCH 7/7] ixgbevf: eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1520997629-17361-7-git-send-email-okaya@codeaurora.org>
+Date: Wed, 14 Mar 2018 18:47:23 -0700
+Subject: [PATCH 2/7] ixgbe: eliminate duplicate barriers on weakly-ordered
+ archs
+In-Reply-To: <1520997629-17361-2-git-send-email-okaya@codeaurora.org>
 References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
- <1520997629-17361-7-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAKgT0Uf+1U6tBFTFO=c_4AgEDwqkB=hvAFk4b0G+_-mMLtZ5Mg@mail.gmail.com>
+ <1520997629-17361-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAKgT0Ue=hYC6qRO9Z193JKKvkQtmyaXm3rcy3naxFqTRW0J_8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,51 +20,5 @@ On Tue, Mar 13, 2018 at 8:20 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
 > writel_relaxed().
 >
 > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 ++++-
->  drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 7 +++++++
->  2 files changed, 11 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-> index f695242..64d0e0b 100644
-> --- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-> +++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-> @@ -244,9 +244,12 @@ static inline u16 ixgbevf_desc_unused(struct ixgbevf_ring *ring)
->         return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
->  }
->
-> +/* Assumes caller has executed a write barrier to order memory and device
-> + * requests.
-> + */
->  static inline void ixgbevf_write_tail(struct ixgbevf_ring *ring, u32 value)
->  {
-> -       writel(value, ring->tail);
-> +       writel_relaxed(value, ring->tail);
->  }
->
->  #define IXGBEVF_RX_DESC(R, i)  \
-> diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-> index 9b3d43d..0ba7f59 100644
-> --- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-> +++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-> @@ -3643,6 +3643,13 @@ static void ixgbevf_tx_map(struct ixgbevf_ring *tx_ring,
->
->         tx_ring->next_to_use = i;
->
-> +       /* Force memory writes to complete before letting h/w
-> +        * know there are new descriptors to fetch.  (Only
-> +        * applicable for weak-ordered memory model archs,
-> +        * such as IA-64).
-> +        */
-> +       wmb();
 
-This memory barrier is redundant. There is a wmb() that is called
-about 10 lines before this.
-
-> +
->         /* notify HW of packet */
->         ixgbevf_write_tail(tx_ring, i);
->
-> --
-> 2.7.4
->
+In this patch you missed the writel at the end of ixgbe_tx_map.
