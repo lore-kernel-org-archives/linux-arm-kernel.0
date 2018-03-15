@@ -1,32 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Mar 2018 16:25:10 +0100
-Subject: [GIT PULL 1/6] i.MX drivers updates for 4.17
-In-Reply-To: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a32SL4vaD+o8wRWDnnv0e0k5qyER9Ly-2j9PZAOrkyV6w@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 15 Mar 2018 15:25:12 +0000
+Subject: [PATCH 3/3] arm64: dts: update the cpu idle node
+In-Reply-To: <20180208075436.38443-3-ran.wang_1@nxp.com>
+References: <20180208075436.38443-1-ran.wang_1@nxp.com>
+ <20180208075436.38443-3-ran.wang_1@nxp.com>
+Message-ID: <346ad3d2-04e4-7df3-5187-36124b3c717b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
->
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.17
->
-> for you to fetch changes up to f40a1e3705be23e845fbeec66acf3a6582524145:
->
->   soc: imx: gpc: ARM power domain should be always-on (2018-02-12 13:07:48 +0800)
->
-> ----------------------------------------------------------------
-> i.MX drivers update for 4.17:
->  - Set GENPD_FLAG_ALWAYS_ON flag for ARM power domain to avoid incorrect
->    power state in sysfs pm_genpd_summary output.
+(sorry for replying so late, just found this by accident when clearing
+ old emails)
 
-Pulled into next/drivers. I can't really tell from the patch description whether
-this is urgent or not. Can you confirm that we don't want this in 4.16 or older
-kernels?
+On 08/02/18 07:54, Ran Wang wrote:
+> From: Yuantian Tang <andy.tang@nxp.com>
+> 
+> According to PSCI standard v0.2, for CPU_SUSPEND call, which is
+> used by cpu idle framework, bit[16] of state parameter must be 0.
+> So update bit[16] of property 'arm,psci-suspend-param', which is
+> used as state parameter, to 0.
+> 
+This changelog makes zero sense to me.
 
-        Arnd
+1. PSCI specification makes no reference to "cpu idle framework".
+   It's not a Linux specification to reference anything specific to
+   Linux CPUIdle framework.
+
+2. "for CPU_SUSPEND call,...bit[16] of state parameter must be 0."
+   Where exactly to you see that ? Specification tells what value of
+   0 or 1 in bit[16] means.
+
+3. Is this retention state and doesn't need any save restore ? If not
+   this change is wrong and will break if and when we use
+   CPU_PM_CPU_IDLE_ENTER_RETENTION if this bit is not set.
+
+-- 
+Regards,
+Sudeep
