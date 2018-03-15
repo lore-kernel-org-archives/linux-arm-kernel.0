@@ -1,40 +1,62 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 15 Mar 2018 16:18:49 +0200
-Subject: [PATCH v3 02/11] mmc: sdhci-omap: Remove setting ADMA capability
- in driver
-In-Reply-To: <20180307132020.30951-3-kishon@ti.com>
-References: <20180307132020.30951-1-kishon@ti.com>
- <20180307132020.30951-3-kishon@ti.com>
-Message-ID: <a867eebf-2c32-4a0f-713a-766d81d52c4c@intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Mar 2018 15:19:43 +0100
+Subject: [PATCH v6 00/25] PM / Domains: Support hierarchical CPU
+ arrangement (PSCI/ARM)
+In-Reply-To: <20180314171914.tdwtppsvjsgxiqlv@lakrids.cambridge.arm.com>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+ <20180314171914.tdwtppsvjsgxiqlv@lakrids.cambridge.arm.com>
+Message-ID: <CAPDyKFq5kZ5j-kBN=YyjGmn=_AEUEwe+QbSguEEAvsP87A0Kng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
-> sdhci can directly get ADMA capability from MMCHS_CAPA register.
-> Remove explicitly setting ADMA here as some instances might not have
-> ADMA enabled. (sdhci_read_caps() is also removed from here since
-> sdhci_setup_host() invokes it).
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 14 March 2018 at 18:19, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ulf,
+>
+> On Wed, Mar 14, 2018 at 05:58:10PM +0100, Ulf Hansson wrote:
+>> For ARM, the PSCI firmware interface may be managing the power to the CPUs.
+>> Depending on the SoC, CPUs may also be arranged in hierarchical manner, which
+>> could add another level of complexity from a CPU idle management point of view.
+>>
+>> PSCI v1.0+ adds support for the so called OS initiated CPU suspend mode, which
+>> enables a more fine grained method, allowing Linux to get more control, in
+>> regards to being energy efficient. This is typically useful for these kind of
+>> complex battery driven platforms.
+>
+>> The series is based on v4.16-rc5, but applies also as of today to Rafael's
+>> linux-pm.git next branch. The code has been tested on a QCOM 410c dragonboard
+>> and I except that test coverage should be increased by some more boards
+>> shortly (for ARM64 with PSCI OSI support - only a few DT changes are needed).
+>
+> Do we have any numbers to show how this affects energy efficiency?
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+What kind of numbers are you looking for?
 
-> ---
->  drivers/mmc/host/sdhci-omap.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-omap.c b/drivers/mmc/host/sdhci-omap.c
-> index 3cce30584d2f..0c40b13fb67d 100644
-> --- a/drivers/mmc/host/sdhci-omap.c
-> +++ b/drivers/mmc/host/sdhci-omap.c
-> @@ -923,9 +923,6 @@ static int sdhci_omap_probe(struct platform_device *pdev)
->  	host->mmc_host_ops.card_busy = sdhci_omap_card_busy;
->  	host->mmc_host_ops.execute_tuning = sdhci_omap_execute_tuning;
->  
-> -	sdhci_read_caps(host);
-> -	host->caps |= SDHCI_CAN_DO_ADMA2;
-> -
->  	ret = sdhci_setup_host(host);
->  	if (ret)
->  		goto err_put_sync;
-> 
+I don't have fresh energy numbers at hand, but of course I can run
+some use cases and trying to get some data from the ARM energy probe.
+
+What I have done recently, is of course to verify the solution using
+trace_printk(). That in way by checking statistics from it, to for
+example find out how often we enter an idle state for the CPU cluster
+(and how long we stay in it).
+
+However, as I have been working on the QCOM 410c, which currently uses
+a proprietary ATF binary and which has the PSCI OSI mode supported.
+Just leaving it in the Platform Coordinated mode and test to get a
+comparison, won't actually say us much - because we don't know, in
+what way QCOM implemented the PC mode (if at all), but of course I can
+ask.
+
+>
+> Are there any other platforms with OSI support?
+
+Our goal is to implement OSI support in the upstream version of ATF,
+so anybody that want it can pick it for their ARM SoC.
+
+We have so far played with a few hacks in ATF to enable OSI mode, as
+to test this on a few other ARM SoCs (Hikey and a MTK developer board
+for example).
+
+Thanks for reviewing!
+
+Kind regards
+Uffe
