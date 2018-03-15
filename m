@@ -1,38 +1,35 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 15 Mar 2018 17:50:37 +0100
-Subject: [PATCH 35/60] arm: dts: kirkwood-openrd-base: use
- SPDX-License-Identifier
+Date: Thu, 15 Mar 2018 17:50:20 +0100
+Subject: [PATCH 18/60] arm: dts: kirkwood-ds209: use SPDX-License-Identifier
 In-Reply-To: <20180315165102.27160-1-gregory.clement@bootlin.com>
 References: <20180315165102.27160-1-gregory.clement@bootlin.com>
-Message-ID: <20180315165102.27160-36-gregory.clement@bootlin.com>
+Message-ID: <20180315165102.27160-19-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Follow the recent trend for the license description
 
-Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Ben Peddell <klightspeed@killerwolves.net>
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm/boot/dts/kirkwood-openrd-base.dts | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/boot/dts/kirkwood-ds209.dts | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-openrd-base.dts b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-index 8af58999606d..094191ece3d7 100644
---- a/arch/arm/boot/dts/kirkwood-openrd-base.dts
-+++ b/arch/arm/boot/dts/kirkwood-openrd-base.dts
-@@ -1,12 +1,9 @@
+diff --git a/arch/arm/boot/dts/kirkwood-ds209.dts b/arch/arm/boot/dts/kirkwood-ds209.dts
+index 6d25093a9ac4..f41fe95e055f 100644
+--- a/arch/arm/boot/dts/kirkwood-ds209.dts
++++ b/arch/arm/boot/dts/kirkwood-ds209.dts
+@@ -1,10 +1,8 @@
 +// SPDX-License-Identifier: GPL-2.0
  /*
-  * Marvell OpenRD Base Board Description
-  *
   * Andrew Lunn <andrew@lunn.ch>
+  * Ben Peddell <klightspeed@killerwolves.net>
   *
 - * This file is licensed under the terms of the GNU General Public
 - * License version 2.  This program is licensed "as is" without any
 - * warranty of any kind, whether express or implied.
-- *
-  * This file contains the definitions that are specific to OpenRD
-  * base variant of the Marvell Kirkwood Development Board.
   */
+ 
+ /dts-v1/;
 -- 
 2.16.1
