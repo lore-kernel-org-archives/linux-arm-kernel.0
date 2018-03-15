@@ -1,39 +1,79 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Thu, 15 Mar 2018 09:06:01 +0000
-Subject: [GIT PULL] STi DT update for v4.17 round 2
-Message-ID: <af473935-7cb6-e59a-3b52-055d8492248c@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Mar 2018 10:23:15 +0100
+Subject: [PATCH v2 2/8] mmc: sunxi: Move the power off action in a
+ separate function
+In-Reply-To: <bd3c692c488e0e3ee8f4cc169980a74384717ec2.1520520655.git-series.maxime.ripard@bootlin.com>
+References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
+ <bd3c692c488e0e3ee8f4cc169980a74384717ec2.1520520655.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAPDyKFpdX5Xg_S0daFeFWE-4CQFRa=MC-qdmzqNyCaipyxAj3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof
+On 8 March 2018 at 15:52, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> We'll need to have the power off behaviour in order to implement
+> runtime_pm. Move it outside of the .set_ios callback for an easier access.
 
-PLease consider this second round of STi dts update for v4.17
+This isn't correct. To implement runtime PM for the sunxi device,
+which I think is what your goal is, you should not disable/enable
+regulators to the (e)MMC/SD/SDIO card.
 
-The following changes since commit 0e04ce02e6a2ac30d21294d8bb2aeceb8489e52b:
+If you also want runtime PM deployment for the card, that is managed
+by the mmc core already. All you have to do is to set
+MMC_CAP_AGGRESSIVE_PM for your mmc host, if you want that.
 
-   ARM: dts: STi: Remove unused clk_ext2f_a9 clock (2018-02-13 13:31:38 
-+0100)
+>
+> And it improves readibility as a bonus.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 25 +++++++++++++++++--------
+>  1 file changed, 17 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index f9723797a9f8..a53e39d8b07e 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -855,6 +855,22 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+>         return 0;
+>  }
+>
+> +static void sunxi_mmc_power_off(struct mmc_host *mmc, struct mmc_ios *ios)
+> +{
+> +       struct sunxi_mmc_host *host = mmc_priv(mmc);
+> +
+> +       dev_dbg(mmc_dev(mmc), "Powering off\n");
+> +
+> +       sunxi_mmc_reset_host(host);
+> +       if (!IS_ERR(mmc->supply.vmmc))
+> +               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> +
+> +       if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
+> +               regulator_disable(mmc->supply.vqmmc);
+> +
+> +       host->vqmmc_enabled = false;
+> +}
+> +
+>  static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  {
+>         struct sunxi_mmc_host *host = mmc_priv(mmc);
+> @@ -892,14 +908,7 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>                 break;
+>
+>         case MMC_POWER_OFF:
+> -               dev_dbg(mmc_dev(mmc), "power off!\n");
+> -               sunxi_mmc_reset_host(host);
+> -               if (!IS_ERR(mmc->supply.vmmc))
+> -                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> -
+> -               if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
+> -                       regulator_disable(mmc->supply.vqmmc);
+> -               host->vqmmc_enabled = false;
+> +               sunxi_mmc_power_off(mmc, ios);
+>                 break;
+>         }
+>
+> --
+> git-series 0.9.1
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-
-for you to fetch changes up to 9a5f4879cd8de167e82f335317c63f2ffdc80129:
-
-   ARM: dts: stih4xx: Add missing #sound-dai-cells (2018-03-15 09:52:25 
-+0100)
-
-----------------------------------------------------------------
-
-STi DT update:
-
-Add missing #sound-dai-cells which fix DT dtc warnings when building 
-with W=1
-
-----------------------------------------------------------------
-Rob Herring (1):
-       ARM: dts: stih4xx: Add missing #sound-dai-cells
-
-  arch/arm/boot/dts/stih407.dtsi | 1 +
-  arch/arm/boot/dts/stih410.dtsi | 1 +
-  2 files changed, 2 insertions(+)
+Kind regards
+Uffe
