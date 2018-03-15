@@ -1,168 +1,137 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Thu, 15 Mar 2018 10:29:48 +0100
-Subject: [PATCH 1/2] cec: stm32: simplify clock management
-In-Reply-To: <20180315092949.9895-1-benjamin.gaignard@st.com>
-References: <20180315092949.9895-1-benjamin.gaignard@st.com>
-Message-ID: <20180315092949.9895-2-benjamin.gaignard@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 15 Mar 2018 10:30:54 +0100
+Subject: [PATCH v2 8/8] mmc: sunxi: Add runtime_pm support
+In-Reply-To: <052c21c000f64c28fd6b64c4db11e4b706bebf79.1520520655.git-series.maxime.ripard@bootlin.com>
+References: <cover.e1acb3dc84e043c8342166e7fb45f79be36ab154.1520520655.git-series.maxime.ripard@bootlin.com>
+ <052c21c000f64c28fd6b64c4db11e4b706bebf79.1520520655.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAPDyKFoJ0KftG1VxzdM97ubFJ25M+X0EjgOPc6HxewgyZMPipg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+On 8 March 2018 at 15:52, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> So far, even if our card was not in use, we didn't shut down our main
+> clock, which meant that it was still output on the MMC bus.
+>
+> While this obviously means that we could save some power there, it also
+> created issues when it comes with EMC control since we'll have a perfect
+> peak at the card clock rate.
+>
+> Let's implement runtime_pm with autosuspend so that we will shut down the
+> clock when it's not been in use for quite some time.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 46 +++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 46 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index f6374066081b..0f98a5fcaade 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/of_gpio.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/reset.h>
+>  #include <linux/scatterlist.h>
+> @@ -973,6 +974,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+>         unsigned long flags;
+>         u32 imask;
+>
+> +       if (enable)
+> +               pm_runtime_get_noresume(host->dev);
+> +
+>         spin_lock_irqsave(&host->lock, flags);
+>
+>         imask = mmc_readl(host, REG_IMASK);
+> @@ -985,6 +989,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
+>         }
+>         mmc_writel(host, REG_IMASK, imask);
+>         spin_unlock_irqrestore(&host->lock, flags);
+> +
+> +       if (!enable)
+> +               pm_runtime_put_noidle(host->mmc->parent);
+>  }
+>
+>  static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
+> @@ -1398,6 +1405,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto error_free_dma;
+>
+> +       pm_runtime_set_active(&pdev->dev);
+> +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> +       pm_runtime_use_autosuspend(&pdev->dev);
+> +       pm_runtime_enable(&pdev->dev);
+> +
+>         ret = mmc_add_host(mmc);
+>         if (ret)
+>                 goto error_free_dma;
+> @@ -1418,6 +1430,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+>         struct sunxi_mmc_host *host = mmc_priv(mmc);
+>
+>         mmc_remove_host(mmc);
+> +       pm_runtime_force_suspend(&pdev->dev);
+>         disable_irq(host->irq);
+>         sunxi_mmc_disable(host);
+>         dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
+> @@ -1426,10 +1439,43 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +static int sunxi_mmc_runtime_resume(struct device *dev)
+> +{
+> +       struct mmc_host *mmc = dev_get_drvdata(dev);
+> +       struct sunxi_mmc_host *host = mmc_priv(mmc);
+> +       int ret;
+> +
+> +       ret = sunxi_mmc_enable(host);
+> +       if (ret)
+> +               return ret;
+> +
+> +       sunxi_mmc_power_up(mmc, &mmc->ios);
 
-Since CEC framework enable and disable the adapter when it is needed
-just follow it orders to enable/disable the clocks.
-Call stm32_cec_hw_init() when the adapter is enabled and do not let
-regmap manage registers clock help to simplify clocking scheme.
+Instead of doing power up, you may need restore some ios settings,
+such as the clock rate for example.
 
-While reworking cec clock start using pm_runtime.
+You may also need to restore some registers in sunxi device, in case
+it's possible that the controller loses context at runtime suspend.
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- drivers/media/platform/stm32/stm32-cec.c | 70 ++++++++++++++++++--------------
- 1 file changed, 40 insertions(+), 30 deletions(-)
+> +
+> +       return 0;
+> +}
+> +
+> +static int sunxi_mmc_runtime_suspend(struct device *dev)
+> +{
+> +       struct mmc_host *mmc = dev_get_drvdata(dev);
+> +       struct sunxi_mmc_host *host = mmc_priv(mmc);
+> +
+> +       sunxi_mmc_power_off(mmc, &mmc->ios);
+> +       sunxi_mmc_disable(host);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct dev_pm_ops sunxi_mmc_pm_ops = {
+> +       SET_RUNTIME_PM_OPS(sunxi_mmc_runtime_suspend,
+> +                          sunxi_mmc_runtime_resume,
+> +                          NULL)
+> +};
+> +
+>  static struct platform_driver sunxi_mmc_driver = {
+>         .driver = {
+>                 .name   = "sunxi-mmc",
+>                 .of_match_table = of_match_ptr(sunxi_mmc_of_match),
+> +               .pm = &sunxi_mmc_pm_ops,
+>         },
+>         .probe          = sunxi_mmc_probe,
+>         .remove         = sunxi_mmc_remove,
+> --
+> git-series 0.9.1
 
-diff --git a/drivers/media/platform/stm32/stm32-cec.c b/drivers/media/platform/stm32/stm32-cec.c
-index 7c496bc1cf38..35cc2ffd6b96 100644
---- a/drivers/media/platform/stm32/stm32-cec.c
-+++ b/drivers/media/platform/stm32/stm32-cec.c
-@@ -12,6 +12,7 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/regmap.h>
- 
- #include <media/cec.h>
-@@ -70,7 +71,7 @@ struct stm32_cec {
- 	int			tx_cnt;
- };
- 
--static void cec_hw_init(struct stm32_cec *cec)
-+static void stm32_cec_hw_init(struct stm32_cec *cec)
- {
- 	regmap_update_bits(cec->regmap, CEC_CR, TXEOM | TXSOM | CECEN, 0);
- 
-@@ -166,22 +167,17 @@ static irqreturn_t stm32_cec_irq_handler(int irq, void *arg)
- static int stm32_cec_adap_enable(struct cec_adapter *adap, bool enable)
- {
- 	struct stm32_cec *cec = adap->priv;
--	int ret = 0;
- 
- 	if (enable) {
--		ret = clk_enable(cec->clk_cec);
--		if (ret)
--			dev_err(cec->dev, "fail to enable cec clock\n");
--
--		clk_enable(cec->clk_hdmi_cec);
-+		pm_runtime_get_sync(cec->dev);
-+		stm32_cec_hw_init(cec);
- 		regmap_update_bits(cec->regmap, CEC_CR, CECEN, CECEN);
- 	} else {
--		clk_disable(cec->clk_cec);
--		clk_disable(cec->clk_hdmi_cec);
- 		regmap_update_bits(cec->regmap, CEC_CR, CECEN, 0);
-+		pm_runtime_disable(cec->dev);
- 	}
- 
--	return ret;
-+	return 0;
- }
- 
- static int stm32_cec_adap_log_addr(struct cec_adapter *adap, u8 logical_addr)
-@@ -260,8 +256,8 @@ static int stm32_cec_probe(struct platform_device *pdev)
- 	if (IS_ERR(mmio))
- 		return PTR_ERR(mmio);
- 
--	cec->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "cec", mmio,
--						&stm32_cec_regmap_cfg);
-+	cec->regmap = devm_regmap_init_mmio(&pdev->dev, mmio,
-+					    &stm32_cec_regmap_cfg);
- 
- 	if (IS_ERR(cec->regmap))
- 		return PTR_ERR(cec->regmap);
-@@ -284,19 +280,10 @@ static int stm32_cec_probe(struct platform_device *pdev)
- 		return PTR_ERR(cec->clk_cec);
- 	}
- 
--	ret = clk_prepare(cec->clk_cec);
--	if (ret) {
--		dev_err(&pdev->dev, "Unable to prepare cec clock\n");
--		return ret;
--	}
--
- 	cec->clk_hdmi_cec = devm_clk_get(&pdev->dev, "hdmi-cec");
--	if (!IS_ERR(cec->clk_hdmi_cec)) {
--		ret = clk_prepare(cec->clk_hdmi_cec);
--		if (ret) {
--			dev_err(&pdev->dev, "Unable to prepare hdmi-cec clock\n");
--			return ret;
--		}
-+	if (IS_ERR(cec->clk_hdmi_cec)) {
-+		dev_err(&pdev->dev, "Cannot get cec clock\n");
-+		return PTR_ERR(cec->clk_hdmi_cec);
- 	}
- 
- 	/*
-@@ -315,24 +302,46 @@ static int stm32_cec_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	cec_hw_init(cec);
--
- 	platform_set_drvdata(pdev, cec);
-+	pm_runtime_enable(&pdev->dev);
- 
--	return 0;
-+	return ret;
- }
- 
- static int stm32_cec_remove(struct platform_device *pdev)
- {
- 	struct stm32_cec *cec = platform_get_drvdata(pdev);
- 
--	clk_unprepare(cec->clk_cec);
--	clk_unprepare(cec->clk_hdmi_cec);
--
- 	cec_unregister_adapter(cec->adap);
- 
-+	pm_runtime_disable(&pdev->dev);
-+
- 	return 0;
- }
-+static int __maybe_unused stm32_cec_runtime_suspend(struct device *dev)
-+{
-+	struct stm32_cec *cec = dev_get_drvdata(dev);
-+
-+	clk_disable_unprepare(cec->clk_cec);
-+	clk_disable_unprepare(cec->clk_hdmi_cec);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused stm32_cec_runtime_resume(struct device *dev)
-+{
-+	struct stm32_cec *cec = dev_get_drvdata(dev);
-+
-+	clk_prepare_enable(cec->clk_cec);
-+	clk_prepare_enable(cec->clk_hdmi_cec);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops stm32_cec_pm_ops = {
-+	SET_RUNTIME_PM_OPS(stm32_cec_runtime_suspend, stm32_cec_runtime_resume,
-+			   NULL)
-+};
- 
- static const struct of_device_id stm32_cec_of_match[] = {
- 	{ .compatible = "st,stm32-cec" },
-@@ -346,6 +355,7 @@ static struct platform_driver stm32_cec_driver = {
- 	.driver = {
- 		.name		= CEC_NAME,
- 		.of_match_table = stm32_cec_of_match,
-+		.pm = &stm32_cec_pm_ops,
- 	},
- };
- 
--- 
-2.15.0
+
+Otherwise, overall, this looks rather okay to me.
+
+Kind regards
+Uffe
