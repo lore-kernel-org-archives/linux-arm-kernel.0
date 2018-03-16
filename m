@@ -1,28 +1,65 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 16 Mar 2018 10:55:29 -0700
-Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
-In-Reply-To: <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <1519071723-31790-11-git-send-email-david@lechnology.com>
- <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
-Message-ID: <152122292977.70929.17084619305591596735@swboyd.mtv.corp.google.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 17 Mar 2018 01:53:49 +0800
+Subject: [PATCH 2/7] dt-bindings: add binding for the Allwinner A64 DE2 bus
+In-Reply-To: <20180316175354.21437-1-icenowy@aosc.io>
+References: <20180316175354.21437-1-icenowy@aosc.io>
+Message-ID: <20180316175354.21437-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bartosz Golaszewski (2018-02-28 04:38:38)
-> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
-> 
-> I believe there to be two issues: one is with v7 - we need to increase
-> the clock reference count in davinci_psc_genpd_attach_dev().
-> 
-> Second is the error path in the clock framework - we should remove the
-> destroyed clk_core from the debug list, which is not being done now.
-> 
-> Why we even need to track the refcount of clk_core is a mistery for me
-> though. Stephen, Mike?
-> 
+All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64 SoC to
+be claimed, otherwise the whole DE2 space is inaccessible.
 
-Which part of the code are we talking about? I see that
-__clk_core_init() calls clk_debug_register() when ret == 0 and that
-looks fine. I do wonder why clk_debug_register() even returns a value
-though because we ignore it.
+Add a device tree binding of the DE2 part as a sub-bus.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ .../devicetree/bindings/bus/sun50i-de2-bus.txt     | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+
+diff --git a/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+new file mode 100644
+index 000000000000..87dfb33fb3be
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+@@ -0,0 +1,37 @@
++Device tree bindings for Allwinner A64 DE2 bus
++
++The Allwinner A64 DE2 is on a special bus, which needs a SRAM region (SRAM C)
++to be claimed for enabling the access.
++
++Required properties:
++
++ - compatible:		Should contain "allwinner,sun50i-a64-de2"
++ - reg:			A resource specifier for the register space
++ - #address-cells:	Must be set to 1
++ - #size-cells:		Must be set to 1
++ - ranges:		Must be set up to map the address space inside the
++			DE2, for the sub-blocks of DE2.
++ - allwinner,sram:	the SRAM that needs to be claimed
++
++Example:
++
++	de2 at 1000000 {
++		compatible = "allwinner,sun50i-a64-de2";
++		reg = <0x1000000 0x400000>;
++		allwinner,sram = <&de2_sram 1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x1000000 0x400000>;
++
++		display_clocks: clock at 0 {
++			compatible = "allwinner,sun50i-a64-de2-clk";
++			reg = <0x0 0x100000>;
++			clocks = <&ccu CLK_DE>,
++				 <&ccu CLK_BUS_DE>;
++			clock-names = "mod",
++				      "bus";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++	};
+-- 
+2.15.1
