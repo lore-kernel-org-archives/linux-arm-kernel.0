@@ -1,27 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 15:00:38 +0000
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
- <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
- <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
-Message-ID: <2e84a842-96e8-aec4-8b85-9ee879bb323a@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 15:50:37 +0100
+Subject: [PATCH 07/69] arm64: dts: renesas: r8a77970: move node which has no
+ reg property out of bus
+In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
+References: <cover.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <7569d1ee01c75b8581521bc67e595a575a7eafce.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/18 14:53, Andrey Konovalov wrote:
-> On Fri, Mar 16, 2018 at 3:13 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> I wasn't aware of that discussion, but this is indeed quite annoying.
->> Note that you should be able to restrict this to arch/arm64/kvm/hyp/*
->> and virt/kvm/arm/hyp/*.
-> 
-> That works as well (tried it, the kernel boots). I've also tried
-> compiling without the flag for virt/kvm/arm/hyp/*, it boots as well.
+Move timer node from soc node to root node.  The node that have been moved
+do not have any register properties and thus shouldn't be placed on the
+bus.
 
-That's just luck. Anything in a hyp/ directory has the potential to be
-executed at EL2, and thus could be generating these jump tables. It
-could blow up at a later time, once you start running VMs...
+This problem is flagged by the compiler as follows:
+$ make W=1
+...
+  DTC     arch/arm64/boot/dts/renesas/r8a77970-eagle.dtb
+arch/arm64/boot/dts/renesas/r8a77970-eagle.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+  DTC     arch/arm64/boot/dts/renesas/r8a77970-v3msk.dtb
+arch/arm64/boot/dts/renesas/r8a77970-v3msk.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
 
-	M.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index c35a117fc447..566a7f704830 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -92,18 +92,6 @@
+ 			resets = <&cpg 408>;
+ 		};
+ 
+-		timer {
+-			compatible = "arm,armv8-timer";
+-			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) |
+-						  IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) |
+-						  IRQ_TYPE_LEVEL_LOW)>;
+-		};
+-
+ 		rwdt: watchdog at e6020000 {
+ 			compatible = "renesas,r8a77970-wdt",
+ 				     "renesas,rcar-gen3-wdt";
+@@ -442,4 +430,12 @@
+ 			#size-cells = <0>;
+ 		};
+ 	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
++	};
+ };
 -- 
-Jazz is not dead. It just smells funny...
+2.11.0
