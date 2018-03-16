@@ -1,179 +1,89 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 12:16:26 -0400
-Subject: [PATCH v3 13/18] net: cxgb4/cxgb4vf: Eliminate duplicate barriers on
+Date: Fri, 16 Mar 2018 12:16:14 -0400
+Subject: [PATCH v3 01/18] i40e/i40evf: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
 References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521216991-28706-14-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521216991-28706-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier on
-some architectures like arm64.
+Code includes wmb() followed by writel(). writel() already has a barrier
+on some architectures like arm64.
 
 This ends up CPU observing two barriers back to back before executing the
 register write.
 
-Create a new wrapper function with relaxed write operator. Use the new
-wrapper when a write is following a wmb().
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  6 ++++++
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 13 +++++++------
- drivers/net/ethernet/chelsio/cxgb4/sge.c        |  8 ++++----
- drivers/net/ethernet/chelsio/cxgb4/t4_hw.c      |  2 +-
- drivers/net/ethernet/chelsio/cxgb4vf/adapter.h  | 14 ++++++++++++++
- drivers/net/ethernet/chelsio/cxgb4vf/sge.c      | 16 +++++++++-------
- 6 files changed, 41 insertions(+), 18 deletions(-)
+ drivers/net/ethernet/intel/i40e/i40e_txrx.c   | 8 ++++----
+ drivers/net/ethernet/intel/i40evf/i40e_txrx.c | 4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index 9040e13..6bde0b9 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-@@ -1202,6 +1202,12 @@ static inline void t4_write_reg(struct adapter *adap, u32 reg_addr, u32 val)
- 	writel(val, adap->regs + reg_addr);
+diff --git a/drivers/net/ethernet/intel/i40e/i40e_txrx.c b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+index e554aa6cf..9455869 100644
+--- a/drivers/net/ethernet/intel/i40e/i40e_txrx.c
++++ b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+@@ -185,7 +185,7 @@ static int i40e_program_fdir_filter(struct i40e_fdir_filter *fdir_data,
+ 	/* Mark the data descriptor to be watched */
+ 	first->next_to_watch = tx_desc;
+ 
+-	writel(tx_ring->next_to_use, tx_ring->tail);
++	writel_relaxed(tx_ring->next_to_use, tx_ring->tail);
+ 	return 0;
+ 
+ dma_fail:
+@@ -1375,7 +1375,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
+ 	 * such as IA-64).
+ 	 */
+ 	wmb();
+-	writel(val, rx_ring->tail);
++	writel_relaxed(val, rx_ring->tail);
  }
  
-+static inline void t4_write_reg_relaxed(struct adapter *adap, u32 reg_addr,
-+					u32 val)
-+{
-+	writel_relaxed(val, adap->regs + reg_addr);
-+}
-+
- #ifndef readq
- static inline u64 readq(const volatile void __iomem *addr)
- {
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 7b452e8..276472d 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -1723,8 +1723,8 @@ int cxgb4_sync_txq_pidx(struct net_device *dev, u16 qid, u16 pidx,
- 		else
- 			val = PIDX_T5_V(delta);
- 		wmb();
--		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--			     QID_V(qid) | val);
-+		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+				     QID_V(qid) | val);
- 	}
- out:
- 	return ret;
-@@ -1902,8 +1902,9 @@ static void enable_txq_db(struct adapter *adap, struct sge_txq *q)
- 		 * are committed before we tell HW about them.
+ /**
+@@ -2258,7 +2258,7 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
  		 */
  		wmb();
--		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--			     QID_V(q->cntxt_id) | PIDX_V(q->db_pidx_inc));
-+		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+				     QID_V(q->cntxt_id) |
-+						PIDX_V(q->db_pidx_inc));
- 		q->db_pidx_inc = 0;
- 	}
- 	q->db_disabled = 0;
-@@ -2003,8 +2004,8 @@ static void sync_txq_pidx(struct adapter *adap, struct sge_txq *q)
- 		else
- 			val = PIDX_T5_V(delta);
- 		wmb();
--		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--			     QID_V(q->cntxt_id) | val);
-+		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+				     QID_V(q->cntxt_id) | val);
- 	}
- out:
- 	q->db_disabled = 0;
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-index 6e310a0..1a1738a 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-@@ -530,11 +530,11 @@ static inline void ring_fl_db(struct adapter *adap, struct sge_fl *q)
- 		 * mechanism.
- 		 */
- 		if (unlikely(q->bar2_addr == NULL)) {
--			t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--				     val | QID_V(q->cntxt_id));
-+			t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+					     val | QID_V(q->cntxt_id));
- 		} else {
--			writel(val | QID_V(q->bar2_qid),
--			       q->bar2_addr + SGE_UDB_KDOORBELL);
-+			writel_relaxed(val | QID_V(q->bar2_qid),
-+				       q->bar2_addr + SGE_UDB_KDOORBELL);
  
- 			/* This Write memory Barrier will force the write to
- 			 * the User Doorbell area to be flushed.
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 920bccd..8b723a0 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-@@ -139,7 +139,7 @@ void t4_write_indirect(struct adapter *adap, unsigned int addr_reg,
- {
- 	while (nregs--) {
- 		t4_write_reg(adap, addr_reg, start_idx++);
--		t4_write_reg(adap, data_reg, *vals++);
-+		t4_write_reg_relaxed(adap, data_reg, *vals++);
+-		writel(xdp_ring->next_to_use, xdp_ring->tail);
++		writel_relaxed(xdp_ring->next_to_use, xdp_ring->tail);
  	}
+ 
+ 	rx_ring->skb = skb;
+@@ -3286,7 +3286,7 @@ static inline int i40e_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
+ 
+ 	/* notify HW of packet */
+ 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+-		writel(i, tx_ring->tail);
++		writel_relaxed(i, tx_ring->tail);
+ 
+ 		/* we need this if more than one processor can write to our tail
+ 		 * at a time, it synchronizes IO on IA64/Altix systems
+diff --git a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
+index 357d605..56eea20 100644
+--- a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
++++ b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
+@@ -667,7 +667,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
+ 	 * such as IA-64).
+ 	 */
+ 	wmb();
+-	writel(val, rx_ring->tail);
++	writel_relaxed(val, rx_ring->tail);
  }
  
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-index 5883f09..00247be4 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-@@ -442,6 +442,20 @@ static inline void t4_write_reg(struct adapter *adapter, u32 reg_addr, u32 val)
- 	writel(val, adapter->regs + reg_addr);
- }
+ /**
+@@ -2243,7 +2243,7 @@ static inline void i40evf_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
  
-+/**
-+ * t4_write_reg_relaxed - write a HW register without ordering guarantees
-+ * @adapter: the adapter
-+ * @reg_addr: the register address
-+ * @val: the value to write
-+ *
-+ * Write a 32-bit value into the given HW register.
-+ */
-+static inline void t4_write_reg_relaxed(struct adapter *adapter, u32 reg_addr,
-+					u32 val)
-+{
-+	writel_relaxed(val, adapter->regs + reg_addr);
-+}
-+
- #ifndef readq
- static inline u64 readq(const volatile void __iomem *addr)
- {
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-index dfce5df..1d98387 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-@@ -546,12 +546,13 @@ static inline void ring_fl_db(struct adapter *adapter, struct sge_fl *fl)
- 		 * mechanism.
- 		 */
- 		if (unlikely(fl->bar2_addr == NULL)) {
--			t4_write_reg(adapter,
--				     T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
--				     QID_V(fl->cntxt_id) | val);
-+			t4_write_reg_relaxed(adapter,
-+					     T4VF_SGE_BASE_ADDR +
-+							SGE_VF_KDOORBELL,
-+					     QID_V(fl->cntxt_id) | val);
- 		} else {
--			writel(val | QID_V(fl->bar2_qid),
--			       fl->bar2_addr + SGE_UDB_KDOORBELL);
-+			writel_relaxed(val | QID_V(fl->bar2_qid),
-+				       fl->bar2_addr + SGE_UDB_KDOORBELL);
+ 	/* notify HW of packet */
+ 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+-		writel(i, tx_ring->tail);
++		writel_relaxed(i, tx_ring->tail);
  
- 			/* This Write memory Barrier will force the write to
- 			 * the User Doorbell area to be flushed.
-@@ -980,8 +981,9 @@ static inline void ring_tx_db(struct adapter *adapter, struct sge_txq *tq,
- 	if (unlikely(tq->bar2_addr == NULL)) {
- 		u32 val = PIDX_V(n);
- 
--		t4_write_reg(adapter, T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
--			     QID_V(tq->cntxt_id) | val);
-+		t4_write_reg_relaxed(adapter,
-+				     T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
-+				     QID_V(tq->cntxt_id) | val);
- 	} else {
- 		u32 val = PIDX_T5_V(n);
- 
+ 		/* we need this if more than one processor can write to our tail
+ 		 * at a time, it synchronizes IO on IA64/Altix systems
 -- 
 2.7.4
