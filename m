@@ -1,61 +1,57 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 16 Mar 2018 16:54:31 +0800
-Subject: [PATCH] ARM: dts: imx7d-sdb: add gpio key support
-Message-ID: <1521190471-25242-1-git-send-email-Anson.Huang@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 Mar 2018 13:00:12 +0100
+Subject: [PATCH v2 2/3] arm64: dts: renesas: salvator-common: Configure
+ PMIC for DDR Backup Power
+In-Reply-To: <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
+References: <1521029386-29975-1-git-send-email-geert+renesas@glider.be>
+ <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
+ <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
+Message-ID: <CAMuHMdUO-Op4u44naZJ37VgzN1GJBL33yRWnF11D9a24y8+x1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for imx7d-sdb board's gpio keys:
+Hi Sergei,
 
-S1(FUNC1): KEY_VOLUMEUP
-S3(FUNC2): KEY_VOLUMEDOWN
+On Wed, Mar 14, 2018 at 4:17 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 03/14/2018 03:09 PM, Geert Uytterhoeven wrote:
+>> On Salvator-X(S), all of the DDR0, DDR1, DDR0C, and DDR1C power rails
+>> need to be kept powered when backup mode is enabled.  Reflect this in
+>> the "rohm,ddr-backup-power" property for the BD9571MWV PMIC node.
+>>
+>> The accessory power switch (SW23) is a toggle switch, hense specify
+>> "rohm,rstbmode-level".
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> v2:
+>>   - Add rohm,rstbmode-level.
+>> ---
+>>  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+>> index 2a7f36abd2dd85c6..80794c38c2669d75 100644
+>> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+>> @@ -376,6 +376,8 @@
+>>               #interrupt-cells = <2>;
+>>               gpio-controller;
+>>               #gpio-cells = <2>;
+>> +             rohm,ddr-backup-power = <15>;
+>
+>   Why not 0xf if those are all bit flags?
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx7d-sdb.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Because it's a small number?
+Does it matter?
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 7f241af..e47b5b2 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -52,6 +52,24 @@
- 		reg = <0x80000000 0x80000000>;
- 	};
- 
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
-+
-+		volume-up {
-+			label = "Volume Up";
-+			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEUP>;
-+		};
-+
-+		volume-down {
-+			label = "Volume Down";
-+			gpios = <&gpio5 10 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_VOLUMEDOWN>;
-+		};
-+	};
-+
- 	spi4 {
- 		compatible = "spi-gpio";
- 		pinctrl-names = "default";
-@@ -519,6 +537,12 @@
- 			>;
- 		};
- 
-+		pinctrl_gpio_keys: gpio_keysgrp {
-+			fsl,pins = <
-+				MX7D_PAD_SD2_RESET_B__GPIO5_IO11	0x59
-+				MX7D_PAD_SD2_WP__GPIO5_IO10		0x59
-+			>;
-+		};
- 
- 		pinctrl_hog: hoggrp {
- 			fsl,pins = <
--- 
-2.7.4
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
