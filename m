@@ -1,53 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 16 Mar 2018 20:35:51 +0530
-Subject: [v2] ARM: davinci: fix the GPIO lookup for omapl138-hawk
-In-Reply-To: <2641a421-9823-c0bb-93d9-ca0c64060c51@lechnology.com>
-References: <20180301103448.27233-1-brgl@bgdev.pl>
- <2641a421-9823-c0bb-93d9-ca0c64060c51@lechnology.com>
-Message-ID: <e0cad8b8-c2fe-0a66-411f-d478e145ade4@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 15:50:44 +0100
+Subject: [PATCH 14/69] arm64: add Renesas R8A77980 support
+In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
+References: <cover.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <b85e1f77d9e285e61f8aa5a3a7e2bc46431d07ee.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 March 2018 10:05 PM, David Lechner wrote:
-> On 03/01/2018 04:34 AM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
->> mmc can correctly lookup the wp and cp gpios.
->>
->> Fixes: c69f43fb4f26 ("ARM: davinci: hawk: use gpio descriptor for mmc
->> pins")
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->> ---
->> v1 -> v2:
->> - added the Fixes: tag
->>
->> ? arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
->> ? 1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
->> b/arch/arm/mach-davinci/board-omapl138-hawk.c
->> index a3e78074be70..62eb7d668890 100644
->> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
->> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
->> @@ -127,8 +127,8 @@ static struct gpiod_lookup_table mmc_gpios_table = {
->> ????? .dev_id = "da830-mmc.0",
->> ????? .table = {
->> ????????? /* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
->> -??????? GPIO_LOOKUP("davinci_gpio.1", 28, "cd", GPIO_ACTIVE_LOW),
->> -??????? GPIO_LOOKUP("davinci_gpio.1", 29, "wp", GPIO_ACTIVE_LOW),
->> +??????? GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
->> +??????? GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
->> ????? },
->> ? };
->> ?
-> 
-> Does board-da830-evm.c need the same fix? It also uses "davinci_gpio.1".
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Yes. looks like fixes are needed here and other places. I will send
-patches since I have ability to test them.
+Add a configuration option for the R-Car V3H (R8A77980) SoC.
 
-Thanks,
-Sekhar
+Based on the original (and large) patch by Vladimir Barinov.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index fbedbd8f619a..b51db26f6eaa 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -196,6 +196,12 @@ config ARCH_R8A77970
+ 	help
+ 	  This enables support for the Renesas R-Car V3M SoC.
+ 
++config ARCH_R8A77980
++	bool "Renesas R-Car V3H SoC Platform"
++	depends on ARCH_RENESAS
++	help
++	  This enables support for the Renesas R-Car V3H SoC.
++
+ config ARCH_R8A77995
+ 	bool "Renesas R-Car D3 SoC Platform"
+ 	depends on ARCH_RENESAS
+-- 
+2.11.0
