@@ -1,101 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:41 +0100
-Subject: [PATCH 11/69] arm64: dts: renesas: r8a77995: add I2C support
+Date: Fri, 16 Mar 2018 15:50:39 +0100
+Subject: [PATCH 09/69] arm64: dts: renesas: r8a7795: update register size for
+ thermal
 In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
 References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <ffcd060fd51682d2695da7334aa607a807e3838e.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <cd8325dc194d6fa0707c9d5b427ca1fed6893b53.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-Defines R-Car D3 I2C controllers 0-3.
+To be able to read fused calibration values from hardware the size of
+the register resource of TSC1 needs to be incremented to cover one more
+register which holds the information if the calibration values have been
+fused or not.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Instead of increasing TSC1 size to the value from the datasheet update
+all TSC's size to the smallest granularity of the address decoder
+circuitry
+
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 67 +++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 23f763beab46..22e633c87d4c 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -536,6 +536,73 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 19b7de57704c..ce85704976f0 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -2385,9 +2385,9 @@
  
-+		i2c0: i2c at e6500000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77995",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6500000 0 0x40>;
-+			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 931>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 931>;
-+			dmas = <&dmac1 0x91>, <&dmac1 0x90>,
-+			       <&dmac2 0x91>, <&dmac2 0x90>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at e6508000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77995",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6508000 0 0x40>;
-+			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 930>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 930>;
-+			dmas = <&dmac1 0x93>, <&dmac1 0x92>,
-+			       <&dmac2 0x93>, <&dmac2 0x92>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at e6510000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77995",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe6510000 0 0x40>;
-+			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 929>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 929>;
-+			dmas = <&dmac1 0x95>, <&dmac1 0x94>,
-+			       <&dmac2 0x95>, <&dmac2 0x94>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at e66d0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77995",
-+				     "renesas,rcar-gen3-i2c";
-+			reg = <0 0xe66d0000 0 0x40>;
-+			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 928>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 928>;
-+			dmas = <&dmac0 0x97>, <&dmac0 0x96>;
-+			dma-names = "tx", "rx";
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
- 		pwm0: pwm at e6e30000 {
- 			compatible = "renesas,pwm-r8a77995", "renesas,pwm-rcar";
- 			reg = <0 0xe6e30000 0 0x8>;
+ 		tsc: thermal at e6198000 {
+ 			compatible = "renesas,r8a7795-thermal";
+-			reg = <0 0xe6198000 0 0x68>,
+-			      <0 0xe61a0000 0 0x5c>,
+-			      <0 0xe61a8000 0 0x5c>;
++			reg = <0 0xe6198000 0 0x100>,
++			      <0 0xe61a0000 0 0x100>,
++			      <0 0xe61a8000 0 0x100>;
+ 			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.11.0
