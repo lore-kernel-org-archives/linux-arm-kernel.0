@@ -1,54 +1,48 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 16 Mar 2018 23:57:35 +0800
-Subject: [PATCH v5 00/23] crypto: arm64 - play nice with CONFIG_PREEMPT
-In-Reply-To: <20180310152208.10369-1-ard.biesheuvel@linaro.org>
-References: <20180310152208.10369-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180316155735.GJ7095@gondor.apana.org.au>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 16 Mar 2018 12:16:17 -0400
+Subject: [PATCH v3 04/18] igb: eliminate duplicate barriers on weakly-ordered
+ archs
+In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521216991-28706-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 10, 2018 at 03:21:45PM +0000, Ard Biesheuvel wrote:
-> As reported by Sebastian, the way the arm64 NEON crypto code currently
-> keeps kernel mode NEON enabled across calls into skcipher_walk_xxx() is
-> causing problems with RT builds, given that the skcipher walk API may
-> allocate and free temporary buffers it uses to present the input and
-> output arrays to the crypto algorithm in blocksize sized chunks (where
-> blocksize is the natural blocksize of the crypto algorithm), and doing
-> so with NEON enabled means we're alloc/free'ing memory with preemption
-> disabled.
-> 
-> This was deliberate: when this code was introduced, each kernel_neon_begin()
-> and kernel_neon_end() call incurred a fixed penalty of storing resp.
-> loading the contents of all NEON registers to/from memory, and so doing
-> it less often had an obvious performance benefit. However, in the mean time,
-> we have refactored the core kernel mode NEON code, and now kernel_neon_begin()
-> only incurs this penalty the first time it is called after entering the kernel,
-> and the NEON register restore is deferred until returning to userland. This
-> means pulling those calls into the loops that iterate over the input/output
-> of the crypto algorithm is not a big deal anymore (although there are some
-> places in the code where we relied on the NEON registers retaining their
-> values between calls)
-> 
-> So let's clean this up for arm64: update the NEON based skcipher drivers to
-> no longer keep the NEON enabled when calling into the skcipher walk API.
-> 
-> As pointed out by Peter, this only solves part of the problem. So let's
-> tackle it more thoroughly, and update the algorithms to test the NEED_RESCHED
-> flag each time after processing a fixed chunk of input.
-> 
-> Given that this issue was flagged by the RT people, I would appreciate it
-> if they could confirm whether they are happy with this approach.
-> 
-> Changes since v4:
-> - rebase onto v4.16-rc3
-> - apply the same treatment to new SHA512, SHA-3 and SM3 code that landed
->   in v4.16-rc1
+Code includes wmb() followed by writel(). writel() already has a barrier
+on some architectures like arm64.
 
-Looks good to me.  If more work is needed we can always do
-incremental fixes.
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
-Patches 1-22 applied.  Thanks.
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/net/ethernet/intel/igb/igb_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
+index b88fae7..82aea92 100644
+--- a/drivers/net/ethernet/intel/igb/igb_main.c
++++ b/drivers/net/ethernet/intel/igb/igb_main.c
+@@ -5671,7 +5671,7 @@ static int igb_tx_map(struct igb_ring *tx_ring,
+ 	igb_maybe_stop_tx(tx_ring, DESC_NEEDED);
+ 
+ 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+-		writel(i, tx_ring->tail);
++		writel_relaxed(i, tx_ring->tail);
+ 
+ 		/* we need this if more than one processor can write to our tail
+ 		 * at a time, it synchronizes IO on IA64/Altix systems
+@@ -8072,7 +8072,7 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		writel(i, rx_ring->tail);
++		writel_relaxed(i, rx_ring->tail);
+ 	}
+ }
+ 
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.7.4
