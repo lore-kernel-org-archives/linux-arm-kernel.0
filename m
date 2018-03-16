@@ -1,68 +1,81 @@
-From: absahu@codeaurora.org (Abhishek Sahu)
-Date: Fri, 16 Mar 2018 15:57:03 +0530
-Subject: [PATCH v2 10/13] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2
- board file
-In-Reply-To: <1521193101-4586-11-git-send-email-sricharan@codeaurora.org>
-References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
- <1521193101-4586-11-git-send-email-sricharan@codeaurora.org>
-Message-ID: <0a8267721c841603894cbe50fe51560b@codeaurora.org>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 16 Mar 2018 10:28:01 +0000
+Subject: [PATCH] ARM: dts: imx7d-sdb: add gpio key support
+In-Reply-To: <1521190471-25242-1-git-send-email-Anson.Huang@nxp.com>
+References: <1521190471-25242-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <AM3PR04MB306ED8D196C18858B5B368480D70@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-16 15:08, Sricharan R wrote:
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-
-  Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-
-> ---
->  arch/arm/boot/dts/Makefile                      |  1 +
->  arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts | 26 
-> +++++++++++++++++++++++++
->  2 files changed, 27 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+> -----Original Message-----
+> From: Anson Huang [mailto:Anson.Huang at nxp.com]
+> Sent: Friday, March 16, 2018 4:55 PM
+> To: shawnguo at kernel.org; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> linux at armlinux.org.uk
+> Cc: dl-linux-imx <linux-imx@nxp.com>; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: [PATCH] ARM: dts: imx7d-sdb: add gpio key support
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 8c93fd0..0844087 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -750,6 +750,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->  	qcom-ipq4019-ap.dk04.1-c1.dtb \
->  	qcom-ipq4019-ap.dk04.1-c3.dtb \
->  	qcom-ipq4019-ap.dk07.1-c1.dtb \
-> +	qcom-ipq4019-ap.dk07.1-c2.dtb \
->  	qcom-ipq8064-ap148.dtb \
->  	qcom-msm8660-surf.dtb \
->  	qcom-msm8960-cdp.dtb \
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-> new file mode 100644
-> index 0000000..c1e909c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
-> @@ -0,0 +1,26 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> Add support for imx7d-sdb board's gpio keys:
+> 
+> S1(FUNC1): KEY_VOLUMEUP
+> S3(FUNC2): KEY_VOLUMEDOWN
+> 
+
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+Regards
+Dong Aisheng
+
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx7d-sdb.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-
+> sdb.dts index 7f241af..e47b5b2 100644
+> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> @@ -52,6 +52,24 @@
+>  		reg = <0x80000000 0x80000000>;
+>  	};
+> 
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_keys>;
 > +
-> +#include "qcom-ipq4019-ap.dk07.1.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1-C2";
-> +
-> +	soc {
-> +		pinctrl at 1000000 {
-> +			serial_1_pins: serial1_pinmux {
-> +				mux {
-> +					pins = "gpio8", "gpio9";
-> +					function = "blsp_uart1";
-> +					bias-disable;
-> +				};
-> +			};
+> +		volume-up {
+> +			label = "Volume Up";
+> +			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_VOLUMEUP>;
 > +		};
 > +
-> +		serial at 78b0000 {
-> +			pinctrl-0 = <&serial_1_pins>;
-> +			pinctrl-names = "default";
-> +			status = "ok";
+> +		volume-down {
+> +			label = "Volume Down";
+> +			gpios = <&gpio5 10 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_VOLUMEDOWN>;
 > +		};
 > +	};
-> +};
+> +
+>  	spi4 {
+>  		compatible = "spi-gpio";
+>  		pinctrl-names = "default";
+> @@ -519,6 +537,12 @@
+>  			>;
+>  		};
+> 
+> +		pinctrl_gpio_keys: gpio_keysgrp {
+> +			fsl,pins = <
+> +				MX7D_PAD_SD2_RESET_B__GPIO5_IO11
+> 	0x59
+> +				MX7D_PAD_SD2_WP__GPIO5_IO10
+> 	0x59
+> +			>;
+> +		};
+> 
+>  		pinctrl_hog: hoggrp {
+>  			fsl,pins = <
+> --
+> 2.7.4
