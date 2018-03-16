@@ -1,35 +1,28 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 16 Mar 2018 09:10:55 +0100
-Subject: [PATCH v2 60/60] arm: dts: kirkwood-blackarmor-nas220: use
- SPDX-License-Identifier
-In-Reply-To: <20180315165102.27160-61-gregory.clement@bootlin.com>
-References: <20180315165102.27160-61-gregory.clement@bootlin.com>
-Message-ID: <20180316081055.5397-1-gregory.clement@bootlin.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Mar 2018 09:19:25 +0100
+Subject: [PATCH 1/2] ARM: imx: fix imx6sll-only build
+In-Reply-To: <20180316004843.GM26859@dragon>
+References: <20180315151345.3089601-1-arnd@arndb.de>
+ <20180316004843.GM26859@dragon>
+Message-ID: <CAK8P3a0aUHZ+64N1bDk+uozmMqQEVDgYRLhb1qZt42dqo7hbmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Follow the recent trend for the license description
+On Fri, Mar 16, 2018 at 1:48 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Thu, Mar 15, 2018 at 04:13:18PM +0100, Arnd Bergmann wrote:
+>> When selecting SOC_IMX6SLL but not SOC_IMX6SL, we get a link error:
+>>
+>> arch/arm/mach-imx/mach-imx6sl.o: In function `imx6sl_init_late':
+>> mach-imx6sl.c:(.init.text+0x14): undefined reference to `imx6sl_cpuidle_init'
+>>
+>> This adds the missing line to the Makefile to also build the cpuidle
+>> support that we need here.
+>>
+>> Fixes: dee5dee2a5b2 ("ARM: imx: Add basic msl support for imx6sll")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
 
-Cc: Evgeni Dobrev <evgeni@studio-punkt.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Thanks. Applied both now.
 
-diff --git a/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts b/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
-index f16a73e49a88..07fbfca444d5 100644
---- a/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
-+++ b/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
-@@ -1,9 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0+
- /*
-  * Device Tree file for Seagate Blackarmor NAS220
-  *
-  * Copyright (C) 2014 Evgeni Dobrev <evgeni@studio-punkt.com>
-- *
-- * Licensed under GPLv2 or later.
-  */
- 
- /dts-v1/;
--- 
-2.16.1
+      Arnd
