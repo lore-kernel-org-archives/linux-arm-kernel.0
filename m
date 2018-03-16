@@ -1,41 +1,118 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Fri, 16 Mar 2018 07:34:06 +0000
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <CAK8P3a2-fUi0nnsLVJ6h_UuJCgwoNs2OEroYed2ofLd=FiPG0g@mail.gmail.com>
-References: <20180316075629.019b6560@canb.auug.org.au>
- <CAK8P3a2-fUi0nnsLVJ6h_UuJCgwoNs2OEroYed2ofLd=FiPG0g@mail.gmail.com>
-Message-ID: <6b239ab5-5ded-b32b-eefc-601075d33f25@st.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Fri, 16 Mar 2018 13:10:15 +0530
+Subject: [PATCH v2 2/4] ioremap: Implement TLB_INV before huge mapping
+In-Reply-To: <1521130368.2693.177.camel@hpe.com>
+References: <1521117906-20107-1-git-send-email-cpandya@codeaurora.org>
+ <1521117906-20107-3-git-send-email-cpandya@codeaurora.org>
+ <1521130368.2693.177.camel@hpe.com>
+Message-ID: <0cec2b79-1668-68d1-32db-531f5a8a9db2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Stephen
 
-On 03/15/2018 10:06 PM, Arnd Bergmann wrote:
-> On Thu, Mar 15, 2018 at 9:56 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->> Hi all,
+
+On 3/15/2018 9:42 PM, Kani, Toshi wrote:
+> On Thu, 2018-03-15 at 18:15 +0530, Chintan Pandya wrote:
+>> Huge mapping changes PMD/PUD which could have
+>> valid previous entries. This requires proper
+>> TLB maintanance on some architectures, like
+>> ARM64.
 >>
->> Commit
+>> Implent BBM (break-before-make) safe TLB
+>> invalidation.
 >>
->>    9a5f4879cd8d ("ARM: dts: stih4xx: Add missing #sound-dai-cells")
+>> Here, I've used flush_tlb_pgtable() instead
+>> of flush_kernel_range() because invalidating
+>> intermediate page_table entries could have
+>> been optimized for specific arch. That's the
+>> case with ARM64 at least.
 >>
->> is missing a Signed-off-by from its committer.
+>> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+>> ---
+>>   lib/ioremap.c | 25 +++++++++++++++++++------
+>>   1 file changed, 19 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/lib/ioremap.c b/lib/ioremap.c
+>> index 54e5bba..55f8648 100644
+>> --- a/lib/ioremap.c
+>> +++ b/lib/ioremap.c
+>> @@ -13,6 +13,7 @@
+>>   #include <linux/export.h>
+>>   #include <asm/cacheflush.h>
+>>   #include <asm/pgtable.h>
+>> +#include <asm-generic/tlb.h>
+>>   
+>>   #ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
+>>   static int __read_mostly ioremap_p4d_capable;
+>> @@ -80,6 +81,7 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
+>>   		unsigned long end, phys_addr_t phys_addr, pgprot_t prot)
+>>   {
+>>   	pmd_t *pmd;
+>> +	pmd_t old_pmd;
+>>   	unsigned long next;
+>>   
+>>   	phys_addr -= addr;
+>> @@ -91,10 +93,15 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
+>>   
+>>   		if (ioremap_pmd_enabled() &&
+>>   		    ((next - addr) == PMD_SIZE) &&
+>> -		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+>> -		    pmd_free_pte_page(pmd)) {
+>> -			if (pmd_set_huge(pmd, phys_addr + addr, prot))
+>> +		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
+>> +			old_pmd = *pmd;
+>> +			pmd_clear(pmd);
 > 
-> Thanks for the report.
+> pmd_clear() is one of the operations pmd_free_pte_page() needs to do.
+> See the x86 version.
 > 
-> What script do you use to find those? I guess I should check for
-> missing signoffs as well when pulling a branch.
+>> +			flush_tlb_pgtable(&init_mm, addr);
 > 
-> Patrice, I've dropped the merge now, and picked up the one
-> patch in it directly, with my signoff. This should fix the issue this
-> time, but please make sure you always sign off patches when
-> you apply them from the list.
+> You can call it in pmd_free_pte_page() on arm64 as well.
 > 
->          Arnd
+>> +			if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
+>> +				pmd_free_pte_page(&old_pmd);
+>>   				continue;
+>> +			} else
+>> +				set_pmd(pmd, old_pmd);
+> 
+> I do not understand why you needed to make this change.
+> pmd_free_pte_page() is defined as an arch-specific function so that you
+> can additionally perform TLB purges on arm64.  Please try to make proper
+> arm64 implementation of this interface.  And if you find any issue in
+> this interface, please let me know.
+TLB ops require VA at least. And this interface passes just the PMD/PUD.
+
+Second is, if we clear the previous table entry inside the arch specific
+code and then we fail in pmd/pud_set_huge, we can't fallback (x86 case).
+
+So, we can do something like this (following Mark's suggestion),
+
+	if (ioremap_pmd_enabled() &&
+         	((next - addr) == PMD_SIZE) &&
+		IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+		pmd_can_set_huge(pmd, phys_addr + addr, prot)) {
+			/*
+			 * Clear existing table entry,
+			 * Invalidate,
+			 * Free the page table
+			 * inside this code
+			 */
+			pmd_free_pte_page(pmd, addr, addr + PMD_SIZE);
+			pmd_set_huge(...) //without fail
+			continue;
+	}
+
+
+> 
+> Same for pud.
+> 
+> Thanks,
+> -Toshi
 > 
 
-Ok i will update my script on my side with Stephen's script to avoid 
-this in the future.
-
-Thanks
-
-Patrice
+Chintan
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
