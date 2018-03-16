@@ -1,49 +1,73 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 16:39:47 +0000
-Subject: [PATCH 0/2] irqchip/gic*: Complain about the use of IRQ_TYPE_NONE
-In-Reply-To: <5f274a06-3a9c-7d41-2e4d-9733e4ac6078@arm.com>
-References: <20180316145511.28362-1-marc.zyngier@arm.com>
- <5f274a06-3a9c-7d41-2e4d-9733e4ac6078@arm.com>
-Message-ID: <399d5e06-c530-6a29-8a4d-9e8ca62167c4@arm.com>
+Date: Fri, 16 Mar 2018 16:38:14 +0000
+Subject: [PATCH v6 19/26] arm64: KVM: Move stashing of x0/x1 into the
+ vector code itself
+In-Reply-To: <20180316162257.rvz26fbn3j5jvsku@armageddon.cambridge.arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-20-marc.zyngier@arm.com>
+ <20180316162257.rvz26fbn3j5jvsku@armageddon.cambridge.arm.com>
+Message-ID: <e744a7fa-b5cd-ccb9-6a67-cf2bfde77f6f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/18 16:19, Robin Murphy wrote:
-> On 16/03/18 14:55, Marc Zyngier wrote:
->> Grepping through the dts files, the documentation, and reviewing
->> patches, one can only notice the use of IRQ_TYPE_NONE in interrupt
->> specifiers. At least for the GIC, this doesn't mean anything. The
->> unsuspecting driver will end-up with whatever was there before, and
->> there is a 50% probability that it is not what it wants.
+On 16/03/18 16:22, Catalin Marinas wrote:
+> On Wed, Mar 14, 2018 at 04:50:42PM +0000, Marc Zyngier wrote:
+>> All our useful entry points into the hypervisor are starting by
+>> saving x0 and x1 on the stack. Let's move those into the vectors
+>> by introducing macros that annotate whether a vector is valid or
+>> not, thus indicating whether we want to stash registers or not.
 >>
->> I'd love to fix it myself, but I also have a 50% probability of
->> getting it wrong. In order to make the user aware they are walking on
->> thin ice, let's add some warnings. Hopefully, they'll be annoying
->> enough that people will fix their firmware. Croudsourcing debugging...
+>> The only drawback is that we now also stash registers for el2_error,
+>> but this should never happen, and we pop them back right at the
+>> start of the handling sequence.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/hyp-entry.S | 56 ++++++++++++++++++++++++------------------
+>>  1 file changed, 32 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+>> index f36464bd57c5..0f62b5f76aa5 100644
+>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+>> @@ -55,7 +55,6 @@ ENTRY(__vhe_hyp_call)
+>>  ENDPROC(__vhe_hyp_call)
+>>  
+>>  el1_sync:				// Guest trapped into EL2
+>> -	stp	x0, x1, [sp, #-16]!
+>>  
+>>  alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+>>  	mrs	x1, esr_el2
+>> @@ -137,18 +136,18 @@ alternative_else_nop_endif
+>>  	b	__guest_exit
+>>  
+>>  el1_irq:
+>> -	stp     x0, x1, [sp, #-16]!
+>>  	ldr	x1, [sp, #16 + 8]
+>>  	mov	x0, #ARM_EXCEPTION_IRQ
+>>  	b	__guest_exit
+>>  
+>>  el1_error:
+>> -	stp     x0, x1, [sp, #-16]!
+>>  	ldr	x1, [sp, #16 + 8]
+>>  	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+>>  	b	__guest_exit
+>>  
+>>  el2_error:
+>> +	ldp	x0, x1, [sp], #16
+>> +
 > 
-> I guess there's also the alternative nuclear option of breaking their 
-> build ;)
+> Nitpick: you don't need a memory access here, just:
 > 
-> Robin.
+> 	add	sp, sp, #16
 > 
-> ----->8-----
-> diff --git a/include/dt-bindings/interrupt-controller/irq.h 
-> b/include/dt-bindings/interrupt-controller/irq.h
-> index a8b310555f14..de79af80d01e 100644
-> --- a/include/dt-bindings/interrupt-controller/irq.h
-> +++ b/include/dt-bindings/interrupt-controller/irq.h
-> @@ -10,7 +10,7 @@
->   #ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_IRQ_H
->   #define _DT_BINDINGS_INTERRUPT_CONTROLLER_IRQ_H
-> 
-> -#define IRQ_TYPE_NONE		0
-> +#define IRQ_TYPE_NONE		"This is nonsense and needs fixing"
->   #define IRQ_TYPE_EDGE_RISING	1
->   #define IRQ_TYPE_EDGE_FALLING	2
->   #define IRQ_TYPE_EDGE_BOTH	(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING)
-> 
+> (unless el2_error has changed somewhere before this patch)
 
-What really annoys me with this patch is that you haven't put a SoB on it...
+At this point in the series, I agree. But starting with patch 22, we
+start messing with x0 if HARDEN_EL2_VECTORS is valid, meaning we really
+need to restore it in order to preserve the guest state.
+
+Thanks,
 
 	M.
 -- 
