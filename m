@@ -1,13 +1,17 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:52:33 +0100
-Subject: [PATCH 14/52] ARM: dts: r8a7791: sort subnodes of root node
+Date: Fri, 16 Mar 2018 15:52:35 +0100
+Subject: [PATCH 16/52] ARM: dts: r8a7793: consistently use single space after =
 In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
 References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <21b05c52abe355e205eb133f2fe3dbc2520edeed.1521208546.git.horms+renesas@verge.net.au>
+Message-ID: <93a4a46fa1a6b2cf51cfbdd2e46572e5d4dad57d.1521208546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort subnodes of root node to aid maintenance.
+Consistently use a single space after a =.
+
+This patch removes instances where a tab is used instead.  It also avoids
+running over 80 columns in width in one of the lines where whitespace is
+updated.
 
 This patch should not introduce any functional change.
 
@@ -15,180 +19,45 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 134 ++++++++++++++++++++---------------------
- 1 file changed, 67 insertions(+), 67 deletions(-)
+ arch/arm/boot/dts/r8a7793.dtsi | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index de2af2199731..dc659351472f 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -39,6 +39,35 @@
- 		vin2 = &vin2;
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index e95f4fb44dc4..ea4bc06c8e8a 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -228,9 +228,9 @@
  	};
  
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -82,23 +111,27 @@
- 		};
- 	};
+ 	thermal: thermal at e61f0000 {
+-		compatible =	"renesas,thermal-r8a7793",
+-				"renesas,rcar-gen2-thermal",
+-				"renesas,rcar-thermal";
++		compatible = "renesas,thermal-r8a7793",
++			     "renesas,rcar-gen2-thermal",
++			     "renesas,rcar-thermal";
+ 		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
+ 		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cpg CPG_MOD 522>;
+@@ -1174,12 +1174,13 @@
+ 		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
+ 		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
+ 		 */
+-		compatible =  "renesas,rcar_sound-r8a7793", "renesas,rcar_sound-gen2";
+-		reg =	<0 0xec500000 0 0x1000>, /* SCU */
+-			<0 0xec5a0000 0 0x100>,  /* ADG */
+-			<0 0xec540000 0 0x1000>, /* SSIU */
+-			<0 0xec541000 0 0x280>,  /* SSI */
+-			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
++		compatible = "renesas,rcar_sound-r8a7793",
++			     "renesas,rcar_sound-gen2";
++		reg = <0 0xec500000 0 0x1000>, /* SCU */
++		      <0 0xec5a0000 0 0x100>,  /* ADG */
++		      <0 0xec540000 0 0x1000>, /* SSIU */
++		      <0 0xec541000 0 0x280>,  /* SSI */
++		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
+ 		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
  
--	thermal-zones {
--		cpu_thermal: cpu-thermal {
--			polling-delay-passive	= <0>;
--			polling-delay		= <0>;
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
- 
--			thermal-sensors = <&thermal>;
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
- 
--			trips {
--				cpu-crit {
--					temperature	= <95000>;
--					hysteresis	= <0>;
--					type		= "critical";
--				};
--			};
--			cooling-maps {
--			};
--		};
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
- 	};
- 
- 	soc {
-@@ -1668,6 +1701,25 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu-thermal {
-+			polling-delay-passive	= <0>;
-+			polling-delay		= <0>;
-+
-+			thermal-sensors = <&thermal>;
-+
-+			trips {
-+				cpu-crit {
-+					temperature	= <95000>;
-+					hysteresis	= <0>;
-+					type		= "critical";
-+				};
-+			};
-+			cooling-maps {
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -1676,62 +1728,10 @@
- 				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
--	/* External root clock */
--	extal_clk: extal {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
--	/*
--	 * The external audio clocks are configured as 0 Hz fixed frequency
--	 * clocks by default.
--	 * Boards that provide audio clocks should override them.
--	 */
--	audio_clk_a: audio_clk_a {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--	audio_clk_b: audio_clk_b {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--	audio_clk_c: audio_clk_c {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	/* External PCIe clock - can be overridden by the board */
--	pcie_bus_clk: pcie_bus {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <0>;
--	};
--
--	/* External SCIF clock */
--	scif_clk: scif {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
--
- 	/* External USB clock - can be overridden by the board */
- 	usb_extal_clk: usb_extal {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <48000000>;
- 	};
--
--	/* External CAN clock */
--	can_clk: can {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		/* This value must be overridden by the board. */
--		clock-frequency = <0>;
--	};
- };
+ 		clocks = <&cpg CPG_MOD 1005>,
 -- 
 2.11.0
