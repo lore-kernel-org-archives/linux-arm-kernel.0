@@ -1,118 +1,179 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Fri, 16 Mar 2018 13:10:15 +0530
-Subject: [PATCH v2 2/4] ioremap: Implement TLB_INV before huge mapping
-In-Reply-To: <1521130368.2693.177.camel@hpe.com>
-References: <1521117906-20107-1-git-send-email-cpandya@codeaurora.org>
- <1521117906-20107-3-git-send-email-cpandya@codeaurora.org>
- <1521130368.2693.177.camel@hpe.com>
-Message-ID: <0cec2b79-1668-68d1-32db-531f5a8a9db2@codeaurora.org>
+From: chenhc@lemote.com (Huacai Chen)
+Date: Fri, 16 Mar 2018 15:55:16 +0800
+Subject: [PATCH V3] ZBOOT: fix stack protector in compressed boot phase
+Message-ID: <1521186916-13745-1-git-send-email-chenhc@lemote.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Call __stack_chk_guard_setup() in decompress_kernel() is too late that
+stack checking always fails for decompress_kernel() itself. So remove
+__stack_chk_guard_setup() and initialize __stack_chk_guard before we
+call decompress_kernel().
 
+Original code comes from ARM but also used for MIPS and SH, so fix them
+together. If without this fix, compressed booting of these archs will
+fail because stack checking is enabled by default (>=4.16).
 
-On 3/15/2018 9:42 PM, Kani, Toshi wrote:
-> On Thu, 2018-03-15 at 18:15 +0530, Chintan Pandya wrote:
->> Huge mapping changes PMD/PUD which could have
->> valid previous entries. This requires proper
->> TLB maintanance on some architectures, like
->> ARM64.
->>
->> Implent BBM (break-before-make) safe TLB
->> invalidation.
->>
->> Here, I've used flush_tlb_pgtable() instead
->> of flush_kernel_range() because invalidating
->> intermediate page_table entries could have
->> been optimized for specific arch. That's the
->> case with ARM64 at least.
->>
->> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
->> ---
->>   lib/ioremap.c | 25 +++++++++++++++++++------
->>   1 file changed, 19 insertions(+), 6 deletions(-)
->>
->> diff --git a/lib/ioremap.c b/lib/ioremap.c
->> index 54e5bba..55f8648 100644
->> --- a/lib/ioremap.c
->> +++ b/lib/ioremap.c
->> @@ -13,6 +13,7 @@
->>   #include <linux/export.h>
->>   #include <asm/cacheflush.h>
->>   #include <asm/pgtable.h>
->> +#include <asm-generic/tlb.h>
->>   
->>   #ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
->>   static int __read_mostly ioremap_p4d_capable;
->> @@ -80,6 +81,7 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
->>   		unsigned long end, phys_addr_t phys_addr, pgprot_t prot)
->>   {
->>   	pmd_t *pmd;
->> +	pmd_t old_pmd;
->>   	unsigned long next;
->>   
->>   	phys_addr -= addr;
->> @@ -91,10 +93,15 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
->>   
->>   		if (ioremap_pmd_enabled() &&
->>   		    ((next - addr) == PMD_SIZE) &&
->> -		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
->> -		    pmd_free_pte_page(pmd)) {
->> -			if (pmd_set_huge(pmd, phys_addr + addr, prot))
->> +		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
->> +			old_pmd = *pmd;
->> +			pmd_clear(pmd);
-> 
-> pmd_clear() is one of the operations pmd_free_pte_page() needs to do.
-> See the x86 version.
-> 
->> +			flush_tlb_pgtable(&init_mm, addr);
-> 
-> You can call it in pmd_free_pte_page() on arm64 as well.
-> 
->> +			if (pmd_set_huge(pmd, phys_addr + addr, prot)) {
->> +				pmd_free_pte_page(&old_pmd);
->>   				continue;
->> +			} else
->> +				set_pmd(pmd, old_pmd);
-> 
-> I do not understand why you needed to make this change.
-> pmd_free_pte_page() is defined as an arch-specific function so that you
-> can additionally perform TLB purges on arm64.  Please try to make proper
-> arm64 implementation of this interface.  And if you find any issue in
-> this interface, please let me know.
-TLB ops require VA at least. And this interface passes just the PMD/PUD.
+V2: Fix build on ARM.
+V3: Fix build on SuperH.
 
-Second is, if we clear the previous table entry inside the arch specific
-code and then we fail in pmd/pud_set_huge, we can't fallback (x86 case).
+Cc: stable at vger.kernel.org
+Signed-off-by: Huacai Chen <chenhc@lemote.com>
+---
+ arch/arm/boot/compressed/head.S        | 4 ++++
+ arch/arm/boot/compressed/misc.c        | 7 -------
+ arch/mips/boot/compressed/decompress.c | 7 -------
+ arch/mips/boot/compressed/head.S       | 4 ++++
+ arch/sh/boot/compressed/head_32.S      | 8 ++++++++
+ arch/sh/boot/compressed/head_64.S      | 4 ++++
+ arch/sh/boot/compressed/misc.c         | 7 -------
+ 7 files changed, 20 insertions(+), 21 deletions(-)
 
-So, we can do something like this (following Mark's suggestion),
-
-	if (ioremap_pmd_enabled() &&
-         	((next - addr) == PMD_SIZE) &&
-		IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
-		pmd_can_set_huge(pmd, phys_addr + addr, prot)) {
-			/*
-			 * Clear existing table entry,
-			 * Invalidate,
-			 * Free the page table
-			 * inside this code
-			 */
-			pmd_free_pte_page(pmd, addr, addr + PMD_SIZE);
-			pmd_set_huge(...) //without fail
-			continue;
-	}
-
-
-> 
-> Same for pud.
-> 
-> Thanks,
-> -Toshi
-> 
-
-Chintan
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 45c8823..bae1fc6 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -547,6 +547,10 @@ not_relocated:	mov	r0, #0
+ 		bic	r4, r4, #1
+ 		blne	cache_on
+ 
++		ldr	r0, =__stack_chk_guard
++		ldr	r1, =0x000a0dff
++		str	r1, [r0]
++
+ /*
+  * The C runtime environment should now be setup sufficiently.
+  * Set up some pointers, and start decompressing.
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 16a8a80..e518ef5 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -130,11 +130,6 @@ asmlinkage void __div0(void)
+ 
+ unsigned long __stack_chk_guard;
+ 
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
+-
+ void __stack_chk_fail(void)
+ {
+ 	error("stack-protector: Kernel stack is corrupted\n");
+@@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ {
+ 	int ret;
+ 
+-	__stack_chk_guard_setup();
+-
+ 	output_data		= (unsigned char *)output_start;
+ 	free_mem_ptr		= free_mem_ptr_p;
+ 	free_mem_end_ptr	= free_mem_ptr_end_p;
+diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
+index fdf99e9..5ba431c 100644
+--- a/arch/mips/boot/compressed/decompress.c
++++ b/arch/mips/boot/compressed/decompress.c
+@@ -78,11 +78,6 @@ void error(char *x)
+ 
+ unsigned long __stack_chk_guard;
+ 
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
+-
+ void __stack_chk_fail(void)
+ {
+ 	error("stack-protector: Kernel stack is corrupted\n");
+@@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
+ {
+ 	unsigned long zimage_start, zimage_size;
+ 
+-	__stack_chk_guard_setup();
+-
+ 	zimage_start = (unsigned long)(&__image_begin);
+ 	zimage_size = (unsigned long)(&__image_end) -
+ 	    (unsigned long)(&__image_begin);
+diff --git a/arch/mips/boot/compressed/head.S b/arch/mips/boot/compressed/head.S
+index 409cb48..00d0ee0 100644
+--- a/arch/mips/boot/compressed/head.S
++++ b/arch/mips/boot/compressed/head.S
+@@ -32,6 +32,10 @@ start:
+ 	bne	a2, a0, 1b
+ 	 addiu	a0, a0, 4
+ 
++	PTR_LA	a0, __stack_chk_guard
++	PTR_LI	a1, 0x000a0dff
++	sw	a1, 0(a0)
++
+ 	PTR_LA	a0, (.heap)	     /* heap address */
+ 	PTR_LA	sp, (.stack + 8192)  /* stack address */
+ 
+diff --git a/arch/sh/boot/compressed/head_32.S b/arch/sh/boot/compressed/head_32.S
+index 7bb1681..e84237d 100644
+--- a/arch/sh/boot/compressed/head_32.S
++++ b/arch/sh/boot/compressed/head_32.S
+@@ -76,6 +76,10 @@ l1:
+ 	mov.l	init_stack_addr, r0
+ 	mov.l	@r0, r15
+ 
++	mov.l	__stack_chk_guard_addr, r0
++	mov.l	__stack_chk_guard_val, r1
++	mov.l	r1, @r0
++
+ 	/* Decompress the kernel */
+ 	mov.l	decompress_kernel_addr, r0
+ 	jsr	@r0
+@@ -97,6 +101,10 @@ kexec_magic:
+ 	.long	0x400000F0	/* magic used by kexec to parse zImage format */
+ init_stack_addr:
+ 	.long	stack_start
++__stack_chk_guard_val:
++	.long	0x000A0DFF
++__stack_chk_guard_addr:
++	.long	__stack_chk_guard
+ decompress_kernel_addr:
+ 	.long	decompress_kernel
+ kernel_start_addr:
+diff --git a/arch/sh/boot/compressed/head_64.S b/arch/sh/boot/compressed/head_64.S
+index 9993113..8b4d540 100644
+--- a/arch/sh/boot/compressed/head_64.S
++++ b/arch/sh/boot/compressed/head_64.S
+@@ -132,6 +132,10 @@ startup:
+ 	addi	r22, 4, r22
+ 	bne	r22, r23, tr1
+ 
++	movi	datalabel __stack_chk_guard, r0
++	movi	0x000a0dff, r1
++	st.l	r0, 0, r1
++
+ 	/*
+ 	 * Decompress the kernel.
+ 	 */
+diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
+index 627ce8e..fe4c079 100644
+--- a/arch/sh/boot/compressed/misc.c
++++ b/arch/sh/boot/compressed/misc.c
+@@ -106,11 +106,6 @@ static void error(char *x)
+ 
+ unsigned long __stack_chk_guard;
+ 
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
+-
+ void __stack_chk_fail(void)
+ {
+ 	error("stack-protector: Kernel stack is corrupted\n");
+@@ -130,8 +125,6 @@ void decompress_kernel(void)
+ {
+ 	unsigned long output_addr;
+ 
+-	__stack_chk_guard_setup();
+-
+ #ifdef CONFIG_SUPERH64
+ 	output_addr = (CONFIG_MEMORY_START + 0x2000);
+ #else
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+2.7.0
