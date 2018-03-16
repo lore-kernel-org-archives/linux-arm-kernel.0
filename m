@@ -1,51 +1,93 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Fri, 16 Mar 2018 11:42:44 +0200
-Subject: [RESEND PATCH] clk: enable hi655x common clk automatically
-In-Reply-To: <152113644553.107923.8652081506535849458@swboyd.mtv.corp.google.com>
-References: <20180312104945.3001-1-riku.voipio@linaro.org>
- <152113644553.107923.8652081506535849458@swboyd.mtv.corp.google.com>
-Message-ID: <CAAqcGHkAKVShOL2atHwcdQMHt5wGpx+zmHQbzJPs1wc1VvLyrg@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 16 Mar 2018 10:51:13 +0100
+Subject: update vruntime incorrectly When use rt_mutex
+In-Reply-To: <1521099370.7712.4.camel@mtkswgap22>
+References: <1521099370.7712.4.camel@mtkswgap22>
+Message-ID: <20180316095113.GA4064@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 March 2018 at 19:54, Stephen Boyd <sboyd@kernel.org> wrote:
-> Quoting riku.voipio at linaro.org (2018-03-12 03:49:45)
->> From: Riku Voipio <riku.voipio@linaro.org>
->>
->> Without COMMON_CLK_HI655X Wifi and bluetooth are non-functional on Hikey.
->> As suggested by Arnd, enable the driver automatically when the parent
->> driver is selected. With sensible defaults in place, we can leave other
->> choices for EXPERT.
->>
->> Cc: John Stultz <john.stultz@linaro.org>
->> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->> Cc: Wei Xu <xuwei5@hisilicon.com>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Suggested-by: Arnd Bergmann <arnd@linaro.org>
->> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
->> ---
->> Previous discussion at https://patchwork.kernel.org/patch/9767143/
->> ---
->>  drivers/clk/Kconfig | 6 ++++--
->>  1 file changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
->> index 98ce9fc6e6c0..448ce83b334d 100644
->> --- a/drivers/clk/Kconfig
->> +++ b/drivers/clk/Kconfig
->> @@ -55,8 +55,10 @@ config COMMON_CLK_RK808
->>           by control register.
->>
->>  config COMMON_CLK_HI655X
->> -       tristate "Clock driver for Hi655x"
->> -       depends on MFD_HI655X_PMIC || COMPILE_TEST
->> +       tristate "Clock driver for Hi655x" if EXPERT
->
-> Hmm. This would be the first EXPERT usage in the clk code. I guess
-> that's ok.
+On Thu, Mar 15, 2018 at 03:36:10PM +0800, Kathleen Chang wrote:
+> hi,  
+> 
+> We found the vruntime might update incorrectly when use rt_mutex.
 
-Put it this way - would you comfortable letting a non-expert fiddle this option?
+That's nice, on what kernel?
 
->> +       depends on (MFD_HI655X_PMIC || COMPILE_TEST)
->> +       depends on REGMAP
->> +       default MFD_HI655X_PMIC
+Also, your email is very hard to make sense of.
+
+> <<abnormal case>>
+> When the Task is waking, update vruntime incorrectly.
+> 1.  When there is a CFS task (A) hold  rt_mutex_lock and the state is
+> TASK_WAKING (on_rq=0),  a RT task (B) want to hold this rt_mutex_lock.
+> Update vruntime incorrectly.
+> 
+>   RT task (B)
+>      rt_mutex_setprio  (cfs->RT)  ->  Task is waking , and update
+> vruntime
+> 
+>        queued = task_on_rq_queued(p); // task is waking, queued=0
+>        running = task_current(rq, p);
+>        if (queued)      /*   don't update vruntime here!   */
+>                 dequeue_task(rq, p, queue_flag);                      
+>        if (running)
+>                 put_prev_task(rq, p);
+>        
+>        check_class_changed(rq, p, prev_class, oldprio);   -> 
+>                 switched_from_fair -> 
+>                       detach_task_cfs_rq  
+>           ( due to task is waking, and bypass
+> vruntime-=cfs_rq.min_vruntime) 
+> 
+> static void detach_task_cfs_rq(struct task_struct *p)
+> {
+>         struct sched_entity *se = &p->se;
+>         struct cfs_rq *cfs_rq = cfs_rq_of(se);
+> 
+>         if (!vruntime_normalized(p)) {   // return 1, then p->state is
+> TASK_WAKING
+>                 /*
+>                  * Fix up our vruntime so that the current sleep doesn't
+>                  * cause 'unlimited' sleep bonus.
+>                  */
+>                 place_entity(cfs_rq, se, 0);
+>                 check_vruntime(8, se, cfs_rq->min_vruntime);
+>                 se->vruntime -= cfs_rq->min_vruntime;
+
+So here we subtract min_vruntime,
+
+>                 se->normalized = true;
+
+this doesn't exist.. which makes me wonder what you're looking at,
+
+>         }
+> 
+>         detach_entity_cfs_rq(se);
+> }
+> 
+> // when p->state is TASK_WAKING, the task's vruntime is normalized 
+> static inline bool vruntime_normalized(struct task_struct *p)
+> {
+> .....
+>         if (!se->sum_exec_runtime || p->state == TASK_WAKING)
+>                 return true;
+> 
+> }
+> 
+> 2.  When the task (A) which holds the rt_muex_lock unlock the
+> rt_mutex_lock.
+>      Task (A) must be on_rq=1 
+> 
+>     rt_mutex_setprio (RT->CFS)     
+>        if (queued)
+>                 enqueue_task(rq, p, queue_flag);    );     
+>                     /* vruntime += cfs_rq.min_vruntime */
+
+And here we're adding min_vruntime.
+
+>        if (running)
+>                 set_curr_task(rq, p);
+> 
+>     that result in vruntime accumulates
+
+So what exactly is the problem?
