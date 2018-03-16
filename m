@@ -1,142 +1,92 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:52:53 +0100
-Subject: [PATCH 34/52] ARM: dts: lager: use demuxer for IIC3/I2C3
+Date: Fri, 16 Mar 2018 15:52:49 +0100
+Subject: [PATCH 30/52] ARM: dts: r8a7745: Add IPMMU DT nodes
 In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
 References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <e6081b21a19156c982f757cb1b6753cfb7e93ebc.1521208546.git.horms+renesas@verge.net.au>
+Message-ID: <0dcba3de58354e35c91a31dafe597e81e7c22294.1521208546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Create a separate bus for da9063 PMIC and da9210 regulator
-related I2C slaves.
+Add the six IPMMU instances found in the r8a7745 to DT with a disabled
+status.
 
-Based on similar work for HDMI by Wolfram Sang.
-
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-[wsa: rebased, corrected chip name in commit msg, updated aliases]
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 84 +++++++++++++++++++++++--------------
- 1 file changed, 53 insertions(+), 31 deletions(-)
+ arch/arm/boot/dts/r8a7745.dtsi | 58 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 9f511d4fac10..20c1b4f224b8 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -55,6 +55,7 @@
- 		i2c10 = &i2cexio0;
- 		i2c11 = &i2cexio1;
- 		i2c12 = &i2chdmi;
-+		i2c13 = &i2cpwr;
- 	};
- 
- 	chosen {
-@@ -418,6 +419,46 @@
- 			};
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 9c8d72c83bdc..413288b05515 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -288,6 +288,64 @@
+ 			resets = <&cpg 407>;
  		};
- 	};
-+
-+	/*
-+	 * IIC3 and I2C3 may be switched using pinmux.
-+	 * IIC3/I2C3 does not appear to support fallback to GPIO.
-+	 */
-+	i2cpwr: i2c-13 {
-+		compatible = "i2c-demux-pinctrl";
-+		i2c-parent = <&iic3>, <&i2c3>;
-+		i2c-bus-name = "i2c-pwr";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pmic at 58 {
-+			compatible = "dlg,da9063";
-+			reg = <0x58>;
-+			interrupt-parent = <&irqc0>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-controller;
-+
-+			rtc {
-+				compatible = "dlg,da9063-rtc";
-+			};
-+
-+			wdt {
-+				compatible = "dlg,da9063-watchdog";
-+			};
+ 
++		ipmmu_sy0: mmu at e6280000 {
++			compatible = "renesas,ipmmu-r8a7745",
++				     "renesas,ipmmu-vmsa";
++			reg = <0 0xe6280000 0 0x1000>;
++			interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 224 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <1>;
++			status = "disabled";
 +		};
 +
-+		vdd_dvfs: regulator at 68 {
-+			compatible = "dlg,da9210";
-+			reg = <0x68>;
-+			interrupt-parent = <&irqc0>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1000000>;
-+			regulator-boot-on;
-+			regulator-always-on;
++		ipmmu_sy1: mmu at e6290000 {
++			compatible = "renesas,ipmmu-r8a7745",
++				     "renesas,ipmmu-vmsa";
++			reg = <0 0xe6290000 0 0x1000>;
++			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <1>;
++			status = "disabled";
 +		};
-+	};
- };
- 
- &du {
-@@ -557,6 +598,11 @@
- 		function = "iic2";
- 	};
- 
-+	i2c3_pins: i2c3 {
-+		groups = "i2c3";
-+		function = "i2c3";
-+	};
 +
- 	iic3_pins: iic3 {
- 		groups = "iic3";
- 		function = "iic3";
-@@ -772,38 +818,14 @@
- 	clock-frequency = <100000>;
- };
- 
--&iic3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&iic3_pins>;
--	status = "okay";
--
--	pmic at 58 {
--		compatible = "dlg,da9063";
--		reg = <0x58>;
--		interrupt-parent = <&irqc0>;
--		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
--		interrupt-controller;
--
--		rtc {
--			compatible = "dlg,da9063-rtc";
--		};
--
--		wdt {
--			compatible = "dlg,da9063-watchdog";
--		};
--	};
--
--	vdd_dvfs: regulator at 68 {
--		compatible = "dlg,da9210";
--		reg = <0x68>;
--		interrupt-parent = <&irqc0>;
--		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+&i2c3	{
-+	pinctrl-0 = <&i2c3_pins>;
-+	pinctrl-names = "i2c-pwr";
-+};
- 
--		regulator-min-microvolt = <1000000>;
--		regulator-max-microvolt = <1000000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
-+&iic3	{
-+	pinctrl-0 = <&iic3_pins>;
-+	pinctrl-names = "i2c-pwr";
- };
- 
- &pci0 {
++		ipmmu_ds: mmu at e6740000 {
++			compatible = "renesas,ipmmu-r8a7745",
++				     "renesas,ipmmu-vmsa";
++			reg = <0 0xe6740000 0 0x1000>;
++			interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_mp: mmu at ec680000 {
++			compatible = "renesas,ipmmu-r8a7745",
++				     "renesas,ipmmu-vmsa";
++			reg = <0 0xec680000 0 0x1000>;
++			interrupts = <GIC_SPI 226 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_mx: mmu at fe951000 {
++			compatible = "renesas,ipmmu-r8a7745",
++				     "renesas,ipmmu-vmsa";
++			reg = <0 0xfe951000 0 0x1000>;
++			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_gp: mmu at e62a0000 {
++			compatible = "renesas,ipmmu-r8a7745",
++				     "renesas,ipmmu-vmsa";
++			reg = <0 0xe62a0000 0 0x1000>;
++			interrupts = <GIC_SPI 260 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
+ 		icram0:	sram at e63a0000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0 0xe63a0000 0 0x12000>;
 -- 
 2.11.0
