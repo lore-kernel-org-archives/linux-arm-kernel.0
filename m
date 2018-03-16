@@ -1,107 +1,359 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 16 Mar 2018 14:31:19 +0000
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <20180316141313.q5vjmj627rv7r7kf@lakrids.cambridge.arm.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
- <20180316141313.q5vjmj627rv7r7kf@lakrids.cambridge.arm.com>
-Message-ID: <20180316143119.cdjw4dhm6crcjyrd@lakrids.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 16 Mar 2018 16:32:29 +0200
+Subject: [PATCH usb-next v10 3/8] usb: core: add a wrapper for the USB
+ PHYs on the HCD
+In-Reply-To: <20180218184504.3331-4-martin.blumenstingl@googlemail.com>
+References: <20180218184504.3331-1-martin.blumenstingl@googlemail.com>
+ <20180218184504.3331-4-martin.blumenstingl@googlemail.com>
+Message-ID: <7f511a6f-f3a2-2002-f601-5ce1742f4539@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 02:13:14PM +0000, Mark Rutland wrote:
-> On Fri, Mar 16, 2018 at 02:49:00PM +0100, Andrey Konovalov wrote:
-> > Hi!
++some TI folks
+
+Hi Martin,
+
+On 18/02/18 20:44, Martin Blumenstingl wrote:
+> Many SoC platforms have separate devices for the USB PHY which are
+> registered through the generic PHY framework. These PHYs have to be
+> enabled to make the USB controller actually work. They also have to be
+> disabled again on shutdown/suspend.
 > 
-> Hi,
+> Currently (at least) the following HCI platform drivers are using custom
+> code to obtain all PHYs via devicetree for the roothub/controller and
+> disable/enable them when required:
+> - ehci-platform.c has ehci_platform_power_{on,off}
+> - xhci-mtk.c has xhci_mtk_phy_{init,exit,power_on,power_off}
+> - ohci-platform.c has ohci_platform_power_{on,off}
+> 
+> With this new wrapper the USB PHYs can be specified directly in the
+> USB controller's devicetree node (just like on the drivers listed
+> above). This allows SoCs like the Amlogic Meson GXL family to operate
+> correctly once this is wired up correctly. These SoCs use a dwc3
+> controller and require all USB PHYs to be initialized (if one of the USB
+> PHYs it not initialized then none of USB port works at all).
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Tested-by: Yixun Lan <yixun.lan@amlogic.com>
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Chunfeng Yun <chunfeng.yun@mediatek.com>
+
+This patch is breaking low power cases on TI SoCs when USB is in host mode.
+I'll explain why below.
+
+> ---
+>  drivers/usb/core/Makefile |   2 +-
+>  drivers/usb/core/phy.c    | 158 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/usb/core/phy.h    |   7 ++
+>  3 files changed, 166 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/usb/core/phy.c
+>  create mode 100644 drivers/usb/core/phy.h
+> 
+> diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
+> index 92c9cefb4317..18e874b0441e 100644
+> --- a/drivers/usb/core/Makefile
+> +++ b/drivers/usb/core/Makefile
+> @@ -6,7 +6,7 @@
+>  usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
+>  usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
+>  usbcore-y += devio.o notify.o generic.o quirks.o devices.o
+> -usbcore-y += port.o
+> +usbcore-y += phy.o port.o
 >  
-> > I've recently tried to boot clang built kernel on real hardware
-> > (Odroid C2 board) instead of using a VM. The issue that I stumbled
-> > upon is that arm64 kvm built with clang doesn't boot.
-> > 
-> > Adding -fno-jump-tables compiler flag to arch/arm64/kvm/* helps. There
-> > was a patch some time ago that did exactly that
-> > (https://patchwork.kernel.org/patch/10060381/), but it wasn't accepted
-> > AFAICT (see the discussion on that thread).
-> > 
-> > What would be the best way to get this fixed?
-> 
-> I think that patch is our best bet currently, but to save ourselves pain
-> in future it would be *really* nice if GCC and clang could provide an
-> option line -fno-absolute-addressing that would implicitly disable any
-> feature that would generate an absolute address as jump tables do.
-> 
-> > I've also had to disable CONFIG_JUMP_LABEL to get the kernel boot
-> > (even without kvm enabled), but that might be a different (though
-> > related) issue.
-> 
-> With v4.15 (and clang 5.0.0), I did not have to disable jump labels to
-> get a kernel booting on a Juno platform, though I did have to pass
-> -fno-jump-tables to the hyp code.
+>  usbcore-$(CONFIG_OF)		+= of.o
+>  usbcore-$(CONFIG_USB_PCI)		+= hcd-pci.o
+> diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
+> new file mode 100644
+> index 000000000000..09b7c43c0ea4
+> --- /dev/null
+> +++ b/drivers/usb/core/phy.c
+> @@ -0,0 +1,158 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * A wrapper for multiple PHYs which passes all phy_* function calls to
+> + * multiple (actual) PHY devices. This is comes handy when initializing
+> + * all PHYs on a HCD and to keep them all in the same state.
+> + *
+> + * Copyright (C) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/list.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/of.h>
+> +
+> +#include "phy.h"
+> +
+> +struct usb_phy_roothub {
+> +	struct phy		*phy;
+> +	struct list_head	list;
+> +};
+> +
+> +static struct usb_phy_roothub *usb_phy_roothub_alloc(struct device *dev)
+> +{
+> +	struct usb_phy_roothub *roothub_entry;
+> +
+> +	roothub_entry = devm_kzalloc(dev, sizeof(*roothub_entry), GFP_KERNEL);
+> +	if (!roothub_entry)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	INIT_LIST_HEAD(&roothub_entry->list);
+> +
+> +	return roothub_entry;
+> +}
+> +
+> +static int usb_phy_roothub_add_phy(struct device *dev, int index,
+> +				   struct list_head *list)
+> +{
+> +	struct usb_phy_roothub *roothub_entry;
+> +	struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
+> +
+> +	if (IS_ERR_OR_NULL(phy)) {
+> +		if (!phy || PTR_ERR(phy) == -ENODEV)
+> +			return 0;
+> +		else
+> +			return PTR_ERR(phy);
+> +	}
+> +
+> +	roothub_entry = usb_phy_roothub_alloc(dev);
+> +	if (IS_ERR(roothub_entry))
+> +		return PTR_ERR(roothub_entry);
+> +
+> +	roothub_entry->phy = phy;
+> +
+> +	list_add_tail(&roothub_entry->list, list);
+> +
+> +	return 0;
+> +}
+> +
+> +struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev)
+> +{
+> +	struct usb_phy_roothub *phy_roothub;
+> +	struct usb_phy_roothub *roothub_entry;
+> +	struct list_head *head;
+> +	int i, num_phys, err;
+> +
+> +	num_phys = of_count_phandle_with_args(dev->of_node, "phys",
+> +					      "#phy-cells");
+> +	if (num_phys <= 0)
+> +		return NULL;
+> +
+> +	phy_roothub = usb_phy_roothub_alloc(dev);
+> +	if (IS_ERR(phy_roothub))
+> +		return phy_roothub;
+> +
+> +	for (i = 0; i < num_phys; i++) {
+> +		err = usb_phy_roothub_add_phy(dev, i, &phy_roothub->list);
+> +		if (err)
+> +			goto err_out;
+> +	}
+> +
+> +	head = &phy_roothub->list;
+> +
+> +	list_for_each_entry(roothub_entry, head, list) {
+> +		err = phy_init(roothub_entry->phy);
 
-FWIW, with that same compiler and patch applied atop of v4.16-rc4, and
-some bodges around clang not liking the rX register naming in the SMCCC
-code, I get a kernel that boots on my Juno, though I immediately hit a
-KASAN splat:
+The phy_init() function actually enables the PHY clocks.
+It should be moved to the usb_phy_roothub_exit() routine just before calling phy_power_on().
 
-[    8.476766] ==================================================================
-[    8.483990] BUG: KASAN: slab-out-of-bounds in __d_lookup_rcu+0x350/0x400
-[    8.490664] Read of size 8 at addr ffff8009336e2a30 by task init/1
-[    8.496808] 
-[    8.498313] CPU: 2 PID: 1 Comm: init Not tainted 4.16.0-rc4-00001-g1e3a801c4e30-dirty #1
-[    8.506361] Hardware name: ARM Juno development board (r1) (DT)
-[    8.512248] Call trace:
-[    8.514699]  dump_backtrace+0x0/0x29c
-[    8.518356]  show_stack+0x20/0x2c
-[    8.521667]  dump_stack+0x118/0x15c
-[    8.525151]  print_address_description+0x80/0x2d0
-[    8.529839]  kasan_report+0x208/0x278
-[    8.533492]  __asan_load8+0x1b0/0x1b8
-[    8.537148]  __d_lookup_rcu+0x350/0x400
-[    8.540974]  lookup_fast+0x19c/0x780
-[    8.544541]  walk_component+0x108/0x121c
-[    8.548452]  path_lookupat+0x1a4/0x620
-[    8.552197]  filename_lookup+0x1d8/0x440
-[    8.556113]  user_path_at_empty+0x54/0x68
-[    8.560112]  vfs_statx+0x108/0x1f0
-[    8.563507]  SyS_newfstatat+0x118/0x19c
-[    8.567333]  el0_svc_naked+0x30/0x34
-[    8.570889] 
-[    8.572380] Allocated by task 1:
-[    8.575603]  kasan_kmalloc+0xe0/0x1ac
-[    8.579259]  __kmalloc+0x1e4/0x278
-[    8.582656]  __d_alloc+0x8c/0x370
-[    8.585968]  d_alloc_parallel+0xdc/0xca0
-[    8.589883]  nfs_readdir_xdr_to_array+0xe44/0x1694
-[    8.594658]  nfs_readdir_filler+0x44/0xe8
-[    8.598662]  do_read_cache_page+0x450/0x6f4
-[    8.602836]  read_cache_page+0x44/0x54
-[    8.606575]  nfs_readdir+0xd58/0xef4
-[    8.610143]  iterate_dir+0x15c/0x26c
-[    8.613711]  SyS_getdents64+0x180/0x30c
-[    8.617538]  el0_svc_naked+0x30/0x34
-[    8.621093] 
-[    8.622584] Freed by task 0:
-[    8.625451] (stack is not available)
-[    8.629007] 
-[    8.630505] The buggy address belongs to the object at ffff8009336e2a00
-[    8.630505]  which belongs to the cache kmalloc-128 of size 128
-[    8.642969] The buggy address is located 48 bytes inside of
-[    8.642969]  128-byte region [ffff8009336e2a00, ffff8009336e2a80)
-[    8.654558] The buggy address belongs to the page:
-[    8.659335] page:ffff7e0024cdb880 count:1 mapcount:0 mapping:0000000000000000 index:0x0
-[    8.667304] flags: 0x1fffc00000000100(slab)
-[    8.671487] raw: 1fffc00000000100 0000000000000000 0000000000000000 0000000100100010
-[    8.679206] raw: dead000000000100 dead000000000200 ffff800937403c00 0000000000000000
-[    8.686907] page dumped because: kasan: bad access detected
-[    8.692447] 
-[    8.693935] Memory state around the buggy address:
-[    8.698710]  ffff8009336e2900: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-[    8.705902]  ffff8009336e2980: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
-[    8.713093] >ffff8009336e2a00: 00 00 00 00 00 00 06 fc fc fc fc fc fc fc fc fc
-[    8.720277]                                      ^
-[    8.725051]  ffff8009336e2a80: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
-[    8.732242]  ffff8009336e2b00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-[    8.739426] ==================================================================
+> +		if (err)
+> +			goto err_exit_phys;
+> +	}
+> +
+> +	return phy_roothub;
+> +
+> +err_exit_phys:
+> +	list_for_each_entry_continue_reverse(roothub_entry, head, list)
+> +		phy_exit(roothub_entry->phy);
+> +
+> +err_out:
+> +	return ERR_PTR(err);
+> +}
+> +EXPORT_SYMBOL_GPL(usb_phy_roothub_init);
+> +
+> +int usb_phy_roothub_exit(struct usb_phy_roothub *phy_roothub)
+> +{
+> +	struct usb_phy_roothub *roothub_entry;
+> +	struct list_head *head;
+> +	int err, ret = 0;
+> +
+> +	if (!phy_roothub)
+> +		return 0;
+> +
+> +	head = &phy_roothub->list;
+> +
+> +	list_for_each_entry(roothub_entry, head, list) {
+> +		err = phy_exit(roothub_entry->phy);
+> +		if (err)
+> +			ret = ret;
+> +	}
 
-Thanks,
-Mark.
+phy_exit() should be moved to usb_phy_roothub_poweroff() just after calling phy_power_off().
+
+With that there is nothing else being done here. Shouldn't we be doing the equivalent of
+usb_phy_roothub_del_phy() and usb_phy_roothub_free() here?
+
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(usb_phy_roothub_exit);
+> +
+> +int usb_phy_roothub_power_on(struct usb_phy_roothub *phy_roothub)
+> +{
+> +	struct usb_phy_roothub *roothub_entry;
+> +	struct list_head *head;
+> +	int err;
+> +
+> +	if (!phy_roothub)
+> +		return 0;
+> +
+> +	head = &phy_roothub->list;
+> +
+> +	list_for_each_entry(roothub_entry, head, list) {
+> +		err = phy_power_on(roothub_entry->phy);
+> +		if (err)
+> +			goto err_out;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_out:
+> +	list_for_each_entry_continue_reverse(roothub_entry, head, list)
+> +		phy_power_off(roothub_entry->phy);
+> +
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(usb_phy_roothub_power_on);
+> +
+> +void usb_phy_roothub_power_off(struct usb_phy_roothub *phy_roothub)
+> +{
+> +	struct usb_phy_roothub *roothub_entry;
+> +
+> +	if (!phy_roothub)
+> +		return;
+> +
+> +	list_for_each_entry_reverse(roothub_entry, &phy_roothub->list, list)
+> +		phy_power_off(roothub_entry->phy);
+
+Not doing the phy_exit() here leaves the clocks enabled on our SoC and
+we're no longer able to reach low power states on system suspend.
+
+> +}
+> +EXPORT_SYMBOL_GPL(usb_phy_roothub_power_off);
+> diff --git a/drivers/usb/core/phy.h b/drivers/usb/core/phy.h
+> new file mode 100644
+> index 000000000000..6fde59bfbff8
+> --- /dev/null
+> +++ b/drivers/usb/core/phy.h
+> @@ -0,0 +1,7 @@
+> +struct usb_phy_roothub;
+> +
+> +struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev);
+> +int usb_phy_roothub_exit(struct usb_phy_roothub *phy_roothub);
+> +
+> +int usb_phy_roothub_power_on(struct usb_phy_roothub *phy_roothub);
+> +void usb_phy_roothub_power_off(struct usb_phy_roothub *phy_roothub);
+> 
+
+The following patch fixes the issue for me. Let me know what you think and I can post it officially.
+
+diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
+index 09b7c43..23232d3 100644
+--- a/drivers/usb/core/phy.c
++++ b/drivers/usb/core/phy.c
+@@ -59,8 +59,6 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
+ struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev)
+ {
+ 	struct usb_phy_roothub *phy_roothub;
+-	struct usb_phy_roothub *roothub_entry;
+-	struct list_head *head;
+ 	int i, num_phys, err;
+ 
+ 	num_phys = of_count_phandle_with_args(dev->of_node, "phys",
+@@ -75,25 +73,10 @@ struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev)
+ 	for (i = 0; i < num_phys; i++) {
+ 		err = usb_phy_roothub_add_phy(dev, i, &phy_roothub->list);
+ 		if (err)
+-			goto err_out;
+-	}
+-
+-	head = &phy_roothub->list;
+-
+-	list_for_each_entry(roothub_entry, head, list) {
+-		err = phy_init(roothub_entry->phy);
+-		if (err)
+-			goto err_exit_phys;
++			return ERR_PTR(err);
+ 	}
+ 
+ 	return phy_roothub;
+-
+-err_exit_phys:
+-	list_for_each_entry_continue_reverse(roothub_entry, head, list)
+-		phy_exit(roothub_entry->phy);
+-
+-err_out:
+-	return ERR_PTR(err);
+ }
+ EXPORT_SYMBOL_GPL(usb_phy_roothub_init);
+ 
+@@ -106,13 +89,8 @@ int usb_phy_roothub_exit(struct usb_phy_roothub *phy_roothub)
+ 	if (!phy_roothub)
+ 		return 0;
+ 
+-	head = &phy_roothub->list;
+-
+-	list_for_each_entry(roothub_entry, head, list) {
+-		err = phy_exit(roothub_entry->phy);
+-		if (err)
+-			ret = ret;
+-	}
++	/* TODO: usb_phy_roothub_del_phy */
++	/* TODO: usb_phy_roothub_free */
+ 
+ 	return ret;
+ }
+@@ -130,16 +108,23 @@ int usb_phy_roothub_power_on(struct usb_phy_roothub *phy_roothub)
+ 	head = &phy_roothub->list;
+ 
+ 	list_for_each_entry(roothub_entry, head, list) {
+-		err = phy_power_on(roothub_entry->phy);
++		err = phy_init(roothub_entry->phy);
+ 		if (err)
+ 			goto err_out;
++		err = phy_power_on(roothub_entry->phy);
++		if (err) {
++			phy_exit(roothub_entry->phy);
++			goto err_out;
++		}
+ 	}
+ 
+ 	return 0;
+ 
+ err_out:
+-	list_for_each_entry_continue_reverse(roothub_entry, head, list)
++	list_for_each_entry_continue_reverse(roothub_entry, head, list) {
+ 		phy_power_off(roothub_entry->phy);
++		phy_exit(roothub_entry->phy);
++	}
+ 
+ 	return err;
+ }
+@@ -152,7 +137,9 @@ void usb_phy_roothub_power_off(struct usb_phy_roothub *phy_roothub)
+ 	if (!phy_roothub)
+ 		return;
+ 
+-	list_for_each_entry_reverse(roothub_entry, &phy_roothub->list, list)
++	list_for_each_entry_reverse(roothub_entry, &phy_roothub->list, list) {
+ 		phy_power_off(roothub_entry->phy);
++		phy_exit(roothub_entry->phy);
++	}
+ }
+ EXPORT_SYMBOL_GPL(usb_phy_roothub_power_off);
+
+
+-- 
+cheers,
+-roger
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
