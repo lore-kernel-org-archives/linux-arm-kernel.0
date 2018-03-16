@@ -1,37 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 16 Mar 2018 15:14:50 +0100
-Subject: [PATCH] arm64: dts: armada-3720-espressobin: Document URL for
- schematic
-In-Reply-To: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
-References: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20180316141450.GF17895@lunn.ch>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 16 Mar 2018 15:18:44 +0100
+Subject: [GIT PULL 1/7] ARM: tegra: Miscellaneous changes for v4.17-rc1
+Message-ID: <20180316141850.4876-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 11:01:24AM +0100, Uwe Kleine-K?nig wrote:
-> The schematic of hte espressobin is publicly available, add a comment
-> where to find it.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> index bdfb5553ddb5..6d070b267abe 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> @@ -42,6 +42,9 @@
->   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->   *     OTHER DEALINGS IN THE SOFTWARE.
->   */
-> +/*
-> + * Schematic available at http://espressobin.net/wp-content/uploads/2017/08/ESPRESSObin_V5_Schematics.pdf
-> + */
+Hi ARM SoC maintainers,
 
-Version 4 is also available:
-http://wiki.espressobin.net/tiki-download_file.php?fileId=90. I've no
-idea how you tell the boards apart. But my espressobin has more
-jumpers behind the reset button than the board on the home page.
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-	Andrew
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-misc
+
+for you to fetch changes up to 601ff7edc748213fc6d4d7c1ded6467edbd1f1c2:
+
+  MAINTAINERS: Update Tegra IOMMU maintainer (2018-03-09 09:45:27 +0100)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+ARM: tegra: Miscellaneous changes for v4.17-rc1
+
+This contains a single patch to update the MAINTAINERS entry for the
+Tegra SMMU driver.
+
+----------------------------------------------------------------
+Jon Hunter (1):
+      MAINTAINERS: Update Tegra IOMMU maintainer
+
+ MAINTAINERS | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
