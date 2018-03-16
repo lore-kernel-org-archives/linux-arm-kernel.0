@@ -1,149 +1,158 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 21:52:17 -0500
-Subject: [PATCH v8 01/42] dt-bindings: clock: Add new bindings for TI Davinci
- PLL clocks
+Date: Thu, 15 Mar 2018 21:52:23 -0500
+Subject: [PATCH v8 07/42] clk: davinci: Add platform information for TI DM644x
+ PLL
 In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
 References: <1521168778-27236-1-git-send-email-david@lechnology.com>
-Message-ID: <1521168778-27236-2-git-send-email-david@lechnology.com>
+Message-ID: <1521168778-27236-8-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new binding for the PLL IP blocks in the mach-davinci
-family of processors. Currently, only da850 has device tree support
-but these bindings can also work for other SoCs in this family just
-by adding new compatible strings.
-
-Note: Although these PLL controllers are very similar to the TI Keystone
-SoCs, we are not re-using those bindings. The Keystone bindings use a
-legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
-have a slightly different PLL register layout and a number of quirks
-that can't be handled by the existing bindings, so the keystone bindings
-could not be used as-is anyway.
+This adds platform-specific declarations for the PLL clocks on TI
+DM644x based systems.
 
 Signed-off-by: David Lechner <david@lechnology.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 
 v8 changes:
-- None
+- drop __init and __initconst attributes
+- add a clkdev lookup for each SYSCLK
 
 v7 changes:
-- None (there was some debate about having child nodes, but the consensus was
-  that this is "good enough" as it is)
+- split registration functions for each PLL
+- Add platform_device_id lookup
 
 v6 changes:
-- Added clock-names property
-- Added ti,clkmode-square-wave property
-- Added pllout child node
-- Added obsclk child node
-- Expanded examples
+- Added dm644x_pll{1,2}_info with controller-specific information
+- Add empty lines between function calls
 
+ drivers/clk/davinci/Makefile     |  1 +
+ drivers/clk/davinci/pll-dm644x.c | 80 ++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/davinci/pll.c        |  2 +
+ drivers/clk/davinci/pll.h        |  3 ++
+ 4 files changed, 86 insertions(+)
+ create mode 100644 drivers/clk/davinci/pll-dm644x.c
 
- .../devicetree/bindings/clock/ti/davinci/pll.txt   | 96 ++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
-
-diff --git a/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
+diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
+index 353aa02..59d8ab6 100644
+--- a/drivers/clk/davinci/Makefile
++++ b/drivers/clk/davinci/Makefile
+@@ -6,4 +6,5 @@ obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= pll-da830.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= pll-da850.o
+ obj-$(CONFIG_ARCH_DAVINCI_DM355)	+= pll-dm355.o
+ obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= pll-dm365.o
++obj-$(CONFIG_ARCH_DAVINCI_DM644x)	+= pll-dm644x.o
+ endif
+diff --git a/drivers/clk/davinci/pll-dm644x.c b/drivers/clk/davinci/pll-dm644x.c
 new file mode 100644
-index 0000000..36998e1
+index 0000000..69bf785
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/ti/davinci/pll.txt
-@@ -0,0 +1,96 @@
-+Binding for TI DaVinci PLL Controllers
++++ b/drivers/clk/davinci/pll-dm644x.c
+@@ -0,0 +1,80 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * PLL clock descriptions for TI DM644X
++ *
++ * Copyright (C) 2018 David Lechner <david@lechnology.com>
++ */
 +
-+The PLL provides clocks to most of the components on the SoC. In addition
-+to the PLL itself, this controller also contains bypasses, gates, dividers,
-+an multiplexers for various clock signals.
++#include <linux/bitops.h>
++#include <linux/clkdev.h>
++#include <linux/init.h>
++#include <linux/types.h>
 +
-+Required properties:
-+- compatible: shall be one of:
-+	- "ti,da850-pll0" for PLL0 on DA850/OMAP-L138/AM18XX
-+	- "ti,da850-pll1" for PLL1 on DA850/OMAP-L138/AM18XX
-+- reg: physical base address and size of the controller's register area.
-+- clocks: phandles corresponding to the clock names
-+- clock-names: names of the clock sources - depends on compatible string
-+	- for "ti,da850-pll0", shall be "clksrc", "extclksrc"
-+	- for "ti,da850-pll1", shall be "clksrc"
++#include "pll.h"
 +
-+Optional properties:
-+- ti,clkmode-square-wave: Indicates that the the board is supplying a square
-+	wave input on the OSCIN pin instead of using a crystal oscillator.
-+	This property is only valid when compatible = "ti,da850-pll0".
++static const struct davinci_pll_clk_info dm644x_pll1_info = {
++	.name = "pll1",
++	.pllm_mask = GENMASK(4, 0),
++	.pllm_min = 1,
++	.pllm_max = 32,
++	.pllout_min_rate = 400000000,
++	.pllout_max_rate = 600000000, /* 810MHz @ 1.3V, -810 only */
++	.flags = PLL_HAS_CLKMODE | PLL_HAS_POSTDIV,
++};
 +
++SYSCLK(1, pll1_sysclk1, pll1_pllen, 4, SYSCLK_FIXED_DIV);
++SYSCLK(2, pll1_sysclk2, pll1_pllen, 4, SYSCLK_FIXED_DIV);
++SYSCLK(3, pll1_sysclk3, pll1_pllen, 4, SYSCLK_FIXED_DIV);
++SYSCLK(5, pll1_sysclk5, pll1_pllen, 4, SYSCLK_FIXED_DIV);
 +
-+Optional child nodes:
++int dm644x_pll1_init(struct device *dev, void __iomem *base)
++{
++	struct clk *clk;
 +
-+pllout
-+	Describes the main PLL clock output (before POSTDIV). The node name must
-+	be "pllout".
++	davinci_pll_clk_register(dev, &dm644x_pll1_info, "ref_clk", base);
 +
-+	Required properties:
-+	- #clock-cells: shall be 0
++	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk1, base);
++	clk_register_clkdev(clk, "pll1_sysclk1", "dm644x-psc");
 +
-+sysclk
-+	Describes the PLLDIVn divider clocks that provide the SYSCLKn clock
-+	domains. The node name must be "sysclk". Consumers of this node should
-+	use "n" in "SYSCLKn" as the index parameter for the clock cell.
++	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk2, base);
++	clk_register_clkdev(clk, "pll1_sysclk2", "dm644x-psc");
 +
-+	Required properties:
-+	- #clock-cells: shall be 1
++	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk3, base);
++	clk_register_clkdev(clk, "pll1_sysclk3", "dm644x-psc");
 +
-+auxclk
-+	Describes the AUXCLK output of the PLL. The node name must be "auxclk".
-+	This child node is only valid when compatible = "ti,da850-pll0".
++	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk5, base);
++	clk_register_clkdev(clk, "pll1_sysclk5", "dm644x-psc");
 +
-+	Required properties:
-+	- #clock-cells: shall be 0
++	clk = davinci_pll_auxclk_register(dev, "pll1_auxclk", base);
++	clk_register_clkdev(clk, "pll1_auxclk", "dm644x-psc");
 +
-+obsclk
-+	Describes the OBSCLK output of the PLL. The node name must be "obsclk".
++	davinci_pll_sysclkbp_clk_register(dev, "pll1_sysclkbp", base);
 +
-+	Required properties:
-+	- #clock-cells: shall be 0
++	return 0;
++}
 +
++static const struct davinci_pll_clk_info dm644x_pll2_info = {
++	.name = "pll2",
++	.pllm_mask = GENMASK(4, 0),
++	.pllm_min = 1,
++	.pllm_max = 32,
++	.pllout_min_rate = 400000000,
++	.pllout_max_rate = 900000000,
++	.flags = PLL_HAS_POSTDIV | PLL_POSTDIV_FIXED_DIV,
++};
 +
-+Examples:
++SYSCLK(1, pll2_sysclk1, pll2_pllen, 4, 0);
++SYSCLK(2, pll2_sysclk2, pll2_pllen, 4, 0);
 +
-+	pll0: clock-controller at 11000 {
-+		compatible = "ti,da850-pll0";
-+		reg = <0x11000 0x1000>;
-+		clocks = <&ref_clk>, <&pll1_sysclk 3>;
-+		clock-names = "clksrc", "extclksrc";
-+		ti,clkmode-square-wave;
++int dm644x_pll2_init(struct device *dev, void __iomem *base)
++{
++	davinci_pll_clk_register(dev, &dm644x_pll2_info, "oscin", base);
 +
-+		pll0_pllout: pllout {
-+			#clock-cells = <0>;
-+		};
++	davinci_pll_sysclk_register(dev, &pll2_sysclk1, base);
 +
-+		pll0_sysclk: sysclk {
-+			#clock-cells = <1>;
-+		};
++	davinci_pll_sysclk_register(dev, &pll2_sysclk2, base);
 +
-+		pll0_auxclk: auxclk {
-+			#clock-cells = <0>;
-+		};
++	davinci_pll_sysclkbp_clk_register(dev, "pll2_sysclkbp", base);
 +
-+		pll0_obsclk: obsclk {
-+			#clock-cells = <0>;
-+		};
-+	};
++	return 0;
++}
+diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
+index 3d8f4d2..0a1e68f 100644
+--- a/drivers/clk/davinci/pll.c
++++ b/drivers/clk/davinci/pll.c
+@@ -784,6 +784,8 @@ static const struct platform_device_id davinci_pll_id_table[] = {
+ 	{ .name = "dm355-pll2",  .driver_data = (kernel_ulong_t)dm355_pll2_init  },
+ 	{ .name = "dm365-pll1",  .driver_data = (kernel_ulong_t)dm365_pll1_init  },
+ 	{ .name = "dm365-pll2",  .driver_data = (kernel_ulong_t)dm365_pll2_init  },
++	{ .name = "dm644x-pll1", .driver_data = (kernel_ulong_t)dm644x_pll1_init },
++	{ .name = "dm644x-pll2", .driver_data = (kernel_ulong_t)dm644x_pll2_init },
+ 	{ }
+ };
+ 
+diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
+index bf9fdc8..d8af4f5 100644
+--- a/drivers/clk/davinci/pll.h
++++ b/drivers/clk/davinci/pll.h
+@@ -132,4 +132,7 @@ int dm355_pll2_init(struct device *dev, void __iomem *base);
+ int dm365_pll1_init(struct device *dev, void __iomem *base);
+ int dm365_pll2_init(struct device *dev, void __iomem *base);
+ 
++int dm644x_pll1_init(struct device *dev, void __iomem *base);
++int dm644x_pll2_init(struct device *dev, void __iomem *base);
 +
-+	pll1: clock-controller at 21a000 {
-+		compatible = "ti,da850-pll1";
-+		reg = <0x21a000 0x1000>;
-+		clocks = <&ref_clk>;
-+		clock-names = "clksrc";
-+
-+		pll0_sysclk: sysclk {
-+			#clock-cells = <1>;
-+		};
-+
-+		pll0_obsclk: obsclk {
-+			#clock-cells = <0>;
-+		};
-+	};
-+
-+Also see:
-+- Documentation/devicetree/bindings/clock/clock-bindings.txt
+ #endif /* __CLK_DAVINCI_PLL_H___ */
 -- 
 2.7.4
