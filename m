@@ -1,143 +1,106 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 16 Mar 2018 14:38:24 +0100
-Subject: [PATCH 21/52] mtd: rawnand: jz4780: convert driver to nand_scan()
-In-Reply-To: <d57f95d3-03d0-5905-835f-c278df578b1e@gmail.com>
-References: <20180302170400.6712-1-miquel.raynal@bootlin.com>
- <20180302170400.6712-22-miquel.raynal@bootlin.com>
- <d57f95d3-03d0-5905-835f-c278df578b1e@gmail.com>
-Message-ID: <20180316143824.568be773@xps13>
+From: gabriel.matni@exfo.com (Gabriel Matni)
+Date: Fri, 16 Mar 2018 13:45:32 +0000
+Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
+In-Reply-To: <20180315212137.57ca7c65@xps13>
+References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
+ <20180315165516.GA9519@kroah.com>
+ <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
+ <20180315212137.57ca7c65@xps13>
+Message-ID: <3B588D51285A4A4D8D39C94212E07826278BDF@SPQCMBX02.exfo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Harvey,
+From: Gabriel Matni <gabriel.matni@exfo.com>
 
-On Thu, 15 Mar 2018 15:40:25 +0000, Harvey Hunt
-<harveyhuntnexus@gmail.com> wrote:
+Fixes missing characters on kernel console at low baud rates (i.e.9600).
+The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
+that the transmitter holding register (THR) is ready to receive a new byte.
 
-> Hi Miquel,
+TX_EMP tells us when it is possible to send a break sequence via
+SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+empty, it does not guarantee that a new byte can be written just yet.
+
+Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
+      serial port")
+Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
+Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
+Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
+
+---
+ drivers/tty/serial/mvebu-uart.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index a100e98259d7..f0df0640208e 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+ 	u32 val;
+ 
+ 	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+-				  (val & STAT_TX_EMP), 1, 10000);
++				  (val & STAT_TX_RDY(port)), 1, 10000);
+ }
+ 
+ static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+-- 
+2.7.4
+
+
+> -----Original Message-----
+> From: Miquel Raynal <miquel.raynal@bootlin.com>
+> Sent: March 15, 2018 4:22 PM
+> To: Gabriel Matni <gabriel.matni@exfo.com>
+> Cc: gregkh at linuxfoundation.org; linux-serial at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; stable at vger.kernel.org; Gr?gory Clement
+> <gregory.clement@bootlin.com>; Thomas Petazzoni
+> <thomas.petazzoni@bootlin.com>
+> Subject: Re: [PATCH] serial: mvebu-uart: fix tx lost characters
 > 
-> Sorry it's taken me a little while to review your changes, a few
-> comments below:
+> Hi Gabriel,
 > 
-> On 03/02/2018 05:03 PM, Miquel Raynal wrote:
-> > Two helpers have been added to the core to make ECC-related
-> > configuration between the detection phase and the final NAND scan. Use
-> > these hooks and convert the driver to just use nand_scan() instead of
-> > both nand_scan_ident() and nand_scan_tail().
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> On Thu, 15 Mar 2018 18:55:25 +0000, Gabriel Matni
+> <gabriel.matni@exfo.com> wrote:
+> 
+> > From: Gabriel Matni <gabriel.matni@exfo.com>
+> >
+> > Fixes missing characters on kernel console at low baud rates (i.e.9600).
+> > The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to
+> ensure
+> > that the transmitter holding register (THR) is ready to receive a new byte.
+> >
+> > TX_EMP tells us when it is possible to send a break sequence via
+> > SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+> > empty, it does not guarantee that a new byte can be written just yet.
+> >
+> > Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
+> >       serial port")
+> > Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> > Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
+> >
 > > ---
-> >  drivers/mtd/nand/raw/jz4780_nand.c | 30 ++++++++++++------------------
-> >  1 file changed, 12 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/raw/jz4780_nand.c b/drivers/mtd/nand/raw/jz4780_nand.c
-> > index e69f6ae4c539..fd5dc9d9b0c6 100644
-> > --- a/drivers/mtd/nand/raw/jz4780_nand.c
-> > +++ b/drivers/mtd/nand/raw/jz4780_nand.c
-> > @@ -157,9 +157,8 @@ static int jz4780_nand_ecc_correct(struct mtd_info *mtd, u8 *dat,
-> >  	return jz4780_bch_correct(nfc->bch, &params, dat, read_ecc);
-> >  }
-> >  
-> > -static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *dev)
-> > +static int jz4780_nand_attach_chip(struct nand_chip *chip)
-> >  {
-> > -	struct nand_chip *chip = &nand->chip;
-> >  	struct mtd_info *mtd = nand_to_mtd(chip);
-> >  	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(chip->controller);
-> >  	int eccbytes;
-> > @@ -170,7 +169,8 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
-> >  	switch (chip->ecc.mode) {
-> >  	case NAND_ECC_HW:
-> >  		if (!nfc->bch) {
-> > -			dev_err(dev, "HW BCH selected, but BCH controller not found\n");
-> > +			dev_err(nfc->dev,
-> > +				"HW BCH selected, but BCH controller not found\n");
-> >  			return -ENODEV;
-> >  		}
-> >  
-> > @@ -179,15 +179,16 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
-> >  		chip->ecc.correct = jz4780_nand_ecc_correct;
-> >  		/* fall through */
-> >  	case NAND_ECC_SOFT:
-> > -		dev_info(dev, "using %s (strength %d, size %d, bytes %d)\n",
-> > -			(nfc->bch) ? "hardware BCH" : "software ECC",
-> > -			chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
-> > +		dev_info(nfc->dev, "using %s (strength %d, size %d, bytes %d)\n",
-> > +			 (nfc->bch) ? "hardware BCH" : "software ECC",
-> > +			 chip->ecc.strength, chip->ecc.size, chip->ecc.bytes)>  		break;
-> >  	case NAND_ECC_NONE:
-> > -		dev_info(dev, "not using ECC\n");
-> > +		dev_info(nfc->dev, "not using ECC\n");
-> >  		break;
-> >  	default:
-> > -		dev_err(dev, "ECC mode %d not supported\n", chip->ecc.mode);
-> > +		dev_err(nfc->dev, "ECC mode %d not supported\n",
-> > +			chip->ecc.mode);
-> >  		return -EINVAL;
-> >  	}  
-> These changes seem redundant as dev is passed into the function,
-> although you could remove it from the function defintion.
-
-That is right, I should have also removed the 'dev' parameter.
-
+> >  drivers/tty/serial/mvebu-uart.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-
+> uart.c
+> > index a100e98259d7..400e1bc558b2 100644
+> > --- a/drivers/tty/serial/mvebu-uart.c
+> > +++ b/drivers/tty/serial/mvebu-uart.c
+> > @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+> >  	u32 val;
+> >
+> >  	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+> > -				  (val & STAT_TX_EMP), 1, 10000);
+> > +             (val & STAT_TX_RDY(port)), 1, 10000);
 > 
-> >  
-> > @@ -199,7 +200,7 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
-> >  	eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
-> >  
-> >  	if (eccbytes > mtd->oobsize - 2) {
-> > -		dev_err(dev,
-> > +		dev_err(nfc->dev,
-> >  			"invalid ECC config: required %d ECC bytes, but only %d are available",
-> >  			eccbytes, mtd->oobsize - 2);
-> >  		return -EINVAL;
-> > @@ -279,15 +280,8 @@ static int jz4780_nand_init_chip(struct platform_device *pdev,
-> >  	chip->controller = &nfc->controller;
-> >  	nand_set_flash_node(chip, np);
-> >  
-> > -	ret = nand_scan_ident(mtd, 1, NULL);
-> > -	if (ret)
-> > -		return ret;
-> > -
-> > -	ret = jz4780_nand_init_ecc(nand, dev)  
-> 
-> You've removed this call, but without it the ECC won't be initialised...
-
-Actually it is not removed but just renamed to match the core's hook
-name. The purpose of this function is to perform any chip-related
-tuning after the identification, and the name should not limit
-ourselves to do something not related to ECC configuration.
-
-> 
-> > -	if (ret)
-> > -		return ret;
-> > -
-> > -	ret = nand_scan_tail(mtd);
-> > +	chip->ecc.attach_chip = jz4780_nand_attach_chip;  
-> 
-> This function doesn't exist.
-
-See above, the *nand_init_ecc() function has been renamed in
-*nand_attach_chip().
-
-This hook: chip->ecc.attach_chip() will be called between
-nand_scan_ident() and nand_scan_tail() from within nand_scan().
-
-> 
-> > +	ret = nand_scan(mtd, 1);
-> >  	if (ret)
-> >  		return ret;
-> >  
-> >   
+> I think this line should be indented like the one you replaced.
 > 
 > Thanks,
+> Miqu?l
 > 
-> Harvey
-
-Thanks for reviewing,
-Miqu?l
-
--- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> --
+> Miquel Raynal, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
