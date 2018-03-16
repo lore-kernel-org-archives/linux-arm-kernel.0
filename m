@@ -1,100 +1,50 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 16 Mar 2018 14:10:09 -0300
-Subject: [PATCH v2] ARM: mxs_defconfig: Re-sync defconfig
-Message-ID: <1521220209-27621-1-git-send-email-festevam@gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sat, 17 Mar 2018 01:53:47 +0800
+Subject: [PATCH 0/7] Allwinner A64 DE2 CCU support with dedicated DE2 bus
+ driver
+Message-ID: <20180316175354.21437-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+This patchset tries to implement the Allwinner A64 DE2 as a bus driver,
+in order to model the fact that the SRAM claim controls the access to
+the whole DE2 memory space.
 
-Re-sync the defconfig by doing:
+PATCH 1 and PATCH 4 are for the CCU part.
 
-make savedefconfig
-cp defconfig arch/arm/configs/mxs_defconfig
+PATCH 2 is the device tree binding for the A64 DE2 bus, and PATCH 3
+implements the bus driver.
 
-So keep it in sync to help further changes in defconfig.
+PATCH 5 is a modified version of A64 DE2 CCU patch, which uses the A64
+DE2 bus.
 
-The explanation for removing the Kconfig symbols:
+PATCH 6 and 7 are just the simplefb patches for A64.
 
-CONFIG_FHANDLE=y: verified that it is still selected
-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set: verified that it is still not
-selected
-CONFIG_DEVPTS_MULTIPLE_INSTANCES=y: does not exist anymore
-# CONFIG_DEVKMEM is not set: verified that it is still not selected
-CONFIG_NVMEM=y: verified that it is still selected
-CONFIG_LOCKUP_DETECTOR=y: need to select CONFIG_SOFTLOCKUP_DETECTOR now
-CONFIG_TIMER_STATS=y: does not exist anymore
+Icenowy Zheng (7):
+  dt-bindings: add compatible string for the A64 DE2 CCU
+  dt-bindings: add binding for the Allwinner A64 DE2 bus
+  bus: add bus driver for accessing Allwinner A64 DE2
+  clk: sunxi-ng: add A64 compatible string
+  arm64: allwinner: a64: add DE2 CCU related device tree nodes
+  arm64: allwinner: a64: add simplefb for A64 SoC
+  arm64: allwinner: a64: add HDMI regulator to all DTs' simplefb_hdmi
 
-Boot tested on a imx28evk.
+ .../devicetree/bindings/bus/sun50i-de2-bus.txt     | 37 ++++++++++++
+ .../devicetree/bindings/clock/sun8i-de2.txt        |  1 +
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  4 ++
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   |  4 ++
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    |  4 ++
+ .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts |  4 ++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  4 ++
+ .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  4 ++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 68 ++++++++++++++++++++++
+ drivers/bus/Kconfig                                | 10 ++++
+ drivers/bus/Makefile                               |  1 +
+ drivers/bus/sun50i-de2.c                           | 49 ++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c               | 11 ++--
+ 13 files changed, 194 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+ create mode 100644 drivers/bus/sun50i-de2.c
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Keep the changes to a minimum and explain the reason for
-the each one of the removed options (Arnd).
-
- arch/arm/configs/mxs_defconfig | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index bbfb675..a508eb3 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -1,5 +1,4 @@
- CONFIG_SYSVIPC=y
--CONFIG_FHANDLE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_TASKSTATS=y
-@@ -62,14 +61,13 @@ CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- CONFIG_ENC28J60=y
--CONFIG_SMSC_PHY=y
- CONFIG_ICPLUS_PHY=y
--CONFIG_REALTEK_PHY=y
- CONFIG_MICREL_PHY=y
-+CONFIG_REALTEK_PHY=y
-+CONFIG_SMSC_PHY=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_WLAN is not set
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
-@@ -77,9 +75,7 @@ CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_MXS_LRADC=y
- CONFIG_TOUCHSCREEN_TSC2007=m
- # CONFIG_SERIO is not set
--CONFIG_DEVPTS_MULTIPLE_INSTANCES=y
- # CONFIG_LEGACY_PTYS is not set
--# CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_SERIAL_MXS_AUART=y
-@@ -138,11 +134,10 @@ CONFIG_RTC_DRV_STMP=y
- CONFIG_DMADEVICES=y
- CONFIG_MXS_DMA=y
- CONFIG_IIO=y
--CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_MXS_LRADC_ADC=y
-+CONFIG_IIO_SYSFS_TRIGGER=y
- CONFIG_PWM=y
- CONFIG_PWM_MXS=y
--CONFIG_NVMEM=y
- CONFIG_NVMEM_MXS_OCOTP=y
- CONFIG_EXT4_FS=y
- # CONFIG_DNOTIFY is not set
-@@ -172,8 +167,7 @@ CONFIG_FRAME_WARN=2048
- CONFIG_UNUSED_SYMBOLS=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
--CONFIG_LOCKUP_DETECTOR=y
--CONFIG_TIMER_STATS=y
-+CONFIG_SOFTLOCKUP_DETECTOR=y
- CONFIG_PROVE_LOCKING=y
- CONFIG_BLK_DEV_IO_TRACE=y
- CONFIG_STRICT_DEVMEM=y
 -- 
-2.7.4
+2.15.1
