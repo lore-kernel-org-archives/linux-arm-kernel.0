@@ -1,44 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 14:13:31 +0000
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
-Message-ID: <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 16 Mar 2018 15:14:50 +0100
+Subject: [PATCH] arm64: dts: armada-3720-espressobin: Document URL for
+ schematic
+In-Reply-To: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
+References: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20180316141450.GF17895@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
-
-On 16/03/18 13:49, Andrey Konovalov wrote:
-> Hi!
+On Fri, Mar 16, 2018 at 11:01:24AM +0100, Uwe Kleine-K?nig wrote:
+> The schematic of hte espressobin is publicly available, add a comment
+> where to find it.
 > 
-> I've recently tried to boot clang built kernel on real hardware
-> (Odroid C2 board) instead of using a VM. The issue that I stumbled
-> upon is that arm64 kvm built with clang doesn't boot.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Adding -fno-jump-tables compiler flag to arch/arm64/kvm/* helps. There
-> was a patch some time ago that did exactly that
-> (https://patchwork.kernel.org/patch/10060381/), but it wasn't accepted
-> AFAICT (see the discussion on that thread).
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> index bdfb5553ddb5..6d070b267abe 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> @@ -42,6 +42,9 @@
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+> +/*
+> + * Schematic available at http://espressobin.net/wp-content/uploads/2017/08/ESPRESSObin_V5_Schematics.pdf
+> + */
 
-I wasn't aware of that discussion, but this is indeed quite annoying.
-Note that you should be able to restrict this to arch/arm64/kvm/hyp/*
-and virt/kvm/arm/hyp/*.
+Version 4 is also available:
+http://wiki.espressobin.net/tiki-download_file.php?fileId=90. I've no
+idea how you tell the boards apart. But my espressobin has more
+jumpers behind the reset button than the board on the home page.
 
-> What would be the best way to get this fixed?
-
-Ideally, I'd like to see is a way to stick to PC-relative addressing
-within a compilation unit.
-
-> I've also had to disable CONFIG_JUMP_LABEL to get the kernel boot
-> (even without kvm enabled), but that might be a different (though
-> related) issue.
-
-That's quite bizarre. Does clang has the equivalent of "asm goto"? Or do
-you rely on reading a variable to decide whether or not to branch?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Andrew
