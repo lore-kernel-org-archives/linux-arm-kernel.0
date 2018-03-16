@@ -1,43 +1,17 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:51:18 +0100
-Subject: [PATCH 48/69] arm64: dts: renesas: r8a77965: Add #interrupt-cells
- property
-In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
-References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <f5af77016bcd80bfe850ca41da51d65bd31f8051.1521206129.git.horms+renesas@verge.net.au>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Fri, 16 Mar 2018 15:53:17 +0100
+Subject: arm64 kvm built with clang doesn't boot
+In-Reply-To: <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
+References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
+ <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
+Message-ID: <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+On Fri, Mar 16, 2018 at 3:13 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> I wasn't aware of that discussion, but this is indeed quite annoying.
+> Note that you should be able to restrict this to arch/arm64/kvm/hyp/*
+> and virt/kvm/arm/hyp/*.
 
-Add "#interrupt-cells" property and "interrupt-controller" label to
-"interrupt-controller at e61c0000" device node.
-
-This silences the following DTC compiler warnings:
-Warning (interrupts_property): Missing interrupt-controller or
-interrupt-map property in /soc/interrupt-controller at e61c0000
-Warning (interrupts_property): Missing #interrupt-cells in
-interrupt-parent /soc/interrupt-controller at e61c000
-
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 5dff176590d5..0118956cc6e0 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -316,6 +316,8 @@
- 		};
- 
- 		intc_ex: interrupt-controller at e61c0000 {
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
- 			reg = <0 0xe61c0000 0 0x200>;
- 			/* placeholder */
- 		};
--- 
-2.11.0
+That works as well (tried it, the kernel boots). I've also tried
+compiling without the flag for virt/kvm/arm/hyp/*, it boots as well.
