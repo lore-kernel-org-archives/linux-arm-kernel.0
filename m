@@ -1,142 +1,39 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:53:05 +0100
-Subject: [PATCH 46/52] ARM: dts: r7s72100: sort subnodes of root node
-In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
-References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <8234641d84ca17e0f6f8cfbb4f34fa56d73a07ab.1521208546.git.horms+renesas@verge.net.au>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Mar 2018 15:53:07 +0000
+Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface
+ to use in-band negotiation
+In-Reply-To: <20180316103351.16616-3-antoine.tenart@bootlin.com>
+References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
+ <20180316103351.16616-3-antoine.tenart@bootlin.com>
+Message-ID: <20180316155307.GQ9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort the subnodes of the soc node to improve maintainability.
-The sort has been done alphabetically with the node name as the key.
+On Fri, Mar 16, 2018 at 11:33:43AM +0100, Antoine Tenart wrote:
+> The PHY mode 10GKR can use in-band negotiation. This patches allows this
+> mode to be used with MLO_AN_INBAND in phylink.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+> ---
+>  drivers/net/phy/phylink.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/phy/phylink.c b/drivers/net/phy/phylink.c
+> index 51a011a349fe..7224b005f0dd 100644
+> --- a/drivers/net/phy/phylink.c
+> +++ b/drivers/net/phy/phylink.c
+> @@ -768,7 +768,8 @@ int phylink_of_phy_connect(struct phylink *pl, struct device_node *dn,
+>  	/* Fixed links and 802.3z are handled without needing a PHY */
+>  	if (pl->link_an_mode == MLO_AN_FIXED ||
+>  	    (pl->link_an_mode == MLO_AN_INBAND &&
+> -	     phy_interface_mode_is_8023z(pl->link_interface)))
+> +	     (phy_interface_mode_is_8023z(pl->link_interface) ||
+> +	      pl->link_interface == PHY_INTERFACE_MODE_10GKR)))
 
-This patch should not introduce any functional change.
+There is no inband negotiation like there is with 802.3z or SGMII,
+so this makes no sense.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r7s72100.dtsi | 78 +++++++++++++++++++++--------------------
- 1 file changed, 40 insertions(+), 38 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index d69d4810e597..ecf9516bcda8 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -30,43 +30,45 @@
- 		spi4 = &spi4;
- 	};
- 
--	/* External clocks */
--	extal_clk: extal {
-+	/* Fixed factor clocks */
-+	b_clk: b {
- 		#clock-cells = <0>;
--		compatible = "fixed-clock";
--		/* If clk present, value must be set by board */
--		clock-frequency = <0>;
-+		compatible = "fixed-factor-clock";
-+		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
-+		clock-mult = <1>;
-+		clock-div = <3>;
- 	};
- 
--	usb_x1_clk: usb_x1 {
--		#clock-cells = <0>;
--		compatible = "fixed-clock";
--		/* If clk present, value must be set by board */
--		clock-frequency = <0>;
--	};
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 
--	rtc_x1_clk: rtc_x1 {
--		#clock-cells = <0>;
--		compatible = "fixed-clock";
--		/* If clk present, value must be set by board to 32678 */
--		clock-frequency = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0>;
-+			clock-frequency = <400000000>;
-+			clocks = <&cpg_clocks R7S72100_CLK_I>;
-+			next-level-cache = <&L2>;
-+		};
- 	};
- 
--	rtc_x3_clk: rtc_x3 {
-+	/* External clocks */
-+	extal_clk: extal {
- 		#clock-cells = <0>;
- 		compatible = "fixed-clock";
--		/* If clk present, value must be set by board to 4000000 */
-+		/* If clk present, value must be set by board */
- 		clock-frequency = <0>;
- 	};
- 
--	/* Fixed factor clocks */
--	b_clk: b {
-+	p0_clk: p0 {
- 		#clock-cells = <0>;
- 		compatible = "fixed-factor-clock";
- 		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
- 		clock-mult = <1>;
--		clock-div = <3>;
-+		clock-div = <12>;
- 	};
-+
- 	p1_clk: p1 {
- 		#clock-cells = <0>;
- 		compatible = "fixed-factor-clock";
-@@ -74,26 +76,19 @@
- 		clock-mult = <1>;
- 		clock-div = <6>;
- 	};
--	p0_clk: p0 {
-+
-+	rtc_x1_clk: rtc_x1 {
- 		#clock-cells = <0>;
--		compatible = "fixed-factor-clock";
--		clocks = <&cpg_clocks R7S72100_CLK_PLL>;
--		clock-mult = <1>;
--		clock-div = <12>;
-+		compatible = "fixed-clock";
-+		/* If clk present, value must be set by board to 32678 */
-+		clock-frequency = <0>;
- 	};
- 
--	cpus {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		cpu at 0 {
--			device_type = "cpu";
--			compatible = "arm,cortex-a9";
--			reg = <0>;
--			clock-frequency = <400000000>;
--			clocks = <&cpg_clocks R7S72100_CLK_I>;
--			next-level-cache = <&L2>;
--		};
-+	rtc_x3_clk: rtc_x3 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		/* If clk present, value must be set by board to 4000000 */
-+		clock-frequency = <0>;
- 	};
- 
- 	soc {
-@@ -689,4 +684,11 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	usb_x1_clk: usb_x1 {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		/* If clk present, value must be set by board */
-+		clock-frequency = <0>;
-+	};
- };
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
