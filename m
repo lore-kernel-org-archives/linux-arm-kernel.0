@@ -1,54 +1,80 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Fri, 16 Mar 2018 16:52:08 +0000
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <2e84a842-96e8-aec4-8b85-9ee879bb323a@arm.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
- <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
- <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
- <2e84a842-96e8-aec4-8b85-9ee879bb323a@arm.com>
-Message-ID: <CAKwvOd=-TeLJn9=V_Dmj-X+qcRBcfH8tcktbm33xAx671VCYUw@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 17:38:17 +0100
+Subject: [PATCH 20/47] ARM: dts: r8a7794: consistently use single space after =
+In-Reply-To: <cover.1521218085.git.horms+renesas@verge.net.au>
+References: <cover.1521218085.git.horms+renesas@verge.net.au>
+Message-ID: <b190cce35ff90e392f89a3d45e0814cdbfd7434c.1521218085.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Sami (Google), Takahiro (Linaro)
+Consistently use a single space after a =.
 
-Just so I fully understand the problem enough to articulate it, we'd be
-looking for the compiler to keep the jump tables for speed (I would guess
--fno-jump-tables would emit an if-else chain) but only emit relative jumps
-(not absolute jumps)?
+This patch removes instances where a tab is used instead.
 
-> Perhaps Nick can comment on whether something like
--fno-absolute-addressing would be feasible in clang.
+This patch should not introduce any functional change.
 
-Checked with some of my LLVM friends.  They mentioned that this is tricky
-because you need to move the addresses of the jump table from a data
-section back into the text section.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7794.dtsi | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
 
-Looks like LLVM has an interesting method
-`shouldPutJumpTableInFunctionSection` [0]. Unfortunately, it gets
-overridden for ELF to always return false. [1]
-
-It looks like there's also a flag `no-jump-tables` [2].  Looks like Sami
-has used this in the past in kvm. [3]
-
-It's still probably possible to add this to LLVM, so I can pursue that with
-LLVM devs.
-
-> But just for the reference, I'm using 4.16-rc4 with a patch to fix SMCCC
-issues that you mentioned.
-
-Is this in regards to: commit "arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
-hardening support"? Has anyone tried to upstream a fix for this?  We
-probably want to be very explicit with register widths here.
-
-[0]
-https://github.com/llvm-mirror/llvm/blob/a5bd54307b1adacb3df297b9b8010979b9afa4d7/lib/Target/TargetLoweringObjectFile.cpp#L280
-[1]
-https://github.com/llvm-mirror/llvm/blob/e7676fec11b02e4b698b5ffc99e1901246a7bf66/lib/CodeGen/TargetLoweringObjectFileImpl.cpp#L494
-[2]
-https://github.com/llvm-mirror/llvm/blob/11f5adb29bf90bc1a40b8bb512afcff4b1ac0f56/lib/Transforms/Utils/SimplifyCFG.cpp#L5233
-[3] https://patchwork.kernel.org/patch/10060301/
-
---
-Thanks,
-~Nick Desaulniers
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 106b4e1649ff..79263377ded3 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -319,20 +319,20 @@
+ 	audma0: dma-controller at ec700000 {
+ 		compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
+ 		reg = <0 0xec700000 0 0x10000>;
+-		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
+-				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
++			      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-names = "error",
+ 				  "ch0", "ch1", "ch2", "ch3", "ch4", "ch5",
+ 				  "ch6", "ch7", "ch8", "ch9", "ch10", "ch11",
+@@ -1186,11 +1186,11 @@
+ 		 */
+ 		compatible = "renesas,rcar_sound-r8a7794",
+ 			     "renesas,rcar_sound-gen2";
+-		reg =	<0 0xec500000 0 0x1000>, /* SCU */
+-			<0 0xec5a0000 0 0x100>,  /* ADG */
+-			<0 0xec540000 0 0x1000>, /* SSIU */
+-			<0 0xec541000 0 0x280>,  /* SSI */
+-			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
++		reg = <0 0xec500000 0 0x1000>, /* SCU */
++		      <0 0xec5a0000 0 0x100>,  /* ADG */
++		      <0 0xec540000 0 0x1000>, /* SSIU */
++		      <0 0xec541000 0 0x280>,  /* SSI */
++		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
+ 		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
+ 
+ 		clocks = <&cpg CPG_MOD 1005>,
+-- 
+2.11.0
