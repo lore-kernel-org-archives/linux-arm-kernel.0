@@ -1,31 +1,39 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Fri, 16 Mar 2018 15:02:13 +0000
-Subject: [PATCH 42/52] ARM: dts: r7s72100: add USB device to device tree
-In-Reply-To: <faa6c0071114fd433e83dddd3a42fba547ca9a67.1521208546.git.horms+renesas@verge.net.au>
-References: <cover.1521208546.git.horms+renesas@verge.net.au>
- <faa6c0071114fd433e83dddd3a42fba547ca9a67.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <TY1PR01MB1562ED183D137FA48FCBC7DB8AD70@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 15:50:36 +0100
+Subject: [PATCH 06/69] arm64: dts: renesas: salvator-common: add GPIO extender
+In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
+References: <cover.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <ece30287af4e08e681f27c3d58853b68cdde658b.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-On Friday, March 16, 2018 1, Simon Horman wrote:
-> From: Chris Brandt <chris.brandt@renesas.com>
-> 
-> Add USB device support.
-> 
-> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+We need to configure its GPIOs later.
 
-This patch is already in mainline:
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8a99b6ad4da2f90969bb2ebb426c1d3dd0089fa4
-
-Pushed by Greg.
-
-At one point Greg applied it, then reverted it (as requested by Geert), 
-but then somehow it still went in.
-
-Chris
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index c3fafb6025b3..89cbb3b95acd 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -338,6 +338,13 @@
+ &i2c4 {
+ 	status = "okay";
+ 
++	pca9654: gpio at 20 {
++		compatible = "onnn,pca9654";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
+ 	csa_vdd: adc at 7c {
+ 		compatible = "maxim,max9611";
+ 		reg = <0x7c>;
+-- 
+2.11.0
