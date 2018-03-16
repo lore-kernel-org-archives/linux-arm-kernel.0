@@ -1,41 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:34 +0100
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.17
-Message-ID: <cover.1521201256.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Mar 2018 15:50:40 +0100
+Subject: [PATCH 2/3] arm64: defconfig: Enable PWM and USB for R-Car
+In-Reply-To: <cover.1521201256.git.horms+renesas@verge.net.au>
+References: <cover.1521201256.git.horms+renesas@verge.net.au>
+Message-ID: <5cb300ce806bfe3273bb94d373d43ca35c33ffdf.1521201256.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Please consider these Renesas ARM64 based SoC defconfig updates for v4.17.
+Enables PWM controller, USB-DMAC that is used by HS-USB, USB 3.0
+peripheral controller and USB 3.0 PHY for R-Car SoCs.
 
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/configs/defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.17
-
-for you to fetch changes up to f3768b0bc2e924477b6ca20c2293e8d51d948431:
-
-  arm64: defconfig: enable R8A77965 SoC (2018-02-26 12:01:34 +0100)
-
-----------------------------------------------------------------
-Renesas ARM64 Based SoC Defconfig Updates for v4.17
-
-Enable the following to allow them to be more widely exercised:
-* Newly added R8A77965 and R8A77980 SoCs
-* PWM and USB as used on R-Car Gen3 SoCs
-
-----------------------------------------------------------------
-Simon Horman (2):
-      arm64: defconfig: enable R8A77980 SoC
-      arm64: defconfig: enable R8A77965 SoC
-
-Yoshihiro Shimoda (1):
-      arm64: defconfig: Enable PWM and USB for R-Car
-
- arch/arm64/configs/defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index a850bc5e1af3..ceafd26f0fab 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -445,6 +445,7 @@ CONFIG_NOP_USB_XCEIV=y
+ CONFIG_USB_ULPI=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=m
++CONFIG_USB_RENESAS_USB3=m
+ CONFIG_USB_ULPI_BUS=y
+ CONFIG_MMC=y
+ CONFIG_MMC_BLOCK_MINORS=32
+@@ -501,6 +502,7 @@ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_QCOM_HIDMA_MGMT=y
+ CONFIG_QCOM_HIDMA=y
+ CONFIG_RCAR_DMAC=y
++CONFIG_RENESAS_USB_DMAC=m
+ CONFIG_VFIO=y
+ CONFIG_VFIO_PCI=y
+ CONFIG_VIRTIO_PCI=y
+@@ -548,10 +550,12 @@ CONFIG_PWM=y
+ CONFIG_PWM_BCM2835=m
+ CONFIG_PWM_CROS_EC=m
+ CONFIG_PWM_MESON=m
++CONFIG_PWM_RCAR=m
+ CONFIG_PWM_ROCKCHIP=y
+ CONFIG_PWM_SAMSUNG=y
+ CONFIG_PWM_TEGRA=m
+ CONFIG_PHY_RCAR_GEN3_USB2=y
++CONFIG_PHY_RCAR_GEN3_USB3=m
+ CONFIG_PHY_HI6220_USB=y
+ CONFIG_PHY_QCOM_USB_HS=y
+ CONFIG_PHY_SUN4I_USB=y
+-- 
+2.11.0
