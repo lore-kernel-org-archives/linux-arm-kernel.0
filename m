@@ -1,133 +1,55 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 17:38:09 +0100
-Subject: [PATCH 12/47] ARM: dts: r8a7791: consistently use single space after =
-In-Reply-To: <cover.1521218085.git.horms+renesas@verge.net.au>
-References: <cover.1521218085.git.horms+renesas@verge.net.au>
-Message-ID: <5025c78b3b69914d4da8e75cf2390329cf04ca95.1521218085.git.horms+renesas@verge.net.au>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 16 Mar 2018 16:46:20 +0000
+Subject: [PATCH 0/2] irqchip/gic*: Complain about the use of IRQ_TYPE_NONE
+In-Reply-To: <399d5e06-c530-6a29-8a4d-9e8ca62167c4@arm.com>
+References: <20180316145511.28362-1-marc.zyngier@arm.com>
+ <5f274a06-3a9c-7d41-2e4d-9733e4ac6078@arm.com>
+ <399d5e06-c530-6a29-8a4d-9e8ca62167c4@arm.com>
+Message-ID: <0c775a8f-07a8-3904-13cf-162a7f23ef49@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consistently use a single space after a =.
+On 16/03/18 16:39, Marc Zyngier wrote:
+> On 16/03/18 16:19, Robin Murphy wrote:
+>> On 16/03/18 14:55, Marc Zyngier wrote:
+>>> Grepping through the dts files, the documentation, and reviewing
+>>> patches, one can only notice the use of IRQ_TYPE_NONE in interrupt
+>>> specifiers. At least for the GIC, this doesn't mean anything. The
+>>> unsuspecting driver will end-up with whatever was there before, and
+>>> there is a 50% probability that it is not what it wants.
+>>>
+>>> I'd love to fix it myself, but I also have a 50% probability of
+>>> getting it wrong. In order to make the user aware they are walking on
+>>> thin ice, let's add some warnings. Hopefully, they'll be annoying
+>>> enough that people will fix their firmware. Croudsourcing debugging...
+>>
+>> I guess there's also the alternative nuclear option of breaking their
+>> build ;)
+>>
+>> Robin.
+>>
+>> ----->8-----
+>> diff --git a/include/dt-bindings/interrupt-controller/irq.h
+>> b/include/dt-bindings/interrupt-controller/irq.h
+>> index a8b310555f14..de79af80d01e 100644
+>> --- a/include/dt-bindings/interrupt-controller/irq.h
+>> +++ b/include/dt-bindings/interrupt-controller/irq.h
+>> @@ -10,7 +10,7 @@
+>>    #ifndef _DT_BINDINGS_INTERRUPT_CONTROLLER_IRQ_H
+>>    #define _DT_BINDINGS_INTERRUPT_CONTROLLER_IRQ_H
+>>
+>> -#define IRQ_TYPE_NONE		0
+>> +#define IRQ_TYPE_NONE		"This is nonsense and needs fixing"
+>>    #define IRQ_TYPE_EDGE_RISING	1
+>>    #define IRQ_TYPE_EDGE_FALLING	2
+>>    #define IRQ_TYPE_EDGE_BOTH	(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING)
+>>
+> 
+> What really annoys me with this patch is that you haven't put a SoB on it...
 
-This patch removes instances where a tab or multiple spaces are used
-instead.  It also avoids running over 80 columns in width in one of the
-lines where whitespace is updated.
+On a more serious note, though, it dawns on me that this might be 
+something DTC could realistically scream about for us, although I guess 
+not all irqchip bindings include a type specifier so it would probably 
+need to special-case known ones.
 
-This patch should not introduce any functional change.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7791.dtsi | 75 +++++++++++++++++++++---------------------
- 1 file changed, 38 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 8266a9b7cafd..38a9b8cb736d 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -237,9 +237,9 @@
- 	};
- 
- 	thermal: thermal at e61f0000 {
--		compatible =	"renesas,thermal-r8a7791",
--				"renesas,rcar-gen2-thermal",
--				"renesas,rcar-thermal";
-+		compatible = "renesas,thermal-r8a7791",
-+			     "renesas,rcar-gen2-thermal",
-+			     "renesas,rcar-thermal";
- 		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
- 		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cpg CPG_MOD 522>;
-@@ -375,20 +375,20 @@
- 	audma0: dma-controller at ec700000 {
- 		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
- 		reg = <0 0xec700000 0 0x10000>;
--		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error",
- 				"ch0", "ch1", "ch2", "ch3",
- 				"ch4", "ch5", "ch6", "ch7",
-@@ -405,20 +405,20 @@
- 	audma1: dma-controller at ec720000 {
- 		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
- 		reg = <0 0xec720000 0 0x10000>;
--		interrupts =	<GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 347 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 336 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 338 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 343 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error",
- 				"ch0", "ch1", "ch2", "ch3",
- 				"ch4", "ch5", "ch6", "ch7",
-@@ -1487,12 +1487,13 @@
- 		 * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
- 		 * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
- 		 */
--		compatible =  "renesas,rcar_sound-r8a7791", "renesas,rcar_sound-gen2";
--		reg =	<0 0xec500000 0 0x1000>, /* SCU */
--			<0 0xec5a0000 0 0x100>,  /* ADG */
--			<0 0xec540000 0 0x1000>, /* SSIU */
--			<0 0xec541000 0 0x280>,  /* SSI */
--			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
-+		compatible = "renesas,rcar_sound-r8a7791",
-+			     "renesas,rcar_sound-gen2";
-+		reg = <0 0xec500000 0 0x1000>, /* SCU */
-+		      <0 0xec5a0000 0 0x100>,  /* ADG */
-+		      <0 0xec540000 0 0x1000>, /* SSIU */
-+		      <0 0xec541000 0 0x280>,  /* SSI */
-+		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
- 		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
- 
- 		clocks = <&cpg CPG_MOD 1005>,
--- 
-2.11.0
+Robin.
