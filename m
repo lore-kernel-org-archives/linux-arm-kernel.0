@@ -1,134 +1,34 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 16 Mar 2018 15:08:19 +0530
-Subject: [PATCH v2 11/13] ARM: dts: ipq8074: Add peripheral nodes
-In-Reply-To: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
-References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521193101-4586-12-git-send-email-sricharan@codeaurora.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 16 Mar 2018 11:10:19 +0100
+Subject: [PATCH v2 4/4] clk: imx: add clock driver for i.MX8MQ CCM
+In-Reply-To: <20180315213304.ejvgpkhxtblr6xb3@pengutronix.de>
+References: <20180201175412.9480-1-l.stach@pengutronix.de>
+ <20180201175412.9480-4-l.stach@pengutronix.de>
+ <20180315213304.ejvgpkhxtblr6xb3@pengutronix.de>
+Message-ID: <1521195019.3492.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add serial, i2c, bam, spi, qpic peripheral nodes.
+Am Donnerstag, den 15.03.2018, 22:33 +0100 schrieb Sascha Hauer:
+> On Thu, Feb 01, 2018 at 06:54:12PM +0100, Lucas Stach wrote:
+> > Add driver for the Clock Control Module found on i.MX8MQ.
+> > 
+> > This is largely based on the downstream driver from Anson Huang and
+> > Bai Ping at NXP, with only some small adaptions to mainline from me.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> 
+> A general thought: The i.MX8M finally has a consistent clock tree. We
+> have for example 70 Peripheral clock slices consisting of a mux, a gate
+> and two dividers, all 70 looking the same.
+> For these it might make sense to create a more complex clock type
+> providing mux, gate and set rate functionality in one clock. This would
+> drastically reduce the number of clocks we have to handle.
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/ipq8074.dtsi | 105 ++++++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
+I agree. It seems we are missing the 4.17 merge window with this
+anyways, due to the large number of changes still required and time
+constraints on my side, so a larger rework of the driver might be
+possible if we target 4.18.
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-index 2bc5dec..806fc56 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-+++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-@@ -124,6 +124,111 @@
- 			clock-names = "core", "iface";
- 			status = "disabled";
- 		};
-+
-+		blsp_dma: dma at 7884000 {
-+			compatible = "qcom,bam-v1.7.0";
-+			reg = <0x07884000 0x2b000>;
-+			interrupts = <GIC_SPI 238 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "bam_clk";
-+			#dma-cells = <1>;
-+			qcom,ee = <0>;
-+		};
-+
-+		serial_blsp0: serial at 78af000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78af000 0x200>;
-+			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
-+
-+		serial_blsp2: serial at 78B1000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78B1000 0x200>;
-+			interrupts = <GIC_SPI 306 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_UART3_APPS_CLK>,
-+				<&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 4>,
-+				<&blsp_dma 5>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
-+		spi_0: spi at 78b5000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x78b5000 0x600>;
-+			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
-+			spi-max-frequency = <50000000>;
-+			clocks = <&gcc GCC_BLSP1_QUP1_SPI_APPS_CLK>,
-+				<&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			dmas = <&blsp_dma 12>, <&blsp_dma 13>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
-+		i2c_0: i2c at 78b6000 {
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x78b6000 0x600>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-+				<&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			clock-frequency  = <400000>;
-+			dmas = <&blsp_dma 15>, <&blsp_dma 14>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		i2c_1: i2c at 78b7000 {
-+			compatible = "qcom,i2c-qup-v2.2.1";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x78b7000 0x600>;
-+			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-+				<&gcc GCC_BLSP1_QUP3_I2C_APPS_CLK>;
-+			clock-names = "iface", "core";
-+			clock-frequency  = <100000>;
-+			dmas = <&blsp_dma 17>, <&blsp_dma 16>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		qpic_bam: dma at 7984000 {
-+			compatible = "qcom,bam-v1.7.0";
-+			reg = <0x7984000 0x1a000>;
-+			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_QPIC_AHB_CLK>;
-+			clock-names = "bam_clk";
-+			#dma-cells = <1>;
-+			qcom,ee = <0>;
-+			status = "disabled";
-+		};
-+
-+		qpic_nand: nand at 79b0000 {
-+			compatible = "qcom,ipq8074-nand";
-+			reg = <0x79b0000 0x10000>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&gcc GCC_QPIC_CLK>,
-+				 <&gcc GCC_QPIC_AHB_CLK>;
-+			clock-names = "core", "aon";
-+
-+			dmas = <&qpic_bam 0>,
-+			       <&qpic_bam 1>,
-+			       <&qpic_bam 2>;
-+			dma-names = "tx", "rx", "cmd";
-+			status = "disabled";
-+		};
- 	};
- 
- 	cpus {
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+Lucas
