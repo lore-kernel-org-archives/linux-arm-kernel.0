@@ -1,41 +1,45 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 12:16:23 -0400
-Subject: [PATCH v3 10/18] net: qla3xxx: Eliminate duplicate barriers on
+Date: Fri, 16 Mar 2018 12:16:28 -0400
+Subject: [PATCH v3 15/18] RDMA/bnxt_re: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
 References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521216991-28706-11-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521216991-28706-16-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a
-barrier on some architectures like arm64.
+Code includes wmb() followed by writel(). writel() already has a barrier on
+some architectures like arm64.
 
-This ends up CPU observing two barriers back to back before executing
-the register write.
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
 Since code already has an explicit barrier call, changing writel() to
 writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/qlogic/qla3xxx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/infiniband/hw/bnxt_re/qplib_rcfw.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/qlogic/qla3xxx.c b/drivers/net/ethernet/qlogic/qla3xxx.c
-index 9e5264d..0e71b74 100644
---- a/drivers/net/ethernet/qlogic/qla3xxx.c
-+++ b/drivers/net/ethernet/qlogic/qla3xxx.c
-@@ -1858,8 +1858,8 @@ static void ql_update_small_bufq_prod_index(struct ql3_adapter *qdev)
- 			qdev->small_buf_release_cnt -= 8;
- 		}
- 		wmb();
--		writel(qdev->small_buf_q_producer_index,
--			&port_regs->CommonRegs.rxSmallQProducerIndex);
-+		writel_relaxed(qdev->small_buf_q_producer_index,
-+			       &port_regs->CommonRegs.rxSmallQProducerIndex);
- 	}
- }
+diff --git a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+index 8329ec6..4a6b981 100644
+--- a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
++++ b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+@@ -181,10 +181,10 @@ static int __send_message(struct bnxt_qplib_rcfw *rcfw, struct cmdq_base *req,
  
+ 	/* ring CMDQ DB */
+ 	wmb();
+-	writel(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
+-	       rcfw->cmdq_bar_reg_prod_off);
+-	writel(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
+-	       rcfw->cmdq_bar_reg_trig_off);
++	writel_relaxed(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
++		       rcfw->cmdq_bar_reg_prod_off);
++	writel_relaxed(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
++		       rcfw->cmdq_bar_reg_trig_off);
+ done:
+ 	spin_unlock_irqrestore(&cmdq->lock, flags);
+ 	/* Return the CREQ response pointer */
 -- 
 2.7.4
