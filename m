@@ -1,34 +1,106 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 16 Mar 2018 12:51:50 -0600
-Subject: [v2 PATCH 0/2] arm64: dts: Add sdm845 GPU/GMU and SMMU
-Message-ID: <20180316185152.32020-1-jcrouse@codeaurora.org>
+Date: Fri, 16 Mar 2018 12:51:51 -0600
+Subject: [PATCH 1/2] dt-bindings: Document qcom,adreno-gmu
+In-Reply-To: <20180316185152.32020-1-jcrouse@codeaurora.org>
+References: <20180316185152.32020-1-jcrouse@codeaurora.org>
+Message-ID: <20180316185152.32020-2-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(resend because I forgot to CC everybody on the patches)
+Document the device tree bindings for the Adreno GMU device
+available on Adreno a6xx targets.
 
-Add DT nodes for the sdm845 GPU/GMU (graphics management unit) and the companion
-arm-smmu-v2 compatible SMMU.
-
-This builds on the following dependencies -
-https://patchwork.kernel.org/patch/10286369/ - bindings for qcom,level
-https://patchwork.kernel.org/patch/10281599/ - qcom,smmu-v2 bindings
-
-Please refer to https://patchwork.freedesktop.org/series/37428/ for the driver
-code.
-
-[v2 - changed qcom,arc-level to qcom,level following discussion with Viresh;
-change gmu phandle to qcom,gmu per Rob]
-
-Jordan Crouse (2):
-  dt-bindings: Document qcom,adreno-gmu
-  arm64: dts: sdm845: Add gpu and gmu device nodes
-
- .../devicetree/bindings/display/msm/gmu.txt        |  54 ++++++++++
- .../devicetree/bindings/display/msm/gpu.txt        |  10 +-
- arch/arm64/boot/dts/qcom/sdm845.dtsi               | 119 +++++++++++++++++++++
- 3 files changed, 181 insertions(+), 2 deletions(-)
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+---
+ .../devicetree/bindings/display/msm/gmu.txt        | 54 ++++++++++++++++++++++
+ .../devicetree/bindings/display/msm/gpu.txt        | 10 +++-
+ 2 files changed, 62 insertions(+), 2 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
 
+diff --git a/Documentation/devicetree/bindings/display/msm/gmu.txt b/Documentation/devicetree/bindings/display/msm/gmu.txt
+new file mode 100644
+index 000000000000..f65bb49fff36
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/msm/gmu.txt
+@@ -0,0 +1,54 @@
++Qualcomm adreno/snapdragon GMU (Graphics management unit)
++
++The GMU is a programmable power controller for the GPU. the CPU controls the
++GMU which in turn handles power controls for the GPU.
++
++Required properties:
++- compatible:
++  * "qcom,adreno-gmu"
++- reg: Physical base address and length of the GMU registers.
++- reg-names: Matching names for the register regions
++  * "gmu"
++  * "gmu_pdc"
++- interrupts: The interrupt signals from the GMU.
++- interrupt-names: Matching names for the interrupts
++  * "hfi"
++  * "gmu"
++- clocks: phandles to the device clocks
++- clock-names: Matching names for the clocks
++   * "gmu"
++   * "cxo"
++   * "axi"
++   * "mnoc"
++- power-domains: should be <&clock_gpucc GPU_CX_GDSC>
++- iommus: phandle to the adreno iommu
++- operating-points-v2: phandle to the OPP operating points
++
++Example:
++
++/ {
++	...
++
++	gmu: gmu at 506a000 {
++		compatible="qcom,adreno-gmu";
++
++		reg = <0x506a000 0x30000>,
++			<0xb200000 0x300000>;
++		reg-names = "gmu", "gmu_pdc";
++
++		interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
++			<GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "hfi", "gmu";
++
++		clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
++			<&clock_gpucc GPU_CC_CXO_CLK>,
++			<&clock_gcc GCC_DDRSS_GPU_AXI_CLK>,
++			<&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>;
++		clock-names = "gmu", "cxo", "axi", "memnoc";
++
++		power-domains = <&clock_gpucc GPU_CX_GDSC>;
++		iommus = <&adreno_smmu 5>;
++
++	i	operating-points-v2 = <&gmu_opp_table>;
++	};
++};
+diff --git a/Documentation/devicetree/bindings/display/msm/gpu.txt b/Documentation/devicetree/bindings/display/msm/gpu.txt
+index 43fac0fe09bb..544a7510166b 100644
+--- a/Documentation/devicetree/bindings/display/msm/gpu.txt
++++ b/Documentation/devicetree/bindings/display/msm/gpu.txt
+@@ -8,12 +8,18 @@ Required properties:
+   with the chip-id.
+ - reg: Physical base address and length of the controller's registers.
+ - interrupts: The interrupt signal from the gpu.
+-- clocks: device clocks
++
++Optional properties.
++- clocks: device clocks. Required for a3xx, a4xx and a5xx targets. a6xx and
++  newer with a GMU attached do not have direct clock control from the CPU and
++  do not need to provide clock properties.
+   See ../clocks/clock-bindings.txt for details.
+-- clock-names: the following clocks are required:
++- clock-names: the following clocks can be provided:
+   * "core"
+   * "iface"
+   * "mem_iface"
++- qcom,gmu: For a6xx and newer targets a phandle to the GMU device that will
++  control the power for the GPU
+ 
+ Example:
+ 
 -- 
 2.16.1
