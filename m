@@ -1,107 +1,22 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 08:52:14 +0000
-Subject: [PATCH v6 04/26] arm64: KVM: Dynamically patch the kernel/hyp VA
- mask
-In-Reply-To: <5AAAC659.70403@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180314165049.30105-5-marc.zyngier@arm.com> <5AAAC659.70403@arm.com>
-Message-ID: <141abcdc-f926-2599-3f68-87c9b8f3c634@arm.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 16 Mar 2018 11:47:12 +0300
+Subject: [PATCH -next] ASoC: mediatek: mt2701: drop unnessary
+ snd_soc_unregister_component()
+In-Reply-To: <1521185516-164333-1-git-send-email-weiyongjun1@huawei.com>
+References: <1521185516-164333-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <20180316084712.hh4ll7hfsncqqsos@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/18 19:15, James Morse wrote:
-> Hi Marc,
+On Fri, Mar 16, 2018 at 07:31:56AM +0000, Wei Yongjun wrote:
+> It's not necessary to unregister a component registered
+> with devm_snd_soc_register_component().
 > 
-> On 14/03/18 16:50, Marc Zyngier wrote:
->> So far, we're using a complicated sequence of alternatives to
->> patch the kernel/hyp VA mask on non-VHE, and NOP out the
->> masking altogether when on VHE.
->>
->> The newly introduced dynamic patching gives us the opportunity
->> to simplify that code by patching a single instruction with
->> the correct mask (instead of the mind bending cummulative masking
-> 
-> (Nit: cumulative)
-> 
-> (so this series removes mind bending code?)
+> Fixes: f1b5bf07365d ("ASoC: mt2701/mt8173: replace platform to componen")
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-Absolutely. And replaces it with... erm... (/me shuts up).
 
-> 
->> we have at the moment) or even a single NOP on VHE. This also
->> adds some initial code that will allow the patching callback
->> to switch to a more complex patching.
-> 
->> diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
->> new file mode 100644
->> index 000000000000..45e7802328d4
->> --- /dev/null
->> +++ b/arch/arm64/kvm/va_layout.c
-> 
->> +void __init kvm_update_va_mask(struct alt_instr *alt,
->> +			       __le32 *origptr, __le32 *updptr, int nr_inst)
->> +{
->> +	int i;
->> +
->> +	/* We only expect a single instruction in the alternative sequence */
->> +	BUG_ON(nr_inst != 1);
->> +
->> +	if (!has_vhe() && !va_mask)
->> +		compute_layout();
->> +
->> +	for (i = 0; i < nr_inst; i++) {
->> +		u32 rd, rn, insn, oinsn;
->> +
->> +		/*
->> +		 * VHE doesn't need any address translation, let's NOP
->> +		 * everything.
->> +		 */
->> +		if (has_vhe()) {
->> +			updptr[i] = aarch64_insn_gen_nop();
-> 
-> cpu_to_le32()? (I'm not going to try an boot a BE VHE model...)
+This fixes a double free on unload, right?
 
-You're missing out. Let's make BE big again.
-
-> 
-> aarch64_insn_gen_nop() returns:
-> | aarch64_insn_get_hint_value() | AARCH64_INSN_HINT_NOP;
-> 
-> It doesn't look like these aarch64_insn_get_XXX_value() helpers are forcing a
-> particular endianness. ftrace uses this, via ftrace_modify_code() ->
-> aarch64_insn_patch_text_nosync() -> aarch64_insn_write(), which does:
-> | return  __aarch64_insn_write(addr, cpu_to_le32(insn));
-> 
-> So it looks like the conversion is required. Patch 16 looks fine for this.
-
-Absolutely correct, I'm missing the byte swap. Now fixed.
-
-> (and, I ran the teardown code on Juno big-endian...)
-
-Wow. You *the* user!!!! ;-)
-
-> 
-> 
->> +			continue;
->> +		}
->> +
->> +		oinsn = le32_to_cpu(origptr[i]);
->> +		rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
->> +		rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
->> +
->> +		insn = compute_instruction(i, rd, rn);
->> +		BUG_ON(insn == AARCH64_BREAK_FAULT);
->> +
->> +		updptr[i] = cpu_to_le32(insn);
->> +	}
->> +}
-> 
-> With that,
-> 
-> Reviewed-by: James Morse <james.morse@arm.com>
-
-Thanks a lot,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+regards,
+dan carpenter
