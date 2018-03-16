@@ -1,38 +1,57 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 16 Mar 2018 16:02:53 -0700
-Subject: [PATCH v6 16/20] clk: add support for clocks provided by SCMI
-In-Reply-To: <1519403030-21189-17-git-send-email-sudeep.holla@arm.com>
-References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
- <1519403030-21189-17-git-send-email-sudeep.holla@arm.com>
-Message-ID: <152124137391.242365.17144416413429914606@swboyd.mtv.corp.google.com>
+From: swise@opengridcomputing.com (Steve Wise)
+Date: Fri, 16 Mar 2018 18:04:40 -0500
+Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
+ on weakly-ordered archs
+In-Reply-To: <20180316221347.GA958@ziepe.ca>
+References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+ <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
+ <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
+ <20180316221347.GA958@ziepe.ca>
+Message-ID: <004401d3bd7b$2a2e70b0$7e8b5210$@opengridcomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sudeep Holla (2018-02-23 08:23:46)
-> diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
-> new file mode 100644
-> index 000000000000..1e4d7a57779b
-> --- /dev/null
-> +++ b/drivers/clk/clk-scmi.c
-> +                       hws[idx] = &sclk->hw;
-> +               }
-> +       }
-> +
-> +       return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
+> 
+> On Fri, Mar 16, 2018 at 04:05:10PM -0500, Steve Wise wrote:
+> > > Code includes wmb() followed by writel(). writel() already has a
+barrier
+> > on
+> > > some architectures like arm64.
+> > >
+> > > This ends up CPU observing two barriers back to back before executing
+> the
+> > > register write.
+> > >
+> > > Since code already has an explicit barrier call, changing writel() to
+> > > writel_relaxed().
+> > >
+> > > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >
+> > NAK - This isn't correct for PowerPC.  For PowerPC, writeX_relaxed() is
+just
+> > writeX().
+> 
+> ?? Why is changing writex() to writeX() a NAK then?
 
-devm_of_clk_add_hw_provider?
+Because I want it correct for PPC as well.
 
-> +}
-> +
-> +static void scmi_clocks_remove(struct scmi_device *sdev)
-> +{
-> +       struct device *dev = &sdev->dev;
-> +       struct device_node *np = dev->of_node;
-> +
-> +       of_clk_del_provider(np);
-> +}
-> +
+> 
+> > I was just looking at this with Chelsio developers, and they said the
+> > writeX() should be replaced with __raw_writeX(), not writeX_relaxed(),
+to
+> > get rid of the extra barrier for all architectures.
+> 
+> That doesn't seem semanticaly sane.
+> 
+> __raw_writeX() should not appear in driver code, IMHO. Only the arch
+> code can know what the exact semantics of that accessor are..
+> 
+> If ppc can't use writel_relaxed to optimize then we probably need yet
+> another io accessor semantic defined :(
 
-Drop?
 
-You can keep my acked-by otherwise.
+Anybody understand why the PPC implementation of writeX_relaxed() isn't
+relaxed?
+
+
+Steve.
