@@ -1,58 +1,104 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 16 Mar 2018 18:10:49 +0530
-Subject: [PATCH v2 02/13] ARM: dts: ipq4019: Add a few peripheral nodes
-In-Reply-To: <eb50deb1-0530-866f-502e-e675cdd1e732@arm.com>
+Date: Fri, 16 Mar 2018 18:12:18 +0530
+Subject: [PATCH v2 12/13] ARM: dts: ipq8074: Add pcie nodes
+In-Reply-To: <69ff9b14b9b2fe4d90a02ca629059af2@codeaurora.org>
 References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
- <1521193101-4586-3-git-send-email-sricharan@codeaurora.org>
- <eb50deb1-0530-866f-502e-e675cdd1e732@arm.com>
-Message-ID: <e8b8c76f-c684-de9d-a315-1051017dcdef@codeaurora.org>
+ <1521193101-4586-13-git-send-email-sricharan@codeaurora.org>
+ <69ff9b14b9b2fe4d90a02ca629059af2@codeaurora.org>
+Message-ID: <28faf397-5d28-0ec2-15b1-2a39b2eb426f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Abhishek,
 
-On 3/16/2018 5:47 PM, Marc Zyngier wrote:
-> On 16/03/18 09:38, Sricharan R wrote:
->> Now with the driver updates for some peripherals being there,
->> add i2c, spi, pcie, bam, qpic-nand, scm nodes to enhance the available
->> peripheral support.
+On 3/16/2018 4:50 PM, Abhishek Sahu wrote:
+> On 2018-03-16 15:08, Sricharan R wrote:
+>> The driver/phy support for ipq8074 is available now.
+>> So enabling the nodes in DT.
 >>
 >> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 >> ---
->>  arch/arm/boot/dts/qcom-ipq4019.dtsi | 134 ++++++++++++++++++++++++++++++++++++
->>  1 file changed, 134 insertions(+)
+>> ?arch/arm64/boot/dts/qcom/ipq8074.dtsi | 157 +++++++++++++++++++++++++++++++++-
+>> ?1 file changed, 156 insertions(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
->> index 10d112a..e38fffa 100644
->> --- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
->> +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
->> @@ -25,7 +25,9 @@
-> 
-> [...]
-> 
->> +		pcie0: pci at 40000000 {
->> +			compatible = "qcom,pcie-ipq4019", "snps,dw-pcie";
->> +			reg =  <0x40000000 0xf1d
->> +				0x40000f20 0xa8
->> +				0x80000 0x2000
->> +				0x40100000 0x1000>;
->> +			reg-names = "dbi", "elbi", "parf", "config";
->> +			device_type = "pci";
->> +			linux,pci-domain = <0>;
->> +			bus-range = <0x00 0xff>;
->> +			num-lanes = <1>;
->> +			#address-cells = <3>;
->> +			#size-cells = <2>;
+>> diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+>> b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+>> index 806fc56..7562650 100644
+>> --- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+>> @@ -24,7 +24,7 @@
+>> ???????? ranges = <0 0 0 0xffffffff>;
+>> ???????? compatible = "simple-bus";
+>>
+>> -??????? pinctrl at 1000000 {
+>> +??????? tlmm: pinctrl at 1000000 {
+>> ???????????? compatible = "qcom,ipq8074-pinctrl";
+>> ???????????? reg = <0x1000000 0x300000>;
+>> ???????????? interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+>> @@ -229,6 +229,161 @@
+>> ???????????? dma-names = "tx", "rx", "cmd";
+>> ???????????? status = "disabled";
+>> ???????? };
 >> +
->> +			ranges = <0x81000000 0 0x40200000 0x40200000 0 0x00100000
->> +				  0x82000000 0 0x48000000 0x48000000 0 0x10000000>;
+>> +??????? pcie_phy0: phy at 86000 {
+>> +??????????? compatible = "qcom,ipq8074-qmp-pcie-phy";
+>> +??????????? reg = <0x86000 0x1000>;
+>> +??????????? #phy-cells = <0>;
+>> +??????????? clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
+>> +??????????? clock-names = "pipe_clk";
+>> +??????????? clock-output-names = "pcie20_phy0_pipe_clk";
 >> +
->> +			interrupts = <GIC_SPI 141 IRQ_TYPE_NONE>;
+>> +??????????? resets = <&gcc GCC_PCIE0_PHY_BCR>,
+>> +??????????????? <&gcc GCC_PCIE0PHY_PHY_BCR>;
+>> +??????????? reset-names = "phy",
+>> +????????????????????? "common";
+>> +??????????? status = "disabled";
+>> +??????? };
+>> +
+>> +??????? pcie0: pci at 20000000 {
+>> +??????????? compatible = "qcom,pcie-ipq8074";
+>> +??????????? reg =? <0x20000000 0xf1d
+>> +??????????????? 0x20000F20 0xa8
 > 
-> There is no such thing as IRQ_TYPE_NONE. Please replace this with the
-> actual trigger information.
+> ?s/0x20000F20/0x20000f20
 
- ok, will update this.
+ok
+
+> 
+>> +??????????????? 0x80000 0x2000
+>> +??????????????? 0x20100000 0x1000>;
+>> +??????????? reg-names = "dbi", "elbi", "parf", "config";
+>> +??????????? device_type = "pci";
+>> +??????????? linux,pci-domain = <0>;
+>> +??????????? bus-range = <0x00 0xff>;
+>> +??????????? num-lanes = <1>;
+>> +??????????? #address-cells = <3>;
+>> +??????????? #size-cells = <2>;
+>> +
+>> +??????????? phys = <&pcie_phy0>;
+>> +??????????? phy-names = "pciephy";
+>> +
+>> +??????????? ranges = <0x81000000 0 0x20200000 0x20200000
+>> +????????????????? 0 0x00100000?? /* downstream I/O */
+> 
+> ?we can remove trailing zeros from address.
+> ?s/0x00100000/0x100000
+> 
+>> +????????????????? 0x82000000 0 0x20300000 0x20300000
+>> +????????????????? 0 0x00d00000>; /* non-prefetchable memory */
+> 
+> ?s/0x00d00000/0xd00000
+> 
+> ?Same changes are for PCIE1 also.
+
+ ok
+
+> 
+> ?With that.
+> 
+> ?Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
+
+ Thanks.
 
 Regards,
  Sricharan
