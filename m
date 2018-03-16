@@ -1,38 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:49 +0100
-Subject: [PATCH 19/69] arm64: dts: renesas: r8a77970: add PFC support
+Date: Fri, 16 Mar 2018 15:50:50 +0100
+Subject: [PATCH 20/69] arm64: dts: renesas: eagle: add SCIF0 pins
 In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
 References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <15981bab23cc1caf7070fa10ac39efa5d928dee9.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <31bded67ad215be592deda0c9ee8acdfe2067243.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Define the generic R8A77970 part of the PFC device node.
+Add the (previously omitted) SCIF0 pin data to the Eagle board's
+device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970-eagle.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index fc397ccd06b6..8eccfec83c9c 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -166,6 +166,11 @@
- 			#iommu-cells = <1>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+index 8fe5c193e049..f174103d2206 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+@@ -52,11 +52,21 @@
+ 	clock-frequency = <32768>;
+ };
  
-+		pfc: pin-controller at e6060000 {
-+			compatible = "renesas,pfc-r8a77970";
-+			reg = <0 0xe6060000 0 0x504>;
-+		};
++&pfc {
++	scif0_pins: scif0 {
++		groups = "scif0_data";
++		function = "scif0";
++	};
++};
 +
- 		intc_ex: interrupt-controller at e61c0000 {
- 			compatible = "renesas,intc-ex-r8a77970", "renesas,irqc";
- 			#interrupt-cells = <2>;
+ &rwdt {
+ 	timeout-sec = <60>;
+ 	status = "okay";
+ };
+ 
+ &scif0 {
++	pinctrl-0 = <&scif0_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
 -- 
 2.11.0
