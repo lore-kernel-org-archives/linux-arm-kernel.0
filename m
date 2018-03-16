@@ -1,43 +1,22 @@
-From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Fri, 16 Mar 2018 16:13:47 -0600
-Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
- <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
- <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
-Message-ID: <20180316221347.GA958@ziepe.ca>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 16 Mar 2018 15:29:13 -0700
+Subject: [PATCH 0/7] clk: add helper functions for managing
+ clk_onecell_data
+In-Reply-To: <1515112695-3160-1-git-send-email-david@lechnology.com>
+References: <1515112695-3160-1-git-send-email-david@lechnology.com>
+Message-ID: <152123935331.242365.4716792321487612827@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 04:05:10PM -0500, Steve Wise wrote:
-> > Code includes wmb() followed by writel(). writel() already has a barrier
-> on
-> > some architectures like arm64.
-> > 
-> > This ends up CPU observing two barriers back to back before executing the
-> > register write.
-> > 
-> > Since code already has an explicit barrier call, changing writel() to
-> > writel_relaxed().
-> > 
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Quoting David Lechner (2018-01-04 16:38:05)
+> I am writing some clock drivers that use struct clk_onecell_data a few
+> times, so I decided to write a helper function to allocate the memory
+> since it is a two step process and can be tedious. Then I noticed that
+> mediatek already had such a helper function, so I have moved that to the
+> clk core and made use of it in other drivers where possible.
 > 
-> NAK - This isn't correct for PowerPC.  For PowerPC, writeX_relaxed() is just
-> writeX().  
 
-?? Why is changing writex() to writeX() a NAK then?
-
-> I was just looking at this with Chelsio developers, and they said the
-> writeX() should be replaced with __raw_writeX(), not writeX_relaxed(), to
-> get rid of the extra barrier for all architectures.
-
-That doesn't seem semanticaly sane.
-
-__raw_writeX() should not appear in driver code, IMHO. Only the arch
-code can know what the exact semantics of that accessor are..
-
-If ppc can't use writel_relaxed to optimize then we probably need yet
-another io accessor semantic defined :(
-
-Jason
+We're actively trying to discourage driver authors from adding more
+clk_onecell_data and pushing them to register clks and providers with
+the clk_hw structures. So thanks for doing the consolidation work, but
+no thanks. We can wait for the conversion to hw pointers instead.
