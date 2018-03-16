@@ -1,51 +1,37 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Mar 2018 09:56:09 +0800
-Subject: [GIT PULL 5/6] Freescale arm64 device tree updates for 4.17
-In-Reply-To: <CAK8P3a1RZjpSj=6eWAJ7Y=6=N9PPXkVcHN84LFBFJROyN0d0iw@mail.gmail.com>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
- <1521113800-16401-5-git-send-email-shawnguo@kernel.org>
- <CAK8P3a1RZjpSj=6eWAJ7Y=6=N9PPXkVcHN84LFBFJROyN0d0iw@mail.gmail.com>
-Message-ID: <20180316015608.GQ26859@dragon>
+Date: Fri, 16 Mar 2018 10:28:55 +0800
+Subject: [GIT PULL] i.MX device tree updates for 4.17, round 2
+Message-ID: <20180316022854.GR26859@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 04:29:12PM +0100, Arnd Bergmann wrote:
-> On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-> >
-> >   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.17
-> >
-> > for you to fetch changes up to 4e017f1419397473cf3db6e9fa020013998b1aa4:
-> >
-> >   dt-bindings: ifc: Fix the unit address format in the examples (2018-03-12 15:38:49 +0800)
-> >
-> > ----------------------------------------------------------------
-> > Freescale arm64 device tree updates for 4.17:
-> >  - Move cpu_thermal device out of bus node to fix DTC simple_bus_reg
-> >    warning seen with W=1 switch.
-> >  - Fix IFC child nodes' unit-address to eliminate DTC simple_bus_reg
-> >    warnings.
-> >  - Add a dummy size memory 'reg' property for LS1046A device tree to
-> >    avoid unit_address_vs_reg DTC warning, and the real size will be
-> >    filled by bootloader.
-> >  - Update ls208xa-qds board device tree to fix unit_address_vs_reg
-> >    warnings with DSPI device.
-> >  - Add idle-states for LS1012A and LS1043A, and correct
-> >    arm,psci-suspend-param setting for already added idle-states.
-> >  - DPAA QBMan portal and watchdog device addition.
-> 
-> Pulled into next/dt
-> 
-> What's the status of the imx8 support? Do you plan to send another
-> pull request for that for 4.17, or are you still waiting for some
-> dependencies?
+The following changes since commit f4be9b77fac3d8141add1d84e75199f0e0ddd5a3:
 
-The i.MX8 platform/DT support depends on clock driver which hasn't been
-ready for merge.  And even for platform/DT series, I haven't seen the
-new version from Lucas, since we put quite some comments on v2.
+  ARM: dts: i.MX25: define SSI FIFO depth (2018-03-12 15:23:36 +0800)
 
-Shawn
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-4.17-2
+
+for you to fetch changes up to 326e7ba992cbe17c12d4235f65d72c6e222a73a1:
+
+  ARM: dts: imx6ul-isiot: Pass the required '#sound-dai-cells' (2018-03-16 09:13:38 +0800)
+
+----------------------------------------------------------------
+i.MX device tree updates for 4.17, round 2:
+ - Add missing property '#sound-dai-cells' for sgtl5000 codec node
+   in imx6ul-isiot board to fix warning seen with DTC 1.4.6.
+ - Use stdout-path instead of linux,stdout-path to fix DTC warning
+   reported by DTC 1.4.6.
+
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: dts: imx6-phytec: Use the standard 'stdout-path' property
+      ARM: dts: imx6ul-isiot: Pass the required '#sound-dai-cells'
+
+ arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dts | 2 +-
+ arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dts  | 2 +-
+ arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dts  | 2 +-
+ arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dts | 2 +-
+ arch/arm/boot/dts/imx6ul-isiot.dtsi               | 1 +
+ 5 files changed, 5 insertions(+), 4 deletions(-)
