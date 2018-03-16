@@ -1,51 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:53:01 +0100
-Subject: [PATCH 42/52] ARM: dts: r7s72100: add USB device to device tree
+Date: Fri, 16 Mar 2018 15:52:45 +0100
+Subject: [PATCH 26/52] ARM: dts: r8a7793: consistently use single space before
+ =
 In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
 References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <faa6c0071114fd433e83dddd3a42fba547ca9a67.1521208546.git.horms+renesas@verge.net.au>
+Message-ID: <77b1e3d230e5e42bbde3f11923b34382832a8415.1521208546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+Consistently use a single space before a =.
 
-Add USB device support.
+This patch fixes instances where a tab is used instead.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch should not introduce any functional change.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index ab9645a42eca..bd6366d1800b 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -667,4 +667,24 @@
- 		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
-+
-+	usbhs0: usb at e8010000 {
-+		compatible = "renesas,usbhs-r7s72100", "renesas,rza1-usbhs";
-+		reg = <0xe8010000 0x1a0>;
-+		interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R7S72100_CLK_USB0>;
-+		renesas,buswait = <4>;
-+		power-domains = <&cpg_clocks>;
-+		status = "disabled";
-+	};
-+
-+	usbhs1: usb at e8207000 {
-+		compatible = "renesas,usbhs-r7s72100", "renesas,rza1-usbhs";
-+		reg = <0xe8207000 0x1a0>;
-+		interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp7_clks R7S72100_CLK_USB1>;
-+		renesas,buswait = <4>;
-+		power-domains = <&cpg_clocks>;
-+		status = "disabled";
-+	};
- };
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index aa7d7792fb13..f9c5a557107d 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -1362,16 +1362,16 @@
+ 
+ 	thermal-zones {
+ 		cpu_thermal: cpu-thermal {
+-			polling-delay-passive	= <0>;
+-			polling-delay		= <0>;
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
+ 
+ 			thermal-sensors = <&thermal>;
+ 
+ 			trips {
+ 				cpu-crit {
+-					temperature	= <95000>;
+-					hysteresis	= <0>;
+-					type		= "critical";
++					temperature = <95000>;
++					hysteresis = <0>;
++					type = "critical";
+ 				};
+ 			};
+ 			cooling-maps {
 -- 
 2.11.0
