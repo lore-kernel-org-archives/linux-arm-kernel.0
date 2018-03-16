@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 16 Mar 2018 15:18:49 +0100
-Subject: [GIT PULL 6/7] arm64: Default configuration updates for v4.17-rc1
+Date: Fri, 16 Mar 2018 15:18:47 +0100
+Subject: [GIT PULL 4/7] soc/tegra: Changes for v4.17-rc1
 In-Reply-To: <20180316141850.4876-1-thierry.reding@gmail.com>
 References: <20180316141850.4876-1-thierry.reding@gmail.com>
-Message-ID: <20180316141850.4876-6-thierry.reding@gmail.com>
+Message-ID: <20180316141850.4876-4-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,30 +15,35 @@ The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-arm64-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-soc
 
-for you to fetch changes up to dc7073b0234ee6f48a8e609cd2def777de1e2d26:
+for you to fetch changes up to 0cad0983bd3c002e92dff1e9d7f28c2c312c1973:
 
-  arm64: defconfig: Enable the Tegra SMMU by default (2018-03-14 13:27:41 +0100)
+  soc/tegra: pmc: Use the new reset APIs to manage reset controllers (2018-03-09 08:51:07 +0100)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-arm64: Default configuration updates for v4.17-rc1
+soc/tegra: Changes for v4.17-rc1
 
-Enable the BPMP thermal and CPU frequency drivers as well as make sure
-that the Tegra SMMU is enabled by default because there's no fun without
-it. Also enable initial Tegra194 support.
+This contains more Tegra194 support as well as an implementation for the
+MBIST workaround needed to avoid some memory-related issues on Tegra210.
 
 ----------------------------------------------------------------
-Mikko Perttunen (3):
-      arm64: defconfig: Enable NVIDIA Tegra194 support
-      arm64: defconfig: Enable CONFIG_ARM_TEGRA186_CPUFREQ
-      arm64: defconfig: Enable CONFIG_TEGRA_BPMP_THERMAL
+Mikko Perttunen (2):
+      soc/tegra: Add Tegra194 SoC configuration option
+      soc/tegra: pmc: Add Tegra194 compatibility string
+
+Peter De Schrijver (1):
+      soc/tegra: pmc: MBIST work around for Tegra210
 
 Thierry Reding (1):
-      arm64: defconfig: Enable the Tegra SMMU by default
+      soc/tegra: pmc: Pass PMC to tegra_powergate_power_up()
 
- arch/arm64/configs/defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+Vivek Gautam (1):
+      soc/tegra: pmc: Use the new reset APIs to manage reset controllers
+
+ drivers/soc/tegra/Kconfig | 10 +++++
+ drivers/soc/tegra/pmc.c   | 95 ++++++++++++-----------------------------------
+ 2 files changed, 33 insertions(+), 72 deletions(-)
