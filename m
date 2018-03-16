@@ -1,10 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 12:16:24 -0400
-Subject: [PATCH v3 11/18] qlcnic: Eliminate duplicate barriers on
+Date: Fri, 16 Mar 2018 12:16:23 -0400
+Subject: [PATCH v3 10/18] net: qla3xxx: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
 References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521216991-28706-12-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521216991-28706-11-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,21 +19,23 @@ writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/qlogic/qla3xxx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c
-index 46b0372..97c146e7 100644
---- a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c
-+++ b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c
-@@ -478,7 +478,7 @@ irqreturn_t qlcnic_83xx_clear_legacy_intr(struct qlcnic_adapter *adapter)
- 	wmb();
+diff --git a/drivers/net/ethernet/qlogic/qla3xxx.c b/drivers/net/ethernet/qlogic/qla3xxx.c
+index 9e5264d..0e71b74 100644
+--- a/drivers/net/ethernet/qlogic/qla3xxx.c
++++ b/drivers/net/ethernet/qlogic/qla3xxx.c
+@@ -1858,8 +1858,8 @@ static void ql_update_small_bufq_prod_index(struct ql3_adapter *qdev)
+ 			qdev->small_buf_release_cnt -= 8;
+ 		}
+ 		wmb();
+-		writel(qdev->small_buf_q_producer_index,
+-			&port_regs->CommonRegs.rxSmallQProducerIndex);
++		writel_relaxed(qdev->small_buf_q_producer_index,
++			       &port_regs->CommonRegs.rxSmallQProducerIndex);
+ 	}
+ }
  
- 	/* clear the interrupt trigger control register */
--	writel(0, adapter->isr_int_vec);
-+	writel_relaxed(0, adapter->isr_int_vec);
- 	intr_val = readl(adapter->isr_int_vec);
- 	do {
- 		intr_val = readl(adapter->tgt_status_reg);
 -- 
 2.7.4
