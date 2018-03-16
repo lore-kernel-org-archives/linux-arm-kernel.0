@@ -1,65 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Mar 2018 16:22:58 +0000
-Subject: [PATCH v6 19/26] arm64: KVM: Move stashing of x0/x1 into the
- vector code itself
-In-Reply-To: <20180314165049.30105-20-marc.zyngier@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180314165049.30105-20-marc.zyngier@arm.com>
-Message-ID: <20180316162257.rvz26fbn3j5jvsku@armageddon.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 16 Mar 2018 16:19:43 +0000
+Subject: [PATCH v5 0/2] add support for Socionext SynQuacer I2C controller
+In-Reply-To: <CAKv+Gu_hRsJGT-inrzXmAmabaZiUTL7BowdUrxwSWHJecjeVsg@mail.gmail.com>
+References: <20180302083123.7259-1-ard.biesheuvel@linaro.org>
+ <CAKv+Gu_hRsJGT-inrzXmAmabaZiUTL7BowdUrxwSWHJecjeVsg@mail.gmail.com>
+Message-ID: <CAKv+Gu-7MP9OqsQpR+AKzn=yHTH5qv5pa4THy0X5JGr-O+XLDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 04:50:42PM +0000, Marc Zyngier wrote:
-> All our useful entry points into the hypervisor are starting by
-> saving x0 and x1 on the stack. Let's move those into the vectors
-> by introducing macros that annotate whether a vector is valid or
-> not, thus indicating whether we want to stash registers or not.
-> 
-> The only drawback is that we now also stash registers for el2_error,
-> but this should never happen, and we pop them back right at the
-> start of the handling sequence.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/hyp-entry.S | 56 ++++++++++++++++++++++++------------------
->  1 file changed, 32 insertions(+), 24 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> index f36464bd57c5..0f62b5f76aa5 100644
-> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> @@ -55,7 +55,6 @@ ENTRY(__vhe_hyp_call)
->  ENDPROC(__vhe_hyp_call)
->  
->  el1_sync:				// Guest trapped into EL2
-> -	stp	x0, x1, [sp, #-16]!
->  
->  alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
->  	mrs	x1, esr_el2
-> @@ -137,18 +136,18 @@ alternative_else_nop_endif
->  	b	__guest_exit
->  
->  el1_irq:
-> -	stp     x0, x1, [sp, #-16]!
->  	ldr	x1, [sp, #16 + 8]
->  	mov	x0, #ARM_EXCEPTION_IRQ
->  	b	__guest_exit
->  
->  el1_error:
-> -	stp     x0, x1, [sp, #-16]!
->  	ldr	x1, [sp, #16 + 8]
->  	mov	x0, #ARM_EXCEPTION_EL1_SERROR
->  	b	__guest_exit
->  
->  el2_error:
-> +	ldp	x0, x1, [sp], #16
-> +
+On 10 March 2018 at 15:01, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 2 March 2018 at 08:31, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> Add a binding and a driver for the I2C IP found in the Socionext SynQuacer
+>> SoC, which is essentially a rebranded version of the Fujitsu F_I2C controller.
+>>
+>> I think this is good to go now. Wolfram?
+>>
+>
+> Ping?
+>
 
-Nitpick: you don't need a memory access here, just:
+Ping?
 
-	add	sp, sp, #16
-
-(unless el2_error has changed somewhere before this patch)
-
--- 
-Catalin
+>> v5:
+>> - add Rob's ack to #1
+>> - drop unnecessary 'platform_set_drvdata(pdev, NULL)' in remove path (#2)
+>>
+>> v4:
+>> - clarify binding that only a single interrupt specifier is expected (#1)
+>> - check return value of clk_prepare_enable() on probe path (#2)
+>> - add Andy's R-b to patch #2
+>>
+>> v3:
+>> - incorporate more of Andy's review comments (#2), especially regarding the
+>>   bus speed and clock source handling for ACPI
+>> - patch #1 unchanged.
+>>
+>> v2:
+>> - incorporate Andy's review comments (#2)
+>> - patch #1 unchanged.
+>>
+>> Ard Biesheuvel (2):
+>>   dt-bindings: i2c: add binding for Socionext SynQuacer I2C
+>>   i2c: add support for Socionext SynQuacer I2C controller
+>>
+>>  Documentation/devicetree/bindings/i2c/i2c-synquacer.txt |  29 +
+>>  drivers/i2c/busses/Kconfig                              |  10 +
+>>  drivers/i2c/busses/Makefile                             |   1 +
+>>  drivers/i2c/busses/i2c-synquacer.c                      | 791 ++++++++++++++++++++
+>>  4 files changed, 831 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+>>  create mode 100644 drivers/i2c/busses/i2c-synquacer.c
+>>
+>> --
+>> 2.11.0
+>>
