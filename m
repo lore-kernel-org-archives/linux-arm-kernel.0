@@ -1,214 +1,77 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 16 Mar 2018 14:29:51 +0100
-Subject: [PATCH v2 2/2] reset: stm32mp1: Enable stm32mp1 reset driver
-In-Reply-To: <1521045001-30788-3-git-send-email-gabriel.fernandez@st.com>
-References: <1521045001-30788-1-git-send-email-gabriel.fernandez@st.com>
- <1521045001-30788-3-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1521206991.5061.5.camel@pengutronix.de>
+From: marcus.folkesson@gmail.com (Marcus Folkesson)
+Date: Fri, 16 Mar 2018 14:37:04 +0100
+Subject: [PATCH v3 1/7] watchdog: sama5d4: make use of timeout-secs
+ provided in devicetree
+In-Reply-To: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+Message-ID: <20180316133703.GA31029@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+Hi,
 
-this looks mostly good to me, a few questions and comments below:
+Am I supposed to do something more to make this patchset picked up?
 
-On Wed, 2018-03-14 at 17:30 +0100, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+Thanks,
+Marcus Folkesson
+
+On Sun, Feb 11, 2018 at 09:08:41PM +0100, Marcus Folkesson wrote:
+> watchdog_init_timeout() will allways pick timeout_param since it
+> defaults to a valid timeout.
 > 
-> stm32mp1 RCC IP 1 has a reset SET register and a reset CLEAR register.
+> Following best practice described in
+> Documentation/watchdog/watchdog-kernel-api.txt to make use of
+> the parameter logic.
 > 
-> Writing '0' on reset SET register has no effect
-> Writing '1' on reset SET register
-> 	activates the reset of the corresponding peripheral
-> 
-> Writing '0' on reset CLEAR register	has no effect
-> Writing '1' on reset CLEAR register
-> 	releases the reset of the corresponding peripheral
-> 
-> See Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Signed-off-by: Marcus Folkesson <marcus.folkesson@gmail.com>
 > ---
->  drivers/reset/Kconfig          |   6 ++
->  drivers/reset/Makefile         |   1 +
->  drivers/reset/reset-stm32mp1.c | 122 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 129 insertions(+)
->  create mode 100644 drivers/reset/reset-stm32mp1.c
 > 
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index 1efbc6c..c0b292b 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -97,6 +97,12 @@ config RESET_SIMPLE
->  	   - Allwinner SoCs
->  	   - ZTE's zx2967 family
+> Notes:
+>     v3:
+>     	- Use wdd->timeout instead of wdt_timeout when print out
+>     	  timout in probe function.
+> 
+>  drivers/watchdog/sama5d4_wdt.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index 0ae947c3d7bc..255169916dbb 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -33,7 +33,7 @@ struct sama5d4_wdt {
+>  	unsigned long		last_ping;
+>  };
 >  
-> +config RESET_STM32MP157
-> +	bool "STM32MP157 Reset Driver" if COMPILE_TEST
-> +	default MACH_STM32MP157
-> +	help
-> +	  This enables the RCC reset controller driver for STM32 MPUs.
-> +
->  config RESET_SUNXI
->  	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
->  	default ARCH_SUNXI
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 132c24f..c1261dc 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -15,6 +15,7 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
->  obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
->  obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
-> +obj-$(CONFIG_RESET_STM32MP157) += reset-stm32mp1.o
->  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
->  obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
-> diff --git a/drivers/reset/reset-stm32mp1.c b/drivers/reset/reset-stm32mp1.c
-> new file mode 100644
-> index 0000000..5e25388
-> --- /dev/null
-> +++ b/drivers/reset/reset-stm32mp1.c
-> @@ -0,0 +1,122 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
-> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
-> + */
-> +
-> +#include <linux/arm-smccc.h>
-
-This does not seem to be necessary.
-
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/of.h>
-
-> +#include <linux/of_device.h>
-
-This does not seem to be necessary either.
-
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +
-> +#define CLR_OFFSET 0x4
-> +
-> +struct stm32_reset_data {
-> +	struct reset_controller_dev	rcdev;
-> +	void __iomem			*membase;
-> +};
-> +
-> +static inline struct stm32_reset_data *
-> +to_stm32_reset_data(struct reset_controller_dev *rcdev)
-> +{
-> +	return container_of(rcdev, struct stm32_reset_data, rcdev);
-> +}
-> +
-> +static int stm32_reset_update(struct reset_controller_dev *rcdev,
-> +			      unsigned long id, bool assert)
-> +{
-> +	struct stm32_reset_data *data = to_stm32_reset_data(rcdev);
-> +	int reg_width = sizeof(u32);
-> +	int bank = id / (reg_width * BITS_PER_BYTE);
-> +	int offset = id % (reg_width * BITS_PER_BYTE);
-> +	void __iomem *addr;
-> +
-> +	addr = data->membase + (bank * reg_width);
-> +	if (!assert)
-> +		addr += CLR_OFFSET;
-> +
-> +	writel(BIT(offset), addr);
-> +
-> +	return 0;
-> +}
-> +
-> +static int stm32_reset_assert(struct reset_controller_dev *rcdev,
-> +			      unsigned long id)
-> +{
-> +	return stm32_reset_update(rcdev, id, true);
-> +}
-> +
-> +static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-> +{
-> +	return stm32_reset_update(rcdev, id, false);
-> +}
-> +
-> +static int stm32_reset_status(struct reset_controller_dev *rcdev,
-> +			      unsigned long id)
-> +{
-> +	struct stm32_reset_data *data = to_stm32_reset_data(rcdev);
-> +	int reg_width = sizeof(u32);
-> +	int bank = id / (reg_width * BITS_PER_BYTE);
-> +	int offset = id % (reg_width * BITS_PER_BYTE);
-> +	u32 reg;
-> +
-> +	reg = readl(data->membase + (bank * reg_width));
-> +
-> +	return !(reg & BIT(offset));
-> +}
-
-So the SET register can be read back and returns 0 for reset lines that
-are currently asserted and returns 1 for reset lines that are currently
-deasserted?
-
-> +
-> +const struct reset_control_ops stm32_reset_ops = {
-> +	.assert		= stm32_reset_assert,
-> +	.deassert	= stm32_reset_deassert,
-> +	.status		= stm32_reset_status,
-> +};
-> +
-> +static const struct of_device_id stm32_reset_dt_ids[] = {
-> +	{ .compatible = "st,stm32mp1-rcc"},
-> +	{ /* sentinel */ },
-> +};
-
->From the DT bindings it looks like the clock and reset drivers are
-sharing the same node. Is there just no clock platform_driver at all?
-
-> +
-> +static int stm32_reset_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct stm32_reset_data *data;
-> +	void __iomem *membase;
-> +	struct resource *res;
-> +
-> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	membase = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(membase))
-> +		return PTR_ERR(membase);
-> +
-> +	data->membase = membase;
-> +	data->rcdev.owner = THIS_MODULE;
-> +	data->rcdev.nr_resets = resource_size(res) * BITS_PER_BYTE;
-> +	data->rcdev.ops = &stm32_reset_ops;
-> +	data->rcdev.of_node = dev->of_node;
-> +
-> +	return devm_reset_controller_register(dev, &data->rcdev);
-> +}
-> +
-> +static struct platform_driver stm32_reset_driver = {
-> +	.probe	= stm32_reset_probe,
-> +	.driver = {
-> +		.name		= "stm32mp1-reset",
-> +		.of_match_table	= stm32_reset_dt_ids,
-> +	},
-> +};
-> +
-> +static int __init stm32_reset_init(void)
-> +{
-> +	return platform_driver_register(&stm32_reset_driver);
-> +}
-> +
-> +postcore_initcall(stm32_reset_init);
-
-Isn't builtin_platform_driver early enough?
-
-regards
-Philipp
+> -static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+> +static int wdt_timeout;
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  
+>  module_param(wdt_timeout, int, 0);
+> @@ -212,7 +212,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	wdd = &wdt->wdd;
+> -	wdd->timeout = wdt_timeout;
+> +	wdd->timeout = WDT_DEFAULT_TIMEOUT;
+>  	wdd->info = &sama5d4_wdt_info;
+>  	wdd->ops = &sama5d4_wdt_ops;
+>  	wdd->min_timeout = MIN_WDT_TIMEOUT;
+> @@ -273,7 +273,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, wdt);
+>  
+>  	dev_info(&pdev->dev, "initialized (timeout = %d sec, nowayout = %d)\n",
+> -		 wdt_timeout, nowayout);
+> +		 wdd->timeout, nowayout);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.15.1
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180316/b80ee7cb/attachment.sig>
