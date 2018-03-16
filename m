@@ -1,34 +1,87 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri, 16 Mar 2018 11:33:43 +0100
-Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface to
- use in-band negotiation
+Date: Fri, 16 Mar 2018 11:33:46 +0100
+Subject: [PATCH net-next 05/10] phy: cp110-comphy: 2.5G SGMII mode
 In-Reply-To: <20180316103351.16616-1-antoine.tenart@bootlin.com>
 References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
-Message-ID: <20180316103351.16616-3-antoine.tenart@bootlin.com>
+Message-ID: <20180316103351.16616-6-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PHY mode 10GKR can use in-band negotiation. This patches allows this
-mode to be used with MLO_AN_INBAND in phylink.
+This patch allow the CP100 comphy to configure some lanes in the
+2.5G SGMII mode. This mode is quite close to SGMII and uses nearly the
+same code path.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- drivers/net/phy/phylink.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/phy/phylink.c b/drivers/net/phy/phylink.c
-index 51a011a349fe..7224b005f0dd 100644
---- a/drivers/net/phy/phylink.c
-+++ b/drivers/net/phy/phylink.c
-@@ -768,7 +768,8 @@ int phylink_of_phy_connect(struct phylink *pl, struct device_node *dn,
- 	/* Fixed links and 802.3z are handled without needing a PHY */
- 	if (pl->link_an_mode == MLO_AN_FIXED ||
- 	    (pl->link_an_mode == MLO_AN_INBAND &&
--	     phy_interface_mode_is_8023z(pl->link_interface)))
-+	     (phy_interface_mode_is_8023z(pl->link_interface) ||
-+	      pl->link_interface == PHY_INTERFACE_MODE_10GKR)))
- 		return 0;
+diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+index a0d522154cdf..4ef429250d7b 100644
+--- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
++++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+@@ -135,19 +135,25 @@ struct mvebu_comhy_conf {
+ static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
+ 	/* lane 0 */
+ 	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
+ 	/* lane 1 */
+ 	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII, 0x1),
+ 	/* lane 2 */
+ 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII, 0x1),
+ 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR, 0x1),
+ 	/* lane 3 */
+ 	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII, 0x2),
++	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII, 0x2),
+ 	/* lane 4 */
+ 	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_SGMII, 0x2),
++	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_2500SGMII, 0x2),
+ 	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR, 0x2),
+ 	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII, 0x1),
+ 	/* lane 5 */
+ 	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII, 0x1),
++	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII, 0x1),
+ };
  
- 	phy_node = of_parse_phandle(dn, "phy-handle", 0);
+ struct mvebu_comphy_priv {
+@@ -206,6 +212,10 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
+ 	if (mode == PHY_MODE_10GKR)
+ 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xe) |
+ 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xe);
++	else if (mode == PHY_MODE_2500SGMII)
++		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x8) |
++		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x8) |
++		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
+ 	else if (mode == PHY_MODE_SGMII)
+ 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x6) |
+ 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x6) |
+@@ -296,13 +306,13 @@ static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
+ 	return 0;
+ }
+ 
+-static int mvebu_comphy_set_mode_sgmii(struct phy *phy)
++static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
+ {
+ 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
+ 	struct mvebu_comphy_priv *priv = lane->priv;
+ 	u32 val;
+ 
+-	mvebu_comphy_ethernet_init_reset(lane, PHY_MODE_SGMII);
++	mvebu_comphy_ethernet_init_reset(lane, mode);
+ 
+ 	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
+ 	val &= ~MVEBU_COMPHY_RX_CTRL1_CLK8T_EN;
+@@ -487,7 +497,8 @@ static int mvebu_comphy_power_on(struct phy *phy)
+ 
+ 	switch (lane->mode) {
+ 	case PHY_MODE_SGMII:
+-		ret = mvebu_comphy_set_mode_sgmii(phy);
++	case PHY_MODE_2500SGMII:
++		ret = mvebu_comphy_set_mode_sgmii(phy, lane->mode);
+ 		break;
+ 	case PHY_MODE_10GKR:
+ 		ret = mvebu_comphy_set_mode_10gkr(phy);
 -- 
 2.14.3
