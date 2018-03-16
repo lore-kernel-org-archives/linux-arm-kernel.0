@@ -1,48 +1,95 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:53:27 +0100
-Subject: [PATCH 05/14] soc: renesas: r8a77970-sysc: fix power area parents
+Date: Fri, 16 Mar 2018 15:53:26 +0100
+Subject: [PATCH 04/14] soc: renesas: rcar-rst: Enable watchdog as reset
+ trigger for Gen2
 In-Reply-To: <cover.1521211738.git.horms+renesas@verge.net.au>
 References: <cover.1521211738.git.horms+renesas@verge.net.au>
-Message-ID: <40d5c8e94751f4a4fa4e0e27e3805e201a4e79c0.1521211738.git.horms+renesas@verge.net.au>
+Message-ID: <69e0d1b8db8f8cc319f966ec3eb2fffce28c4f28.1521211738.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-According to the figure 9.2(b) of the R-Car Series, 3rd Generation User?s
-Manual: Hardware Rev. 0.80 the A2IRn and A2SCn power areas in R8A77970 have
-the A3IR area as a parent, thus the SYSC driver has those parents wrong...
+This patch allows for platform specific quirks as some of the SoC need
+further customization for the watchdog to work properly, like for R-Car
+Gen2 and for RZ/G.
 
-Fixes: bab9b2a74fe9 ("soc: renesas: rcar-sysc: add R8A77970 support")
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/r8a77970-sysc.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/soc/renesas/rcar-rst.c | 37 ++++++++++++++++++++++++++++++-------
+ 1 file changed, 30 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/soc/renesas/r8a77970-sysc.c b/drivers/soc/renesas/r8a77970-sysc.c
-index 8c614164718e..caf894f193ed 100644
---- a/drivers/soc/renesas/r8a77970-sysc.c
-+++ b/drivers/soc/renesas/r8a77970-sysc.c
-@@ -25,12 +25,12 @@ static const struct rcar_sysc_area r8a77970_areas[] __initconst = {
- 	  PD_CPU_NOCR },
- 	{ "cr7",	0x240, 0, R8A77970_PD_CR7,	R8A77970_PD_ALWAYS_ON },
- 	{ "a3ir",	0x180, 0, R8A77970_PD_A3IR,	R8A77970_PD_ALWAYS_ON },
--	{ "a2ir0",	0x400, 0, R8A77970_PD_A2IR0,	R8A77970_PD_ALWAYS_ON },
--	{ "a2ir1",	0x400, 1, R8A77970_PD_A2IR1,	R8A77970_PD_A2IR0 },
--	{ "a2ir2",	0x400, 2, R8A77970_PD_A2IR2,	R8A77970_PD_A2IR0 },
--	{ "a2ir3",	0x400, 3, R8A77970_PD_A2IR3,	R8A77970_PD_A2IR0 },
--	{ "a2sc0",	0x400, 4, R8A77970_PD_A2SC0,	R8A77970_PD_ALWAYS_ON },
--	{ "a2sc1",	0x400, 5, R8A77970_PD_A2SC1,	R8A77970_PD_A2SC0 },
-+	{ "a2ir0",	0x400, 0, R8A77970_PD_A2IR0,	R8A77970_PD_A3IR },
-+	{ "a2ir1",	0x400, 1, R8A77970_PD_A2IR1,	R8A77970_PD_A3IR },
-+	{ "a2ir2",	0x400, 2, R8A77970_PD_A2IR2,	R8A77970_PD_A3IR },
-+	{ "a2ir3",	0x400, 3, R8A77970_PD_A2IR3,	R8A77970_PD_A3IR },
-+	{ "a2sc0",	0x400, 4, R8A77970_PD_A2SC0,	R8A77970_PD_A3IR },
-+	{ "a2sc1",	0x400, 5, R8A77970_PD_A2SC1,	R8A77970_PD_A3IR },
+diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
+index e2340eb9ea9c..34136664ece4 100644
+--- a/drivers/soc/renesas/rcar-rst.c
++++ b/drivers/soc/renesas/rcar-rst.c
+@@ -13,8 +13,18 @@
+ #include <linux/of_address.h>
+ #include <linux/soc/renesas/rcar-rst.h>
+ 
++#define WDTRSTCR_RESET		0xA55A0002
++#define WDTRSTCR		0x0054
++
++static int rcar_rst_enable_wdt_reset(void __iomem *base)
++{
++	iowrite32(WDTRSTCR_RESET, base + WDTRSTCR);
++	return 0;
++}
++
+ struct rst_config {
+-	unsigned int modemr;	/* Mode Monitoring Register Offset */
++	unsigned int modemr;		/* Mode Monitoring Register Offset */
++	int (*configure)(void *base);	/* Platform specific configuration */
  };
  
- const struct rcar_sysc_info r8a77970_sysc_info __initconst = {
+ static const struct rst_config rcar_rst_gen1 __initconst = {
+@@ -23,6 +33,11 @@ static const struct rst_config rcar_rst_gen1 __initconst = {
+ 
+ static const struct rst_config rcar_rst_gen2 __initconst = {
+ 	.modemr = 0x60,
++	.configure = rcar_rst_enable_wdt_reset,
++};
++
++static const struct rst_config rcar_rst_gen3 __initconst = {
++	.modemr = 0x60,
+ };
+ 
+ static const struct of_device_id rcar_rst_matches[] __initconst = {
+@@ -38,12 +53,12 @@ static const struct of_device_id rcar_rst_matches[] __initconst = {
+ 	{ .compatible = "renesas,r8a7792-rst", .data = &rcar_rst_gen2 },
+ 	{ .compatible = "renesas,r8a7793-rst", .data = &rcar_rst_gen2 },
+ 	{ .compatible = "renesas,r8a7794-rst", .data = &rcar_rst_gen2 },
+-	/* R-Car Gen3 is handled like R-Car Gen2 */
+-	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen2 },
+-	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen2 },
++	/* R-Car Gen3 */
++	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen3 },
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -72,6 +87,14 @@ static int __init rcar_rst_init(void)
+ 	rcar_rst_base = base;
+ 	cfg = match->data;
+ 	saved_mode = ioread32(base + cfg->modemr);
++	if (cfg->configure) {
++		error = cfg->configure(base);
++		if (error) {
++			pr_warn("%pOF: Cannot run SoC specific configuration\n",
++				np);
++			goto out_put;
++		}
++	}
+ 
+ 	pr_debug("%pOF: MODE = 0x%08x\n", np, saved_mode);
+ 
 -- 
 2.11.0
