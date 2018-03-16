@@ -1,38 +1,179 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 16 Mar 2018 17:07:28 +0000
-Subject: [linux-sunxi] [PATCH v4 4/9] pinctrl: sunxi: add support for the
- Allwinner H6 main pin controller
-In-Reply-To: <20180316140215.28663-5-icenowy@aosc.io>
-References: <20180316140215.28663-1-icenowy@aosc.io>
- <20180316140215.28663-5-icenowy@aosc.io>
-Message-ID: <a74d898f-7047-eebf-027e-106c40be2b9d@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 17:38:36 +0100
+Subject: [PATCH 39/47] ARM: dts: silk: use demuxer for I2C1
+In-Reply-To: <cover.1521218085.git.horms+renesas@verge.net.au>
+References: <cover.1521218085.git.horms+renesas@verge.net.au>
+Message-ID: <d4c1ce2813942407cead7adb86d1dd9dfc46f74c.1521218085.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-On 16/03/18 14:02, Icenowy Zheng wrote:
-> The Allwinner H6 SoC has two pin controllers, one main controller
-> (called CPUX-PORT in user manual) and one controller in CPUs power
-> domain (called CPUS-PORT in user manual).
-> 
-> This commit introduces support for the main pin controller on H6.
-> 
-> The pin bank A and B are not wired out and hidden from the SoC's
-> documents, however it's shown that the "ATE" (an AC200 chip
-> co-packaged with the H6 die) is connected to the main SoC die via these
-> pin banks. The information about these banks is just copied from the BSP
-> pinctrl driver, but re-formatted to fit the mainline pinctrl driver
-> format. The GPIO functions are dropped, as they're impossible to use --
-> except a GPIO&IRQ only pin (PB20) which might be the IRQ of ATE.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Rob Herring <robh@kernel.org>
+Create a separate bus for HDMI related I2C1 and provide fallback to GPIO.
 
-As mentioned before, I checked every single pin against the manual and
-this looks correct to me.
+Based on work for the r8a7790/lager by Wolfram Sang.
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[wsa: rebased, fixed aliases, switched to named GPIOs]
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
+ arch/arm/boot/dts/r8a7794-silk.dts | 128 ++++++++++++++++++++++---------------
+ 1 file changed, 75 insertions(+), 53 deletions(-)
 
-Thanks!
-Andre.
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index edfad0e5ac53..f1afe2dda13a 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -31,6 +31,8 @@
+ 
+ 	aliases {
+ 		serial0 = &scif2;
++		i2c9 = &gpioi2c1;
++		i2c10 = &i2chdmi;
+ 	};
+ 
+ 	chosen {
+@@ -153,6 +155,78 @@
+ 			clocks = <&x9_clk>;
+ 		};
+ 	};
++
++	gpioi2c1: i2c-9 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		status = "disabled";
++		scl-gpios = <&gpio4 0 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		sda-gpios = <&gpio4 1 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		i2c-gpio,delay-us = <5>;
++	};
++
++	/*
++	 * A fallback to GPIO is provided for I2C1.
++	 */
++	i2chdmi: i2c-10 {
++		compatible = "i2c-demux-pinctrl";
++		i2c-parent = <&i2c1>, <&gpioi2c1>;
++		i2c-bus-name = "i2c-hdmi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ak4643: codec at 12 {
++			compatible = "asahi-kasei,ak4643";
++			#sound-dai-cells = <0>;
++			reg = <0x12>;
++		};
++
++		composite-in at 20 {
++			compatible = "adi,adv7180";
++			reg = <0x20>;
++			remote = <&vin0>;
++
++			port {
++				adv7180: endpoint {
++					bus-width = <8>;
++					remote-endpoint = <&vin0ep>;
++				};
++			};
++		};
++
++		hdmi at 39 {
++			compatible = "adi,adv7511w";
++			reg = <0x39>;
++			interrupt-parent = <&gpio5>;
++			interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
++
++			adi,input-depth = <8>;
++			adi,input-colorspace = "rgb";
++			adi,input-clock = "1x";
++			adi,input-style = <1>;
++			adi,input-justification = "evenly";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					adv7511_in: endpoint {
++						remote-endpoint = <&du_out_rgb0>;
++					};
++				};
++
++				port at 1 {
++					reg = <1>;
++					adv7511_out: endpoint {
++						remote-endpoint = <&hdmi_con>;
++					};
++				};
++			};
++		};
++	};
+ };
+ 
+ &extal_clk {
+@@ -268,61 +342,9 @@
+ 
+ &i2c1 {
+ 	pinctrl-0 = <&i2c1_pins>;
+-	pinctrl-names = "default";
++	pinctrl-names = "i2c-hdmi";
+ 
+-	status = "okay";
+ 	clock-frequency = <400000>;
+-
+-	ak4643: codec at 12 {
+-		compatible = "asahi-kasei,ak4643";
+-		#sound-dai-cells = <0>;
+-		reg = <0x12>;
+-	};
+-
+-	composite-in at 20 {
+-		compatible = "adi,adv7180";
+-		reg = <0x20>;
+-		remote = <&vin0>;
+-
+-		port {
+-			adv7180: endpoint {
+-				bus-width = <8>;
+-				remote-endpoint = <&vin0ep>;
+-			};
+-		};
+-	};
+-
+-	hdmi at 39 {
+-		compatible = "adi,adv7511w";
+-		reg = <0x39>;
+-		interrupt-parent = <&gpio5>;
+-		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
+-
+-		adi,input-depth = <8>;
+-		adi,input-colorspace = "rgb";
+-		adi,input-clock = "1x";
+-		adi,input-style = <1>;
+-		adi,input-justification = "evenly";
+-
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			port at 0 {
+-				reg = <0>;
+-				adv7511_in: endpoint {
+-					remote-endpoint = <&du_out_rgb0>;
+-				};
+-			};
+-
+-			port at 1 {
+-				reg = <1>;
+-				adv7511_out: endpoint {
+-					remote-endpoint = <&hdmi_con>;
+-				};
+-			};
+-		};
+-	};
+ };
+ 
+ &mmcif0 {
+-- 
+2.11.0
