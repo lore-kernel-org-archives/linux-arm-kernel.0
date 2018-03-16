@@ -1,49 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:51:19 +0100
-Subject: [PATCH 49/69] arm64: dts: renesas: r8a77965: Move usb2_phy1 up
+Date: Fri, 16 Mar 2018 15:51:20 +0100
+Subject: [PATCH 50/69] arm64: dts: renesas: Add support for Salvator-XS with
+ R-Car M3-N
 In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
 References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <fe6746059b165ab42e8aa0a2c7b7bf307baad660.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <19591a9b416669419110c8da3f4096d219b810ac.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Move "usb2_ph1" place-holder device node next to "usb2_phy0" one.
+Add initial support for the Renesas Salvator-XS (Salvator-X 2nd version)
+development board equipped with an R-Car M3-N SiP.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Most features are enabled through the shared salvator-xs.dtsi board
+description.  The memory configuration is specific to the M3-N SiP.
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+[geert: Switch to SPDX-License-Identifier, update patch description]
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/renesas/Makefile                |  2 +-
+ .../arm64/boot/dts/renesas/r8a77965-salvator-xs.dts | 21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 0118956cc6e0..8c9648a24ee0 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -604,6 +604,11 @@
- 			/* placeholder */
- 		};
- 
-+		usb2_phy1: usb-phy at ee0a0200 {
-+			reg = <0 0xee0a0200 0 0x700>;
-+			/* placeholder */
-+		};
+diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+index 9ea5ec0daeba..5ede06000ea4 100644
+--- a/arch/arm64/boot/dts/renesas/Makefile
++++ b/arch/arm64/boot/dts/renesas/Makefile
+@@ -7,7 +7,7 @@ dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-h3ulcb-kf.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-m3ulcb-kf.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-xs.dtb
+-dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-salvator-x.dtb
++dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-salvator-x.dtb r8a77965-salvator-xs.dtb
+ dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb r8a77970-v3msk.dtb
+ dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb
+ dtb-$(CONFIG_ARCH_R8A77995) += r8a77995-draak.dtb
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+new file mode 100644
+index 000000000000..8a45fc43348d
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+@@ -0,0 +1,21 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree Source for the Salvator-X 2nd version board
++ *
++ * Copyright (C) 2017 Renesas Electronics Corp.
++ */
 +
- 		ohci1: usb at ee0a0000 {
- 			reg = <0 0xee0a0000 0 0x100>;
- 			/* placeholder */
-@@ -771,11 +776,6 @@
- 			};
- 		};
- 
--		usb2_phy1: usb-phy at ee0a0200 {
--			reg = <0 0xee0a0200 0 0x700>;
--			/* placeholder */
--		};
--
- 		sdhi0: sd at ee100000 {
- 			reg = <0 0xee100000 0 0x2000>;
- 			/* placeholder */
++/dts-v1/;
++#include "r8a77965.dtsi"
++#include "salvator-xs.dtsi"
++
++/ {
++	model = "Renesas Salvator-X 2nd version board based on r8a77965";
++	compatible = "renesas,salvator-xs", "renesas,r8a77965";
++
++	memory at 48000000 {
++		device_type = "memory";
++		/* first 128MB is reserved for secure area. */
++		reg = <0x0 0x48000000 0x0 0x78000000>;
++	};
++};
 -- 
 2.11.0
