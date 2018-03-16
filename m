@@ -1,106 +1,25 @@
-From: gabriel.matni@exfo.com (Gabriel Matni)
-Date: Fri, 16 Mar 2018 13:45:32 +0000
-Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
-In-Reply-To: <20180315212137.57ca7c65@xps13>
-References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
- <20180315165516.GA9519@kroah.com>
- <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
- <20180315212137.57ca7c65@xps13>
-Message-ID: <3B588D51285A4A4D8D39C94212E07826278BDF@SPQCMBX02.exfo.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Fri, 16 Mar 2018 14:49:00 +0100
+Subject: arm64 kvm built with clang doesn't boot
+Message-ID: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Matni <gabriel.matni@exfo.com>
+Hi!
 
-Fixes missing characters on kernel console at low baud rates (i.e.9600).
-The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
-that the transmitter holding register (THR) is ready to receive a new byte.
+I've recently tried to boot clang built kernel on real hardware
+(Odroid C2 board) instead of using a VM. The issue that I stumbled
+upon is that arm64 kvm built with clang doesn't boot.
 
-TX_EMP tells us when it is possible to send a break sequence via
-SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-empty, it does not guarantee that a new byte can be written just yet.
+Adding -fno-jump-tables compiler flag to arch/arm64/kvm/* helps. There
+was a patch some time ago that did exactly that
+(https://patchwork.kernel.org/patch/10060381/), but it wasn't accepted
+AFAICT (see the discussion on that thread).
 
-Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
-      serial port")
-Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
-Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
-Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
+What would be the best way to get this fixed?
 
----
- drivers/tty/serial/mvebu-uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I've also had to disable CONFIG_JUMP_LABEL to get the kernel boot
+(even without kvm enabled), but that might be a different (though
+related) issue.
 
-diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-index a100e98259d7..f0df0640208e 100644
---- a/drivers/tty/serial/mvebu-uart.c
-+++ b/drivers/tty/serial/mvebu-uart.c
-@@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
- 	u32 val;
- 
- 	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
--				  (val & STAT_TX_EMP), 1, 10000);
-+				  (val & STAT_TX_RDY(port)), 1, 10000);
- }
- 
- static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
--- 
-2.7.4
-
-
-> -----Original Message-----
-> From: Miquel Raynal <miquel.raynal@bootlin.com>
-> Sent: March 15, 2018 4:22 PM
-> To: Gabriel Matni <gabriel.matni@exfo.com>
-> Cc: gregkh at linuxfoundation.org; linux-serial at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; stable at vger.kernel.org; Gr?gory Clement
-> <gregory.clement@bootlin.com>; Thomas Petazzoni
-> <thomas.petazzoni@bootlin.com>
-> Subject: Re: [PATCH] serial: mvebu-uart: fix tx lost characters
-> 
-> Hi Gabriel,
-> 
-> On Thu, 15 Mar 2018 18:55:25 +0000, Gabriel Matni
-> <gabriel.matni@exfo.com> wrote:
-> 
-> > From: Gabriel Matni <gabriel.matni@exfo.com>
-> >
-> > Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> > The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to
-> ensure
-> > that the transmitter holding register (THR) is ready to receive a new byte.
-> >
-> > TX_EMP tells us when it is possible to send a break sequence via
-> > SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-> > empty, it does not guarantee that a new byte can be written just yet.
-> >
-> > Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
-> >       serial port")
-> > Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> > Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com>
-> >
-> > ---
-> >  drivers/tty/serial/mvebu-uart.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-
-> uart.c
-> > index a100e98259d7..400e1bc558b2 100644
-> > --- a/drivers/tty/serial/mvebu-uart.c
-> > +++ b/drivers/tty/serial/mvebu-uart.c
-> > @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
-> >  	u32 val;
-> >
-> >  	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-> > -				  (val & STAT_TX_EMP), 1, 10000);
-> > +             (val & STAT_TX_RDY(port)), 1, 10000);
-> 
-> I think this line should be indented like the one you replaced.
-> 
-> Thanks,
-> Miqu?l
-> 
-> --
-> Miquel Raynal, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+Thanks!
