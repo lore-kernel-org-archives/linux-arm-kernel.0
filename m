@@ -1,38 +1,40 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:51:24 +0100
-Subject: [PATCH 54/69] arm64: dts: renesas: ulcb: Override EtherAVB phy-mode
-In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
-References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <b3635b18bba8fc6bd57b7747d97fc46afcf551b8.1521206129.git.horms+renesas@verge.net.au>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 16 Mar 2018 10:20:36 -0500
+Subject: [PATCH] ARM: davinci: DA8XX: fix oops in USB PHY driver due to
+ stack allocated platform platform_data
+In-Reply-To: <382a269a-f486-8c1a-23b2-9620a01a073c@ti.com>
+References: <1521136976-32730-1-git-send-email-david@lechnology.com>
+ <382a269a-f486-8c1a-23b2-9620a01a073c@ti.com>
+Message-ID: <c8ece16e-7335-f99e-8602-5f0be6897a1d@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+On 03/16/2018 05:17 AM, Sekhar Nori wrote:
+> On Thursday 15 March 2018 11:32 PM, David Lechner wrote:
+>> This fixes a possible kernel oops due to using stack allocated platform
+>> data for the USB PHY driver on DA8XX devices. If the platform device
+>> probe is deferred, then we get a corrupt pointer for the platform data.
+>>
+>> We now use a global static struct for the platform data so that the
+>> platform data pointer does not get written over.
+>>
+>> Tested on OMAP-L138 LCDK board using legacy board file.
+> 
+> Oops. That should have been caught in review.
+> 
+>>
+>> Fixes: 9b504750923cb ("ARM: davinci: da8xx: Add USB PHY platform device")
+> 
+> The offending commit seems to be bdec5a6b5789 ("ARM: da8xx: use platform
+> data for CFGCHIP syscon regmap") in my tree which should be in
+> linux-next. I don't think we have this issue in mainline. Right?
 
-As the PHY interface installed on the ULCB board provides TX
-channel delay, make the "phy-mode" property a board-specific one, meant
-to override the one specified in the SoC DTSI.
+You are right. I'm not sure how I got that older commit. The issue is not
+in mainline yet.
 
-Follow up patches will reset the r8a7795/96 SoC DTSI to use "rgmii" mode\
-and let the board files override that.
-
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/ulcb.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-index 3e7a6b94e9f8..6f814845f8b6 100644
---- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
-+++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
-@@ -146,6 +146,7 @@
- 	pinctrl-0 = <&avb_pins>;
- 	pinctrl-names = "default";
- 	phy-handle = <&phy0>;
-+	phy-mode = "rgmii-txid";
- 	status = "okay";
- 
- 	phy0: ethernet-phy at 0 {
--- 
-2.11.0
+> 
+>> Signed-off-by: David Lechner <david@lechnology.com>
+> 
+> Thanks,
+> Sekhar
+> 
