@@ -1,29 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Mar 2018 11:04:34 +0530
-Subject: [PATCH V7 00/13] drivers: Boot Constraint core
-In-Reply-To: <cover.1519380923.git.viresh.kumar@linaro.org>
-References: <cover.1519380923.git.viresh.kumar@linaro.org>
-Message-ID: <20180316053434.GW15832@vireshk-i7>
+From: brendanhiggins@google.com (Brendan Higgins)
+Date: Fri, 16 Mar 2018 05:52:14 +0000
+Subject: [PATCH v1 2/2] arm: npcm: Enable L2 Cache in NPCM7xx
+In-Reply-To: <1521155412-29229-3-git-send-email-tmaimon77@gmail.com>
+References: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
+ <1521155412-29229-3-git-send-email-tmaimon77@gmail.com>
+Message-ID: <CAFd5g44NOFRmQbDJfRLw_SwsHwVB-hxsUYMYSmkqeyRKmXqSqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-02-18, 15:53, Viresh Kumar wrote:
-> Hi Greg,
-> 
-> The V7 version incorporates the organizational changes suggested by Olof
-> earlier. Everything else is same otherwise.
-> 
-> I have tested the Hisilicon patches (again) on hikey 9660 board, IMX stuff was
-> earlier tested by Sascha (Pengutronix) on i.MX6 and Qualcomm stuff was earlier
-> tested by Rajendra (Qualcomm) on Dragonboard 410C (This required some more
-> patches related to display driver which Rajendra should be sending separately
-> later on).
+On Thu, Mar 15, 2018 at 4:16 PM Tomer Maimon <tmaimon77@gmail.com> wrote:
 
-Hi Greg,
+> Enable L2 Cache in Nuvoton NPCM7xx BMC.
 
-Are you going to pick this one for 4.17 ?
+> Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
+> ---
+>   arch/arm/mach-npcm/npcm7xx.c | 2 ++
+>   1 file changed, 2 insertions(+)
 
-Thanks.
+> diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
+> index 5f7cd88103ef..c5f77d854c4f 100644
+> --- a/arch/arm/mach-npcm/npcm7xx.c
+> +++ b/arch/arm/mach-npcm/npcm7xx.c
+> @@ -17,4 +17,6 @@ static const char *const npcm7xx_dt_match[] = {
+>   DT_MACHINE_START(NPCM7XX_DT, "NPCM7XX Chip family")
+>          .atag_offset    = 0x100,
+>          .dt_compat      = npcm7xx_dt_match,
+> +       .l2c_aux_val    = 0x0,
+> +       .l2c_aux_mask   = ~0x0,
 
--- 
-viresh
+You need to limit this to the specific bit(s) you want to set and verify
+that
+the l2c driver does not already manage that bit appropriately and that it
+can
+not be specified via the dtsi.
+
+We discussed this a little while ago with Rob here:
+https://www.spinics.net/lists/arm-kernel/msg613372.html
+
+>   MACHINE_END
+> --
+> 2.14.1
+
+
+Cheers
