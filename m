@@ -1,29 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 17:18:13 +0000
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <CAKwvOd=-TeLJn9=V_Dmj-X+qcRBcfH8tcktbm33xAx671VCYUw@mail.gmail.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
- <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
- <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
- <2e84a842-96e8-aec4-8b85-9ee879bb323a@arm.com>
- <CAKwvOd=-TeLJn9=V_Dmj-X+qcRBcfH8tcktbm33xAx671VCYUw@mail.gmail.com>
-Message-ID: <38b3c636-38cd-2cc5-79d0-8ccf234e2b26@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 16 Mar 2018 10:40:13 -0500
+Subject: [PATCH v4 1/2] ARM: dts: imx: Add basic dtsi file for imx6sll
+In-Reply-To: <HE1PR04MB3113DC090D0608077D396DCB87D30@HE1PR04MB3113.eurprd04.prod.outlook.com>
+References: <1520503424-22985-1-git-send-email-ping.bai@nxp.com>
+ <20180309233931.7xujvo4eg4g5ftri@rob-hp-laptop>
+ <HE1PR04MB3113DC090D0608077D396DCB87D30@HE1PR04MB3113.eurprd04.prod.outlook.com>
+Message-ID: <CAL_Jsq+=qMOAYw1+APwWKmgkfY=2c8OSes5ah2jrXnRVNU78mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/18 16:52, Nick Desaulniers wrote:
+On Sun, Mar 11, 2018 at 11:43 PM, Jacky Bai <ping.bai@nxp.com> wrote:
+>> > diff --git a/arch/arm/boot/dts/imx6sll.dtsi b/arch/arm/boot/dts/imx6sll.dtsi
+>> > +           spi3 = &ecspi3;
+>> > +           spi4 = &ecspi4;
+>> > +           usbphy0 = &usbphy1;
+>> > +           usbphy1 = &usbphy2;
+>>
+>> Why do you need a alias for phys?
+>
+> The alias of usbphy seems used by drivers/usb/phy/phy-mxs-usb.c. So we need to add alias for usbphy.
 
-[dropping kernel-dynamic-tools at google.com which keeps bouncing]
+That use should be fixed. The correct way to handle this is add a cell
+to "fsl,anatop" with 0 or 1 to distinguish each phy.
 
-> Is this in regards to: commit "arm64: Add ARM_SMCCC_ARCH_WORKAROUND_1 BP
-> hardening support"? Has anyone tried to upstream a fix for this?  We
-> probably want to be very explicit with register widths here.
-What do you mean? The current code is as strict as it gets, and
-explicitly tells the compiler to use the right register width, based on
-the SMC call parameter types.
+>> > +   };
+>> > +
+>> > +   cpus {
+>> > +           #address-cells = <1>;
+>> > +           #size-cells = <0>;
+>> > +
+>> > +           cpu0: cpu at 0 {
+>> > +                   compatible = "arm,cortex-a9";
+>> > +                   device_type = "cpu";
+>> > +                   reg = <0>;
+>> > +                   next-level-cache = <&L2>;
+>> > +                   operating-points = <
+>> > +                           /* kHz    uV */
+>> > +                           996000  1225000
+>> > +                           792000  1175000
+>> > +                           396000  1075000
+>> > +                           198000  975000
+>> > +                   >;
+>> > +                   fsl,soc-operating-points = <
+>>
+>> This is not documented.
+>
+> This is same as we used on other imx6 SOC. I don't know where to add doc for this property. Please give me some suggestion.
 
-Thanks,
+Along side other OPP binding docs. The real question is why you need
+this and can't use the original OPP binding (which you have too) or
+move to the v2 binding.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Rob
