@@ -1,83 +1,201 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 21:52:45 -0500
-Subject: [PATCH v8 29/42] ARM: davinci: remove CONFIG_DAVINCI_RESET_CLOCKS
+Date: Thu, 15 Mar 2018 21:52:40 -0500
+Subject: [PATCH v8 24/42] ARM: davinci: dm365: add new clock init using common
+ clock framework
 In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
 References: <1521168778-27236-1-git-send-email-david@lechnology.com>
-Message-ID: <1521168778-27236-30-git-send-email-david@lechnology.com>
+Message-ID: <1521168778-27236-25-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common clock framework will take care of disabling unused clocks when
-we switch from the legacy davinci clocks and having this enabled will
-cause compile errors after we switch, so remove it now.
+This adds the new board-specific clock init in mach-davinci/dm365.c
+using the new common clock framework drivers.
+
+The #ifdefs are needed to prevent compile errors until the entire
+ARCH_DAVINCI is converted.
+
+Also clean up the #includes since we are adding some here.
 
 Signed-off-by: David Lechner <david@lechnology.com>
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 ---
 
 v8 changes:
 - none
 
 v7 changes:
-- none
+- add clock platform device declarations
+- register platform devices instead of registering clocks directly
+- add davinci prefix to commit description
 
 v6 changes:
-- none
+- add blank lines between function calls
 
- arch/arm/mach-davinci/Kconfig               | 12 ------------
- arch/arm/mach-davinci/common.c              |  1 -
- arch/arm/mach-davinci/include/mach/common.h |  6 ------
- 3 files changed, 19 deletions(-)
+ arch/arm/mach-davinci/board-dm365-evm.c |  2 +
+ arch/arm/mach-davinci/davinci.h         |  1 +
+ arch/arm/mach-davinci/dm365.c           | 88 ++++++++++++++++++++++++++++-----
+ 3 files changed, 79 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 05c3eecf..ba9912b 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -231,18 +231,6 @@ config DAVINCI_MUX_WARNINGS
- 	  to change the pin multiplexing setup. When there are no warnings
- 	  printed, it's safe to deselect DAVINCI_MUX for your product.
- 
--config DAVINCI_RESET_CLOCKS
--	bool "Reset unused clocks during boot"
--	depends on ARCH_DAVINCI
--	help
--	  Say Y if you want to reset unused clocks during boot.
--	  This option saves power, but assumes all drivers are
--	  using the clock framework. Broken drivers that do not
--	  yet use clock framework may not work with this option.
--	  If you are booting from another operating system, you
--	  probably do not want this option enabled until your
--	  device drivers work properly.
--
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index bcb6a7b..e03f95c 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -118,5 +118,4 @@ void __init davinci_common_init(const struct davinci_soc_info *soc_info)
- void __init davinci_init_late(void)
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 0ac085b..36b69a1 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -741,6 +741,8 @@ static __init void dm365_evm_init(void)
  {
- 	davinci_cpufreq_init();
--	davinci_clk_disable_unused();
- }
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 5f45d0a..ded8f5f 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -83,12 +83,6 @@ extern void davinci_common_init(const struct davinci_soc_info *soc_info);
- extern void davinci_init_ide(void);
- void davinci_init_late(void);
+ 	int ret;
  
--#ifdef CONFIG_DAVINCI_RESET_CLOCKS
--int davinci_clk_disable_unused(void);
--#else
--static inline int davinci_clk_disable_unused(void) { return 0; }
--#endif
++	dm365_register_clocks();
++
+ 	ret = dm365_gpio_register();
+ 	if (ret)
+ 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index 6b6abf0a..c865226 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -94,6 +94,7 @@ int dm355_gpio_register(void);
+ /* DM365 function declarations */
+ void dm365_init(void);
+ void dm365_init_time(void);
++void dm365_register_clocks(void);
+ void dm365_init_asp(void);
+ void dm365_init_vc(void);
+ void dm365_init_ks(struct davinci_ks_platform_data *pdata);
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 871372a..93067e1 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -12,32 +12,35 @@
+  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
+-#include <linux/init.h>
+-#include <linux/clk.h>
+-#include <linux/serial_8250.h>
+-#include <linux/platform_device.h>
++#include <linux/clk-provider.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+-#include <linux/spi/spi.h>
++#include <linux/init.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
+ #include <linux/platform_data/keyscan-davinci.h>
+ #include <linux/platform_data/spi-davinci.h>
++#include <linux/platform_device.h>
++#include <linux/serial_8250.h>
++#include <linux/spi/spi.h>
+ 
+ #include <asm/mach/map.h>
+ 
++#include <mach/common.h>
+ #include <mach/cputype.h>
+-#include "psc.h"
+-#include <mach/mux.h>
+ #include <mach/irqs.h>
+-#include <mach/time.h>
++#include <mach/mux.h>
+ #include <mach/serial.h>
+-#include <mach/common.h>
++#include <mach/time.h>
+ 
++#include "asp.h"
+ #include "davinci.h"
+-#include "clock.h"
+ #include "mux.h"
+-#include "asp.h"
++
++#ifndef CONFIG_COMMON_CLK
++#include "clock.h"
++#include "psc.h"
++#endif
+ 
+ #define DM365_REF_FREQ		24000000	/* 24 MHz on the DM365 EVM */
+ #define DM365_RTC_BASE			0x01c69000
+@@ -54,6 +57,7 @@
+ #define DM365_EMAC_CNTRL_RAM_OFFSET	0x1000
+ #define DM365_EMAC_CNTRL_RAM_SIZE	0x2000
+ 
++#ifndef CONFIG_COMMON_CLK
+ static struct pll_data pll1_data = {
+ 	.num		= 1,
+ 	.phys_base	= DAVINCI_PLL1_BASE,
+@@ -485,7 +489,7 @@ static struct clk_lookup dm365_clks[] = {
+ 	CLK(NULL, "mjcp", &mjcp_clk),
+ 	CLK(NULL, NULL, NULL),
+ };
 -
- #ifdef CONFIG_CPU_FREQ
- int davinci_cpufreq_init(void);
- #else
++#endif
+ /*----------------------------------------------------------------------*/
+ 
+ #define INTMUX		0x18
+@@ -1171,8 +1175,68 @@ void __init dm365_init(void)
+ 
+ void __init dm365_init_time(void)
+ {
++#ifdef CONFIG_COMMON_CLK
++	struct clk *clk;
++
++	clk = clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM365_REF_FREQ);
++
++	davinci_timer_init(clk);
++#else
+ 	davinci_clk_init(dm365_clks);
+ 	davinci_timer_init(&timer0_clk);
++#endif
++}
++
++static struct resource dm365_pll1_resources[] = {
++	{
++		.start	= DAVINCI_PLL1_BASE,
++		.end	= DAVINCI_PLL1_BASE + SZ_4K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device dm365_pll1_device = {
++	.name		= "dm365-pll1",
++	.id		= -1,
++	.resource	= dm365_pll1_resources,
++	.num_resources	= ARRAY_SIZE(dm365_pll1_resources),
++};
++
++static struct resource dm365_pll2_resources[] = {
++	{
++		.start	= DAVINCI_PLL2_BASE,
++		.end	= DAVINCI_PLL2_BASE + SZ_4K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device dm365_pll2_device = {
++	.name		= "dm365-pll2",
++	.id		= -1,
++	.resource	= dm365_pll2_resources,
++	.num_resources	= ARRAY_SIZE(dm365_pll2_resources),
++};
++
++static struct resource dm365_psc_resources[] = {
++	{
++		.start	= DAVINCI_PWR_SLEEP_CNTRL_BASE,
++		.end	= DAVINCI_PWR_SLEEP_CNTRL_BASE + SZ_4K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device dm365_psc_device = {
++	.name		= "dm365-psc",
++	.id		= -1,
++	.resource	= dm365_psc_resources,
++	.num_resources	= ARRAY_SIZE(dm365_psc_resources),
++};
++
++void __init dm365_register_clocks(void)
++{
++	platform_device_register(&dm365_pll1_device);
++	platform_device_register(&dm365_pll2_device);
++	platform_device_register(&dm365_psc_device);
+ }
+ 
+ static struct resource dm365_vpss_resources[] = {
 -- 
 2.7.4
