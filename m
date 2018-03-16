@@ -1,54 +1,76 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri, 16 Mar 2018 11:33:42 +0100
-Subject: [PATCH net-next 01/10] net: mvpp2: align the ethtool ops definition
-In-Reply-To: <20180316103351.16616-1-antoine.tenart@bootlin.com>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
-Message-ID: <20180316103351.16616-2-antoine.tenart@bootlin.com>
+Date: Fri, 16 Mar 2018 11:33:41 +0100
+Subject: [PATCH net-next 00/10] net: mvpp2: phylink conversion
+Message-ID: <20180316103351.16616-1-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cosmetic patch to align the ethtool functions to ops definitions. This
-patch does not change in any way the driver's behaviour.
+Hi Dave, Russell,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
----
- drivers/net/ethernet/marvell/mvpp2.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+This series convert the Marvell PPv2 driver to phylink (models the MAC
+to PHY link). The series is a respin of a patch[1] and a series[2] sent
+a while ago. All these patches have been heavily reworked, this is why
+this series isn't a new version of the previous work. I still tried to
+take in account the comments I got back then (when applicable).
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 9bd35f2291d6..430114ad93fc 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -7885,18 +7885,18 @@ static const struct net_device_ops mvpp2_netdev_ops = {
- };
- 
- static const struct ethtool_ops mvpp2_eth_tool_ops = {
--	.nway_reset	= phy_ethtool_nway_reset,
--	.get_link	= ethtool_op_get_link,
--	.set_coalesce	= mvpp2_ethtool_set_coalesce,
--	.get_coalesce	= mvpp2_ethtool_get_coalesce,
--	.get_drvinfo	= mvpp2_ethtool_get_drvinfo,
--	.get_ringparam	= mvpp2_ethtool_get_ringparam,
--	.set_ringparam	= mvpp2_ethtool_set_ringparam,
--	.get_strings	= mvpp2_ethtool_get_strings,
--	.get_ethtool_stats = mvpp2_ethtool_get_stats,
--	.get_sset_count	= mvpp2_ethtool_get_sset_count,
--	.get_link_ksettings = phy_ethtool_get_link_ksettings,
--	.set_link_ksettings = phy_ethtool_set_link_ksettings,
-+	.nway_reset		= phy_ethtool_nway_reset,
-+	.get_link		= ethtool_op_get_link,
-+	.set_coalesce		= mvpp2_ethtool_set_coalesce,
-+	.get_coalesce		= mvpp2_ethtool_get_coalesce,
-+	.get_drvinfo		= mvpp2_ethtool_get_drvinfo,
-+	.get_ringparam		= mvpp2_ethtool_get_ringparam,
-+	.set_ringparam		= mvpp2_ethtool_set_ringparam,
-+	.get_strings		= mvpp2_ethtool_get_strings,
-+	.get_ethtool_stats	= mvpp2_ethtool_get_stats,
-+	.get_sset_count		= mvpp2_ethtool_get_sset_count,
-+	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
-+	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
- };
- 
- /* Used for PPv2.1, or PPv2.2 with the old Device Tree binding that
+One important point is the PPv2 driver supports two probe modes: device
+tree and ACPI. This series only brings phylink support for the device
+tree mode, as the ACPI one will need further work. Still, the driver
+should be working as before when using ACPI. This split should be
+temporary, and was discussed with Marcin (in Cc.) who added ACPI support
+to the driver.
+
+Before implementing phylink callbacks in the PPv2 driver, some patches
+are required (patches 1 and 2). The first one is a cosmetic patch, the
+other one modifies the phylink core. Then PPv2 is converted to phylink.
+
+The rest of the series uses phylink to add support for 1000BaseX and
+2500BaseX modes in the PPv2 driver. To do this, two patches are needed
+in the common PHY framework (patches 4 and 5). These patches were
+previously acked by Kishon but as this was a while ago I didn't kept the
+tags. The last 3 patches modify the device tree to use the new PPv2
+functionalities.
+
+@Dave: patches 8 to 10 should go through the mvebu tree (Gregory in Cc.)
+to avoid any conflict with the other mvebu dt patches taken during this
+cycle.
+
+The series has been tested for the device tree mode on the 7040-db,
+8040-db and 8040-mcbin boards, to ensure all the interface where working
+as expected. Marcin (in Cc.) tested the series for the ACPI mode.
+
+The series is based on today's net-next, and is available at:
+https://github.com/MISL-EBU-System-SW/mainline-public/ at/net-next/ppv2-phylink
+
+Thanks!
+Antoine
+
+[1] http://www.spinics.net/lists/netdev/msg456023.html
+[2] https://lkml.org/lkml/2018/1/12/59
+
+Antoine Tenart (10):
+  net: mvpp2: align the ethtool ops definition
+  net: phy: phylink: allow 10GKR interface to use in-band negotiation
+  net: mvpp2: phylink support
+  phy: add 2.5G SGMII mode to the phy_mode enum
+  phy: cp110-comphy: 2.5G SGMII mode
+  net: mvpp2: 1000baseX support
+  net: mvpp2: 2500baseX support
+  arm64: dts: marvell: 7040-db: set the 10G interface management to
+    in-band
+  arm64: dts: marvell: 8040-db: set the 10G interfaces management to
+    in-band
+  arm64: dts: marvell: mcbin: enable the fourth network interface
+
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts    |   1 +
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts    |   2 +
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts |  11 +
+ drivers/net/ethernet/marvell/Kconfig              |   1 +
+ drivers/net/ethernet/marvell/mvpp2.c              | 917 +++++++++++++---------
+ drivers/net/phy/phylink.c                         |   3 +-
+ drivers/phy/marvell/phy-mvebu-cp110-comphy.c      |  17 +-
+ include/linux/phy/phy.h                           |   1 +
+ 8 files changed, 599 insertions(+), 354 deletions(-)
+
 -- 
 2.14.3
