@@ -1,31 +1,42 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 16 Mar 2018 15:27:12 -0400 (EDT)
-Subject: [PATCH] net: ethernet: arc: Fix a potential memory leak if an
- optional regulator is deferred
-In-Reply-To: <7fd57a4e7f7a41dccf55430cbc43de3b0a7f7826.1521061530.git.christophe.jaillet@wanadoo.fr>
-References: <7fd57a4e7f7a41dccf55430cbc43de3b0a7f7826.1521061530.git.christophe.jaillet@wanadoo.fr>
-Message-ID: <20180316.152712.1584177628223195375.davem@davemloft.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Mar 2018 19:55:52 +0000
+Subject: [PATCH 0/8] sa1100: Generic CF socket support
+Message-ID: <20180316195552.GS9418@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-Date: Wed, 14 Mar 2018 22:09:34 +0100
+This series adds generic soc-common based CF socket support, which
+in conjunction with using gpiolib and regulator, allows us to
+eliminate a bunch of SA11x0 specific low-level socket drivers.
+This series covers just SA11x0 drivers.
 
-> diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-> index 16f9bee992fe..8ee9dfd0e363 100644
-> --- a/drivers/net/ethernet/arc/emac_rockchip.c
-> +++ b/drivers/net/ethernet/arc/emac_rockchip.c
-> @@ -169,8 +169,10 @@ static int emac_rockchip_probe(struct platform_device *pdev)
->  	/* Optional regulator for PHY */
->  	priv->regulator = devm_regulator_get_optional(dev, "phy");
->  	if (IS_ERR(priv->regulator)) {
-> -		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER)
-> -			return -EPROBE_DEFER;
-> +		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER) {
-> +			ret = -EPROBE_DEFER;
-> +			goto out_clk_disable;
-> +		}
+ arch/arm/mach-sa1100/Kconfig                |   4 +
+ arch/arm/mach-sa1100/assabet.c              |  39 +++++++-
+ arch/arm/mach-sa1100/cerf.c                 |  18 +++-
+ arch/arm/mach-sa1100/clock.c                |   2 +
+ arch/arm/mach-sa1100/generic.c              |  44 ++++++++-
+ arch/arm/mach-sa1100/generic.h              |   8 ++
+ arch/arm/mach-sa1100/h3xxx.c                |  17 ++++
+ arch/arm/mach-sa1100/include/mach/assabet.h |   6 --
+ arch/arm/mach-sa1100/nanoengine.c           |  23 +++++
+ arch/arm/mach-sa1100/shannon.c              |  38 ++++++++
+ arch/arm/mach-sa1100/simpad.c               |  11 +++
+ drivers/pcmcia/Makefile                     |   3 -
+ drivers/pcmcia/sa1100_assabet.c             | 100 ---------------------
+ drivers/pcmcia/sa1100_cerf.c                |  86 ------------------
+ drivers/pcmcia/sa1100_generic.c             | 115 ++++++++++++++++++++----
+ drivers/pcmcia/sa1100_generic.h             |   4 -
+ drivers/pcmcia/sa1100_h3600.c               |  16 ++--
+ drivers/pcmcia/sa1100_nanoengine.c          | 133 ----------------------------
+ drivers/pcmcia/sa1100_shannon.c             | 104 ----------------------
+ drivers/pcmcia/sa1100_simpad.c              |  12 +--
+ 20 files changed, 307 insertions(+), 476 deletions(-)
+ delete mode 100644 drivers/pcmcia/sa1100_assabet.c
+ delete mode 100644 drivers/pcmcia/sa1100_cerf.c
+ delete mode 100644 drivers/pcmcia/sa1100_nanoengine.c
+ delete mode 100644 drivers/pcmcia/sa1100_shannon.c
 
-Please build test your changes.
-
-There is no 'ret' variable in this function, perhaps you meant 'err'.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
