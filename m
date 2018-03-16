@@ -1,47 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 12:49:47 +0100
-Subject: [PATCH v2 2/3] arm64: dts: renesas: salvator-common: Configure
- PMIC for DDR Backup Power
-In-Reply-To: <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
-References: <1521029386-29975-1-git-send-email-geert+renesas@glider.be>
- <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
- <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
-Message-ID: <20180316114946.uyvy6zwhf6n6etpz@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Mar 2018 11:51:32 +0000
+Subject: [PATCH v6 06/26] KVM: arm/arm64: Do not use kern_hyp_va() with
+ kvm_vgic_global_state
+In-Reply-To: <CAKv+Gu-gtGQj8YzEEawqykzYeqJXTKKjm8CN5t6ovcdaz4vUtQ@mail.gmail.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-7-marc.zyngier@arm.com> <5AAAC67E.4010002@arm.com>
+ <98ec10c0-73a3-db00-b78b-2777c0874968@arm.com>
+ <20180316113507.apyvlsvekvjm36ix@kamzik.brq.redhat.com>
+ <CAKv+Gu-gtGQj8YzEEawqykzYeqJXTKKjm8CN5t6ovcdaz4vUtQ@mail.gmail.com>
+Message-ID: <2e597ea3-f00c-ec6b-17b9-c133193a6bd5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 06:17:17PM +0300, Sergei Shtylyov wrote:
-> Hello!
+On 16/03/18 11:38, Ard Biesheuvel wrote:
+> On 16 March 2018 at 11:35, Andrew Jones <drjones@redhat.com> wrote:
+>> On Fri, Mar 16, 2018 at 09:31:57AM +0000, Marc Zyngier wrote:
+>>> On 15/03/18 19:16, James Morse wrote:
+>>>>
+>>>> (I had a go at using 'Ush', to let the compiler schedule the adrp, but couldn't
+>>>> get it to work.)
+>>>
+>>> I tried that as well at some point, but couldn't see how to use it. The
+>>> compiler was never happy with my use of the constraints, so I gave up
+>>> and did it my way...
+>>>
+>>
+>> What's 'Ush'? I tried to search for it, but came up short. I'm wondering
+>> what things I can try (and fail) to use it on too :-)
+>>
 > 
-> On 03/14/2018 03:09 PM, Geert Uytterhoeven wrote:
-> 
-> > On Salvator-X(S), all of the DDR0, DDR1, DDR0C, and DDR1C power rails
-> > need to be kept powered when backup mode is enabled.  Reflect this in
-> > the "rohm,ddr-backup-power" property for the BD9571MWV PMIC node.
-> > 
-> > The accessory power switch (SW23) is a toggle switch, hense specify
-> > "rohm,rstbmode-level".
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > v2:
-> >   - Add rohm,rstbmode-level.
-> > ---
-> >  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> > index 2a7f36abd2dd85c6..80794c38c2669d75 100644
-> > --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> > @@ -376,6 +376,8 @@
-> >  		#interrupt-cells = <2>;
-> >  		gpio-controller;
-> >  		#gpio-cells = <2>;
-> > +		rohm,ddr-backup-power = <15>;
-> 
->   Why not 0xf if those are all bit flags?
+> https://gcc.gnu.org/onlinedocs/gccint/Machine-Constraints.html
 
-Hi Geert,
+I was hoping that something like:
 
-could you address this feedback when you have some time?
+	asm("add %0, %1, :lo12:%2" : "=r" (addr) : "Ush" (&s), "S" (&s))
+
+would do the right thing (generating an ADRP), but all I managed was to
+get the compiler shouting at me (in a rather unhelpful manner).
+
+I guess I could have looked into the GCC source code to find out how to
+use this thing, but life is short.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
