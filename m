@@ -1,50 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:52:43 +0100
-Subject: [PATCH 24/52] ARM: dts: r8a7790: consistently use single space before
- =
+Date: Fri, 16 Mar 2018 15:53:10 +0100
+Subject: [PATCH 51/52] ARM: dts: silk: Add r1ex24002 EEPROM to DT
 In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
 References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <5a63226206ce2313badee0b6ffec47f7a305c8ae.1521208546.git.horms+renesas@verge.net.au>
+Message-ID: <adfca5ba9a7bfb36ffd9c5c6620c88e7076b47e3.1521208546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consistently use a single space before a =.
+From: Magnus Damm <damm+renesas@opensource.se>
 
-This patch fixes instances where a tab is used instead.
+Extend the Silk board support to include U14 which is an I2C based EEPROM
+hooked up to the I2C1 bus.
 
-This patch should not introduce any functional change.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/r8a7794-silk.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 3bbcc0b93f1c..e4367cecad18 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1705,16 +1705,16 @@
- 
- 	thermal-zones {
- 		cpu_thermal: cpu-thermal {
--			polling-delay-passive	= <0>;
--			polling-delay		= <0>;
-+			polling-delay-passive = <0>;
-+			polling-delay = <0>;
- 
- 			thermal-sensors = <&thermal>;
- 
- 			trips {
- 				cpu-crit {
--					temperature	= <95000>;
--					hysteresis	= <0>;
--					type		= "critical";
-+					temperature = <95000>;
-+					hysteresis = <0>;
-+					type = "critical";
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index f1afe2dda13a..befd0fb880cc 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -226,6 +226,12 @@
  				};
  			};
- 			cooling-maps {
+ 		};
++
++		eeprom at 50 {
++			compatible = "renesas,r1ex24002", "atmel,24c02";
++			reg = <0x50>;
++			pagesize = <16>;
++		};
+ 	};
+ };
+ 
 -- 
 2.11.0
