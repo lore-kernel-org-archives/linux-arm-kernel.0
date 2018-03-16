@@ -1,58 +1,96 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 12:16:18 -0400
-Subject: [PATCH v3 05/18] ixgbevf: keep writel() closer to wmb()
+Date: Fri, 16 Mar 2018 12:16:30 -0400
+Subject: [PATCH v3 17/18] RDMA/i40iw: Eliminate duplicate barriers on
+ weakly-ordered archs
 In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
 References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521216991-28706-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521216991-28706-18-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove ixgbevf_write_tail() in favor of moving writel() close to
-wmb().
+Code includes wmb() followed by writel(). writel() already has a barrier on
+some architectures like arm64.
+
+This ends up CPU observing two barriers back to back before executing the
+register write.
+
+Create a new wrapper function with relaxed write operator. Use the new
+wrapper when a write is following a wmb().
+
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
- drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 4 ++--
- 2 files changed, 2 insertions(+), 7 deletions(-)
+ drivers/infiniband/hw/i40iw/i40iw_ctrl.c  |  6 ++++--
+ drivers/infiniband/hw/i40iw/i40iw_osdep.h |  1 +
+ drivers/infiniband/hw/i40iw/i40iw_uk.c    |  2 +-
+ drivers/infiniband/hw/i40iw/i40iw_utils.c | 11 +++++++++++
+ 4 files changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-index f695242..11e893e 100644
---- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-+++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-@@ -244,11 +244,6 @@ static inline u16 ixgbevf_desc_unused(struct ixgbevf_ring *ring)
- 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+index c74fd33..47f473e 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+@@ -706,9 +706,11 @@ static void i40iw_sc_ccq_arm(struct i40iw_sc_cq *ccq)
+ 	wmb();       /* make sure shadow area is updated before arming */
+ 
+ 	if (ccq->dev->is_pf)
+-		i40iw_wr32(ccq->dev->hw, I40E_PFPE_CQARM, ccq->cq_uk.cq_id);
++		i40iw_wr32_relaxed(ccq->dev->hw, I40E_PFPE_CQARM,
++				   ccq->cq_uk.cq_id);
+ 	else
+-		i40iw_wr32(ccq->dev->hw, I40E_VFPE_CQARM1, ccq->cq_uk.cq_id);
++		i40iw_wr32_relaxed(ccq->dev->hw, I40E_VFPE_CQARM1,
++				   ccq->cq_uk.cq_id);
  }
  
--static inline void ixgbevf_write_tail(struct ixgbevf_ring *ring, u32 value)
--{
--	writel(value, ring->tail);
--}
--
- #define IXGBEVF_RX_DESC(R, i)	\
- 	(&(((union ixgbe_adv_rx_desc *)((R)->desc))[i]))
- #define IXGBEVF_TX_DESC(R, i)	\
-diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-index 9b3d43d..6bf778a 100644
---- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-+++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-@@ -659,7 +659,7 @@ static void ixgbevf_alloc_rx_buffers(struct ixgbevf_ring *rx_ring,
- 		 * such as IA-64).
- 		 */
- 		wmb();
--		ixgbevf_write_tail(rx_ring, i);
-+		writel(i, rx_ring->tail);
- 	}
+ /**
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_osdep.h b/drivers/infiniband/hw/i40iw/i40iw_osdep.h
+index f27be3e..e06f4b9 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_osdep.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_osdep.h
+@@ -213,5 +213,6 @@ void i40iw_hw_stats_start_timer(struct i40iw_sc_vsi *vsi);
+ void i40iw_hw_stats_stop_timer(struct i40iw_sc_vsi *vsi);
+ #define i40iw_mmiowb() mmiowb()
+ void i40iw_wr32(struct i40iw_hw *hw, u32 reg, u32 value);
++void i40iw_wr32_relaxed(struct i40iw_hw *hw, u32 reg, u32 value);
+ u32  i40iw_rd32(struct i40iw_hw *hw, u32 reg);
+ #endif				/* _I40IW_OSDEP_H_ */
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_uk.c b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+index 8afa5a6..7f0ebed 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_uk.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+@@ -723,7 +723,7 @@ static void i40iw_cq_request_notification(struct i40iw_cq_uk *cq,
+ 
+ 	wmb(); /* make sure WQE is populated before valid bit is set */
+ 
+-	writel(cq->cq_id, cq->cqe_alloc_reg);
++	writel_relaxed(cq->cq_id, cq->cqe_alloc_reg);
  }
  
-@@ -3644,7 +3644,7 @@ static void ixgbevf_tx_map(struct ixgbevf_ring *tx_ring,
- 	tx_ring->next_to_use = i;
+ /**
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_utils.c b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+index ddc1056..99aa6f8 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_utils.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+@@ -125,6 +125,17 @@ inline void i40iw_wr32(struct i40iw_hw *hw, u32 reg, u32 value)
+ }
  
- 	/* notify HW of packet */
--	ixgbevf_write_tail(tx_ring, i);
-+	writel(i, tx_ring->tail);
- 
- 	return;
- dma_error:
+ /**
++ * i40iw_wr32_relaxed - write 32 bits to hw register without ordering
++ * @hw: hardware information including registers
++ * @reg: register offset
++ * @value: vvalue to write to register
++ */
++inline void i40iw_wr32_relaxed(struct i40iw_hw *hw, u32 reg, u32 value)
++{
++	writel_relaxed(value, hw->hw_addr + reg);
++}
++
++/**
+  * i40iw_rd32 - read a 32 bit hw register
+  * @hw: hardware information including registers
+  * @reg: register offset
 -- 
 2.7.4
