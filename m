@@ -1,50 +1,77 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 17:46:16 -0400
-Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
- <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
- <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
-Message-ID: <83387f6e-adcb-14e9-2c22-96abf9493cc6@codeaurora.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 15:53:36 +0100
+Subject: [PATCH 14/14] ARM: shmobile: rcar-gen2: Add watchdog support
+In-Reply-To: <cover.1521211738.git.horms+renesas@verge.net.au>
+References: <cover.1521211738.git.horms+renesas@verge.net.au>
+Message-ID: <01d675f159e0f0792947fb823cf2425da4d747ad.1521211738.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/16/2018 5:05 PM, Steve Wise wrote:
->> Code includes wmb() followed by writel(). writel() already has a barrier
-> on
->> some architectures like arm64.
->>
->> This ends up CPU observing two barriers back to back before executing the
->> register write.
->>
->> Since code already has an explicit barrier call, changing writel() to
->> writel_relaxed().
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> 
-> NAK - This isn't correct for PowerPC.  For PowerPC, writeX_relaxed() is just
-> writeX().  
-> 
-> I was just looking at this with Chelsio developers, and they said the
-> writeX() should be replaced with __raw_writeX(), not writeX_relaxed(), to
-> get rid of the extra barrier for all architectures.
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-OK. I can do that but isn't the problem at PowerPC adaptation?
+This patch adds watchdog support by installing shmobile_boot_vector_gen2
+to ICRAM1 when enough memory is available, in which case we also keep a
+copy of MPIDR to complete the reset vector logic.
 
-/*
- * We don't do relaxed operations yet, at least not with this semantic
- */
-#define readb_relaxed(addr)	readb(addr)
-#define readw_relaxed(addr)	readw(addr)
-#define readl_relaxed(addr)	readl(addr)
-#define readq_relaxed(addr)	readq(addr)
-#define writeb_relaxed(v, addr)	writeb(v, addr)
-#define writew_relaxed(v, addr)	writew(v, addr)
-#define writel_relaxed(v, addr)	writel(v, addr)
-#define writeq_relaxed(v, addr)	writeq(v, addr)
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/platsmp-apmu.c |  1 +
+ arch/arm/mach-shmobile/pm-rcar-gen2.c | 15 ++++++++++++---
+ 2 files changed, 13 insertions(+), 3 deletions(-)
 
-Why don't we fix the PowerPC's relaxed operators? Is that a bigger task?
-
->From API perspective both __raw_writeX() and writeX_relaxed() are correct.
-It is just PowerPC doesn't seem the follow the definition yet.
+diff --git a/arch/arm/mach-shmobile/platsmp-apmu.c b/arch/arm/mach-shmobile/platsmp-apmu.c
+index 4422b615a6ee..ba732effc90b 100644
+--- a/arch/arm/mach-shmobile/platsmp-apmu.c
++++ b/arch/arm/mach-shmobile/platsmp-apmu.c
+@@ -191,6 +191,7 @@ static void __init shmobile_smp_apmu_setup_boot(void)
+ {
+ 	/* install boot code shared by all CPUs */
+ 	shmobile_boot_fn = __pa_symbol(shmobile_smp_boot);
++	shmobile_boot_fn_gen2 = shmobile_boot_fn;
+ }
+ 
+ void __init shmobile_smp_apmu_prepare_cpus(unsigned int max_cpus,
+diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+index e5f215c8b218..5a798b406af0 100644
+--- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+@@ -17,6 +17,7 @@
+ #include <linux/smp.h>
+ #include <linux/soc/renesas/rcar-sysc.h>
+ #include <asm/io.h>
++#include <asm/cputype.h>
+ #include "common.h"
+ #include "rcar-gen2.h"
+ 
+@@ -37,7 +38,6 @@
+ #define CA7RESCNT_CODE	0x5a5a0000
+ #define CA7RESCNT_CPUS	0xf		/* CPU0-3 */
+ 
+-
+ /* On-chip RAM */
+ #define ICRAM1		0xe63c0000	/* Inter Connect RAM1 (4 KiB) */
+ 
+@@ -119,8 +119,17 @@ void __init rcar_gen2_pm_init(void)
+ 	p = ioremap(res.start, resource_size(&res));
+ 	if (!p)
+ 		return;
+-
+-	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
++	/*
++	 * install the reset vector, use the largest version if we have enough
++	 * memory available
++	 */
++	if (resource_size(&res) >= shmobile_boot_size_gen2) {
++		shmobile_boot_cpu_gen2 = read_cpuid_mpidr();
++		memcpy_toio(p, shmobile_boot_vector_gen2,
++			    shmobile_boot_size_gen2);
++	} else {
++		memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
++	}
+ 	iounmap(p);
+ 
+ 	/* setup reset vectors */
+-- 
+2.11.0
