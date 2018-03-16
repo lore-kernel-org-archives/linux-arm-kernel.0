@@ -1,272 +1,100 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:52:59 +0100
-Subject: [PATCH 40/52] ARM: dts: gose: use demuxer for I2C2
+Date: Fri, 16 Mar 2018 15:53:00 +0100
+Subject: [PATCH 41/52] ARM: dts: gose: use demuxer for I2C4
 In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
 References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <786ef2eeb04cca41d6382556f1409f37f64c4a0c.1521208546.git.horms+renesas@verge.net.au>
+Message-ID: <931bc7ec2d43f85c0b05aacb31bd1bd187ed7f65.1521208546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Create a separate bus for HDMI related I2C2 and provide fallback to GPIO.
+Make it possible to fallback to GPIO for I2C4 on the EXIO-E connector.
 
-Based on work for the r8a7790/lager by Wolfram Sang.
+This is based on reference work for the I2C0 core of the lager/r8a7790
+by Wolfram Sang.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 [wsa: rebased, corrected board name in subject, fixed aliases, switched
-to named GPIOs]
+to named GPIOs, fixed pinmux for I2C4]
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 218 ++++++++++++++++++++-----------------
- 1 file changed, 121 insertions(+), 97 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 51b3ffac8efa..2b330ef71f4c 100644
+index 2b330ef71f4c..9ed6961f2d9a 100644
 --- a/arch/arm/boot/dts/r8a7793-gose.dts
 +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -48,6 +48,8 @@
- 	aliases {
+@@ -49,7 +49,9 @@
  		serial0 = &scif0;
  		serial1 = &scif1;
-+		i2c9 = &gpioi2c2;
-+		i2c11 = &i2chdmi;
+ 		i2c9 = &gpioi2c2;
++		i2c10 = &gpioi2c4;
+ 		i2c11 = &i2chdmi;
++		i2c12 = &i2cexio4;
  	};
  
  	chosen {
-@@ -296,6 +298,124 @@
- 		#clock-cells = <0>;
- 		clock-frequency = <148500000>;
+@@ -309,6 +311,16 @@
+ 		i2c-gpio,delay-us = <5>;
  	};
-+
-+	gpioi2c2: i2c-9 {
+ 
++	gpioi2c4: i2c-10 {
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +		compatible = "i2c-gpio";
 +		status = "disabled";
-+		scl-gpios = <&gpio2 6 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+		sda-gpios = <&gpio2 7 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		scl-gpios = <&gpio7 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		sda-gpios = <&gpio7 14 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
 +		i2c-gpio,delay-us = <5>;
 +	};
 +
+ 	/*
+ 	 * A fallback to GPIO is provided for I2C2.
+ 	 */
+@@ -416,6 +428,18 @@
+ 			pagesize = <16>;
+ 		};
+ 	};
++
 +	/*
-+	 * A fallback to GPIO is provided for I2C2.
++	 * I2C4 is routed to EXIO connector E, pins 37 (SCL) + 39 (SDA).
++	 * A fallback to GPIO is provided.
 +	 */
-+	i2chdmi: i2c-11 {
++	i2cexio4: i2c-12 {
 +		compatible = "i2c-demux-pinctrl";
-+		i2c-parent = <&i2c2>, <&gpioi2c2>;
-+		i2c-bus-name = "i2c-hdmi";
++		i2c-parent = <&i2c4>, <&gpioi2c4>;
++		i2c-bus-name = "i2c-exio4";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+
-+		ak4643: codec at 12 {
-+			compatible = "asahi-kasei,ak4643";
-+			#sound-dai-cells = <0>;
-+			reg = <0x12>;
-+		};
-+
-+		composite-in at 20 {
-+			compatible = "adi,adv7180cp";
-+			reg = <0x20>;
-+			remote = <&vin1>;
-+
-+			port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					adv7180_in: endpoint {
-+						remote-endpoint = <&composite_con_in>;
-+					};
-+				};
-+
-+				port at 3 {
-+					reg = <3>;
-+					adv7180_out: endpoint {
-+						bus-width = <8>;
-+						remote-endpoint = <&vin1ep>;
-+					};
-+				};
-+			};
-+		};
-+
-+		hdmi at 39 {
-+			compatible = "adi,adv7511w";
-+			reg = <0x39>;
-+			interrupt-parent = <&gpio3>;
-+			interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
-+
-+			adi,input-depth = <8>;
-+			adi,input-colorspace = "rgb";
-+			adi,input-clock = "1x";
-+			adi,input-style = <1>;
-+			adi,input-justification = "evenly";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					adv7511_in: endpoint {
-+						remote-endpoint = <&du_out_rgb>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					adv7511_out: endpoint {
-+						remote-endpoint = <&hdmi_con_out>;
-+					};
-+				};
-+			};
-+		};
-+
-+		hdmi-in at 4c {
-+			compatible = "adi,adv7612";
-+			reg = <0x4c>;
-+			interrupt-parent = <&gpio4>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+			default-input = <0>;
-+
-+			port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					adv7612_in: endpoint {
-+						remote-endpoint = <&hdmi_con_in>;
-+					};
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					adv7612_out: endpoint {
-+						remote-endpoint = <&vin0ep2>;
-+					};
-+				};
-+			};
-+		};
-+
-+		eeprom at 50 {
-+			compatible = "renesas,r1ex24002", "atmel,24c02";
-+			reg = <0x50>;
-+			pagesize = <16>;
-+		};
 +	};
  };
  
  &du {
-@@ -544,107 +664,11 @@
+@@ -454,6 +478,11 @@
+ 		function = "i2c2";
+ 	};
  
- &i2c2 {
- 	pinctrl-0 = <&i2c2_pins>;
--	pinctrl-names = "default";
-+	pinctrl-names = "i2c-hdmi";
- 
- 	status = "okay";
- 	clock-frequency = <100000>;
- 
--	ak4643: codec at 12 {
--		compatible = "asahi-kasei,ak4643";
--		#sound-dai-cells = <0>;
--		reg = <0x12>;
--	};
--
--	composite-in at 20 {
--		compatible = "adi,adv7180cp";
--		reg = <0x20>;
--		remote = <&vin1>;
--
--		port {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 0 {
--				reg = <0>;
--				adv7180_in: endpoint {
--					remote-endpoint = <&composite_con_in>;
--				};
--			};
--
--			port at 3 {
--				reg = <3>;
--				adv7180_out: endpoint {
--					bus-width = <8>;
--					remote-endpoint = <&vin1ep>;
--				};
--			};
--		};
--	};
--
--	hdmi at 39 {
--		compatible = "adi,adv7511w";
--		reg = <0x39>;
--		interrupt-parent = <&gpio3>;
--		interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
--
--		adi,input-depth = <8>;
--		adi,input-colorspace = "rgb";
--		adi,input-clock = "1x";
--		adi,input-style = <1>;
--		adi,input-justification = "evenly";
--
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 0 {
--				reg = <0>;
--				adv7511_in: endpoint {
--					remote-endpoint = <&du_out_rgb>;
--				};
--			};
--
--			port at 1 {
--				reg = <1>;
--				adv7511_out: endpoint {
--					remote-endpoint = <&hdmi_con_out>;
--				};
--			};
--		};
--	};
--
--	hdmi-in at 4c {
--		compatible = "adi,adv7612";
--		reg = <0x4c>;
--		interrupt-parent = <&gpio4>;
--		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
--		default-input = <0>;
--
--		port {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 0 {
--				reg = <0>;
--				adv7612_in: endpoint {
--					remote-endpoint = <&hdmi_con_in>;
--				};
--			};
--
--			port at 2 {
--				reg = <2>;
--				adv7612_out: endpoint {
--					remote-endpoint = <&vin0ep2>;
--				};
--			};
--		};
--	};
--
--	eeprom at 50 {
--		compatible = "renesas,r1ex24002", "atmel,24c02";
--		reg = <0x50>;
--		pagesize = <16>;
--	};
++	i2c4_pins: i2c4 {
++		groups = "i2c4_c";
++		function = "i2c4";
++	};
++
+ 	du_pins: du {
+ 		groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
+ 		function = "du";
+@@ -692,6 +721,11 @@
+ 	};
  };
  
- &i2c6 {
++&i2c4 {
++	pinctrl-0 = <&i2c4_pins>;
++	pinctrl-names = "i2c-exio4";
++};
++
+ &rcar_sound {
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.11.0
