@@ -1,17 +1,18 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 21:52:29 -0500
-Subject: [PATCH v8 13/42] clk: davinci: Add platform information for TI DM355
+Date: Thu, 15 Mar 2018 21:52:30 -0500
+Subject: [PATCH v8 14/42] clk: davinci: Add platform information for TI DM365
  PSC
 In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
 References: <1521168778-27236-1-git-send-email-david@lechnology.com>
-Message-ID: <1521168778-27236-14-git-send-email-david@lechnology.com>
+Message-ID: <1521168778-27236-15-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This adds platform-specific declarations for the PSC clocks on TI
-DM355 based systems.
+DM365 based systems.
 
 Signed-off-by: David Lechner <david@lechnology.com>
+Reviewed-by: Sekhar Nori <nsekhar@ti.com>
 ---
 
 v8 changes:
@@ -28,31 +29,31 @@ v6 changes:
 - change how clkdev lookups are declared
 
  drivers/clk/davinci/Makefile    |  1 +
- drivers/clk/davinci/psc-dm355.c | 88 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/davinci/psc-dm365.c | 96 +++++++++++++++++++++++++++++++++++++++++
  drivers/clk/davinci/psc.c       |  1 +
  drivers/clk/davinci/psc.h       |  1 +
- 4 files changed, 91 insertions(+)
- create mode 100644 drivers/clk/davinci/psc-dm355.c
+ 4 files changed, 99 insertions(+)
+ create mode 100644 drivers/clk/davinci/psc-dm365.c
 
 diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
-index aef0390..e0da5c3 100644
+index e0da5c3..78dc1eb 100644
 --- a/drivers/clk/davinci/Makefile
 +++ b/drivers/clk/davinci/Makefile
-@@ -12,4 +12,5 @@ obj-$(CONFIG_ARCH_DAVINCI_DM646x)	+= pll-dm646x.o
- obj-y += psc.o
+@@ -13,4 +13,5 @@ obj-y += psc.o
  obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= psc-da830.o
  obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= psc-da850.o
-+obj-$(CONFIG_ARCH_DAVINCI_DM355)	+= psc-dm355.o
+ obj-$(CONFIG_ARCH_DAVINCI_DM355)	+= psc-dm355.o
++obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= psc-dm365.o
  endif
-diff --git a/drivers/clk/davinci/psc-dm355.c b/drivers/clk/davinci/psc-dm355.c
+diff --git a/drivers/clk/davinci/psc-dm365.c b/drivers/clk/davinci/psc-dm365.c
 new file mode 100644
-index 0000000..249a053
+index 0000000..3ad915f
 --- /dev/null
-+++ b/drivers/clk/davinci/psc-dm355.c
-@@ -0,0 +1,88 @@
++++ b/drivers/clk/davinci/psc-dm365.c
+@@ -0,0 +1,96 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * PSC clock descriptions for TI DaVinci DM355
++ * PSC clock descriptions for TI DaVinci DM365
 + *
 + * Copyright (C) 2018 David Lechner <david@lechnology.com>
 + */
@@ -66,99 +67,107 @@ index 0000000..249a053
 +
 +#include "psc.h"
 +
-+LPSC_CLKDEV1(vpss_master_clkdev,	"master",	"vpss");
 +LPSC_CLKDEV1(vpss_slave_clkdev,		"slave",	"vpss");
 +LPSC_CLKDEV1(spi1_clkdev,		NULL,		"spi_davinci.1");
-+LPSC_CLKDEV1(mmcsd1_clkdev,		NULL,		"dm6441-mmc.1");
-+LPSC_CLKDEV1(mcbsp1_clkdev,		NULL,		"davinci-mcbsp.1");
++LPSC_CLKDEV1(mmcsd1_clkdev,		NULL,		"da830-mmc.1");
++LPSC_CLKDEV1(asp0_clkdev,		NULL,		"davinci-mcbsp");
 +LPSC_CLKDEV1(usb_clkdev,		"usb",		NULL);
 +LPSC_CLKDEV1(spi2_clkdev,		NULL,		"spi_davinci.2");
 +LPSC_CLKDEV1(aemif_clkdev,		"aemif",	NULL);
-+LPSC_CLKDEV1(mmcsd0_clkdev,		NULL,		"dm6441-mmc.0");
-+LPSC_CLKDEV1(mcbsp0_clkdev,		NULL,		"davinci-mcbsp.0");
++LPSC_CLKDEV1(mmcsd0_clkdev,		NULL,		"da830-mmc.0");
 +LPSC_CLKDEV1(i2c_clkdev,		NULL,		"i2c_davinci.1");
 +LPSC_CLKDEV1(uart0_clkdev,		NULL,		"serial8250.0");
 +LPSC_CLKDEV1(uart1_clkdev,		NULL,		"serial8250.1");
-+LPSC_CLKDEV1(uart2_clkdev,		NULL,		"serial8250.2");
 +LPSC_CLKDEV1(spi0_clkdev,		NULL,		"spi_davinci.0");
 +/* REVISIT: gpio-davinci.c should be modified to drop con_id */
 +LPSC_CLKDEV1(gpio_clkdev,		"gpio",		NULL);
 +LPSC_CLKDEV1(timer0_clkdev,		"timer0",	NULL);
 +LPSC_CLKDEV1(timer2_clkdev,		NULL,		"davinci-wdt");
++LPSC_CLKDEV1(spi3_clkdev,		NULL,		"spi_davinci.3");
++LPSC_CLKDEV1(spi4_clkdev,		NULL,		"spi_davinci.4");
++LPSC_CLKDEV2(emac_clkdev,		NULL,		"davinci_emac.1",
++					"fck",		"davinci_mdio.0");
++LPSC_CLKDEV1(voice_codec_clkdev,	NULL,		"davinci_voicecodec");
 +LPSC_CLKDEV1(vpss_dac_clkdev,		"vpss_dac",	NULL);
++LPSC_CLKDEV1(vpss_master_clkdev,	"master",	"vpss");
 +
-+static const struct davinci_lpsc_clk_info dm355_psc_info[] = {
-+	LPSC(0,  0, vpss_master, pll1_sysclk4, vpss_master_clkdev, 0),
-+	LPSC(1,  0, vpss_slave,  pll1_sysclk4, vpss_slave_clkdev,  0),
++static const struct davinci_lpsc_clk_info dm365_psc_info[] = {
++	LPSC(1,  0, vpss_slave,  pll1_sysclk5, vpss_slave_clkdev,  0),
 +	LPSC(5,  0, timer3,      pll1_auxclk,  NULL,               0),
-+	LPSC(6,  0, spi1,        pll1_sysclk2, spi1_clkdev,        0),
-+	LPSC(7,  0, mmcsd1,      pll1_sysclk2, mmcsd1_clkdev,      0),
-+	LPSC(8,  0, asp1,        pll1_sysclk2, NULL,               0),
-+	LPSC(9,  0, usb,         pll1_sysclk2, usb_clkdev,         0),
++	LPSC(6,  0, spi1,        pll1_sysclk4, spi1_clkdev,        0),
++	LPSC(7,  0, mmcsd1,      pll1_sysclk4, mmcsd1_clkdev,      0),
++	LPSC(8,  0, asp0,        pll1_sysclk4, asp0_clkdev,        0),
++	LPSC(9,  0, usb,         pll1_auxclk,  usb_clkdev,         0),
 +	LPSC(10, 0, pwm3,        pll1_auxclk,  NULL,               0),
-+	LPSC(11, 0, spi2,        pll1_sysclk2, spi2_clkdev,        0),
-+	LPSC(12, 0, rto,         pll1_auxclk,  NULL,               0),
-+	LPSC(14, 0, aemif,       pll1_sysclk2, aemif_clkdev,       0),
-+	LPSC(15, 0, mmcsd0,      pll1_sysclk2, mmcsd0_clkdev,      0),
-+	LPSC(17, 0, asp0,        pll1_sysclk2, NULL,               0),
++	LPSC(11, 0, spi2,        pll1_sysclk4, spi2_clkdev,        0),
++	LPSC(12, 0, rto,         pll1_sysclk4, NULL,               0),
++	LPSC(14, 0, aemif,       pll1_sysclk4, aemif_clkdev,       0),
++	LPSC(15, 0, mmcsd0,      pll1_sysclk8, mmcsd0_clkdev,      0),
 +	LPSC(18, 0, i2c,         pll1_auxclk,  i2c_clkdev,         0),
 +	LPSC(19, 0, uart0,       pll1_auxclk,  uart0_clkdev,       0),
-+	LPSC(20, 0, uart1,       pll1_auxclk,  uart1_clkdev,       0),
-+	LPSC(21, 0, uart2,       pll1_sysclk2, uart2_clkdev,       0),
-+	LPSC(22, 0, spi0,        pll1_sysclk2, spi0_clkdev,        0),
++	LPSC(20, 0, uart1,       pll1_sysclk4, uart1_clkdev,       0),
++	LPSC(22, 0, spi0,        pll1_sysclk4, spi0_clkdev,        0),
 +	LPSC(23, 0, pwm0,        pll1_auxclk,  NULL,               0),
 +	LPSC(24, 0, pwm1,        pll1_auxclk,  NULL,               0),
 +	LPSC(25, 0, pwm2,        pll1_auxclk,  NULL,               0),
-+	LPSC(26, 0, gpio,        pll1_sysclk2, gpio_clkdev,        0),
++	LPSC(26, 0, gpio,        pll1_sysclk4, gpio_clkdev,        0),
 +	LPSC(27, 0, timer0,      pll1_auxclk,  timer0_clkdev,      LPSC_ALWAYS_ENABLED),
 +	LPSC(28, 0, timer1,      pll1_auxclk,  NULL,               0),
 +	/* REVISIT: why can't this be disabled? */
 +	LPSC(29, 0, timer2,      pll1_auxclk,  timer2_clkdev,      LPSC_ALWAYS_ENABLED),
-+	LPSC(31, 0, arm,         pll1_sysclk1, NULL,               LPSC_ALWAYS_ENABLED),
-+	LPSC(40, 0, mjcp,        pll1_sysclk1, NULL,               0),
-+	LPSC(41, 0, vpss_dac,    pll1_sysclk3, vpss_dac_clkdev,    0),
++	LPSC(31, 0, arm,         pll2_sysclk2, NULL,               LPSC_ALWAYS_ENABLED),
++	LPSC(38, 0, spi3,        pll1_sysclk4, spi3_clkdev,        0),
++	LPSC(39, 0, spi4,        pll1_auxclk,  spi4_clkdev,        0),
++	LPSC(40, 0, emac,        pll2_sysclk4, emac_clkdev,        0),
++	LPSC(44, 1, voice_codec, pll1_sysclk3, voice_codec_clkdev, 0),
++	LPSC(46, 1, vpss_dac,    pll1_sysclk3, vpss_dac_clkdev,    0),
++	LPSC(47, 0, vpss_master, pll1_sysclk5, vpss_master_clkdev, 0),
++	LPSC(50, 0, mjcp,        pll1_sysclk3, NULL,               0),
 +	{ }
 +};
 +
-+static int dm355_psc_init(struct device *dev, void __iomem *base)
++static int dm365_psc_init(struct device *dev, void __iomem *base)
 +{
-+	return davinci_psc_register_clocks(base, dm355_psc_info, 42, base);
++	return davinci_psc_register_clocks(dev, dm365_psc_info, 52, base);
 +}
 +
-+static struct clk_bulk_data dm355_psc_parent_clks[] = {
++static struct clk_bulk_data dm365_psc_parent_clks[] = {
 +	{ .id = "pll1_sysclk1" },
-+	{ .id = "pll1_sysclk2" },
 +	{ .id = "pll1_sysclk3" },
 +	{ .id = "pll1_sysclk4" },
++	{ .id = "pll1_sysclk5" },
++	{ .id = "pll1_sysclk8" },
++	{ .id = "pll2_sysclk2" },
++	{ .id = "pll2_sysclk4" },
 +	{ .id = "pll1_auxclk"  },
 +};
 +
-+const struct davinci_psc_init_data dm355_psc_init_data = {
-+	.parent_clks		= dm355_psc_parent_clks,
-+	.num_parent_clks	= ARRAY_SIZE(dm355_psc_parent_clks),
-+	.psc_init		= &dm355_psc_init,
++const struct davinci_psc_init_data dm365_psc_init_data = {
++	.parent_clks		= dm365_psc_parent_clks,
++	.num_parent_clks	= ARRAY_SIZE(dm365_psc_parent_clks),
++	.psc_init		= &dm365_psc_init,
 +};
 diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
-index fa39536..0825b62 100644
+index 0825b62..7bcf316 100644
 --- a/drivers/clk/davinci/psc.c
 +++ b/drivers/clk/davinci/psc.c
-@@ -492,6 +492,7 @@ static const struct platform_device_id davinci_psc_id_table[] = {
- 	{ .name = "da830-psc1", .driver_data = (kernel_ulong_t)&da830_psc1_init_data },
+@@ -493,6 +493,7 @@ static const struct platform_device_id davinci_psc_id_table[] = {
  	{ .name = "da850-psc0", .driver_data = (kernel_ulong_t)&da850_psc0_init_data },
  	{ .name = "da850-psc1", .driver_data = (kernel_ulong_t)&da850_psc1_init_data },
-+	{ .name = "dm355-psc",  .driver_data = (kernel_ulong_t)&dm355_psc_init_data  },
+ 	{ .name = "dm355-psc",  .driver_data = (kernel_ulong_t)&dm355_psc_init_data  },
++	{ .name = "dm365-psc",  .driver_data = (kernel_ulong_t)&dm365_psc_init_data  },
  	{ }
  };
  
 diff --git a/drivers/clk/davinci/psc.h b/drivers/clk/davinci/psc.h
-index 476bd74..d672e72 100644
+index d672e72..4f6210e 100644
 --- a/drivers/clk/davinci/psc.h
 +++ b/drivers/clk/davinci/psc.h
-@@ -100,5 +100,6 @@ extern const struct davinci_psc_init_data da850_psc0_init_data;
- extern const struct davinci_psc_init_data da850_psc1_init_data;
+@@ -101,5 +101,6 @@ extern const struct davinci_psc_init_data da850_psc1_init_data;
  extern const struct davinci_psc_init_data of_da850_psc0_init_data;
  extern const struct davinci_psc_init_data of_da850_psc1_init_data;
-+extern const struct davinci_psc_init_data dm355_psc_init_data;
+ extern const struct davinci_psc_init_data dm355_psc_init_data;
++extern const struct davinci_psc_init_data dm365_psc_init_data;
  
  #endif /* __CLK_DAVINCI_PSC_H__ */
 -- 
