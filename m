@@ -1,47 +1,27 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:40 +0100
-Subject: [PATCH 10/69] arm64: dts: renesas: r8a7796: update register size for
- thermal
-In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
-References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <a052d934a4e03a81e1f6cf1c63ac693b04e9a441.1521206129.git.horms+renesas@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Mar 2018 15:00:38 +0000
+Subject: arm64 kvm built with clang doesn't boot
+In-Reply-To: <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
+References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
+ <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
+ <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
+Message-ID: <2e84a842-96e8-aec4-8b85-9ee879bb323a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+On 16/03/18 14:53, Andrey Konovalov wrote:
+> On Fri, Mar 16, 2018 at 3:13 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> I wasn't aware of that discussion, but this is indeed quite annoying.
+>> Note that you should be able to restrict this to arch/arm64/kvm/hyp/*
+>> and virt/kvm/arm/hyp/*.
+> 
+> That works as well (tried it, the kernel boots). I've also tried
+> compiling without the flag for virt/kvm/arm/hyp/*, it boots as well.
 
-To be able to read fused calibration values from hardware the size of
-the register resource of TSC1 needs to be incremented to cover one more
-register which holds the information if the calibration values have been
-fused or not.
+That's just luck. Anything in a hyp/ directory has the potential to be
+executed at EL2, and thus could be generating these jump tables. It
+could blow up at a later time, once you start running VMs...
 
-Instead of increasing TSC1 size to the value from the datasheet update
-all TSC's size to the smallest granularity of the address decoder
-circuitry.
-
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index ef10fb548681..f8e9313f9405 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1625,9 +1625,9 @@
- 
- 		tsc: thermal at e6198000 {
- 			compatible = "renesas,r8a7796-thermal";
--			reg = <0 0xe6198000 0 0x68>,
--			      <0 0xe61a0000 0 0x5c>,
--			      <0 0xe61a8000 0 0x5c>;
-+			reg = <0 0xe6198000 0 0x100>,
-+			      <0 0xe61a0000 0 0x100>,
-+			      <0 0xe61a8000 0 0x100>;
- 			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
+	M.
 -- 
-2.11.0
+Jazz is not dead. It just smells funny...
