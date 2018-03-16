@@ -1,32 +1,146 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Fri, 16 Mar 2018 12:44:08 -0600
-Subject: [v2 PATCH 0/2] arm64: dts: Add sdm845 GPU/GMU and SMMU
-Message-ID: <20180316184410.29863-1-jcrouse@codeaurora.org>
+Date: Fri, 16 Mar 2018 12:51:52 -0600
+Subject: [PATCH 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
+In-Reply-To: <20180316185152.32020-1-jcrouse@codeaurora.org>
+References: <20180316185152.32020-1-jcrouse@codeaurora.org>
+Message-ID: <20180316185152.32020-3-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT nodes for the sdm845 GPU/GMU (graphics management unit) and the companion
-arm-smmu-v2 compatible SMMU.
+Add the nodes to describe the Adreno GPU and GMU devices.
 
-This builds on the following dependencies -
-https://patchwork.kernel.org/patch/10286369/ - bindings for qcom,level
-https://patchwork.kernel.org/patch/10281599/ - qcom,smmu-v2 bindings
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+---
+ arch/arm64/boot/dts/qcom/sdm845.dtsi | 119 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 119 insertions(+)
 
-Please refer to https://patchwork.freedesktop.org/series/37428/ for the driver
-code.
-
-[v2 - changed qcom,arc-level to qcom,level following discussion with Viresh;
-change gmu phandle to qcom,gmu per Rob]
-
-Jordan Crouse (2):
-  dt-bindings: Document qcom,adreno-gmu
-  arm64: dts: sdm845: Add gpu and gmu device nodes
-
- .../devicetree/bindings/display/msm/gmu.txt        |  54 ++++++++++
- .../devicetree/bindings/display/msm/gpu.txt        |  10 +-
- arch/arm64/boot/dts/qcom/sdm845.dtsi               | 119 +++++++++++++++++++++
- 3 files changed, 181 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
-
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index 16b5f356ec96..854da6604417 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -312,4 +312,123 @@
+ 			};
+ 		};
+ 	};
++
++	adreno_smmu: arm,smmu-adreno at 5040000 {
++		compatible = "qcom,msm8996-smmu-v2";
++		reg = <0x5040000 0x10000>;
++		#iommu-cells = <1>;
++		#global-interrupts = <2>;
++		interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
++			     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
++			     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
++			     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
++			     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
++			     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
++			     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
++			     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
++		clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
++			 <&clock_gcc GCC_GPU_CFG_AHB_CLK>;
++		clock-names = "bus", "iface";
++
++		power-domains = <&clock_gpucc GPU_CX_GDSC>;
++	};
++
++	gpu_opp_table: adreno-opp-table {
++		compatible = "operating-points-v2";
++
++		opp-710000000 {
++			opp-hz = /bits/ 64 <710000000>;
++			qcom,level = <416>;
++		};
++
++		opp-675000000 {
++			opp-hz = /bits/ 64 <675000000>;
++			qcom,level = <384>;
++		};
++
++		opp-596000000 {
++			opp-hz = /bits/ 64 <596000000>;
++			qcom,level = <320>;
++		};
++
++		opp-520000000 {
++			opp-hz = /bits/ 64 <520000000>;
++			qcom,level = <256>;
++		};
++
++		opp-414000000 {
++			opp-hz = /bits/ 64 <414000000>;
++			qcom,level = <192>;
++		};
++
++		opp-342000000 {
++			opp-hz = /bits/ 64 <342000000>;
++			qcom,level = <128>;
++		};
++
++		opp-257000000 {
++			opp-hz = /bits/ 64 <257000000>;
++			qcom,level = <64>;
++		};
++	};
++
++	gpu at 5000000 {
++		compatible = "qcom,adreno-630.2", "qcom,adreno";
++		#stream-id-cells = <16>;
++
++		reg = <0x5000000 0x40000>;
++		reg-names = "kgsl_3d0_reg_memory";
++
++		/*
++		 * Look ma, no clocks! The GPU clocks and power are controlled
++		 * entirely by the GMU
++		 */
++
++		interrupts = <0 300 0>;
++		interrupt-names = "kgsl_3d0_irq";
++
++		iommus = <&adreno_smmu 0>;
++
++		operating-points-v2 = <&gpu_opp_table>;
++
++		gmu = <&gmu>;
++	};
++
++	gmu_opp_table: adreno-gmu-opp-table {
++		compatible = "operating-points-v2";
++
++		opp-400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			qcom,level = <128>;
++		};
++
++		opp-200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++			qcom,level = <48>;
++		};
++	};
++
++	gmu: gmu at 506a000 {
++		compatible="qcom,adreno-gmu";
++
++		reg = <0x506a000 0x30000>, <0xb200000 0x300000>;
++		reg-names = "gmu", "gmu_pdc";
++
++		interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "hfi", "gmu";
++
++		clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
++			<&clock_gpucc GPU_CC_CXO_CLK>,
++			<&clock_gcc GCC_DDRSS_GPU_AXI_CLK>,
++			<&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>;
++		clock-names = "gmu", "cxo", "axi", "memnoc";
++
++		power-domains = <&clock_gpucc GPU_CX_GDSC>;
++		iommus = <&adreno_smmu 5>;
++
++		operating-points-v2 = <&gmu_opp_table>;
++	};
+ };
 -- 
 2.16.1
