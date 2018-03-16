@@ -1,42 +1,51 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Fri, 16 Mar 2018 15:05:10 +0530
-Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
-In-Reply-To: <20180314182448.bnvjtgyzipsuxcbe@lakrids.cambridge.arm.com>
-References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
- <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
- <20180313102158.GI25863@linaro.org>
- <20180313104715.prurmrizho4ddc4l@lakrids.cambridge.arm.com>
- <20180313110747.GJ25863@linaro.org>
- <20180313112016.ocx4qqhji3zfwjhs@lakrids.cambridge.arm.com>
- <CACi5LpN4DTYFVSVqru2j0y=CKr2ztrJ1gCW32sJBU=oUV2fcWw@mail.gmail.com>
- <20180314021050.GK25863@linaro.org>
- <20180314182448.bnvjtgyzipsuxcbe@lakrids.cambridge.arm.com>
-Message-ID: <CACi5LpNyx5VKO6mYB1yXNPENPKhAfAJ7cUSBeVzVtXfF6+EPwg@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 16 Mar 2018 15:08:09 +0530
+Subject: [PATCH v2 01/13] firmware: qcom: scm: Add ipq4019 soc compatible
+In-Reply-To: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
+References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521193101-4586-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 11:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Mar 14, 2018 at 11:10:53AM +0900, AKASHI Takahiro wrote:
->> If kaslr-seed has a critical value in terms of security, is kexec-tools
->> a right place? It is exposed to user space albeit for a short time of period.
->
-> The kernel zeroes the seed in the DT at boot time, so the current seed
-> isn't visible to userspace.
->
-> If kexec-tools generates a seed, and inserts it into the DTB that it
-> loads, this is only visible to kexec tools or other applications which
-> can inspect its memory, so I don't think this is much of a concern.
-> Anything with such privilege can presumably kexec() to arbitrary code
-> anyhow.
->
-> The next kernel will then zero its seed in the DT at boot time, so
-> similarly this won't be visible to userspace on the new kernel.
->
-> FWIW, having kexec tools generate a seed for the kexec_load() case makes
-> sense to me.
+Add the compatible for ipq4019.
+This does not need clocks to do scm calls.
 
-Fair enough. I will try to take a stab at the same and come back with
-my findings on this thread.
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ Documentation/devicetree/bindings/firmware/qcom,scm.txt | 3 ++-
+ drivers/firmware/qcom_scm.c                             | 3 +++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-Thanks,
-Bhupesh
+diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+index 7b40054..fcf6979 100644
+--- a/Documentation/devicetree/bindings/firmware/qcom,scm.txt
++++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+@@ -11,9 +11,10 @@ Required properties:
+  * "qcom,scm-msm8660" for MSM8660 platforms
+  * "qcom,scm-msm8690" for MSM8690 platforms
+  * "qcom,scm-msm8996" for MSM8996 platforms
++ * "qcom,scm-ipq4019" for IPQ4019 platforms
+  * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
+ - clocks: One to three clocks may be required based on compatible.
+- * No clock required for "qcom,scm-msm8996"
++ * No clock required for "qcom,scm-msm8996", "qcom,scm-ipq4019"
+  * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
+  * Core, iface, and bus clocks required for "qcom,scm"
+ - clock-names: Must contain "core" for the core clock, "iface" for the interface
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index 5a7d6930..e778af7 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -603,6 +603,9 @@ static void qcom_scm_shutdown(struct platform_device *pdev)
+ 	{ .compatible = "qcom,scm-msm8996",
+ 	  .data = NULL, /* no clocks */
+ 	},
++	{ .compatible = "qcom,scm-ipq4019",
++	  .data = NULL, /* no clocks */
++	},
+ 	{ .compatible = "qcom,scm",
+ 	  .data = (void *)(SCM_HAS_CORE_CLK
+ 			   | SCM_HAS_IFACE_CLK
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
