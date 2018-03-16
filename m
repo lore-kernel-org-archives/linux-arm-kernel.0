@@ -1,37 +1,66 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 17:37:58 +0100
-Subject: [PATCH 01/47] ARM: dts: r8a7790: Reduce size of thermal registers
-In-Reply-To: <cover.1521218085.git.horms+renesas@verge.net.au>
-References: <cover.1521218085.git.horms+renesas@verge.net.au>
-Message-ID: <61ad2b1ab4b1ce4e495854c4faa75ca95e5e8ecd.1521218085.git.horms+renesas@verge.net.au>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 16 Mar 2018 12:16:15 -0400
+Subject: [PATCH v3 02/18] ixgbe: eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521216991-28706-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reduce size of thermal registers in DT for r8a7790 (R-Car H2) SoC.
+Code includes wmb() followed by writel() in multiple places. writel()
+already has a barrier on some architectures like arm64.
 
-According to the "User's Manual: Hardware" v2.00 the registers at base
-0xe61f0000 extend to an offset of 0x10, rather than 0x14 which is the case
-on the r8a73a4 (R-Mobile APE6).
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
-This should not have any runtime affect as mapping granularity is PAGE_SIZE.
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/intel/ixgbe/ixgbe_main.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index ed9a68538a55..13926fc7abfa 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -294,7 +294,7 @@
- 		compatible =	"renesas,thermal-r8a7790",
- 				"renesas,rcar-gen2-thermal",
- 				"renesas,rcar-thermal";
--		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
-+		reg = <0 0xe61f0000 0 0x10>, <0 0xe61f0100 0 0x38>;
- 		interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&cpg CPG_MOD 522>;
- 		power-domains = <&sysc R8A7790_PD_ALWAYS_ON>;
+diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
+index 0da5aa2..58ed70f 100644
+--- a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
++++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
+@@ -1692,7 +1692,7 @@ void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		writel(i, rx_ring->tail);
++		writel_relaxed(i, rx_ring->tail);
+ 	}
+ }
+ 
+@@ -2453,7 +2453,7 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
+ 		 * know there are new descriptors to fetch.
+ 		 */
+ 		wmb();
+-		writel(ring->next_to_use, ring->tail);
++		writel_relaxed(ring->next_to_use, ring->tail);
+ 
+ 		xdp_do_flush_map();
+ 	}
+@@ -8078,7 +8078,7 @@ static int ixgbe_tx_map(struct ixgbe_ring *tx_ring,
+ 	ixgbe_maybe_stop_tx(tx_ring, DESC_NEEDED);
+ 
+ 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+-		writel(i, tx_ring->tail);
++		writel_relaxed(i, tx_ring->tail);
+ 
+ 		/* we need this if more than one processor can write to our tail
+ 		 * at a time, it synchronizes IO on IA64/Altix systems
+@@ -10014,7 +10014,7 @@ static void ixgbe_xdp_flush(struct net_device *dev)
+ 	 * are new descriptors to fetch.
+ 	 */
+ 	wmb();
+-	writel(ring->next_to_use, ring->tail);
++	writel_relaxed(ring->next_to_use, ring->tail);
+ 
+ 	return;
+ }
 -- 
-2.11.0
+2.7.4
