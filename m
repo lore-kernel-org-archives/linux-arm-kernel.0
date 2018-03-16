@@ -1,57 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:53:09 +0100
-Subject: [PATCH 50/52] ARM: dts: marzen: Add SDHI0 VCCQ Regulator
+Date: Fri, 16 Mar 2018 15:52:43 +0100
+Subject: [PATCH 24/52] ARM: dts: r8a7790: consistently use single space before
+ =
 In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
 References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <55bb4ae21d5819177200765d582e4a544e120260.1521208546.git.horms+renesas@verge.net.au>
+Message-ID: <5a63226206ce2313badee0b6ffec47f7a305c8ae.1521208546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+Consistently use a single space before a =.
 
-Add support for the on-board voltage regulator hooked up to GPIO3_20
-on r8a7779 Marzen. The board schematics describes the regulator as U4
-TPS2110A. Input wise, U4 has D0 fixed to ground, D1 tied to GPIO3_20
-while IN1 is fixed to 3.3V and IN2 is fixed to 1.8V. OUT goes to the
-pull-ups for the data pins of SDHI0.
+This patch fixes instances where a tab is used instead.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+This patch should not introduce any functional change.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7779-marzen.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index 9412a86f9b30..4b9006bac3cb 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -42,6 +42,19 @@
- 		regulator-always-on;
- 	};
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 3bbcc0b93f1c..e4367cecad18 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1705,16 +1705,16 @@
  
-+	vccq_sdhi0: regulator-vccq-sdhi0 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI0 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
-+
- 	ethernet at 18000000 {
- 		compatible = "smsc,lan9220", "smsc,lan9115";
- 		reg = <0x18000000 0x100>;
-@@ -243,6 +256,7 @@
- 	pinctrl-names = "default";
+ 	thermal-zones {
+ 		cpu_thermal: cpu-thermal {
+-			polling-delay-passive	= <0>;
+-			polling-delay		= <0>;
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
  
- 	vmmc-supply = <&fixedregulator3v3>;
-+	vqmmc-supply = <&vccq_sdhi0>;
- 	bus-width = <4>;
- 	status = "okay";
- };
+ 			thermal-sensors = <&thermal>;
+ 
+ 			trips {
+ 				cpu-crit {
+-					temperature	= <95000>;
+-					hysteresis	= <0>;
+-					type		= "critical";
++					temperature = <95000>;
++					hysteresis = <0>;
++					type = "critical";
+ 				};
+ 			};
+ 			cooling-maps {
 -- 
 2.11.0
