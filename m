@@ -1,33 +1,212 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 16 Mar 2018 12:02:53 +0100
-Subject: [PATCH v3 6/6] drm/rockchip: cdn-dp: remove the DP phy switch
-In-Reply-To: <20180216120956.19034-6-enric.balletbo@collabora.com>
-References: <20180216120956.19034-1-enric.balletbo@collabora.com>
- <20180216120956.19034-6-enric.balletbo@collabora.com>
-Message-ID: <1866837.JGGNoqQO1N@phil>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Fri, 16 Mar 2018 16:50:57 +0530
+Subject: [PATCH v2 12/13] ARM: dts: ipq8074: Add pcie nodes
+In-Reply-To: <1521193101-4586-13-git-send-email-sricharan@codeaurora.org>
+References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
+ <1521193101-4586-13-git-send-email-sricharan@codeaurora.org>
+Message-ID: <69ff9b14b9b2fe4d90a02ca629059af2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 16. Februar 2018, 13:09:56 CET schrieb Enric Balletbo i Serra:
-> From: Chris Zhong <zyw@rock-chips.com>
+On 2018-03-16 15:08, Sricharan R wrote:
+> The driver/phy support for ipq8074 is available now.
+> So enabling the nodes in DT.
 > 
-> There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
-> only one PHY can connect to DP controller at one time, the other should
-> be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
-> set this bit means enable PHY 1, clear this bit means enable PHY 0.
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  arch/arm64/boot/dts/qcom/ipq8074.dtsi | 157 
+> +++++++++++++++++++++++++++++++++-
+>  1 file changed, 156 insertions(+), 1 deletion(-)
 > 
-> If the board has 2 Type-C ports, the DP driver get the phy id from
-> devm_of_phy_get_by_index, and then control this switch according to
-> this id. But some others board only has one Type-C port, it may be PHY 0
-> or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
-> this switch to PHY driver, the PHY driver can distinguish between PHY 0
-> and PHY 1, and then write the correct register bit.
+> diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+> b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+> index 806fc56..7562650 100644
+> --- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
+> @@ -24,7 +24,7 @@
+>  		ranges = <0 0 0 0xffffffff>;
+>  		compatible = "simple-bus";
 > 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> -		pinctrl at 1000000 {
+> +		tlmm: pinctrl at 1000000 {
+>  			compatible = "qcom,ipq8074-pinctrl";
+>  			reg = <0x1000000 0x300000>;
+>  			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -229,6 +229,161 @@
+>  			dma-names = "tx", "rx", "cmd";
+>  			status = "disabled";
+>  		};
+> +
+> +		pcie_phy0: phy at 86000 {
+> +			compatible = "qcom,ipq8074-qmp-pcie-phy";
+> +			reg = <0x86000 0x1000>;
+> +			#phy-cells = <0>;
+> +			clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
+> +			clock-names = "pipe_clk";
+> +			clock-output-names = "pcie20_phy0_pipe_clk";
+> +
+> +			resets = <&gcc GCC_PCIE0_PHY_BCR>,
+> +				<&gcc GCC_PCIE0PHY_PHY_BCR>;
+> +			reset-names = "phy",
+> +				      "common";
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie0: pci at 20000000 {
+> +			compatible = "qcom,pcie-ipq8074";
+> +			reg =  <0x20000000 0xf1d
+> +				0x20000F20 0xa8
 
-applied to drm-misc with a note stating where the rest of the series
-went to.
+  s/0x20000F20/0x20000f20
 
-Thanks
-Heiko
+> +				0x80000 0x2000
+> +				0x20100000 0x1000>;
+> +			reg-names = "dbi", "elbi", "parf", "config";
+> +			device_type = "pci";
+> +			linux,pci-domain = <0>;
+> +			bus-range = <0x00 0xff>;
+> +			num-lanes = <1>;
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +
+> +			phys = <&pcie_phy0>;
+> +			phy-names = "pciephy";
+> +
+> +			ranges = <0x81000000 0 0x20200000 0x20200000
+> +				  0 0x00100000   /* downstream I/O */
+
+  we can remove trailing zeros from address.
+  s/0x00100000/0x100000
+
+> +				  0x82000000 0 0x20300000 0x20300000
+> +				  0 0x00d00000>; /* non-prefetchable memory */
+
+  s/0x00d00000/0xd00000
+
+  Same changes are for PCIE1 also.
+
+  With that.
+
+  Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
+
+> +
+> +			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "msi";
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 0x7>;
+> +			interrupt-map = <0 0 0 1 &intc 0 75
+> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
+> +					<0 0 0 2 &intc 0 78
+> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
+> +					<0 0 0 3 &intc 0 79
+> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
+> +					<0 0 0 4 &intc 0 83
+> +					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
+> +
+> +			clocks = <&gcc GCC_SYS_NOC_PCIE0_AXI_CLK>,
+> +				 <&gcc GCC_PCIE0_AXI_M_CLK>,
+> +				 <&gcc GCC_PCIE0_AXI_S_CLK>,
+> +				 <&gcc GCC_PCIE0_AHB_CLK>,
+> +				 <&gcc GCC_PCIE0_AUX_CLK>;
+> +
+> +			clock-names = "iface",
+> +				      "axi_m",
+> +				      "axi_s",
+> +				      "ahb",
+> +				      "aux";
+> +			resets = <&gcc GCC_PCIE0_PIPE_ARES>,
+> +				 <&gcc GCC_PCIE0_SLEEP_ARES>,
+> +				 <&gcc GCC_PCIE0_CORE_STICKY_ARES>,
+> +				 <&gcc GCC_PCIE0_AXI_MASTER_ARES>,
+> +				 <&gcc GCC_PCIE0_AXI_SLAVE_ARES>,
+> +				 <&gcc GCC_PCIE0_AHB_ARES>,
+> +				 <&gcc GCC_PCIE0_AXI_MASTER_STICKY_ARES>;
+> +			reset-names = "pipe",
+> +				      "sleep",
+> +				      "sticky",
+> +				      "axi_m",
+> +				      "axi_s",
+> +				      "ahb",
+> +				      "axi_m_sticky";
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie_phy1: phy at 8e000 {
+> +			compatible = "qcom,ipq8074-qmp-pcie-phy";
+> +			reg = <0x8e000 0x1000>;
+> +			#phy-cells = <0>;
+> +			clocks = <&gcc GCC_PCIE1_PIPE_CLK>;
+> +			clock-names = "pipe_clk";
+> +			clock-output-names = "pcie20_phy1_pipe_clk";
+> +
+> +			resets = <&gcc GCC_PCIE1_PHY_BCR>,
+> +				<&gcc GCC_PCIE1PHY_PHY_BCR>;
+> +			reset-names = "phy",
+> +				      "common";
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie1: pci at 10000000 {
+> +			compatible = "qcom,pcie-ipq8074";
+> +			reg =  <0x10000000 0xf1d
+> +				0x10000F20 0xa8
+> +				0x88000 0x2000
+> +				0x10100000 0x1000>;
+> +			reg-names = "dbi", "elbi", "parf", "config";
+> +			device_type = "pci";
+> +			linux,pci-domain = <1>;
+> +			bus-range = <0x00 0xff>;
+> +			num-lanes = <1>;
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +
+> +			phys = <&pcie_phy1>;
+> +			phy-names = "pciephy";
+> +
+> +			ranges = <0x81000000 0 0x10200000 0x10200000
+> +				  0 0x00100000   /* downstream I/O */
+> +				  0x82000000 0 0x10300000 0x10300000
+> +				  0 0x00d00000>; /* non-prefetchable memory */
+> +
+> +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "msi";
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 0x7>;
+> +			interrupt-map = <0 0 0 1 &intc 0 142
+> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
+> +					<0 0 0 2 &intc 0 143
+> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
+> +					<0 0 0 3 &intc 0 144
+> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
+> +					<0 0 0 4 &intc 0 145
+> +					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
+> +
+> +			clocks = <&gcc GCC_SYS_NOC_PCIE1_AXI_CLK>,
+> +				 <&gcc GCC_PCIE1_AXI_M_CLK>,
+> +				 <&gcc GCC_PCIE1_AXI_S_CLK>,
+> +				 <&gcc GCC_PCIE1_AHB_CLK>,
+> +				 <&gcc GCC_PCIE1_AUX_CLK>;
+> +			clock-names = "iface",
+> +				      "axi_m",
+> +				      "axi_s",
+> +				      "ahb",
+> +				      "aux";
+> +			resets = <&gcc GCC_PCIE1_PIPE_ARES>,
+> +				 <&gcc GCC_PCIE1_SLEEP_ARES>,
+> +				 <&gcc GCC_PCIE1_CORE_STICKY_ARES>,
+> +				 <&gcc GCC_PCIE1_AXI_MASTER_ARES>,
+> +				 <&gcc GCC_PCIE1_AXI_SLAVE_ARES>,
+> +				 <&gcc GCC_PCIE1_AHB_ARES>,
+> +				 <&gcc GCC_PCIE1_AXI_MASTER_STICKY_ARES>;
+> +			reset-names = "pipe",
+> +				      "sleep",
+> +				      "sticky",
+> +				      "axi_m",
+> +				      "axi_s",
+> +				      "ahb",
+> +				      "axi_m_sticky";
+> +			status = "disabled";
+> +		};
+>  	};
+> 
+>  	cpus {
