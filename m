@@ -1,144 +1,203 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 16 Mar 2018 11:22:16 +0000
-Subject: [PATCH v5 1/2] PCI: mediatek: Clear IRQ status after IRQ
- dispatched to avoid reentry
-In-Reply-To: <1515153107.25872.57.camel@mhfsdcap03>
-References: <1514336394-17747-1-git-send-email-honghui.zhang@mediatek.com>
- <1514336394-17747-2-git-send-email-honghui.zhang@mediatek.com>
- <20180104184040.GE12239@red-moon>
- <88c84a3e-17ea-08f2-e5fc-4799b41de267@arm.com>
- <1515153107.25872.57.camel@mhfsdcap03>
-Message-ID: <20180316112216.GA24325@e107981-ln.cambridge.arm.com>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Fri, 16 Mar 2018 16:59:56 +0530
+Subject: [PATCH v2 02/13] ARM: dts: ipq4019: Add a few peripheral nodes
+In-Reply-To: <1521193101-4586-3-git-send-email-sricharan@codeaurora.org>
+References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
+ <1521193101-4586-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <663e744bc9d77fc9c7fac1d8e450c5aa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 05, 2018 at 07:51:47PM +0800, Honghui Zhang wrote:
-> On Thu, 2018-01-04 at 19:04 +0000, Marc Zyngier wrote:
-> > On 04/01/18 18:40, Lorenzo Pieralisi wrote:
-> > > [+Marc]
-> > > 
-> > > On Wed, Dec 27, 2017 at 08:59:53AM +0800, honghui.zhang at mediatek.com wrote:
-> > >> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > >>
-> > >> There maybe a same IRQ reentry scenario after IRQ received in current
-> > >> IRQ handle flow:
-> > >> 	EP device		PCIe host driver	EP driver
-> > >> 1. issue an IRQ
-> > >> 			2. received IRQ
-> > >> 			3. clear IRQ status
-> > >> 			4. dispatch IRQ
-> > >> 						5. clear IRQ source
-> > >> The IRQ status was not successfully cleared at step 2 since the IRQ
-> > >> source was not cleared yet. So the PCIe host driver may receive the
-> > >> same IRQ after step 5. Then there's an IRQ reentry occurred.
-> > >> Even worse, if the reentry IRQ was not an IRQ that EP driver expected,
-> > >> it may not handle the IRQ. Then we may run into the infinite loop from
-> > >> step 2 to step 4.
-> > >> Clear the IRQ status after IRQ have been dispatched to avoid the IRQ
-> > >> reentry.
-> > >> This patch also fix another INTx IRQ issue by initialize the iterate
-> > >> before the loop. If an INTx IRQ re-occurred while we are dispatching
-> > >> the INTx IRQ, then iterate may start from PCI_NUM_INTX + INTX_SHIFT
-> > >> instead of INTX_SHIFT for the second time entering the
-> > >> for_each_set_bit_from() loop.
-> > > 
-> > > This looks like two different issues that should be fixed with two
-> > > patches.
+On 2018-03-16 15:08, Sricharan R wrote:
+> Now with the driver updates for some peripherals being there,
+> add i2c, spi, pcie, bam, qpic-nand, scm nodes to enhance the available
+> peripheral support.
 > 
-> Ok, I split this into two patches and figure out a more reasonable
-> approach by using irq_chip solution.
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 
-For the time being, I will mark this patch as "Changes Requested"
-waiting for a new version.
+Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
 
-Thanks,
-Lorenzo
-
+> ---
+>  arch/arm/boot/dts/qcom-ipq4019.dtsi | 134 
+> ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 134 insertions(+)
 > 
-> > > 
-> > >> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > >> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
-> > >> ---
-> > >>  drivers/pci/host/pcie-mediatek.c | 11 ++++++-----
-> > >>  1 file changed, 6 insertions(+), 5 deletions(-)
-> > > 
-> > > For the sake of uniformity, I first want to understand why this
-> > > driver does not call:
-> > > 
-> > > chained_irq_enter/exit()
-> > > 
-> > > in the primary handler (mtk_pcie_intr_handler()).
-> > > 
-> > > With the GIC as a primary interrupt controller we have not
-> > > even figured out how current code can actually work without
-> > > calling the chained_* API.
-> > > 
-> > > I want to come up with a consistent handling of IRQ domains for
-> > > all host bridges and any discrepancy should be explained.
-> > 
-> > That's because this driver is a huge hack, see below:
-> > 
-> > > 
-> > >> diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-> > >> index db93efd..fc29a9a 100644
-> > >> --- a/drivers/pci/host/pcie-mediatek.c
-> > >> +++ b/drivers/pci/host/pcie-mediatek.c
-> > >> @@ -601,15 +601,16 @@ static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
-> > 
-> > This function is not a chained irqchip, but an interrupt handler...
-> > 
-> > >>  	struct mtk_pcie_port *port = (struct mtk_pcie_port *)data;
-> > >>  	unsigned long status;
-> > >>  	u32 virq;
-> > >> -	u32 bit = INTX_SHIFT;
-> > >> +	u32 bit;
-> > >>  
-> > >>  	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
-> > >> +		bit = INTX_SHIFT;
-> > >>  		for_each_set_bit_from(bit, &status, PCI_NUM_INTX + INTX_SHIFT) {
-> > >> -			/* Clear the INTx */
-> > >> -			writel(1 << bit, port->base + PCIE_INT_STATUS);
-> > >>  			virq = irq_find_mapping(port->irq_domain,
-> > >>  						bit - INTX_SHIFT);
-> > >>  			generic_handle_irq(virq);
-> > 
-> > and nonetheless, this calls into generic_handle_irq(). That's a complete
-> > violation of the interrupt layering. Maybe there is a good reason for
-> > it, but I'd like to know which one.
-> > 
-> > Which means that all of the ack/mask has to be done outside of the
-> > irqchip framework too... Disgusting.
-> > 
-> > >> +			/* Clear the INTx */
-> > >> +			writel(1 << bit, port->base + PCIE_INT_STATUS);
-> > > 
-> > > I think that these masking/acking should actually be done through
-> > > the irq_chip hooks (see for instance pci-ftpci100.c) - that would
-> > > make this kind of bugs much easier to prevent (because the IRQ
-> > > layer does the sequencing for you).
-> > 
-> > +1.
-> > 
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> index 10d112a..e38fffa 100644
+> --- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> @@ -25,7 +25,9 @@
 > 
-> Thanks for your advice, I need to do some homework to have a better
-> understanding of the irq_chip approach.
+>  	aliases {
+>  		spi0 = &spi_0;
+> +		spi1 = &spi_1;
+>  		i2c0 = &i2c_0;
+> +		i2c1 = &i2c_1;
+>  	};
 > 
-> > > Marc (CC'ed) has a more comprehensive view on this than me - I would
-> > > like to get to a point where all host bridges uses a consistent
-> > > approach for chained IRQ handling and I hope this bug fix can be
-> > > a starting point.
-> > 
-> > +1 again. We definitely need to come up with some form of common
-> > approach for all these host drivers, and maybe turn that into a library...
-> > 
+>  	cpus {
+> @@ -104,6 +106,12 @@
+>  		};
+>  	};
 > 
-> Well, this is beyond my knowledge now, I guess I can figure out how to
-> using irq_chip for the first step, then I may following this "common
-> approach" after we have a solution for that?
+> +	firmware {
+> +		scm {
+> +			compatible = "qcom,scm-ipq4019";
+> +		};
+> +	};
+> +
+>  	timer {
+>  		compatible = "arm,armv7-timer";
+>  		interrupts = <1 2 0xf08>,
+> @@ -172,6 +180,22 @@
+>  			clock-names = "core", "iface";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +			dmas = <&blsp_dma 5>, <&blsp_dma 4>;
+> +			dma-names = "rx", "tx";
+> +			status = "disabled";
+> +		};
+> +
+> +		spi_1: spi at 78b6000 { /* BLSP1 QUP2 */
+> +			compatible = "qcom,spi-qup-v2.2.1";
+> +			reg = <0x78b6000 0x600>;
+> +			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&gcc GCC_BLSP1_QUP2_SPI_APPS_CLK>,
+> +				<&gcc GCC_BLSP1_AHB_CLK>;
+> +			clock-names = "core", "iface";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			dmas = <&blsp_dma 7>, <&blsp_dma 6>;
+> +			dma-names = "rx", "tx";
+>  			status = "disabled";
+>  		};
 > 
-> thanks.
-> > Thanks,
-> > 
-> > 	M.
+> @@ -184,9 +208,24 @@
+>  			clock-names = "iface", "core";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +			dmas = <&blsp_dma 9>, <&blsp_dma 8>;
+> +			dma-names = "rx", "tx";
+>  			status = "disabled";
+>  		};
 > 
+> +		i2c_1: i2c at 78b8000 { /* BLSP1 QUP4 */
+> +			compatible = "qcom,i2c-qup-v2.2.1";
+> +			reg = <0x78b8000 0x600>;
+> +			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+> +				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
+> +			clock-names = "iface", "core";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			dmas = <&blsp_dma 11>, <&blsp_dma 10>;
+> +			dma-names = "rx", "tx";
+> +			status = "disabled";
+> +		};
 > 
+>  		cryptobam: dma at 8e04000 {
+>  			compatible = "qcom,bam-v1.7.0";
+> @@ -293,6 +332,101 @@
+>  			reg = <0x4ab000 0x4>;
+>  		};
+> 
+> +		pcie0: pci at 40000000 {
+> +			compatible = "qcom,pcie-ipq4019", "snps,dw-pcie";
+> +			reg =  <0x40000000 0xf1d
+> +				0x40000f20 0xa8
+> +				0x80000 0x2000
+> +				0x40100000 0x1000>;
+> +			reg-names = "dbi", "elbi", "parf", "config";
+> +			device_type = "pci";
+> +			linux,pci-domain = <0>;
+> +			bus-range = <0x00 0xff>;
+> +			num-lanes = <1>;
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +
+> +			ranges = <0x81000000 0 0x40200000 0x40200000 0 0x00100000
+> +				  0x82000000 0 0x48000000 0x48000000 0 0x10000000>;
+> +
+> +			interrupts = <GIC_SPI 141 IRQ_TYPE_NONE>;
+> +			interrupt-names = "msi";
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 0x7>;
+> +			interrupt-map = <0 0 0 1 &intc 0 142 IRQ_TYPE_LEVEL_HIGH>, /* int_a 
+> */
+> +					<0 0 0 2 &intc 0 143 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
+> +					<0 0 0 3 &intc 0 144 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
+> +					<0 0 0 4 &intc 0 145 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
+> +			clocks = <&gcc GCC_PCIE_AHB_CLK>,
+> +				 <&gcc GCC_PCIE_AXI_M_CLK>,
+> +				 <&gcc GCC_PCIE_AXI_S_CLK>;
+> +			clock-names = "aux",
+> +				      "master_bus",
+> +				      "slave_bus";
+> +
+> +			resets = <&gcc PCIE_AXI_M_ARES>,
+> +				 <&gcc PCIE_AXI_S_ARES>,
+> +				 <&gcc PCIE_PIPE_ARES>,
+> +				 <&gcc PCIE_AXI_M_VMIDMT_ARES>,
+> +				 <&gcc PCIE_AXI_S_XPU_ARES>,
+> +				 <&gcc PCIE_PARF_XPU_ARES>,
+> +				 <&gcc PCIE_PHY_ARES>,
+> +				 <&gcc PCIE_AXI_M_STICKY_ARES>,
+> +				 <&gcc PCIE_PIPE_STICKY_ARES>,
+> +				 <&gcc PCIE_PWR_ARES>,
+> +				 <&gcc PCIE_AHB_ARES>,
+> +				 <&gcc PCIE_PHY_AHB_ARES>;
+> +			reset-names = "axi_m",
+> +				      "axi_s",
+> +				      "pipe",
+> +				      "axi_m_vmid",
+> +				      "axi_s_xpu",
+> +				      "parf",
+> +				      "phy",
+> +				      "axi_m_sticky",
+> +				      "pipe_sticky",
+> +				      "pwr",
+> +				      "ahb",
+> +				      "phy_ahb";
+> +
+> +			status = "disabled";
+> +		};
+> +
+> +		qpic_bam: dma at 7984000 {
+> +			compatible = "qcom,bam-v1.7.0";
+> +			reg = <0x7984000 0x1a000>;
+> +			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&gcc GCC_QPIC_CLK>;
+> +			clock-names = "bam_clk";
+> +			#dma-cells = <1>;
+> +			qcom,ee = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		nand: qpic-nand at 79b0000 {
+> +			compatible = "qcom,ipq4019-nand";
+> +			reg = <0x79b0000 0x1000>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			clocks = <&gcc GCC_QPIC_CLK>,
+> +				 <&gcc GCC_QPIC_AHB_CLK>;
+> +			clock-names = "core", "aon";
+> +
+> +			dmas = <&qpic_bam 0>,
+> +			       <&qpic_bam 1>,
+> +			       <&qpic_bam 2>;
+> +			dma-names = "tx", "rx", "cmd";
+> +			status = "disabled";
+> +
+> +			nand at 0 {
+> +				reg = <0>;
+> +
+> +				nand-ecc-strength = <4>;
+> +				nand-ecc-step-size = <512>;
+> +				nand-bus-width = <8>;
+> +			};
+> +		};
+> +
+>  		wifi0: wifi at a000000 {
+>  			compatible = "qcom,ipq4019-wifi";
+>  			reg = <0xa000000 0x200000>;
