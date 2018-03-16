@@ -1,54 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 08:55:32 +0000
-Subject: [PATCH v6 10/26] KVM: arm/arm64: Fix idmap size and alignment
-In-Reply-To: <5AAAC664.8070400@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180314165049.30105-11-marc.zyngier@arm.com> <5AAAC664.8070400@arm.com>
-Message-ID: <6421e60d-1e11-5590-038f-71f09f02af30@arm.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Fri, 16 Mar 2018 10:10:09 +0100
+Subject: [PATCH 0/2] iio: stm32-dfsdm-adc: fix filter & rate setting
+In-Reply-To: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
+References: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1ddfcfad-f06e-738f-53cf-11dc56e61da1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/03/18 19:15, James Morse wrote:
-> On 14/03/18 16:50, Marc Zyngier wrote:
->> Although the idmap section of KVM can only be at most 4kB and
->> must be aligned on a 4kB boundary, the rest of the code expects
->> it to be page aligned. Things get messy when tearing down the
->> HYP page tables when PAGE_SIZE is 64K, and the idmap section isn't
->> 64K aligned.
->>
->> Let's fix this by computing aligned boundaries that the HYP code
->> will use.
-> 
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 0e5cfffb4c21..a9e0513868e9 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1815,7 +1815,9 @@ int kvm_mmu_init(void)
->>  	int err;
->>  
->>  	hyp_idmap_start = kvm_virt_to_phys(__hyp_idmap_text_start);
->> +	hyp_idmap_start = ALIGN_DOWN(hyp_idmap_start, PAGE_SIZE);
->>  	hyp_idmap_end = kvm_virt_to_phys(__hyp_idmap_text_end);
->> +	hyp_idmap_end = ALIGN(hyp_idmap_end, PAGE_SIZE);
->>  	hyp_idmap_vector = kvm_virt_to_phys(__kvm_hyp_init);
->>  
->>  	/*
-> 
-> 
-> This makes the:
-> | hyp_idmap_start != (unsigned long)__hyp_idmap_text_start
-> 
-> check below look funny, but that must be for 32bit which only has 4K pages (I
-> think), so its behaviour hasn't changed.
+Hello,
 
-Yes, that's to handle the 2/2 split on 32bit where some funnies may
-happen, see d2896d4b55b2 ("arm: KVM: Fix idmap overlap detection when
-the kernel is idmap'ed").
-
-> Reviewed-by: James Morse <james.morse@arm.com>
+For the series:
+Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 
 Thanks,
+Arnaud
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+On 03/13/2018 03:23 PM, Fabrice Gasnier wrote:
+> This series brings fixes to STM32 DFSDM ADC driver.
+> 
+> Fabrice Gasnier (2):
+>   iio: adc: stm32-dfsdm: fix successive oversampling settings
+>   iio: adc: stm32-dfsdm: fix sample rate for div2 spi clock
+> 
+>  drivers/iio/adc/stm32-dfsdm-adc.c | 17 ++++++++++++++---
+>  1 file changed, 14 insertions(+), 3 deletions(-)
+> 
