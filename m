@@ -1,43 +1,21 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 12:33:14 -0400
-Subject: [Intel-wired-lan] [PATCH v3 09/18] fm10k: Eliminate duplicate
- barriers on weakly-ordered archs
-In-Reply-To: <CAKgT0UcKdCpzFgX4qn7EdYnedOsJa9as5g24tfb6qFLXTxZ29A@mail.gmail.com>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
- <1521216991-28706-10-git-send-email-okaya@codeaurora.org>
- <CAKgT0UcKdCpzFgX4qn7EdYnedOsJa9as5g24tfb6qFLXTxZ29A@mail.gmail.com>
-Message-ID: <2d346b70-70d4-5996-24ce-94031ee68c90@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Mar 2018 16:24:58 +0000
+Subject: [PATCH v6 20/26] arm64: KVM: Move BP hardening vectors into
+ .hyp.text section
+In-Reply-To: <20180314165049.30105-21-marc.zyngier@arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-21-marc.zyngier@arm.com>
+Message-ID: <20180316162457.67xkrist66vtp4mv@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/16/2018 12:30 PM, Alexander Duyck wrote:
-> On Fri, Mar 16, 2018 at 9:16 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> Code includes wmb() followed by writel(). writel() already has a
->> barrier on some architectures like arm64.
->>
->> This ends up CPU observing two barriers back to back before executing
->> the register write.
->>
->> Since code already has an explicit barrier call, changing writel() to
->> writel_relaxed().
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+On Wed, Mar 14, 2018 at 04:50:43PM +0000, Marc Zyngier wrote:
+> There is no reason why the BP hardening vectors shouldn't be part
+> of the HYP text at compile time, rather than being mapped at runtime.
 > 
-> You can update the writel call in fm10k_tx_map as well.
+> Also introduce a new config symbol that controls the compilation
+> of bpi.S.
 > 
-> Of the drivers updated in drivers/net/ethernet/intel/* it looks like
-> this is the only one that still requires any additional changes.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-will do. thanks for the feedback.
-
-> 
-> Thanks.
-> 
-> - Alex
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
