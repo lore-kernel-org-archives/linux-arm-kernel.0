@@ -1,59 +1,53 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:42 +0100
-Subject: [PATCH 12/69] arm64: dts: renesas: draak: enable I2C controller 0 and
- EEPROM
-In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
-References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <86e7a972adec5093e24e888ae3a949ee185dc533.1521206129.git.horms+renesas@verge.net.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 16 Mar 2018 20:35:51 +0530
+Subject: [v2] ARM: davinci: fix the GPIO lookup for omapl138-hawk
+In-Reply-To: <2641a421-9823-c0bb-93d9-ca0c64060c51@lechnology.com>
+References: <20180301103448.27233-1-brgl@bgdev.pl>
+ <2641a421-9823-c0bb-93d9-ca0c64060c51@lechnology.com>
+Message-ID: <e0cad8b8-c2fe-0a66-411f-d478e145ade4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+On Thursday 15 March 2018 10:05 PM, David Lechner wrote:
+> On 03/01/2018 04:34 AM, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> The GPIO chip is called davinci_gpio.0 in legacy mode. Fix it, so that
+>> mmc can correctly lookup the wp and cp gpios.
+>>
+>> Fixes: c69f43fb4f26 ("ARM: davinci: hawk: use gpio descriptor for mmc
+>> pins")
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> ---
+>> v1 -> v2:
+>> - added the Fixes: tag
+>>
+>> ? arch/arm/mach-davinci/board-omapl138-hawk.c | 4 ++--
+>> ? 1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> index a3e78074be70..62eb7d668890 100644
+>> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+>> @@ -127,8 +127,8 @@ static struct gpiod_lookup_table mmc_gpios_table = {
+>> ????? .dev_id = "da830-mmc.0",
+>> ????? .table = {
+>> ????????? /* CD: gpio3_12: gpio60: chip 1 contains gpio range 32-63*/
+>> -??????? GPIO_LOOKUP("davinci_gpio.1", 28, "cd", GPIO_ACTIVE_LOW),
+>> -??????? GPIO_LOOKUP("davinci_gpio.1", 29, "wp", GPIO_ACTIVE_LOW),
+>> +??????? GPIO_LOOKUP("davinci_gpio.0", 28, "cd", GPIO_ACTIVE_LOW),
+>> +??????? GPIO_LOOKUP("davinci_gpio.0", 29, "wp", GPIO_ACTIVE_LOW),
+>> ????? },
+>> ? };
+>> ?
+> 
+> Does board-da830-evm.c need the same fix? It also uses "davinci_gpio.1".
 
-Enables EEPROM on I2C0 on the Draak board.
+Yes. looks like fixes are needed here and other places. I will send
+patches since I have ability to test them.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index 09de73b11db8..6ff9d3eb7540 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -46,6 +46,11 @@
- 		};
- 	};
- 
-+	i2c0_pins: i2c0 {
-+		groups = "i2c0";
-+		function = "i2c0";
-+	};
-+
- 	pwm0_pins: pwm0 {
- 		groups = "pwm0_c";
- 		function = "pwm0";
-@@ -67,6 +72,18 @@
- 	};
- };
- 
-+&i2c0 {
-+	pinctrl-0 = <&i2c0_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	eeprom at 50 {
-+		compatible = "rohm,br24t01", "atmel,24c01";
-+		reg = <0x50>;
-+		pagesize = <8>;
-+	};
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
--- 
-2.11.0
+Thanks,
+Sekhar
