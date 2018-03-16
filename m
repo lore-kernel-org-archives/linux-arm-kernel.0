@@ -1,211 +1,74 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 17:32:43 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.17
-In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
-References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <20180316163243.ymcnbdvpbvzrext2@verge.net.au>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Mar 2018 16:37:15 +0000
+Subject: [PATCH v6 19/26] arm64: KVM: Move stashing of x0/x1 into the
+ vector code itself
+In-Reply-To: <20180316162257.rvz26fbn3j5jvsku@armageddon.cambridge.arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180314165049.30105-20-marc.zyngier@arm.com>
+ <20180316162257.rvz26fbn3j5jvsku@armageddon.cambridge.arm.com>
+Message-ID: <6f9bb886-d4fa-2272-2bd5-9f440b2f9e8c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 03:53:09PM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On 16/03/18 16:22, Catalin Marinas wrote:
+> On Wed, Mar 14, 2018 at 04:50:42PM +0000, Marc Zyngier wrote:
+>> All our useful entry points into the hypervisor are starting by
+>> saving x0 and x1 on the stack. Let's move those into the vectors
+>> by introducing macros that annotate whether a vector is valid or
+>> not, thus indicating whether we want to stash registers or not.
+>>
+>> The only drawback is that we now also stash registers for el2_error,
+>> but this should never happen, and we pop them back right at the
+>> start of the handling sequence.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/hyp-entry.S | 56 ++++++++++++++++++++++++------------------
+>>  1 file changed, 32 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+>> index f36464bd57c5..0f62b5f76aa5 100644
+>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+>> @@ -55,7 +55,6 @@ ENTRY(__vhe_hyp_call)
+>>  ENDPROC(__vhe_hyp_call)
+>>  
+>>  el1_sync:				// Guest trapped into EL2
+>> -	stp	x0, x1, [sp, #-16]!
+>>  
+>>  alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+>>  	mrs	x1, esr_el2
+>> @@ -137,18 +136,18 @@ alternative_else_nop_endif
+>>  	b	__guest_exit
+>>  
+>>  el1_irq:
+>> -	stp     x0, x1, [sp, #-16]!
+>>  	ldr	x1, [sp, #16 + 8]
+>>  	mov	x0, #ARM_EXCEPTION_IRQ
+>>  	b	__guest_exit
+>>  
+>>  el1_error:
+>> -	stp     x0, x1, [sp, #-16]!
+>>  	ldr	x1, [sp, #16 + 8]
+>>  	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+>>  	b	__guest_exit
+>>  
+>>  el2_error:
+>> +	ldp	x0, x1, [sp], #16
+>> +
 > 
-> Please consider these Renesas ARM based SoC DT updates for v4.17.
+> Nitpick: you don't need a memory access here, just:
+> 
+> 	add	sp, sp, #16
+> 
+> (unless el2_error has changed somewhere before this patch)
 
-Unfortunately there seems to be a small problem with this pull request.
+At this point in the series, I agree. But starting with patch 22, we
+start messing with x0 if HARDEN_EL2_VECTORS is valid, meaning we really
+need to restore it in order to preserve the guest state.
 
-"ARM: dts: r7s72100: add USB device to device tree" is already
-present upstream via Greg KH.
+Thanks,
 
-I will drop that patch, and the r7s72100 cleanup patches that depend on it
-and post a v2. I'll also see about re-applying the cleanup patches for v4.18.
-
-> 
-> 
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-> 
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.17
-> 
-> for you to fetch changes up to 49846cbda7d3f85f0bb6cebccf8f039b51401fcb:
-> 
->   ARM: dts: silk: Add GPIO keys to DT (2018-03-13 19:33:11 +0100)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Updates for v4.17
-> 
-> * Silk board with R-Car E2 (r8a7794) SoC
->   - Add r1ex24002 EEPROM to DT
-> 
->     Magnus Damm says "Extend the Silk board support to include U14 which is
->     an I2C based EEPROM hooked up to the I2C1 bus."
-> 
->   - Add GPIO keys to DT
-> 
->     Magnus Damm says "Extend the Silk board support to include SW3, SW4,
->     SW6 and SW12. They are all connected via GPIO lines and handled by the
->     gpio-keys driver"
-> 
-> * Marzen board with R-Car H1 (r7a7779) SoC
->   - Add SDHI0 VCCQ Regulator
-> 
->     Magnus Damm says "Add support for the on-board voltage regulator hooked
->     up to GPIO3_20 on r8a7779 Marzen. The board schematics describes the
->     regulator as U4 TPS2110A. Input wise, U4 has D0 fixed to ground, D1
->     tied to GPIO3_20 while IN1 is fixed to 3.3V and IN2 is fixed to 1.8V.
->     OUT goes to the pull-ups for the data pins of SDHI0."
-> 
-> * Porter board with R-Car M3W (r8a7791) SoC
->   - Fix HDMI output routing
-> 
->     Laurent Pinchart says "The HDMI encoder is connected to the RGB output
->     of the DU, which is port at 0, not port at 1."
-> 
-> * iWave Systems RZ/G1E SODIMM System On Module (iW-RainboW-G22M-SM) and
->   iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
->   - Enable cmt0
-> 
-> * Stout board with R-Car H2 (r8a7790) SoC
->   - Initial support
-> 
-> * Lager board with R-Car H2 (r8a7790) SoC
->   - Add CEC clock for HDMI transmitter
-> 
->     Niklas S?derlund says "The adv7511 on the Lager board has a 12 MHz
->     fixed clock for the CEC block. Specify this in the dts to enable CEC
->     support."
-> 
->   - Move cec_clock to root node
-> 
->     By definition nodes without a bus address do not belong on the bus
-> 
-> * kzm9d board with EMMA Mobile EV2 (EMEV2) SoC
->   - Fix "debounce-interval" property misspelling
-> 
-> * RZ/A1 (r7s72100) SoC
->   - Add USB nodes
-> 
-> * RZ/G1M (r8a7743) and RZ/G1H (r8a7745) SoCs
->   - Add IPMMU DT nodes
->   - Add VSP support
-> 
-> * R-Car Gen2 boards
->   - Use I2C demuxer for
-> 
->     This allows run-time switching between alternate I2C IP blocks
-> 
-> * R-Car Gen2 and RZ SoCs
->   - Clean up DT files to ease future maintenance
->     + add soc node for IP attached to the bus
->     + sort subnodes of soc and root node
->     + consistently use single space after =
-> 
-> * R-Car H2 (r8a7790), M3-W (r8a7791) and M3-N (r7a7793) SoCs
->   - Reduce size of thermal registers
-> 
->     According to the "User's Manual: Hardware" v2.00 the registers at base
->     0xe61f0000 extend to an offset of 0x10, rather than 0x14 which is the
->     case on the r8a73a4 (R-Mobile APE6).
-> 
->     This should not have any runtime affect as mapping granularity is
->     PAGE_SIZE.
-> 
-> ----------------------------------------------------------------
-> Biju Das (4):
->       ARM: dts: r8a7743: Add IPMMU DT nodes
->       ARM: dts: r8a7745: Add IPMMU DT nodes
->       ARM: dts: r8a7743: Add VSP support
->       ARM: dts: r8a7745: Add VSP support
-> 
-> Chris Brandt (1):
->       ARM: dts: r7s72100: add USB device to device tree
-> 
-> Fabrizio Castro (2):
->       ARM: dts: iwg20m: Enable cmt0
->       ARM: dts: iwg22m: Enable cmt0
-> 
-> Geert Uytterhoeven (2):
->       ARM: dts: kzm9d: Fix "debounce-interval" property misspelling
->       ARM: dts: lager: Move cec_clock to root node
-> 
-> Laurent Pinchart (1):
->       ARM: dts: porter: Fix HDMI output routing
-> 
-> Magnus Damm (3):
->       ARM: dts: marzen: Add SDHI0 VCCQ Regulator
->       ARM: dts: silk: Add r1ex24002 EEPROM to DT
->       ARM: dts: silk: Add GPIO keys to DT
-> 
-> Marek Vasut (1):
->       ARM: dts: stout: Initial r8a7790 Stout board support
-> 
-> Niklas S?derlund (1):
->       ARM: dts: lager: Add CEC clock for HDMI transmitter
-> 
-> Simon Horman (28):
->       ARM: dts: r8a7790: Reduce size of thermal registers
->       ARM: dts: r8a7791: Reduce size of thermal registers
->       ARM: dts: r8a7793: Reduce size of thermal registers
->       ARM: dts: r8a7790: consistently use single space after =
->       ARM: dts: r8a7790: add soc node
->       ARM: dts: r8a7790: sort subnodes of soc node
->       ARM: dts: r8a7790: sort subnodes of root node
->       ARM: dts: r8a7791: consistently use single space after =
->       ARM: dts: r8a7791: add soc node
->       ARM: dts: r8a7791: sort subnodes of root node
->       ARM: dts: r8a7792: sort subnodes of soc node
->       ARM: dts: r8a7793: consistently use single space after =
->       ARM: dts: r8a7793: add soc node
->       ARM: dts: r8a7793: sort subnodes of soc node
->       ARM: dts: r8a7793: sort subnodes of root node
->       ARM: dts: r8a7794: consistently use single space after =
->       ARM: dts: r8a7794: add soc node
->       ARM: dts: r8a7794: sort subnodes of soc node
->       ARM: dts: r8a7794: sort subnodes of root node
->       ARM: dts: r8a7790: consistently use single space before =
->       ARM: dts: r8a7791: consistently use single space before =
->       ARM: dts: r8a7793: consistently use single space before =
->       ARM: dts: r8a7743: sort subnodes of soc node
->       ARM: dts: r8a7745: sort subnodes of soc node
->       ARM: dts: r7s72100: add soc node
->       ARM: dts: r7s72100: sort subnodes of soc node
->       ARM: dts: r7s72100: stop grouping clocks under a "clocks" subnode
->       ARM: dts: r7s72100: sort subnodes of root node
-> 
-> Wolfram Sang (9):
->       ARM: dts: lager: use demuxer for IIC2/I2C2
->       ARM: dts: lager: use demuxer for IIC3/I2C3
->       ARM: dts: koelsch: use demuxer for I2C2
->       ARM: dts: koelsch: use demuxer for I2C4
->       ARM: dts: porter: use demuxer for I2C2
->       ARM: dts: alt: use demuxer for I2C1
->       ARM: dts: silk: use demuxer for I2C1
->       ARM: dts: gose: use demuxer for I2C2
->       ARM: dts: gose: use demuxer for I2C4
-> 
->  arch/arm/boot/dts/Makefile            |    1 +
->  arch/arm/boot/dts/emev2-kzm9d.dts     |    8 +-
->  arch/arm/boot/dts/r7s72100.dtsi       | 1018 +++++------
->  arch/arm/boot/dts/r8a7743-iwg20m.dtsi |    4 +
->  arch/arm/boot/dts/r8a7743.dtsi        | 1324 ++++++++-------
->  arch/arm/boot/dts/r8a7745-iwg22m.dtsi |    4 +
->  arch/arm/boot/dts/r8a7745.dtsi        | 1778 ++++++++++----------
->  arch/arm/boot/dts/r8a7779-marzen.dts  |   14 +
->  arch/arm/boot/dts/r8a7790-lager.dts   |  287 ++--
->  arch/arm/boot/dts/r8a7790-stout.dts   |  363 ++++
->  arch/arm/boot/dts/r8a7790.dtsi        | 2837 ++++++++++++++++---------------
->  arch/arm/boot/dts/r8a7791-koelsch.dts |  232 ++-
->  arch/arm/boot/dts/r8a7791-porter.dts  |  130 +-
->  arch/arm/boot/dts/r8a7791.dtsi        | 2986 +++++++++++++++++----------------
->  arch/arm/boot/dts/r8a7792.dtsi        |  498 +++---
->  arch/arm/boot/dts/r8a7793-gose.dts    |  252 +--
->  arch/arm/boot/dts/r8a7793.dtsi        | 2392 +++++++++++++-------------
->  arch/arm/boot/dts/r8a7794-alt.dts     |   53 +-
->  arch/arm/boot/dts/r8a7794-silk.dts    |  189 ++-
->  arch/arm/boot/dts/r8a7794.dtsi        | 2421 +++++++++++++-------------
->  20 files changed, 8957 insertions(+), 7834 deletions(-)
->  create mode 100644 arch/arm/boot/dts/r8a7790-stout.dts
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
