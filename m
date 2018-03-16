@@ -1,201 +1,38 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 17 Mar 2018 00:17:33 +0100
-Subject: [PATCH v2] arm64: allwinner: H5: Add Xunlong Orange Pi Zero Plus
-Message-ID: <20180316231733.15399-1-hauke@hauke-m.de>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 16 Mar 2018 16:02:53 -0700
+Subject: [PATCH v6 16/20] clk: add support for clocks provided by SCMI
+In-Reply-To: <1519403030-21189-17-git-send-email-sudeep.holla@arm.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+ <1519403030-21189-17-git-send-email-sudeep.holla@arm.com>
+Message-ID: <152124137391.242365.17144416413429914606@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xunlong Orange Pi Zero Plus is single board computer.
-- H5 Quad-core 64-bit Cortex-A53
-- 512MB DDR3
-- microSD slot
-- Debug TTL UART
-- 1000M/100M/10M Ethernet RJ45
-- Realtek RTL8189FTV
-- Spi flash (2MB)
-- One USB 2.0 HOST, One USB 2.0 OTG
+Quoting Sudeep Holla (2018-02-23 08:23:46)
+> diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
+> new file mode 100644
+> index 000000000000..1e4d7a57779b
+> --- /dev/null
+> +++ b/drivers/clk/clk-scmi.c
+> +                       hws[idx] = &sclk->hw;
+> +               }
+> +       }
+> +
+> +       return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
 
-This is based on a patch from armbian:
-https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/sunxi-add-orangepi-zero-plus.patch
+devm_of_clk_add_hw_provider?
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
+> +}
+> +
+> +static void scmi_clocks_remove(struct scmi_device *sdev)
+> +{
+> +       struct device *dev = &sdev->dev;
+> +       struct device_node *np = dev->of_node;
+> +
+> +       of_clk_del_provider(np);
+> +}
+> +
 
-Changees since v1:
- * Add my copyright
- * Add SPDX-License
- * moved Makefile entry
- * removed unused reg_usb0_vbus entry
+Drop?
 
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../dts/allwinner/sun50i-h5-orangepi-zero-plus.dts | 147 +++++++++++++++++++++
- 2 files changed, 148 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
-
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index f505227b0250..915604e46e88 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -7,6 +7,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
-new file mode 100644
-index 000000000000..74f33941b551
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
-@@ -0,0 +1,147 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ * Copyright (C) 2018 Hauke Mehrtens <hauke@hauke-m.de>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR X11)
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi Zero Plus";
-+	compatible = "xunlong,orangepi-zero-plus", "allwinner,sun50i-h5";
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	aliases {
-+		ethernet0 = &emac;
-+		ethernet1 = &rtl8189ftv;
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
-+			default-state = "on";
-+		};
-+
-+		status {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>; /* PA17 */
-+		};
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&external_mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	/*
-+	 * Explicitly define the sdio device, so that we can add an ethernet
-+	 * alias for it (which e.g. makes u-boot set a mac-address).
-+	 */
-+	rtl8189ftv: sdio_wifi at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&spi0  {
-+	status = "okay";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "mxicy,mx25l1606e", "winbond,w25q128";
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+	};
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB Type-A ports' VBUS is always on */
-+	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+	status = "okay";
-+};
--- 
-2.11.0
+You can keep my acked-by otherwise.
