@@ -1,37 +1,56 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 15 Mar 2018 21:04:56 -0400
-Subject: [PATCH v2 6/6] ixgbevf: eliminate duplicate barriers on
- weakly-ordered archs
+Date: Thu, 15 Mar 2018 21:04:55 -0400
+Subject: [PATCH v2 5/6] ixgbevf: keep writel() closer to wmb()
 In-Reply-To: <1521162296-19729-1-git-send-email-okaya@codeaurora.org>
 References: <1521162296-19729-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521162296-19729-7-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521162296-19729-6-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel() in multiple places. writel()
-already has a barrier on some architectures like arm64.
-
-This ends up CPU observing two barriers back to back before executing the
-register write.
-
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+Remove ixgbevf_write_tail() in favor of moving writel() close to
+wmb().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 4 ++--
+ 2 files changed, 2 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
+index f695242..11e893e 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
+@@ -244,11 +244,6 @@ static inline u16 ixgbevf_desc_unused(struct ixgbevf_ring *ring)
+ 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
+ }
+ 
+-static inline void ixgbevf_write_tail(struct ixgbevf_ring *ring, u32 value)
+-{
+-	writel(value, ring->tail);
+-}
+-
+ #define IXGBEVF_RX_DESC(R, i)	\
+ 	(&(((union ixgbe_adv_rx_desc *)((R)->desc))[i]))
+ #define IXGBEVF_TX_DESC(R, i)	\
 diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-index b65f691..9e2e0fd 100644
+index 9b3d43d..b65f691 100644
 --- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
 +++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+@@ -659,7 +659,7 @@ static void ixgbevf_alloc_rx_buffers(struct ixgbevf_ring *rx_ring,
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		ixgbevf_write_tail(rx_ring, i);
++		writel(i, rx_ring->tail);
+ 	}
+ }
+ 
 @@ -3644,7 +3644,7 @@ static void ixgbevf_tx_map(struct ixgbevf_ring *tx_ring,
  	tx_ring->next_to_use = i;
  
  	/* notify HW of packet */
--	writel(value, tx_ring->tail);
-+	writel_relaxed(value, tx_ring->tail);
+-	ixgbevf_write_tail(tx_ring, i);
++	writel(value, tx_ring->tail);
  
  	return;
  dma_error:
