@@ -1,143 +1,54 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:33 +0100
-Subject: [PATCH 03/69] arm64: dts: renesas: r8a7796: Add OPPs table for cpu
- devices
-In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
-References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <da7e3113344fda50b10f1ad2c633abaaaf25d21b.1521206129.git.horms+renesas@verge.net.au>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 16 Mar 2018 15:53:52 +0100
+Subject: [PATCH] arm64: dts: armada-3720-espressobin: Document URL for
+ schematic
+In-Reply-To: <20180316141450.GF17895@lunn.ch>
+References: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
+ <20180316141450.GF17895@lunn.ch>
+Message-ID: <20180316145352.n6bqsoxdg5lsol2f@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dien Pham <dien.pham.ry@rvc.renesas.com>
+Hello Andrew,
 
-Define OOP tables for all CPUs.
-This allows CPUFreq to function.
+On Fri, Mar 16, 2018 at 03:14:50PM +0100, Andrew Lunn wrote:
+> On Fri, Mar 16, 2018 at 11:01:24AM +0100, Uwe Kleine-K?nig wrote:
+> > The schematic of hte espressobin is publicly available, add a comment
+> > where to find it.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> > index bdfb5553ddb5..6d070b267abe 100644
+> > --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> > +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> > @@ -42,6 +42,9 @@
+> >   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> >   *     OTHER DEALINGS IN THE SOFTWARE.
+> >   */
+> > +/*
+> > + * Schematic available at http://espressobin.net/wp-content/uploads/2017/08/ESPRESSObin_V5_Schematics.pdf
+> > + */
+> 
+> Version 4 is also available:
+> http://wiki.espressobin.net/tiki-download_file.php?fileId=90. I've no
+> idea how you tell the boards apart. But my espressobin has more
+> jumpers behind the reset button than the board on the home page.
 
-Based in part on work by Hien Dang.
+on the back side my board has printed:
 
-Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 62 ++++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
+	ESPRESSObin_V5_0_1
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index c5192d513d7d..e06bde6e2853 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -71,6 +71,8 @@
- 			power-domains = <&sysc R8A7796_PD_CA57_CPU0>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A7796_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		a57_1: cpu at 1 {
-@@ -80,6 +82,8 @@
- 			power-domains = <&sysc R8A7796_PD_CA57_CPU1>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A7796_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		a53_0: cpu at 100 {
-@@ -89,6 +93,8 @@
- 			power-domains = <&sysc R8A7796_PD_CA53_CPU0>;
- 			next-level-cache = <&L2_CA53>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A7796_CLK_Z2>;
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 
- 		a53_1: cpu at 101 {
-@@ -98,6 +104,8 @@
- 			power-domains = <&sysc R8A7796_PD_CA53_CPU1>;
- 			next-level-cache = <&L2_CA53>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A7796_CLK_Z2>;
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 
- 		a53_2: cpu at 102 {
-@@ -107,6 +115,8 @@
- 			power-domains = <&sysc R8A7796_PD_CA53_CPU2>;
- 			next-level-cache = <&L2_CA53>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A7796_CLK_Z2>;
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 
- 		a53_3: cpu at 103 {
-@@ -116,6 +126,8 @@
- 			power-domains = <&sysc R8A7796_PD_CA53_CPU3>;
- 			next-level-cache = <&L2_CA53>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A7796_CLK_Z2>;
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 
- 		L2_CA57: cache-controller-0 {
-@@ -147,6 +159,56 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <820000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp-1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <820000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp-1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <820000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp-1600000000 {
-+			opp-hz = /bits/ 64 <1600000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp-1700000000 {
-+			opp-hz = /bits/ 64 <1700000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp-1800000000 {
-+			opp-hz = /bits/ 64 <1800000000>;
-+			opp-microvolt = <960000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+	};
-+
-+	cluster1_opp: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <820000>;
-+			clock-latency-ns = <300000>;
-+		};
-+	};
-+
- 	/* External PCIe clock - can be overridden by the board */
- 	pcie_bus_clk: pcie_bus {
- 		compatible = "fixed-clock";
+between the ethernet ports and the blue USB port, so I guess V5 is the
+right schematic for me. And my board has 3 3-pin-headers near the reset
+button, these are described on page 7 of the V5 schematic.
+
+Best regards
+Uwe
+
 -- 
-2.11.0
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
