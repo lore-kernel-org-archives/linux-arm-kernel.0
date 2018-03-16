@@ -1,56 +1,40 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Fri, 16 Mar 2018 10:19:41 +0100
-Subject: [PATCH] ARM: dts: sun7i: Add pinmux settings for LCD0 RGB888
- output.
-In-Reply-To: <20180316064731.muiw5yumhmfnwxg2@flea>
-References: <1521121410-17103-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180316064731.muiw5yumhmfnwxg2@flea>
-Message-ID: <658946b9-4f49-ff24-3b84-da1eb9b7d9ad@micronovasrl.com>
+From: harald@ccbib.org (Harald Geyer)
+Date: Fri, 16 Mar 2018 10:30:55 +0100
+Subject: arm64: allwinner: Add support for TERES I laptop
+In-Reply-To: <20180315170606.GA3635@afzalpc>
+References: <20180312161050.7647-1-harald@ccbib.org>
+ <20180315170606.GA3635@afzalpc>
+Message-ID: <E1ewlhQ-0000Jx-6s@stardust.g4.wien.funkfeuer.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-Il 16/03/2018 07:47, Maxime Ripard ha scritto:
-> Hi Giulio,
+afzal mohammed writes:
+> On Mon, Mar 12, 2018 at 04:10:45PM +0000, Harald Geyer wrote:
+> > This series adds support for the TERES I open hardware laptop produced
+> > by olimex. With these patches and a bootloader capable of setting up
+> > simple framebuffer the laptop is quite useable.
 > 
-> On Thu, Mar 15, 2018 at 02:43:30PM +0100, Giulio Benetti wrote:
->> The A20 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
->> for the needed pins.
->>
->> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> Thanks for the patches
 > 
-> Like we discussed last time, we only merge this kind of patches if
-> there's an immediate user.
-
-You're right.
-In few time(I hope), I'm going to send dts for Linova1-4_3 and Linova1-7,
-where I use those pins.
-I have also to send 2 patches for 2 new panels for panel-simple.
-
-So I think I have to send 2 displays' patches before.
-And a patchset for the 2 boards and rgb888 pins.
-
-One question: do I have to wait for panels' patches to applied and then 
-send patchset for boards dts?
-Or can I send a unique patchset?
-Because as I understand those patches should be applied to 2 different 
-repositories, right?
-
-Thanks in advance
-
--- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
-
+> w/ defconfig could reach to prompt via serial console using audio
+> jack.
 > 
-> Maxime
+> And just by enabling PWM_SUN4I & FB_SIMPLE, laptop could function
+> standalone as well.
 > 
+> Suggestions (feel free to ignore):
+> 
+> 1. seems currently only review comment pending is on simple
+> framebuffer, perhaps you can proceed removing just that so that a
+> basic bootable system can be achieved at the earliest (iiuc, anyway
+> drm would be the final solution for display)
+
+I'm under the impression that I addressed the concerns regarding simplefb
+satisfactorily. But yes: I hope to get this merged in time for 4.17.
+If simplefb is a problem for that, I'd rather drop it then postpone
+the entire series.
+
+Thanks for testing,
+Harald
