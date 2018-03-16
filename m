@@ -1,39 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:51:58 +0100
-Subject: [PATCH 2/8] dt-bindings: arm: document Condor board bindings
+Date: Fri, 16 Mar 2018 15:52:02 +0100
+Subject: [PATCH 6/8] dt-bindings: arm: Document Renesas V3MSK and Wheat board
+ part numbers
 In-Reply-To: <cover.1521206902.git.horms+renesas@verge.net.au>
 References: <cover.1521206902.git.horms+renesas@verge.net.au>
-Message-ID: <8dc09f400a08108984c0bacc4af5cb395a3c5c22.1521206902.git.horms+renesas@verge.net.au>
+Message-ID: <04db44132bc544e12f8c7693db35a080edded6ee.1521206902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Document the Condor device tree bindings, listing it as a supported board.
+The DT binding documentation for the Renesas V3MSK and Wheat boards
+lacked board part numbers.
 
-This allows to use checkpatch.pl to validate .dts files referring to the
-Condor board.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[simon: corrected Wheat part number]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 3ccad353acfa..41d3920aaa5e 100644
+index a99359e63b0a..66edc1406bb8 100644
 --- a/Documentation/devicetree/bindings/arm/shmobile.txt
 +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -59,6 +59,8 @@ Boards:
-     compatible = "renesas,blanche", "renesas,r8a7792"
-   - BOCK-W
-     compatible = "renesas,bockw", "renesas,r8a7778"
-+  - Condor (RTP0RC77980SEB0010SS/RTP0RC77980SEB0010SA01)
-+    compatible = "renesas,condor", "renesas,r8a77980"
-   - Draak (RTP0RC77995SEB0010S)
-     compatible = "renesas,draak", "renesas,r8a77995"
-   - Eagle (RTP0RC77970SEB0010S)
+@@ -120,9 +120,9 @@ Boards:
+     compatible = "renesas,sk-rzg1m", "renesas,r8a7743"
+   - Stout (ADAS Starterkit, Y-R-CAR-ADAS-SKH2-BOARD)
+     compatible = "renesas,stout", "renesas,r8a7790"
+-  - V3MSK
++  - V3MSK (Y-ASK-RCAR-V3M-WS10)
+     compatible = "renesas,v3msk", "renesas,r8a77970"
+-  - Wheat
++  - Wheat (RTP0RC7792ASKB0000JE)
+     compatible = "renesas,wheat", "renesas,r8a7792"
+ 
+ 
 -- 
 2.11.0
