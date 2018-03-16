@@ -1,41 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 18:05:59 +0000
-Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
- mitigation)
-In-Reply-To: <20180316174644.klbpmuhyod5qea3r@armageddon.cambridge.arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180316174644.klbpmuhyod5qea3r@armageddon.cambridge.arm.com>
-Message-ID: <a91ea637-1d20-2d9a-7da9-16fd695497a6@arm.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Fri, 16 Mar 2018 12:27:01 -0600
+Subject: [PATCH 1/2] dt-bindings: Document qcom,adreno-gmu
+In-Reply-To: <CAL_Jsq+OJ0jon2uFb6oMKjZuw4iPQxkxfBrbDyMN-BrNZfTRzA@mail.gmail.com>
+References: <20180302215638.6145-1-jcrouse@codeaurora.org>
+ <20180302215638.6145-2-jcrouse@codeaurora.org>
+ <CAL_Jsq+OJ0jon2uFb6oMKjZuw4iPQxkxfBrbDyMN-BrNZfTRzA@mail.gmail.com>
+Message-ID: <20180316182701.GC28808@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/18 17:46, Catalin Marinas wrote:
-> On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
->> Whilst KVM benefits from the kernel randomisation via KASLR, there is
->> no additional randomisation when the kernel is running at EL1, as we
->> directly use a fixed offset from the linear mapping. This is not
->> necessarily a problem, but we could do a bit better by independently
->> randomizing the HYP placement.
+On Mon, Mar 05, 2018 at 01:38:59PM -0600, Rob Herring wrote:
+> On Fri, Mar 2, 2018 at 3:56 PM, Jordan Crouse <jcrouse@codeaurora.org> wrote:
+> > Document the device tree bindings for the Adreno GMU device
+> > available on Adreno a6xx targets.
+> >
+> > Change-Id: I3cfd5fb35ab0045e39905ff12393006e60f1a124
 > 
-> For the rest of the patches in this series:
+> Gerrit!
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks for that.
-
-> Some points for a future series:
+> > Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> > ---
+> >  .../devicetree/bindings/display/msm/gmu.txt        | 54 ++++++++++++++++++++++
+> >  .../devicetree/bindings/display/msm/gpu.txt        | 10 +++-
+> >  2 files changed, 62 insertions(+), 2 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/display/msm/gmu.txt b/Documentation/devicetree/bindings/display/msm/gmu.txt
+> > new file mode 100644
+> > index 000000000000..f65bb49fff36
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/display/msm/gmu.txt
+> > @@ -0,0 +1,54 @@
+> > +Qualcomm adreno/snapdragon GMU (Graphics management unit)
+> > +
+> > +The GMU is a programmable power controller for the GPU. the CPU controls the
+> > +GMU which in turn handles power controls for the GPU.
+> > +
+> > +Required properties:
+> > +- compatible:
+> > +  * "qcom,adreno-gmu"
 > 
-> - in bpi.S, drop the __smccc_workaround_1_hvc_start/end as HVC PSCI
->   conduit for hyp doesn't make much sense (could pass NULL instead to
->   __install_bp_hardening_cb())
-> 
-> - maybe move bpi.S under arch/arm64/kvm/ if it doesn't cause other
->   dependency issues in cpu_errata.c
+> Kind of generic. All the features are discoverable?
 
-Sure. I'll have a look at a bit of a post-paranoia cleanup next week.
+I was just prepping a new version and I realized I never responded to this.
+Sorry.
 
-Thanks,
+Yes, all the features are discoverable. Since the GMU is on the same die as the
+GPU we would use the GPU revision as the criteria for applying hardware
+workarounds and whatnot. I can't think of any current situation that would
+require us to uniquely identify the GMU from DT.
 
-	M.
+Jordan
+
 -- 
-Jazz is not dead. It just smells funny...
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
