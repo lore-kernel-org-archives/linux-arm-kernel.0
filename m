@@ -1,80 +1,133 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:52:39 +0100
-Subject: [PATCH 20/52] ARM: dts: r8a7794: consistently use single space after =
-In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
-References: <cover.1521208546.git.horms+renesas@verge.net.au>
-Message-ID: <b190cce35ff90e392f89a3d45e0814cdbfd7434c.1521208546.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Mar 2018 15:51:11 +0100
+Subject: [PATCH 41/69] arm64: dts: renesas: r8a77965: Add SCIF device nodes
+In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
+References: <cover.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <0ea5b2fd38db56aad29e4b6a2028fccde438a110.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consistently use a single space after a =.
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-This patch removes instances where a tab is used instead.
+Add SCIF[0-5] device nodes for M3-N (r8a77965) SoC.
 
-This patch should not introduce any functional change.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 38 +++++++++++++++++++-------------------
- 1 file changed, 19 insertions(+), 19 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 85 ++++++++++++++++++++++++++++---
+ 1 file changed, 79 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 106b4e1649ff..79263377ded3 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -319,20 +319,20 @@
- 	audma0: dma-controller at ec700000 {
- 		compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
- 		reg = <0 0xec700000 0 0x10000>;
--		interrupts =	<GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
--				 GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupts = <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
-+			      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error",
- 				  "ch0", "ch1", "ch2", "ch3", "ch4", "ch5",
- 				  "ch6", "ch7", "ch8", "ch9", "ch10", "ch11",
-@@ -1186,11 +1186,11 @@
- 		 */
- 		compatible = "renesas,rcar_sound-r8a7794",
- 			     "renesas,rcar_sound-gen2";
--		reg =	<0 0xec500000 0 0x1000>, /* SCU */
--			<0 0xec5a0000 0 0x100>,  /* ADG */
--			<0 0xec540000 0 0x1000>, /* SSIU */
--			<0 0xec541000 0 0x280>,  /* SSI */
--			<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
-+		reg = <0 0xec500000 0 0x1000>, /* SCU */
-+		      <0 0xec5a0000 0 0x100>,  /* ADG */
-+		      <0 0xec540000 0 0x1000>, /* SSIU */
-+		      <0 0xec541000 0 0x280>,  /* SSI */
-+		      <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
- 		reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index b83dafc5745e..3cb1a332314e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -335,27 +335,100 @@
+ 		};
  
- 		clocks = <&cpg CPG_MOD 1005>,
+ 		scif0: serial at e6e60000 {
+-			/* placeholder */
++			compatible = "renesas,scif-r8a77965",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6e60000 0 64>;
++			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 207>,
++				 <&cpg CPG_CORE 20>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
++			       <&dmac2 0x51>, <&dmac2 0x50>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 207>;
++			status = "disabled";
+ 		};
+ 
+ 		scif1: serial at e6e68000 {
+-			/* placeholder */
++			compatible = "renesas,scif-r8a77965",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6e68000 0 64>;
++			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 206>,
++				 <&cpg CPG_CORE 20>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
++			       <&dmac2 0x53>, <&dmac2 0x52>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 206>;
++			status = "disabled";
+ 		};
+ 
+ 		scif2: serial at e6e88000 {
+-			/* placeholder */
++			compatible = "renesas,scif-r8a77965",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6e88000 0 64>;
++			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 310>,
++				 <&cpg CPG_CORE 20>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 310>;
++			status = "disabled";
+ 		};
+ 
+ 		scif3: serial at e6c50000 {
+-			/* placeholder */
++			compatible = "renesas,scif-r8a77965",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6c50000 0 64>;
++			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 204>,
++				 <&cpg CPG_CORE 20>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x57>, <&dmac0 0x56>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 204>;
++			status = "disabled";
+ 		};
+ 
+ 		scif4: serial at e6c40000 {
+-			/* placeholder */
++			compatible = "renesas,scif-r8a77965",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6c40000 0 64>;
++			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 203>,
++				 <&cpg CPG_CORE 20>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x59>, <&dmac0 0x58>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 203>;
++			status = "disabled";
+ 		};
+ 
+ 		scif5: serial at e6f30000 {
+-			/* placeholder */
++			compatible = "renesas,scif-r8a77965",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6f30000 0 64>;
++			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 202>,
++				 <&cpg CPG_CORE 20>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>,
++			       <&dmac2 0x5b>, <&dmac2 0x5a>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 202>;
++			status = "disabled";
+ 		};
+ 
+ 		avb: ethernet at e6800000 {
 -- 
 2.11.0
