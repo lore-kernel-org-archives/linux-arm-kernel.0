@@ -1,55 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:52:02 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.17
-Message-ID: <cover.1521206902.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Mar 2018 15:51:57 +0100
+Subject: [PATCH 1/8] dt-bindings: arm: document R8A77980 SoC bindings
+In-Reply-To: <cover.1521206902.git.horms+renesas@verge.net.au>
+References: <cover.1521206902.git.horms+renesas@verge.net.au>
+Message-ID: <f15092f8482b63b91d7ca7f4bd7090da7f9f2f24.1521206902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please consider these Renesas ARM based SoC DT bindings updates for v4.17.
+Document the R-Car V3H (R8A77980) SoC device tree bindings.
 
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.17
-
-for you to fetch changes up to 09bea76aad76058d7d1dae8f5804751a017967c1:
-
-  dt-bindings: arm: Document Renesas R-Car M3-N-based Salvator-X board (2018-02-28 07:51:32 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Bindings Updates for v4.17
-
-* Document the bindings for:
-  - R-Car V3H (r8a77980) SoC
-  - Condor board with V3H (r8a77980) SoC
-  - Stout (ADAS Starterkit) board with R-Car H2 (r8a7790) SoC
-  - R-Car M3-N (r8a77965) SoC
-  - Salvator-X and Salvator-XS boards with R-Car M3-N (r8a77965) SoC
-* Document that Armadillo-800 is compatibie with R-Mobile A1 (r8a7740) SoC
-* Document part numbers of Wheat and V3MSK boards
-
-----------------------------------------------------------------
-Geert Uytterhoeven (4):
-      dt-bindings: arm: Document SoC compatible value for Armadillo-800 EVA
-      dt-bindings: arm: Document Renesas V3MSK and Wheat board part numbers
-      dt-bindings: arm: Document Renesas R-Car M3-N-based Salvator-XS board
-      dt-bindings: arm: Document Renesas R-Car M3-N-based Salvator-X board
-
-Jacopo Mondi (1):
-      dt-bindings: arm: Document R-Car M3-N SoC DT bindings
-
-Marek Vasut (1):
-      dt-bindings: arm: Document Renesas H2-based Stout DT bindings
-
-Sergei Shtylyov (2):
-      dt-bindings: arm: document R8A77980 SoC bindings
-      dt-bindings: arm: document Condor board bindings
-
- Documentation/devicetree/bindings/arm/shmobile.txt | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 5c3af7ef0761..3ccad353acfa 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -41,6 +41,8 @@ SoCs:
+     compatible = "renesas,r8a7796"
+   - R-Car V3M (R8A77970)
+     compatible = "renesas,r8a77970"
++  - R-Car V3H (R8A77980)
++    compatible = "renesas,r8a77980"
+   - R-Car D3 (R8A77995)
+     compatible = "renesas,r8a77995"
+ 
+-- 
+2.11.0
