@@ -1,87 +1,33 @@
 From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri, 16 Mar 2018 11:33:46 +0100
-Subject: [PATCH net-next 05/10] phy: cp110-comphy: 2.5G SGMII mode
+Date: Fri, 16 Mar 2018 11:33:49 +0100
+Subject: [PATCH net-next 08/10] arm64: dts: marvell: 7040-db: set the 10G
+ interface management to in-band
 In-Reply-To: <20180316103351.16616-1-antoine.tenart@bootlin.com>
 References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
-Message-ID: <20180316103351.16616-6-antoine.tenart@bootlin.com>
+Message-ID: <20180316103351.16616-9-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allow the CP100 comphy to configure some lanes in the
-2.5G SGMII mode. This mode is quite close to SGMII and uses nearly the
-same code path.
+This patch sets the 10G interface (cp0_eth0) management to in-band. This
+is needed for the PPv2 driver to handle such ports, with its conversion
+to phylink.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-index a0d522154cdf..4ef429250d7b 100644
---- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-+++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-@@ -135,19 +135,25 @@ struct mvebu_comhy_conf {
- static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
- 	/* lane 0 */
- 	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
- 	/* lane 1 */
- 	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII, 0x1),
- 	/* lane 2 */
- 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII, 0x1),
- 	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR, 0x1),
- 	/* lane 3 */
- 	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII, 0x2),
-+	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII, 0x2),
- 	/* lane 4 */
- 	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_SGMII, 0x2),
-+	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_2500SGMII, 0x2),
- 	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR, 0x2),
- 	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII, 0x1),
- 	/* lane 5 */
- 	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII, 0x1),
-+	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII, 0x1),
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index 3ae05eee2c9a..f27af07db381 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -267,6 +267,7 @@
+ 	status = "okay";
+ 	/* Network PHY */
+ 	phy-mode = "10gbase-kr";
++	managed = "in-band-status";
+ 	/* Generic PHY, providing serdes lanes */
+ 	phys = <&cp0_comphy2 0>;
  };
- 
- struct mvebu_comphy_priv {
-@@ -206,6 +212,10 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
- 	if (mode == PHY_MODE_10GKR)
- 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xe) |
- 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xe);
-+	else if (mode == PHY_MODE_2500SGMII)
-+		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x8) |
-+		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x8) |
-+		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
- 	else if (mode == PHY_MODE_SGMII)
- 		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x6) |
- 		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x6) |
-@@ -296,13 +306,13 @@ static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
- 	return 0;
- }
- 
--static int mvebu_comphy_set_mode_sgmii(struct phy *phy)
-+static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
- {
- 	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
- 	struct mvebu_comphy_priv *priv = lane->priv;
- 	u32 val;
- 
--	mvebu_comphy_ethernet_init_reset(lane, PHY_MODE_SGMII);
-+	mvebu_comphy_ethernet_init_reset(lane, mode);
- 
- 	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
- 	val &= ~MVEBU_COMPHY_RX_CTRL1_CLK8T_EN;
-@@ -487,7 +497,8 @@ static int mvebu_comphy_power_on(struct phy *phy)
- 
- 	switch (lane->mode) {
- 	case PHY_MODE_SGMII:
--		ret = mvebu_comphy_set_mode_sgmii(phy);
-+	case PHY_MODE_2500SGMII:
-+		ret = mvebu_comphy_set_mode_sgmii(phy, lane->mode);
- 		break;
- 	case PHY_MODE_10GKR:
- 		ret = mvebu_comphy_set_mode_10gkr(phy);
 -- 
 2.14.3
