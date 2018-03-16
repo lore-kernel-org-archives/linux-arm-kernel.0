@@ -1,84 +1,61 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Fri, 16 Mar 2018 15:58:14 +0800
-Subject: [PATCH v10 1/5] arm64: KVM: Prepare set virtual SEI syndrome value
-In-Reply-To: <5AAAD9A1.6090107@arm.com>
-References: <1520093380-42577-1-git-send-email-gengdongjiu@huawei.com>
- <1520093380-42577-2-git-send-email-gengdongjiu@huawei.com>
- <5AAAD9A1.6090107@arm.com>
-Message-ID: <076069fe-0017-7cb4-8316-4d4d58f9f06b@huawei.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 16 Mar 2018 08:58:59 +0100
+Subject: [PATCH 60/60] arm: dts: kirkwood-blackarmor-nas220: use
+ SPDX-License-Identifier
+In-Reply-To: <20180316133248.0b0f485e@xhacker.debian> (Jisheng Zhang's message
+ of "Fri, 16 Mar 2018 13:32:48 +0800")
+References: <20180315165102.27160-1-gregory.clement@bootlin.com>
+ <20180315165102.27160-61-gregory.clement@bootlin.com>
+ <20180316133248.0b0f485e@xhacker.debian>
+Message-ID: <87po44zc1o.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-   Thank you very much for this mail and your time to review this patch. Appreciate that.
-I will check it and reply.
+Hi Jisheng,
+ 
+ On ven., mars 16 2018, Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
+
+> Hi Gregory,
+>
+> On Thu, 15 Mar 2018 17:51:02 +0100 Gregory CLEMENT wrote:
+>
+>> Follow the recent trend for the license description
+>> 
+>> Cc: Evgeni Dobrev <evgeni@studio-punkt.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+>> ---
+>>  arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts | 2 --
+>>  1 file changed, 2 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts b/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
+>> index f16a73e49a88..28fec7212919 100644
+>> --- a/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
+>> +++ b/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
+>> @@ -2,8 +2,6 @@
+>>   * Device Tree file for Seagate Blackarmor NAS220
+>
+> The SPDX-License-Identifier is missing?
 
 
-On 2018/3/16 4:37, James Morse wrote:
-> Hi Dongjiu Geng,
-> 
-> On 03/03/18 16:09, Dongjiu Geng wrote:
->> Export one API to specify virtual SEI syndrome value
->> for guest, and add a helper to get the VSESR_EL2 value.
-> 
-> This patch adds two helpers that nothing calls... its not big, please merge it
-> with the patch that uses these.
-> 
-> 
->> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
->> index 413dc82..3294885 100644
->> --- a/arch/arm64/include/asm/kvm_emulate.h
->> +++ b/arch/arm64/include/asm/kvm_emulate.h
->> @@ -71,6 +71,11 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
->>  	vcpu->arch.hcr_el2 = hcr;
->>  }
+Right!
+
+I'm fixing it.
+
+Thanks,
+
+Gregory
+
+>
+>>   *
+>>   * Copyright (C) 2014 Evgeni Dobrev <evgeni@studio-punkt.com>
+>> - *
+>> - * Licensed under GPLv2 or later.
+>>   */
 >>  
->> +static inline unsigned long vcpu_get_vsesr(struct kvm_vcpu *vcpu)
->> +{
->> +	return vcpu->arch.vsesr_el2;
->> +}
->> +
->>  static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
->>  {
->>  	vcpu->arch.vsesr_el2 = vsesr;
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index a73f63a..3dc49b7 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -354,6 +354,8 @@ void handle_exit_early(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>  int kvm_perf_init(void);
->>  int kvm_perf_teardown(void);
->>  
->> +void kvm_set_sei_esr(struct kvm_vcpu *vcpu, u64 syndrome);
->> +
->>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->>  
->>  static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
->> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
->> index 60666a0..78ecb28 100644
->> --- a/arch/arm64/kvm/inject_fault.c
->> +++ b/arch/arm64/kvm/inject_fault.c
->> @@ -186,3 +186,8 @@ void kvm_inject_vabt(struct kvm_vcpu *vcpu)
->>  {
->>  	pend_guest_serror(vcpu, ESR_ELx_ISV);
->>  }
->> +
->> +void kvm_set_sei_esr(struct kvm_vcpu *vcpu, u64 syndrome)
->> +{
->> +	pend_guest_serror(vcpu, syndrome & ESR_ELx_ISS_MASK);
-> 
-> If you move the ISS_MASK into pend_guest_serror(), you wouldn't need this at all.
-> 
-> It would be better if any validation were in the user-space helpers so we can
-> check user-space hasn't put something funny in the top bits.
-> 
->> +}
->>
-> 
-> 
-> Thanks,
-> 
-> James
-> 
-> .
-> 
+>>  /dts-v1/;
+>
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
