@@ -1,37 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Mar 2018 16:03:22 +0000
-Subject: [PATCH net-next 03/10] net: mvpp2: phylink support
-In-Reply-To: <20180316103351.16616-4-antoine.tenart@bootlin.com>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
- <20180316103351.16616-4-antoine.tenart@bootlin.com>
-Message-ID: <20180316160322.GR9418@n2100.armlinux.org.uk>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 15:53:23 +0100
+Subject: [PATCH 01/14] soc: renesas: rcar-sysc: Mark rcar_sysc_matches[]
+ __initconst
+In-Reply-To: <cover.1521211738.git.horms+renesas@verge.net.au>
+References: <cover.1521211738.git.horms+renesas@verge.net.au>
+Message-ID: <707aa45d2612778e2f3b6c5e1950ed9fa48974aa.1521211738.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 11:33:44AM +0100, Antoine Tenart wrote:
-> +static void mvpp2_phylink_validate(struct net_device *dev,
-> +				   unsigned long *supported,
-> +				   struct phylink_link_state *state)
-> +{
-> +	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
-> +
-> +	phylink_set(mask, Autoneg);
-> +	phylink_set_port_modes(mask);
-> +	phylink_set(mask, Pause);
-> +	phylink_set(mask, Asym_Pause);
-> +
-> +	phylink_set(mask, 10baseT_Half);
-> +	phylink_set(mask, 10baseT_Full);
-> +	phylink_set(mask, 100baseT_Half);
-> +	phylink_set(mask, 100baseT_Full);
-> +	phylink_set(mask, 1000baseT_Full);
-> +	phylink_set(mask, 1000baseX_Full);
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-AFAICS, the driver (before these patches) does not support 1000baseX
-as it always clears the MVPP2_GMAC_PORT_TYPE_MASK bit, so adding this
-mode should be part of the patch adding 1000baseX support.
+rcar_sysc_matches[] is used only by rcar_sysc_pd_init(), which is
+__init.  Hence mark rcar_sysc_matches[] __initconst.
 
+This frees another 1764 bytes (arm32/shmobile_defconfig) or 1000 bytes
+(arm64/renesas_defconfig) of memory after kernel init.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/soc/renesas/rcar-sysc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 52c25a5e2646..636872bc2416 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -254,7 +254,7 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
+ 	pm_genpd_init(genpd, gov, false);
+ }
+ 
+-static const struct of_device_id rcar_sysc_matches[] = {
++static const struct of_device_id rcar_sysc_matches[] __initconst = {
+ #ifdef CONFIG_SYSC_R8A7743
+ 	{ .compatible = "renesas,r8a7743-sysc", .data = &r8a7743_sysc_info },
+ #endif
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.11.0
