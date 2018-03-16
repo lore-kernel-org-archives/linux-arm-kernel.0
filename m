@@ -1,32 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 16 Mar 2018 11:01:24 +0100
-Subject: [PATCH] arm64: dts: armada-3720-espressobin: Document URL for
- schematic
-Message-ID: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 16 Mar 2018 15:08:18 +0530
+Subject: [PATCH v2 10/13] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2
+ board file
+In-Reply-To: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
+References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521193101-4586-11-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The schematic of hte espressobin is publicly available, add a comment
-where to find it.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts | 26 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-index bdfb5553ddb5..6d070b267abe 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-@@ -42,6 +42,9 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-+/*
-+ * Schematic available at http://espressobin.net/wp-content/uploads/2017/08/ESPRESSObin_V5_Schematics.pdf
-+ */
- 
- /dts-v1/;
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8c93fd0..0844087 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -750,6 +750,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-ipq4019-ap.dk04.1-c1.dtb \
+ 	qcom-ipq4019-ap.dk04.1-c3.dtb \
+ 	qcom-ipq4019-ap.dk07.1-c1.dtb \
++	qcom-ipq4019-ap.dk07.1-c2.dtb \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+new file mode 100644
+index 0000000..c1e909c
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#include "qcom-ipq4019-ap.dk07.1.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1-C2";
++
++	soc {
++		pinctrl at 1000000 {
++			serial_1_pins: serial1_pinmux {
++				mux {
++					pins = "gpio8", "gpio9";
++					function = "blsp_uart1";
++					bias-disable;
++				};
++			};
++		};
++
++		serial at 78b0000 {
++			pinctrl-0 = <&serial_1_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++		};
++	};
++};
 -- 
-2.16.2
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
