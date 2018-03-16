@@ -1,28 +1,28 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 16 Mar 2018 11:38:44 +0100
-Subject: [PATCH v2 4/6] arm64: dts: rockchip: enable typec-phy for
- rk3399-firefly.
-In-Reply-To: <20180301152515.20940-5-enric.balletbo@collabora.com>
+Date: Fri, 16 Mar 2018 11:38:08 +0100
+Subject: [PATCH v2 3/6] arm64: dts: rockchip: enable typec-phy for
+ rk3399-sapphire.
+In-Reply-To: <20180301152515.20940-4-enric.balletbo@collabora.com>
 References: <20180301152515.20940-1-enric.balletbo@collabora.com>
- <20180301152515.20940-5-enric.balletbo@collabora.com>
-Message-ID: <1887626.1ycpCmxoJD@phil>
+ <20180301152515.20940-4-enric.balletbo@collabora.com>
+Message-ID: <4216465.6C9qR2QedA@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 1. M?rz 2018, 16:25:13 CET schrieb Enric Balletbo i Serra:
+Am Donnerstag, 1. M?rz 2018, 16:25:12 CET schrieb Enric Balletbo i Serra:
 > Commit c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port
-> support for rk3399") caused a regression regarding the USB3. During boot,
-> the following message appears a few times:
+> support for rk3399") caused a regression regarding the USB3 type-A port.
+> During boot, the following message appears a few times:
 > 
->       dwc3: failed to initialize core
+>   dwc3: failed to initialize core
 > 
 > The driver is deferred waiting for the typec-phy, but this never happens
-> beause is disabled. So, enable it.
+> bceause is disabled. So, enable it.
 > 
 > Fixes: c301b327aea898af ("arm64: dts: rockchip: add usb3-phy otg-port support for rk3399")
+> Reported-by: Vicente Bergas <vicencb@gmail.com>
 > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-[Same blurb as in patch 3/6]
 I've amended the message a bit to clarify that the offending commit
 has been reverted for now and this change is needed for reenabling it
 and also dropped the Fixes tag.
