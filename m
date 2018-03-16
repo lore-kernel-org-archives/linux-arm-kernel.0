@@ -1,103 +1,152 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 16 Mar 2018 10:53:50 +0000
-Subject: [PATCH RESEND V3 0/9] clk: add imx7ulp clk support
-In-Reply-To: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
-References: <1518528494-25723-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <AM3PR04MB306A4A43EDD03EC199BFD6D80D70@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: absahu@codeaurora.org (Abhishek Sahu)
+Date: Fri, 16 Mar 2018 16:27:25 +0530
+Subject: [PATCH v2 13/13] ARM: dts: ipq8074: Enable few peripherals for
+ hk01 board
+In-Reply-To: <1521193101-4586-14-git-send-email-sricharan@codeaurora.org>
+References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
+ <1521193101-4586-14-git-send-email-sricharan@codeaurora.org>
+Message-ID: <7284d03a864202fd0baaeeea093068ee@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn & Stephen,
+On 2018-03-16 15:08, Sricharan R wrote:
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 103 
+> ++++++++++++++++++++++++++++++
+>  1 file changed, 103 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+> b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+> index 6a838b5..81dff867 100644
+> --- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+> +++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+> @@ -21,6 +21,7 @@
+> 
+>  	aliases {
+>  		serial0 = &blsp1_uart5;
+> +		serial1 = &serial_blsp2;
+>  	};
+> 
+>  	chosen {
+> @@ -41,6 +42,47 @@
+>  					bias-disable;
+>  				};
+>  			};
+> +
+> +			 i2c_0_pins: i2c_0_pinmux {
+> +				  mux {
+> +					   pins = "gpio42", "gpio43";
+> +					   function = "blsp1_i2c";
+> +					   drive-strength = <8>;
+> +					   bias-disable;
+> +				  };
+> +			 };
+> +
+> +			 spi_0_pins: spi_0_pins {
+> +				  mux {
+> +					   pins = "gpio38", "gpio39", "gpio40", "gpio41";
+> +					   function = "blsp0_spi";
+> +					   drive-strength = <8>;
+> +					   bias-disable;
+> +				  };
+> +			 };
+> +
+> +			 hsuart_pins: hsuart_pins {
+> +				  mux {
+> +					   pins = "gpio46", "gpio47", "gpio48", "gpio49";
+> +					   function = "blsp2_uart";
+> +					   drive-strength = <8>;
+> +					   bias-disable;
+> +				  };
+> +			 };
+> +
+> +			 qpic_pins: qpic_pins {
+> +				mux {
+> +					   pins = "gpio1", "gpio3", "gpio4",
+> +						  "gpio5", "gpio6", "gpio7",
+> +						  "gpio8", "gpio10", "gpio11",
+> +						  "gpio12", "gpio13", "gpio14",
+> +						  "gpio15", "gpio16", "gpio17";
+> +					   function = "qpic";
+> +					   drive-strength = <8>;
+> +					   bias-disable;
+> +				  };
+> +			};
+> +
+>  		};
+> 
+>  		serial at 78b3000 {
+> @@ -48,5 +90,66 @@
+>  			pinctrl-names = "default";
+>  			status = "ok";
+>  		};
+> +
+> +		spi at 78b5000 {
+> +			 pinctrl-0 = <&spi_0_pins>;
+> +			 pinctrl-names = "default";
+> +			 status = "ok";
+> +
+> +			 m25p80 at 0 {
+> +				  #address-cells = <1>;
+> +				  #size-cells = <1>;
+> +				  compatible = "n25q128a11", "jedec,spi-nor";
+> +				  reg = <0>;
+> +				  spi-max-frequency = <50000000>;
+> +			 };
+> +		};
+> +
+> +		serial at 78B1000 {
 
-Would you help review this series? It's pending for a long time.
+  s/78B1000/78b1000
 
-Regards
-Dong Aisheng
+  With that,
+  Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
 
-> -----Original Message-----
-> From: Dong Aisheng [mailto:aisheng.dong at nxp.com]
-> Sent: Tuesday, February 13, 2018 9:28 PM
-> To: linux-clk at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> sboyd at codeaurora.org; mturquette at baylibre.com; shawnguo at kernel.org;
-> Anson Huang <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; A.s.
-> Dong <aisheng.dong@nxp.com>
-> Subject: [PATCH RESEND V3 0/9] clk: add imx7ulp clk support
-> 
-> This is a resend patch series.
-> See the original one from here:
-> [PATCH V3 00/10] clk: add imx7ulp clk support
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flk
-> ml.org%2Flkml%2F2018%2F1%2F19%2F351&data=02%7C01%7Caisheng.dong
-> %40nxp.com%7C2158b9d83b9442c6fa8208d572e5b5f5%7C686ea1d3bc2b4c6f
-> a92cd99c5c301635%7C0%7C0%7C636541253280073434&sdata=VQ7%2Fx08X5
-> 9AQ8SoYna%2Bw4HnErty3vR5Zwh2dp7FzJqU%3D&reserved=0
-> No function changes but remove the last one which is used for the test.
-> Rebased against clk-next branch.
-> 
-> This patch series intends to add imx7ulp clk support.
-> 
-> i.MX7ULP Clock functions are under joint control of the System Clock
-> Generation (SCG) modules, Peripheral Clock Control (PCC) modules, and
-> Core Mode Controller (CMC)1 blocks
-> 
-> The clocking scheme provides clear separation between M4 domain and A7
-> domain. Except for a few clock sources shared between two domains, such
-> as the System Oscillator clock, the Slow IRC (SIRC), and and the Fast IRC clock
-> (FIRCLK), clock sources and clock management are separated and contained
-> within each domain.
-> 
-> M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
-> A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
-> 
-> Note: this series only adds A7 clock domain support as M4 clock domain will
-> be handled by M4 seperately.
-> 
-> Change Log:
-> v2->v3:
->  * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible racy
->    Others no changes.
-> 
-> v1->v2:
->  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
->  * use clk_hw apis to register clocks
->  * use of_clk_add_hw_provider
->  * split the clocks register process into two parts: early part for possible
->    timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
->    the left normal peripheral clocks registered by a platform driver.
-> 
-> 
-> Dong Aisheng (9):
->   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
->   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
->   clk: imx: add pllv4 support
->   clk: imx: add pfdv2 support
->   clk: imx: add composite clk support
->   dt-bindings: clock: add imx7ulp clock binding doc
->   clk: imx: make mux parent strings const
->   clk: imx: implement new clk_hw based APIs
->   clk: imx: add imx7ulp clk driver
-> 
->  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++
->  drivers/clk/clk-divider.c                          | 152 ++++++++++++++
->  drivers/clk/clk-fractional-divider.c               |  10 +
->  drivers/clk/imx/Makefile                           |   6 +-
->  drivers/clk/imx/clk-busy.c                         |   2 +-
->  drivers/clk/imx/clk-composite.c                    |  90 ++++++++
->  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
->  drivers/clk/imx/clk-imx7ulp.c                      | 232 +++++++++++++++++++++
->  drivers/clk/imx/clk-pfdv2.c                        | 207 ++++++++++++++++++
->  drivers/clk/imx/clk-pllv4.c                        | 188 +++++++++++++++++
->  drivers/clk/imx/clk.c                              |  22 ++
->  drivers/clk/imx/clk.h                              |  92 +++++++-
->  include/dt-bindings/clock/imx7ulp-clock.h          | 108 ++++++++++
->  include/linux/clk-provider.h                       |  17 ++
->  14 files changed, 1180 insertions(+), 10 deletions(-)  create mode 100644
-> Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
->  create mode 100644 drivers/clk/imx/clk-composite.c  create mode 100644
-> drivers/clk/imx/clk-imx7ulp.c  create mode 100644 drivers/clk/imx/clk-
-> pfdv2.c  create mode 100644 drivers/clk/imx/clk-pllv4.c  create mode 100644
-> include/dt-bindings/clock/imx7ulp-clock.h
-> 
-> --
-> 2.7.4
+> +			 pinctrl-0 = <&hsuart_pins>;
+> +			 pinctrl-names = "default";
+> +			 status = "ok";
+> +		};
+> +
+> +		i2c_0 at 78b6000 {
+> +			 pinctrl-0 = <&i2c_0_pins>;
+> +			 pinctrl-names = "default";
+> +			 status = "ok";
+> +		};
+> +
+> +		dma at 7984000 {
+> +			 status = "ok";
+> +		};
+> +
+> +		nand at 79b0000 {
+> +			pinctrl-0 = <&qpic_pins>;
+> +			pinctrl-names = "default";
+> +			status = "ok";
+> +
+> +			nand at 0 {
+> +				reg = <0>;
+> +				nand-ecc-strength = <4>;
+> +				nand-ecc-step-size = <512>;
+> +				nand-bus-width = <8>;
+> +			};
+> +		};
+> +
+> +		phy at 86000 {
+> +			status = "ok";
+> +		};
+> +
+> +		phy at 8e000 {
+> +			status = "ok";
+> +		};
+> +
+> +		pci at 20000000 {
+> +			status = "ok";
+> +			perst-gpio = <&tlmm 58 0x1>;
+> +		};
+> +
+> +		pci at 10000000 {
+> +			status = "ok";
+> +			perst-gpio = <&tlmm 61 0x1>;
+> +		};
+>  	};
+>  };
