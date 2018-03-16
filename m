@@ -1,68 +1,55 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 12:16:31 -0400
-Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 16 Mar 2018 23:53:43 +0800
+Subject: [RFC PATCH] crypto: arm64/speck - add NEON-accelerated
+ implementation of Speck-XTS
+In-Reply-To: <20180305191707.143961-1-ebiggers@google.com>
+References: <20180305191707.143961-1-ebiggers@google.com>
+Message-ID: <20180316155343.GC7095@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier on
-some architectures like arm64.
+On Mon, Mar 05, 2018 at 11:17:07AM -0800, Eric Biggers wrote:
+> Add a NEON-accelerated implementation of Speck128-XTS and Speck64-XTS
+> for ARM64.  This is ported from the 32-bit version.  It may be useful on
+> devices with 64-bit ARM CPUs that don't have the Cryptography
+> Extensions, so cannot do AES efficiently -- e.g. the Cortex-A53
+> processor on the Raspberry Pi 3.
+> 
+> It generally works the same way as the 32-bit version, but there are
+> some slight differences due to the different instructions, registers,
+> and syntax available in ARM64 vs. in ARM32.  For example, in the 64-bit
+> version there are enough registers to hold the XTS tweaks for each
+> 128-byte chunk, so they don't need to be saved on the stack.
+> 
+> Benchmarks on a Raspberry Pi 3 running a 64-bit kernel:
+> 
+>    Algorithm                              Encryption     Decryption
+>    ---------                              ----------     ----------
+>    Speck64/128-XTS (NEON)                 92.2 MB/s      92.2 MB/s
+>    Speck128/256-XTS (NEON)                75.0 MB/s      75.0 MB/s
+>    Speck128/256-XTS (generic)             47.4 MB/s      35.6 MB/s
+>    AES-128-XTS (NEON bit-sliced)          33.4 MB/s      29.6 MB/s
+>    AES-256-XTS (NEON bit-sliced)          24.6 MB/s      21.7 MB/s
+> 
+> The code performs well on higher-end ARM64 processors as well, though
+> such processors tend to have the Crypto Extensions which make AES
+> preferred.  For example, here are the same benchmarks run on a HiKey960
+> (with CPU affinity set for the A73 cores), with the Crypto Extensions
+> implementation of AES-256-XTS added:
+> 
+>    Algorithm                              Encryption     Decryption
+>    ---------                              -----------    -----------
+>    AES-256-XTS (Crypto Extensions)        1273.3 MB/s    1274.7 MB/s
+>    Speck64/128-XTS (NEON)                  359.8 MB/s     348.0 MB/s
+>    Speck128/256-XTS (NEON)                 292.5 MB/s     286.1 MB/s
+>    Speck128/256-XTS (generic)              186.3 MB/s     181.8 MB/s
+>    AES-128-XTS (NEON bit-sliced)           142.0 MB/s     124.3 MB/s
+>    AES-256-XTS (NEON bit-sliced)           104.7 MB/s      91.1 MB/s
+> 
+> Signed-off-by: Eric Biggers <ebiggers@google.com>
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
-
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/infiniband/hw/cxgb4/t4.h | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
-index 8369c7c..7a48c9e 100644
---- a/drivers/infiniband/hw/cxgb4/t4.h
-+++ b/drivers/infiniband/hw/cxgb4/t4.h
-@@ -477,15 +477,15 @@ static inline void t4_ring_sq_db(struct t4_wq *wq, u16 inc, union t4_wr *wqe)
- 				 (u64 *)wqe);
- 		} else {
- 			pr_debug("DB wq->sq.pidx = %d\n", wq->sq.pidx);
--			writel(PIDX_T5_V(inc) | QID_V(wq->sq.bar2_qid),
--			       wq->sq.bar2_va + SGE_UDB_KDOORBELL);
-+			writel_relaxed(PIDX_T5_V(inc) | QID_V(wq->sq.bar2_qid),
-+				       wq->sq.bar2_va + SGE_UDB_KDOORBELL);
- 		}
- 
- 		/* Flush user doorbell area writes. */
- 		wmb();
- 		return;
- 	}
--	writel(QID_V(wq->sq.qid) | PIDX_V(inc), wq->db);
-+	writel_relaxed(QID_V(wq->sq.qid) | PIDX_V(inc), wq->db);
- }
- 
- static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
-@@ -502,15 +502,15 @@ static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
- 				 (void *)wqe);
- 		} else {
- 			pr_debug("DB wq->rq.pidx = %d\n", wq->rq.pidx);
--			writel(PIDX_T5_V(inc) | QID_V(wq->rq.bar2_qid),
--			       wq->rq.bar2_va + SGE_UDB_KDOORBELL);
-+			writel_relaxed(PIDX_T5_V(inc) | QID_V(wq->rq.bar2_qid),
-+				       wq->rq.bar2_va + SGE_UDB_KDOORBELL);
- 		}
- 
- 		/* Flush user doorbell area writes. */
- 		wmb();
- 		return;
- 	}
--	writel(QID_V(wq->rq.qid) | PIDX_V(inc), wq->db);
-+	writel_relaxed(QID_V(wq->rq.qid) | PIDX_V(inc), wq->db);
- }
- 
- static inline int t4_wq_in_error(struct t4_wq *wq)
+Patch applied.  Thanks.
 -- 
-2.7.4
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
