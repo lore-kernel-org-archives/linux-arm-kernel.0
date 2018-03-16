@@ -1,30 +1,48 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Fri, 16 Mar 2018 16:08:11 +0900
-Subject: [PATCH 0/2] add syscon property to binding document
-Message-ID: <20180316070813.17969-1-suzuki.katsuhiro@socionext.com>
+Date: Fri, 16 Mar 2018 16:08:12 +0900
+Subject: [PATCH 1/2] ASoC: uniphier: add syscon property to binding document
+In-Reply-To: <20180316070813.17969-1-suzuki.katsuhiro@socionext.com>
+References: <20180316070813.17969-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180316070813.17969-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds syscon property for specifying soc-glue core.
+This patch adds syscon property for specifying soc-glue core into
+DT binding documentation.
 
-The soc-glue core is used for changing the state of S/PDIF signal
-output pin to signal output state or Hi-Z state. After resetting of
-SoC Hi-Z state is selected.
+Currently, soc-glue core is used for changing the state of S/PDIF
+signal output pin to signal output state or Hi-Z state. If you don't
+need to use features on soc-glue described above you can ommit this
+property.
 
-Currently, we set this mode in local changed U-Boot or some
-bootloaders fixedly. This patch removes dependencies of bootloader
-from UniPhier audio system driver.
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ Documentation/devicetree/bindings/sound/uniphier,aio.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Katsuhiro Suzuki (2):
-  ASoC: uniphier: add syscon property to binding document
-  ASoC: uniphier: add syscon property for UniPhier sound system
-
- .../devicetree/bindings/sound/uniphier,aio.txt      |  8 ++++++++
- sound/soc/uniphier/aio-core.c                       | 21 +++++++++++++++++++++
- sound/soc/uniphier/aio-cpu.c                        | 11 +++++++++++
- sound/soc/uniphier/aio-reg.h                        |  3 +++
- sound/soc/uniphier/aio.h                            |  2 ++
- 5 files changed, 45 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/sound/uniphier,aio.txt b/Documentation/devicetree/bindings/sound/uniphier,aio.txt
+index 65d71cf6ef0f..4ce68ed6f2f2 100644
+--- a/Documentation/devicetree/bindings/sound/uniphier,aio.txt
++++ b/Documentation/devicetree/bindings/sound/uniphier,aio.txt
+@@ -22,6 +22,12 @@ Required properties:
+                     entry in reset-names.
+ - #sound-dai-cells: should be 1.
+ 
++Optional properties:
++- socionext,syscon: a phandle, should contain soc-glue.
++                    The soc-glue is used for changing mode of S/PDIF signal pin
++                    to Output from Hi-Z. This property is optional if you use
++                    I2S signal pins only.
++
+ Example:
+ 	audio {
+ 		compatible = "socionext,uniphier-ld20-aio";
+@@ -34,4 +40,6 @@ Example:
+ 		reset-names = "aio";
+ 		resets = <&sys_rst 40>;
+ 		#sound-dai-cells = <1>;
++
++		socionext,syscon = <&sg>;
+ 	};
 -- 
 2.16.2
