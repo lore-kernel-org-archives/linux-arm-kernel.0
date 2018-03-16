@@ -1,224 +1,164 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Fri, 16 Mar 2018 14:35:16 +0000
-Subject: [PATCH v2 2/2] reset: stm32mp1: Enable stm32mp1 reset driver
-In-Reply-To: <1521206991.5061.5.camel@pengutronix.de>
-References: <1521045001-30788-1-git-send-email-gabriel.fernandez@st.com>
- <1521045001-30788-3-git-send-email-gabriel.fernandez@st.com>
- <1521206991.5061.5.camel@pengutronix.de>
-Message-ID: <0aa41806-22c9-c8ef-6fe4-1353cbbd680a@st.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Fri, 16 Mar 2018 16:21:08 +0200
+Subject: [PATCH v3 07/11] mmc: sdhci: Program a relatively accurate SW
+ timeout value
+In-Reply-To: <47752066-aeda-87bc-6928-1a9b80f1c45c@ti.com>
+References: <20180307132020.30951-1-kishon@ti.com>
+ <20180307132020.30951-8-kishon@ti.com>
+ <1e87e5f9-13e1-765b-f077-26a55359b2c3@intel.com>
+ <47752066-aeda-87bc-6928-1a9b80f1c45c@ti.com>
+Message-ID: <49210daa-b593-4b34-abf5-be81580723bc@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Philipp,
-
-Thanks for reviewing.
-
-On 03/16/2018 02:29 PM, Philipp Zabel wrote:
-> Hi Gabriel,
->
-> this looks mostly good to me, a few questions and comments below:
->
-> On Wed, 2018-03-14 at 17:30 +0100, gabriel.fernandez at st.com wrote:
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 16/03/18 08:29, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Thursday 15 March 2018 06:43 PM, Adrian Hunter wrote:
+>> On 07/03/18 15:20, Kishon Vijay Abraham I wrote:
+>>> sdhci has a 10 second timeout to catch devices that stop responding.
+>>> Instead of programming 10 second arbitrary value, calculate the total time
+>>> it would take for the entire transfer to happen and program the timeout
+>>> value accordingly.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>  drivers/mmc/host/sdhci.c | 47 ++++++++++++++++++++++++++++++++++++++++-------
+>>>  drivers/mmc/host/sdhci.h | 10 ++++++++++
+>>>  2 files changed, 50 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+>>> index 1dd117cbeb6e..baab67bfa39b 100644
+>>> --- a/drivers/mmc/host/sdhci.c
+>>> +++ b/drivers/mmc/host/sdhci.c
+>>> @@ -709,6 +709,36 @@ static u32 sdhci_sdma_address(struct sdhci_host *host)
+>>>  		return sg_dma_address(host->data->sg);
+>>>  }
+>>>  
+>>> +static void sdhci_calc_sw_timeout(struct sdhci_host *host,
+>>> +				  struct mmc_command *cmd,
+>>> +				  unsigned int target_timeout)
+>>> +{
+>>> +	struct mmc_data *data = cmd->data;
+>>> +	struct mmc_host *mmc = host->mmc;
+>>> +	u64 transfer_time;
+>>> +	struct mmc_ios *ios = &mmc->ios;
+>>> +	unsigned char bus_width = 1 << ios->bus_width;
+>>> +	unsigned int blksz;
+>>> +	unsigned int freq;
+>>> +
+>>> +	if (data) {
+>>> +		blksz = data->blksz;
+>>> +		freq = host->mmc->actual_clock ? : host->clock;
+>>> +		transfer_time = (u64)blksz * NSEC_PER_SEC * (8 / bus_width);
+>>> +		do_div(transfer_time, freq);
+>>> +		/* multiply by '2' to account for any unknowns */
+>>> +		transfer_time = transfer_time * 2;
+>>> +		/* calculate timeout for the entire data */
+>>> +		host->data_timeout = (data->blocks * ((target_timeout *
+>>> +						       NSEC_PER_USEC) +
+>>> +						       transfer_time));
 >>
->> stm32mp1 RCC IP 1 has a reset SET register and a reset CLEAR register.
+>> (target_timeout * NSEC_PER_USEC) might be 32-bit and therefore overflow
+>> for timeouts greater than about 4 seconds.
 >>
->> Writing '0' on reset SET register has no effect
->> Writing '1' on reset SET register
->> 	activates the reset of the corresponding peripheral
+>>> +	} else {
+>>> +		host->data_timeout = (u64)target_timeout * NSEC_PER_USEC;
+>>> +	}
+>>> +
+>>> +	host->data_timeout += MMC_CMD_TRANSFER_TIME;
 >>
->> Writing '0' on reset CLEAR register	has no effect
->> Writing '1' on reset CLEAR register
->> 	releases the reset of the corresponding peripheral
+>> Need to allow for target_timeout == 0 so:
 >>
->> See Documentation/devicetree/bindings/clock/st,stm32mp1-rcc.txt
+>> 	if (host->data_timeout)
+>> 		host->data_timeout += MMC_CMD_TRANSFER_TIME;
 >>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->> ---
->>   drivers/reset/Kconfig          |   6 ++
->>   drivers/reset/Makefile         |   1 +
->>   drivers/reset/reset-stm32mp1.c | 122 +++++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 129 insertions(+)
->>   create mode 100644 drivers/reset/reset-stm32mp1.c
+>>> +}
+>>> +
+>>>  static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>>>  {
+>>>  	u8 count;
+>>> @@ -766,6 +796,7 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
+>>>  		if (count >= 0xF)
+>>>  			break;
+>>>  	}
+>>> +	sdhci_calc_sw_timeout(host, cmd, target_timeout);
 >>
->> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
->> index 1efbc6c..c0b292b 100644
->> --- a/drivers/reset/Kconfig
->> +++ b/drivers/reset/Kconfig
->> @@ -97,6 +97,12 @@ config RESET_SIMPLE
->>   	   - Allwinner SoCs
->>   	   - ZTE's zx2967 family
->>   
->> +config RESET_STM32MP157
->> +	bool "STM32MP157 Reset Driver" if COMPILE_TEST
->> +	default MACH_STM32MP157
->> +	help
->> +	  This enables the RCC reset controller driver for STM32 MPUs.
->> +
->>   config RESET_SUNXI
->>   	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
->>   	default ARCH_SUNXI
->> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
->> index 132c24f..c1261dc 100644
->> --- a/drivers/reset/Makefile
->> +++ b/drivers/reset/Makefile
->> @@ -15,6 +15,7 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
->>   obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
->>   obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
->>   obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
->> +obj-$(CONFIG_RESET_STM32MP157) += reset-stm32mp1.o
->>   obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
->>   obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
->>   obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
->> diff --git a/drivers/reset/reset-stm32mp1.c b/drivers/reset/reset-stm32mp1.c
->> new file mode 100644
->> index 0000000..5e25388
->> --- /dev/null
->> +++ b/drivers/reset/reset-stm32mp1.c
->> @@ -0,0 +1,122 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
->> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
->> + */
->> +
->> +#include <linux/arm-smccc.h>
-> This does not seem to be necessary.
-right
->> +#include <linux/device.h>
->> +#include <linux/err.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
-> This does not seem to be necessary either.
-ok
->> +#include <linux/platform_device.h>
->> +#include <linux/reset-controller.h>
->> +
->> +#define CLR_OFFSET 0x4
->> +
->> +struct stm32_reset_data {
->> +	struct reset_controller_dev	rcdev;
->> +	void __iomem			*membase;
->> +};
->> +
->> +static inline struct stm32_reset_data *
->> +to_stm32_reset_data(struct reset_controller_dev *rcdev)
->> +{
->> +	return container_of(rcdev, struct stm32_reset_data, rcdev);
->> +}
->> +
->> +static int stm32_reset_update(struct reset_controller_dev *rcdev,
->> +			      unsigned long id, bool assert)
->> +{
->> +	struct stm32_reset_data *data = to_stm32_reset_data(rcdev);
->> +	int reg_width = sizeof(u32);
->> +	int bank = id / (reg_width * BITS_PER_BYTE);
->> +	int offset = id % (reg_width * BITS_PER_BYTE);
->> +	void __iomem *addr;
->> +
->> +	addr = data->membase + (bank * reg_width);
->> +	if (!assert)
->> +		addr += CLR_OFFSET;
->> +
->> +	writel(BIT(offset), addr);
->> +
->> +	return 0;
->> +}
->> +
->> +static int stm32_reset_assert(struct reset_controller_dev *rcdev,
->> +			      unsigned long id)
->> +{
->> +	return stm32_reset_update(rcdev, id, true);
->> +}
->> +
->> +static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
->> +				unsigned long id)
->> +{
->> +	return stm32_reset_update(rcdev, id, false);
->> +}
->> +
->> +static int stm32_reset_status(struct reset_controller_dev *rcdev,
->> +			      unsigned long id)
->> +{
->> +	struct stm32_reset_data *data = to_stm32_reset_data(rcdev);
->> +	int reg_width = sizeof(u32);
->> +	int bank = id / (reg_width * BITS_PER_BYTE);
->> +	int offset = id % (reg_width * BITS_PER_BYTE);
->> +	u32 reg;
->> +
->> +	reg = readl(data->membase + (bank * reg_width));
->> +
->> +	return !(reg & BIT(offset));
->> +}
-> So the SET register can be read back and returns 0 for reset lines that
-> are currently asserted and returns 1 for reset lines that are currently
-> deasserted?
-yes you have spotted a error, i will replace by'return !!(reg & 
-BIT(offset));'
->> +
->> +const struct reset_control_ops stm32_reset_ops = {
->> +	.assert		= stm32_reset_assert,
->> +	.deassert	= stm32_reset_deassert,
->> +	.status		= stm32_reset_status,
->> +};
->> +
->> +static const struct of_device_id stm32_reset_dt_ids[] = {
->> +	{ .compatible = "st,stm32mp1-rcc"},
->> +	{ /* sentinel */ },
->> +};
->  From the DT bindings it looks like the clock and reset drivers are
-> sharing the same node. Is there just no clock platform_driver at all?
-there is one hardware block that is used for clock, reset and power, 
-they share the same node but each have it own platform_driver
+>> If you make the changes I suggest for patch 6, then this would
+>> move sdhci_calc_sw_timeout() into sdhci_set_timeout().
+>>
+>> I suggest you factor out the target_timeout calculation e.g.
+>>
+>> static unsigned int sdhci_target_timeout(struct sdhci_host *host,
+>> 					 struct mmc_command *cmd,
+>> 					 struct mmc_data *data)
+>> {
+>> 	unsigned int target_timeout;
+>>
+>> 	/* timeout in us */
+>> 	if (!data)
+>> 		target_timeout = cmd->busy_timeout * 1000;
+>> 	else {
+>> 		target_timeout = DIV_ROUND_UP(data->timeout_ns, 1000);
+>> 		if (host->clock && data->timeout_clks) {
+>> 			unsigned long long val;
+>>
+>> 			/*
+>> 			 * data->timeout_clks is in units of clock cycles.
+>> 			 * host->clock is in Hz.  target_timeout is in us.
+>> 			 * Hence, us = 1000000 * cycles / Hz.  Round up.
+>> 			 */
+>> 			val = 1000000ULL * data->timeout_clks;
+>> 			if (do_div(val, host->clock))
+>> 				target_timeout++;
+>> 			target_timeout += val;
+>> 		}
+>> 	}
+>>
+>> 	return target_timeout;
+>> }
+>>
+>> And call it from sdhci_calc_sw_timeout()
+>>
+>>>  
+>>>  	return count;
+>>>  }
+>>> @@ -1175,13 +1206,6 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+>>>  		mdelay(1);
+>>>  	}
+>>>  
+>>> -	timeout = jiffies;
+>>> -	if (!cmd->data && cmd->busy_timeout > 9000)
+>>> -		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
+>>> -	else
+>>> -		timeout += 10 * HZ;
+>>> -	sdhci_mod_timer(host, cmd->mrq, timeout);
+>>> -
+>>>  	host->cmd = cmd;
+>>>  	if (sdhci_data_line_cmd(cmd)) {
+>>>  		WARN_ON(host->data_cmd);
+>>> @@ -1221,6 +1245,15 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
+>>>  	    cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200)
+>>>  		flags |= SDHCI_CMD_DATA;
+>>>  
+>>> +	timeout = jiffies;
+>>> +	if (host->data_timeout > 0) {
+>>
+>> This can be just:
+>>
+>> 	if (host->data_timeout) {
+>>
+>>> +		timeout += nsecs_to_jiffies(host->data_timeout);
+>>> +		host->data_timeout = 0;
+>>
+>> It would be better to initialize host->data_timeout = 0 at the top of
+>> sdhci_prepare_data().
+>>
+>> Also still need:
+>>
+>> 	else if (!cmd->data && cmd->busy_timeout > 9000) {
+>> 		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
+> 
+> sdhci_calc_sw_timeout should have calculated the timeout for this case too no?
 
->> +
->> +static int stm32_reset_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct stm32_reset_data *data;
->> +	void __iomem *membase;
->> +	struct resource *res;
->> +
->> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->> +	if (!data)
->> +		return -ENOMEM;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	membase = devm_ioremap_resource(dev, res);
->> +	if (IS_ERR(membase))
->> +		return PTR_ERR(membase);
->> +
->> +	data->membase = membase;
->> +	data->rcdev.owner = THIS_MODULE;
->> +	data->rcdev.nr_resets = resource_size(res) * BITS_PER_BYTE;
->> +	data->rcdev.ops = &stm32_reset_ops;
->> +	data->rcdev.of_node = dev->of_node;
->> +
->> +	return devm_reset_controller_register(dev, &data->rcdev);
->> +}
->> +
->> +static struct platform_driver stm32_reset_driver = {
->> +	.probe	= stm32_reset_probe,
->> +	.driver = {
->> +		.name		= "stm32mp1-reset",
->> +		.of_match_table	= stm32_reset_dt_ids,
->> +	},
->> +};
->> +
->> +static int __init stm32_reset_init(void)
->> +{
->> +	return platform_driver_register(&stm32_reset_driver);
->> +}
->> +
->> +postcore_initcall(stm32_reset_init);
-> Isn't builtin_platform_driver early enough?
-ok
-
-Best Regards
-
-Gabriel
-
->
-> regards
-> Philipp
+Yes, but I was thinking you would only calculate when it was needed.
