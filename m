@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:34 +0100
-Subject: [PATCH 04/69] arm64: dts: renesas: r8a7796: add thermal cooling
+Date: Fri, 16 Mar 2018 15:50:35 +0100
+Subject: [PATCH 05/69] arm64: dts: renesas: r8a7795: add thermal cooling
  management
 In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
 References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <479e5d70a9cee635d0feda260eed3719fb565ca8.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <0c38c54ef9bc2a1062900adb01833e0b824f8462.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,30 +16,46 @@ Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Acked-by: Eduardo Valentin <edubezval@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 38 ++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 40 ++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index e06bde6e2853..ef10fb548681 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -73,6 +73,7 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 1485e6a8e112..19b7de57704c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -43,6 +43,7 @@
  			enable-method = "psci";
- 			clocks =<&cpg CPG_CORE R8A7796_CLK_Z>;
+ 			clocks =<&cpg CPG_CORE R8A7795_CLK_Z>;
  			operating-points-v2 = <&cluster0_opp>;
 +			#cooling-cells = <2>;
  		};
  
  		a57_1: cpu at 1 {
-@@ -84,6 +85,7 @@
+@@ -54,6 +55,7 @@
  			enable-method = "psci";
- 			clocks =<&cpg CPG_CORE R8A7796_CLK_Z>;
+ 			clocks =<&cpg CPG_CORE R8A7795_CLK_Z>;
+ 			operating-points-v2 = <&cluster0_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		a57_2: cpu at 2 {
+@@ -65,6 +67,7 @@
+ 			enable-method = "psci";
+ 			clocks =<&cpg CPG_CORE R8A7795_CLK_Z>;
+ 			operating-points-v2 = <&cluster0_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		a57_3: cpu at 3 {
+@@ -76,6 +79,7 @@
+ 			enable-method = "psci";
+ 			clocks =<&cpg CPG_CORE R8A7795_CLK_Z>;
  			operating-points-v2 = <&cluster0_opp>;
 +			#cooling-cells = <2>;
  		};
  
  		a53_0: cpu at 100 {
-@@ -2060,12 +2062,24 @@
+@@ -2418,12 +2422,24 @@
  			thermal-sensors = <&tsc 0>;
  
  			trips {
@@ -58,13 +74,13 @@ index e06bde6e2853..ef10fb548681 100644
 +			cooling-maps {
 +				map0 {
 +					trip = <&sensor1_passive>;
-+					cooling-device = <&a57_0 5 5>;
++					cooling-device = <&a57_0 4 4>;
 +				};
 +			};
  		};
  
  		sensor_thermal2: sensor-thermal2 {
-@@ -2074,12 +2088,24 @@
+@@ -2432,12 +2448,24 @@
  			thermal-sensors = <&tsc 1>;
  
  			trips {
@@ -83,13 +99,13 @@ index e06bde6e2853..ef10fb548681 100644
 +			cooling-maps {
 +				map0 {
 +					trip = <&sensor2_passive>;
-+					cooling-device = <&a57_0 5 5>;
++					cooling-device = <&a57_0 4 4>;
 +				};
 +			};
  		};
  
  		sensor_thermal3: sensor-thermal3 {
-@@ -2088,12 +2114,24 @@
+@@ -2446,12 +2474,24 @@
  			thermal-sensors = <&tsc 2>;
  
  			trips {
@@ -108,7 +124,7 @@ index e06bde6e2853..ef10fb548681 100644
 +			cooling-maps {
 +				map0 {
 +					trip = <&sensor3_passive>;
-+					cooling-device = <&a57_0 5 5>;
++					cooling-device = <&a57_0 4 4>;
 +				};
 +			};
  		};
