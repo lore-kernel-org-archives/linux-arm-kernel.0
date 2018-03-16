@@ -1,48 +1,41 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 16 Mar 2018 12:16:16 -0400
-Subject: [PATCH v3 03/18] igbvf: eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521216991-28706-4-git-send-email-okaya@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Mar 2018 18:05:59 +0000
+Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
+ mitigation)
+In-Reply-To: <20180316174644.klbpmuhyod5qea3r@armageddon.cambridge.arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+ <20180316174644.klbpmuhyod5qea3r@armageddon.cambridge.arm.com>
+Message-ID: <a91ea637-1d20-2d9a-7da9-16fd695497a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier
-on some architectures like arm64.
+On 16/03/18 17:46, Catalin Marinas wrote:
+> On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
+>> Whilst KVM benefits from the kernel randomisation via KASLR, there is
+>> no additional randomisation when the kernel is running at EL1, as we
+>> directly use a fixed offset from the linear mapping. This is not
+>> necessarily a problem, but we could do a bit better by independently
+>> randomizing the HYP placement.
+> 
+> For the rest of the patches in this series:
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
+Thanks for that.
 
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+> Some points for a future series:
+> 
+> - in bpi.S, drop the __smccc_workaround_1_hvc_start/end as HVC PSCI
+>   conduit for hyp doesn't make much sense (could pass NULL instead to
+>   __install_bp_hardening_cb())
+> 
+> - maybe move bpi.S under arch/arm64/kvm/ if it doesn't cause other
+>   dependency issues in cpu_errata.c
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/net/ethernet/intel/igbvf/netdev.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Sure. I'll have a look at a bit of a post-paranoia cleanup next week.
 
-diff --git a/drivers/net/ethernet/intel/igbvf/netdev.c b/drivers/net/ethernet/intel/igbvf/netdev.c
-index 4214c15..edb1c34 100644
---- a/drivers/net/ethernet/intel/igbvf/netdev.c
-+++ b/drivers/net/ethernet/intel/igbvf/netdev.c
-@@ -251,7 +251,7 @@ static void igbvf_alloc_rx_buffers(struct igbvf_ring *rx_ring,
- 		 * such as IA-64).
- 		*/
- 		wmb();
--		writel(i, adapter->hw.hw_addr + rx_ring->tail);
-+		writel_relaxed(i, adapter->hw.hw_addr + rx_ring->tail);
- 	}
- }
- 
-@@ -2297,7 +2297,7 @@ static inline void igbvf_tx_queue_adv(struct igbvf_adapter *adapter,
- 
- 	tx_ring->buffer_info[first].next_to_watch = tx_desc;
- 	tx_ring->next_to_use = i;
--	writel(i, adapter->hw.hw_addr + tx_ring->tail);
-+	writel_relaxed(i, adapter->hw.hw_addr + tx_ring->tail);
- 	/* we need this if more than one processor can write to our tail
- 	 * at a time, it synchronizes IO on IA64/Altix systems
- 	 */
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
