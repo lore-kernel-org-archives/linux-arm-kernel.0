@@ -1,39 +1,29 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 16 Mar 2018 13:32:48 +0800
-Subject: [PATCH 60/60] arm: dts: kirkwood-blackarmor-nas220: use
- SPDX-License-Identifier
-In-Reply-To: <20180315165102.27160-61-gregory.clement@bootlin.com>
-References: <20180315165102.27160-1-gregory.clement@bootlin.com>
- <20180315165102.27160-61-gregory.clement@bootlin.com>
-Message-ID: <20180316133248.0b0f485e@xhacker.debian>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 16 Mar 2018 11:04:34 +0530
+Subject: [PATCH V7 00/13] drivers: Boot Constraint core
+In-Reply-To: <cover.1519380923.git.viresh.kumar@linaro.org>
+References: <cover.1519380923.git.viresh.kumar@linaro.org>
+Message-ID: <20180316053434.GW15832@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-On Thu, 15 Mar 2018 17:51:02 +0100 Gregory CLEMENT wrote:
-
-> Follow the recent trend for the license description
+On 23-02-18, 15:53, Viresh Kumar wrote:
+> Hi Greg,
 > 
-> Cc: Evgeni Dobrev <evgeni@studio-punkt.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts | 2 --
->  1 file changed, 2 deletions(-)
+> The V7 version incorporates the organizational changes suggested by Olof
+> earlier. Everything else is same otherwise.
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts b/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
-> index f16a73e49a88..28fec7212919 100644
-> --- a/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
-> +++ b/arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts
-> @@ -2,8 +2,6 @@
->   * Device Tree file for Seagate Blackarmor NAS220
+> I have tested the Hisilicon patches (again) on hikey 9660 board, IMX stuff was
+> earlier tested by Sascha (Pengutronix) on i.MX6 and Qualcomm stuff was earlier
+> tested by Rajendra (Qualcomm) on Dragonboard 410C (This required some more
+> patches related to display driver which Rajendra should be sending separately
+> later on).
 
-The SPDX-License-Identifier is missing?
+Hi Greg,
 
->   *
->   * Copyright (C) 2014 Evgeni Dobrev <evgeni@studio-punkt.com>
-> - *
-> - * Licensed under GPLv2 or later.
->   */
->  
->  /dts-v1/;
+Are you going to pick this one for 4.17 ?
+
+Thanks.
+
+-- 
+viresh
