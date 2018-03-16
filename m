@@ -1,22 +1,20 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 22:11:50 -0500
-Subject: [PATCH v8 12/42] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <1521168778-27236-13-git-send-email-david@lechnology.com>
+Date: Thu, 15 Mar 2018 21:59:04 -0500
+Subject: =?UTF-8?Q?Re:_[PATCH_v8_00/42]_ARM:_davinci:_convert_to_common_cloc?=
+ =?UTF-8?Q?k_framework=e2=80=8b?=
+In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
 References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-13-git-send-email-david@lechnology.com>
-Message-ID: <6cf9d57c-206b-7295-f595-87a2205e289d@lechnology.com>
+Message-ID: <234488a1-7b99-68e4-0a4b-fbf7121944b5@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/15/2018 09:52 PM, David Lechner wrote:
-> This adds platform-specific declarations for the PSC clocks on TI DA850/
-> OMAP-L138/AM18XX SoCs.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-> ---
+> This series converts mach-davinci to use the common clock framework.
 > 
 
-This Reviewed-by: was supposed to be dropped. This file has had some significant
-changes.
+
+Hi Adam,
+
+I think we are getting pretty close to the final product here. If you
+have time to test the EVM(s) you have again, I think this is a good
+time to do it.
