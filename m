@@ -1,77 +1,145 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 16 Mar 2018 08:38:18 -0700
-Subject: [GIT PULL] omap defconfig changes for v4.17
-Message-ID: <pull-1521214671-54392@atomide.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 16 Mar 2018 15:52:42 +0100
+Subject: [PATCH 23/52] ARM: dts: r8a7794: sort subnodes of root node
+In-Reply-To: <cover.1521208546.git.horms+renesas@verge.net.au>
+References: <cover.1521208546.git.horms+renesas@verge.net.au>
+Message-ID: <807eeaf95e2647277f89284d91d1785c2280c2c6.1521208546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Sort the subnodes of the soc node to improve maintainability.
+The sort key is the address on the bus with instances of the same
+IP block grouped together.
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+Also re-align comment of audio_clka to match other R-Car SoCs.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+This patch should not introduce any functional change.
 
-are available in the Git repository at:
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7794.dtsi | 90 +++++++++++++++++++++---------------------
+ 1 file changed, 45 insertions(+), 45 deletions(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/defconfig-signed
-
-for you to fetch changes up to 740c01f76ab3712a45c2f02233c800829626e9ba:
-
-  ARM: multi_v7_defconfig: Enable USB gadget configfs as loadable module (2018-03-06 11:25:37 -0800)
-
-----------------------------------------------------------------
-Defconfig updates for omap variants for v4.17 merge window
-
-We need to enable MMC_SDHCI option in both omap2plus_defconfig and
-multi_v7_defconfig so systems are able to mount root when the dts files
-get updated for sdhci.
-
-Then let's update omap2plus_defconfig so we can patch it easier. And as
-Arnd noticed earlier, just running make savedefconfig will accidentally
-drop few Kconfig options. This is happening because some options are no
-longer available as loadable modules like LIRC. Or new dependencies have
-been added such as SND_OSSEMUL for selecting SOUND_OSS_CORE.
-
-So we first move the unchanged options around to their make savedefconfig
-suggested place, then update the options to prevent make savedefconfig
-dropping some options accidentally, and then finally drop the unused
-options.
-
-And after that we enable options DRM_OMAP and 8250_OMAP. These both have
-been around for years now. And we do have 8250_OMAP warn about console
-being redirected with SERIAL_8250_OMAP_TTYO_FIXUP option that is enabled
-by default. Some users may need to update their inittab to use ttyS*
-instead of ttyO* though. If this turns out to be a problem, we may want
-to introduce a separate compatible for 8250-omap. But I think we're good
-to go with the SERIAL_8250_OMAP_TTYO_FIXUP warning now. Let's not update
-multi_v7_defconfig yet though and first see how 8250_OMAP change plays
-out.
-
-We also enable few new options for PM on am335x and am437x, and CEC in
-omap2plus_defconfig. Naturally similar options can be later on added to
-multi_v7_defconfig, but in this series we only enable OTG, MUSB and the
-related PHYs in multi_v7_defconfig to make it more usable for distros.
-
-----------------------------------------------------------------
-Kishon Vijay Abraham I (2):
-      ARM: multi_v7_defconfig: Enable CONFIG_MMC_SDHCI_OMAP
-      ARM: omap2plus_defconfig: Enable CONFIG_MMC_SDHCI_OMAP
-
-Tony Lindgren (13):
-      ARM: omap2plus_defconfig: Update for moved options
-      ARM: omap2plus_defconfig: Add SERIAL_DEV for bluetooth
-      ARM: omap2plus_defconfig: Select MFD_TI_LMU
-      ARM: omap2plus_defconfig: Update LIRC options
-      ARM: omap2plus_defconfig: Add SND_OSSEMUL
-      ARM: omap2plus_defconfig: Drop unneeded options
-      ARM: omap2plus_defconfig: Enable am335x and am437x PM options
-      ARM: omap2plus_defconfig: Enable CEC
-      ARM: omap2plus_defconfig: Switch to use omapdrm by default
-      ARM: omap2plus_defconfig: Enable 8250_OMAP
-      ARM: multi_v7_defconfig: Enable OTG and MUSB as loadable modules
-      ARM: multi_v7_defconfig: Enable various USB PHYs found on omap variants
-      ARM: multi_v7_defconfig: Enable USB gadget configfs as loadable module
-
- arch/arm/configs/multi_v7_defconfig  | 36 ++++++++++++++
- arch/arm/configs/omap2plus_defconfig | 94 +++++++++++++++++++++---------------
- 2 files changed, 91 insertions(+), 39 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 9e5f886f53c5..d588efa6aeaa 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -33,6 +33,35 @@
+ 		vin1 = &vin1;
+ 	};
+ 
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clka: audio_clka {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++	audio_clkb: audio_clkb {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++	audio_clkc: audio_clkc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	/* External CAN clock */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -66,6 +95,22 @@
+ 		};
+ 	};
+ 
++	/* External root clock */
++	extal_clk: extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
++	/* External SCIF clock */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
+@@ -1353,55 +1398,10 @@
+ 				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+ 
+-	/* External root clock */
+-	extal_clk: extal {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+-
+ 	/* External USB clock - can be overridden by the board */
+ 	usb_extal_clk: usb_extal {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+ 		clock-frequency = <48000000>;
+ 	};
+-
+-	/* External CAN clock */
+-	can_clk: can {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+-
+-	/* External SCIF clock */
+-	scif_clk: scif {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		/* This value must be overridden by the board. */
+-		clock-frequency = <0>;
+-	};
+-
+-	/*
+-	 * The external audio clocks are configured  as 0 Hz fixed
+-	 * frequency clocks by default.  Boards that provide audio
+-	 * clocks should override them.
+-	 */
+-	audio_clka: audio_clka {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-	audio_clkb: audio_clkb {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-	audio_clkc: audio_clkc {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+ };
+-- 
+2.11.0
