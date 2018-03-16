@@ -1,25 +1,48 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Fri, 16 Mar 2018 15:55:16 +0100
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <20180316143119.cdjw4dhm6crcjyrd@lakrids.cambridge.arm.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
- <20180316141313.q5vjmj627rv7r7kf@lakrids.cambridge.arm.com>
- <20180316143119.cdjw4dhm6crcjyrd@lakrids.cambridge.arm.com>
-Message-ID: <CAAeHK+z12AhRNQMVL5Xza+U=E-7NL3YA3VZmvrN2pGx8O-+a5Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Mar 2018 14:55:10 +0000
+Subject: [PATCH 1/2] irqchip/gic: Loudly complain about the use of
+ IRQ_TYPE_NONE
+In-Reply-To: <20180316145511.28362-1-marc.zyngier@arm.com>
+References: <20180316145511.28362-1-marc.zyngier@arm.com>
+Message-ID: <20180316145511.28362-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 3:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->
-> FWIW, with that same compiler and patch applied atop of v4.16-rc4, and
-> some bodges around clang not liking the rX register naming in the SMCCC
-> code, I get a kernel that boots on my Juno, though I immediately hit a
-> KASAN splat:
->
-> [    8.476766] ==================================================================
-> [    8.483990] BUG: KASAN: slab-out-of-bounds in __d_lookup_rcu+0x350/0x400
-> [    8.490664] Read of size 8 at addr ffff8009336e2a30 by task init/1
+There is a huge number of broken device trees out there. Just
+grepping through the tree for the use of IRQ_TYPE_NONE in conjunction
+with the GIC is scary.
 
-I see this as well, I'm looking into it. It seems that
-__no_sanitize_address is not defined for clang (defining it doesn't
-help though, so the issue might be deeper).
+People just don't realise that IRQ_TYPE_NONE just doesn't exist, and
+you just get whatever junk was there before. So let's make them aware
+of the issue.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 79801c24800b..ac2e62d613d1 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1011,6 +1011,9 @@ static int gic_irq_domain_translate(struct irq_domain *d,
+ 			*hwirq += 16;
+ 
+ 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
++
++		/* Make it clear that broken DTs are... broken */
++		WARN_ON(*type == IRQ_TYPE_NONE);
+ 		return 0;
+ 	}
+ 
+@@ -1020,6 +1023,8 @@ static int gic_irq_domain_translate(struct irq_domain *d,
+ 
+ 		*hwirq = fwspec->param[0];
+ 		*type = fwspec->param[1];
++
++		WARN_ON(*type == IRQ_TYPE_NONE);
+ 		return 0;
+ 	}
+ 
+-- 
+2.14.2
