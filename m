@@ -1,58 +1,201 @@
-From: swise@opengridcomputing.com (Steve Wise)
-Date: Fri, 16 Mar 2018 18:05:44 -0500
-Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <83387f6e-adcb-14e9-2c22-96abf9493cc6@codeaurora.org>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
- <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
- <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
- <83387f6e-adcb-14e9-2c22-96abf9493cc6@codeaurora.org>
-Message-ID: <004501d3bd7b$505e70f0$f11b52d0$@opengridcomputing.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 17 Mar 2018 00:17:33 +0100
+Subject: [PATCH v2] arm64: allwinner: H5: Add Xunlong Orange Pi Zero Plus
+Message-ID: <20180316231733.15399-1-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> On 3/16/2018 5:05 PM, Steve Wise wrote:
-> >> Code includes wmb() followed by writel(). writel() already has a barrier
-> > on
-> >> some architectures like arm64.
-> >>
-> >> This ends up CPU observing two barriers back to back before executing
-> the
-> >> register write.
-> >>
-> >> Since code already has an explicit barrier call, changing writel() to
-> >> writel_relaxed().
-> >>
-> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >
-> > NAK - This isn't correct for PowerPC.  For PowerPC, writeX_relaxed() is just
-> > writeX().
-> >
-> > I was just looking at this with Chelsio developers, and they said the
-> > writeX() should be replaced with __raw_writeX(), not writeX_relaxed(), to
-> > get rid of the extra barrier for all architectures.
-> 
-> OK. I can do that but isn't the problem at PowerPC adaptation?
-> 
-> /*
->  * We don't do relaxed operations yet, at least not with this semantic
->  */
-> #define readb_relaxed(addr)	readb(addr)
-> #define readw_relaxed(addr)	readw(addr)
-> #define readl_relaxed(addr)	readl(addr)
-> #define readq_relaxed(addr)	readq(addr)
-> #define writeb_relaxed(v, addr)	writeb(v, addr)
-> #define writew_relaxed(v, addr)	writew(v, addr)
-> #define writel_relaxed(v, addr)	writel(v, addr)
-> #define writeq_relaxed(v, addr)	writeq(v, addr)
-> 
-> Why don't we fix the PowerPC's relaxed operators? Is that a bigger task?
+The Xunlong Orange Pi Zero Plus is single board computer.
+- H5 Quad-core 64-bit Cortex-A53
+- 512MB DDR3
+- microSD slot
+- Debug TTL UART
+- 1000M/100M/10M Ethernet RJ45
+- Realtek RTL8189FTV
+- Spi flash (2MB)
+- One USB 2.0 HOST, One USB 2.0 OTG
 
-I don't know the answer, but perhaps the proper fix is to correctly implement these for PPC?
+This is based on a patch from armbian:
+https://github.com/armbian/build/blob/master/patch/kernel/sunxi-next/sunxi-add-orangepi-zero-plus.patch
 
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
 
-> 
-> >From API perspective both __raw_writeX() and writeX_relaxed() are
-> correct.
-> It is just PowerPC doesn't seem the follow the definition yet.
+Changees since v1:
+ * Add my copyright
+ * Add SPDX-License
+ * moved Makefile entry
+ * removed unused reg_usb0_vbus entry
+
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../dts/allwinner/sun50i-h5-orangepi-zero-plus.dts | 147 +++++++++++++++++++++
+ 2 files changed, 148 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index f505227b0250..915604e46e88 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -7,6 +7,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+new file mode 100644
+index 000000000000..74f33941b551
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+@@ -0,0 +1,147 @@
++/*
++ * Copyright (C) 2016 ARM Ltd.
++ * Copyright (C) 2018 Hauke Mehrtens <hauke@hauke-m.de>
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR X11)
++ */
++
++/dts-v1/;
++#include "sun50i-h5.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Xunlong Orange Pi Zero Plus";
++	compatible = "xunlong,orangepi-zero-plus", "allwinner,sun50i-h5";
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	aliases {
++		ethernet0 = &emac;
++		ethernet1 = &rtl8189ftv;
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pwr {
++			label = "orangepi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
++			default-state = "on";
++		};
++
++		status {
++			label = "orangepi:red:status";
++			gpios = <&pio 0 17 GPIO_ACTIVE_HIGH>; /* PA17 */
++		};
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&external_mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	/*
++	 * Explicitly define the sdio device, so that we can add an ethernet
++	 * alias for it (which e.g. makes u-boot set a mac-address).
++	 */
++	rtl8189ftv: sdio_wifi at 1 {
++		reg = <1>;
++	};
++};
++
++&spi0  {
++	status = "okay";
++
++	flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "mxicy,mx25l1606e", "winbond,w25q128";
++		reg = <0>;
++		spi-max-frequency = <40000000>;
++	};
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "peripheral";
++	status = "okay";
++};
++
++&usbphy {
++	/* USB Type-A ports' VBUS is always on */
++	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++	status = "okay";
++};
+-- 
+2.11.0
