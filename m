@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 16 Mar 2018 15:18:45 +0100
-Subject: [GIT PULL 2/7] dt-bindings: Changes for v4.17-rc1
+Date: Fri, 16 Mar 2018 15:18:49 +0100
+Subject: [GIT PULL 6/7] arm64: Default configuration updates for v4.17-rc1
 In-Reply-To: <20180316141850.4876-1-thierry.reding@gmail.com>
 References: <20180316141850.4876-1-thierry.reding@gmail.com>
-Message-ID: <20180316141850.4876-2-thierry.reding@gmail.com>
+Message-ID: <20180316141850.4876-6-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,31 +15,30 @@ The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-dt-bindings
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-arm64-defconfig
 
-for you to fetch changes up to 2c7305569296719094c9f67481249e2e61dbee6a:
+for you to fetch changes up to dc7073b0234ee6f48a8e609cd2def777de1e2d26:
 
-  dt/bindings: Fix binding examples for Tegra GMI controller (2018-03-08 16:03:33 +0100)
+  arm64: defconfig: Enable the Tegra SMMU by default (2018-03-14 13:27:41 +0100)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-dt-bindings: Changes for v4.17-rc1
+arm64: Default configuration updates for v4.17-rc1
 
-Mostly cleanup of existing bindings and initial support for Tegra194.
+Enable the BPMP thermal and CPU frequency drivers as well as make sure
+that the Tegra SMMU is enabled by default because there's no fun without
+it. Also enable initial Tegra194 support.
 
 ----------------------------------------------------------------
-Marcel Ziswiler (2):
-      dt-bindings: phy: Clarify ULPI PHY source clock
-      dt/bindings: Fix binding examples for Tegra GMI controller
+Mikko Perttunen (3):
+      arm64: defconfig: Enable NVIDIA Tegra194 support
+      arm64: defconfig: Enable CONFIG_ARM_TEGRA186_CPUFREQ
+      arm64: defconfig: Enable CONFIG_TEGRA_BPMP_THERMAL
 
-Mikko Perttunen (2):
-      dt-bindings: tegra: Add missing chips and NVIDIA boards
-      dt-bindings: tegra: Add documentation for nvidia,tegra194-pmc
+Thierry Reding (1):
+      arm64: defconfig: Enable the Tegra SMMU by default
 
- Documentation/devicetree/bindings/arm/tegra.txt          | 16 ++++++++++++++++
- .../bindings/arm/tegra/nvidia,tegra186-pmc.txt           |  2 ++
- .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt       |  6 ++----
- .../devicetree/bindings/phy/nvidia,tegra20-usb-phy.txt   |  4 +++-
- 4 files changed, 23 insertions(+), 5 deletions(-)
+ arch/arm64/configs/defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
