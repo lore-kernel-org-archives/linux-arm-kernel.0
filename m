@@ -1,95 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:53:26 +0100
-Subject: [PATCH 04/14] soc: renesas: rcar-rst: Enable watchdog as reset
- trigger for Gen2
+Date: Fri, 16 Mar 2018 15:53:33 +0100
+Subject: [PATCH 11/14] soc: renesas: rcar-rst: Add support for R-Car M3-N
 In-Reply-To: <cover.1521211738.git.horms+renesas@verge.net.au>
 References: <cover.1521211738.git.horms+renesas@verge.net.au>
-Message-ID: <69e0d1b8db8f8cc319f966ec3eb2fffce28c4f28.1521211738.git.horms+renesas@verge.net.au>
+Message-ID: <bf79cd635db50fab2319add2462cf803ff76d346.1521211738.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-This patch allows for platform specific quirks as some of the SoC need
-further customization for the watchdog to work properly, like for R-Car
-Gen2 and for RZ/G.
-
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/rcar-rst.c | 37 ++++++++++++++++++++++++++++++-------
- 1 file changed, 30 insertions(+), 7 deletions(-)
+ Documentation/devicetree/bindings/reset/renesas,rst.txt | 1 +
+ drivers/soc/renesas/Kconfig                             | 4 ++--
+ drivers/soc/renesas/rcar-rst.c                          | 1 +
+ 3 files changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+index a55b88658446..294a0dae106a 100644
+--- a/Documentation/devicetree/bindings/reset/renesas,rst.txt
++++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+@@ -26,6 +26,7 @@ Required properties:
+ 		  - "renesas,r8a7794-rst" (R-Car E2)
+ 		  - "renesas,r8a7795-rst" (R-Car H3)
+ 		  - "renesas,r8a7796-rst" (R-Car M3-W)
++		  - "renesas,r8a77965-rst" (R-Car M3-N)
+ 		  - "renesas,r8a77970-rst" (R-Car V3M)
+ 		  - "renesas,r8a77980-rst" (R-Car V3H)
+ 		  - "renesas,r8a77995-rst" (R-Car D3)
+diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
+index 7106a6330210..3bbe6114a420 100644
+--- a/drivers/soc/renesas/Kconfig
++++ b/drivers/soc/renesas/Kconfig
+@@ -3,8 +3,8 @@ config SOC_RENESAS
+ 	default y if ARCH_RENESAS
+ 	select SOC_BUS
+ 	select RST_RCAR if ARCH_RCAR_GEN1 || ARCH_RCAR_GEN2 || \
+-			   ARCH_R8A7795 || ARCH_R8A7796 || ARCH_R8A77970 || \
+-			   ARCH_R8A77980 || ARCH_R8A77995
++			   ARCH_R8A7795 || ARCH_R8A7796 || ARCH_R8A77965 || \
++			   ARCH_R8A77970 || ARCH_R8A77980 || ARCH_R8A77995
+ 	select SYSC_R8A7743 if ARCH_R8A7743
+ 	select SYSC_R8A7745 if ARCH_R8A7745
+ 	select SYSC_R8A7779 if ARCH_R8A7779
 diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
-index e2340eb9ea9c..34136664ece4 100644
+index 34136664ece4..8e9cb7996ab0 100644
 --- a/drivers/soc/renesas/rcar-rst.c
 +++ b/drivers/soc/renesas/rcar-rst.c
-@@ -13,8 +13,18 @@
- #include <linux/of_address.h>
- #include <linux/soc/renesas/rcar-rst.h>
- 
-+#define WDTRSTCR_RESET		0xA55A0002
-+#define WDTRSTCR		0x0054
-+
-+static int rcar_rst_enable_wdt_reset(void __iomem *base)
-+{
-+	iowrite32(WDTRSTCR_RESET, base + WDTRSTCR);
-+	return 0;
-+}
-+
- struct rst_config {
--	unsigned int modemr;	/* Mode Monitoring Register Offset */
-+	unsigned int modemr;		/* Mode Monitoring Register Offset */
-+	int (*configure)(void *base);	/* Platform specific configuration */
- };
- 
- static const struct rst_config rcar_rst_gen1 __initconst = {
-@@ -23,6 +33,11 @@ static const struct rst_config rcar_rst_gen1 __initconst = {
- 
- static const struct rst_config rcar_rst_gen2 __initconst = {
- 	.modemr = 0x60,
-+	.configure = rcar_rst_enable_wdt_reset,
-+};
-+
-+static const struct rst_config rcar_rst_gen3 __initconst = {
-+	.modemr = 0x60,
- };
- 
- static const struct of_device_id rcar_rst_matches[] __initconst = {
-@@ -38,12 +53,12 @@ static const struct of_device_id rcar_rst_matches[] __initconst = {
- 	{ .compatible = "renesas,r8a7792-rst", .data = &rcar_rst_gen2 },
- 	{ .compatible = "renesas,r8a7793-rst", .data = &rcar_rst_gen2 },
- 	{ .compatible = "renesas,r8a7794-rst", .data = &rcar_rst_gen2 },
--	/* R-Car Gen3 is handled like R-Car Gen2 */
--	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen2 },
--	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen2 },
--	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen2 },
--	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen2 },
--	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen2 },
-+	/* R-Car Gen3 */
-+	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen3 },
-+	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen3 },
-+	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen3 },
-+	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen3 },
-+	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen3 },
- 	{ /* sentinel */ }
- };
- 
-@@ -72,6 +87,14 @@ static int __init rcar_rst_init(void)
- 	rcar_rst_base = base;
- 	cfg = match->data;
- 	saved_mode = ioread32(base + cfg->modemr);
-+	if (cfg->configure) {
-+		error = cfg->configure(base);
-+		if (error) {
-+			pr_warn("%pOF: Cannot run SoC specific configuration\n",
-+				np);
-+			goto out_put;
-+		}
-+	}
- 
- 	pr_debug("%pOF: MODE = 0x%08x\n", np, saved_mode);
- 
+@@ -56,6 +56,7 @@ static const struct of_device_id rcar_rst_matches[] __initconst = {
+ 	/* R-Car Gen3 */
+ 	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen3 },
+ 	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen3 },
++	{ .compatible = "renesas,r8a77965-rst", .data = &rcar_rst_gen3 },
+ 	{ .compatible = "renesas,r8a77970-rst", .data = &rcar_rst_gen3 },
+ 	{ .compatible = "renesas,r8a77980-rst", .data = &rcar_rst_gen3 },
+ 	{ .compatible = "renesas,r8a77995-rst", .data = &rcar_rst_gen3 },
 -- 
 2.11.0
