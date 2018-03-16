@@ -1,179 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 17:38:34 +0100
-Subject: [PATCH 37/47] ARM: dts: porter: use demuxer for I2C2
+Date: Fri, 16 Mar 2018 17:38:22 +0100
+Subject: [PATCH 25/47] ARM: dts: r8a7791: consistently use single space before
+ =
 In-Reply-To: <cover.1521218085.git.horms+renesas@verge.net.au>
 References: <cover.1521218085.git.horms+renesas@verge.net.au>
-Message-ID: <12937bffd64f5b9970589d0b946305d14cc45e6a.1521218085.git.horms+renesas@verge.net.au>
+Message-ID: <c57c1b7ce8c6743ca745a577e7ac6b81a59a2479.1521218085.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Consistently use a single space before a =.
 
-Create a separate bus for HDMI related I2C2 and provide fallback to GPIO.
+This patch fixes instances where a tab is used instead.
 
-Based on work for the r8a7790/lager by Wolfram Sang.
+This patch should not introduce any functional change.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-[wsa: rebased, fixed aliases, switched to named GPIOs]
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791-porter.dts | 128 ++++++++++++++++++++---------------
- 1 file changed, 75 insertions(+), 53 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index 9a02d03b23c2..c14e6fe9e4f6 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -29,6 +29,8 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index dc659351472f..f11dab71b03a 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1703,16 +1703,16 @@
  
- 	aliases {
- 		serial0 = &scif0;
-+		i2c9 = &gpioi2c2;
-+		i2c10 = &i2chdmi;
- 	};
+ 	thermal-zones {
+ 		cpu_thermal: cpu-thermal {
+-			polling-delay-passive	= <0>;
+-			polling-delay		= <0>;
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
  
- 	chosen {
-@@ -135,6 +137,78 @@
- 			clocks = <&x14_clk>;
- 		};
- 	};
-+
-+	gpioi2c2: i2c-9 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "i2c-gpio";
-+		status = "disabled";
-+		scl-gpios = <&gpio2 6 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+		sda-gpios = <&gpio2 7 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+		i2c-gpio,delay-us = <5>;
-+	};
-+
-+	/*
-+	 * A fallback to GPIO is provided for I2C2.
-+	 */
-+	i2chdmi: i2c-10 {
-+		compatible = "i2c-demux-pinctrl";
-+		i2c-parent = <&i2c2>, <&gpioi2c2>;
-+		i2c-bus-name = "i2c-hdmi";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ak4642: codec at 12 {
-+			compatible = "asahi-kasei,ak4642";
-+			#sound-dai-cells = <0>;
-+			reg = <0x12>;
-+		};
-+
-+		composite-in at 20 {
-+			compatible = "adi,adv7180";
-+			reg = <0x20>;
-+			remote = <&vin0>;
-+
-+			port {
-+				adv7180: endpoint {
-+					bus-width = <8>;
-+					remote-endpoint = <&vin0ep>;
-+				};
-+			};
-+		};
-+
-+		hdmi at 39 {
-+			compatible = "adi,adv7511w";
-+			reg = <0x39>;
-+			interrupt-parent = <&gpio3>;
-+			interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
-+
-+			adi,input-depth = <8>;
-+			adi,input-colorspace = "rgb";
-+			adi,input-clock = "1x";
-+			adi,input-style = <1>;
-+			adi,input-justification = "evenly";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					adv7511_in: endpoint {
-+						remote-endpoint = <&du_out_rgb>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					adv7511_out: endpoint {
-+						remote-endpoint = <&hdmi_con>;
-+					};
-+				};
-+			};
-+		};
-+	};
- };
+ 			thermal-sensors = <&thermal>;
  
- &extal_clk {
-@@ -296,61 +370,9 @@
- 
- &i2c2 {
- 	pinctrl-0 = <&i2c2_pins>;
--	pinctrl-names = "default";
-+	pinctrl-names = "i2c-hdmi";
- 
--	status = "okay";
- 	clock-frequency = <400000>;
--
--	ak4642: codec at 12 {
--		compatible = "asahi-kasei,ak4642";
--		#sound-dai-cells = <0>;
--		reg = <0x12>;
--	};
--
--	composite-in at 20 {
--		compatible = "adi,adv7180";
--		reg = <0x20>;
--		remote = <&vin0>;
--
--		port {
--			adv7180: endpoint {
--				bus-width = <8>;
--				remote-endpoint = <&vin0ep>;
--			};
--		};
--	};
--
--	hdmi at 39 {
--		compatible = "adi,adv7511w";
--		reg = <0x39>;
--		interrupt-parent = <&gpio3>;
--		interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
--
--		adi,input-depth = <8>;
--		adi,input-colorspace = "rgb";
--		adi,input-clock = "1x";
--		adi,input-style = <1>;
--		adi,input-justification = "evenly";
--
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 0 {
--				reg = <0>;
--				adv7511_in: endpoint {
--					remote-endpoint = <&du_out_rgb>;
--				};
--			};
--
--			port at 1 {
--				reg = <1>;
--				adv7511_out: endpoint {
--					remote-endpoint = <&hdmi_con>;
--				};
--			};
--		};
--	};
- };
- 
- &sata0 {
+ 			trips {
+ 				cpu-crit {
+-					temperature	= <95000>;
+-					hysteresis	= <0>;
+-					type		= "critical";
++					temperature = <95000>;
++					hysteresis = <0>;
++					type = "critical";
+ 				};
+ 			};
+ 			cooling-maps {
 -- 
 2.11.0
