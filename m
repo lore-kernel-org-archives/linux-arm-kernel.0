@@ -1,120 +1,34 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 17 Mar 2018 01:53:54 +0800
-Subject: [PATCH 7/7] arm64: allwinner: a64: add HDMI regulator to all DTs'
- simplefb_hdmi
-In-Reply-To: <20180316175354.21437-1-icenowy@aosc.io>
-References: <20180316175354.21437-1-icenowy@aosc.io>
-Message-ID: <20180316175354.21437-8-icenowy@aosc.io>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 16 Mar 2018 17:46:45 +0000
+Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
+ mitigation)
+In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
+References: <20180314165049.30105-1-marc.zyngier@arm.com>
+Message-ID: <20180316174644.klbpmuhyod5qea3r@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On usual A64 board design the power of HDMI controller is connected to
-DLDO1 of the AXP803 PMIC. If this regulator is shut down, the HDMI
-output will be blank. Therefore the simplefb driver should keep this
-regulator on.
+On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
+> Whilst KVM benefits from the kernel randomisation via KASLR, there is
+> no additional randomisation when the kernel is running at EL1, as we
+> directly use a fixed offset from the linear mapping. This is not
+> necessarily a problem, but we could do a bit better by independently
+> randomizing the HYP placement.
 
-Add the regulator to all currently available A64 boards' simplefb_hdmi
-device node.
+For the rest of the patches in this series:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts     | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts       | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts        | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts     | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts           | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 4 ++++
- 6 files changed, 24 insertions(+)
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 2250dec9974c..2fd343512d41 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -282,6 +282,10 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&simplefb_hdmi {
-+	vcc-hdmi-supply = <&reg_dldo1>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-index e2dce48fa29a..98dbff19f5cc 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-@@ -195,6 +195,10 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&simplefb_hdmi {
-+	vcc-hdmi-supply = <&reg_dldo1>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-index 3b3081b10ecb..3f531393eaee 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-@@ -214,6 +214,10 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&simplefb_hdmi {
-+	vcc-hdmi-supply = <&reg_dldo1>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-index bf42690a3361..1221764f5719 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-@@ -191,6 +191,10 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&simplefb_hdmi {
-+	vcc-hdmi-supply = <&reg_dldo1>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index a75825798a71..1b9b92e541d2 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -229,6 +229,10 @@
- 	regulator-name = "vcc-rtc";
- };
- 
-+&simplefb_hdmi {
-+	vcc-hdmi-supply = <&reg_dldo1>;
-+};
-+
- /* On Euler connector */
- &spdif {
- 	status = "disabled";
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index abe179de35d7..c21f2331add6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -134,6 +134,10 @@
- 	regulator-name = "vcc-wifi";
- };
- 
-+&simplefb_hdmi {
-+	vcc-hdmi-supply = <&reg_dldo1>;
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+Some points for a future series:
+
+- in bpi.S, drop the __smccc_workaround_1_hvc_start/end as HVC PSCI
+  conduit for hyp doesn't make much sense (could pass NULL instead to
+  __install_bp_hardening_cb())
+
+- maybe move bpi.S under arch/arm64/kvm/ if it doesn't cause other
+  dependency issues in cpu_errata.c
+
+Thanks.
+
 -- 
-2.15.1
+Catalin
