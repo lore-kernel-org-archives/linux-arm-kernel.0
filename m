@@ -1,44 +1,71 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Mar 2018 08:55:16 +0800
-Subject: [GIT PULL 2/6] i.MX SoC changes for 4.17
-In-Reply-To: <CAK8P3a1vNZf9uk+u+mnot37TuKYfN-P_xxXm+uG6p0oyPjZTEw@mail.gmail.com>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
- <1521113800-16401-2-git-send-email-shawnguo@kernel.org>
- <CAK8P3a1vNZf9uk+u+mnot37TuKYfN-P_xxXm+uG6p0oyPjZTEw@mail.gmail.com>
-Message-ID: <20180316005515.GO26859@dragon>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 16 Mar 2018 08:58:09 +0800
+Subject: [PATCH 1/2] of_pci_irq: add a check to fallback to standard
+ device tree parsing
+In-Reply-To: <20180315174329.GB22176@e107981-ln.cambridge.arm.com>
+References: <31c765c53e85e41bfc001d110d69e46c9967f4e7.1516961656.git.ryder.lee@mediatek.com>
+ <20180315174329.GB22176@e107981-ln.cambridge.arm.com>
+Message-ID: <1521161889.13458.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 04:12:33PM +0100, Arnd Bergmann wrote:
-> On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-> >
-> >   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.17
-> >
-> > for you to fetch changes up to dee5dee2a5b285d20f55a4758d3a51349691eeea:
-> >
-> >   ARM: imx: Add basic msl support for imx6sll (2018-03-09 09:22:06 +0800)
-> >
-> > ----------------------------------------------------------------
-> > i.MX SoC changes for 4.17:
-> >  - Add i.MX 6SoloLiteLite (i.MX6SLL) SoC support on top of the existing
-> >    i.MX6SL platform code.
-> >  - Improve the SoC revision mapping by utilizing the MAJOR field of
-> >    ANATOP DIGPROG register.
-> >  - Add CPUIDLE_FLAG_TIMER_STOP flag for cpuidle ARM power off state,
-> >    so that we can use ARM generic timer for some i.MX6 SoC.
-> >  - Set low-power interrupt mask for i.MX25 to support STOP mode.
-> >  - Drop EPIT driver as there is no user of it.
-> >  - Simplify the error path of imx6_pm_get_base() a bit.
+On Thu, 2018-03-15 at 17:43 +0000, Lorenzo Pieralisi wrote:
+> On Wed, Jan 31, 2018 at 03:41:49PM +0800, Ryder Lee wrote:
+> > A root complex usually consist of a host bridge and multiple P2P bridges,
+> > and someone may express that in the form of a root node with many subnodes
+> > and list all four interrupts for each slot (child node) in the root node
+> > like this:
+> > 
+> > 	pcie-controller {
+> > 		...
+> > 		interrupt-map-mask = <0xf800 0 0 7>;
+> > 		interrupt-map = <0x0000 0 0 {INTx} &{interrupt parent} ...>
+> > 				 0x0800 0 0 {INTx} &{interrupt parent} ...>;
+> > 
+> > 		pcie at 0,0 {
+> > 			reg = <0x0000 0 0 0 0>;
+> > 			...
+> > 		};
+> > 
+> > 		pcie at 1,0 {
+> > 			reg = <0x0800 0 0 0 0>;
+> > 			...
+> > 		};
+> > 	};
+> > 
+> > As shown above, we'd like to propagate IRQs from a root port to the devices
+> > in the hierarchy below it in this way.  However, it seems that the current
+> > parser couldn't handle such cases and will get something unexpected below:
+> > 
+> > 	pcieport 0000:00:01.0: assign IRQ: got 213
+> > 	igb 0000:01:00.0: assign IRQ: got 212
+> > 
+> > There is a device which is connected to 2nd slot, but the port doesn't share
+> > the same IRQ with its downstream devices.  The problem here is that, if the
+> > loop found a P2P bridge, it wouldn't check whether the reg property exists
+> > in ppnode or not but just pass the subordinate devfn to of_irq_parse_raw(),
+> > thus the subsequent flow couldn't correctly resolve them.
+> > 
+> > Fix this by adding a check to fallback to standard device tree parsing.
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> > Please refer to the previous discussion thread: https://patchwork.ozlabs.org/patch/829108/
+> > ---
+> >  drivers/of/of_pci_irq.c | 14 ++++++++++++--
+> >  1 file changed, 12 insertions(+), 2 deletions(-)
 > 
-> Pulled into next/soc. However, I need two fixups for bugs I ran into during
-> linux-next randconfig testing. Sending them out now, please Ack so
-> I can apply them directly.
+> Hi Ryder,
+> 
+> from the thread discussion I gather I can drop this series from the PCI
+> queue and you will update the DT as agreed with Ben, that looks like
+> the most reasonable solution to the problem you are facing, please
+> let me know if there is anything I am missing.
+> 
+> Thanks,
+> Lorenzo
+> 
 
-Thanks for the fixups.  I have just Ack-ed them.
+Yes, please drop the series.
 
-Shawn
+Thanks
