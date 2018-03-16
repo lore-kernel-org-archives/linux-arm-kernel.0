@@ -1,23 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 16 Mar 2018 20:58:45 +0100
-Subject: [PATCH] arm64: dts: armada-3720-espressobin: Document URL for
- schematic
-In-Reply-To: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
-References: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20180316195845.pvyddhtgscac6otm@pengutronix.de>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 16 Mar 2018 13:36:58 -0700
+Subject: [PATCH v3 01/15] dt-bindings: clock: mediatek: add missing
+ required #reset-cells
+In-Reply-To: <7365f2286ff2cebcfb590715cb4a15dedd089046.1518895232.git.sean.wang@mediatek.com>
+References: <cover.1518895232.git.sean.wang@mediatek.com>
+ <7365f2286ff2cebcfb590715cb4a15dedd089046.1518895232.git.sean.wang@mediatek.com>
+Message-ID: <152123261872.225550.10226809804986023416@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 11:01:24AM +0100, Uwe Kleine-K?nig wrote:
-> The schematic of hte espressobin is publicly available, add a comment
+Quoting sean.wang at mediatek.com (2018-02-17 11:54:36)
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> All ethsys, pciesys and ssusbsys internally include reset controller, so
+> explicitly add back these missing cell definitions to related bindings
+> and examples.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: linux-clk at vger.kernel.org
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
 
-s/hte/the/
-
-Maybe you can fix this up when applying?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Acked-by: Stephen Boyd <sboyd@kernel.org>
