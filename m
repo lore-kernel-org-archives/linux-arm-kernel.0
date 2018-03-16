@@ -1,34 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Mar 2018 17:46:45 +0000
-Subject: [PATCH v6 00/26] KVM/arm64: Randomise EL2 mappings (variant 3a
- mitigation)
-In-Reply-To: <20180314165049.30105-1-marc.zyngier@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
-Message-ID: <20180316174644.klbpmuhyod5qea3r@armageddon.cambridge.arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 16 Mar 2018 12:33:14 -0400
+Subject: [Intel-wired-lan] [PATCH v3 09/18] fm10k: Eliminate duplicate
+ barriers on weakly-ordered archs
+In-Reply-To: <CAKgT0UcKdCpzFgX4qn7EdYnedOsJa9as5g24tfb6qFLXTxZ29A@mail.gmail.com>
+References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+ <1521216991-28706-10-git-send-email-okaya@codeaurora.org>
+ <CAKgT0UcKdCpzFgX4qn7EdYnedOsJa9as5g24tfb6qFLXTxZ29A@mail.gmail.com>
+Message-ID: <2d346b70-70d4-5996-24ce-94031ee68c90@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 04:50:23PM +0000, Marc Zyngier wrote:
-> Whilst KVM benefits from the kernel randomisation via KASLR, there is
-> no additional randomisation when the kernel is running at EL1, as we
-> directly use a fixed offset from the linear mapping. This is not
-> necessarily a problem, but we could do a bit better by independently
-> randomizing the HYP placement.
+On 3/16/2018 12:30 PM, Alexander Duyck wrote:
+> On Fri, Mar 16, 2018 at 9:16 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> Code includes wmb() followed by writel(). writel() already has a
+>> barrier on some architectures like arm64.
+>>
+>> This ends up CPU observing two barriers back to back before executing
+>> the register write.
+>>
+>> Since code already has an explicit barrier call, changing writel() to
+>> writel_relaxed().
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> 
+> You can update the writel call in fm10k_tx_map as well.
+> 
+> Of the drivers updated in drivers/net/ethernet/intel/* it looks like
+> this is the only one that still requires any additional changes.
 
-For the rest of the patches in this series:
+will do. thanks for the feedback.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Thanks.
+> 
+> - Alex
+> 
 
-Some points for a future series:
-
-- in bpi.S, drop the __smccc_workaround_1_hvc_start/end as HVC PSCI
-  conduit for hyp doesn't make much sense (could pass NULL instead to
-  __install_bp_hardening_cb())
-
-- maybe move bpi.S under arch/arm64/kvm/ if it doesn't cause other
-  dependency issues in cpu_errata.c
-
-Thanks.
 
 -- 
-Catalin
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
