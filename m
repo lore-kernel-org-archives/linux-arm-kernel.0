@@ -1,194 +1,57 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 16 Mar 2018 15:08:20 +0530
-Subject: [PATCH v2 12/13] ARM: dts: ipq8074: Add pcie nodes
-In-Reply-To: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
-References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521193101-4586-13-git-send-email-sricharan@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 16 Mar 2018 17:39:23 +0800
+Subject: [PATCH] ARM: dts: sun7i: Add pinmux settings for LCD0 RGB888
+ output.
+In-Reply-To: <658946b9-4f49-ff24-3b84-da1eb9b7d9ad@micronovasrl.com>
+References: <1521121410-17103-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180316064731.muiw5yumhmfnwxg2@flea>
+ <658946b9-4f49-ff24-3b84-da1eb9b7d9ad@micronovasrl.com>
+Message-ID: <CAGb2v66bdH4kr=T=A0MNKShOCKkvp=+dWDZLskBoUJn_pUJDgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver/phy support for ipq8074 is available now.
-So enabling the nodes in DT.
+On Fri, Mar 16, 2018 at 5:19 PM, Giulio Benetti
+<giulio.benetti@micronovasrl.com> wrote:
+> Hi Maxime,
+>
+> Il 16/03/2018 07:47, Maxime Ripard ha scritto:
+>>
+>> Hi Giulio,
+>>
+>> On Thu, Mar 15, 2018 at 02:43:30PM +0100, Giulio Benetti wrote:
+>>>
+>>> The A20 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
+>>> for the needed pins.
+>>>
+>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>
+>>
+>> Like we discussed last time, we only merge this kind of patches if
+>> there's an immediate user.
+>
+>
+> You're right.
+> In few time(I hope), I'm going to send dts for Linova1-4_3 and Linova1-7,
+> where I use those pins.
+> I have also to send 2 patches for 2 new panels for panel-simple.
+>
+> So I think I have to send 2 displays' patches before.
+> And a patchset for the 2 boards and rgb888 pins.
+>
+> One question: do I have to wait for panels' patches to applied and then send
+> patchset for boards dts?
+> Or can I send a unique patchset?
+> Because as I understand those patches should be applied to 2 different
+> repositories, right?
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/ipq8074.dtsi | 157 +++++++++++++++++++++++++++++++++-
- 1 file changed, 156 insertions(+), 1 deletion(-)
+If none of them have been merged yet, it's best to send all of them
+as part of the same series, and to all parties involved. That way,
+people have the full picture of what you're trying to achieve when
+they review your patches. Unless your series is really big.
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-index 806fc56..7562650 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-+++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-@@ -24,7 +24,7 @@
- 		ranges = <0 0 0 0xffffffff>;
- 		compatible = "simple-bus";
- 
--		pinctrl at 1000000 {
-+		tlmm: pinctrl at 1000000 {
- 			compatible = "qcom,ipq8074-pinctrl";
- 			reg = <0x1000000 0x300000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
-@@ -229,6 +229,161 @@
- 			dma-names = "tx", "rx", "cmd";
- 			status = "disabled";
- 		};
-+
-+		pcie_phy0: phy at 86000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x86000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy0_pipe_clk";
-+
-+			resets = <&gcc GCC_PCIE0_PHY_BCR>,
-+				<&gcc GCC_PCIE0PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
-+			status = "disabled";
-+		};
-+
-+		pcie0: pci at 20000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x20000000 0xf1d
-+				0x20000F20 0xa8
-+				0x80000 0x2000
-+				0x20100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <0>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			phys = <&pcie_phy0>;
-+			phy-names = "pciephy";
-+
-+			ranges = <0x81000000 0 0x20200000 0x20200000
-+				  0 0x00100000   /* downstream I/O */
-+				  0x82000000 0 0x20300000 0x20300000
-+				  0 0x00d00000>; /* non-prefetchable memory */
-+
-+			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 75
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 78
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 79
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 83
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+
-+			clocks = <&gcc GCC_SYS_NOC_PCIE0_AXI_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE0_AHB_CLK>,
-+				 <&gcc GCC_PCIE0_AUX_CLK>;
-+
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE0_PIPE_ARES>,
-+				 <&gcc GCC_PCIE0_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE0_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE0_AHB_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
-+			status = "disabled";
-+		};
-+
-+		pcie_phy1: phy at 8e000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x8e000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE1_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy1_pipe_clk";
-+
-+			resets = <&gcc GCC_PCIE1_PHY_BCR>,
-+				<&gcc GCC_PCIE1PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
-+			status = "disabled";
-+		};
-+
-+		pcie1: pci at 10000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x10000000 0xf1d
-+				0x10000F20 0xa8
-+				0x88000 0x2000
-+				0x10100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <1>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			phys = <&pcie_phy1>;
-+			phy-names = "pciephy";
-+
-+			ranges = <0x81000000 0 0x10200000 0x10200000
-+				  0 0x00100000   /* downstream I/O */
-+				  0x82000000 0 0x10300000 0x10300000
-+				  0 0x00d00000>; /* non-prefetchable memory */
-+
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 142
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 143
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 144
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 145
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+
-+			clocks = <&gcc GCC_SYS_NOC_PCIE1_AXI_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE1_AHB_CLK>,
-+				 <&gcc GCC_PCIE1_AUX_CLK>;
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE1_PIPE_ARES>,
-+				 <&gcc GCC_PCIE1_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE1_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE1_AHB_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
-+			status = "disabled";
-+		};
- 	};
- 
- 	cpus {
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Maintainers will pick up patches that need to go through their trees.
+In general you don't need to do much coordination beyond pointing out
+whether the patches are safe to go in independently or there are
+dependencies that the maintainers need to be aware of.
+
+ChenYu
