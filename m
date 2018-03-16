@@ -1,55 +1,33 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 16 Mar 2018 07:44:40 +0800
-Subject: [PATCH v7 3/3] dts: arm64: Add mailbox binding for hi3660
-In-Reply-To: <5AAAA22E.5030009@hisilicon.com>
-References: <1521130058-24796-1-git-send-email-leo.yan@linaro.org>
- <1521130058-24796-4-git-send-email-leo.yan@linaro.org>
- <5AAAA22E.5030009@hisilicon.com>
-Message-ID: <20180315234440.GA18160@leoy-ThinkPad-X240s>
+From: alexander.duyck@gmail.com (Alexander Duyck)
+Date: Thu, 15 Mar 2018 17:25:17 -0700
+Subject: [PATCH 6/7] e1000: eliminate duplicate barriers on weakly-ordered
+ archs
+In-Reply-To: <39dc5bb4-02b1-bf7e-fbfc-17fc484e4fb7@codeaurora.org>
+References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
+ <1520997629-17361-6-git-send-email-okaya@codeaurora.org>
+ <CAKgT0UfJwYFy5g_2TE5W4MgdEvyH2CvBAS2imdw9UUiumuUOhQ@mail.gmail.com>
+ <39dc5bb4-02b1-bf7e-fbfc-17fc484e4fb7@codeaurora.org>
+Message-ID: <CAKgT0UcfEwL9Jas149a=h3R4zeu4oA=uywJ9dpYD9kDdnpWQFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 04:41:18PM +0000, Wei Xu wrote:
-> Hi Leo,
-> 
-> On 2018/3/15 16:07, Leo Yan wrote:
-> > From: Kaihua Zhong <zhongkaihua@huawei.com>
-> > 
-> > Add DT binding for mailbox driver.
-> > 
-> > Signed-off-by: Ruyi Wang <wangruyi@huawei.com>
-> > Signed-off-by: Kaihua Zhong <zhongkaihua@huawei.com>
-> 
-> Fine to me. Thanks!
-> Acked-by: Wei Xu <xuwei5@hisilicon.com>
+On Thu, Mar 15, 2018 at 4:30 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 3/14/2018 9:41 PM, Alexander Duyck wrote:
+>>>  }
+>>>
+>> So you missed the writel in e1000_xmit_frame. You should probably get
+>> that one too while you are doing these updates. The wmb() is in
+>> e1000_tx_queue().
+>>
+>
+> I brought wmb() outside along with the next descriptor assignment to be
+> similar to the rest of the other code.
+>
+> if wmb() and writel() are not visible in the same function, let's not touch
+> the code.
 
-Thanks, Wei.
-
-> Best Regards,
-> Wei
-> 
-> > ---
-> >  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > index 63d4f9d..3788448 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-> > @@ -298,6 +298,14 @@
-> >  			#reset-cells = <2>;
-> >  		};
-> >  
-> > +		mailbox: mailbox at e896b000 {
-> > +			compatible = "hisilicon,hi3660-mbox";
-> > +			reg = <0x0 0xe896b000 0x0 0x1000>;
-> > +			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
-> > +			#mbox-cells = <3>;
-> > +		};
-> > +
-> >  		dual_timer0: timer at fff14000 {
-> >  			compatible = "arm,sp804", "arm,primecell";
-> >  			reg = <0x0 0xfff14000 0x0 0x1000>;
-> > 
-> 
+Maybe for e1000 we should just skip the driver entirely. Odds are you
+aren't going to have any e1000 parts running on ARM anyway since most
+of them are legacy PCI or PCI-X parts that were made over 10 years
+ago. Most of your efforts would probably be best spent on igb, igbvf,
+ixgbe, ixgbevf, i40e, i40evf, and fm10k.
