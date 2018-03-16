@@ -1,55 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 16 Mar 2018 12:17:55 +0000
-Subject: [PATCH v2 02/13] ARM: dts: ipq4019: Add a few peripheral nodes
-In-Reply-To: <1521193101-4586-3-git-send-email-sricharan@codeaurora.org>
-References: <1521193101-4586-1-git-send-email-sricharan@codeaurora.org>
- <1521193101-4586-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <eb50deb1-0530-866f-502e-e675cdd1e732@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 16 Mar 2018 20:22:33 +0800
+Subject: [RFC PATCH] reset: stm32mp1: stm32_reset_ops can be static
+In-Reply-To: <1521045001-30788-3-git-send-email-gabriel.fernandez@st.com>
+References: <1521045001-30788-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20180316122233.GA85610@lkp-sb05>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/18 09:38, Sricharan R wrote:
-> Now with the driver updates for some peripherals being there,
-> add i2c, spi, pcie, bam, qpic-nand, scm nodes to enhance the available
-> peripheral support.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  arch/arm/boot/dts/qcom-ipq4019.dtsi | 134 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 134 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> index 10d112a..e38fffa 100644
-> --- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-> @@ -25,7 +25,9 @@
 
-[...]
+Fixes: d05c83341cbc ("reset: stm32mp1: Enable stm32mp1 reset driver")
+Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+---
+ reset-stm32mp1.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +		pcie0: pci at 40000000 {
-> +			compatible = "qcom,pcie-ipq4019", "snps,dw-pcie";
-> +			reg =  <0x40000000 0xf1d
-> +				0x40000f20 0xa8
-> +				0x80000 0x2000
-> +				0x40100000 0x1000>;
-> +			reg-names = "dbi", "elbi", "parf", "config";
-> +			device_type = "pci";
-> +			linux,pci-domain = <0>;
-> +			bus-range = <0x00 0xff>;
-> +			num-lanes = <1>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +
-> +			ranges = <0x81000000 0 0x40200000 0x40200000 0 0x00100000
-> +				  0x82000000 0 0x48000000 0x48000000 0 0x10000000>;
-> +
-> +			interrupts = <GIC_SPI 141 IRQ_TYPE_NONE>;
-
-There is no such thing as IRQ_TYPE_NONE. Please replace this with the
-actual trigger information.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/drivers/reset/reset-stm32mp1.c b/drivers/reset/reset-stm32mp1.c
+index 5e25388..ed44604 100644
+--- a/drivers/reset/reset-stm32mp1.c
++++ b/drivers/reset/reset-stm32mp1.c
+@@ -70,7 +70,7 @@ static int stm32_reset_status(struct reset_controller_dev *rcdev,
+ 	return !(reg & BIT(offset));
+ }
+ 
+-const struct reset_control_ops stm32_reset_ops = {
++static const struct reset_control_ops stm32_reset_ops = {
+ 	.assert		= stm32_reset_assert,
+ 	.deassert	= stm32_reset_deassert,
+ 	.status		= stm32_reset_status,
