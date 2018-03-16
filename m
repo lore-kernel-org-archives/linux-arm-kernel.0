@@ -1,36 +1,43 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 16 Mar 2018 15:13:37 -0700
-Subject: [PATCH V3] ZBOOT: fix stack protector in compressed boot phase
-In-Reply-To: <1521186916-13745-1-git-send-email-chenhc@lemote.com>
-References: <1521186916-13745-1-git-send-email-chenhc@lemote.com>
-Message-ID: <20180316151337.f277e3a734326672d41cec61@linux-foundation.org>
+From: jgg@ziepe.ca (Jason Gunthorpe)
+Date: Fri, 16 Mar 2018 16:13:47 -0600
+Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
+ on weakly-ordered archs
+In-Reply-To: <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
+References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+ <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
+ <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
+Message-ID: <20180316221347.GA958@ziepe.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Mar 2018 15:55:16 +0800 Huacai Chen <chenhc@lemote.com> wrote:
-
-> Call __stack_chk_guard_setup() in decompress_kernel() is too late that
-> stack checking always fails for decompress_kernel() itself. So remove
-> __stack_chk_guard_setup() and initialize __stack_chk_guard before we
-> call decompress_kernel().
+On Fri, Mar 16, 2018 at 04:05:10PM -0500, Steve Wise wrote:
+> > Code includes wmb() followed by writel(). writel() already has a barrier
+> on
+> > some architectures like arm64.
+> > 
+> > This ends up CPU observing two barriers back to back before executing the
+> > register write.
+> > 
+> > Since code already has an explicit barrier call, changing writel() to
+> > writel_relaxed().
+> > 
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > 
-> Original code comes from ARM but also used for MIPS and SH, so fix them
-> together. If without this fix, compressed booting of these archs will
-> fail because stack checking is enabled by default (>=4.16).
-> 
-> ...
->
->  arch/arm/boot/compressed/head.S        | 4 ++++
->  arch/arm/boot/compressed/misc.c        | 7 -------
->  arch/mips/boot/compressed/decompress.c | 7 -------
->  arch/mips/boot/compressed/head.S       | 4 ++++
->  arch/sh/boot/compressed/head_32.S      | 8 ++++++++
->  arch/sh/boot/compressed/head_64.S      | 4 ++++
->  arch/sh/boot/compressed/misc.c         | 7 -------
->  7 files changed, 20 insertions(+), 21 deletions(-)
+> NAK - This isn't correct for PowerPC.  For PowerPC, writeX_relaxed() is just
+> writeX().  
 
-Perhaps this should be split into three patches and each one routed via
-the appropriate arch tree maintainer (for sh, that might be me).
+?? Why is changing writex() to writeX() a NAK then?
 
-But we can do it this way if the arm and mips teams can send an ack,
-please?
+> I was just looking at this with Chelsio developers, and they said the
+> writeX() should be replaced with __raw_writeX(), not writeX_relaxed(), to
+> get rid of the extra barrier for all architectures.
+
+That doesn't seem semanticaly sane.
+
+__raw_writeX() should not appear in driver code, IMHO. Only the arch
+code can know what the exact semantics of that accessor are..
+
+If ppc can't use writel_relaxed to optimize then we probably need yet
+another io accessor semantic defined :(
+
+Jason
