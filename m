@@ -1,87 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:50:38 +0100
-Subject: [PATCH 08/69] arm64: dts: renesas: r8a77995: move nodes which have no
- reg property out of bus
+Date: Fri, 16 Mar 2018 15:50:40 +0100
+Subject: [PATCH 10/69] arm64: dts: renesas: r8a7796: update register size for
+ thermal
 In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
 References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <f320eead5dad37f296201bbcc00a88188a63a7da.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <a052d934a4e03a81e1f6cf1c63ac693b04e9a441.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move pmu_a53 and timer nodes from soc node to root node.  The nodes that
-have been moved do not have any register properties and thus shouldn't be
-placed on the bus.
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-This problem is flagged by the compiler as follows:
-$ make W=1
-...
-arch/arm64/boot/dts/renesas/r8a77995-draak.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a77995-draak.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+To be able to read fused calibration values from hardware the size of
+the register resource of TSC1 needs to be incremented to cover one more
+register which holds the information if the calibration values have been
+fused or not.
 
+Instead of increasing TSC1 size to the value from the datasheet update
+all TSC's size to the smallest granularity of the address decoder
+circuitry.
+
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 30 +++++++++++++-----------------
- 1 file changed, 13 insertions(+), 17 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index cff42cd1a6c8..23f763beab46 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -58,6 +58,11 @@
- 		clock-frequency = <0>;
- 	};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index ef10fb548681..f8e9313f9405 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1625,9 +1625,9 @@
  
-+	pmu_a53 {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	scif_clk: scif {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
-@@ -88,18 +93,6 @@
- 			resets = <&cpg 408>;
- 		};
- 
--		timer {
--			compatible = "arm,armv8-timer";
--			interrupts = <GIC_PPI 13
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 14
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 11
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 10
--					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
--		};
--
- 		rwdt: watchdog at e6020000 {
- 			compatible = "renesas,r8a77995-wdt",
- 				     "renesas,rcar-gen3-wdt";
-@@ -110,11 +103,6 @@
- 			status = "disabled";
- 		};
- 
--		pmu_a53 {
--			compatible = "arm,cortex-a53-pmu";
--			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
--		};
--
- 		ipmmu_vi0: mmu at febd0000 {
- 			compatible = "renesas,ipmmu-r8a77995";
- 			reg = <0 0xfebd0000 0 0x1000>;
-@@ -637,4 +625,12 @@
- 			status = "disabled";
- 		};
- 	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
- };
+ 		tsc: thermal at e6198000 {
+ 			compatible = "renesas,r8a7796-thermal";
+-			reg = <0 0xe6198000 0 0x68>,
+-			      <0 0xe61a0000 0 0x5c>,
+-			      <0 0xe61a8000 0 0x5c>;
++			reg = <0 0xe6198000 0 0x100>,
++			      <0 0xe61a0000 0 0x100>,
++			      <0 0xe61a8000 0 0x100>;
+ 			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.11.0
