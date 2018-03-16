@@ -1,15 +1,15 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 15 Mar 2018 21:52:21 -0500
-Subject: [PATCH v8 05/42] clk: davinci: Add platform information for TI DM355
+Date: Thu, 15 Mar 2018 21:52:19 -0500
+Subject: [PATCH v8 03/42] clk: davinci: Add platform information for TI DA830
  PLL
 In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
 References: <1521168778-27236-1-git-send-email-david@lechnology.com>
-Message-ID: <1521168778-27236-6-git-send-email-david@lechnology.com>
+Message-ID: <1521168778-27236-4-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds platform-specific declarations for the PLL clocks on TI
-DM355 based systems.
+This adds platform-specific declarations for the PLL clocks on TI DA830/
+OMAP-L137/AM17XX SoCs.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
@@ -19,138 +19,130 @@ v8 changes:
 - add a clkdev lookup for each SYSCLK
 
 v7 changes:
-- split registration functions for each PLL
+- include clkdev lookup registration here instead of in mach-davinci
 - Add platform_device_id lookup
 
 v6 changes:
-- Added dm355_pll{1,2}_info with controller-specific information
+- Added da830_pll_info with controller-specific information
 - Add empty lines between function calls
 
+
  drivers/clk/davinci/Makefile    |  1 +
- drivers/clk/davinci/pll-dm355.c | 79 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/davinci/pll.c       |  2 ++
- drivers/clk/davinci/pll.h       |  3 ++
- 4 files changed, 85 insertions(+)
- create mode 100644 drivers/clk/davinci/pll-dm355.c
+ drivers/clk/davinci/pll-da830.c | 70 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/davinci/pll.c       |  1 +
+ drivers/clk/davinci/pll.h       |  4 +++
+ 4 files changed, 76 insertions(+)
+ create mode 100644 drivers/clk/davinci/pll-da830.c
 
 diff --git a/drivers/clk/davinci/Makefile b/drivers/clk/davinci/Makefile
-index 13049d4..6720bd0 100644
+index d9673bd..9061e19 100644
 --- a/drivers/clk/davinci/Makefile
 +++ b/drivers/clk/davinci/Makefile
-@@ -4,4 +4,5 @@ ifeq ($(CONFIG_COMMON_CLK), y)
+@@ -2,4 +2,5 @@
+ 
+ ifeq ($(CONFIG_COMMON_CLK), y)
  obj-y += pll.o
- obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= pll-da830.o
- obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= pll-da850.o
-+obj-$(CONFIG_ARCH_DAVINCI_DM355)	+= pll-dm355.o
++obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= pll-da830.o
  endif
-diff --git a/drivers/clk/davinci/pll-dm355.c b/drivers/clk/davinci/pll-dm355.c
+diff --git a/drivers/clk/davinci/pll-da830.c b/drivers/clk/davinci/pll-da830.c
 new file mode 100644
-index 0000000..5345f82
+index 0000000..929a3d3
 --- /dev/null
-+++ b/drivers/clk/davinci/pll-dm355.c
-@@ -0,0 +1,79 @@
++++ b/drivers/clk/davinci/pll-da830.c
+@@ -0,0 +1,70 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * PLL clock descriptions for TI DM355
++ * PLL clock descriptions for TI DA830/OMAP-L137/AM17XX
 + *
 + * Copyright (C) 2018 David Lechner <david@lechnology.com>
 + */
 +
-+#include <linux/bitops.h>
 +#include <linux/clkdev.h>
++#include <linux/bitops.h>
 +#include <linux/init.h>
 +#include <linux/types.h>
 +
 +#include "pll.h"
 +
-+static const struct davinci_pll_clk_info dm355_pll1_info = {
-+	.name = "pll1",
-+	.pllm_mask = GENMASK(7, 0),
-+	.pllm_min = 92,
-+	.pllm_max = 184,
-+	.flags = PLL_HAS_CLKMODE | PLL_HAS_PREDIV | PLL_PREDIV_ALWAYS_ENABLED |
-+		 PLL_PREDIV_FIXED8 | PLL_HAS_POSTDIV |
-+		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
++static const struct davinci_pll_clk_info da830_pll_info = {
++	.name = "pll0",
++	.pllm_mask = GENMASK(4, 0),
++	.pllm_min = 4,
++	.pllm_max = 32,
++	.pllout_min_rate = 300000000,
++	.pllout_max_rate = 600000000,
++	.flags = PLL_HAS_CLKMODE | PLL_HAS_PREDIV | PLL_HAS_POSTDIV,
 +};
 +
-+SYSCLK(1, pll1_sysclk1, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-+SYSCLK(2, pll1_sysclk2, pll1, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-+SYSCLK(3, pll1_sysclk3, pll1, 5, SYSCLK_ALWAYS_ENABLED);
-+SYSCLK(4, pll1_sysclk4, pll1, 5, SYSCLK_ALWAYS_ENABLED);
++/*
++ * NB: Technically, the clocks flagged as SYSCLK_FIXED_DIV are "fixed ratio",
++ * meaning that we could change the divider as long as we keep the correct
++ * ratio between all of the clocks, but we don't support that because there is
++ * currently not a need for it.
++ */
 +
-+int dm355_pll1_init(struct device *dev, void __iomem *base)
++SYSCLK(2, pll0_sysclk2, pll0_pllen, 5, SYSCLK_FIXED_DIV);
++SYSCLK(3, pll0_sysclk3, pll0_pllen, 5, 0);
++SYSCLK(4, pll0_sysclk4, pll0_pllen, 5, SYSCLK_FIXED_DIV);
++SYSCLK(5, pll0_sysclk5, pll0_pllen, 5, 0);
++SYSCLK(6, pll0_sysclk6, pll0_pllen, 5, SYSCLK_FIXED_DIV);
++SYSCLK(7, pll0_sysclk7, pll0_pllen, 5, 0);
++
++int da830_pll_init(struct device *dev, void __iomem *base)
 +{
 +	struct clk *clk;
 +
-+	davinci_pll_clk_register(dev, &dm355_pll1_info, "ref_clk", base);
++	davinci_pll_clk_register(dev, &da830_pll_info, "ref_clk", base);
 +
-+	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk1, base);
-+	clk_register_clkdev(clk, "pll1_sysclk1", "dm355-psc");
++	clk = davinci_pll_sysclk_register(dev, &pll0_sysclk2, base);
++	clk_register_clkdev(clk, "pll0_sysclk2", "da830-psc0");
++	clk_register_clkdev(clk, "pll0_sysclk2", "da830-psc1");
 +
-+	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk2, base);
-+	clk_register_clkdev(clk, "pll1_sysclk2", "dm355-psc");
++	clk = davinci_pll_sysclk_register(dev, &pll0_sysclk3, base);
++	clk_register_clkdev(clk, "pll0_sysclk3", "da830-psc0");
 +
-+	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk3, base);
-+	clk_register_clkdev(clk, "pll1_sysclk3", "dm355-psc");
++	clk = davinci_pll_sysclk_register(dev, &pll0_sysclk4, base);
++	clk_register_clkdev(clk, "pll0_sysclk4", "da830-psc0");
++	clk_register_clkdev(clk, "pll0_sysclk4", "da830-psc1");
 +
-+	clk = davinci_pll_sysclk_register(dev, &pll1_sysclk4, base);
-+	clk_register_clkdev(clk, "pll1_sysclk4", "dm355-psc");
++	clk = davinci_pll_sysclk_register(dev, &pll0_sysclk5, base);
++	clk_register_clkdev(clk, "pll0_sysclk5", "da830-psc1");
 +
-+	clk = davinci_pll_auxclk_register(dev, "pll1_auxclk", base);
-+	clk_register_clkdev(clk, "pll1_auxclk", "dm355-psc");
++	clk = davinci_pll_sysclk_register(dev, &pll0_sysclk6, base);
++	clk_register_clkdev(clk, "pll0_sysclk6", "da830-psc0");
 +
-+	davinci_pll_sysclkbp_clk_register(dev, "pll1_sysclkbp", base);
++	clk = davinci_pll_sysclk_register(dev, &pll0_sysclk7, base);
 +
-+	return 0;
-+}
-+
-+static const struct davinci_pll_clk_info dm355_pll2_info = {
-+	.name = "pll2",
-+	.pllm_mask = GENMASK(7, 0),
-+	.pllm_min = 92,
-+	.pllm_max = 184,
-+	.flags = PLL_HAS_PREDIV | PLL_PREDIV_ALWAYS_ENABLED | PLL_HAS_POSTDIV |
-+		 PLL_POSTDIV_ALWAYS_ENABLED | PLL_POSTDIV_FIXED_DIV,
-+};
-+
-+SYSCLK(1, pll2_sysclk1, pll2, 5, SYSCLK_FIXED_DIV);
-+SYSCLK(2, pll2_sysclk2, pll2, 5, SYSCLK_FIXED_DIV | SYSCLK_ALWAYS_ENABLED);
-+
-+int dm355_pll2_init(struct device *dev, void __iomem *base)
-+{
-+	davinci_pll_clk_register(dev, &dm355_pll2_info, "oscin", base);
-+
-+	davinci_pll_sysclk_register(dev, &pll2_sysclk1, base);
-+
-+	davinci_pll_sysclk_register(dev, &pll2_sysclk2, base);
-+
-+	davinci_pll_sysclkbp_clk_register(dev, "pll2_sysclkbp", base);
++	clk = davinci_pll_auxclk_register(dev, "pll0_auxclk", base);
++	clk_register_clkdev(clk, NULL, "i2c_davinci.1");
++	clk_register_clkdev(clk, "timer0", NULL);
++	clk_register_clkdev(clk, NULL, "davinci-wdt");
 +
 +	return 0;
 +}
 diff --git a/drivers/clk/davinci/pll.c b/drivers/clk/davinci/pll.c
-index 535f725..305d2e9 100644
+index 22ee95c..eaf8049 100644
 --- a/drivers/clk/davinci/pll.c
 +++ b/drivers/clk/davinci/pll.c
-@@ -780,6 +780,8 @@ static const struct platform_device_id davinci_pll_id_table[] = {
- 	{ .name = "da830-pll",   .driver_data = (kernel_ulong_t)da830_pll_init   },
- 	{ .name = "da850-pll0",  .driver_data = (kernel_ulong_t)da850_pll0_init  },
- 	{ .name = "da850-pll1",  .driver_data = (kernel_ulong_t)da850_pll1_init  },
-+	{ .name = "dm355-pll1",  .driver_data = (kernel_ulong_t)dm355_pll1_init  },
-+	{ .name = "dm355-pll2",  .driver_data = (kernel_ulong_t)dm355_pll2_init  },
+@@ -775,6 +775,7 @@ static const struct of_device_id davinci_pll_of_match[] = {
+ };
+ 
+ static const struct platform_device_id davinci_pll_id_table[] = {
++	{ .name = "da830-pll",   .driver_data = (kernel_ulong_t)da830_pll_init   },
  	{ }
  };
  
 diff --git a/drivers/clk/davinci/pll.h b/drivers/clk/davinci/pll.h
-index 53b8d51..d90d308 100644
+index 52103ae..0de2c61 100644
 --- a/drivers/clk/davinci/pll.h
 +++ b/drivers/clk/davinci/pll.h
-@@ -126,4 +126,7 @@ int da850_pll1_init(struct device *dev, void __iomem *base);
- int of_da850_pll0_init(struct device *dev, void __iomem *base);
- int of_da850_pll1_init(struct device *dev, void __iomem *base);
+@@ -117,4 +117,8 @@ int of_davinci_pll_init(struct device *dev,
+ 			u8 max_sysclk_id,
+ 			void __iomem *base);
  
-+int dm355_pll1_init(struct device *dev, void __iomem *base);
-+int dm355_pll2_init(struct device *dev, void __iomem *base);
++/* Platform-specific callbacks */
++
++int da830_pll_init(struct device *dev, void __iomem *base);
 +
  #endif /* __CLK_DAVINCI_PLL_H___ */
 -- 
