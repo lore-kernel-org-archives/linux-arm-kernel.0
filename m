@@ -1,59 +1,100 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 17:38:39 +0100
-Subject: [PATCH 42/47] ARM: dts: kzm9d: Fix "debounce-interval" property
- misspelling
+Date: Fri, 16 Mar 2018 17:38:38 +0100
+Subject: [PATCH 41/47] ARM: dts: gose: use demuxer for I2C4
 In-Reply-To: <cover.1521218085.git.horms+renesas@verge.net.au>
 References: <cover.1521218085.git.horms+renesas@verge.net.au>
-Message-ID: <b1798f2a97dacade8c6db97074b0f36327c77bcc.1521218085.git.horms+renesas@verge.net.au>
+Message-ID: <931bc7ec2d43f85c0b05aacb31bd1bd187ed7f65.1521218085.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-"debounce_interval" was never supported.
+Make it possible to fallback to GPIO for I2C4 on the EXIO-E connector.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This is based on reference work for the I2C0 core of the lager/r8a7790
+by Wolfram Sang.
+
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+[wsa: rebased, corrected board name in subject, fixed aliases, switched
+to named GPIOs, fixed pinmux for I2C4]
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/emev2-kzm9d.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7793-gose.dts | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
-index 60d0a732833a..c238407133bf 100644
---- a/arch/arm/boot/dts/emev2-kzm9d.dts
-+++ b/arch/arm/boot/dts/emev2-kzm9d.dts
-@@ -38,28 +38,28 @@
- 		#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 2b330ef71f4c..9ed6961f2d9a 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -49,7 +49,9 @@
+ 		serial0 = &scif0;
+ 		serial1 = &scif1;
+ 		i2c9 = &gpioi2c2;
++		i2c10 = &gpioi2c4;
+ 		i2c11 = &i2chdmi;
++		i2c12 = &i2cexio4;
+ 	};
  
- 		one {
--			debounce_interval = <50>;
-+			debounce-interval = <50>;
- 			wakeup-source;
- 			label = "DSW2-1";
- 			linux,code = <KEY_1>;
- 			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+ 	chosen {
+@@ -309,6 +311,16 @@
+ 		i2c-gpio,delay-us = <5>;
+ 	};
+ 
++	gpioi2c4: i2c-10 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		status = "disabled";
++		scl-gpios = <&gpio7 13 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		sda-gpios = <&gpio7 14 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		i2c-gpio,delay-us = <5>;
++	};
++
+ 	/*
+ 	 * A fallback to GPIO is provided for I2C2.
+ 	 */
+@@ -416,6 +428,18 @@
+ 			pagesize = <16>;
  		};
- 		two {
--			debounce_interval = <50>;
-+			debounce-interval = <50>;
- 			wakeup-source;
- 			label = "DSW2-2";
- 			linux,code = <KEY_2>;
- 			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
- 		};
- 		three {
--			debounce_interval = <50>;
-+			debounce-interval = <50>;
- 			wakeup-source;
- 			label = "DSW2-3";
- 			linux,code = <KEY_3>;
- 			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
- 		};
- 		four {
--			debounce_interval = <50>;
-+			debounce-interval = <50>;
- 			wakeup-source;
- 			label = "DSW2-4";
- 			linux,code = <KEY_4>;
+ 	};
++
++	/*
++	 * I2C4 is routed to EXIO connector E, pins 37 (SCL) + 39 (SDA).
++	 * A fallback to GPIO is provided.
++	 */
++	i2cexio4: i2c-12 {
++		compatible = "i2c-demux-pinctrl";
++		i2c-parent = <&i2c4>, <&gpioi2c4>;
++		i2c-bus-name = "i2c-exio4";
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
+ };
+ 
+ &du {
+@@ -454,6 +478,11 @@
+ 		function = "i2c2";
+ 	};
+ 
++	i2c4_pins: i2c4 {
++		groups = "i2c4_c";
++		function = "i2c4";
++	};
++
+ 	du_pins: du {
+ 		groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
+ 		function = "du";
+@@ -692,6 +721,11 @@
+ 	};
+ };
+ 
++&i2c4 {
++	pinctrl-0 = <&i2c4_pins>;
++	pinctrl-names = "i2c-exio4";
++};
++
+ &rcar_sound {
+ 	pinctrl-0 = <&sound_pins &sound_clk_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.11.0
