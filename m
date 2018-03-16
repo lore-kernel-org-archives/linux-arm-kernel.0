@@ -1,57 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 17:38:42 +0100
-Subject: [PATCH 45/47] ARM: dts: marzen: Add SDHI0 VCCQ Regulator
+Date: Fri, 16 Mar 2018 17:38:43 +0100
+Subject: [PATCH 46/47] ARM: dts: silk: Add r1ex24002 EEPROM to DT
 In-Reply-To: <cover.1521218085.git.horms+renesas@verge.net.au>
 References: <cover.1521218085.git.horms+renesas@verge.net.au>
-Message-ID: <56bac953b15087dbced6951248ca05a6f0888831.1521218085.git.horms+renesas@verge.net.au>
+Message-ID: <7f8f74cd8d28f0b14b004c6c1640df439e5c2108.1521218085.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Add support for the on-board voltage regulator hooked up to GPIO3_20
-on r8a7779 Marzen. The board schematics describes the regulator as U4
-TPS2110A. Input wise, U4 has D0 fixed to ground, D1 tied to GPIO3_20
-while IN1 is fixed to 3.3V and IN2 is fixed to 1.8V. OUT goes to the
-pull-ups for the data pins of SDHI0.
+Extend the Silk board support to include U14 which is an I2C based EEPROM
+hooked up to the I2C1 bus.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/r8a7794-silk.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index 9412a86f9b30..4b9006bac3cb 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -42,6 +42,19 @@
- 		regulator-always-on;
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index f1afe2dda13a..befd0fb880cc 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -226,6 +226,12 @@
+ 				};
+ 			};
+ 		};
++
++		eeprom at 50 {
++			compatible = "renesas,r1ex24002", "atmel,24c02";
++			reg = <0x50>;
++			pagesize = <16>;
++		};
  	};
- 
-+	vccq_sdhi0: regulator-vccq-sdhi0 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI0 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
-+
- 	ethernet at 18000000 {
- 		compatible = "smsc,lan9220", "smsc,lan9115";
- 		reg = <0x18000000 0x100>;
-@@ -243,6 +256,7 @@
- 	pinctrl-names = "default";
- 
- 	vmmc-supply = <&fixedregulator3v3>;
-+	vqmmc-supply = <&vccq_sdhi0>;
- 	bus-width = <4>;
- 	status = "okay";
  };
+ 
 -- 
 2.11.0
