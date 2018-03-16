@@ -1,21 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 16 Mar 2018 16:24:58 +0000
-Subject: [PATCH v6 20/26] arm64: KVM: Move BP hardening vectors into
- .hyp.text section
-In-Reply-To: <20180314165049.30105-21-marc.zyngier@arm.com>
-References: <20180314165049.30105-1-marc.zyngier@arm.com>
- <20180314165049.30105-21-marc.zyngier@arm.com>
-Message-ID: <20180316162457.67xkrist66vtp4mv@armageddon.cambridge.arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 16 Mar 2018 12:16:29 -0400
+Subject: [PATCH v3 16/18] IB/mlx4: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521216991-28706-17-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 04:50:43PM +0000, Marc Zyngier wrote:
-> There is no reason why the BP hardening vectors shouldn't be part
-> of the HYP text at compile time, rather than being mapped at runtime.
-> 
-> Also introduce a new config symbol that controls the compilation
-> of bpi.S.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Code includes wmb() followed by writel(). writel() already has a barrier on
+some architectures like arm64.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+This ends up CPU observing two barriers back to back before executing the
+register write.
+
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/infiniband/hw/mlx4/qp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/mlx4/qp.c b/drivers/infiniband/hw/mlx4/qp.c
+index f045491..74b27b0 100644
+--- a/drivers/infiniband/hw/mlx4/qp.c
++++ b/drivers/infiniband/hw/mlx4/qp.c
+@@ -3880,8 +3880,8 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+ 		 */
+ 		wmb();
+ 
+-		writel(qp->doorbell_qpn,
+-		       to_mdev(ibqp->device)->uar_map + MLX4_SEND_DOORBELL);
++		writel_relaxed(qp->doorbell_qpn,
++			to_mdev(ibqp->device)->uar_map + MLX4_SEND_DOORBELL);
+ 
+ 		/*
+ 		 * Make sure doorbells don't leak out of SQ spinlock
+-- 
+2.7.4
