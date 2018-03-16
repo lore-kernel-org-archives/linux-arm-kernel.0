@@ -1,133 +1,158 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:51:11 +0100
-Subject: [PATCH 41/69] arm64: dts: renesas: r8a77965: Add SCIF device nodes
+Date: Fri, 16 Mar 2018 15:51:12 +0100
+Subject: [PATCH 42/69] arm64: dts: renesas: r8a77965: Add GPIO nodes
 In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
 References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <0ea5b2fd38db56aad29e4b6a2028fccde438a110.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <e34ca96b81a241523f79a244b5551135cf069852.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Add SCIF[0-5] device nodes for M3-N (r8a77965) SoC.
+Add GPIO nodes to r8a77965 SoC device tree file.
 
 Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 85 ++++++++++++++++++++++++++++---
- 1 file changed, 79 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 104 +++++++++++++++++++++++++++---
+ 1 file changed, 96 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index b83dafc5745e..3cb1a332314e 100644
+index 3cb1a332314e..55f05f79f7f7 100644
 --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -335,27 +335,100 @@
+@@ -197,35 +197,123 @@
  		};
  
- 		scif0: serial at e6e60000 {
+ 		gpio0: gpio at e6050000 {
 -			/* placeholder */
-+			compatible = "renesas,scif-r8a77965",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e60000 0 64>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 207>,
-+				 <&cpg CPG_CORE 20>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
-+			       <&dmac2 0x51>, <&dmac2 0x50>;
-+			dma-names = "tx", "rx", "tx", "rx";
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6050000 0 0x50>;
++			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 0 16>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 912>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 207>;
-+			status = "disabled";
++			resets = <&cpg 912>;
  		};
  
- 		scif1: serial at e6e68000 {
+ 		gpio1: gpio at e6051000 {
 -			/* placeholder */
-+			compatible = "renesas,scif-r8a77965",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e68000 0 64>;
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 206>,
-+				 <&cpg CPG_CORE 20>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
-+			       <&dmac2 0x53>, <&dmac2 0x52>;
-+			dma-names = "tx", "rx", "tx", "rx";
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6051000 0 0x50>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 32 29>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 911>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 206>;
-+			status = "disabled";
++			resets = <&cpg 911>;
  		};
  
- 		scif2: serial at e6e88000 {
+ 		gpio2: gpio at e6052000 {
 -			/* placeholder */
-+			compatible = "renesas,scif-r8a77965",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e88000 0 64>;
-+			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 310>,
-+				 <&cpg CPG_CORE 20>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6052000 0 0x50>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 64 15>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 910>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 310>;
-+			status = "disabled";
++			resets = <&cpg 910>;
  		};
  
- 		scif3: serial at e6c50000 {
+ 		gpio3: gpio at e6053000 {
 -			/* placeholder */
-+			compatible = "renesas,scif-r8a77965",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6c50000 0 64>;
-+			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 204>,
-+				 <&cpg CPG_CORE 20>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x57>, <&dmac0 0x56>;
-+			dma-names = "tx", "rx";
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6053000 0 0x50>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 96 16>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 909>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 204>;
-+			status = "disabled";
++			resets = <&cpg 909>;
  		};
  
- 		scif4: serial at e6c40000 {
+ 		gpio4: gpio at e6054000 {
 -			/* placeholder */
-+			compatible = "renesas,scif-r8a77965",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6c40000 0 64>;
-+			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 203>,
-+				 <&cpg CPG_CORE 20>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x59>, <&dmac0 0x58>;
-+			dma-names = "tx", "rx";
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6054000 0 0x50>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 128 18>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 908>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 203>;
-+			status = "disabled";
++			resets = <&cpg 908>;
  		};
  
- 		scif5: serial at e6f30000 {
+ 		gpio5: gpio at e6055000 {
 -			/* placeholder */
-+			compatible = "renesas,scif-r8a77965",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6f30000 0 64>;
-+			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 202>,
-+				 <&cpg CPG_CORE 20>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x5b>, <&dmac1 0x5a>,
-+			       <&dmac2 0x5b>, <&dmac2 0x5a>;
-+			dma-names = "tx", "rx", "tx", "rx";
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6055000 0 0x50>;
++			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 160 26>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 907>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 202>;
-+			status = "disabled";
++			resets = <&cpg 907>;
  		};
  
- 		avb: ethernet at e6800000 {
+ 		gpio6: gpio at e6055400 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6055400 0 0x50>;
++			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 192 32>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 906>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 906>;
+ 		};
+ 
+ 		gpio7: gpio at e6055800 {
+-			/* placeholder */
++			compatible = "renesas,gpio-r8a77965",
++				     "renesas,rcar-gen3-gpio";
++			reg = <0 0xe6055800 0 0x50>;
++			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			#gpio-cells = <2>;
++			gpio-controller;
++			gpio-ranges = <&pfc 0 224 4>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			clocks = <&cpg CPG_MOD 905>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 905>;
+ 		};
+ 
+ 		intc_ex: interrupt-controller at e61c0000 {
 -- 
 2.11.0
