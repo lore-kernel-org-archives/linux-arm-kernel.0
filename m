@@ -1,59 +1,197 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 16 Mar 2018 15:18:50 +0100
-Subject: [GIT PULL 7/7] arm64: tegra: Device tree changes for v4.17-rc1
-In-Reply-To: <20180316141850.4876-1-thierry.reding@gmail.com>
-References: <20180316141850.4876-1-thierry.reding@gmail.com>
-Message-ID: <20180316141850.4876-7-thierry.reding@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Mar 2018 14:30:15 +0000
+Subject: [PATCH v2] KVM: arm/arm64: vgic: Disallow Active+Pending for level
+ interrupts
+Message-ID: <20180316143015.32055-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+It was recently reported that VFIO mediated devices, and anything
+that VFIO exposes as level interrupts, do no strictly follow the
+expected logic of such interrupts as it only lowers the input
+line when the guest has EOId the interrupt at the GIC level, rather
+than when it Acked the interrupt at the device level.
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+THe GIC's Active+Pending state is fundamentally incompatible with
+this behaviour, as it prevents KVM from observing the EOI, and in
+turn results in VFIO never dropping the line. This results in an
+interrupt storm in the guest, which it really never expected.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+As we cannot really change VFIO to follow the strict rules of level
+signalling, let's forbid the A+P state altogether, as it is in the
+end only an optimization. It ensures that we will transition via
+an invalid state, which we can use to notify VFIO of the EOI.
 
-are available in the Git repository at:
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+- From v1:
+  * Only clear the latch when going via an invalid state
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-arm64-dt
+ virt/kvm/arm/vgic/vgic-v2.c | 54 +++++++++++++++++++++++++--------------------
+ virt/kvm/arm/vgic/vgic-v3.c | 54 +++++++++++++++++++++++++--------------------
+ 2 files changed, 60 insertions(+), 48 deletions(-)
 
-for you to fetch changes up to 0f2754cee38fd2bc42f446d299ff0c53815dc5bd:
-
-  arm64: tegra: Enable AHCI on Jetson TX1 (2018-03-14 17:34:51 +0100)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-arm64: tegra: Device tree changes for v4.17-rc1
-
-Adds initial support for the P2972-0000 development board based on
-Tegra194 and enables the AHCI controller on Jetson TX1.
-
-----------------------------------------------------------------
-Mikko Perttunen (2):
-      arm64: tegra: Add Tegra194 chip device tree
-      arm64: tegra: Add device tree for the Tegra194 P2972-0000 board
-
-Preetham Ramchandra (2):
-      arm64: tegra: Add SATA node for Tegra210
-      arm64: tegra: Enable AHCI on Jetson TX1
-
- arch/arm64/boot/dts/nvidia/Makefile                |   1 +
- arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi     | 248 +++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts |  16 +
- arch/arm64/boot/dts/nvidia/tegra194.dtsi           | 344 +++++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi     |   5 +
- arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  16 +
- include/dt-bindings/clock/tegra194-clock.h         | 321 +++++++++++++++++++
- include/dt-bindings/gpio/tegra194-gpio.h           |  61 ++++
- include/dt-bindings/power/tegra194-powergate.h     |  35 +++
- include/dt-bindings/reset/tegra194-reset.h         | 152 +++++++++
- 10 files changed, 1199 insertions(+)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra194.dtsi
- create mode 100644 include/dt-bindings/clock/tegra194-clock.h
- create mode 100644 include/dt-bindings/gpio/tegra194-gpio.h
- create mode 100644 include/dt-bindings/power/tegra194-powergate.h
- create mode 100644 include/dt-bindings/reset/tegra194-reset.h
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 29556f71b691..8427586760fc 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -105,12 +105,9 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 
+ 		/*
+ 		 * Clear soft pending state when level irqs have been acked.
+-		 * Always regenerate the pending state.
+ 		 */
+-		if (irq->config == VGIC_CONFIG_LEVEL) {
+-			if (!(val & GICH_LR_PENDING_BIT))
+-				irq->pending_latch = false;
+-		}
++		if (irq->config == VGIC_CONFIG_LEVEL && !(val & GICH_LR_STATE))
++			irq->pending_latch = false;
+ 
+ 		/*
+ 		 * Level-triggered mapped IRQs are special because we only
+@@ -153,8 +150,35 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ {
+ 	u32 val = irq->intid;
++	bool allow_pending = true;
++
++	if (irq->active)
++		val |= GICH_LR_ACTIVE_BIT;
++
++	if (irq->hw) {
++		val |= GICH_LR_HW;
++		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
++		/*
++		 * Never set pending+active on a HW interrupt, as the
++		 * pending state is kept@the physical distributor
++		 * level.
++		 */
++		if (irq->active)
++			allow_pending = false;
++	} else {
++		if (irq->config == VGIC_CONFIG_LEVEL) {
++			val |= GICH_LR_EOI;
+ 
+-	if (irq_is_pending(irq)) {
++			/*
++			 * Software resampling doesn't work very well
++			 * if we allow P+A, so let's not do that.
++			 */
++			if (irq->active)
++				allow_pending = false;
++		}
++	}
++
++	if (allow_pending && irq_is_pending(irq)) {
+ 		val |= GICH_LR_PENDING_BIT;
+ 
+ 		if (irq->config == VGIC_CONFIG_EDGE)
+@@ -171,24 +195,6 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 		}
+ 	}
+ 
+-	if (irq->active)
+-		val |= GICH_LR_ACTIVE_BIT;
+-
+-	if (irq->hw) {
+-		val |= GICH_LR_HW;
+-		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+-		/*
+-		 * Never set pending+active on a HW interrupt, as the
+-		 * pending state is kept@the physical distributor
+-		 * level.
+-		 */
+-		if (irq->active && irq_is_pending(irq))
+-			val &= ~GICH_LR_PENDING_BIT;
+-	} else {
+-		if (irq->config == VGIC_CONFIG_LEVEL)
+-			val |= GICH_LR_EOI;
+-	}
+-
+ 	/*
+ 	 * Level-triggered mapped IRQs are special because we only observe
+ 	 * rising edges as input to the VGIC.  We therefore lower the line
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 0ff2006f3781..dd984f726805 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -96,12 +96,9 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 
+ 		/*
+ 		 * Clear soft pending state when level irqs have been acked.
+-		 * Always regenerate the pending state.
+ 		 */
+-		if (irq->config == VGIC_CONFIG_LEVEL) {
+-			if (!(val & ICH_LR_PENDING_BIT))
+-				irq->pending_latch = false;
+-		}
++		if (irq->config == VGIC_CONFIG_LEVEL && !(val & ICH_LR_STATE))
++			irq->pending_latch = false;
+ 
+ 		/*
+ 		 * Level-triggered mapped IRQs are special because we only
+@@ -135,8 +132,35 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ {
+ 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+ 	u64 val = irq->intid;
++	bool allow_pending = true;
++
++	if (irq->active)
++		val |= ICH_LR_ACTIVE_BIT;
++
++	if (irq->hw) {
++		val |= ICH_LR_HW;
++		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
++		/*
++		 * Never set pending+active on a HW interrupt, as the
++		 * pending state is kept@the physical distributor
++		 * level.
++		 */
++		if (irq->active)
++			allow_pending = false;
++	} else {
++		if (irq->config == VGIC_CONFIG_LEVEL) {
++			val |= ICH_LR_EOI;
+ 
+-	if (irq_is_pending(irq)) {
++			/*
++			 * Software resampling doesn't work very well
++			 * if we allow P+A, so let's not do that.
++			 */
++			if (irq->active)
++				allow_pending = false;
++		}
++	}
++
++	if (allow_pending && irq_is_pending(irq)) {
+ 		val |= ICH_LR_PENDING_BIT;
+ 
+ 		if (irq->config == VGIC_CONFIG_EDGE)
+@@ -154,24 +178,6 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 		}
+ 	}
+ 
+-	if (irq->active)
+-		val |= ICH_LR_ACTIVE_BIT;
+-
+-	if (irq->hw) {
+-		val |= ICH_LR_HW;
+-		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
+-		/*
+-		 * Never set pending+active on a HW interrupt, as the
+-		 * pending state is kept@the physical distributor
+-		 * level.
+-		 */
+-		if (irq->active && irq_is_pending(irq))
+-			val &= ~ICH_LR_PENDING_BIT;
+-	} else {
+-		if (irq->config == VGIC_CONFIG_LEVEL)
+-			val |= ICH_LR_EOI;
+-	}
+-
+ 	/*
+ 	 * Level-triggered mapped IRQs are special because we only observe
+ 	 * rising edges as input to the VGIC.  We therefore lower the line
+-- 
+2.14.2
