@@ -1,61 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:51:35 +0100
-Subject: [PATCH 65/69] arm64: dts: renesas: eagle: add I2C0 support
+Date: Fri, 16 Mar 2018 15:51:36 +0100
+Subject: [PATCH 66/69] arm64: dts: renesas: r8a77970: sort subnodes of root
+ node alphabetically
 In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
 References: <cover.1521206129.git.horms+renesas@verge.net.au>
-Message-ID: <7859eb31e4d457496ace72965f2fbb50e836ef12.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <c7a99343cc30704c1d173de9bbe06adaa5e96101.1521206129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Define the Eagle board dependent part of the I2C0 device node.
+Sort root sub-nodes alphabetically for allow for easier maintenance of
+this file.
 
-The I2C0 bus is populated by ON Semiconductor PCA9653 I/O expander and
-Analog Devices ADV7511W HDMI transmitter (but we're only describing the
-former chip now).
-
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970-eagle.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-index fd3448deb714..3c5f598c9766 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
-@@ -55,7 +55,27 @@
- 	clock-frequency = <32768>;
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index e44281cc1047..c6db8ea43906 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -27,11 +27,6 @@
+ 		i2c4 = &i2c4;
+ 	};
  
-+&i2c0 {
-+	pinctrl-0 = <&i2c0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	io_expander: gpio at 20 {
-+		compatible = "onnn,pca9654";
-+		reg = <0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+};
-+
- &pfc {
-+	i2c0_pins: i2c0 {
-+		groups = "i2c0";
-+		function = "i2c0";
+-	psci {
+-		compatible = "arm,psci-1.0", "arm,psci-0.2";
+-		method = "smc";
+-	};
+-
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -68,6 +63,11 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	psci {
++		compatible = "arm,psci-1.0", "arm,psci-0.2";
++		method = "smc";
 +	};
 +
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
+ 	/* External SCIF clock - to be overridden by boards that provide it */
+ 	scif_clk: scif {
+ 		compatible = "fixed-clock";
 -- 
 2.11.0
