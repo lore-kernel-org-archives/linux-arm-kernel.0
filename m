@@ -1,114 +1,45 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 17 Mar 2018 01:53:50 +0800
-Subject: [PATCH 3/7] bus: add bus driver for accessing Allwinner A64 DE2
+Date: Sat, 17 Mar 2018 01:53:51 +0800
+Subject: [PATCH 4/7] clk: sunxi-ng: add A64 compatible string
 In-Reply-To: <20180316175354.21437-1-icenowy@aosc.io>
 References: <20180316175354.21437-1-icenowy@aosc.io>
-Message-ID: <20180316175354.21437-4-icenowy@aosc.io>
+Message-ID: <20180316175354.21437-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "Display Engine 2.0" (usually called DE2) on the Allwinner A64 SoC
-is different from the ones on other Allwinner SoCs. It requires a SRAM
-region to be claimed, otherwise all DE2 subblocks won't be accessible.
+As claiming Allwinner A64 SRAM C is a prerequisite for all sub-blocks of
+the A64 DE2, not only the CCU sub-block, a bus driver is then written for
+enabling the access to the whole DE2 part by claiming the SRAM.
 
-Add a bus driver for the Allwinner A64 DE2 part which claims the SRAM
-region when probing.
+In this situation, the A64 compatible string will be just added with no
+other requirments, as they're processed by the parent bus driver.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/bus/Kconfig      | 10 ++++++++++
- drivers/bus/Makefile     |  1 +
- drivers/bus/sun50i-de2.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 60 insertions(+)
- create mode 100644 drivers/bus/sun50i-de2.c
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index ff70850031c5..cc8e4b4b6b59 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -95,6 +95,16 @@ config SIMPLE_PM_BUS
- 	  Controller (BSC, sometimes called "LBSC within Bus Bridge", or
- 	  "External Bus Interface") as found on several Renesas ARM SoCs.
- 
-+config SUN50I_DE2_BUS
-+	bool "Allwinner A64 DE2 Bus Driver"
-+	  default ARM64
-+	  depends on ARCH_SUNXI
-+	  select SUNXI_SRAM
-+	  help
-+	  Say y here to enable support for Allwinner A64 DE2 bus driver. It's
-+	  mostly transparent, but a SRAM region needs to be claimed in the SRAM
-+	  controller to make the all blocks in the DE2 part accessible.
-+
- config SUNXI_RSB
- 	tristate "Allwinner sunXi Reduced Serial Bus Driver"
- 	  default MACH_SUN8I || MACH_SUN9I || ARM64
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index 3d473b8adeac..746ff0cebe10 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -19,6 +19,7 @@ obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
- 
- obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
- obj-$(CONFIG_QCOM_EBI2)		+= qcom-ebi2.o
-+obj-$(CONFIG_SUN50I_DE2_BUS)	+= sun50i-de2.o
- obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
- obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
- obj-$(CONFIG_TEGRA_ACONNECT)	+= tegra-aconnect.o
-diff --git a/drivers/bus/sun50i-de2.c b/drivers/bus/sun50i-de2.c
-new file mode 100644
-index 000000000000..836828ef96d5
---- /dev/null
-+++ b/drivers/bus/sun50i-de2.c
-@@ -0,0 +1,49 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Allwinner A64 Display Engine 2.0 Bus Driver
-+ *
-+ * Copyright (C) 2018 Icenowy Zheng <icenowy@aosc.io>
-+ */
-+
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/soc/sunxi/sunxi_sram.h>
-+
-+static int sun50i_de2_bus_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret;
-+
-+	ret = sunxi_sram_claim(&pdev->dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Error couldn't map SRAM to device\n");
-+		return ret;
-+	}
-+
-+	if (np)
-+		of_platform_populate(np, NULL, NULL, &pdev->dev);
-+
-+	return 0;
-+}
-+
-+static int sun50i_de2_bus_remove(struct platform_device *pdev)
-+{
-+	sunxi_sram_release(&pdev->dev);
-+	return 0;
-+}
-+
-+static const struct of_device_id sun50i_de2_bus_of_match[] = {
-+	{ .compatible = "allwinner,sun50i-a64-de2", },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver sun50i_de2_bus_driver = {
-+	.probe = sun50i_de2_bus_probe,
-+	.remove = sun50i_de2_bus_remove,
-+	.driver = {
-+		.name = "sun50i-de2-bus",
-+		.of_match_table = sun50i_de2_bus_of_match,
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+index 468d1abaf0ee..8df7cd93453e 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -292,13 +292,10 @@ static const struct of_device_id sunxi_de2_clk_ids[] = {
+ 		.compatible = "allwinner,sun50i-h5-de2-clk",
+ 		.data = &sun50i_a64_de2_clk_desc,
+ 	},
+-	/*
+-	 * The Allwinner A64 SoC needs some bit to be poke in syscon to make
+-	 * DE2 really working.
+-	 * So there's currently no A64 compatible here.
+-	 * H5 shares the same reset line with A64, so here H5 is using the
+-	 * clock description of A64.
+-	 */
++	{
++		.compatible = "allwinner,sun50i-a64-de2-clk",
++		.data = &sun50i_a64_de2_clk_desc,
 +	},
-+};
-+
-+builtin_platform_driver(sun50i_de2_bus_driver);
+ 	{ }
+ };
+ 
 -- 
 2.15.1
