@@ -1,43 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 15 Mar 2018 20:50:58 -0400
-Subject: [PATCH 6/7] e1000: eliminate duplicate barriers on weakly-ordered
- archs
-In-Reply-To: <CAKgT0UcfEwL9Jas149a=h3R4zeu4oA=uywJ9dpYD9kDdnpWQFA@mail.gmail.com>
-References: <1520997629-17361-1-git-send-email-okaya@codeaurora.org>
- <1520997629-17361-6-git-send-email-okaya@codeaurora.org>
- <CAKgT0UfJwYFy5g_2TE5W4MgdEvyH2CvBAS2imdw9UUiumuUOhQ@mail.gmail.com>
- <39dc5bb4-02b1-bf7e-fbfc-17fc484e4fb7@codeaurora.org>
- <CAKgT0UcfEwL9Jas149a=h3R4zeu4oA=uywJ9dpYD9kDdnpWQFA@mail.gmail.com>
-Message-ID: <95118f6e-d406-f2b6-dc67-249dc5f648f9@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 16 Mar 2018 08:55:16 +0800
+Subject: [GIT PULL 2/6] i.MX SoC changes for 4.17
+In-Reply-To: <CAK8P3a1vNZf9uk+u+mnot37TuKYfN-P_xxXm+uG6p0oyPjZTEw@mail.gmail.com>
+References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
+ <1521113800-16401-2-git-send-email-shawnguo@kernel.org>
+ <CAK8P3a1vNZf9uk+u+mnot37TuKYfN-P_xxXm+uG6p0oyPjZTEw@mail.gmail.com>
+Message-ID: <20180316005515.GO26859@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/15/2018 8:25 PM, Alexander Duyck wrote:
-> On Thu, Mar 15, 2018 at 4:30 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> On 3/14/2018 9:41 PM, Alexander Duyck wrote:
->>>>  }
->>>>
->>> So you missed the writel in e1000_xmit_frame. You should probably get
->>> that one too while you are doing these updates. The wmb() is in
->>> e1000_tx_queue().
->>>
->>
->> I brought wmb() outside along with the next descriptor assignment to be
->> similar to the rest of the other code.
->>
->> if wmb() and writel() are not visible in the same function, let's not touch
->> the code.
+On Thu, Mar 15, 2018 at 04:12:33PM +0100, Arnd Bergmann wrote:
+> On Thu, Mar 15, 2018 at 12:36 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+> >
+> >   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.17
+> >
+> > for you to fetch changes up to dee5dee2a5b285d20f55a4758d3a51349691eeea:
+> >
+> >   ARM: imx: Add basic msl support for imx6sll (2018-03-09 09:22:06 +0800)
+> >
+> > ----------------------------------------------------------------
+> > i.MX SoC changes for 4.17:
+> >  - Add i.MX 6SoloLiteLite (i.MX6SLL) SoC support on top of the existing
+> >    i.MX6SL platform code.
+> >  - Improve the SoC revision mapping by utilizing the MAJOR field of
+> >    ANATOP DIGPROG register.
+> >  - Add CPUIDLE_FLAG_TIMER_STOP flag for cpuidle ARM power off state,
+> >    so that we can use ARM generic timer for some i.MX6 SoC.
+> >  - Set low-power interrupt mask for i.MX25 to support STOP mode.
+> >  - Drop EPIT driver as there is no user of it.
+> >  - Simplify the error path of imx6_pm_get_base() a bit.
 > 
-> Maybe for e1000 we should just skip the driver entirely. Odds are you
-> aren't going to have any e1000 parts running on ARM anyway since most
-> of them are legacy PCI or PCI-X parts that were made over 10 years
-> ago. Most of your efforts would probably be best spent on igb, igbvf,
-> ixgbe, ixgbevf, i40e, i40evf, and fm10k.
-> 
+> Pulled into next/soc. However, I need two fixups for bugs I ran into during
+> linux-next randconfig testing. Sending them out now, please Ack so
+> I can apply them directly.
 
-Sure. I'll drop it.
+Thanks for the fixups.  I have just Ack-ed them.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Shawn
