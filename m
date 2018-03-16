@@ -1,71 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 16 Mar 2018 15:51:51 +0100
-Subject: [PATCH 3/3] ARM: shmobile: defconfig: Disable CONFIG_EMBEDDED
-In-Reply-To: <cover.1521206439.git.horms+renesas@verge.net.au>
-References: <cover.1521206439.git.horms+renesas@verge.net.au>
-Message-ID: <a20d1390c1daac4b8ae1e544e1e49dfd386125a8.1521206439.git.horms+renesas@verge.net.au>
+Date: Fri, 16 Mar 2018 15:52:02 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.17
+Message-ID: <cover.1521206902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-CONFIG_EXPERT exposes too many config options that do not matter for
-development.  E.g. it prohibits using the default values for the various
-SH_SCI options.  However, CONFIG_EMBEDDED selects CONFIG_EXPERT, so it
-cannot be disabled.
+Please consider these Renesas ARM based SoC DT bindings updates for v4.17.
 
-Hence disable CONFIG_EMBEDDED, and compensate for the loss of
-CONFIG_DEBUG_KERNEL by enabling the latter.
 
-Actual impact, all harmless:
-  - CONFIG_NAMESPACES=y (plus a few related CONFIG_*_NS options),
-  - CONFIG_SYSCTL_SYSCALL=n,
-  - CONFIG_SERIAL_SH_SCI_NR_UARTS changed from 20 to 18,
-  - Some HID support became enabled,
-  - CONFIG_DEBUG_MEMORY_INIT=y,
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Refresh the result.
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+are available in the git repository at:
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index e3658ec04e83..a701601fbd76 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -5,8 +5,6 @@ CONFIG_IKCONFIG_PROC=y
- CONFIG_CGROUPS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
--CONFIG_SYSCTL_SYSCALL=y
--CONFIG_EMBEDDED=y
- CONFIG_PERF_EVENTS=y
- CONFIG_SLAB=y
- CONFIG_ARCH_RENESAS=y
-@@ -103,7 +101,6 @@ CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_SH_SCI=y
--CONFIG_SERIAL_SH_SCI_NR_UARTS=20
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_DEMUX_PINCTRL=y
-@@ -164,7 +161,6 @@ CONFIG_FB_SH_MOBILE_MERAM=y
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_BACKLIGHT_AS3711=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-@@ -225,4 +221,5 @@ CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
-+CONFIG_DEBUG_KERNEL=y
- # CONFIG_ARM_UNWIND is not set
--- 
-2.11.0
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.17
+
+for you to fetch changes up to 09bea76aad76058d7d1dae8f5804751a017967c1:
+
+  dt-bindings: arm: Document Renesas R-Car M3-N-based Salvator-X board (2018-02-28 07:51:32 +0100)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Bindings Updates for v4.17
+
+* Document the bindings for:
+  - R-Car V3H (r8a77980) SoC
+  - Condor board with V3H (r8a77980) SoC
+  - Stout (ADAS Starterkit) board with R-Car H2 (r8a7790) SoC
+  - R-Car M3-N (r8a77965) SoC
+  - Salvator-X and Salvator-XS boards with R-Car M3-N (r8a77965) SoC
+* Document that Armadillo-800 is compatibie with R-Mobile A1 (r8a7740) SoC
+* Document part numbers of Wheat and V3MSK boards
+
+----------------------------------------------------------------
+Geert Uytterhoeven (4):
+      dt-bindings: arm: Document SoC compatible value for Armadillo-800 EVA
+      dt-bindings: arm: Document Renesas V3MSK and Wheat board part numbers
+      dt-bindings: arm: Document Renesas R-Car M3-N-based Salvator-XS board
+      dt-bindings: arm: Document Renesas R-Car M3-N-based Salvator-X board
+
+Jacopo Mondi (1):
+      dt-bindings: arm: Document R-Car M3-N SoC DT bindings
+
+Marek Vasut (1):
+      dt-bindings: arm: Document Renesas H2-based Stout DT bindings
+
+Sergei Shtylyov (2):
+      dt-bindings: arm: document R8A77980 SoC bindings
+      dt-bindings: arm: document Condor board bindings
+
+ Documentation/devicetree/bindings/arm/shmobile.txt | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
