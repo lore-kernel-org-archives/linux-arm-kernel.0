@@ -1,19 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 16 Mar 2018 18:23:06 +0100
-Subject: [PATCH] arm64: dts: armada-3720-espressobin: Document URL for
- schematic
-In-Reply-To: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
-References: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20180316172306.GB4212@lunn.ch>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 16 Mar 2018 12:20:02 -0500
+Subject: [PATCH v8 42/42] ARM: dts: da850: Add clocks
+In-Reply-To: <1521168778-27236-43-git-send-email-david@lechnology.com>
+References: <1521168778-27236-1-git-send-email-david@lechnology.com>
+ <1521168778-27236-43-git-send-email-david@lechnology.com>
+Message-ID: <cf0c4153-b65d-da57-cd0f-0a16cb186377@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 11:01:24AM +0100, Uwe Kleine-K?nig wrote:
-> The schematic of hte espressobin is publicly available, add a comment
-> where to find it.
+On 03/15/2018 09:52 PM, David Lechner wrote:
+> This adds clock provider nodes for da850 and wires them up to all of the
+> devices.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+...
 
-    Andrew
+This is the mcasp0: mcasp at 100000 node...
+
+> @@ -560,6 +720,7 @@
+>   			dmas = <&edma0 1 1>,
+>   				<&edma0 0 1>;
+>   			dma-names = "tx", "rx";
+> +			clocks = <&psc1 7>;
+
+After some testing, it looks like it needs to be:
+
++			power-domains = <&psc1 7>;
+
+instead of
+
++			clocks = <&psc1 7>;
+
+>   		};
+>   
+>   		lcdc: display at 213000 {
