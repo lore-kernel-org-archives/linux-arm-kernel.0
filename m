@@ -1,57 +1,20 @@
-From: swise@opengridcomputing.com (Steve Wise)
-Date: Fri, 16 Mar 2018 18:04:40 -0500
-Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <20180316221347.GA958@ziepe.ca>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
- <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
- <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
- <20180316221347.GA958@ziepe.ca>
-Message-ID: <004401d3bd7b$2a2e70b0$7e8b5210$@opengridcomputing.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 16 Mar 2018 15:46:21 -0700
+Subject: [PATCH 1/1] clk: add more __must_check for bulk APIs
+In-Reply-To: <1516710285-23683-1-git-send-email-aisheng.dong@nxp.com>
+References: <1516710285-23683-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <152124038126.242365.15669852275487154303@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Dong Aisheng (2018-01-23 04:24:45)
+> we need it even when !CONFIG_HAVE_CLK because it allows
+> us to catch missing checking return values in the non-clk
+> compile configurations too. More test coverage.
 > 
-> On Fri, Mar 16, 2018 at 04:05:10PM -0500, Steve Wise wrote:
-> > > Code includes wmb() followed by writel(). writel() already has a
-barrier
-> > on
-> > > some architectures like arm64.
-> > >
-> > > This ends up CPU observing two barriers back to back before executing
-> the
-> > > register write.
-> > >
-> > > Since code already has an explicit barrier call, changing writel() to
-> > > writel_relaxed().
-> > >
-> > > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >
-> > NAK - This isn't correct for PowerPC.  For PowerPC, writeX_relaxed() is
-just
-> > writeX().
-> 
-> ?? Why is changing writex() to writeX() a NAK then?
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
 
-Because I want it correct for PPC as well.
-
-> 
-> > I was just looking at this with Chelsio developers, and they said the
-> > writeX() should be replaced with __raw_writeX(), not writeX_relaxed(),
-to
-> > get rid of the extra barrier for all architectures.
-> 
-> That doesn't seem semanticaly sane.
-> 
-> __raw_writeX() should not appear in driver code, IMHO. Only the arch
-> code can know what the exact semantics of that accessor are..
-> 
-> If ppc can't use writel_relaxed to optimize then we probably need yet
-> another io accessor semantic defined :(
-
-
-Anybody understand why the PPC implementation of writeX_relaxed() isn't
-relaxed?
-
-
-Steve.
+Applied to clk-next
