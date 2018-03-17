@@ -1,183 +1,329 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Mar 2018 17:28:51 +0800
-Subject: [PATCH net-next 06/12] net: stmmac: dwmac-sun8i: Use regmap_field for
- syscon register access
-In-Reply-To: <20180317092857.4396-1-wens@csie.org>
-References: <20180317092857.4396-1-wens@csie.org>
-Message-ID: <20180317092857.4396-7-wens@csie.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sat, 17 Mar 2018 15:39:51 +0530
+Subject: [PATCH v5 11/12] clk: actions: Add pll clock support
+In-Reply-To: <20180317100952.28538-1-manivannan.sadhasivam@linaro.org>
+References: <20180317100952.28538-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180317100952.28538-12-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Allwinner R40, the "GMAC clock" register is located in the CCU
-block, at a different register address than the other SoCs that have
-it in the "system control" block.
+Add support for Actions Semi PLL clock.
 
-This patch converts the use of regmap to regmap_field for mapping and
-accessing the syscon register, so we can have the register address in
-the variants data, and not in the actual register manipulation code.
-
-This patch only converts regmap_read() and regmap_write() calls to
-regmap_field_read() and regmap_field_write() calls. There are some
-places where it might make sense to switch to regmap_field_update_bits(),
-but this is not done here to keep the patch simple.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 42 +++++++++++++++++------
- 1 file changed, 31 insertions(+), 11 deletions(-)
+ drivers/clk/actions/Makefile  |   1 +
+ drivers/clk/actions/owl-pll.c | 194 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/actions/owl-pll.h |  92 ++++++++++++++++++++
+ 3 files changed, 287 insertions(+)
+ create mode 100644 drivers/clk/actions/owl-pll.c
+ create mode 100644 drivers/clk/actions/owl-pll.h
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index a3fa65b1ca8e..de93f0faf58d 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -42,6 +42,7 @@
-  *				This value is used for disabling properly EMAC
-  *				and used as a good starting value in case of the
-  *				boot process(uboot) leave some stuff.
-+ * @syscon_field		reg_field for the syscon's gmac register
-  * @soc_has_internal_phy:	Does the MAC embed an internal PHY
-  * @support_mii:		Does the MAC handle MII
-  * @support_rmii:		Does the MAC handle RMII
-@@ -49,6 +50,7 @@
-  */
- struct emac_variant {
- 	u32 default_syscon_value;
-+	const struct reg_field *syscon_field;
- 	bool soc_has_internal_phy;
- 	bool support_mii;
- 	bool support_rmii;
-@@ -71,13 +73,21 @@ struct sunxi_priv_data {
- 	struct regulator *regulator;
- 	struct reset_control *rst_ephy;
- 	const struct emac_variant *variant;
--	struct regmap *regmap;
-+	struct regmap_field *regmap_field;
- 	bool internal_phy_powered;
- 	void *mux_handle;
- };
- 
-+/* EMAC clock register @ 0x30 in the "system control" address range */
-+const struct reg_field sun8i_syscon_reg_field = {
-+	.reg = 0x30,
-+	.lsb = 0,
-+	.msb = 31,
-+};
+diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
+index dc905b285bdc..22bf986bd67c 100644
+--- a/drivers/clk/actions/Makefile
++++ b/drivers/clk/actions/Makefile
+@@ -7,3 +7,4 @@ clk-owl-y			+= owl-divider.o
+ clk-owl-y			+= owl-factor.o
+ clk-owl-y			+= owl-fixed-factor.o
+ clk-owl-y			+= owl-composite.o
++clk-owl-y			+= owl-pll.o
+diff --git a/drivers/clk/actions/owl-pll.c b/drivers/clk/actions/owl-pll.c
+new file mode 100644
+index 000000000000..3560c7324f9c
+--- /dev/null
++++ b/drivers/clk/actions/owl-pll.c
+@@ -0,0 +1,194 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL pll clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 +
- static const struct emac_variant emac_variant_h3 = {
- 	.default_syscon_value = 0x58000,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = true,
- 	.support_mii = true,
- 	.support_rmii = true,
-@@ -86,12 +96,14 @@ static const struct emac_variant emac_variant_h3 = {
- 
- static const struct emac_variant emac_variant_v3s = {
- 	.default_syscon_value = 0x38000,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = true,
- 	.support_mii = true
- };
- 
- static const struct emac_variant emac_variant_a83t = {
- 	.default_syscon_value = 0,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = false,
- 	.support_mii = true,
- 	.support_rgmii = true
-@@ -99,6 +111,7 @@ static const struct emac_variant emac_variant_a83t = {
- 
- static const struct emac_variant emac_variant_a64 = {
- 	.default_syscon_value = 0,
-+	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = false,
- 	.support_mii = true,
- 	.support_rmii = true,
-@@ -216,7 +229,6 @@ static const struct emac_variant emac_variant_a64 = {
- #define SYSCON_ETCS_MII		0x0
- #define SYSCON_ETCS_EXT_GMII	0x1
- #define SYSCON_ETCS_INT_GMII	0x2
--#define SYSCON_EMAC_REG		0x30
- 
- /* sun8i_dwmac_dma_reset() - reset the EMAC
-  * Called from stmmac via stmmac_dma_ops->reset
-@@ -745,7 +757,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
- 	bool need_power_ephy = false;
- 
- 	if (current_child ^ desired_child) {
--		regmap_read(gmac->regmap, SYSCON_EMAC_REG, &reg);
-+		regmap_field_read(gmac->regmap_field, &reg);
- 		switch (desired_child) {
- 		case DWMAC_SUN8I_MDIO_MUX_INTERNAL_ID:
- 			dev_info(priv->device, "Switch mux to internal PHY");
-@@ -763,7 +775,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
- 				desired_child);
- 			return -EINVAL;
- 		}
--		regmap_write(gmac->regmap, SYSCON_EMAC_REG, val);
-+		regmap_field_write(gmac->regmap_field, val);
- 		if (need_power_ephy) {
- 			ret = sun8i_dwmac_power_internal_phy(priv);
- 			if (ret)
-@@ -801,7 +813,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 	int ret;
- 	u32 reg, val;
- 
--	regmap_read(gmac->regmap, SYSCON_EMAC_REG, &val);
-+	regmap_field_read(gmac->regmap_field, &val);
- 	reg = gmac->variant->default_syscon_value;
- 	if (reg != val)
- 		dev_warn(priv->device,
-@@ -883,7 +895,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 		return -EINVAL;
- 	}
- 
--	regmap_write(gmac->regmap, SYSCON_EMAC_REG, reg);
-+	regmap_field_write(gmac->regmap_field, reg);
- 
- 	return 0;
- }
-@@ -892,7 +904,7 @@ static void sun8i_dwmac_unset_syscon(struct sunxi_priv_data *gmac)
- {
- 	u32 reg = gmac->variant->default_syscon_value;
- 
--	regmap_write(gmac->regmap, SYSCON_EMAC_REG, reg);
-+	regmap_field_write(gmac->regmap_field, reg);
- }
- 
- static void sun8i_dwmac_exit(struct platform_device *pdev, void *priv)
-@@ -980,6 +992,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 	int ret;
- 	struct stmmac_priv *priv;
- 	struct net_device *ndev;
-+	struct regmap *regmap;
- 
- 	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
- 	if (ret)
-@@ -1014,14 +1027,21 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 		gmac->regulator = NULL;
- 	}
- 
--	gmac->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
--						       "syscon");
--	if (IS_ERR(gmac->regmap)) {
--		ret = PTR_ERR(gmac->regmap);
-+	regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "syscon");
-+	if (IS_ERR(regmap)) {
-+		ret = PTR_ERR(regmap);
- 		dev_err(&pdev->dev, "Unable to map syscon: %d\n", ret);
- 		return ret;
- 	}
- 
-+	gmac->regmap_field = devm_regmap_field_alloc(dev, regmap,
-+						     *gmac->variant->syscon_field);
-+	if (IS_ERR(gmac->regmap_field)) {
-+		ret = PTR_ERR(gmac->regmap_field);
-+		dev_err(dev, "Unable to map syscon register: %d\n", ret);
-+		return ret;
++#include <linux/clk-provider.h>
++#include <linux/slab.h>
++#include <linux/io.h>
++#include <linux/delay.h>
++
++#include "owl-pll.h"
++
++static u32 owl_pll_calculate_mul(struct owl_pll_hw *pll_hw, unsigned long rate)
++{
++	u32 mul;
++
++	mul = DIV_ROUND_CLOSEST(rate, pll_hw->bfreq);
++	if (mul < pll_hw->min_mul)
++		mul = pll_hw->min_mul;
++	else if (mul > pll_hw->max_mul)
++		mul = pll_hw->max_mul;
++
++	return mul &= mul_mask(pll_hw);
++}
++
++static unsigned int _get_table_rate(const struct clk_pll_table *table,
++		unsigned int val)
++{
++	const struct clk_pll_table *clkt;
++
++	for (clkt = table; clkt->rate; clkt++)
++		if (clkt->val == val)
++			return clkt->rate;
++
++	return 0;
++}
++
++static const struct clk_pll_table *_get_pll_table(
++		const struct clk_pll_table *table, unsigned long rate)
++{
++	const struct clk_pll_table *clkt;
++
++	for (clkt = table; clkt->rate; clkt++) {
++		if (clkt->rate == rate) {
++			table = clkt;
++			break;
++		} else if (clkt->rate < rate)
++			table = clkt;
 +	}
 +
- 	plat_dat->interface = of_get_phy_mode(dev->of_node);
- 
- 	/* platform data specifying hardware features and callbacks.
++	return table;
++}
++
++static long owl_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *parent_rate)
++{
++	struct owl_pll *pll = hw_to_owl_pll(hw);
++	struct owl_pll_hw *pll_hw = &pll->pll_hw;
++	const struct clk_pll_table *clkt;
++	u32 mul;
++
++	if (pll_hw->table) {
++		clkt = _get_pll_table(pll_hw->table, rate);
++		return clkt->rate;
++	}
++
++	/* fixed frequency */
++	if (pll_hw->width == 0)
++		return pll_hw->bfreq;
++
++	mul = owl_pll_calculate_mul(pll_hw, rate);
++
++	return pll_hw->bfreq * mul;
++}
++
++static unsigned long owl_pll_recalc_rate(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct owl_pll *pll = hw_to_owl_pll(hw);
++	struct owl_pll_hw *pll_hw = &pll->pll_hw;
++	const struct owl_clk_common *common = &pll->common;
++	u32 val;
++
++	if (pll_hw->table) {
++		regmap_read(common->regmap, pll_hw->reg, &val);
++
++		val = val >> pll_hw->shift;
++		val &= mul_mask(pll_hw);
++
++		return _get_table_rate(pll_hw->table, val);
++	}
++
++	/* fixed frequency */
++	if (pll_hw->width == 0)
++		return pll_hw->bfreq;
++
++	regmap_read(common->regmap, pll_hw->reg, &val);
++
++	val = val >> pll_hw->shift;
++	val &= mul_mask(pll_hw);
++
++	return pll_hw->bfreq * val;
++}
++
++static int owl_pll_is_enabled(struct clk_hw *hw)
++{
++	struct owl_pll *pll = hw_to_owl_pll(hw);
++	struct owl_pll_hw *pll_hw = &pll->pll_hw;
++	const struct owl_clk_common *common = &pll->common;
++	u32 reg;
++
++	regmap_read(common->regmap, pll_hw->reg, &reg);
++
++	return !!(reg & BIT(pll_hw->bit_idx));
++}
++
++static void owl_pll_set(const struct owl_clk_common *common,
++		       const struct owl_pll_hw *pll_hw, bool enable)
++{
++	u32 reg;
++
++	regmap_read(common->regmap, pll_hw->reg, &reg);
++
++	if (enable)
++		reg |= BIT(pll_hw->bit_idx);
++	else
++		reg &= ~BIT(pll_hw->bit_idx);
++
++	regmap_write(common->regmap, pll_hw->reg, reg);
++}
++
++static int owl_pll_enable(struct clk_hw *hw)
++{
++	struct owl_pll *pll = hw_to_owl_pll(hw);
++	const struct owl_clk_common *common = &pll->common;
++
++	owl_pll_set(common, &pll->pll_hw, true);
++
++	return 0;
++}
++
++static void owl_pll_disable(struct clk_hw *hw)
++{
++	struct owl_pll *pll = hw_to_owl_pll(hw);
++	const struct owl_clk_common *common = &pll->common;
++
++	owl_pll_set(common, &pll->pll_hw, false);
++}
++
++static int owl_pll_set_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long parent_rate)
++{
++	struct owl_pll *pll = hw_to_owl_pll(hw);
++	struct owl_pll_hw *pll_hw = &pll->pll_hw;
++	const struct owl_clk_common *common = &pll->common;
++	const struct clk_pll_table *clkt;
++	u32 val, reg;
++
++	/* fixed frequency */
++	if (pll_hw->width == 0)
++		return 0;
++
++	if (pll_hw->table) {
++		clkt = _get_pll_table(pll_hw->table, rate);
++		val = clkt->val;
++	} else {
++		val = owl_pll_calculate_mul(pll_hw, rate);
++	}
++
++	regmap_read(common->regmap, pll_hw->reg, &reg);
++
++	reg &= ~mul_mask(pll_hw);
++	reg |= val << pll_hw->shift;
++
++	regmap_write(common->regmap, pll_hw->reg, reg);
++
++	udelay(PLL_STABILITY_WAIT_US);
++
++	return 0;
++}
++
++const struct clk_ops owl_pll_ops = {
++	.enable = owl_pll_enable,
++	.disable = owl_pll_disable,
++	.is_enabled = owl_pll_is_enabled,
++	.round_rate = owl_pll_round_rate,
++	.recalc_rate = owl_pll_recalc_rate,
++	.set_rate = owl_pll_set_rate,
++};
+diff --git a/drivers/clk/actions/owl-pll.h b/drivers/clk/actions/owl-pll.h
+new file mode 100644
+index 000000000000..0aae30abd5dc
+--- /dev/null
++++ b/drivers/clk/actions/owl-pll.h
+@@ -0,0 +1,92 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL pll clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#ifndef _OWL_PLL_H_
++#define _OWL_PLL_H_
++
++#include "owl-common.h"
++
++/* last entry should have rate = 0 */
++struct clk_pll_table {
++	unsigned int		val;
++	unsigned long		rate;
++};
++
++struct owl_pll_hw {
++	u32			reg;
++	u32			bfreq;
++	u8			bit_idx;
++	u8			shift;
++	u8			width;
++	u8			min_mul;
++	u8			max_mul;
++	const struct clk_pll_table *table;
++};
++
++struct owl_pll {
++	struct owl_pll_hw	pll_hw;
++	struct owl_clk_common	common;
++};
++
++#define OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,			\
++		   _width, _min_mul, _max_mul, _table)			\
++	{								\
++		.reg		= _reg,					\
++		.bfreq		= _bfreq,				\
++		.bit_idx	= _bit_idx,				\
++		.shift		= _shift,				\
++		.width		= _width,				\
++		.min_mul	= _min_mul,				\
++		.max_mul	= _max_mul,				\
++		.table		= _table,				\
++	}
++
++#define OWL_PLL(_struct, _name, _parent, _reg, _bfreq, _bit_idx,	\
++		_shift, _width, _min_mul, _max_mul, _table, _flags)	\
++	struct owl_pll _struct = {					\
++		.pll_hw	= OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,	\
++				     _width, _min_mul,			\
++				     _max_mul, _table),			\
++		.common = {						\
++			.regmap = NULL,					\
++			.hw.init = CLK_HW_INIT(_name,			\
++					       _parent,			\
++					       &owl_pll_ops,		\
++					       _flags),			\
++		},							\
++	}
++
++#define OWL_PLL_NO_PARENT(_struct, _name, _reg, _bfreq, _bit_idx,	\
++		_shift, _width, _min_mul, _max_mul, _table, _flags)	\
++	struct owl_pll _struct = {					\
++		.pll_hw	= OWL_PLL_HW(_reg, _bfreq, _bit_idx, _shift,	\
++				     _width, _min_mul,			\
++				     _max_mul, _table),			\
++		.common = {						\
++			.regmap = NULL,					\
++			.hw.init = CLK_HW_INIT_NO_PARENT(_name,		\
++					       &owl_pll_ops,		\
++					       _flags),			\
++		},							\
++	}
++
++#define mul_mask(m)		((1 << ((m)->width)) - 1)
++#define PLL_STABILITY_WAIT_US	(50)
++
++static inline struct owl_pll *hw_to_owl_pll(const struct clk_hw *hw)
++{
++	struct owl_clk_common *common = hw_to_owl_clk_common(hw);
++
++	return container_of(common, struct owl_pll, common);
++}
++
++extern const struct clk_ops owl_pll_ops;
++
++#endif /* _OWL_PLL_H_ */
 -- 
-2.16.2
+2.14.1
