@@ -1,83 +1,69 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Mar 2018 17:28:57 +0800
-Subject: [PATCH net-next 12/12] ARM: dts: sun8i: r40: bananapi-m2-ultra:
- Enable GMAC ethernet controller
+Date: Sat, 17 Mar 2018 17:28:54 +0800
+Subject: [PATCH net-next 09/12] net: stmmac: dwmac-sun8i: Add support for GMAC
+ on Allwinner R40 SoC
 In-Reply-To: <20180317092857.4396-1-wens@csie.org>
 References: <20180317092857.4396-1-wens@csie.org>
-Message-ID: <20180317092857.4396-13-wens@csie.org>
+Message-ID: <20180317092857.4396-10-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Bananapi M2 Ultra has a Realtek RTL8211E RGMII PHY tied to the GMAC.
-The PMIC's DC1SW output provides power for the PHY, while the ALDO2
-output provides I/O voltages on both sides.
+The Allwinner R40 SoC has the EMAC controller supported by dwmac-sun8i.
+It is named "GMAC", while EMAC refers to the 10/100 Mbps Ethernet
+controller supported by sun4i-emac. The controller is the same, but
+the R40 has the glue layer controls in the clock control unit (CCU),
+with a reduced RX delay chain, and no TX delay chain.
+
+This patch adds support for it using the framework laid out by previous
+patches to map the differences.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 30 +++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index c6da21e43572..25fb048c7df2 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -51,6 +51,7 @@
- 	compatible = "sinovoip,bpi-m2-ultra", "allwinner,sun8i-r40";
- 
- 	aliases {
-+		ethernet0 = &gmac;
- 		serial0 = &uart0;
- 	};
- 
-@@ -101,6 +102,22 @@
- 	status = "okay";
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+index 08d263567a52..be6705e89e95 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+@@ -97,6 +97,13 @@ const struct reg_field sun8i_syscon_reg_field = {
+ 	.msb = 31,
  };
  
-+&gmac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gmac_rgmii_pins>;
-+	phy-handle = <&phy1>;
-+	phy-mode = "rgmii";
-+	phy-supply = <&reg_dc1sw>;
-+	status = "okay";
++/* EMAC clock register @ 0x164 in the CCU address range */
++const struct reg_field sun8i_ccu_reg_field = {
++	.reg = 0x164,
++	.lsb = 0,
++	.msb = 31,
 +};
 +
-+&gmac_mdio {
-+	phy1: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- 
-@@ -149,6 +166,13 @@
- 	status = "okay";
+ static const struct emac_variant emac_variant_h3 = {
+ 	.default_syscon_value = 0x58000,
+ 	.syscon_field = &sun8i_syscon_reg_field,
+@@ -125,6 +132,15 @@ static const struct emac_variant emac_variant_a83t = {
+ 	.tx_delay_max = 7,
  };
  
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2500000>;
-+	regulator-max-microvolt = <2500000>;
-+	regulator-name = "vcc-pa";
++static const struct emac_variant emac_variant_r40 = {
++	.default_syscon_value = 0,
++	.syscon_field = &sun8i_ccu_reg_field,
++	.syscon_from_dev = true,
++	.support_mii = true,
++	.support_rgmii = true,
++	.rx_delay_max = 7,
 +};
 +
- &reg_aldo3 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <2700000>;
-@@ -156,6 +180,12 @@
- 	regulator-name = "avcc";
- };
- 
-+&reg_dc1sw {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-gmac-phy";
-+};
-+
- &reg_dcdc1 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <3000000>;
+ static const struct emac_variant emac_variant_a64 = {
+ 	.default_syscon_value = 0,
+ 	.syscon_field = &sun8i_syscon_reg_field,
+@@ -1148,6 +1164,8 @@ static const struct of_device_id sun8i_dwmac_match[] = {
+ 		.data = &emac_variant_v3s },
+ 	{ .compatible = "allwinner,sun8i-a83t-emac",
+ 		.data = &emac_variant_a83t },
++	{ .compatible = "allwinner,sun8i-r40-gmac",
++		.data = &emac_variant_r40 },
+ 	{ .compatible = "allwinner,sun50i-a64-emac",
+ 		.data = &emac_variant_a64 },
+ 	{ }
 -- 
 2.16.2
