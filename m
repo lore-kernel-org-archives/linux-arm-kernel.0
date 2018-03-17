@@ -1,80 +1,110 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Mar 2018 17:28:47 +0800
-Subject: [PATCH net-next 02/12] clk: sunxi-ng: r40: export a regmap to access
- the GMAC register
+Date: Sat, 17 Mar 2018 17:28:55 +0800
+Subject: [PATCH net-next 10/12] ARM: dts: sun8i: r40: bananapi-m2-ultra: Sort
+ device node dereferences
 In-Reply-To: <20180317092857.4396-1-wens@csie.org>
 References: <20180317092857.4396-1-wens@csie.org>
-Message-ID: <20180317092857.4396-3-wens@csie.org>
+Message-ID: <20180317092857.4396-11-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+The device nodes dereference (&foo) usages should be sorted by the label
+names, barring any parsing order issues such as the #include statement
+for the PMIC's .dtsi file that must come after the PMIC.
 
-There's a GMAC configuration register, which exists on A64/A83T/H3/H5 in
-the syscon part, in the CCU of R40 SoC.
+Move the mmc and ohci blocks in front of the PMIC's regulator blocks.
 
-Export a regmap of the CCU.
-
-Read access is not restricted to all registers, but only the GMAC
-register is allowed to be written.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 69 ++++++++++++-----------
+ 1 file changed, 35 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-index c3aa839a453d..54c7a6106206 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-@@ -1251,9 +1251,35 @@ static struct ccu_mux_nb sun8i_r40_cpu_nb = {
- 	.bypass_index	= 1, /* index of 24 MHz oscillator */
- };
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+index 27d9ccd0ef2f..c6da21e43572 100644
+--- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -114,6 +114,41 @@
  
-+/*
-+ * Add a regmap for the GMAC driver (dwmac-sun8i) to access the
-+ * GMAC configuration register.
-+ * Only this register is allowed to be written, in order to
-+ * prevent overriding critical clock configuration.
-+ */
-+
-+#define SUN8I_R40_GMAC_CFG_REG 0x164
-+static bool sun8i_r40_ccu_regmap_writeable_reg(struct device *dev,
-+					       unsigned int reg)
-+{
-+	if (reg == SUN8I_R40_GMAC_CFG_REG)
-+		return true;
-+	return false;
-+}
-+
-+static struct regmap_config sun8i_r40_ccu_regmap_config = {
-+	.reg_bits	= 32,
-+	.val_bits	= 32,
-+	.reg_stride	= 4,
-+	.max_register	= 0x320, /* PLL_LOCK_CTRL_REG */
-+
-+	.writeable_reg	= sun8i_r40_ccu_regmap_writeable_reg,
+ #include "axp22x.dtsi"
+ 
++&mmc0 {
++	vmmc-supply = <&reg_dcdc1>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
++	cd-inverted;
++	status = "okay";
 +};
 +
- static int sun8i_r40_ccu_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-+	struct regmap *regmap;
- 	void __iomem *reg;
- 	u32 val;
- 	int ret;
-@@ -1278,6 +1304,11 @@ static int sun8i_r40_ccu_probe(struct platform_device *pdev)
- 	val &= ~GENMASK(25, 20);
- 	writel(val, reg + SUN8I_R40_USB_CLK_REG);
- 
-+	regmap = devm_regmap_init_mmio(&pdev->dev, reg,
-+				       &sun8i_r40_ccu_regmap_config);
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pg_pins>;
++	vmmc-supply = <&reg_dldo2>;
++	vqmmc-supply = <&reg_dldo1>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
 +
- 	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun8i_r40_ccu_desc);
- 	if (ret)
- 		return ret;
++&mmc2 {
++	vmmc-supply = <&reg_dcdc1>;
++	vqmmc-supply = <&reg_dcdc1>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
+ &reg_aldo3 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <2700000>;
+@@ -161,40 +196,6 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
+-&mmc0 {
+-	vmmc-supply = <&reg_dcdc1>;
+-	bus-width = <4>;
+-	cd-gpios = <&pio 7 13 GPIO_ACTIVE_LOW>; /* PH13 */
+-	status = "okay";
+-};
+-
+-&mmc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc1_pg_pins>;
+-	vmmc-supply = <&reg_dldo2>;
+-	vqmmc-supply = <&reg_dldo1>;
+-	mmc-pwrseq = <&wifi_pwrseq>;
+-	bus-width = <4>;
+-	non-removable;
+-	status = "okay";
+-};
+-
+-&mmc2 {
+-	vmmc-supply = <&reg_dcdc1>;
+-	vqmmc-supply = <&reg_dcdc1>;
+-	bus-width = <8>;
+-	non-removable;
+-	status = "okay";
+-};
+-
+-&ohci1 {
+-	status = "okay";
+-};
+-
+-&ohci2 {
+-	status = "okay";
+-};
+-
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 2.16.2
