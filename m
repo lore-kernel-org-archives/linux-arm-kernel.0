@@ -1,89 +1,80 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Mar 2018 17:28:45 +0800
-Subject: [PATCH net-next 00/12] ARM: sun8i: r40: Add Ethernet support
-Message-ID: <20180317092857.4396-1-wens@csie.org>
+Date: Sat, 17 Mar 2018 17:28:47 +0800
+Subject: [PATCH net-next 02/12] clk: sunxi-ng: r40: export a regmap to access
+ the GMAC register
+In-Reply-To: <20180317092857.4396-1-wens@csie.org>
+References: <20180317092857.4396-1-wens@csie.org>
+Message-ID: <20180317092857.4396-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+From: Icenowy Zheng <icenowy@aosc.io>
 
-This series adds support for the DWMAC based Ethernet controller found
-on the Allwinner R40 SoC. The controller is either a DWMAC clone or
-DWMAC core with its registers rearranged. This is already supported by
-the dwmac-sun8i driver. The glue layer control registers, unlike other
-sun8i family SoCs, is not in the system controller region, but in the
-clock control unit, like with the older A20 and A31 SoCs.
+There's a GMAC configuration register, which exists on A64/A83T/H3/H5 in
+the syscon part, in the CCU of R40 SoC.
 
-Mark (Brown), could you take a look at the regmap bits in patches 2 and
-7? While we reuse the bindings for dwmac-sun8i using a syscon phandle
-reference, we need some custom plumbing for the clock driver to export
-a regmap that only allows access to the GMAC register to the dwmac-sun8i
-driver. An alternative would be to allow drivers to register custom
-syscon devices with their own regmap and locking.
+Export a regmap of the CCU.
 
-Patch 1 converts the CLK_OF_DECLARE style clock driver to a platform
-one, so the regmap introduced later has a struct device to tie to.
+Read access is not restricted to all registers, but only the GMAC
+register is allowed to be written.
 
-Patch 2 adds a regmap that is exported by the clock driver for the
-dwmac-sun8i driver to use.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-Patch 3 and 4 clean up the dwmac-sun8i binding.
-
-Patch 5 adds device tree binding for Allwinner R40's Ethernet
-controller.
-
-Patch 6 converts regmap access of the syscon region in the dwmac-sun8i
-driver to regmap_field, in anticipation of different field widths on
-the R40.
-
-Patch 7 introduces custom plumbing in the dwmac-sun8i driver to fetch
-a regmap from the clock module, by looking up a device via a phandle,
-then getting the regmap associated with that device.
-
-Patch 8 adds support for different or absent TX/RX delay chain ranges
-to the dwmac-sun8i driver.
-
-Patch 9 adds support for the R40's ethernet controller.
-
-Patch 10 cleans up the Bananapi M2 Ultra device tree file.
-
-Patch 11 adds a GMAC device node and RGMII mode pinmux setting for the
-R40.
-
-Patch 12 enables Ethernet on the Bananapi M2 Ultra.
-
-
-Please have a look.
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (10):
-  dt-bindings: net: dwmac-sun8i: Clean up clock delay chain descriptions
-  dt-bindings: net: dwmac-sun8i: Sort syscon compatibles by alphabetical
-    order
-  dt-bindings: net: dwmac-sun8i: Add binding for GMAC on Allwinner R40
-    SoC
-  net: stmmac: dwmac-sun8i: Use regmap_field for syscon register access
-  net: stmmac: dwmac-sun8i: Allow getting syscon regmap from CCU device
-  net: stmmac: dwmac-sun8i: Support different ranges for TX/RX delay
-    chains
-  net: stmmac: dwmac-sun8i: Add support for GMAC on Allwinner R40 SoC
-  ARM: dts: sun8i: r40: bananapi-m2-ultra: Sort device node dereferences
-  ARM: dts: sun8i: r40: Add device node and RGMII pinmux node for GMAC
-  ARM: dts: sun8i: r40: bananapi-m2-ultra: Enable GMAC ethernet
-    controller
-
-Icenowy Zheng (2):
-  clk: sunxi-ng: r40: rewrite init code to a platform driver
-  clk: sunxi-ng: r40: export a regmap to access the GMAC register
-
- .../devicetree/bindings/net/dwmac-sun8i.txt        |  17 ++-
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  99 ++++++++++------
- arch/arm/boot/dts/sun8i-r40.dtsi                   |  34 ++++++
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c               |  70 +++++++++--
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  | 128 +++++++++++++++++----
- 5 files changed, 278 insertions(+), 70 deletions(-)
-
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+index c3aa839a453d..54c7a6106206 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+@@ -1251,9 +1251,35 @@ static struct ccu_mux_nb sun8i_r40_cpu_nb = {
+ 	.bypass_index	= 1, /* index of 24 MHz oscillator */
+ };
+ 
++/*
++ * Add a regmap for the GMAC driver (dwmac-sun8i) to access the
++ * GMAC configuration register.
++ * Only this register is allowed to be written, in order to
++ * prevent overriding critical clock configuration.
++ */
++
++#define SUN8I_R40_GMAC_CFG_REG 0x164
++static bool sun8i_r40_ccu_regmap_writeable_reg(struct device *dev,
++					       unsigned int reg)
++{
++	if (reg == SUN8I_R40_GMAC_CFG_REG)
++		return true;
++	return false;
++}
++
++static struct regmap_config sun8i_r40_ccu_regmap_config = {
++	.reg_bits	= 32,
++	.val_bits	= 32,
++	.reg_stride	= 4,
++	.max_register	= 0x320, /* PLL_LOCK_CTRL_REG */
++
++	.writeable_reg	= sun8i_r40_ccu_regmap_writeable_reg,
++};
++
+ static int sun8i_r40_ccu_probe(struct platform_device *pdev)
+ {
+ 	struct resource *res;
++	struct regmap *regmap;
+ 	void __iomem *reg;
+ 	u32 val;
+ 	int ret;
+@@ -1278,6 +1304,11 @@ static int sun8i_r40_ccu_probe(struct platform_device *pdev)
+ 	val &= ~GENMASK(25, 20);
+ 	writel(val, reg + SUN8I_R40_USB_CLK_REG);
+ 
++	regmap = devm_regmap_init_mmio(&pdev->dev, reg,
++				       &sun8i_r40_ccu_regmap_config);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
++
+ 	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun8i_r40_ccu_desc);
+ 	if (ret)
+ 		return ret;
 -- 
 2.16.2
