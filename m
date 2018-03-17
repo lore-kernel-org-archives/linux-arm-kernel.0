@@ -1,211 +1,88 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 17 Mar 2018 11:14:20 +0800
-Subject: [xlnx:master 1122/1540] include/linux/kernel.h:929:32: error:
- dereferencing pointer to incomplete type 'struct clk_hw'
-Message-ID: <201803171107.n0gIjuck%fengguang.wu@intel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 16 Mar 2018 23:40:50 -0400
+Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
+ on weakly-ordered archs
+In-Reply-To: <004501d3bd7b$505e70f0$f11b52d0$@opengridcomputing.com>
+References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
+ <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
+ <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
+ <83387f6e-adcb-14e9-2c22-96abf9493cc6@codeaurora.org>
+ <004501d3bd7b$505e70f0$f11b52d0$@opengridcomputing.com>
+Message-ID: <740c7d45-450e-c9b3-ceed-7bc7fcefbc5a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   82f616d7008a600126b365e6e84985843fc60a18
-commit: 818f168696f561c127f161379eb5b8d1835218a2 [1122/1540] Merge tag 'v4.14' into master
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 818f168696f561c127f161379eb5b8d1835218a2
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+On 3/16/2018 7:05 PM, Steve Wise wrote:
+>>
+>> On 3/16/2018 5:05 PM, Steve Wise wrote:
+>>>> Code includes wmb() followed by writel(). writel() already has a barrier
+>>> on
+>>>> some architectures like arm64.
+>>>>
+>>>> This ends up CPU observing two barriers back to back before executing
+>> the
+>>>> register write.
+>>>>
+>>>> Since code already has an explicit barrier call, changing writel() to
+>>>> writel_relaxed().
+>>>>
+>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>>
+>>> NAK - This isn't correct for PowerPC.  For PowerPC, writeX_relaxed() is just
+>>> writeX().
+>>>
+>>> I was just looking at this with Chelsio developers, and they said the
+>>> writeX() should be replaced with __raw_writeX(), not writeX_relaxed(), to
+>>> get rid of the extra barrier for all architectures.
+>>
+>> OK. I can do that but isn't the problem at PowerPC adaptation?
+>>
+>> /*
+>>  * We don't do relaxed operations yet, at least not with this semantic
+>>  */
+>> #define readb_relaxed(addr)	readb(addr)
+>> #define readw_relaxed(addr)	readw(addr)
+>> #define readl_relaxed(addr)	readl(addr)
+>> #define readq_relaxed(addr)	readq(addr)
+>> #define writeb_relaxed(v, addr)	writeb(v, addr)
+>> #define writew_relaxed(v, addr)	writew(v, addr)
+>> #define writel_relaxed(v, addr)	writel(v, addr)
+>> #define writeq_relaxed(v, addr)	writeq(v, addr)
+>>
+>> Why don't we fix the PowerPC's relaxed operators? Is that a bigger task?
+> 
+> I don't know the answer, but perhaps the proper fix is to correctly implement these for PPC?
+> 
 
-All errors (new ones prefixed by >>):
+I found this article: https://lwn.net/Articles/698014/#PowerPC%20Implementation
 
-   drivers/misc/jesd204b/xilinx_jesd204b.c:28:17: error: field 'hw' has incomplete type
-     struct clk_hw  hw;
-                    ^~
-   In file included from include/linux/err.h:5:0,
-                    from include/linux/clk.h:15,
-                    from drivers/misc/jesd204b/xilinx_jesd204b.c:11:
-   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_enable':
->> include/linux/kernel.h:929:32: error: dereferencing pointer to incomplete type 'struct clk_hw'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-                                   ^~~~~~
-   include/linux/compiler.h:554:19: note: in definition of macro '__compiletime_assert'
-      bool __cond = !(condition);    \
-                      ^~~~~~~~~
-   include/linux/compiler.h:577:2: note: in expansion of macro '_compiletime_assert'
-     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-     ^~~~~~~~~~~~~~~~~~~
-   include/linux/build_bug.h:47:37: note: in expansion of macro 'compiletime_assert'
-    #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
-                                        ^~~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:929:2: note: in expansion of macro 'BUILD_BUG_ON_MSG'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-     ^~~~~~~~~~~~~~~~
-   include/linux/kernel.h:929:20: note: in expansion of macro '__same_type'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-                       ^~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
-    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
-                             ^~~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:214:2: note: in expansion of macro 'to_clk_priv'
-     to_clk_priv(hw)->enabled = true;
-     ^~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c: At top level:
-   drivers/misc/jesd204b/xilinx_jesd204b.c:229:21: error: variable 'clkout_ops' has initializer but incomplete type
-    static const struct clk_ops clkout_ops = {
-                        ^~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:230:3: error: 'const struct clk_ops' has no member named 'recalc_rate'
-     .recalc_rate = jesd204b_clk_recalc_rate,
-      ^~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:230:17: warning: excess elements in struct initializer
-     .recalc_rate = jesd204b_clk_recalc_rate,
-                    ^~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:230:17: note: (near initialization for 'clkout_ops')
-   drivers/misc/jesd204b/xilinx_jesd204b.c:231:3: error: 'const struct clk_ops' has no member named 'enable'
-     .enable = jesd204b_clk_enable,
-      ^~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:231:12: warning: excess elements in struct initializer
-     .enable = jesd204b_clk_enable,
-               ^~~~~~~~~~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:231:12: note: (near initialization for 'clkout_ops')
-   drivers/misc/jesd204b/xilinx_jesd204b.c:232:3: error: 'const struct clk_ops' has no member named 'disable'
-     .disable = jesd204b_clk_disable,
-      ^~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:232:13: warning: excess elements in struct initializer
-     .disable = jesd204b_clk_disable,
-                ^~~~~~~~~~~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:232:13: note: (near initialization for 'clkout_ops')
-   drivers/misc/jesd204b/xilinx_jesd204b.c:233:3: error: 'const struct clk_ops' has no member named 'is_enabled'
-     .is_enabled = jesd204b_clk_is_enabled,
-      ^~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:233:16: warning: excess elements in struct initializer
-     .is_enabled = jesd204b_clk_is_enabled,
-                   ^~~~~~~~~~~~~~~~~~~~~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:233:16: note: (near initialization for 'clkout_ops')
-   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_probe':
-   drivers/misc/jesd204b/xilinx_jesd204b.c:251:23: error: storage size of 'init' isn't known
-     struct clk_init_data init;
-                          ^~~~
-   drivers/misc/jesd204b/xilinx_jesd204b.c:251:23: warning: unused variable 'init' [-Wunused-variable]
-   drivers/misc/jesd204b/xilinx_jesd204b.c: At top level:
-   drivers/misc/jesd204b/xilinx_jesd204b.c:229:29: error: storage size of 'clkout_ops' isn't known
-    static const struct clk_ops clkout_ops = {
-                                ^~~~~~~~~~
---
-   drivers/misc//jesd204b/xilinx_jesd204b.c:28:17: error: field 'hw' has incomplete type
-     struct clk_hw  hw;
-                    ^~
-   In file included from include/linux/err.h:5:0,
-                    from include/linux/clk.h:15,
-                    from drivers/misc//jesd204b/xilinx_jesd204b.c:11:
-   drivers/misc//jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_enable':
->> include/linux/kernel.h:929:32: error: dereferencing pointer to incomplete type 'struct clk_hw'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-                                   ^~~~~~
-   include/linux/compiler.h:554:19: note: in definition of macro '__compiletime_assert'
-      bool __cond = !(condition);    \
-                      ^~~~~~~~~
-   include/linux/compiler.h:577:2: note: in expansion of macro '_compiletime_assert'
-     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-     ^~~~~~~~~~~~~~~~~~~
-   include/linux/build_bug.h:47:37: note: in expansion of macro 'compiletime_assert'
-    #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
-                                        ^~~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:929:2: note: in expansion of macro 'BUILD_BUG_ON_MSG'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-     ^~~~~~~~~~~~~~~~
-   include/linux/kernel.h:929:20: note: in expansion of macro '__same_type'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-                       ^~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
-    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
-                             ^~~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:214:2: note: in expansion of macro 'to_clk_priv'
-     to_clk_priv(hw)->enabled = true;
-     ^~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c: At top level:
-   drivers/misc//jesd204b/xilinx_jesd204b.c:229:21: error: variable 'clkout_ops' has initializer but incomplete type
-    static const struct clk_ops clkout_ops = {
-                        ^~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:230:3: error: 'const struct clk_ops' has no member named 'recalc_rate'
-     .recalc_rate = jesd204b_clk_recalc_rate,
-      ^~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:230:17: warning: excess elements in struct initializer
-     .recalc_rate = jesd204b_clk_recalc_rate,
-                    ^~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:230:17: note: (near initialization for 'clkout_ops')
-   drivers/misc//jesd204b/xilinx_jesd204b.c:231:3: error: 'const struct clk_ops' has no member named 'enable'
-     .enable = jesd204b_clk_enable,
-      ^~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:231:12: warning: excess elements in struct initializer
-     .enable = jesd204b_clk_enable,
-               ^~~~~~~~~~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:231:12: note: (near initialization for 'clkout_ops')
-   drivers/misc//jesd204b/xilinx_jesd204b.c:232:3: error: 'const struct clk_ops' has no member named 'disable'
-     .disable = jesd204b_clk_disable,
-      ^~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:232:13: warning: excess elements in struct initializer
-     .disable = jesd204b_clk_disable,
-                ^~~~~~~~~~~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:232:13: note: (near initialization for 'clkout_ops')
-   drivers/misc//jesd204b/xilinx_jesd204b.c:233:3: error: 'const struct clk_ops' has no member named 'is_enabled'
-     .is_enabled = jesd204b_clk_is_enabled,
-      ^~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:233:16: warning: excess elements in struct initializer
-     .is_enabled = jesd204b_clk_is_enabled,
-                   ^~~~~~~~~~~~~~~~~~~~~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:233:16: note: (near initialization for 'clkout_ops')
-   drivers/misc//jesd204b/xilinx_jesd204b.c: In function 'jesd204b_probe':
-   drivers/misc//jesd204b/xilinx_jesd204b.c:251:23: error: storage size of 'init' isn't known
-     struct clk_init_data init;
-                          ^~~~
-   drivers/misc//jesd204b/xilinx_jesd204b.c:251:23: warning: unused variable 'init' [-Wunused-variable]
-   drivers/misc//jesd204b/xilinx_jesd204b.c: At top level:
-   drivers/misc//jesd204b/xilinx_jesd204b.c:229:29: error: storage size of 'clkout_ops' isn't known
-    static const struct clk_ops clkout_ops = {
-                                ^~~~~~~~~~
+Apparently, this issue was discussed at a conference in 2015.
 
-vim +929 include/linux/kernel.h
+Based on how I read this article, writel() and writel_relaxed() behave exactly
+the same on PowerPC because the barrier is enforced by the time code is leaving
+a critical section not during MMIO execution.
 
-^1da177e4 Linus Torvalds 2005-04-16  910  
-91f68b735 Wu Fengguang   2009-01-07  911  
-e8c97af0c Randy Dunlap   2017-10-13  912  /**
-e8c97af0c Randy Dunlap   2017-10-13  913   * swap - swap values of @a and @b
-e8c97af0c Randy Dunlap   2017-10-13  914   * @a: first value
-e8c97af0c Randy Dunlap   2017-10-13  915   * @b: second value
-91f68b735 Wu Fengguang   2009-01-07  916   */
-ac7b90049 Peter Zijlstra 2009-02-04  917  #define swap(a, b) \
-ac7b90049 Peter Zijlstra 2009-02-04  918  	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
-91f68b735 Wu Fengguang   2009-01-07  919  
-^1da177e4 Linus Torvalds 2005-04-16  920  /**
-^1da177e4 Linus Torvalds 2005-04-16  921   * container_of - cast a member of a structure out to the containing structure
-^1da177e4 Linus Torvalds 2005-04-16  922   * @ptr:	the pointer to the member.
-^1da177e4 Linus Torvalds 2005-04-16  923   * @type:	the type of the container struct this is embedded in.
-^1da177e4 Linus Torvalds 2005-04-16  924   * @member:	the name of the member within the struct.
-^1da177e4 Linus Torvalds 2005-04-16  925   *
-^1da177e4 Linus Torvalds 2005-04-16  926   */
-^1da177e4 Linus Torvalds 2005-04-16  927  #define container_of(ptr, type, member) ({				\
-c7acec713 Ian Abbott     2017-07-12  928  	void *__mptr = (void *)(ptr);					\
-c7acec713 Ian Abbott     2017-07-12 @929  	BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) &&	\
-c7acec713 Ian Abbott     2017-07-12  930  			 !__same_type(*(ptr), void),			\
-c7acec713 Ian Abbott     2017-07-12  931  			 "pointer type mismatch in container_of()");	\
-c7acec713 Ian Abbott     2017-07-12  932  	((type *)(__mptr - offsetof(type, member))); })
-^1da177e4 Linus Torvalds 2005-04-16  933  
+I also see that __raw_writel() is being heavily used in drivers directory.
 
-:::::: The code at line 929 was first introduced by commit
-:::::: c7acec713d14c6ce8a20154f9dfda258d6bcad3b kernel.h: handle pointers to arrays better in container_of()
+https://elixir.bootlin.com/linux/latest/ident/__raw_writel
 
-:::::: TO: Ian Abbott <abbotti@mev.co.uk>
-:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
+I'll change writel_relaxed() with __raw_writel() in the series like you suggested
+and also look at your other comments.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 49051 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180317/5f80e652/attachment-0001.gz>
+This seems to be the current norm.
+
+> 
+>>
+>> >From API perspective both __raw_writeX() and writeX_relaxed() are
+>> correct.
+>> It is just PowerPC doesn't seem the follow the definition yet.
+> 
+> 
+> 
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
