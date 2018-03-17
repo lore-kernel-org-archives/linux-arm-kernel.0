@@ -1,161 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 17 Mar 2018 13:34:45 +0000
-Subject: [PATCH v2] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
- observed before enabling
-In-Reply-To: <1521124287-25009-1-git-send-email-shankerd@codeaurora.org>
-References: <1521124287-25009-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20180317133445.772733ac@why.wild-wind.fr.eu.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 17 Mar 2018 11:53:08 -0300
+Subject: [PATCH 1/2] ARM: dts: pfuze3000: update sw1a/vldo4 voltage range
+In-Reply-To: <1521269828-8874-1-git-send-email-Anson.Huang@nxp.com>
+References: <1521269828-8874-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5BzE46Dm24++j+xVA4KGFnpsopGfJ97h7sFGOAxVa19=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Mar 2018 09:31:27 -0500
-Shanker Donthineni <shankerd@codeaurora.org> wrote:
+Hi Anson,
 
-> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
-> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
-> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
-> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
-> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+On Sat, Mar 17, 2018 at 3:57 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
+> Update sw1a/vldo4's voltage range according to latest pfuze3000
+> datasheet from:
+>
+> http://cache.freescale.com/files/analog/doc/data_sheet/PF3000.pdf?fsrch=1&sr=1&pageNum=1
+>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
 > ---
-> Changes since v1:
->   -Moved LPI disable code to a seperate function as Marc suggested.
->   -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
->   
->  drivers/irqchip/irq-gic-v3-its.c   | 66 ++++++++++++++++++++++++++++++--------
->  include/linux/irqchip/arm-gic-v3.h |  1 +
->  2 files changed, 53 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 1d3056f..cba71a7 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -33,6 +33,8 @@
->  #include <linux/of_platform.h>
->  #include <linux/percpu.h>
->  #include <linux/slab.h>
-> +#include <linux/time64.h>
-> +#include <linux/iopoll.h>
->  
->  #include <linux/irqchip.h>
->  #include <linux/irqchip/arm-gic-v3.h>
-> @@ -1875,16 +1877,6 @@ static void its_cpu_init_lpis(void)
->  		gic_data_rdist()->pend_page = pend_page;
->  	}
->  
-> -	/* Disable LPIs */
-> -	val = readl_relaxed(rbase + GICR_CTLR);
-> -	val &= ~GICR_CTLR_ENABLE_LPIS;
-> -	writel_relaxed(val, rbase + GICR_CTLR);
-> -
-> -	/*
-> -	 * Make sure any change to the table is observable by the GIC.
-> -	 */
-> -	dsb(sy);
-> -
->  	/* set PROPBASE */
->  	val = (page_to_phys(gic_rdists->prop_page) |
->  	       GICR_PROPBASER_InnerShareable |
-> @@ -3288,13 +3280,59 @@ static bool gic_rdists_supports_plpis(void)
->  	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
->  }
->  
-> +static int redist_disable_lpis(void)
-> +{
-> +	void __iomem *rbase = gic_data_rdist_rd_base();
-> +	u64 val;
-> +	int ret;
-> +
-> +	if (!gic_rdists_supports_plpis()) {
-> +		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-> +		return -ENXIO;
-> +	}
-> +
-> +	val = readl_relaxed(rbase + GICR_CTLR);
-> +	if (!(val & GICR_CTLR_ENABLE_LPIS))
-> +		return 0;
-> +
-> +	/* Disable LPIs */
-> +	val &= ~GICR_CTLR_ENABLE_LPIS;
-> +	writel_relaxed(val, rbase + GICR_CTLR);
-> +
-> +	/* Make sure any change to GICR_CTLR is observable by the GIC */
-> +	dsb(sy);
-> +
-> +	/* Wait for GICR_CTLR.GICR_CTLR_ENABLE_LPIS==0 or timeout */
-> +	ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
-> +					 !(val & GICR_CTLR_ENABLE_LPIS), 1,
-> +					 USEC_PER_SEC);
+>  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi  | 2 +-
+>  arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 4 ++--
+>  arch/arm/boot/dts/imx7d-nitrogen7.dts   | 2 +-
+>  arch/arm/boot/dts/imx7d-sdb.dts         | 6 +++---
+>  arch/arm/boot/dts/imx7s-warp.dts        | 2 +-
+>  5 files changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> index 53b3eac..1de0a0f 100644
+> --- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> @@ -142,7 +142,7 @@
+>                 regulators {
+>                         sw1a_reg: sw1a {
+>                                 regulator-min-microvolt = <700000>;
+> -                               regulator-max-microvolt = <1475000>;
+> +                               regulator-max-microvolt = <3300000>;
 
-Why do you need to poll on EnableLPIs? It is supposed to be immediately
-written. It seems to me that the sequence should be:
+This change does not look like a safe thing to do without carefully
+checking each one of the board schematics.
 
-- Check EnableLPis
-- If set to 1, scream about bootloader being braindead
-- Write EnableLPIs to 0
-- Read back EnableLpis:
-- If still set 1, bail out, we're doomed. Scream about the HW being
-  braindead
-- Poll RWP
-- If timeout, bail out, the HW has locked up. Scream again.
-
-I think this should cover the whole thing. An alternative would be to
-place the poll between the write and read-back, but that doesn't change
-anything.
-
-> +	if (ret) {
-> +		pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
-> +		return -EBUSY;
-> +	}
-> +
-> +	/* Wait for GICR_CTLR.RWP==0 or timeout */
-> +	ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
-> +					 !(val & GICR_CTLR_RWP), 1,
-> +					 USEC_PER_SEC);
-> +	if (ret) {
-> +		pr_err("CPU%d: Failed to observe RWP==0 after enabling LPIs\n",
-> +		       smp_processor_id());
-> +		return -EBUSY;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  int its_cpu_init(void)
->  {
-> +	int ret;
-> +
->  	if (!list_empty(&its_nodes)) {
-
-nit: move 'ret' here.
-
-> -		if (!gic_rdists_supports_plpis()) {
-> -			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-> -			return -ENXIO;
-> -		}
-> +		ret = redist_disable_lpis();
-> +		if (ret)
-> +			return ret;
-> +
->  		its_cpu_init_lpis();
->  		its_cpu_init_collection();
->  	}
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index c00c4c33..4d5fb60 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -106,6 +106,7 @@
->  #define GICR_PIDR2			GICD_PIDR2
->  
->  #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
-> +#define GICR_CTLR_RWP			(1UL << 3)
->  
->  #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
->  
-
-Thanks,
-
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+Even if the regulator itself is capable of driving a higher voltage,
+it does not mean that the circuitry that consumes such regulator is
+allowed to receive the higher voltages.
