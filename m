@@ -1,42 +1,42 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 17 Mar 2018 15:39:49 +0530
-Subject: [PATCH v5 09/12] clk: actions: Add fixed factor clock support
+Date: Sat, 17 Mar 2018 15:39:50 +0530
+Subject: [PATCH v5 10/12] clk: actions: Add composite clock support
 In-Reply-To: <20180317100952.28538-1-manivannan.sadhasivam@linaro.org>
 References: <20180317100952.28538-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180317100952.28538-10-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180317100952.28538-11-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Actions Semi fixed factor clock together with
-helper functions to be used in composite clock.
+Add support for Actions Semi composite clock. This clock
+consists of gate, mux, divider, factor and fixed factor clocks.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/clk/actions/Makefile           |  1 +
- drivers/clk/actions/owl-fixed-factor.c | 81 ++++++++++++++++++++++++++++++++++
- drivers/clk/actions/owl-fixed-factor.h | 62 ++++++++++++++++++++++++++
- 3 files changed, 144 insertions(+)
- create mode 100644 drivers/clk/actions/owl-fixed-factor.c
- create mode 100644 drivers/clk/actions/owl-fixed-factor.h
+ drivers/clk/actions/Makefile        |   1 +
+ drivers/clk/actions/owl-composite.c | 200 ++++++++++++++++++++++++++++++++++++
+ drivers/clk/actions/owl-composite.h | 118 +++++++++++++++++++++
+ 3 files changed, 319 insertions(+)
+ create mode 100644 drivers/clk/actions/owl-composite.c
+ create mode 100644 drivers/clk/actions/owl-composite.h
 
 diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
-index 994357fa560b..b618696ba54e 100644
+index b618696ba54e..dc905b285bdc 100644
 --- a/drivers/clk/actions/Makefile
 +++ b/drivers/clk/actions/Makefile
-@@ -5,3 +5,4 @@ clk-owl-y			+= owl-gate.o
- clk-owl-y			+= owl-mux.o
+@@ -6,3 +6,4 @@ clk-owl-y			+= owl-mux.o
  clk-owl-y			+= owl-divider.o
  clk-owl-y			+= owl-factor.o
-+clk-owl-y			+= owl-fixed-factor.o
-diff --git a/drivers/clk/actions/owl-fixed-factor.c b/drivers/clk/actions/owl-fixed-factor.c
+ clk-owl-y			+= owl-fixed-factor.o
++clk-owl-y			+= owl-composite.o
+diff --git a/drivers/clk/actions/owl-composite.c b/drivers/clk/actions/owl-composite.c
 new file mode 100644
-index 000000000000..f1281565129c
+index 000000000000..d0ffbfc2c34c
 --- /dev/null
-+++ b/drivers/clk/actions/owl-fixed-factor.c
-@@ -0,0 +1,81 @@
++++ b/drivers/clk/actions/owl-composite.c
+@@ -0,0 +1,200 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +//
-+// OWL fixed factor clock driver
++// OWL composite clock driver
 +//
 +// Copyright (c) 2014 Actions Semi Inc.
 +// Author: David Liu <liuwei@actions-semi.com>
@@ -46,60 +46,128 @@ index 000000000000..f1281565129c
 +
 +#include <linux/clk-provider.h>
 +#include <linux/regmap.h>
-+#include <linux/slab.h>
 +
-+#include "owl-fixed-factor.h"
++#include "owl-composite.h"
 +
-+long owl_fix_fact_helper_round_rate(struct owl_clk_common *common,
-+				const struct owl_fix_fact_hw *fix_fact_hw,
-+				unsigned long rate,
++static u8 owl_comp_get_parent(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_mux_helper_get_parent(&comp->common, &comp->mux_hw);
++}
++
++static int owl_comp_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_mux_helper_set_parent(&comp->common, &comp->mux_hw, index);
++}
++
++static void owl_comp_disable(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++	struct owl_clk_common *common = &comp->common;
++
++	clk_gate_set(common, &comp->gate_hw, false);
++}
++
++static int owl_comp_enable(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++	struct owl_clk_common *common = &comp->common;
++
++	clk_gate_set(common, &comp->gate_hw, true);
++
++	return 0;
++}
++
++static int owl_comp_is_enabled(struct clk_hw *hw)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++	struct owl_clk_common *common = &comp->common;
++
++	return clk_is_enabled(common, &comp->gate_hw);
++}
++
++static long owl_comp_div_round_rate(struct clk_hw *hw, unsigned long rate,
 +				unsigned long *parent_rate)
 +{
-+	if (clk_hw_get_flags(&common->hw) & CLK_SET_RATE_PARENT) {
-+		unsigned long best_parent;
++	struct owl_composite *comp = hw_to_owl_comp(hw);
 +
-+		best_parent = (rate / fix_fact_hw->mul) * fix_fact_hw->div;
-+		*parent_rate = clk_hw_round_rate(clk_hw_get_parent(&common->hw),
-+							best_parent);
-+	}
-+
-+	return (*parent_rate / fix_fact_hw->div) * fix_fact_hw->mul;
++	return owl_divider_helper_round_rate(&comp->common, &comp->rate.div_hw,
++					rate, parent_rate);
 +}
 +
-+static long owl_fix_fact_round_rate(struct clk_hw *hw, unsigned long rate,
++static unsigned long owl_comp_div_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_divider_helper_recalc_rate(&comp->common, &comp->rate.div_hw,
++					parent_rate);
++}
++
++static int owl_comp_div_set_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_divider_helper_set_rate(&comp->common, &comp->rate.div_hw,
++					rate, parent_rate);
++}
++
++static long owl_comp_fact_round_rate(struct clk_hw *hw, unsigned long rate,
 +			unsigned long *parent_rate)
 +{
-+	struct owl_fix_fact *fix_fact = hw_to_owl_fix_fact(hw);
-+	struct owl_fix_fact_hw *fix_fact_hw = &fix_fact->fix_fact_hw;
++	struct owl_composite *comp = hw_to_owl_comp(hw);
 +
-+	return owl_fix_fact_helper_round_rate(&fix_fact->common, fix_fact_hw,
-+							rate, parent_rate);
++	return owl_factor_helper_round_rate(&comp->common,
++					&comp->rate.factor_hw,
++					rate, parent_rate);
 +}
 +
-+unsigned long owl_fix_fact_helper_recalc_rate(struct owl_clk_common *common,
-+			const struct owl_fix_fact_hw *fix_fact_hw,
++static unsigned long owl_comp_fact_recalc_rate(struct clk_hw *hw,
 +			unsigned long parent_rate)
 +{
-+	unsigned long long int rate;
++	struct owl_composite *comp = hw_to_owl_comp(hw);
 +
-+	rate = (unsigned long long int)parent_rate * fix_fact_hw->mul;
-+	do_div(rate, fix_fact_hw->div);
-+
-+	return (unsigned long)rate;
++	return owl_factor_helper_recalc_rate(&comp->common,
++					&comp->rate.factor_hw,
++					parent_rate);
 +}
 +
-+static unsigned long owl_fix_fact_recalc_rate(struct clk_hw *hw,
++static int owl_comp_fact_set_rate(struct clk_hw *hw, unsigned long rate,
 +			unsigned long parent_rate)
 +{
-+	struct owl_fix_fact *fix_fact = hw_to_owl_fix_fact(hw);
-+	struct owl_fix_fact_hw *fix_fact_hw = &fix_fact->fix_fact_hw;
++	struct owl_composite *comp = hw_to_owl_comp(hw);
 +
-+	return owl_fix_fact_helper_recalc_rate(&fix_fact->common, fix_fact_hw,
-+							parent_rate);
++	return owl_factor_helper_set_rate(&comp->common,
++					&comp->rate.factor_hw,
++					rate, parent_rate);
 +}
 +
-+static int owl_fix_fact_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
++static long owl_comp_fix_fact_round_rate(struct clk_hw *hw, unsigned long rate,
++			unsigned long *parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_fix_fact_helper_round_rate(&comp->common,
++					&comp->rate.fix_fact_hw,
++					rate, parent_rate);
++}
++
++static unsigned long owl_comp_fix_fact_recalc_rate(struct clk_hw *hw,
++			unsigned long parent_rate)
++{
++	struct owl_composite *comp = hw_to_owl_comp(hw);
++
++	return owl_fix_fact_helper_recalc_rate(&comp->common,
++					&comp->rate.fix_fact_hw,
++					parent_rate);
++}
++
++static int owl_comp_fix_fact_set_rate(struct clk_hw *hw, unsigned long rate,
++			unsigned long parent_rate)
 +{
 +	/*
 +	 * We must report success but we can do so unconditionally because
@@ -110,20 +178,71 @@ index 000000000000..f1281565129c
 +	return 0;
 +}
 +
-+const struct clk_ops owl_fix_fact_ops = {
-+	.round_rate	= owl_fix_fact_round_rate,
-+	.recalc_rate	= owl_fix_fact_recalc_rate,
-+	.set_rate	= owl_fix_fact_set_rate,
++const struct clk_ops owl_comp_div_ops = {
++	/* mux_ops */
++	.get_parent	= owl_comp_get_parent,
++	.set_parent	= owl_comp_set_parent,
++
++	/* gate_ops */
++	.disable	= owl_comp_disable,
++	.enable		= owl_comp_enable,
++	.is_enabled	= owl_comp_is_enabled,
++
++	/* div_ops */
++	.round_rate	= owl_comp_div_round_rate,
++	.recalc_rate	= owl_comp_div_recalc_rate,
++	.set_rate	= owl_comp_div_set_rate,
 +};
-diff --git a/drivers/clk/actions/owl-fixed-factor.h b/drivers/clk/actions/owl-fixed-factor.h
++
++
++const struct clk_ops owl_comp_fact_ops = {
++	/* mux_ops */
++	.get_parent	= owl_comp_get_parent,
++	.set_parent	= owl_comp_set_parent,
++
++	/* gate_ops */
++	.disable	= owl_comp_disable,
++	.enable		= owl_comp_enable,
++	.is_enabled	= owl_comp_is_enabled,
++
++	/* fact_ops */
++	.round_rate	= owl_comp_fact_round_rate,
++	.recalc_rate	= owl_comp_fact_recalc_rate,
++	.set_rate	= owl_comp_fact_set_rate,
++};
++
++const struct clk_ops owl_comp_fix_fact_ops = {
++	/* gate_ops */
++	.disable	= owl_comp_disable,
++	.enable		= owl_comp_enable,
++	.is_enabled	= owl_comp_is_enabled,
++
++	/* fix_fact_ops */
++	.round_rate	= owl_comp_fix_fact_round_rate,
++	.recalc_rate	= owl_comp_fix_fact_recalc_rate,
++	.set_rate	= owl_comp_fix_fact_set_rate,
++};
++
++
++const struct clk_ops owl_comp_pass_ops = {
++	/* mux_ops */
++	.get_parent	= owl_comp_get_parent,
++	.set_parent	= owl_comp_set_parent,
++
++	/* gate_ops */
++	.disable	= owl_comp_disable,
++	.enable		= owl_comp_enable,
++	.is_enabled	= owl_comp_is_enabled,
++};
+diff --git a/drivers/clk/actions/owl-composite.h b/drivers/clk/actions/owl-composite.h
 new file mode 100644
-index 000000000000..665dadef8738
+index 000000000000..0763ba1ce2ad
 --- /dev/null
-+++ b/drivers/clk/actions/owl-fixed-factor.h
-@@ -0,0 +1,62 @@
++++ b/drivers/clk/actions/owl-composite.h
+@@ -0,0 +1,118 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +//
-+// OWL fixed factor clock driver
++// OWL composite clock driver
 +//
 +// Copyright (c) 2014 Actions Semi Inc.
 +// Author: David Liu <liuwei@actions-semi.com>
@@ -131,57 +250,113 @@ index 000000000000..665dadef8738
 +// Copyright (c) 2018 Linaro Ltd.
 +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 +
-+#ifndef _OWL_FIXED_FACTOR_H_
-+#define _OWL_FIXED_FACTOR_H_
++#ifndef _OWL_COMPOSITE_H_
++#define _OWL_COMPOSITE_H_
 +
 +#include "owl-common.h"
++#include "owl-mux.h"
++#include "owl-gate.h"
++#include "owl-factor.h"
++#include "owl-fixed-factor.h"
++#include "owl-divider.h"
 +
-+struct owl_fix_fact_hw {
-+	unsigned int		mul;
-+	unsigned int		div;
++union owl_rate {
++	struct owl_divider_hw	div_hw;
++	struct owl_factor_hw	factor_hw;
++	struct owl_fix_fact_hw	fix_fact_hw;
 +};
 +
-+struct owl_fix_fact {
-+	struct owl_fix_fact_hw	fix_fact_hw;
++struct owl_composite {
++	struct owl_mux_hw	mux_hw;
++	struct owl_gate_hw	gate_hw;
++	union owl_rate		rate;
 +	struct owl_clk_common	common;
 +};
 +
-+#define OWL_FIX_FACT_HW(_mul, _div)					\
-+	{								\
-+		.mul		= _mul,					\
-+		.div		= _div,					\
-+	}
-+
-+#define OWL_FIX_FACT(_struct, _name, _parent, _mul, _div, _flags)	\
-+	struct owl_fix_fact _struct = {					\
-+		.fix_fact_hw = OWL_FIX_FACT_HW(_mul, _div),		\
++#define OWL_COMP_DIV(_struct, _name, _parent,				\
++		     _mux, _gate, _div, _flags)				\
++	struct owl_composite _struct = {				\
++		.mux_hw		= _mux,					\
++		.gate_hw	= _gate,				\
++		.rate.div_hw	= _div,					\
 +		.common = {						\
 +			.regmap		= NULL,				\
-+			.hw.init	= CLK_HW_INIT(_name,		\
-+						      _parent,		\
-+						      &owl_fix_fact_ops,\
-+						      _flags),		\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++						     _parent,		\
++						      &owl_comp_div_ops,\
++						     _flags),		\
 +		},							\
 +	}
 +
-+static inline struct owl_fix_fact *hw_to_owl_fix_fact(const struct clk_hw *hw)
++#define OWL_COMP_DIV_FIXED(_struct, _name, _parent,			\
++		     _gate, _div, _flags)				\
++	struct owl_composite _struct = {				\
++		.gate_hw	= _gate,				\
++		.rate.div_hw	= _div,					\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						     _parent,		\
++						      &owl_comp_div_ops,\
++						     _flags),		\
++		},							\
++	}
++
++#define OWL_COMP_FACTOR(_struct, _name, _parent,			\
++			_mux, _gate, _factor, _flags)			\
++	struct owl_composite _struct = {				\
++		.mux_hw		= _mux,					\
++		.gate_hw	= _gate,				\
++		.rate.factor_hw	= _factor,				\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++						     _parent,		\
++						     &owl_comp_fact_ops,\
++						     _flags),		\
++		},							\
++	}
++
++#define OWL_COMP_FIXED_FACTOR(_struct, _name, _parent,			\
++			_gate, _fix_fact, _flags)			\
++	struct owl_composite _struct = {				\
++		.gate_hw		= _gate,			\
++		.rate.fix_fact_hw	= _fix_fact,			\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						 _parent,		\
++						 &owl_comp_fix_fact_ops,\
++						 _flags),		\
++		},							\
++	}
++
++#define OWL_COMP_PASS(_struct, _name, _parent,				\
++		      _mux, _gate, _flags)				\
++	struct owl_composite _struct = {				\
++		.mux_hw		= _mux,					\
++		.gate_hw	= _gate,				\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++						     _parent,		\
++						     &owl_comp_pass_ops,\
++						     _flags),		\
++		},							\
++	}
++
++static inline struct owl_composite *hw_to_owl_comp(const struct clk_hw *hw)
 +{
 +	struct owl_clk_common *common = hw_to_owl_clk_common(hw);
 +
-+	return container_of(common, struct owl_fix_fact, common);
++	return container_of(common, struct owl_composite, common);
 +}
 +
-+long owl_fix_fact_helper_round_rate(struct owl_clk_common *common,
-+				const struct owl_fix_fact_hw *fix_fact_hw,
-+				unsigned long rate,
-+				unsigned long *parent_rate);
++extern const struct clk_ops owl_comp_div_ops;
++extern const struct clk_ops owl_comp_fact_ops;
++extern const struct clk_ops owl_comp_fix_fact_ops;
++extern const struct clk_ops owl_comp_pass_ops;
 +
-+unsigned long owl_fix_fact_helper_recalc_rate(struct owl_clk_common *common,
-+				const struct owl_fix_fact_hw *fix_fact_hw,
-+				unsigned long parent_rate);
-+
-+extern const struct clk_ops owl_fix_fact_ops;
-+
-+#endif /* _OWL_FIXED_FACTOR_H_ */
++#endif /* _OWL_COMPOSITE_H_ */
 -- 
 2.14.1
