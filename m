@@ -1,89 +1,30 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 17 Mar 2018 18:19:51 +0000
-Subject: [RFC PATCH] iio: adc: Add Xilinx AMS driver
-In-Reply-To: <20180316201925.GA18013@himanshu-Vostro-3559>
-References: <1521124947-18950-1-git-send-email-mnarani@xilinx.com>
- <20180316201925.GA18013@himanshu-Vostro-3559>
-Message-ID: <20180317181936.14468be2@archlinux>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 17 Mar 2018 15:27:23 -0300
+Subject: [PATCH 2/2] regulator: pfuze100: update voltage setting for
+ pfuze3000 sw1a
+In-Reply-To: <1937778373.476574.1521290144753@email.1und1.de>
+References: <1521269828-8874-1-git-send-email-Anson.Huang@nxp.com>
+ <1521269828-8874-2-git-send-email-Anson.Huang@nxp.com>
+ <1937778373.476574.1521290144753@email.1und1.de>
+Message-ID: <CAOMZO5CUD373oZsnE69kEwj0oXLSQTMeb5k2YK6H5gPY7QyZPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 17 Mar 2018 01:49:25 +0530
-Himanshu Jha <himanshujha199640@gmail.com> wrote:
+Hi Stefan,
 
-> On Thu, Mar 15, 2018 at 08:12:27PM +0530, Manish Narani wrote:
-> > The AMS includes an ADC as well as on-chip sensors that can be used to
-> > sample external voltages and monitor on-die operating conditions, such as
-> > temperature and supply voltage levels. The AMS has two SYSMON blocks.
-> > PL-SYSMON block is capable of monitoring off chip voltage and temperature.
-> > PL-SYSMON block has DRP, JTAG and I2C interface to enable monitoring from
-> > external master. Out of these interface currently only DRP is supported.
-> > Other block PS-SYSMON is memory mapped to PS.
-> > 
-> > The AMS can use internal channels to monitor voltage and temperature
-> > as well as one primary and up to 16 auxiliary channels for measuring
-> > external voltages.
-> > 
-> > The voltage and temperature monitoring channels also have event
-> > capability which allows to generate an interrupt when their value
-> > falls below or raises above a set threshold.
-> > 
-> > Signed-off-by: Manish Narani <mnarani@xilinx.com>
-> > ---  
-> 
-> [..]
-> 
-> > +static const struct of_device_id ams_of_match_table[] = {
-> > +       { .compatible = "xlnx,zynqmp-ams", &ams_pl_apb },
-> > +       { }
-> > +};
-> > +MODULE_DEVICE_TABLE(of, ams_of_match_table);  
-> 
-> [..]
-> 
-> > +static int ams_probe(struct platform_device *pdev)
-> > +{
-> > +       struct iio_dev *indio_dev;
-> > +       struct ams *ams;
-> > +       struct resource *res;
-> > +       const struct of_device_id *id;
-> > +       int ret;
-> > +
-> > +       if (!pdev->dev.of_node)
-> > +               return -ENODEV;
-> > +
-> > +       id = of_match_node(ams_of_match_table, pdev->dev.of_node);
-> > +       if (!id)
-> > +               return -ENODEV;  
-> 
-> Is the above check required ?
-> 
-> Isn't the probe function called if and only if a match is found in
-> ams_of_match_table[] since it is a pure OF driver ?
-> 
-> And therefore the above condition would never happen!
-Agreed in principle.  However, from a reviewer point of view, it is sometimes
-easier to have an error check that can never happen than have to check whether
-or not it can.  Hence I'd keep this in place (well actually not because there
-are better ways of doing this block of code, but that is unconnected to your
-comment Himanshu!)
+On Sat, Mar 17, 2018 at 9:35 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi Anson,
+>
+>> Anson Huang <Anson.Huang@nxp.com> hat am 17. M?rz 2018 um 07:57 geschrieben:
+>>
+>>
+>> Latest pfuze3000 datasheet from:
+>>
+>> http://cache.freescale.com/files/analog/doc/data_sheet/PF3000.pdf?fsrch=1&sr=1&pageNum=1
+>
+> this link goes to Rev. 7.0, 9/2016, which isn't the latest one.
+>
+> I guess Rev. 9.0, 8/2017 is the latest.
 
-Was a good point to raise though and sometimes people add comments
-saying "This can never fail but is here for completeness" or similar.
-Not necessary but does avoid reviewers then asking why it was done.
-
-Jonathan
-
-> 
-> > +static struct platform_driver ams_driver = {
-> > +       .probe = ams_probe,
-> > +       .remove = ams_remove,
-> > +       .driver = {
-> > +               .name = "ams",
-> > +               .pm     = &ams_pm_ops,
-> > +               .of_match_table = ams_of_match_table,
-> > +       },
-> > +};
-> > +module_platform_driver(ams_driver);  
-> 
-> 
+You are right. This is the link to the latest datasheet:
+https://www.nxp.com/docs/en/data-sheet/PF3000.pdf
