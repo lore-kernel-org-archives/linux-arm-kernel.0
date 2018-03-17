@@ -1,118 +1,183 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Mar 2018 17:28:53 +0800
-Subject: [PATCH net-next 08/12] net: stmmac: dwmac-sun8i: Support different
- ranges for TX/RX delay chains
+Date: Sat, 17 Mar 2018 17:28:51 +0800
+Subject: [PATCH net-next 06/12] net: stmmac: dwmac-sun8i: Use regmap_field for
+ syscon register access
 In-Reply-To: <20180317092857.4396-1-wens@csie.org>
 References: <20180317092857.4396-1-wens@csie.org>
-Message-ID: <20180317092857.4396-9-wens@csie.org>
+Message-ID: <20180317092857.4396-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the R40 SoC, the RX delay chain only has a range of 0~7 (hundred
-picoseconds), instead of 0~31. Also the TX delay chain is completely
-absent.
+On the Allwinner R40, the "GMAC clock" register is located in the CCU
+block, at a different register address than the other SoCs that have
+it in the "system control" block.
 
-This patch adds support for different ranges by adding per-compatible
-maximum values in the variant data. A maximum of 0 indicates that the
-delay chain is not supported or absent.
+This patch converts the use of regmap to regmap_field for mapping and
+accessing the syscon register, so we can have the register address in
+the variants data, and not in the actual register manipulation code.
+
+This patch only converts regmap_read() and regmap_write() calls to
+regmap_field_read() and regmap_field_write() calls. There are some
+places where it might make sense to switch to regmap_field_update_bits(),
+but this is not done here to keep the patch simple.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 32 ++++++++++++++++-------
- 1 file changed, 23 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 42 +++++++++++++++++------
+ 1 file changed, 31 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index a51175bcfd11..08d263567a52 100644
+index a3fa65b1ca8e..de93f0faf58d 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -50,6 +50,12 @@
+@@ -42,6 +42,7 @@
+  *				This value is used for disabling properly EMAC
+  *				and used as a good starting value in case of the
+  *				boot process(uboot) leave some stuff.
++ * @syscon_field		reg_field for the syscon's gmac register
+  * @soc_has_internal_phy:	Does the MAC embed an internal PHY
   * @support_mii:		Does the MAC handle MII
   * @support_rmii:		Does the MAC handle RMII
-  * @support_rgmii:		Does the MAC handle RGMII
-+ *
-+ * @rx_delay_max:		Maximum raw value for RX delay chain
-+ * @tx_delay_max:		Maximum raw value for TX delay chain
-+ *				These two also indicate the bitmask for
-+ *				the RX and TX delay chain registers. A
-+ *				value of zero indicates this is not supported.
+@@ -49,6 +50,7 @@
   */
  struct emac_variant {
  	u32 default_syscon_value;
-@@ -59,6 +65,8 @@ struct emac_variant {
++	const struct reg_field *syscon_field;
+ 	bool soc_has_internal_phy;
  	bool support_mii;
  	bool support_rmii;
- 	bool support_rgmii;
-+	u8 rx_delay_max;
-+	u8 tx_delay_max;
+@@ -71,13 +73,21 @@ struct sunxi_priv_data {
+ 	struct regulator *regulator;
+ 	struct reset_control *rst_ephy;
+ 	const struct emac_variant *variant;
+-	struct regmap *regmap;
++	struct regmap_field *regmap_field;
+ 	bool internal_phy_powered;
+ 	void *mux_handle;
  };
  
- /* struct sunxi_priv_data - hold all sunxi private data
-@@ -95,7 +103,9 @@ static const struct emac_variant emac_variant_h3 = {
++/* EMAC clock register @ 0x30 in the "system control" address range */
++const struct reg_field sun8i_syscon_reg_field = {
++	.reg = 0x30,
++	.lsb = 0,
++	.msb = 31,
++};
++
+ static const struct emac_variant emac_variant_h3 = {
+ 	.default_syscon_value = 0x58000,
++	.syscon_field = &sun8i_syscon_reg_field,
  	.soc_has_internal_phy = true,
  	.support_mii = true,
  	.support_rmii = true,
--	.support_rgmii = true
-+	.support_rgmii = true,
-+	.rx_delay_max = 31,
-+	.tx_delay_max = 7,
- };
+@@ -86,12 +96,14 @@ static const struct emac_variant emac_variant_h3 = {
  
  static const struct emac_variant emac_variant_v3s = {
-@@ -110,7 +120,9 @@ static const struct emac_variant emac_variant_a83t = {
- 	.syscon_field = &sun8i_syscon_reg_field,
- 	.soc_has_internal_phy = false,
- 	.support_mii = true,
--	.support_rgmii = true
-+	.support_rgmii = true,
-+	.rx_delay_max = 31,
-+	.tx_delay_max = 7,
+ 	.default_syscon_value = 0x38000,
++	.syscon_field = &sun8i_syscon_reg_field,
+ 	.soc_has_internal_phy = true,
+ 	.support_mii = true
  };
  
+ static const struct emac_variant emac_variant_a83t = {
+ 	.default_syscon_value = 0,
++	.syscon_field = &sun8i_syscon_reg_field,
+ 	.soc_has_internal_phy = false,
+ 	.support_mii = true,
+ 	.support_rgmii = true
+@@ -99,6 +111,7 @@ static const struct emac_variant emac_variant_a83t = {
+ 
  static const struct emac_variant emac_variant_a64 = {
-@@ -119,7 +131,9 @@ static const struct emac_variant emac_variant_a64 = {
+ 	.default_syscon_value = 0,
++	.syscon_field = &sun8i_syscon_reg_field,
  	.soc_has_internal_phy = false,
  	.support_mii = true,
  	.support_rmii = true,
--	.support_rgmii = true
-+	.support_rgmii = true,
-+	.rx_delay_max = 31,
-+	.tx_delay_max = 7,
- };
+@@ -216,7 +229,6 @@ static const struct emac_variant emac_variant_a64 = {
+ #define SYSCON_ETCS_MII		0x0
+ #define SYSCON_ETCS_EXT_GMII	0x1
+ #define SYSCON_ETCS_INT_GMII	0x2
+-#define SYSCON_EMAC_REG		0x30
  
- #define EMAC_BASIC_CTL0 0x00
-@@ -223,9 +237,7 @@ static const struct emac_variant emac_variant_a64 = {
- #define SYSCON_RMII_EN		BIT(13) /* 1: enable RMII (overrides EPIT) */
+ /* sun8i_dwmac_dma_reset() - reset the EMAC
+  * Called from stmmac via stmmac_dma_ops->reset
+@@ -745,7 +757,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
+ 	bool need_power_ephy = false;
  
- /* Generic system control EMAC_CLK bits */
--#define SYSCON_ETXDC_MASK		GENMASK(2, 0)
- #define SYSCON_ETXDC_SHIFT		10
--#define SYSCON_ERXDC_MASK		GENMASK(4, 0)
- #define SYSCON_ERXDC_SHIFT		5
- /* EMAC PHY Interface Type */
- #define SYSCON_EPIT			BIT(2) /* 1: RGMII, 0: MII */
-@@ -851,8 +863,9 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+ 	if (current_child ^ desired_child) {
+-		regmap_read(gmac->regmap, SYSCON_EMAC_REG, &reg);
++		regmap_field_read(gmac->regmap_field, &reg);
+ 		switch (desired_child) {
+ 		case DWMAC_SUN8I_MDIO_MUX_INTERNAL_ID:
+ 			dev_info(priv->device, "Switch mux to internal PHY");
+@@ -763,7 +775,7 @@ static int mdio_mux_syscon_switch_fn(int current_child, int desired_child,
+ 				desired_child);
+ 			return -EINVAL;
  		}
- 		val /= 100;
- 		dev_dbg(priv->device, "set tx-delay to %x\n", val);
--		if (val <= SYSCON_ETXDC_MASK) {
--			reg &= ~(SYSCON_ETXDC_MASK << SYSCON_ETXDC_SHIFT);
-+		if (val <= gmac->variant->tx_delay_max) {
-+			reg &= ~(gmac->variant->tx_delay_max <<
-+				 SYSCON_ETXDC_SHIFT);
- 			reg |= (val << SYSCON_ETXDC_SHIFT);
- 		} else {
- 			dev_err(priv->device, "Invalid TX clock delay: %d\n",
-@@ -868,8 +881,9 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 		}
- 		val /= 100;
- 		dev_dbg(priv->device, "set rx-delay to %x\n", val);
--		if (val <= SYSCON_ERXDC_MASK) {
--			reg &= ~(SYSCON_ERXDC_MASK << SYSCON_ERXDC_SHIFT);
-+		if (val <= gmac->variant->rx_delay_max) {
-+			reg &= ~(gmac->variant->rx_delay_max <<
-+				 SYSCON_ERXDC_SHIFT);
- 			reg |= (val << SYSCON_ERXDC_SHIFT);
- 		} else {
- 			dev_err(priv->device, "Invalid RX clock delay: %d\n",
+-		regmap_write(gmac->regmap, SYSCON_EMAC_REG, val);
++		regmap_field_write(gmac->regmap_field, val);
+ 		if (need_power_ephy) {
+ 			ret = sun8i_dwmac_power_internal_phy(priv);
+ 			if (ret)
+@@ -801,7 +813,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+ 	int ret;
+ 	u32 reg, val;
+ 
+-	regmap_read(gmac->regmap, SYSCON_EMAC_REG, &val);
++	regmap_field_read(gmac->regmap_field, &val);
+ 	reg = gmac->variant->default_syscon_value;
+ 	if (reg != val)
+ 		dev_warn(priv->device,
+@@ -883,7 +895,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+ 		return -EINVAL;
+ 	}
+ 
+-	regmap_write(gmac->regmap, SYSCON_EMAC_REG, reg);
++	regmap_field_write(gmac->regmap_field, reg);
+ 
+ 	return 0;
+ }
+@@ -892,7 +904,7 @@ static void sun8i_dwmac_unset_syscon(struct sunxi_priv_data *gmac)
+ {
+ 	u32 reg = gmac->variant->default_syscon_value;
+ 
+-	regmap_write(gmac->regmap, SYSCON_EMAC_REG, reg);
++	regmap_field_write(gmac->regmap_field, reg);
+ }
+ 
+ static void sun8i_dwmac_exit(struct platform_device *pdev, void *priv)
+@@ -980,6 +992,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
+ 	int ret;
+ 	struct stmmac_priv *priv;
+ 	struct net_device *ndev;
++	struct regmap *regmap;
+ 
+ 	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
+ 	if (ret)
+@@ -1014,14 +1027,21 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
+ 		gmac->regulator = NULL;
+ 	}
+ 
+-	gmac->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+-						       "syscon");
+-	if (IS_ERR(gmac->regmap)) {
+-		ret = PTR_ERR(gmac->regmap);
++	regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "syscon");
++	if (IS_ERR(regmap)) {
++		ret = PTR_ERR(regmap);
+ 		dev_err(&pdev->dev, "Unable to map syscon: %d\n", ret);
+ 		return ret;
+ 	}
+ 
++	gmac->regmap_field = devm_regmap_field_alloc(dev, regmap,
++						     *gmac->variant->syscon_field);
++	if (IS_ERR(gmac->regmap_field)) {
++		ret = PTR_ERR(gmac->regmap_field);
++		dev_err(dev, "Unable to map syscon register: %d\n", ret);
++		return ret;
++	}
++
+ 	plat_dat->interface = of_get_phy_mode(dev->of_node);
+ 
+ 	/* platform data specifying hardware features and callbacks.
 -- 
 2.16.2
