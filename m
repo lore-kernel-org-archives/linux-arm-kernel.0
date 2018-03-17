@@ -1,55 +1,76 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Mar 2018 17:28:50 +0800
-Subject: [PATCH net-next 05/12] dt-bindings: net: dwmac-sun8i: Add binding for
- GMAC on Allwinner R40 SoC
+Date: Sat, 17 Mar 2018 17:28:56 +0800
+Subject: [PATCH net-next 11/12] ARM: dts: sun8i: r40: Add device node and
+ RGMII pinmux node for GMAC
 In-Reply-To: <20180317092857.4396-1-wens@csie.org>
 References: <20180317092857.4396-1-wens@csie.org>
-Message-ID: <20180317092857.4396-6-wens@csie.org>
+Message-ID: <20180317092857.4396-12-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner R40 SoC has the EMAC controller supported by dwmac-sun8i.
-It is named "GMAC", while EMAC refers to the 10/100 Mbps Ethernet
-controller supported by sun4i-emac. The controller is the same, but
-the R40 has the glue layer controls in the clock control unit (CCU),
-with a reduced RX delay chain, and no TX delay chain.
+The R40 SoC has a GMAC (gigabit capable Ethernet controller). Add a
+device node for it. The only publicly available board for this SoC
+uses an RGMII PHY. Add a pinmux node for it as well.
 
-This patch adds the R40 specific bits to the dwmac-sun8i binding.
+Since this SoC also has an old 10/100 Mbps EMAC, which also has an
+MDIO bus controller, the MDIO bus for the GMAC is labeled "gmac_mdio".
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-index 74b3ef79e57a..fe4a48a1eb50 100644
---- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-+++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-@@ -7,6 +7,7 @@ Required properties:
- - compatible: must be one of the following string:
- 		"allwinner,sun8i-a83t-emac"
- 		"allwinner,sun8i-h3-emac"
-+		"allwinner,sun8i-r40-gmac"
- 		"allwinner,sun8i-v3s-emac"
- 		"allwinner,sun50i-a64-emac"
- - reg: address and length of the register for the device.
-@@ -24,14 +25,17 @@ Required properties:
-  compatible string:
-   - allwinner,sun8i-a83t-system-controller
-   - allwinner,sun8i-h3-system-controller
-+  - allwinner,sun8i-r40-ccu
-   - allwinner,sun8i-v3s-system-controller
-   - allwinner,sun50i-a64-system-controller
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index 173dcc1652d2..bd97ca3dc2fa 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -265,6 +265,19 @@
+ 			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
- Optional properties:
- - allwinner,tx-delay-ps: TX clock delay chain value in ps.
- 			 Range is 0-700. Default is 0.
-+			 Unavailable for allwinner,sun8i-r40-gmac
- - allwinner,rx-delay-ps: RX clock delay chain value in ps.
- 			 Range is 0-3100. Default is 0.
-+			 Range is 0-700 for allwinner,sun8i-r40-gmac
- Both delay properties need to be a multiple of 100. They control the
- clock delay for external RGMII PHY. They are do apply to the internal
- PHY or external non-RGMII PHYs.
++			gmac_rgmii_pins: gmac-rgmii-pins {
++				pins = "PA0", "PA1", "PA2", "PA3",
++				       "PA4", "PA5", "PA6", "PA7",
++				       "PA8", "PA10", "PA11", "PA12",
++				       "PA13", "PA15", "PA16";
++				function = "gmac";
++				/*
++				 * data lines in RGMII mode use DDR mode
++				 * and need a higher signal drive strength
++				 */
++				drive-strength = <40>;
++			};
++
+ 			i2c0_pins: i2c0-pins {
+ 				pins = "PB0", "PB1";
+ 				function = "i2c0";
+@@ -451,6 +464,27 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		gmac: ethernet at 1c50000 {
++			compatible = "allwinner,sun8i-r40-gmac";
++			syscon = <&ccu>;
++			reg = <0x01c50000 0x10000>;
++			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "macirq";
++			resets = <&ccu RST_BUS_GMAC>;
++			reset-names = "stmmaceth";
++			clocks = <&ccu CLK_BUS_GMAC>;
++			clock-names = "stmmaceth";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			gmac_mdio: mdio {
++				compatible = "snps,dwmac-mdio";
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.16.2
