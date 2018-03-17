@@ -1,50 +1,37 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 17 Mar 2018 14:13:55 +0800
-Subject: [PATCH] ARM: dts: stm32: Enable stm32mp1 clock driver on
- stm32mp157c
-In-Reply-To: <1521098327-13958-1-git-send-email-gabriel.fernandez@st.com>
-References: <1521098327-13958-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <201803171420.CjlcN0Pg%fengguang.wu@intel.com>
+From: marcus.folkesson@gmail.com (Marcus Folkesson)
+Date: Sat, 17 Mar 2018 09:37:03 +0100
+Subject: [PATCH v3 1/7] watchdog: sama5d4: make use of timeout-secs
+ provided in devicetree
+In-Reply-To: <f3d913af-a396-ccdf-105f-c4e64397cbff@roeck-us.net>
+References: <20180211200847.25000-1-marcus.folkesson@gmail.com>
+ <20180316133703.GA31029@gmail.com>
+ <f3d913af-a396-ccdf-105f-c4e64397cbff@roeck-us.net>
+Message-ID: <20180317083646.GA927@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+On Fri, Mar 16, 2018 at 06:56:27PM -0700, Guenter Roeck wrote:
+> On 03/16/2018 06:37 AM, Marcus Folkesson wrote:
+> > Hi,
+> > 
+> > Am I supposed to do something more to make this patchset picked up?
+> > 
+> 
+> Did you check linux-next ?
 
-Thank you for the patch! Yet something to improve:
+:-)
 
-[auto build test ERROR on next-20180309]
-[cannot apply to v4.16-rc4 v4.16-rc3 v4.16-rc2 v4.16-rc5]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thank you
 
-url:    https://github.com/0day-ci/linux/commits/gabriel-fernandez-st-com/ARM-dts-stm32-Enable-stm32mp1-clock-driver-on-stm32mp157c/20180317-102206
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+/Marcus
 
-All errors (new ones prefixed by >>):
-
-   In file included from arch/arm/boot/dts/stm32mp157c-ed1.dts:8:0:
->> arch/arm/boot/dts/stm32mp157c.dtsi:7:10: fatal error: dt-bindings/clock/stm32mp1-clks.h: No such file or directory
-    #include <dt-bindings/clock/stm32mp1-clks.h>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   compilation terminated.
-
-vim +7 arch/arm/boot/dts/stm32mp157c.dtsi
-
-   > 7	#include <dt-bindings/clock/stm32mp1-clks.h>
-     8	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
+> Guenter
+> 
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23072 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180317/44ebd997/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180317/8f662ce2/attachment.sig>
