@@ -1,110 +1,55 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 17 Mar 2018 17:28:55 +0800
-Subject: [PATCH net-next 10/12] ARM: dts: sun8i: r40: bananapi-m2-ultra: Sort
- device node dereferences
+Date: Sat, 17 Mar 2018 17:28:50 +0800
+Subject: [PATCH net-next 05/12] dt-bindings: net: dwmac-sun8i: Add binding for
+ GMAC on Allwinner R40 SoC
 In-Reply-To: <20180317092857.4396-1-wens@csie.org>
 References: <20180317092857.4396-1-wens@csie.org>
-Message-ID: <20180317092857.4396-11-wens@csie.org>
+Message-ID: <20180317092857.4396-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device nodes dereference (&foo) usages should be sorted by the label
-names, barring any parsing order issues such as the #include statement
-for the PMIC's .dtsi file that must come after the PMIC.
+The Allwinner R40 SoC has the EMAC controller supported by dwmac-sun8i.
+It is named "GMAC", while EMAC refers to the 10/100 Mbps Ethernet
+controller supported by sun4i-emac. The controller is the same, but
+the R40 has the glue layer controls in the clock control unit (CCU),
+with a reduced RX delay chain, and no TX delay chain.
 
-Move the mmc and ohci blocks in front of the PMIC's regulator blocks.
+This patch adds the R40 specific bits to the dwmac-sun8i binding.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 69 ++++++++++++-----------
- 1 file changed, 35 insertions(+), 34 deletions(-)
+ Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index 27d9ccd0ef2f..c6da21e43572 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -114,6 +114,41 @@
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+index 74b3ef79e57a..fe4a48a1eb50 100644
+--- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -7,6 +7,7 @@ Required properties:
+ - compatible: must be one of the following string:
+ 		"allwinner,sun8i-a83t-emac"
+ 		"allwinner,sun8i-h3-emac"
++		"allwinner,sun8i-r40-gmac"
+ 		"allwinner,sun8i-v3s-emac"
+ 		"allwinner,sun50i-a64-emac"
+ - reg: address and length of the register for the device.
+@@ -24,14 +25,17 @@ Required properties:
+  compatible string:
+   - allwinner,sun8i-a83t-system-controller
+   - allwinner,sun8i-h3-system-controller
++  - allwinner,sun8i-r40-ccu
+   - allwinner,sun8i-v3s-system-controller
+   - allwinner,sun50i-a64-system-controller
  
- #include "axp22x.dtsi"
- 
-+&mmc0 {
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 13 GPIO_ACTIVE_HIGH>; /* PH13 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pg_pins>;
-+	vmmc-supply = <&reg_dldo2>;
-+	vqmmc-supply = <&reg_dldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	vmmc-supply = <&reg_dcdc1>;
-+	vqmmc-supply = <&reg_dcdc1>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
- &reg_aldo3 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <2700000>;
-@@ -161,40 +196,6 @@
- 	regulator-name = "vcc-wifi";
- };
- 
--&mmc0 {
--	vmmc-supply = <&reg_dcdc1>;
--	bus-width = <4>;
--	cd-gpios = <&pio 7 13 GPIO_ACTIVE_LOW>; /* PH13 */
--	status = "okay";
--};
--
--&mmc1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pg_pins>;
--	vmmc-supply = <&reg_dldo2>;
--	vqmmc-supply = <&reg_dldo1>;
--	mmc-pwrseq = <&wifi_pwrseq>;
--	bus-width = <4>;
--	non-removable;
--	status = "okay";
--};
--
--&mmc2 {
--	vmmc-supply = <&reg_dcdc1>;
--	vqmmc-supply = <&reg_dcdc1>;
--	bus-width = <8>;
--	non-removable;
--	status = "okay";
--};
--
--&ohci1 {
--	status = "okay";
--};
--
--&ohci2 {
--	status = "okay";
--};
--
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+ Optional properties:
+ - allwinner,tx-delay-ps: TX clock delay chain value in ps.
+ 			 Range is 0-700. Default is 0.
++			 Unavailable for allwinner,sun8i-r40-gmac
+ - allwinner,rx-delay-ps: RX clock delay chain value in ps.
+ 			 Range is 0-3100. Default is 0.
++			 Range is 0-700 for allwinner,sun8i-r40-gmac
+ Both delay properties need to be a multiple of 100. They control the
+ clock delay for external RGMII PHY. They are do apply to the internal
+ PHY or external non-RGMII PHYs.
 -- 
 2.16.2
