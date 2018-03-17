@@ -1,66 +1,223 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 17 Mar 2018 17:00:21 +0100
-Subject: [PATCH v5 07/36] drm/bridge: analogix_dp: Move enable video into
- config_video()
-In-Reply-To: <79009f48-d677-ccc0-4d61-3b379d8448a8@codeaurora.org>
-References: <20180309222327.18689-1-enric.balletbo@collabora.com>
- <20180309222327.18689-8-enric.balletbo@collabora.com>
- <79009f48-d677-ccc0-4d61-3b379d8448a8@codeaurora.org>
-Message-ID: <1685480.Fci6377Q9J@phil>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sat, 17 Mar 2018 11:11:06 -0500
+Subject: [PATCH v2] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
+ observed before enabling
+In-Reply-To: <20180317133445.772733ac@why.wild-wind.fr.eu.org>
+References: <1521124287-25009-1-git-send-email-shankerd@codeaurora.org>
+ <20180317133445.772733ac@why.wild-wind.fr.eu.org>
+Message-ID: <dccddaa7-6331-961d-a77f-15dc15cd8850@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Archit,
+Hi Marc,
 
-Am Mittwoch, 14. M?rz 2018, 06:59:59 CET schrieb Archit Taneja:
-> On Saturday 10 March 2018 03:52 AM, Enric Balletbo i Serra wrote:
-> > From: Lin Huang <hl@rock-chips.com>
-> > 
-> > We need to enable video before analogix_dp_is_video_stream_on(), so
-> > we can get the right video stream status.
-> > 
-> > Cc: ?? ? <wzz@rock-chips.com>
-> > Cc: St?phane Marchesin <marcheu@chromium.org>
-> > Signed-off-by: Lin Huang <hl@rock-chips.com>
-> > Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> > Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-> > Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> > 
-> >   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 11 +++++------
-> >   1 file changed, 5 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> > index 5a2e35dc41e3..f9661b410cb9 100644
-> > --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> > +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-> > @@ -819,11 +819,10 @@ static int analogix_dp_config_video(struct analogix_dp_device *dp)
-> >   		if (analogix_dp_is_slave_video_stream_clock_on(dp) == 0)
-> >   			break;
-> >   		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
-> > -			dev_err(dp->dev, "Timeout of video streamclk ok\n");
-> > +			dev_err(dp->dev, "Timeout of slave video streamclk ok\n");
-> >   			return -ETIMEDOUT;
-> >   		}
-> > -
-> > -		usleep_range(1, 2);
-> > +		usleep_range(1000, 1001);
+On 03/17/2018 08:34 AM, Marc Zyngier wrote:
+> On Thu, 15 Mar 2018 09:31:27 -0500
+> Shanker Donthineni <shankerd@codeaurora.org> wrote:
 > 
-> Could we briefly explain in the commit message why we need to increase
-> the delay in the timeout loop? Is it a consequence of calling
-> analogix_dp_start_video() earlier, or is this the preferred time
-> mentioned in the specs?
+>> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
+>> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
+>> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
+>> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
+>> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
+>>
+>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>> ---
+>> Changes since v1:
+>>   -Moved LPI disable code to a seperate function as Marc suggested.
+>>   -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
+>>   
+>>  drivers/irqchip/irq-gic-v3-its.c   | 66 ++++++++++++++++++++++++++++++--------
+>>  include/linux/irqchip/arm-gic-v3.h |  1 +
+>>  2 files changed, 53 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index 1d3056f..cba71a7 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -33,6 +33,8 @@
+>>  #include <linux/of_platform.h>
+>>  #include <linux/percpu.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/time64.h>
+>> +#include <linux/iopoll.h>
+>>  
+>>  #include <linux/irqchip.h>
+>>  #include <linux/irqchip/arm-gic-v3.h>
+>> @@ -1875,16 +1877,6 @@ static void its_cpu_init_lpis(void)
+>>  		gic_data_rdist()->pend_page = pend_page;
+>>  	}
+>>  
+>> -	/* Disable LPIs */
+>> -	val = readl_relaxed(rbase + GICR_CTLR);
+>> -	val &= ~GICR_CTLR_ENABLE_LPIS;
+>> -	writel_relaxed(val, rbase + GICR_CTLR);
+>> -
+>> -	/*
+>> -	 * Make sure any change to the table is observable by the GIC.
+>> -	 */
+>> -	dsb(sy);
+>> -
+>>  	/* set PROPBASE */
+>>  	val = (page_to_phys(gic_rdists->prop_page) |
+>>  	       GICR_PROPBASER_InnerShareable |
+>> @@ -3288,13 +3280,59 @@ static bool gic_rdists_supports_plpis(void)
+>>  	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
+>>  }
+>>  
+>> +static int redist_disable_lpis(void)
+>> +{
+>> +	void __iomem *rbase = gic_data_rdist_rd_base();
+>> +	u64 val;
+>> +	int ret;
+>> +
+>> +	if (!gic_rdists_supports_plpis()) {
+>> +		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	val = readl_relaxed(rbase + GICR_CTLR);
+>> +	if (!(val & GICR_CTLR_ENABLE_LPIS))
+>> +		return 0;
+>> +
+>> +	/* Disable LPIs */
+>> +	val &= ~GICR_CTLR_ENABLE_LPIS;
+>> +	writel_relaxed(val, rbase + GICR_CTLR);
+>> +
+>> +	/* Make sure any change to GICR_CTLR is observable by the GIC */
+>> +	dsb(sy);
+>> +
+>> +	/* Wait for GICR_CTLR.GICR_CTLR_ENABLE_LPIS==0 or timeout */
+>> +	ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
+>> +					 !(val & GICR_CTLR_ENABLE_LPIS), 1,
+>> +					 USEC_PER_SEC);
+> 
+> Why do you need to poll on EnableLPIs? It is supposed to be immediately
+> written. It seems to me that the sequence should be:
+> 
 
-I asked Lin, the original author of this patch, response quoted below:
+Agree we don't need to poll EnableLPIs here. I'll remove.
 
-"There is random "Timeout of video streamclk ok" message happen when 
-debug edp panel,
-So we extend this time,  this time do not define in the spec."
+> - Check EnableLPis
+> - If set to 1, scream about bootloader being braindead
+> - Write EnableLPIs to 0
+> - Read back EnableLpis:
+> - If still set 1, bail out, we're doomed. Scream about the HW being
+>   braindead
+> - Poll RWP
+> - If timeout, bail out, the HW has locked up. Scream again.
+> 
+> I think this should cover the whole thing. An alternative would be to
+> place the poll between the write and read-back, but that doesn't change
+> anything.
+> 
 
-So it looks like it was working by chance before and this move triggered
-some sort of timing issue.
+I'll prefer your second approach. Please comment on the below change before
+I post v3.
 
+static int redist_disable_lpis(void)
+{
+        void __iomem *rbase = gic_data_rdist_rd_base();
+        u64 val;
+        int ret;
 
-Heiko
+        if (!gic_rdists_supports_plpis()) {
+                pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+                return -ENXIO;
+        }
+
+        if (!(readl(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS))
+                return 0;
+
+        pr_warn("CPU%d: Trying to disable LPIs\n", smp_processor_id());
+        val &= ~GICR_CTLR_ENABLE_LPIS;
+        writel_relaxed(val, rbase + GICR_CTLR);
+
+        /* Make sure any change to GICR_CTLR is observable by the GIC */
+        dsb(sy);
+
+        /**
+         * Software must observe RWP==0 after clearing GICR_CTLR.EnableLPIs
+         * from 1 to 0 before programming GICR_PEND{PROP}BASER registers.
+         * Bail out the driver probe() in case of timeout.
+         */
+        ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
+                                                !(val & GICR_CTLR_RWP), 1,
+                                                USEC_PER_SEC);
+        if (ret) {
+                pr_err("CPU%d: EnableLPIs not observed\n", smp_processor_id());
+                return ret;
+        }
+ 
+        /**
+         * After it has been written to 1, it is IMPLEMENTATION DEFINED whether
+         * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to 0.
+         * Bail out the driver probe() on systems where it's RES1.
+         */
+        if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
+                pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
+                return -EPERM;
+        }
+
+        return 0;
+}
+ 
+>> +	if (ret) {
+>> +		pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
+>> +		return -EBUSY;
+>> +	}
+>> +
+>> +	/* Wait for GICR_CTLR.RWP==0 or timeout */
+>> +	ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
+>> +					 !(val & GICR_CTLR_RWP), 1,
+>> +					 USEC_PER_SEC);
+>> +	if (ret) {
+>> +		pr_err("CPU%d: Failed to observe RWP==0 after enabling LPIs\n",
+>> +		       smp_processor_id());
+>> +		return -EBUSY;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  int its_cpu_init(void)
+>>  {
+>> +	int ret;
+>> +
+>>  	if (!list_empty(&its_nodes)) {
+> 
+> nit: move 'ret' here.
+> 
+>> -		if (!gic_rdists_supports_plpis()) {
+>> -			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+>> -			return -ENXIO;
+>> -		}
+>> +		ret = redist_disable_lpis();
+>> +		if (ret)
+>> +			return ret;
+>> +
+>>  		its_cpu_init_lpis();
+>>  		its_cpu_init_collection();
+>>  	}
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index c00c4c33..4d5fb60 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -106,6 +106,7 @@
+>>  #define GICR_PIDR2			GICD_PIDR2
+>>  
+>>  #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
+>> +#define GICR_CTLR_RWP			(1UL << 3)
+>>  
+>>  #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
+>>  
+> 
+> Thanks,
+> 
+> 	M.
+> 
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
