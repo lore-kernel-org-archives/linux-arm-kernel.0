@@ -1,23 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 17 Mar 2018 21:51:10 +0100
-Subject: [RESEND PATCH v1 2/6] i2c: i2c-stm32f7: Add slave support
-In-Reply-To: <1520852023-27083-3-git-send-email-pierre-yves.mordret@st.com>
-References: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
- <1520852023-27083-3-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20180317205109.gocf5wemtjkyomct@ninjato>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 17 Mar 2018 22:34:22 +0000
+Subject: [PATCH 0/2] iio: stm32-dfsdm-adc: fix filter & rate setting
+In-Reply-To: <1ddfcfad-f06e-738f-53cf-11dc56e61da1@st.com>
+References: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
+ <1ddfcfad-f06e-738f-53cf-11dc56e61da1@st.com>
+Message-ID: <20180317223422.1a08a254@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 16 Mar 2018 10:10:09 +0100
+Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
-> + * @master_mode: boolean to know in which mode the I2C is running (master or
-> + * slave)
+> Hello,
+> 
+> For the series:
+> Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Both applied and marked for stable (as I'm not sure exactly when this will hit
+mainline and it may be after the next merge window)
 
-It can't do both at the same time?
+Thanks,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180317/3a104d20/attachment.sig>
+Jonathan
+
+> 
+> Thanks,
+> Arnaud
+> 
+> On 03/13/2018 03:23 PM, Fabrice Gasnier wrote:
+> > This series brings fixes to STM32 DFSDM ADC driver.
+> > 
+> > Fabrice Gasnier (2):
+> >   iio: adc: stm32-dfsdm: fix successive oversampling settings
+> >   iio: adc: stm32-dfsdm: fix sample rate for div2 spi clock
+> > 
+> >  drivers/iio/adc/stm32-dfsdm-adc.c | 17 ++++++++++++++---
+> >  1 file changed, 14 insertions(+), 3 deletions(-)
+> >   
