@@ -1,146 +1,34 @@
-From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Sat, 17 Mar 2018 09:05:20 -0600
-Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <1f5e3b14-05a1-08d0-c0cb-00805526448d@codeaurora.org>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
- <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
- <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
- <83387f6e-adcb-14e9-2c22-96abf9493cc6@codeaurora.org>
- <004501d3bd7b$505e70f0$f11b52d0$@opengridcomputing.com>
- <740c7d45-450e-c9b3-ceed-7bc7fcefbc5a@codeaurora.org>
- <71e37a55-537b-d75a-cfde-f188b7cfce8e@codeaurora.org>
- <1f5e3b14-05a1-08d0-c0cb-00805526448d@codeaurora.org>
-Message-ID: <20180317150520.GA23463@ziepe.ca>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 17 Mar 2018 16:47:50 +0100
+Subject: ARM: dts: armada-385-linksys: Disable internal RTC
+Message-ID: <20180317154750.32560-1-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 17, 2018 at 12:25:14AM -0400, Sinan Kaya wrote:
-> On 3/17/2018 12:03 AM, Sinan Kaya wrote:
-> > On 3/16/2018 11:40 PM, Sinan Kaya wrote:
-> >> I'll change writel_relaxed() with __raw_writel() in the series like you suggested
-> >> and also look at your other comments.
-> > 
-> > I spoke too soon.
-> > 
-> > Now that I realized, code needs to follow one of the following patterns for correctness
-> > 
-> > 1)
-> > wmb()
-> > writel()/writel_relaxed()
-> > 
-> > or 
-> > 
-> > 2)
-> > wmb()
-> > __raw_wrltel()
-> > mmiowb()
-> > 
-> > but definitely not
-> > 
-> > wmb()
-> > __raw_wrltel()
-> > 
-> > Since #1 == #2, I'll stick to my current implementation of writel_relaxed()
-> > 
-> > Changing writel() to writel_relaxed() or __raw_writel() isn't enough. PowerPC needs mmiowb()
-> > for correctness. ARM's mmiowb() implementation is empty.
-> > 
-> > So, there is no one size fits all solution with the current state of affairs.
-> > 
-> > 
-> 
-> I think I finally got what you mean.
-> 
-> Code seems to have
-> 
-> wmb()
-> writel()/writeq()
-> wmb()
-> 
-> this can be safely replaced with
-> 
-> wmb()
-> __raw_writel()/__raw_writeq()
-> wmb()
-> 
-> This will work on all arches. Below is the new version. Let me know if this is OK.
-> 
-> +++ b/drivers/infiniband/hw/cxgb4/t4.h
-> @@ -457,7 +457,7 @@ static inline void pio_copy(u64 __iomem *dst, u64 *src)
->         int count = 8;
-> 
->         while (count) {
-> -               writeq(*src, dst);
-> +               __raw_writeq(*src, dst);
->                 src++;
->                 dst++;
->                 count--;
-> @@ -477,15 +477,16 @@ static inline void t4_ring_sq_db(struct t4_wq *wq, u16 inc, union t4_wr *wqe)
->                                  (u64 *)wqe);
->                 } else {
->                         pr_debug("DB wq->sq.pidx = %d\n", wq->sq.pidx);
-> -                       writel(PIDX_T5_V(inc) | QID_V(wq->sq.bar2_qid),
-> -                              wq->sq.bar2_va + SGE_UDB_KDOORBELL);
-> +                       __raw_writel(PIDX_T5_V(inc) | QID_V(wq->sq.bar2_qid),
-> +                                    wq->sq.bar2_va + SGE_UDB_KDOORBELL);
->                 }
-> 
->                 /* Flush user doorbell area writes. */
->                 wmb();
->                 return;
->         }
-> -       writel(QID_V(wq->sq.qid) | PIDX_V(inc), wq->db);
-> +       __raw_writel(QID_V(wq->sq.qid) | PIDX_V(inc), wq->db);
-> +       mmiowmb()
->  }
-> 
->  static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
-> @@ -502,15 +503,16 @@ static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
->                                  (void *)wqe);
->                 } else {
->                         pr_debug("DB wq->rq.pidx = %d\n", wq->rq.pidx);
-> -                       writel(PIDX_T5_V(inc) | QID_V(wq->rq.bar2_qid),
-> -                              wq->rq.bar2_va + SGE_UDB_KDOORBELL);
-> +                       __raw_writel(PIDX_T5_V(inc) | QID_V(wq->rq.bar2_qid),
-> +                                    wq->rq.bar2_va + SGE_UDB_KDOORBELL);
->                 }
-> 
->                 /* Flush user doorbell area writes. */
->                 wmb();
->                 return;
->         }
-> -       writel(QID_V(wq->rq.qid) | PIDX_V(inc), wq->db);
-> +       __raw_writel(QID_V(wq->rq.qid) | PIDX_V(inc), wq->db);
-> +       mmiowmb();
+The internal RTC does not work correctly on these Linksys boards based
+on Marvell SoCs. For me it only shows Wed Dec 31 23:59:59 1969 and for
+others it is off by 3 minutes in 10 minutes running, this was reported
+by multiple users. On the Linksys Mamba device the device tree comment
+says that no crystal is connected to the internal RTC, this is probably
+also true for the other devices.
 
-No! NAK! Adding *new* barriers to use the *wrong* accessor is crazy!
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ arch/arm/boot/dts/armada-385-linksys.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Your first patch was right, replacing
-  wmb()
-  writel()
-
-With wmb(); writel_relaxed() is fine, and helps ARM.
-
-The problem with PPC has nothing to do with the writel, it is with the
-spinlock, and we can't improve it without adding some new
-infrastructure. Certainly don't hack around the problem by using
-__raw_writel in multi-arch drivers!
-
-In userspace we settled on something like this as a pattern:
-
- mmio_wc_spin_lock()
- writel_wc_mmio()
- mmio_wc_spin_unlock()
-
-Where mmio_wc_spin_unlock incorporates the mmiowmb and is defined to
-fully contain all MMIO access to WC and UC memory.
-
-Due to our userspace the pattern is specifically used with MMIO writes
-to WC BAR memory, but it could be generalized..
-
-This allows all known arches to use the best code in all cases. x86
-can even optimize a lot and combine the mmiowmb() into the
-spin_unlock, apparently.
-
-Jason
+diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
+index 434dc9aaa5e4..b7bbf15571c5 100644
+--- a/arch/arm/boot/dts/armada-385-linksys.dtsi
++++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+@@ -282,3 +282,8 @@
+ 	status = "okay";
+ 	usb-phy = <&usb3_1_phy>;
+ };
++
++&rtc {
++	/* No crystal connected to the internal RTC */
++	status = "disabled";
++};
+-- 
+2.11.0
