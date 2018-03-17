@@ -1,44 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 17 Mar 2018 10:19:12 +0000
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <20180316171349.fodlraapz2sq2hhs@lakrids.cambridge.arm.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
- <26a25069-ea1d-5fb3-549c-ab653f454a30@arm.com>
- <CAAeHK+zq4-mw3pCNf3nob3gN-s+aWVq7vUy1p8yY4bU4QYNNMg@mail.gmail.com>
- <2e84a842-96e8-aec4-8b85-9ee879bb323a@arm.com>
- <CAKwvOd=-TeLJn9=V_Dmj-X+qcRBcfH8tcktbm33xAx671VCYUw@mail.gmail.com>
- <20180316171349.fodlraapz2sq2hhs@lakrids.cambridge.arm.com>
-Message-ID: <CAKv+Gu-eBHaoyqO_Vs0ZWahj9pkWWo6kP+9svtMoqcFMjKVd7A@mail.gmail.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Sat, 17 Mar 2018 13:49:12 +0300
+Subject: SPI driver issue
+Message-ID: <99bf058c-d15e-390b-7723-fca15770c118@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Thomas)
+Hi guys,
 
-On 16 March 2018 at 17:13, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Mar 16, 2018 at 04:52:08PM +0000, Nick Desaulniers wrote:
->> + Sami (Google), Takahiro (Linaro)
->>
->> Just so I fully understand the problem enough to articulate it, we'd be
->> looking for the compiler to keep the jump tables for speed (I would guess
->> -fno-jump-tables would emit an if-else chain) but only emit relative jumps
->> (not absolute jumps)?
->
-> Our main concern is that there is no absolute addressing. If that rules
-> out using a relative jump table, that's ok.
->
-> We want to avoid the fragility of collecting -f-no-* options as future
-> compiler transformations end up introducing absolute addressing.
->
+I have recently found a critical issue with sun6i SPI driver. It was 
+actually found long time ago while using spidev but I didn't considered 
+it as something important. Now it seems like a blocking issue that 
+prevents using the driver in any serious application.
+I have created a DRM driver for a ili9488-based display, its source is 
+available here [1] and device tree overlay [2]. The driver has been 
+successfully verified on RPi3, but? it is failing on sunxi: the driver 
+gets loaded, display seems working but SPI transfers are periodically 
+failing with error -110 (timeout). Due to the issue the picture is 
+frozen and completely refreshed again from time to time.
 
-This all comes back to the assumptions made by the compiler when
-building PIC/PIE code, i.e., that symbols should be preemptible and
-thus all references should be indirected via GOT entries, and that
-text relocations should be avoided.
+The problem is reproduced on OrangePi PC and BananaPi M2. I am providing 
+dmesg from my OrangePi PC [3].
 
-If we had a way to tell the compiler that these concerns do not apply
-for us, we could use -fpic/-fpie in the kernel and be done with it.
--fvisibility=hidden *almost* gives us what we need, but in practice,
-only the #pragma variant (#pragma GCC visibility push (hidden)) makes
--fpic behave in a sensible way for freestanding builds, and gets rid
-of absolute references where possible (note that statically
-initialized pointer variables always involve absolute relocations)
+Let know if you need any additional info.
+
+Thanks
+
+-------------------------------------------------------------------
+
+[1] https://github.com/sergey-suloev/tinydrm/blob/master/ili9488.c
+
+[2] 
+https://github.com/sergey-suloev/tinydrm/blob/master/overlays/sunxi/mainline/sun8i-h3-ertft0356-drm.dts
+
+[3] https://pastebin.com/xYqWKcJ2
