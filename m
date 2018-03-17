@@ -1,35 +1,99 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Sat, 17 Mar 2018 13:49:12 +0300
-Subject: SPI driver issue
-Message-ID: <99bf058c-d15e-390b-7723-fca15770c118@orpaltech.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 17 Mar 2018 17:28:46 +0800
+Subject: [PATCH net-next 01/12] clk: sunxi-ng: r40: rewrite init code to a
+ platform driver
+In-Reply-To: <20180317092857.4396-1-wens@csie.org>
+References: <20180317092857.4396-1-wens@csie.org>
+Message-ID: <20180317092857.4396-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+From: Icenowy Zheng <icenowy@aosc.io>
 
-I have recently found a critical issue with sun6i SPI driver. It was 
-actually found long time ago while using spidev but I didn't considered 
-it as something important. Now it seems like a blocking issue that 
-prevents using the driver in any serious application.
-I have created a DRM driver for a ili9488-based display, its source is 
-available here [1] and device tree overlay [2]. The driver has been 
-successfully verified on RPi3, but? it is failing on sunxi: the driver 
-gets loaded, display seems working but SPI transfers are periodically 
-failing with error -110 (timeout). Due to the issue the picture is 
-frozen and completely refreshed again from time to time.
+As we need to register a regmap on the R40 CCU, there needs to be a
+device structure bound to the CCU device node.
 
-The problem is reproduced on OrangePi PC and BananaPi M2. I am providing 
-dmesg from my OrangePi PC [3].
+Rewrite the R40 CCU driver initial code to make it a proper platform
+driver, thus we will have a platform device bound to it.
 
-Let know if you need any additional info.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 39 ++++++++++++++++++++++++++----------
+ 1 file changed, 28 insertions(+), 11 deletions(-)
 
-Thanks
-
--------------------------------------------------------------------
-
-[1] https://github.com/sergey-suloev/tinydrm/blob/master/ili9488.c
-
-[2] 
-https://github.com/sergey-suloev/tinydrm/blob/master/overlays/sunxi/mainline/sun8i-h3-ertft0356-drm.dts
-
-[3] https://pastebin.com/xYqWKcJ2
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+index 933f2e68f42a..c3aa839a453d 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
+@@ -12,7 +12,8 @@
+  */
+ 
+ #include <linux/clk-provider.h>
+-#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
+ 
+ #include "ccu_common.h"
+ #include "ccu_reset.h"
+@@ -1250,17 +1251,17 @@ static struct ccu_mux_nb sun8i_r40_cpu_nb = {
+ 	.bypass_index	= 1, /* index of 24 MHz oscillator */
+ };
+ 
+-static void __init sun8i_r40_ccu_setup(struct device_node *node)
++static int sun8i_r40_ccu_probe(struct platform_device *pdev)
+ {
++	struct resource *res;
+ 	void __iomem *reg;
+ 	u32 val;
++	int ret;
+ 
+-	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+-	if (IS_ERR(reg)) {
+-		pr_err("%s: Could not map the clock registers\n",
+-		       of_node_full_name(node));
+-		return;
+-	}
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(reg))
++		return PTR_ERR(reg);
+ 
+ 	/* Force the PLL-Audio-1x divider to 4 */
+ 	val = readl(reg + SUN8I_R40_PLL_AUDIO_REG);
+@@ -1277,7 +1278,9 @@ static void __init sun8i_r40_ccu_setup(struct device_node *node)
+ 	val &= ~GENMASK(25, 20);
+ 	writel(val, reg + SUN8I_R40_USB_CLK_REG);
+ 
+-	sunxi_ccu_probe(node, reg, &sun8i_r40_ccu_desc);
++	ret = sunxi_ccu_probe(pdev->dev.of_node, reg, &sun8i_r40_ccu_desc);
++	if (ret)
++		return ret;
+ 
+ 	/* Gate then ungate PLL CPU after any rate changes */
+ 	ccu_pll_notifier_register(&sun8i_r40_pll_cpu_nb);
+@@ -1285,6 +1288,20 @@ static void __init sun8i_r40_ccu_setup(struct device_node *node)
+ 	/* Reparent CPU during PLL CPU rate changes */
+ 	ccu_mux_notifier_register(pll_cpu_clk.common.hw.clk,
+ 				  &sun8i_r40_cpu_nb);
++
++	return 0;
+ }
+-CLK_OF_DECLARE(sun8i_r40_ccu, "allwinner,sun8i-r40-ccu",
+-	       sun8i_r40_ccu_setup);
++
++static const struct of_device_id sun8i_r40_ccu_ids[] = {
++	{ .compatible = "allwinner,sun8i-r40-ccu" },
++	{ }
++};
++
++static struct platform_driver sun8i_r40_ccu_driver = {
++	.probe	= sun8i_r40_ccu_probe,
++	.driver	= {
++		.name	= "sun8i-r40-ccu",
++		.of_match_table	= sun8i_r40_ccu_ids,
++	},
++};
++builtin_platform_driver(sun8i_r40_ccu_driver);
+-- 
+2.16.2
