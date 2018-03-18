@@ -1,76 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 18 Mar 2018 10:21:36 -0300
-Subject: [PATCH V2] ARM: dts: imx6q: Add support for the DHCOM iMX6 SoM
- and PDK2
-In-Reply-To: <20180318084238.26759-1-marex@denx.de>
-References: <20180318084238.26759-1-marex@denx.de>
-Message-ID: <CAOMZO5AfXgZPLXSx5MnigMjSG0HCqPDg5t_mZTtj37eg9hwQkQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 18 Mar 2018 13:21:27 +0000
+Subject: [PATCH 1/7] 2 1-byte checks more safer for memory_is_poisoned_16
+In-Reply-To: <20180318125342.4278-2-liuwenliang@huawei.com>
+References: <20180318125342.4278-1-liuwenliang@huawei.com>
+ <20180318125342.4278-2-liuwenliang@huawei.com>
+Message-ID: <20180318132126.GA565@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Sun, Mar 18, 2018 at 08:53:36PM +0800, Abbott Liu wrote:
+> Because in some architecture(eg. arm) instruction set, non-aligned
+> access support is not very well, so 2 1-byte checks is more
+> safer than 1 2-byte check. The impact on performance is small
+> because 16-byte accesses are not too common.
 
-On Sun, Mar 18, 2018 at 5:42 AM, Marek Vasut <marex@denx.de> wrote:
+This is unnecessary:
 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 3b4cc1b64a1e..c39f991e3c3e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -440,6 +440,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->         imx6q-cubox-i-som-v15.dtb \
->         imx6q-dfi-fs700-m60.dtb \
->         imx6q-display5-tianma-tm070-1280x768.dtb \
-> +       imx6q-dhcom-pdk2.dtb \
+1. a load of a 16-bit quantity will work as desired on modern ARMs.
+2. Networking already relies on unaligned loads to work as per x86
+   (iow, an unaligned 32-bit load loads the 32-bits at the address
+   even if it's not naturally aligned, and that also goes for 16-bit
+   accesses.)
 
-imx6q-dhcom-pdk2.dtb should come prior to
-imx6q-display5-tianma-tm070-1280x768.dtb to keep in alphabetical
-order.
+If these are rare (which you say above - "not too common") then it's
+much better to leave the code as-is, because it will most likely be
+faster on modern CPUs, and the impact for older generation CPUs is
+likely to be low.
 
-> +&ecspi1 {
-> +       fsl,spi-num-chipselects = <2>;
-
-This property is not necessary.
-
-> +       cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio4 11 GPIO_ACTIVE_HIGH>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_ecspi1>;
-> +       status = "okay";
-> +
-> +       flash at 0 {       /* S25FL116K */
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "jedec,spi-nor";
-> +               spi-max-frequency = <50000000>;
-> +               reg = <0>;
-> +               m25p,fast-read;
-> +       };
-> +};
-> +
-> +&ecspi2 {
-> +       fsl,spi-num-chipselects = <1>;
-
-Same here.
-
-> +       cs-gpios = <&gpio5 29 1>;
-
-&gpio5 29 GPIO_ACTIVE_LOW
-
-> +&fec {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_enet_100M>;
-> +       phy-mode = "rmii";
-> +       phy-handle = <&ethphy0>;
-> +       power-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
-
-'power-gpios' is not a valid property for fec.
-
-
-> +       ltc3676: pmic at 3c {
-> +               compatible = "lltc,ltc3676";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_pmic_hw300>;
-> +               reg = <0x3c>;
-> +               interrupt-parent = <&gpio5>;
-> +               interrupts = <2 2>;
-
-interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
