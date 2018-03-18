@@ -1,20 +1,33 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 18 Mar 2018 09:54:42 -0300
-Subject: [PATCH 1/2] ARM: dts: pfuze3000: update sw1a/vldo4 voltage range
-In-Reply-To: <AM3PR04MB1315E1C3071C0BD2E7169968F5D50@AM3PR04MB1315.eurprd04.prod.outlook.com>
-References: <1521269828-8874-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5BzE46Dm24++j+xVA4KGFnpsopGfJ97h7sFGOAxVa19=g@mail.gmail.com>
- <AM3PR04MB1315E1C3071C0BD2E7169968F5D50@AM3PR04MB1315.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5AFJk_Q5CYrV0s+hLmORHosWujRSGjwf9smyAQc4nmJ+A@mail.gmail.com>
+Date: Sun, 18 Mar 2018 10:03:43 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
+ source
+In-Reply-To: <1521342853-2941-2-git-send-email-Anson.Huang@nxp.com>
+References: <1521342853-2941-1-git-send-email-Anson.Huang@nxp.com>
+ <1521342853-2941-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAOMZO5CG6XuJ7N8W--zEwEVd9JHj887_7aNp+K8D-Xt1OnKh7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 17, 2018 at 11:23 PM, Anson Huang <anson.huang@nxp.com> wrote:
+On Sun, Mar 18, 2018 at 12:14 AM, Anson Huang <Anson.Huang@nxp.com> wrote:
 
-> I thought the max value here means the capability of regulator itself, like the internal
+> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> index 72da5ac..83f7cac 100644
+> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> @@ -18,6 +18,14 @@
+>                 reg = <0x80000000 0x80000000>;
+>         };
+>
+> +       clocks {
+> +               codec_osc: anaclk2 {
+> +                       #clock-cells = <0>;
+> +                       compatible = "fixed-clock";
+> +                       clock-frequency = <24576000>;
+> +               };
+> +       };
 
-No it is not.
+The clocks container should be removed and the clock node could be put
+directly into the root node.
 
-Please check Documentation/devicetree/bindings/regulator/regulator.txt:
-
-"- regulator-max-microvolt: largest voltage consumers may set"
+Also, I do not see 'codec_osc' being used in this dts.
