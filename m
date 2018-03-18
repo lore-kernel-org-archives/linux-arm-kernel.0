@@ -1,57 +1,50 @@
-From: liuwenliang@huawei.com (Abbott Liu)
-Date: Sun, 18 Mar 2018 20:53:36 +0800
-Subject: [PATCH 1/7] 2 1-byte checks more safer for memory_is_poisoned_16
-In-Reply-To: <20180318125342.4278-1-liuwenliang@huawei.com>
-References: <20180318125342.4278-1-liuwenliang@huawei.com>
-Message-ID: <20180318125342.4278-2-liuwenliang@huawei.com>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Sun, 18 Mar 2018 13:51:04 +0000
+Subject: [PATCHv2 4/5] arm64: dts: allwinner: a64: Add pwm device
+In-Reply-To: <20180318032309.dys4p5gth5fvyawn@rob-hp-laptop>
+References: <20180315162510.11669-1-harald@ccbib.org>
+ <20180315162510.11669-5-harald@ccbib.org>
+ <20180318032309.dys4p5gth5fvyawn@rob-hp-laptop>
+Message-ID: <1d6ba3e9-e2e7-c121-dc6d-7d4b867316ab@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because in some architecture(eg. arm) instruction set, non-aligned
-access support is not very well, so 2 1-byte checks is more
-safer than 1 2-byte check. The impact on performance is small
-because 16-byte accesses are not too common.
+On 18/03/18 12:52, Rob Herring wrote:
+> On Thu, Mar 15, 2018 at 04:25:09PM +0000, Harald Geyer wrote:
+>> This device is compatible with A13, so no new driver is needed.
+>> A new compatible string is reserved in the binding documentation, to be
+>> used together with the proper fall back. Tested on Teres-I.
+>>
+>> Signed-off-by: Harald Geyer <harald@ccbib.org>
+>> ---
+>> changes since v1:
+>>  * add and use an A64 specific compatible string
+>>  * claim the full memory range
+>>
+>> I saw that Andre Przywara has been working on A64 pwm too and has
+>> submitted some patches a few days ago. I think his patches are functionally
+>> equivalent to this one here, but clean up things a bit and additionally
+>> add support for r_pwm and thus are preferable. See:
+>>
+>> https://groups.google.com/forum/#!topic/linux-sunxi/hQFeteP591k
+>>
+>> I'm including my patch here mostly to have a consistent series for others
+>> to test. OTOH you might merge the device tree changes here and pick up
+>> the cleanup patches from him. Either way should work fine.
+> 
+> I would sync up with Andre and send out a combined series. Don't make 
+> the maintainer(s) have to sort this out.
 
-Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
-Reviewed-by: Andrew Morton <akpm@linux-foundation.org>
-Reviewed-by: Russell King - ARM Linux <linux@armlinux.org.uk>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Dmitry Vyukov <dvyukov@google.com>
-Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
----
- mm/kasan/kasan.c | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
+I have something ready, but need to test it. Will try to send an updated
+series later tonight.
 
-diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
-index e13d911..104839a 100644
---- a/mm/kasan/kasan.c
-+++ b/mm/kasan/kasan.c
-@@ -151,13 +151,20 @@ static __always_inline bool memory_is_poisoned_2_4_8(unsigned long addr,
- 
- static __always_inline bool memory_is_poisoned_16(unsigned long addr)
- {
--	u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
--
--	/* Unaligned 16-bytes access maps into 3 shadow bytes. */
--	if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
--		return *shadow_addr || memory_is_poisoned_1(addr + 15);
-+	u8 *shadow_addr = (u8 *)kasan_mem_to_shadow((void *)addr);
- 
--	return *shadow_addr;
-+	if (unlikely(shadow_addr[0] || shadow_addr[1])) {
-+		return true;
-+	} else if (likely(IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE))) {
-+		/*
-+		 * If two shadow bytes covers 16-byte access, we don't
-+		 * need to do anything more. Otherwise, test the last
-+		 * shadow byte.
-+		 */
-+		return false;
-+	} else {
-+		return memory_is_poisoned_1(addr + 15);
-+	}
- }
- 
- static __always_inline unsigned long bytes_is_nonzero(const u8 *start,
--- 
-2.9.0
+Thanks,
+Andre.
+
+> 
+>>  Documentation/devicetree/bindings/pwm/pwm-sun4i.txt |  1 +
+>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi       | 14 ++++++++++++++
+>>  2 files changed, 15 insertions(+)
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> 
