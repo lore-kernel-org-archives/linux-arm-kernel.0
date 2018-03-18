@@ -1,36 +1,43 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Sun, 18 Mar 2018 21:15:19 +0100
-Subject: [PATCH v4 3/9] pinctrl: sunxi: change irq_bank_base to
- irq_bank_map
-In-Reply-To: <20180316140215.28663-4-icenowy@aosc.io>
-References: <20180316140215.28663-1-icenowy@aosc.io>
- <20180316140215.28663-4-icenowy@aosc.io>
-Message-ID: <20180318201519.smbzfswz4wxdw45q@flea>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun, 18 Mar 2018 21:15:08 +0100
+Subject: [PATCH 1/3] ARM: imx_v6_v7_defconfig: add RN5T618 PMIC family support
+Message-ID: <20180318201510.13086-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 10:02:09PM +0800, Icenowy Zheng wrote:
-> The Allwinner H6 SoC have its pin controllers with the first IRQ-capable
-> GPIO bank at IRQ bank 1 and the second bank at IRQ bank 5.
-> 
-> Change the current code that uses IRQ bank base to a IRQ bank map, in
-> order to support the case that holes exist among IRQ banks.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+This allows to successfully boot Colibri iMX7 which is using
+the Ricoh RN5T567 PMIC.
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Thanks!
-Maxime
-
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 3a308437b088..8947769cd449 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -214,11 +214,13 @@ CONFIG_CPU_THERMAL=y
+ CONFIG_IMX_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_DA9062_WATCHDOG=y
++CONFIG_RN5T618_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_DA9052_I2C=y
+ CONFIG_MFD_DA9062=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_MFD_MC13XXX_I2C=y
++CONFIG_MFD_RN5T618=y
+ CONFIG_MFD_STMPE=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+@@ -229,6 +231,7 @@ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_MC13783=y
+ CONFIG_REGULATOR_MC13892=y
+ CONFIG_REGULATOR_PFUZE100=y
++CONFIG_REGULATOR_RN5T618=y
+ CONFIG_RC_CORE=y
+ CONFIG_RC_DEVICES=y
+ CONFIG_IR_GPIO_CIR=y
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180318/fad1872b/attachment.sig>
+2.16.2
