@@ -1,102 +1,90 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Sun, 18 Mar 2018 09:52:54 +0800
-Subject: [PATCH] iommu/mediatek: Fix protect memory setting
-Message-ID: <1521337974-22112-1-git-send-email-yong.wu@mediatek.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Sun, 18 Mar 2018 02:23:18 +0000
+Subject: [PATCH 1/2] ARM: dts: pfuze3000: update sw1a/vldo4 voltage range
+In-Reply-To: <CAOMZO5BzE46Dm24++j+xVA4KGFnpsopGfJ97h7sFGOAxVa19=g@mail.gmail.com>
+References: <1521269828-8874-1-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5BzE46Dm24++j+xVA4KGFnpsopGfJ97h7sFGOAxVa19=g@mail.gmail.com>
+Message-ID: <AM3PR04MB1315E1C3071C0BD2E7169968F5D50@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In MediaTek's IOMMU design, When a iommu translation fault occurs
-(HW can NOT translate the destination address to a valid physical
-address), the IOMMU HW output the dirty data into a special memory
-to avoid corrupting the main memory, this is called "protect memory".
-the register(0x114) for protect memory is a little different between
-mt8173 and mt2712.
 
-In the mt8173, bit[30:6] in the register represents [31:7] of the
-physical address. In the 4GB mode, the register bit[31] should be 1.
-While in the mt2712, the bits don't shift. bit[31:7] in the register
-represents [31:7] in the physical address, and bit[1:0] in the
-register represents bit[33:32] of the physical address if it has.
 
-Fixes: e6dec9230862 ("iommu/mediatek: Add mt2712 IOMMU support")
-Reported-by: Honghui Zhang <honghui.zhang@mediatek.com>
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
----
-After adding the setting above, the macro will be complex, like:
- #define F_MMU_IVRP_PA_SET(data)		({	\
-	const struct mtk_iommu_data *_data =  data;	\
-	phys_addr_t _pa = data->protect_base;		\
-	((_data->m4u_plat == M4U_MT8173) ?		\
-	((_pa >> 1) | (_data->enable_4GB << 31)) :	\
-	(lower_32_bits(_pa) | (_pa >> 32)));		\
-	})
-And this macro is called twice(hw_init and resume).
+Anson Huang
+Best Regards!
 
-To avoid adding this complex macro or a new function, I put
-it in the code and backup its value in the suspend registers.
----
- drivers/iommu/mtk_iommu.c | 15 ++++++++++-----
- drivers/iommu/mtk_iommu.h |  1 +
- 2 files changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index f227d73..f2832a1 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -60,7 +60,7 @@
- 	(((prot) & 0x3) << F_MMU_TF_PROTECT_SEL_SHIFT(data))
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Saturday, March 17, 2018 10:53 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Robin Gong <yibin.gong@nxp.com>; Shawn Guo <shawnguo@kernel.org>;
+> Sascha Hauer <kernel@pengutronix.de>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Russell King - ARM Linux <linux@armlinux.org.uk>;
+> Liam Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
+> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
+> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
+> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
+> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH 1/2] ARM: dts: pfuze3000: update sw1a/vldo4 voltage range
+> 
+> Hi Anson,
+> 
+> On Sat, Mar 17, 2018 at 3:57 AM, Anson Huang <Anson.Huang@nxp.com>
+> wrote:
+> > Update sw1a/vldo4's voltage range according to latest pfuze3000
+> > datasheet from:
+> >
+> > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fcach
+> >
+> e.freescale.com%2Ffiles%2Fanalog%2Fdoc%2Fdata_sheet%2FPF3000.pdf%3Ffsr
+> >
+> ch%3D1%26sr%3D1%26pageNum%3D1&data=02%7C01%7CAnson.Huang%40n
+> xp.com%7Cc
+> >
+> 9614ae26f9443c2d0ae08d58c16cd8a%7C686ea1d3bc2b4c6fa92cd99c5c30163
+> 5%7C0
+> > %7C1%7C636568951923456037&sdata=OeM%2B3xPNlm9OETpZcrvG65LjH%
+> 2Fp4CRZvyD
+> > HT819kuPk%3D&reserved=0
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> > ---
+> >  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi  | 2 +-
+> > arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 4 ++--
+> >  arch/arm/boot/dts/imx7d-nitrogen7.dts   | 2 +-
+> >  arch/arm/boot/dts/imx7d-sdb.dts         | 6 +++---
+> >  arch/arm/boot/dts/imx7s-warp.dts        | 2 +-
+> >  5 files changed, 8 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> > b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> > index 53b3eac..1de0a0f 100644
+> > --- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> > @@ -142,7 +142,7 @@
+> >                 regulators {
+> >                         sw1a_reg: sw1a {
+> >                                 regulator-min-microvolt = <700000>;
+> > -                               regulator-max-microvolt = <1475000>;
+> > +                               regulator-max-microvolt =
+> <3300000>;
+> 
+> This change does not look like a safe thing to do without carefully checking each
+> one of the board schematics.
+> 
+> Even if the regulator itself is capable of driving a higher voltage, it does not
+> mean that the circuitry that consumes such regulator is allowed to receive the
+> higher voltages.
  
- #define REG_MMU_IVRP_PADDR			0x114
--#define F_MMU_IVRP_PA_SET(pa, ext)		(((pa) >> 1) | ((!!(ext)) << 31))
-+
- #define REG_MMU_VLD_PA_RNG			0x118
- #define F_MMU_VLD_PA_RNG(EA, SA)		(((EA) << 8) | (SA))
- 
-@@ -539,8 +539,13 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
- 		F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
- 	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
- 
--	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
--		       data->base + REG_MMU_IVRP_PADDR);
-+	if (data->m4u_plat == M4U_MT8173)
-+		regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
-+	else
-+		regval = lower_32_bits(data->protect_base) |
-+			 upper_32_bits(data->protect_base);
-+	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
-+
- 	if (data->enable_4GB && data->m4u_plat != M4U_MT8173) {
- 		/*
- 		 * If 4GB mode is enabled, the validate PA range is from
-@@ -695,6 +700,7 @@ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
- 	reg->ctrl_reg = readl_relaxed(base + REG_MMU_CTRL_REG);
- 	reg->int_control0 = readl_relaxed(base + REG_MMU_INT_CONTROL0);
- 	reg->int_main_control = readl_relaxed(base + REG_MMU_INT_MAIN_CONTROL);
-+	reg->ivrp_paddr = readl_relaxed(base + REG_MMU_IVRP_PADDR);
- 	clk_disable_unprepare(data->bclk);
- 	return 0;
- }
-@@ -717,8 +723,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
- 	writel_relaxed(reg->ctrl_reg, base + REG_MMU_CTRL_REG);
- 	writel_relaxed(reg->int_control0, base + REG_MMU_INT_CONTROL0);
- 	writel_relaxed(reg->int_main_control, base + REG_MMU_INT_MAIN_CONTROL);
--	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
--		       base + REG_MMU_IVRP_PADDR);
-+	writel_relaxed(reg->ivrp_paddr, base + REG_MMU_IVRP_PADDR);
- 	if (data->m4u_dom)
- 		writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0],
- 		       base + REG_MMU_PT_BASE_ADDR);
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index b4451a1..778498b 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -32,6 +32,7 @@ struct mtk_iommu_suspend_reg {
- 	u32				ctrl_reg;
- 	u32				int_control0;
- 	u32				int_main_control;
-+	u32				ivrp_paddr;
- };
- 
- enum mtk_iommu_plat {
--- 
-1.8.1.1.dirty
+I thought the max value here means the capability of regulator itself, like the internal
+anatop LDO regulator VDD_CORE, the max value defined in dtsi is 1.45V, but out i.MX6
+SoCs can NOT receive to voltage higher than 1.3V.
+
+The default setting of PMIC output is controlled by its OTP and the OTP value should
+consider the board design, the rest of voltage setting should be taken care by device driver.
+Here I think the max means PMIC's capability.
+
+Anson.
