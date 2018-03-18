@@ -1,28 +1,49 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Mar 2018 07:49:30 -0500
-Subject: [PATCH v1 1/8] dt-bindings: stm32-dma: introduce DMA features
- bitfield
-In-Reply-To: <1520959327-25760-2-git-send-email-pierre-yves.mordret@st.com>
-References: <1520959327-25760-1-git-send-email-pierre-yves.mordret@st.com>
- <1520959327-25760-2-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20180318124930.tgd4llar3zat7idx@rob-hp-laptop>
+Date: Sun, 18 Mar 2018 07:51:59 -0500
+Subject: [PATCH v6 11/25] of: base: Add of_get_cpu_state_node() to get
+ idle states for a CPU node
+In-Reply-To: <1521046715-30683-12-git-send-email-ulf.hansson@linaro.org>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+ <1521046715-30683-12-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20180318023811.izvvsjqzb3awqwpy@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 05:42:00PM +0100, Pierre-Yves MORDRET wrote:
-> This bitfield intends to address features to be activated within the
-> driver. Initially the mask was only meant for FIFO Threshold management.
-> Backward compatibility is preserved but the meaning of this field has been
-> extended to features instead of only threshold.
+On Wed, Mar 14, 2018 at 05:58:21PM +0100, Ulf Hansson wrote:
+> The CPU's idle state nodes are currently parsed at the common cpuidle DT
+> library, but also when initializing back-end data for the arch specific CPU
+> operations, as in the PSCI driver case.
 > 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> To avoid open-coding, let's introduce of_get_cpu_state_node(), which takes
+> the device node for the CPU and the index to the requested idle state node,
+> as in-parameters. In case a corresponding idle state node is found, it
+> returns the node with the refcount incremented for it, else it returns
+> NULL.
+> 
+> Moreover, for ARM, there are two generic methods, to describe the CPU's
+> idle states, either via the flattened description through the
+> "cpu-idle-states" binding [1] or via the hierarchical layout, using the
+> "power-domains" and the "domain-idle-states" bindings [2]. Hence, let's
+> take both options into account.
+> 
+> [1]
+> Documentation/devicetree/bindings/arm/idle-states.txt
+> [2]
+> Documentation/devicetree/bindings/arm/psci.txt
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: Lina Iyer <ilina@codeaurora.org>
+> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->   Version history:
->     v1:
->        * Initial
-> ---
-> ---
->  Documentation/devicetree/bindings/dma/stm32-dma.txt | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  drivers/of/base.c  | 35 +++++++++++++++++++++++++++++++++++
+>  include/linux/of.h |  8 ++++++++
+>  2 files changed, 43 insertions(+)
+
+I'd prefer not to add this here, but don't have a better suggestion. If 
+more cpu related functions are added, I'd like to move them to a 
+separate file in drivers/of/, but that can wait.
 
 Reviewed-by: Rob Herring <robh@kernel.org>
