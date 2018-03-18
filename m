@@ -1,91 +1,60 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Mar 2018 07:48:00 -0500
-Subject: [PATCH 6/9] sunxi-cedrus: Add device tree binding document
-In-Reply-To: <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
-References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
- <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
-Message-ID: <20180318124800.7soqh34fxvwjm7pn@rob-hp-laptop>
+Date: Sun, 18 Mar 2018 07:48:15 -0500
+Subject: [PATCH RFC 1/3] dt-bindings: nvmem: add binding for Raspberry Pi
+ OTP
+In-Reply-To: <1520602328-28972-2-git-send-email-stefan.wahren@i2se.com>
+References: <1520602328-28972-1-git-send-email-stefan.wahren@i2se.com>
+ <1520602328-28972-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20180318124815.xntwums7hu2jtacn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 11:14:42AM +0100, Paul Kocialkowski wrote:
-> From: Florent Revest <florent.revest@free-electrons.com>
-
-"device tree binding document" can all be summarized with the subject 
-prefix "dt-bindings: media: ".
-
-Also, email should be updated to @bootlin.com?
-
+On Fri, Mar 09, 2018 at 02:32:06PM +0100, Stefan Wahren wrote:
+> This patch adds the devicetree binding for Raspberry Pi customer OTP
+> driver.
 > 
-> Device Tree bindings for the Allwinner's video engine
-> 
-> Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 > ---
->  .../devicetree/bindings/media/sunxi-cedrus.txt     | 44 ++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+>  .../nvmem/raspberrypi,bcm2835-customer-otp.txt     | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/media/sunxi-cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> diff --git a/Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt b/Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt
 > new file mode 100644
-> index 000000000000..138581113c49
+> index 0000000..3f57744
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-> @@ -0,0 +1,44 @@
-> +Device-Tree bindings for SUNXI video engine found in sunXi SoC family
+> +++ b/Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt
+> @@ -0,0 +1,27 @@
+> +Customer OTP Memory for Raspberry Pi
 > +
-> +Required properties:
-> +- compatible	    : "allwinner,sun4i-a10-video-engine";
-> +- memory-region     : DMA pool for buffers allocation;
-
-Why do you need this linkage? Many drivers use CMA and don't need this.
-
-> +- clocks	    : list of clock specifiers, corresponding to
-> +		      entries in clock-names property;
-> +- clock-names	    : should contain "ahb", "mod" and "ram" entries;
-> +- resets	    : phandle for reset;
-> +- interrupts	    : should contain VE interrupt number;
-> +- reg		    : should contain register base and length of VE.
+> +The VC4 firmware exposes a mailbox interface that allows the ARM core
+> +to access the customer part of the OTP memory.
+> +
+> +The OTP node must be a child node of the Raspberry Pi firmware node.
+> +
+> +Required properties :
+> +- compatible     : Should be "raspberrypi,bcm2835-customer-otp"
+> +- #address-cells : Should be 1
+> +- #size-cells    : Should be 1
+> +
+> +See nvmem.txt for more information.
 > +
 > +Example:
 > +
-> +reserved-memory {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
+> +firmware: firmware-rpi {
+> +	compatible = "raspberrypi,bcm2835-firmware";
+> +	mboxes = <&mailbox>;
 > +
-> +	ve_reserved: cma {
-> +		compatible = "shared-dma-pool";
-> +		reg = <0x43d00000 0x9000000>;
-> +		no-map;
-> +		linux,cma-default;
-> +	};
-> +};
-> +
-> +video-engine {
-> +	compatible = "allwinner,sun4i-a10-video-engine";
-> +	memory-region = <&ve_reserved>;
-> +
-> +	clocks = <&ahb_gates 32>, <&ccu CLK_VE>,
-> +		 <&dram_gates 0>;
-> +	clock-names = "ahb", "mod", "ram";
-> +
-> +	assigned-clocks = <&ccu CLK_VE>;
-> +	assigned-clock-rates = <320000000>;
+> +	customer_otp: otp {
+> +		compatible = "raspberrypi,bcm2835-customer-otp";
+> +		firmware = <&firmware>;
 
-Not documented.
+Not documented nor necessary. It's the parent.
 
-> +
-> +	resets = <&ccu RST_VE>;
-> +
-> +	interrupts = <53>;
-> +
-> +	reg = <0x01c0e000 4096>;
-> +};
-> -- 
-> 2.16.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+
+Are there some child nodes? If not, there's no point in having this 
+node.
+
+Rob
