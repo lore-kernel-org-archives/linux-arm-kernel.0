@@ -1,67 +1,55 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun, 18 Mar 2018 17:48:44 +0300
-Subject: [PATCH v16 10/13] arch/arm: enable task isolation functionality
-In-Reply-To: <1509728692-10460-11-git-send-email-cmetcalf@mellanox.com>
-References: <1509728692-10460-1-git-send-email-cmetcalf@mellanox.com>
- <1509728692-10460-11-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <20180318144844.ehkbx7npszfreyeh@yury-thinkpad>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Sun, 18 Mar 2018 16:09:57 +0100
+Subject: [PATCH 1/4] dt-bindings: clock: meson: update documentation
+ with hhi syscon
+In-Reply-To: <20180318125222.kqtybu4hiwvsx3om@rob-hp-laptop>
+References: <20180315115545.1884-1-jbrunet@baylibre.com>
+ <20180315115545.1884-2-jbrunet@baylibre.com>
+ <20180318125222.kqtybu4hiwvsx3om@rob-hp-laptop>
+Message-ID: <1521385797.6569.90.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Francis, Chris,
-
-On Fri, Nov 03, 2017 at 01:04:49PM -0400, Chris Metcalf wrote:
-> From: Francis Giraldeau <francis.giraldeau@gmail.com>
+On Sun, 2018-03-18 at 07:52 -0500, Rob Herring wrote:
+> On Thu, Mar 15, 2018 at 12:55:42PM +0100, Jerome Brunet wrote:
+> > The HHI register region hosts more than just clocks and needs to
+> > accessed drivers other than the clock controller, such as the display
+> > driver.
+> > 
+> > This register region should be managed by syscon. It is already the case
+> > on gxbb/gxl and it soon will be on axg. The clock controllers must use
+> > this system controller instead of directly mapping the registers.
 > 
-> This patch is a port of the task isolation functionality to the arm 32-bit
-> architecture. The task isolation needs an additional thread flag that
-> requires to change the entry assembly code to accept a bitfield larger than
-> one byte.  The constants _TIF_SYSCALL_WORK and _TIF_WORK_MASK are now
-> defined in the literal pool. The rest of the patch is straightforward and
-> reflects what is done on other architectures.
+> Sounds like a kernel problem, not a DT one.
+
+It's a platform problem, so it has much a kernel problem (solution already
+merged) as a DT problem
+
+DT wise, we've got two devices mapping the same region
+
+in arch/arm64/boot/dts/amlogic/meson-gx.dtsi:
+> system-controller at 0 
+
+which is used by the display device.
+
+and in arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi (same for gxl)
+> clock-controller at 0
+
+It has worked so far because the clock controller claims the region w/o
+reserving it but it remains unsafe since both device may access the same region.
+The fix is to have the clock controller go through the existing syscon.
+
 > 
-> To avoid problems with the tst instruction in the v7m build, we renumber
-> TIF_SECCOMP to bit 8 and let TIF_TASK_ISOLATION use bit 7.
+> > 
 > 
-> Signed-off-by: Francis Giraldeau <francis.giraldeau@gmail.com>
-> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com> [with modifications]
+> With a single child, there is really no point to this change. A single 
+> node can provide multiple functions. Look at nodes that are both reset 
+> and clock providers.
 
-[...]
+There is more than a single user, as explained above and in the cover letter of
+this series.
 
-> ---
-> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-> index 58e3771e4c5b..0cfcba5a93df 100644
-> --- a/arch/arm/kernel/ptrace.c
-> +++ b/arch/arm/kernel/ptrace.c
-> @@ -27,6 +27,7 @@
->  #include <linux/audit.h>
->  #include <linux/tracehook.h>
->  #include <linux/unistd.h>
-> +#include <linux/isolation.h>
->  
->  #include <asm/pgtable.h>
->  #include <asm/traps.h>
-> @@ -936,6 +937,15 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs, int scno)
->  	if (test_thread_flag(TIF_SYSCALL_TRACE))
->  		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
->  
-> +	/*
-> +	 * In task isolation mode, we may prevent the syscall from
-> +	 * running, and if so we also deliver a signal to the process.
-> +	 */
-> +	if (test_thread_flag(TIF_TASK_ISOLATION)) {
-> +		if (task_isolation_syscall(scno) == -1)
-> +			return -1;
-> +	}
-
-I think it would make sense to load thread flags to local variable
-because later in the code test_thread_flag() is called again to check
-TIF_SYSCALL_TRACEPOINT flag, and we can avoid it, like this:
-
-unsigned long work = READ_ONCE(current_thread_info()->flags);
-
-Also, all other architectures cache thread flags to local
-variable before use; so doing this would make sense for the sake
-of unification.
-
-Yury
+> 
+> What other functions are there?
+> 
+> Rob
