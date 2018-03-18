@@ -1,49 +1,71 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Mar 2018 07:51:59 -0500
-Subject: [PATCH v6 11/25] of: base: Add of_get_cpu_state_node() to get
- idle states for a CPU node
-In-Reply-To: <1521046715-30683-12-git-send-email-ulf.hansson@linaro.org>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
- <1521046715-30683-12-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20180318023811.izvvsjqzb3awqwpy@rob-hp-laptop>
+Date: Sun, 18 Mar 2018 07:52:22 -0500
+Subject: [PATCH 1/4] dt-bindings: clock: meson: update documentation with
+ hhi syscon
+In-Reply-To: <20180315115545.1884-2-jbrunet@baylibre.com>
+References: <20180315115545.1884-1-jbrunet@baylibre.com>
+ <20180315115545.1884-2-jbrunet@baylibre.com>
+Message-ID: <20180318125222.kqtybu4hiwvsx3om@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 14, 2018 at 05:58:21PM +0100, Ulf Hansson wrote:
-> The CPU's idle state nodes are currently parsed at the common cpuidle DT
-> library, but also when initializing back-end data for the arch specific CPU
-> operations, as in the PSCI driver case.
+On Thu, Mar 15, 2018 at 12:55:42PM +0100, Jerome Brunet wrote:
+> The HHI register region hosts more than just clocks and needs to
+> accessed drivers other than the clock controller, such as the display
+> driver.
 > 
-> To avoid open-coding, let's introduce of_get_cpu_state_node(), which takes
-> the device node for the CPU and the index to the requested idle state node,
-> as in-parameters. In case a corresponding idle state node is found, it
-> returns the node with the refcount incremented for it, else it returns
-> NULL.
+> This register region should be managed by syscon. It is already the case
+> on gxbb/gxl and it soon will be on axg. The clock controllers must use
+> this system controller instead of directly mapping the registers.
+
+Sounds like a kernel problem, not a DT one.
+
 > 
-> Moreover, for ARM, there are two generic methods, to describe the CPU's
-> idle states, either via the flattened description through the
-> "cpu-idle-states" binding [1] or via the hierarchical layout, using the
-> "power-domains" and the "domain-idle-states" bindings [2]. Hence, let's
-> take both options into account.
+> This changes the bindings of gxbb and axg's clock controllers. This is
+> due to an initial 'incomplete' knowledge of these SoCs, which is why the
+> meson bindings are unstable ATM.
 > 
-> [1]
-> Documentation/devicetree/bindings/arm/idle-states.txt
-> [2]
-> Documentation/devicetree/bindings/arm/psci.txt
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: Lina Iyer <ilina@codeaurora.org>
-> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
-> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > ---
->  drivers/of/base.c  | 35 +++++++++++++++++++++++++++++++++++
->  include/linux/of.h |  8 ++++++++
->  2 files changed, 43 insertions(+)
+>  .../devicetree/bindings/clock/amlogic,gxbb-clkc.txt      | 16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
+> index e2b377ed6f91..e950599566a9 100644
+> --- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
+> +++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
+> @@ -10,9 +10,6 @@ Required Properties:
+>  		"amlogic,gxl-clkc" for GXL and GXM SoC,
+>  		"amlogic,axg-clkc" for AXG SoC.
+>  
+> -- reg: physical base address of the clock controller and length of memory
+> -       mapped region.
+> -
+>  - #clock-cells: should be 1.
+>  
+>  Each clock is assigned an identifier and client nodes can use this identifier
+> @@ -20,13 +17,22 @@ to specify the clock which they consume. All available clocks are defined as
+>  preprocessor macros in the dt-bindings/clock/gxbb-clkc.h header and can be
+>  used in device tree sources.
+>  
+> +Parent node should have the following properties :
+> +- compatible: "syscon", "simple-mfd, and "amlogic,meson-gx-hhi-sysctrl" or
+> +              "amlogic,meson-axg-hhi-sysctrl"
+> +- reg: base address and size of the HHI system control register space.
+> +
+>  Example: Clock controller node:
+>  
+> -	clkc: clock-controller at c883c000 {
+> +sysctrl: system-controller at 0 {
+> +	compatible = "amlogic,meson-gx-hhi-sysctrl", "syscon", "simple-mfd";
+> +	reg = <0 0 0 0x400>;
+> +
+> +	clkc: clock-controller {
 
-I'd prefer not to add this here, but don't have a better suggestion. If 
-more cpu related functions are added, I'd like to move them to a 
-separate file in drivers/of/, but that can wait.
+With a single child, there is really no point to this change. A single 
+node can provide multiple functions. Look at nodes that are both reset 
+and clock providers.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+What other functions are there?
+
+Rob
