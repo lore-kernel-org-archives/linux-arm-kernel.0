@@ -1,26 +1,41 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 18 Mar 2018 07:48:23 -0500
-Subject: [PATCH v3 3/6] dt-bindings: soc: Add a binding for the Broadcom
- VCHIQ services. (v3)
-In-Reply-To: <20180309184417.23368-3-eric@anholt.net>
-References: <20180309184417.23368-1-eric@anholt.net>
- <20180309184417.23368-3-eric@anholt.net>
-Message-ID: <20180318124823.jfvoy3xraogsxpdi@rob-hp-laptop>
+Date: Sun, 18 Mar 2018 07:48:38 -0500
+Subject: [PATCH v2 3/3] dt-bindings: phy-mtk-tphy: add properties for U2
+ slew rate calibrate
+In-Reply-To: <94a7d3b1240297cd0cac82df52954d0a53d50d36.1520832210.git.chunfeng.yun@mediatek.com>
+References: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520832210.git.chunfeng.yun@mediatek.com>
+ <94a7d3b1240297cd0cac82df52954d0a53d50d36.1520832210.git.chunfeng.yun@mediatek.com>
+Message-ID: <20180318124838.ruakamqywz4jd6jz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 09, 2018 at 10:44:14AM -0800, Eric Anholt wrote:
-> The VCHIQ communication channel can be provided by BCM283x and Capri
-> SoCs, to communicate with the VPU-side OS services.
+On Mon, Mar 12, 2018 at 01:25:40PM +0800, Chunfeng Yun wrote:
+> Add two properties of ref_clk and coefficient used by U2 slew rate
+> calibrate which may vary on different SoCs
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 > ---
+>  Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> v2: VCHI->VCHIQ, dropped firmware property, added cache-line-size
-> v3: Dropped cache-line-size, s/vchi@/mailbox@/
-> 
->  .../devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt   | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> index 41e09ed..0d34b2b 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> @@ -27,6 +27,10 @@ Optional properties (controller (parent) node):
+>   - reg		: offset and length of register shared by multiple ports,
+>  		  exclude port's private register. It is needed on mt2701
+>  		  and mt8173, but not on mt2712.
+> + - mediatek,src-ref-clk-mhz	: frequency of reference clock for slew rate
+> +		  calibrate
+> + - mediatek,src-coef	: coefficient for slew rate calibrate, depends on
+> +		  SoC process
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+What are valid values? This is one cell?
+
+>  
+>  Required properties (port (child) node):
+>  - reg		: address and length of the register set for the port.
+> -- 
+> 1.9.1
+> 
