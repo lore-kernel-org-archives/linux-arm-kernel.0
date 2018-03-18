@@ -1,28 +1,39 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 18 Mar 2018 06:42:48 +0200
-Subject: [PATCH net-next 05/10] phy: cp110-comphy: 2.5G SGMII mode
-In-Reply-To: <20180316103351.16616-6-antoine.tenart@bootlin.com>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
- <20180316103351.16616-6-antoine.tenart@bootlin.com>
-Message-ID: <20180318044247.kp3i2ymvrj5fdoj3@sapphire.tkos.co.il>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Sun, 18 Mar 2018 11:14:13 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
+ source
+In-Reply-To: <1521342853-2941-1-git-send-email-Anson.Huang@nxp.com>
+References: <1521342853-2941-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1521342853-2941-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
+On i.MX6SX SabreAuto board, there is external 24MHz clock
+source for analog clock2, add this clock source to clock tree.
 
-On Fri, Mar 16, 2018 at 11:33:46AM +0100, Antoine Tenart wrote:
-> This patch allow the CP100 comphy to configure some lanes in the
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6sx-sabreauto.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Should be 'CP110'.
-
-> 2.5G SGMII mode. This mode is quite close to SGMII and uses nearly the
-> same code path.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
-
-baruch
-
+diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+index 72da5ac..83f7cac 100644
+--- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+@@ -18,6 +18,14 @@
+ 		reg = <0x80000000 0x80000000>;
+ 	};
+ 
++	clocks {
++		codec_osc: anaclk2 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24576000>;
++		};
++	};
++
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+2.7.4
