@@ -1,139 +1,150 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Sun, 18 Mar 2018 20:07:15 +0100
-Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
-In-Reply-To: <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-11-mylene.josserand@bootlin.com>
- <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
-Message-ID: <20180318200715.363f3135@dell-desktop.home>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 18 Mar 2018 12:13:50 -0700
+Subject: [PATCH v2 0/7] KASan for arm
+In-Reply-To: <20180318125342.4278-1-liuwenliang@huawei.com>
+References: <20180318125342.4278-1-liuwenliang@huawei.com>
+Message-ID: <5d400f83-6557-0862-c851-a9a2df51f5ee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Hi Abbott,
 
-Please, excuse me for this late answer and thank you for the review!
+On 03/18/2018 05:53 AM, Abbott Liu wrote:
+> Changelog:
+> v2 - v1
+> - Fixed some compiling error which happens on changing kernel compression
+>   mode to lzma/xz/lzo/lz4.
+>   ---Reported by: Florian Fainelli <f.fainelli@gmail.com>,
+> 	     Russell King - ARM Linux <linux@armlinux.org.uk>
+> - Fixed a compiling error cause by some older arm instruction set(armv4t)
+>   don't suppory movw/movt which is reported by kbuild.
+> - Changed the pte flag from _L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN to
+>   pgprot_val(PAGE_KERNEL).
+>   ---Reported by: Russell King - ARM Linux <linux@armlinux.org.uk>
+> - Moved Enable KASan patch as the last one.
+>   ---Reported by: Florian Fainelli <f.fainelli@gmail.com>,
+>      Russell King - ARM Linux <linux@armlinux.org.uk>
+> - Moved the definitions of cp15 registers from 
+>   arch/arm/include/asm/kvm_hyp.h to arch/arm/include/asm/cp15.h.
+>   ---Asked by: Mark Rutland <mark.rutland@arm.com>
+> - Merge the following commits into the commit
+>   Define the virtual space of KASan's shadow region:
+>   1) Define the virtual space of KASan's shadow region;
+>   2) Avoid cleaning the KASan shadow area's mapping table;
+>   3) Add KASan layout;
+> - Merge the following commits into the commit
+>   Initialize the mapping of KASan shadow memory:
+>   1) Initialize the mapping of KASan shadow memory;
+>   2) Add support arm LPAE;
+>   3) Don't need to map the shadow of KASan's shadow memory;
+>      ---Reported by: Russell King - ARM Linux <linux@armlinux.org.uk>
+>   4) Change mapping of kasan_zero_page int readonly.
 
-On Wed, 7 Mar 2018 12:18:33 +0000
-Marc Zyngier <marc.zyngier@arm.com> wrote:
-
-> On 23/02/18 13:37, Myl?ne Josserand wrote:
-> > On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.  
-> 
-> Only on A7? Is that specific to your platform?
-
-I do not really know other Allwinner's platforms about this subject. At
-least, the sun9i-a80 which is a Cortex-a15/a7 does not need that but it
-is necessary for sun8i-a83t which is a cortex-a7. Maybe, Chen-Yu or
-Maxime could help us on it.
-
-> 
-> > It should be done by the bootloader but it is currently not the case,
-> > even for boot CPU because this SoC is booting in secure mode.
-> > It leads to an random offset value meaning that each CPU will have a
-> > different time, which isn't working very well.
-> > 
-> > Add assembly code used for boot CPU and secondary CPU cores to make
-> > sure that the CNTVOFF register is initialized.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > ---
-> >  arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
-> >  arch/arm/mach-sunxi/sunxi.c   |  4 ++++
-> >  2 files changed, 25 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> > index d5c97e945e69..605896251927 100644
-> > --- a/arch/arm/mach-sunxi/headsmp.S
-> > +++ b/arch/arm/mach-sunxi/headsmp.S
-> > @@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
-> >  	first: .word sunxi_mc_smp_first_comer - .
-> >  ENDPROC(sunxi_mc_smp_cluster_cache_enable)
-> >  
-> > +ENTRY(sunxi_init_cntvoff)
-> > +	/*
-> > +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
-> > +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
-> > +	 * then it should be handled by the secure code
-> > +	 */
-> > +	cps	#MON_MODE
-> > +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
-> > +	orr	r0, r1, #1
-> > +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
-> > +	instr_sync  
-> 
-> Since these CPUs are all ARMv7, you can use isb directly. Nobody wants
-> to see more of the CP15 barriers.
-
-Okay, thanks, I will update that.
+Thanks for posting these patches! Just FWIW, you cannot quite add
+someone's Tested-by for a patch series that was just resubmitted given
+the differences with v1. I just gave it a spin on a Cortex-A5 (no LPAE)
+and it looks like test_kasan.ko is passing, great job!
 
 > 
-> > +	mov	r0, #0
-> > +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
-> > +	instr_sync
-> > +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
-> > +	instr_sync
-> > +	cps	#SVC_MODE
-> > +	ret	lr  
+> Hi,all:
+>    These patches add arch specific code for kernel address sanitizer
+> (see Documentation/kasan.txt).
 > 
-> Given that this code is identical to the shmobile hack, it'd be good to
-> make it common, one way or another.
-
-Sure, I will try that.
-May you have some hints to give me on how to implement it?
-
+>    1/8 of kernel addresses reserved for shadow memory. There was no
+> big enough hole for this, so virtual addresses for shadow were
+> stolen from user space.
 > 
-> > +ENDPROC(sunxi_init_cntvoff)
-> > +
-> >  #ifdef CONFIG_SMP
-> >  ENTRY(sunxi_boot)
-> >  	bl	sunxi_mc_smp_cluster_cache_enable
-> > +	bl	sunxi_init_cntvoff
-> >  	b	secondary_startup
-> >  ENDPROC(sunxi_boot)
-> >  
-> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> > index 5e9602ce1573..4bb041492b54 100644
-> > --- a/arch/arm/mach-sunxi/sunxi.c
-> > +++ b/arch/arm/mach-sunxi/sunxi.c
-> > @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
-> >  };
-> >  
-> >  extern void __init sun6i_reset_init(void);
-> > +extern void sunxi_init_cntvoff(void);
-> > +
-> >  static void __init sun6i_timer_init(void)
-> >  {
-> > +	sunxi_init_cntvoff();
-> > +  
+>    At early boot stage the whole shadow region populated with just
+> one physical page (kasan_zero_page). Later, this page reused
+> as readonly zero shadow for some memory that KASan currently
+> don't track (vmalloc).
 > 
-> It is slightly odd that some CPUs get initialized from the early asm
-> code, and some others do a detour via some C code. I'm sure this could
-> be made to work
-
-Renesa's code was also doing that so I thought it could be ok to do
-it.
-
-Without this code in this timer_init function, it fails to initialize
-cntvoff correctly:
-http://code.bulix.org/i9fhc9-302612?raw
-
-How should I implement that?
-
+>   After mapping the physical memory, pages for shadow memory are
+> allocated and mapped.
+>   
+>   KASan's stack instrumentation significantly increases stack's
+> consumption, so CONFIG_KASAN doubles THREAD_SIZE.
 > 
-> >  	of_clk_init(NULL);
-> >  	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
-> >  		sun6i_reset_init();
-> >   
+>   Functions like memset/memmove/memcpy do a lot of memory accesses.
+> If bad pointer passed to one of these function it is important
+> to catch this. Compiler's instrumentation cannot do this since
+> these functions are written in assembly.
 > 
-> Thanks,
+>   KASan replaces memory functions with manually instrumented variants.
+> Original functions declared as weak symbols so strong definitions
+> in mm/kasan/kasan.c could replace them. Original functions have aliases
+> with '__' prefix in name, so we could call non-instrumented variant
+> if needed.
 > 
-> 	M.
-
-Thanks,
-
-Best regards,
+>   Some files built without kasan instrumentation (e.g. mm/slub.c).
+> Original mem* function replaced (via #define) with prefixed variants
+> to disable memory access checks for such files.
+> 
+>   On arm LPAE architecture,  the mapping table of KASan shadow memory(if
+> PAGE_OFFSET is 0xc0000000, the KASan shadow memory's virtual space is
+> 0xb6e000000~0xbf000000) can't be filled in do_translation_fault function,
+> because kasan instrumentation maybe cause do_translation_fault function
+> accessing KASan shadow memory. The accessing of KASan shadow memory in
+> do_translation_fault function maybe cause dead circle. So the mapping table
+> of KASan shadow memory need be copyed in pgd_alloc function.
+> 
+> 
+> Most of the code comes from:
+> https://github.com/aryabinin/linux/commit/0b54f17e70ff50a902c4af05bb92716eb95acefe
+> 
+> These patches are tested on vexpress-ca15, vexpress-ca9
+> 
+> 
+> 
+> Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
+> Tested-by: Abbott Liu <liuwenliang@huawei.com>
+> Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+> 
+> Abbott Liu (3):
+>   2 1-byte checks more safer for memory_is_poisoned_16
+>   Add TTBR operator for kasan_init
+>   Define the virtual space of KASan's shadow region
+> 
+> Andrey Ryabinin (4):
+>   Disable instrumentation for some code
+>   Replace memory function for kasan
+>   Initialize the mapping of KASan shadow memory
+>   Enable KASan for arm
+> 
+>  arch/arm/Kconfig                      |   1 +
+>  arch/arm/boot/compressed/Makefile     |   1 +
+>  arch/arm/boot/compressed/decompress.c |   2 +
+>  arch/arm/boot/compressed/libfdt_env.h |   2 +
+>  arch/arm/include/asm/cp15.h           | 104 ++++++++++++
+>  arch/arm/include/asm/kasan.h          |  23 +++
+>  arch/arm/include/asm/kasan_def.h      |  52 ++++++
+>  arch/arm/include/asm/kvm_hyp.h        |  52 ------
+>  arch/arm/include/asm/memory.h         |   5 +
+>  arch/arm/include/asm/pgalloc.h        |   7 +-
+>  arch/arm/include/asm/string.h         |  17 ++
+>  arch/arm/include/asm/thread_info.h    |   4 +
+>  arch/arm/kernel/entry-armv.S          |   5 +-
+>  arch/arm/kernel/entry-common.S        |   6 +-
+>  arch/arm/kernel/head-common.S         |   7 +-
+>  arch/arm/kernel/setup.c               |   2 +
+>  arch/arm/kernel/unwind.c              |   3 +-
+>  arch/arm/kvm/hyp/cp15-sr.c            |  12 +-
+>  arch/arm/kvm/hyp/switch.c             |   6 +-
+>  arch/arm/lib/memcpy.S                 |   3 +
+>  arch/arm/lib/memmove.S                |   5 +-
+>  arch/arm/lib/memset.S                 |   3 +
+>  arch/arm/mm/Makefile                  |   3 +
+>  arch/arm/mm/init.c                    |   6 +
+>  arch/arm/mm/kasan_init.c              | 290 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mm/mmu.c                     |   7 +-
+>  arch/arm/mm/pgd.c                     |  14 ++
+>  arch/arm/vdso/Makefile                |   2 +
+>  mm/kasan/kasan.c                      |  24 ++-
+>  29 files changed, 588 insertions(+), 80 deletions(-)
+>  create mode 100644 arch/arm/include/asm/kasan.h
+>  create mode 100644 arch/arm/include/asm/kasan_def.h
+>  create mode 100644 arch/arm/mm/kasan_init.c
+> 
 
 -- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Florian
