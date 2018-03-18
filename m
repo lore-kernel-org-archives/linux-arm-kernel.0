@@ -1,38 +1,44 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Sun, 18 Mar 2018 23:59:36 +0100
-Subject: [PATCH v2] net: ethernet: arc: Fix a potential memory leak if an
- optional regulator is deferred
-Message-ID: <7fd57a4e79da41dccf55430cbc43de340a7f1826.1521061530.git.christophe.jaillet@wanadoo.fr>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Sun, 18 Mar 2018 23:28:43 +0000
+Subject: [PATCH v2 0/4] drivers: pwm: sun4i: Improve support for A64 SoCs
+Message-ID: <20180318232847.14278-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the optional regulator is deferred, we must release some resources.
-They will be re-allocated when the probe function will be called again.
+A rework addressing the comments. I dropped the H6 and the reset support
+for now, to simplify merging this series.
 
-Fixes: 6eacf31139bf ("ethernet: arc: Add support for Rockchip SoC layer device tree bindings")
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
-v2: v1 did not compile because of an erroneous variable name. s/ret/err/
----
- drivers/net/ethernet/arc/emac_rockchip.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+This series adds PWM support for new Allwinner SoCs. Actually the A64 PWM 
+is fully compatible with the A13 and H3 PWM IP, so the driver does not
+need any additional code. But I use this opportunity to provide some
+cleanup.
+Patch 1 removes a no longer used parameter from our per-SoC data structure,
+to simplify patch 2, which groups SoCs with a compatible PWM controller.
+Patch 3 adds the new compatible strings to the binding documentation
+(and just there, we expect to use "allwinner,sun5i-a13-pwm" as a fallback
+compatible string).
+The final patch 4 adds the respective PWM nodes to the A64 .dtsi.
+This eventually does not enable the PWM on any new board at the moment, as
+the PWM pins are either not usable (muxed with Ethernet) or exposed on
+a header pin not dedicated to PWM. But the Pinebook (and Teres I) should be
+able to use the PWM for the LCD backlights, plus users can enable the
+R_PWM on their Pine64 boards, if they like.
 
-diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-index 16f9bee992fe..8ee9dfd0e363 100644
---- a/drivers/net/ethernet/arc/emac_rockchip.c
-+++ b/drivers/net/ethernet/arc/emac_rockchip.c
-@@ -169,8 +169,10 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 	/* Optional regulator for PHY */
- 	priv->regulator = devm_regulator_get_optional(dev, "phy");
- 	if (IS_ERR(priv->regulator)) {
--		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
-+		if (PTR_ERR(priv->regulator) == -EPROBE_DEFER) {
-+			err = -EPROBE_DEFER;
-+			goto out_clk_disable;
-+		}
- 		dev_err(dev, "no regulator found\n");
- 		priv->regulator = NULL;
- 	}
+Tested by manually enabling r_pwm on a Pine64-LTS.
+
+Cheers,
+Andre.
+
+Andre Przywara (4):
+  pwm: sun4i: drop unused .has_rdy member
+  pwm: sun4i: simplify controller mapping
+  dt-bindings: pwm: sunxi: add new compatible strings
+  dts: sunxi: A64: Add PWM controllers
+
+ .../devicetree/bindings/pwm/pwm-sun4i.txt          |  2 ++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 28 +++++++++++++++++++
+ drivers/pwm/pwm-sun4i.c                            | 32 ++++++----------------
+ 3 files changed, 38 insertions(+), 24 deletions(-)
+
 -- 
 2.14.1
