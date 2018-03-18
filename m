@@ -1,112 +1,85 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Sun, 18 Mar 2018 13:02:42 +0100
-Subject: [PATCH v2] Revert "mm/page_alloc: fix memmap_init_zone pageblock
- alignment"
-In-Reply-To: <4c31c5ed-9f68-10c3-c73f-5b6f34dd82c9@codeaurora.org>
-References: <20180314192937.12888-1-ard.biesheuvel@linaro.org>
- <20180314222530.GA6300@wintermute>
- <4c31c5ed-9f68-10c3-c73f-5b6f34dd82c9@codeaurora.org>
-Message-ID: <72c94b30-f837-91ac-ac3a-86d7846dfb23@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 18 Mar 2018 07:47:53 -0500
+Subject: [PATCH RESEND 2/2] clk: stm32: Add DSI clock for STM32F469 Board
+In-Reply-To: <1520578651-28849-3-git-send-email-gabriel.fernandez@st.com>
+References: <1520578651-28849-1-git-send-email-gabriel.fernandez@st.com>
+ <1520578651-28849-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20180318124753.nbjbs5deslihl7ir@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/03/2018 23:53, Shanker Donthineni wrote:
+On Fri, Mar 09, 2018 at 07:57:31AM +0100, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> Hi Ard,
+> This patch adds DSI clock for STM32F469 board
 > 
-> On 03/14/2018 05:25 PM, Jan Glauber wrote:
->> On Wed, Mar 14, 2018 at 07:29:37PM +0000, Ard Biesheuvel wrote:
->>> This reverts commit 864b75f9d6b0100bb24fdd9a20d156e7cda9b5ae.
->>
->> FWIW, the revert fixes the boot hang I'm seeing on ThunderX1.
->>
->> --Jan
->>
-> 
-> Thanks for this patch, it fixes the boot hang on QDF2400 platform.
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  drivers/clk/clk-stm32f4.c                 | 11 ++++++++++-
+>  include/dt-bindings/clock/stm32fx-clock.h |  3 ++-
+>  2 files changed, 12 insertions(+), 2 deletions(-)
 
-For the record, this also fixes boot on Amlogic S905X (and for the whole GX family I presume).
-
-Thanks,
-Neil
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 > 
-> 
->>> Commit 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock
->>> alignment") modified the logic in memmap_init_zone() to initialize
->>> struct pages associated with invalid PFNs, to appease a VM_BUG_ON()
->>> in move_freepages(), which is redundant by its own admission, and
->>> dereferences struct page fields to obtain the zone without checking
->>> whether the struct pages in question are valid to begin with.
->>>
->>> Commit 864b75f9d6b0 only makes it worse, since the rounding it does
->>> may cause pfn assume the same value it had in a prior iteration of
->>> the loop, resulting in an infinite loop and a hang very early in the
->>> boot. Also, since it doesn't perform the same rounding on start_pfn
->>> itself but only on intermediate values following an invalid PFN, we
->>> may still hit the same VM_BUG_ON() as before.
->>>
->>> So instead, let's fix this at the core, and ensure that the BUG
->>> check doesn't dereference struct page fields of invalid pages.
->>>
->>> Fixes: 864b75f9d6b0 ("mm/page_alloc: fix memmap_init_zone pageblock alignment")
->>> Cc: Daniel Vacek <neelx@redhat.com>
->>> Cc: Mel Gorman <mgorman@techsingularity.net>
->>> Cc: Michal Hocko <mhocko@suse.com>
->>> Cc: Paul Burton <paul.burton@imgtec.com>
->>> Cc: Pavel Tatashin <pasha.tatashin@oracle.com>
->>> Cc: Vlastimil Babka <vbabka@suse.cz>
->>> Cc: Andrew Morton <akpm@linux-foundation.org>
->>> Cc: Linus Torvalds <torvalds@linux-foundation.org>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  mm/page_alloc.c | 13 +++++--------
->>>  1 file changed, 5 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->>> index 3d974cb2a1a1..635d7dd29d7f 100644
->>> --- a/mm/page_alloc.c
->>> +++ b/mm/page_alloc.c
->>> @@ -1910,7 +1910,9 @@ static int move_freepages(struct zone *zone,
->>>  	 * Remove at a later date when no bug reports exist related to
->>>  	 * grouping pages by mobility
->>>  	 */
->>> -	VM_BUG_ON(page_zone(start_page) != page_zone(end_page));
->>> +	VM_BUG_ON(pfn_valid(page_to_pfn(start_page)) &&
->>> +	          pfn_valid(page_to_pfn(end_page)) &&
->>> +	          page_zone(start_page) != page_zone(end_page));
->>>  #endif
->>>  
->>>  	if (num_movable)
->>> @@ -5359,14 +5361,9 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
->>>  			/*
->>>  			 * Skip to the pfn preceding the next valid one (or
->>>  			 * end_pfn), such that we hit a valid pfn (or end_pfn)
->>> -			 * on our next iteration of the loop. Note that it needs
->>> -			 * to be pageblock aligned even when the region itself
->>> -			 * is not. move_freepages_block() can shift ahead of
->>> -			 * the valid region but still depends on correct page
->>> -			 * metadata.
->>> +			 * on our next iteration of the loop.
->>>  			 */
->>> -			pfn = (memblock_next_valid_pfn(pfn, end_pfn) &
->>> -					~(pageblock_nr_pages-1)) - 1;
->>> +			pfn = memblock_next_valid_pfn(pfn, end_pfn) - 1;
->>>  #endif
->>>  			continue;
->>>  		}
->>> -- 
->>> 2.15.1
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+> index 96c6b6b..d15bae6 100644
+> --- a/drivers/clk/clk-stm32f4.c
+> +++ b/drivers/clk/clk-stm32f4.c
+> @@ -521,7 +521,7 @@ struct stm32f4_pll_data {
+>  };
+>  
+>  static const struct stm32f4_pll_data stm32f469_pll[MAX_PLL_DIV] = {
+> -	{ PLL,	   50, { "pll",	     "pll-q",    NULL	    } },
+> +	{ PLL,	   50, { "pll",	     "pll-q",    "pll-r"    } },
+>  	{ PLL_I2S, 50, { "plli2s-p", "plli2s-q", "plli2s-r" } },
+>  	{ PLL_SAI, 50, { "pllsai-p", "pllsai-q", "pllsai-r" } },
+>  };
+> @@ -1047,6 +1047,8 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+>  	"no-clock", "lse", "lsi", "hse-rtc"
+>  };
+>  
+> +static const char *dsi_parent[2] = { NULL, "pll-r" };
+> +
+>  static const char *lcd_parent[1] = { "pllsai-r-div" };
+>  
+>  static const char *i2s_parents[2] = { "plli2s-r", NULL };
+> @@ -1156,6 +1158,12 @@ struct stm32f4_clk_data {
+>  		NO_GATE, 0,
+>  		0
+>  	},
+> +	{
+> +		CLK_F469_DSI, "dsi", dsi_parent, ARRAY_SIZE(dsi_parent),
+> +		STM32F4_RCC_DCKCFGR, 29, 1,
+> +		STM32F4_RCC_APB2ENR, 27,
+> +		CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT
+> +	},
+>  };
+>  
+>  static const struct stm32_aux_clk stm32f746_aux_clk[] = {
+> @@ -1450,6 +1458,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+>  	stm32f4_gate_map = data->gates_map;
+>  
+>  	hse_clk = of_clk_get_parent_name(np, 0);
+> +	dsi_parent[0] = hse_clk;
+>  
+>  	i2s_in_clk = of_clk_get_parent_name(np, 1);
+>  
+> diff --git a/include/dt-bindings/clock/stm32fx-clock.h b/include/dt-bindings/clock/stm32fx-clock.h
+> index 4d523b0..58d8b51 100644
+> --- a/include/dt-bindings/clock/stm32fx-clock.h
+> +++ b/include/dt-bindings/clock/stm32fx-clock.h
+> @@ -35,8 +35,9 @@
+>  #define CLK_SAIQ_PDIV		13
+>  #define CLK_HSI			14
+>  #define CLK_SYSCLK		15
+> +#define CLK_F469_DSI		16
+>  
+> -#define END_PRIMARY_CLK		16
+> +#define END_PRIMARY_CLK		17
+>  
+>  #define CLK_HDMI_CEC		16
+>  #define CLK_SPDIF		17
+> -- 
+> 1.9.1
 > 
