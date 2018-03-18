@@ -1,85 +1,136 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Sun, 18 Mar 2018 23:28:45 +0000
-Subject: [PATCH v2 2/4] pwm: sun4i: simplify controller mapping
-In-Reply-To: <20180318232847.14278-1-andre.przywara@arm.com>
-References: <20180318232847.14278-1-andre.przywara@arm.com>
-Message-ID: <20180318232847.14278-3-andre.przywara@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 19 Mar 2018 00:46:41 +0100
+Subject: [PATCH v1 13/19] arm: dts: mt7623: move node mt6323 leds to
+ mt6323.dtsi
+In-Reply-To: <1520030818.8089.190.camel@mtkswgap22>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+ <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
+ <20180302154050.lfxojro4woucl6lh@rob-hp-laptop>
+ <1520030818.8089.190.camel@mtkswgap22>
+Message-ID: <457d4fb4-dd38-af89-208d-31477a2eb20e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment we assign our supported compatible strings to a respective
-instance of our sun4i_pwm_data structure, even though some of them
-are the same.
-To avoid further clutter, split out the three different combinations of
-features we have at the moment and name them accordingly.
-This should make it more obvious which compatible string to use for new
-SoCs.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/pwm/pwm-sun4i.c | 26 ++++++++------------------
- 1 file changed, 8 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index b3e4a4b3774d..078172dee462 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -310,27 +310,17 @@ static const struct pwm_ops sun4i_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
--static const struct sun4i_pwm_data sun4i_pwm_data_a10 = {
-+static const struct sun4i_pwm_data sun4i_pwm_dual_nobypass = {
- 	.has_prescaler_bypass = false,
- 	.npwm = 2,
- };
- 
--static const struct sun4i_pwm_data sun4i_pwm_data_a10s = {
-+static const struct sun4i_pwm_data sun4i_pwm_dual_bypass = {
- 	.has_prescaler_bypass = true,
- 	.npwm = 2,
- };
- 
--static const struct sun4i_pwm_data sun4i_pwm_data_a13 = {
--	.has_prescaler_bypass = true,
--	.npwm = 1,
--};
--
--static const struct sun4i_pwm_data sun4i_pwm_data_a20 = {
--	.has_prescaler_bypass = true,
--	.npwm = 2,
--};
--
--static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
-+static const struct sun4i_pwm_data sun4i_pwm_single_bypass = {
- 	.has_prescaler_bypass = true,
- 	.npwm = 1,
- };
-@@ -338,19 +328,19 @@ static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
- static const struct of_device_id sun4i_pwm_dt_ids[] = {
- 	{
- 		.compatible = "allwinner,sun4i-a10-pwm",
--		.data = &sun4i_pwm_data_a10,
-+		.data = &sun4i_pwm_dual_nobypass,
- 	}, {
- 		.compatible = "allwinner,sun5i-a10s-pwm",
--		.data = &sun4i_pwm_data_a10s,
-+		.data = &sun4i_pwm_dual_bypass,
- 	}, {
- 		.compatible = "allwinner,sun5i-a13-pwm",
--		.data = &sun4i_pwm_data_a13,
-+		.data = &sun4i_pwm_single_bypass,
- 	}, {
- 		.compatible = "allwinner,sun7i-a20-pwm",
--		.data = &sun4i_pwm_data_a20,
-+		.data = &sun4i_pwm_dual_bypass,
- 	}, {
- 		.compatible = "allwinner,sun8i-h3-pwm",
--		.data = &sun4i_pwm_data_h3,
-+		.data = &sun4i_pwm_single_bypass,
- 	}, {
- 		/* sentinel */
- 	},
--- 
-2.14.1
+On 03/02/2018 11:46 PM, Sean Wang wrote:
+> On Fri, 2018-03-02 at 09:40 -0600, Rob Herring wrote:
+>> On Fri, Feb 23, 2018 at 06:16:33PM +0800, sean.wang at mediatek.com wrote:
+>>> From: Sean Wang <sean.wang@mediatek.com>
+>>>
+>>> Since those LEDs are parts of PMIC MT6323, it is reasonable to merge
+>>> those LEDs node definition back into mt6323.dtsi. This way can improve
+>>> the reusability of those nodes among different boards with the same PMIC.
+>>>
+>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>>> Cc: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>  arch/arm/boot/dts/mt6323.dtsi                 | 26 ++++++++++++++++++++++++-
+>>>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 28 ---------------------------
+>>>  2 files changed, 25 insertions(+), 29 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/mt6323.dtsi b/arch/arm/boot/dts/mt6323.dtsi
+>>> index 7c783d6..44c5642 100644
+>>> --- a/arch/arm/boot/dts/mt6323.dtsi
+>>> +++ b/arch/arm/boot/dts/mt6323.dtsi
+>>> @@ -1,5 +1,5 @@
+>>>  /*
+>>> - * Copyright (c) 2017 MediaTek Inc.
+>>> + * Copyright (c) 2017-2018 MediaTek Inc.
+>>>   * Author: John Crispin <john@phrozen.org>
+>>>   *	   Sean Wang <sean.wang@mediatek.com>
+>>>   * This program is free software; you can redistribute it and/or modify
+>>> @@ -237,5 +237,29 @@
+>>>  				regulator-enable-ramp-delay = <216>;
+>>>  			};
+>>>  		};
+>>> +
+>>> +		leds {
+>>> +			compatible = "mediatek,mt6323-led";
+>>> +			#address-cells = <1>;
+>>> +			#size-cells = <0>;
+>>> +
+>>> +			led at 0 {
+>>> +				reg = <0>;
+>>> +				label = "mt6323:isink:green";
+>>
+>> Changing the label potentially breaks userspace. And the fact that it is 
+>> a green LED is very much board specific. So I think the old location was 
+>> correct. You could put the parent node here and leave these child nodes 
+>> in the board specific dts file.
+>>
+> 
+> yes, I really made a mistake on breaking userspace with a label change.
+> 
+> I will keep the parent node here and then leave these child nodes into
+> board specific dts files. thanks for your idea!
+> 
+
+Sorry I didn't see your email when I wrote my first comment. Yes this sounds
+like the proper way to do it.
+
+Regards,
+Matthias
+
+>>
+>>> +				default-state = "off";
+>>> +			};
+>>> +
+>>> +			led at 1 {
+>>> +				reg = <1>;
+>>> +				label = "mt6323:isink:red";
+>>> +				default-state = "off";
+>>> +			};
+>>> +
+>>> +			led at 2 {
+>>> +				reg = <2>;
+>>> +				label = "mt6323:isink:blue";
+>>> +				default-state = "off";
+>>> +			};
+>>> +		};
+>>>  	};
+>>>  };
+>>> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+>>> index 75e61c4..767b225 100644
+>>> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+>>> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+>>> @@ -483,34 +483,6 @@
+>>>  	status = "okay";
+>>>  };
+>>>  
+>>> -&pwrap {
+>>> -	mt6323 {
+>>> -		mt6323led: led {
+>>> -			compatible = "mediatek,mt6323-led";
+>>> -			#address-cells = <1>;
+>>> -			#size-cells = <0>;
+>>> -
+>>> -			led at 0 {
+>>> -				reg = <0>;
+>>> -				label = "bpi-r2:isink:green";
+>>> -				default-state = "off";
+>>> -			};
+>>> -
+>>> -			led at 1 {
+>>> -				reg = <1>;
+>>> -				label = "bpi-r2:isink:red";
+>>> -				default-state = "off";
+>>> -			};
+>>> -
+>>> -			led at 2 {
+>>> -				reg = <2>;
+>>> -				label = "bpi-r2:isink:blue";
+>>> -				default-state = "off";
+>>> -			};
+>>> -		};
+>>> -	};
+>>> -};
+>>> -
+>>>  &spi0 {
+>>>  	pinctrl-names = "default";
+>>>  	pinctrl-0 = <&spi0_pins_a>;
+>>> -- 
+>>> 2.7.4
+>>>
+> 
+> 
