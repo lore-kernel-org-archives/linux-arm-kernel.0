@@ -1,115 +1,37 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 18 Mar 2018 23:01:40 +0100
-Subject: [PATCH v1 13/19] arm: dts: mt7623: move node mt6323 leds to
- mt6323.dtsi
-In-Reply-To: <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
- <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
-Message-ID: <a4097137-4364-6ca3-ece3-1842569d7e54@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 18 Mar 2018 23:04:18 +0100
+Subject: 4.16-rc5 on Motorola Droid 4
+Message-ID: <20180318220418.GA22880@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
+I have the phone, I have safestrap installed, kexec seems to work
+(crashes my system). But I can't get any output from the new kernel.
 
-On 02/23/2018 11:16 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Since those LEDs are parts of PMIC MT6323, it is reasonable to merge
-> those LEDs node definition back into mt6323.dtsi. This way can improve
-> the reusability of those nodes among different boards with the same PMIC.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/mt6323.dtsi                 | 26 ++++++++++++++++++++++++-
->  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 28 ---------------------------
->  2 files changed, 25 insertions(+), 29 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/mt6323.dtsi b/arch/arm/boot/dts/mt6323.dtsi
-> index 7c783d6..44c5642 100644
-> --- a/arch/arm/boot/dts/mt6323.dtsi
-> +++ b/arch/arm/boot/dts/mt6323.dtsi
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright (c) 2017 MediaTek Inc.
-> + * Copyright (c) 2017-2018 MediaTek Inc.
->   * Author: John Crispin <john@phrozen.org>
->   *	   Sean Wang <sean.wang@mediatek.com>
->   * This program is free software; you can redistribute it and/or modify
-> @@ -237,5 +237,29 @@
->  				regulator-enable-ramp-delay = <216>;
->  			};
->  		};
-> +
-> +		leds {
-> +			compatible = "mediatek,mt6323-led";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			led at 0 {
-> +				reg = <0>;
-> +				label = "mt6323:isink:green";
-> +				default-state = "off";
-> +			};
-> +
-> +			led at 1 {
-> +				reg = <1>;
-> +				label = "mt6323:isink:red";
-> +				default-state = "off";
-> +			};
-> +
-> +			led at 2 {
-> +				reg = <2>;
-> +				label = "mt6323:isink:blue";
-> +				default-state = "off";
-> +			};
-> +		};
+All the howtos assume serial connection, but I don't yet have
+that. I'm really bad at soldering. IIRC display should work in the
+latest kernels, maybe with some patches?
 
-The color of the leds are defined by the board and not by the PMIC. So as long
-as you don't have any good arguments, I tend not to merge this one.
+Could someone give me .config and git hash that works for him? Once I
+get working display I should be able to continue easily. I'd really
+like to get voice calls working...
 
-Regards,
-Matthias
+I took a brief look through dts, and I did not find anything that
+could be easily used for debugging. (It seems that capslock LED and
+keyboard backlight is not yet supported? Also volume down  seems to be
+supported but not volume up, funny).
 
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> index 75e61c4..767b225 100644
-> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> @@ -483,34 +483,6 @@
->  	status = "okay";
->  };
->  
-> -&pwrap {
-> -	mt6323 {
-> -		mt6323led: led {
-> -			compatible = "mediatek,mt6323-led";
-> -			#address-cells = <1>;
-> -			#size-cells = <0>;
-> -
-> -			led at 0 {
-> -				reg = <0>;
-> -				label = "bpi-r2:isink:green";
-> -				default-state = "off";
-> -			};
-> -
-> -			led at 1 {
-> -				reg = <1>;
-> -				label = "bpi-r2:isink:red";
-> -				default-state = "off";
-> -			};
-> -
-> -			led at 2 {
-> -				reg = <2>;
-> -				label = "bpi-r2:isink:blue";
-> -				default-state = "off";
-> -			};
-> -		};
-> -	};
-> -};
-> -
->  &spi0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&spi0_pins_a>;
-> 
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180318/b5c348d3/attachment.sig>
