@@ -1,31 +1,33 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 18 Mar 2018 21:34:40 +0100
-Subject: [PATCH 5/7] ARM: multi_v7_defconfig: add GPMI NAND controller support
-In-Reply-To: <20180318203442.19759-1-stefan@agner.ch>
-References: <20180318203442.19759-1-stefan@agner.ch>
-Message-ID: <20180318203442.19759-5-stefan@agner.ch>
+Date: Sun, 18 Mar 2018 21:34:36 +0100
+Subject: [PATCH 1/7] ARM: multi_v7_defconfig: add OCOTP driver for NXP SoCs
+Message-ID: <20180318203442.19759-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPMI NAND controller support as required by some NXP i.MX6/7
-based boards.
+Enable on-chip OTP NVMEM support for NXP i.MX and VF610 SoCs.
+Since OTP values might be required by drivers required during
+boot, make sure the driver is built-in (e.g. i.MX thermal
+driver).
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 66c32741a130..984e509d41bf 100644
+index da7387689b88..6395425854cc 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -208,6 +208,7 @@ CONFIG_MTD_NAND_DENALI_DT=y
- CONFIG_MTD_NAND_OMAP2=y
- CONFIG_MTD_NAND_OMAP_BCH=y
- CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_NAND_GPMI_NAND=y
- CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_VF610_NFC=y
- CONFIG_MTD_NAND_DAVINCI=y
+@@ -917,7 +917,9 @@ CONFIG_PHY_SAMSUNG_USB2=m
+ CONFIG_PHY_TEGRA_XUSB=y
+ CONFIG_PHY_BRCM_SATA=y
+ CONFIG_NVMEM=y
++CONFIG_NVMEM_IMX_OCOTP=y
+ CONFIG_NVMEM_SUNXI_SID=y
++CONFIG_NVMEM_VF610_OCOTP=y
+ CONFIG_BCM2835_MBOX=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
+ CONFIG_EFI_VARS=m
 -- 
 2.16.2
