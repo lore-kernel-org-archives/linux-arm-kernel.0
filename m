@@ -1,684 +1,139 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 18 Mar 2018 18:34:03 +0100
-Subject: [PATCH V3] ARM: dts: imx6q: Add support for the DHCOM iMX6 SoM and
- PDK2
-Message-ID: <20180318173403.31460-1-marex@denx.de>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Sun, 18 Mar 2018 20:07:15 +0100
+Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+In-Reply-To: <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+ <20180223133742.26044-11-mylene.josserand@bootlin.com>
+ <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
+Message-ID: <20180318200715.363f3135@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the DH i.MX6 Quad based SoM and a PDK2 evaluation board.
-The evaluation board features three serial ports, USB OTG, USB host with
-an USB hub, Fast or Gigabit ethernet, eMMC, uSD, SD, mSATA, analog audio,
-PCIe and HDMI video output.
+Hello Mark,
 
-All of the aforementioned features are supported by this patch.
+Please, excuse me for this late answer and thank you for the review!
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
----
-V2: - Rename the DT nodes to match upstream expectations
-    - Connect reg_arm and reg_soc regulators
-V3: - Drop fsl,spi-num-chipselects
-    - Use macros for interrupt and GPIO types
-    - Drop power-gpios
----
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/imx6q-dhcom-pdk2.dts | 150 +++++++++++
- arch/arm/boot/dts/imx6q-dhcom-som.dtsi | 476 +++++++++++++++++++++++++++++++++
- 3 files changed, 627 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-dhcom-pdk2.dts
- create mode 100644 arch/arm/boot/dts/imx6q-dhcom-som.dtsi
+On Wed, 7 Mar 2018 12:18:33 +0000
+Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 3b4cc1b64a1e..b53aaa60e7a3 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -439,6 +439,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-cubox-i-emmc-som-v15.dtb \
- 	imx6q-cubox-i-som-v15.dtb \
- 	imx6q-dfi-fs700-m60.dtb \
-+	imx6q-dhcom-pdk2.dtb \
- 	imx6q-display5-tianma-tm070-1280x768.dtb \
- 	imx6q-dmo-edmqmx6.dtb \
- 	imx6q-dms-ba16.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-dhcom-pdk2.dts b/arch/arm/boot/dts/imx6q-dhcom-pdk2.dts
-new file mode 100644
-index 000000000000..b5425f26fc86
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-dhcom-pdk2.dts
-@@ -0,0 +1,150 @@
-+// SPDX-License-Identifier: (GPL-2.0+)
-+/*
-+ * Copyright (C) 2015 DH electronics GmbH
-+ * Copyright (C) 2018 Marek Vasut <marex@denx.de>
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q-dhcom-som.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX6 Quad DHCOM Premium Developer Kit (2)";
-+	compatible = "dh,imx6q-dhcom-pdk2", "dh,imx6q-dhcom-som", "fsl,imx6q";
-+
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	clk_ext_audio_codec: clock-codec {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24000000>;
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx-audio-sgtl5000";
-+		model = "imx-sgtl5000";
-+		ssi-controller = <&ssi1>;
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"LINE_IN", "Line In Jack",
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <1>;
-+		mux-ext-port = <3>;
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_ext>;
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	sgtl5000: codec at a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		clocks = <&clk_ext_audio_codec>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog_base &pinctrl_hog>;
-+
-+	pinctrl_hog: hog-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x400120b0
-+			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x400120b0
-+			MX6QDL_PAD_GPIO_5__GPIO1_IO05		0x400120b0
-+			MX6QDL_PAD_CSI0_DAT17__GPIO6_IO03	0x400120b0
-+			MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x120b0
-+			MX6QDL_PAD_DI0_PIN4__GPIO4_IO20		0x400120b0
-+			MX6QDL_PAD_EIM_D27__GPIO3_IO27		0x120b0
-+			MX6QDL_PAD_KEY_ROW0__GPIO4_IO07		0x120b0
-+			MX6QDL_PAD_KEY_COL1__GPIO4_IO08		0x400120b0
-+			MX6QDL_PAD_NANDF_CS1__GPIO6_IO14	0x400120b0
-+			MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x400120b0
-+			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09		0x400120b0
-+			MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x400120b0
-+			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x400120b0
-+			MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21	0x400120b0
-+			MX6QDL_PAD_GPIO_18__GPIO7_IO13		0x400120b0
-+			MX6QDL_PAD_SD1_CMD__GPIO1_IO18		0x400120b0
-+			MX6QDL_PAD_SD1_DAT0__GPIO1_IO16		0x400120b0
-+			MX6QDL_PAD_SD1_DAT1__GPIO1_IO17		0x400120b0
-+			MX6QDL_PAD_SD1_DAT2__GPIO1_IO19		0x400120b0
-+			MX6QDL_PAD_SD1_CLK__GPIO1_IO20		0x400120b0
-+			MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18	0x400120b0
-+			MX6QDL_PAD_CSI0_MCLK__GPIO5_IO19	0x400120b0
-+			MX6QDL_PAD_KEY_COL0__GPIO4_IO06		0x400120b0
-+		>;
-+	};
-+
-+	pinctrl_audmux_ext: audmux-ext-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-+			MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-+			MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-+			MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
-+		>;
-+	};
-+
-+	pinctrl_enet_1G: enet-1G-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x100b0
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x100b0
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x100b0
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x100b0
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x100b0
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x100b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+			MX6QDL_PAD_EIM_D29__GPIO3_IO29		0x000b0
-+			MX6QDL_PAD_GPIO_0__GPIO1_IO00		0x000b1
-+			MX6QDL_PAD_EIM_D26__GPIO3_IO26		0x000b1
-+		>;
-+	};
-+
-+	pinctrl_pcie: pcie-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x1b0b1
-+		>;
-+	};
-+};
-+
-+&pcie {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pcie>;
-+	reset-gpio = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&ssi1 {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6q-dhcom-som.dtsi b/arch/arm/boot/dts/imx6q-dhcom-som.dtsi
-new file mode 100644
-index 000000000000..bbba0671f0f4
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-dhcom-som.dtsi
-@@ -0,0 +1,476 @@
-+// SPDX-License-Identifier: (GPL-2.0+)
-+/*
-+ * Copyright (C) 2015 DH electronics GmbH
-+ * Copyright (C) 2018 Marek Vasut <marex@denx.de>
-+ */
-+
-+#include "imx6q.dtsi"
-+#include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/clock/imx6qdl-clock.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	aliases {
-+		mmc0 = &usdhc2;
-+		mmc1 = &usdhc3;
-+		mmc2 = &usdhc4;
-+		mmc3 = &usdhc1;
-+	};
-+
-+	memory at 10000000 {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
-+	reg_usb_h1_vbus: regulator-usb-h1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 31 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_3p3v: regulator-3P3V {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "okay";
-+};
-+
-+&can2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	status = "okay";
-+};
-+
-+&ecspi1 {
-+	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio4 11 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
-+	status = "okay";
-+
-+	flash at 0 {	/* S25FL116K */
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "jedec,spi-nor";
-+		spi-max-frequency = <50000000>;
-+		reg = <0>;
-+		m25p,fast-read;
-+	};
-+};
-+
-+&ecspi2 {
-+	cs-gpios = <&gpio5 29 GPIO_ACTIVE_LOW>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi2>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_100M>;
-+	phy-mode = "rmii";
-+	phy-handle = <&ethphy0>;
-+	status = "okay";
-+
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethphy0: ethernet-phy at 0 {	/* SMSC LAN8710Ai */
-+			reg = <0>;
-+			max-speed = <100>;
-+			reset-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-+			reset-delay-us = <1000>;
-+			reset-post-delay-us = <1000>;
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+
-+	ltc3676: pmic at 3c {
-+		compatible = "lltc,ltc3676";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pmic_hw300>;
-+		reg = <0x3c>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-+
-+		regulators {
-+			sw1_reg: sw1 {
-+				regulator-min-microvolt = <787500>;
-+				regulator-max-microvolt = <1527272>;
-+				lltc,fb-voltage-divider = <100000 110000>;
-+				regulator-suspend-mem-microvolt = <1040000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <1885714>;
-+				regulator-max-microvolt = <3657142>;
-+				lltc,fb-voltage-divider = <100000 28000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3_reg: sw3 {
-+				regulator-min-microvolt = <787500>;
-+				regulator-max-microvolt = <1527272>;
-+				lltc,fb-voltage-divider = <100000 110000>;
-+				regulator-suspend-mem-microvolt = <980000>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <855571>;
-+				regulator-max-microvolt = <1659291>;
-+				lltc,fb-voltage-divider = <100000 93100>;
-+				regulator-ramp-delay = <7000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo1_reg: ldo1 {
-+				regulator-min-microvolt = <3240306>;
-+				regulator-max-microvolt = <3240306>;
-+				lltc,fb-voltage-divider = <102000 29400>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo2_reg: ldo2 {
-+				regulator-min-microvolt = <2484708>;
-+				regulator-max-microvolt = <2484708>;
-+				lltc,fb-voltage-divider = <100000 41200>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+
-+	touchscreen at 49 {	/* TSC2004 */
-+		compatible = "ti,tsc2004";
-+		reg = <0x49>;
-+		vio-supply = <&reg_3p3v>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_tsc2004_hw300>;
-+		interrupts-extended = <&gpio4 14 IRQ_TYPE_EDGE_FALLING>;
-+		status = "disabled";
-+	};
-+
-+	eeprom at 50 {
-+		compatible = "atmel,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+
-+	rtc at 56 {
-+		compatible = "rv3029c2";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_rtc_hw300>;
-+		reg = <0x56>;
-+		interrupt-parent = <&gpio7>;
-+		interrupts = <12 2>;
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog_base>;
-+
-+	pinctrl_hog_base: hog-base-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_A19__GPIO2_IO19		0x120b0
-+			MX6QDL_PAD_EIM_A23__GPIO6_IO06		0x120b0
-+			MX6QDL_PAD_EIM_A22__GPIO2_IO16		0x120b0
-+			MX6QDL_PAD_EIM_A16__GPIO2_IO22		0x120b0
-+			MX6QDL_PAD_EIM_A17__GPIO2_IO21		0x120b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi1: ecspi1-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-+			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
-+			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
-+			MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x1b0b0
-+			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi2: ecspi2-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT10__ECSPI2_MISO	0x100b1
-+			MX6QDL_PAD_CSI0_DAT9__ECSPI2_MOSI	0x100b1
-+			MX6QDL_PAD_CSI0_DAT8__ECSPI2_SCLK	0x100b1
-+			MX6QDL_PAD_CSI0_DAT11__GPIO5_IO29	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_enet_100M: enet-100M-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
-+			MX6QDL_PAD_EIM_WAIT__GPIO5_IO00		0x000b0
-+			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x000b1
-+			MX6QDL_PAD_GPIO_7__GPIO1_IO07		0x120b0
-+		>;
-+	};
-+
-+	pinctrl_flexcan1: flexcan1-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x1b0b0
-+			MX6QDL_PAD_GPIO_8__FLEXCAN1_RX		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_flexcan2: flexcan2-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT0__FLEXCAN2_TX	0x1b0b0
-+			MX6QDL_PAD_SD3_DAT1__FLEXCAN2_RX	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
-+			MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-+			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_3__I2C3_SCL		0x4001b8b1
-+			MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_pmic_hw300: pmic-hw300-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1B0B0
-+		>;
-+	};
-+
-+	pinctrl_rtc_hw300: rtc-hw300-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x120B0
-+		>;
-+	};
-+
-+	pinctrl_tsc2004_hw300: tsc2004-hw300-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL4__GPIO4_IO14		0x120B0
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_EIM_D20__UART1_RTS_B		0x1b0b1
-+			MX6QDL_PAD_EIM_D19__UART1_CTS_B		0x4001b0b1
-+			MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x4001b0b1
-+			MX6QDL_PAD_EIM_D24__GPIO3_IO24		0x4001b0b1
-+			MX6QDL_PAD_EIM_D25__GPIO3_IO25		0x4001b0b1
-+			MX6QDL_PAD_EIM_EB3__GPIO2_IO31		0x4001b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart4: uart4-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart5: uart5-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT14__UART5_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT15__UART5_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT18__UART5_RTS_B	0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT19__UART5_CTS_B	0x4001b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbh1: usbh1-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x120B0
-+		>;
-+	};
-+
-+	pinctrl_usbotg: usbotg-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-+			MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
-+			MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-+			MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-+			MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-+			MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-+			MX6QDL_PAD_NANDF_CS3__GPIO6_IO16	0x120B0
-+		>;
-+	};
-+
-+	pinctrl_usdhc3: usdhc3-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-+			MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x120B0
-+		>;
-+	};
-+
-+	pinctrl_usdhc4: usdhc4-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD4_CMD__SD4_CMD		0x17059
-+			MX6QDL_PAD_SD4_CLK__SD4_CLK		0x10059
-+			MX6QDL_PAD_SD4_DAT0__SD4_DATA0		0x17059
-+			MX6QDL_PAD_SD4_DAT1__SD4_DATA1		0x17059
-+			MX6QDL_PAD_SD4_DAT2__SD4_DATA2		0x17059
-+			MX6QDL_PAD_SD4_DAT3__SD4_DATA3		0x17059
-+			MX6QDL_PAD_SD4_DAT4__SD4_DATA4		0x17059
-+			MX6QDL_PAD_SD4_DAT5__SD4_DATA5		0x17059
-+			MX6QDL_PAD_SD4_DAT6__SD4_DATA6		0x17059
-+			MX6QDL_PAD_SD4_DAT7__SD4_DATA7		0x17059
-+		>;
-+	};
-+};
-+
-+&reg_arm {
-+	vin-supply = <&sw3_reg>;
-+};
-+
-+&reg_soc {
-+	vin-supply = <&sw1_reg>;
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	uart-has-rtscts;
-+	dtr-gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
-+	dsr-gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
-+	dcd-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
-+	rng-gpios = <&gpio2 31 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh1>;
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	cd-gpios = <&gpio6 16 GPIO_ACTIVE_HIGH>;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	cd-gpios = <&gpio7 8 GPIO_ACTIVE_LOW>;
-+	fsl,wp-controller;
-+	keep-power-in-suspend;
-+	status = "disabled";
-+};
-+
-+&usdhc4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc4>;
-+	non-removable;
-+	bus-width = <8>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
+> On 23/02/18 13:37, Myl?ne Josserand wrote:
+> > On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.  
+> 
+> Only on A7? Is that specific to your platform?
+
+I do not really know other Allwinner's platforms about this subject. At
+least, the sun9i-a80 which is a Cortex-a15/a7 does not need that but it
+is necessary for sun8i-a83t which is a cortex-a7. Maybe, Chen-Yu or
+Maxime could help us on it.
+
+> 
+> > It should be done by the bootloader but it is currently not the case,
+> > even for boot CPU because this SoC is booting in secure mode.
+> > It leads to an random offset value meaning that each CPU will have a
+> > different time, which isn't working very well.
+> > 
+> > Add assembly code used for boot CPU and secondary CPU cores to make
+> > sure that the CNTVOFF register is initialized.
+> > 
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > ---
+> >  arch/arm/mach-sunxi/headsmp.S | 21 +++++++++++++++++++++
+> >  arch/arm/mach-sunxi/sunxi.c   |  4 ++++
+> >  2 files changed, 25 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> > index d5c97e945e69..605896251927 100644
+> > --- a/arch/arm/mach-sunxi/headsmp.S
+> > +++ b/arch/arm/mach-sunxi/headsmp.S
+> > @@ -65,9 +65,30 @@ ENTRY(sunxi_mc_smp_cluster_cache_enable)
+> >  	first: .word sunxi_mc_smp_first_comer - .
+> >  ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+> >  
+> > +ENTRY(sunxi_init_cntvoff)
+> > +	/*
+> > +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
+> > +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+> > +	 * then it should be handled by the secure code
+> > +	 */
+> > +	cps	#MON_MODE
+> > +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
+> > +	orr	r0, r1, #1
+> > +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
+> > +	instr_sync  
+> 
+> Since these CPUs are all ARMv7, you can use isb directly. Nobody wants
+> to see more of the CP15 barriers.
+
+Okay, thanks, I will update that.
+
+> 
+> > +	mov	r0, #0
+> > +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
+> > +	instr_sync
+> > +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
+> > +	instr_sync
+> > +	cps	#SVC_MODE
+> > +	ret	lr  
+> 
+> Given that this code is identical to the shmobile hack, it'd be good to
+> make it common, one way or another.
+
+Sure, I will try that.
+May you have some hints to give me on how to implement it?
+
+> 
+> > +ENDPROC(sunxi_init_cntvoff)
+> > +
+> >  #ifdef CONFIG_SMP
+> >  ENTRY(sunxi_boot)
+> >  	bl	sunxi_mc_smp_cluster_cache_enable
+> > +	bl	sunxi_init_cntvoff
+> >  	b	secondary_startup
+> >  ENDPROC(sunxi_boot)
+> >  
+> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > index 5e9602ce1573..4bb041492b54 100644
+> > --- a/arch/arm/mach-sunxi/sunxi.c
+> > +++ b/arch/arm/mach-sunxi/sunxi.c
+> > @@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
+> >  };
+> >  
+> >  extern void __init sun6i_reset_init(void);
+> > +extern void sunxi_init_cntvoff(void);
+> > +
+> >  static void __init sun6i_timer_init(void)
+> >  {
+> > +	sunxi_init_cntvoff();
+> > +  
+> 
+> It is slightly odd that some CPUs get initialized from the early asm
+> code, and some others do a detour via some C code. I'm sure this could
+> be made to work
+
+Renesa's code was also doing that so I thought it could be ok to do
+it.
+
+Without this code in this timer_init function, it fails to initialize
+cntvoff correctly:
+http://code.bulix.org/i9fhc9-302612?raw
+
+How should I implement that?
+
+> 
+> >  	of_clk_init(NULL);
+> >  	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
+> >  		sun6i_reset_init();
+> >   
+> 
+> Thanks,
+> 
+> 	M.
+
+Thanks,
+
+Best regards,
+
 -- 
-2.16.2
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
