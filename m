@@ -1,34 +1,47 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 18 Mar 2018 21:34:38 +0100
-Subject: [PATCH 3/7] ARM: multi_v7_defconfig: configure I2C driver built-in
+Date: Sun, 18 Mar 2018 21:34:39 +0100
+Subject: [PATCH 4/7] ARM: multi_v7_defconfig: add RN5T618 PMIC family support
 In-Reply-To: <20180318203442.19759-1-stefan@agner.ch>
 References: <20180318203442.19759-1-stefan@agner.ch>
-Message-ID: <20180318203442.19759-3-stefan@agner.ch>
+Message-ID: <20180318203442.19759-4-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PMIC often require the I2C bus, and the PMIC regulators might be
-necessary to power on eMMC/SD-card or other supplies required
-for successful boot. Make sure I2C driver for i.MX devices is
-built-in.
+This allows to successfully boot Colibri iMX7 which is using
+the Ricoh RN5T567 PMIC.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/configs/multi_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 608bc85856a1..fc142dc75092 100644
+index fc142dc75092..66c32741a130 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -368,7 +368,7 @@ CONFIG_I2C_DIGICOLOR=m
- CONFIG_I2C_EMEV2=m
- CONFIG_I2C_GPIO=m
- CONFIG_I2C_EXYNOS5=y
--CONFIG_I2C_IMX=m
-+CONFIG_I2C_IMX=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_RK3X=y
+@@ -477,6 +477,7 @@ CONFIG_ARM_SP805_WATCHDOG=y
+ CONFIG_AT91SAM9X_WATCHDOG=y
+ CONFIG_SAMA5D4_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++CONFIG_RN5T618_WATCHDOG=y
+ CONFIG_ST_LPC_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+@@ -512,6 +513,7 @@ CONFIG_MFD_RK808=y
+ CONFIG_MFD_PM8XXX=y
+ CONFIG_MFD_QCOM_RPM=y
+ CONFIG_MFD_SPMI_PMIC=y
++CONFIG_MFD_RN5T618=y
+ CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_STMPE=y
+ CONFIG_MFD_PALMAS=y
+@@ -548,6 +550,7 @@ CONFIG_REGULATOR_PBIAS=y
+ CONFIG_REGULATOR_PWM=y
+ CONFIG_REGULATOR_QCOM_RPM=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
++CONFIG_REGULATOR_RN5T618=y
+ CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_REGULATOR_S5M8767=y
+ CONFIG_REGULATOR_TI_ABB=y
 -- 
 2.16.2
