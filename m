@@ -1,52 +1,115 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun, 18 Mar 2018 23:57:39 +0200
-Subject: [PATCH v5 3/4] clk: lpc32xx: Set name of regmap_config
-In-Reply-To: <20180312095142.30854-4-jeffy.chen@rock-chips.com>
-References: <20180312095142.30854-1-jeffy.chen@rock-chips.com>
- <20180312095142.30854-4-jeffy.chen@rock-chips.com>
-Message-ID: <23a9cbf8-9b1d-f7ec-b980-a16c9b2c4d84@mleia.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 18 Mar 2018 23:01:40 +0100
+Subject: [PATCH v1 13/19] arm: dts: mt7623: move node mt6323 leds to
+ mt6323.dtsi
+In-Reply-To: <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+ <e8a515a1aeaf06a7162b8b0e390bee615b323303.1519378872.git.sean.wang@mediatek.com>
+Message-ID: <a4097137-4364-6ca3-ece3-1842569d7e54@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
 
-On 03/12/2018 11:51 AM, Jeffy Chen wrote:
-> We are now allowing to register debugfs without a valid device, and not
-> having a valid name will end up using "dummy*" to create debugfs dir.
+
+On 02/23/2018 11:16 AM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Since those LEDs are parts of PMIC MT6323, it is reasonable to merge
+> those LEDs node definition back into mt6323.dtsi. This way can improve
+> the reusability of those nodes among different boards with the same PMIC.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
 > ---
+>  arch/arm/boot/dts/mt6323.dtsi                 | 26 ++++++++++++++++++++++++-
+>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 28 ---------------------------
+>  2 files changed, 25 insertions(+), 29 deletions(-)
 > 
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3: None
-> 
->  drivers/clk/nxp/clk-lpc32xx.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-> index f5d815f577e0..a2a0a7f3bc57 100644
-> --- a/drivers/clk/nxp/clk-lpc32xx.c
-> +++ b/drivers/clk/nxp/clk-lpc32xx.c
-> @@ -67,6 +67,7 @@
->  #define LPC32XX_USB_CLK_STS		0xF8
+> diff --git a/arch/arm/boot/dts/mt6323.dtsi b/arch/arm/boot/dts/mt6323.dtsi
+> index 7c783d6..44c5642 100644
+> --- a/arch/arm/boot/dts/mt6323.dtsi
+> +++ b/arch/arm/boot/dts/mt6323.dtsi
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright (c) 2017 MediaTek Inc.
+> + * Copyright (c) 2017-2018 MediaTek Inc.
+>   * Author: John Crispin <john@phrozen.org>
+>   *	   Sean Wang <sean.wang@mediatek.com>
+>   * This program is free software; you can redistribute it and/or modify
+> @@ -237,5 +237,29 @@
+>  				regulator-enable-ramp-delay = <216>;
+>  			};
+>  		};
+> +
+> +		leds {
+> +			compatible = "mediatek,mt6323-led";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			led at 0 {
+> +				reg = <0>;
+> +				label = "mt6323:isink:green";
+> +				default-state = "off";
+> +			};
+> +
+> +			led at 1 {
+> +				reg = <1>;
+> +				label = "mt6323:isink:red";
+> +				default-state = "off";
+> +			};
+> +
+> +			led at 2 {
+> +				reg = <2>;
+> +				label = "mt6323:isink:blue";
+> +				default-state = "off";
+> +			};
+> +		};
+
+The color of the leds are defined by the board and not by the PMIC. So as long
+as you don't have any good arguments, I tend not to merge this one.
+
+Regards,
+Matthias
+
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> index 75e61c4..767b225 100644
+> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> @@ -483,34 +483,6 @@
+>  	status = "okay";
+>  };
 >  
->  static struct regmap_config lpc32xx_scb_regmap_config = {
-> +	.name = "lpc32xx-scb",
-
-please rename it to "scb", LPC32xx SoC name is already known from the context.
-
-When it's done, feel free to add to the next version my
-
-Acked-by: Vladimir Zapolskiy <vz@mleia.com>
-
->  	.reg_bits = 32,
->  	.val_bits = 32,
->  	.reg_stride = 4,
+> -&pwrap {
+> -	mt6323 {
+> -		mt6323led: led {
+> -			compatible = "mediatek,mt6323-led";
+> -			#address-cells = <1>;
+> -			#size-cells = <0>;
+> -
+> -			led at 0 {
+> -				reg = <0>;
+> -				label = "bpi-r2:isink:green";
+> -				default-state = "off";
+> -			};
+> -
+> -			led at 1 {
+> -				reg = <1>;
+> -				label = "bpi-r2:isink:red";
+> -				default-state = "off";
+> -			};
+> -
+> -			led at 2 {
+> -				reg = <2>;
+> -				label = "bpi-r2:isink:blue";
+> -				default-state = "off";
+> -			};
+> -		};
+> -	};
+> -};
+> -
+>  &spi0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&spi0_pins_a>;
 > 
-
-Thank you for the change.
-
---
-With best wishes,
-Vladimir
