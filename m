@@ -1,55 +1,54 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Sun, 18 Mar 2018 16:09:57 +0100
-Subject: [PATCH 1/4] dt-bindings: clock: meson: update documentation
- with hhi syscon
-In-Reply-To: <20180318125222.kqtybu4hiwvsx3om@rob-hp-laptop>
-References: <20180315115545.1884-1-jbrunet@baylibre.com>
- <20180315115545.1884-2-jbrunet@baylibre.com>
- <20180318125222.kqtybu4hiwvsx3om@rob-hp-laptop>
-Message-ID: <1521385797.6569.90.camel@baylibre.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 18 Mar 2018 16:34:15 +0100
+Subject: [GIT PULL] ARM: dts: exynos: Second pull for v4.17
+Message-ID: <20180318153415.8229-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2018-03-18 at 07:52 -0500, Rob Herring wrote:
-> On Thu, Mar 15, 2018 at 12:55:42PM +0100, Jerome Brunet wrote:
-> > The HHI register region hosts more than just clocks and needs to
-> > accessed drivers other than the clock controller, such as the display
-> > driver.
-> > 
-> > This register region should be managed by syscon. It is already the case
-> > on gxbb/gxl and it soon will be on axg. The clock controllers must use
-> > this system controller instead of directly mapping the registers.
-> 
-> Sounds like a kernel problem, not a DT one.
+Hi,
 
-It's a platform problem, so it has much a kernel problem (solution already
-merged) as a DT problem
+On top of previous DT pull.
 
-DT wise, we've got two devices mapping the same region
+Best regards,
+Krzysztof
 
-in arch/arm64/boot/dts/amlogic/meson-gx.dtsi:
-> system-controller at 0 
 
-which is used by the display device.
+The following changes since commit 6f4870753f29edf7dc39444246f9e39987b8b158:
 
-and in arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi (same for gxl)
-> clock-controller at 0
+  ARM: dts: exynos: Fix IOMMU support for GScaler devices on Exynos5250 (2018-03-05 19:11:40 +0100)
 
-It has worked so far because the clock controller claims the region w/o
-reserving it but it remains unsafe since both device may access the same region.
-The fix is to have the clock controller go through the existing syscon.
+are available in the git repository at:
 
-> 
-> > 
-> 
-> With a single child, there is really no point to this change. A single 
-> node can provide multiple functions. Look at nodes that are both reset 
-> and clock providers.
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.17-2
 
-There is more than a single user, as explained above and in the cover letter of
-this series.
+for you to fetch changes up to 720b5fc3ca0f72b30452089d0510cd1e81a3df6d:
 
-> 
-> What other functions are there?
-> 
-> Rob
+  ARM: dts: exynos: Add #sound-dai-cells property to exynos5250 i2s nodes (2018-03-14 20:14:24 +0100)
+
+----------------------------------------------------------------
+Samsung DTS ARM changes for v4.17, part two
+
+1. Fix audio on Exynos5250 Chromebook Snow.
+2. Enable HDMI audio Chromebook Snow, Peach Pit and Peach Pi.
+3. Fix debounce of "OK" key on Midas (Trats2, Galaxy S3) boards.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: dts: exynos: Fix "debounce-interval" property misspelling in Midas
+
+Sylwester Nawrocki (7):
+      ARM: dts: exynos: Add #sound-dai-cells property to hdmi node in exynos5250.dtsi
+      ARM: dts: exynos: Add audio clocks configuration for Snow Chromebook
+      ARM: dts: exynos: Add missing clock and DAI properties to the max98095 node in Snow Chromebook
+      ARM: dts: exynos: Enable HDMI audio on Snow Chromebook
+      ARM: dts: exynos: Enable HDMI audio support on Peach Pit
+      ARM: dts: exynos: Enable HDMI audio support on Peach Pi
+      ARM: dts: exynos: Add #sound-dai-cells property to exynos5250 i2s nodes
+
+ arch/arm/boot/dts/exynos4412-midas.dtsi       |  2 +-
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi | 18 ++++++++++++++++++
+ arch/arm/boot/dts/exynos5250-snow.dts         | 11 +++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi             |  5 +++++
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    | 17 +++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     | 17 +++++++++++++++++
+ 6 files changed, 69 insertions(+), 1 deletion(-)
