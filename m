@@ -1,38 +1,102 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 17 Mar 2018 22:34:22 +0000
-Subject: [PATCH 0/2] iio: stm32-dfsdm-adc: fix filter & rate setting
-In-Reply-To: <1ddfcfad-f06e-738f-53cf-11dc56e61da1@st.com>
-References: <1520950986-23116-1-git-send-email-fabrice.gasnier@st.com>
- <1ddfcfad-f06e-738f-53cf-11dc56e61da1@st.com>
-Message-ID: <20180317223422.1a08a254@archlinux>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Sun, 18 Mar 2018 09:52:54 +0800
+Subject: [PATCH] iommu/mediatek: Fix protect memory setting
+Message-ID: <1521337974-22112-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Mar 2018 10:10:09 +0100
-Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
+In MediaTek's IOMMU design, When a iommu translation fault occurs
+(HW can NOT translate the destination address to a valid physical
+address), the IOMMU HW output the dirty data into a special memory
+to avoid corrupting the main memory, this is called "protect memory".
+the register(0x114) for protect memory is a little different between
+mt8173 and mt2712.
 
-> Hello,
-> 
-> For the series:
-> Acked-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Both applied and marked for stable (as I'm not sure exactly when this will hit
-mainline and it may be after the next merge window)
+In the mt8173, bit[30:6] in the register represents [31:7] of the
+physical address. In the 4GB mode, the register bit[31] should be 1.
+While in the mt2712, the bits don't shift. bit[31:7] in the register
+represents [31:7] in the physical address, and bit[1:0] in the
+register represents bit[33:32] of the physical address if it has.
 
-Thanks,
+Fixes: e6dec9230862 ("iommu/mediatek: Add mt2712 IOMMU support")
+Reported-by: Honghui Zhang <honghui.zhang@mediatek.com>
+Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+---
+After adding the setting above, the macro will be complex, like:
+ #define F_MMU_IVRP_PA_SET(data)		({	\
+	const struct mtk_iommu_data *_data =  data;	\
+	phys_addr_t _pa = data->protect_base;		\
+	((_data->m4u_plat == M4U_MT8173) ?		\
+	((_pa >> 1) | (_data->enable_4GB << 31)) :	\
+	(lower_32_bits(_pa) | (_pa >> 32)));		\
+	})
+And this macro is called twice(hw_init and resume).
 
-Jonathan
+To avoid adding this complex macro or a new function, I put
+it in the code and backup its value in the suspend registers.
+---
+ drivers/iommu/mtk_iommu.c | 15 ++++++++++-----
+ drivers/iommu/mtk_iommu.h |  1 +
+ 2 files changed, 11 insertions(+), 5 deletions(-)
 
-> 
-> Thanks,
-> Arnaud
-> 
-> On 03/13/2018 03:23 PM, Fabrice Gasnier wrote:
-> > This series brings fixes to STM32 DFSDM ADC driver.
-> > 
-> > Fabrice Gasnier (2):
-> >   iio: adc: stm32-dfsdm: fix successive oversampling settings
-> >   iio: adc: stm32-dfsdm: fix sample rate for div2 spi clock
-> > 
-> >  drivers/iio/adc/stm32-dfsdm-adc.c | 17 ++++++++++++++---
-> >  1 file changed, 14 insertions(+), 3 deletions(-)
-> >   
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index f227d73..f2832a1 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -60,7 +60,7 @@
+ 	(((prot) & 0x3) << F_MMU_TF_PROTECT_SEL_SHIFT(data))
+ 
+ #define REG_MMU_IVRP_PADDR			0x114
+-#define F_MMU_IVRP_PA_SET(pa, ext)		(((pa) >> 1) | ((!!(ext)) << 31))
++
+ #define REG_MMU_VLD_PA_RNG			0x118
+ #define F_MMU_VLD_PA_RNG(EA, SA)		(((EA) << 8) | (SA))
+ 
+@@ -539,8 +539,13 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 		F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
+ 	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+ 
+-	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
+-		       data->base + REG_MMU_IVRP_PADDR);
++	if (data->m4u_plat == M4U_MT8173)
++		regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
++	else
++		regval = lower_32_bits(data->protect_base) |
++			 upper_32_bits(data->protect_base);
++	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
++
+ 	if (data->enable_4GB && data->m4u_plat != M4U_MT8173) {
+ 		/*
+ 		 * If 4GB mode is enabled, the validate PA range is from
+@@ -695,6 +700,7 @@ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
+ 	reg->ctrl_reg = readl_relaxed(base + REG_MMU_CTRL_REG);
+ 	reg->int_control0 = readl_relaxed(base + REG_MMU_INT_CONTROL0);
+ 	reg->int_main_control = readl_relaxed(base + REG_MMU_INT_MAIN_CONTROL);
++	reg->ivrp_paddr = readl_relaxed(base + REG_MMU_IVRP_PADDR);
+ 	clk_disable_unprepare(data->bclk);
+ 	return 0;
+ }
+@@ -717,8 +723,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+ 	writel_relaxed(reg->ctrl_reg, base + REG_MMU_CTRL_REG);
+ 	writel_relaxed(reg->int_control0, base + REG_MMU_INT_CONTROL0);
+ 	writel_relaxed(reg->int_main_control, base + REG_MMU_INT_MAIN_CONTROL);
+-	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
+-		       base + REG_MMU_IVRP_PADDR);
++	writel_relaxed(reg->ivrp_paddr, base + REG_MMU_IVRP_PADDR);
+ 	if (data->m4u_dom)
+ 		writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0],
+ 		       base + REG_MMU_PT_BASE_ADDR);
+diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+index b4451a1..778498b 100644
+--- a/drivers/iommu/mtk_iommu.h
++++ b/drivers/iommu/mtk_iommu.h
+@@ -32,6 +32,7 @@ struct mtk_iommu_suspend_reg {
+ 	u32				ctrl_reg;
+ 	u32				int_control0;
+ 	u32				int_main_control;
++	u32				ivrp_paddr;
+ };
+ 
+ enum mtk_iommu_plat {
+-- 
+1.8.1.1.dirty
