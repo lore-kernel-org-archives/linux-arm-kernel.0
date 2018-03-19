@@ -1,95 +1,201 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 19 Mar 2018 11:35:04 +0100
-Subject: [PATCH v1 02/19] dt-bindings: cpufreq: mediatek: use - instead of
- _ in examples
-In-Reply-To: <1521427861.13211.8.camel@mtkswgap22>
-References: <cover.1519378871.git.sean.wang@mediatek.com>
- <fd1fc4c6760ab8fcbf7518df1cecf3837ab18d2c.1519378871.git.sean.wang@mediatek.com>
- <20180226041336.GJ26947@vireshk-i7> <1521427861.13211.8.camel@mtkswgap22>
-Message-ID: <1eafba31-0d0b-89d9-fb66-c4ba5ca6b56f@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 19 Mar 2018 11:46:20 +0100
+Subject: [PATCH v7 05/13] ACPI/PPTT: Add Processor Properties Topology
+ Table parsing
+In-Reply-To: <20180228220619.6992-6-jeremy.linton@arm.com>
+References: <20180228220619.6992-1-jeremy.linton@arm.com>
+ <20180228220619.6992-6-jeremy.linton@arm.com>
+Message-ID: <2844054.uKnBIypXtU@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+On Wednesday, February 28, 2018 11:06:11 PM CET Jeremy Linton wrote:
+> ACPI 6.2 adds a new table, which describes how processing units
+> are related to each other in tree like fashion. Caches are
+> also sprinkled throughout the tree and describe the properties
+> of the caches in relation to other caches and processing units.
+> 
+> Add the code to parse the cache hierarchy and report the total
+> number of levels of cache for a given core using
+> acpi_find_last_cache_level() as well as fill out the individual
+> cores cache information with cache_setup_acpi() once the
+> cpu_cacheinfo structure has been populated by the arch specific
+> code.
+> 
+> An additional patch later in the set adds the ability to report
+> peers in the topology using find_acpi_cpu_topology()
+> to report a unique ID for each processing unit at a given level
+> in the tree. These unique id's can then be used to match related
+> processing units which exist as threads, COD (clusters
+> on die), within a given package, etc.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 
-On 03/19/2018 03:51 AM, Sean Wang wrote:
-> 
-> Hi, Matthias
-> 
-> I'm worried you missed the patch which already got both tags Reviewed-by
-> from Rob and Acked-by: Viresh and thus I thought it
-> should be ready for your tree.
-> 
+A couple of cosmetic comments.
 
-Yes, sorry I missed this one. Fortunately it is not critical, can you please add
-it to v2.
+> ---
+>  drivers/acpi/pptt.c | 488 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 488 insertions(+)
+>  create mode 100644 drivers/acpi/pptt.c
+> 
+> diff --git a/drivers/acpi/pptt.c b/drivers/acpi/pptt.c
+> new file mode 100644
+> index 000000000000..883e4318c6cd
+> --- /dev/null
+> +++ b/drivers/acpi/pptt.c
+> @@ -0,0 +1,488 @@
 
-I suppose you realized that I didn't take any from 12/19 onwards, especially 14,
-15 and 17, because they have many conflicts with previous patches in the series.
+Use an SPDX license ID here and then you don't need the license boilerplate
+below.
 
-Sorry for the inconvenience.
-Matthias
+> +/*
+> + * Copyright (C) 2018, ARM
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * This file implements parsing of Processor Properties Topology Table (PPTT)
+> + * which is optionally used to describe the processor and cache topology.
+> + * Due to the relative pointers used throughout the table, this doesn't
+> + * leverage the existing subtable parsing in the kernel.
+> + *
+> + * The PPTT structure is an inverted tree, with each node potentially
+> + * holding one or two inverted tree data structures describing
+> + * the caches available at that level. Each cache structure optionally
+> + * contains properties describing the cache at a given level which can be
+> + * used to override hardware probed values.
+> + */
+> +#define pr_fmt(fmt) "ACPI PPTT: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/cacheinfo.h>
+> +#include <acpi/processor.h>
+> +
+> +/*
+> + * Given the PPTT table, find and verify that the subtable entry
+> + * is located within the table
+> + */
 
-> For the other patches in the same series, I will have v2 to refine them
-> according to these suggestions and comments in v1 and let them easy to
-> review.
-> 
-> Really thanks for your effort!
-> 	
-> 	Sean
-> 
-> 
-> On Mon, 2018-02-26 at 09:43 +0530, Viresh Kumar wrote:
->> On 23-02-18, 18:16, sean.wang at mediatek.com wrote:
->>> From: Sean Wang <sean.wang@mediatek.com>
->>>
->>> It should be good that no use "_" is in examples. Consequently,
->>> those nodes in certain files which have an inappropriate name containing
->>> "_" are all being replaced with "-".
->>>
->>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->>> Cc: Rob Herring <robh+dt@kernel.org>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: linux-pm at vger.kernel.org
->>> Cc: devicetree at vger.kernel.org
->>> ---
->>>  Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt | 6 +++---
->>>  1 file changed, 3 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
->>> index d36f07e..38cfbb5 100644
->>> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
->>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
->>> @@ -26,7 +26,7 @@ Optional properties:
->>>  
->>>  Example 1 (MT7623 SoC):
->>>  
->>> -	cpu_opp_table: opp_table {
->>> +	cpu_opp_table: opp-table {
->>>  		compatible = "operating-points-v2";
->>>  		opp-shared;
->>>  
->>> @@ -86,7 +86,7 @@ Example 1 (MT7623 SoC):
->>>  	};
->>>  
->>>  Example 2 (MT8173 SoC):
->>> -	cpu_opp_table_a: opp_table_a {
->>> +	cpu_opp_table_a: opp-table-a {
->>>  		compatible = "operating-points-v2";
->>>  		opp-shared;
->>>  
->>> @@ -131,7 +131,7 @@ Example 2 (MT8173 SoC):
->>>  		};
->>>  	};
->>>  
->>> -	cpu_opp_table_b: opp_table_b {
->>> +	cpu_opp_table_b: opp-table-b {
->>>  		compatible = "operating-points-v2";
->>>  		opp-shared;
->>
->> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
->>
-> 
-> 
+If you add a comment above a function, make it a kerneldoc.  That
+never hurts, but really helps sometimes.
+
+> +static struct acpi_subtable_header *fetch_pptt_subtable(
+
+Don't break the line here, it can be broken after the first arg.
+
+That's OK even if it is more than 80 chars long.
+
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	struct acpi_subtable_header *entry;
+> +
+> +	/* there isn't a subtable at reference 0 */
+> +	if (pptt_ref < sizeof(struct acpi_subtable_header))
+> +		return NULL;
+> +
+> +	if (pptt_ref + sizeof(struct acpi_subtable_header) > table_hdr->length)
+> +		return NULL;
+> +
+> +	entry = ACPI_ADD_PTR(struct acpi_subtable_header, table_hdr, pptt_ref);
+> +
+> +	if (pptt_ref + entry->length > table_hdr->length)
+> +		return NULL;
+> +
+> +	return entry;
+> +}
+> +
+> +static struct acpi_pptt_processor *fetch_pptt_node(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	return (struct acpi_pptt_processor *)fetch_pptt_subtable(table_hdr,
+> +								 pptt_ref);
+
+You don't need to break this line too.
+
+> +}
+> +
+> +static struct acpi_pptt_cache *fetch_pptt_cache(
+> +	struct acpi_table_header *table_hdr, u32 pptt_ref)
+> +{
+> +	return (struct acpi_pptt_cache *)fetch_pptt_subtable(table_hdr,
+> +							     pptt_ref);
+
+And here.
+
+> +}
+> +
+> +static struct acpi_subtable_header *acpi_get_pptt_resource(
+> +	struct acpi_table_header *table_hdr,
+> +	struct acpi_pptt_processor *node, int resource)
+> +{
+> +	u32 *ref;
+> +
+> +	if (resource >= node->number_of_priv_resources)
+> +		return NULL;
+> +
+> +	ref = ACPI_ADD_PTR(u32, node, sizeof(struct acpi_pptt_processor));
+> +	ref += resource;
+> +
+> +	return fetch_pptt_subtable(table_hdr, *ref);
+> +}
+> +
+> +/*
+> + * Match the type passed and special case the TYPE_UNIFIED so that
+> + * it match both ACPI_PPTT_CACHE_TYPE_UNIFIED(_ALT) types.
+> + */
+> +static inline bool acpi_pptt_match_type(int table_type, int type)
+> +{
+> +	return (((table_type & ACPI_PPTT_MASK_CACHE_TYPE) == type) ||
+> +		(table_type & ACPI_PPTT_CACHE_TYPE_UNIFIED & type));
+> +}
+> +
+> +/*
+> + * Attempt to find a given cache level, while counting the max number
+> + * of cache levels for the cache node.
+> + *
+> + * Given a pptt resource, verify that it is a cache node, then walk
+> + * down each level of caches, counting how many levels are found
+> + * as well as checking the cache type (icache, dcache, unified). If a
+> + * level & type match, then we set found, and continue the search.
+> + * Once the entire cache branch has been walked return its max
+> + * depth.
+> + */
+> +static int acpi_pptt_walk_cache(struct acpi_table_header *table_hdr,
+> +				int local_level,
+> +				struct acpi_subtable_header *res,
+> +				struct acpi_pptt_cache **found,
+> +				int level, int type)
+> +{
+> +	struct acpi_pptt_cache *cache;
+> +
+> +	if (res->type != ACPI_PPTT_TYPE_CACHE)
+> +		return 0;
+> +
+> +	cache = (struct acpi_pptt_cache *) res;
+> +	while (cache) {
+> +		local_level++;
+> +
+> +		if ((local_level == level) &&
+> +		    (cache->flags & ACPI_PPTT_CACHE_TYPE_VALID) &&
+> +		    acpi_pptt_match_type(cache->attributes, type)) {
+> +			if ((*found != NULL) && (cache != *found))
+
+Inner parens are not necessary (and above and in some other places too).
+
+> +				pr_err("Found duplicate cache level/type unable to determine uniqueness\n");
+
+This is not an error, rather a statement that something is inconsistent in the
+ACPI table, so please consider using a different log level here.
+
+[cut]
+
+I guess I could post similar comments for the other general ACPI patches in
+this series, so please address them in there too if applicable.
+
+Thanks!
