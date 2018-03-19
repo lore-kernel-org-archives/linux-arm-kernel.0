@@ -1,25 +1,53 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 19 Mar 2018 13:25:36 -0700
-Subject: [PATCH 1/2] dt-bindings: clock: mediatek: add binding for
- fixed-factor clock axisel_d4
-In-Reply-To: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
-References: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
-Message-ID: <152149113631.242365.14902026013263544653@swboyd.mtv.corp.google.com>
+Date: Mon, 19 Mar 2018 13:31:24 -0700
+Subject: [PATCH v4 3/6] clk: mediatek: add audsys support for MT2701
+In-Reply-To: <f1445b95864af04f1f90d3be96d0a485d1bb4560.1520327262.git.ryder.lee@mediatek.com>
+References: <cover.1520327262.git.ryder.lee@mediatek.com>
+ <f1445b95864af04f1f90d3be96d0a485d1bb4560.1520327262.git.ryder.lee@mediatek.com>
+Message-ID: <152149148431.242365.4625152577833480987@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting sean.wang at mediatek.com (2018-02-28 19:27:50)
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Just add binding for a fixed-factor clock axisel_d4, which would be
-> referenced by PWM devices on MT7623 or MT2701 SoC.
-> 
-> Cc: stable at vger.kernel.org
-> Fixes: 1de9b21633d6 ("clk: mediatek: Add dt-bindings for MT2701 clocks")
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> ---
+Quoting Ryder Lee (2018-03-06 01:09:28)
+> +
+> +static const struct of_device_id of_match_clk_mt2701_aud[] = {
+> +       { .compatible = "mediatek,mt2701-audsys", },
+> +       {}
+> +};
+> +
+> +static int clk_mt2701_aud_probe(struct platform_device *pdev)
+> +{
+> +       struct clk_onecell_data *clk_data;
+> +       struct device_node *node = pdev->dev.of_node;
+> +       int r;
+> +
+> +       clk_data = mtk_alloc_clk_data(CLK_AUD_NR);
+> +
+> +       mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
+> +                              clk_data);
+> +
+> +       r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> +       if (r) {
+> +               dev_err(&pdev->dev,
+> +                       "could not register clock provider: %s: %d\n",
+> +                       pdev->name, r);
+> +
+> +               return r;
+> +       }
 
-Applied to clk-next
+This fails to remove the clk provider when devm_of_platform_populate()
+returns an error.
+
+> +
+> +       return devm_of_platform_populate(&pdev->dev);
+> +}
+> +
+> +static struct platform_driver clk_mt2701_aud_drv = {
+> +       .probe = clk_mt2701_aud_probe,
+> +       .driver = {
+> +               .name = "clk-mt2701-aud",
+> +               .of_match_table = of_match_clk_mt2701_aud,
+> +       },
+> +};
+> +
+> +builtin_platform_driver(clk_mt2701_aud_drv);
