@@ -1,10 +1,12 @@
 From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 19 Mar 2018 02:06:16 +0000
-Subject: [PATCH] ARM: dts: imx7s: add anatop vdd1p2 regulator
-In-Reply-To: <CAOMZO5DJ5-AdudGhk6VfTazJXBpReGHW-bxKM1=bLZO90PnXsg@mail.gmail.com>
-References: <1521272215-22514-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5DJ5-AdudGhk6VfTazJXBpReGHW-bxKM1=bLZO90PnXsg@mail.gmail.com>
-Message-ID: <AM3PR04MB1315193720D4160F00FF0590F5D40@AM3PR04MB1315.eurprd04.prod.outlook.com>
+Date: Mon, 19 Mar 2018 02:09:39 +0000
+Subject: [PATCH 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
+ source
+In-Reply-To: <CAOMZO5CG6XuJ7N8W--zEwEVd9JHj887_7aNp+K8D-Xt1OnKh7A@mail.gmail.com>
+References: <1521342853-2941-1-git-send-email-Anson.Huang@nxp.com>
+ <1521342853-2941-2-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5CG6XuJ7N8W--zEwEVd9JHj887_7aNp+K8D-Xt1OnKh7A@mail.gmail.com>
+Message-ID: <AM3PR04MB1315E9D8E8C4492876E6CFF3F5D40@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,65 +18,47 @@ Best Regards!
 
 > -----Original Message-----
 > From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Monday, March 19, 2018 3:54 AM
+> Sent: Sunday, March 18, 2018 9:04 PM
 > To: Anson Huang <anson.huang@nxp.com>
 > Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
 > <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
 > Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Russell King - ARM Linux <linux@armlinux.org.uk>; dl-linux-imx
-> <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC ARM
-> ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
-> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
-> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH] ARM: dts: imx7s: add anatop vdd1p2 regulator
+> Russell King - ARM Linux <linux@armlinux.org.uk>; Michael Turquette
+> <mturquette@baylibre.com>; Stephen Boyd <sboyd@kernel.org>; S.j. Wang
+> <shengjiu.wang@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; moderated
+> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> <linux-arm-kernel@lists.infradead.org>; open list:OPEN FIRMWARE AND
+> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel
+> <linux-kernel@vger.kernel.org>; linux-clk <linux-clk@vger.kernel.org>
+> Subject: Re: [PATCH 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
+> source
 > 
-> Hi Anson,
-> 
-> On Sat, Mar 17, 2018 at 4:36 AM, Anson Huang <Anson.Huang@nxp.com>
+> On Sun, Mar 18, 2018 at 12:14 AM, Anson Huang <Anson.Huang@nxp.com>
 > wrote:
-> > Add i.MX7S/D anatop vdd1p2 regulator.
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> >  arch/arm/boot/dts/imx7s.dtsi | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/imx7s.dtsi
-> > b/arch/arm/boot/dts/imx7s.dtsi index cd6964f..1210028 100644
-> > --- a/arch/arm/boot/dts/imx7s.dtsi
-> > +++ b/arch/arm/boot/dts/imx7s.dtsi
-> > @@ -565,6 +565,21 @@
-> >                                         anatop-max-voltage =
-> <1200000>;
-> >                                         anatop-enable-bit = <0>;
-> >                                 };
-> > +
-> > +                               reg_1p2:
-> regulator-vdd1p2 at 30360220 {
-> > +                                       reg = <0x30360220>;
-> > +                                       compatible =
-> "fsl,anatop-regulator";
-> > +                                       regulator-name = "vdd1p2";
-> > +                                       regulator-min-microvolt =
-> <1100000>;
-> > +                                       regulator-max-microvolt =
-> <1300000>;
-> > +                                       anatop-reg-offset =
-> <0x220>;
-> > +                                       anatop-vol-bit-shift = <8>;
-> > +                                       anatop-vol-bit-width = <5>;
-> > +                                       anatop-min-bit-val =
-> <0x14>;
-> > +                                       anatop-min-voltage =
-> <1100000>;
-> > +                                       anatop-max-voltage =
-> <1300000>;
-> > +                                       anatop-enable-bit = <0>;
-> > +                               };
 > 
-> Do you also plan to add a consumer for it?
+> > diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> > b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> > index 72da5ac..83f7cac 100644
+> > --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> > +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> > @@ -18,6 +18,14 @@
+> >                 reg = <0x80000000 0x80000000>;
+> >         };
+> >
+> > +       clocks {
+> > +               codec_osc: anaclk2 {
+> > +                       #clock-cells = <0>;
+> > +                       compatible = "fixed-clock";
+> > +                       clock-frequency = <24576000>;
+> > +               };
+> > +       };
+> 
+> The clocks container should be removed and the clock node could be put directly
+> into the root node.
+> 
+> Also, I do not see 'codec_osc' being used in this dts.
  
-This regulator is mainly for USB HSIC, the consumer will be added when HSIC
-do upstream.
+This clock will be used by cs42888 codec, this patch is only to add basic clock source
+to complete the clock tree. Thanks.
 
 Anson.
