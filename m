@@ -1,55 +1,80 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 19 Mar 2018 10:59:47 -0500
-Subject: =?UTF-8?Q?Re:_[PATCH_v8_00/42]_ARM:_davinci:_convert_to_common_cloc?=
- =?UTF-8?Q?k_framework=e2=80=8b?=
-In-Reply-To: <CAMpxmJX-AxhpPpCnWoaSGYmNh3o8iRjdKacnmozsPWmhpcGdTg@mail.gmail.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <CAMpxmJX-AxhpPpCnWoaSGYmNh3o8iRjdKacnmozsPWmhpcGdTg@mail.gmail.com>
-Message-ID: <af89be8d-04dd-e845-1d5b-afdd7e55629f@lechnology.com>
+From: Alexander.Levin@microsoft.com (Sasha Levin)
+Date: Mon, 19 Mar 2018 16:03:27 +0000
+Subject: [PATCH AUTOSEL for 4.9 280/281] signal/arm: Document conflicts with
+ SI_USER and SIGFPE
+In-Reply-To: <20180319155742.13731-1-alexander.levin@microsoft.com>
+References: <20180319155742.13731-1-alexander.levin@microsoft.com>
+Message-ID: <20180319155742.13731-280-alexander.levin@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2018 08:17 AM, Bartosz Golaszewski wrote:
-> 2018-03-16 3:52 GMT+01:00 David Lechner <david@lechnology.com>:
->> This series converts mach-davinci to use the common clock framework.
->>
->> The series works like this, the first 19 patches create new clock drivers
->> using the common clock framework. There are basically 3 groups of clocks -
->> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
->> unique init data, which is the reason for so many patches.
->>
->> Then, starting with "ARM: davinci: pass clock as parameter to
->> davinci_timer_init()", we get the mach code ready for the switch by adding the
->> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
->> around the legacy clocks so that we can switch easily between the old and the
->> new.
->>
->> "ARM: davinci: switch to common clock framework" actually flips the switch
->> to start using the new clock drivers. Then the next 8 patches remove all
->> of the old clock code.
->>
->> The final three patches add device tree clock support to the one SoC that
->> supports it.
->>
->> This series has been tested on LEGO MINDSTORMS EV3 (device tree) and TI
->> OMAP-L138 LCDK (both device tree and legacy board file).
->>
-> 
-> Hi David,
-> 
-> thanks, with the u-boot fix everything seems to work fine. I tested
-> da850-lcdk and da850-evm boards in DT and board file modes.
-> 
-> I'll be working with this series in the following days and will do
-> some thorough testing and rebase my aemif series on top of it. I'll
-> also use the recently merged reset support for board files to get rid
-> of the exported reset functions.
-> 
-> Thanks for your work!
-> 
-> Best regards,
-> Bartosz Golaszewski
-> 
+From: "Eric W. Biederman" <ebiederm@xmission.com>
 
-Sounds like a good plan to me. FYI, I've started a common-clk-v9 branch
-on my GitHub already with a few minor fixes.
+[ Upstream commit 7771c66457004977b616bab785209f49d164f527 ]
+
+Setting si_code to 0 results in a userspace seeing an si_code of 0.
+This is the same si_code as SI_USER.  Posix and common sense requires
+that SI_USER not be a signal specific si_code.  As such this use of 0
+for the si_code is a pretty horribly broken ABI.
+
+Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
+value of __SI_KILL and now sees a value of SIL_KILL with the result
+that uid and pid fields are copied and which might copying the si_addr
+field by accident but certainly not by design.  Making this a very
+flakey implementation.
+
+Utilizing FPE_FIXME, siginfo_layout will now return SIL_FAULT and the
+appropriate fields will be reliably copied.
+
+Possible ABI fixes includee:
+- Send the signal without siginfo
+- Don't generate a signal
+- Possibly assign and use an appropriate si_code
+- Don't handle cases which can't happen
+
+Cc: Russell King <rmk@flint.arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Ref: 451436b7bbb2 ("[ARM] Add support code for ARM hardware vector floating point")
+History Tree: https://git.kernel.org/pub/scm/linux/kernel/git/tglx/history.git
+Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+---
+ arch/arm/include/uapi/asm/siginfo.h | 13 +++++++++++++
+ arch/arm/vfp/vfpmodule.c            |  2 +-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/uapi/asm/siginfo.h
+
+diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
+new file mode 100644
+index 000000000000..d0513880be21
+--- /dev/null
++++ b/arch/arm/include/uapi/asm/siginfo.h
+@@ -0,0 +1,13 @@
++#ifndef __ASM_SIGINFO_H
++#define __ASM_SIGINFO_H
++
++#include <asm-generic/siginfo.h>
++
++/*
++ * SIGFPE si_codes
++ */
++#ifdef __KERNEL__
++#define FPE_FIXME	0	/* Broken dup of SI_USER */
++#endif /* __KERNEL__ */
++
++#endif
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index da0b33deba6d..911468a3e35a 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -257,7 +257,7 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
+ 
+ 	if (exceptions == VFP_EXCEPTION_ERROR) {
+ 		vfp_panic("unhandled bounce", inst);
+-		vfp_raise_sigfpe(0, regs);
++		vfp_raise_sigfpe(FPE_FIXME, regs);
+ 		return;
+ 	}
+ 
+-- 
+2.14.1
