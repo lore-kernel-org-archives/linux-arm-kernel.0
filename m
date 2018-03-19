@@ -1,63 +1,46 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 19 Mar 2018 09:42:02 +0100
-Subject: [GIT PULL 4/7] soc/tegra: Changes for v4.17-rc1
-In-Reply-To: <20180316141850.4876-4-thierry.reding@gmail.com>
-References: <20180316141850.4876-1-thierry.reding@gmail.com>
- <20180316141850.4876-4-thierry.reding@gmail.com>
-Message-ID: <20180319084202.GA24307@ulmo>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Mon, 19 Mar 2018 09:43:48 +0100
+Subject: [PATCH v2 0/7] KASan for arm
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C0076FFD@dggemm510-mbs.china.huawei.com>
+References: <B8AC3E80E903784988AB3003E3E97330C0076FFD@dggemm510-mbs.china.huawei.com>
+Message-ID: <CACT4Y+bec8x8AZOneZ57bnxei=gBGGKG2_VUiqyMaa1OPzov2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 03:18:47PM +0100, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
-> 
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-> 
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-soc
-> 
-> for you to fetch changes up to 0cad0983bd3c002e92dff1e9d7f28c2c312c1973:
-> 
->   soc/tegra: pmc: Use the new reset APIs to manage reset controllers (2018-03-09 08:51:07 +0100)
-> 
-> Thanks,
-> Thierry
-> 
-> ----------------------------------------------------------------
-> soc/tegra: Changes for v4.17-rc1
-> 
-> This contains more Tegra194 support as well as an implementation for the
-> MBIST workaround needed to avoid some memory-related issues on Tegra210.
-> 
-> ----------------------------------------------------------------
-> Mikko Perttunen (2):
->       soc/tegra: Add Tegra194 SoC configuration option
->       soc/tegra: pmc: Add Tegra194 compatibility string
-> 
-> Peter De Schrijver (1):
->       soc/tegra: pmc: MBIST work around for Tegra210
-> 
-> Thierry Reding (1):
->       soc/tegra: pmc: Pass PMC to tegra_powergate_power_up()
-> 
-> Vivek Gautam (1):
->       soc/tegra: pmc: Use the new reset APIs to manage reset controllers
+On Mon, Mar 19, 2018 at 2:56 AM, Liuwenliang (Abbott Liu)
+<liuwenliang@huawei.com> wrote:
+> On 03/19/2018 09:23 AM, Florian Fainelli wrote:
+>>On 03/18/2018 06:20 PM, Liuwenliang (Abbott Liu) wrote:
+>>> On 03/19/2018 03:14 AM, Florian Fainelli wrote:
+>>>> Thanks for posting these patches! Just FWIW, you cannot quite add
+>>>> someone's Tested-by for a patch series that was just resubmitted given
+>>>> the differences with v1. I just gave it a spin on a Cortex-A5 (no LPAE)
+>>>> and it looks like test_kasan.ko is passing, great job!
+>>>
+>>> I'm sorry.
+>>> Thanks for your testing very much!
+>>> I forget to add Tested-by in cover letter patch file. But I have alreadly added
+>>> Tested-by in some of following patch.
+>>> In the next version I am going to add Tested-by in all patches.
+>>
+>>This is not exactly what I meant. When you submit a v2 of your patches,
+>>you must wait for people to give you their test results. The Tested-by
+>>applied to v1, and so much has changed it is no longer valid for v2
+>>unless someone tells you they tested v2. Hope this is clearer.
+>
+> Ok, I understand now. thank you for your explanation.
 
-I'd like to update this pull request with this final patch fixed up. I
-had to apply it manually and it looks like I messed it up. This has one
-hunk missing that causes a failure to boot on Jetson TX1, but only if
-neither DSI nor HDMI are enabled (DSI explicitly disabled in DT, and
-HDMI not connected). I only stumbled on this because I was testing some
-unrelated display code paths.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180319/0a01a84b/attachment.sig>
+Hi Abbott,
+
+I've skimmed through the changes and they generally look good to me. I
+am not an expect in arm, so I did not look too closely on these parts
+(which is actually most of the changes).
+
+FWIW
+Acked-by: Dmitry Vyukov <dvyukov@google.com>
+
+Please also update set of supported archs at the top of
+Documentation/dev-tools/kasan.rst
+
+Thanks for working on upstreaming this!
