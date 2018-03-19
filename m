@@ -1,71 +1,39 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 19 Mar 2018 11:20:22 +0100
-Subject: [GIT PUL] ARM: mediatek: dts64 updates for v4.16-next
-Message-ID: <e006b345-5711-3c1b-cd06-d75d87beefef@gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 19 Mar 2018 11:26:35 +0100
+Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
+In-Reply-To: <152122292977.70929.17084619305591596735@swboyd.mtv.corp.google.com>
+References: <1519071723-31790-1-git-send-email-david@lechnology.com>
+ <1519071723-31790-11-git-send-email-david@lechnology.com>
+ <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
+ <152122292977.70929.17084619305591596735@swboyd.mtv.corp.google.com>
+Message-ID: <CAMRc=Me-OCQjB-q8iV5k-n00-iF8aH-UU444iL1zCN=DdKnwzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+2018-03-16 18:55 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
+> Quoting Bartosz Golaszewski (2018-02-28 04:38:38)
+>> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
+>>
+>> I believe there to be two issues: one is with v7 - we need to increase
+>> the clock reference count in davinci_psc_genpd_attach_dev().
+>>
+>> Second is the error path in the clock framework - we should remove the
+>> destroyed clk_core from the debug list, which is not being done now.
+>>
+>> Why we even need to track the refcount of clk_core is a mistery for me
+>> though. Stephen, Mike?
+>>
+>
+> Which part of the code are we talking about? I see that
+> __clk_core_init() calls clk_debug_register() when ret == 0 and that
+> looks fine. I do wonder why clk_debug_register() even returns a value
+> though because we ignore it.
 
-Please pull the following commits.
+Hi Stephen,
 
-Thanks a lot,
-Matthias
+invalid usage of clock pm ops was the culprit here. I just had not
+understood why we count references in the CCF - now I get it so
+nevermind this mail.
 
----
-
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v4.16-next-dts64
-
-for you to fetch changes up to 5f59955299a13196233bbc0fb72f8dd5b5ba22a1:
-
-  arm64: dts: mt2712: Add auxadc device node. (2018-03-19 02:49:59 +0100)
-
-----------------------------------------------------------------
-- mt2712e add auxadc devcie
-
-mt7622:
-- fix clock bindings description
-- add nodes for mmc, usb, SATA, PCI, ethernet, cpufreq, PMIC mt6380,
-pinctrl, scpsys and clock devices
-
-----------------------------------------------------------------
-Chunfeng Yun (1):
-      arm64: dts: mt7622: add usb device nodes
-
-Ryder Lee (2):
-      arm64: dts: mt7622: add PCIe device nodes
-      arm64: dts: mt7622: add SATA device nodes
-
-Sean Wang (11):
-      arm64: dts: mt7622: add clock controller device nodes
-      arm64: dts: mt7622: add power domain controller device nodes
-      arm64: dts: mt7622: add pinctrl related device nodes
-      arm64: dts: mt7622: add PMIC MT6380 related nodes
-      arm64: dts: mt7622: add cpufreq related device nodes
-      arm64: dts: mt7622: turn uart0 clock to real ones
-      arm64: dts: mt7622: add SoC and peripheral related device nodes
-      arm64: dts: mt7622: add flash related device nodes
-      arm64: dts: mt7622: add ethernet device nodes
-      arm64: dts: mt7622: add mmc related device nodes
-      dt-bindings: clock: mediatek: add missing required #reset-cells
-
-Zhiyong Tao (1):
-      arm64: dts: mt2712: Add auxadc device node.
-
- .../bindings/arm/mediatek/mediatek,ethsys.txt      |   1 +
- .../bindings/arm/mediatek/mediatek,pciesys.txt     |   2 +
- .../bindings/arm/mediatek/mediatek,ssusbsys.txt    |   2 +
- arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |   4 +
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |   9 +
- arch/arm64/boot/dts/mediatek/mt6380.dtsi           |  86 +++
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       | 469 ++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 675 ++++++++++++++++++++-
- 8 files changed, 1243 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
+Thanks,
+Bart
