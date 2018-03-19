@@ -1,64 +1,48 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 19 Mar 2018 09:50:18 -0700
-Subject: [PATCH v3 07/10] clk: qcom: clk-cpu-8996: Prepare PLLs on probe
-In-Reply-To: <1518616792-29028-8-git-send-email-ilialin@codeaurora.org>
-References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
- <1518616792-29028-8-git-send-email-ilialin@codeaurora.org>
-Message-ID: <152147821849.242365.7709382599118820578@swboyd.mtv.corp.google.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 19 Mar 2018 17:50:31 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.17 (#2)
+Message-ID: <87lgeoxb54.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ilia Lin (2018-02-14 05:59:49)
-> The PLLs must be prepared enabled during the probe to be
-> accessible by the OPPs. Otherwise an OPP may switch
-> to non-enabled clock.
+Hi,
 
-Sounds like an OPP problem.
+Here is the second pull request for dt64 for mvebu for v4.17.
 
-> 
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> ---
->  drivers/clk/qcom/clk-cpu-8996.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/qcom/clk-cpu-8996.c b/drivers/clk/qcom/clk-cpu-8996.c
-> index 854f327..b0a3b73 100644
-> --- a/drivers/clk/qcom/clk-cpu-8996.c
-> +++ b/drivers/clk/qcom/clk-cpu-8996.c
-> @@ -15,7 +15,7 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
-> -
-> +#include <linux/clk-provider.h>
+Gregory
 
-Please leave a newline between linux/* and local includes.
+The following changes since commit 597667d889517c6085d57aac92dbf1cc624cd8ae:
 
->  #include "clk-alpha-pll.h"
->  
->  #define VCO(a, b, c) { \
-> @@ -376,6 +376,18 @@ struct clk_hw_clks {
->         clk_alpha_pll_configure(&perfcl_alt_pll, regmap, &altpll_config);
->         clk_alpha_pll_configure(&pwrcl_alt_pll, regmap, &altpll_config);
->  
-> +       /* Enable all PLLs and alt PLLs */
-> +       clk_prepare_enable(pwrcl_alt_pll.clkr.hw.clk);
-> +       clk_prepare_enable(perfcl_alt_pll.clkr.hw.clk);
-> +       clk_prepare_enable(pwrcl_pll.clkr.hw.clk);
-> +       clk_prepare_enable(perfcl_pll.clkr.hw.clk);
+  ARM64: dts: marvell: armada-cp110: Add apb_pclk clock for the uart nodes (2018-03-09 17:49:46 +0100)
 
-And this can't be done by the cpufreq-dt driver?
+are available in the Git repository at:
 
-> +
-> +       /* Set initial boot frequencies for power/perf PLLs */
-> +       clk_set_rate(pwrcl_alt_pll.clkr.hw.clk, 652800000);
-> +       clk_set_rate(perfcl_alt_pll.clkr.hw.clk, 652800000);
-> +       clk_set_rate(pwrcl_pll.clkr.hw.clk, 652800000);
-> +       clk_set_rate(perfcl_pll.clkr.hw.clk, 652800000);
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.17-2
 
-We have assigned rates in DT for this.
+for you to fetch changes up to 003456f564205ca3c3b8b4c9f9c22a0846d81fd7:
 
-> +
->         ret = clk_notifier_register(pwrcl_pmux.clkr.hw.clk, &pwrcl_pmux.nb);
->         if (ret)
->                 return ret;
+  arm64: dts: armada-3720-espressobin: Document URL for schematic (2018-03-19 17:19:24 +0100)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.17 (part 2)
+
+- Add registers clock for all the peripheral nodes that had been yet
+  converted for CP110 (Armada 7K/8K)
+
+- Document URL for schematic for the EspressoBin (Armada 3720)
+
+----------------------------------------------------------------
+Gregory CLEMENT (6):
+      ARM64: dts: marvell: armada-cp110: Add registers clock for USB host nodes
+      ARM64: dts: marvell: armada-cp110: Add registers clock for XOR engine nodes
+      ARM64: dts: marvell: armada-cp110: Add registers clock for the trng node
+      ARM64: dts: marvell: armada-cp110: Add registers clock for the crypto node
+      ARM64: dts: marvell: armada-cp110: Add registers clock for the NAND node
+      ARM64: dts: marvell: armada-cp110: Add registers clock for the PCIe nodes
+
+Uwe Kleine-K?nig (1):
+      arm64: dts: armada-3720-espressobin: Document URL for schematic
+
+ .../boot/dts/marvell/armada-3720-espressobin.dts   |  3 ++
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi      | 37 ++++++++++++++++------
+ 2 files changed, 30 insertions(+), 10 deletions(-)
