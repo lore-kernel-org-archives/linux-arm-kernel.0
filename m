@@ -1,26 +1,36 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 19 Mar 2018 13:52:33 -0700
-Subject: [RESEND PATCH] clk: enable hi655x common clk automatically
-In-Reply-To: <20180312104945.3001-1-riku.voipio@linaro.org>
-References: <20180312104945.3001-1-riku.voipio@linaro.org>
-Message-ID: <152149275385.242365.18026048344034278094@swboyd.mtv.corp.google.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 19 Mar 2018 22:06:06 +0100
+Subject: [PATCH 0/2] drm/sun4i: backend: Support interleaved YUV planes
+In-Reply-To: <cover.f0cb3210f2d878853ef16506da152f38ba2e3286.1519931807.git-series.maxime.ripard@bootlin.com>
+References: <cover.f0cb3210f2d878853ef16506da152f38ba2e3286.1519931807.git-series.maxime.ripard@bootlin.com>
+Message-ID: <20180319210606.svrm3a345736qhwf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting riku.voipio at linaro.org (2018-03-12 03:49:45)
-> From: Riku Voipio <riku.voipio@linaro.org>
+On Thu, Mar 01, 2018 at 08:18:44PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Without COMMON_CLK_HI655X Wifi and bluetooth are non-functional on Hikey.
-> As suggested by Arnd, enable the driver automatically when the parent
-> driver is selected. With sensible defaults in place, we can leave other
-> choices for EXPERT.
+> This is an attempt at supporting the interleaved YUV planes in the sun4i
+> DRM driver for SoCs that use the DE1.
 > 
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Wei Xu <xuwei5@hisilicon.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Suggested-by: Arnd Bergmann <arnd@linaro.org>
-> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-> ---
+> There's nothing out of the extraordinary there, we just have one more
+> constraint in our DRM driver, since we can only have a single YUV plane.
+> 
+> Let me know what you think,
+> Maxime
 
-Applied to clk-next
+Applied both with Chen-Yu comments fixed.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180319/c3893184/attachment.sig>
