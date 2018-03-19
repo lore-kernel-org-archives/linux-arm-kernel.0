@@ -1,179 +1,77 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 19 Mar 2018 16:33:13 +0100
-Subject: [PATCH v2 3/4] ARM: davinci: add aemif & nand support to da850-lcdk
- in legacy mode
-In-Reply-To: <20180319153314.26120-1-brgl@bgdev.pl>
-References: <20180319153314.26120-1-brgl@bgdev.pl>
-Message-ID: <20180319153314.26120-4-brgl@bgdev.pl>
+Date: Mon, 19 Mar 2018 16:42:07 +0100
+Subject: [PATCH] clk: don't call __of_clk_get_by_name() unnecessarily from
+ clk_get()
+In-Reply-To: <20180212210053.GO9418@n2100.armlinux.org.uk>
+References: <20180212142439.15885-1-brgl@bgdev.pl>
+ <36b4b8a0-0254-c6fa-c84f-ceab20c326ad@lechnology.com>
+ <20180212210053.GO9418@n2100.armlinux.org.uk>
+Message-ID: <CAMRc=MfD0m6rs7hVyf9B5ScCa1Wu9zUGYMNs-tmQJUqeSpNPdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+2018-02-12 22:00 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+> On Mon, Feb 12, 2018 at 02:51:57PM -0600, David Lechner wrote:
+>> On 02/12/2018 08:24 AM, Bartosz Golaszewski wrote:
+>> >From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> >
+>> >The way this function is implemented caused some confusion when
+>> >converting the TI DaVinci platform to using the common clock framework.
+>> >
+>> >Current kernel supports booting DaVinci boards both in device tree as
+>> >well as legacy, board-file mode. In the latter, we always end up
+>> >calling clk_get_sys() as of_node is NULL and __of_clk_get_by_name()
+>> >returns -ENOENT.
+>> >
+>> >It was not obvious at first glance how clk_get(dev, NULL) will work in
+>> >board-file mode since we always call __of_clk_get_by_name(). Let's make
+>> >it clearer by checking if of_node is NULL and skipping right to
+>> >clk_get_sys().
+>> >
+>> >Cc: Sekhar Nori <nsekhar@ti.com>
+>> >Cc: Kevin Hilman <khilman@baylibre.com>
+>> >Cc: David Lechner <david@lechnology.com>
+>> >Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> >---
+>> >  drivers/clk/clkdev.c | 2 +-
+>> >  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >
+>> >diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+>> >index 7513411140b6..f394e8964909 100644
+>> >--- a/drivers/clk/clkdev.c
+>> >+++ b/drivers/clk/clkdev.c
+>> >@@ -199,7 +199,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+>> >     const char *dev_id = dev ? dev_name(dev) : NULL;
+>> >     struct clk *clk;
+>> >-    if (dev) {
+>> >+    if (dev && dev->of_node) {
+>> >             clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
+>> >             if (!IS_ERR(clk) || PTR_ERR(clk) == -EPROBE_DEFER)
+>> >                     return clk;
+>> >
+>>
+>> Shouldn't you be sending this to the linux-clk mailing list and cc'ing
+>> the clock maintainers?
+>
+> No, I'm the maintainer for clkdev, as per MAINTAINERS.
+>
+>> FWIW, it seems pretty clear to me that if we are using a board file
+>> then we should expect clk_get_sys() to be called because there is
+>> no device tree.
+>
+> clk_get() pre-dates DT, and using it has no bearing on whether DT is
+> in use or not.  The above change looks correct to me - if the
+> struct device is not a DT device, then we shouldn't be trying to look
+> up the clock in DT.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
 
-We now have support for aemif & nand from board files. As an example
-add support for nand to da850-lcdk in legacy mode.
+Hi Russell,
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++++++++++
- 1 file changed, 132 insertions(+)
+can you pick this patch up for 4.17?
 
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 6c997c59a3cd..9c3de56b54e4 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -16,6 +16,11 @@
- #include <linux/gpio.h>
- #include <linux/gpio/machine.h>
- #include <linux/platform_data/gpio-davinci.h>
-+#include <linux/platform_data/ti-aemif.h>
-+#include <linux/mtd/rawnand.h>
-+#include <linux/mtd/partitions.h>
-+#include <linux/platform_data/mtd-davinci.h>
-+#include <linux/platform_data/mtd-davinci-aemif.h>
- #include <linux/regulator/machine.h>
- 
- #include <asm/mach-types.h>
-@@ -162,6 +167,129 @@ static __init void omapl138_hawk_mmc_init(void)
- 	gpiod_remove_lookup_table(&mmc_gpios_table);
- }
- 
-+static struct mtd_partition omapl138_hawk_nandflash_partition[] = {
-+	{
-+		.name		= "u-boot env",
-+		.offset		= 0,
-+		.size		= SZ_128K,
-+		.mask_flags	= MTD_WRITEABLE,
-+	 },
-+	{
-+		.name		= "u-boot",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_128K,
-+		.mask_flags	= MTD_WRITEABLE,
-+	},
-+	{
-+		.name		= "free space",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= MTDPART_SIZ_FULL,
-+		.mask_flags	= 0,
-+	},
-+};
-+
-+static struct davinci_aemif_timing omapl138_hawk_nandflash_timing = {
-+	.wsetup		= 24,
-+	.wstrobe	= 21,
-+	.whold		= 14,
-+	.rsetup		= 19,
-+	.rstrobe	= 50,
-+	.rhold		= 0,
-+	.ta		= 20,
-+};
-+
-+static struct davinci_nand_pdata omapl138_hawk_nandflash_data = {
-+	.parts		= omapl138_hawk_nandflash_partition,
-+	.nr_parts	= ARRAY_SIZE(omapl138_hawk_nandflash_partition),
-+	.ecc_mode	= NAND_ECC_HW,
-+	.ecc_bits	= 4,
-+	.bbt_options	= NAND_BBT_USE_FLASH,
-+	.options	= NAND_BUSWIDTH_16,
-+	.timing		= &omapl138_hawk_nandflash_timing,
-+	.mask_chipsel	= 0,
-+	.mask_ale	= 0,
-+	.mask_cle	= 0,
-+};
-+
-+static struct resource omapl138_hawk_nandflash_resource[] = {
-+	{
-+		.start	= DA8XX_AEMIF_CS3_BASE,
-+		.end	= DA8XX_AEMIF_CS3_BASE + SZ_32M,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= DA8XX_AEMIF_CTL_BASE,
-+		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct resource omapl138_hawk_aemif_resource[] = {
-+	{
-+		.start	= DA8XX_AEMIF_CTL_BASE,
-+		.end	= DA8XX_AEMIF_CTL_BASE + SZ_32K,
-+		.flags	= IORESOURCE_MEM,
-+	}
-+};
-+
-+static struct aemif_abus_data omapl138_hawk_aemif_abus_data[] = {
-+	{
-+		.cs	= 3,
-+	}
-+};
-+
-+static struct platform_device omapl138_hawk_aemif_devices[] = {
-+	{
-+		.name		= "davinci_nand",
-+		.id		= 1,
-+		.dev		= {
-+			.platform_data	= &omapl138_hawk_nandflash_data,
-+		},
-+		.resource	= omapl138_hawk_nandflash_resource,
-+		.num_resources	= ARRAY_SIZE(omapl138_hawk_nandflash_resource),
-+		.id		= 0,
-+	}
-+};
-+
-+static struct aemif_platform_data omapl138_hawk_aemif_pdata = {
-+	.cs_offset = 2,
-+	.abus_data = omapl138_hawk_aemif_abus_data,
-+	.num_abus_data = ARRAY_SIZE(omapl138_hawk_aemif_abus_data),
-+	.sub_devices = omapl138_hawk_aemif_devices,
-+	.num_sub_devices = ARRAY_SIZE(omapl138_hawk_aemif_devices),
-+};
-+
-+static struct platform_device omapl138_hawk_aemif_device = {
-+	.name		= "ti-aemif",
-+	.dev = {
-+		.platform_data	= &omapl138_hawk_aemif_pdata,
-+	},
-+	.resource	= omapl138_hawk_aemif_resource,
-+	.num_resources	= ARRAY_SIZE(omapl138_hawk_aemif_resource),
-+	.id		= -1,
-+};
-+
-+static const short omapl138_hawk_nand_pins[] = {
-+	DA850_EMA_WAIT_1, DA850_NEMA_OE, DA850_NEMA_WE, DA850_NEMA_CS_3,
-+	DA850_EMA_D_0, DA850_EMA_D_1, DA850_EMA_D_2, DA850_EMA_D_3,
-+	DA850_EMA_D_4, DA850_EMA_D_5, DA850_EMA_D_6, DA850_EMA_D_7,
-+	DA850_EMA_D_8, DA850_EMA_D_9, DA850_EMA_D_10, DA850_EMA_D_11,
-+	DA850_EMA_D_12, DA850_EMA_D_13, DA850_EMA_D_14, DA850_EMA_D_15,
-+	DA850_EMA_A_1, DA850_EMA_A_2,
-+	-1
-+};
-+
-+static int omapl138_hawk_register_aemif(void)
-+{
-+	int ret;
-+
-+	ret = davinci_cfg_reg_list(omapl138_hawk_nand_pins);
-+	if (ret)
-+		pr_warn("%s: NAND mux setup failed: %d\n", __func__, ret);
-+
-+	return platform_device_register(&omapl138_hawk_aemif_device);
-+}
-+
- static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id);
- static da8xx_ocic_handler_t hawk_usb_ocic_handler;
- 
-@@ -294,6 +422,10 @@ static __init void omapl138_hawk_init(void)
- 
- 	omapl138_hawk_usb_init();
- 
-+	ret = omapl138_hawk_register_aemif();
-+	if (ret)
-+		pr_warn("%s: aemif registration failed: %d\n", __func__, ret);
-+
- 	ret = da8xx_register_watchdog();
- 	if (ret)
- 		pr_warn("%s: watchdog registration failed: %d\n",
--- 
-2.16.1
+Thanks in advance,
+Bartosz
