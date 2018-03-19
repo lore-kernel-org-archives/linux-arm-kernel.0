@@ -1,73 +1,208 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 19 Mar 2018 14:54:18 +0100
-Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
- receiver) power control driver
-In-Reply-To: <22A8F5FE-C8B9-46EB-B98D-A94EA4170131@goldelico.com>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
- <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
- <20180112153903.GB5992@localhost> <20180212152618.GC13962@amd>
- <20180227070415.GB18666@localhost>
- <22A8F5FE-C8B9-46EB-B98D-A94EA4170131@goldelico.com>
-Message-ID: <20180319135418.GL18359@localhost>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 19 Mar 2018 08:55:49 -0500
+Subject: [PATCH v2] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
+ observed before enabling
+In-Reply-To: <864llebp6q.wl-marc.zyngier@arm.com>
+References: <1521124287-25009-1-git-send-email-shankerd@codeaurora.org>
+ <20180317133445.772733ac@why.wild-wind.fr.eu.org>
+ <dccddaa7-6331-961d-a77f-15dc15cd8850@codeaurora.org>
+ <864llebp6q.wl-marc.zyngier@arm.com>
+Message-ID: <827da852-8cef-a8b4-c303-9e13c727b488@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 27, 2018 at 08:32:50AM +0100, H. Nikolaus Schaller wrote:
-> Hi Johan,
-> 
-> > Am 27.02.2018 um 08:04 schrieb Johan Hovold <johan@kernel.org>:
-> > 
-> > On Mon, Feb 12, 2018 at 04:26:18PM +0100, Pavel Machek wrote:
-> >> Hi!
-> >> 
-> >>>> Let's restart this discussion and focus on the main roadblock (others
-> >>>> are minor details which can be sorted out later).
-> >>>> 
-> >>>> If it feels like a hack, the key issue seems to me to be the choice of
-> >>>> the API to present the GPS data to user space. Right?
-> >>> 
-> >>> Or even more fundamentally, does this belong in the kernel at all?
-> >> 
-> >> Yes, it does.
-> 
-> Thanks, Pavel for supporting our view.
-> 
-> > 
-> > But not necessarily in its current form.
-> 
-> Is this a "yes after some code fixes"?
+Hi Marc,
 
-No, we need some kind of at least rudimentary gps framework even if we
-allow for a raw (NMEA) interface for the time being (possibly
-indefinitely).
-
-> Pavel mentioned an example where such an evolutionary approach was taken.
-> > 
-> >>> Now, if we'd ever have a proper GPS framework that handled everything in
-> >>> kernel space (i.e. no more gpsd) then we would be able to write kernel
-> >>> drivers that also take care of PM. But perhaps that's unlikely to ever
-> >>> be realised given the state of things (proprietary protocols, numerous
-> >>> quirky implementations, etc).
-> >> 
-> >> That is what needs to happen.
-> >> 
-> >>> The kernel is probably not the place to be working around issues like
-> >>> that, even if serdev at least allows for such hacks to be fairly
-> >>> isolated in drivers (unlike some of the earlier proposals touching core
-> >>> code).
-> >> 
-> >> Oh, kernel is indeed right place to provide hardware abstraction --
-> >> and that includes bug workarounds.
-> > 
-> > Right, at least when such hacks can be confined to a driver and not be
-> > spread all over the place.
+On 03/17/2018 12:13 PM, Marc Zyngier wrote:
+> On Sat, 17 Mar 2018 16:11:06 +0000,
+> Shanker Donthineni wrote:
+>>
+>> Hi Marc,
+>>
+>> On 03/17/2018 08:34 AM, Marc Zyngier wrote:
+>>> On Thu, 15 Mar 2018 09:31:27 -0500
+>>> Shanker Donthineni <shankerd@codeaurora.org> wrote:
+>>>
+>>>> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
+>>>> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
+>>>> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
+>>>> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
+>>>> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
+>>>>
+>>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>>>> ---
+>>>> Changes since v1:
+>>>>   -Moved LPI disable code to a seperate function as Marc suggested.
+>>>>   -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
+>>>>   
+>>>>  drivers/irqchip/irq-gic-v3-its.c   | 66 ++++++++++++++++++++++++++++++--------
+>>>>  include/linux/irqchip/arm-gic-v3.h |  1 +
+>>>>  2 files changed, 53 insertions(+), 14 deletions(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>>>> index 1d3056f..cba71a7 100644
+>>>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>>>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>>>> @@ -33,6 +33,8 @@
+>>>>  #include <linux/of_platform.h>
+>>>>  #include <linux/percpu.h>
+>>>>  #include <linux/slab.h>
+>>>> +#include <linux/time64.h>
+>>>> +#include <linux/iopoll.h>
+>>>>  
+>>>>  #include <linux/irqchip.h>
+>>>>  #include <linux/irqchip/arm-gic-v3.h>
+>>>> @@ -1875,16 +1877,6 @@ static void its_cpu_init_lpis(void)
+>>>>  		gic_data_rdist()->pend_page = pend_page;
+>>>>  	}
+>>>>  
+>>>> -	/* Disable LPIs */
+>>>> -	val = readl_relaxed(rbase + GICR_CTLR);
+>>>> -	val &= ~GICR_CTLR_ENABLE_LPIS;
+>>>> -	writel_relaxed(val, rbase + GICR_CTLR);
+>>>> -
+>>>> -	/*
+>>>> -	 * Make sure any change to the table is observable by the GIC.
+>>>> -	 */
+>>>> -	dsb(sy);
+>>>> -
+>>>>  	/* set PROPBASE */
+>>>>  	val = (page_to_phys(gic_rdists->prop_page) |
+>>>>  	       GICR_PROPBASER_InnerShareable |
+>>>> @@ -3288,13 +3280,59 @@ static bool gic_rdists_supports_plpis(void)
+>>>>  	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
+>>>>  }
+>>>>  
+>>>> +static int redist_disable_lpis(void)
+>>>> +{
+>>>> +	void __iomem *rbase = gic_data_rdist_rd_base();
+>>>> +	u64 val;
+>>>> +	int ret;
+>>>> +
+>>>> +	if (!gic_rdists_supports_plpis()) {
+>>>> +		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+>>>> +		return -ENXIO;
+>>>> +	}
+>>>> +
+>>>> +	val = readl_relaxed(rbase + GICR_CTLR);
+>>>> +	if (!(val & GICR_CTLR_ENABLE_LPIS))
+>>>> +		return 0;
+>>>> +
+>>>> +	/* Disable LPIs */
+>>>> +	val &= ~GICR_CTLR_ENABLE_LPIS;
+>>>> +	writel_relaxed(val, rbase + GICR_CTLR);
+>>>> +
+>>>> +	/* Make sure any change to GICR_CTLR is observable by the GIC */
+>>>> +	dsb(sy);
+>>>> +
+>>>> +	/* Wait for GICR_CTLR.GICR_CTLR_ENABLE_LPIS==0 or timeout */
+>>>> +	ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
+>>>> +					 !(val & GICR_CTLR_ENABLE_LPIS), 1,
+>>>> +					 USEC_PER_SEC);
+>>>
+>>> Why do you need to poll on EnableLPIs? It is supposed to be immediately
+>>> written. It seems to me that the sequence should be:
+>>>
+>>
+>> Agree we don't need to poll EnableLPIs here. I'll remove.
+>>
+>>> - Check EnableLPis
+>>> - If set to 1, scream about bootloader being braindead
+>>> - Write EnableLPIs to 0
+>>> - Read back EnableLpis:
+>>> - If still set 1, bail out, we're doomed. Scream about the HW being
+>>>   braindead
+>>> - Poll RWP
+>>> - If timeout, bail out, the HW has locked up. Scream again.
+>>>
+>>> I think this should cover the whole thing. An alternative would be to
+>>> place the poll between the write and read-back, but that doesn't change
+>>> anything.
+>>>
+>>
+>> I'll prefer your second approach. Please comment on the below change before
+>> I post v3.
+>>
+>> static int redist_disable_lpis(void)
+>> {
+>>         void __iomem *rbase = gic_data_rdist_rd_base();
+>>         u64 val;
+>>         int ret;
+>>
+>>         if (!gic_rdists_supports_plpis()) {
+>>                 pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+>>                 return -ENXIO;
+>>         }
+>>
+>>         if (!(readl(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS))
+>>                 return 0;
+>>
+>>         pr_warn("CPU%d: Trying to disable LPIs\n", smp_processor_id());
 > 
-> It seems that you forgot that the driver we propose is not spread all over
-> the place. It *is* confined to a single driver thanks to the serdev api.
+> I'd be much more clear:
+> 
+> 	pr_warn("CPU%d: Booted with LPIs enabled, memory probably corrupted\n",
+> 		smp_processor_id());
+> 	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
+> 
+>>         val &= ~GICR_CTLR_ENABLE_LPIS;
+>>         writel_relaxed(val, rbase + GICR_CTLR);
+>>
+>>         /* Make sure any change to GICR_CTLR is observable by the GIC */
+>>         dsb(sy);
+>>
+>>         /**
+>>          * Software must observe RWP==0 after clearing GICR_CTLR.EnableLPIs
+>>          * from 1 to 0 before programming GICR_PEND{PROP}BASER registers.
+>>          * Bail out the driver probe() in case of timeout.
+>>          */
+>>         ret = readl_relaxed_poll_timeout_atomic(rbase + GICR_CTLR, val,
+>>                                                 !(val & GICR_CTLR_RWP), 1,
+>>                                                 USEC_PER_SEC);
+>>         if (ret) {
+>>                 pr_err("CPU%d: EnableLPIs not observed\n", smp_processor_id());
+> 
+> Let's call a spade a spade: the redistributor hasn't reacted after a
+> whole second, it has probably locked-up. Just say so, because your
+> message doesn't mean much to me.
+> 
 
-I believe that's what I wrote above.
+Sure I'll change, and also readX_relaxed_poll_XXX() helper macros aren't usable during
+GIC/ITS probe time, noticed kernel crashes when I tested KEXEC/KDUMP kernel on QDF2400.
+I believe this's because of the timer subsystem "timer_init()" is initialized after
+calling init_IRQ(). I've to go back to v1 change for handling timeout.
 
-Johan
+        while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
+                if (!timeout) {
+                        pr_err("CPU%d: Failed to observe RWP==0 after disabling LPIs\n",
+                               smp_processor_id());
+                        return -ETIMEDOUT;
+                }
+                udelay(1);
+                timeout--;
+                cpu_relax();
+        }
+ 
+>>                 return ret;
+>>         }
+>>  
+>>         /**
+>>          * After it has been written to 1, it is IMPLEMENTATION DEFINED whether
+>>          * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to 0.
+>>          * Bail out the driver probe() on systems where it's RES1.
+>>          */
+>>         if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
+>>                 pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
+>>                 return -EPERM;
+> 
+> EPERM? EBUSY was a better approximation...
+> 
+> Thanks,
+> 
+> 	M.
+> 
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
