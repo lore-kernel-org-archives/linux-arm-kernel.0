@@ -1,349 +1,178 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 19 Mar 2018 17:12:06 +0100
-Subject: [PATCH usb-next v10 3/8] usb: core: add a wrapper for the USB
- PHYs on the HCD
-In-Reply-To: <e723fe80-1ff3-6f47-fbbd-699dfcd0be4f@ti.com>
-References: <20180218184504.3331-1-martin.blumenstingl@googlemail.com>
- <20180218184504.3331-4-martin.blumenstingl@googlemail.com>
- <7f511a6f-f3a2-2002-f601-5ce1742f4539@ti.com>
- <CAFBinCAOG9Yj5PQo4wsxH2Ev6WOwFge+jBMprRiOgxKuA_z8wA@mail.gmail.com>
- <e723fe80-1ff3-6f47-fbbd-699dfcd0be4f@ti.com>
-Message-ID: <CAFBinCBB2eqHC-k9wN67ZehKb9eun=mPaLuqhrbR-J1C0Ldqtw@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 19 Mar 2018 17:14:05 +0100
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v8_00=2F42=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <CAHCN7xKQ47DnVXiZTJ-0myoth2SJ3wnyvDb2i07uKZDgomhgwQ@mail.gmail.com>
+References: <1521168778-27236-1-git-send-email-david@lechnology.com>
+ <CAMpxmJX-AxhpPpCnWoaSGYmNh3o8iRjdKacnmozsPWmhpcGdTg@mail.gmail.com>
+ <af89be8d-04dd-e845-1d5b-afdd7e55629f@lechnology.com>
+ <CAHCN7xKQ47DnVXiZTJ-0myoth2SJ3wnyvDb2i07uKZDgomhgwQ@mail.gmail.com>
+Message-ID: <CAMpxmJWoP+BDYeuqCnQ2txWy7wkxKuyjKODJqgDtRkq0ahY1mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-On Mon, Mar 19, 2018 at 9:49 AM, Roger Quadros <rogerq@ti.com> wrote:
-> Hi,
->
-> On 19/03/18 00:29, Martin Blumenstingl wrote:
->> Hi Roger,
->>
->> On Fri, Mar 16, 2018 at 3:32 PM, Roger Quadros <rogerq@ti.com> wrote:
->>> +some TI folks
+2018-03-19 17:11 GMT+01:00 Adam Ford <aford173@gmail.com>:
+> On Mon, Mar 19, 2018 at 10:59 AM, David Lechner <david@lechnology.com> wrote:
+>> On 03/19/2018 08:17 AM, Bartosz Golaszewski wrote:
 >>>
->>> Hi Martin,
->>>
->>> On 18/02/18 20:44, Martin Blumenstingl wrote:
->>>> Many SoC platforms have separate devices for the USB PHY which are
->>>> registered through the generic PHY framework. These PHYs have to be
->>>> enabled to make the USB controller actually work. They also have to be
->>>> disabled again on shutdown/suspend.
+>>> 2018-03-16 3:52 GMT+01:00 David Lechner <david@lechnology.com>:
 >>>>
->>>> Currently (at least) the following HCI platform drivers are using custom
->>>> code to obtain all PHYs via devicetree for the roothub/controller and
->>>> disable/enable them when required:
->>>> - ehci-platform.c has ehci_platform_power_{on,off}
->>>> - xhci-mtk.c has xhci_mtk_phy_{init,exit,power_on,power_off}
->>>> - ohci-platform.c has ohci_platform_power_{on,off}
+>>>> This series converts mach-davinci to use the common clock framework.
 >>>>
->>>> With this new wrapper the USB PHYs can be specified directly in the
->>>> USB controller's devicetree node (just like on the drivers listed
->>>> above). This allows SoCs like the Amlogic Meson GXL family to operate
->>>> correctly once this is wired up correctly. These SoCs use a dwc3
->>>> controller and require all USB PHYs to be initialized (if one of the USB
->>>> PHYs it not initialized then none of USB port works at all).
+>>>> The series works like this, the first 19 patches create new clock drivers
+>>>> using the common clock framework. There are basically 3 groups of clocks
+>>>> -
+>>>> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each
+>>>> have
+>>>> unique init data, which is the reason for so many patches.
 >>>>
->>>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>>> Tested-by: Yixun Lan <yixun.lan@amlogic.com>
->>>> Cc: Neil Armstrong <narmstrong@baylibre.com>
->>>> Cc: Chunfeng Yun <chunfeng.yun@mediatek.com>
->>>
->>> This patch is breaking low power cases on TI SoCs when USB is in host mode.
->>> I'll explain why below.
->> based on your explanation and reading the TI PHY drivers I am assuming
->> that the affected SoCs are using the "phy-omap-usb2" driver
->>
-> yes and phy-ti-pipe3 as well i.e. "ti,phy-usb3" and "ti,omap-usb3"
-I missed that, thanks
-
->>>> ---
->>>>  drivers/usb/core/Makefile |   2 +-
->>>>  drivers/usb/core/phy.c    | 158 ++++++++++++++++++++++++++++++++++++++++++++++
->>>>  drivers/usb/core/phy.h    |   7 ++
->>>>  3 files changed, 166 insertions(+), 1 deletion(-)
->>>>  create mode 100644 drivers/usb/core/phy.c
->>>>  create mode 100644 drivers/usb/core/phy.h
+>>>> Then, starting with "ARM: davinci: pass clock as parameter to
+>>>> davinci_timer_init()", we get the mach code ready for the switch by
+>>>> adding the
+>>>> code needed for the new clock drivers and adding #ifndef
+>>>> CONFIG_COMMON_CLK
+>>>> around the legacy clocks so that we can switch easily between the old and
+>>>> the
+>>>> new.
 >>>>
->>>> diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
->>>> index 92c9cefb4317..18e874b0441e 100644
->>>> --- a/drivers/usb/core/Makefile
->>>> +++ b/drivers/usb/core/Makefile
->>>> @@ -6,7 +6,7 @@
->>>>  usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
->>>>  usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
->>>>  usbcore-y += devio.o notify.o generic.o quirks.o devices.o
->>>> -usbcore-y += port.o
->>>> +usbcore-y += phy.o port.o
+>>>> "ARM: davinci: switch to common clock framework" actually flips the
+>>>> switch
+>>>> to start using the new clock drivers. Then the next 8 patches remove all
+>>>> of the old clock code.
 >>>>
->>>>  usbcore-$(CONFIG_OF)         += of.o
->>>>  usbcore-$(CONFIG_USB_PCI)            += hcd-pci.o
->>>> diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
->>>> new file mode 100644
->>>> index 000000000000..09b7c43c0ea4
->>>> --- /dev/null
->>>> +++ b/drivers/usb/core/phy.c
->>>> @@ -0,0 +1,158 @@
->>>> +// SPDX-License-Identifier: GPL-2.0+
->>>> +/*
->>>> + * A wrapper for multiple PHYs which passes all phy_* function calls to
->>>> + * multiple (actual) PHY devices. This is comes handy when initializing
->>>> + * all PHYs on a HCD and to keep them all in the same state.
->>>> + *
->>>> + * Copyright (C) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->>>> + */
->>>> +
->>>> +#include <linux/device.h>
->>>> +#include <linux/list.h>
->>>> +#include <linux/phy/phy.h>
->>>> +#include <linux/of.h>
->>>> +
->>>> +#include "phy.h"
->>>> +
->>>> +struct usb_phy_roothub {
->>>> +     struct phy              *phy;
->>>> +     struct list_head        list;
->>>> +};
->>>> +
->>>> +static struct usb_phy_roothub *usb_phy_roothub_alloc(struct device *dev)
->>>> +{
->>>> +     struct usb_phy_roothub *roothub_entry;
->>>> +
->>>> +     roothub_entry = devm_kzalloc(dev, sizeof(*roothub_entry), GFP_KERNEL);
->>>> +     if (!roothub_entry)
->>>> +             return ERR_PTR(-ENOMEM);
->>>> +
->>>> +     INIT_LIST_HEAD(&roothub_entry->list);
->>>> +
->>>> +     return roothub_entry;
->>>> +}
->>>> +
->>>> +static int usb_phy_roothub_add_phy(struct device *dev, int index,
->>>> +                                struct list_head *list)
->>>> +{
->>>> +     struct usb_phy_roothub *roothub_entry;
->>>> +     struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
->>>> +
->>>> +     if (IS_ERR_OR_NULL(phy)) {
->>>> +             if (!phy || PTR_ERR(phy) == -ENODEV)
->>>> +                     return 0;
->>>> +             else
->>>> +                     return PTR_ERR(phy);
->>>> +     }
->>>> +
->>>> +     roothub_entry = usb_phy_roothub_alloc(dev);
->>>> +     if (IS_ERR(roothub_entry))
->>>> +             return PTR_ERR(roothub_entry);
->>>> +
->>>> +     roothub_entry->phy = phy;
->>>> +
->>>> +     list_add_tail(&roothub_entry->list, list);
->>>> +
->>>> +     return 0;
->>>> +}
->>>> +
->>>> +struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev)
->>>> +{
->>>> +     struct usb_phy_roothub *phy_roothub;
->>>> +     struct usb_phy_roothub *roothub_entry;
->>>> +     struct list_head *head;
->>>> +     int i, num_phys, err;
->>>> +
->>>> +     num_phys = of_count_phandle_with_args(dev->of_node, "phys",
->>>> +                                           "#phy-cells");
->>>> +     if (num_phys <= 0)
->>>> +             return NULL;
->>>> +
->>>> +     phy_roothub = usb_phy_roothub_alloc(dev);
->>>> +     if (IS_ERR(phy_roothub))
->>>> +             return phy_roothub;
->>>> +
->>>> +     for (i = 0; i < num_phys; i++) {
->>>> +             err = usb_phy_roothub_add_phy(dev, i, &phy_roothub->list);
->>>> +             if (err)
->>>> +                     goto err_out;
->>>> +     }
->>>> +
->>>> +     head = &phy_roothub->list;
->>>> +
->>>> +     list_for_each_entry(roothub_entry, head, list) {
->>>> +             err = phy_init(roothub_entry->phy);
->>>
->>> The phy_init() function actually enables the PHY clocks.
->>> It should be moved to the usb_phy_roothub_exit() routine just before calling phy_power_on().
->> do you mean that phy_init should be moved to usb_phy_roothub_power_on
->> (just before phy_power_on is called within usb_phy_roothub_power_on)?
->>
->
-> Yes.
->
->> an earlier version of my patch did exactly this, but it caused
->> problems during a suspend/resume cycle on Mediatek devices
->> Chunfeng Yun reported that issue here [0], quote from that mail for
->> easier reading:
->> "In order to keep link state on mt8173, we just power off all phys(not
->> exit) when system enter suspend, then power on them again (needn't
->> init, otherwise device will be disconnected) when system resume, this
->> can avoid re-enumerating device."
->>
->>>> +             if (err)
->>>> +                     goto err_exit_phys;
->>>> +     }
->>>> +
->>>> +     return phy_roothub;
->>>> +
->>>> +err_exit_phys:
->>>> +     list_for_each_entry_continue_reverse(roothub_entry, head, list)
->>>> +             phy_exit(roothub_entry->phy);
->>>> +
->>>> +err_out:
->>>> +     return ERR_PTR(err);
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(usb_phy_roothub_init);
->>>> +
->>>> +int usb_phy_roothub_exit(struct usb_phy_roothub *phy_roothub)
->>>> +{
->>>> +     struct usb_phy_roothub *roothub_entry;
->>>> +     struct list_head *head;
->>>> +     int err, ret = 0;
->>>> +
->>>> +     if (!phy_roothub)
->>>> +             return 0;
->>>> +
->>>> +     head = &phy_roothub->list;
->>>> +
->>>> +     list_for_each_entry(roothub_entry, head, list) {
->>>> +             err = phy_exit(roothub_entry->phy);
->>>> +             if (err)
->>>> +                     ret = ret;
->>>> +     }
->>>
->>> phy_exit() should be moved to usb_phy_roothub_poweroff() just after calling phy_power_off().
->> if I understood Chunfeng Yun correctly this will require
->> re-enumeration of the USB devices after a suspend/resume cycle on
->> Mediatek SoCs
->>
->
-> OK. I suppose that there are 2 cases
-> 1) Mediatek's case: USB controller context retained across suspend/resume.
-> Remote wakeup probably required.
-> No re-enumeration preferred after resume. phy_exit()/phy_init() must not be called
-> during suspend/resume to keep PHY link active.
-Documentation/devicetree/bindings/usb/mediatek,mtu3.txt indeed shows
-that the parent of the USB controller can be marked as "wakeup-source"
-
-> 2) TI's case: low power important: USB context is lost, OK to re-enumerate.
-> phy_exit()/phy_init() must be called during suspend/resume.
-ACK
-
->>> With that there is nothing else being done here. Shouldn't we be doing the equivalent of
->>> usb_phy_roothub_del_phy() and usb_phy_roothub_free() here?
->>>
->>>> +
->>>> +     return ret;
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(usb_phy_roothub_exit);
->>>> +
->>>> +int usb_phy_roothub_power_on(struct usb_phy_roothub *phy_roothub)
->>>> +{
->>>> +     struct usb_phy_roothub *roothub_entry;
->>>> +     struct list_head *head;
->>>> +     int err;
->>>> +
->>>> +     if (!phy_roothub)
->>>> +             return 0;
->>>> +
->>>> +     head = &phy_roothub->list;
->>>> +
->>>> +     list_for_each_entry(roothub_entry, head, list) {
->>>> +             err = phy_power_on(roothub_entry->phy);
->>>> +             if (err)
->>>> +                     goto err_out;
->>>> +     }
->>>> +
->>>> +     return 0;
->>>> +
->>>> +err_out:
->>>> +     list_for_each_entry_continue_reverse(roothub_entry, head, list)
->>>> +             phy_power_off(roothub_entry->phy);
->>>> +
->>>> +     return err;
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(usb_phy_roothub_power_on);
->>>> +
->>>> +void usb_phy_roothub_power_off(struct usb_phy_roothub *phy_roothub)
->>>> +{
->>>> +     struct usb_phy_roothub *roothub_entry;
->>>> +
->>>> +     if (!phy_roothub)
->>>> +             return;
->>>> +
->>>> +     list_for_each_entry_reverse(roothub_entry, &phy_roothub->list, list)
->>>> +             phy_power_off(roothub_entry->phy);
->>>
->>> Not doing the phy_exit() here leaves the clocks enabled on our SoC and
->>> we're no longer able to reach low power states on system suspend.
->> I'm not sure where this problem should be solved:
->> - set skip_phy_initialization in struct usb_hcd to 1 for the affected
->> TI platforms
->
-> Many TI platforms are affected, omap5*, dra7*, am43*
->
->> - fix this in the usb_phy_roothub code
->
-> I'd vote for fixing it in the usb_phy_roothub code. How?
-> How about using the device_can_wakeup() to decide if we should call phy_exit()/init() or not?
-> If the USB device can't wakeup the system there is no point in keeping it powered/clocked right?
-@Chunfeng: can you confirm Roger's idea that we could call phy_exit if
-the controller is *NOT* marked as "wakeup-source"?
-I am also not sure if it would work, since the "wakeup-source"
-property is defined on the USB controller's parent node in case of the
-Mediatek MTU3 (Mediatek USB3.0 DRD) controller
-
->> - fix this in the PHY driver
->
-> There is nothing to fix in the PHY driver. It is doing what it is supposed to do.
-I actually wonder if phy_ops should have explicit suspend/resume support:
-- assuming we define two new callbacks: .suspend and .resume
-- the PHY framework could call .power_off by default if .suspend is not defined
-- the PHY framework could call .power_on by default if .resume is not defined
-- drivers could set .suspend and .resume on their own, allowing more
-fine-grained control by for example *only* stopping the clock (but not
-re-initializing the registers, etc.)
-
-@Roger: what do you think about this?
-Kishon (the PHY framework maintainer) is also CC'ed - I would like to
-hear his opinion too
-
->> - somewhere else
->>
->>>> +}
->>>> +EXPORT_SYMBOL_GPL(usb_phy_roothub_power_off);
->>>> diff --git a/drivers/usb/core/phy.h b/drivers/usb/core/phy.h
->>>> new file mode 100644
->>>> index 000000000000..6fde59bfbff8
->>>> --- /dev/null
->>>> +++ b/drivers/usb/core/phy.h
->>>> @@ -0,0 +1,7 @@
->>>> +struct usb_phy_roothub;
->>>> +
->>>> +struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev);
->>>> +int usb_phy_roothub_exit(struct usb_phy_roothub *phy_roothub);
->>>> +
->>>> +int usb_phy_roothub_power_on(struct usb_phy_roothub *phy_roothub);
->>>> +void usb_phy_roothub_power_off(struct usb_phy_roothub *phy_roothub);
+>>>> The final three patches add device tree clock support to the one SoC that
+>>>> supports it.
+>>>>
+>>>> This series has been tested on LEGO MINDSTORMS EV3 (device tree) and TI
+>>>> OMAP-L138 LCDK (both device tree and legacy board file).
 >>>>
 >>>
+>>> Hi David,
+>>>
+>>> thanks, with the u-boot fix everything seems to work fine. I tested
+>>> da850-lcdk and da850-evm boards in DT and board file modes.
+>>>
 >
-> <snip>
+> I tested MMC and Ethernet.  Both appear to be operating normally, but
+> I have having USB issues.
 >
-> --
-> cheers,
-> -roger
+> Should I be testing cpufreq?  I noticed that when changing the
+> frequencies, the USB appears to stop recognizing connections and
+> disconnections.
 >
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> I did some testing on the DA850-EVM with USB from your repo, and I'm
+> getting some crashing on MUSB unplug that do not appear in the
+> 4.16-RC6 from linux-stable:
+>
+>
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 13 at drivers/dma/cppi41.c:694
+> cppi41_stop_chan+0x1f4/0x378 [cppi41]
+> Modules linked in: evbug evdev mousedev hid_generic usbhid hid
+> usb_f_ss_lb g_zero libcomposite configfs ofpart cmdlinepart m25p80
+> spi_nor cppi41 adv7343 tvp514x vpif_display vpif_capture
+> videobuf2_dma_con
+> tig videobuf2_memops videobuf2_v4l2 videobuf2_common v4l2_fwnode
+> v4l2_common snd_soc_simple_card tilcdc spi_davinci
+> snd_soc_simple_card_utils videodev pwm_tiecap spi_bitbang da8xx
+> drm_kms_helper phy_gener
+> ic syscopyarea ohci_da8xx musb_hdrc sysfillrect sysimgblt fb_sys_fops
+> ohci_hcd udc_core drm usbcore drm_panel_orientation_quirks usb_common
+> snd_soc_tlv320aic3x vpif snd_soc_davinci_mcasp snd_soc_edma snd_
+> soc_core snd_pcm_dmaengine snd_pcm rtc_omap snd_timer snd soundcore
+> phy_da8xx_usb davinci_nand nand nand_ecc mtd pwm_bl backlight
+> cpufreq_dt ti_aemif
+> CPU: 0 PID: 13 Comm: kworker/0:1 Not tainted 4.16.0-rc5-g291ba8b-dirty #3
+> Hardware name: Generic DA850/OMAP-L138/AM18x
+> Workqueue: usb_hub_wq hub_event [usbcore]
+> Backtrace:
+> [<c000df94>] (dump_backtrace) from [<c000e264>] (show_stack+0x18/0x1c)
+>  r7:00000009 r6:00000000 r5:bf339ad0 r4:00000000
+> [<c000e24c>] (show_stack) from [<c04864c0>] (dump_stack+0x20/0x28)
+> [<c04864a0>] (dump_stack) from [<c001ac38>] (__warn+0xd4/0xfc)
+> [<c001ab64>] (__warn) from [<c001ad7c>] (warn_slowpath_null+0x44/0x50)
+>  r8:c6c43080 r7:c05f1008 r6:bf338744 r5:000002b6 r4:bf339ad0
+> [<c001ad38>] (warn_slowpath_null) from [<bf338744>]
+> (cppi41_stop_chan+0x1f4/0x378 [cppi41])
+>  r6:c5e59410 r5:c5e59420 r4:c5feca50
+> [<bf338550>] (cppi41_stop_chan [cppi41]) from [<bf213dac>]
+> (cppi41_dma_channel_abort+0xe0/0x2a8 [musb_hdrc])
+>  r8:c6929180 r7:00000000 r6:c5c67290 r5:bf2175a0 r4:00000008
+> [<bf213ccc>] (cppi41_dma_channel_abort [musb_hdrc]) from [<bf20c4bc>]
+> (musb_cleanup_urb+0x60/0x210 [musb_hdrc])
+>  r10:00000001 r9:c5fca010 r8:c5c67290 r7:a0000093 r6:00000080 r5:c55b5100
+>  r4:c5fca5a8
+> [<bf20c45c>] (musb_cleanup_urb [musb_hdrc]) from [<bf20ca8c>]
+> (musb_urb_dequeue+0xfc/0x164 [musb_hdrc])
+>  r10:00000001 r9:40408280 r8:c5fca010 r7:a0000093 r6:00000000 r5:c55b5380
+>  r4:c55b5100
+> [<bf20c990>] (musb_urb_dequeue [musb_hdrc]) from [<bf10fd7c>]
+> (unlink1+0x34/0x13c [usbcore])
+>  r10:00000100 r9:c5cb2a00 r8:c55b5100 r7:ffffff94 r6:c5c6c000 r5:c5dd2380
+>  r4:c55b5100 r3:bf20c990
+> [<bf10fd48>] (unlink1 [usbcore]) from [<bf112424>]
+> (usb_hcd_flush_endpoint+0x164/0x1a4 [usbcore])
+>  r9:c5cb2a00 r8:c55b5100 r7:c5c6c000 r6:c5dd2398 r5:c5dd2380 r4:ffffe000
+> [<bf1122c0>] (usb_hcd_flush_endpoint [usbcore]) from [<bf11563c>]
+> (usb_disable_endpoint+0x50/0x94 [usbcore])
+>  r9:c5cb2a00 r8:bf39e898 r7:00000000 r6:c5c43000 r5:c5c43000 r4:c5dd2380
+> [<bf1155ec>] (usb_disable_endpoint [usbcore]) from [<bf1156c4>]
+> (usb_disable_interface+0x44/0x58 [usbcore])
+>  r5:c5dd2348 r4:00000000
+> [<bf115680>] (usb_disable_interface [usbcore]) from [<bf118044>]
+> (usb_unbind_interface+0x1c0/0x268 [usbcore])
+>  r7:c5cb2c00 r6:bf39e898 r5:c5cb2c20 r4:c5cb2c20
+> [<bf117e84>] (usb_unbind_interface [usbcore]) from [<c02ce180>]
+> (device_release_driver_internal+0x160/0x208)
+>  r10:00000100 r9:c5cb2a00 r8:00000034 r7:00000000 r6:bf39e898 r5:c5cb2c54
+>  r4:c5cb2c20
+> [<c02ce020>] (device_release_driver_internal) from [<c02ce240>]
+> (device_release_driver+0x18/0x1c)
+>  r9:c5cb2a00 r8:c05f1008 r7:c5c43070 r6:bf12895c r5:c5cb2c20 r4:c5dc91ac
+> [<c02ce228>] (device_release_driver) from [<c02ccf70>]
+> (bus_remove_device+0xd0/0x100)
+> [<c02ccea0>] (bus_remove_device) from [<c02c9c60>] (device_del+0x120/0x378)
+>  r7:c5c43070 r6:c5cb2c28 r5:00000000 r4:c5cb2c20
+> [<c02c9b40>] (device_del) from [<bf11576c>]
+> (usb_disable_device+0x94/0x1d8 [usbcore])
+>  r10:00000100 r9:c5cb2a00 r8:c5cb2c00 r7:c5c6c000 r6:00000001 r5:00000000
+>  r4:c5c43000
+> [<bf1156d8>] (usb_disable_device [usbcore]) from [<bf10bccc>]
+> (usb_disconnect+0xb4/0x244 [usbcore])
+>  r9:c5cb2a00 r8:c5c2d600 r7:c5c430a4 r6:c5c43070 r5:c5c43000 r4:00000000
+> [<bf10bc18>] (usb_disconnect [usbcore]) from [<bf10d788>]
+> (hub_event+0x678/0x11dc [usbcore])
+>  r10:00000100 r9:c05f1008 r8:c5c2dcf8 r7:c68fc400 r6:00000001 r5:40000000
+>  r4:00000000
+> [<bf10d110>] (hub_event [usbcore]) from [<c0031db0>]
+> (process_one_work+0x1d8/0x41c)
+>  r10:00000008 r9:00000000 r8:c060b1d0 r7:00000000 r6:c7ede200 r5:c6882480
+>  r4:c5c2dcf8
+> [<c0031bd8>] (process_one_work) from [<c0032030>] (worker_thread+0x3c/0x670)
+>  r10:00000008 r9:c060b1e4 r8:c061ab60 r7:c6882498 r6:ffffe000 r5:c060b1d0
+>  r4:c6882480
+> [<c0031ff4>] (worker_thread) from [<c0038270>] (kthread+0x134/0x14c)
+>  r10:c683fe90 r9:c0031ff4 r8:c6882480 r7:c6896000 r6:00000000 r5:c687bd80
+>  r4:c6803e80
+> [<c003813c>] (kthread) from [<c00090e0>] (ret_from_fork+0x14/0x34)
+> Exception stack(0xc6897fb0 to 0xc6897ff8)
+> 7fa0:                                     00000000 00000000 00000000 00000000
+> 7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+> 7fe0: 00000000 00000000 00000000 00000000 00000013 00000000
+>  r10:00000000 r9:00000000 r8:00000000 r7:00000000 r6:00000000 r5:c003813c
+>  r4:c687bd80
+> ---[ end trace cb9c7f93aaa3ed36 ]---
+> ------------[ cut here ]------------
+>
+>
+> adam
+>
 
+Hi Adam,
 
-Regards
-Martin
+this is a known issue and it's present in mainline and even in TI BSP.
+It's been deprioritized for now, but I'll return to debugging it once
+the common clock conversion is complete.
+
+Thanks,
+Bartosz
