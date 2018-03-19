@@ -1,56 +1,37 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Mar 2018 22:13:22 +0100
-Subject: [PATCH 0/8] ARM: sun9i: a80: Add display support
-In-Reply-To: <20180315114136.24747-1-wens@csie.org>
-References: <20180315114136.24747-1-wens@csie.org>
-Message-ID: <20180319211322.gnbc4mgk4nn2uskg@flea>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 19 Mar 2018 14:21:22 -0700
+Subject: [PATCH v3 08/10] clk: qcom: Add ACD path to CPU clock driver for
+ msm8996
+In-Reply-To: <41f3b246-43f4-450d-5c6b-34cdad7b15dd@arm.com>
+References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
+ <1518616792-29028-9-git-send-email-ilialin@codeaurora.org>
+ <152147863176.242365.17292287330283256524@swboyd.mtv.corp.google.com>
+ <41f3b246-43f4-450d-5c6b-34cdad7b15dd@arm.com>
+Message-ID: <152149448251.242365.16980775001987673274@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 07:41:28PM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
+Quoting Robin Murphy (2018-03-19 11:16:15)
+> On 19/03/18 16:57, Stephen Boyd wrote:
+> [...]
+> >> +
+> > 
+> >> +                       writel_relaxed(SSSCTL_VAL, vbases[APC_BASE] +
+> >> +                                       PWRCL_REG_OFFSET + SSSCTL_OFFSET);
+> >> +               /* Ensure SSSCTL config goes through before enabling ACD. */
+> >> +               mb();
+> > 
+> > Use writel instead.
 > 
-> This series adds basic support for the display pipelines found on the
-> Allwinner A80 SoC. Currently only parallel RGB output via TCON0 is
-> supported. TCON1 drives the HDMI encoder, which I've not been able to
-> get working yet.
+> Note that writel() only gives an implicit wmb() *before* the store to 
+> ensure ordering against any previous writes. If this code really needs 
+> to ensure that the given write has definitely completed before any other 
+> accesses happen, then it still needs an explicit barrier *after* the 
+> write*(), unless perhaps the next access is always guaranteed to be a 
+> non-relaxed write (thus implicitly providing a suitable DSB).
 > 
-> Patch 1 adds device tree bindings for the TCONs on the A80. In
-> particular, TCON0 requires the eDP reset control in addition to its own.
-> 
-> Patch 2 adds a device tree binding for the Detail Enhancement Unit found
-> only on the A80.
-> 
-> Patch 3 adds driver support for the TCONs.
-> 
-> Patch 4 adds compatible strings to the device tree bindings for all the 
-> remaining peripherals covered by this series.
-> 
-> Patch 5 adds support for the compatible strings from the previous patch
-> to the sun4i-drm driver.
-> 
-> Patch 6 adds the display pipeline device nodes to the A80 .dtsi file.
-> 
-> Patch 7 adds a pinmux setting for RGB888 output for TCON0.
-> 
-> Patch 8 enables VGA output on the Cubieboard4 via an external DAC and
-> an I2C bus from the SoC for DDC.
-> 
-> 
-> I've had these patches for quite some time now, rebasing them as more
-> features were added to sun4i-drm. Please have a look.
 
-Applied all, thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180319/2a2f6472/attachment.sig>
+Ah right. So this should be a wmb() too? I suspect it's to order with
+the write to the l2 indirect registers, but reading that register before
+the MMIO write is not a problem. The comment above the l2 accessors
+could be slightly more specific here and it would help immensely.
