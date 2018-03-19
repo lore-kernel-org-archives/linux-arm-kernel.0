@@ -1,36 +1,47 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 19 Mar 2018 15:05:55 +0100
-Subject: [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps receiver) power
- control driver
-In-Reply-To: <461DBB7C-5FF7-4723-9518-C9A5E7E5610D@goldelico.com>
-References: <cover.1512114576.git.hns@goldelico.com>
- <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
- <20171222124427.GI3374@localhost>
- <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
- <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
- <20180112153903.GB5992@localhost>
- <E7ECBBB8-2E88-4F04-AFC3-659332E84CF6@goldelico.com>
- <20180118061314.GG3286@localhost>
- <8B2641B8-E86B-425C-9E79-E9C41E4E623C@goldelico.com>
- <461DBB7C-5FF7-4723-9518-C9A5E7E5610D@goldelico.com>
-Message-ID: <20180319140555.GN18359@localhost>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 19 Mar 2018 14:55:05 +0100
+Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+In-Reply-To: <CAGb2v65QHkuM2GmT4MC+tp+HqN2ecqeZt8bB5OvZm2br1AJJ-w@mail.gmail.com>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+ <20180223133742.26044-11-mylene.josserand@bootlin.com>
+ <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
+ <20180318200715.363f3135@dell-desktop.home>
+ <CAGb2v65QHkuM2GmT4MC+tp+HqN2ecqeZt8bB5OvZm2br1AJJ-w@mail.gmail.com>
+Message-ID: <20180319135505.py4evmbexm2asvlo@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 07, 2018 at 04:53:12PM +0100, H. Nikolaus Schaller wrote:
-
-> If I look for example at the camera module drivers provided by
-> drivers/media/i2c, most of them could be easily power-controlled from
-> user-space by i2c-tools and 1-2 gpios through /sys/class/gpio and
-> a big set of scripts.
+On Mon, Mar 19, 2018 at 10:14:19AM +0800, Chen-Yu Tsai wrote:
+> On Mon, Mar 19, 2018 at 3:07 AM, Myl?ne Josserand
+> <mylene.josserand@bootlin.com> wrote:
+> > Hello Mark,
+> >
+> > Please, excuse me for this late answer and thank you for the review!
+> >
+> > On Wed, 7 Mar 2018 12:18:33 +0000
+> > Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >
+> >> On 23/02/18 13:37, Myl?ne Josserand wrote:
+> >> > On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
+> >>
+> >> Only on A7? Is that specific to your platform?
+> >
+> > I do not really know other Allwinner's platforms about this subject. At
+> > least, the sun9i-a80 which is a Cortex-a15/a7 does not need that but it
+> > is necessary for sun8i-a83t which is a cortex-a7. Maybe, Chen-Yu or
+> > Maxime could help us on it.
 > 
-> Still they have a place in the kernel and cameras are powered on
-> if the device is opened and powered down if it is closed.
-> 
-> So I am still trying to understand the rationale and logic (if one exists)
-> behind having them in kernel but rejecting our driver which does the
-> same for a different class of devices.
+> AFAIK all Allwinner CPUs need it if there isn't a firmware (PSCI) layer
+> beneath the kernel that will do the setup. We just have
+> "arm,cpu-registers-not-fw-configured" set for all the other SoCs that
+> have in-kernel SMP support, which includes the A31, A23, A33 and A80.
 
-For media we have a framework in place; for gps we do not (yet).
+Most of these ones are here for historical reasons though. Now that we
+have U-Boot properly setting it up, we could probably remove it.
 
-Johan
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
