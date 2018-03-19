@@ -1,115 +1,60 @@
-From: preid@electromag.com.au (Phil Reid)
-Date: Mon, 19 Mar 2018 17:36:30 +0800
-Subject: [RESEND PATCH v1 6/6] i2c: i2c-stm32f7: Implement I2C recovery
- mechanism
-In-Reply-To: <1520852023-27083-7-git-send-email-pierre-yves.mordret@st.com>
-References: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
- <1520852023-27083-7-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <c9b7a9c9-4924-cadc-c539-0775aab23368@electromag.com.au>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Mon, 19 Mar 2018 17:41:36 +0800
+Subject: [PATCH v4 6/7] dt-bindings: Introduce interconnect consumers
+ bindings
+In-Reply-To: <20180318224957.GP5626@tuxbook-pro>
+References: <20180309210958.16672-1-georgi.djakov@linaro.org>
+ <20180309210958.16672-7-georgi.djakov@linaro.org>
+ <20180318224957.GP5626@tuxbook-pro>
+Message-ID: <79b65ce6-1e4e-a8f5-b9ac-1993fca5108a@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/2018 18:53, Pierre-Yves MORDRET wrote:
-> Feature prevents I2C lock-ups. Mechanism resets I2C state machine
-> and releases SCL/SDA signals but preserves I2C registers.
+Hi Bjorn,
+
+On 03/19/2018 06:49 AM, Bjorn Andersson wrote:
+> On Fri 09 Mar 13:09 PST 2018, Georgi Djakov wrote:
 > 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->    Version history:
->      v1:
->         * Initial
-> ---
-> ---
->   drivers/i2c/busses/i2c-stm32f7.c | 32 +++++++++++++++++++++++++++++---
->   1 file changed, 29 insertions(+), 3 deletions(-)
+>> Add documentation for the interconnect consumer bindings, that will allow
+>> to link a device node (consumer) to its interconnect controller hardware.
+>>
+>> Tha aim is to enable drivers to request a framework API to configure an
+>> interconnect path by providing their struct device pointer and a name.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  .../bindings/interconnect/interconnect.txt         | 23 ++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> index 70612bb201e4..7935abf10c4b 100644
+>> --- a/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> @@ -45,3 +45,26 @@ Examples:
+>>  			status = "okay";
+>>  		};
+>>  
+>> += interconnect consumers =
+>> +
+>> +The interconnect consumers are device nodes which consume the interconnect
+>> +path(s) provided by the interconnect provider. There can be multiple
+>> +interconnect providers on a SoC and the consumer may consume multiple paths
+>> +from different providers depending on usecase and the components it has to
+>> +interact with.
+>> +
+>> +Required-properties:
+>> +interconnects: Pairs of phandles and interconnect provider specifier to denote
+>> +		the source and the destination port of the interconnect path.
+>> +interconnect-names: List of interconnect path name strings sorted in the same
+>> +		order as the interconnects property. Consumers drivers will use
+>> +		interconnect-names to match interconnect paths with interconnect
+>> +		specifiers.
 > 
-> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-> index 69a2e5e..3808bc9 100644
-> --- a/drivers/i2c/busses/i2c-stm32f7.c
-> +++ b/drivers/i2c/busses/i2c-stm32f7.c
-> @@ -718,6 +718,20 @@ static void stm32f7_i2c_smbus_reload(struct stm32f7_i2c_dev *i2c_dev)
->   	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
->   }
->   
-> +static int stm32f7_i2c_recover_bus(struct i2c_adapter *i2c_adap)
-> +{
-> +	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
-> +
-> +	dev_info(i2c_dev->dev, "Trying to recover bus\n");
-> +
-> +	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
-> +			     STM32F7_I2C_CR1_PE);
-
-This only "releases" the scl / sda on the stm32f7 end (outputs are hiz I guess).
-It doesn't trigger the scl clocking needed to recover a stuck device  via i2c recovery
-from what I can see in the data sheet.
-
-
-> +
-> +	stm32f7_i2c_hw_config(i2c_dev);
-
-Nothing in here either I think.
-
-
-> +
-> +	return 0;
-> +}
-> +
->   static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
->   {
->   	u32 status;
-> @@ -727,12 +741,18 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
->   					 status,
->   					 !(status & STM32F7_I2C_ISR_BUSY),
->   					 10, 1000);
-> +	if (!ret)
-> +		return 0;
-> +
-> +	dev_info(i2c_dev->dev, "bus busy\n");
-> +
-> +	ret = i2c_recover_bus(&i2c_dev->adap);
->   	if (ret) {
-> -		dev_dbg(i2c_dev->dev, "bus busy\n");
-> -		ret = -EBUSY;
-> +		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);
-> +		return ret;
->   	}
->   
-> -	return ret;
-> +	return -EBUSY;
->   }
->   
->   static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
-> @@ -1476,6 +1496,7 @@ static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
->   	if (status & STM32F7_I2C_ISR_BERR) {
->   		dev_err(dev, "<%s>: Bus error\n", __func__);
->   		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
-> +		i2c_recover_bus(&i2c_dev->adap);
->   		f7_msg->result = -EIO;
->   	}
->   
-> @@ -1760,6 +1781,10 @@ static struct i2c_algorithm stm32f7_i2c_algo = {
->   	.unreg_slave = stm32f7_i2c_unreg_slave,
->   };
->   
-> +static struct i2c_bus_recovery_info stm32f7_i2c_recovery_info = {
-> +	.recover_bus = stm32f7_i2c_recover_bus,
-> +};
-> +
->   static int stm32f7_i2c_probe(struct platform_device *pdev)
->   {
->   	struct device_node *np = pdev->dev.of_node;
-> @@ -1879,6 +1904,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
->   	adap->algo = &stm32f7_i2c_algo;
->   	adap->dev.parent = &pdev->dev;
->   	adap->dev.of_node = pdev->dev.of_node;
-> +	adap->bus_recovery_info = &stm32f7_i2c_recovery_info;
->   
->   	init_completion(&i2c_dev->complete);
->   
+> Analog to other subsystems the -names property should be optional, at
+> least when there's only a single entry in interconnects.
 > 
 
+Will do it.
 
--- 
-Regards
-Phil
+Thanks,
+Georgi
