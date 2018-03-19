@@ -1,75 +1,99 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 19 Mar 2018 11:08:30 -0700
-Subject: [PATCHv6 1/3] dt-bindings: documentation: add clock bindings
- information for Stratix10
-In-Reply-To: <1519656455-14629-1-git-send-email-dinguyen@kernel.org>
-References: <1519656455-14629-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <152148291051.242365.11482305337775703728@swboyd.mtv.corp.google.com>
+From: harald@ccbib.org (Harald Geyer)
+Date: Mon, 19 Mar 2018 19:15:17 +0100
+Subject: [v2,4/4] dts: sunxi: A64: Add PWM controllers
+In-Reply-To: <20180318232847.14278-5-andre.przywara@arm.com>
+References: <20180318232847.14278-5-andre.przywara@arm.com>
+Message-ID: <E1exzJV-0000LZ-EY@stardust.g4.wien.funkfeuer.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dinh Nguyen (2018-02-26 06:47:33)
-> diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
-> new file mode 100644
-> index 0000000..0652ff1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
-> @@ -0,0 +1,51 @@
-> +Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible : shall be
-> +       "intel,stratix10-clkmgr"
-> +
-> +- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
-> +
-> +- #clock-cells : from common clock binding, shall be set to 1.
-> +
-> +- clocks : Should contain fixed-clock sources, such as oscillators.
-> +
-> +Example:
-> +       clkmgr: clock-controller at ffd10000 {
-> +               compatible = "intel,stratix10-clkmgr";
-> +               reg = <0xffd10000 0x1000>;
-> +               #clock-cells = <1>;
-> +
-> +               clocks {
+Andre Przywara writes:
+> The Allwinner A64 SoC features two PWM controllers, which are fully
+> compatible to the one used in the A13 and H3 chips.
+> Add the respective device nodes (one for the "normal" PWM, the other for
+> the one in the CPUS domain) and the pin their output is connected to.
+> On the A64 the "normal" PWM is muxed together with one of the MDIO pins
+> used to communicate with the Ethernet PHY, so it won't be usable on many
+> boards. But the Pinebook laptop uses this pin for controlling the LCD
+> backlight.
 
-Why do we need a subnode for clocks inside of a clock controller node?
+for the entire series:
+Tested-by: Harald Geyer <harald@ccbib.org> on Teres-I (only the "normal" PWM)
 
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +
-> +                       cb_intosc_hs_div2_clk: cb-intosc-hs-div2-clk {
-> +                               #clock-cells = <0>;
-> +                               compatible = "fixed-clock";
-> +                               clock-frequency = <25000000>;
+Thanks for your work,
+Harald
 
-What is this for? I would think oscillators go into the root of the DT
-because they're on the board, not inside the clock controller.
+> The CPUS PWM pin however is routed to the "RPi2" header, at the same
+> location as the PWM pin on the RaspberryPi.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 28 +++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index d783d164b9c3..fda1783b1c86 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -321,6 +321,11 @@
+>  				bias-pull-up;
+>  			};
+>  
+> +			pwm_pin: pwm_pin {
+> +				pins = "PD22";
+> +				function = "pwm";
+> +			};
+> +
+>  			rmii_pins: rmii_pins {
+>  				pins = "PD10", "PD11", "PD13", "PD14", "PD17",
+>  				       "PD18", "PD19", "PD20", "PD22", "PD23";
+> @@ -537,6 +542,15 @@
+>  			#interrupt-cells = <3>;
+>  		};
+>  
+> +		pwm: pwm at 1c21400 {
+> +			compatible = "allwinner,sun50i-a64-pwm",
+> +				     "allwinner,sun5i-a13-pwm";
+> +			reg = <0x01c21400 0x400>;
+> +			clocks = <&osc24M>;
+> +			#pwm-cells = <3>;
+> +			status = "disabled";
+> +		};
+> +
+>  		rtc: rtc at 1f00000 {
+>  			compatible = "allwinner,sun6i-a31-rtc";
+>  			reg = <0x01f00000 0x54>;
+> @@ -563,6 +577,15 @@
+>  			#reset-cells = <1>;
+>  		};
+>  
+> +		r_pwm: pwm at 1f03800 {
+> +			compatible = "allwinner,sun50i-a64-pwm",
+> +				     "allwinner,sun5i-a13-pwm";
+> +			reg = <0x01f03800 0x400>;
+> +			clocks = <&osc24M>;
+> +			#pwm-cells = <3>;
+> +			status = "disabled";
+> +		};
+> +
+>  		r_pio: pinctrl at 1f02c00 {
+>  			compatible = "allwinner,sun50i-a64-r-pinctrl";
+>  			reg = <0x01f02c00 0x400>;
+> @@ -578,6 +601,11 @@
+>  				pins = "PL0", "PL1";
+>  				function = "s_rsb";
+>  			};
+> +
+> +			r_pwm_pin: pwm {
+> +				pins = "PL10";
+> +				function = "s_pwm";
+> +			};
+>  		};
+>  
+>  		r_rsb: rsb at 1f03400 {
 
-> +                       };
-> +
-> +                       cb_intosc_ls_clk: cb-intosc-ls-clk {
-> +                               #clock-cells = <0>;
-> +                               compatible = "fixed-clock";
-> +                               clock-frequency = <25000000>;
-> +                       };
-> +
-> +                       f2s_free_clk: f2s-free-clk {
-> +                               #clock-cells = <0>;
-> +                               compatible = "fixed-clock";
-> +                               clock-frequency = <25000000>;
-> +                       };
-> +
-> +                       osc1: osc1 {
-> +                               #clock-cells = <0>;
-> +                               compatible = "fixed-clock";
-> +                               clock-frequency = <25000000>;
-> +                       };
-> +               };
-> +       };
+-- 
+If you want to support my work:
+see http://friends.ccbib.org/harald/supporting/
+or donate via CLAM to xASPBtezLNqj4cUe8MT5nZjthRSEjrRQXN
+or via peercoin to P98LRdhit3gZbHDBe7ta5jtXrMJUms4p7w
