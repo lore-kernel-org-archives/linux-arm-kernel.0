@@ -1,16 +1,15 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 19 Mar 2018 11:21:53 +0100
-Subject: [GIT PULL] ARM: mediatek: updates for soc drivers for v4.16-next
-Message-ID: <8e4c1ec7-4e07-f1a6-0307-56accf2941e9@gmail.com>
+Date: Mon, 19 Mar 2018 11:20:22 +0100
+Subject: [GIT PUL] ARM: mediatek: dts64 updates for v4.16-next
+Message-ID: <e006b345-5711-3c1b-cd06-d75d87beefef@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-Hi Olof,
+Hi Arnd and Olof,
 
-Please take the following commits.
+Please pull the following commits.
 
-Thanks,
+Thanks a lot,
 Matthias
 
 ---
@@ -22,35 +21,51 @@ The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 are available in the Git repository at:
 
   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v4.16-next-soc
+tags/v4.16-next-dts64
 
-for you to fetch changes up to 9f9971266110add19b512f7b10a6d922e741368e:
+for you to fetch changes up to 5f59955299a13196233bbc0fb72f8dd5b5ba22a1:
 
-  soc: mediatek: update power domain data of MT2712 (2018-03-19 02:29:05 +0100)
-
-----------------------------------------------------------------
-scpsy:
-- mt2712: update power domains to reflect design changes in the SoC
-- fix initialisation of power subdomains
-- add support for mt7623a SoC
-- use defines for mt2701 bus protection mask
+  arm64: dts: mt2712: Add auxadc device node. (2018-03-19 02:49:59 +0100)
 
 ----------------------------------------------------------------
-Sean Wang (5):
-      dt-bindings: soc: add SCPSYS binding for MT7623 and MT7623A SoC
-      dt-bindings: soc: add header files required for MT7623A SCPSYS dt-binding
-      soc: mediatek: avoid hardcoded value with bus_prot_mask
-      soc: mediatek: add SCPSYS power domain driver for MediaTek MT7623A SoC
-      soc: mediatek: fix the mistaken pointer accessed when subdomains are added
+- mt2712e add auxadc devcie
 
-weiyi.lu at mediatek.com (2):
-      dt-bindings: soc: update MT2712 power dt-bindings
-      soc: mediatek: update power domain data of MT2712
+mt7622:
+- fix clock bindings description
+- add nodes for mmc, usb, SATA, PCI, ethernet, cpufreq, PMIC mt6380,
+pinctrl, scpsys and clock devices
 
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |   5 +-
- drivers/soc/mediatek/mtk-scpsys.c                  | 104 ++++++++++++++++++++-
- include/dt-bindings/power/mt2712-power.h           |   3 +
- include/dt-bindings/power/mt7623a-power.h          |  10 ++
- include/linux/soc/mediatek/infracfg.h              |   4 +
- 5 files changed, 120 insertions(+), 6 deletions(-)
- create mode 100644 include/dt-bindings/power/mt7623a-power.h
+----------------------------------------------------------------
+Chunfeng Yun (1):
+      arm64: dts: mt7622: add usb device nodes
+
+Ryder Lee (2):
+      arm64: dts: mt7622: add PCIe device nodes
+      arm64: dts: mt7622: add SATA device nodes
+
+Sean Wang (11):
+      arm64: dts: mt7622: add clock controller device nodes
+      arm64: dts: mt7622: add power domain controller device nodes
+      arm64: dts: mt7622: add pinctrl related device nodes
+      arm64: dts: mt7622: add PMIC MT6380 related nodes
+      arm64: dts: mt7622: add cpufreq related device nodes
+      arm64: dts: mt7622: turn uart0 clock to real ones
+      arm64: dts: mt7622: add SoC and peripheral related device nodes
+      arm64: dts: mt7622: add flash related device nodes
+      arm64: dts: mt7622: add ethernet device nodes
+      arm64: dts: mt7622: add mmc related device nodes
+      dt-bindings: clock: mediatek: add missing required #reset-cells
+
+Zhiyong Tao (1):
+      arm64: dts: mt2712: Add auxadc device node.
+
+ .../bindings/arm/mediatek/mediatek,ethsys.txt      |   1 +
+ .../bindings/arm/mediatek/mediatek,pciesys.txt     |   2 +
+ .../bindings/arm/mediatek/mediatek,ssusbsys.txt    |   2 +
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |   4 +
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |   9 +
+ arch/arm64/boot/dts/mediatek/mt6380.dtsi           |  86 +++
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       | 469 ++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 675 ++++++++++++++++++++-
+ 8 files changed, 1243 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6380.dtsi
