@@ -1,10 +1,10 @@
 From: Alexander.Levin@microsoft.com (Sasha Levin)
-Date: Mon, 19 Mar 2018 15:49:18 +0000
-Subject: [PATCH AUTOSEL for 4.15 121/124] signal/arm: Document conflicts with
+Date: Mon, 19 Mar 2018 15:56:36 +0000
+Subject: [PATCH AUTOSEL for 4.14 94/97] signal/arm: Document conflicts with
  SI_USER and SIGFPE
-In-Reply-To: <20180319154645.11350-1-alexander.levin@microsoft.com>
-References: <20180319154645.11350-1-alexander.levin@microsoft.com>
-Message-ID: <20180319154645.11350-121-alexander.levin@microsoft.com>
+In-Reply-To: <20180319155411.12348-1-alexander.levin@microsoft.com>
+References: <20180319155411.12348-1-alexander.levin@microsoft.com>
+Message-ID: <20180319155411.12348-94-alexander.levin@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
