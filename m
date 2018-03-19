@@ -1,36 +1,80 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Mon, 19 Mar 2018 18:43:43 +0300
-Subject: sun6i SPI driver issue
-Message-ID: <536bf3b1-4440-d060-b22f-2ce7321f4c13@orpaltech.com>
+From: Alexander.Levin@microsoft.com (Sasha Levin)
+Date: Mon, 19 Mar 2018 15:49:18 +0000
+Subject: [PATCH AUTOSEL for 4.15 121/124] signal/arm: Document conflicts with
+ SI_USER and SIGFPE
+In-Reply-To: <20180319154645.11350-1-alexander.levin@microsoft.com>
+References: <20180319154645.11350-1-alexander.levin@microsoft.com>
+Message-ID: <20180319154645.11350-121-alexander.levin@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+From: "Eric W. Biederman" <ebiederm@xmission.com>
 
-I have recently found a critical issue with sun6i SPI driver. It 
-actually found it long time ago while using spidev but I didn't 
-considered it as something important. Now it seems like a blocking issue 
-that prevents using the driver in any serious application.
-I have created a DRM driver for a ili9488-based display, its source is 
-available here [1] and device tree overlay [2]. The driver has been 
-successfully verified on RPi3, but? it is failing on sunxi: the driver 
-gets loaded, display seems working but SPI transfers are periodically 
-failing with error -110 (timeout). Due to the issue the picture is 
-frozen and completely refreshed again from time to time.
+[ Upstream commit 7771c66457004977b616bab785209f49d164f527 ]
 
-The problem is reproduced on OrangePi PC and BananaPi M2. I am providing 
-dmesg from my OrangePi PC [3].
+Setting si_code to 0 results in a userspace seeing an si_code of 0.
+This is the same si_code as SI_USER.  Posix and common sense requires
+that SI_USER not be a signal specific si_code.  As such this use of 0
+for the si_code is a pretty horribly broken ABI.
 
-Let know if you need any additional info.
+Further use of si_code == 0 guaranteed that copy_siginfo_to_user saw a
+value of __SI_KILL and now sees a value of SIL_KILL with the result
+that uid and pid fields are copied and which might copying the si_addr
+field by accident but certainly not by design.  Making this a very
+flakey implementation.
 
-Thanks
+Utilizing FPE_FIXME, siginfo_layout will now return SIL_FAULT and the
+appropriate fields will be reliably copied.
 
--------------------------------------------------------------------
+Possible ABI fixes includee:
+- Send the signal without siginfo
+- Don't generate a signal
+- Possibly assign and use an appropriate si_code
+- Don't handle cases which can't happen
 
-[1] https://github.com/sergey-suloev/tinydrm/blob/master/ili9488.c
+Cc: Russell King <rmk@flint.arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Ref: 451436b7bbb2 ("[ARM] Add support code for ARM hardware vector floating point")
+History Tree: https://git.kernel.org/pub/scm/linux/kernel/git/tglx/history.git
+Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+---
+ arch/arm/include/uapi/asm/siginfo.h | 13 +++++++++++++
+ arch/arm/vfp/vfpmodule.c            |  2 +-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/uapi/asm/siginfo.h
 
-[2] 
-https://github.com/sergey-suloev/tinydrm/blob/master/overlays/sunxi/mainline/sun8i-h3-ertft0356-drm.dts 
-
-
-[3] https://pastebin.com/xYqWKcJ2
+diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
+new file mode 100644
+index 000000000000..d0513880be21
+--- /dev/null
++++ b/arch/arm/include/uapi/asm/siginfo.h
+@@ -0,0 +1,13 @@
++#ifndef __ASM_SIGINFO_H
++#define __ASM_SIGINFO_H
++
++#include <asm-generic/siginfo.h>
++
++/*
++ * SIGFPE si_codes
++ */
++#ifdef __KERNEL__
++#define FPE_FIXME	0	/* Broken dup of SI_USER */
++#endif /* __KERNEL__ */
++
++#endif
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index a71a48e71fff..03c6a3c72f9c 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -257,7 +257,7 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
+ 
+ 	if (exceptions == VFP_EXCEPTION_ERROR) {
+ 		vfp_panic("unhandled bounce", inst);
+-		vfp_raise_sigfpe(0, regs);
++		vfp_raise_sigfpe(FPE_FIXME, regs);
+ 		return;
+ 	}
+ 
+-- 
+2.14.1
