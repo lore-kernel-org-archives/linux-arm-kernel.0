@@ -1,32 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 19 Mar 2018 11:23:02 +0000
-Subject: [PATCH v2] arm64: fix undefined reference to 'printk'
-In-Reply-To: <20180313125309.3662792-1-arnd@arndb.de>
-References: <CAKv+Gu-6s1tqBzAEgL63WxXrc9SuF2C9PtADqmEcUKWxP8eZUw@mail.gmail.com>
- <20180313125309.3662792-1-arnd@arndb.de>
-Message-ID: <20180319112302.GA11021@arm.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Mon, 19 Mar 2018 18:10:53 +0530
+Subject: [PATCH v3 0/3] Fix issues with huge mapping in ioremap for ARM64
+Message-ID: <1521463256-19858-1-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 01:52:36PM +0100, Arnd Bergmann wrote:
-> The printk symbol was intended as a generic address that is always
-> exported, however that turned out to be false with CONFIG_PRINTK=n:
-> 
-> ERROR: "printk" [arch/arm64/kernel/arm64-reloc-test.ko] undefined!
-> 
-> This changes the references to memstart_addr, which should be there
-> regardless of configuration.
-> 
-> Fixes: a257e02579e4 ("arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419")
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v2: fix changelog as pointed out by Ard
-> 
->  arch/arm64/kernel/reloc_test_core.c | 2 +-
->  arch/arm64/kernel/reloc_test_syms.S | 4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
+This series of patches are follow up work (and depends on)
+Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
+panic in ioremap huge pages".
 
-Cheers, I've picked this up now. Sorry for the delay.
+This series of patches are tested on 4.9 kernel with Cortex-A75
+based SoC.
 
-Will
+Chintan Pandya (3):
+  ioremap: Update pgtable free interfaces with addr
+  arm64: Implement page table free interfaces
+  Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+
+>From V2->V3:
+ - Use the exisiting page table free interface to do arm64
+   specific things
+
+>From V1->V2:
+ - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+   Add interfaces to free unmapped page table"
+ - Honored BBM for ARM64
+
+ arch/arm64/mm/mmu.c           | 40 ++++++++++++++++++++++++++++------------
+ arch/x86/mm/pgtable.c         |  4 ++--
+ include/asm-generic/pgtable.h |  8 ++++----
+ lib/ioremap.c                 |  4 ++--
+ 4 files changed, 36 insertions(+), 20 deletions(-)
+
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
