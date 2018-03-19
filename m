@@ -1,51 +1,115 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon, 19 Mar 2018 17:34:24 +0800
-Subject: [PATCH v4 2/7] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <20180318225029.GQ5626@tuxbook-pro>
-References: <20180309210958.16672-1-georgi.djakov@linaro.org>
- <20180309210958.16672-3-georgi.djakov@linaro.org>
- <20180318225029.GQ5626@tuxbook-pro>
-Message-ID: <45cba7ca-3a83-0ef8-eff7-a8b33bce9185@linaro.org>
+From: preid@electromag.com.au (Phil Reid)
+Date: Mon, 19 Mar 2018 17:36:30 +0800
+Subject: [RESEND PATCH v1 6/6] i2c: i2c-stm32f7: Implement I2C recovery
+ mechanism
+In-Reply-To: <1520852023-27083-7-git-send-email-pierre-yves.mordret@st.com>
+References: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
+ <1520852023-27083-7-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <c9b7a9c9-4924-cadc-c539-0775aab23368@electromag.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-On 03/19/2018 06:50 AM, Bjorn Andersson wrote:
-> On Fri 09 Mar 13:09 PST 2018, Georgi Djakov wrote:
->> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> [..]
->> +Required properties:
->> +- compatible : contains the interconnect provider vendor specific compatible
->> +	       string
->> +- reg : register space of the interconnect controller hardware
+On 12/03/2018 18:53, Pierre-Yves MORDRET wrote:
+> Feature prevents I2C lock-ups. Mechanism resets I2C state machine
+> and releases SCL/SDA signals but preserves I2C registers.
 > 
-> These properties doesn't relate to the interconnect provider, so there's
-> no need to describe them here.
-
-Agree.
-
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> ---
+>    Version history:
+>      v1:
+>         * Initial
+> ---
+> ---
+>   drivers/i2c/busses/i2c-stm32f7.c | 32 +++++++++++++++++++++++++++++---
+>   1 file changed, 29 insertions(+), 3 deletions(-)
 > 
->> +
->> +Examples:
->> +
->> +		snoc: snoc at 580000 {
+> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+> index 69a2e5e..3808bc9 100644
+> --- a/drivers/i2c/busses/i2c-stm32f7.c
+> +++ b/drivers/i2c/busses/i2c-stm32f7.c
+> @@ -718,6 +718,20 @@ static void stm32f7_i2c_smbus_reload(struct stm32f7_i2c_dev *i2c_dev)
+>   	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
+>   }
+>   
+> +static int stm32f7_i2c_recover_bus(struct i2c_adapter *i2c_adap)
+> +{
+> +	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
+> +
+> +	dev_info(i2c_dev->dev, "Trying to recover bus\n");
+> +
+> +	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
+> +			     STM32F7_I2C_CR1_PE);
+
+This only "releases" the scl / sda on the stm32f7 end (outputs are hiz I guess).
+It doesn't trigger the scl clocking needed to recover a stuck device  via i2c recovery
+from what I can see in the data sheet.
+
+
+> +
+> +	stm32f7_i2c_hw_config(i2c_dev);
+
+Nothing in here either I think.
+
+
+> +
+> +	return 0;
+> +}
+> +
+>   static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
+>   {
+>   	u32 status;
+> @@ -727,12 +741,18 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
+>   					 status,
+>   					 !(status & STM32F7_I2C_ISR_BUSY),
+>   					 10, 1000);
+> +	if (!ret)
+> +		return 0;
+> +
+> +	dev_info(i2c_dev->dev, "bus busy\n");
+> +
+> +	ret = i2c_recover_bus(&i2c_dev->adap);
+>   	if (ret) {
+> -		dev_dbg(i2c_dev->dev, "bus busy\n");
+> -		ret = -EBUSY;
+> +		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);
+> +		return ret;
+>   	}
+>   
+> -	return ret;
+> +	return -EBUSY;
+>   }
+>   
+>   static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
+> @@ -1476,6 +1496,7 @@ static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
+>   	if (status & STM32F7_I2C_ISR_BERR) {
+>   		dev_err(dev, "<%s>: Bus error\n", __func__);
+>   		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
+> +		i2c_recover_bus(&i2c_dev->adap);
+>   		f7_msg->result = -EIO;
+>   	}
+>   
+> @@ -1760,6 +1781,10 @@ static struct i2c_algorithm stm32f7_i2c_algo = {
+>   	.unreg_slave = stm32f7_i2c_unreg_slave,
+>   };
+>   
+> +static struct i2c_bus_recovery_info stm32f7_i2c_recovery_info = {
+> +	.recover_bus = stm32f7_i2c_recover_bus,
+> +};
+> +
+>   static int stm32f7_i2c_probe(struct platform_device *pdev)
+>   {
+>   	struct device_node *np = pdev->dev.of_node;
+> @@ -1879,6 +1904,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
+>   	adap->algo = &stm32f7_i2c_algo;
+>   	adap->dev.parent = &pdev->dev;
+>   	adap->dev.of_node = pdev->dev.of_node;
+> +	adap->bus_recovery_info = &stm32f7_i2c_recovery_info;
+>   
+>   	init_completion(&i2c_dev->complete);
+>   
 > 
-> These nodes should be described in a qcom/msm8916 binding document.
 
-Ok, will move this and the above to the platform specific binding
-documentation.
 
-> 
->> +			compatible = "qcom,msm8916-snoc";
->> +			reg = <0x580000 0x14000>;
->> +			clock-names = "bus_clk", "bus_a_clk";
->> +			clocks = <&rpmcc RPM_SMD_SNOC_CLK>, <&rpmcc RPM_SMD_SNOC_A_CLK>;
->> +			status = "okay";
->> +		};
-
-Thanks for the comments!
-
-BR,
-Georgi
+-- 
+Regards
+Phil
