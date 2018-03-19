@@ -1,39 +1,95 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 19 Mar 2018 11:26:35 +0100
-Subject: [PATCH v7 10/42] clk: davinci: New driver for davinci PSC clocks
-In-Reply-To: <152122292977.70929.17084619305591596735@swboyd.mtv.corp.google.com>
-References: <1519071723-31790-1-git-send-email-david@lechnology.com>
- <1519071723-31790-11-git-send-email-david@lechnology.com>
- <CAMpxmJVxfGtO=kh63KF-5Uqew3yy97DsK4FSd14CyyRQTOhrTA@mail.gmail.com>
- <152122292977.70929.17084619305591596735@swboyd.mtv.corp.google.com>
-Message-ID: <CAMRc=Me-OCQjB-q8iV5k-n00-iF8aH-UU444iL1zCN=DdKnwzA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 19 Mar 2018 11:35:04 +0100
+Subject: [PATCH v1 02/19] dt-bindings: cpufreq: mediatek: use - instead of
+ _ in examples
+In-Reply-To: <1521427861.13211.8.camel@mtkswgap22>
+References: <cover.1519378871.git.sean.wang@mediatek.com>
+ <fd1fc4c6760ab8fcbf7518df1cecf3837ab18d2c.1519378871.git.sean.wang@mediatek.com>
+ <20180226041336.GJ26947@vireshk-i7> <1521427861.13211.8.camel@mtkswgap22>
+Message-ID: <1eafba31-0d0b-89d9-fb66-c4ba5ca6b56f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-16 18:55 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
-> Quoting Bartosz Golaszewski (2018-02-28 04:38:38)
->> 2018-02-19 21:21 GMT+01:00 David Lechner <david@lechnology.com>:
->>
->> I believe there to be two issues: one is with v7 - we need to increase
->> the clock reference count in davinci_psc_genpd_attach_dev().
->>
->> Second is the error path in the clock framework - we should remove the
->> destroyed clk_core from the debug list, which is not being done now.
->>
->> Why we even need to track the refcount of clk_core is a mistery for me
->> though. Stephen, Mike?
->>
->
-> Which part of the code are we talking about? I see that
-> __clk_core_init() calls clk_debug_register() when ret == 0 and that
-> looks fine. I do wonder why clk_debug_register() even returns a value
-> though because we ignore it.
+Hi Sean,
 
-Hi Stephen,
+On 03/19/2018 03:51 AM, Sean Wang wrote:
+> 
+> Hi, Matthias
+> 
+> I'm worried you missed the patch which already got both tags Reviewed-by
+> from Rob and Acked-by: Viresh and thus I thought it
+> should be ready for your tree.
+> 
 
-invalid usage of clock pm ops was the culprit here. I just had not
-understood why we count references in the CCF - now I get it so
-nevermind this mail.
+Yes, sorry I missed this one. Fortunately it is not critical, can you please add
+it to v2.
 
-Thanks,
-Bart
+I suppose you realized that I didn't take any from 12/19 onwards, especially 14,
+15 and 17, because they have many conflicts with previous patches in the series.
+
+Sorry for the inconvenience.
+Matthias
+
+> For the other patches in the same series, I will have v2 to refine them
+> according to these suggestions and comments in v1 and let them easy to
+> review.
+> 
+> Really thanks for your effort!
+> 	
+> 	Sean
+> 
+> 
+> On Mon, 2018-02-26 at 09:43 +0530, Viresh Kumar wrote:
+>> On 23-02-18, 18:16, sean.wang at mediatek.com wrote:
+>>> From: Sean Wang <sean.wang@mediatek.com>
+>>>
+>>> It should be good that no use "_" is in examples. Consequently,
+>>> those nodes in certain files which have an inappropriate name containing
+>>> "_" are all being replaced with "-".
+>>>
+>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: linux-pm at vger.kernel.org
+>>> Cc: devicetree at vger.kernel.org
+>>> ---
+>>>  Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt | 6 +++---
+>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+>>> index d36f07e..38cfbb5 100644
+>>> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+>>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mediatek.txt
+>>> @@ -26,7 +26,7 @@ Optional properties:
+>>>  
+>>>  Example 1 (MT7623 SoC):
+>>>  
+>>> -	cpu_opp_table: opp_table {
+>>> +	cpu_opp_table: opp-table {
+>>>  		compatible = "operating-points-v2";
+>>>  		opp-shared;
+>>>  
+>>> @@ -86,7 +86,7 @@ Example 1 (MT7623 SoC):
+>>>  	};
+>>>  
+>>>  Example 2 (MT8173 SoC):
+>>> -	cpu_opp_table_a: opp_table_a {
+>>> +	cpu_opp_table_a: opp-table-a {
+>>>  		compatible = "operating-points-v2";
+>>>  		opp-shared;
+>>>  
+>>> @@ -131,7 +131,7 @@ Example 2 (MT8173 SoC):
+>>>  		};
+>>>  	};
+>>>  
+>>> -	cpu_opp_table_b: opp_table_b {
+>>> +	cpu_opp_table_b: opp-table-b {
+>>>  		compatible = "operating-points-v2";
+>>>  		opp-shared;
+>>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>
+> 
+> 
