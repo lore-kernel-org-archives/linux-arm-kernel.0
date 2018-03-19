@@ -1,89 +1,30 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Mon, 19 Mar 2018 10:21:58 +0900
-Subject: [PATCH] arm64: dts: uniphier: add syscon property for UniPhier sound
- system
-Message-ID: <20180319012158.26411-1-suzuki.katsuhiro@socionext.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 18 Mar 2018 18:23:15 -0700
+Subject: [PATCH v2 0/7] KASan for arm
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C0076FBE@dggemm510-mbs.china.huawei.com>
+References: <B8AC3E80E903784988AB3003E3E97330C0076FBE@dggemm510-mbs.china.huawei.com>
+Message-ID: <b9a813b8-30fe-ef17-ff79-372c2134723f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds syscon property for specifying soc-glue core into
-device-tree of LD11/LD20 SoC.
 
-Currently, soc-glue core is used for changing the state of S/PDIF
-signal output pin to signal output state or Hi-Z state.
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
----
- arch/arm/boot/dts/uniphier-pxs2.dtsi             | 4 +++-
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 4 +++-
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 4 +++-
- 3 files changed, 9 insertions(+), 3 deletions(-)
+On 03/18/2018 06:20 PM, Liuwenliang (Abbott Liu) wrote:
+> On 03/19/2018 03:14 AM, Florian Fainelli wrote:
+>> Thanks for posting these patches! Just FWIW, you cannot quite add
+>> someone's Tested-by for a patch series that was just resubmitted given
+>> the differences with v1. I just gave it a spin on a Cortex-A5 (no LPAE)
+>> and it looks like test_kasan.ko is passing, great job!
+> 
+> I'm sorry.
+> Thanks for your testing very much!
+> I forget to add Tested-by in cover letter patch file. But I have alreadly added
+> Tested-by in some of following patch. 
+> In the next version I am going to add Tested-by in all patches.
 
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index 595045441c9c..c72c0a123c87 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -243,6 +243,8 @@
- 			resets = <&sys_rst 40>;
- 			#sound-dai-cells = <1>;
- 
-+			socionext,syscon = <&sg>;
-+
- 			i2s_port0: port at 0 {
- 				i2s_hdmi: endpoint {
- 				};
-@@ -418,7 +420,7 @@
- 			};
- 		};
- 
--		soc-glue at 5f800000 {
-+		sg: soc-glue at 5f800000 {
- 			compatible = "socionext,uniphier-pxs2-soc-glue",
- 				     "simple-mfd", "syscon";
- 			reg = <0x5f800000 0x2000>;
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index efa95573b2aa..5a1b8d574904 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -198,6 +198,8 @@
- 			resets = <&sys_rst 40>;
- 			#sound-dai-cells = <1>;
- 
-+			socionext,syscon = <&sg>;
-+
- 			i2s_port0: port at 0 {
- 				i2s_hdmi: endpoint {
- 				};
-@@ -479,7 +481,7 @@
- 			};
- 		};
- 
--		soc-glue at 5f800000 {
-+		sg: soc-glue at 5f800000 {
- 			compatible = "socionext,uniphier-ld11-soc-glue",
- 				     "simple-mfd", "syscon";
- 			reg = <0x5f800000 0x2000>;
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index 19c935688a77..831522444276 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -298,6 +298,8 @@
- 			resets = <&sys_rst 40>;
- 			#sound-dai-cells = <1>;
- 
-+			socionext,syscon = <&sg>;
-+
- 			i2s_port0: port at 0 {
- 				i2s_hdmi: endpoint {
- 				};
-@@ -525,7 +527,7 @@
- 			cdns,phy-dll-delay-sdclk-hsmmc = <21>;
- 		};
- 
--		soc-glue at 5f800000 {
-+		sg: soc-glue at 5f800000 {
- 			compatible = "socionext,uniphier-ld20-soc-glue",
- 				     "simple-mfd", "syscon";
- 			reg = <0x5f800000 0x2000>;
+This is not exactly what I meant. When you submit a v2 of your patches,
+you must wait for people to give you their test results. The Tested-by
+applied to v1, and so much has changed it is no longer valid for v2
+unless someone tells you they tested v2. Hope this is clearer.
 -- 
-2.16.2
+Florian
