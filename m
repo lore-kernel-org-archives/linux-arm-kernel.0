@@ -1,53 +1,45 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Mon, 19 Mar 2018 12:47:23 +0530
-Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
- laptop
-In-Reply-To: <20180318202251.5gpv6sblfr4edxmj@flea>
-References: <20180315162510.11669-1-harald@ccbib.org>
- <20180315162510.11669-6-harald@ccbib.org>
- <20180318202251.5gpv6sblfr4edxmj@flea>
-Message-ID: <20180319071723.GA854@afzalpc>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Mon, 19 Mar 2018 08:25:49 +0100
+Subject: [PATCH v3 0/2] Introduce STM32MP1 Reset driver
+Message-ID: <1521444351-29550-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-On Sun, Mar 18, 2018 at 09:22:51PM +0100, Maxime Ripard wrote:
-> The first part is supposed to be the name of the boards. I did sed
-> s/leds/teres-i/, and applied, together with all the patches but the
-> PWM (so I had to drop the backlight node as well).
-> 
-> Please coordinate with Andre about who should send the PWM support.
+v3:
+remove unused includes
+fix status ops
+fix from Fengguang Wu
+	for Kbuild test robot: symbol 'stm32_reset_ops' was not declared. Should it be static?
+use 'builtin_platform_driver' instead 'postcore_initcall'
 
-Assuming that these patches were applied to your sunxi/dt64-for-4.17
-branch, since PWM support patch is missing, there is a build error,
+v2:
+Don't use reset-simple driver but a custom reset driver.
+add dt-binding documentation.
 
-arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts:129.1-5 Label or path pwm not found
+This patch-set enables the reset of STM32MP1.
+STM32MP1 reset IP has a register to assert by writing '1' and another
+register to de-assert by writing '1'.
 
-Diff at the end cures it.
+The patch 'dt-bindings: reset: add STM32MP1 resets' could be squashed
+with the patch:
+'dt-bindings: Document STM32MP1 Reset Clock Controller (RCC) bindings'
+commit 3830681d354f
 
-(there is another H6 pine 64 DT build error related to header file
-missing)
+Gabriel Fernandez (2):
+  dt-bindings: reset: add STM32MP1 resets
+  reset: stm32mp1: Enable stm32mp1 reset driver
 
-afzal
+ .../devicetree/bindings/reset/st,stm32mp1-rcc.txt  |   6 ++
+ drivers/reset/Kconfig                              |   6 ++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-stm32mp1.c                     | 115 +++++++++++++++++++++
+ include/dt-bindings/reset/stm32mp1-resets.h        | 108 +++++++++++++++++++
+ 5 files changed, 236 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
+ create mode 100644 drivers/reset/reset-stm32mp1.c
+ create mode 100644 include/dt-bindings/reset/stm32mp1-resets.h
 
-
---->8---
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-index b3c7ef6b6fe5..d9baab3dc96b 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
-@@ -126,12 +126,6 @@
-        status = "okay";
- };
- 
--&pwm {
--       pinctrl-names = "default";
--       pinctrl-0 = <&pwm_pin>;
--       status = "okay";
--};
--
- &ohci1 {
-        status = "okay";
- };
+-- 
+1.9.1
