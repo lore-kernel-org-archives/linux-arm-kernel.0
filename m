@@ -1,78 +1,57 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Mar 2018 13:42:10 +0000
-Subject: [EXT] Re: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR
- interface to use in-band negotiation
-In-Reply-To: <02614799e30f4823a97fca0e9f29b14b@IL-EXCH01.marvell.com>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
- <20180316103351.16616-3-antoine.tenart@bootlin.com>
- <20180316155307.GQ9418@n2100.armlinux.org.uk>
- <20180319085252.GF4519@kwain>
- <20180319111205.GB2743@n2100.armlinux.org.uk>
- <20180319125227.GI4519@kwain> <20180319125953.GD19795@lunn.ch>
- <54e290a192734831b5db22191f056a81@IL-EXCH01.marvell.com>
- <20180319130823.GA22306@lunn.ch>
- <02614799e30f4823a97fca0e9f29b14b@IL-EXCH01.marvell.com>
-Message-ID: <20180319134210.GA26979@n2100.armlinux.org.uk>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 19 Mar 2018 14:44:56 +0100
+Subject: [PATCH v4 0/9] Initial Allwinner H6 support
+In-Reply-To: <F40271A8-3782-4A69-8C40-3909EB296C66@aosc.io>
+References: <20180316140215.28663-1-icenowy@aosc.io>
+ <20180318201744.dw6hnm2vdybaunev@flea>
+ <F40271A8-3782-4A69-8C40-3909EB296C66@aosc.io>
+Message-ID: <20180319134456.shebby73ngqavsnl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 01:19:24PM +0000, Stefan Chulski wrote:
+On Mon, Mar 19, 2018 at 09:28:23AM +0800, Icenowy Zheng wrote:
 > 
 > 
-> > -----Original Message-----
-> > From: Andrew Lunn [mailto:andrew at lunn.ch]
-> > Sent: Monday, March 19, 2018 3:08 PM
-> > To: Stefan Chulski <stefanc@marvell.com>
-> > Cc: Antoine Tenart <antoine.tenart@bootlin.com>; Russell King - ARM Linux
-> > <linux@armlinux.org.uk>; davem at davemloft.net; kishon at ti.com;
-> > gregory.clement at bootlin.com; jason at lakedaemon.net;
-> > sebastian.hesselbarth at gmail.com; netdev at vger.kernel.org; linux-
-> > kernel at vger.kernel.org; thomas.petazzoni at bootlin.com;
-> > maxime.chevallier at bootlin.com; miquel.raynal at bootlin.com; Nadav Haklai
-> > <nadavh@marvell.com>; Yan Markman <ymarkman@marvell.com>;
-> > mw at semihalf.com; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [EXT] Re: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR
-> > interface to use in-band negotiation
-> > 
-> > > > If they don't have PHYs, how are the connected to the outside world?
-> > > >
-> > > >    Andrew
-> > >
-> > > By external SFP or direct attached cable.
-> > 
-> > Maybe i'm missing something, but don't you just need to add an SFP device
-> > in the device tree. The SFP code and PHYLINK will work together, query what
-> > the SFP module is, use the GPIOs to determine link up/down and module
-> > present, and tell the MAC how to configure the MAC-SFP link?
-> > 
-> >      Andrew
+> ? 2018?3?19? GMT+08:00 ??4:17:44, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >On Fri, Mar 16, 2018 at 10:02:06PM +0800, Icenowy Zheng wrote:
+> >> This patchset adds initial support for the Allwinner H6 SoC.
+> >> 
+> >> It's quite different from earlier Allwinner SoCs. For example, the
+> >> memory map is refactored, and the CCU is rearranged. It's also the
+> >first
+> >> Allwinner SoC with PCI Express interface (although the implementation
+> >> of the PCI Express controller is broken), and the second one with USB
+> >> 3.0 (the first one is A80).
+> >> 
+> >> This patchset adds the most basical support for it, including the
+> >main pin
+> >> controller, the main CCU and the basical device tree.
+> >> 
+> >> Icenowy Zheng (9):
+> >>   pinctrl: sunxi: refactor irq related register function to have desc
+> >>   pinctrl: sunxi: introduce IRQ bank conversion function
+> >>   pinctrl: sunxi: change irq_bank_base to irq_bank_map
+> >>   pinctrl: sunxi: add support for the Allwinner H6 main pin
+> >controller
+> >>   clk: sunxi-ng: Support fixed post-dividers on NKMP style clocks
+> >>   dt-bindings: add device tree binding for Allwinner H6 main CCU
+> >>   clk: sunxi-ng: add support for the Allwinner H6 CCU
+> >>   arm64: allwinner: h6: add the basical Allwinner H6 DTSI file
+> >>   arm64: allwinner: h6: add support for Pine H64 board
+> >
+> >Applied the !pinctrl patches.
 > 
-> phylink pool SFP loss signal to determine link up/down?
+> Oops, one clock (CLK_HDMI_SLOW) is missing in the CCU
+> driver, as Jernej pointed out.
+> 
+> Should I send a patch that fix it?
 
-No.  Phylink was merged along with SFP cage support, which includes a DT
-description for SFP cages, including the various signals for the cage.
+Yes, please.
 
-The SFP layer will take care of monitoring the cage and conveying state
-information to Phylink.
-
-Phylink's job is to work out how any SFP module, PHY and MAC should be
-configured and to determine the link state based on information supplied
-by or requested from each depending on the configured state.
-
-Please do not try and support SFP cages as fixed links.  They aren't,
-and such an approach will always have sub-standard link state monitoring.
-
-In an optical setup, the SFP LOS signal just indicates whether there is
-sufficient optical power present at the receiver.  It doesn't indicate
-whether there is a valid signal there, or whether the chip at the other
-end of the serdes link can decode the signal.  That has to come from the
-upstream chip, whether it be a PHY or a MAC.
-
-SFP optical modules do not perform protocol validation - they merely
-convert the serdes electrical signal into a light signal and back again,
-with varying amounts of monitoring on board.
+Thanks!
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
