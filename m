@@ -1,50 +1,52 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 19 Mar 2018 02:51:58 +0100
-Subject: [PATCH 3/3] arm64: dts: mt2712: Add auxadc device node.
-In-Reply-To: <6680d15a-625a-cc16-830f-9831f5f52ad3@gmail.com>
-References: <1505957212-13402-1-git-send-email-zhiyong.tao@mediatek.com>
- <1505957212-13402-4-git-send-email-zhiyong.tao@mediatek.com>
- <20170924164705.78cbb856@archlinux>
- <0e1bac27-18ca-121c-f1d7-8063af177a8b@gmail.com>
- <6680d15a-625a-cc16-830f-9831f5f52ad3@gmail.com>
-Message-ID: <f1c8f79f-8536-f3cc-22be-31466a1390ad@gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Mon, 19 Mar 2018 01:59:41 +0000
+Subject: [PATCH 1/2] ARM: dts: pfuze3000: update sw1a/vldo4 voltage range
+In-Reply-To: <CAOMZO5AFJk_Q5CYrV0s+hLmORHosWujRSGjwf9smyAQc4nmJ+A@mail.gmail.com>
+References: <1521269828-8874-1-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5BzE46Dm24++j+xVA4KGFnpsopGfJ97h7sFGOAxVa19=g@mail.gmail.com>
+ <AM3PR04MB1315E1C3071C0BD2E7169968F5D50@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <CAOMZO5AFJk_Q5CYrV0s+hLmORHosWujRSGjwf9smyAQc4nmJ+A@mail.gmail.com>
+Message-ID: <AM3PR04MB1315E036D33F27C9AF617252F5D40@AM3PR04MB1315.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Fabio
+
+Anson Huang
+Best Regards!
 
 
-On 10/16/2017 05:09 PM, Matthias Brugger wrote:
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Sunday, March 18, 2018 8:55 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Robin Gong <yibin.gong@nxp.com>; Shawn Guo <shawnguo@kernel.org>;
+> Sascha Hauer <kernel@pengutronix.de>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Russell King - ARM Linux <linux@armlinux.org.uk>;
+> Liam Girdwood <lgirdwood@gmail.com>; Mark Brown <broonie@kernel.org>;
+> dl-linux-imx <linux-imx@nxp.com>; moderated list:ARM/FREESCALE IMX / MXC
+> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; open list:OPEN
+> FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
+> <devicetree@vger.kernel.org>; linux-kernel <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH 1/2] ARM: dts: pfuze3000: update sw1a/vldo4 voltage range
 > 
+> On Sat, Mar 17, 2018 at 11:23 PM, Anson Huang <anson.huang@nxp.com>
+> wrote:
 > 
-> On 10/13/2017 05:11 PM, Matthias Brugger wrote:
->>
->>
->> On 09/24/2017 05:47 PM, Jonathan Cameron wrote:
->>> On Thu, 21 Sep 2017 09:26:52 +0800
->>> Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
->>>
->>>> Add auxadc device node for MT2712.
->>>>
->>>> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
->>>
->>> I've applied the IIO patches to make this work, so assume this will get
->>> picked up in due course.
->>>
->>
->> pushed now to v4.14-next/dts64
->> Thanks.
->>
+> > I thought the max value here means the capability of regulator itself, like the
+> internal
 > 
-> I realized that this needs the mt2712 clock patches to actually work.
-> Dropped for now. Please resubmit as soon as mt2712 clock patches got [1]
-> accepted upstream.
+> No it is not.
 > 
+> Please check Documentation/devicetree/bindings/regulator/regulator.txt:
+> 
+> "- regulator-max-microvolt: largest voltage consumers may set"
+ 
+OK, so I should change the max value of SW1A according to board design, such
+as for MX7D, it is 1.075V for max cpu-freq's voltage, set it to 1.075 in dts?
 
-I think you actually never resubmitted. Anyway I pushed it now to v4.16-next/dts64
+Also, according to the binding doc, do you think the anatop's vdd_arm and vdd_soc/pu's max
+value also need to be adjusted to match the value define in each soc's datasheet? 
 
-Thanks.
-
-> Thanks,
-> Matthias
-> 
-> [1] https://lkml.org/lkml/2017/9/19/9
+Anson.
