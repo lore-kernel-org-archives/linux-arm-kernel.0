@@ -1,60 +1,50 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 19 Mar 2018 01:48:17 +0000
-Subject: [PATCH -next] ASoC: mediatek: mt2701: drop unnessary
- snd_soc_unregister_component()
-In-Reply-To: <1521185516-164333-1-git-send-email-weiyongjun1@huawei.com>
-References: <1521185516-164333-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <87lgeou9bo.wl%kuninori.morimoto.gx@renesas.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 19 Mar 2018 02:51:58 +0100
+Subject: [PATCH 3/3] arm64: dts: mt2712: Add auxadc device node.
+In-Reply-To: <6680d15a-625a-cc16-830f-9831f5f52ad3@gmail.com>
+References: <1505957212-13402-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1505957212-13402-4-git-send-email-zhiyong.tao@mediatek.com>
+ <20170924164705.78cbb856@archlinux>
+ <0e1bac27-18ca-121c-f1d7-8063af177a8b@gmail.com>
+ <6680d15a-625a-cc16-830f-9831f5f52ad3@gmail.com>
+Message-ID: <f1c8f79f-8536-f3cc-22be-31466a1390ad@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Wei
 
-> It's not necessary to unregister a component registered
-> with devm_snd_soc_register_component().
+On 10/16/2017 05:09 PM, Matthias Brugger wrote:
 > 
-> Fixes: f1b5bf07365d ("ASoC: mt2701/mt8173: replace platform to componen")
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> ---
->  sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 2 --
->  1 file changed, 2 deletions(-)
 > 
-> diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> index f7e0702..43837a3 100644
-> --- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> +++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> @@ -1561,8 +1561,6 @@ static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
->  	if (!pm_runtime_status_suspended(&pdev->dev))
->  		mt2701_afe_runtime_suspend(&pdev->dev);
->  
-> -	snd_soc_unregister_component(&pdev->dev);
-> -
->  	return 0;
->  }
+> On 10/13/2017 05:11 PM, Matthias Brugger wrote:
+>>
+>>
+>> On 09/24/2017 05:47 PM, Jonathan Cameron wrote:
+>>> On Thu, 21 Sep 2017 09:26:52 +0800
+>>> Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
+>>>
+>>>> Add auxadc device node for MT2712.
+>>>>
+>>>> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+>>>
+>>> I've applied the IIO patches to make this work, so assume this will get
+>>> picked up in due course.
+>>>
+>>
+>> pushed now to v4.14-next/dts64
+>> Thanks.
+>>
+> 
+> I realized that this needs the mt2712 clock patches to actually work.
+> Dropped for now. Please resubmit as soon as mt2712 clock patches got [1]
+> accepted upstream.
+> 
 
-I guess, below patch is using normal snd_soc_add_component() not devm_ version,
-and above unregister is for it ?
-And I think f1b5bf07365d patch is not related to youur patch
-(It is "platform" replace patch, your one is for "component" patch).
+I think you actually never resubmitted. Anyway I pushed it now to v4.16-next/dts64
 
-	dc2a17f4f074c434757e2cef5026d4747fe22955
-	("ASoC: mediatek: fix double free in mt2701_afe_pcm_dev_probe()")
+Thanks.
 
-static int mt2701_afe_add_component(struct mtk_base_afe *afe)
-{
-        struct snd_soc_component *component;
-
-        component = kzalloc(sizeof(*component), GFP_KERNEL);
-        if (!component)
-                return -ENOMEM;
-
-        component->regmap = afe->regmap;
-
-        return snd_soc_add_component(afe->dev, component,
-                                     &mt2701_afe_pcm_dai_component,
-                                     mt2701_afe_pcm_dais,
-                                     ARRAY_SIZE(mt2701_afe_pcm_dais));
-}
-
-    
+> Thanks,
+> Matthias
+> 
+> [1] https://lkml.org/lkml/2017/9/19/9
