@@ -1,38 +1,49 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Mon, 19 Mar 2018 14:13:43 +0100
-Subject: [EXT] Re: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR
- interface to use in-band negotiation
-In-Reply-To: <20180319130823.GA22306@lunn.ch>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
- <20180316103351.16616-3-antoine.tenart@bootlin.com>
- <20180316155307.GQ9418@n2100.armlinux.org.uk>
- <20180319085252.GF4519@kwain>
- <20180319111205.GB2743@n2100.armlinux.org.uk>
- <20180319125227.GI4519@kwain> <20180319125953.GD19795@lunn.ch>
- <54e290a192734831b5db22191f056a81@IL-EXCH01.marvell.com>
- <20180319130823.GA22306@lunn.ch>
-Message-ID: <20180319131343.GK4519@kwain>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 19 Mar 2018 14:17:01 +0100
+Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v8_00=2F42=5D_ARM=3A_davinci=3A_convert_to_common?=
+ =?UTF-8?Q?_clock_framework=E2=80=8B?=
+In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
+References: <1521168778-27236-1-git-send-email-david@lechnology.com>
+Message-ID: <CAMpxmJX-AxhpPpCnWoaSGYmNh3o8iRjdKacnmozsPWmhpcGdTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 02:08:23PM +0100, Andrew Lunn wrote:
-> > > If they don't have PHYs, how are the connected to the outside world?
-> > 
-> > By external SFP or direct attached cable.
-> 
-> Maybe i'm missing something, but don't you just need to add an SFP
-> device in the device tree. The SFP code and PHYLINK will work
-> together, query what the SFP module is, use the GPIOs to determine
-> link up/down and module present, and tell the MAC how to configure the
-> MAC-SFP link?
+2018-03-16 3:52 GMT+01:00 David Lechner <david@lechnology.com>:
+> This series converts mach-davinci to use the common clock framework.
+>
+> The series works like this, the first 19 patches create new clock drivers
+> using the common clock framework. There are basically 3 groups of clocks -
+> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
+> unique init data, which is the reason for so many patches.
+>
+> Then, starting with "ARM: davinci: pass clock as parameter to
+> davinci_timer_init()", we get the mach code ready for the switch by adding the
+> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
+> around the legacy clocks so that we can switch easily between the old and the
+> new.
+>
+> "ARM: davinci: switch to common clock framework" actually flips the switch
+> to start using the new clock drivers. Then the next 8 patches remove all
+> of the old clock code.
+>
+> The final three patches add device tree clock support to the one SoC that
+> supports it.
+>
+> This series has been tested on LEGO MINDSTORMS EV3 (device tree) and TI
+> OMAP-L138 LCDK (both device tree and legacy board file).
+>
 
-This would definitively work for SFP connectors with a PHY, but would
-that work when using direct attached cable? As in the second case
-phylink wouldn't be able to ask the SFP PHY for the link state.
+Hi David,
 
-Antoine
+thanks, with the u-boot fix everything seems to work fine. I tested
+da850-lcdk and da850-evm boards in DT and board file modes.
 
--- 
-Antoine T?nart, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+I'll be working with this series in the following days and will do
+some thorough testing and rebase my aemif series on top of it. I'll
+also use the recently merged reset support for board files to get rid
+of the exported reset functions.
+
+Thanks for your work!
+
+Best regards,
+Bartosz Golaszewski
