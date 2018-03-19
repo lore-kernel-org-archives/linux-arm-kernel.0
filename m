@@ -1,119 +1,142 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Mon, 19 Mar 2018 17:25:20 +0100
-Subject: [RESEND PATCH v1 6/6] i2c: i2c-stm32f7: Implement I2C recovery
- mechanism
-In-Reply-To: <c9b7a9c9-4924-cadc-c539-0775aab23368@electromag.com.au>
-References: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
- <1520852023-27083-7-git-send-email-pierre-yves.mordret@st.com>
- <c9b7a9c9-4924-cadc-c539-0775aab23368@electromag.com.au>
-Message-ID: <ceeba3e9-7912-c47a-02e2-f22cdaef5041@st.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Mon, 19 Mar 2018 17:41:10 +0100
+Subject: [PATCH 00/36] use SPDX-License-Identifier for 32 bits Armada SoCs
+ and boards
+In-Reply-To: <20180315150717.10588-1-gregory.clement@bootlin.com> (Gregory
+ CLEMENT's message of "Thu, 15 Mar 2018 16:06:41 +0100")
+References: <20180315150717.10588-1-gregory.clement@bootlin.com>
+Message-ID: <87r2ogxbkp.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+ 
+ On jeu., mars 15 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
+> Hi,
+>
+> this series follow the recent trend for the license description to use
+> the SPDX-License-Identifier.
 
-On 03/19/2018 10:36 AM, Phil Reid wrote:
-> On 12/03/2018 18:53, Pierre-Yves MORDRET wrote:
->> Feature prevents I2C lock-ups. Mechanism resets I2C state machine
->> and releases SCL/SDA signals but preserves I2C registers.
->>
->> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
->> ---
->>    Version history:
->>      v1:
->>         * Initial
->> ---
->> ---
->>   drivers/i2c/busses/i2c-stm32f7.c | 32 +++++++++++++++++++++++++++++---
->>   1 file changed, 29 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
->> index 69a2e5e..3808bc9 100644
->> --- a/drivers/i2c/busses/i2c-stm32f7.c
->> +++ b/drivers/i2c/busses/i2c-stm32f7.c
->> @@ -718,6 +718,20 @@ static void stm32f7_i2c_smbus_reload(struct stm32f7_i2c_dev *i2c_dev)
->>   	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
->>   }
->>   
->> +static int stm32f7_i2c_recover_bus(struct i2c_adapter *i2c_adap)
->> +{
->> +	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
->> +
->> +	dev_info(i2c_dev->dev, "Trying to recover bus\n");
->> +
->> +	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
->> +			     STM32F7_I2C_CR1_PE);
-> 
-> This only "releases" the scl / sda on the stm32f7 end (outputs are hiz I guess).
-> It doesn't trigger the scl clocking needed to recover a stuck device  via i2c recovery
-> from what I can see in the data sheet.
-> 
+Whole series applied on mvebu/dt with the acked-by flags.
 
-Correct. This mechanism resets the core IP and not the slave.
+Gregpry
 
-> 
->> +
->> +	stm32f7_i2c_hw_config(i2c_dev);
-> 
-> Nothing in here either I think.
-> 
-> 
->> +
->> +	return 0;
->> +}
->> +
->>   static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
->>   {
->>   	u32 status;
->> @@ -727,12 +741,18 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
->>   					 status,
->>   					 !(status & STM32F7_I2C_ISR_BUSY),
->>   					 10, 1000);
->> +	if (!ret)
->> +		return 0;
->> +
->> +	dev_info(i2c_dev->dev, "bus busy\n");
->> +
->> +	ret = i2c_recover_bus(&i2c_dev->adap);
->>   	if (ret) {
->> -		dev_dbg(i2c_dev->dev, "bus busy\n");
->> -		ret = -EBUSY;
->> +		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);
->> +		return ret;
->>   	}
->>   
->> -	return ret;
->> +	return -EBUSY;
->>   }
->>   
->>   static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
->> @@ -1476,6 +1496,7 @@ static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
->>   	if (status & STM32F7_I2C_ISR_BERR) {
->>   		dev_err(dev, "<%s>: Bus error\n", __func__);
->>   		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
->> +		i2c_recover_bus(&i2c_dev->adap);
->>   		f7_msg->result = -EIO;
->>   	}
->>   
->> @@ -1760,6 +1781,10 @@ static struct i2c_algorithm stm32f7_i2c_algo = {
->>   	.unreg_slave = stm32f7_i2c_unreg_slave,
->>   };
->>   
->> +static struct i2c_bus_recovery_info stm32f7_i2c_recovery_info = {
->> +	.recover_bus = stm32f7_i2c_recover_bus,
->> +};
->> +
->>   static int stm32f7_i2c_probe(struct platform_device *pdev)
->>   {
->>   	struct device_node *np = pdev->dev.of_node;
->> @@ -1879,6 +1904,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
->>   	adap->algo = &stm32f7_i2c_algo;
->>   	adap->dev.parent = &pdev->dev;
->>   	adap->dev.of_node = pdev->dev.of_node;
->> +	adap->bus_recovery_info = &stm32f7_i2c_recovery_info;
->>   
->>   	init_completion(&i2c_dev->complete);
->>   
->>
-> 
-> 
+>
+> Gregory
+>
+> Gregory CLEMENT (36):
+>   arm: dts: armada-370-xp: use SPDX-License-Identifier for Armada 370/XP
+>     SoCs
+>   arm: dts: armada-375: use SPDX-License-Identifier for Armada 375 SoCs
+>   arm: dts: armada-38x: use SPDX-License-Identifier for Armada 38x SoCs
+>   arm: dts: armada-39x: use SPDX-License-Identifier for Armada 39x SoCs
+>   arm: dts: armada-xp-98dx: use SPDX-License-Identifier for prestara 98d
+>     SoCs
+>   arm: dts: armada-370-db: use SPDX-License-Identifier
+>   arm: dts: armada-370-dlink-dns327l: use SPDX-License-Identifier
+>   arm: dts: armada-370-mirabox: use SPDX-License-Identifier
+>   arm: dts: armada-370-netgear-rn*: use SPDX-License-Identifier
+>   arm: dts: armada-370-rd: use SPDX-License-Identifier
+>   arm: dts: armada-370-synology-ds213j: use SPDX-License-Identifier
+>   arm: dts: armada-375-db: use SPDX-License-Identifier
+>   arm: dts: armada-388-db: use SPDX-License-Identifier
+>   arm: dts: armada-388-rd: use SPDX-License-Identifier
+>   arm: dts: armada-390-db: use SPDX-License-Identifier
+>   arm: dts: armada-398-db: use SPDX-License-Identifier
+>   arm: dts: armada-xp-axpwifiap: use SPDX-License-Identifier
+>   arm: dts: armada-xp-db-dxbc2: use SPDX-License-Identifier
+>   arm: dts: armada-xp-db-xc3-24g4xg: use SPDX-License-Identifier
+>   arm: dts: armada-xp-db: use SPDX-License-Identifier
+>   arm: dts: armada-xp-gp: use SPDX-License-Identifier
+>   arm: dts: armada-xp-lenovo-ix4-300d: use SPDX-License-Identifier
+>   arm: dts: armada-xp-matrix: use SPDX-License-Identifier
+>   arm: dts: armada-xp-netgear-rn2120: use SPDX-License-Identifier
+>   arm: dts: armada-xp-openblocks-ax3-4: use SPDX-License-Identifier
+>   arm: dts: armada-xp-synology-ds414: use SPDX-License-Identifier
+>   arm: dts: armada-385-db-ap: use SPDX-License-Identifier
+>   arm: dts: armada-385-linksys*: use SPDX-License-Identifier for Linksys
+>     boards
+>   arm: dts: armada-385-synology-ds116: use SPDX-License-Identifier
+>   arm: dts: armada-385-turris-omnia: use SPDX-License-Identifier
+>   arm: dts: armada-388-clearfog*: use SPDX-License-Identifier for
+>     clearfog and microsom
+>   arm: dts: armada-388-gp: use SPDX-License-Identifier
+>   arm: dts: armada-395-gp: use SPDX-License-Identifier
+>   arm: dts: armada-xp-linksys-mamba: use SPDX-License-Identifier
+>   arm: dts: armada-370-seagate-nas-*: use SPDX-License-Identifier
+>   arm: dts: armada-370-seagate-personal-cloud*: use
+>     SPDX-License-Identifier
+>
+>  arch/arm/boot/dts/armada-370-db.dts                | 39 +---------------------
+>  arch/arm/boot/dts/armada-370-dlink-dns327l.dts     | 39 +---------------------
+>  arch/arm/boot/dts/armada-370-mirabox.dts           | 39 +---------------------
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 39 +---------------------
+>  arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 39 +---------------------
+>  arch/arm/boot/dts/armada-370-rd.dts                | 39 +---------------------
+>  arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts  |  5 +--
+>  arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  |  5 +--
+>  arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |  5 +--
+>  .../dts/armada-370-seagate-personal-cloud-2bay.dts |  5 +--
+>  .../boot/dts/armada-370-seagate-personal-cloud.dts |  5 +--
+>  .../dts/armada-370-seagate-personal-cloud.dtsi     |  5 +--
+>  arch/arm/boot/dts/armada-370-synology-ds213j.dts   | 39 +---------------------
+>  arch/arm/boot/dts/armada-370-xp.dtsi               | 39 +---------------------
+>  arch/arm/boot/dts/armada-370.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-375-db.dts                | 39 +---------------------
+>  arch/arm/boot/dts/armada-375.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-380.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-385-db-ap.dts             | 33 +-----------------
+>  arch/arm/boot/dts/armada-385-linksys-caiman.dts    | 34 +------------------
+>  arch/arm/boot/dts/armada-385-linksys-cobra.dts     | 34 +------------------
+>  arch/arm/boot/dts/armada-385-linksys-rango.dts     | 34 +------------------
+>  arch/arm/boot/dts/armada-385-linksys-shelby.dts    | 34 +------------------
+>  arch/arm/boot/dts/armada-385-linksys.dtsi          | 34 +------------------
+>  arch/arm/boot/dts/armada-385-synology-ds116.dts    | 33 +-----------------
+>  arch/arm/boot/dts/armada-385-turris-omnia.dts      | 35 +------------------
+>  arch/arm/boot/dts/armada-385.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-388-clearfog-base.dts     | 38 +--------------------
+>  arch/arm/boot/dts/armada-388-clearfog-pro.dts      | 38 +--------------------
+>  arch/arm/boot/dts/armada-388-clearfog.dts          | 38 +--------------------
+>  arch/arm/boot/dts/armada-388-clearfog.dtsi         | 38 +--------------------
+>  arch/arm/boot/dts/armada-388-db.dts                | 39 +---------------------
+>  arch/arm/boot/dts/armada-388-gp.dts                | 33 +-----------------
+>  arch/arm/boot/dts/armada-388-rd.dts                | 39 +---------------------
+>  arch/arm/boot/dts/armada-388.dtsi                  | 34 +------------------
+>  .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 38 +--------------------
+>  arch/arm/boot/dts/armada-38x.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-390-db.dts                | 39 +---------------------
+>  arch/arm/boot/dts/armada-390.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-395-gp.dts                | 33 +-----------------
+>  arch/arm/boot/dts/armada-395.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-398-db.dts                | 39 +---------------------
+>  arch/arm/boot/dts/armada-398.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-39x.dtsi                  | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-98dx3336.dtsi          | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-98dx4251.dtsi          | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts          | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts           | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-db.dts                 | 38 +--------------------
+>  arch/arm/boot/dts/armada-xp-gp.dts                 | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts      | 33 +-----------------
+>  arch/arm/boot/dts/armada-xp-matrix.dts             | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-mv78230.dtsi           | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-mv78260.dtsi           | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-mv78460.dtsi           | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp-synology-ds414.dts     | 39 +---------------------
+>  arch/arm/boot/dts/armada-xp.dtsi                   | 39 +---------------------
+>  62 files changed, 62 insertions(+), 2082 deletions(-)
+>
+> -- 
+> 2.16.1
+>
+
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
