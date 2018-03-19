@@ -1,64 +1,81 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Mar 2018 11:12:05 +0000
-Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface
- to use in-band negotiation
-In-Reply-To: <20180319085252.GF4519@kwain>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
- <20180316103351.16616-3-antoine.tenart@bootlin.com>
- <20180316155307.GQ9418@n2100.armlinux.org.uk>
- <20180319085252.GF4519@kwain>
-Message-ID: <20180319111205.GB2743@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 19 Mar 2018 19:19:55 +0800
+Subject: [RFC PATCH 3/6] arm64/mm: use physical address as cpu_replace_ttbr1()
+ argument
+In-Reply-To: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
+References: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180319111958.4171-4-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 09:52:52AM +0100, Antoine Tenart wrote:
-> Hi Russell,
-> 
-> On Fri, Mar 16, 2018 at 03:53:07PM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Mar 16, 2018 at 11:33:43AM +0100, Antoine Tenart wrote:
-> > > The PHY mode 10GKR can use in-band negotiation. This patches allows this
-> > > mode to be used with MLO_AN_INBAND in phylink.
-> > > 
-> > > Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
-> > > ---
-> > >  drivers/net/phy/phylink.c | 3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/net/phy/phylink.c b/drivers/net/phy/phylink.c
-> > > index 51a011a349fe..7224b005f0dd 100644
-> > > --- a/drivers/net/phy/phylink.c
-> > > +++ b/drivers/net/phy/phylink.c
-> > > @@ -768,7 +768,8 @@ int phylink_of_phy_connect(struct phylink *pl, struct device_node *dn,
-> > >  	/* Fixed links and 802.3z are handled without needing a PHY */
-> > >  	if (pl->link_an_mode == MLO_AN_FIXED ||
-> > >  	    (pl->link_an_mode == MLO_AN_INBAND &&
-> > > -	     phy_interface_mode_is_8023z(pl->link_interface)))
-> > > +	     (phy_interface_mode_is_8023z(pl->link_interface) ||
-> > > +	      pl->link_interface == PHY_INTERFACE_MODE_10GKR)))
-> > 
-> > There is no inband negotiation like there is with 802.3z or SGMII,
-> > so this makes no sense.
-> 
-> Oh, that's what I feared. I read some docs but probably will need more
-> :)
-> 
-> Anyway, the reason to use in-band negotiation was also to avoid using
-> fixed-link. It would work but always report the link is up, which for
-> the user isn't a great experience as we have a way to detect this.
-> 
-> What would you suggest to achieve this in a reasonable way?
+Every caller of cpu_replace_ttbr1() currently translates the
+pgd* argument from physical to virtual, only to translate it
+back in the implementation of the function. Drop this redundancy.
 
-The intention of this test in phylink_of_phy_connect() is to avoid
-failing when there is no requirement for a PHY to be present (such as
-a fixed link, or an 802.3z link.)  However, with 10G PHYs such as the
-3310, we need the PHY so we can read the speed from it, and so know
-whether to downgrade the MAC to SGMII mode, or having downgraded the
-MAC, upgrade it back to 10G mode when the PHY switches to 10G.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/mmu_context.h | 4 +---
+ arch/arm64/mm/kasan_init.c           | 4 ++--
+ arch/arm64/mm/mmu.c                  | 4 ++--
+ 3 files changed, 5 insertions(+), 7 deletions(-)
 
-I'm guessing that you're wanting this for the DB boards, but I don't
-see why.  Do they not have PHYs?
-
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 39ec0b8a689e..3eddb871f251 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -141,14 +141,12 @@ static inline void cpu_install_idmap(void)
+  * Atomically replaces the active TTBR1_EL1 PGD with a new VA-compatible PGD,
+  * avoiding the possibility of conflicting TLB entries being allocated.
+  */
+-static inline void cpu_replace_ttbr1(pgd_t *pgdp)
++static inline void cpu_replace_ttbr1(phys_addr_t pgd_phys)
+ {
+ 	typedef void (ttbr_replace_func)(phys_addr_t);
+ 	extern ttbr_replace_func idmap_cpu_replace_ttbr1;
+ 	ttbr_replace_func *replace_phys;
+ 
+-	phys_addr_t pgd_phys = virt_to_phys(pgdp);
+-
+ 	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
+ 
+ 	cpu_install_idmap();
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index dabfc1ecda3d..1f17642811b3 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -199,7 +199,7 @@ void __init kasan_init(void)
+ 	 */
+ 	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
+ 	dsb(ishst);
+-	cpu_replace_ttbr1(lm_alias(tmp_pg_dir));
++	cpu_replace_ttbr1(__pa_symbol(tmp_pg_dir));
+ 
+ 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
+ 
+@@ -236,7 +236,7 @@ void __init kasan_init(void)
+ 			pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
+ 
+ 	memset(kasan_zero_page, 0, PAGE_SIZE);
+-	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
++	cpu_replace_ttbr1(__pa_symbol(swapper_pg_dir));
+ 
+ 	/* At this point kasan is fully initialized. Enable error messages */
+ 	init_task.kasan_depth = 0;
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0a9c08c0948c..365fedf22fcd 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -650,9 +650,9 @@ void __init paging_init(void)
+ 	 *
+ 	 * To do this we need to go via a temporary pgd.
+ 	 */
+-	cpu_replace_ttbr1(__va(pgd_phys));
++	cpu_replace_ttbr1(pgd_phys);
+ 	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
+-	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
++	cpu_replace_ttbr1(__pa_symbol(swapper_pg_dir));
+ 
+ 	pgd_clear_fixmap();
+ 	memblock_free(pgd_phys, PAGE_SIZE);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.11.0
