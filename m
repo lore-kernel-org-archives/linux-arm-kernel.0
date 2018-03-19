@@ -1,46 +1,34 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 19 Mar 2018 11:21:40 +0800
-Subject: [PATCH v2 3/3] dt-bindings: phy-mtk-tphy: add properties for U2
- slew rate calibrate
-In-Reply-To: <20180318124838.ruakamqywz4jd6jz@rob-hp-laptop>
-References: <c9679bc6e969ebf0f97a01c6d1aff3bbc0e8e4f7.1520832210.git.chunfeng.yun@mediatek.com>
- <94a7d3b1240297cd0cac82df52954d0a53d50d36.1520832210.git.chunfeng.yun@mediatek.com>
- <20180318124838.ruakamqywz4jd6jz@rob-hp-laptop>
-Message-ID: <1521429700.3717.31.camel@mhfsdcap03>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Mon, 19 Mar 2018 11:58:54 +0800
+Subject: [PATCH v6] clk: lpc32xx: Set name of regmap_config
+Message-ID: <20180319035854.3265-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2018-03-18 at 07:48 -0500, Rob Herring wrote:
-> On Mon, Mar 12, 2018 at 01:25:40PM +0800, Chunfeng Yun wrote:
-> > Add two properties of ref_clk and coefficient used by U2 slew rate
-> > calibrate which may vary on different SoCs
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-> > index 41e09ed..0d34b2b 100644
-> > --- a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-> > +++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-> > @@ -27,6 +27,10 @@ Optional properties (controller (parent) node):
-> >   - reg		: offset and length of register shared by multiple ports,
-> >  		  exclude port's private register. It is needed on mt2701
-> >  		  and mt8173, but not on mt2712.
-> > + - mediatek,src-ref-clk-mhz	: frequency of reference clock for slew rate
-> > +		  calibrate
-> > + - mediatek,src-coef	: coefficient for slew rate calibrate, depends on
-> > +		  SoC process
-> 
-> What are valid values? This is one cell?
-Yes, one cell, integer type. If need, I'll send a new patch
+We are now allowing to register debugfs without a valid device, and not
+having a valid name will end up using "dummy*" to create debugfs dir.
 
-Thanks
-> 
-> >  
-> >  Required properties (port (child) node):
-> >  - reg		: address and length of the register set for the port.
-> > -- 
-> > 1.9.1
-> > 
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Acked-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+
+Changes in v6:
+Modify name as Vladimir suggested.
+
+ drivers/clk/nxp/clk-lpc32xx.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+index f5d815f577e0..5eeecee17b69 100644
+--- a/drivers/clk/nxp/clk-lpc32xx.c
++++ b/drivers/clk/nxp/clk-lpc32xx.c
+@@ -67,6 +67,7 @@
+ #define LPC32XX_USB_CLK_STS		0xF8
+ 
+ static struct regmap_config lpc32xx_scb_regmap_config = {
++	.name = "scb",
+ 	.reg_bits = 32,
+ 	.val_bits = 32,
+ 	.reg_stride = 4,
+-- 
+2.11.0
