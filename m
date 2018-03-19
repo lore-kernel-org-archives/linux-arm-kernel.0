@@ -1,67 +1,49 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 19 Mar 2018 23:35:32 +0900
-Subject: [PATCH] arm64: dts: uniphier: add syscon property for UniPhier
- sound system
-In-Reply-To: <20180319012158.26411-1-suzuki.katsuhiro@socionext.com>
-References: <20180319012158.26411-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <CAK7LNAQ__FYvJdvxPhzazyi4fSCwkMzCWGVVjy5FKfOp+-hfcg@mail.gmail.com>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Mon, 19 Mar 2018 08:55:25 -0600
+Subject: [PATCH 2/2] drivers: soc: Add LLCC driver
+In-Reply-To: <1516924513-20183-3-git-send-email-ckadabi@codeaurora.org>
+References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+ <1516924513-20183-3-git-send-email-ckadabi@codeaurora.org>
+Message-ID: <20180319145525.GD28808@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-19 10:21 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
-> This patch adds syscon property for specifying soc-glue core into
-> device-tree of LD11/LD20 SoC.
->
-> Currently, soc-glue core is used for changing the state of S/PDIF
-> signal output pin to signal output state or Hi-Z state.
->
-> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-> ---
->  arch/arm/boot/dts/uniphier-pxs2.dtsi             | 4 +++-
+On Thu, Jan 25, 2018 at 03:55:13PM -0800, Channagoud Kadabi wrote:
+> LLCC (Last Level Cache Controller) provides additional cache memory
+> in the system. LLCC is partitioned into muliple slices and each
+> slice gets its own priority, size, ID and other config parameters.
+> LLCC driver programs these parameters for each slice. Clients that
+> are assigned to use LLCC need to get information such size & ID of the
+> slice for their usecase and activate or deactivate the slice as needed.
+> LLCC driver provides API interfaces for the clients to perform these
+> operations.
 
+<snip>
 
-Please split PXs2 changes into a different patch.
-
-
->  arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 4 +++-
->  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 4 +++-
->  3 files changed, 9 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> index 595045441c9c..c72c0a123c87 100644
-> --- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> +++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> @@ -243,6 +243,8 @@
->                         resets = <&sys_rst 40>;
->                         #sound-dai-cells = <1>;
->
-> +                       socionext,syscon = <&sg>;
-
-
-Remove unneeded blank line between properties.
-
-
+> +/**
+> + * llcc_slice_deactivate - Deactivate the llcc slice
+> + * @desc: Pointer to llcc slice descriptor
+> + *
+> + * A value zero will be returned on success and a negative errno will
+> + * be returned in error cases
+> + */
+> +int llcc_slice_deactivate(struct llcc_slice_desc *desc)
+> +{
+> +	u32 act_ctrl_val;
+> +	int rc = -EINVAL;
+> +	struct llcc_drv_data *drv;
 > +
->                         i2s_port0: port at 0 {
->                                 i2s_hdmi: endpoint {
->                                 };
-> @@ -418,7 +420,7 @@
->                         };
->                 };
->
-> -               soc-glue at 5f800000 {
-> +               sg: soc-glue at 5f800000 {
->                         compatible = "socionext,uniphier-pxs2-soc-glue",
->                                      "simple-mfd", "syscon";
->                         reg = <0x5f800000 0x2000>;
+> +	if (desc == NULL) {
+> +		pr_err("Input descriptor supplied is invalid\n");
 
+Sorry that this is out of the blue, but I was reviewing a client driver that
+uses this API. This should not print an error - we should be allowed to safely
+pass a null pointer from an aborted sequence in the driver without the
+conditional checks and it shouldn't generate a bit of log spam as it goes about
+it's business.
 
-Could you use 'soc_glue', please?
-I saw a conflict between 'sg' and 'soc_glue' among Socionext engineers
-and I prefer the latter.
-
-
+Jordan
 
 -- 
-Best Regards
-Masahiro Yamada
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
