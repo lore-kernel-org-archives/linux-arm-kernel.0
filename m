@@ -1,60 +1,38 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Mon, 19 Mar 2018 17:41:36 +0800
-Subject: [PATCH v4 6/7] dt-bindings: Introduce interconnect consumers
- bindings
-In-Reply-To: <20180318224957.GP5626@tuxbook-pro>
-References: <20180309210958.16672-1-georgi.djakov@linaro.org>
- <20180309210958.16672-7-georgi.djakov@linaro.org>
- <20180318224957.GP5626@tuxbook-pro>
-Message-ID: <79b65ce6-1e4e-a8f5-b9ac-1993fca5108a@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 19 Mar 2018 15:16:53 +0530
+Subject: [PATCH net-next 04/10] phy: add 2.5G SGMII mode to the phy_mode
+ enum
+In-Reply-To: <20180316103351.16616-5-antoine.tenart@bootlin.com>
+References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
+ <20180316103351.16616-5-antoine.tenart@bootlin.com>
+Message-ID: <8b8ffdcb-f365-09c6-24f2-7fcebe3b5f76@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
 
-On 03/19/2018 06:49 AM, Bjorn Andersson wrote:
-> On Fri 09 Mar 13:09 PST 2018, Georgi Djakov wrote:
-> 
->> Add documentation for the interconnect consumer bindings, that will allow
->> to link a device node (consumer) to its interconnect controller hardware.
->>
->> Tha aim is to enable drivers to request a framework API to configure an
->> interconnect path by providing their struct device pointer and a name.
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  .../bindings/interconnect/interconnect.txt         | 23 ++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> index 70612bb201e4..7935abf10c4b 100644
->> --- a/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> @@ -45,3 +45,26 @@ Examples:
->>  			status = "okay";
->>  		};
->>  
->> += interconnect consumers =
->> +
->> +The interconnect consumers are device nodes which consume the interconnect
->> +path(s) provided by the interconnect provider. There can be multiple
->> +interconnect providers on a SoC and the consumer may consume multiple paths
->> +from different providers depending on usecase and the components it has to
->> +interact with.
->> +
->> +Required-properties:
->> +interconnects: Pairs of phandles and interconnect provider specifier to denote
->> +		the source and the destination port of the interconnect path.
->> +interconnect-names: List of interconnect path name strings sorted in the same
->> +		order as the interconnects property. Consumers drivers will use
->> +		interconnect-names to match interconnect paths with interconnect
->> +		specifiers.
-> 
-> Analog to other subsystems the -names property should be optional, at
-> least when there's only a single entry in interconnects.
-> 
 
-Will do it.
+On Friday 16 March 2018 04:03 PM, Antoine Tenart wrote:
+> This patch adds one more generic PHY mode to the phy_mode enum, to allow
+> configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
+> callback.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 
-Thanks,
-Georgi
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  include/linux/phy/phy.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index 4f8423a948d5..5a80e9de3686 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -28,6 +28,7 @@ enum phy_mode {
+>  	PHY_MODE_USB_DEVICE,
+>  	PHY_MODE_USB_OTG,
+>  	PHY_MODE_SGMII,
+> +	PHY_MODE_2500SGMII,
+>  	PHY_MODE_10GKR,
+>  	PHY_MODE_UFS_HS_A,
+>  	PHY_MODE_UFS_HS_B,
+> 
