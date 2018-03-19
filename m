@@ -1,49 +1,55 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 19 Mar 2018 09:52:45 +0100
-Subject: [GIT PULL v2 4/7] soc/tegra: Changes for v4.17-rc1
-In-Reply-To: <20180316141850.4876-4-thierry.reding@gmail.com>
-References: <20180316141850.4876-4-thierry.reding@gmail.com>
-Message-ID: <20180319085245.25834-1-thierry.reding@gmail.com>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Mon, 19 Mar 2018 09:52:52 +0100
+Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface
+ to use in-band negotiation
+In-Reply-To: <20180316155307.GQ9418@n2100.armlinux.org.uk>
+References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
+ <20180316103351.16616-3-antoine.tenart@bootlin.com>
+ <20180316155307.GQ9418@n2100.armlinux.org.uk>
+Message-ID: <20180319085252.GF4519@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Hi Russell,
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+On Fri, Mar 16, 2018 at 03:53:07PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 16, 2018 at 11:33:43AM +0100, Antoine Tenart wrote:
+> > The PHY mode 10GKR can use in-band negotiation. This patches allows this
+> > mode to be used with MLO_AN_INBAND in phylink.
+> > 
+> > Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+> > ---
+> >  drivers/net/phy/phylink.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/net/phy/phylink.c b/drivers/net/phy/phylink.c
+> > index 51a011a349fe..7224b005f0dd 100644
+> > --- a/drivers/net/phy/phylink.c
+> > +++ b/drivers/net/phy/phylink.c
+> > @@ -768,7 +768,8 @@ int phylink_of_phy_connect(struct phylink *pl, struct device_node *dn,
+> >  	/* Fixed links and 802.3z are handled without needing a PHY */
+> >  	if (pl->link_an_mode == MLO_AN_FIXED ||
+> >  	    (pl->link_an_mode == MLO_AN_INBAND &&
+> > -	     phy_interface_mode_is_8023z(pl->link_interface)))
+> > +	     (phy_interface_mode_is_8023z(pl->link_interface) ||
+> > +	      pl->link_interface == PHY_INTERFACE_MODE_10GKR)))
+> 
+> There is no inband negotiation like there is with 802.3z or SGMII,
+> so this makes no sense.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+Oh, that's what I feared. I read some docs but probably will need more
+:)
 
-are available in the Git repository at:
+Anyway, the reason to use in-band negotiation was also to avoid using
+fixed-link. It would work but always report the link is up, which for
+the user isn't a great experience as we have a way to detect this.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.17-soc-2
-
-for you to fetch changes up to 4c817ccf73abaf7b06a2630e8352d82648c8bc70:
-
-  soc/tegra: pmc: Use the new reset APIs to manage reset controllers (2018-03-19 09:42:39 +0100)
+What would you suggest to achieve this in a reasonable way?
 
 Thanks,
-Thierry
+Antoine
 
-----------------------------------------------------------------
-soc/tegra: Changes for v4.17-rc1
-
-This contains more Tegra194 support as well as an implementation for the
-MBIST workaround needed to avoid some memory-related issues on Tegra210.
-
-----------------------------------------------------------------
-Mikko Perttunen (2):
-      soc/tegra: Add Tegra194 SoC configuration option
-      soc/tegra: pmc: Add Tegra194 compatibility string
-
-Peter De Schrijver (1):
-      soc/tegra: pmc: MBIST work around for Tegra210
-
-Thierry Reding (1):
-      soc/tegra: pmc: Pass PMC to tegra_powergate_power_up()
-
-Vivek Gautam (1):
-      soc/tegra: pmc: Use the new reset APIs to manage reset controllers
-
- drivers/soc/tegra/Kconfig | 10 +++++
- drivers/soc/tegra/pmc.c   | 98 ++++++++++++++---------------------------------
- 2 files changed, 38 insertions(+), 70 deletions(-)
+-- 
+Antoine T?nart, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
