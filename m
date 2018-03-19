@@ -1,64 +1,45 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Mon, 19 Mar 2018 14:26:33 +0100
-Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface
- to use in-band negotiation
-In-Reply-To: <20180319131804.GD2743@n2100.armlinux.org.uk>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
- <20180316103351.16616-3-antoine.tenart@bootlin.com>
- <20180316155307.GQ9418@n2100.armlinux.org.uk>
- <20180319085252.GF4519@kwain>
- <20180319111205.GB2743@n2100.armlinux.org.uk>
- <20180319125227.GI4519@kwain> <20180319125953.GD19795@lunn.ch>
- <20180319131009.GJ4519@kwain>
- <20180319131804.GD2743@n2100.armlinux.org.uk>
-Message-ID: <20180319132633.GL4519@kwain>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 19 Mar 2018 11:59:11 +0100
+Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180318200715.363f3135@dell-desktop.home>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+ <20180223133742.26044-11-mylene.josserand@bootlin.com>
+ <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
+ <20180318200715.363f3135@dell-desktop.home>
+Message-ID: <20180319105911.o63otbbhld54br4r@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Mon, Mar 19, 2018 at 01:18:05PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 19, 2018 at 02:10:09PM +0100, Antoine Tenart wrote:
-> > 
-> > On 7k/8k you have the following scheme for 10G only interfaces:
-> > 
-> >    MAC -- Comphy -- PHY -- SFP cage -- ...
-> > 
-> > Or
-> > 
-> >    MAC -- Comphy -- SFP cage -- ...
-> > 
-> > The comphy provides serdes lanes, and can be configured in various
-> > modes (SGMII, 2500SGMII, 10GKR...).
+On Sun, Mar 18, 2018 at 08:07:15PM +0100, Myl?ne Josserand wrote:
+> Hello Mark,
 > 
-> Right - the correct mode is dependent on the SFP module plugged into
-> the cage.  Trying to describe this by ignoring the SFP cage isn't
-> going to work out well for end-user functionality, though is fine if
-> you're just hacking a configuration to test (which would not be
-> suitable for mainline kernels!)
+> Please, excuse me for this late answer and thank you for the review!
 > 
-> As I've recently replied to Yan, this is a configuration I haven't
-> tested yet, and it's entirely possible that phylink may need some
-> tweaks for it.
+> On Wed, 7 Mar 2018 12:18:33 +0000
+> Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-> What you have is a very similar setup to what is on Clearfog with
-> its SFP cage, where the SFP cage is connected directly to the
-> Armada 388.  That only has to deal with 2500base-X / 1000base-X /
-> SGMII and not 10G.
+> > On 23/02/18 13:37, Myl?ne Josserand wrote:
+> > > On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.  
+> > 
+> > Only on A7? Is that specific to your platform?
 > 
-> What I want is to avoid hacks as much as possible here - if there is
-> a short-coming with SFP/phylink here, we need to address that
-> properly.
+> I do not really know other Allwinner's platforms about this subject. At
+> least, the sun9i-a80 which is a Cortex-a15/a7 does not need that but it
+> is necessary for sun8i-a83t which is a cortex-a7. Maybe, Chen-Yu or
+> Maxime could help us on it.
 
-OK. So the proper solution would be to properly describe the SFP cages
-in the device tree (and check if phylink deals with it nicely).
+This is not related to the CPU.
 
-I'll update the patches in this way.
+On all the other SoCs but the A80 and the A83t, U-Boot will boot the
+system in HYP, and while switching to non-secure will setup CNTVOFF on
+the boot CPU.
 
-Thanks for the feedback,
-Antoine
+On the A80 and A83t, U-Boot will execute the kernel in secure, it will
+not switch to non-secure, and CNTVOFF will not be set on the boot CPU.
+
+Maxime
 
 -- 
-Antoine T?nart, Bootlin (formerly Free Electrons)
+Maxime Ripard, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
 https://bootlin.com
