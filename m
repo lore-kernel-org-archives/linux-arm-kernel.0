@@ -1,38 +1,56 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 19 Mar 2018 15:16:53 +0530
-Subject: [PATCH net-next 04/10] phy: add 2.5G SGMII mode to the phy_mode
- enum
-In-Reply-To: <20180316103351.16616-5-antoine.tenart@bootlin.com>
-References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
- <20180316103351.16616-5-antoine.tenart@bootlin.com>
-Message-ID: <8b8ffdcb-f365-09c6-24f2-7fcebe3b5f76@ti.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Mon, 19 Mar 2018 17:47:15 +0800
+Subject: [PATCH 37/37] vfio: Add support for Shared Virtual Addressing
+In-Reply-To: <1519280641-30258-37-git-send-email-xieyisheng1@huawei.com>
+References: <1519280641-30258-1-git-send-email-xieyisheng1@huawei.com>
+ <1519280641-30258-37-git-send-email-xieyisheng1@huawei.com>
+Message-ID: <e3ae1693-0ed8-65e1-352a-07f79038dcbd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jean,
 
+vfio can be compiled as module, however you use some functions which are not
+exported.
 
-On Friday 16 March 2018 04:03 PM, Antoine Tenart wrote:
-> This patch adds one more generic PHY mode to the phy_mode enum, to allow
-> configuring generic PHYs to the 2.5G SGMII mode by using the set_mode
-> callback.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+comment inline:
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+[...]
+> Add two new ioctl for VFIO containers. VFIO_IOMMU_BIND_PROCESS creates a
+> bond between a container and a process address space, identified by a
+> device-specific ID named PASID. This allows the device to target DMA
+> transactions at the process virtual addresses without a need for mapping
+> and unmapping buffers explicitly in the IOMMU. The process page tables are
+> shared with the IOMMU, and mechanisms such as PCI ATS/PRI are used to
+> handle faults. VFIO_IOMMU_UNBIND_PROCESS removes a bond created with
+> VFIO_IOMMU_BIND_PROCESS.
+>
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 > ---
->  include/linux/phy/phy.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index 4f8423a948d5..5a80e9de3686 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -28,6 +28,7 @@ enum phy_mode {
->  	PHY_MODE_USB_DEVICE,
->  	PHY_MODE_USB_OTG,
->  	PHY_MODE_SGMII,
-> +	PHY_MODE_2500SGMII,
->  	PHY_MODE_10GKR,
->  	PHY_MODE_UFS_HS_A,
->  	PHY_MODE_UFS_HS_B,
-> 
+[...]
+> +static struct mm_struct *vfio_iommu_get_mm_by_vpid(pid_t vpid)
+> +{
+> +	struct mm_struct *mm;
+> +	struct task_struct *task;
+> +
+> +	rcu_read_lock();
+> +	task = find_task_by_vpid(vpid);
+
+Maybe can use?
+	task = pid_task(find_vpid(params.vpid), PIDTYPE_PID)
+
+> +	if (task)
+> +		get_task_struct(task);
+> +	rcu_read_unlock();
+> +	if (!task)
+> +		return ERR_PTR(-ESRCH);
+> +
+> +	/* Ensure that current has RW access on the mm */
+> +	mm = mm_access(task, PTRACE_MODE_ATTACH_REALCREDS);
+
+You will try to export mm_access, I find Felix have tried to, but seems give up:
+
+ https://patchwork.kernel.org/patch/9744281/
+
+Thanks
+Yisheng
