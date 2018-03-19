@@ -1,195 +1,28 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Mon, 19 Mar 2018 16:14:13 -0400
-Subject: [PATCH v2] arm: dts: hummingboard: convert onboard audio to
- simple-audio-card
-Message-ID: <20180319201414.29481-1-mporter@konsulko.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 19 Mar 2018 13:25:39 -0700
+Subject: [PATCH 2/2] clk: mediatek: fix PWM clock source by adding a
+ fixed-factor clock
+In-Reply-To: <b6eafb38f8d697bd8d00c8d86a0b22be809f8062.1519874655.git.sean.wang@mediatek.com>
+References: <cd26a3bdc9f29e237089395fbba93e28549ddf25.1519874655.git.sean.wang@mediatek.com>
+ <b6eafb38f8d697bd8d00c8d86a0b22be809f8062.1519874655.git.sean.wang@mediatek.com>
+Message-ID: <152149113900.242365.801086554904089563@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HB onboard audio currently makes use of the imx-audio-sgtl5000
-binding. This binding does not support auxiliary audio devices such
-as external amplifiers. The simple-audio-card binding does support
-this property which allows systems incorporating the HB to add an
-auxiliary device that's attached to the HB audio jack with an
-overlay. Convert the HB onboard audio to use simple-audio-card for
-this additional flexibility.
+Quoting sean.wang at mediatek.com (2018-02-28 19:27:51)
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> The clock for which all PWM devices on MT7623 or MT2701 actually depending
+> on has to be divided by four from its parent clock axi_sel in the clock
+> path prior to PWM devices.
+> 
+> Consequently, adding a fixed-factor clock axisel_d4 as one-fourth of
+> clock axi_sel allows that PWM devices can have the correct resolution
+> calculation.
+> 
+> Cc: stable at vger.kernel.org
+> Fixes: e9862118272a ("clk: mediatek: Add MT2701 clock support")
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
 
-Signed-off-by: Matt Porter <mporter@konsulko.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-v2:
-    - also convert HB1 to simple-audio-card
-    - retain original card name as "On-board Codec" [case change]
-
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi  | 52 ++++++++++++++++++++++------
- arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 48 ++++++++++++++++++++-----
- 2 files changed, 82 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 92583238ca4a..2f6e51fbd4bc 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -38,6 +38,7 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
- 
- / {
- 	chosen {
-@@ -105,17 +106,27 @@
- 		vin-supply = <&v_5v0>;
- 	};
- 
--	sound-sgtl5000 {
--		audio-codec = <&sgtl5000>;
--		audio-routing =
--			"MIC_IN", "Mic Jack",
--			"Mic Jack", "Mic Bias",
-+	audio: sound-sgtl5000 {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "On-board Codec";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&sound_codec>;
-+		simple-audio-card,frame-master = <&sound_codec>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Headphone Jack",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Headphone Jack",
-+			"Headphone Jack", "Mic Bias",
- 			"Headphone Jack", "HP_OUT";
--		compatible = "fsl,imx-audio-sgtl5000";
--		model = "On-board Codec";
--		mux-ext-port = <5>;
--		mux-int-port = <1>;
--		ssi-controller = <&ssi1>;
-+
-+		sound_cpu: simple-audio-card,cpu {
-+			sound-dai = <&ssi1>;
-+		};
-+
-+		sound_codec: simple-audio-card,codec {
-+			sound-dai = <&sgtl5000>;
-+		};
- 	};
- 
- 	sound-spdif {
-@@ -129,6 +140,26 @@
- 
- &audmux {
- 	status = "okay";
-+
-+	ssi1 {
-+		fsl,audmux-port = <0>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_SYN |
-+			 IMX_AUDMUX_V2_PTCR_TFSEL(4) |
-+			 IMX_AUDMUX_V2_PTCR_TCSEL(4) |
-+			 IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			 IMX_AUDMUX_V2_PTCR_TCLKDIR)
-+			 IMX_AUDMUX_V2_PDCR_RXDSEL(4)
-+		>;
-+	};
-+
-+	pins5 {
-+		fsl,audmux-port = <4>;
-+		fsl,port-config = <
-+			IMX_AUDMUX_V2_PTCR_SYN
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
-+		>;
-+	};
- };
- 
- &can1 {
-@@ -161,6 +192,7 @@
- 		compatible = "fsl,sgtl5000";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard_sgtl5000>;
-+		#sound-dai-cells = <0>;
- 		reg = <0x0a>;
- 		VDDA-supply = <&v_3v2>;
- 		VDDIO-supply = <&v_3v2>;
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-index dffbc92e0023..47d780fafd87 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
-@@ -38,6 +38,7 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
- 
- / {
- 	chosen {
-@@ -145,22 +146,52 @@
- 		vin-supply = <&v_5v0>;
- 	};
- 
--	sound-sgtl5000 {
--		audio-codec = <&sgtl5000>;
--		audio-routing =
-+	audio: sound-sgtl5000 {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "On-board Codec";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&sound_codec>;
-+		simple-audio-card,frame-master = <&sound_codec>;
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
- 			"MIC_IN", "Mic Jack",
- 			"Mic Jack", "Mic Bias",
- 			"Headphone Jack", "HP_OUT";
--		compatible = "fsl,imx-audio-sgtl5000";
--		model = "On-board Codec";
--		mux-ext-port = <5>;
--		mux-int-port = <1>;
--		ssi-controller = <&ssi1>;
-+
-+		sound_cpu: simple-audio-card,cpu {
-+			sound-dai = <&ssi1>;
-+		};
-+
-+		sound_codec: simple-audio-card,codec {
-+			sound-dai = <&sgtl5000>;
-+		};
- 	};
- };
- 
- &audmux {
- 	status = "okay";
-+
-+	ssi1 {
-+		fsl,audmux-port = <0>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_SYN |
-+			 IMX_AUDMUX_V2_PTCR_TFSEL(4) |
-+			 IMX_AUDMUX_V2_PTCR_TCSEL(4) |
-+			 IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			 IMX_AUDMUX_V2_PTCR_TCLKDIR)
-+			 IMX_AUDMUX_V2_PDCR_RXDSEL(4)
-+		>;
-+	};
-+
-+	pins5 {
-+		fsl,audmux-port = <4>;
-+		fsl,port-config = <
-+			IMX_AUDMUX_V2_PTCR_SYN
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
-+		>;
-+	};
- };
- 
- &ecspi2 {
-@@ -193,6 +224,7 @@
- 		compatible = "fsl,sgtl5000";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard2_sgtl5000>;
-+		#sound-dai-cells = <0>;
- 		reg = <0x0a>;
- 		VDDA-supply = <&v_3v2>;
- 		VDDD-supply = <&vcc_1p8>;
--- 
-2.11.0
+Applied to clk-next
