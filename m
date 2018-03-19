@@ -1,57 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Mar 2018 13:18:05 +0000
-Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface
- to use in-band negotiation
-In-Reply-To: <20180319131009.GJ4519@kwain>
+From: stefanc@marvell.com (Stefan Chulski)
+Date: Mon, 19 Mar 2018 13:19:24 +0000
+Subject: [EXT] Re: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR
+ interface to use in-band negotiation
+In-Reply-To: <20180319130823.GA22306@lunn.ch>
 References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
  <20180316103351.16616-3-antoine.tenart@bootlin.com>
- <20180316155307.GQ9418@n2100.armlinux.org.uk>
- <20180319085252.GF4519@kwain>
- <20180319111205.GB2743@n2100.armlinux.org.uk>
- <20180319125227.GI4519@kwain> <20180319125953.GD19795@lunn.ch>
- <20180319131009.GJ4519@kwain>
-Message-ID: <20180319131804.GD2743@n2100.armlinux.org.uk>
+ <20180316155307.GQ9418@n2100.armlinux.org.uk> <20180319085252.GF4519@kwain>
+ <20180319111205.GB2743@n2100.armlinux.org.uk> <20180319125227.GI4519@kwain>
+ <20180319125953.GD19795@lunn.ch>
+ <54e290a192734831b5db22191f056a81@IL-EXCH01.marvell.com>
+ <20180319130823.GA22306@lunn.ch>
+Message-ID: <02614799e30f4823a97fca0e9f29b14b@IL-EXCH01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 02:10:09PM +0100, Antoine Tenart wrote:
-> Hi Andrew,
-> 
-> On Mon, Mar 19, 2018 at 01:59:53PM +0100, Andrew Lunn wrote:
-> > 
-> > If they don't have PHYs, how are the connected to the outside world?
-> 
-> On 7k/8k you have the following scheme for 10G only interfaces:
-> 
->    MAC -- Comphy -- PHY -- SFP cage -- ...
-> 
-> Or
-> 
->    MAC -- Comphy -- SFP cage -- ...
-> 
-> The comphy provides serdes lanes, and can be configured in various
-> modes (SGMII, 2500SGMII, 10GKR...).
 
-Right - the correct mode is dependent on the SFP module plugged into
-the cage.  Trying to describe this by ignoring the SFP cage isn't
-going to work out well for end-user functionality, though is fine if
-you're just hacking a configuration to test (which would not be
-suitable for mainline kernels!)
 
-As I've recently replied to Yan, this is a configuration I haven't
-tested yet, and it's entirely possible that phylink may need some
-tweaks for it.
+> -----Original Message-----
+> From: Andrew Lunn [mailto:andrew at lunn.ch]
+> Sent: Monday, March 19, 2018 3:08 PM
+> To: Stefan Chulski <stefanc@marvell.com>
+> Cc: Antoine Tenart <antoine.tenart@bootlin.com>; Russell King - ARM Linux
+> <linux@armlinux.org.uk>; davem at davemloft.net; kishon at ti.com;
+> gregory.clement at bootlin.com; jason at lakedaemon.net;
+> sebastian.hesselbarth at gmail.com; netdev at vger.kernel.org; linux-
+> kernel at vger.kernel.org; thomas.petazzoni at bootlin.com;
+> maxime.chevallier at bootlin.com; miquel.raynal at bootlin.com; Nadav Haklai
+> <nadavh@marvell.com>; Yan Markman <ymarkman@marvell.com>;
+> mw at semihalf.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [EXT] Re: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR
+> interface to use in-band negotiation
+> 
+> > > If they don't have PHYs, how are the connected to the outside world?
+> > >
+> > >    Andrew
+> >
+> > By external SFP or direct attached cable.
+> 
+> Maybe i'm missing something, but don't you just need to add an SFP device
+> in the device tree. The SFP code and PHYLINK will work together, query what
+> the SFP module is, use the GPIOs to determine link up/down and module
+> present, and tell the MAC how to configure the MAC-SFP link?
+> 
+>      Andrew
 
-What you have is a very similar setup to what is on Clearfog with
-its SFP cage, where the SFP cage is connected directly to the
-Armada 388.  That only has to deal with 2500base-X / 1000base-X /
-SGMII and not 10G.
+phylink pool SFP loss signal to determine link up/down?
 
-What I want is to avoid hacks as much as possible here - if there is
-a short-coming with SFP/phylink here, we need to address that
-properly.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Stefan,
+Best Regards.
