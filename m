@@ -1,21 +1,22 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 19 Mar 2018 16:41:32 -0700
-Subject: [PATCH v2] amlogic: meson-gx-socinfo: Update soc ids
-In-Reply-To: <1520853460-6960-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Mon, 12 Mar 2018 12:17:40 +0100")
-References: <1520853460-6960-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7h7eq7sker.fsf@baylibre.com>
+Date: Mon, 19 Mar 2018 16:44:50 -0700
+Subject: [PATCH] ARM64: dts: meson-gx: make efuse read-only
+In-Reply-To: <20180316145021.8517-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Fri, 16 Mar 2018 15:50:21 +0100")
+References: <20180316145021.8517-1-jbrunet@baylibre.com>
+Message-ID: <7h370vsk99.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-> Updates the Amlogic Meson SoCs IDs for the Armv8 based SoCs.
-> It includes the new families and packages.
+> efuse is one time programmable, so it is safer to deny write request
+> to this memory, unless the user is savvy enough to remove the read-only
+> flag from DTB
 >
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 
-Applied to v4.17/drivers,
+Applied to v4.17/dt64,
 
 Thanks,
 
