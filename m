@@ -1,269 +1,432 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 20 Mar 2018 01:11:14 +0530
-Subject: [PATCH v2 2/2] ARM: dts: i.MX6: Add BTicino i.MX6DL Mamoj initial
- support
-In-Reply-To: <20180319194114.15349-1-jagan@amarulasolutions.com>
-References: <20180319194114.15349-1-jagan@amarulasolutions.com>
-Message-ID: <20180319194114.15349-2-jagan@amarulasolutions.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Tue, 20 Mar 2018 01:18:34 +0530
+Subject: [RFC] arm64: extra entries in /proc/iomem for kexec
+In-Reply-To: <20180314082941.GM25863@linaro.org>
+References: <20180314082941.GM25863@linaro.org>
+Message-ID: <2d2e1be6-b925-1595-9b6e-76dd270d396d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds initial support for BTicino i.MX6DL Mamoj board.
+On 03/14/2018 01:59 PM, AKASHI Takahiro wrote:
+> In the last couples of months, there were some problems reported [1],[2]
+> around arm64 kexec/kdump. Where those phenomenon look different,
+> the root cause would be that kexec/kdump doesn't take into account
+> crucial "reserved" regions of system memory and unintentionally corrupts
+> them.
+> 
+> Given that kexec-tools looks for all the information by seeking the file,
+> /proc/iomem, the first step to address said problems is to expand this file's
+> format so that it will have enough information about system memory and
+> its usage.
+> 
+> Attached is my experimental code: With this patch applied, /proc/iomem sees
+> something like the below:
+> 
+> (format A)
+> 40000000-5871ffff : System RAM
+>    40080000-40f1ffff : Kernel code
+>    41040000-411e8fff : Kernel data
+>    54400000-583fffff : Crash kernel
+>    58590000-585effff : EFI Resources
+>    58700000-5871ffff : EFI Resources
+> 58720000-58b5ffff : System RAM
+>    58720000-58b5ffff : EFI Resources
+> 58b60000-5be3ffff : System RAM
+>    58b61018-58b61947 : EFI Memory Map
+>    59a7b118-59a7b667 : EFI Configuration Tables
+> 5be40000-5becffff : System RAM                  <== (A-1)
+>    5be40000-5becffff : EFI Resources
+> 5bed0000-5bedffff : System RAM
+> 5bee0000-5bffffff : System RAM
+>    5bee0000-5bffffff : EFI Resources
+> 5c000000-5fffffff : System RAM
+> 8000000000-ffffffffff : PCI Bus 0000:00
+> 
+> Meanwhile, the workaround I suggested in [3] gave us a simpler view:
+> 
+> (format B)
+> 40000000-5871ffff : System RAM
+>    40080000-40f1ffff : Kernel code
+>    41040000-411e9fff : Kernel data
+>    54400000-583fffff : Crash kernel
+>    58590000-585effff : reserved
+>    58700000-5871ffff : reserved
+> 58720000-58b5ffff : reserved
+> 58b60000-5be3ffff : System RAM
+>    58b61000-58b61fff : reserved
+>    59a7b318-59a7b867 : reserved
+> 5be40000-5becffff : reserved                    <== (B-1)
+> 5bed0000-5bedffff : System RAM
+> 5bee0000-5bffffff : reserved
+> 5c000000-5fffffff : System RAM
+>    5ec00000-5edfffff : reserved
+> 8000000000-ffffffffff : PCI Bus 0000:00
+> 
+> Here all the regions to be protected are named just "reserved" whether
+> they are NOMAP regions or simply-memblock_reserve'd. 
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Signed-off-by: Simone CIANNI <simone.cianni@bticino.it>
-Signed-off-by: Raffaele RECALCATI <raffaele.recalcati@bticino.it>
----
-Changes for v2:
-- Squash 'PFUZE100 support' patch
-- Remove fec PHY reset mux
+Personally, I like this format over the other two proposed.
 
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/imx6dl-mamoj.dts | 224 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 225 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-mamoj.dts
+However, I would suggest adding "reserved" regions as reserved (NOMAP) 
+regions and reserved (MAP'ed) regions (or a similar meaning wording for 
+the same).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 26e2e290ec28..b5dcc55bd157 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -397,6 +397,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-hummingboard2-som-v15.dtb \
- 	imx6dl-icore.dtb \
- 	imx6dl-icore-rqs.dtb \
-+	imx6dl-mamoj.dtb \
- 	imx6dl-nit6xlite.dtb \
- 	imx6dl-nitrogen6x.dtb \
- 	imx6dl-phytec-mira-rdk-nand.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-mamoj.dts b/arch/arm/boot/dts/imx6dl-mamoj.dts
-new file mode 100644
-index 000000000000..58b676922745
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-mamoj.dts
-@@ -0,0 +1,224 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2018 BTicino
-+ * Copyright (C) 2018 Amarula Solutions B.V.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6dl.dtsi"
-+
-+/ {
-+	model = "BTicino i.MX6DL Mamoj board";
-+	compatible = "bticino,imx6dl-mamoj", "fsl,imx6dl";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "mii";
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <400000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c4>;
-+	status = "okay";
-+
-+	pmic: pfuze100 at 8 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			/* CPU vdd_arm core */
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			/* SOC vdd_soc */
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			/* I/O power GEN_3V3 */
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* DDR memory */
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* DDR memory */
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* not used */
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			/* not used */
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			/* PMIC vsnvs. EX boot mode */
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			/* not used */
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			/* not used */
-+			vgen2_reg: vgen2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			/* not used */
-+			vgen3_reg: vgen3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			/* 1v8 general power */
-+			vgen4_reg: vgen4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			/* 2v8 general power IMX6 */
-+			vgen5_reg: vgen5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			/* 3v3 Ethernet */
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	bus-width = <8>;
-+	non-removable;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b1
-+			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-+			MX6QDL_PAD_KEY_ROW2__ENET_TX_DATA2	0x1b0b0
-+			MX6QDL_PAD_KEY_ROW0__ENET_TX_DATA3	0x1b0b0
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_GPIO_19__ENET_TX_ER		0x1b0b0
-+			MX6QDL_PAD_GPIO_18__ENET_RX_CLK		0x1b0b1
-+			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-+			MX6QDL_PAD_KEY_COL2__ENET_RX_DATA2	0x1b0b0
-+			MX6QDL_PAD_KEY_COL0__ENET_RX_DATA3      0x1b0b0
-+			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER	0x1b0b0
-+			MX6QDL_PAD_KEY_COL3__ENET_CRS		0x1b0b0
-+			MX6QDL_PAD_KEY_ROW1__ENET_COL		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_3__I2C3_SCL     0x4001b8b1
-+			MX6QDL_PAD_GPIO_6__I2C3_SDA     0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c4: i2c4grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_7__I2C4_SCL	0x4001b8b1
-+			MX6QDL_PAD_GPIO_8__I2C4_SDA	0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
-+			MX6QDL_PAD_SD3_DAT4__SD3_DATA4	0x17059
-+			MX6QDL_PAD_SD3_DAT5__SD3_DATA5	0x17059
-+			MX6QDL_PAD_SD3_DAT6__SD3_DATA6	0x17059
-+			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x17059
-+		>;
-+	};
-+};
--- 
-2.14.3
+> They are not very
+> useful for anything but kexec/kdump which knows what they mean.
+
+I disagree. I have found the naming does help in debugging issues
+in the crashkernel itself which cause an early panic in the crashkernel.
+
+Knowing the type of entry in '/proc/iomem' really helps in understanding 
+what the kexec-tools might have picked up and sent as a part of the 
+"linux,usable-memory" range property to the crashkernel.
+
+> Alternatively, we may want to give them more specific names, based on
+> related efi memory map descriptors and else, that will characterize
+> their contents:
+> 
+> (format C)
+> 40000000-5871ffff : System RAM
+>    40080000-40f1ffff : Kernel code
+>    41040000-411e9fff : Kernel data
+>    54400000-583fffff : Crash kernel
+>    58590000-585effff : ACPI Reclaim Memory
+>    58700000-5871ffff : ACPI Reclaim Memory
+> 58720000-58b5ffff : System RAM
+>    58720000-5878ffff : Runtime Data
+>    58790000-587dffff : Runtime Code
+>    587e0000-5882ffff : Runtime Data
+>    58830000-5887ffff : Runtime Code
+>    58880000-588cffff : Runtime Data
+>    588d0000-5891ffff : Runtime Code
+>    58920000-5896ffff : Runtime Data
+>    58970000-589bffff : Runtime Code
+>    589c0000-58a5ffff : Runtime Data
+>    58a60000-58abffff : Runtime Code
+>    58ac0000-58b0ffff : Runtime Data
+>    58b10000-58b5ffff : Runtime Code
+> 58b60000-5be3ffff : System RAM
+>    58b61000-58b61fff : EFI Memory Map
+>    59a7b118-59a7b667 : EFI Memory Attributes Table
+> 5be40000-5becffff : System RAM
+>    5be40000-5becffff : Runtime Code
+> 5bed0000-5bedffff : System RAM
+> 5bee0000-5bffffff : System RAM
+>    5bee0000-5bffffff : Runtime Data
+> 5c000000-5fffffff : System RAM
+> 8000000000-ffffffffff : PCI Bus 0000:00
+> 
+> I once created a patch for this format, but it looks quite noisy and
+> names are a sort of mixture of memory attributes( ACPI Reclaim memory,
+> Conventional Memory, Persistent Memory etc.) vs.
+> function/usages ([Loader|Boot Service|Runtime] Code/Data).
+> (As a matter of fact, (C-1) consists of various ACPI tables.)
+> Anyhow, they seem not so useful for most of other applications.
+> 
+> Those observations lead to format A, where some entries with the same
+> attributes are squeezed into a single entry under a simple name if they
+> are neighbouring.
+> 
+> 
+> So my questions here are:
+> 
+> 1. Which format, A, B, or C, is the most appropriate for the moment?
+>     or any other suggestions?
+> 
+> Currently, there is a inconsistent view between (A) and the mainline's:
+> see (A-1) and (B-1). If this is really a matter, I can fix it.
+> Kexec-tools can be easily modified to accept both formats, though.
+> 
+> 
+> 2. How should we determine which regions be exported in /proc/iomem?
+> 
+>   a. Trust all the memblock_reserve'd regions as my previous patch [3] does.
+> 
+>      As I said, it's a kind of "overkill." Some of regions, say fdt, are
+>      not required to be preserved across kexec.
+
+
+I think we should preserve all the memblock_reserve'd regions. So +1 on 
+this approach from my side. I believe it might help avoid issues we have 
+seen in the past with 'kexec-tools' _incorrectly_ determining which 
+regions to pick from the '/proc/iomem'.
+
+If every memblock_reserve'd region is exported in /proc/iomem', its 
+easier to debug issues in the 'kexec-tools' which might have cause the 
+early crashkernel to panic and we can exclude primary kernel as a 
+potential suspect for causing the same.
+
+Regards,
+Bhupesh
+
+> 
+>   b. List regions separately and exhaustively later on at a single point
+>      as my patch attached does.
+> 
+>      I'm afraid of any possibility that some regions may be doubly counted,
+>      one from efi memory map search and another from other efi/acpi code
+>      (various type of "tables" in most cases).
+> 
+>   c. Expand efi_mem_reserve() with an argument of "resource descriptor" and
+>      replace memblock_reserve() in efi code wherever necessary so as to
+>      maintain an export list.
+> 
+>      efi_mem_reserve() was first introduced for specific needs at kexec
+>      on x86, but I believe that its coverage over efi code is far from perfect.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/541831.html
+> [2] http://lkml.iu.edu//hypermail/linux/kernel/1802.2/06745.html
+> [3] http://lkml.iu.edu//hypermail/linux/kernel/1803.0/04658.html
+>      http://lkml.iu.edu//hypermail/linux/kernel/1803.0/04659.html
+> 
+> -Takahiro AKASHI
+> 
+> ===8<===
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 30ad2f085d1f..feda5cbdc6bf 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -214,13 +214,8 @@ static void __init request_standard_resources(void)
+>   
+>   	for_each_memblock(memory, region) {
+>   		res = alloc_bootmem_low(sizeof(*res));
+> -		if (memblock_is_nomap(region)) {
+> -			res->name  = "reserved";
+> -			res->flags = IORESOURCE_MEM;
+> -		} else {
+> -			res->name  = "System RAM";
+> -			res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+> -		}
+> +		res->name  = "System RAM";
+> +		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+>   		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+>   		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
+>   
+> @@ -239,6 +234,9 @@ static void __init request_standard_resources(void)
+>   			request_resource(res, &crashk_res);
+>   #endif
+>   	}
+> +
+> +	/* Add firmware-reserved memory */
+> +	efi_arch_request_resources();
+>   }
+>   
+>   u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+> index 80d1a885def5..308143e69db4 100644
+> --- a/drivers/firmware/efi/arm-init.c
+> +++ b/drivers/firmware/efi/arm-init.c
+> @@ -13,8 +13,10 @@
+>   
+>   #define pr_fmt(fmt)	"efi: " fmt
+>   
+> +#include <linux/bootmem.h>
+>   #include <linux/efi.h>
+>   #include <linux/init.h>
+> +#include <linux/ioport.h>
+>   #include <linux/memblock.h>
+>   #include <linux/mm_types.h>
+>   #include <linux/of.h>
+> @@ -280,3 +282,97 @@ static int __init register_gop_device(void)
+>   	return PTR_ERR_OR_ZERO(pd);
+>   }
+>   subsys_initcall(register_gop_device);
+> +
+> +static unsigned long __init efi_memattr_to_iores_type(u64 addr)
+> +{
+> +	if (efi_mem_attributes(addr) &
+> +			(EFI_MEMORY_WB|EFI_MEMORY_WT|EFI_MEMORY_WC))
+> +		return IORESOURCE_SYSTEM_RAM;
+> +	else
+> +		return IORESOURCE_MEM;
+> +}
+> +
+> +static unsigned long __init efi_type_to_iores_desc(u64 addr)
+> +{
+> +	/* TODO */
+> +	return IORES_DESC_NONE;
+> +}
+> +
+> +static struct resource * __init _efi_arch_request_resource(u64 start, u64 end,
+> +					char *name, struct resource *prev)
+> +{
+> +	struct resource *conflict, *res;
+> +
+> +	res = alloc_bootmem_low(sizeof(*res));
+> +
+> +	res->start = start;
+> +	res->end = end;
+> +	res->flags = efi_memattr_to_iores_type(res->start);
+> +	res->desc = efi_type_to_iores_desc(res->start);
+> +	res->name = name;
+> +
+> +	conflict = request_resource_conflict(&iomem_resource, res);
+> +	if (conflict) {
+> +		if (prev && (prev->parent == conflict) &&
+> +				((prev->end + 1) == start)) {
+> +			/* merge consecutive regions */
+> +			adjust_resource(prev, prev->start,
+> +							end - prev->start + 1);
+> +			free_bootmem((unsigned long)res, sizeof(*res));
+> +			res = prev;
+> +		} else
+> +			insert_resource(conflict, res);
+> +	}
+> +
+> +	return res;
+> +}
+> +
+> +/* Kexec expects those resources to be preserved */
+> +void __init efi_arch_request_resources(void)
+> +{
+> +	struct resource *res = NULL;
+> +	efi_memory_desc_t *md;
+> +	u64 paddr, npages, size;
+> +
+> +	/* EFI Memory Map */
+> +	/* FIXME */
+> +	_efi_arch_request_resource(efi.memmap.phys_map,
+> +			efi.memmap.phys_map
+> +			+ efi.memmap.desc_size * efi.memmap.nr_map - 1,
+> +			"EFI Memory Map", res);
+> +
+> +	/* generic EFI Configuration Tables */
+> +	efi_request_config_table_resources(_efi_arch_request_resource);
+> +
+> +	/* architecture-specifc Configuration Tables */
+> +	if (screen_info.lfb_size)
+> +		_efi_arch_request_resource(screen_info.lfb_base,
+> +				screen_info.lfb_base + screen_info.lfb_size - 1,
+> +				"EFI Screen Info Table", res);
+> +
+> +	/* architecture-specific EFI resources */
+> +	/* FIXME */
+> +	efi_memmap_install(efi.memmap.phys_map, efi.memmap.nr_map);
+> +
+> +	res = NULL;
+> +	for_each_efi_memory_desc(md) {
+> +		paddr = md->phys_addr;
+> +		npages = md->num_pages;
+> +
+> +		memrange_efi_to_native(&paddr, &npages);
+> +		size = npages << PAGE_SHIFT;
+> +
+> +		if (is_memory(md)) {
+> +			if (!is_usable_memory(md))
+> +				res = _efi_arch_request_resource(paddr,
+> +						paddr + size - 1,
+> +						"EFI Resources", res);
+> +
+> +			if (md->type == EFI_ACPI_RECLAIM_MEMORY)
+> +				res = _efi_arch_request_resource(paddr,
+> +						paddr + size - 1,
+> +						"EFI Resources", res);
+> +		}
+> +	}
+> +	efi_memmap_unmap();
+> +}
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index cd42f66a7c85..b13c9461278b 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -603,6 +603,33 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
+>   	return ret;
+>   }
+>   
+> +void __init efi_request_config_table_resources(struct resource *(*fn)(u64 start,
+> +				u64 end, char *name, struct resource *prev))
+> +{
+> +	struct resource *prev = NULL;
+> +	char *name = "EFI Configuration Tables";
+> +
+> +	if (efi.config_table_size)
+> +		prev = fn(efi.config_table,
+> +			efi.config_table + efi.config_table_size - 1, name,
+> +									prev);
+> +
+> +	if (efi.mem_attr_table_size)
+> +		prev = fn(efi.mem_attr_table,
+> +			efi.mem_attr_table + efi.mem_attr_table_size - 1, name,
+> +									prev);
+> +
+> +	if (efi.esrt_size)
+> +		prev = fn(efi.esrt, efi.esrt + efi.esrt_size - 1, name, prev);
+> +
+> +	if (efi.tpm_log_size)
+> +		prev = fn(efi.tpm_log, efi.tpm_log + efi.tpm_log_size - 1, name,
+> +									prev);
+> +
+> +
+> +	/* TODO: BGRT */
+> +}
+> +
+>   #ifdef CONFIG_EFI_VARS_MODULE
+>   static int __init efi_load_efivars(void)
+>   {
+> diff --git a/drivers/firmware/efi/esrt.c b/drivers/firmware/efi/esrt.c
+> index c47e0c6ec00f..61f66c139afb 100644
+> --- a/drivers/firmware/efi/esrt.c
+> +++ b/drivers/firmware/efi/esrt.c
+> @@ -330,6 +330,7 @@ void __init efi_esrt_init(void)
+>   
+>   	esrt_data = (phys_addr_t)efi.esrt;
+>   	esrt_data_size = size;
+> +	efi.esrt_size = size;
+>   
+>   	end = esrt_data + size;
+>   	pr_info("Reserving ESRT space from %pa to %pa.\n", &esrt_data, &end);
+> diff --git a/drivers/firmware/efi/memattr.c b/drivers/firmware/efi/memattr.c
+> index 8986757eafaf..dc2c7608793a 100644
+> --- a/drivers/firmware/efi/memattr.c
+> +++ b/drivers/firmware/efi/memattr.c
+> @@ -42,6 +42,7 @@ int __init efi_memattr_init(void)
+>   	}
+>   
+>   	tbl_size = sizeof(*tbl) + tbl->num_entries * tbl->desc_size;
+> +	efi.mem_attr_table_size = tbl_size;
+>   	memblock_reserve(efi.mem_attr_table, tbl_size);
+>   	set_bit(EFI_MEM_ATTR, &efi.flags);
+>   
+> diff --git a/drivers/firmware/efi/tpm.c b/drivers/firmware/efi/tpm.c
+> index 0cbeb3d46b18..53cfb12513fa 100644
+> --- a/drivers/firmware/efi/tpm.c
+> +++ b/drivers/firmware/efi/tpm.c
+> @@ -33,6 +33,7 @@ int __init efi_tpm_eventlog_init(void)
+>   	}
+>   
+>   	tbl_size = sizeof(*log_tbl) + log_tbl->size;
+> +	efi.tpm_log_size = tbl_size;
+>   	memblock_reserve(efi.tpm_log, tbl_size);
+>   	early_memunmap(log_tbl, sizeof(*log_tbl));
+>   	return 0;
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index f5083aa72eae..9c3f8d284b36 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -942,11 +942,15 @@ extern struct efi {
+>   	unsigned long fw_vendor;	/* fw_vendor */
+>   	unsigned long runtime;		/* runtime table */
+>   	unsigned long config_table;	/* config tables */
+> +	unsigned long config_table_size;
+>   	unsigned long esrt;		/* ESRT table */
+> +	unsigned long esrt_size;
+>   	unsigned long properties_table;	/* properties table */
+>   	unsigned long mem_attr_table;	/* memory attributes table */
+> +	unsigned long mem_attr_table_size;
+>   	unsigned long rng_seed;		/* UEFI firmware random seed */
+>   	unsigned long tpm_log;		/* TPM2 Event Log table */
+> +	unsigned long tpm_log_size;
+>   	efi_get_time_t *get_time;
+>   	efi_set_time_t *set_time;
+>   	efi_get_wakeup_time_t *get_wakeup_time;
+> @@ -980,6 +984,9 @@ efi_guid_to_str(efi_guid_t *guid, char *out)
+>   }
+>   
+>   extern void efi_init (void);
+> +extern void efi_arch_request_resources(void);
+> +extern void efi_request_config_table_resources(struct resource *
+> +		(*fn)(u64 start, u64 end, char *name, struct resource *prev));
+>   extern void *efi_get_pal_addr (void);
+>   extern void efi_map_pal_code (void);
+>   extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
+> 
