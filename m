@@ -1,49 +1,57 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 19 Mar 2018 14:17:01 +0100
-Subject: =?UTF-8?Q?Re=3A_=5BPATCH_v8_00=2F42=5D_ARM=3A_davinci=3A_convert_to_common?=
- =?UTF-8?Q?_clock_framework=E2=80=8B?=
-In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
-Message-ID: <CAMpxmJX-AxhpPpCnWoaSGYmNh3o8iRjdKacnmozsPWmhpcGdTg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Mar 2018 13:18:05 +0000
+Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface
+ to use in-band negotiation
+In-Reply-To: <20180319131009.GJ4519@kwain>
+References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
+ <20180316103351.16616-3-antoine.tenart@bootlin.com>
+ <20180316155307.GQ9418@n2100.armlinux.org.uk>
+ <20180319085252.GF4519@kwain>
+ <20180319111205.GB2743@n2100.armlinux.org.uk>
+ <20180319125227.GI4519@kwain> <20180319125953.GD19795@lunn.ch>
+ <20180319131009.GJ4519@kwain>
+Message-ID: <20180319131804.GD2743@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-16 3:52 GMT+01:00 David Lechner <david@lechnology.com>:
-> This series converts mach-davinci to use the common clock framework.
->
-> The series works like this, the first 19 patches create new clock drivers
-> using the common clock framework. There are basically 3 groups of clocks -
-> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
-> unique init data, which is the reason for so many patches.
->
-> Then, starting with "ARM: davinci: pass clock as parameter to
-> davinci_timer_init()", we get the mach code ready for the switch by adding the
-> code needed for the new clock drivers and adding #ifndef CONFIG_COMMON_CLK
-> around the legacy clocks so that we can switch easily between the old and the
-> new.
->
-> "ARM: davinci: switch to common clock framework" actually flips the switch
-> to start using the new clock drivers. Then the next 8 patches remove all
-> of the old clock code.
->
-> The final three patches add device tree clock support to the one SoC that
-> supports it.
->
-> This series has been tested on LEGO MINDSTORMS EV3 (device tree) and TI
-> OMAP-L138 LCDK (both device tree and legacy board file).
->
+On Mon, Mar 19, 2018 at 02:10:09PM +0100, Antoine Tenart wrote:
+> Hi Andrew,
+> 
+> On Mon, Mar 19, 2018 at 01:59:53PM +0100, Andrew Lunn wrote:
+> > 
+> > If they don't have PHYs, how are the connected to the outside world?
+> 
+> On 7k/8k you have the following scheme for 10G only interfaces:
+> 
+>    MAC -- Comphy -- PHY -- SFP cage -- ...
+> 
+> Or
+> 
+>    MAC -- Comphy -- SFP cage -- ...
+> 
+> The comphy provides serdes lanes, and can be configured in various
+> modes (SGMII, 2500SGMII, 10GKR...).
 
-Hi David,
+Right - the correct mode is dependent on the SFP module plugged into
+the cage.  Trying to describe this by ignoring the SFP cage isn't
+going to work out well for end-user functionality, though is fine if
+you're just hacking a configuration to test (which would not be
+suitable for mainline kernels!)
 
-thanks, with the u-boot fix everything seems to work fine. I tested
-da850-lcdk and da850-evm boards in DT and board file modes.
+As I've recently replied to Yan, this is a configuration I haven't
+tested yet, and it's entirely possible that phylink may need some
+tweaks for it.
 
-I'll be working with this series in the following days and will do
-some thorough testing and rebase my aemif series on top of it. I'll
-also use the recently merged reset support for board files to get rid
-of the exported reset functions.
+What you have is a very similar setup to what is on Clearfog with
+its SFP cage, where the SFP cage is connected directly to the
+Armada 388.  That only has to deal with 2500base-X / 1000base-X /
+SGMII and not 10G.
 
-Thanks for your work!
+What I want is to avoid hacks as much as possible here - if there is
+a short-coming with SFP/phylink here, we need to address that
+properly.
 
-Best regards,
-Bartosz Golaszewski
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
