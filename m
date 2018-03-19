@@ -1,66 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 19 Mar 2018 19:19:53 +0800
-Subject: [RFC PATCH 1/6] arm64/mm: add explicit physical address argument to
- map_kernel_segment
-In-Reply-To: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
-References: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180319111958.4171-2-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 19 Mar 2018 11:23:02 +0000
+Subject: [PATCH v2] arm64: fix undefined reference to 'printk'
+In-Reply-To: <20180313125309.3662792-1-arnd@arndb.de>
+References: <CAKv+Gu-6s1tqBzAEgL63WxXrc9SuF2C9PtADqmEcUKWxP8eZUw@mail.gmail.com>
+ <20180313125309.3662792-1-arnd@arndb.de>
+Message-ID: <20180319112302.GA11021@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation of mapping a physically non-adjacent memory region
-as backing for the vmlinux segment covering the trampoline and primary
-level swapper_pg_dir regions, make the physical address an explicit
-argument of map_kernel_segment().
+On Tue, Mar 13, 2018 at 01:52:36PM +0100, Arnd Bergmann wrote:
+> The printk symbol was intended as a generic address that is always
+> exported, however that turned out to be false with CONFIG_PRINTK=n:
+> 
+> ERROR: "printk" [arch/arm64/kernel/arm64-reloc-test.ko] undefined!
+> 
+> This changes the references to memstart_addr, which should be there
+> regardless of configuration.
+> 
+> Fixes: a257e02579e4 ("arm64/kernel: don't ban ADRP to work around Cortex-A53 erratum #843419")
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: fix changelog as pointed out by Ard
+> 
+>  arch/arm64/kernel/reloc_test_core.c | 2 +-
+>  arch/arm64/kernel/reloc_test_syms.S | 4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/mmu.c | 22 ++++++++++++--------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+Cheers, I've picked this up now. Sorry for the delay.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 8c704f1e53c2..007b2e32ca71 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -507,10 +507,10 @@ void mark_rodata_ro(void)
- }
- 
- static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
--				      pgprot_t prot, struct vm_struct *vma,
--				      int flags, unsigned long vm_flags)
-+				      phys_addr_t pa_start, pgprot_t prot,
-+				      struct vm_struct *vma, int flags,
-+				      unsigned long vm_flags)
- {
--	phys_addr_t pa_start = __pa_symbol(va_start);
- 	unsigned long size = va_end - va_start;
- 
- 	BUG_ON(!PAGE_ALIGNED(pa_start));
-@@ -585,15 +585,19 @@ static void __init map_kernel(pgd_t *pgdp)
- 	 * Only rodata will be remapped with different permissions later on,
- 	 * all other segments are allowed to use contiguous mappings.
- 	 */
--	map_kernel_segment(pgdp, _text, _etext, text_prot, &vmlinux_text, 0,
--			   VM_NO_GUARD);
--	map_kernel_segment(pgdp, __start_rodata, __inittext_begin, PAGE_KERNEL,
-+	map_kernel_segment(pgdp, _text, _etext, __pa_symbol(_text), text_prot,
-+			   &vmlinux_text, 0, VM_NO_GUARD);
-+	map_kernel_segment(pgdp, __start_rodata, __inittext_begin,
-+			   __pa_symbol(__start_rodata), PAGE_KERNEL,
- 			   &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
--	map_kernel_segment(pgdp, __inittext_begin, __inittext_end, text_prot,
-+	map_kernel_segment(pgdp, __inittext_begin, __inittext_end,
-+			   __pa_symbol(__inittext_begin), text_prot,
- 			   &vmlinux_inittext, 0, VM_NO_GUARD);
--	map_kernel_segment(pgdp, __initdata_begin, __initdata_end, PAGE_KERNEL,
-+	map_kernel_segment(pgdp, __initdata_begin, __initdata_end,
-+			   __pa_symbol(__initdata_begin), PAGE_KERNEL,
- 			   &vmlinux_initdata, 0, VM_NO_GUARD);
--	map_kernel_segment(pgdp, _data, _end, PAGE_KERNEL, &vmlinux_data, 0, 0);
-+	map_kernel_segment(pgdp, _data, _end, __pa_symbol(_data), PAGE_KERNEL,
-+			   &vmlinux_data, 0, 0);
- 
- 	if (!READ_ONCE(pgd_val(*pgd_offset_raw(pgdp, FIXADDR_START)))) {
- 		/*
--- 
-2.11.0
+Will
