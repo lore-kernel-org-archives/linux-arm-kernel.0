@@ -1,81 +1,34 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 19 Mar 2018 19:19:55 +0800
-Subject: [RFC PATCH 3/6] arm64/mm: use physical address as cpu_replace_ttbr1()
- argument
-In-Reply-To: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
-References: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180319111958.4171-4-ard.biesheuvel@linaro.org>
+Date: Mon, 19 Mar 2018 19:19:52 +0800
+Subject: [RFC PATCH 0/6] replace static mapping for pgdir region
+Message-ID: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Every caller of cpu_replace_ttbr1() currently translates the
-pgd* argument from physical to virtual, only to translate it
-back in the implementation of the function. Drop this redundancy.
+On systems that are affected by S&M variant 3a, KPTI is not sufficient to
+hide the physical placement of the kernel, since the trampoline page is
+statically allocated, and the contents of TTBR1_EL1 is visible to attackers.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/mmu_context.h | 4 +---
- arch/arm64/mm/kasan_init.c           | 4 ++--
- arch/arm64/mm/mmu.c                  | 4 ++--
- 3 files changed, 5 insertions(+), 7 deletions(-)
+So instead, use a separate physical allocation and map it at the same
+virtual offset as swapper_pg_dir and the trampoline were mapped before.
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 39ec0b8a689e..3eddb871f251 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -141,14 +141,12 @@ static inline void cpu_install_idmap(void)
-  * Atomically replaces the active TTBR1_EL1 PGD with a new VA-compatible PGD,
-  * avoiding the possibility of conflicting TLB entries being allocated.
-  */
--static inline void cpu_replace_ttbr1(pgd_t *pgdp)
-+static inline void cpu_replace_ttbr1(phys_addr_t pgd_phys)
- {
- 	typedef void (ttbr_replace_func)(phys_addr_t);
- 	extern ttbr_replace_func idmap_cpu_replace_ttbr1;
- 	ttbr_replace_func *replace_phys;
- 
--	phys_addr_t pgd_phys = virt_to_phys(pgdp);
--
- 	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
- 
- 	cpu_install_idmap();
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index dabfc1ecda3d..1f17642811b3 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -199,7 +199,7 @@ void __init kasan_init(void)
- 	 */
- 	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
- 	dsb(ishst);
--	cpu_replace_ttbr1(lm_alias(tmp_pg_dir));
-+	cpu_replace_ttbr1(__pa_symbol(tmp_pg_dir));
- 
- 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
- 
-@@ -236,7 +236,7 @@ void __init kasan_init(void)
- 			pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
- 
- 	memset(kasan_zero_page, 0, PAGE_SIZE);
--	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
-+	cpu_replace_ttbr1(__pa_symbol(swapper_pg_dir));
- 
- 	/* At this point kasan is fully initialized. Enable error messages */
- 	init_task.kasan_depth = 0;
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 0a9c08c0948c..365fedf22fcd 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -650,9 +650,9 @@ void __init paging_init(void)
- 	 *
- 	 * To do this we need to go via a temporary pgd.
- 	 */
--	cpu_replace_ttbr1(__va(pgd_phys));
-+	cpu_replace_ttbr1(pgd_phys);
- 	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
--	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
-+	cpu_replace_ttbr1(__pa_symbol(swapper_pg_dir));
- 
- 	pgd_clear_fixmap();
- 	memblock_free(pgd_phys, PAGE_SIZE);
+Ard Biesheuvel (6):
+  arm64/mm: add explicit physical address argument to map_kernel_segment
+  arm64/mm: create dedicated segment for pgdir mappings
+  arm64/mm: use physical address as cpu_replace_ttbr1() argument
+  arm64/mm: stop using __pa_symbol() for swapper_pg_dir
+  arm64/mm: factor out clear_page() for unmapped memory
+  arm64/mm: use independent physical allocation for pgdir segment
+
+ arch/arm64/include/asm/mmu_context.h |  4 +-
+ arch/arm64/include/asm/pgtable.h     |  2 +
+ arch/arm64/include/asm/sections.h    |  1 +
+ arch/arm64/kernel/cpufeature.c       |  2 +-
+ arch/arm64/kernel/hibernate.c        |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S      |  3 +
+ arch/arm64/mm/kasan_init.c           |  4 +-
+ arch/arm64/mm/mmu.c                  | 84 ++++++++++----------
+ 8 files changed, 55 insertions(+), 47 deletions(-)
+
 -- 
 2.11.0
