@@ -1,57 +1,73 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Mar 2018 14:44:56 +0100
-Subject: [PATCH v4 0/9] Initial Allwinner H6 support
-In-Reply-To: <F40271A8-3782-4A69-8C40-3909EB296C66@aosc.io>
-References: <20180316140215.28663-1-icenowy@aosc.io>
- <20180318201744.dw6hnm2vdybaunev@flea>
- <F40271A8-3782-4A69-8C40-3909EB296C66@aosc.io>
-Message-ID: <20180319134456.shebby73ngqavsnl@flea>
+From: johan@kernel.org (Johan Hovold)
+Date: Mon, 19 Mar 2018 14:54:18 +0100
+Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
+ receiver) power control driver
+In-Reply-To: <22A8F5FE-C8B9-46EB-B98D-A94EA4170131@goldelico.com>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost>
+ <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
+ <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
+ <20180112153903.GB5992@localhost> <20180212152618.GC13962@amd>
+ <20180227070415.GB18666@localhost>
+ <22A8F5FE-C8B9-46EB-B98D-A94EA4170131@goldelico.com>
+Message-ID: <20180319135418.GL18359@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 09:28:23AM +0800, Icenowy Zheng wrote:
+On Tue, Feb 27, 2018 at 08:32:50AM +0100, H. Nikolaus Schaller wrote:
+> Hi Johan,
 > 
-> 
-> ? 2018?3?19? GMT+08:00 ??4:17:44, Maxime Ripard <maxime.ripard@bootlin.com> ??:
-> >On Fri, Mar 16, 2018 at 10:02:06PM +0800, Icenowy Zheng wrote:
-> >> This patchset adds initial support for the Allwinner H6 SoC.
+> > Am 27.02.2018 um 08:04 schrieb Johan Hovold <johan@kernel.org>:
+> > 
+> > On Mon, Feb 12, 2018 at 04:26:18PM +0100, Pavel Machek wrote:
+> >> Hi!
 > >> 
-> >> It's quite different from earlier Allwinner SoCs. For example, the
-> >> memory map is refactored, and the CCU is rearranged. It's also the
-> >first
-> >> Allwinner SoC with PCI Express interface (although the implementation
-> >> of the PCI Express controller is broken), and the second one with USB
-> >> 3.0 (the first one is A80).
+> >>>> Let's restart this discussion and focus on the main roadblock (others
+> >>>> are minor details which can be sorted out later).
+> >>>> 
+> >>>> If it feels like a hack, the key issue seems to me to be the choice of
+> >>>> the API to present the GPS data to user space. Right?
+> >>> 
+> >>> Or even more fundamentally, does this belong in the kernel at all?
 > >> 
-> >> This patchset adds the most basical support for it, including the
-> >main pin
-> >> controller, the main CCU and the basical device tree.
+> >> Yes, it does.
+> 
+> Thanks, Pavel for supporting our view.
+> 
+> > 
+> > But not necessarily in its current form.
+> 
+> Is this a "yes after some code fixes"?
+
+No, we need some kind of at least rudimentary gps framework even if we
+allow for a raw (NMEA) interface for the time being (possibly
+indefinitely).
+
+> Pavel mentioned an example where such an evolutionary approach was taken.
+> > 
+> >>> Now, if we'd ever have a proper GPS framework that handled everything in
+> >>> kernel space (i.e. no more gpsd) then we would be able to write kernel
+> >>> drivers that also take care of PM. But perhaps that's unlikely to ever
+> >>> be realised given the state of things (proprietary protocols, numerous
+> >>> quirky implementations, etc).
 > >> 
-> >> Icenowy Zheng (9):
-> >>   pinctrl: sunxi: refactor irq related register function to have desc
-> >>   pinctrl: sunxi: introduce IRQ bank conversion function
-> >>   pinctrl: sunxi: change irq_bank_base to irq_bank_map
-> >>   pinctrl: sunxi: add support for the Allwinner H6 main pin
-> >controller
-> >>   clk: sunxi-ng: Support fixed post-dividers on NKMP style clocks
-> >>   dt-bindings: add device tree binding for Allwinner H6 main CCU
-> >>   clk: sunxi-ng: add support for the Allwinner H6 CCU
-> >>   arm64: allwinner: h6: add the basical Allwinner H6 DTSI file
-> >>   arm64: allwinner: h6: add support for Pine H64 board
-> >
-> >Applied the !pinctrl patches.
+> >> That is what needs to happen.
+> >> 
+> >>> The kernel is probably not the place to be working around issues like
+> >>> that, even if serdev at least allows for such hacks to be fairly
+> >>> isolated in drivers (unlike some of the earlier proposals touching core
+> >>> code).
+> >> 
+> >> Oh, kernel is indeed right place to provide hardware abstraction --
+> >> and that includes bug workarounds.
+> > 
+> > Right, at least when such hacks can be confined to a driver and not be
+> > spread all over the place.
 > 
-> Oops, one clock (CLK_HDMI_SLOW) is missing in the CCU
-> driver, as Jernej pointed out.
-> 
-> Should I send a patch that fix it?
+> It seems that you forgot that the driver we propose is not spread all over
+> the place. It *is* confined to a single driver thanks to the serdev api.
 
-Yes, please.
+I believe that's what I wrote above.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Johan
