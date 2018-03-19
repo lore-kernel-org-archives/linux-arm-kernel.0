@@ -1,47 +1,104 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Mar 2018 14:55:05 +0100
-Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
-In-Reply-To: <CAGb2v65QHkuM2GmT4MC+tp+HqN2ecqeZt8bB5OvZm2br1AJJ-w@mail.gmail.com>
-References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
- <20180223133742.26044-11-mylene.josserand@bootlin.com>
- <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
- <20180318200715.363f3135@dell-desktop.home>
- <CAGb2v65QHkuM2GmT4MC+tp+HqN2ecqeZt8bB5OvZm2br1AJJ-w@mail.gmail.com>
-Message-ID: <20180319135505.py4evmbexm2asvlo@flea>
+From: mporter@konsulko.com (Matt Porter)
+Date: Mon, 19 Mar 2018 09:53:26 -0400
+Subject: [PATCH] arm: dts: hummingboard2: convert onboard audio to
+ simple-audio-card
+Message-ID: <20180319135326.24357-1-mporter@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 10:14:19AM +0800, Chen-Yu Tsai wrote:
-> On Mon, Mar 19, 2018 at 3:07 AM, Myl?ne Josserand
-> <mylene.josserand@bootlin.com> wrote:
-> > Hello Mark,
-> >
-> > Please, excuse me for this late answer and thank you for the review!
-> >
-> > On Wed, 7 Mar 2018 12:18:33 +0000
-> > Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >
-> >> On 23/02/18 13:37, Myl?ne Josserand wrote:
-> >> > On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
-> >>
-> >> Only on A7? Is that specific to your platform?
-> >
-> > I do not really know other Allwinner's platforms about this subject. At
-> > least, the sun9i-a80 which is a Cortex-a15/a7 does not need that but it
-> > is necessary for sun8i-a83t which is a cortex-a7. Maybe, Chen-Yu or
-> > Maxime could help us on it.
-> 
-> AFAIK all Allwinner CPUs need it if there isn't a firmware (PSCI) layer
-> beneath the kernel that will do the setup. We just have
-> "arm,cpu-registers-not-fw-configured" set for all the other SoCs that
-> have in-kernel SMP support, which includes the A31, A23, A33 and A80.
+The HB2 onboard audio currently makes use of the imx-audio-sgtl5000
+binding. This binding does not support auxiliary audio devices such
+as external amplifiers. The simple-audio-card binding does support
+this property which allows systems incorporating the HB2 to easily
+add an auxiliary device that's attached to the HB2 audio jack with
+an overlay. Convert HB2 to use simple-audio-card for the onboard
+audio to allow for this additional flexibility.
 
-Most of these ones are here for historical reasons though. Now that we
-have U-Boot properly setting it up, we could probably remove it.
+Signed-off-by: Matt Porter <mporter@konsulko.com>
+---
+ arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi | 48 +++++++++++++++++++++++-----
+ 1 file changed, 40 insertions(+), 8 deletions(-)
 
-Maxime
-
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+index dffbc92e0023..587251ab76ec 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard2.dtsi
+@@ -38,6 +38,7 @@
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
++#include <dt-bindings/sound/fsl-imx-audmux.h>
+ 
+ / {
+ 	chosen {
+@@ -145,22 +146,52 @@
+ 		vin-supply = <&v_5v0>;
+ 	};
+ 
+-	sound-sgtl5000 {
+-		audio-codec = <&sgtl5000>;
+-		audio-routing =
++	audio: sound-sgtl5000 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "On-Board Codec";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&sound_codec>;
++		simple-audio-card,frame-master = <&sound_codec>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Headphone", "Headphone Jack";
++		simple-audio-card,routing =
+ 			"MIC_IN", "Mic Jack",
+ 			"Mic Jack", "Mic Bias",
+ 			"Headphone Jack", "HP_OUT";
+-		compatible = "fsl,imx-audio-sgtl5000";
+-		model = "On-board Codec";
+-		mux-ext-port = <5>;
+-		mux-int-port = <1>;
+-		ssi-controller = <&ssi1>;
++
++		sound_cpu: simple-audio-card,cpu {
++			sound-dai = <&ssi1>;
++		};
++
++		sound_codec: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++		};
+ 	};
+ };
+ 
+ &audmux {
+ 	status = "okay";
++
++	ssi1 {
++		fsl,audmux-port = <0>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_SYN |
++			 IMX_AUDMUX_V2_PTCR_TFSEL(4) |
++			 IMX_AUDMUX_V2_PTCR_TCSEL(4) |
++			 IMX_AUDMUX_V2_PTCR_TFSDIR |
++			 IMX_AUDMUX_V2_PTCR_TCLKDIR)
++			 IMX_AUDMUX_V2_PDCR_RXDSEL(4)
++		>;
++	};
++
++	pins5 {
++		fsl,audmux-port = <4>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
++		>;
++	};
+ };
+ 
+ &ecspi2 {
+@@ -193,6 +224,7 @@
+ 		compatible = "fsl,sgtl5000";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_hummingboard2_sgtl5000>;
++		#sound-dai-cells = <0>;
+ 		reg = <0x0a>;
+ 		VDDA-supply = <&v_3v2>;
+ 		VDDD-supply = <&vcc_1p8>;
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.11.0
