@@ -1,50 +1,52 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Mon, 19 Mar 2018 18:10:56 +0530
-Subject: [PATCH v3 3/3] Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
-In-Reply-To: <1521463256-19858-1-git-send-email-cpandya@codeaurora.org>
-References: <1521463256-19858-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1521463256-19858-4-git-send-email-cpandya@codeaurora.org>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Mon, 19 Mar 2018 13:52:27 +0100
+Subject: [PATCH net-next 02/10] net: phy: phylink: allow 10GKR interface
+ to use in-band negotiation
+In-Reply-To: <20180319111205.GB2743@n2100.armlinux.org.uk>
+References: <20180316103351.16616-1-antoine.tenart@bootlin.com>
+ <20180316103351.16616-3-antoine.tenart@bootlin.com>
+ <20180316155307.GQ9418@n2100.armlinux.org.uk>
+ <20180319085252.GF4519@kwain>
+ <20180319111205.GB2743@n2100.armlinux.org.uk>
+Message-ID: <20180319125227.GI4519@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit 15122ee2c515a ("arm64: Enforce BBM for huge
-IO/VMAP mappings") is a temporary work-around until the
-issues with CONFIG_HAVE_ARCH_HUGE_VMAP gets fixed.
+Hi Russell,
 
-Revert this change as we have fixes for the issue.
+On Mon, Mar 19, 2018 at 11:12:05AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 19, 2018 at 09:52:52AM +0100, Antoine Tenart wrote:
+> > 
+> > Anyway, the reason to use in-band negotiation was also to avoid using
+> > fixed-link. It would work but always report the link is up, which for
+> > the user isn't a great experience as we have a way to detect this.
+> > 
+> > What would you suggest to achieve this in a reasonable way?
+> 
+> The intention of this test in phylink_of_phy_connect() is to avoid
+> failing when there is no requirement for a PHY to be present (such as
+> a fixed link, or an 802.3z link.)  However, with 10G PHYs such as the
+> 3310, we need the PHY so we can read the speed from it, and so know
+> whether to downgrade the MAC to SGMII mode, or having downgraded the
+> MAC, upgrade it back to 10G mode when the PHY switches to 10G.
+> 
+> I'm guessing that you're wanting this for the DB boards, but I don't
+> see why.  Do they not have PHYs?
 
-Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
----
- arch/arm64/mm/mmu.c | 8 --------
- 1 file changed, 8 deletions(-)
+You guessed right, that's exactly my use case. The DB boards (7k and 8k)
+have 10G interfaces without PHYs. I could describe them as fixed-link
+(it works), but it would be better not to require a PHY in
+phylink_of_phy_connect() for such interfaces.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c70f139..a29a684 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -935,10 +935,6 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
- 
--	/* ioremap_page_range doesn't honour BBM */
--	if (pud_present(READ_ONCE(*pudp)))
--		return 0;
--
- 	BUG_ON(phys & ~PUD_MASK);
- 	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
- 	return 1;
-@@ -949,10 +945,6 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
- 
--	/* ioremap_page_range doesn't honour BBM */
--	if (pmd_present(READ_ONCE(*pmdp)))
--		return 0;
--
- 	BUG_ON(phys & ~PMD_MASK);
- 	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
- 	return 1;
+That's why I used in-band AN, which is wrong, but we still probably
+need to add a check to allow such setups. I'm all ears for suggestions
+as I do not have the full picture of all the supported modes and their
+requirements.
+
+Thanks!
+Antoine
+
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation
-Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
-Collaborative Project
+Antoine T?nart, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
