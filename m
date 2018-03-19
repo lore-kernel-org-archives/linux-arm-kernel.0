@@ -1,86 +1,75 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Mon, 19 Mar 2018 07:46:17 +0000
-Subject: [PATCH v5 2/4] clk: imx: add new gate/gate2 wrapper funtion
-In-Reply-To: <AM3PR04MB3065CB215B6264649D64C9B80D70@AM3PR04MB306.eurprd04.prod.outlook.com>
-References: <1520846957-22348-1-git-send-email-ping.bai@nxp.com>
- <1520846957-22348-2-git-send-email-ping.bai@nxp.com>
- <AM3PR04MB3065CB215B6264649D64C9B80D70@AM3PR04MB306.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR04MB311383FB9988727A63ED3A3587D40@HE1PR04MB3113.eurprd04.prod.outlook.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 19 Mar 2018 16:11:07 +0800
+Subject: [PATCH 1/2] clk: sunxi-ng: add missing hdmi-slow clock for H6 CCU
+Message-ID: <20180319081108.23496-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Subject: [PATCH v5 2/4] clk: imx: add new gate/gate2 wrapper funtion
-> >
-> > Add new gate/gate2 wrapper function to register clocks with optional flags.
-> >
-> > Signed-off-by: Bai Ping <ping.bai@nxp.com>
-> 
-> AFAIK Stephen requested to switch to clk_hw based APIs when reviewing my
-> mx7ulp clk driver. We may need some comments from Stephen here.
-> 
-> Hi Stefen,
-> 
-> Do you have any comments about this?
-> 
+The Allwinner H6 CCU has a "HDMI Slow Clock", which is currently missing
+in the ccu-sun50i-h6 driver.
 
-I think we need to just keep it as we did on other imx6 platform. 
-In the clk driver, we need to do 'clk_set_rate/clk_set_parent' for clks that need
-special init sequence('assigned-clocks' in dts is not applicable for such flow) .
-If the we register with clk_hw_xxx API, it seems not easy to handle such things.
+Add this missing clock to the driver.
 
-Additionally, if we switch to clk_hw based driver for imx6sll, all the old imx6 platform
-need to be changed accordingly. Too many efforts.
+Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c      | 4 ++++
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.h      | 2 +-
+ include/dt-bindings/clock/sun50i-h6-ccu.h | 1 +
+ 3 files changed, 6 insertions(+), 1 deletion(-)
 
-Jacky
-
-> Regards
-> Dong Aisheng
-> 
-> > ---
-> >  change from v3->v4:
-> >  - no
-> >  change from v4->5:
-> >  - optimize commit subject
-> > ---
-> >  drivers/clk/imx/clk.h | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> >
-> > diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h index
-> > d69c4bb..8076ec0 100644
-> > --- a/drivers/clk/imx/clk.h
-> > +++ b/drivers/clk/imx/clk.h
-> > @@ -123,6 +123,13 @@ static inline struct clk *imx_clk_gate(const char
-> > *name, const char *parent,
-> >  			shift, 0, &imx_ccm_lock);
-> >  }
-> >
-> > +static inline struct clk *imx_clk_gate_flags(const char *name, const
-> > +char
-> > *parent,
-> > +		void __iomem *reg, u8 shift, unsigned long flags) {
-> > +	return clk_register_gate(NULL, name, parent, flags |
-> > CLK_SET_RATE_PARENT, reg,
-> > +			shift, 0, &imx_ccm_lock);
-> > +}
-> > +
-> >  static inline struct clk *imx_clk_gate_dis(const char *name, const
-> > char *parent,
-> >  		void __iomem *reg, u8 shift)
-> >  {
-> > @@ -137,6 +144,13 @@ static inline struct clk *imx_clk_gate2(const
-> > char *name, const char *parent,
-> >  			shift, 0x3, 0, &imx_ccm_lock, NULL);  }
-> >
-> > +static inline struct clk *imx_clk_gate2_flags(const char *name, const
-> > +char
-> > *parent,
-> > +		void __iomem *reg, u8 shift, unsigned long flags) {
-> > +	return clk_register_gate2(NULL, name, parent, flags |
-> > CLK_SET_RATE_PARENT, reg,
-> > +			shift, 0x3, 0, &imx_ccm_lock, NULL); }
-> > +
-> >  static inline struct clk *imx_clk_gate2_shared(const char *name,
-> >  		const char *parent, void __iomem *reg, u8 shift,
-> >  		unsigned int *share_count)
-> > --
-> > 1.9.1
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+index d5eab49e6350..bdbfe78fe133 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+@@ -643,6 +643,8 @@ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents, 0xb00,
+ 				 BIT(31),	/* gate */
+ 				 0);
+ 
++static SUNXI_CCU_GATE(hdmi_slow_clk, "hdmi-slow", "osc24M", 0xb04, BIT(31), 0);
++
+ static const char * const hdmi_cec_parents[] = { "osc32k", "pll-periph0-2x" };
+ static const struct ccu_mux_fixed_prediv hdmi_cec_predivs[] = {
+ 	{ .index = 1, .div = 36621 },
+@@ -876,6 +878,7 @@ static struct ccu_common *sun50i_h6_ccu_clks[] = {
+ 	&pcie_aux_clk.common,
+ 	&bus_pcie_clk.common,
+ 	&hdmi_clk.common,
++	&hdmi_slow_clk.common,
+ 	&hdmi_cec_clk.common,
+ 	&bus_hdmi_clk.common,
+ 	&bus_tcon_top_clk.common,
+@@ -1017,6 +1020,7 @@ static struct clk_hw_onecell_data sun50i_h6_hw_clks = {
+ 		[CLK_PCIE_AUX]		= &pcie_aux_clk.common.hw,
+ 		[CLK_BUS_PCIE]		= &bus_pcie_clk.common.hw,
+ 		[CLK_HDMI]		= &hdmi_clk.common.hw,
++		[CLK_HDMI_SLOW]		= &hdmi_slow_clk.common.hw,
+ 		[CLK_HDMI_CEC]		= &hdmi_cec_clk.common.hw,
+ 		[CLK_BUS_HDMI]		= &bus_hdmi_clk.common.hw,
+ 		[CLK_BUS_TCON_TOP]	= &bus_tcon_top_clk.common.hw,
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.h b/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
+index ad6da4aa733c..ef499a7d45f2 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
+@@ -51,6 +51,6 @@
+ 
+ #define CLK_BUS_DRAM		60
+ 
+-#define CLK_NUMBER		137
++#define CLK_NUMBER		(CLK_HDMI_SLOW + 1)
+ 
+ #endif /* _CCU_SUN50I_H6_H_ */
+diff --git a/include/dt-bindings/clock/sun50i-h6-ccu.h b/include/dt-bindings/clock/sun50i-h6-ccu.h
+index 6045735a2821..205d09d3dc72 100644
+--- a/include/dt-bindings/clock/sun50i-h6-ccu.h
++++ b/include/dt-bindings/clock/sun50i-h6-ccu.h
+@@ -107,6 +107,7 @@
+ #define CLK_PCIE_AUX		121
+ #define CLK_BUS_PCIE		122
+ #define CLK_HDMI		123
++#define CLK_HDMI_SLOW		137
+ #define CLK_HDMI_CEC		124
+ #define CLK_BUS_HDMI		125
+ #define CLK_BUS_TCON_TOP	126
+-- 
+2.15.1
