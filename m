@@ -1,35 +1,60 @@
-From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Sun, 18 Mar 2018 19:48:05 -0600
-Subject: [PATCH v3 18/18] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <ac9c34e1-0a81-a494-c7c7-ac9c3922095a@codeaurora.org>
-References: <1521216991-28706-1-git-send-email-okaya@codeaurora.org>
- <1521216991-28706-19-git-send-email-okaya@codeaurora.org>
- <003601d3bd6a$783d6970$68b83c50$@opengridcomputing.com>
- <83387f6e-adcb-14e9-2c22-96abf9493cc6@codeaurora.org>
- <004501d3bd7b$505e70f0$f11b52d0$@opengridcomputing.com>
- <740c7d45-450e-c9b3-ceed-7bc7fcefbc5a@codeaurora.org>
- <71e37a55-537b-d75a-cfde-f188b7cfce8e@codeaurora.org>
- <1f5e3b14-05a1-08d0-c0cb-00805526448d@codeaurora.org>
- <20180317150520.GA23463@ziepe.ca>
- <ac9c34e1-0a81-a494-c7c7-ac9c3922095a@codeaurora.org>
-Message-ID: <20180319014805.GA27186@ziepe.ca>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Mon, 19 Mar 2018 01:48:17 +0000
+Subject: [PATCH -next] ASoC: mediatek: mt2701: drop unnessary
+ snd_soc_unregister_component()
+In-Reply-To: <1521185516-164333-1-git-send-email-weiyongjun1@huawei.com>
+References: <1521185516-164333-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <87lgeou9bo.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 17, 2018 at 02:30:10PM -0400, Sinan Kaya wrote:
 
-> Somebody also has to take a task and work very hard to get rid of __raw_writeX()
-> APIs in drivers/net directory. It looked like a very common practice though
-> it clearly violates multiarch portability concerns Jason and Deve highlighted.
+Hi Wei
 
-When you posted your list I thought most of the hits were in what I'd
-think of 'one-arch drivers', eg an IRQ controller or clock driver or
-something.. Some might have a reason for it (eg avoiding the swap, for
-instance), maybe it is a hold over from before writel_relaxed, or
-maybe it is just a cargo-cult behavior..
+> It's not necessary to unregister a component registered
+> with devm_snd_soc_register_component().
+> 
+> Fixes: f1b5bf07365d ("ASoC: mt2701/mt8173: replace platform to componen")
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+> index f7e0702..43837a3 100644
+> --- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+> +++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
+> @@ -1561,8 +1561,6 @@ static int mt2701_afe_pcm_dev_remove(struct platform_device *pdev)
+>  	if (!pm_runtime_status_suspended(&pdev->dev))
+>  		mt2701_afe_runtime_suspend(&pdev->dev);
+>  
+> -	snd_soc_unregister_component(&pdev->dev);
+> -
+>  	return 0;
+>  }
 
-It is the obviously multi-arch drivers that probably need some
-attention..
+I guess, below patch is using normal snd_soc_add_component() not devm_ version,
+and above unregister is for it ?
+And I think f1b5bf07365d patch is not related to youur patch
+(It is "platform" replace patch, your one is for "component" patch).
 
-Jason
+	dc2a17f4f074c434757e2cef5026d4747fe22955
+	("ASoC: mediatek: fix double free in mt2701_afe_pcm_dev_probe()")
+
+static int mt2701_afe_add_component(struct mtk_base_afe *afe)
+{
+        struct snd_soc_component *component;
+
+        component = kzalloc(sizeof(*component), GFP_KERNEL);
+        if (!component)
+                return -ENOMEM;
+
+        component->regmap = afe->regmap;
+
+        return snd_soc_add_component(afe->dev, component,
+                                     &mt2701_afe_pcm_dai_component,
+                                     mt2701_afe_pcm_dais,
+                                     ARRAY_SIZE(mt2701_afe_pcm_dais));
+}
+
+    
