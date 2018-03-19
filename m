@@ -1,92 +1,62 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Mar 2018 22:27:05 +0100
-Subject: [PATCH 2/2] arm64: allwinner: h6: temporarily drop the usage of
- CCU headers in DTSI
-In-Reply-To: <20180319081108.23496-2-icenowy@aosc.io>
-References: <20180319081108.23496-1-icenowy@aosc.io>
- <20180319081108.23496-2-icenowy@aosc.io>
-Message-ID: <20180319212705.7u5yqz4mk644aomk@flea>
+Date: Mon, 19 Mar 2018 22:27:42 +0100
+Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
+ laptop
+In-Reply-To: <20180319071723.GA854@afzalpc>
+References: <20180315162510.11669-1-harald@ccbib.org>
+ <20180315162510.11669-6-harald@ccbib.org>
+ <20180318202251.5gpv6sblfr4edxmj@flea>
+ <20180319071723.GA854@afzalpc>
+Message-ID: <20180319212742.wttebbgoh2la63o5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 04:11:08PM +0800, Icenowy Zheng wrote:
-> As the CCU driver will be merged in different tree with the device tree,
-> temporarily drop the usage of CCU headers in the DTSI file, and replace
-> macros with the corresponding numbers.
-> 
-> After they are both merged into Linus' tree, it can be switched back to
-> use the CCU headers.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 20 +++++++++-----------
->  1 file changed, 9 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> index 4debc3962830..56563150d61a 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> @@ -4,8 +4,6 @@
->   */
->  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> -#include <dt-bindings/clock/sun50i-h6-ccu.h>
-> -#include <dt-bindings/reset/sun50i-h6-ccu.h>
->  
->  / {
->  	interrupt-parent = <&gic>;
-> @@ -117,7 +115,7 @@
->  				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
->  				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
->  				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
-> -			clocks = <&ccu CLK_APB1>, <&osc24M>, <&osc32k>;
-> +			clocks = <&ccu 26>, <&osc24M>, <&osc32k>;
->  			clock-names = "apb", "hosc", "losc";
->  			gpio-controller;
->  			#gpio-cells = <3>;
-> @@ -136,8 +134,8 @@
->  			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> -			clocks = <&ccu CLK_BUS_UART0>;
-> -			resets = <&ccu RST_BUS_UART0>;
-> +			clocks = <&ccu 70>;
-> +			resets = <&ccu 21>;
->  			status = "disabled";
->  		};
->  
-> @@ -147,8 +145,8 @@
->  			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> -			clocks = <&ccu CLK_BUS_UART1>;
-> -			resets = <&ccu RST_BUS_UART1>;
-> +			clocks = <&ccu 71>;
-> +			resets = <&ccu 22>;
->  			status = "disabled";
->  		};
->  
-> @@ -158,8 +156,8 @@
->  			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> -			clocks = <&ccu CLK_BUS_UART2>;
-> -			resets = <&ccu RST_BUS_UART2>;
-> +			clocks = <&ccu 72>;
-> +			resets = <&ccu 23>;
->  			status = "disabled";
->  		};
->  
-> @@ -169,8 +167,8 @@
->  			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> -			clocks = <&ccu CLK_BUS_UART3>;
-> -			resets = <&ccu RST_BUS_UART3>;
-> +			clocks = <&ccu 73>;
-> +			resets = <&ccu 24>;
+hi,
 
-Thanks, I squashed a similar patch earlier.
+On Mon, Mar 19, 2018 at 12:47:23PM +0530, afzal mohammed wrote:
+> On Sun, Mar 18, 2018 at 09:22:51PM +0100, Maxime Ripard wrote:
+> > The first part is supposed to be the name of the boards. I did sed
+> > s/leds/teres-i/, and applied, together with all the patches but the
+> > PWM (so I had to drop the backlight node as well).
+> > 
+> > Please coordinate with Andre about who should send the PWM support.
+> 
+> Assuming that these patches were applied to your sunxi/dt64-for-4.17
+> branch, since PWM support patch is missing, there is a build error,
+> 
+> arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts:129.1-5 Label or path pwm not found
+> 
+> Diff at the end cures it.
+> 
+> (there is another H6 pine 64 DT build error related to header file
+> missing)
+> 
+> afzal
+> 
+> 
+> --->8---
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+> b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+> index b3c7ef6b6fe5..d9baab3dc96b 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-teres-i.dts
+> @@ -126,12 +126,6 @@
+>         status = "okay";
+>  };
+>  
+> -&pwm {
+> -       pinctrl-names = "default";
+> -       pinctrl-0 = <&pwm_pin>;
+> -       status = "okay";
+> -};
+> -
+>  &ohci1 {
+>         status = "okay";
+>  };
+> 
+
+Thanks for noticing and sending a patch. I've fixed the original
+commit.
 
 Maxime
 
@@ -100,4 +70,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180319/e9d36f9f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180319/ae8f8c20/attachment.sig>
