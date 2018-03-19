@@ -1,64 +1,37 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 19 Mar 2018 02:09:39 +0000
-Subject: [PATCH 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
- source
-In-Reply-To: <CAOMZO5CG6XuJ7N8W--zEwEVd9JHj887_7aNp+K8D-Xt1OnKh7A@mail.gmail.com>
-References: <1521342853-2941-1-git-send-email-Anson.Huang@nxp.com>
- <1521342853-2941-2-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5CG6XuJ7N8W--zEwEVd9JHj887_7aNp+K8D-Xt1OnKh7A@mail.gmail.com>
-Message-ID: <AM3PR04MB1315E9D8E8C4492876E6CFF3F5D40@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 19 Mar 2018 10:14:19 +0800
+Subject: [PATCH v4 10/10] ARM: sunxi: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180318200715.363f3135@dell-desktop.home>
+References: <20180223133742.26044-1-mylene.josserand@bootlin.com>
+ <20180223133742.26044-11-mylene.josserand@bootlin.com>
+ <6329fbb6-13a1-41fe-f6cf-f2f0d4b2e5f9@arm.com>
+ <20180318200715.363f3135@dell-desktop.home>
+Message-ID: <CAGb2v65QHkuM2GmT4MC+tp+HqN2ecqeZt8bB5OvZm2br1AJJ-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
+On Mon, Mar 19, 2018 at 3:07 AM, Myl?ne Josserand
+<mylene.josserand@bootlin.com> wrote:
+> Hello Mark,
+>
+> Please, excuse me for this late answer and thank you for the review!
+>
+> On Wed, 7 Mar 2018 12:18:33 +0000
+> Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+>> On 23/02/18 13:37, Myl?ne Josserand wrote:
+>> > On Cortex-A7, the CNTVOFF register from arch timer is uninitialized.
+>>
+>> Only on A7? Is that specific to your platform?
+>
+> I do not really know other Allwinner's platforms about this subject. At
+> least, the sun9i-a80 which is a Cortex-a15/a7 does not need that but it
+> is necessary for sun8i-a83t which is a cortex-a7. Maybe, Chen-Yu or
+> Maxime could help us on it.
 
-Anson Huang
-Best Regards!
+AFAIK all Allwinner CPUs need it if there isn't a firmware (PSCI) layer
+beneath the kernel that will do the setup. We just have
+"arm,cpu-registers-not-fw-configured" set for all the other SoCs that
+have in-kernel SMP support, which includes the A31, A23, A33 and A80.
 
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Sunday, March 18, 2018 9:04 PM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Russell King - ARM Linux <linux@armlinux.org.uk>; Michael Turquette
-> <mturquette@baylibre.com>; Stephen Boyd <sboyd@kernel.org>; S.j. Wang
-> <shengjiu.wang@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; moderated
-> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
-> <linux-arm-kernel@lists.infradead.org>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>; linux-clk <linux-clk@vger.kernel.org>
-> Subject: Re: [PATCH 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
-> source
-> 
-> On Sun, Mar 18, 2018 at 12:14 AM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> 
-> > diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > index 72da5ac..83f7cac 100644
-> > --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> > @@ -18,6 +18,14 @@
-> >                 reg = <0x80000000 0x80000000>;
-> >         };
-> >
-> > +       clocks {
-> > +               codec_osc: anaclk2 {
-> > +                       #clock-cells = <0>;
-> > +                       compatible = "fixed-clock";
-> > +                       clock-frequency = <24576000>;
-> > +               };
-> > +       };
-> 
-> The clocks container should be removed and the clock node could be put directly
-> into the root node.
-> 
-> Also, I do not see 'codec_osc' being used in this dts.
- 
-This clock will be used by cs42888 codec, this patch is only to add basic clock source
-to complete the clock tree. Thanks.
-
-Anson.
+ChenYu
