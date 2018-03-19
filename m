@@ -1,214 +1,53 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 19 Mar 2018 09:22:17 -0700
-Subject: [RFC PATCH 1/2] clk: add new APIs to operate on all available
- clocks
-In-Reply-To: <1516711841-25234-2-git-send-email-aisheng.dong@nxp.com>
-References: <1516711841-25234-1-git-send-email-aisheng.dong@nxp.com>
- <1516711841-25234-2-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <152147653725.242365.16805388526685631797@swboyd.mtv.corp.google.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Mon, 19 Mar 2018 17:22:35 +0100
+Subject: [PATCH] arm64: dts: armada-3720-espressobin: Document URL for
+ schematic
+In-Reply-To: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de> ("Uwe
+ =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Fri, 16 Mar 2018 11:01:24
+ +0100")
+References: <20180316100124.29972-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <87vadsxcfo.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dong Aisheng (2018-01-23 04:50:40)
-> This patch introduces of_clk_bulk_get_all and clk_bulk_x_all APIs
-> to users who just want to handle all available clocks from device tree
-> without need to know the detailed clock information likes clock numbers
-> and names. This is useful in writing some generic drivers to handle clock
-> part.
-> 
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
+Hi Uwe,
+ 
+ On ven., mars 16 2018, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+
+> The schematic of hte espressobin is publicly available, add a comment
+> where to find it.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Applied on mvebu/dt64 with the Reviewed-by from Andrew Lunn and the typo
+fixed.
+
+Thanks,
+
+Gregory
 > ---
-> A few question may need discuss:
-> 1)  This patch is written based on of_clk_bulk_get.
-> [V4,1/1] clk: bulk: add of_clk_bulk_get()
-> https://patchwork.kernel.org/patch/9971527/
-> Stepen once said we may not need it, but i guess as we already
-> have clk_bulk_get, there may be guys who want of_clk_bulk_get as
-> well if they need specify the clock count information, becaues
-> of_clk_bulk_get_all will not check the count.
-> And of_clk_bulk_get is also helpful when implementing
-> of_clk_bulk_get_all.
-
-Hmm ok. It's ok to implement it on top of of_clk_bulk_get I suppose, but
-maybe that API can be kept private until someone can prove they need it
-because they don't have a struct device pointer. Can you pick that patch
-from the list and resend in the series?
-
-> 
-> 2) It only implements the DT type clk_get_all as i see
-> Stephen said we probably may not need to implement non-dt
-> type as there're still no users.
-
-Good.
-
-> 
-> If we do want to implement non-dt type as well, we could revise
-> the patch to add it too.
-> ---
->  drivers/clk/clk-bulk.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk.h    | 61 ++++++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 124 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-> index 1c1a79d..bac2aae 100644
-> --- a/drivers/clk/clk-bulk.c
-> +++ b/drivers/clk/clk-bulk.c
-> @@ -17,9 +17,11 @@
+>  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> index bdfb5553ddb5..6d070b267abe 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> @@ -42,6 +42,9 @@
+>   *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>   *     OTHER DEALINGS IN THE SOFTWARE.
 >   */
->  
->  #include <linux/clk.h>
-> +#include <linux/clk-provider.h>
->  #include <linux/device.h>
->  #include <linux/export.h>
->  #include <linux/of.h>
-> +#include <linux/slab.h>
->  
->  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
->  int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-> @@ -50,6 +52,45 @@ int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
->         return ret;
->  }
->  EXPORT_SYMBOL(of_clk_bulk_get);
-> +
-> +struct clk_bulk __must_check *of_clk_bulk_get_all(struct device_node *np)
-> +{
-> +       struct clk_bulk *clk_bulk;
-> +       int num_clks;
-> +       int ret;
-> +
-> +       num_clks = of_clk_get_parent_count(np);
-> +       if (!num_clks)
-> +               return NULL;
-> +
-> +       clk_bulk = kzalloc(sizeof(*clk_bulk) +
-> +                          num_clks * sizeof(struct clk_bulk_data),
-> +                          GFP_KERNEL);
-> +       if (!clk_bulk)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       clk_bulk->num_clks = num_clks;
-> +       ret = of_clk_bulk_get(np, clk_bulk->num_clks, clk_bulk->clks);
-> +       if (ret) {
-> +               kfree(clk_bulk);
-> +               return ERR_PTR(ret);
-> +       }
-
-Has this been tested? clk_bulk->clks probably points to junk?
-
-> +
-> +       return clk_bulk;
-> +}
-> +EXPORT_SYMBOL(of_clk_bulk_get_all);
-> +
-> +void of_clk_bulk_put_all(struct clk_bulk *clk_bulk)
-> +{
-> +       if (IS_ERR_OR_NULL(clk_bulk))
-> +               return;
-> +
-> +       clk_bulk_put(clk_bulk->num_clks, clk_bulk->clks);
-> +
-> +       kfree(clk_bulk->clks);
-> +       kfree(clk_bulk);
-> +}
-> +EXPORT_SYMBOL(of_clk_bulk_put_all);
->  #endif
-
-My goal was to make device drivers pass in their struct device to
-clk_bulk_get_all() and then have that call into a private DT helper
-function like of_clk_bulk_get_all(). With your patch 2 that could still
-be done so let's go that direction?
-
->  
->  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
-> @@ -107,6 +148,12 @@ void clk_bulk_unprepare(int num_clks, const struct clk_bulk_data *clks)
->  }
->  EXPORT_SYMBOL_GPL(clk_bulk_unprepare);
->  
-> +void inline clk_bulk_unprepare_all(const struct clk_bulk *clk_bulk)
-> +{
-> +       clk_bulk_unprepare(clk_bulk->num_clks, clk_bulk->clks);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_bulk_unprepare_all);
-
-Do we really need these _all APIs though?
-
-> +
->  /**
->   * clk_bulk_prepare - prepare a set of clocks
->   * @num_clks: the number of clk_bulk_data
-> @@ -139,6 +186,11 @@ int __must_check clk_bulk_prepare(int num_clks,
->  }
->  EXPORT_SYMBOL_GPL(clk_bulk_prepare);
->  
-> +int inline __must_check clk_bulk_prepare_all(const struct clk_bulk *clk_bulk)
-
-inline won't help much here. Maybe these wrappers should go into the
-header file?
-
-> +{
-> +       return clk_bulk_prepare(clk_bulk->num_clks, clk_bulk->clks);
-> +}
-> +
->  #endif /* CONFIG_HAVE_CLK_PREPARE */
->  
->  /**
-> @@ -158,6 +210,12 @@ void clk_bulk_disable(int num_clks, const struct clk_bulk_data *clks)
->  }
->  EXPORT_SYMBOL_GPL(clk_bulk_disable);
->  
-> +void inline clk_bulk_disable_all(const struct clk_bulk *clk_bulk)
-
-ditto
-
-> +{
-> +       return clk_bulk_disable(clk_bulk->num_clks, clk_bulk->clks);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_bulk_disable_all);
-> +
->  /**
->   * clk_bulk_enable - ungate a set of clocks
->   * @num_clks: the number of clk_bulk_data
-> @@ -188,3 +246,9 @@ int __must_check clk_bulk_enable(int num_clks, const struct clk_bulk_data *clks)
->         return  ret;
->  }
->  EXPORT_SYMBOL_GPL(clk_bulk_enable);
-> +
-> +int inline __must_check clk_bulk_enable_all(const struct clk_bulk *clk_bulk)
-
-again
-
-> +{
-> +       return clk_bulk_enable(clk_bulk->num_clks, clk_bulk->clks);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_bulk_enable_all);
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 09ae760..ccafda1 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -92,6 +92,21 @@ struct clk_bulk_data {
->         struct clk              *clk;
->  };
->  
-> +/**
-> + * struct clk_bulk - bulk clk structure
-> + *
-> + * @num_clks: the number of avaliable clocks in this bulk
-> + * @clks: struct clk_bulk_data * to store the associated clock
-> + *
-> + * The CLK APIs provide a series of clk_bulk_x_all() API calls as
-> + * a convenience to consumers which require multiple clks.  This
-> + * structure is used to manage data for these calls.
+> +/*
+> + * Schematic available at http://espressobin.net/wp-content/uploads/2017/08/ESPRESSObin_V5_Schematics.pdf
 > + */
-> +struct clk_bulk {
-> +       int num_clks;
-> +       struct clk_bulk_data *clks;
-> +};
+>  
+>  /dts-v1/;
+>  
+> -- 
+> 2.16.2
+>
 
-This could go away, and we could return the number of clks from
-clk_bulk_get_all() as a positive number, 0 if there are none, and a
-negative number if something failed. Then we don't need the _all
-variants or a wrapper struct. It would be nice to avoid the extra
-variants just because we need to tell it the number of clks to handle.
+-- 
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
