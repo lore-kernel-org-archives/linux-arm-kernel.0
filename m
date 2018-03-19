@@ -1,40 +1,20 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Mon, 19 Mar 2018 14:47:29 -0700
-Subject: [PATCH] regulator: fix platform_no_drv_owner.cocci warnings
-In-Reply-To: <20180318203832.GA74597@lkp-hsx03.lkp.intel.com>
-References: <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
- <20180318203832.GA74597@lkp-hsx03.lkp.intel.com>
-Message-ID: <d7f7ade6-865a-00da-b4c9-6225b8822ec0@codeaurora.org>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 19 Mar 2018 15:00:51 -0700
+Subject: [PATCH 1/7] dt-bindings: add compatible string for the A64 DE2 CCU
+In-Reply-To: <20180316175354.21437-2-icenowy@aosc.io>
+References: <20180316175354.21437-1-icenowy@aosc.io>
+ <20180316175354.21437-2-icenowy@aosc.io>
+Message-ID: <152149685123.242365.3440079243287970205@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2018 01:38 PM, kbuild test robot wrote:
-> From: Fengguang Wu <fengguang.wu@intel.com>
+Quoting Icenowy Zheng (2018-03-16 10:53:48)
+> The Allwinner A64 SoC has a DE2 CCU like the one in the DE2 of Allwinner
+> H5 SoC.
 > 
-> drivers/regulator/qcom_rpmh-regulator.c:1104:3-8: 
-> No need to set .owner here. The core will do it.
+> Add a compatible string for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
 
-Thanks for pointing this out.
-
-> --- a/drivers/regulator/qcom_rpmh-regulator.c
-> +++ b/drivers/regulator/qcom_rpmh-regulator.c
-> @@ -1101,7 +1101,6 @@ static struct platform_driver rpmh_regul
->  	.driver		= {
->  		.name		= "qcom-rpmh-regulator",
->  		.of_match_table	= rpmh_regulator_match_table,
-> -		.owner		= THIS_MODULE,
->  	},
->  	.probe		= rpmh_regulator_probe,
->  	.remove		= rpmh_regulator_remove,
-
-I'll make this modification in [1] if I end up sending out a second
-version of the patch.
-
-Take care,
-David
-
-[1]: https://lkml.org/lkml/2018/3/16/1430
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Stephen Boyd <sboyd@kernel.org>
