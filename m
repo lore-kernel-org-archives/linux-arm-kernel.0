@@ -1,69 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 19 Mar 2018 23:31:24 +0800
-Subject: [PATCH v5 00/23] crypto: arm64 - play nice with CONFIG_PREEMPT
-In-Reply-To: <20180316155735.GJ7095@gondor.apana.org.au>
-References: <20180310152208.10369-1-ard.biesheuvel@linaro.org>
- <20180316155735.GJ7095@gondor.apana.org.au>
-Message-ID: <CAKv+Gu8jCa7dAoXHan+3zwBt2pZjD22MaCSwiAM-bXHgvVJkmQ@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 19 Mar 2018 16:33:10 +0100
+Subject: [PATCH v2 0/4] ARM: davinci: remove the mach-specific aemif driver -
+ part 1
+Message-ID: <20180319153314.26120-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 March 2018 at 23:57, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Sat, Mar 10, 2018 at 03:21:45PM +0000, Ard Biesheuvel wrote:
->> As reported by Sebastian, the way the arm64 NEON crypto code currently
->> keeps kernel mode NEON enabled across calls into skcipher_walk_xxx() is
->> causing problems with RT builds, given that the skcipher walk API may
->> allocate and free temporary buffers it uses to present the input and
->> output arrays to the crypto algorithm in blocksize sized chunks (where
->> blocksize is the natural blocksize of the crypto algorithm), and doing
->> so with NEON enabled means we're alloc/free'ing memory with preemption
->> disabled.
->>
->> This was deliberate: when this code was introduced, each kernel_neon_begin()
->> and kernel_neon_end() call incurred a fixed penalty of storing resp.
->> loading the contents of all NEON registers to/from memory, and so doing
->> it less often had an obvious performance benefit. However, in the mean time,
->> we have refactored the core kernel mode NEON code, and now kernel_neon_begin()
->> only incurs this penalty the first time it is called after entering the kernel,
->> and the NEON register restore is deferred until returning to userland. This
->> means pulling those calls into the loops that iterate over the input/output
->> of the crypto algorithm is not a big deal anymore (although there are some
->> places in the code where we relied on the NEON registers retaining their
->> values between calls)
->>
->> So let's clean this up for arm64: update the NEON based skcipher drivers to
->> no longer keep the NEON enabled when calling into the skcipher walk API.
->>
->> As pointed out by Peter, this only solves part of the problem. So let's
->> tackle it more thoroughly, and update the algorithms to test the NEED_RESCHED
->> flag each time after processing a fixed chunk of input.
->>
->> Given that this issue was flagged by the RT people, I would appreciate it
->> if they could confirm whether they are happy with this approach.
->>
->> Changes since v4:
->> - rebase onto v4.16-rc3
->> - apply the same treatment to new SHA512, SHA-3 and SM3 code that landed
->>   in v4.16-rc1
->
-> Looks good to me.  If more work is needed we can always do
-> incremental fixes.
->
-> Patches 1-22 applied.  Thanks.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Thanks Herbert.
+This is the first part of changes required to remove duplicate aemif
+support from mach-davinci.
 
-Apologies if this wasn't clear, but there are some cross dependencies
-with the arm64 tree, which receives non-trivial modifications in
-patches 10 and 11, which are subsequently depended upon by patches 12
-- 23.
+I actually noticed that one of my previous changes from 2017 broke nand
+in legacy mode - the clock lookup no longer works. This series addresses
+it as well.
 
-Without acks from them, we should really not be merging this code yet,
-especially because I noticed a rebase issue in patch #10 (my bad).
+First patch just uses a static string for the ti-aemif driver name.
 
-Would you mind reverting 10 - 22? I will revisit this asap, and try to
-get acks for the arm64 patches. If that means waiting for the next
-cycle, so be it.
+The second adds support for board files to the aemif driver.
 
-Thanks,
-Ard.
+Last two add nand support to da850-lcdk in legacy mode and make
+da850-evm use the platform driver instead of the mach-specific one.
+
+If these patches get accepted, I'll prepere a follow-up moving all
+other boards to the new platform driver.
+
+This series applies on top of v8 of David Lechner's CCF series.
+
+v1 -> v2:
+- drop the first two patches, which are no longer needed with David's
+  psc driver
+
+Bartosz Golaszewski (4):
+  memory: aemif: don't rely on kbuild for driver's name
+  memory: aemif: add support for board files
+  ARM: davinci: add aemif & nand support to da850-lcdk in legacy mode
+  ARM: davinci: use aemif platform driver in legacy mode for da850-evm
+
+ arch/arm/mach-davinci/board-da850-evm.c     |  93 +++++++++++---------
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++++++++++
+ drivers/memory/ti-aemif.c                   |  59 ++++++++-----
+ include/linux/platform_data/ti-aemif.h      |   9 ++
+ 4 files changed, 230 insertions(+), 63 deletions(-)
+
+-- 
+2.16.1
