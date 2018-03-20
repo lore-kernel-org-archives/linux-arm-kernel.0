@@ -1,69 +1,48 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Mar 2018 00:02:04 +0100
-Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
+Date: Wed, 21 Mar 2018 00:02:06 +0100
+Subject: [PATCH 5/5] ARM: add support for building ARM kernel with clang
 In-Reply-To: <20180320230206.25289-1-stefan@agner.ch>
 References: <20180320230206.25289-1-stefan@agner.ch>
-Message-ID: <20180320230206.25289-4-stefan@agner.ch>
+Message-ID: <20180320230206.25289-6-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As documented in GCC naked functions should only use Basic asm
-syntax. The Extended asm or mixture of Basic asm and "C" code is
-not guaranteed. Currently this works because it was hard coded
-to follow and check GCC behavior for arguments and register
-placement.
+Use cc-options call for compiler options which are not available
+in clang. With this patch an ARMv7 multi platform kernel can be
+successfully build using clang (tested with version 5.0.1).
 
-Furthermore with clang using parameters in Extended asm in a
-naked function is not supported:
-  arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
-          references not allowed in naked functions
-                : "r" (type), "r" (arg1), "r" (arg2)
-                       ^
-
-Use a regular function to be more portable. This aligns also with
-the other smc call implementations e.g. in qcom_scm-32.c and
-bcm_kona_smc.c.
-
-Additionally also make sure all callee-saved registers get saved
-as it has been done before.
-
+Based-on-patches-by: Behan Webster <behanw@converseincode.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/firmware/trusted_foundations.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/Makefile                 | 2 +-
+ arch/arm/boot/compressed/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-index 3fb1b5a1dce9..426d732e6591 100644
---- a/arch/arm/firmware/trusted_foundations.c
-+++ b/arch/arm/firmware/trusted_foundations.c
-@@ -31,21 +31,23 @@
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e9e3fde3c657..20e9fee1ccc5 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -39,7 +39,7 @@ KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
+ endif
  
- static unsigned long cpu_boot_addr;
+ ifeq ($(CONFIG_FRAME_POINTER),y)
+-KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
++KBUILD_CFLAGS	+=-fno-omit-frame-pointer $(call cc-option,-mapcs,) $(call cc-option,-mno-sched-prolog,)
+ endif
  
--static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
-+static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
- {
-+	register u32 r0 asm("r0") = type;
-+	register u32 r1 asm("r1") = arg1;
-+	register u32 r2 asm("r2") = arg2;
-+
- 	asm volatile(
- 		".arch_extension	sec\n\t"
--		"stmfd	sp!, {r4 - r11, lr}\n\t"
- 		__asmeq("%0", "r0")
- 		__asmeq("%1", "r1")
- 		__asmeq("%2", "r2")
- 		"mov	r3, #0\n\t"
- 		"mov	r4, #0\n\t"
- 		"smc	#0\n\t"
--		"ldmfd	sp!, {r4 - r11, pc}"
- 		:
--		: "r" (type), "r" (arg1), "r" (arg2)
--		: "memory");
-+		: "r" (r0), "r" (r1), "r" (r2)
-+		: "memory", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10");
- }
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 45a6b9b7af2a..6a5c4ac97703 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -113,7 +113,7 @@ CFLAGS_fdt_ro.o := $(nossp_flags)
+ CFLAGS_fdt_rw.o := $(nossp_flags)
+ CFLAGS_fdt_wip.o := $(nossp_flags)
  
- static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+-ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
++ccflags-y := -fpic $(call cc-option,-mno-single-pic-base,) -fno-builtin -I$(obj)
+ asflags-y := -DZIMAGE
+ 
+ # Supply kernel BSS size to the decompressor via a linker symbol.
 -- 
 2.16.2
