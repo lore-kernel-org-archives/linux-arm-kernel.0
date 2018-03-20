@@ -1,145 +1,49 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 20 Mar 2018 09:28:56 +0530
-Subject: [PATCH v3 13/13] ARM: dts: ipq8074: Enable few peripherals for hk01
- board
-In-Reply-To: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
-References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521518336-5467-14-git-send-email-sricharan@codeaurora.org>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 20 Mar 2018 10:08:40 +0800
+Subject: [PATCH V2] ARM: dts: imx7d-pinfunc: update sai select input value
+Message-ID: <1521511720-17598-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 103 ++++++++++++++++++++++++++++++
- 1 file changed, 103 insertions(+)
+From: Shengjiu Wang <shengjiu.wang@nxp.com>
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-index 6a838b5..8efc8f9e 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-+++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-@@ -21,6 +21,7 @@
- 
- 	aliases {
- 		serial0 = &blsp1_uart5;
-+		serial1 = &serial_blsp2;
- 	};
- 
- 	chosen {
-@@ -41,6 +42,47 @@
- 					bias-disable;
- 				};
- 			};
-+
-+			 i2c_0_pins: i2c_0_pinmux {
-+				  mux {
-+					   pins = "gpio42", "gpio43";
-+					   function = "blsp1_i2c";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 spi_0_pins: spi_0_pins {
-+				  mux {
-+					   pins = "gpio38", "gpio39", "gpio40", "gpio41";
-+					   function = "blsp0_spi";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 hsuart_pins: hsuart_pins {
-+				  mux {
-+					   pins = "gpio46", "gpio47", "gpio48", "gpio49";
-+					   function = "blsp2_uart";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 qpic_pins: qpic_pins {
-+				mux {
-+					   pins = "gpio1", "gpio3", "gpio4",
-+						  "gpio5", "gpio6", "gpio7",
-+						  "gpio8", "gpio10", "gpio11",
-+						  "gpio12", "gpio13", "gpio14",
-+						  "gpio15", "gpio16", "gpio17";
-+					   function = "qpic";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			};
-+
- 		};
- 
- 		serial at 78b3000 {
-@@ -48,5 +90,66 @@
- 			pinctrl-names = "default";
- 			status = "ok";
- 		};
-+
-+		spi at 78b5000 {
-+			 pinctrl-0 = <&spi_0_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+
-+			 m25p80 at 0 {
-+				  #address-cells = <1>;
-+				  #size-cells = <1>;
-+				  compatible = "n25q128a11", "jedec,spi-nor";
-+				  reg = <0>;
-+				  spi-max-frequency = <50000000>;
-+			 };
-+		};
-+
-+		serial at 78b1000 {
-+			 pinctrl-0 = <&hsuart_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+		};
-+
-+		i2c_0 at 78b6000 {
-+			 pinctrl-0 = <&i2c_0_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+		};
-+
-+		dma at 7984000 {
-+			 status = "ok";
-+		};
-+
-+		nand at 79b0000 {
-+			pinctrl-0 = <&qpic_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+
-+			nand at 0 {
-+				reg = <0>;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+				nand-bus-width = <8>;
-+			};
-+		};
-+
-+		phy at 86000 {
-+			status = "ok";
-+		};
-+
-+		phy at 8e000 {
-+			status = "ok";
-+		};
-+
-+		pci at 20000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 58 0x1>;
-+		};
-+
-+		pci at 10000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 61 0x1>;
-+		};
- 	};
- };
+Update SAI select input daisy chain value according to
+Reference Manual.
+
+Signed-off-by: Shengjiu Wang <shengjiu.wang@nxp.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx7d-pinfunc.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx7d-pinfunc.h b/arch/arm/boot/dts/imx7d-pinfunc.h
+index f2493bc..aa9dbea 100644
+--- a/arch/arm/boot/dts/imx7d-pinfunc.h
++++ b/arch/arm/boot/dts/imx7d-pinfunc.h
+@@ -592,7 +592,7 @@
+ #define MX7D_PAD_UART2_RX_DATA__UART2_DCE_RX                      0x0130 0x03A0 0x06FC 0x0 0x2
+ #define MX7D_PAD_UART2_RX_DATA__UART2_DTE_TX                      0x0130 0x03A0 0x0000 0x0 0x0
+ #define MX7D_PAD_UART2_RX_DATA__I2C2_SCL                          0x0130 0x03A0 0x05DC 0x1 0x0
+-#define MX7D_PAD_UART2_RX_DATA__SAI3_RX_BCLK                      0x0130 0x03A0 0x0000 0x2 0x0
++#define MX7D_PAD_UART2_RX_DATA__SAI3_RX_BCLK                      0x0130 0x03A0 0x06C4 0x2 0x0
+ #define MX7D_PAD_UART2_RX_DATA__ECSPI1_SS3                        0x0130 0x03A0 0x0000 0x3 0x0
+ #define MX7D_PAD_UART2_RX_DATA__ENET2_1588_EVENT1_IN              0x0130 0x03A0 0x0000 0x4 0x0
+ #define MX7D_PAD_UART2_RX_DATA__GPIO4_IO2                         0x0130 0x03A0 0x0000 0x5 0x0
+@@ -1112,13 +1112,13 @@
+ #define MX7D_PAD_ENET1_RGMII_TD3__GPIO7_IO9                       0x0250 0x04C0 0x0000 0x5 0x0
+ #define MX7D_PAD_ENET1_RGMII_TD3__CAAM_RNG_OSC_OBS                0x0250 0x04C0 0x0000 0x7 0x0
+ #define MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL           0x0254 0x04C4 0x0000 0x0 0x0
+-#define MX7D_PAD_ENET1_RGMII_TX_CTL__SAI1_RX_SYNC                 0x0254 0x04C4 0x0000 0x2 0x0
++#define MX7D_PAD_ENET1_RGMII_TX_CTL__SAI1_RX_SYNC                 0x0254 0x04C4 0x06A4 0x2 0x1
+ #define MX7D_PAD_ENET1_RGMII_TX_CTL__GPT2_COMPARE1                0x0254 0x04C4 0x0000 0x3 0x0
+ #define MX7D_PAD_ENET1_RGMII_TX_CTL__EPDC_PWR_CTRL2               0x0254 0x04C4 0x0000 0x4 0x0
+ #define MX7D_PAD_ENET1_RGMII_TX_CTL__GPIO7_IO10                   0x0254 0x04C4 0x0000 0x5 0x0
+ #define MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC                 0x0258 0x04C8 0x0000 0x0 0x0
+ #define MX7D_PAD_ENET1_RGMII_TXC__ENET1_TX_ER                     0x0258 0x04C8 0x0000 0x1 0x0
+-#define MX7D_PAD_ENET1_RGMII_TXC__SAI1_RX_BCLK                    0x0258 0x04C8 0x0000 0x2 0x0
++#define MX7D_PAD_ENET1_RGMII_TXC__SAI1_RX_BCLK                    0x0258 0x04C8 0x069C 0x2 0x1
+ #define MX7D_PAD_ENET1_RGMII_TXC__GPT2_COMPARE2                   0x0258 0x04C8 0x0000 0x3 0x0
+ #define MX7D_PAD_ENET1_RGMII_TXC__EPDC_PWR_CTRL3                  0x0258 0x04C8 0x0000 0x4 0x0
+ #define MX7D_PAD_ENET1_RGMII_TXC__GPIO7_IO11                      0x0258 0x04C8 0x0000 0x5 0x0
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.7.4
