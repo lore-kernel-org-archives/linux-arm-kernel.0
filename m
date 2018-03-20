@@ -1,36 +1,49 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 20 Mar 2018 14:07:48 +0800
-Subject: [PATCH v2 0/5] update Mediatek MT2712 clock and scpsys support
-In-Reply-To: <20180312070342.4335-1-weiyi.lu@mediatek.com>
-References: <20180312070342.4335-1-weiyi.lu@mediatek.com>
-Message-ID: <1521526068.13313.8.camel@mtksdaap41>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 20 Mar 2018 14:38:52 +0800
+Subject: [PATCH v4 3/6] clk: mediatek: add audsys support for MT2701
+In-Reply-To: <152149148431.242365.4625152577833480987@swboyd.mtv.corp.google.com>
+References: <cover.1520327262.git.ryder.lee@mediatek.com>
+ <f1445b95864af04f1f90d3be96d0a485d1bb4560.1520327262.git.ryder.lee@mediatek.com>
+ <152149148431.242365.4625152577833480987@swboyd.mtv.corp.google.com>
+Message-ID: <1521527932.21199.4.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-03-12 at 15:03 +0800, Weiyi Lu wrote:
-> This series is based on v4.16-rc1 and composed of scpsys control (PATCH 1-2) and clock control (PATCH 3-5).
-> Basically, all changes are for the ECO design change of MT2712.
+On Mon, 2018-03-19 at 13:31 -0700, Stephen Boyd wrote:
+> Quoting Ryder Lee (2018-03-06 01:09:28)
+> > +
+> > +static const struct of_device_id of_match_clk_mt2701_aud[] = {
+> > +       { .compatible = "mediatek,mt2701-audsys", },
+> > +       {}
+> > +};
+> > +
+> > +static int clk_mt2701_aud_probe(struct platform_device *pdev)
+> > +{
+> > +       struct clk_onecell_data *clk_data;
+> > +       struct device_node *node = pdev->dev.of_node;
+> > +       int r;
+> > +
+> > +       clk_data = mtk_alloc_clk_data(CLK_AUD_NR);
+> > +
+> > +       mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
+> > +                              clk_data);
+> > +
+> > +       r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> > +       if (r) {
+> > +               dev_err(&pdev->dev,
+> > +                       "could not register clock provider: %s: %d\n",
+> > +                       pdev->name, r);
+> > +
+> > +               return r;
+> > +       }
 > 
-> changes since v1:
-> - Avoid renumbering clocks. Append new clocks at the bottom of each own subsystem.
+> This fails to remove the clk provider when devm_of_platform_populate()
+> returns an error.
 > 
-Hi Matthias & Stephen,
+> > +
+> > +       return devm_of_platform_populate(&pdev->dev);
+> > +}
 
-Sorry to bother. Just saw patch 1/2 are already pushed to v4.16-next-soc
-and patch 3/5 are applied onto clk-next. What about the patch 4(arm64:
-dts: add clock device nodes of MT2712). Does there any problem remain or
-it cause some problems? Many thanks.
-> Weiyi Lu (5):
->   dt-bindings: soc: update MT2712 power dt-bindings
->   soc: mediatek: update power domain data of MT2712
->   dt-bindings: clock: add clocks for MT2712
->   arm64: dts: add clock device nodes of MT2712
->   clk: mediatek: update clock driver of MT2712
-> 
->  arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 28 +++++++++++++
->  drivers/clk/mediatek/clk-mt2712.c         | 69 ++++++++++++++++++++++++-------
->  drivers/soc/mediatek/mtk-scpsys.c         | 42 ++++++++++++++++++-
->  include/dt-bindings/clock/mt2712-clk.h    | 12 +++++-
->  include/dt-bindings/power/mt2712-power.h  |  3 ++
->  5 files changed, 136 insertions(+), 18 deletions(-)
-> 
+I've sent a new one to fix it.
+
+Thanks
