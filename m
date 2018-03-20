@@ -1,48 +1,71 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Tue, 20 Mar 2018 13:19:59 +0000
-Subject: [PATCH -next] phy: phy-mtk-tphy: fix missing clk_disable_unprepare()
- on error in mtk_phy_init()
-Message-ID: <1521551999-154546-1-git-send-email-weiyongjun1@huawei.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Tue, 20 Mar 2018 14:18:59 +0100
+Subject: [PATCH -next] phy: stm32: fix usbphyc static checker and checkpatch
+ warnings
+Message-ID: <1521551939-29922-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the missing clk_disable_unprepare() before return
-from mtk_phy_init() in the error handling case.
+This patch fixes the following issues:
+* warning reported by checkpatch:
+WARNING: line over 80 characters
+#87: FILE: drivers/phy/st/phy-stm32-usbphyc.c:87:
++static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+* bug reported by static checker (Dan Carpenter):
+drivers/phy/st/phy-stm32-usbphyc.c:371 stm32_usbphyc_probe()
+error: uninitialized symbol 'i'.
+
+* unused stm32_usbphyc structure member: bool pll_enabled.
+
+* unnecessary extra line in stm32_usbphyc_of_xlate
+
+Fixes: 94c358da3a05 "phy: stm32: add support for STM32 USB PHY Controller (USBPHYC)"
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- drivers/phy/mediatek/phy-mtk-tphy.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/phy/st/phy-stm32-usbphyc.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-index 38c281b..3ff9020 100644
---- a/drivers/phy/mediatek/phy-mtk-tphy.c
-+++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-@@ -841,7 +841,7 @@ static int mtk_phy_init(struct phy *phy)
- 	ret = clk_prepare_enable(instance->ref_clk);
- 	if (ret) {
- 		dev_err(tphy->dev, "failed to enable ref_clk\n");
--		return ret;
-+		goto disable_u3phya_ref;
- 	}
+diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
+index bc4e78a..1255cd1 100644
+--- a/drivers/phy/st/phy-stm32-usbphyc.c
++++ b/drivers/phy/st/phy-stm32-usbphyc.c
+@@ -71,7 +71,6 @@ struct stm32_usbphyc {
+ 	struct stm32_usbphyc_phy **phys;
+ 	int nphys;
+ 	int switch_setup;
+-	bool pll_enabled;
+ };
  
- 	switch (instance->type) {
-@@ -859,10 +859,17 @@ static int mtk_phy_init(struct phy *phy)
- 		break;
- 	default:
- 		dev_err(tphy->dev, "incompatible PHY type\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto disable_ref_clk;
- 	}
- 
- 	return 0;
-+
-+disable_ref_clk:
-+	clk_disable_unprepare(instance->ref_clk);
-+disable_u3phya_ref:
-+	clk_disable_unprepare(tphy->u3phya_ref);
-+	return ret;
+ static inline void stm32_usbphyc_set_bits(void __iomem *reg, u32 bits)
+@@ -84,7 +83,8 @@ static inline void stm32_usbphyc_clr_bits(void __iomem *reg, u32 bits)
+ 	writel_relaxed(readl_relaxed(reg) & ~bits, reg);
  }
  
- static int mtk_phy_power_on(struct phy *phy)
+-static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
++static void stm32_usbphyc_get_pll_params(u32 clk_rate,
++					 struct pll_params *pll_params)
+ {
+ 	unsigned long long fvco, ndiv, frac;
+ 
+@@ -271,7 +271,6 @@ static struct phy *stm32_usbphyc_of_xlate(struct device *dev,
+ 	struct stm32_usbphyc *usbphyc = dev_get_drvdata(dev);
+ 	struct stm32_usbphyc_phy *usbphyc_phy = NULL;
+ 	struct device_node *phynode = args->np;
+-
+ 	int port = 0;
+ 
+ 	for (port = 0; port < usbphyc->nphys; port++) {
+@@ -367,8 +366,8 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
+ 		if (IS_ERR(phy)) {
+ 			ret = PTR_ERR(phy);
+ 			if (ret != -EPROBE_DEFER)
+-				dev_err(dev,
+-					"failed to create phy%d: %d\n", i, ret);
++				dev_err(dev, "failed to create phy%d: %d\n",
++					port, ret);
+ 			goto put_child;
+ 		}
+ 
+-- 
+2.7.4
