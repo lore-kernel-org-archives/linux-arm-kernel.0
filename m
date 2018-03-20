@@ -1,41 +1,42 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:47:44 -0400
-Subject: [PATCH v4 2/6] IB/mlx4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
-References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521514068-8856-3-git-send-email-okaya@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Mar 2018 04:07:45 +0100
+Subject: [PATCH] ARM: dts: Set DNS-313 LEDs to use better triggers
+Message-ID: <20180320030745.9958-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier on
-some architectures like arm64.
+We just used one LED for "disk activity" but using the green
+LED for disk read and the red LED for disk write gives a way
+better user experience.
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
-
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/infiniband/hw/mlx4/qp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The necessary changes to the LED trigger has been merged to the
+LEDs subsystem.
+---
+ arch/arm/boot/dts/gemini-dlink-dns-313.dts | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/infiniband/hw/mlx4/qp.c b/drivers/infiniband/hw/mlx4/qp.c
-index f045491..74b27b0 100644
---- a/drivers/infiniband/hw/mlx4/qp.c
-+++ b/drivers/infiniband/hw/mlx4/qp.c
-@@ -3880,8 +3880,8 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
- 		 */
- 		wmb();
+diff --git a/arch/arm/boot/dts/gemini-dlink-dns-313.dts b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
+index da8bb9d60f99..5fb3ea8bf300 100644
+--- a/arch/arm/boot/dts/gemini-dlink-dns-313.dts
++++ b/arch/arm/boot/dts/gemini-dlink-dns-313.dts
+@@ -59,14 +59,13 @@
+ 			label = "dns313:green:disk";
+ 			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+ 			default-state = "off";
+-			linux,default-trigger = "ide-disk";
+-			/* Ideally should activate while reading */
++			linux,default-trigger = "disk-read";
+ 		};
+ 		led-disk-red {
+ 			label = "dns313:red:disk";
+ 			gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+ 			default-state = "off";
+-			/* Ideally should activate while writing */
++			linux,default-trigger = "disk-write";
+ 		};
+ 	};
  
--		writel(qp->doorbell_qpn,
--		       to_mdev(ibqp->device)->uar_map + MLX4_SEND_DOORBELL);
-+		writel_relaxed(qp->doorbell_qpn,
-+			to_mdev(ibqp->device)->uar_map + MLX4_SEND_DOORBELL);
- 
- 		/*
- 		 * Make sure doorbells don't leak out of SQ spinlock
 -- 
-2.7.4
+2.14.3
