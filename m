@@ -1,53 +1,144 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 20 Mar 2018 18:37:48 +0000
-Subject: [GIT PULL] firmware: ARM SCMI fixes for v4.17
-Message-ID: <20180320183747.GB16362@e107155-lin>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Tue, 20 Mar 2018 20:42:23 +0200
+Subject: [PATCH v3 01/10] soc: qcom: Separate kryo l2 accessors from PMU
+ driver
+In-Reply-To: <152148150406.242365.14021083340615345047@swboyd.mtv.corp.google.com>
+References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
+ <1518616792-29028-2-git-send-email-ilialin@codeaurora.org>
+ <152148150406.242365.14021083340615345047@swboyd.mtv.corp.google.com>
+Message-ID: <016d01d3c07b$34fa84e0$9eef8ea0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC Team,
 
-I have based this on the earlier/first SCMI pull request I sent for
-v4.17. Couple of build/static checker warnings were reported and also
-received a comment from clock maintainer to use new devm_* API. This
-PR contains patches addressing those.
 
-Please pull !
+> -----Original Message-----
+> From: Stephen Boyd <sboyd@kernel.org>
+> Sent: Monday, March 19, 2018 19:45
+> To: Ilia Lin <ilialin@codeaurora.org>; linux-arm-kernel at lists.infradead.org;
+> linux-arm-msm at vger.kernel.org; linux-clk at vger.kernel.org;
+> sboyd at codeaurora.org
+> Cc: mark.rutland at arm.com; devicetree at vger.kernel.org;
+> rnayak at codeaurora.org; robh at kernel.org; will.deacon at arm.com;
+> amit.kucheria at linaro.org; tfinkel at codeaurora.org; ilialin at codeaurora.org;
+> nicolas.dechesne at linaro.org; celster at codeaurora.org
+> Subject: Re: [PATCH v3 01/10] soc: qcom: Separate kryo l2 accessors from
+> PMU driver
+> 
+> Quoting Ilia Lin (2018-02-14 05:59:43)
+> > diff --git a/arch/arm64/Kconfig.platforms
+> > b/arch/arm64/Kconfig.platforms index fbedbd8..78a103b 100644
+> > --- a/arch/arm64/Kconfig.platforms
+> > +++ b/arch/arm64/Kconfig.platforms
+> > @@ -145,6 +145,13 @@ config ARCH_REALTEK
+> >           This enables support for the ARMv8 based Realtek chipsets,
+> >           like the RTD1295.
+> >
+> > +config ARCH_MSM8996
+> > +    bool "Enable Support for Qualcomm Technologies, Inc. MSM8996"
+> > +       depends on ARCH_QCOM
+> 
+> Is this really the proposed approach? Doesn't the PMU code use these
+> accessors? I would think the accessors are compiled if ARCH_QCOM=y so
+> that the PMU stuff keeps working. Drop this Kconfig addition?
 
-Regards,
-Sudeep
+I'll check whether the kryo-accessors code is SOC specific or not.
 
---
+> 
+> > +       help
+> > +       This enables support for the MSM8996 chipset. If you do not
+> > +       wish to build a kernel that runs on this chipset, say 'N' here.
+> > +
+> >  config ARCH_ROCKCHIP
+> >         bool "Rockchip Platforms"
+> >         select ARCH_HAS_RESET_CONTROLLER diff --git
+> > a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c index
+> > 4fdc848..8cece9e 100644
+> > --- a/drivers/perf/qcom_l2_pmu.c
+> > +++ b/drivers/perf/qcom_l2_pmu.c
+> > @@ -1,4 +1,4 @@
+> > -/* Copyright (c) 2015-2017 The Linux Foundation. All rights reserved.
+> > +/* Copyright (c) 2015-2018 The Linux Foundation. All rights reserved.
+> 
+> Sorry, this makes little sense. First off, code is only being deleted and more
+> than half the file isn't being modified so why update copyright dates?
 
-The following changes since commit 02f208c5c60549039445402505dea284e15f0f4f:
+Agree. Will roll back.
 
-  cpufreq: scmi: add support for fast frequency switching (2018-02-28 16:37:57 +0000)
+> 
+> >   *
+> >   * This program is free software; you can redistribute it and/or modify
+> >   * it under the terms of the GNU General Public License version 2 and
+> > diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+> > index dcebf28..4e91e2a 100644
+> > --- a/drivers/soc/qcom/Makefile
+> > +++ b/drivers/soc/qcom/Makefile
+> > @@ -12,3 +12,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) +=
+> smem_state.o
+> >  obj-$(CONFIG_QCOM_SMP2P)       += smp2p.o
+> >  obj-$(CONFIG_QCOM_SMSM)        += smsm.o
+> >  obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
+> > +obj-$(CONFIG_ARCH_MSM8996) +=  kryo-l2-accessors.o
+> > diff --git a/drivers/soc/qcom/kryo-l2-accessors.c
+> > b/drivers/soc/qcom/kryo-l2-accessors.c
+> > new file mode 100644
+> > index 0000000..6743848
+> > --- /dev/null
+> > +++ b/drivers/soc/qcom/kryo-l2-accessors.c
+> > @@ -0,0 +1,64 @@
+> > +/*
+> > + * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > +modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> 
+> SPDX tags?
 
-are available in the git repository at:
+Will do.
 
-  ssh://git at gitolite.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-fixes-4.17
+> 
+> > diff --git a/include/soc/qcom/kryo-l2-accessors.h
+> > b/include/soc/qcom/kryo-l2-accessors.h
+> > new file mode 100644
+> > index 0000000..e9a5eab
+> > --- /dev/null
+> > +++ b/include/soc/qcom/kryo-l2-accessors.h
+> > @@ -0,0 +1,22 @@
+> > +/*
+> > + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > +modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#ifndef __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
+> > +#define __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
+> 
+> Maybe change this tO __SOC_ARCH_QCOM_KRYO_L2_ACCESSORS_H
 
-for you to fetch changes up to 7f9badfceffc6d2ae331050f1cd155a633130437:
+No problem. Will change.
 
-  clk: scmi: use devm_of_clk_add_hw_provider() API and drop scmi_clocks_remove (2018-03-20 16:23:26 +0000)
+> 
+> > +
+> > +#ifdef CONFIG_ARCH_QCOM
+> > +void set_l2_indirect_reg(u64 reg_addr, u64 val);
+> > +u64 get_l2_indirect_reg(u64 reg_addr); #endif
+> 
+> This ifdef isn't doing much. Drop it? Or provide the inline nop alternatives.
 
-----------------------------------------------------------------
-ARM SCMI fixes/cleanups for v4.17
-
-Couple of fixes for build warning due to uninitialised variable
-and static checker warning for passing NULL pointer to PTR_ERR.
-It also contains cleanup suggested by Stephen Boyd in SCMI clock
-driver using the new devm_of_clk_add_hw_provider() API.
-
-----------------------------------------------------------------
-Anders Roxell (1):
-      firmware: arm_scmi: prevent accessing rate_discrete uninitialized
-
-Sudeep Holla (2):
-      hwmon: (scmi) return -EINVAL when sensor information is unavailable
-      clk: scmi: use devm_of_clk_add_hw_provider() API and drop scmi_clocks_remove
-
- drivers/clk/clk-scmi.c            | 12 ++----------
- drivers/firmware/arm_scmi/clock.c |  5 +++--
- drivers/hwmon/scmi-hwmon.c        |  2 +-
- 3 files changed, 6 insertions(+), 13 deletions(-)
+Right. I'll drop it.
