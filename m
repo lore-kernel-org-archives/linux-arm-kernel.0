@@ -1,40 +1,49 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Mar 2018 00:02:01 +0100
-Subject: [PATCH 0/5] ARM: clang support
-Message-ID: <20180320230206.25289-1-stefan@agner.ch>
+Date: Wed, 21 Mar 2018 00:02:02 +0100
+Subject: [PATCH 1/5] bus: arm-cci: use asm unreachable
+In-Reply-To: <20180320230206.25289-1-stefan@agner.ch>
+References: <20180320230206.25289-1-stefan@agner.ch>
+Message-ID: <20180320230206.25289-2-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes some remaining issues when building the ARM
-architecture using LLVM/clang.  The patchset requires the following
-kbuild change:
-https://lkml.org/lkml/2018/3/19/1756
+Mixing asm and C code is not recommended in a naked function by
+gcc and leads to an error when using clang:
+  drivers/bus/arm-cci.c:2107:2: error: non-ASM statement in naked
+  function is not supported
+        unreachable();
+        ^
 
-With that patch and this patchset applied and I can successfully
-build the multi_v7_defconfig with 4.16-rc5 using clang 5.0.1.
+Instead of using the unreachable() macro use the assember variant
+ASM_UNREACHABLE.  This will no longer emit __builtin_unreachable(),
+but since the function is naked and its return type is void it seems
+not to have aversive effects.
 
-So far I mainly tested with ARMv7 architectures. A brief test with
-ARMv6 enabled (multi platform configuraiton) failed with an error
-from the assembler:
-/tmp/empty-96a4d6.s: Assembler messages:
-/tmp/empty-96a4d6.s:4: Error: unknown cpu `arm1176j-s'
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/bus/arm-cci.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-It seems that clang emits a non-existig cpu name:
-https://reviews.llvm.org/D18086
-
-Stefan Agner (5):
-  bus: arm-cci: use asm unreachable
-  efi/libstub/arm: add support for building with clang
-  ARM: trusted_foundations: do not use naked function
-  ARM: drop no-thumb-interwork in EABI mode
-  ARM: add support for building ARM kernel with clang
-
- arch/arm/Makefile                       |  4 ++--
- arch/arm/boot/compressed/Makefile       |  2 +-
- arch/arm/firmware/trusted_foundations.c | 12 +++++++-----
- drivers/bus/arm-cci.c                   |  3 +--
- drivers/firmware/efi/libstub/Makefile   |  3 ++-
- 5 files changed, 13 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 5426c04fe24b..ee9da86fec47 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -2084,6 +2084,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+ 
+ "	mov	r0, #0 \n"
+ "	bx	lr \n"
++	ASM_UNREACHABLE
+ 
+ "	.align	2 \n"
+ "5:	.word	cpu_port - . \n"
+@@ -2103,8 +2104,6 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+ 	[sizeof_struct_cpu_port] "i" (sizeof(struct cpu_port)),
+ 	[sizeof_struct_ace_port] "i" (sizeof(struct cci_ace_port)),
+ 	[offsetof_port_phys] "i" (offsetof(struct cci_ace_port, phys)) );
+-
+-	unreachable();
+ }
+ 
+ /**
 -- 
 2.16.2
