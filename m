@@ -1,16 +1,13 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:50:03 -0400
-Subject: [PATCH v4 3/7] scsi: dpt_i2o: eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
-References: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521514207-10695-4-git-send-email-okaya@codeaurora.org>
+Date: Mon, 19 Mar 2018 22:50:00 -0400
+Subject: [PATCH v4 0/7] scsi: Eliminate duplicate barriers on weakly-ordered
+ archs
+Message-ID: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes barrier() followed by writel(). writel() already has a
-barrier
-on some architectures like arm64.
+Code includes wmb() followed by writel() in multiple places. writel()
+already has a barrier on some architectures like arm64.
 
 This ends up CPU observing two barriers back to back before executing the
 register write.
@@ -18,41 +15,52 @@ register write.
 Since code already has an explicit barrier call, changing writel() to
 writel_relaxed().
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/scsi/dpt_i2o.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+I did a regex search for wmb() followed by writel() in each drivers
+directory.
+I scrubbed the ones I care about in this series.
 
-diff --git a/drivers/scsi/dpt_i2o.c b/drivers/scsi/dpt_i2o.c
-index fd172b0..3c1e64a 100644
---- a/drivers/scsi/dpt_i2o.c
-+++ b/drivers/scsi/dpt_i2o.c
-@@ -1300,7 +1300,7 @@ static s32 adpt_i2o_post_this(adpt_hba* pHba, u32* data, int len)
- 	wmb();
- 
- 	//post message
--	writel(m, pHba->post_port);
-+	writel_relaxed(m, pHba->post_port);
- 	wmb();
- 
- 	return 0;
-@@ -1390,7 +1390,7 @@ static s32 adpt_i2o_reset_hba(adpt_hba* pHba)
- 
- 	memcpy_toio(pHba->msg_addr_virt+m, msg, sizeof(msg));
- 	wmb();
--	writel(m, pHba->post_port);
-+	writel_relaxed(m, pHba->post_port);
- 	wmb();
- 
- 	while(*status == 0){
-@@ -2797,7 +2797,7 @@ static s32 adpt_send_nop(adpt_hba*pHba,u32 m)
- 	writel( 0,&msg[2]);
- 	wmb();
- 
--	writel(m, pHba->post_port);
-+	writel_relaxed(m, pHba->post_port);
- 	wmb();
- 	return 0;
- }
+I considered "ease of change", "popular usage" and "performance critical
+path" as the determining criteria for my filtering.
+
+We used relaxed API heavily on ARM for a long time but
+it did not exist on other architectures. For this reason, relaxed
+architectures have been paying double penalty in order to use the common
+drivers.
+
+Now that relaxed API is present on all architectures, we can go and scrub
+all drivers to see what needs to change and what can remain.
+
+We start with mostly used ones and hope to increase the coverage over time.
+It will take a while to cover all drivers.
+
+Feel free to apply patches individually.
+
+Changes since v3:
+- https://www.spinics.net/lists/arm-kernel/msg641851.html
+- group patches together into subsystems scsi:...
+- collect reviewed and tested bys
+- scrub barrier()
+
+Sinan Kaya (7):
+  scsi: hpsa: Eliminate duplicate barriers on weakly-ordered archs
+  scsi: megaraid: eliminate duplicate barriers on weakly-ordered archs
+  scsi: dpt_i2o: eliminate duplicate barriers on weakly-ordered archs
+  scsi: lpfc: Eliminate duplicate barriers on weakly-ordered archs
+  scsi: ipr: Eliminate duplicate barriers on weakly-ordered archs
+  scsi: bnx2i: Eliminate duplicate barriers on weakly-ordered archs
+  scsi: csiostor: Eliminate duplicate barriers on weakly-ordered archs
+
+ drivers/scsi/bnx2i/bnx2i_hwi.c              | 2 +-
+ drivers/scsi/csiostor/csio_hw.h             | 4 ++++
+ drivers/scsi/csiostor/csio_wr.c             | 2 +-
+ drivers/scsi/dpt_i2o.c                      | 6 +++---
+ drivers/scsi/hpsa.h                         | 2 +-
+ drivers/scsi/ipr.c                          | 7 ++++---
+ drivers/scsi/lpfc/lpfc_sli.c                | 4 ++--
+ drivers/scsi/megaraid/megaraid_mbox.c       | 8 ++++----
+ drivers/scsi/megaraid/megaraid_mbox.h       | 2 ++
+ drivers/scsi/megaraid/megaraid_sas_fusion.c | 4 ++--
+ 10 files changed, 24 insertions(+), 17 deletions(-)
+
 -- 
 2.7.4
