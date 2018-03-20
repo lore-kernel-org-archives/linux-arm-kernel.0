@@ -1,69 +1,162 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:42:29 -0400
-Subject: [PATCH v4 14/17] net: qlge: Eliminate duplicate barriers on
+Date: Mon, 19 Mar 2018 22:42:26 -0400
+Subject: [PATCH v4 11/17] bnx2x: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
 References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521513753-7325-15-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521513753-7325-12-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier on
-some architectures like arm64.
+Code includes wmb() followed by writel(). writel() already has a
+barrier on some architectures like arm64.
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
+This ends up CPU observing two barriers back to back before executing
+the register write.
 
-Create a new wrapper function with relaxed write operator. Use the new
-wrapper when a write is following a wmb().
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/qlogic/qlge/qlge.h      | 18 ++++++++++++++++++
- drivers/net/ethernet/qlogic/qlge/qlge_main.c |  2 +-
- 2 files changed, 19 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x.h       |  9 ++++++++-
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h   |  4 ++--
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c  | 21 +++++++++++----------
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c |  2 +-
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c  |  2 +-
+ 5 files changed, 23 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/net/ethernet/qlogic/qlge/qlge.h b/drivers/net/ethernet/qlogic/qlge/qlge.h
-index 84ac50f..1465986 100644
---- a/drivers/net/ethernet/qlogic/qlge/qlge.h
-+++ b/drivers/net/ethernet/qlogic/qlge/qlge.h
-@@ -2185,6 +2185,24 @@ static inline void ql_write_db_reg(u32 val, void __iomem *addr)
- }
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h
+index 352beff..ac38db9 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h
+@@ -166,6 +166,12 @@ do {						\
+ #define REG_RD8(bp, offset)		readb(REG_ADDR(bp, offset))
+ #define REG_RD16(bp, offset)		readw(REG_ADDR(bp, offset))
  
- /*
-+ * Doorbell Registers:
-+ * Doorbell registers are virtual registers in the PCI memory space.
-+ * The space is allocated by the chip during PCI initialization.  The
-+ * device driver finds the doorbell address in BAR 3 in PCI config space.
-+ * The registers are used to control outbound and inbound queues. For
-+ * example, the producer index for an outbound queue.  Each queue uses
-+ * 1 4k chunk of memory.  The lower half of the space is for outbound
-+ * queues. The upper half is for inbound queues.
-+ * Caller has to guarantee ordering.
-+ */
-+static inline void ql_write_db_reg_relaxed(u32 val, void __iomem *addr)
-+{
-+	writel_relaxed(val, addr);
-+	mmiowb();
-+}
++#define REG_WR_RELAXED(bp, offset, val)	writel_relaxed((u32)val,\
++						       REG_ADDR(bp, offset))
 +
++#define REG_WR16_RELAXED(bp, offset, val) \
++	writew_relaxed((u16)val, REG_ADDR(bp, offset))
 +
-+/*
-  * Shadow Registers:
-  * Outbound queues have a consumer index that is maintained by the chip.
-  * Inbound queues have a producer index that is maintained by the chip.
-diff --git a/drivers/net/ethernet/qlogic/qlge/qlge_main.c b/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-index 50038d9..c222b7c 100644
---- a/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-+++ b/drivers/net/ethernet/qlogic/qlge/qlge_main.c
-@@ -2700,7 +2700,7 @@ static netdev_tx_t qlge_send(struct sk_buff *skb, struct net_device *ndev)
- 		tx_ring->prod_idx = 0;
+ #define REG_WR(bp, offset, val)		writel((u32)val, REG_ADDR(bp, offset))
+ #define REG_WR8(bp, offset, val)	writeb((u8)val, REG_ADDR(bp, offset))
+ #define REG_WR16(bp, offset, val)	writew((u16)val, REG_ADDR(bp, offset))
+@@ -760,7 +766,8 @@ struct bnx2x_fastpath {
+ #endif
+ #define DOORBELL(bp, cid, val) \
+ 	do { \
+-		writel((u32)(val), bp->doorbells + (bp->db_size * (cid))); \
++		writel_relaxed((u32)(val),\
++				bp->doorbells + (bp->db_size * (cid))); \
+ 	} while (0)
+ 
+ /* TX CSUM helpers */
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
+index a5265e1..a8ce5c5 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
+@@ -522,8 +522,8 @@ static inline void bnx2x_update_rx_prod(struct bnx2x *bp,
  	wmb();
  
--	ql_write_db_reg(tx_ring->prod_idx, tx_ring->prod_idx_db_reg);
-+	ql_write_db_reg_relaxed(tx_ring->prod_idx, tx_ring->prod_idx_db_reg);
- 	netif_printk(qdev, tx_queued, KERN_DEBUG, qdev->ndev,
- 		     "tx queued, slot %d, len %d\n",
- 		     tx_ring->prod_idx, skb->len);
+ 	for (i = 0; i < sizeof(rx_prods)/4; i++)
+-		REG_WR(bp, fp->ustorm_rx_prods_offset + i*4,
+-		       ((u32 *)&rx_prods)[i]);
++		REG_WR_RELAXED(bp, fp->ustorm_rx_prods_offset + i * 4,
++			       ((u32 *)&rx_prods)[i]);
+ 
+ 	mmiowb(); /* keep prod updates ordered */
+ 
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
+index 74fc9af..2dea1b6 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
+@@ -1608,8 +1608,8 @@ static void bnx2x_hc_int_enable(struct bnx2x *bp)
+ 		} else
+ 			val = 0xffff;
+ 
+-		REG_WR(bp, HC_REG_TRAILING_EDGE_0 + port*8, val);
+-		REG_WR(bp, HC_REG_LEADING_EDGE_0 + port*8, val);
++		REG_WR_RELAXED(bp, HC_REG_TRAILING_EDGE_0 + port * 8, val);
++		REG_WR_RELAXED(bp, HC_REG_LEADING_EDGE_0 + port * 8, val);
+ 	}
+ 
+ 	/* Make sure that interrupts are indeed enabled from here on */
+@@ -1672,8 +1672,8 @@ static void bnx2x_igu_int_enable(struct bnx2x *bp)
+ 	} else
+ 		val = 0xffff;
+ 
+-	REG_WR(bp, IGU_REG_TRAILING_EDGE_LATCH, val);
+-	REG_WR(bp, IGU_REG_LEADING_EDGE_LATCH, val);
++	REG_WR_RELAXED(bp, IGU_REG_TRAILING_EDGE_LATCH, val);
++	REG_WR_RELAXED(bp, IGU_REG_LEADING_EDGE_LATCH, val);
+ 
+ 	/* Make sure that interrupts are indeed enabled from here on */
+ 	mmiowb();
+@@ -3817,8 +3817,8 @@ static void bnx2x_sp_prod_update(struct bnx2x *bp)
+ 	 */
+ 	mb();
+ 
+-	REG_WR16(bp, BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func),
+-		 bp->spq_prod_idx);
++	REG_WR16_RELAXED(bp, BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func),
++			 bp->spq_prod_idx);
+ 	mmiowb();
+ }
+ 
+@@ -7761,7 +7761,7 @@ void bnx2x_igu_clear_sb_gen(struct bnx2x *bp, u8 func, u8 idu_sb_id, bool is_pf)
+ 	barrier();
+ 	DP(NETIF_MSG_HW, "write 0x%08x to IGU(via GRC) addr 0x%x\n",
+ 			  ctl, igu_addr_ctl);
+-	REG_WR(bp, igu_addr_ctl, ctl);
++	REG_WR_RELAXED(bp, igu_addr_ctl, ctl);
+ 	mmiowb();
+ 	barrier();
+ 
+@@ -9720,13 +9720,14 @@ static void bnx2x_process_kill_chip_reset(struct bnx2x *bp, bool global)
+ 	barrier();
+ 	mmiowb();
+ 
+-	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
+-	       reset_mask2 & (~stay_reset2));
++	REG_WR_RELAXED(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
++		       reset_mask2 & (~stay_reset2));
+ 
+ 	barrier();
+ 	mmiowb();
+ 
+-	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, reset_mask1);
++	REG_WR_RELAXED(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET,
++		       reset_mask1);
+ 	mmiowb();
+ }
+ 
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+index ffa7959..40e55d8 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+@@ -105,7 +105,7 @@ static void bnx2x_vf_igu_ack_sb(struct bnx2x *bp, struct bnx2x_virtf *vf,
+ 
+ 	DP(NETIF_MSG_HW, "write 0x%08x to IGU(via GRC) addr 0x%x\n",
+ 	   ctl, igu_addr_ctl);
+-	REG_WR(bp, igu_addr_ctl, ctl);
++	REG_WR_RELAXED(bp, igu_addr_ctl, ctl);
+ 	mmiowb();
+ 	barrier();
+ }
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c
+index 76a4668..3b2f1bd 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c
+@@ -170,7 +170,7 @@ static int bnx2x_send_msg2pf(struct bnx2x *bp, u8 *done, dma_addr_t msg_mapping)
+ 	wmb();
+ 
+ 	/* Trigger the PF FW */
+-	writeb(1, &zone_data->trigger.vf_pf_channel.addr_valid);
++	writeb_relaxed(1, &zone_data->trigger.vf_pf_channel.addr_valid);
+ 
+ 	/* Wait for PF to complete */
+ 	while ((tout >= 0) && (!*done)) {
 -- 
 2.7.4
