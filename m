@@ -1,207 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Mar 2018 09:56:27 +0000
-Subject: Failed to boot ARM64 boards for recent linux-next
-In-Reply-To: <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
-References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
- <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
- <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
-Message-ID: <2dfe4f47-8163-d7a4-c9cc-d60b9f0e71a8@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Mar 2018 10:04:38 +0000
+Subject: [PATCH v2 2/3] arm64: fpsimd: Fix bad si_code for undiagnosed
+ SIGFPE
+In-Reply-To: <87vadxyrdt.fsf@xmission.com>
+References: <1519926248-12591-1-git-send-email-Dave.Martin@arm.com>
+ <1519926248-12591-3-git-send-email-Dave.Martin@arm.com>
+ <20180308171153.GD14918@arm.com> <87o9jymbsj.fsf@xmission.com>
+ <20180309131017.GB20370@arm.com>
+ <20180309142557.GT32331@e103592.cambridge.arm.com>
+ <87vadxyrdt.fsf@xmission.com>
+Message-ID: <20180320100437.GB24986@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/18 09:32, Shawn Lin wrote:
-> Hi Marc,
+On Thu, Mar 15, 2018 at 04:13:02PM -0500, Eric W. Biederman wrote:
+> Dave Martin <Dave.Martin@arm.com> writes:
 > 
-> On 2018/3/20 17:01, Marc Zyngier wrote:
->> Hi Shawn,
->>
->> On 20/03/18 08:48, Shawn Lin wrote:
->>> Hi Marc,
->>>
->>>       I was able to boot my RK3399 board with in linux-next-20180314,
->>> but not today. My bisect robot shows me it was introduced by
->>>
->>> commit d6062a6d62c643a06c393745d032da3e6441d4bd
->>> Author: Marc Zyngier <marc.zyngier@arm.com>
->>> Date:   Fri Mar 9 14:53:19 2018 +0000
->>>
->>>       irqchip/gic-v3: Reset APgRn registers at boot time
->>>
->>>       Booting a crash kernel while in an interrupt handler is likely
->>>       to leave the Active Priority Registers with some state that
->>>       is not relevant to the new kernel, and is likely to lead
->>>       to erratic behaviours such as interrupts not firing as their
->>>       priority is already active.
->>>
->>>       As a sanity measure, wipe the APRs clean on startup. We make
->>>       sure to wipe both group 0 and 1 registers in order to avoid
->>>       any surprise.
->>>
->>>
->>> The panic log is here:
->>> https://paste.ubuntu.com/p/7WrJJDG6JQ/
->>>
->>> Is it a known issue or is there a coming patch for that?
->>
->>   Interesting. No, that wasn't the intention, but I may have missed a key
->> detail (group 0 access traps to EL3 if SCR_EL3.FIQ==1). Can you have a
->> go at the following hack, just to narrow it down:
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index 5bb7bb22f1c1..f8ff43b1d4f8 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -570,16 +570,12 @@ static void gic_cpu_sys_reg_init(void)
->>   	switch(val + 1) {
->>   	case 8:
->>   	case 7:
->> -		write_gicreg(0, ICC_AP0R3_EL1);
->>   		write_gicreg(0, ICC_AP1R3_EL1);
->> -		write_gicreg(0, ICC_AP0R2_EL1);
->>   		write_gicreg(0, ICC_AP1R2_EL1);
->>   	case 6:
->> -		write_gicreg(0, ICC_AP0R1_EL1);
->>   		write_gicreg(0, ICC_AP1R1_EL1);
->>   	case 5:
->>   	case 4:
->> -		write_gicreg(0, ICC_AP0R0_EL1);
->>   		write_gicreg(0, ICC_AP1R0_EL1);
->>   	}
->>
->> Let me know if that helps.
->>
+> > On Fri, Mar 09, 2018 at 01:10:18PM +0000, Will Deacon wrote:
+> >> Hi Eric,
+> >> 
+> >> On Thu, Mar 08, 2018 at 04:40:12PM -0600, Eric W. Biederman wrote:
+> >> > Will Deacon <will.deacon@arm.com> writes:
+> >> > > Happy to take this patch once the dependency on FPE_FLTUNK in core code is
+> >> > > resolved.
+> >> > 
+> >> > Would it help for me to take the FPE_FLTUNK patch into my siginfo-next
+> >> > branch?   So that there is a common branch with the code so we don't
+> >> > need to worry about conflicts.  If so I will look at that on Monday.
+> >> 
+> >> Yes please, that would be helpful actually. I can then pull that into
+> >> arm64 if you give me a stable branch or tag. Alternatively, I can define
+> >> FPE_FLTUNK locally and remove it at -rc1.
+> >
+> > OK Eric, let me know if you need me to rebase anything for the first 2
+> > patches.
 > 
-> It works for me. Thanks!
-OK. Would you mind testing a much more complete patch?
+> The first patch is now in my siginfo-next tree and avialable at:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/ebiederm/user-namespace.git siginfo-next
+> HEAD: 266da65e9156d93e1126e185259a4aae68188d0e signal: Add FPE_FLTUNK si_code for undiagnosable fp exceptions
+> 
+> I will not rebase this branch, so please fee free to merge it into other
+> trees.
 
->From 192786590930c205461ea0a379d295a2d0375fc1 Mon Sep 17 00:00:00 2001
-From: Marc Zyngier <marc.zyngier@arm.com>
-Date: Tue, 20 Mar 2018 09:46:42 +0000
-Subject: [PATCH] irqchip/gic-v3: Check availability of Group0 before resetting
- AP0Rn
+Thanks, Eric. I've pulled this into the arm64 for-next/core branch and I'll
+push it out later on.
 
-We now try to reset the Active Priority Registers at boot time,
-without checking  if we actually have access to them. Bad move.
-If the secure side has set SCR_EL3.FIQ=1, we'll trap to EL3, and
-the firmware may not be please to get such an exception.
-
-Instead, let's use PMR to find out if its value gets affected by
-SCR_EL3.FIQ being set. Only if a readback from PMR shows the same
-value (or a higher priority) will we be able to write to AP0Rn.
-
-Fixes: d6062a6d62c6 ("irqchip/gic-v3: Reset APgRn registers at boot time")
-Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/arch_gicv3.h   |  6 +-----
- arch/arm64/include/asm/arch_gicv3.h |  5 -----
- drivers/irqchip/irq-gic-v3.c        | 25 ++++++++++++++++++++-----
- 3 files changed, 21 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index 27288bdbd840..0bd530702118 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -137,6 +137,7 @@ static inline u64 read_ ## a64(void)		\
- 	return val; 				\
- }
- 
-+CPUIF_MAP(ICC_PMR, ICC_PMR_EL1)
- CPUIF_MAP(ICC_AP0R0, ICC_AP0R0_EL1)
- CPUIF_MAP(ICC_AP0R1, ICC_AP0R1_EL1)
- CPUIF_MAP(ICC_AP0R2, ICC_AP0R2_EL1)
-@@ -206,11 +207,6 @@ static inline u32 gic_read_iar(void)
- 	return irqstat;
- }
- 
--static inline void gic_write_pmr(u32 val)
--{
--	write_sysreg(val, ICC_PMR);
--}
--
- static inline void gic_write_ctlr(u32 val)
- {
- 	write_sysreg(val, ICC_CTLR);
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 9becba9ab392..e278f94df0c9 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -76,11 +76,6 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
- 	return irqstat;
- }
- 
--static inline void gic_write_pmr(u32 val)
--{
--	write_sysreg_s(val, SYS_ICC_PMR_EL1);
--}
--
- static inline void gic_write_ctlr(u32 val)
- {
- 	write_sysreg_s(val, SYS_ICC_CTLR_EL1);
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 5bb7bb22f1c1..a3f7624f5b00 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -532,6 +532,7 @@ static void gic_cpu_sys_reg_init(void)
- 	int i, cpu = smp_processor_id();
- 	u64 mpidr = cpu_logical_map(cpu);
- 	u64 need_rss = MPIDR_RS(mpidr);
-+	bool group0;
- 	u32 val;
- 
- 	/*
-@@ -545,7 +546,11 @@ static void gic_cpu_sys_reg_init(void)
- 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
- 
- 	/* Set priority mask register */
--	gic_write_pmr(DEFAULT_PMR_VALUE);
-+	write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
-+
-+	/* Is Group0 available to us? */
-+	val = read_gicreg(ICC_PMR_EL1);
-+	group0 = (val <= DEFAULT_PMR_VALUE);
- 
- 	/*
- 	 * Some firmwares hand over to the kernel with the BPR changed from
-@@ -567,19 +572,29 @@ static void gic_cpu_sys_reg_init(void)
- 	val &= ICC_CTLR_EL1_PRI_BITS_MASK;
- 	val >>= ICC_CTLR_EL1_PRI_BITS_SHIFT;
- 
-+	if (group0) {
-+		switch(val + 1) {
-+		case 8:
-+		case 7:
-+			write_gicreg(0, ICC_AP0R3_EL1);
-+			write_gicreg(0, ICC_AP0R2_EL1);
-+		case 6:
-+			write_gicreg(0, ICC_AP0R1_EL1);
-+		case 5:
-+		case 4:
-+			write_gicreg(0, ICC_AP0R0_EL1);
-+		}
-+	}
-+
- 	switch(val + 1) {
- 	case 8:
- 	case 7:
--		write_gicreg(0, ICC_AP0R3_EL1);
- 		write_gicreg(0, ICC_AP1R3_EL1);
--		write_gicreg(0, ICC_AP0R2_EL1);
- 		write_gicreg(0, ICC_AP1R2_EL1);
- 	case 6:
--		write_gicreg(0, ICC_AP0R1_EL1);
- 		write_gicreg(0, ICC_AP1R1_EL1);
- 	case 5:
- 	case 4:
--		write_gicreg(0, ICC_AP0R0_EL1);
- 		write_gicreg(0, ICC_AP1R0_EL1);
- 	}
- 
--- 
-2.14.2
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
