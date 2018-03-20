@@ -1,20 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Mar 2018 01:58:11 +0100
-Subject: [PATCH] net: gemini: fix memory leak
-In-Reply-To: <1521441651-19753-1-git-send-email-igor.pylypiv@gmail.com>
-References: <1521441651-19753-1-git-send-email-igor.pylypiv@gmail.com>
-Message-ID: <CACRpkdak+-JrOy24iYvZNf0za6roVUsGUgVq4b28q5YPNy27tQ@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 19 Mar 2018 17:59:51 -0700
+Subject: [PATCH v5 01/12] dt-bindings: clock: Add Actions S900 clock
+ bindings
+In-Reply-To: <20180317100952.28538-2-manivannan.sadhasivam@linaro.org>
+References: <20180317100952.28538-1-manivannan.sadhasivam@linaro.org>
+ <20180317100952.28538-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <152150759188.254778.1766919298343763795@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 7:40 AM, Igor Pylypiv <igor.pylypiv@gmail.com> wrote:
+Quoting Manivannan Sadhasivam (2018-03-17 03:09:41)
+> Add Actions Semi S900 clock bindings.
+> 
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
-> cppcheck report:
-> [drivers/net/ethernet/cortina/gemini.c:543]: (error) Memory leak: skb_tab
->
-> Signed-off-by: Igor Pylypiv <igor.pylypiv@gmail.com>
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Applied to clk-next
