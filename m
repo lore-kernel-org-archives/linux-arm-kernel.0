@@ -1,242 +1,255 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 20 Mar 2018 11:16:52 +0800
-Subject: [PATCH 2/2] clk: mediatek: add audsys support for MT2701
-In-Reply-To: <004f07aef08148321c320ea09f8169982f73dd2b.1521514928.git.ryder.lee@mediatek.com>
-References: <004f07aef08148321c320ea09f8169982f73dd2b.1521514928.git.ryder.lee@mediatek.com>
-Message-ID: <75e15960cb001e5fc04c1d5157848e5c524bf963.1521514928.git.ryder.lee@mediatek.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 20 Mar 2018 03:21:17 +0000
+Subject: [RFC PATCH 1/2] clk: add new APIs to operate on all available
+ clocks
+In-Reply-To: <152147653725.242365.16805388526685631797@swboyd.mtv.corp.google.com>
+References: <1516711841-25234-1-git-send-email-aisheng.dong@nxp.com>
+ <1516711841-25234-2-git-send-email-aisheng.dong@nxp.com>
+ <152147653725.242365.16805388526685631797@swboyd.mtv.corp.google.com>
+Message-ID: <AM3PR04MB306226CE9E4AD6F1F2383F180AB0@AM3PR04MB306.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock driver support for MT2701 audsys.
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at kernel.org]
+> Sent: Tuesday, March 20, 2018 12:22 AM
+> To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; dl-
+> linux-imx <linux-imx@nxp.com>; aisheng.dong at codeaurora.org; linux-
+> fbdev at vger.kernel.org; yamada.masahiro at socionext.com;
+> sboyd at codeaurora.org; hdegoede at redhat.com;
+> b.zolnierkie at samsung.com; A.s. Dong <aisheng.dong@nxp.com>
+> Subject: Re: [RFC PATCH 1/2] clk: add new APIs to operate on all available
+> clocks
+> 
+> Quoting Dong Aisheng (2018-01-23 04:50:40)
+> > This patch introduces of_clk_bulk_get_all and clk_bulk_x_all APIs to
+> > users who just want to handle all available clocks from device tree
+> > without need to know the detailed clock information likes clock
+> > numbers and names. This is useful in writing some generic drivers to
+> > handle clock part.
+> >
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> >
+> > ---
+> > A few question may need discuss:
+> > 1)  This patch is written based on of_clk_bulk_get.
+> > [V4,1/1] clk: bulk: add of_clk_bulk_get()
+> >
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpat
+> >
+> chwork.kernel.org%2Fpatch%2F9971527%2F&data=02%7C01%7Caisheng.don
+> g%40n
+> >
+> xp.com%7C449209dd3e19491afb9908d58db5966d%7C686ea1d3bc2b4c6fa92c
+> d99c5c
+> >
+> 301635%7C0%7C0%7C636570733411754127&sdata=4m5emXOR%2Bui3Mqw
+> MbAJQDQxJcE
+> > %2BxLcB51hEi2q3V2O8%3D&reserved=0 Stepen once said we may not
+> need it,
+> > but i guess as we already have clk_bulk_get, there may be guys who
+> > want of_clk_bulk_get as well if they need specify the clock count
+> > information, becaues of_clk_bulk_get_all will not check the count.
+> > And of_clk_bulk_get is also helpful when implementing
+> > of_clk_bulk_get_all.
+> 
+> Hmm ok. It's ok to implement it on top of of_clk_bulk_get I suppose, but
+> maybe that API can be kept private until someone can prove they need it
+> because they don't have a struct device pointer. Can you pick that patch from
+> the list and resend in the series?
+> 
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/clk/mediatek/Kconfig          |   6 ++
- drivers/clk/mediatek/Makefile         |   1 +
- drivers/clk/mediatek/clk-mt2701-aud.c | 186 ++++++++++++++++++++++++++++++++++
- 3 files changed, 193 insertions(+)
- create mode 100644 drivers/clk/mediatek/clk-mt2701-aud.c
+Of course. I will do that.
 
-diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-index 1f9ea0f..92afe59 100644
---- a/drivers/clk/mediatek/Kconfig
-+++ b/drivers/clk/mediatek/Kconfig
-@@ -54,6 +54,12 @@ config COMMON_CLK_MT2701_BDPSYS
- 	---help---
- 	  This driver supports MediaTek MT2701 bdpsys clocks.
- 
-+config COMMON_CLK_MT2701_AUDSYS
-+	bool "Clock driver for Mediatek MT2701 audsys"
-+	depends on COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 audsys clocks.
-+
- config COMMON_CLK_MT2712
- 	bool "Clock driver for MediaTek MT2712"
- 	depends on (ARCH_MEDIATEK && ARM64) || COMPILE_TEST
-diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-index 5160fdc..b80eff2 100644
---- a/drivers/clk/mediatek/Makefile
-+++ b/drivers/clk/mediatek/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_COMMON_CLK_MT6797_MMSYS) += clk-mt6797-mm.o
- obj-$(CONFIG_COMMON_CLK_MT6797_VDECSYS) += clk-mt6797-vdec.o
- obj-$(CONFIG_COMMON_CLK_MT6797_VENCSYS) += clk-mt6797-venc.o
- obj-$(CONFIG_COMMON_CLK_MT2701) += clk-mt2701.o
-+obj-$(CONFIG_COMMON_CLK_MT2701_AUDSYS) += clk-mt2701-aud.o
- obj-$(CONFIG_COMMON_CLK_MT2701_BDPSYS) += clk-mt2701-bdp.o
- obj-$(CONFIG_COMMON_CLK_MT2701_ETHSYS) += clk-mt2701-eth.o
- obj-$(CONFIG_COMMON_CLK_MT2701_HIFSYS) += clk-mt2701-hif.o
-diff --git a/drivers/clk/mediatek/clk-mt2701-aud.c b/drivers/clk/mediatek/clk-mt2701-aud.c
-new file mode 100644
-index 0000000..e66896a
---- /dev/null
-+++ b/drivers/clk/mediatek/clk-mt2701-aud.c
-@@ -0,0 +1,186 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Ryder Lee <ryder.lee@mediatek.com>
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+
-+#include "clk-mtk.h"
-+#include "clk-gate.h"
-+
-+#include <dt-bindings/clock/mt2701-clk.h>
-+
-+#define GATE_AUDIO0(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio0_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+#define GATE_AUDIO1(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio1_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+#define GATE_AUDIO2(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio2_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+#define GATE_AUDIO3(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &audio3_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_no_setclr,	\
-+	}
-+
-+static const struct mtk_gate_regs audio0_cg_regs = {
-+	.set_ofs = 0x0,
-+	.clr_ofs = 0x0,
-+	.sta_ofs = 0x0,
-+};
-+
-+static const struct mtk_gate_regs audio1_cg_regs = {
-+	.set_ofs = 0x10,
-+	.clr_ofs = 0x10,
-+	.sta_ofs = 0x10,
-+};
-+
-+static const struct mtk_gate_regs audio2_cg_regs = {
-+	.set_ofs = 0x14,
-+	.clr_ofs = 0x14,
-+	.sta_ofs = 0x14,
-+};
-+
-+static const struct mtk_gate_regs audio3_cg_regs = {
-+	.set_ofs = 0x634,
-+	.clr_ofs = 0x634,
-+	.sta_ofs = 0x634,
-+};
-+
-+static const struct mtk_gate audio_clks[] = {
-+	/* AUDIO0 */
-+	GATE_AUDIO0(CLK_AUD_AFE, "audio_afe", "aud_intbus_sel", 2),
-+	GATE_AUDIO0(CLK_AUD_HDMI, "audio_hdmi", "audpll_sel", 20),
-+	GATE_AUDIO0(CLK_AUD_SPDF, "audio_spdf", "audpll_sel", 21),
-+	GATE_AUDIO0(CLK_AUD_SPDF2, "audio_spdf2", "audpll_sel", 22),
-+	GATE_AUDIO0(CLK_AUD_APLL, "audio_apll", "audpll_sel", 23),
-+	/* AUDIO1 */
-+	GATE_AUDIO1(CLK_AUD_I2SIN1, "audio_i2sin1", "aud_mux1_sel", 0),
-+	GATE_AUDIO1(CLK_AUD_I2SIN2, "audio_i2sin2", "aud_mux1_sel", 1),
-+	GATE_AUDIO1(CLK_AUD_I2SIN3, "audio_i2sin3", "aud_mux1_sel", 2),
-+	GATE_AUDIO1(CLK_AUD_I2SIN4, "audio_i2sin4", "aud_mux1_sel", 3),
-+	GATE_AUDIO1(CLK_AUD_I2SIN5, "audio_i2sin5", "aud_mux1_sel", 4),
-+	GATE_AUDIO1(CLK_AUD_I2SIN6, "audio_i2sin6", "aud_mux1_sel", 5),
-+	GATE_AUDIO1(CLK_AUD_I2SO1, "audio_i2so1", "aud_mux1_sel", 6),
-+	GATE_AUDIO1(CLK_AUD_I2SO2, "audio_i2so2", "aud_mux1_sel", 7),
-+	GATE_AUDIO1(CLK_AUD_I2SO3, "audio_i2so3", "aud_mux1_sel", 8),
-+	GATE_AUDIO1(CLK_AUD_I2SO4, "audio_i2so4", "aud_mux1_sel", 9),
-+	GATE_AUDIO1(CLK_AUD_I2SO5, "audio_i2so5", "aud_mux1_sel", 10),
-+	GATE_AUDIO1(CLK_AUD_I2SO6, "audio_i2so6", "aud_mux1_sel", 11),
-+	GATE_AUDIO1(CLK_AUD_ASRCI1, "audio_asrci1", "asm_h_sel", 12),
-+	GATE_AUDIO1(CLK_AUD_ASRCI2, "audio_asrci2", "asm_h_sel", 13),
-+	GATE_AUDIO1(CLK_AUD_ASRCO1, "audio_asrco1", "asm_h_sel", 14),
-+	GATE_AUDIO1(CLK_AUD_ASRCO2, "audio_asrco2", "asm_h_sel", 15),
-+	GATE_AUDIO1(CLK_AUD_INTDIR, "audio_intdir", "intdir_sel", 20),
-+	GATE_AUDIO1(CLK_AUD_A1SYS, "audio_a1sys", "aud_mux1_sel", 21),
-+	GATE_AUDIO1(CLK_AUD_A2SYS, "audio_a2sys", "aud_mux2_sel", 22),
-+	GATE_AUDIO1(CLK_AUD_AFE_CONN, "audio_afe_conn", "aud_mux1_sel", 23),
-+	GATE_AUDIO1(CLK_AUD_AFE_MRGIF, "audio_afe_mrgif", "aud_mux1_sel", 25),
-+	/* AUDIO2 */
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL1, "audio_ul1", "aud_mux1_sel", 0),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL2, "audio_ul2", "aud_mux1_sel", 1),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL3, "audio_ul3", "aud_mux1_sel", 2),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL4, "audio_ul4", "aud_mux1_sel", 3),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL5, "audio_ul5", "aud_mux1_sel", 4),
-+	GATE_AUDIO2(CLK_AUD_MMIF_UL6, "audio_ul6", "aud_mux1_sel", 5),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL1, "audio_dl1", "aud_mux1_sel", 6),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL2, "audio_dl2", "aud_mux1_sel", 7),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL3, "audio_dl3", "aud_mux1_sel", 8),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL4, "audio_dl4", "aud_mux1_sel", 9),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL5, "audio_dl5", "aud_mux1_sel", 10),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DL6, "audio_dl6", "aud_mux1_sel", 11),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DLMCH, "audio_dlmch", "aud_mux1_sel", 12),
-+	GATE_AUDIO2(CLK_AUD_MMIF_ARB1, "audio_arb1", "aud_mux1_sel", 13),
-+	GATE_AUDIO2(CLK_AUD_MMIF_AWB1, "audio_awb", "aud_mux1_sel", 14),
-+	GATE_AUDIO2(CLK_AUD_MMIF_AWB2, "audio_awb2", "aud_mux1_sel", 15),
-+	GATE_AUDIO2(CLK_AUD_MMIF_DAI, "audio_dai", "aud_mux1_sel", 16),
-+	/* AUDIO3 */
-+	GATE_AUDIO3(CLK_AUD_ASRCI3, "audio_asrci3", "asm_h_sel", 2),
-+	GATE_AUDIO3(CLK_AUD_ASRCI4, "audio_asrci4", "asm_h_sel", 3),
-+	GATE_AUDIO3(CLK_AUD_ASRCI5, "audio_asrci5", "asm_h_sel", 4),
-+	GATE_AUDIO3(CLK_AUD_ASRCI6, "audio_asrci6", "asm_h_sel", 5),
-+	GATE_AUDIO3(CLK_AUD_ASRCO3, "audio_asrco3", "asm_h_sel", 6),
-+	GATE_AUDIO3(CLK_AUD_ASRCO4, "audio_asrco4", "asm_h_sel", 7),
-+	GATE_AUDIO3(CLK_AUD_ASRCO5, "audio_asrco5", "asm_h_sel", 8),
-+	GATE_AUDIO3(CLK_AUD_ASRCO6, "audio_asrco6", "asm_h_sel", 9),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC1, "audio_mem_asrc1", "asm_h_sel", 10),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC2, "audio_mem_asrc2", "asm_h_sel", 11),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC3, "audio_mem_asrc3", "asm_h_sel", 12),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC4, "audio_mem_asrc4", "asm_h_sel", 13),
-+	GATE_AUDIO3(CLK_AUD_MEM_ASRC5, "audio_mem_asrc5", "asm_h_sel", 14),
-+};
-+
-+static const struct of_device_id of_match_clk_mt2701_aud[] = {
-+	{ .compatible = "mediatek,mt2701-audsys", },
-+	{}
-+};
-+
-+static int clk_mt2701_aud_probe(struct platform_device *pdev)
-+{
-+	struct clk_onecell_data *clk_data;
-+	struct device_node *node = pdev->dev.of_node;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_AUD_NR);
-+
-+	mtk_clk_register_gates(node, audio_clks, ARRAY_SIZE(audio_clks),
-+			       clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r) {
-+		dev_err(&pdev->dev,
-+			"could not register clock provider: %s: %d\n",
-+			pdev->name, r);
-+
-+		goto err_clk_provider;
-+	}
-+
-+	r = devm_of_platform_populate(&pdev->dev);
-+	if (r)
-+		goto err_plat_populate;
-+
-+	return 0;
-+
-+err_plat_populate:
-+	of_clk_del_provider(node);
-+err_clk_provider:
-+	return r;
-+}
-+
-+static struct platform_driver clk_mt2701_aud_drv = {
-+	.probe = clk_mt2701_aud_probe,
-+	.driver = {
-+		.name = "clk-mt2701-aud",
-+		.of_match_table = of_match_clk_mt2701_aud,
-+	},
-+};
-+
-+builtin_platform_driver(clk_mt2701_aud_drv);
--- 
-1.9.1
+> >
+> > 2) It only implements the DT type clk_get_all as i see Stephen said we
+> > probably may not need to implement non-dt type as there're still no
+> > users.
+> 
+> Good.
+> 
+> >
+> > If we do want to implement non-dt type as well, we could revise the
+> > patch to add it too.
+> > ---
+> >  drivers/clk/clk-bulk.c | 64
+> ++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/clk.h    | 61
+> ++++++++++++++++++++++++++++++++++++++++++++++-
+> >  2 files changed, 124 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c index
+> > 1c1a79d..bac2aae 100644
+> > --- a/drivers/clk/clk-bulk.c
+> > +++ b/drivers/clk/clk-bulk.c
+> > @@ -17,9 +17,11 @@
+> >   */
+> >
+> >  #include <linux/clk.h>
+> > +#include <linux/clk-provider.h>
+> >  #include <linux/device.h>
+> >  #include <linux/export.h>
+> >  #include <linux/of.h>
+> > +#include <linux/slab.h>
+> >
+> >  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)  int
+> > __must_check of_clk_bulk_get(struct device_node *np, int num_clks, @@
+> > -50,6 +52,45 @@ int __must_check of_clk_bulk_get(struct device_node
+> *np, int num_clks,
+> >         return ret;
+> >  }
+> >  EXPORT_SYMBOL(of_clk_bulk_get);
+> > +
+> > +struct clk_bulk __must_check *of_clk_bulk_get_all(struct device_node
+> > +*np) {
+> > +       struct clk_bulk *clk_bulk;
+> > +       int num_clks;
+> > +       int ret;
+> > +
+> > +       num_clks = of_clk_get_parent_count(np);
+> > +       if (!num_clks)
+> > +               return NULL;
+> > +
+> > +       clk_bulk = kzalloc(sizeof(*clk_bulk) +
+> > +                          num_clks * sizeof(struct clk_bulk_data),
+> > +                          GFP_KERNEL);
+> > +       if (!clk_bulk)
+> > +               return ERR_PTR(-ENOMEM);
+> > +
+> > +       clk_bulk->num_clks = num_clks;
+> > +       ret = of_clk_bulk_get(np, clk_bulk->num_clks, clk_bulk->clks);
+> > +       if (ret) {
+> > +               kfree(clk_bulk);
+> > +               return ERR_PTR(ret);
+> > +       }
+> 
+> Has this been tested? clk_bulk->clks probably points to junk?
+> 
+
+You're right. Will fix in a formal patch.
+
+> > +
+> > +       return clk_bulk;
+> > +}
+> > +EXPORT_SYMBOL(of_clk_bulk_get_all);
+> > +
+> > +void of_clk_bulk_put_all(struct clk_bulk *clk_bulk) {
+> > +       if (IS_ERR_OR_NULL(clk_bulk))
+> > +               return;
+> > +
+> > +       clk_bulk_put(clk_bulk->num_clks, clk_bulk->clks);
+> > +
+> > +       kfree(clk_bulk->clks);
+> > +       kfree(clk_bulk);
+> > +}
+> > +EXPORT_SYMBOL(of_clk_bulk_put_all);
+> >  #endif
+> 
+> My goal was to make device drivers pass in their struct device to
+> clk_bulk_get_all() and then have that call into a private DT helper function
+> like of_clk_bulk_get_all(). With your patch 2 that could still be done so let's
+> go that direction?
+> 
+
+Sounds good to me.
+
+> >
+> >  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks) @@ -107,6
+> > +148,12 @@ void clk_bulk_unprepare(int num_clks, const struct
+> > clk_bulk_data *clks)  }  EXPORT_SYMBOL_GPL(clk_bulk_unprepare);
+> >
+> > +void inline clk_bulk_unprepare_all(const struct clk_bulk *clk_bulk) {
+> > +       clk_bulk_unprepare(clk_bulk->num_clks, clk_bulk->clks); }
+> > +EXPORT_SYMBOL_GPL(clk_bulk_unprepare_all);
+> 
+> Do we really need these _all APIs though?
+> 
+> > +
+> >  /**
+> >   * clk_bulk_prepare - prepare a set of clocks
+> >   * @num_clks: the number of clk_bulk_data @@ -139,6 +186,11 @@ int
+> > __must_check clk_bulk_prepare(int num_clks,  }
+> > EXPORT_SYMBOL_GPL(clk_bulk_prepare);
+> >
+> > +int inline __must_check clk_bulk_prepare_all(const struct clk_bulk
+> > +*clk_bulk)
+> 
+> inline won't help much here. Maybe these wrappers should go into the
+> header file?
+> 
+
+Will try that.
+
+> > +{
+> > +       return clk_bulk_prepare(clk_bulk->num_clks, clk_bulk->clks); }
+> > +
+> >  #endif /* CONFIG_HAVE_CLK_PREPARE */
+> >
+> >  /**
+> > @@ -158,6 +210,12 @@ void clk_bulk_disable(int num_clks, const struct
+> > clk_bulk_data *clks)  }  EXPORT_SYMBOL_GPL(clk_bulk_disable);
+> >
+> > +void inline clk_bulk_disable_all(const struct clk_bulk *clk_bulk)
+> 
+> ditto
+> 
+> > +{
+> > +       return clk_bulk_disable(clk_bulk->num_clks, clk_bulk->clks); }
+> > +EXPORT_SYMBOL_GPL(clk_bulk_disable_all);
+> > +
+> >  /**
+> >   * clk_bulk_enable - ungate a set of clocks
+> >   * @num_clks: the number of clk_bulk_data @@ -188,3 +246,9 @@ int
+> > __must_check clk_bulk_enable(int num_clks, const struct clk_bulk_data
+> *clks)
+> >         return  ret;
+> >  }
+> >  EXPORT_SYMBOL_GPL(clk_bulk_enable);
+> > +
+> > +int inline __must_check clk_bulk_enable_all(const struct clk_bulk
+> > +*clk_bulk)
+> 
+> again
+> 
+> > +{
+> > +       return clk_bulk_enable(clk_bulk->num_clks, clk_bulk->clks); }
+> > +EXPORT_SYMBOL_GPL(clk_bulk_enable_all);
+> > diff --git a/include/linux/clk.h b/include/linux/clk.h index
+> > 09ae760..ccafda1 100644
+> > --- a/include/linux/clk.h
+> > +++ b/include/linux/clk.h
+> > @@ -92,6 +92,21 @@ struct clk_bulk_data {
+> >         struct clk              *clk;
+> >  };
+> >
+> > +/**
+> > + * struct clk_bulk - bulk clk structure
+> > + *
+> > + * @num_clks: the number of avaliable clocks in this bulk
+> > + * @clks: struct clk_bulk_data * to store the associated clock
+> > + *
+> > + * The CLK APIs provide a series of clk_bulk_x_all() API calls as
+> > + * a convenience to consumers which require multiple clks.  This
+> > + * structure is used to manage data for these calls.
+> > + */
+> > +struct clk_bulk {
+> > +       int num_clks;
+> > +       struct clk_bulk_data *clks;
+> > +};
+> 
+> This could go away, and we could return the number of clks from
+> clk_bulk_get_all() as a positive number, 0 if there are none, and a negative
+> number if something failed. Then we don't need the _all variants or a
+> wrapper struct. It would be nice to avoid the extra variants just because we
+> need to tell it the number of clks to handle.
+
+This looks like a good idea.
+I will try it.
+
+Thanks for your good suggestions.
+
+Regards
+Dong Aisheng
