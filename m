@@ -1,52 +1,50 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Tue, 20 Mar 2018 13:21:48 +0000
-Subject: [PATCH -next] phy: stm32: fix using 0 as NULL pointer warnings
-In-Reply-To: <1521551982-154471-1-git-send-email-weiyongjun1@huawei.com>
-References: <1521551982-154471-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <3d799714-6e2c-658e-b1f2-def58584c356@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Mar 2018 13:34:31 +0000
+Subject: Failed to boot ARM64 boards for recent linux-next
+In-Reply-To: <5AB0DEB2.4000803@rock-chips.com>
+References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
+ <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+ <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
+ <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
+ <5AB0DEB2.4000803@rock-chips.com>
+Message-ID: <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 20/03/18 10:13, JeffyChen wrote:
+> Hi Shawn,
+> 
+> On 03/20/2018 05:39 PM, Shawn Lin wrote:
+>>
+>>
+>> Also another patch warns a lot when booting the kernel. Is there
+>> anything else I could do to let it go? Seems I am using broken
+>> dts for requesting IRQ_TYPE_NONE there?
+> 
+> could be:
+> https://github.com/torvalds/linux/blob/master/drivers/irqchip/irq-gic-v3.c#L1145
+> 
+> 		struct irq_fwspec ppi_fwspec = {
+> 			.fwnode		= gic_data.fwnode,
+> 			.param_count	= 3,
+> 			.param		= {
+> 				[0]	= 1,
+> 				[1]	= i,
+> 				[2]	= IRQ_TYPE_NONE, <--
+> 			},
+> 		};
+> 
+> 		irq = irq_create_fwspec_mapping(&ppi_fwspec);
 
+Probably is. Caught at my own game, fun! ;-)
 
-On 03/20/2018 02:19 PM, Wei Yongjun wrote:
-> Fixes the following sparse warnings:
-> 
-> drivers/phy/st/phy-stm32-usbphyc.c:331:42: warning:
->   Using plain integer as NULL pointer
-> drivers/phy/st/phy-stm32-usbphyc.c:344:52: warning:
->   Using plain integer as NULL pointer
-> 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> ---
->   drivers/phy/st/phy-stm32-usbphyc.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
-> index bc4e78a..48d4086 100644
-> --- a/drivers/phy/st/phy-stm32-usbphyc.c
-> +++ b/drivers/phy/st/phy-stm32-usbphyc.c
-> @@ -328,7 +328,7 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
->   	if (IS_ERR(usbphyc->base))
->   		return PTR_ERR(usbphyc->base);
->   
-> -	usbphyc->clk = devm_clk_get(dev, 0);
-> +	usbphyc->clk = devm_clk_get(dev, NULL);
->   	if (IS_ERR(usbphyc->clk)) {
->   		ret = PTR_ERR(usbphyc->clk);
->   		dev_err(dev, "clk get failed: %d\n", ret);
-> @@ -341,7 +341,7 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
->   		return ret;
->   	}
->   
-> -	usbphyc->rst = devm_reset_control_get(dev, 0);
-> +	usbphyc->rst = devm_reset_control_get(dev, NULL);
->   	if (!IS_ERR(usbphyc->rst)) {
->   		reset_control_assert(usbphyc->rst);
->   		udelay(2);
-> 
-
-Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
+Turning that NONE into LEVEL will work, as there is no known PPIs
+configured as edge (specially in a partitioned system), but the general
+case isn't pretty. I'll queue a workaround for now, and will look at
+addressing the more general issue.
 
 Thanks,
-Amelie
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
