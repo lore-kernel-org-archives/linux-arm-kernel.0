@@ -1,46 +1,80 @@
-From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Tue, 20 Mar 2018 08:48:51 -0600
-Subject: [PATCH v4 2/6] IB/mlx4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521514068-8856-3-git-send-email-okaya@codeaurora.org>
-References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
- <1521514068-8856-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180320144851.GF19744@ziepe.ca>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Tue, 20 Mar 2018 15:49:33 +0100
+Subject: [Letux-kernel] [PATCH v5 3/5] misc serdev: Add w2sg0004 (gps
+ receiver) power control driver
+In-Reply-To: <20180319135418.GL18359@localhost>
+References: <cover.1512114576.git.hns@goldelico.com>
+ <5494ad34b39a6c62601e3747440268dfb3be7d5a.1512114576.git.hns@goldelico.com>
+ <20171222124427.GI3374@localhost>
+ <91850CC3-B280-4701-9D07-96AFF3A79A6F@goldelico.com>
+ <90F9A8E4-035A-4A9E-8AAB-757491D63E69@goldelico.com>
+ <20180112153903.GB5992@localhost> <20180212152618.GC13962@amd>
+ <20180227070415.GB18666@localhost>
+ <22A8F5FE-C8B9-46EB-B98D-A94EA4170131@goldelico.com>
+ <20180319135418.GL18359@localhost>
+Message-ID: <FCD404C1-3DD4-45BD-9242-3F7A7C44F6C9@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 10:47:44PM -0400, Sinan Kaya wrote:
-> Code includes wmb() followed by writel(). writel() already has a barrier on
-> some architectures like arm64.
-> 
-> This ends up CPU observing two barriers back to back before executing the
-> register write.
-> 
-> Since code already has an explicit barrier call, changing writel() to
-> writel_relaxed().
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/infiniband/hw/mlx4/qp.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+Hi Johan,
 
-Reviewed-by: Jason Gunthorpe <jgg@mellanox.com>
-
-> diff --git a/drivers/infiniband/hw/mlx4/qp.c b/drivers/infiniband/hw/mlx4/qp.c
-> index f045491..74b27b0 100644
-> --- a/drivers/infiniband/hw/mlx4/qp.c
-> +++ b/drivers/infiniband/hw/mlx4/qp.c
-> @@ -3880,8 +3880,8 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
->  		 */
->  		wmb();
->  
-> -		writel(qp->doorbell_qpn,
-> -		       to_mdev(ibqp->device)->uar_map + MLX4_SEND_DOORBELL);
-> +		writel_relaxed(qp->doorbell_qpn,
-> +			to_mdev(ibqp->device)->uar_map + MLX4_SEND_DOORBELL);
->  
->  		/*
->  		 * Make sure doorbells don't leak out of SQ spinlock
-> -- 
-> 2.7.4
+> Am 19.03.2018 um 14:54 schrieb Johan Hovold <johan@kernel.org>:
 > 
+> On Tue, Feb 27, 2018 at 08:32:50AM +0100, H. Nikolaus Schaller wrote:
+>> Hi Johan,
+>> 
+>>> Am 27.02.2018 um 08:04 schrieb Johan Hovold <johan@kernel.org>:
+>>> 
+>>> On Mon, Feb 12, 2018 at 04:26:18PM +0100, Pavel Machek wrote:
+>>>> Hi!
+>>>> 
+>>>>>> Let's restart this discussion and focus on the main roadblock (others
+>>>>>> are minor details which can be sorted out later).
+>>>>>> 
+>>>>>> If it feels like a hack, the key issue seems to me to be the choice of
+>>>>>> the API to present the GPS data to user space. Right?
+>>>>> 
+>>>>> Or even more fundamentally, does this belong in the kernel at all?
+>>>> 
+>>>> Yes, it does.
+>> 
+>> Thanks, Pavel for supporting our view.
+>> 
+>>> 
+>>> But not necessarily in its current form.
+>> 
+>> Is this a "yes after some code fixes"?
+> 
+> No, we need some kind of at least rudimentary gps framework even if we
+> allow for a raw (NMEA) interface for the time being (possibly
+> indefinitely).
+
+Ok, that would be fine if we can get that!
+
+For a minimal set of API I think something like this (following hci_dev) would suffice:
+
+struct gps_dev {
+	...
+	int (*open)(struct gps_dev *gdev);
+	int (*close)(struct gps_dev *gdev);
+	int (*send)(struct gps_dev *gdev, char *data, int length);
+};
+
+int gps_register_dev(struct gps_dev *gdev);
+void gps_unregister_dev(struct gps_dev *gdev);
+int gps_recv_nmea_chars(struct gps_dev *gdev, char *data, int length);
+
+If that would wrap all creation of some /dev/ttyGPS0 (or however it is called),
+it would fit our needs for a driver and user-space for our system.
+
+And I would be happy to get rid of creating and registering a /dev/ttyGPS0
+in the w2sg0004 driver.
+
+Then, the driver will not need to be touched if the GPS framework is improved
+in some far future (e.g. to provide some additional ioctl for getting kalman-filtered
+position+heading by doing sensor fusion with some iio-based accelerometer/gyro). 
+
+So I am looking forward to some framework for review and integration testing.
+
+BR and thanks,
+Nikolaus
