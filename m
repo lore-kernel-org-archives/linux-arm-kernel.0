@@ -1,30 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Mar 2018 04:10:19 +0100
-Subject: [PATCH 07/10] ARM: dts: gemini: Remove "cooling-{min|max}-level"
- for gpio-fan node
-In-Reply-To: <01ddf0ac8962feb63e8871a2c2c3498c763f649b.1518166039.git.viresh.kumar@linaro.org>
-References: <cover.1518166039.git.viresh.kumar@linaro.org>
- <01ddf0ac8962feb63e8871a2c2c3498c763f649b.1518166039.git.viresh.kumar@linaro.org>
-Message-ID: <CACRpkdaQtPOJCcXoVB0UufLDNhkkh4__XTT2sapAKWDu9jw73g@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 19 Mar 2018 22:50:04 -0400
+Subject: [PATCH v4 4/7] scsi: lpfc: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
+References: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521514207-10695-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 9, 2018 at 9:58 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Code includes barrier() followed by writel(). writel() already has a
+barrier
+on some architectures like arm64.
 
-> The "cooling-min-level" and "cooling-max-level" properties are not
-> parsed by any part of the kernel currently and the max cooling state of
-> gpio-fan cooling device is found by referring to the
-> "gpio-fan,speed-map" instead.
->
-> Remove the unused properties from the gpio-fan node.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
-I can queue it next week (different machine hosting the git tree)
-but it is also OK if the ARM SoC maintainers want to pick it
-directly for the ARM SoC DTS branch.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/scsi/lpfc/lpfc_sli.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/scsi/lpfc/lpfc_sli.c b/drivers/scsi/lpfc/lpfc_sli.c
+index 5f5528a..7dae7d3 100644
+--- a/drivers/scsi/lpfc/lpfc_sli.c
++++ b/drivers/scsi/lpfc/lpfc_sli.c
+@@ -1647,7 +1647,7 @@ lpfc_sli_update_full_ring(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
+ 	 * Set ring 'ringno' to SET R0CE_REQ in Chip Att register.
+ 	 * The HBA will tell us when an IOCB entry is available.
+ 	 */
+-	writel((CA_R0ATT|CA_R0CE_REQ) << (ringno*4), phba->CAregaddr);
++	writel_relaxed((CA_R0ATT|CA_R0CE_REQ) << (ringno*4), phba->CAregaddr);
+ 	readl(phba->CAregaddr); /* flush */
+ 
+ 	pring->stats.iocb_cmd_full++;
+@@ -1672,7 +1672,7 @@ lpfc_sli_update_ring(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
+ 	 */
+ 	if (!(phba->sli3_options & LPFC_SLI3_CRP_ENABLED)) {
+ 		wmb();
+-		writel(CA_R0ATT << (ringno * 4), phba->CAregaddr);
++		writel_relaxed(CA_R0ATT << (ringno * 4), phba->CAregaddr);
+ 		readl(phba->CAregaddr); /* flush */
+ 	}
+ }
+-- 
+2.7.4
