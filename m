@@ -1,102 +1,207 @@
-From: lambertarthur22@gmail.com (Arthur LAMBERT)
-Date: Tue, 20 Mar 2018 11:04:27 +0100
-Subject: issue with kexec/kdump on imx6ull
-Message-ID: <20180320100427.GA21933@arthur-bzh>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 20 Mar 2018 18:06:02 +0800
+Subject: Failed to boot ARM64 boards for recent linux-next
+In-Reply-To: <2dfe4f47-8163-d7a4-c9cc-d60b9f0e71a8@arm.com>
+References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
+ <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+ <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
+ <2dfe4f47-8163-d7a4-c9cc-d60b9f0e71a8@arm.com>
+Message-ID: <1d4d0797-1630-b09d-943d-1a1cac178700@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marc,
 
-I am trying to use kexec/kdump on imx6ull evaluation kit without success.
-kernel : git://git.freescale.com/imx/linux-imx.git
-kernel tag : rel_imx_4.9.x_1.0.0_ga
-defconfig : imx_v7
-device tree :  imx6ull-14x14-evk
+? 2018/3/20 17:56, Marc Zyngier ??:
+> On 20/03/18 09:32, Shawn Lin wrote:
+>> Hi Marc,
+>>
+>> On 2018/3/20 17:01, Marc Zyngier wrote:
+>>> Hi Shawn,
+>>>
+>>> On 20/03/18 08:48, Shawn Lin wrote:
+>>>> Hi Marc,
+>>>>
+>>>>        I was able to boot my RK3399 board with in linux-next-20180314,
+>>>> but not today. My bisect robot shows me it was introduced by
+>>>>
+>>>> commit d6062a6d62c643a06c393745d032da3e6441d4bd
+>>>> Author: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Date:   Fri Mar 9 14:53:19 2018 +0000
+>>>>
+>>>>        irqchip/gic-v3: Reset APgRn registers at boot time
+>>>>
+>>>>        Booting a crash kernel while in an interrupt handler is likely
+>>>>        to leave the Active Priority Registers with some state that
+>>>>        is not relevant to the new kernel, and is likely to lead
+>>>>        to erratic behaviours such as interrupts not firing as their
+>>>>        priority is already active.
+>>>>
+>>>>        As a sanity measure, wipe the APRs clean on startup. We make
+>>>>        sure to wipe both group 0 and 1 registers in order to avoid
+>>>>        any surprise.
+>>>>
+>>>>
+>>>> The panic log is here:
+>>>> https://paste.ubuntu.com/p/7WrJJDG6JQ/
+>>>>
+>>>> Is it a known issue or is there a coming patch for that?
+>>>
+>>>    Interesting. No, that wasn't the intention, but I may have missed a key
+>>> detail (group 0 access traps to EL3 if SCR_EL3.FIQ==1). Can you have a
+>>> go at the following hack, just to narrow it down:
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>>> index 5bb7bb22f1c1..f8ff43b1d4f8 100644
+>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>> @@ -570,16 +570,12 @@ static void gic_cpu_sys_reg_init(void)
+>>>    	switch(val + 1) {
+>>>    	case 8:
+>>>    	case 7:
+>>> -		write_gicreg(0, ICC_AP0R3_EL1);
+>>>    		write_gicreg(0, ICC_AP1R3_EL1);
+>>> -		write_gicreg(0, ICC_AP0R2_EL1);
+>>>    		write_gicreg(0, ICC_AP1R2_EL1);
+>>>    	case 6:
+>>> -		write_gicreg(0, ICC_AP0R1_EL1);
+>>>    		write_gicreg(0, ICC_AP1R1_EL1);
+>>>    	case 5:
+>>>    	case 4:
+>>> -		write_gicreg(0, ICC_AP0R0_EL1);
+>>>    		write_gicreg(0, ICC_AP1R0_EL1);
+>>>    	}
+>>>
+>>> Let me know if that helps.
+>>>
+>>
+>> It works for me. Thanks!
+> OK. Would you mind testing a much more complete patch?
 
-First I enable kexec/kdump in kernel config and add crashkernel to kernel command line :
+Hmm.. the more complete patch doesn't work for me.
 
-[arthur * dreem] diff -Naur arch/arm/configs/imx_v7_defconfig defconfig
---- arch/arm/configs/imx_v7_defconfig			      2017-09-07 11:46:46.000000000 +0200
-+++ defconfig						      2018-03-19 18:33:22.776513159 +0100
-@@ -1,4 +1,3 @@
--CONFIG_KERNEL_LZO=y
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-@@ -36,7 +35,10 @@
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_CMA=y
--CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
-+CONFIG_CMDLINE="console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw crashkernel=50M"
-+CONFIG_CMDLINE_FORCE=y
-+CONFIG_KEXEC=y
-+CONFIG_CRASH_DUMP=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-@@ -416,6 +418,7 @@
- CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
- CONFIG_NLS_UTF8=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- # CONFIG_SCHED_DEBUG is not set
-
-crashkernel initialization is a success :
-
-# dmesg | grep -i crash
-Reserving 50MB of memory at 2176MB for crashkernel (System RAM: 512MB)
-Kernel command line: console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw crashkernel=50M
-
-I used a script to load kernel in crashkernel area with kexec :
-
-# cat kx.sh
-#!/bin/sh
-
-DUMPK_CMDLINE="console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw  maxcpus=1 reset_devices init=/sbin/init"
-kexec --type zImage \
--p /root/zImage \
---dtb=/root/imx6ull-14x14-evk.dtb \
---append="${DUMPK_CMDLINE}"
-[ $? -ne 0 ] && {
-    echo "kexec failed." ; exit 1
-    }
-    echo "$0: kexec: success, dump kernel loaded."
-    exit 0
-
-I used the same kernel && device tree in kexec that the current one :
-
-# mkdir kernel
-# mount /dev/mmcblk1p1  kernel
-# cp kernel/zImage /root/.
-# cp kernel/imx6ull-14x14-evk.dtb /root/.
-#
-# sync
-# umount kernel
-# rm -r kernel
-
-I run the test :
-
-# sh kx.sh
-kx.sh: kexec: success, dump kernel loaded.
-#
-
-I trigger a kernel panic to test the kdump feature :
-
-# echo c > /proc/sysrq-trigger
-sysrq: SysRq : Trigger a crash
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-(...)
-Loading crashdump kernel...
-Bye!
-
-No more output after that. In my opinion the kernel loaded with kexec is frozen
-during init.
-
-Is there a mistake in my process ? Is there a freeze during the kernel init ? How can I debug
-this kind of issue ?
-
-Thanks,
-Arthur.
+> 
+>>From 192786590930c205461ea0a379d295a2d0375fc1 Mon Sep 17 00:00:00 2001
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> Date: Tue, 20 Mar 2018 09:46:42 +0000
+> Subject: [PATCH] irqchip/gic-v3: Check availability of Group0 before resetting
+>   AP0Rn
+> 
+> We now try to reset the Active Priority Registers at boot time,
+> without checking  if we actually have access to them. Bad move.
+> If the secure side has set SCR_EL3.FIQ=1, we'll trap to EL3, and
+> the firmware may not be please to get such an exception.
+> 
+> Instead, let's use PMR to find out if its value gets affected by
+> SCR_EL3.FIQ being set. Only if a readback from PMR shows the same
+> value (or a higher priority) will we be able to write to AP0Rn.
+> 
+> Fixes: d6062a6d62c6 ("irqchip/gic-v3: Reset APgRn registers at boot time")
+> Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm/include/asm/arch_gicv3.h   |  6 +-----
+>   arch/arm64/include/asm/arch_gicv3.h |  5 -----
+>   drivers/irqchip/irq-gic-v3.c        | 25 ++++++++++++++++++++-----
+>   3 files changed, 21 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+> index 27288bdbd840..0bd530702118 100644
+> --- a/arch/arm/include/asm/arch_gicv3.h
+> +++ b/arch/arm/include/asm/arch_gicv3.h
+> @@ -137,6 +137,7 @@ static inline u64 read_ ## a64(void)		\
+>   	return val; 				\
+>   }
+>   
+> +CPUIF_MAP(ICC_PMR, ICC_PMR_EL1)
+>   CPUIF_MAP(ICC_AP0R0, ICC_AP0R0_EL1)
+>   CPUIF_MAP(ICC_AP0R1, ICC_AP0R1_EL1)
+>   CPUIF_MAP(ICC_AP0R2, ICC_AP0R2_EL1)
+> @@ -206,11 +207,6 @@ static inline u32 gic_read_iar(void)
+>   	return irqstat;
+>   }
+>   
+> -static inline void gic_write_pmr(u32 val)
+> -{
+> -	write_sysreg(val, ICC_PMR);
+> -}
+> -
+>   static inline void gic_write_ctlr(u32 val)
+>   {
+>   	write_sysreg(val, ICC_CTLR);
+> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+> index 9becba9ab392..e278f94df0c9 100644
+> --- a/arch/arm64/include/asm/arch_gicv3.h
+> +++ b/arch/arm64/include/asm/arch_gicv3.h
+> @@ -76,11 +76,6 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
+>   	return irqstat;
+>   }
+>   
+> -static inline void gic_write_pmr(u32 val)
+> -{
+> -	write_sysreg_s(val, SYS_ICC_PMR_EL1);
+> -}
+> -
+>   static inline void gic_write_ctlr(u32 val)
+>   {
+>   	write_sysreg_s(val, SYS_ICC_CTLR_EL1);
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 5bb7bb22f1c1..a3f7624f5b00 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -532,6 +532,7 @@ static void gic_cpu_sys_reg_init(void)
+>   	int i, cpu = smp_processor_id();
+>   	u64 mpidr = cpu_logical_map(cpu);
+>   	u64 need_rss = MPIDR_RS(mpidr);
+> +	bool group0;
+>   	u32 val;
+>   
+>   	/*
+> @@ -545,7 +546,11 @@ static void gic_cpu_sys_reg_init(void)
+>   		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+>   
+>   	/* Set priority mask register */
+> -	gic_write_pmr(DEFAULT_PMR_VALUE);
+> +	write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
+> +
+> +	/* Is Group0 available to us? */
+> +	val = read_gicreg(ICC_PMR_EL1);
+> +	group0 = (val <= DEFAULT_PMR_VALUE);
+>   
+>   	/*
+>   	 * Some firmwares hand over to the kernel with the BPR changed from
+> @@ -567,19 +572,29 @@ static void gic_cpu_sys_reg_init(void)
+>   	val &= ICC_CTLR_EL1_PRI_BITS_MASK;
+>   	val >>= ICC_CTLR_EL1_PRI_BITS_SHIFT;
+>   
+> +	if (group0) {
+> +		switch(val + 1) {
+> +		case 8:
+> +		case 7:
+> +			write_gicreg(0, ICC_AP0R3_EL1);
+> +			write_gicreg(0, ICC_AP0R2_EL1);
+> +		case 6:
+> +			write_gicreg(0, ICC_AP0R1_EL1);
+> +		case 5:
+> +		case 4:
+> +			write_gicreg(0, ICC_AP0R0_EL1);
+> +		}
+> +	}
+> +
+>   	switch(val + 1) {
+>   	case 8:
+>   	case 7:
+> -		write_gicreg(0, ICC_AP0R3_EL1);
+>   		write_gicreg(0, ICC_AP1R3_EL1);
+> -		write_gicreg(0, ICC_AP0R2_EL1);
+>   		write_gicreg(0, ICC_AP1R2_EL1);
+>   	case 6:
+> -		write_gicreg(0, ICC_AP0R1_EL1);
+>   		write_gicreg(0, ICC_AP1R1_EL1);
+>   	case 5:
+>   	case 4:
+> -		write_gicreg(0, ICC_AP0R0_EL1);
+>   		write_gicreg(0, ICC_AP1R0_EL1);
+>   	}
+>   
+> 
