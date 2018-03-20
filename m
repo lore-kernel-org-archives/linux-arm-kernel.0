@@ -1,38 +1,41 @@
 From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Tue, 20 Mar 2018 13:03:29 -0300
-Subject: [PATCH 0/3] Fix audio regression on rk3288
-Message-ID: <20180320160332.13212-1-ezequiel@vanguardiasur.com.ar>
+Date: Tue, 20 Mar 2018 13:03:30 -0300
+Subject: [PATCH 1/3] ASoC: rockchip: Fix dai_name for HDMI codec
+In-Reply-To: <20180320160332.13212-1-ezequiel@vanguardiasur.com.ar>
+References: <20180320160332.13212-1-ezequiel@vanguardiasur.com.ar>
+Message-ID: <20180320160332.13212-2-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ezequiel Garcia <ezequiel@collabora.co.uk>
 
-Currently on rk3288 boards the ASoC machine driver fails to load,
-breaking audio support.
+Commit 24069b589b02 ("ASoC: hdmi-codec: remove multi detection support")
+changed the dai_name for the HDMI Codec, breaking the rk3288_hdmi_analog
+driver, which fails to register with a:
 
-Apparently, the regression was introduced by commit 24069b589b02
-("ASoC: hdmi-codec: remove multi detection support") which changed
-the codec name.
+  rk3288-snd-hdmi-analog sound: ASoC: CODEC DAI hdmi-hifi.0 not registered
 
-If there is a lesson here, it would be about binding drivers using
-strings and how fragile this is. Or maybe it's about regression
-testing. Or maybe there isn't a lesson.
+This commit fixes the dai_name, fixing the issue.
 
-Anyway, the first patch fixes the regression; the second patch
-makes the machine driver selects all the codecs it; finally
-the third patch is just a binding documentation fix.
+Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Fixes: 24069b589b02 ("ASoC: hdmi-codec: remove multi detection support")
+Signed-off-by: Ezequiel Garcia <ezequiel@collabora.co.uk>
+---
+ sound/soc/rockchip/rk3288_hdmi_analog.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tested on a Radxa Rock2 Square board.
-
-Ezequiel Garcia (3):
-  ASoC: rockchip: Fix dai_name for HDMI codec
-  ASoC: rockchip: rk3288-hdmi-analog: Select needed codecs
-  dt-bindings: sound: rockchip Fix compatible string in example
-
- .../devicetree/bindings/sound/rockchip,rk3288-hdmi-analog.txt          | 2 +-
- sound/soc/rockchip/Kconfig                                             | 3 +++
- sound/soc/rockchip/rk3288_hdmi_analog.c                                | 2 +-
- 3 files changed, 5 insertions(+), 2 deletions(-)
-
+diff --git a/sound/soc/rockchip/rk3288_hdmi_analog.c b/sound/soc/rockchip/rk3288_hdmi_analog.c
+index fa44e3901336..929b3fe289b0 100644
+--- a/sound/soc/rockchip/rk3288_hdmi_analog.c
++++ b/sound/soc/rockchip/rk3288_hdmi_analog.c
+@@ -155,7 +155,7 @@ static struct snd_soc_dai_link_component rk_codecs[] = {
+ 	{ },
+ 	{
+ 		.name = "hdmi-audio-codec.2.auto",
+-		.dai_name = "hdmi-hifi.0",
++		.dai_name = "i2s-hifi",
+ 	},
+ };
+ 
 -- 
 2.16.2
