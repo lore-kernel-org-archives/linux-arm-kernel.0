@@ -1,255 +1,37 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 20 Mar 2018 03:21:17 +0000
-Subject: [RFC PATCH 1/2] clk: add new APIs to operate on all available
- clocks
-In-Reply-To: <152147653725.242365.16805388526685631797@swboyd.mtv.corp.google.com>
-References: <1516711841-25234-1-git-send-email-aisheng.dong@nxp.com>
- <1516711841-25234-2-git-send-email-aisheng.dong@nxp.com>
- <152147653725.242365.16805388526685631797@swboyd.mtv.corp.google.com>
-Message-ID: <AM3PR04MB306226CE9E4AD6F1F2383F180AB0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Mar 2018 04:36:35 +0100
+Subject: [PATCH v2 1/3] dt-bindings: pinctrl: Add a reserved-gpio-ranges
+ property
+In-Reply-To: <20180126011400.2191-2-sboyd@codeaurora.org>
+References: <20180126011400.2191-1-sboyd@codeaurora.org>
+ <20180126011400.2191-2-sboyd@codeaurora.org>
+Message-ID: <CACRpkdbAYPpcoyVkMm=yKABMByJuCyXdYifuFdYhV4g6CU3sEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Tuesday, March 20, 2018 12:22 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; dl-
-> linux-imx <linux-imx@nxp.com>; aisheng.dong at codeaurora.org; linux-
-> fbdev at vger.kernel.org; yamada.masahiro at socionext.com;
-> sboyd at codeaurora.org; hdegoede at redhat.com;
-> b.zolnierkie at samsung.com; A.s. Dong <aisheng.dong@nxp.com>
-> Subject: Re: [RFC PATCH 1/2] clk: add new APIs to operate on all available
-> clocks
-> 
-> Quoting Dong Aisheng (2018-01-23 04:50:40)
-> > This patch introduces of_clk_bulk_get_all and clk_bulk_x_all APIs to
-> > users who just want to handle all available clocks from device tree
-> > without need to know the detailed clock information likes clock
-> > numbers and names. This is useful in writing some generic drivers to
-> > handle clock part.
-> >
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> >
-> > ---
-> > A few question may need discuss:
-> > 1)  This patch is written based on of_clk_bulk_get.
-> > [V4,1/1] clk: bulk: add of_clk_bulk_get()
-> >
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpat
-> >
-> chwork.kernel.org%2Fpatch%2F9971527%2F&data=02%7C01%7Caisheng.don
-> g%40n
-> >
-> xp.com%7C449209dd3e19491afb9908d58db5966d%7C686ea1d3bc2b4c6fa92c
-> d99c5c
-> >
-> 301635%7C0%7C0%7C636570733411754127&sdata=4m5emXOR%2Bui3Mqw
-> MbAJQDQxJcE
-> > %2BxLcB51hEi2q3V2O8%3D&reserved=0 Stepen once said we may not
-> need it,
-> > but i guess as we already have clk_bulk_get, there may be guys who
-> > want of_clk_bulk_get as well if they need specify the clock count
-> > information, becaues of_clk_bulk_get_all will not check the count.
-> > And of_clk_bulk_get is also helpful when implementing
-> > of_clk_bulk_get_all.
-> 
-> Hmm ok. It's ok to implement it on top of of_clk_bulk_get I suppose, but
-> maybe that API can be kept private until someone can prove they need it
-> because they don't have a struct device pointer. Can you pick that patch from
-> the list and resend in the series?
-> 
+Hi Stephen,
 
-Of course. I will do that.
+thanks for the patch and hope you have a good time at your new
+workplace!
 
-> >
-> > 2) It only implements the DT type clk_get_all as i see Stephen said we
-> > probably may not need to implement non-dt type as there're still no
-> > users.
-> 
-> Good.
-> 
-> >
-> > If we do want to implement non-dt type as well, we could revise the
-> > patch to add it too.
-> > ---
-> >  drivers/clk/clk-bulk.c | 64
-> ++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/clk.h    | 61
-> ++++++++++++++++++++++++++++++++++++++++++++++-
-> >  2 files changed, 124 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c index
-> > 1c1a79d..bac2aae 100644
-> > --- a/drivers/clk/clk-bulk.c
-> > +++ b/drivers/clk/clk-bulk.c
-> > @@ -17,9 +17,11 @@
-> >   */
-> >
-> >  #include <linux/clk.h>
-> > +#include <linux/clk-provider.h>
-> >  #include <linux/device.h>
-> >  #include <linux/export.h>
-> >  #include <linux/of.h>
-> > +#include <linux/slab.h>
-> >
-> >  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)  int
-> > __must_check of_clk_bulk_get(struct device_node *np, int num_clks, @@
-> > -50,6 +52,45 @@ int __must_check of_clk_bulk_get(struct device_node
-> *np, int num_clks,
-> >         return ret;
-> >  }
-> >  EXPORT_SYMBOL(of_clk_bulk_get);
-> > +
-> > +struct clk_bulk __must_check *of_clk_bulk_get_all(struct device_node
-> > +*np) {
-> > +       struct clk_bulk *clk_bulk;
-> > +       int num_clks;
-> > +       int ret;
-> > +
-> > +       num_clks = of_clk_get_parent_count(np);
-> > +       if (!num_clks)
-> > +               return NULL;
-> > +
-> > +       clk_bulk = kzalloc(sizeof(*clk_bulk) +
-> > +                          num_clks * sizeof(struct clk_bulk_data),
-> > +                          GFP_KERNEL);
-> > +       if (!clk_bulk)
-> > +               return ERR_PTR(-ENOMEM);
-> > +
-> > +       clk_bulk->num_clks = num_clks;
-> > +       ret = of_clk_bulk_get(np, clk_bulk->num_clks, clk_bulk->clks);
-> > +       if (ret) {
-> > +               kfree(clk_bulk);
-> > +               return ERR_PTR(ret);
-> > +       }
-> 
-> Has this been tested? clk_bulk->clks probably points to junk?
-> 
+On Fri, Jan 26, 2018 at 2:13 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-You're right. Will fix in a formal patch.
+> Some qcom platforms make some GPIOs or pins unavailable for use
+> by non-secure operating systems, and thus reading or writing the
+> registers for those pins will cause access control issues.
+> Introduce a DT property to describe the set of GPIOs that are
+> available for use so that higher level OSes are able to know what
+> pins to avoid reading/writing.
+>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-> > +
-> > +       return clk_bulk;
-> > +}
-> > +EXPORT_SYMBOL(of_clk_bulk_get_all);
-> > +
-> > +void of_clk_bulk_put_all(struct clk_bulk *clk_bulk) {
-> > +       if (IS_ERR_OR_NULL(clk_bulk))
-> > +               return;
-> > +
-> > +       clk_bulk_put(clk_bulk->num_clks, clk_bulk->clks);
-> > +
-> > +       kfree(clk_bulk->clks);
-> > +       kfree(clk_bulk);
-> > +}
-> > +EXPORT_SYMBOL(of_clk_bulk_put_all);
-> >  #endif
-> 
-> My goal was to make device drivers pass in their struct device to
-> clk_bulk_get_all() and then have that call into a private DT helper function
-> like of_clk_bulk_get_all(). With your patch 2 that could still be done so let's
-> go that direction?
-> 
+This looks fine except Andy's note to rename this ranges
+to gpio-reserved-ranges for namespacing.
 
-Sounds good to me.
+Are you reposting this series as v3 with this fixed or does someone
+else need to pick it up?
 
-> >
-> >  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks) @@ -107,6
-> > +148,12 @@ void clk_bulk_unprepare(int num_clks, const struct
-> > clk_bulk_data *clks)  }  EXPORT_SYMBOL_GPL(clk_bulk_unprepare);
-> >
-> > +void inline clk_bulk_unprepare_all(const struct clk_bulk *clk_bulk) {
-> > +       clk_bulk_unprepare(clk_bulk->num_clks, clk_bulk->clks); }
-> > +EXPORT_SYMBOL_GPL(clk_bulk_unprepare_all);
-> 
-> Do we really need these _all APIs though?
-> 
-> > +
-> >  /**
-> >   * clk_bulk_prepare - prepare a set of clocks
-> >   * @num_clks: the number of clk_bulk_data @@ -139,6 +186,11 @@ int
-> > __must_check clk_bulk_prepare(int num_clks,  }
-> > EXPORT_SYMBOL_GPL(clk_bulk_prepare);
-> >
-> > +int inline __must_check clk_bulk_prepare_all(const struct clk_bulk
-> > +*clk_bulk)
-> 
-> inline won't help much here. Maybe these wrappers should go into the
-> header file?
-> 
-
-Will try that.
-
-> > +{
-> > +       return clk_bulk_prepare(clk_bulk->num_clks, clk_bulk->clks); }
-> > +
-> >  #endif /* CONFIG_HAVE_CLK_PREPARE */
-> >
-> >  /**
-> > @@ -158,6 +210,12 @@ void clk_bulk_disable(int num_clks, const struct
-> > clk_bulk_data *clks)  }  EXPORT_SYMBOL_GPL(clk_bulk_disable);
-> >
-> > +void inline clk_bulk_disable_all(const struct clk_bulk *clk_bulk)
-> 
-> ditto
-> 
-> > +{
-> > +       return clk_bulk_disable(clk_bulk->num_clks, clk_bulk->clks); }
-> > +EXPORT_SYMBOL_GPL(clk_bulk_disable_all);
-> > +
-> >  /**
-> >   * clk_bulk_enable - ungate a set of clocks
-> >   * @num_clks: the number of clk_bulk_data @@ -188,3 +246,9 @@ int
-> > __must_check clk_bulk_enable(int num_clks, const struct clk_bulk_data
-> *clks)
-> >         return  ret;
-> >  }
-> >  EXPORT_SYMBOL_GPL(clk_bulk_enable);
-> > +
-> > +int inline __must_check clk_bulk_enable_all(const struct clk_bulk
-> > +*clk_bulk)
-> 
-> again
-> 
-> > +{
-> > +       return clk_bulk_enable(clk_bulk->num_clks, clk_bulk->clks); }
-> > +EXPORT_SYMBOL_GPL(clk_bulk_enable_all);
-> > diff --git a/include/linux/clk.h b/include/linux/clk.h index
-> > 09ae760..ccafda1 100644
-> > --- a/include/linux/clk.h
-> > +++ b/include/linux/clk.h
-> > @@ -92,6 +92,21 @@ struct clk_bulk_data {
-> >         struct clk              *clk;
-> >  };
-> >
-> > +/**
-> > + * struct clk_bulk - bulk clk structure
-> > + *
-> > + * @num_clks: the number of avaliable clocks in this bulk
-> > + * @clks: struct clk_bulk_data * to store the associated clock
-> > + *
-> > + * The CLK APIs provide a series of clk_bulk_x_all() API calls as
-> > + * a convenience to consumers which require multiple clks.  This
-> > + * structure is used to manage data for these calls.
-> > + */
-> > +struct clk_bulk {
-> > +       int num_clks;
-> > +       struct clk_bulk_data *clks;
-> > +};
-> 
-> This could go away, and we could return the number of clks from
-> clk_bulk_get_all() as a positive number, 0 if there are none, and a negative
-> number if something failed. Then we don't need the _all variants or a
-> wrapper struct. It would be nice to avoid the extra variants just because we
-> need to tell it the number of clks to handle.
-
-This looks like a good idea.
-I will try it.
-
-Thanks for your good suggestions.
-
-Regards
-Dong Aisheng
+Yours,
+Linus Walleij
