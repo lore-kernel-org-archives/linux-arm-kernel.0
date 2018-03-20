@@ -1,50 +1,21 @@
-From: swise@opengridcomputing.com (Steve Wise)
-Date: Tue, 20 Mar 2018 10:10:40 -0500
-Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180320145159.GG19744@ziepe.ca>
-References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
- <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
- <20180320145159.GG19744@ziepe.ca>
-Message-ID: <3d6801d3c05d$9c35f630$d4a1e290$@opengridcomputing.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 21 Mar 2018 00:14:47 +0900
+Subject: [PATCH v2 1/2] arm64: dts: uniphier: add syscon property for
+ UniPhier sound system
+In-Reply-To: <20180320024824.28902-1-suzuki.katsuhiro@socionext.com>
+References: <20180320024824.28902-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <CAK7LNAQ+AwEjNpXP1PSrdkBH09OaePs+8f3eKiF=8MVm8fp4mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, Mar 19, 2018 at 10:47:46PM -0400, Sinan Kaya wrote:
-> > Code includes wmb() followed by writel(). writel() already has a barrier
-on
-> > some architectures like arm64.
-> >
-> > This ends up CPU observing two barriers back to back before executing
-> the
-> > register write.
-> >
-> > Since code already has an explicit barrier call, changing writel() to
-> > writel_relaxed().
-> >
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >  drivers/infiniband/hw/cxgb4/t4.h | 14 +++++++-------
-> >  1 file changed, 7 insertions(+), 7 deletions(-)
-> >
-> > diff --git a/drivers/infiniband/hw/cxgb4/t4.h
-> b/drivers/infiniband/hw/cxgb4/t4.h
-> > index 8369c7c..6e5658a 100644
-> > +++ b/drivers/infiniband/hw/cxgb4/t4.h
-> > @@ -457,7 +457,7 @@ static inline void pio_copy(u64 __iomem *dst, u64
-> *src)
-> >  	int count = 8;
-> >
-> >  	while (count) {
-> > -		writeq(*src, dst);
-> > +		writeq_relaxed(*src, dst);
-> >  		src++;
-> >  		dst++;
-> >  		count--;
-> 
-> This is another case where writes can be re-ordered.. IIRC dst is WC
-> BAR memory, so the NIC should tolerate re-ordering, but Steve will
-> have to ack this.
-> 
+2018-03-20 11:48 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> This patch adds syscon property for specifying soc-glue core into
+> device-tree of LD11/LD20 SoC.
+>
+> Currently, soc-glue core is used for changing the state of S/PDIF
+> signal output pin to signal output state or Hi-Z state.
+>
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 
-Yes, this is WC BAR memory.  The goal is that pio_copy() will enable
-write-combining this into a single 64B pci-e transaction.
+Both applied.
+Thanks.
