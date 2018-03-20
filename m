@@ -1,31 +1,49 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Mar 2018 23:13:09 +0000
-Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
-In-Reply-To: <20180320230206.25289-4-stefan@agner.ch>
+Date: Tue, 20 Mar 2018 23:18:33 +0000
+Subject: [PATCH 5/5] ARM: add support for building ARM kernel with clang
+In-Reply-To: <20180320230206.25289-6-stefan@agner.ch>
 References: <20180320230206.25289-1-stefan@agner.ch>
- <20180320230206.25289-4-stefan@agner.ch>
-Message-ID: <20180320231309.GJ2743@n2100.armlinux.org.uk>
+ <20180320230206.25289-6-stefan@agner.ch>
+Message-ID: <20180320231832.GK2743@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 12:02:04AM +0100, Stefan Agner wrote:
-> As documented in GCC naked functions should only use Basic asm
-> syntax. The Extended asm or mixture of Basic asm and "C" code is
-> not guaranteed. Currently this works because it was hard coded
-> to follow and check GCC behavior for arguments and register
-> placement.
+On Wed, Mar 21, 2018 at 12:02:06AM +0100, Stefan Agner wrote:
+> Use cc-options call for compiler options which are not available
+> in clang. With this patch an ARMv7 multi platform kernel can be
+> successfully build using clang (tested with version 5.0.1).
+> 
+> Based-on-patches-by: Behan Webster <behanw@converseincode.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/Makefile                 | 2 +-
+>  arch/arm/boot/compressed/Makefile | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index e9e3fde3c657..20e9fee1ccc5 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -39,7 +39,7 @@ KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
+>  endif
+>  
+>  ifeq ($(CONFIG_FRAME_POINTER),y)
+> -KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
+> +KBUILD_CFLAGS	+=-fno-omit-frame-pointer $(call cc-option,-mapcs,) $(call cc-option,-mno-sched-prolog,)
 
-Those checks have nothing to do with that at all.  The whole point of
-__asmeq() is to catch situations where you use register variables,
-specifying which register you want them in, and GCC then ends up
-passing them to assembly code in some other random register(s).
+Some of these options here are to ensure that we generate the following
+code, so we can backtrace:
 
-This was found with older GCCs, and the problem was fixed.  It has
-nothing to do with naked functions per se.
+	mov	ip, sp
+	stmfd	sp!, {fp, ip, lr, pc}
+	sub	fp, ip, #4
 
-In fact, as you're introducing further register variables, these
-checks become more important to have than they were with the
-previous code.
+If clang isn't producing that code at the start of functions with
+CONFIG_FRAME_POINTER=y, then backtracing will not work, and arguably
+CONFIG_FRAME_POINTER=y is useless there.  In that circumstance, it's
+probably better to fail so the user can configure something more
+debuggable, rather than having the kernel potentially producing
+undebuggable oopses.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
