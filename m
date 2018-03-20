@@ -1,92 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Mar 2018 07:16:22 -0700
-Subject: [PATCH 5/5] ARM: multi_v7_defconfig: Enable CPCAP related options
- mostly as loadable modules
-In-Reply-To: <20180320141622.77989-1-tony@atomide.com>
-References: <20180320141622.77989-1-tony@atomide.com>
-Message-ID: <20180320141622.77989-6-tony@atomide.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 20 Mar 2018 15:13:54 +0100
+Subject: [PATCHv2 5/5] arm64: allwinner: a64: Add support for TERES-I
+ laptop
+In-Reply-To: <E1exwhF-0000Qw-4g@stardust.g4.wien.funkfeuer.at>
+References: <20180315162510.11669-1-harald@ccbib.org>
+ <20180315162510.11669-6-harald@ccbib.org>
+ <20180318202251.5gpv6sblfr4edxmj@flea>
+ <E1exwhF-0000Qw-4g@stardust.g4.wien.funkfeuer.at>
+Message-ID: <20180320141353.zmzq4e5652rsp4ye@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need the CPCAP MFD and regulator built-in for UART console to work,
-the rest can be loadable modules. Note that users probably want to also
-enable serial 8250_OMAP that is not yet enabled by default.
+On Mon, Mar 19, 2018 at 04:27:36PM +0100, Harald Geyer wrote:
+> > together with all the patches but the
+> > PWM (so I had to drop the backlight node as well).
+> >
+> > Please coordinate with Andre about who should send the PWM support.
+> 
+> Seems the patch got broken because only the backlight node but not the
+> pwm node was removed. Anyway, since Andre has already sent an updated
+> version of his series, maybe just revert the broken patch, merge his
+> series and then apply the original teres-i patch again?
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/multi_v7_defconfig | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Unfortunately, there's dependencies on the PWM driver itself, and the
+maintainer hasn't replied yet.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -307,6 +307,7 @@ CONFIG_TOUCHSCREEN_WM97XX=m
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MAX77693_HAPTIC=m
- CONFIG_INPUT_MAX8997_HAPTIC=m
-+CONFIG_INPUT_CPCAP_PWRBUTTON=m
- CONFIG_INPUT_AXP20X_PEK=m
- CONFIG_INPUT_ADXL34X=m
- CONFIG_SERIO_AMBAKMI=y
-@@ -438,9 +439,11 @@ CONFIG_GPIO_SYSCON=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
- CONFIG_BATTERY_ACT8945A=y
-+CONFIG_BATTERY_CPCAP=m
- CONFIG_BATTERY_SBS=y
- CONFIG_BATTERY_MAX17040=m
- CONFIG_BATTERY_MAX17042=m
-+CONFIG_CHARGER_CPCAP=m
- CONFIG_CHARGER_MAX14577=m
- CONFIG_CHARGER_MAX77693=m
- CONFIG_CHARGER_MAX8997=m
-@@ -508,6 +511,7 @@ CONFIG_MFD_MAX8907=y
- CONFIG_MFD_MAX8997=y
- CONFIG_MFD_MAX8998=y
- CONFIG_MFD_RK808=y
-+CONFIG_MFD_CPCAP=y
- CONFIG_MFD_PM8XXX=y
- CONFIG_MFD_QCOM_RPM=y
- CONFIG_MFD_SPMI_PMIC=y
-@@ -527,6 +531,7 @@ CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_AS3722=y
- CONFIG_REGULATOR_AXP20X=y
- CONFIG_REGULATOR_BCM590XX=y
-+CONFIG_REGULATOR_CPCAP=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_FAN53555=y
- CONFIG_REGULATOR_RK808=y
-@@ -674,6 +679,7 @@ CONFIG_SND_SOC_TEGRA_WM8903=m
- CONFIG_SND_SOC_TEGRA_WM9712=m
- CONFIG_SND_SOC_TEGRA_TRIMSLICE=m
- CONFIG_SND_SOC_TEGRA_ALC5632=m
-+CONFIG_SND_SOC_CPCAP=m
- CONFIG_SND_SOC_TEGRA_MAX98090=m
- CONFIG_SND_SOC_AK4642=m
- CONFIG_SND_SOC_SGTL5000=m
-@@ -787,6 +793,7 @@ CONFIG_MMC_SDHCI_OMAP=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_CLASS_FLASH=m
-+CONFIG_LEDS_CPCAP=m
- CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_PWM=y
- CONFIG_LEDS_MAX77693=m
-@@ -837,6 +844,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
-+CONFIG_RTC_DRV_CPCAP=m
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_AT_HDMAC=y
-@@ -909,6 +917,7 @@ CONFIG_IIO_SW_TRIGGER=y
- CONFIG_AT91_ADC=m
- CONFIG_AT91_SAMA5D2_ADC=m
- CONFIG_BERLIN2_ADC=m
-+CONFIG_CPCAP_ADC=m
- CONFIG_EXYNOS_ADC=m
- CONFIG_VF610_ADC=m
- CONFIG_XILINX_XADC=y
+Maxime
+
 -- 
-2.16.2
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
