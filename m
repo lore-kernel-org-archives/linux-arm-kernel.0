@@ -1,83 +1,118 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:42:30 -0400
-Subject: [PATCH v4 15/17] bnxt_en: Eliminate duplicate barriers on
+Date: Mon, 19 Mar 2018 22:42:32 -0400
+Subject: [PATCH v4 17/17] net: ena: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
 References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521513753-7325-16-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521513753-7325-18-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier on
-some architectures like arm64.
+Code includes barrier() followed by writel(). writel() already has a
+barrier
+on some architectures like arm64.
 
 This ends up CPU observing two barriers back to back before executing the
 register write.
 
 Create a new wrapper function with relaxed write operator. Use the new
-wrapper when a write is following a wmb().
+wrapper when a write is following a barrier().
 
 Since code already has an explicit barrier call, changing writel() to
 writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/broadcom/bnxt/bnxt.c         |  2 +-
- drivers/net/ethernet/broadcom/bnxt/bnxt.h         | 11 ++++++++++-
- drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c |  2 +-
- 3 files changed, 12 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/amazon/ena/ena_com.c     |  6 ++++--
+ drivers/net/ethernet/amazon/ena/ena_eth_com.h | 22 ++++++++++++++++++++--
+ drivers/net/ethernet/amazon/ena/ena_netdev.c  |  4 ++--
+ 3 files changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
-index 1500243..befb538 100644
---- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
-+++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
-@@ -1922,7 +1922,7 @@ static int bnxt_poll_work(struct bnxt *bp, struct bnxt_napi *bnapi, int budget)
- 		/* Sync BD data before updating doorbell */
- 		wmb();
- 
--		bnxt_db_write(bp, db, DB_KEY_TX | prod);
-+		bnxt_db_write_relaxed(bp, db, DB_KEY_TX | prod);
- 	}
- 
- 	cpr->cp_raw_cons = raw_cons;
-diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.h b/drivers/net/ethernet/broadcom/bnxt/bnxt.h
-index 1989c47..4c0d048 100644
---- a/drivers/net/ethernet/broadcom/bnxt/bnxt.h
-+++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.h
-@@ -1402,11 +1402,20 @@ static inline u32 bnxt_tx_avail(struct bnxt *bp, struct bnxt_tx_ring_info *txr)
- }
- 
- /* For TX and RX ring doorbells */
-+static inline void bnxt_db_write_relaxed(struct bnxt *bp, void __iomem *db,
-+					 u32 val)
-+{
-+	writel_relaxed(val, db);
-+	if (bp->flags & BNXT_FLAG_DOUBLE_DB)
-+		writel_relaxed(val, db);
-+}
-+
-+/* For TX and RX ring doorbells */
- static inline void bnxt_db_write(struct bnxt *bp, void __iomem *db, u32 val)
- {
- 	writel(val, db);
- 	if (bp->flags & BNXT_FLAG_DOUBLE_DB)
--		writel(val, db);
-+		writel_relaxed(val, db);
- }
- 
- extern const u16 bnxt_lhint_arr[];
-diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
-index 1801582..a1b1060 100644
---- a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
-+++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
-@@ -2403,7 +2403,7 @@ static int bnxt_run_loopback(struct bnxt *bp)
- 	/* Sync BD data before updating doorbell */
+diff --git a/drivers/net/ethernet/amazon/ena/ena_com.c b/drivers/net/ethernet/amazon/ena/ena_com.c
+index bf2de52..b6e628f 100644
+--- a/drivers/net/ethernet/amazon/ena/ena_com.c
++++ b/drivers/net/ethernet/amazon/ena/ena_com.c
+@@ -631,7 +631,8 @@ static u32 ena_com_reg_bar_read32(struct ena_com_dev *ena_dev, u16 offset)
+ 	 */
  	wmb();
  
--	bnxt_db_write(bp, txr->tx_doorbell, DB_KEY_TX | txr->tx_prod);
-+	bnxt_db_write_relaxed(bp, txr->tx_doorbell, DB_KEY_TX | txr->tx_prod);
- 	rc = bnxt_poll_loopback(bp, pkt_size);
+-	writel(mmio_read_reg, ena_dev->reg_bar + ENA_REGS_MMIO_REG_READ_OFF);
++	writel_relaxed(mmio_read_reg,
++		       ena_dev->reg_bar + ENA_REGS_MMIO_REG_READ_OFF);
  
- 	dma_unmap_single(&bp->pdev->dev, map, pkt_size, PCI_DMA_TODEVICE);
+ 	for (i = 0; i < timeout; i++) {
+ 		if (read_resp->req_id == mmio_read->seq_num)
+@@ -1826,7 +1827,8 @@ void ena_com_aenq_intr_handler(struct ena_com_dev *dev, void *data)
+ 
+ 	/* write the aenq doorbell after all AENQ descriptors were read */
+ 	mb();
+-	writel((u32)aenq->head, dev->reg_bar + ENA_REGS_AENQ_HEAD_DB_OFF);
++	writel_relaxed((u32)aenq->head,
++		       dev->reg_bar + ENA_REGS_AENQ_HEAD_DB_OFF);
+ }
+ 
+ int ena_com_dev_reset(struct ena_com_dev *ena_dev,
+diff --git a/drivers/net/ethernet/amazon/ena/ena_eth_com.h b/drivers/net/ethernet/amazon/ena/ena_eth_com.h
+index 2f76572..09ef7cd 100644
+--- a/drivers/net/ethernet/amazon/ena/ena_eth_com.h
++++ b/drivers/net/ethernet/amazon/ena/ena_eth_com.h
+@@ -107,7 +107,8 @@ static inline int ena_com_sq_empty_space(struct ena_com_io_sq *io_sq)
+ 	return io_sq->q_depth - 1 - cnt;
+ }
+ 
+-static inline int ena_com_write_sq_doorbell(struct ena_com_io_sq *io_sq)
++static inline int ena_com_write_sq_doorbell(struct ena_com_io_sq *io_sq,
++					    bool relaxed)
+ {
+ 	u16 tail;
+ 
+@@ -116,7 +117,24 @@ static inline int ena_com_write_sq_doorbell(struct ena_com_io_sq *io_sq)
+ 	pr_debug("write submission queue doorbell for queue: %d tail: %d\n",
+ 		 io_sq->qid, tail);
+ 
+-	writel(tail, io_sq->db_addr);
++	if (relaxed)
++		writel_relaxed(tail, io_sq->db_addr);
++	else
++		writel(tail, io_sq->db_addr);
++
++	return 0;
++}
++
++static inline int ena_com_write_sq_doorbell_rel(struct ena_com_io_sq *io_sq)
++{
++	u16 tail;
++
++	tail = io_sq->tail;
++
++	pr_debug("write submission queue doorbell for queue: %d tail: %d\n",
++		 io_sq->qid, tail);
++
++	writel_relaxed(tail, io_sq->db_addr);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/net/ethernet/amazon/ena/ena_netdev.c b/drivers/net/ethernet/amazon/ena/ena_netdev.c
+index 6975150..0530201 100644
+--- a/drivers/net/ethernet/amazon/ena/ena_netdev.c
++++ b/drivers/net/ethernet/amazon/ena/ena_netdev.c
+@@ -556,7 +556,7 @@ static int ena_refill_rx_bufs(struct ena_ring *rx_ring, u32 num)
+ 		 * issue a doorbell
+ 		 */
+ 		wmb();
+-		ena_com_write_sq_doorbell(rx_ring->ena_com_io_sq);
++		ena_com_write_sq_doorbell(rx_ring->ena_com_io_sq, true);
+ 	}
+ 
+ 	rx_ring->next_to_use = next_to_use;
+@@ -2151,7 +2151,7 @@ static netdev_tx_t ena_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 
+ 	if (netif_xmit_stopped(txq) || !skb->xmit_more) {
+ 		/* trigger the dma engine */
+-		ena_com_write_sq_doorbell(tx_ring->ena_com_io_sq);
++		ena_com_write_sq_doorbell(tx_ring->ena_com_io_sq, false);
+ 		u64_stats_update_begin(&tx_ring->syncp);
+ 		tx_ring->tx_stats.doorbells++;
+ 		u64_stats_update_end(&tx_ring->syncp);
 -- 
 2.7.4
