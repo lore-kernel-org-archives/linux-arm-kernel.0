@@ -1,49 +1,36 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Mar 2018 00:02:02 +0100
-Subject: [PATCH 1/5] bus: arm-cci: use asm unreachable
+Date: Wed, 21 Mar 2018 00:02:05 +0100
+Subject: [PATCH 4/5] ARM: drop no-thumb-interwork in EABI mode
 In-Reply-To: <20180320230206.25289-1-stefan@agner.ch>
 References: <20180320230206.25289-1-stefan@agner.ch>
-Message-ID: <20180320230206.25289-2-stefan@agner.ch>
+Message-ID: <20180320230206.25289-5-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mixing asm and C code is not recommended in a naked function by
-gcc and leads to an error when using clang:
-  drivers/bus/arm-cci.c:2107:2: error: non-ASM statement in naked
-  function is not supported
-        unreachable();
-        ^
+According to GCC documentation -m(no-)thumb-interwork is
+meaningless in AAPCS configurations. Also clang does not
+support the flag:
+  clang-5.0: error: unknown argument: '-mno-thumb-interwork'
 
-Instead of using the unreachable() macro use the assember variant
-ASM_UNREACHABLE.  This will no longer emit __builtin_unreachable(),
-but since the function is naked and its return type is void it seems
-not to have aversive effects.
+Just drop -mno-thumb-interwork in AEABI configuration.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/bus/arm-cci.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 5426c04fe24b..ee9da86fec47 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -2084,6 +2084,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e83f5161fdd8..e9e3fde3c657 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -106,7 +106,7 @@ tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+ tune-y := $(tune-y)
  
- "	mov	r0, #0 \n"
- "	bx	lr \n"
-+	ASM_UNREACHABLE
- 
- "	.align	2 \n"
- "5:	.word	cpu_port - . \n"
-@@ -2103,8 +2104,6 @@ asmlinkage void __naked cci_enable_port_for_self(void)
- 	[sizeof_struct_cpu_port] "i" (sizeof(struct cpu_port)),
- 	[sizeof_struct_ace_port] "i" (sizeof(struct cci_ace_port)),
- 	[offsetof_port_phys] "i" (offsetof(struct cci_ace_port, phys)) );
--
--	unreachable();
- }
- 
- /**
+ ifeq ($(CONFIG_AEABI),y)
+-CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
++CFLAGS_ABI	:=-mabi=aapcs-linux -mfpu=vfp
+ else
+ CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
+ endif
 -- 
 2.16.2
