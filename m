@@ -1,40 +1,59 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:42:25 -0400
-Subject: [PATCH v4 10/17] qlcnic: Eliminate duplicate barriers on
- weakly-ordered archs
+Date: Mon, 19 Mar 2018 22:42:20 -0400
+Subject: [PATCH v4 05/17] ixgbevf: keep writel() closer to wmb()
 In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
 References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521513753-7325-11-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521513753-7325-6-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a
-barrier on some architectures like arm64.
-
-This ends up CPU observing two barriers back to back before executing
-the register write.
-
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+Remove ixgbevf_write_tail() in favor of moving writel() close to
+wmb().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Acked-by: Manish Chopra <manish.chopra@cavium.com>
+Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
 ---
- drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 4 ++--
+ 2 files changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c
-index 46b0372..97c146e7 100644
---- a/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c
-+++ b/drivers/net/ethernet/qlogic/qlcnic/qlcnic_83xx_hw.c
-@@ -478,7 +478,7 @@ irqreturn_t qlcnic_83xx_clear_legacy_intr(struct qlcnic_adapter *adapter)
- 	wmb();
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
+index f695242..11e893e 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
+@@ -244,11 +244,6 @@ static inline u16 ixgbevf_desc_unused(struct ixgbevf_ring *ring)
+ 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
+ }
  
- 	/* clear the interrupt trigger control register */
--	writel(0, adapter->isr_int_vec);
-+	writel_relaxed(0, adapter->isr_int_vec);
- 	intr_val = readl(adapter->isr_int_vec);
- 	do {
- 		intr_val = readl(adapter->tgt_status_reg);
+-static inline void ixgbevf_write_tail(struct ixgbevf_ring *ring, u32 value)
+-{
+-	writel(value, ring->tail);
+-}
+-
+ #define IXGBEVF_RX_DESC(R, i)	\
+ 	(&(((union ixgbe_adv_rx_desc *)((R)->desc))[i]))
+ #define IXGBEVF_TX_DESC(R, i)	\
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+index 9b3d43d..6bf778a 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+@@ -659,7 +659,7 @@ static void ixgbevf_alloc_rx_buffers(struct ixgbevf_ring *rx_ring,
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		ixgbevf_write_tail(rx_ring, i);
++		writel(i, rx_ring->tail);
+ 	}
+ }
+ 
+@@ -3644,7 +3644,7 @@ static void ixgbevf_tx_map(struct ixgbevf_ring *tx_ring,
+ 	tx_ring->next_to_use = i;
+ 
+ 	/* notify HW of packet */
+-	ixgbevf_write_tail(tx_ring, i);
++	writel(i, tx_ring->tail);
+ 
+ 	return;
+ dma_error:
 -- 
 2.7.4
