@@ -1,29 +1,29 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 20 Mar 2018 10:03:33 -0700
-Subject: [PATCH v8 01/42] dt-bindings: clock: Add new bindings for TI
- Davinci PLL clocks
-In-Reply-To: <1521168778-27236-2-git-send-email-david@lechnology.com>
+Date: Tue, 20 Mar 2018 10:03:36 -0700
+Subject: [PATCH v8 02/42] clk: davinci: New driver for davinci PLL clocks
+In-Reply-To: <1521168778-27236-3-git-send-email-david@lechnology.com>
 References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-2-git-send-email-david@lechnology.com>
-Message-ID: <152156541358.183971.6354552764403526569@swboyd.mtv.corp.google.com>
+ <1521168778-27236-3-git-send-email-david@lechnology.com>
+Message-ID: <152156541626.183971.14116213325024297115@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting David Lechner (2018-03-15 19:52:17)
-> This adds a new binding for the PLL IP blocks in the mach-davinci
-> family of processors. Currently, only da850 has device tree support
-> but these bindings can also work for other SoCs in this family just
-> by adding new compatible strings.
+Quoting David Lechner (2018-03-15 19:52:18)
+> This adds a new driver for mach-davinci PLL clocks. This is porting the
+> code from arch/arm/mach-davinci/clock.c to the common clock framework.
+> Additionally, it adds device tree support for these clocks.
 > 
-> Note: Although these PLL controllers are very similar to the TI Keystone
-> SoCs, we are not re-using those bindings. The Keystone bindings use a
-> legacy one-node-per-clock binding. Furthermore, the mach-davinici SoCs
-> have a slightly different PLL register layout and a number of quirks
-> that can't be handled by the existing bindings, so the keystone bindings
-> could not be used as-is anyway.
+> The ifeq ($(CONFIG_COMMON_CLK), y) in the Makefile is needed to prevent
+> compile errors until the clock code in arch/arm/mach-davinci is removed.
+> 
+> Note: although there are similar clocks for TI Keystone we are not able
+> to share the code for a few reasons. The keystone clocks are device tree
+> only and use legacy one-node-per-clock bindings. Also the register
+> layouts are a bit different, which would add even more if/else mess
+> to the keystone clocks. And the keystone PLL driver doesn't support
+> setting clock rates.
 > 
 > Signed-off-by: David Lechner <david@lechnology.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
 > ---
 
 Applied to clk-next
