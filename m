@@ -1,45 +1,54 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Tue, 20 Mar 2018 10:45:09 +0100
-Subject: [RESEND PATCH v1 6/6] i2c: i2c-stm32f7: Implement I2C recovery
- mechanism
-In-Reply-To: <20180320094216.ugietqyerdowq4c4@katana>
-References: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
- <1520852023-27083-7-git-send-email-pierre-yves.mordret@st.com>
- <20180317204720.mclh4jw5owobbtww@ninjato>
- <2672947b-46b2-7bd7-ac13-501db8bde72b@st.com>
- <fdc16b28-3aab-1d37-3c93-40ed371bfd4f@st.com>
- <20180320094216.ugietqyerdowq4c4@katana>
-Message-ID: <4a1aa386-21dc-12a2-b2b5-6e25586ffc79@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Mar 2018 09:47:44 +0000
+Subject: [PATCH v2] arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP
+ hardening
+In-Reply-To: <fed53181-db58-9f48-0c5b-7eebe9eb9b10@arm.com>
+References: <1520269603-2900-1-git-send-email-shankerd@codeaurora.org>
+ <861sgx5wb6.wl-marc.zyngier@arm.com>
+ <fed53181-db58-9f48-0c5b-7eebe9eb9b10@arm.com>
+Message-ID: <20180320094744.GA24986@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your quick answer
+On Mon, Mar 19, 2018 at 06:30:16PM +0000, Marc Zyngier wrote:
+> On 06/03/18 10:32, Marc Zyngier wrote:
+> > On Mon, 05 Mar 2018 17:06:43 +0000,
+> > Shanker Donthineni wrote:
+> >>
+> >> The function SMCCC_ARCH_WORKAROUND_1 was introduced as part of SMC
+> >> V1.1 Calling Convention to mitigate CVE-2017-5715. This patch uses
+> >> the standard call SMCCC_ARCH_WORKAROUND_1 for Falkor chips instead
+> >> of Silicon provider service ID 0xC2001700.
+> >>
+> >> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> >> ---
+> >> Chnages since v1:
+> >>   - Trivial change in cpucaps.h (refresh after removing ARM64_HARDEN_BP_POST_GUEST_EXIT)
+> >>
+> >>  arch/arm64/include/asm/cpucaps.h |  5 ++--
+> >>  arch/arm64/include/asm/kvm_asm.h |  2 --
+> >>  arch/arm64/kernel/bpi.S          |  8 ------
+> >>  arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++--------------------------
+> >>  arch/arm64/kvm/hyp/entry.S       | 12 ---------
+> >>  arch/arm64/kvm/hyp/switch.c      | 10 --------
+> >>  6 files changed, 21 insertions(+), 71 deletions(-)
+> > 
+> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > Will/Catalin, if you want to take it via the arm64 tree, that's fine
+> > by me.
+> 
+> Please allow me to change my mind. This is going to conflict horribly
+> with the VHE rework and the HYP randomization patches.
+> 
+> I'll take it via the KVM tree, which will make everyone's life a lot easier.
 
-On 03/20/2018 10:42 AM, Wolfram Sang wrote:
-> Hi,
-> 
->> Looking at the recovery API, this recovery is for slave and nothing else with my
->> case. Therefore I think I have to get move this reset out of recovery API.
-> 
-> Yes, you are correct. You need a custom function, this is totally driver
-> specific.
+Sure; if you need it:
 
-OK !
-> 
->> Slave Recovery mechanism is another story to implement in our platform since we
->> have to deal with GPIOs.
-> 
-> For that, the recovery infrastructure in the core has lots of helpers
-> for you.
-> 
-Yeah. This is what I saw nonetheless the main trouble is to setup SCL/SDA into
-GPIO. Not that easy. but feasible of course.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-BTW I will rework my driver.
+You'll probably want to comment out the ARM64_HARDEN_BP_POST_GUEST_EXIT
+capability for now to avoid silly conflicts in -next. I can remove and
+renumber at -rc1.
 
-Thanks.
-
-> Regards,
-> 
->    Wolfram
-> 
+Will
