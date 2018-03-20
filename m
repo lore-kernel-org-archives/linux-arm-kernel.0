@@ -1,90 +1,76 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 21 Mar 2018 05:49:59 +0800
-Subject: [xlnx:master 1383/1541] drivers/dma/xgene-dma.c:459:3: error:
- implicit declaration of function 'xgene_dma_invalidate_buffer'; did you mean
- 'xgene_dma_set_src_buffer'?
-Message-ID: <201803210558.7zrwWZ7A%fengguang.wu@intel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 20 Mar 2018 22:56:15 +0100
+Subject: [PATCH] pinctrl: armada-37xx: Add edge both type gpio irq support
+In-Reply-To: <20171031131617.GA11647@lunn.ch>
+References: <20171019131003.9684-1-gregory.clement@free-electrons.com>
+ <CACRpkdbqjh5U5QoE_B+7GfSyDdHW-NCAvogGq-2n8j6L6nG-Gw@mail.gmail.com>
+ <20171031131617.GA11647@lunn.ch>
+Message-ID: <20180320215615.zszlfw5pnecfqhpt@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On Tue, Oct 31, 2017 at 02:16:17PM +0100, Andrew Lunn wrote:
+> > Patch applied.
+> > 
+> > The discussion here is interesting, it is customary for GPIO drivers
+> > to implement double-edge detection emulation by swapping the
+> > edge detector around like this.
+> 
+> Hi Linus
+> 
+> I was not aware this was customary.
+> 
+> > It might be possible to collect some generic information about
+> > this in the Documentation/gpio/driver.txt document.
+> 
+> Yes, i think it should be documented somewhere. Even in the use case
+> here, detecting an SD card being inserted/removed, you could get some
+> bounce on the microswitch, miss an edge, and be in the wrong state.
 
-FYI, the error/warning still remains.
+Maybe I'm wrong, but I wonder if there could be a set of helper
+functions provided by the gpio core that helps implementing this
+software simulation of IRQ_TYPE_EDGE_BOTH reliably (i.e. as good as
+possible in software) to prevent common mistakes.
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   ebb848efc1cf6a6d63565e09888e56d9928965f6
-commit: d1797ba7285165859c754c6ff22fd77b7c74c0e6 [1383/1541] Revert "dmaengine: remove DMA_SG as it is dead code in kernel"
-config: sh-allmodconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d1797ba7285165859c754c6ff22fd77b7c74c0e6
-        # save the attached .config to linux build tree
-        make.cross ARCH=sh 
+First draft:
 
-All errors (new ones prefixed by >>):
+		disable_irq_nosync(...);
+		level = gpio_get(...);
+	retry:
+		if (level)
+			configure_for_falling_edge();
+		else
+			configure_for_raising_edge();
+		postlevel = gpio_get(...);
 
-   drivers/dma/xgene-dma.c: In function 'xgene_dma_prep_cpy_desc':
->> drivers/dma/xgene-dma.c:459:3: error: implicit declaration of function 'xgene_dma_invalidate_buffer'; did you mean 'xgene_dma_set_src_buffer'? [-Werror=implicit-function-declaration]
-      xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
-      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-      xgene_dma_set_src_buffer
-   cc1: some warnings being treated as errors
+		if (level != postlevel) {
+			mark_irq_pending(); /* something like desc->istate |= IRQS_PENDING */
+			level = postlevel;
+			goto retry;
+		}
 
-vim +459 drivers/dma/xgene-dma.c
+		enable_irq(...); /* this resends the irq */
 
-   422	
-   423	static void xgene_dma_prep_cpy_desc(struct xgene_dma_chan *chan,
-   424					    struct xgene_dma_desc_sw *desc_sw,
-   425					    dma_addr_t dst, dma_addr_t src,
-   426					    size_t len)
-   427	{
-   428		struct xgene_dma_desc_hw *desc1, *desc2;
-   429		int i;
-   430	
-   431		/* Get 1st descriptor */
-   432		desc1 = &desc_sw->desc1;
-   433		xgene_dma_init_desc(desc1, chan->tx_ring.dst_ring_num);
-   434	
-   435		/* Set destination address */
-   436		desc1->m2 |= cpu_to_le64(XGENE_DMA_DESC_DR_BIT);
-   437		desc1->m3 |= cpu_to_le64(dst);
-   438	
-   439		/* Set 1st source address */
-   440		xgene_dma_set_src_buffer(&desc1->m1, &len, &src);
-   441	
-   442		if (!len)
-   443			return;
-   444	
-   445		/*
-   446		 * We need to split this source buffer,
-   447		 * and need to use 2nd descriptor
-   448		 */
-   449		desc2 = &desc_sw->desc2;
-   450		desc1->m0 |= cpu_to_le64(XGENE_DMA_DESC_NV_BIT);
-   451	
-   452		/* Set 2nd to 5th source address */
-   453		for (i = 0; i < 4 && len; i++)
-   454			xgene_dma_set_src_buffer(xgene_dma_lookup_ext8(desc2, i),
-   455						 &len, &src);
-   456	
-   457		/* Invalidate unused source address field */
-   458		for (; i < 4; i++)
- > 459			xgene_dma_invalidate_buffer(xgene_dma_lookup_ext8(desc2, i));
-   460	
-   461		/* Updated flag that we have prepared 64B descriptor */
-   462		desc_sw->flags |= XGENE_DMA_FLAG_64B_DESC;
-   463	}
-   464	
+I think this only looses an event if there is an edge between gpio_get
+and the configure_for_${some}_edge and another before postlevel = ...
+that make the two events invisible. But I think this is okish, as a
+short spike might also be missed by a hw-edge-detector. And compared to
+the current code there should be no way to end in a state where we
+configured for raising edge and the level is already high.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 46837 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180321/8fb14b65/attachment-0001.gz>
+When the gpio toggles quickly this might keep the cpu busy in an endless
+loop, but such a sequence would also block a controller that can trigger
+on both edges in hardware. Not sure if breaking the loop at some point
+is sensible anyhow. Also calling the irq handlers would be beneficial,
+but I don't know if/how this works without (more) racing.
+
+A similar approach would be great to have to "simulate" level sensitive
+irqs if the hardware only implements edge logic (which affects
+armada-37xx, too, which annoys me).
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
