@@ -1,49 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 20 Mar 2018 09:12:16 +0800
-Subject: [PATCH] ASoC: uniphier: evea: add switch for changing source of
- line-in
-In-Reply-To: <001101d3bf39$6e3933c0$4aab9b40$@socionext.com>
-References: <20180314123900.19505-1-suzuki.katsuhiro@socionext.com>
- <20180314162609.GV2186@sirena.org.uk>
- <001101d3bf39$6e3933c0$4aab9b40$@socionext.com>
-Message-ID: <20180320011216.GN2186@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Mar 2018 02:17:28 +0100
+Subject: [GIT PULL] defconfig changes for Versatile DRM
+Message-ID: <CACRpkdZcsFhZYCwe_ub4AEyVYfPRkwxTQ7=E4w3NjUE_8agUbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 01:19:10PM +0900, Katsuhiro Suzuki wrote:
+Hi,
 
-> > I'll apply for now but this should really be a DAPM control so that we
-> > can power down things connected to the disconnected line inputs when
-> > recording.
+this augments the RealView and Versatile defconfigs to use
+DRM on the Pl111 rather than fbdev.
 
-> Thanks a lot for your suggestion. I tried to change the implementation to DAPM
-> control as follows:
+Please pull it in!
 
-> I can see the value of ALINSW1 register at 'Line In 1 Mux',0 using
->   amixer get 'Line In 1 Mux',0
+Yours,
+Linus Walleij
 
-> But I can't change the value.
->   amixer set 'Line In 1 Mux',0 LIN2
->   Simple mixer control 'Line In 1 Mux',0
->     Capabilities: enum
->     Items: 'LIN1' 'LIN2' 'LIN3'
->     Item0: 'LIN1'
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-> Would you tell me what is wrong...
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-Ugh, I *have* run into that before but I can't remember what triggers it
-and your code doesn't have any mistakes I can spot.  Unfortunately I'm
-at Linaro Connect this week and don't have a test system I can poke at
-with me to remind myself, and I'm still travelling next week
-unfortunately.
+are available in the Git repository at:
 
-I'd add some trace to the set code path to make sure everything is being
-called as expected.  It's somemthing really small that's hard to make a
-warning for in the code IIRC.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180320/0d7b9228/attachment.sig>
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/armsoc-versatile-drm-defconfig
+
+for you to fetch changes up to 59ff3af3f2672453fc08f379ee62ae3c8cedbfa1:
+
+  ARM: defconfig: Configure Versatile boards to use PL111 DRM
+(2018-03-20 02:06:54 +0100)
+
+----------------------------------------------------------------
+This augments the RealView and Versatile defconfig to use the PL111
+DRM driver rather than the old fbdev driver.
+
+----------------------------------------------------------------
+Linus Walleij (4):
+      ARM: defconfig: Update RealView defconfig
+      ARM: defconfig: Switch RealView boards to use P111 DRM
+      ARM: defconfig: Update Versatile defconfig
+      ARM: defconfig: Configure Versatile boards to use PL111 DRM
+
+ arch/arm/configs/realview_defconfig  | 21 ++++++++++-----------
+ arch/arm/configs/versatile_defconfig | 18 +++++++++++-------
+ 2 files changed, 21 insertions(+), 18 deletions(-)
