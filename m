@@ -1,49 +1,64 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 20 Mar 2018 10:08:40 +0800
-Subject: [PATCH V2] ARM: dts: imx7d-pinfunc: update sai select input value
-Message-ID: <1521511720-17598-1-git-send-email-Anson.Huang@nxp.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 20 Mar 2018 09:28:53 +0530
+Subject: [PATCH v3 10/13] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2
+ board file
+In-Reply-To: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521518336-5467-11-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shengjiu Wang <shengjiu.wang@nxp.com>
-
-Update SAI select input daisy chain value according to
-Reference Manual.
-
-Signed-off-by: Shengjiu Wang <shengjiu.wang@nxp.com>
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/imx7d-pinfunc.h | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts | 26 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
 
-diff --git a/arch/arm/boot/dts/imx7d-pinfunc.h b/arch/arm/boot/dts/imx7d-pinfunc.h
-index f2493bc..aa9dbea 100644
---- a/arch/arm/boot/dts/imx7d-pinfunc.h
-+++ b/arch/arm/boot/dts/imx7d-pinfunc.h
-@@ -592,7 +592,7 @@
- #define MX7D_PAD_UART2_RX_DATA__UART2_DCE_RX                      0x0130 0x03A0 0x06FC 0x0 0x2
- #define MX7D_PAD_UART2_RX_DATA__UART2_DTE_TX                      0x0130 0x03A0 0x0000 0x0 0x0
- #define MX7D_PAD_UART2_RX_DATA__I2C2_SCL                          0x0130 0x03A0 0x05DC 0x1 0x0
--#define MX7D_PAD_UART2_RX_DATA__SAI3_RX_BCLK                      0x0130 0x03A0 0x0000 0x2 0x0
-+#define MX7D_PAD_UART2_RX_DATA__SAI3_RX_BCLK                      0x0130 0x03A0 0x06C4 0x2 0x0
- #define MX7D_PAD_UART2_RX_DATA__ECSPI1_SS3                        0x0130 0x03A0 0x0000 0x3 0x0
- #define MX7D_PAD_UART2_RX_DATA__ENET2_1588_EVENT1_IN              0x0130 0x03A0 0x0000 0x4 0x0
- #define MX7D_PAD_UART2_RX_DATA__GPIO4_IO2                         0x0130 0x03A0 0x0000 0x5 0x0
-@@ -1112,13 +1112,13 @@
- #define MX7D_PAD_ENET1_RGMII_TD3__GPIO7_IO9                       0x0250 0x04C0 0x0000 0x5 0x0
- #define MX7D_PAD_ENET1_RGMII_TD3__CAAM_RNG_OSC_OBS                0x0250 0x04C0 0x0000 0x7 0x0
- #define MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL           0x0254 0x04C4 0x0000 0x0 0x0
--#define MX7D_PAD_ENET1_RGMII_TX_CTL__SAI1_RX_SYNC                 0x0254 0x04C4 0x0000 0x2 0x0
-+#define MX7D_PAD_ENET1_RGMII_TX_CTL__SAI1_RX_SYNC                 0x0254 0x04C4 0x06A4 0x2 0x1
- #define MX7D_PAD_ENET1_RGMII_TX_CTL__GPT2_COMPARE1                0x0254 0x04C4 0x0000 0x3 0x0
- #define MX7D_PAD_ENET1_RGMII_TX_CTL__EPDC_PWR_CTRL2               0x0254 0x04C4 0x0000 0x4 0x0
- #define MX7D_PAD_ENET1_RGMII_TX_CTL__GPIO7_IO10                   0x0254 0x04C4 0x0000 0x5 0x0
- #define MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC                 0x0258 0x04C8 0x0000 0x0 0x0
- #define MX7D_PAD_ENET1_RGMII_TXC__ENET1_TX_ER                     0x0258 0x04C8 0x0000 0x1 0x0
--#define MX7D_PAD_ENET1_RGMII_TXC__SAI1_RX_BCLK                    0x0258 0x04C8 0x0000 0x2 0x0
-+#define MX7D_PAD_ENET1_RGMII_TXC__SAI1_RX_BCLK                    0x0258 0x04C8 0x069C 0x2 0x1
- #define MX7D_PAD_ENET1_RGMII_TXC__GPT2_COMPARE2                   0x0258 0x04C8 0x0000 0x3 0x0
- #define MX7D_PAD_ENET1_RGMII_TXC__EPDC_PWR_CTRL3                  0x0258 0x04C8 0x0000 0x4 0x0
- #define MX7D_PAD_ENET1_RGMII_TXC__GPIO7_IO11                      0x0258 0x04C8 0x0000 0x5 0x0
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8c93fd0..0844087 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -750,6 +750,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-ipq4019-ap.dk04.1-c1.dtb \
+ 	qcom-ipq4019-ap.dk04.1-c3.dtb \
+ 	qcom-ipq4019-ap.dk07.1-c1.dtb \
++	qcom-ipq4019-ap.dk07.1-c2.dtb \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+new file mode 100644
+index 0000000..c1e909c
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#include "qcom-ipq4019-ap.dk07.1.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1-C2";
++
++	soc {
++		pinctrl at 1000000 {
++			serial_1_pins: serial1_pinmux {
++				mux {
++					pins = "gpio8", "gpio9";
++					function = "blsp_uart1";
++					bias-disable;
++				};
++			};
++		};
++
++		serial at 78b0000 {
++			pinctrl-0 = <&serial_1_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++		};
++	};
++};
 -- 
-2.7.4
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
