@@ -1,74 +1,64 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 20 Mar 2018 10:00:49 -0500
-Subject: [PATCH v4 1/6] RDMA/bnxt_re: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180320144801.GE19744@ziepe.ca>
-References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
- <1521514068-8856-2-git-send-email-okaya@codeaurora.org>
- <20180320144801.GE19744@ziepe.ca>
-Message-ID: <d31c062b-5629-62b8-c291-c656e23c6f82@codeaurora.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 20 Mar 2018 16:04:17 +0100
+Subject: [PATCH -next] drm/meson: Fix potential NULL dereference in
+ meson_drv_bind_master()
+In-Reply-To: <1521555630-29284-1-git-send-email-weiyongjun1@huawei.com>
+References: <1521555630-29284-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <4cad8099-dbb8-d12c-9ce8-b64688222bd7@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/20/2018 9:48 AM, Jason Gunthorpe wrote:
-> On Mon, Mar 19, 2018 at 10:47:43PM -0400, Sinan Kaya wrote:
->> Code includes wmb() followed by writel(). writel() already has a barrier on
->> some architectures like arm64.
->>
->> This ends up CPU observing two barriers back to back before executing the
->> register write.
->>
->> Since code already has an explicit barrier call, changing writel() to
->> writel_relaxed().
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>  drivers/infiniband/hw/bnxt_re/qplib_rcfw.c | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
->> index 8329ec6..4a6b981 100644
->> +++ b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
->> @@ -181,10 +181,10 @@ static int __send_message(struct bnxt_qplib_rcfw *rcfw, struct cmdq_base *req,
->>  
->>  	/* ring CMDQ DB */
->>  	wmb();
->> -	writel(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
->> -	       rcfw->cmdq_bar_reg_prod_off);
->> -	writel(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
->> -	       rcfw->cmdq_bar_reg_trig_off);
->> +	writel_relaxed(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
->> +		       rcfw->cmdq_bar_reg_prod_off);
->> +	writel_relaxed(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
->> +		       rcfw->cmdq_bar_reg_trig_off);
+On 20/03/2018 15:20, Wei Yongjun wrote:
+> platform_get_resource_byname() may fail and return NULL, so we should
+> better check it's return value to avoid a NULL pointer dereference
+> a bit later in the code.
 > 
-> Woah, this may not be safe..
+> This is detected by Coccinelle semantic patch.
 > 
-> The definition of writel_relaxed() is that it is fully unordered, so
-> the above two writes may change order now. Broadcom guys would have to
-> ack if that it is OK or not for their hardware.
+> @@
+> expression pdev, res, n, t, e, e1, e2;
+> @@
 > 
-> In general this is not an OK approach for a mechanical
-> conversion.. Only the first writel can be convereted.
+> res = platform_get_resource_byname(pdev, t, n);
+> + if (!res)
+> +   return -EINVAL;
+> ... when != res == NULL
+> e = devm_ioremap(e1, res->start, e2);
 > 
-> You need to check all your patches to make sure there are no
-> subsequent writel's in the places touched.
-
-I paid special attention to this one and went to check the barriers
-document. According to the document, writes (whether it is relaxed or not)
-are always observed by the HW inorder with respect to each other.
-It just doesn't guarantee anything above writel_relaxed() to be observed.
-Since we already have a wmb(), this is taken care of. 
-
-If somebody wants things to be observed after register write, there should
-have been a wmb() or mmiowb() afterwards.
-
-
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/gpu/drm/meson/meson_drv.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> Jason
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index 3baceb7..32b1a6c 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -197,6 +197,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  	priv->io_base = regs;
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hhi");
+> +	if (!res)
+> +		return -EINVAL;
+>  	/* Simply ioremap since it may be a shared register zone */
+>  	regs = devm_ioremap(dev, res->start, resource_size(res));
+>  	if (!regs) {
+> @@ -213,6 +215,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+>  	}
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
+> +	if (!res)
+> +		return -EINVAL;
+>  	/* Simply ioremap since it may be a shared register zone */
+>  	regs = devm_ioremap(dev, res->start, resource_size(res));
+>  	if (!regs) {
 > 
+> 
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+> 
+Thanks,
 
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
