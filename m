@@ -1,10 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:42:27 -0400
-Subject: [PATCH v4 12/17] net: cxgb4/cxgb4vf: Eliminate duplicate barriers on
+Date: Mon, 19 Mar 2018 22:42:30 -0400
+Subject: [PATCH v4 15/17] bnxt_en: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
 References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521513753-7325-13-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521513753-7325-16-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,183 +17,67 @@ register write.
 Create a new wrapper function with relaxed write operator. Use the new
 wrapper when a write is following a wmb().
 
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
+
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  6 ++++++
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 13 +++++++------
- drivers/net/ethernet/chelsio/cxgb4/sge.c        | 12 ++++++------
- drivers/net/ethernet/chelsio/cxgb4/t4_hw.c      |  2 +-
- drivers/net/ethernet/chelsio/cxgb4vf/adapter.h  | 14 ++++++++++++++
- drivers/net/ethernet/chelsio/cxgb4vf/sge.c      | 18 ++++++++++--------
- 6 files changed, 44 insertions(+), 21 deletions(-)
+ drivers/net/ethernet/broadcom/bnxt/bnxt.c         |  2 +-
+ drivers/net/ethernet/broadcom/bnxt/bnxt.h         | 11 ++++++++++-
+ drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c |  2 +-
+ 3 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index 9040e13..6bde0b9 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-@@ -1202,6 +1202,12 @@ static inline void t4_write_reg(struct adapter *adap, u32 reg_addr, u32 val)
- 	writel(val, adap->regs + reg_addr);
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index 1500243..befb538 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -1922,7 +1922,7 @@ static int bnxt_poll_work(struct bnxt *bp, struct bnxt_napi *bnapi, int budget)
+ 		/* Sync BD data before updating doorbell */
+ 		wmb();
+ 
+-		bnxt_db_write(bp, db, DB_KEY_TX | prod);
++		bnxt_db_write_relaxed(bp, db, DB_KEY_TX | prod);
+ 	}
+ 
+ 	cpr->cp_raw_cons = raw_cons;
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.h b/drivers/net/ethernet/broadcom/bnxt/bnxt.h
+index 1989c47..4c0d048 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.h
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.h
+@@ -1402,11 +1402,20 @@ static inline u32 bnxt_tx_avail(struct bnxt *bp, struct bnxt_tx_ring_info *txr)
  }
  
-+static inline void t4_write_reg_relaxed(struct adapter *adap, u32 reg_addr,
-+					u32 val)
+ /* For TX and RX ring doorbells */
++static inline void bnxt_db_write_relaxed(struct bnxt *bp, void __iomem *db,
++					 u32 val)
 +{
-+	writel_relaxed(val, adap->regs + reg_addr);
++	writel_relaxed(val, db);
++	if (bp->flags & BNXT_FLAG_DOUBLE_DB)
++		writel_relaxed(val, db);
 +}
 +
- #ifndef readq
- static inline u64 readq(const volatile void __iomem *addr)
++/* For TX and RX ring doorbells */
+ static inline void bnxt_db_write(struct bnxt *bp, void __iomem *db, u32 val)
  {
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 7b452e8..276472d 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -1723,8 +1723,8 @@ int cxgb4_sync_txq_pidx(struct net_device *dev, u16 qid, u16 pidx,
- 		else
- 			val = PIDX_T5_V(delta);
- 		wmb();
--		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--			     QID_V(qid) | val);
-+		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+				     QID_V(qid) | val);
- 	}
- out:
- 	return ret;
-@@ -1902,8 +1902,9 @@ static void enable_txq_db(struct adapter *adap, struct sge_txq *q)
- 		 * are committed before we tell HW about them.
- 		 */
- 		wmb();
--		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--			     QID_V(q->cntxt_id) | PIDX_V(q->db_pidx_inc));
-+		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+				     QID_V(q->cntxt_id) |
-+						PIDX_V(q->db_pidx_inc));
- 		q->db_pidx_inc = 0;
- 	}
- 	q->db_disabled = 0;
-@@ -2003,8 +2004,8 @@ static void sync_txq_pidx(struct adapter *adap, struct sge_txq *q)
- 		else
- 			val = PIDX_T5_V(delta);
- 		wmb();
--		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--			     QID_V(q->cntxt_id) | val);
-+		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+				     QID_V(q->cntxt_id) | val);
- 	}
- out:
- 	q->db_disabled = 0;
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-index 6e310a0..7388aac 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-@@ -530,11 +530,11 @@ static inline void ring_fl_db(struct adapter *adap, struct sge_fl *q)
- 		 * mechanism.
- 		 */
- 		if (unlikely(q->bar2_addr == NULL)) {
--			t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
--				     val | QID_V(q->cntxt_id));
-+			t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
-+					     val | QID_V(q->cntxt_id));
- 		} else {
--			writel(val | QID_V(q->bar2_qid),
--			       q->bar2_addr + SGE_UDB_KDOORBELL);
-+			writel_relaxed(val | QID_V(q->bar2_qid),
-+				       q->bar2_addr + SGE_UDB_KDOORBELL);
- 
- 			/* This Write memory Barrier will force the write to
- 			 * the User Doorbell area to be flushed.
-@@ -986,8 +986,8 @@ inline void cxgb4_ring_tx_db(struct adapter *adap, struct sge_txq *q, int n)
- 				      (q->bar2_addr + SGE_UDB_WCDOORBELL),
- 				      wr);
- 		} else {
--			writel(val | QID_V(q->bar2_qid),
--			       q->bar2_addr + SGE_UDB_KDOORBELL);
-+			writel_relaxed(val | QID_V(q->bar2_qid),
-+				       q->bar2_addr + SGE_UDB_KDOORBELL);
- 		}
- 
- 		/* This Write Memory Barrier will force the write to the User
-diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 920bccd..8b723a0 100644
---- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-@@ -139,7 +139,7 @@ void t4_write_indirect(struct adapter *adap, unsigned int addr_reg,
- {
- 	while (nregs--) {
- 		t4_write_reg(adap, addr_reg, start_idx++);
--		t4_write_reg(adap, data_reg, *vals++);
-+		t4_write_reg_relaxed(adap, data_reg, *vals++);
- 	}
+ 	writel(val, db);
+ 	if (bp->flags & BNXT_FLAG_DOUBLE_DB)
+-		writel(val, db);
++		writel_relaxed(val, db);
  }
  
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-index 5883f09..00247be4 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-@@ -442,6 +442,20 @@ static inline void t4_write_reg(struct adapter *adapter, u32 reg_addr, u32 val)
- 	writel(val, adapter->regs + reg_addr);
- }
+ extern const u16 bnxt_lhint_arr[];
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
+index 1801582..a1b1060 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
+@@ -2403,7 +2403,7 @@ static int bnxt_run_loopback(struct bnxt *bp)
+ 	/* Sync BD data before updating doorbell */
+ 	wmb();
  
-+/**
-+ * t4_write_reg_relaxed - write a HW register without ordering guarantees
-+ * @adapter: the adapter
-+ * @reg_addr: the register address
-+ * @val: the value to write
-+ *
-+ * Write a 32-bit value into the given HW register.
-+ */
-+static inline void t4_write_reg_relaxed(struct adapter *adapter, u32 reg_addr,
-+					u32 val)
-+{
-+	writel_relaxed(val, adapter->regs + reg_addr);
-+}
-+
- #ifndef readq
- static inline u64 readq(const volatile void __iomem *addr)
- {
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-index dfce5df..a3a420b 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-@@ -546,12 +546,13 @@ static inline void ring_fl_db(struct adapter *adapter, struct sge_fl *fl)
- 		 * mechanism.
- 		 */
- 		if (unlikely(fl->bar2_addr == NULL)) {
--			t4_write_reg(adapter,
--				     T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
--				     QID_V(fl->cntxt_id) | val);
-+			t4_write_reg_relaxed(adapter,
-+					     T4VF_SGE_BASE_ADDR +
-+							SGE_VF_KDOORBELL,
-+					     QID_V(fl->cntxt_id) | val);
- 		} else {
--			writel(val | QID_V(fl->bar2_qid),
--			       fl->bar2_addr + SGE_UDB_KDOORBELL);
-+			writel_relaxed(val | QID_V(fl->bar2_qid),
-+				       fl->bar2_addr + SGE_UDB_KDOORBELL);
+-	bnxt_db_write(bp, txr->tx_doorbell, DB_KEY_TX | txr->tx_prod);
++	bnxt_db_write_relaxed(bp, txr->tx_doorbell, DB_KEY_TX | txr->tx_prod);
+ 	rc = bnxt_poll_loopback(bp, pkt_size);
  
- 			/* This Write memory Barrier will force the write to
- 			 * the User Doorbell area to be flushed.
-@@ -980,8 +981,9 @@ static inline void ring_tx_db(struct adapter *adapter, struct sge_txq *tq,
- 	if (unlikely(tq->bar2_addr == NULL)) {
- 		u32 val = PIDX_V(n);
- 
--		t4_write_reg(adapter, T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
--			     QID_V(tq->cntxt_id) | val);
-+		t4_write_reg_relaxed(adapter,
-+				     T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
-+				     QID_V(tq->cntxt_id) | val);
- 	} else {
- 		u32 val = PIDX_T5_V(n);
- 
-@@ -1026,7 +1028,7 @@ static inline void ring_tx_db(struct adapter *adapter, struct sge_txq *tq,
- 				count--;
- 			}
- 		} else
--			writel(val | QID_V(tq->bar2_qid),
-+			writel_relaxed(val | QID_V(tq->bar2_qid),
- 			       tq->bar2_addr + SGE_UDB_KDOORBELL);
- 
- 		/* This Write Memory Barrier will force the write to the User
+ 	dma_unmap_single(&bp->pdev->dev, map, pkt_size, PCI_DMA_TODEVICE);
 -- 
 2.7.4
