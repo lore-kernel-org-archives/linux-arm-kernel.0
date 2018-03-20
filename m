@@ -1,28 +1,33 @@
-From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Tue, 20 Mar 2018 08:20:07 +0000
-Subject: [PATCH RESEND 2/2] clk: stm32: Add DSI clock for STM32F469 Board
-In-Reply-To: <152149234283.242365.10046675267029705746@swboyd.mtv.corp.google.com>
-References: <1520578651-28849-1-git-send-email-gabriel.fernandez@st.com>
- <1520578651-28849-3-git-send-email-gabriel.fernandez@st.com>
- <152149234283.242365.10046675267029705746@swboyd.mtv.corp.google.com>
-Message-ID: <898668a8-5582-e84f-878a-35749ab39657@st.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 20 Mar 2018 16:48:49 +0800
+Subject: Failed to boot ARM64 boards for recent linux-next
+Message-ID: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Stephen !
+Hi Marc,
 
-Best Regards
+     I was able to boot my RK3399 board with in linux-next-20180314,
+but not today. My bisect robot shows me it was introduced by
 
-Gabriel
+commit d6062a6d62c643a06c393745d032da3e6441d4bd
+Author: Marc Zyngier <marc.zyngier@arm.com>
+Date:   Fri Mar 9 14:53:19 2018 +0000
+
+     irqchip/gic-v3: Reset APgRn registers at boot time
+
+     Booting a crash kernel while in an interrupt handler is likely
+     to leave the Active Priority Registers with some state that
+     is not relevant to the new kernel, and is likely to lead
+     to erratic behaviours such as interrupts not firing as their
+     priority is already active.
+
+     As a sanity measure, wipe the APRs clean on startup. We make
+     sure to wipe both group 0 and 1 registers in order to avoid
+     any surprise.
 
 
-On 03/19/2018 09:45 PM, Stephen Boyd wrote:
-> Quoting gabriel.fernandez at st.com (2018-03-08 22:57:31)
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>
->> This patch adds DSI clock for STM32F469 board
->>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->> ---
-> Applied to clk-next
->
+The panic log is here:
+https://paste.ubuntu.com/p/7WrJJDG6JQ/
+
+Is it a known issue or is there a coming patch for that?
