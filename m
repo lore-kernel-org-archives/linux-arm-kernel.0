@@ -1,51 +1,145 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 20 Mar 2018 12:09:49 +0800
-Subject: [RFC PATCH 1/6] arm64/mm: add explicit physical address argument
- to map_kernel_segment
-In-Reply-To: <20180320033323.kyjgtbzxc3vjpars@salmiak>
-References: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
- <20180319111958.4171-2-ard.biesheuvel@linaro.org>
- <20180320033323.kyjgtbzxc3vjpars@salmiak>
-Message-ID: <CAKv+Gu9u26jC90rTsRuNuP_vnCKpun=WOoq7RJ0juWwiWy7coA@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 20 Mar 2018 09:28:56 +0530
+Subject: [PATCH v3 13/13] ARM: dts: ipq8074: Enable few peripherals for hk01
+ board
+In-Reply-To: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521518336-5467-14-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2018 at 11:33, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Mar 19, 2018 at 07:19:53PM +0800, Ard Biesheuvel wrote:
->> In preparation of mapping a physically non-adjacent memory region
->> as backing for the vmlinux segment covering the trampoline and primary
->> level swapper_pg_dir regions, make the physical address an explicit
->> argument of map_kernel_segment().
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/mm/mmu.c | 22 ++++++++++++--------
->>  1 file changed, 13 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 8c704f1e53c2..007b2e32ca71 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -507,10 +507,10 @@ void mark_rodata_ro(void)
->>  }
->>
->>  static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
->> -                                   pgprot_t prot, struct vm_struct *vma,
->> -                                   int flags, unsigned long vm_flags)
->> +                                   phys_addr_t pa_start, pgprot_t prot,
->> +                                   struct vm_struct *vma, int flags,
->> +                                   unsigned long vm_flags)
->>  {
->> -     phys_addr_t pa_start = __pa_symbol(va_start);
->>       unsigned long size = va_end - va_start;
->>
->>       BUG_ON(!PAGE_ALIGNED(pa_start));
->
-> How about we rename this to __map_kernel_segment(), and have a
-> map_kernel_segment wrapper that does the __pa_symbol() stuff?
->
-> That would avoid some redundancy in map_kernel(), and when we can use
-> __map_kernel_segment() for the trampoline bits.
->
+Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 103 ++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
 
-Fair enough.
+diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+index 6a838b5..8efc8f9e 100644
+--- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
++++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+@@ -21,6 +21,7 @@
+ 
+ 	aliases {
+ 		serial0 = &blsp1_uart5;
++		serial1 = &serial_blsp2;
+ 	};
+ 
+ 	chosen {
+@@ -41,6 +42,47 @@
+ 					bias-disable;
+ 				};
+ 			};
++
++			 i2c_0_pins: i2c_0_pinmux {
++				  mux {
++					   pins = "gpio42", "gpio43";
++					   function = "blsp1_i2c";
++					   drive-strength = <8>;
++					   bias-disable;
++				  };
++			 };
++
++			 spi_0_pins: spi_0_pins {
++				  mux {
++					   pins = "gpio38", "gpio39", "gpio40", "gpio41";
++					   function = "blsp0_spi";
++					   drive-strength = <8>;
++					   bias-disable;
++				  };
++			 };
++
++			 hsuart_pins: hsuart_pins {
++				  mux {
++					   pins = "gpio46", "gpio47", "gpio48", "gpio49";
++					   function = "blsp2_uart";
++					   drive-strength = <8>;
++					   bias-disable;
++				  };
++			 };
++
++			 qpic_pins: qpic_pins {
++				mux {
++					   pins = "gpio1", "gpio3", "gpio4",
++						  "gpio5", "gpio6", "gpio7",
++						  "gpio8", "gpio10", "gpio11",
++						  "gpio12", "gpio13", "gpio14",
++						  "gpio15", "gpio16", "gpio17";
++					   function = "qpic";
++					   drive-strength = <8>;
++					   bias-disable;
++				  };
++			};
++
+ 		};
+ 
+ 		serial at 78b3000 {
+@@ -48,5 +90,66 @@
+ 			pinctrl-names = "default";
+ 			status = "ok";
+ 		};
++
++		spi at 78b5000 {
++			 pinctrl-0 = <&spi_0_pins>;
++			 pinctrl-names = "default";
++			 status = "ok";
++
++			 m25p80 at 0 {
++				  #address-cells = <1>;
++				  #size-cells = <1>;
++				  compatible = "n25q128a11", "jedec,spi-nor";
++				  reg = <0>;
++				  spi-max-frequency = <50000000>;
++			 };
++		};
++
++		serial at 78b1000 {
++			 pinctrl-0 = <&hsuart_pins>;
++			 pinctrl-names = "default";
++			 status = "ok";
++		};
++
++		i2c_0 at 78b6000 {
++			 pinctrl-0 = <&i2c_0_pins>;
++			 pinctrl-names = "default";
++			 status = "ok";
++		};
++
++		dma at 7984000 {
++			 status = "ok";
++		};
++
++		nand at 79b0000 {
++			pinctrl-0 = <&qpic_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++
++			nand at 0 {
++				reg = <0>;
++				nand-ecc-strength = <4>;
++				nand-ecc-step-size = <512>;
++				nand-bus-width = <8>;
++			};
++		};
++
++		phy at 86000 {
++			status = "ok";
++		};
++
++		phy at 8e000 {
++			status = "ok";
++		};
++
++		pci at 20000000 {
++			status = "ok";
++			perst-gpio = <&tlmm 58 0x1>;
++		};
++
++		pci at 10000000 {
++			status = "ok";
++			perst-gpio = <&tlmm 61 0x1>;
++		};
+ 	};
+ };
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
