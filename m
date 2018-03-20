@@ -1,19 +1,23 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 20 Mar 2018 12:35:27 -0300
-Subject: [PATCH v2 2/2] ARM: dts: i.MX6: Add BTicino i.MX6DL Mamoj initial
- support
-In-Reply-To: <20180319194114.15349-2-jagan@amarulasolutions.com>
-References: <20180319194114.15349-1-jagan@amarulasolutions.com>
- <20180319194114.15349-2-jagan@amarulasolutions.com>
-Message-ID: <CAOMZO5CKz+tuEmj2DnPgJ_ti6hC-CD=_L-U+59PtJDHNk-EE8Q@mail.gmail.com>
+Date: Tue, 20 Mar 2018 12:36:32 -0300
+Subject: [PATCH V3] ARM: dts: imx6q: Add support for the DHCOM iMX6 SoM
+ and PDK2
+In-Reply-To: <20180318173403.31460-1-marex@denx.de>
+References: <20180318173403.31460-1-marex@denx.de>
+Message-ID: <CAOMZO5BHyVf2N8q7oKpe3XEYAT77yR7WYWFeuofQihkP6+moUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 4:41 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> This patch adds initial support for BTicino i.MX6DL Mamoj board.
+On Sun, Mar 18, 2018 at 2:34 PM, Marek Vasut <marex@denx.de> wrote:
+> Add support for the DH i.MX6 Quad based SoM and a PDK2 evaluation board.
+> The evaluation board features three serial ports, USB OTG, USB host with
+> an USB hub, Fast or Gigabit ethernet, eMMC, uSD, SD, mSATA, analog audio,
+> PCIe and HDMI video output.
 >
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> Signed-off-by: Simone CIANNI <simone.cianni@bticino.it>
-> Signed-off-by: Raffaele RECALCATI <raffaele.recalcati@bticino.it>
+> All of the aforementioned features are supported by this patch.
+>
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
