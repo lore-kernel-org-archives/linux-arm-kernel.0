@@ -1,23 +1,25 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 19 Mar 2018 16:44:50 -0700
-Subject: [PATCH] ARM64: dts: meson-gx: make efuse read-only
-In-Reply-To: <20180316145021.8517-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Fri, 16 Mar 2018 15:50:21 +0100")
-References: <20180316145021.8517-1-jbrunet@baylibre.com>
-Message-ID: <7h370vsk99.fsf@baylibre.com>
+Date: Mon, 19 Mar 2018 17:03:40 -0700
+Subject: [GIT PULL] Amlogic driver updates for v4.17
+Message-ID: <7htvtbr4tf.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-> efuse is one time programmable, so it is safer to deny write request
-> to this memory, unless the user is savvy enough to remove the read-only
-> flag from DTB
->
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-Applied to v4.17/dt64,
+are available in the git repository at:
 
-Thanks,
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git v4.17/defconfig
 
-Kevin
+for you to fetch changes up to 266c157de3b21b6da3e015085dda48cfa9f0f76d:
+
+  arm64: defconfig: enable MESON EFUSE (2018-02-12 14:20:43 -0800)
+
+----------------------------------------------------------------
+Jerome Brunet (1):
+      arm64: defconfig: enable MESON EFUSE
+
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
