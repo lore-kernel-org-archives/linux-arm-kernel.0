@@ -1,32 +1,35 @@
-From: toshi.kani@hpe.com (Kani, Toshi)
-Date: Tue, 20 Mar 2018 22:58:18 +0000
-Subject: [PATCH v4 1/3] ioremap: Update pgtable free interfaces with addr
-In-Reply-To: <1521546314-31753-2-git-send-email-cpandya@codeaurora.org>
-References: <1521546314-31753-1-git-send-email-cpandya@codeaurora.org>
- <1521546314-31753-2-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1521586688.2693.231.camel@hpe.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 21 Mar 2018 00:02:03 +0100
+Subject: [PATCH 2/5] efi/libstub/arm: add support for building with clang
+In-Reply-To: <20180320230206.25289-1-stefan@agner.ch>
+References: <20180320230206.25289-1-stefan@agner.ch>
+Message-ID: <20180320230206.25289-3-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-03-20 at 17:15 +0530, Chintan Pandya wrote:
-> This patch ("mm/vmalloc: Add interfaces to free unmapped
-> page table") adds following 2 interfaces to free the page
-> table in case we implement huge mapping.
-> 
-> pud_free_pmd_page() and pmd_free_pte_page()
-> 
-> Some architectures (like arm64) needs to do proper TLB
-> maintanance after updating pagetable entry even in map.
-> Why ? Read this,
-> https://patchwork.kernel.org/patch/10134581/
-> 
-> Pass 'addr' in these interfaces so that proper TLB ops
-> can be performed.
-> 
-> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+Use cc-options call for -mno-single-pic-base since the option is
+not available in clang. LLVM/clang always assumes a fixed
+displacement between text/data and hence uses PC relative
+addressing.
 
-Thanks for the update.  The change looks good.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/firmware/efi/libstub/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Reviewed-by: Toshi Kani <toshi.kani@hpe.com>
-
--Toshi
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 7b3ba40f0745..2bf69cca0d87 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -13,7 +13,8 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__KERNEL__ -O2 \
+ 
+ cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie
+ cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
+-				   -fno-builtin -fpic -mno-single-pic-base
++				   -fno-builtin -fpic \
++				   $(call cc-option,-mno-single-pic-base,)
+ 
+ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ 
+-- 
+2.16.2
