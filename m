@@ -1,51 +1,33 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Tue, 20 Mar 2018 14:20:30 +0000
-Subject: [PATCH -next] drm/meson: Fix potential NULL dereference in
- meson_drv_bind_master()
-Message-ID: <1521555630-29284-1-git-send-email-weiyongjun1@huawei.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Mar 2018 07:16:17 -0700
+Subject: [PATCH 0/5] Enable more droid 4 options in defconfig files
+Message-ID: <20180320141622.77989-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_resource_byname() may fail and return NULL, so we should
-better check it's return value to avoid a NULL pointer dereference
-a bit later in the code.
+Hi all,
 
-This is detected by Coccinelle semantic patch.
+We can now enable some more droid 4 related options to make it easier
+to use and get things ready for distro kernels.
 
-@@
-expression pdev, res, n, t, e, e1, e2;
-@@
+And I noticed kexec booting multi_v7_defconfig still needs --image-size,
+so more work is needed there to debug that issue.
 
-res = platform_get_resource_byname(pdev, t, n);
-+ if (!res)
-+   return -EINVAL;
-... when != res == NULL
-e = devm_ioremap(e1, res->start, e2);
+Regards,
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/gpu/drm/meson/meson_drv.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Tony
 
-diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-index 3baceb7..32b1a6c 100644
---- a/drivers/gpu/drm/meson/meson_drv.c
-+++ b/drivers/gpu/drm/meson/meson_drv.c
-@@ -197,6 +197,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
- 	priv->io_base = regs;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hhi");
-+	if (!res)
-+		return -EINVAL;
- 	/* Simply ioremap since it may be a shared register zone */
- 	regs = devm_ioremap(dev, res->start, resource_size(res));
- 	if (!regs) {
-@@ -213,6 +215,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
- 	}
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
-+	if (!res)
-+		return -EINVAL;
- 	/* Simply ioremap since it may be a shared register zone */
- 	regs = devm_ioremap(dev, res->start, resource_size(res));
- 	if (!regs) {
+Tony Lindgren (5):
+  ARM: omap2plus_defconfig: Enable PWM_VIBRA
+  ARM: omap2plus_defconfig: Add AUDIO_GRAPH_CARD
+  ARM: omap2plus_defconfig: Enable MDM6600 USB PHY
+  ARM: omap2plus_defconfig: Add UINPUT
+  ARM: multi_v7_defconfig: Enable CPCAP related options mostly as
+    loadable modules
+
+ arch/arm/configs/multi_v7_defconfig  | 9 +++++++++
+ arch/arm/configs/omap2plus_defconfig | 5 +++++
+ 2 files changed, 14 insertions(+)
+
+-- 
+2.16.2
