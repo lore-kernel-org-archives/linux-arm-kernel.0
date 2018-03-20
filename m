@@ -1,52 +1,97 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 20 Mar 2018 15:15:02 +0800
-Subject: [PATCH net-next 02/12] clk: sunxi-ng: r40: export a regmap to
- access the GMAC register
-In-Reply-To: <20180318213129.ucwslzvwq6khxrcd@flea>
-References: <20180317092857.4396-1-wens@csie.org>
- <20180317092857.4396-3-wens@csie.org>
- <20180318213129.ucwslzvwq6khxrcd@flea>
-Message-ID: <CAGb2v67Fp20wkmqWyRowpAmm4EDwENnKFG+mccqWaPa5Jj4zBw@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 20 Mar 2018 00:16:07 -0700
+Subject: [PATCH v5 12/12] clk: actions: Add S900 SoC clock support
+In-Reply-To: <20180317100952.28538-13-manivannan.sadhasivam@linaro.org>
+References: <20180317100952.28538-1-manivannan.sadhasivam@linaro.org>
+ <20180317100952.28538-13-manivannan.sadhasivam@linaro.org>
+Message-ID: <152153016749.254778.17294370002590376536@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 5:31 AM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Sat, Mar 17, 2018 at 05:28:47PM +0800, Chen-Yu Tsai wrote:
->> From: Icenowy Zheng <icenowy@aosc.io>
->>
->> There's a GMAC configuration register, which exists on A64/A83T/H3/H5 in
->> the syscon part, in the CCU of R40 SoC.
->>
->> Export a regmap of the CCU.
->>
->> Read access is not restricted to all registers, but only the GMAC
->> register is allowed to be written.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> Gah, this is crazy. I'm really starting to regret letting that syscon
-> in in the first place...
+Quoting Manivannan Sadhasivam (2018-03-17 03:09:52)
+> diff --git a/drivers/clk/actions/owl-s900.c b/drivers/clk/actions/owl-s900.c
+> new file mode 100644
+> index 000000000000..5a9b1e3f3571
+> --- /dev/null
+> +++ b/drivers/clk/actions/owl-s900.c
+> @@ -0,0 +1,690 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +//
+> +// OWL S900 SoC clock driver
+> +//
+> +// Copyright (c) 2014 Actions Semi Inc.
+> +// Author: David Liu <liuwei@actions-semi.com>
+> +//
+> +// Copyright (c) 2018 Linaro Ltd.
+> +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
 
-IMHO syscon is really a better fit. It's part of the glue layer and
-most other dwmac user platforms treat it as such and use a syscon.
-Plus the controls encompass delays (phase), inverters (polarity),
-and even signal routing. It's not really just a group of clock controls,
-like what we poorly modeled for A20/A31. I think that was really a
-mistake.
+Is this include used?
 
-As I mentioned in the cover letter, a slightly saner approach would
-be to let drivers add custom syscon entries, which would then require
-less custom plumbing.
+> +
+> +#include "owl-common.h"
+> +#include "owl-composite.h"
+> +#include "owl-divider.h"
+> +#include "owl-factor.h"
+> +#include "owl-fixed-factor.h"
+> +#include "owl-gate.h"
+> +#include "owl-mux.h"
+> +#include "owl-pll.h"
+> +#include "owl-s900.h"
+> +
+> +#include <dt-bindings/clock/actions,s900-cmu.h>
+> +
+> +static struct clk_pll_table clk_audio_pll_table[] = {
+> +       {0, 45158400}, {1, 49152000},
+> +       {0, 0},
+> +};
+> +
+> +static struct clk_pll_table clk_edp_pll_table[] = {
+> +       {0, 810000000}, {1, 1350000000}, {2, 2700000000},
 
-> And I'm not really looking forward the time where SCPI et al. will be
-> mature and we'll have the clock controller completely outside of our
-> control.
+Please put spaces around brackets.
 
-I don't think it's going to happen for any of the older SoCs. The R40
-only stands out because the GMAC controls are in the clock controller
-address space, presumably to be like the A20.
+> +       {0, 0},
+> +};
+> +
+> +/* pll clocks */
+> +static OWL_PLL_NO_PARENT(core_pll_clk, "core_pll_clk", CMU_COREPLL, 24000000, 9, 0, 8, 5, 107, NULL, CLK_IGNORE_UNUSED);
+> +static OWL_PLL_NO_PARENT(dev_pll_clk, "dev_pll_clk", CMU_DEVPLL, 6000000, 8, 0, 8, 20, 180, NULL, CLK_IGNORE_UNUSED);
+> +static OWL_PLL_NO_PARENT(ddr_pll_clk, "ddr_pll_clk", CMU_DDRPLL, 24000000, 8, 0, 8, 5, 45, NULL, CLK_IGNORE_UNUSED);
+> +static OWL_PLL_NO_PARENT(nand_pll_clk, "nand_pll_clk", CMU_NANDPLL, 6000000, 8, 0, 8, 4, 100, NULL, CLK_IGNORE_UNUSED);
+> +static OWL_PLL_NO_PARENT(display_pll_clk, "display_pll_clk", CMU_DISPLAYPLL, 6000000, 8, 0, 8, 20, 180, NULL, CLK_IGNORE_UNUSED);
+> +static OWL_PLL_NO_PARENT(assist_pll_clk, "assist_pll_clk", CMU_ASSISTPLL, 500000000, 0, 0, 0, 0, 0, NULL, CLK_IGNORE_UNUSED);
+> +static OWL_PLL_NO_PARENT(audio_pll_clk, "audio_pll_clk", CMU_AUDIOPLL, 0, 4, 0, 1, 0, 0, clk_audio_pll_table, CLK_IGNORE_UNUSED);
+> +static OWL_PLL(edp_pll_clk, "edp_pll_clk", "edp24M_clk", CMU_EDPCLK, 0, 9, 0, 2, 0, 0, clk_edp_pll_table, CLK_IGNORE_UNUSED);
+> +
+> +static const char *cpu_clk_mux_p[] = { "losc", "hosc", "core_pll_clk", };
+> +static const char *dev_clk_p[] = { "hosc", "dev_pll_clk", };
+> diff --git a/drivers/clk/actions/owl-s900.h b/drivers/clk/actions/owl-s900.h
+> new file mode 100644
+> index 000000000000..d0c10594e518
+> --- /dev/null
+> +++ b/drivers/clk/actions/owl-s900.h
+> @@ -0,0 +1,61 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +//
+> +// OWL S900 SoC clock driver
+> +//
+> +// Copyright (c) 2014 Actions Semi Inc.
+> +// Author: David Liu <liuwei@actions-semi.com>
+> +//
+> +// Copyright (c) 2018 Linaro Ltd.
+> +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> +
+> +#ifndef _OWL_S900_H_
+> +#define _OWL_S900_H_
 
+I'd prefer this file contents go inside the one C file that uses it so
+we can quickly reference the offsets without going to another file.
 
-ChenYu
+> +
+> +#define CMU_COREPLL            (0x0000)
+> +#define CMU_DEVPLL             (0x0004)
+> +#define CMU_DDRPLL             (0x0008)
