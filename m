@@ -1,71 +1,52 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Tue, 20 Mar 2018 14:18:59 +0100
-Subject: [PATCH -next] phy: stm32: fix usbphyc static checker and checkpatch
- warnings
-Message-ID: <1521551939-29922-1-git-send-email-amelie.delaunay@st.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Tue, 20 Mar 2018 13:21:48 +0000
+Subject: [PATCH -next] phy: stm32: fix using 0 as NULL pointer warnings
+In-Reply-To: <1521551982-154471-1-git-send-email-weiyongjun1@huawei.com>
+References: <1521551982-154471-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <3d799714-6e2c-658e-b1f2-def58584c356@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following issues:
-* warning reported by checkpatch:
-WARNING: line over 80 characters
-#87: FILE: drivers/phy/st/phy-stm32-usbphyc.c:87:
-+static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
 
-* bug reported by static checker (Dan Carpenter):
-drivers/phy/st/phy-stm32-usbphyc.c:371 stm32_usbphyc_probe()
-error: uninitialized symbol 'i'.
 
-* unused stm32_usbphyc structure member: bool pll_enabled.
+On 03/20/2018 02:19 PM, Wei Yongjun wrote:
+> Fixes the following sparse warnings:
+> 
+> drivers/phy/st/phy-stm32-usbphyc.c:331:42: warning:
+>   Using plain integer as NULL pointer
+> drivers/phy/st/phy-stm32-usbphyc.c:344:52: warning:
+>   Using plain integer as NULL pointer
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>   drivers/phy/st/phy-stm32-usbphyc.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
+> index bc4e78a..48d4086 100644
+> --- a/drivers/phy/st/phy-stm32-usbphyc.c
+> +++ b/drivers/phy/st/phy-stm32-usbphyc.c
+> @@ -328,7 +328,7 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
+>   	if (IS_ERR(usbphyc->base))
+>   		return PTR_ERR(usbphyc->base);
+>   
+> -	usbphyc->clk = devm_clk_get(dev, 0);
+> +	usbphyc->clk = devm_clk_get(dev, NULL);
+>   	if (IS_ERR(usbphyc->clk)) {
+>   		ret = PTR_ERR(usbphyc->clk);
+>   		dev_err(dev, "clk get failed: %d\n", ret);
+> @@ -341,7 +341,7 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
+>   		return ret;
+>   	}
+>   
+> -	usbphyc->rst = devm_reset_control_get(dev, 0);
+> +	usbphyc->rst = devm_reset_control_get(dev, NULL);
+>   	if (!IS_ERR(usbphyc->rst)) {
+>   		reset_control_assert(usbphyc->rst);
+>   		udelay(2);
+> 
 
-* unnecessary extra line in stm32_usbphyc_of_xlate
+Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
 
-Fixes: 94c358da3a05 "phy: stm32: add support for STM32 USB PHY Controller (USBPHYC)"
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- drivers/phy/st/phy-stm32-usbphyc.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
-index bc4e78a..1255cd1 100644
---- a/drivers/phy/st/phy-stm32-usbphyc.c
-+++ b/drivers/phy/st/phy-stm32-usbphyc.c
-@@ -71,7 +71,6 @@ struct stm32_usbphyc {
- 	struct stm32_usbphyc_phy **phys;
- 	int nphys;
- 	int switch_setup;
--	bool pll_enabled;
- };
- 
- static inline void stm32_usbphyc_set_bits(void __iomem *reg, u32 bits)
-@@ -84,7 +83,8 @@ static inline void stm32_usbphyc_clr_bits(void __iomem *reg, u32 bits)
- 	writel_relaxed(readl_relaxed(reg) & ~bits, reg);
- }
- 
--static void stm32_usbphyc_get_pll_params(u32 clk_rate, struct pll_params *pll_params)
-+static void stm32_usbphyc_get_pll_params(u32 clk_rate,
-+					 struct pll_params *pll_params)
- {
- 	unsigned long long fvco, ndiv, frac;
- 
-@@ -271,7 +271,6 @@ static struct phy *stm32_usbphyc_of_xlate(struct device *dev,
- 	struct stm32_usbphyc *usbphyc = dev_get_drvdata(dev);
- 	struct stm32_usbphyc_phy *usbphyc_phy = NULL;
- 	struct device_node *phynode = args->np;
--
- 	int port = 0;
- 
- 	for (port = 0; port < usbphyc->nphys; port++) {
-@@ -367,8 +366,8 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
- 		if (IS_ERR(phy)) {
- 			ret = PTR_ERR(phy);
- 			if (ret != -EPROBE_DEFER)
--				dev_err(dev,
--					"failed to create phy%d: %d\n", i, ret);
-+				dev_err(dev, "failed to create phy%d: %d\n",
-+					port, ret);
- 			goto put_child;
- 		}
- 
--- 
-2.7.4
+Thanks,
+Amelie
