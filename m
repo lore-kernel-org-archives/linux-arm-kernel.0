@@ -1,61 +1,36 @@
 From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Tue, 20 Mar 2018 08:55:26 -0600
-Subject: [PATCH v4 6/6] RDMA/qedr: eliminate duplicate barriers on
- weakly-ordered archs #2
-In-Reply-To: <1521514068-8856-7-git-send-email-okaya@codeaurora.org>
+Date: Tue, 20 Mar 2018 08:56:26 -0600
+Subject: [PATCH v4 3/6] RDMA/i40iw: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521514068-8856-4-git-send-email-okaya@codeaurora.org>
 References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
- <1521514068-8856-7-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180320145526.GI19744@ziepe.ca>
+ <1521514068-8856-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180320145626.GJ19744@ziepe.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 10:47:48PM -0400, Sinan Kaya wrote:
-> Code includes wmb() followed by writel() in multiple places. writel()
-> already has a barrier on some architectures like arm64.
+On Mon, Mar 19, 2018 at 10:47:45PM -0400, Sinan Kaya wrote:
+> Code includes wmb() followed by writel(). writel() already has a barrier on
+> some architectures like arm64.
 > 
 > This ends up CPU observing two barriers back to back before executing the
 > register write.
+> 
+> Create a new wrapper function with relaxed write operator. Use the new
+> wrapper when a write is following a wmb().
 > 
 > Since code already has an explicit barrier call, changing writel() to
 > writel_relaxed().
 > 
 > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->  drivers/infiniband/hw/qedr/verbs.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
-> index ccd55f4..db60360 100644
-> +++ b/drivers/infiniband/hw/qedr/verbs.c
-> @@ -860,7 +860,7 @@ static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
->  	wmb();
->  	cq->db.data.agg_flags = flags;
->  	cq->db.data.value = cpu_to_le32(cons);
-> -	writeq(cq->db.raw, cq->db_addr);
-> +	writeq_relaxed(cq->db.raw, cq->db_addr);
->  
->  	/* Make sure write would stick */
->  	mmiowb();
-> @@ -3338,7 +3338,7 @@ int qedr_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
->  
->  		qp->rq.db_data.data.value++;
->  
-> -		writel(qp->rq.db_data.raw, qp->rq.db);
-> +		writel_relaxed(qp->rq.db_data.raw, qp->rq.db);
->  
->  		/* Make sure write sticks */
->  		mmiowb();
+>  drivers/infiniband/hw/i40iw/i40iw_ctrl.c  |  6 ++++--
+>  drivers/infiniband/hw/i40iw/i40iw_osdep.h |  1 +
+>  drivers/infiniband/hw/i40iw/i40iw_uk.c    |  2 +-
+>  drivers/infiniband/hw/i40iw/i40iw_utils.c | 11 +++++++++++
+>  4 files changed, 17 insertions(+), 3 deletions(-)
 
-Looks fine, but the next lines should be relaxed too:
+The one looks fine
 
-
-                /* Make sure write sticks */
-                mmiowb();
-
-                if (rdma_protocol_iwarp(&dev->ibdev, 1)) {
-                        writel(qp->rq.iwarp_db2_data.raw, qp->rq.iwarp_db2);
-                        mmiowb();       /* for second doorbell */
-                }
-
-mmiowb() is strong enough to order writel, IIRC.
+Reviewed-by: Jason Gunthorpe <jgg@mellanox.com>
 
 Jason
