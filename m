@@ -1,40 +1,49 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 20 Mar 2018 11:57:48 -0500
-Subject: [PATCH v8 18/42] clk: davinci: New driver for TI DA8XX CFGCHIP
- clocks
-In-Reply-To: <152156485535.183971.1627687499726447092@swboyd.mtv.corp.google.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-19-git-send-email-david@lechnology.com>
- <152156485535.183971.1627687499726447092@swboyd.mtv.corp.google.com>
-Message-ID: <b4ea5efb-3fa0-b2f3-cd5f-75343e841153@lechnology.com>
+From: loberman@redhat.com (Laurence Oberman)
+Date: Tue, 20 Mar 2018 12:51:58 -0400
+Subject: [PATCH v4 1/7] scsi: hpsa: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521514207-10695-2-git-send-email-okaya@codeaurora.org>
+References: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
+ <1521514207-10695-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521564718.13995.1.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2018 11:54 AM, Stephen Boyd wrote:
-> Quoting David Lechner (2018-03-15 19:52:34)
->> +
->> +typedef int (*da8xx_cfgchip_init)(struct device *dev, void __iomem *base);
+On Mon, 2018-03-19 at 22:50 -0400, Sinan Kaya wrote:
+> Code includes wmb() followed by writel(). writel() already has a
+> barrier on some architectures like arm64.
 > 
-> Should be struct regmap *regmap?
+> This ends up CPU observing two barriers back to back before executing
+> the register write.
+> 
+> Since code already has an explicit barrier call, changing writel() to
+> writel_relaxed().
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+> ?drivers/scsi/hpsa.h | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/scsi/hpsa.h b/drivers/scsi/hpsa.h
+> index 018f980..c7d7e6a 100644
+> --- a/drivers/scsi/hpsa.h
+> +++ b/drivers/scsi/hpsa.h
+> @@ -599,7 +599,7 @@ static unsigned long
+> SA5_ioaccel_mode1_completed(struct ctlr_info *h, u8 q)
+> ?		?* but with current driver design this is easiest.
+> ?		?*/
+> ?		wmb();
+> -		writel((q << 24) | rq->current_entry, h->vaddr +
+> +		writel_relaxed((q << 24) | rq->current_entry, h-
+> >vaddr +
+> ?				IOACCEL_MODE1_CONSUMER_INDEX);
+> ?		atomic_dec(&h->commands_outstanding);
+> ?	}
 
-Yes. It looks like this was copied and pasted from one of the other drivers.
+This looks like it would work for the x86_64 and arm because of how its
+defined architecture specific for the x86_64 and the arm64
 
-Thank you for fixing it.
+I guess its up to Don and the driver folks and if its worth the change.
+I am generally not a fan of messing with these barrier things though.
 
-> 
-> I've squashed this in.
-> 
-> diff --git a/drivers/clk/davinci/da8xx-cfgchip.c b/drivers/clk/davinci/da8xx-cfgchip.c
-> index 858d3786b27b..c971111d2601 100644
-> --- a/drivers/clk/davinci/da8xx-cfgchip.c
-> +++ b/drivers/clk/davinci/da8xx-cfgchip.c
-> @@ -736,7 +736,7 @@ static const struct platform_device_id da8xx_cfgchip_id_table[] = {
->   	{ }
->   };
->   
-> -typedef int (*da8xx_cfgchip_init)(struct device *dev, void __iomem *base);
-> +typedef int (*da8xx_cfgchip_init)(struct device *dev, struct regmap *regmap);
->   
->   static int da8xx_cfgchip_probe(struct platform_device *pdev)
->   {
-> 
+Reviewed-by: Laurence Oberman <loberman@redhat.com>
