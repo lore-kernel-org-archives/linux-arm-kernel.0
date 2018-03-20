@@ -1,162 +1,90 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:42:26 -0400
-Subject: [PATCH v4 11/17] bnx2x: Eliminate duplicate barriers on
+Date: Mon, 19 Mar 2018 22:42:16 -0400
+Subject: [PATCH v4 01/17] i40e/i40evf: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
 References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521513753-7325-12-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521513753-7325-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a
-barrier on some architectures like arm64.
+Code includes wmb() followed by writel(). writel() already has a barrier
+on some architectures like arm64.
 
-This ends up CPU observing two barriers back to back before executing
-the register write.
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
 Since code already has an explicit barrier call, changing writel() to
 writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
 ---
- drivers/net/ethernet/broadcom/bnx2x/bnx2x.h       |  9 ++++++++-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h   |  4 ++--
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c  | 21 +++++++++++----------
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c |  2 +-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c  |  2 +-
- 5 files changed, 23 insertions(+), 15 deletions(-)
+ drivers/net/ethernet/intel/i40e/i40e_txrx.c   | 8 ++++----
+ drivers/net/ethernet/intel/i40evf/i40e_txrx.c | 4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h
-index 352beff..ac38db9 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x.h
-@@ -166,6 +166,12 @@ do {						\
- #define REG_RD8(bp, offset)		readb(REG_ADDR(bp, offset))
- #define REG_RD16(bp, offset)		readw(REG_ADDR(bp, offset))
+diff --git a/drivers/net/ethernet/intel/i40e/i40e_txrx.c b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+index e554aa6cf..9455869 100644
+--- a/drivers/net/ethernet/intel/i40e/i40e_txrx.c
++++ b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+@@ -185,7 +185,7 @@ static int i40e_program_fdir_filter(struct i40e_fdir_filter *fdir_data,
+ 	/* Mark the data descriptor to be watched */
+ 	first->next_to_watch = tx_desc;
  
-+#define REG_WR_RELAXED(bp, offset, val)	writel_relaxed((u32)val,\
-+						       REG_ADDR(bp, offset))
-+
-+#define REG_WR16_RELAXED(bp, offset, val) \
-+	writew_relaxed((u16)val, REG_ADDR(bp, offset))
-+
- #define REG_WR(bp, offset, val)		writel((u32)val, REG_ADDR(bp, offset))
- #define REG_WR8(bp, offset, val)	writeb((u8)val, REG_ADDR(bp, offset))
- #define REG_WR16(bp, offset, val)	writew((u16)val, REG_ADDR(bp, offset))
-@@ -760,7 +766,8 @@ struct bnx2x_fastpath {
- #endif
- #define DOORBELL(bp, cid, val) \
- 	do { \
--		writel((u32)(val), bp->doorbells + (bp->db_size * (cid))); \
-+		writel_relaxed((u32)(val),\
-+				bp->doorbells + (bp->db_size * (cid))); \
- 	} while (0)
+-	writel(tx_ring->next_to_use, tx_ring->tail);
++	writel_relaxed(tx_ring->next_to_use, tx_ring->tail);
+ 	return 0;
  
- /* TX CSUM helpers */
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
-index a5265e1..a8ce5c5 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.h
-@@ -522,8 +522,8 @@ static inline void bnx2x_update_rx_prod(struct bnx2x *bp,
+ dma_fail:
+@@ -1375,7 +1375,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
+ 	 * such as IA-64).
+ 	 */
  	wmb();
+-	writel(val, rx_ring->tail);
++	writel_relaxed(val, rx_ring->tail);
+ }
  
- 	for (i = 0; i < sizeof(rx_prods)/4; i++)
--		REG_WR(bp, fp->ustorm_rx_prods_offset + i*4,
--		       ((u32 *)&rx_prods)[i]);
-+		REG_WR_RELAXED(bp, fp->ustorm_rx_prods_offset + i * 4,
-+			       ((u32 *)&rx_prods)[i]);
+ /**
+@@ -2258,7 +2258,7 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
+ 		 */
+ 		wmb();
  
- 	mmiowb(); /* keep prod updates ordered */
- 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-index 74fc9af..2dea1b6 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-@@ -1608,8 +1608,8 @@ static void bnx2x_hc_int_enable(struct bnx2x *bp)
- 		} else
- 			val = 0xffff;
- 
--		REG_WR(bp, HC_REG_TRAILING_EDGE_0 + port*8, val);
--		REG_WR(bp, HC_REG_LEADING_EDGE_0 + port*8, val);
-+		REG_WR_RELAXED(bp, HC_REG_TRAILING_EDGE_0 + port * 8, val);
-+		REG_WR_RELAXED(bp, HC_REG_LEADING_EDGE_0 + port * 8, val);
+-		writel(xdp_ring->next_to_use, xdp_ring->tail);
++		writel_relaxed(xdp_ring->next_to_use, xdp_ring->tail);
  	}
  
- 	/* Make sure that interrupts are indeed enabled from here on */
-@@ -1672,8 +1672,8 @@ static void bnx2x_igu_int_enable(struct bnx2x *bp)
- 	} else
- 		val = 0xffff;
+ 	rx_ring->skb = skb;
+@@ -3286,7 +3286,7 @@ static inline int i40e_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
  
--	REG_WR(bp, IGU_REG_TRAILING_EDGE_LATCH, val);
--	REG_WR(bp, IGU_REG_LEADING_EDGE_LATCH, val);
-+	REG_WR_RELAXED(bp, IGU_REG_TRAILING_EDGE_LATCH, val);
-+	REG_WR_RELAXED(bp, IGU_REG_LEADING_EDGE_LATCH, val);
+ 	/* notify HW of packet */
+ 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+-		writel(i, tx_ring->tail);
++		writel_relaxed(i, tx_ring->tail);
  
- 	/* Make sure that interrupts are indeed enabled from here on */
- 	mmiowb();
-@@ -3817,8 +3817,8 @@ static void bnx2x_sp_prod_update(struct bnx2x *bp)
+ 		/* we need this if more than one processor can write to our tail
+ 		 * at a time, it synchronizes IO on IA64/Altix systems
+diff --git a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
+index 357d605..56eea20 100644
+--- a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
++++ b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
+@@ -667,7 +667,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
+ 	 * such as IA-64).
  	 */
- 	mb();
- 
--	REG_WR16(bp, BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func),
--		 bp->spq_prod_idx);
-+	REG_WR16_RELAXED(bp, BAR_XSTRORM_INTMEM + XSTORM_SPQ_PROD_OFFSET(func),
-+			 bp->spq_prod_idx);
- 	mmiowb();
- }
- 
-@@ -7761,7 +7761,7 @@ void bnx2x_igu_clear_sb_gen(struct bnx2x *bp, u8 func, u8 idu_sb_id, bool is_pf)
- 	barrier();
- 	DP(NETIF_MSG_HW, "write 0x%08x to IGU(via GRC) addr 0x%x\n",
- 			  ctl, igu_addr_ctl);
--	REG_WR(bp, igu_addr_ctl, ctl);
-+	REG_WR_RELAXED(bp, igu_addr_ctl, ctl);
- 	mmiowb();
- 	barrier();
- 
-@@ -9720,13 +9720,14 @@ static void bnx2x_process_kill_chip_reset(struct bnx2x *bp, bool global)
- 	barrier();
- 	mmiowb();
- 
--	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
--	       reset_mask2 & (~stay_reset2));
-+	REG_WR_RELAXED(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_2_SET,
-+		       reset_mask2 & (~stay_reset2));
- 
- 	barrier();
- 	mmiowb();
- 
--	REG_WR(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET, reset_mask1);
-+	REG_WR_RELAXED(bp, GRCBASE_MISC + MISC_REGISTERS_RESET_REG_1_SET,
-+		       reset_mask1);
- 	mmiowb();
- }
- 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-index ffa7959..40e55d8 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-@@ -105,7 +105,7 @@ static void bnx2x_vf_igu_ack_sb(struct bnx2x *bp, struct bnx2x_virtf *vf,
- 
- 	DP(NETIF_MSG_HW, "write 0x%08x to IGU(via GRC) addr 0x%x\n",
- 	   ctl, igu_addr_ctl);
--	REG_WR(bp, igu_addr_ctl, ctl);
-+	REG_WR_RELAXED(bp, igu_addr_ctl, ctl);
- 	mmiowb();
- 	barrier();
- }
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c
-index 76a4668..3b2f1bd 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_vfpf.c
-@@ -170,7 +170,7 @@ static int bnx2x_send_msg2pf(struct bnx2x *bp, u8 *done, dma_addr_t msg_mapping)
  	wmb();
+-	writel(val, rx_ring->tail);
++	writel_relaxed(val, rx_ring->tail);
+ }
  
- 	/* Trigger the PF FW */
--	writeb(1, &zone_data->trigger.vf_pf_channel.addr_valid);
-+	writeb_relaxed(1, &zone_data->trigger.vf_pf_channel.addr_valid);
+ /**
+@@ -2243,7 +2243,7 @@ static inline void i40evf_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
  
- 	/* Wait for PF to complete */
- 	while ((tout >= 0) && (!*done)) {
+ 	/* notify HW of packet */
+ 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+-		writel(i, tx_ring->tail);
++		writel_relaxed(i, tx_ring->tail);
+ 
+ 		/* we need this if more than one processor can write to our tail
+ 		 * at a time, it synchronizes IO on IA64/Altix systems
 -- 
 2.7.4
