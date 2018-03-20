@@ -1,77 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:47:46 -0400
-Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
-References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Tue, 20 Mar 2018 11:48:24 +0900
+Subject: [PATCH v2 2/2] ARM: dts: uniphier: add syscon property for UniPhier
+ sound system
+In-Reply-To: <20180320024824.28902-1-suzuki.katsuhiro@socionext.com>
+References: <20180320024824.28902-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180320024824.28902-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier on
-some architectures like arm64.
+This patch adds syscon property for specifying soc-glue core into
+device-tree of PXs2 SoC.
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
+Currently, soc-glue core is used for changing the state of S/PDIF
+signal output pin to signal output state or Hi-Z state.
 
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- drivers/infiniband/hw/cxgb4/t4.h | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/uniphier-pxs2.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
-index 8369c7c..6e5658a 100644
---- a/drivers/infiniband/hw/cxgb4/t4.h
-+++ b/drivers/infiniband/hw/cxgb4/t4.h
-@@ -457,7 +457,7 @@ static inline void pio_copy(u64 __iomem *dst, u64 *src)
- 	int count = 8;
+diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+index 595045441c9c..debcbd15c24b 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
++++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+@@ -242,6 +242,7 @@
+ 			reset-names = "aio";
+ 			resets = <&sys_rst 40>;
+ 			#sound-dai-cells = <1>;
++			socionext,syscon = <&soc_glue>;
  
- 	while (count) {
--		writeq(*src, dst);
-+		writeq_relaxed(*src, dst);
- 		src++;
- 		dst++;
- 		count--;
-@@ -477,15 +477,15 @@ static inline void t4_ring_sq_db(struct t4_wq *wq, u16 inc, union t4_wr *wqe)
- 				 (u64 *)wqe);
- 		} else {
- 			pr_debug("DB wq->sq.pidx = %d\n", wq->sq.pidx);
--			writel(PIDX_T5_V(inc) | QID_V(wq->sq.bar2_qid),
--			       wq->sq.bar2_va + SGE_UDB_KDOORBELL);
-+			writel_relaxed(PIDX_T5_V(inc) | QID_V(wq->sq.bar2_qid),
-+				       wq->sq.bar2_va + SGE_UDB_KDOORBELL);
- 		}
+ 			i2s_port0: port at 0 {
+ 				i2s_hdmi: endpoint {
+@@ -418,7 +419,7 @@
+ 			};
+ 		};
  
- 		/* Flush user doorbell area writes. */
- 		wmb();
- 		return;
- 	}
--	writel(QID_V(wq->sq.qid) | PIDX_V(inc), wq->db);
-+	writel_relaxed(QID_V(wq->sq.qid) | PIDX_V(inc), wq->db);
- }
- 
- static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
-@@ -502,15 +502,15 @@ static inline void t4_ring_rq_db(struct t4_wq *wq, u16 inc,
- 				 (void *)wqe);
- 		} else {
- 			pr_debug("DB wq->rq.pidx = %d\n", wq->rq.pidx);
--			writel(PIDX_T5_V(inc) | QID_V(wq->rq.bar2_qid),
--			       wq->rq.bar2_va + SGE_UDB_KDOORBELL);
-+			writel_relaxed(PIDX_T5_V(inc) | QID_V(wq->rq.bar2_qid),
-+				       wq->rq.bar2_va + SGE_UDB_KDOORBELL);
- 		}
- 
- 		/* Flush user doorbell area writes. */
- 		wmb();
- 		return;
- 	}
--	writel(QID_V(wq->rq.qid) | PIDX_V(inc), wq->db);
-+	writel_relaxed(QID_V(wq->rq.qid) | PIDX_V(inc), wq->db);
- }
- 
- static inline int t4_wq_in_error(struct t4_wq *wq)
+-		soc-glue at 5f800000 {
++		soc_glue: soc-glue at 5f800000 {
+ 			compatible = "socionext,uniphier-pxs2-soc-glue",
+ 				     "simple-mfd", "syscon";
+ 			reg = <0x5f800000 0x2000>;
 -- 
-2.7.4
+2.16.2
