@@ -1,90 +1,29 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 20 Mar 2018 10:08:16 -0500
-Subject: [PATCH v4 1/6] RDMA/bnxt_re: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <d31c062b-5629-62b8-c291-c656e23c6f82@codeaurora.org>
-References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
- <1521514068-8856-2-git-send-email-okaya@codeaurora.org>
- <20180320144801.GE19744@ziepe.ca>
- <d31c062b-5629-62b8-c291-c656e23c6f82@codeaurora.org>
-Message-ID: <3e6cfa25-6b9f-24ff-499a-6df2740b658b@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Mar 2018 08:09:11 -0700
+Subject: [PATCH v2 0/6] ARM: OMAP5: add support for fref-xtal-clk
+In-Reply-To: <20180314135315.11215-1-peter.ujfalusi@ti.com>
+References: <20180314135315.11215-1-peter.ujfalusi@ti.com>
+Message-ID: <20180320150911.GA5799@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/20/2018 10:00 AM, Sinan Kaya wrote:
-> On 3/20/2018 9:48 AM, Jason Gunthorpe wrote:
->> On Mon, Mar 19, 2018 at 10:47:43PM -0400, Sinan Kaya wrote:
->>> Code includes wmb() followed by writel(). writel() already has a barrier on
->>> some architectures like arm64.
->>>
->>> This ends up CPU observing two barriers back to back before executing the
->>> register write.
->>>
->>> Since code already has an explicit barrier call, changing writel() to
->>> writel_relaxed().
->>>
->>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>>  drivers/infiniband/hw/bnxt_re/qplib_rcfw.c | 8 ++++----
->>>  1 file changed, 4 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
->>> index 8329ec6..4a6b981 100644
->>> +++ b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
->>> @@ -181,10 +181,10 @@ static int __send_message(struct bnxt_qplib_rcfw *rcfw, struct cmdq_base *req,
->>>  
->>>  	/* ring CMDQ DB */
->>>  	wmb();
->>> -	writel(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
->>> -	       rcfw->cmdq_bar_reg_prod_off);
->>> -	writel(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
->>> -	       rcfw->cmdq_bar_reg_trig_off);
->>> +	writel_relaxed(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
->>> +		       rcfw->cmdq_bar_reg_prod_off);
->>> +	writel_relaxed(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
->>> +		       rcfw->cmdq_bar_reg_trig_off);
->>
->> Woah, this may not be safe..
->>
->> The definition of writel_relaxed() is that it is fully unordered, so
->> the above two writes may change order now. Broadcom guys would have to
->> ack if that it is OK or not for their hardware.
->>
->> In general this is not an OK approach for a mechanical
->> conversion.. Only the first writel can be convereted.
->>
->> You need to check all your patches to make sure there are no
->> subsequent writel's in the places touched.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [180314 06:54]:
+> Hi,
 > 
-> I paid special attention to this one and went to check the barriers
-> document. According to the document, writes (whether it is relaxed or not)
-> are always observed by the HW inorder with respect to each other.
-> It just doesn't guarantee anything above writel_relaxed() to be observed.
-> Since we already have a wmb(), this is taken care of. 
+> Changes since v1 (sent by Tero):
+> - Rebased on linux-next
+> - Split the dts and binding document patch
+> - Tested it on omap5-uevm that the HPPLL of twl6040 is working (xtal clock is
+>   suplied)
 > 
-> If somebody wants things to be observed after register write, there should
-> have been a wmb() or mmiowb() afterwards.
-
-Never mind, it will break some architectures. I'll only change the first one.
-
- (1) On some systems, I/O stores are not strongly ordered across all CPUs, and
-     so for _all_ general drivers locks should be used and mmiowb() must be
-     issued prior to unlocking the critical section.
-
- (2) If the accessor functions are used to refer to an I/O memory window with
-     relaxed memory access properties, then _mandatory_ memory barriers are
-     required to enforce ordering. 
-
-
+> The v1 of this series was sent about two years ago:
+> http://linux-arm-kernel.infradead.narkive.com/hBBbM4D7/patch-0-5-arm-omap5-add-support-for-fref-xtal-clk
 > 
-> 
->>
->> Jason
->>
-> 
-> 
+> but for some reason it was not applied back then, but I have been rolling it on
+> top of linux-next ever since.
 
+OK applying into omap-for-v4.17/soc and omap-for-v4.17/dt thanks.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+
+Tony
