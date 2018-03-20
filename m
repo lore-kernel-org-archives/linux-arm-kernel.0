@@ -1,39 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Mar 2018 13:57:43 -0700
-Subject: [GIT PULL] two omap fixes for v4.16-rc cycle
-In-Reply-To: <pull-1521214629-131951@atomide.com>
-References: <pull-1521214629-131951@atomide.com>
-Message-ID: <20180320205743.GB5799@atomide.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 20 Mar 2018 14:32:07 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.17
+In-Reply-To: <7hh8pbr4kp.fsf@baylibre.com>
+References: <7hh8pbr4kp.fsf@baylibre.com>
+Message-ID: <CAOi56cU2PaWD87w9RrOz5qXjTYZPNN4GQxB=qd=HiGPxjJWKpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180316 15:38]:
-> From: "Tony Lindgren" <tony@atomide.com>
-> 
-> The following changes since commit d39b6ea4f8c90e9e5f03a06b6a4fd4af11e2f617:
-> 
->   bus: ti-sysc: Fix checking of no-reset-on-init quirk (2018-02-15 09:18:55 -0800)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.16/fixes-rc5-signed
-> 
-> for you to fetch changes up to 4e1e720009a78a7057a142de47def1e9f4bf41c7:
-> 
->   ARM: OMAP: Fix SRAM W+X mapping (2018-03-08 10:28:46 -0800)
-> 
+On Mon, Mar 19, 2018 at 5:08 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+>
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
+>
+> for you to fetch changes up to 0793d5376b9986283e8bf9c777eb6ffda5c1b925:
+>
+>   ARM: dts: meson8b-odroidc1: add microSD support (2018-03-19 16:46:46 -0700)
+
+Retracted.  Please ignore  (I've also deleted the tag)
+
 > ----------------------------------------------------------------
-> Two fixes for omap variants for v4.16-rc cycle
-> 
-> Fix insecure W+X mapping warning for SRAM for omaps that
-> don't yet use drivers/misc/*sram*.c code.
+> Amlogic 32-bit DT updates for v4.17
+> - odroid-c1: add microSD, ethernet, USB reset
+> - add reset controller
+> - fix requesting GPIOs greater than GPIOZ_3
+>
+> ----------------------------------------------------------------
+> Emiliano Ingrassia (2):
+>       ARM: dts: meson8b: extend ethernet controller description
+>       ARM: dts: meson8b-odroidc1: ethernet support
+>
+> Linus L?ssing (1):
+>       ARM: dts: meson8b-odroidc1: add microSD support
+>
+> Martin Blumenstingl (5):
+>       ARM: dts: meson8b: grow the reset controller memory zone
+>       ARM: dts: meson8: add the reset controller
+>       ARM: dts: meson8: add the USB reset line
+>       ARM: dts: meson8b: add the I2C clocks
+>       pinctrl: meson: meson8b: fix requesting GPIOs greater than GPIOZ_3
 
-This one oopses on omap3 when enabling low-power modes as we
-need to restore SRAM coming back from off mode after idle.
+This patch is extra, and is already going through the pinctrl tree.  I
+mistakenly applied the driver patch instead of the DT patch.
 
-So let's skip this pull request if not merged yet, I'll do a
-better patch and will resend an updated pull request.
+Respin coming right up.
 
-Regards,
+Thanks to Martin Blumenstingl for pointing out my mistake.
 
-Tony
+Kevin
