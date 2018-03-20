@@ -1,42 +1,87 @@
 From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Tue, 20 Mar 2018 17:15:11 +0530
-Subject: [PATCH v4 0/3] Fix issues with huge mapping in ioremap for ARM64
-Message-ID: <1521546314-31753-1-git-send-email-cpandya@codeaurora.org>
+Date: Tue, 20 Mar 2018 17:15:13 +0530
+Subject: [PATCH v4 2/3] arm64: Implement page table free interfaces
+In-Reply-To: <1521546314-31753-1-git-send-email-cpandya@codeaurora.org>
+References: <1521546314-31753-1-git-send-email-cpandya@codeaurora.org>
+Message-ID: <1521546314-31753-3-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches are follow up work (and depends on)
-Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
-panic in ioremap huge pages".
+Implement pud_free_pmd_page() and pmd_free_pte_page().
 
-This series of patches are tested on 4.9 kernel with Cortex-A75
-based SoC.
+Implementation requires,
+ 1) Freeing of the un-used next level page tables
+ 2) Clearing off the current pud/pmd entry
+ 3) Invalidate TLB which could have previously
+    valid but not stale entry
 
-Chintan Pandya (3):
-  ioremap: Update pgtable free interfaces with addr
-  arm64: Implement page table free interfaces
-  Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+---
+ arch/arm64/mm/mmu.c | 40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
 
->From V3->V4:
- - Add header for 'addr' in x86 implementation
- - Re-order pmd/pud clear and table free
- - Avoid redundant TLB invalidatation in one perticular case
-
->From V2->V3:
- - Use the exisiting page table free interface to do arm64
-   specific things
-
->From V1->V2:
- - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
-   Add interfaces to free unmapped page table"
- - Honored BBM for ARM64
-
- arch/arm64/mm/mmu.c           | 51 +++++++++++++++++++++++++++++++++----------
- arch/x86/mm/pgtable.c         |  6 +++--
- include/asm-generic/pgtable.h |  8 +++----
- lib/ioremap.c                 |  4 ++--
- 4 files changed, 49 insertions(+), 20 deletions(-)
-
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index da98828..7be3106 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -45,6 +45,7 @@
+ #include <asm/memblock.h>
+ #include <asm/mmu_context.h>
+ #include <asm/ptdump.h>
++#include <asm/tlbflush.h>
+ 
+ #define NO_BLOCK_MAPPINGS	BIT(0)
+ #define NO_CONT_MAPPINGS	BIT(1)
+@@ -973,12 +974,47 @@ int pmd_clear_huge(pmd_t *pmdp)
+ 	return 1;
+ }
+ 
++static int __pmd_free_pte_page(pmd_t *pmd, unsigned long addr, bool tlb_inv)
++{
++	pmd_t *table;
++
++	if (pmd_val(*pmd)) {
++		table = __va(pmd_val(*pmd));
++		pmd_clear(pmd);
++		/*
++		 * FIXME: __flush_tlb_pgtable(&init_mm, addr) is
++		 *        ideal candidate here, which exactly
++		 *        flushes intermediate pgtables. But,
++		 *        this is broken (evident from tests).
++		 *        So, use safe TLB op unless that is fixed.
++		 */
++		if (tlb_inv)
++			flush_tlb_kernel_range(addr, addr + PMD_SIZE);
++
++		free_page((unsigned long) table);
++	}
++	return 1;
++}
++
+ int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+ {
+-	return pud_none(*pud);
++	pmd_t *table;
++	int i;
++
++	if (pud_val(*pud)) {
++		table = __va(pud_val(*pud));
++		for (i = 0; i < PTRS_PER_PMD; i++)
++			__pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE),
++						false);
++
++		pud_clear(pud);
++		flush_tlb_kernel_range(addr, addr + PUD_SIZE);
++		free_page((unsigned long) table);
++	}
++	return 1;
+ }
+ 
+ int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+ {
+-	return pmd_none(*pmd);
++	return __pmd_free_pte_page(pmd, addr, true);
+ }
 -- 
 Qualcomm India Private Limited, on behalf of Qualcomm Innovation
 Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
