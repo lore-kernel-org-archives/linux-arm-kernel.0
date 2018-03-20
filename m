@@ -1,58 +1,100 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 20 Mar 2018 15:52:04 +0000
-Subject: Failed to boot ARM64 boards for recent linux-next
-In-Reply-To: <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
-References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
- <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
- <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
- <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
- <5AB0DEB2.4000803@rock-chips.com>
- <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
-Message-ID: <cbc89d68-ba41-1f6a-4ab2-4c9647b48f75@huawei.com>
+From: jgg@ziepe.ca (Jason Gunthorpe)
+Date: Tue, 20 Mar 2018 10:01:51 -0600
+Subject: [PATCH v4 5/6] IB/nes: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <3b96019a-2b3b-374a-453e-0553fb04c0a7@codeaurora.org>
+References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
+ <1521514068-8856-6-git-send-email-okaya@codeaurora.org>
+ <20180320145413.GH19744@ziepe.ca>
+ <3b96019a-2b3b-374a-453e-0553fb04c0a7@codeaurora.org>
+Message-ID: <20180320160151.GM19744@ziepe.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/2018 13:34, Marc Zyngier wrote:
-> On 20/03/18 10:13, JeffyChen wrote:
->> Hi Shawn,
->>
->> On 03/20/2018 05:39 PM, Shawn Lin wrote:
->>>
->>>
->>> Also another patch warns a lot when booting the kernel. Is there
->>> anything else I could do to let it go? Seems I am using broken
->>> dts for requesting IRQ_TYPE_NONE there?
->>
->> could be:
->> https://github.com/torvalds/linux/blob/master/drivers/irqchip/irq-gic-v3.c#L1145
->>
->> 		struct irq_fwspec ppi_fwspec = {
->> 			.fwnode		= gic_data.fwnode,
->> 			.param_count	= 3,
->> 			.param		= {
->> 				[0]	= 1,
->> 				[1]	= i,
->> 				[2]	= IRQ_TYPE_NONE, <--
->> 			},
->> 		};
->>
->> 		irq = irq_create_fwspec_mapping(&ppi_fwspec);
->
-> Probably is. Caught at my own game, fun! ;-)
->
-> Turning that NONE into LEVEL will work, as there is no known PPIs
-> configured as edge (specially in a partitioned system), but the general
-> case isn't pretty. I'll queue a workaround for now, and will look at
-> addressing the more general issue.
->
+On Tue, Mar 20, 2018 at 10:23:16AM -0500, Sinan Kaya wrote:
+> On 3/20/2018 9:54 AM, Jason Gunthorpe wrote:
+> > On Mon, Mar 19, 2018 at 10:47:47PM -0400, Sinan Kaya wrote:
+> >> Code includes barrier() followed by writel(). writel() already has a
+> >> barrier on some architectures like arm64.
+> >>
+> >> This ends up CPU observing two barriers back to back before executing the
+> >> register write.
+> >>
+> >> Create a new wrapper function with relaxed write operator. Use the new
+> >> wrapper when a write is following a barrier().
+> >>
+> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >>  drivers/infiniband/hw/nes/nes.h       |  5 +++++
+> >>  drivers/infiniband/hw/nes/nes_hw.c    | 21 ++++++++++++++-------
+> >>  drivers/infiniband/hw/nes/nes_mgt.c   | 15 ++++++++++-----
+> >>  drivers/infiniband/hw/nes/nes_nic.c   |  2 +-
+> >>  drivers/infiniband/hw/nes/nes_utils.c |  3 ++-
+> >>  drivers/infiniband/hw/nes/nes_verbs.c |  5 +++--
+> >>  6 files changed, 35 insertions(+), 16 deletions(-)
+> >>
+> >> diff --git a/drivers/infiniband/hw/nes/nes.h b/drivers/infiniband/hw/nes/nes.h
+> >> index 00c27291..85e007d 100644
+> >> +++ b/drivers/infiniband/hw/nes/nes.h
+> >> @@ -387,6 +387,11 @@ static inline void nes_write_indexed(struct nes_device *nesdev, u32 reg_index, u
+> >>  	spin_unlock_irqrestore(&nesdev->indexed_regs_lock, flags);
+> >>  }
+> >>  
+> >> +static inline void nes_write32_relaxed(void __iomem *addr, u32 val)
+> >> +{
+> >> +	writel_relaxed(val, addr);
+> >> +}
+> > 
+> > This wrapper is pointless, let us not add more..
+> > 
+> >>  static inline void nes_write32(void __iomem *addr, u32 val)
+> >>  {
+> >>  	writel(val, addr);
+> >> diff --git a/drivers/infiniband/hw/nes/nes_hw.c b/drivers/infiniband/hw/nes/nes_hw.c
+> >> index 18a7de1..568e17d 100644
+> >> +++ b/drivers/infiniband/hw/nes/nes_hw.c
+> >> @@ -1257,7 +1257,8 @@ int nes_destroy_cqp(struct nes_device *nesdev)
+> >>  
+> >>  	barrier();
+> >>  	/* Ring doorbell (5 WQEs) */
+> >> -	nes_write32(nesdev->regs+NES_WQE_ALLOC, 0x05800000 | nesdev->cqp.qp_id);
+> >> +	nes_write32_relaxed(nesdev->regs+NES_WQE_ALLOC,
+> >> +			    0x05800000 | nesdev->cqp.qp_id);
+> > 
+> > barrier() is not strong enough to order writel, so this doesn't seem
+> > right?
+> > 
+> > It is probably noteven strong enough for what this driver thinks it is
+> > doing..  This driver is essentially dead and broken, probably just
+> > don't change it.
+> 
+> Just for the sake of other changes in netdev directory and my education...
+> 
+> barrier() on ARM is a wmb(). It should be a compiler barrier on intel.
+> 
+> You are saying barrier() should have been a wmb(), right?
 
-JFYI, reverting the original patch mentioned by Shawn resolved the boot 
-hang I was seeing on my Huawei D03. My D05 was fine without the revert.
+Yes, that is my understanding.. barrier() is supposed to be a very
+weak barrier that just ensures the CPU is locally consistent with
+itself. It doesn't say anything about DMA access, or SMP cases.
 
-Thanks,
-John
+I don't think it is supposed to order anything related to
+writel_relaxed()
 
-> Thanks,
->
-> 	M.
->
+> I have gone through similar exercise on netdev directory and changed
+> 
+> barrier()
+> writel()
+> 
+> to 
+> 
+> barrier()
+> writel_relaxed()
+> 
+> Do you see any problem with this?
+
+Seems dangerous as a mechanical change to me, it really depends on why
+the driver author put barrier() there.
+
+In this case, I strongly suspect nes really intended to say wmb()
+
+Jason
