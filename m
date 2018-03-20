@@ -1,41 +1,36 @@
 From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Tue, 20 Mar 2018 13:03:30 -0300
-Subject: [PATCH 1/3] ASoC: rockchip: Fix dai_name for HDMI codec
+Date: Tue, 20 Mar 2018 13:03:31 -0300
+Subject: [PATCH 2/3] ASoC: rockchip: rk3288-hdmi-analog: Select needed codecs
 In-Reply-To: <20180320160332.13212-1-ezequiel@vanguardiasur.com.ar>
 References: <20180320160332.13212-1-ezequiel@vanguardiasur.com.ar>
-Message-ID: <20180320160332.13212-2-ezequiel@vanguardiasur.com.ar>
+Message-ID: <20180320160332.13212-3-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ezequiel Garcia <ezequiel@collabora.co.uk>
 
-Commit 24069b589b02 ("ASoC: hdmi-codec: remove multi detection support")
-changed the dai_name for the HDMI Codec, breaking the rk3288_hdmi_analog
-driver, which fails to register with a:
-
-  rk3288-snd-hdmi-analog sound: ASoC: CODEC DAI hdmi-hifi.0 not registered
-
-This commit fixes the dai_name, fixing the issue.
+The driver does not select all the codec drivers that needs.
+Fix it by selecting the analog and HDMI codecs.
 
 Cc: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Fixes: 24069b589b02 ("ASoC: hdmi-codec: remove multi detection support")
 Signed-off-by: Ezequiel Garcia <ezequiel@collabora.co.uk>
 ---
- sound/soc/rockchip/rk3288_hdmi_analog.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/rockchip/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/sound/soc/rockchip/rk3288_hdmi_analog.c b/sound/soc/rockchip/rk3288_hdmi_analog.c
-index fa44e3901336..929b3fe289b0 100644
---- a/sound/soc/rockchip/rk3288_hdmi_analog.c
-+++ b/sound/soc/rockchip/rk3288_hdmi_analog.c
-@@ -155,7 +155,7 @@ static struct snd_soc_dai_link_component rk_codecs[] = {
- 	{ },
- 	{
- 		.name = "hdmi-audio-codec.2.auto",
--		.dai_name = "hdmi-hifi.0",
-+		.dai_name = "i2s-hifi",
- 	},
- };
- 
+diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
+index b0825370d262..957046ac6c8c 100644
+--- a/sound/soc/rockchip/Kconfig
++++ b/sound/soc/rockchip/Kconfig
+@@ -56,6 +56,9 @@ config SND_SOC_RK3288_HDMI_ANALOG
+ 	depends on SND_SOC_ROCKCHIP && I2C && GPIOLIB && CLKDEV_LOOKUP
+ 	select SND_SOC_ROCKCHIP_I2S
+ 	select SND_SOC_HDMI_CODEC
++	select SND_SOC_ES8328_I2C
++	select SND_SOC_ES8328_SPI if SPI_MASTER
++	select DRM_DW_HDMI_I2S_AUDIO if DRM_DW_HDMI
+ 	help
+ 	  Say Y or M here if you want to add support for SoC audio on Rockchip
+ 	  RK3288 boards using an analog output and the built-in HDMI audio.
 -- 
 2.16.2
