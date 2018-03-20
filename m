@@ -1,35 +1,40 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 20 Mar 2018 09:58:07 -0700
-Subject: [PATCH v8 13/42] clk: davinci: Add platform information for TI
- DM355 PSC
-In-Reply-To: <1521168778-27236-14-git-send-email-david@lechnology.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 20 Mar 2018 11:57:48 -0500
+Subject: [PATCH v8 18/42] clk: davinci: New driver for TI DA8XX CFGCHIP
+ clocks
+In-Reply-To: <152156485535.183971.1627687499726447092@swboyd.mtv.corp.google.com>
 References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-14-git-send-email-david@lechnology.com>
-Message-ID: <152156508760.183971.11983086334390852576@swboyd.mtv.corp.google.com>
+ <1521168778-27236-19-git-send-email-david@lechnology.com>
+ <152156485535.183971.1627687499726447092@swboyd.mtv.corp.google.com>
+Message-ID: <b4ea5efb-3fa0-b2f3-cd5f-75343e841153@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting David Lechner (2018-03-15 19:52:29)
-> +static int dm355_psc_init(struct device *dev, void __iomem *base)
-> +{
-> +       return davinci_psc_register_clocks(base, dm355_psc_info, 42, base);
-> +}
-> +
+On 03/20/2018 11:54 AM, Stephen Boyd wrote:
+> Quoting David Lechner (2018-03-15 19:52:34)
+>> +
+>> +typedef int (*da8xx_cfgchip_init)(struct device *dev, void __iomem *base);
+> 
+> Should be struct regmap *regmap?
 
-Should be dev for that first argument to davinci_psc_register_clocks()?
+Yes. It looks like this was copied and pasted from one of the other drivers.
 
-I squashed this in:
+Thank you for fixing it.
 
-diff --git a/drivers/clk/davinci/psc-dm355.c b/drivers/clk/davinci/psc-dm355.c
-index 249a05330457..6995ecea2677 100644
---- a/drivers/clk/davinci/psc-dm355.c
-+++ b/drivers/clk/davinci/psc-dm355.c
-@@ -70,7 +70,7 @@ static const struct davinci_lpsc_clk_info dm355_psc_info[] = {
- 
- static int dm355_psc_init(struct device *dev, void __iomem *base)
- {
--	return davinci_psc_register_clocks(base, dm355_psc_info, 42, base);
-+	return davinci_psc_register_clocks(dev, dm355_psc_info, 42, base);
- }
- 
- static struct clk_bulk_data dm355_psc_parent_clks[] = {
+> 
+> I've squashed this in.
+> 
+> diff --git a/drivers/clk/davinci/da8xx-cfgchip.c b/drivers/clk/davinci/da8xx-cfgchip.c
+> index 858d3786b27b..c971111d2601 100644
+> --- a/drivers/clk/davinci/da8xx-cfgchip.c
+> +++ b/drivers/clk/davinci/da8xx-cfgchip.c
+> @@ -736,7 +736,7 @@ static const struct platform_device_id da8xx_cfgchip_id_table[] = {
+>   	{ }
+>   };
+>   
+> -typedef int (*da8xx_cfgchip_init)(struct device *dev, void __iomem *base);
+> +typedef int (*da8xx_cfgchip_init)(struct device *dev, struct regmap *regmap);
+>   
+>   static int da8xx_cfgchip_probe(struct platform_device *pdev)
+>   {
+> 
