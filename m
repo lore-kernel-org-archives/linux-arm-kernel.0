@@ -1,95 +1,91 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 20 Mar 2018 15:58:31 +0530
-Subject: [PATCH v5 4/9] dt-bindings: gpio: Add gpio nodes for Actions
- S900 SoC
-In-Reply-To: <20180318125304.3i3kqzcefhv5iusv@rob-hp-laptop>
-References: <20180309051345.1011-1-manivannan.sadhasivam@linaro.org>
- <20180309051345.1011-5-manivannan.sadhasivam@linaro.org>
- <20180318125304.3i3kqzcefhv5iusv@rob-hp-laptop>
-Message-ID: <20180320102831.ixxoj55cerhhtmem@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Mar 2018 10:33:31 +0000
+Subject: Failed to boot ARM64 boards for recent linux-next
+In-Reply-To: <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
+References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
+ <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+ <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
+ <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
+Message-ID: <ee53d58b-5e46-b54f-b985-81631aaf7882@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Sun, Mar 18, 2018 at 07:53:04AM -0500, Rob Herring wrote:
-> On Fri, Mar 09, 2018 at 10:43:40AM +0530, Manivannan Sadhasivam wrote:
-> > Add gpio nodes for Actions Semi S900 SoC.
-> > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  .../devicetree/bindings/gpio/actions,owl-gpio.txt  | 90 ++++++++++++++++++++++
-> >  1 file changed, 90 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
-> > new file mode 100644
-> > index 000000000000..ad7d32ce2abe
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
-> > @@ -0,0 +1,90 @@
-> > +* Actions Semi OWL GPIO controller bindings
-> > +
-> > +The GPIOs are organized as individual banks/ports with variable number
-> > +of GPIOs. Each bank is represented as an individual GPIO controller.
-> > +
-> > +Required properties:
-> > +- compatible            : Should be "actions,s900-gpio"
-> > +- reg                   : Address and range of the GPIO controller registers.
-> > +- gpio-controller       : Marks the device node as a GPIO controller.
-> > +- #gpio-cells           : Should be <2>. The first cell is the gpio number
-> > +                          and the second cell is used to specify optional
-> > +                          parameters.
-> > +- ngpios                : Specifies the number of GPIO lines.
-> > +- interrupt-controller  : Marks the device node as an interrupt controller.
-> > +- #interrupt-cells      : Specifies the number of cells needed to encode an
-> > +                          interrupt.  Shall be set to 2.  The first cell
-> > +                          defines the interrupt number, the second encodes
-> > +                          the trigger flags described in
-> > +                          bindings/interrupt-controller/interrupts.txt
-> > +
-> > +Optional properties:
-> > +- gpio-ranges           : Mapping between GPIO and pinctrl
-> > +
-> > +Examples:
-> > +
-> > +       gpioa: gpio at e01b0000 {
-> > +               compatible = "actions,s900-gpio";
-> > +               reg = <0x0 0xe01b0000 0x0 0x1000>;
-> > +               gpio-controller;
-> > +               #gpio-cells = <2>;
-> > +               gpio-ranges = <&pinctrl 0 0 32>;
-> > +               ngpios = <32>;
+On 20/03/18 09:39, Shawn Lin wrote:
+> Hi Marc
 > 
-> This is only needed if the number of gpios is reduced for some reason 
-> such as not pinned out. IOW, 32 is implied because that's the size of 
-> each bank.
+> On 2018/3/20 17:32, Shawn Lin wrote:
+>> Hi Marc,
+>>
+>> On 2018/3/20 17:01, Marc Zyngier wrote:
+>>> Hi Shawn,
+>>>
+>>> On 20/03/18 08:48, Shawn Lin wrote:
+>>>> Hi Marc,
+>>>>
+>>>> ????? I was able to boot my RK3399 board with in linux-next-20180314,
+>>>> but not today. My bisect robot shows me it was introduced by
+>>>>
+>>>> commit d6062a6d62c643a06c393745d032da3e6441d4bd
+>>>> Author: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Date:?? Fri Mar 9 14:53:19 2018 +0000
+>>>>
+>>>> ????? irqchip/gic-v3: Reset APgRn registers at boot time
+>>>>
+>>>> ????? Booting a crash kernel while in an interrupt handler is likely
+>>>> ????? to leave the Active Priority Registers with some state that
+>>>> ????? is not relevant to the new kernel, and is likely to lead
+>>>> ????? to erratic behaviours such as interrupts not firing as their
+>>>> ????? priority is already active.
+>>>>
+>>>> ????? As a sanity measure, wipe the APRs clean on startup. We make
+>>>> ????? sure to wipe both group 0 and 1 registers in order to avoid
+>>>> ????? any surprise.
+>>>>
+>>>>
+>>>> The panic log is here:
+>>>> https://paste.ubuntu.com/p/7WrJJDG6JQ/
+>>>>
+>>>> Is it a known issue or is there a coming patch for that?
+>>>
+>>> ? Interesting. No, that wasn't the intention, but I may have missed a key
+>>> detail (group 0 access traps to EL3 if SCR_EL3.FIQ==1). Can you have a
+>>> go at the following hack, just to narrow it down:
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>>> index 5bb7bb22f1c1..f8ff43b1d4f8 100644
+>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>> @@ -570,16 +570,12 @@ static void gic_cpu_sys_reg_init(void)
+>>> ????? switch(val + 1) {
+>>> ????? case 8:
+>>> ????? case 7:
+>>> -??????? write_gicreg(0, ICC_AP0R3_EL1);
+>>> ????????? write_gicreg(0, ICC_AP1R3_EL1);
+>>> -??????? write_gicreg(0, ICC_AP0R2_EL1);
+>>> ????????? write_gicreg(0, ICC_AP1R2_EL1);
+>>> ????? case 6:
+>>> -??????? write_gicreg(0, ICC_AP0R1_EL1);
+>>> ????????? write_gicreg(0, ICC_AP1R1_EL1);
+>>> ????? case 5:
+>>> ????? case 4:
+>>> -??????? write_gicreg(0, ICC_AP0R0_EL1);
+>>> ????????? write_gicreg(0, ICC_AP1R0_EL1);
+>>> ????? }
+>>>
+>>> Let me know if that helps.
+>>>
+>>
+>> It works for me. Thanks!
 > 
-
-Okay. Then I can remove ngpio property for banks which has 32 GPIOs.
-
-> > +               interrupt-controller;
-> > +               #interrupt-cells = <2>;
-> > +       };
-> > +
-> > +       gpiob: gpio at e01b000c {
-> > +               compatible = "actions,s900-gpio";
-> > +               reg = <0x0 0xe01b000c 0x0 0x1000>;
 > 
-> Due to the sizes, these are still overlapping.
-> 
+> Also another patch warns a lot when booting the kernel. Is there
+> anything else I could do to let it go? Seems I am using broken
+> dts for requesting IRQ_TYPE_NONE there?
 
-Oops, will fix the size.
+Indeed. IRQ_TYPE_NONE is not something you should ever feed to the GIC.
 
 Thanks,
-Mani
 
-> Rob
-> 
-> > +               gpio-controller;
-> > +               #gpio-cells = <2>;
-> > +               gpio-ranges = <&pinctrl 0 32 32>;
-> > +               ngpios = <32>;
-> > +               interrupt-controller;
-> > +               #interrupt-cells = <2>;
-> > +       };
+	M.
+-- 
+Jazz is not dead. It just smells funny...
