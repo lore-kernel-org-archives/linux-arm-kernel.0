@@ -1,77 +1,56 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 20 Mar 2018 17:32:50 +0800
-Subject: Failed to boot ARM64 boards for recent linux-next
-In-Reply-To: <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
-References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
- <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
-Message-ID: <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 20 Mar 2018 10:36:10 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.17
+In-Reply-To: <20180316163243.ymcnbdvpbvzrext2@verge.net.au>
+References: <cover.1521208546.git.horms+renesas@verge.net.au>
+ <20180316163243.ymcnbdvpbvzrext2@verge.net.au>
+Message-ID: <CAMuHMdVcmSHxovU+qK=dhxZXxjkEpc=5B3_AP4LuoWoYEXq05A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Simon,
 
-On 2018/3/20 17:01, Marc Zyngier wrote:
-> Hi Shawn,
-> 
-> On 20/03/18 08:48, Shawn Lin wrote:
->> Hi Marc,
->>
->>       I was able to boot my RK3399 board with in linux-next-20180314,
->> but not today. My bisect robot shows me it was introduced by
->>
->> commit d6062a6d62c643a06c393745d032da3e6441d4bd
->> Author: Marc Zyngier <marc.zyngier@arm.com>
->> Date:   Fri Mar 9 14:53:19 2018 +0000
->>
->>       irqchip/gic-v3: Reset APgRn registers at boot time
->>
->>       Booting a crash kernel while in an interrupt handler is likely
->>       to leave the Active Priority Registers with some state that
->>       is not relevant to the new kernel, and is likely to lead
->>       to erratic behaviours such as interrupts not firing as their
->>       priority is already active.
->>
->>       As a sanity measure, wipe the APRs clean on startup. We make
->>       sure to wipe both group 0 and 1 registers in order to avoid
->>       any surprise.
->>
->>
->> The panic log is here:
->> https://paste.ubuntu.com/p/7WrJJDG6JQ/
->>
->> Is it a known issue or is there a coming patch for that?
-> 
->   Interesting. No, that wasn't the intention, but I may have missed a key
-> detail (group 0 access traps to EL3 if SCR_EL3.FIQ==1). Can you have a
-> go at the following hack, just to narrow it down:
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 5bb7bb22f1c1..f8ff43b1d4f8 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -570,16 +570,12 @@ static void gic_cpu_sys_reg_init(void)
->   	switch(val + 1) {
->   	case 8:
->   	case 7:
-> -		write_gicreg(0, ICC_AP0R3_EL1);
->   		write_gicreg(0, ICC_AP1R3_EL1);
-> -		write_gicreg(0, ICC_AP0R2_EL1);
->   		write_gicreg(0, ICC_AP1R2_EL1);
->   	case 6:
-> -		write_gicreg(0, ICC_AP0R1_EL1);
->   		write_gicreg(0, ICC_AP1R1_EL1);
->   	case 5:
->   	case 4:
-> -		write_gicreg(0, ICC_AP0R0_EL1);
->   		write_gicreg(0, ICC_AP1R0_EL1);
->   	}
-> 
-> Let me know if that helps.
-> 
+On Fri, Mar 16, 2018 at 5:32 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Mar 16, 2018 at 03:53:09PM +0100, Simon Horman wrote:
+>> Please consider these Renesas ARM based SoC DT updates for v4.17.
+>
+> Unfortunately there seems to be a small problem with this pull request.
+>
+> "ARM: dts: r7s72100: add USB device to device tree" is already
+> present upstream via Greg KH.
 
-It works for me. Thanks!
+It is no longer present upstream, as it was reverted by Greg to avoid
+conflicts.
 
-> Thanks,
-> 
-> 	M.
-> 
+Interestingly, "git log" doesn't show it:
+
+$ git log --oneline v4.15..v4.16-rc1 -- arch/arm/boot/dts/r7s72100.dtsi
+$
+
+unless you explicitly mention the commit that created it:
+
+$ git log --oneline v4.15..8a99b6ad4da2f90969bb2ebb426c1d3dd0089fa4 --
+arch/arm/boot/dts/r7s72100.dtsi
+8a99b6ad4da2f909 ARM: dts: r7s72100: add USB device to device tree
+$
+
+or reverted it:
+
+$ git log --oneline v4.15..9836c09442c249b8e4f9646090d3259001cad432 --
+arch/arm/boot/dts/r7s72100.dtsi
+9836c09442c249b8 Revert "ARM: dts: r7s72100: add USB device to device tree"
+8a99b6ad4da2f909 ARM: dts: r7s72100: add USB device to device tree
+$
+
+(both are in v4.16-rc1).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
