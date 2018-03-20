@@ -1,50 +1,77 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Tue, 20 Mar 2018 10:32:08 +0100
-Subject: [PATCH] serial: mvebu-uart: fix tx lost characters
-In-Reply-To: <3B588D51285A4A4D8D39C94212E07826278BDF@SPQCMBX02.exfo.com>
-References: <3B588D51285A4A4D8D39C94212E078262748ED@SPQCMBX02.exfo.com>
- <20180315165516.GA9519@kroah.com>
- <3B588D51285A4A4D8D39C94212E078262787C0@SPQCMBX02.exfo.com>
- <20180315212137.57ca7c65@xps13>
- <3B588D51285A4A4D8D39C94212E07826278BDF@SPQCMBX02.exfo.com>
-Message-ID: <20180320093208.GA22194@kroah.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 20 Mar 2018 17:32:50 +0800
+Subject: Failed to boot ARM64 boards for recent linux-next
+In-Reply-To: <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
+ <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+Message-ID: <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 01:45:32PM +0000, Gabriel Matni wrote:
-> From: Gabriel Matni <gabriel.matni@exfo.com>
+Hi Marc,
+
+On 2018/3/20 17:01, Marc Zyngier wrote:
+> Hi Shawn,
 > 
-> Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
-> that the transmitter holding register (THR) is ready to receive a new byte.
+> On 20/03/18 08:48, Shawn Lin wrote:
+>> Hi Marc,
+>>
+>>       I was able to boot my RK3399 board with in linux-next-20180314,
+>> but not today. My bisect robot shows me it was introduced by
+>>
+>> commit d6062a6d62c643a06c393745d032da3e6441d4bd
+>> Author: Marc Zyngier <marc.zyngier@arm.com>
+>> Date:   Fri Mar 9 14:53:19 2018 +0000
+>>
+>>       irqchip/gic-v3: Reset APgRn registers at boot time
+>>
+>>       Booting a crash kernel while in an interrupt handler is likely
+>>       to leave the Active Priority Registers with some state that
+>>       is not relevant to the new kernel, and is likely to lead
+>>       to erratic behaviours such as interrupts not firing as their
+>>       priority is already active.
+>>
+>>       As a sanity measure, wipe the APRs clean on startup. We make
+>>       sure to wipe both group 0 and 1 registers in order to avoid
+>>       any surprise.
+>>
+>>
+>> The panic log is here:
+>> https://paste.ubuntu.com/p/7WrJJDG6JQ/
+>>
+>> Is it a known issue or is there a coming patch for that?
 > 
-> TX_EMP tells us when it is possible to send a break sequence via
-> SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-> empty, it does not guarantee that a new byte can be written just yet.
+>   Interesting. No, that wasn't the intention, but I may have missed a key
+> detail (group 0 access traps to EL3 if SCR_EL3.FIQ==1). Can you have a
+> go at the following hack, just to narrow it down:
 > 
-> Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700
->       serial port")
-
-Can all be on one line.
-
-And should this go to the stable trees?
-
-> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
-> Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
-> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
-
-Trailing whitespace?
-
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index 5bb7bb22f1c1..f8ff43b1d4f8 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -570,16 +570,12 @@ static void gic_cpu_sys_reg_init(void)
+>   	switch(val + 1) {
+>   	case 8:
+>   	case 7:
+> -		write_gicreg(0, ICC_AP0R3_EL1);
+>   		write_gicreg(0, ICC_AP1R3_EL1);
+> -		write_gicreg(0, ICC_AP0R2_EL1);
+>   		write_gicreg(0, ICC_AP1R2_EL1);
+>   	case 6:
+> -		write_gicreg(0, ICC_AP0R1_EL1);
+>   		write_gicreg(0, ICC_AP1R1_EL1);
+>   	case 5:
+>   	case 4:
+> -		write_gicreg(0, ICC_AP0R0_EL1);
+>   		write_gicreg(0, ICC_AP1R0_EL1);
+>   	}
 > 
-> ---
->  drivers/tty/serial/mvebu-uart.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Let me know if that helps.
+> 
 
-What version of this patch is this?  How do I know which to accept?
+It works for me. Thanks!
 
-Please properly version your patch, and include the changes below the
---- line like the documentation says to do.
-
-thanks,
-
-greg k-h
+> Thanks,
+> 
+> 	M.
+> 
