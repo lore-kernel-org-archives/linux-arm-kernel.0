@@ -1,195 +1,79 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 20 Mar 2018 09:28:55 +0530
-Subject: [PATCH v3 12/13] ARM: dts: ipq8074: Add pcie nodes
-In-Reply-To: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
-References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521518336-5467-13-git-send-email-sricharan@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 20 Mar 2018 03:33:33 +0000
+Subject: [RFC PATCH 1/6] arm64/mm: add explicit physical address argument
+ to map_kernel_segment
+In-Reply-To: <20180319111958.4171-2-ard.biesheuvel@linaro.org>
+References: <20180319111958.4171-1-ard.biesheuvel@linaro.org>
+ <20180319111958.4171-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180320033323.kyjgtbzxc3vjpars@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver/phy support for ipq8074 is available now.
-So enabling the nodes in DT.
+On Mon, Mar 19, 2018 at 07:19:53PM +0800, Ard Biesheuvel wrote:
+> In preparation of mapping a physically non-adjacent memory region
+> as backing for the vmlinux segment covering the trampoline and primary
+> level swapper_pg_dir regions, make the physical address an explicit
+> argument of map_kernel_segment().
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/mmu.c | 22 ++++++++++++--------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 8c704f1e53c2..007b2e32ca71 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -507,10 +507,10 @@ void mark_rodata_ro(void)
+>  }
+>  
+>  static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
+> -				      pgprot_t prot, struct vm_struct *vma,
+> -				      int flags, unsigned long vm_flags)
+> +				      phys_addr_t pa_start, pgprot_t prot,
+> +				      struct vm_struct *vma, int flags,
+> +				      unsigned long vm_flags)
+>  {
+> -	phys_addr_t pa_start = __pa_symbol(va_start);
+>  	unsigned long size = va_end - va_start;
+>  
+>  	BUG_ON(!PAGE_ALIGNED(pa_start));
 
-Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/ipq8074.dtsi | 157 +++++++++++++++++++++++++++++++++-
- 1 file changed, 156 insertions(+), 1 deletion(-)
+How about we rename this to __map_kernel_segment(), and have a
+map_kernel_segment wrapper that does the __pa_symbol() stuff?
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-index a8dbbf0..caf3485 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-+++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-@@ -24,7 +24,7 @@
- 		ranges = <0 0 0 0xffffffff>;
- 		compatible = "simple-bus";
- 
--		pinctrl at 1000000 {
-+		tlmm: pinctrl at 1000000 {
- 			compatible = "qcom,ipq8074-pinctrl";
- 			reg = <0x1000000 0x300000>;
- 			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
-@@ -229,6 +229,161 @@
- 			dma-names = "tx", "rx", "cmd";
- 			status = "disabled";
- 		};
-+
-+		pcie_phy0: phy at 86000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x86000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy0_pipe_clk";
-+
-+			resets = <&gcc GCC_PCIE0_PHY_BCR>,
-+				<&gcc GCC_PCIE0PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
-+			status = "disabled";
-+		};
-+
-+		pcie0: pci at 20000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x20000000 0xf1d
-+				0x20000f20 0xa8
-+				0x80000 0x2000
-+				0x20100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <0>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			phys = <&pcie_phy0>;
-+			phy-names = "pciephy";
-+
-+			ranges = <0x81000000 0 0x20200000 0x20200000
-+				  0 0x100000   /* downstream I/O */
-+				  0x82000000 0 0x20300000 0x20300000
-+				  0 0xd00000>; /* non-prefetchable memory */
-+
-+			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 75
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 78
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 79
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 83
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+
-+			clocks = <&gcc GCC_SYS_NOC_PCIE0_AXI_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE0_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE0_AHB_CLK>,
-+				 <&gcc GCC_PCIE0_AUX_CLK>;
-+
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE0_PIPE_ARES>,
-+				 <&gcc GCC_PCIE0_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE0_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE0_AHB_ARES>,
-+				 <&gcc GCC_PCIE0_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
-+			status = "disabled";
-+		};
-+
-+		pcie_phy1: phy at 8e000 {
-+			compatible = "qcom,ipq8074-qmp-pcie-phy";
-+			reg = <0x8e000 0x1000>;
-+			#phy-cells = <0>;
-+			clocks = <&gcc GCC_PCIE1_PIPE_CLK>;
-+			clock-names = "pipe_clk";
-+			clock-output-names = "pcie20_phy1_pipe_clk";
-+
-+			resets = <&gcc GCC_PCIE1_PHY_BCR>,
-+				<&gcc GCC_PCIE1PHY_PHY_BCR>;
-+			reset-names = "phy",
-+				      "common";
-+			status = "disabled";
-+		};
-+
-+		pcie1: pci at 10000000 {
-+			compatible = "qcom,pcie-ipq8074";
-+			reg =  <0x10000000 0xf1d
-+				0x10000f20 0xa8
-+				0x88000 0x2000
-+				0x10100000 0x1000>;
-+			reg-names = "dbi", "elbi", "parf", "config";
-+			device_type = "pci";
-+			linux,pci-domain = <1>;
-+			bus-range = <0x00 0xff>;
-+			num-lanes = <1>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			phys = <&pcie_phy1>;
-+			phy-names = "pciephy";
-+
-+			ranges = <0x81000000 0 0x10200000 0x10200000
-+				  0 0x100000   /* downstream I/O */
-+				  0x82000000 0 0x10300000 0x10300000
-+				  0 0xd00000>; /* non-prefetchable memory */
-+
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "msi";
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0x7>;
-+			interrupt-map = <0 0 0 1 &intc 0 142
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-+					<0 0 0 2 &intc 0 143
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-+					<0 0 0 3 &intc 0 144
-+					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-+					<0 0 0 4 &intc 0 145
-+					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-+
-+			clocks = <&gcc GCC_SYS_NOC_PCIE1_AXI_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_M_CLK>,
-+				 <&gcc GCC_PCIE1_AXI_S_CLK>,
-+				 <&gcc GCC_PCIE1_AHB_CLK>,
-+				 <&gcc GCC_PCIE1_AUX_CLK>;
-+			clock-names = "iface",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "aux";
-+			resets = <&gcc GCC_PCIE1_PIPE_ARES>,
-+				 <&gcc GCC_PCIE1_SLEEP_ARES>,
-+				 <&gcc GCC_PCIE1_CORE_STICKY_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_SLAVE_ARES>,
-+				 <&gcc GCC_PCIE1_AHB_ARES>,
-+				 <&gcc GCC_PCIE1_AXI_MASTER_STICKY_ARES>;
-+			reset-names = "pipe",
-+				      "sleep",
-+				      "sticky",
-+				      "axi_m",
-+				      "axi_s",
-+				      "ahb",
-+				      "axi_m_sticky";
-+			status = "disabled";
-+		};
- 	};
- 
- 	cpus {
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+That would avoid some redundancy in map_kernel(), and when we can use
+__map_kernel_segment() for the trampoline bits.
+
+Thanks,
+Mark.
+
+> @@ -585,15 +585,19 @@ static void __init map_kernel(pgd_t *pgdp)
+>  	 * Only rodata will be remapped with different permissions later on,
+>  	 * all other segments are allowed to use contiguous mappings.
+>  	 */
+> -	map_kernel_segment(pgdp, _text, _etext, text_prot, &vmlinux_text, 0,
+> -			   VM_NO_GUARD);
+> -	map_kernel_segment(pgdp, __start_rodata, __inittext_begin, PAGE_KERNEL,
+> +	map_kernel_segment(pgdp, _text, _etext, __pa_symbol(_text), text_prot,
+> +			   &vmlinux_text, 0, VM_NO_GUARD);
+> +	map_kernel_segment(pgdp, __start_rodata, __inittext_begin,
+> +			   __pa_symbol(__start_rodata), PAGE_KERNEL,
+>  			   &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
+> -	map_kernel_segment(pgdp, __inittext_begin, __inittext_end, text_prot,
+> +	map_kernel_segment(pgdp, __inittext_begin, __inittext_end,
+> +			   __pa_symbol(__inittext_begin), text_prot,
+>  			   &vmlinux_inittext, 0, VM_NO_GUARD);
+> -	map_kernel_segment(pgdp, __initdata_begin, __initdata_end, PAGE_KERNEL,
+> +	map_kernel_segment(pgdp, __initdata_begin, __initdata_end,
+> +			   __pa_symbol(__initdata_begin), PAGE_KERNEL,
+>  			   &vmlinux_initdata, 0, VM_NO_GUARD);
+> -	map_kernel_segment(pgdp, _data, _end, PAGE_KERNEL, &vmlinux_data, 0, 0);
+> +	map_kernel_segment(pgdp, _data, _end, __pa_symbol(_data), PAGE_KERNEL,
+> +			   &vmlinux_data, 0, 0);
+>  
+>  	if (!READ_ONCE(pgd_val(*pgd_offset_raw(pgdp, FIXADDR_START)))) {
+>  		/*
+> -- 
+> 2.11.0
+> 
