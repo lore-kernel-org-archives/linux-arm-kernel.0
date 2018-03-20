@@ -1,10 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:42:28 -0400
-Subject: [PATCH v4 13/17] net: cxgb3: Eliminate duplicate barriers on
+Date: Mon, 19 Mar 2018 22:42:27 -0400
+Subject: [PATCH v4 12/17] net: cxgb4/cxgb4vf: Eliminate duplicate barriers on
  weakly-ordered archs
 In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
 References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521513753-7325-14-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521513753-7325-13-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,85 +19,181 @@ wrapper when a write is following a wmb().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/chelsio/cxgb3/adapter.h |  7 +++++++
- drivers/net/ethernet/chelsio/cxgb3/sge.c     | 19 ++++++++++---------
- 2 files changed, 17 insertions(+), 9 deletions(-)
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  6 ++++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 13 +++++++------
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        | 12 ++++++------
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c      |  2 +-
+ drivers/net/ethernet/chelsio/cxgb4vf/adapter.h  | 14 ++++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4vf/sge.c      | 18 ++++++++++--------
+ 6 files changed, 44 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/net/ethernet/chelsio/cxgb3/adapter.h b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
-index 087ff0f..0e21e66 100644
---- a/drivers/net/ethernet/chelsio/cxgb3/adapter.h
-+++ b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
-@@ -281,6 +281,13 @@ static inline void t3_write_reg(struct adapter *adapter, u32 reg_addr, u32 val)
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index 9040e13..6bde0b9 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -1202,6 +1202,12 @@ static inline void t4_write_reg(struct adapter *adap, u32 reg_addr, u32 val)
+ 	writel(val, adap->regs + reg_addr);
+ }
+ 
++static inline void t4_write_reg_relaxed(struct adapter *adap, u32 reg_addr,
++					u32 val)
++{
++	writel_relaxed(val, adap->regs + reg_addr);
++}
++
+ #ifndef readq
+ static inline u64 readq(const volatile void __iomem *addr)
+ {
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 7b452e8..276472d 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -1723,8 +1723,8 @@ int cxgb4_sync_txq_pidx(struct net_device *dev, u16 qid, u16 pidx,
+ 		else
+ 			val = PIDX_T5_V(delta);
+ 		wmb();
+-		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
+-			     QID_V(qid) | val);
++		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
++				     QID_V(qid) | val);
+ 	}
+ out:
+ 	return ret;
+@@ -1902,8 +1902,9 @@ static void enable_txq_db(struct adapter *adap, struct sge_txq *q)
+ 		 * are committed before we tell HW about them.
+ 		 */
+ 		wmb();
+-		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
+-			     QID_V(q->cntxt_id) | PIDX_V(q->db_pidx_inc));
++		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
++				     QID_V(q->cntxt_id) |
++						PIDX_V(q->db_pidx_inc));
+ 		q->db_pidx_inc = 0;
+ 	}
+ 	q->db_disabled = 0;
+@@ -2003,8 +2004,8 @@ static void sync_txq_pidx(struct adapter *adap, struct sge_txq *q)
+ 		else
+ 			val = PIDX_T5_V(delta);
+ 		wmb();
+-		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
+-			     QID_V(q->cntxt_id) | val);
++		t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
++				     QID_V(q->cntxt_id) | val);
+ 	}
+ out:
+ 	q->db_disabled = 0;
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index 6e310a0..7388aac 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -530,11 +530,11 @@ static inline void ring_fl_db(struct adapter *adap, struct sge_fl *q)
+ 		 * mechanism.
+ 		 */
+ 		if (unlikely(q->bar2_addr == NULL)) {
+-			t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
+-				     val | QID_V(q->cntxt_id));
++			t4_write_reg_relaxed(adap, MYPF_REG(SGE_PF_KDOORBELL_A),
++					     val | QID_V(q->cntxt_id));
+ 		} else {
+-			writel(val | QID_V(q->bar2_qid),
+-			       q->bar2_addr + SGE_UDB_KDOORBELL);
++			writel_relaxed(val | QID_V(q->bar2_qid),
++				       q->bar2_addr + SGE_UDB_KDOORBELL);
+ 
+ 			/* This Write memory Barrier will force the write to
+ 			 * the User Doorbell area to be flushed.
+@@ -986,8 +986,8 @@ inline void cxgb4_ring_tx_db(struct adapter *adap, struct sge_txq *q, int n)
+ 				      (q->bar2_addr + SGE_UDB_WCDOORBELL),
+ 				      wr);
+ 		} else {
+-			writel(val | QID_V(q->bar2_qid),
+-			       q->bar2_addr + SGE_UDB_KDOORBELL);
++			writel_relaxed(val | QID_V(q->bar2_qid),
++				       q->bar2_addr + SGE_UDB_KDOORBELL);
+ 		}
+ 
+ 		/* This Write Memory Barrier will force the write to the User
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 920bccd..8b723a0 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -139,7 +139,7 @@ void t4_write_indirect(struct adapter *adap, unsigned int addr_reg,
+ {
+ 	while (nregs--) {
+ 		t4_write_reg(adap, addr_reg, start_idx++);
+-		t4_write_reg(adap, data_reg, *vals++);
++		t4_write_reg_relaxed(adap, data_reg, *vals++);
+ 	}
+ }
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
+index 5883f09..00247be4 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
++++ b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
+@@ -442,6 +442,20 @@ static inline void t4_write_reg(struct adapter *adapter, u32 reg_addr, u32 val)
  	writel(val, adapter->regs + reg_addr);
  }
  
-+static inline void t3_write_reg_relaxed(struct adapter *adapter, u32 reg_addr,
++/**
++ * t4_write_reg_relaxed - write a HW register without ordering guarantees
++ * @adapter: the adapter
++ * @reg_addr: the register address
++ * @val: the value to write
++ *
++ * Write a 32-bit value into the given HW register.
++ */
++static inline void t4_write_reg_relaxed(struct adapter *adapter, u32 reg_addr,
 +					u32 val)
 +{
-+	CH_DBG(adapter, MMIO, "setting register 0x%x to 0x%x\n", reg_addr, val);
 +	writel_relaxed(val, adapter->regs + reg_addr);
 +}
 +
- static inline struct port_info *adap2pinfo(struct adapter *adap, int idx)
+ #ifndef readq
+ static inline u64 readq(const volatile void __iomem *addr)
  {
- 	return netdev_priv(adap->port[idx]);
-diff --git a/drivers/net/ethernet/chelsio/cxgb3/sge.c b/drivers/net/ethernet/chelsio/cxgb3/sge.c
-index e988caa..0baab06 100644
---- a/drivers/net/ethernet/chelsio/cxgb3/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb3/sge.c
-@@ -487,7 +487,8 @@ static inline void ring_fl_db(struct adapter *adap, struct sge_fl *q)
- 	if (q->pend_cred >= q->credits / 4) {
- 		q->pend_cred = 0;
- 		wmb();
--		t3_write_reg(adap, A_SG_KDOORBELL, V_EGRCNTX(q->cntxt_id));
-+		t3_write_reg_relaxed(adap, A_SG_KDOORBELL,
-+				     V_EGRCNTX(q->cntxt_id));
- 	}
- }
+diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
+index dfce5df..a3a420b 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
+@@ -546,12 +546,13 @@ static inline void ring_fl_db(struct adapter *adapter, struct sge_fl *fl)
+ 		 * mechanism.
+ 		 */
+ 		if (unlikely(fl->bar2_addr == NULL)) {
+-			t4_write_reg(adapter,
+-				     T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
+-				     QID_V(fl->cntxt_id) | val);
++			t4_write_reg_relaxed(adapter,
++					     T4VF_SGE_BASE_ADDR +
++							SGE_VF_KDOORBELL,
++					     QID_V(fl->cntxt_id) | val);
+ 		} else {
+-			writel(val | QID_V(fl->bar2_qid),
+-			       fl->bar2_addr + SGE_UDB_KDOORBELL);
++			writel_relaxed(val | QID_V(fl->bar2_qid),
++				       fl->bar2_addr + SGE_UDB_KDOORBELL);
  
-@@ -1058,8 +1059,8 @@ static inline void check_ring_tx_db(struct adapter *adap, struct sge_txq *q)
- 	}
- #else
- 	wmb();			/* write descriptors before telling HW */
--	t3_write_reg(adap, A_SG_KDOORBELL,
--		     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
-+	t3_write_reg_relaxed(adap, A_SG_KDOORBELL,
-+			     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
- #endif
- }
+ 			/* This Write memory Barrier will force the write to
+ 			 * the User Doorbell area to be flushed.
+@@ -980,8 +981,9 @@ static inline void ring_tx_db(struct adapter *adapter, struct sge_txq *tq,
+ 	if (unlikely(tq->bar2_addr == NULL)) {
+ 		u32 val = PIDX_V(n);
  
-@@ -1510,8 +1511,8 @@ static int ctrl_xmit(struct adapter *adap, struct sge_txq *q,
- 	}
- 	spin_unlock(&q->lock);
- 	wmb();
--	t3_write_reg(adap, A_SG_KDOORBELL,
--		     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
-+	t3_write_reg_relaxed(adap, A_SG_KDOORBELL,
-+			     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
- 	return NET_XMIT_SUCCESS;
- }
+-		t4_write_reg(adapter, T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
+-			     QID_V(tq->cntxt_id) | val);
++		t4_write_reg_relaxed(adapter,
++				     T4VF_SGE_BASE_ADDR + SGE_VF_KDOORBELL,
++				     QID_V(tq->cntxt_id) | val);
+ 	} else {
+ 		u32 val = PIDX_T5_V(n);
  
-@@ -1554,8 +1555,8 @@ static void restart_ctrlq(unsigned long data)
+@@ -1026,7 +1028,7 @@ static inline void ring_tx_db(struct adapter *adapter, struct sge_txq *tq,
+ 				count--;
+ 			}
+ 		} else
+-			writel(val | QID_V(tq->bar2_qid),
++			writel_relaxed(val | QID_V(tq->bar2_qid),
+ 			       tq->bar2_addr + SGE_UDB_KDOORBELL);
  
- 	spin_unlock(&q->lock);
- 	wmb();
--	t3_write_reg(qs->adap, A_SG_KDOORBELL,
--		     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
-+	t3_write_reg_relaxed(qs->adap, A_SG_KDOORBELL,
-+			     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
- }
- 
- /*
-@@ -1793,8 +1794,8 @@ again:	reclaim_completed_tx(adap, q, TX_RECLAIM_CHUNK);
- #endif
- 	wmb();
- 	if (likely(written))
--		t3_write_reg(adap, A_SG_KDOORBELL,
--			     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
-+		t3_write_reg_relaxed(adap, A_SG_KDOORBELL,
-+				     F_SELEGRCNTX | V_EGRCNTX(q->cntxt_id));
- }
- 
- /**
+ 		/* This Write Memory Barrier will force the write to the User
 -- 
 2.7.4
