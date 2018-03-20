@@ -1,38 +1,28 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 20 Mar 2018 09:28:48 +0530
-Subject: [PATCH v3 05/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
+Date: Tue, 20 Mar 2018 09:28:47 +0530
+Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board data
 In-Reply-To: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
 References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521518336-5467-6-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the common parts for the dk04 boards.
-
 Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
+Adds missing memory, reserved-memory nodes.
+
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi | 129 ++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 28 +++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
-new file mode 100644
-index 0000000..96ce081
---- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
-@@ -0,0 +1,129 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, The Linux Foundation. All rights reserved.
-+
-+#include "qcom-ipq4019.dtsi"
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1";
-+	compatible = "qcom,ipq4019";
-+
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+index e413b21e..ad0fbc9 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+@@ -20,6 +20,34 @@
+ 	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
+ 	compatible = "qcom,ipq4019";
+ 
 +	memory {
 +		device_type = "memory";
 +		reg = <0x80000000 0x10000000>; /* 256MB */
@@ -61,95 +51,8 @@ index 0000000..96ce081
 +		};
 +	};
 +
-+	soc {
-+		pinctrl at 1000000 {
-+			serial_0_pins: serial0_pinmux {
-+				mux {
-+					pins = "gpio16", "gpio17";
-+					function = "blsp_uart0";
-+					bias-disable;
-+				};
-+			};
-+
-+			serial_1_pins: serial1_pinmux {
-+				mux {
-+					pins = "gpio8", "gpio9",
-+						"gpio10", "gpio11";
-+					function = "blsp_uart1";
-+					bias-disable;
-+				};
-+			};
-+
-+			spi_0_pins: spi_0_pinmux {
-+				pinmux {
-+					function = "blsp_spi0";
-+					pins = "gpio13", "gpio14", "gpio15";
-+					bias-disable;
-+				};
-+				pinmux_cs {
-+					function = "gpio";
-+					pins = "gpio12";
-+					bias-disable;
-+					output-high;
-+				};
-+			};
-+
-+			i2c_0_pins: i2c_0_pinmux {
-+				mux {
-+					pins = "gpio20", "gpio21";
-+					function = "blsp_i2c0";
-+					bias-disable;
-+				};
-+			};
-+
-+			nand_pins: nand_pins {
-+				mux {
-+					pins = "gpio53", "gpio55", "gpio56",
-+						"gpio57", "gpio58", "gpio59",
-+						"gpio60", "gpio62", "gpio63",
-+						"gpio64", "gpio65", "gpio66",
-+						"gpio67", "gpio68", "gpio69";
-+					function = "qpic";
-+				};
-+			};
-+		};
-+
-+		serial at 78af000 {
-+			pinctrl-0 = <&serial_0_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		serial at 78b0000 {
-+			pinctrl-0 = <&serial_1_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		blsp_dma: dma at 7884000 {
-+			status = "ok";
-+		};
-+
-+		spi_0: spi at 78b5000 { /* BLSP1 QUP1 */
-+			pinctrl-0 = <&spi_0_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+			cs-gpios = <&tlmm 12 0>;
-+
-+			m25p80 at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0>;
-+				compatible = "n25q128a11";
-+				spi-max-frequency = <24000000>;
-+			};
-+		};
-+
-+		pcie0: pci at 40000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 38 0x1>;
-+		};
-+	};
-+};
+ 	soc {
+ 		rng at 22000 {
+ 			status = "ok";
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
