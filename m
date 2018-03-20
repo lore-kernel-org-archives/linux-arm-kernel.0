@@ -1,93 +1,80 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Tue, 20 Mar 2018 19:29:58 +0000
-Subject: [PATCH 1/3] drivers: clk: Add clk_get_children support
-In-Reply-To: <152148371542.242365.18433130635050412528@swboyd.mtv.corp.google.com>
-References: <1519856861-31384-1-git-send-email-jollys@xilinx.com>
- <1519856861-31384-2-git-send-email-jollys@xilinx.com>
- <152148371542.242365.18433130635050412528@swboyd.mtv.corp.google.com>
-Message-ID: <DM2PR0201MB07679A2DF21F254ACD5E0417B8AB0@DM2PR0201MB0767.namprd02.prod.outlook.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 20 Mar 2018 13:01:54 -0700
+Subject: [PATCH v3 03/10] clk: qcom: Add CPU clock driver for msm8996
+In-Reply-To: <015201d3c056$658ff510$30afdf30$@codeaurora.org>
+References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
+ <1518616792-29028-4-git-send-email-ilialin@codeaurora.org>
+ <152148100496.242365.3846617702949655708@swboyd.mtv.corp.google.com>
+ <015201d3c056$658ff510$30afdf30$@codeaurora.org>
+Message-ID: <152157611468.125118.11602572683762995667@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephan,
+Quoting ilialin at codeaurora.org (2018-03-20 07:18:57)
+> > From: Stephen Boyd <sboyd@kernel.org>
+> > 
+> > > +       struct clk_regmap *clkr = to_clk_regmap(hw);
+> > > +       struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_hw(hw);
+> > > +       unsigned int mask = GENMASK(cpuclk->width + cpuclk->shift - 1,
+> > > +                                   cpuclk->shift);
+> > > +
+> > > +       val = index;
+> > > +       val <<= cpuclk->shift;
+> > > +
+> > > +       return regmap_update_bits(clkr->regmap, cpuclk->reg, mask,
+> > > +val); }
+> > > +
+> > > +static int
+> > > +clk_cpu_8996_mux_determine_rate(struct clk_hw *hw, struct
+> > > +clk_rate_request *req) {
+> > > +       struct clk_cpu_8996_mux *cpuclk = to_clk_cpu_8996_mux_hw(hw);
+> > > +       struct clk_hw *parent = cpuclk->pll;
+> > > +
+> > > +       if (!cpuclk->pll)
+> > > +               return -EINVAL;
+> > 
+> > Does this happen?
+> 
+> On successful probe it shouldn't. May I omit pointer checks in this case? Future maintenance ma y change the flow.
+> 
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Monday, March 19, 2018 11:22 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>; linux-clk at vger.kernel.org;
-> mark.rutland at arm.com; michal.simek at xilinx.com; mturquette at baylibre.com;
-> robh+dt at kernel.org; sboyd at codeaurora.org
-> Cc: Rajan Vaja <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jolly Shah
-> <JOLLYS@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>; Tejas Patel
-> <TEJASP@xilinx.com>; Shubhrajyoti Datta <shubhraj@xilinx.com>
-> Subject: Re: [PATCH 1/3] drivers: clk: Add clk_get_children support
-> 
-> Quoting Jolly Shah (2018-02-28 14:27:39)
-> > From: Jolly Shah <jolly.shah@xilinx.com>
-> >
-> > This API helps to determine the users for any clock.
-> 
-> Ok, but why do you need it?
+Yes please omit useless checks.
 
-As you suggested in other patch, we will move children validation in FW.
+> > 
+> > > +
+> > > +       req->best_parent_rate = clk_hw_round_rate(parent, req->rate);
+> > > +       req->best_parent_hw = parent;
+> > 
+> > Is the parent index always the same? Perhaps just call
+> > clk_hw_get_parent_by_index() then instead of adding a pointer to the
+> > clk_cpu_8996_mux.
+> > 
+> 
+> > 
+> > > +       },
+> > > +};
+> > > +
+> > > +static const struct regmap_config cpu_msm8996_regmap_config = {
+> > > +       .reg_bits               = 32,
+> > > +       .reg_stride             = 4,
+> > > +       .val_bits               = 32,
+> > > +       .max_register           = 0x80210,
+> > > +       .fast_io                = true,
+> > > +       .val_format_endian      = REGMAP_ENDIAN_LITTLE,
+> > > +};
+> > > +
+> > > +static const struct of_device_id match_table[] = {
+> > 
+> > Move this next to driver structure and give it a more specific name.
+> 
+> Will be changed in the next spin.
+> 
+> > 
+> > > +       { .compatible = "qcom-msm8996-apcc" },
+> > 
+> > Bad compatible? Should be qcom,msm8996-apcc?
+> 
+> The naming is per Rob Herring's requirement.
+> 
 
-> 
-> >
-> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > Signed-off-by: Tejas Patel <tejasp@xilinx.com>
-> > Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
-> > ---
-> >  drivers/clk/clk.c            | 28 ++++++++++++++++++++++++++++
-> >  include/linux/clk-provider.h |  1 +
-> >  2 files changed, 29 insertions(+)
-> >
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c index
-> > 0f686a9..947a18b 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -274,6 +274,34 @@ struct clk_hw *clk_hw_get_parent(const struct
-> > clk_hw *hw)  }  EXPORT_SYMBOL_GPL(clk_hw_get_parent);
-> >
-> > +static unsigned int sibling;
-> 
-> Looks very thread unsafe!
-> 
-> > +
-> > +static void clk_show_subtree(struct clk_core *c,
-> > +                            int level) {
-> > +       struct clk_core *child;
-> > +
-> > +       if (!c)
-> > +               return;
-> > +
-> > +       if (level == 1)
-> > +               sibling++;
-> > +
-> > +       hlist_for_each_entry(child, &c->children, child_node)
-> > +               clk_show_subtree(child, level + 1); }
-> > +
-> > +unsigned int clk_get_children(char *name) {
-> > +       struct clk_core *core;
-> > +       struct clk *pclk = __clk_lookup(name);
-> > +
-> > +       sibling = 0;
-> > +       core = pclk->core;
-> > +       clk_show_subtree(core, 0);
-> > +       return sibling;
-> > +}
-> > +
-> >  static struct clk_core *__clk_lookup_subtree(const char *name,
-> >                                              struct clk_core *core)  {
-> > diff --git a/include/linux/clk-provider.h
-> > b/include/linux/clk-provider.h index f711be6..e94dfb2 100644
-> > --- a/include/linux/clk-provider.h
-> > +++ b/include/linux/clk-provider.h
-> > @@ -745,6 +745,7 @@ unsigned int __clk_get_enable_count(struct clk
-> > *clk);  unsigned long clk_hw_get_rate(const struct clk_hw *hw);
-> > unsigned long __clk_get_flags(struct clk *clk);  unsigned long
-> > clk_hw_get_flags(const struct clk_hw *hw);
-> > +unsigned int clk_get_children(char *name);
-> 
-> And uses a string lookup instead of having the clk_hw pointer in hand.
-> No thanks.
+Hmm, maybe Rob made a typo?
