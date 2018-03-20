@@ -1,49 +1,168 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 19 Mar 2018 22:50:04 -0400
-Subject: [PATCH v4 4/7] scsi: lpfc: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
-References: <1521514207-10695-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521514207-10695-5-git-send-email-okaya@codeaurora.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 20 Mar 2018 12:12:55 +0900
+Subject: [PATCH v8 01/13] resource: add walk_system_ram_res_rev()
+In-Reply-To: <20180320014318.GA2514@localhost.localdomain>
+References: <20180222111732.23051-1-takahiro.akashi@linaro.org>
+ <20180222111732.23051-2-takahiro.akashi@linaro.org>
+ <20180223083619.GA4433@dhcp-128-65.nay.redhat.com>
+ <20180320014318.GA2514@localhost.localdomain>
+Message-ID: <20180320031253.bwxat2dr3sns5uj4@dragonfly>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes barrier() followed by writel(). writel() already has a
-barrier
-on some architectures like arm64.
+Baoquan,
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
+On Tue, Mar 20, 2018 at 09:43:18AM +0800, Baoquan He wrote:
+> On 02/23/18 at 04:36pm, Dave Young wrote:
+> > Hi AKASHI,
+> > 
+> > On 02/22/18 at 08:17pm, AKASHI Takahiro wrote:
+> > > This function, being a variant of walk_system_ram_res() introduced in
+> > > commit 8c86e70acead ("resource: provide new functions to walk through
+> > > resources"), walks through a list of all the resources of System RAM
+> > > in reversed order, i.e., from higher to lower.
+> > > 
+> > > It will be used in kexec_file implementation on arm64.
+> > 
+> > I remember there was an old discussion about this, it should be added
+> > in patch log why this is needed.
+> 
+> It's used to load kernel/initrd at the top of system RAM, and this is
+> consistent with user space kexec behaviour.
+> 
+> In x86 64, Vivek didn't do like this since there's no reverse iomem
+> resource iterating function, he just chose a match RAM region bottom up,
+> then put kernel/initrd top down in the found RAM region. This is
+> different than kexec_tools utility. I am considering to change resource
+> sibling as double list, seems AKASHI's way is easier to be accepted by
+> people. So I will use this one to change x86 64 code.
+> 
+> Hi AKASHI,
+> 
+> About arm64 kexec_file patches, will you post recently? Or any other
+> plan?
 
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+A short answer is yes, but my new version won't include this specific patch.
+So please feel free to add it to your own patch set if you want.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/scsi/lpfc/lpfc_sli.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The reason that I'm going to remove it is that we will make a modification
+on /proc/iomem due to a bug fixing and then we will have to have our own 
+"walking" routine.
 
-diff --git a/drivers/scsi/lpfc/lpfc_sli.c b/drivers/scsi/lpfc/lpfc_sli.c
-index 5f5528a..7dae7d3 100644
---- a/drivers/scsi/lpfc/lpfc_sli.c
-+++ b/drivers/scsi/lpfc/lpfc_sli.c
-@@ -1647,7 +1647,7 @@ lpfc_sli_update_full_ring(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
- 	 * Set ring 'ringno' to SET R0CE_REQ in Chip Att register.
- 	 * The HBA will tell us when an IOCB entry is available.
- 	 */
--	writel((CA_R0ATT|CA_R0CE_REQ) << (ringno*4), phba->CAregaddr);
-+	writel_relaxed((CA_R0ATT|CA_R0CE_REQ) << (ringno*4), phba->CAregaddr);
- 	readl(phba->CAregaddr); /* flush */
- 
- 	pring->stats.iocb_cmd_full++;
-@@ -1672,7 +1672,7 @@ lpfc_sli_update_ring(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
- 	 */
- 	if (!(phba->sli3_options & LPFC_SLI3_CRP_ENABLED)) {
- 		wmb();
--		writel(CA_R0ATT << (ringno * 4), phba->CAregaddr);
-+		writel_relaxed(CA_R0ATT << (ringno * 4), phba->CAregaddr);
- 		readl(phba->CAregaddr); /* flush */
- 	}
- }
--- 
-2.7.4
+Thanks,
+-Takahiro AKASHI
+
+> Thanks
+> Baoquan
+> 
+> > 
+> > > 
+> > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > > Cc: Vivek Goyal <vgoyal@redhat.com>
+> > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > Cc: Linus Torvalds <torvalds@linux-foundation.org>
+> > > ---
+> > >  include/linux/ioport.h |  3 +++
+> > >  kernel/resource.c      | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++
+> > >  2 files changed, 60 insertions(+)
+> > > 
+> > > diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+> > > index da0ebaec25f0..f12d95fe038b 100644
+> > > --- a/include/linux/ioport.h
+> > > +++ b/include/linux/ioport.h
+> > > @@ -277,6 +277,9 @@ extern int
+> > >  walk_system_ram_res(u64 start, u64 end, void *arg,
+> > >  		    int (*func)(struct resource *, void *));
+> > >  extern int
+> > > +walk_system_ram_res_rev(u64 start, u64 end, void *arg,
+> > > +			int (*func)(struct resource *, void *));
+> > > +extern int
+> > >  walk_iomem_res_desc(unsigned long desc, unsigned long flags, u64 start, u64 end,
+> > >  		    void *arg, int (*func)(struct resource *, void *));
+> > >  
+> > > diff --git a/kernel/resource.c b/kernel/resource.c
+> > > index e270b5048988..bdaa93407f4c 100644
+> > > --- a/kernel/resource.c
+> > > +++ b/kernel/resource.c
+> > > @@ -23,6 +23,8 @@
+> > >  #include <linux/pfn.h>
+> > >  #include <linux/mm.h>
+> > >  #include <linux/resource_ext.h>
+> > > +#include <linux/string.h>
+> > > +#include <linux/vmalloc.h>
+> > >  #include <asm/io.h>
+> > >  
+> > >  
+> > > @@ -486,6 +488,61 @@ int walk_mem_res(u64 start, u64 end, void *arg,
+> > >  				     arg, func);
+> > >  }
+> > >  
+> > > +int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
+> > > +				int (*func)(struct resource *, void *))
+> > > +{
+> > > +	struct resource res, *rams;
+> > > +	int rams_size = 16, i;
+> > > +	int ret = -1;
+> > > +
+> > > +	/* create a list */
+> > > +	rams = vmalloc(sizeof(struct resource) * rams_size);
+> > > +	if (!rams)
+> > > +		return ret;
+> > > +
+> > > +	res.start = start;
+> > > +	res.end = end;
+> > > +	res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+> > > +	i = 0;
+> > > +	while ((res.start < res.end) &&
+> > > +		(!find_next_iomem_res(&res, IORES_DESC_NONE, true))) {
+> > > +		if (i >= rams_size) {
+> > > +			/* re-alloc */
+> > > +			struct resource *rams_new;
+> > > +			int rams_new_size;
+> > > +
+> > > +			rams_new_size = rams_size + 16;
+> > > +			rams_new = vmalloc(sizeof(struct resource)
+> > > +							* rams_new_size);
+> > > +			if (!rams_new)
+> > > +				goto out;
+> > > +
+> > > +			memcpy(rams_new, rams,
+> > > +					sizeof(struct resource) * rams_size);
+> > > +			vfree(rams);
+> > > +			rams = rams_new;
+> > > +			rams_size = rams_new_size;
+> > > +		}
+> > > +
+> > > +		rams[i].start = res.start;
+> > > +		rams[i++].end = res.end;
+> > > +
+> > > +		res.start = res.end + 1;
+> > > +		res.end = end;
+> > > +	}
+> > > +
+> > > +	/* go reverse */
+> > > +	for (i--; i >= 0; i--) {
+> > > +		ret = (*func)(&rams[i], arg);
+> > > +		if (ret)
+> > > +			break;
+> > > +	}
+> > > +
+> > > +out:
+> > > +	vfree(rams);
+> > > +	return ret;
+> > > +}
+> > > +
+> > >  #if !defined(CONFIG_ARCH_HAS_WALK_MEMORY)
+> > >  
+> > >  /*
+> > > -- 
+> > > 2.16.2
+> > > 
+> > 
+> > Thanks
+> > Dave
+> > 
+> > _______________________________________________
+> > kexec mailing list
+> > kexec at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/kexec
