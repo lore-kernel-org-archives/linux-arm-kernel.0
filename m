@@ -1,80 +1,52 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Tue, 20 Mar 2018 12:36:10 +0530
-Subject: [PATCH v3 2/3] arm64: Implement page table free interfaces
-In-Reply-To: <1521487759.2693.224.camel@hpe.com>
-References: <1521463256-19858-1-git-send-email-cpandya@codeaurora.org>
- <1521463256-19858-3-git-send-email-cpandya@codeaurora.org>
- <1521487759.2693.224.camel@hpe.com>
-Message-ID: <be70a3da-be35-cdee-97a4-ca4e867ca7fb@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 20 Mar 2018 15:15:02 +0800
+Subject: [PATCH net-next 02/12] clk: sunxi-ng: r40: export a regmap to
+ access the GMAC register
+In-Reply-To: <20180318213129.ucwslzvwq6khxrcd@flea>
+References: <20180317092857.4396-1-wens@csie.org>
+ <20180317092857.4396-3-wens@csie.org>
+ <20180318213129.ucwslzvwq6khxrcd@flea>
+Message-ID: <CAGb2v67Fp20wkmqWyRowpAmm4EDwENnKFG+mccqWaPa5Jj4zBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 3/20/2018 12:59 AM, Kani, Toshi wrote:
-> On Mon, 2018-03-19 at 18:10 +0530, Chintan Pandya wrote:
->> Implement pud_free_pmd_page() and pmd_free_pte_page().
+On Mon, Mar 19, 2018 at 5:31 AM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Sat, Mar 17, 2018 at 05:28:47PM +0800, Chen-Yu Tsai wrote:
+>> From: Icenowy Zheng <icenowy@aosc.io>
 >>
->> Implementation requires,
->>   1) Freeing of the un-used next level page tables
->>   2) Clearing off the current pud/pmd entry
->>   3) Invalidate TLB which could have previously
->>      valid but not stale entry
+>> There's a GMAC configuration register, which exists on A64/A83T/H3/H5 in
+>> the syscon part, in the CCU of R40 SoC.
 >>
->> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
->> ---
->>   arch/arm64/mm/mmu.c | 30 ++++++++++++++++++++++++++++--
->>   1 file changed, 28 insertions(+), 2 deletions(-)
+>> Export a regmap of the CCU.
 >>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index da98828..c70f139 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -45,6 +45,7 @@
->>   #include <asm/memblock.h>
->>   #include <asm/mmu_context.h>
->>   #include <asm/ptdump.h>
->> +#include <asm/tlbflush.h>
->>   
->>   #define NO_BLOCK_MAPPINGS	BIT(0)
->>   #define NO_CONT_MAPPINGS	BIT(1)
->> @@ -975,10 +976,35 @@ int pmd_clear_huge(pmd_t *pmdp)
->>   
->>   int pud_free_pmd_page(pud_t *pud, unsigned long addr)
->>   {
->> -	return pud_none(*pud);
->> +	pmd_t *pmd;
->> +	int i;
->> +
->> +	pmd = __va(pud_val(*pud));
->> +	if (pud_val(*pud)) {
->> +		for (i = 0; i < PTRS_PER_PMD; i++)
->> +			pmd_free_pte_page(&pmd[i], addr + (i * PMD_SIZE));
->> +
->> +		free_page((unsigned long) pmd);
-> 
-> Why do you want to free this pmd page before clearing the pud entry on
-> this arm64 version (as it seems you intentionally changed it from the
-> x86 version)?  It can be reused while being pointed by the pud.  Same
-> for pmd.
-Noted.
-> 
->> +		pud_clear(pud);
->> +		flush_tlb_kernel_range(addr, addr + PUD_SIZE);
-> 
-> Since you purge the entire pud range here, do you still need to call
-> pmd_free_pte_page() to purge each pmd range?  This looks very expensive.
-> You may want to consider if calling internal __pmd_free_pte_page()
-> without the purge operation works.
-I completely missed that. Sure, will fix this.
+>> Read access is not restricted to all registers, but only the GMAC
+>> register is allowed to be written.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Gah, this is crazy. I'm really starting to regret letting that syscon
+> in in the first place...
 
-I will upload v4 fixing all 4 comments.
-> 
-> -Toshi
-> 
+IMHO syscon is really a better fit. It's part of the glue layer and
+most other dwmac user platforms treat it as such and use a syscon.
+Plus the controls encompass delays (phase), inverters (polarity),
+and even signal routing. It's not really just a group of clock controls,
+like what we poorly modeled for A20/A31. I think that was really a
+mistake.
 
-Chintan
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+As I mentioned in the cover letter, a slightly saner approach would
+be to let drivers add custom syscon entries, which would then require
+less custom plumbing.
+
+> And I'm not really looking forward the time where SCPI et al. will be
+> mature and we'll have the clock controller completely outside of our
+> control.
+
+I don't think it's going to happen for any of the older SoCs. The R40
+only stands out because the GMAC controls are in the clock controller
+address space, presumably to be like the A20.
+
+
+ChenYu
