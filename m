@@ -1,57 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 20 Mar 2018 12:08:51 +0000
-Subject: [PATCH v6 16/20] clk: add support for clocks provided by SCMI
-In-Reply-To: <152124137391.242365.17144416413429914606@swboyd.mtv.corp.google.com>
-References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
- <1519403030-21189-17-git-send-email-sudeep.holla@arm.com>
- <152124137391.242365.17144416413429914606@swboyd.mtv.corp.google.com>
-Message-ID: <6b5a56f7-ff0d-dde2-097b-bf245971e8a6@arm.com>
+From: sricharan@codeaurora.org (sricharan at codeaurora.org)
+Date: Tue, 20 Mar 2018 17:40:21 +0530
+Subject: [PATCH v3 06/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.1-c1
+ board file
+In-Reply-To: <152153125818.254778.5435627269964796441@swboyd.mtv.corp.google.com>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+ <1521518336-5467-7-git-send-email-sricharan@codeaurora.org>
+ <152153125818.254778.5435627269964796441@swboyd.mtv.corp.google.com>
+Message-ID: <a8ec44084bbcf7d6b4e51f195c9d6046@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 16/03/18 23:02, Stephen Boyd wrote:
-> Quoting Sudeep Holla (2018-02-23 08:23:46)
->> diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
+On 2018-03-20 13:04, Stephen Boyd wrote:
+> Quoting Sricharan R (2018-03-19 20:58:49)
+>> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts 
+>> b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
 >> new file mode 100644
->> index 000000000000..1e4d7a57779b
+>> index 0000000..871ac3f
 >> --- /dev/null
->> +++ b/drivers/clk/clk-scmi.c
->> +                       hws[idx] = &sclk->hw;
->> +               }
->> +       }
+>> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+>> @@ -0,0 +1,20 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
 >> +
->> +       return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
-> 
-> devm_of_clk_add_hw_provider?
-> 
-
-Thanks for noticing this, I wasn't aware of it's addition. This patch
-predates that :(
-
->> +}
+>> +#include "qcom-ipq4019-ap.dk04.1.dtsi"
 >> +
->> +static void scmi_clocks_remove(struct scmi_device *sdev)
->> +{
->> +       struct device *dev = &sdev->dev;
->> +       struct device_node *np = dev->of_node;
+>> +/ {
+>> +       model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C1";
 >> +
->> +       of_clk_del_provider(np);
->> +}
->> +
+>> +       soc {
+>> +               qpic_bam: dma at 7984000 {
 > 
-> Drop?
-> 
-
-Sure, I will have to do these changes as add-on patch as this original
-patch is already queued in ARM SoC tree for v4.17
-
-> You can keep my acked-by otherwise.
+> Why the labels?
 > 
 
-Thanks.
+   ok, will remove here and few other places to make it uniform.
 
--- 
 Regards,
-Sudeep
+  Sricharan
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
