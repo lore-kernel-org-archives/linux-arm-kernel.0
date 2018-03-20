@@ -1,48 +1,58 @@
 From: ping.bai@nxp.com (Bai Ping)
-Date: Tue, 20 Mar 2018 10:24:01 +0800
-Subject: [PATCH v6 1/4] clk: imx: Add CLK_IS_CRITICAL flag for busy divider
- and busy mux
-Message-ID: <1521512644-25265-1-git-send-email-ping.bai@nxp.com>
+Date: Tue, 20 Mar 2018 10:24:02 +0800
+Subject: [PATCH v6 2/4] clk: imx: add new gate/gate2 wrapper funtion
+In-Reply-To: <1521512644-25265-1-git-send-email-ping.bai@nxp.com>
+References: <1521512644-25265-1-git-send-email-ping.bai@nxp.com>
+Message-ID: <1521512644-25265-2-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The busy divider and busy mux is actually used by the system critical clocks,
-so add 'CLK_IS_CRITICAL' to clocks registered with these two type.
+Add new gate/gate2 wrapper function to register clocks with optional flags.
 
 Signed-off-by: Bai Ping <ping.bai@nxp.com>
 Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- change from V3->v4:
- - fix a typo in commit log
- change from v4->v5:
- - optimize the commit subject
+ change from v3->v4:
+ - no
+ change from v4->5:
+ - optimize commit subject
  change from v5->v6:
  - no change
 ---
- drivers/clk/imx/clk-busy.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/imx/clk.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/clk/imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
-index 6df3389..9903652 100644
---- a/drivers/clk/imx/clk-busy.c
-+++ b/drivers/clk/imx/clk-busy.c
-@@ -101,7 +101,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index d69c4bb..8076ec0 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -123,6 +123,13 @@ static inline struct clk *imx_clk_gate(const char *name, const char *parent,
+ 			shift, 0, &imx_ccm_lock);
+ }
  
- 	init.name = name;
- 	init.ops = &clk_busy_divider_ops;
--	init.flags = CLK_SET_RATE_PARENT;
-+	init.flags = CLK_SET_RATE_PARENT | CLK_IS_CRITICAL;
- 	init.parent_names = &parent_name;
- 	init.num_parents = 1;
++static inline struct clk *imx_clk_gate_flags(const char *name, const char *parent,
++		void __iomem *reg, u8 shift, unsigned long flags)
++{
++	return clk_register_gate(NULL, name, parent, flags | CLK_SET_RATE_PARENT, reg,
++			shift, 0, &imx_ccm_lock);
++}
++
+ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
+ {
+@@ -137,6 +144,13 @@ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+ 			shift, 0x3, 0, &imx_ccm_lock, NULL);
+ }
  
-@@ -175,7 +175,7 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
- 
- 	init.name = name;
- 	init.ops = &clk_busy_mux_ops;
--	init.flags = 0;
-+	init.flags = CLK_IS_CRITICAL;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
- 
++static inline struct clk *imx_clk_gate2_flags(const char *name, const char *parent,
++		void __iomem *reg, u8 shift, unsigned long flags)
++{
++	return clk_register_gate2(NULL, name, parent, flags | CLK_SET_RATE_PARENT, reg,
++			shift, 0x3, 0, &imx_ccm_lock, NULL);
++}
++
+ static inline struct clk *imx_clk_gate2_shared(const char *name,
+ 		const char *parent, void __iomem *reg, u8 shift,
+ 		unsigned int *share_count)
 -- 
 1.9.1
