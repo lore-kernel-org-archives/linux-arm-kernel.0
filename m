@@ -1,86 +1,80 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 20 Mar 2018 18:00:29 +0100
-Subject: 4.16-rc5 on Motorola Droid 4
-In-Reply-To: <20180320140322.GU5799@atomide.com>
-References: <20180318220418.GA22880@amd>
- <20180320140322.GU5799@atomide.com>
-Message-ID: <20180320170029.rv3u5wlvqxfl7z2v@earth.universe>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Mar 2018 17:00:49 +0000
+Subject: Failed to boot ARM64 boards for recent linux-next
+In-Reply-To: <ff6cd434-2227-12a6-b3b9-325da78a7fa9@huawei.com>
+References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
+ <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+ <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
+ <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
+ <5AB0DEB2.4000803@rock-chips.com>
+ <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
+ <cbc89d68-ba41-1f6a-4ab2-4c9647b48f75@huawei.com>
+ <d18d6f27-7270-d2d7-58b9-3bf16ffe6b0a@arm.com>
+ <ff6cd434-2227-12a6-b3b9-325da78a7fa9@huawei.com>
+Message-ID: <2aed10a0-ad3d-d9fc-7b6e-3b6877bff0be@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Mar 20, 2018 at 07:03:22AM -0700, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [180318 22:05]:
-> > I have the phone, I have safestrap installed, kexec seems to work
-> > (crashes my system). But I can't get any output from the new kernel.
-> > 
-> > All the howtos assume serial connection, but I don't yet have
-> > that. I'm really bad at soldering. IIRC display should work in the
-> > latest kernels, maybe with some patches?
+On 20/03/18 16:52, John Garry wrote:
+> On 20/03/2018 16:06, Marc Zyngier wrote:
+>> Hi John,
+>>
+>> On 20/03/18 15:52, John Garry wrote:
+>>> On 20/03/2018 13:34, Marc Zyngier wrote:
+>>>> On 20/03/18 10:13, JeffyChen wrote:
+>>>>> Hi Shawn,
+>>>>>
+>>>>> On 03/20/2018 05:39 PM, Shawn Lin wrote:
+>>>>>>
+>>>>>>
+>>>>>> Also another patch warns a lot when booting the kernel. Is there
+>>>>>> anything else I could do to let it go? Seems I am using broken
+>>>>>> dts for requesting IRQ_TYPE_NONE there?
+>>>>>
+>>>>> could be:
+>>>>> https://github.com/torvalds/linux/blob/master/drivers/irqchip/irq-gic-v3.c#L1145
+>>>>>
+>>>>> 		struct irq_fwspec ppi_fwspec = {
+>>>>> 			.fwnode		= gic_data.fwnode,
+>>>>> 			.param_count	= 3,
+>>>>> 			.param		= {
+>>>>> 				[0]	= 1,
+>>>>> 				[1]	= i,
+>>>>> 				[2]	= IRQ_TYPE_NONE, <--
+>>>>> 			},
+>>>>> 		};
+>>>>>
+>>>>> 		irq = irq_create_fwspec_mapping(&ppi_fwspec);
+>>>>
+>>>> Probably is. Caught at my own game, fun! ;-)
+>>>>
+>>>> Turning that NONE into LEVEL will work, as there is no known PPIs
+>>>> configured as edge (specially in a partitioned system), but the general
+>>>> case isn't pretty. I'll queue a workaround for now, and will look at
+>>>> addressing the more general issue.
+>>>>
+>>>
+>>> JFYI, reverting the original patch mentioned by Shawn resolved the boot
+>>> hang I was seeing on my Huawei D03. My D05 was fine without the revert.
+>>
+>> I guess your D05 doesn't set SCR_EL3.FIQ, meaning that no Group-0
+>> interrupts can reach the firmware. Hopefully it doesn't need them.
+>>
+>> Would you mind testing the last patch I posted earlier today[1]?
+>>
 > 
-> Yeah display related stuff is half merged in Linux next, backlight
-> needs some binding changes from what I remember. I think the
-> minimal set is something like this against v4.16-rc:
-
-I have an updated lm355x backlight driver almost ready, that uses
-an updated binding scheme and exposes the keyboard backlight
-using the LED subsystem.
-
-> backlight: add TI LMU backlight driver
-> drm/omap: add framedone interrupt support
-> drm/omap: add manual update detection helper
-> drm/omap: add support for manually updated displays
+> Hi Marc,
 > 
-> Then also audio support is also half merged and need few patches
-> if you check the mailing list archives for cpcap codec related
-> patches.
-
-I just noticed, that I missed Rob gave his Acked-by to the binding
-already. I will prepare a PATCHv6 with the MFD changes this week.
-
-> Maybe get somebody to help you locally with the debug cable
-> soldering? :)
-
-I suppose people from your hackerspace can help you. It's really
-easy to do. Soldering can be avoided btw. You can just use a pair
-of scissors to cut a USB -> Micro USB cable and use a knife to remove
-isolation. Then screw each of the 4 wires into a terminal strip.
-There are USB-TTL adapters available, that have an attached cable.
-If you also cut the connector from such a cable and connect it to
-the other side of the terminal strip you are done. No soldering
-involved ;)
-
-> > Could someone give me .config and git hash that works for him? Once I
-> > get working display I should be able to continue easily. I'd really
-> > like to get voice calls working...
+> Yes, [1] allows my D03 to boot. D05 is still ok.
 > 
-> You want to use omapdrm, below is what I'm using with loadable
-> modules with Linux next based on omap2plus_defconfig. It has some
-> extra debug options enabled too that you might want to ignore,
-> I'll try to send the defconfig related patches out too.
-> 
-> Basically you need the CONFIG_MFD_TI_LMU, CONFIG_DRM_OMAP and
-> CONFIG_DRM_OMAP_PANEL_DSI_CM related options.
-> 
-> > I took a brief look through dts, and I did not find anything that
-> > could be easily used for debugging. (It seems that capslock LED and
-> > keyboard backlight is not yet supported? Also volume down  seems to be
-> > supported but not volume up, funny).
-> 
-> Oh I thought we had all the LEDs mapped already? Volume down is
-> on the internal keypad, then volume up is on a GPIO controller.
-> I guess to allow chords for the bootloader.
+> If you're going to send this same patch to the list then feel free to add:
+> Tested-by: John Garry <john.garry@huawei.com>
 
-The keyboard backlight and lcd backlight are controlled by LM3552,
-that's the driver mentioned above. The other LEDs (status rgb,
-shift/capslock, and the android button backlight) are working.
+OK, thanks for that. There is still a nit on my Chromebook, and I cannot
+yet explain why.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180320/919883ea/attachment-0001.sig>
+Digging.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
