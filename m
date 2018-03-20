@@ -1,69 +1,33 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 20 Mar 2018 17:16:41 +0100
-Subject: [PATCH -next] drm/meson: Fix potential NULL dereference in
- meson_drv_bind_master()
-In-Reply-To: <4cad8099-dbb8-d12c-9ce8-b64688222bd7@baylibre.com>
-References: <1521555630-29284-1-git-send-email-weiyongjun1@huawei.com>
- <4cad8099-dbb8-d12c-9ce8-b64688222bd7@baylibre.com>
-Message-ID: <1772626e-c521-a072-76e4-64e3b4883f2e@baylibre.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 20 Mar 2018 09:22:12 -0700
+Subject: [PATCH v6 16/20] clk: add support for clocks provided by SCMI
+In-Reply-To: <6b5a56f7-ff0d-dde2-097b-bf245971e8a6@arm.com>
+References: <1519403030-21189-1-git-send-email-sudeep.holla@arm.com>
+ <1519403030-21189-17-git-send-email-sudeep.holla@arm.com>
+ <152124137391.242365.17144416413429914606@swboyd.mtv.corp.google.com>
+ <6b5a56f7-ff0d-dde2-097b-bf245971e8a6@arm.com>
+Message-ID: <152156293212.254778.7714453841547508122@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/2018 16:04, Neil Armstrong wrote:
-> On 20/03/2018 15:20, Wei Yongjun wrote:
->> platform_get_resource_byname() may fail and return NULL, so we should
->> better check it's return value to avoid a NULL pointer dereference
->> a bit later in the code.
->>
->> This is detected by Coccinelle semantic patch.
->>
->> @@
->> expression pdev, res, n, t, e, e1, e2;
->> @@
->>
->> res = platform_get_resource_byname(pdev, t, n);
->> + if (!res)
->> +   return -EINVAL;
->> ... when != res == NULL
->> e = devm_ioremap(e1, res->start, e2);
->>
->> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
->> ---
->>  drivers/gpu/drm/meson/meson_drv.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
->> index 3baceb7..32b1a6c 100644
->> --- a/drivers/gpu/drm/meson/meson_drv.c
->> +++ b/drivers/gpu/drm/meson/meson_drv.c
->> @@ -197,6 +197,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
->>  	priv->io_base = regs;
->>  
->>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "hhi");
->> +	if (!res)
->> +		return -EINVAL;
->>  	/* Simply ioremap since it may be a shared register zone */
->>  	regs = devm_ioremap(dev, res->start, resource_size(res));
->>  	if (!regs) {
->> @@ -213,6 +215,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
->>  	}
->>  
->>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
->> +	if (!res)
->> +		return -EINVAL;
->>  	/* Simply ioremap since it may be a shared register zone */
->>  	regs = devm_ioremap(dev, res->start, resource_size(res));
->>  	if (!regs) {
->>
->>
->> _______________________________________________
->> linux-amlogic mailing list
->> linux-amlogic at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-amlogic
->>
-> Thanks,
+Quoting Sudeep Holla (2018-03-20 05:08:51)
 > 
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> >> +}
+> >> +
+> >> +static void scmi_clocks_remove(struct scmi_device *sdev)
+> >> +{
+> >> +       struct device *dev = &sdev->dev;
+> >> +       struct device_node *np = dev->of_node;
+> >> +
+> >> +       of_clk_del_provider(np);
+> >> +}
+> >> +
+> > 
+> > Drop?
+> > 
+> 
+> Sure, I will have to do these changes as add-on patch as this original
+> patch is already queued in ARM SoC tree for v4.17
 > 
 
-Applied to drm-misc-next
+Ok!
