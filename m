@@ -1,208 +1,54 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 20 Mar 2018 15:25:10 +0100
-Subject: [PATCH v2] KVM: arm/arm64: vgic: Disallow Active+Pending for
- level interrupts
-In-Reply-To: <20180316143015.32055-1-marc.zyngier@arm.com>
-References: <20180316143015.32055-1-marc.zyngier@arm.com>
-Message-ID: <4be5cde8-ce15-a6e5-385d-b30288f51e5c@redhat.com>
+From: jgg@ziepe.ca (Jason Gunthorpe)
+Date: Tue, 20 Mar 2018 08:48:01 -0600
+Subject: [PATCH v4 1/6] RDMA/bnxt_re: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521514068-8856-2-git-send-email-okaya@codeaurora.org>
+References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
+ <1521514068-8856-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180320144801.GE19744@ziepe.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Mon, Mar 19, 2018 at 10:47:43PM -0400, Sinan Kaya wrote:
+> Code includes wmb() followed by writel(). writel() already has a barrier on
+> some architectures like arm64.
+> 
+> This ends up CPU observing two barriers back to back before executing the
+> register write.
+> 
+> Since code already has an explicit barrier call, changing writel() to
+> writel_relaxed().
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>  drivers/infiniband/hw/bnxt_re/qplib_rcfw.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+> index 8329ec6..4a6b981 100644
+> +++ b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+> @@ -181,10 +181,10 @@ static int __send_message(struct bnxt_qplib_rcfw *rcfw, struct cmdq_base *req,
+>  
+>  	/* ring CMDQ DB */
+>  	wmb();
+> -	writel(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
+> -	       rcfw->cmdq_bar_reg_prod_off);
+> -	writel(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
+> -	       rcfw->cmdq_bar_reg_trig_off);
+> +	writel_relaxed(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
+> +		       rcfw->cmdq_bar_reg_prod_off);
+> +	writel_relaxed(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
+> +		       rcfw->cmdq_bar_reg_trig_off);
 
-On 16/03/18 15:30, Marc Zyngier wrote:
-> It was recently reported that VFIO mediated devices, and anything
-> that VFIO exposes as level interrupts, do no strictly follow the
-> expected logic of such interrupts as it only lowers the input
-> line when the guest has EOId the interrupt at the GIC level, rather
-> than when it Acked the interrupt at the device level.
-> 
-> THe GIC's Active+Pending state is fundamentally incompatible with
-> this behaviour, as it prevents KVM from observing the EOI, and in
-> turn results in VFIO never dropping the line. This results in an
-> interrupt storm in the guest, which it really never expected.
-> 
-> As we cannot really change VFIO to follow the strict rules of level
-> signalling, let's forbid the A+P state altogether, as it is in the
-> end only an optimization. It ensures that we will transition via
-> an invalid state, which we can use to notify VFIO of the EOI.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Tested-by: Eric Auger <eric.auger@redhat.com>
-with mdev tty device
+Woah, this may not be safe..
 
-Thanks
+The definition of writel_relaxed() is that it is fully unordered, so
+the above two writes may change order now. Broadcom guys would have to
+ack if that it is OK or not for their hardware.
 
-Eric
-> ---
-> - From v1:
->   * Only clear the latch when going via an invalid state
-> 
->  virt/kvm/arm/vgic/vgic-v2.c | 54 +++++++++++++++++++++++++--------------------
->  virt/kvm/arm/vgic/vgic-v3.c | 54 +++++++++++++++++++++++++--------------------
->  2 files changed, 60 insertions(+), 48 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 29556f71b691..8427586760fc 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -105,12 +105,9 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->  
->  		/*
->  		 * Clear soft pending state when level irqs have been acked.
-> -		 * Always regenerate the pending state.
->  		 */
-> -		if (irq->config == VGIC_CONFIG_LEVEL) {
-> -			if (!(val & GICH_LR_PENDING_BIT))
-> -				irq->pending_latch = false;
-> -		}
-> +		if (irq->config == VGIC_CONFIG_LEVEL && !(val & GICH_LR_STATE))
-> +			irq->pending_latch = false;
->  
->  		/*
->  		 * Level-triggered mapped IRQs are special because we only
-> @@ -153,8 +150,35 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->  void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->  {
->  	u32 val = irq->intid;
-> +	bool allow_pending = true;
-> +
-> +	if (irq->active)
-> +		val |= GICH_LR_ACTIVE_BIT;
-> +
-> +	if (irq->hw) {
-> +		val |= GICH_LR_HW;
-> +		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
-> +		/*
-> +		 * Never set pending+active on a HW interrupt, as the
-> +		 * pending state is kept at the physical distributor
-> +		 * level.
-> +		 */
-> +		if (irq->active)
-> +			allow_pending = false;
-> +	} else {
-> +		if (irq->config == VGIC_CONFIG_LEVEL) {
-> +			val |= GICH_LR_EOI;
->  
-> -	if (irq_is_pending(irq)) {
-> +			/*
-> +			 * Software resampling doesn't work very well
-> +			 * if we allow P+A, so let's not do that.
-> +			 */
-> +			if (irq->active)
-> +				allow_pending = false;
-> +		}
-> +	}
-> +
-> +	if (allow_pending && irq_is_pending(irq)) {
->  		val |= GICH_LR_PENDING_BIT;
->  
->  		if (irq->config == VGIC_CONFIG_EDGE)
-> @@ -171,24 +195,6 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->  		}
->  	}
->  
-> -	if (irq->active)
-> -		val |= GICH_LR_ACTIVE_BIT;
-> -
-> -	if (irq->hw) {
-> -		val |= GICH_LR_HW;
-> -		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
-> -		/*
-> -		 * Never set pending+active on a HW interrupt, as the
-> -		 * pending state is kept at the physical distributor
-> -		 * level.
-> -		 */
-> -		if (irq->active && irq_is_pending(irq))
-> -			val &= ~GICH_LR_PENDING_BIT;
-> -	} else {
-> -		if (irq->config == VGIC_CONFIG_LEVEL)
-> -			val |= GICH_LR_EOI;
-> -	}
-> -
->  	/*
->  	 * Level-triggered mapped IRQs are special because we only observe
->  	 * rising edges as input to the VGIC.  We therefore lower the line
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 0ff2006f3781..dd984f726805 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -96,12 +96,9 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
->  
->  		/*
->  		 * Clear soft pending state when level irqs have been acked.
-> -		 * Always regenerate the pending state.
->  		 */
-> -		if (irq->config == VGIC_CONFIG_LEVEL) {
-> -			if (!(val & ICH_LR_PENDING_BIT))
-> -				irq->pending_latch = false;
-> -		}
-> +		if (irq->config == VGIC_CONFIG_LEVEL && !(val & ICH_LR_STATE))
-> +			irq->pending_latch = false;
->  
->  		/*
->  		 * Level-triggered mapped IRQs are special because we only
-> @@ -135,8 +132,35 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->  {
->  	u32 model = vcpu->kvm->arch.vgic.vgic_model;
->  	u64 val = irq->intid;
-> +	bool allow_pending = true;
-> +
-> +	if (irq->active)
-> +		val |= ICH_LR_ACTIVE_BIT;
-> +
-> +	if (irq->hw) {
-> +		val |= ICH_LR_HW;
-> +		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
-> +		/*
-> +		 * Never set pending+active on a HW interrupt, as the
-> +		 * pending state is kept at the physical distributor
-> +		 * level.
-> +		 */
-> +		if (irq->active)
-> +			allow_pending = false;
-> +	} else {
-> +		if (irq->config == VGIC_CONFIG_LEVEL) {
-> +			val |= ICH_LR_EOI;
->  
-> -	if (irq_is_pending(irq)) {
-> +			/*
-> +			 * Software resampling doesn't work very well
-> +			 * if we allow P+A, so let's not do that.
-> +			 */
-> +			if (irq->active)
-> +				allow_pending = false;
-> +		}
-> +	}
-> +
-> +	if (allow_pending && irq_is_pending(irq)) {
->  		val |= ICH_LR_PENDING_BIT;
->  
->  		if (irq->config == VGIC_CONFIG_EDGE)
-> @@ -154,24 +178,6 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->  		}
->  	}
->  
-> -	if (irq->active)
-> -		val |= ICH_LR_ACTIVE_BIT;
-> -
-> -	if (irq->hw) {
-> -		val |= ICH_LR_HW;
-> -		val |= ((u64)irq->hwintid) << ICH_LR_PHYS_ID_SHIFT;
-> -		/*
-> -		 * Never set pending+active on a HW interrupt, as the
-> -		 * pending state is kept at the physical distributor
-> -		 * level.
-> -		 */
-> -		if (irq->active && irq_is_pending(irq))
-> -			val &= ~ICH_LR_PENDING_BIT;
-> -	} else {
-> -		if (irq->config == VGIC_CONFIG_LEVEL)
-> -			val |= ICH_LR_EOI;
-> -	}
-> -
->  	/*
->  	 * Level-triggered mapped IRQs are special because we only observe
->  	 * rising edges as input to the VGIC.  We therefore lower the line
-> 
+In general this is not an OK approach for a mechanical
+conversion.. Only the first writel can be convereted.
+
+You need to check all your patches to make sure there are no
+subsequent writel's in the places touched.
+
+Jason
