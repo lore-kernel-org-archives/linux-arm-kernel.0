@@ -1,21 +1,20 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 19 Mar 2018 17:53:43 -0700
-Subject: =?utf-8?q?Re=3A_=5BPATCH_v8_00/42=5D_ARM=3A_davinci=3A_convert_to_common_?=
- =?utf-8?q?clock_framework=E2=80=8B?=
-In-Reply-To: <1521168778-27236-1-git-send-email-david@lechnology.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
-Message-ID: <152150722338.254778.4743967512266809482@swboyd.mtv.corp.google.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 20 Mar 2018 01:58:11 +0100
+Subject: [PATCH] net: gemini: fix memory leak
+In-Reply-To: <1521441651-19753-1-git-send-email-igor.pylypiv@gmail.com>
+References: <1521441651-19753-1-git-send-email-igor.pylypiv@gmail.com>
+Message-ID: <CACRpkdak+-JrOy24iYvZNf0za6roVUsGUgVq4b28q5YPNy27tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting David Lechner (2018-03-15 19:52:16)
-> This series converts mach-davinci to use the common clock framework.
-> 
-> The series works like this, the first 19 patches create new clock drivers
-> using the common clock framework. There are basically 3 groups of clocks -
-> PLL, PSC and CFGCHIP (syscon). There are six different SoCs that each have
-> unique init data, which is the reason for so many patches.
+On Mon, Mar 19, 2018 at 7:40 AM, Igor Pylypiv <igor.pylypiv@gmail.com> wrote:
 
-Should I apply the first 19 patches to clk tree? Looking over them
-nothing stands out except for your self comment about the bad
-reviewed-by tag which I can remove.
+> cppcheck report:
+> [drivers/net/ethernet/cortina/gemini.c:543]: (error) Memory leak: skb_tab
+>
+> Signed-off-by: Igor Pylypiv <igor.pylypiv@gmail.com>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
