@@ -1,48 +1,39 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 20 Mar 2018 10:36:10 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.17
-In-Reply-To: <20180316163243.ymcnbdvpbvzrext2@verge.net.au>
+Date: Tue, 20 Mar 2018 10:37:21 +0100
+Subject: [PATCH 42/52] ARM: dts: r7s72100: add USB device to device tree
+In-Reply-To: <TY1PR01MB1562ED183D137FA48FCBC7DB8AD70@TY1PR01MB1562.jpnprd01.prod.outlook.com>
 References: <cover.1521208546.git.horms+renesas@verge.net.au>
- <20180316163243.ymcnbdvpbvzrext2@verge.net.au>
-Message-ID: <CAMuHMdVcmSHxovU+qK=dhxZXxjkEpc=5B3_AP4LuoWoYEXq05A@mail.gmail.com>
+ <faa6c0071114fd433e83dddd3a42fba547ca9a67.1521208546.git.horms+renesas@verge.net.au>
+ <TY1PR01MB1562ED183D137FA48FCBC7DB8AD70@TY1PR01MB1562.jpnprd01.prod.outlook.com>
+Message-ID: <CAMuHMdXdvH4Ywj_3rr8MSi-9AKN=WoDtdwHQdAJF=w0RJ8maaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Chris,
 
-On Fri, Mar 16, 2018 at 5:32 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Mar 16, 2018 at 03:53:09PM +0100, Simon Horman wrote:
->> Please consider these Renesas ARM based SoC DT updates for v4.17.
+On Fri, Mar 16, 2018 at 4:02 PM, Chris Brandt <Chris.Brandt@renesas.com> wrote:
+> On Friday, March 16, 2018 1, Simon Horman wrote:
+>> From: Chris Brandt <chris.brandt@renesas.com>
+>>
+>> Add USB device support.
+>>
+>> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 >
-> Unfortunately there seems to be a small problem with this pull request.
+> This patch is already in mainline:
 >
-> "ARM: dts: r7s72100: add USB device to device tree" is already
-> present upstream via Greg KH.
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8a99b6ad4da2f90969bb2ebb426c1d3dd0089fa4
+>
+> Pushed by Greg.
+>
+> At one point Greg applied it, then reverted it (as requested by Geert),
+> but then somehow it still went in.
 
-It is no longer present upstream, as it was reverted by Greg to avoid
-conflicts.
+It's not present in upstream:
 
-Interestingly, "git log" doesn't show it:
-
-$ git log --oneline v4.15..v4.16-rc1 -- arch/arm/boot/dts/r7s72100.dtsi
+$ git grep usbhs0 v4.16-rc6 -- arch/arm/boot/dts/r7s72100.dtsi
 $
-
-unless you explicitly mention the commit that created it:
-
-$ git log --oneline v4.15..8a99b6ad4da2f90969bb2ebb426c1d3dd0089fa4 --
-arch/arm/boot/dts/r7s72100.dtsi
-8a99b6ad4da2f909 ARM: dts: r7s72100: add USB device to device tree
-$
-
-or reverted it:
-
-$ git log --oneline v4.15..9836c09442c249b8e4f9646090d3259001cad432 --
-arch/arm/boot/dts/r7s72100.dtsi
-9836c09442c249b8 Revert "ARM: dts: r7s72100: add USB device to device tree"
-8a99b6ad4da2f909 ARM: dts: r7s72100: add USB device to device tree
-$
-
-(both are in v4.16-rc1).
 
 Gr{oetje,eeting}s,
 
