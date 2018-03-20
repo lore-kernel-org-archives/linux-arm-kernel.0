@@ -1,50 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Mar 2018 13:34:31 +0000
-Subject: Failed to boot ARM64 boards for recent linux-next
-In-Reply-To: <5AB0DEB2.4000803@rock-chips.com>
-References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
- <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
- <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
- <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
- <5AB0DEB2.4000803@rock-chips.com>
-Message-ID: <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
+From: tali.perry1@gmail.com (tali.perry1 at gmail.com)
+Date: Tue, 20 Mar 2018 15:40:47 +0200
+Subject: [PATCH v11 0/2] clk: npcm750: Add NPCM7XX Clock driver and binding
+Message-ID: <1521553249-6971-1-git-send-email-tali.perry1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/03/18 10:13, JeffyChen wrote:
-> Hi Shawn,
-> 
-> On 03/20/2018 05:39 PM, Shawn Lin wrote:
->>
->>
->> Also another patch warns a lot when booting the kernel. Is there
->> anything else I could do to let it go? Seems I am using broken
->> dts for requesting IRQ_TYPE_NONE there?
-> 
-> could be:
-> https://github.com/torvalds/linux/blob/master/drivers/irqchip/irq-gic-v3.c#L1145
-> 
-> 		struct irq_fwspec ppi_fwspec = {
-> 			.fwnode		= gic_data.fwnode,
-> 			.param_count	= 3,
-> 			.param		= {
-> 				[0]	= 1,
-> 				[1]	= i,
-> 				[2]	= IRQ_TYPE_NONE, <--
-> 			},
-> 		};
-> 
-> 		irq = irq_create_fwspec_mapping(&ppi_fwspec);
+From: Tali Perry <tali.perry1@gmail.com>
 
-Probably is. Caught at my own game, fun! ;-)
 
-Turning that NONE into LEVEL will work, as there is no known PPIs
-configured as edge (specially in a partitioned system), but the general
-case isn't pretty. I'll queue a workaround for now, and will look at
-addressing the more general issue.
+Nuvoton NPCM7XX Clock Controller
 
-Thanks,
+Nuvoton Poleg BMC NPCM7XX contains an integrated clock controller, which
+generates and supplies clocks to all modules within the BMC.
 
-	M.
+---
+
+10 ==> 11
+update documentation. "eth" replaced with "ethernet" in use case eaxample.
+
+2 ==> 10
+update documentation. add external clocks as inputs to clk driver.
+fix SPDX comment.
+
+1 ==> 2
+This patch includes fix request described here:
+https://patchwork.kernel.org/patch/10200033/
+(move fixed clocks to DT)
+
+Signed-off-by: Tali Perry <tali.perry1@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+
+Tali Perry (2):
+  clk: npcm750: Add binding for Nuvoton NPCM7XX clock Controller
+  clk: npcm7xx: Add Nuvoton NPCM7XX Clock Controller driver
+
+ .../bindings/clock/nuvoton,npcm750-clk.txt         | 100 +++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-npcm7xx.c                          | 757 +++++++++++++++++++++
+ include/dt-bindings/clock/nuvoton,npcm7xx-clock.h  |  44 ++
+ 4 files changed, 902 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/nuvoton,npcm750-clk.txt
+ create mode 100644 drivers/clk/clk-npcm7xx.c
+ create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
+
 -- 
-Jazz is not dead. It just smells funny...
+2.14.1
