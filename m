@@ -1,45 +1,94 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 19 Mar 2018 17:10:32 -0700
-Subject: [GIT PULL] Amlogic driver updates for v4.17, redo
-Message-ID: <7h7eq7r4hz.fsf@baylibre.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Tue, 20 Mar 2018 09:50:26 +0900
+Subject: [PATCH] arm64: dts: uniphier: add syscon property for UniPhier
+ sound system
+In-Reply-To: <CAK7LNAQ__FYvJdvxPhzazyi4fSCwkMzCWGVVjy5FKfOp+-hfcg@mail.gmail.com>
+References: <20180319012158.26411-1-suzuki.katsuhiro@socionext.com>
+ <CAK7LNAQ__FYvJdvxPhzazyi4fSCwkMzCWGVVjy5FKfOp+-hfcg@mail.gmail.com>
+Message-ID: <000001d3bfe5$700b96a0$5022c3e0$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+Hello Yamada-san,
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+Thank you for reviewing.
 
-are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
+> -----Original Message-----
+> From: Masahiro Yamada [mailto:yamada.masahiro at socionext.com]
+> Sent: Monday, March 19, 2018 11:36 PM
+> To: Suzuki, Katsuhiro <suzuki.katsuhiro@socionext.com>
+> Cc: linux-arm-kernel <linux-arm-kernel@lists.infradead.org>;
+> devicetree at vger.kernel.org; Masami Hiramatsu <masami.hiramatsu@linaro.org>; Jassi
+> Brar <jaswinder.singh@linaro.org>; Linux Kernel Mailing List
+> <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH] arm64: dts: uniphier: add syscon property for UniPhier sound
+> system
+> 
+> 2018-03-19 10:21 GMT+09:00 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>:
+> > This patch adds syscon property for specifying soc-glue core into
+> > device-tree of LD11/LD20 SoC.
+> >
+> > Currently, soc-glue core is used for changing the state of S/PDIF
+> > signal output pin to signal output state or Hi-Z state.
+> >
+> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> > ---
+> >  arch/arm/boot/dts/uniphier-pxs2.dtsi             | 4 +++-
+> 
+> 
+> Please split PXs2 changes into a different patch.
+> 
+> 
+> >  arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 4 +++-
+> >  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 4 +++-
+> >  3 files changed, 9 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi
+> b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+> > index 595045441c9c..c72c0a123c87 100644
+> > --- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
+> > +++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+> > @@ -243,6 +243,8 @@
+> >                         resets = <&sys_rst 40>;
+> >                         #sound-dai-cells = <1>;
+> >
+> > +                       socionext,syscon = <&sg>;
+> 
+> 
+> Remove unneeded blank line between properties.
+> 
+> 
+> > +
+> >                         i2s_port0: port at 0 {
+> >                                 i2s_hdmi: endpoint {
+> >                                 };
+> > @@ -418,7 +420,7 @@
+> >                         };
+> >                 };
+> >
+> > -               soc-glue at 5f800000 {
+> > +               sg: soc-glue at 5f800000 {
+> >                         compatible = "socionext,uniphier-pxs2-soc-glue",
+> >                                      "simple-mfd", "syscon";
+> >                         reg = <0x5f800000 0x2000>;
+> 
+> 
+> Could you use 'soc_glue', please?
+> I saw a conflict between 'sg' and 'soc_glue' among Socionext engineers
+> and I prefer the latter.
 
-for you to fetch changes up to f842c41adc044e4586dd232c6e889f9d46180fa8:
+I see, I'll fix and send v2 series.
 
-  amlogic: meson-gx-socinfo: Update soc ids (2018-03-19 16:40:26 -0700)
 
-----------------------------------------------------------------
-Amlogic driver updates for v4.17
-- socinfo: add more IDs for newer SoC detection
-- firmware: update init to use module_platform_driver_probe
-- soc: mix. VPU power controller fixes
+Regards,
+--
+Katsuhiro Suzuki
 
-----------------------------------------------------------------
-Heiner Kallweit (2):
-      soc: amlogic: meson-gx-pwrc-vpu: don't print error message on probe deferral
-      soc: amlogic: meson-gx-pwrc-vpu: fix error on shutdown when domain is powered off
 
-Neil Armstrong (1):
-      amlogic: meson-gx-socinfo: Update soc ids
-
-Sudeep Holla (1):
-      firmware: meson-sm: rework meson_sm_init to use module_platform_driver_probe
-
-weiyongjun (A) (2):
-      meson-mx-socinfo: Make local function meson_mx_socinfo_init() static
-      meson-gx-socinfo: make local function meson_gx_socinfo_init static
-
- drivers/firmware/meson/meson_sm.c       | 25 ++++++++++++-------------
- drivers/soc/amlogic/meson-gx-pwrc-vpu.c |  9 +++++++--
- drivers/soc/amlogic/meson-gx-socinfo.c  | 12 +++++++++++-
- drivers/soc/amlogic/meson-mx-socinfo.c  |  2 +-
- 4 files changed, 31 insertions(+), 17 deletions(-)
+> 
+> 
+> 
+> --
+> Best Regards
+> Masahiro Yamada
