@@ -1,51 +1,48 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 20 Mar 2018 02:13:14 +0000
-Subject: [PATCH] ARM: dts: imx7d-pinfunc: update sai select input value
-In-Reply-To: <CAOMZO5A0fA2h_T__vFzGXPzrzKZJuMyiRLRvNag43Xffif1EZQ@mail.gmail.com>
-References: <1521429281-23394-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5A0fA2h_T__vFzGXPzrzKZJuMyiRLRvNag43Xffif1EZQ@mail.gmail.com>
-Message-ID: <AM3PR04MB1315B6C5A16ACC2C7D709C71F5AB0@AM3PR04MB1315.eurprd04.prod.outlook.com>
+From: ping.bai@nxp.com (Bai Ping)
+Date: Tue, 20 Mar 2018 10:24:01 +0800
+Subject: [PATCH v6 1/4] clk: imx: Add CLK_IS_CRITICAL flag for busy divider
+ and busy mux
+Message-ID: <1521512644-25265-1-git-send-email-ping.bai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
+The busy divider and busy mux is actually used by the system critical clocks,
+so add 'CLK_IS_CRITICAL' to clocks registered with these two type.
 
-Anson Huang
-Best Regards!
+Signed-off-by: Bai Ping <ping.bai@nxp.com>
+Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ change from V3->v4:
+ - fix a typo in commit log
+ change from v4->v5:
+ - optimize the commit subject
+ change from v5->v6:
+ - no change
+---
+ drivers/clk/imx/clk-busy.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Tuesday, March 20, 2018 9:58 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <kernel@pengutronix.de>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Russell King - ARM Linux <linux@armlinux.org.uk>; S.j. Wang
-> <shengjiu.wang@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; moderated
-> list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
-> <linux-arm-kernel@lists.infradead.org>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>
-> Subject: Re: [PATCH] ARM: dts: imx7d-pinfunc: update sai select input value
-> 
-> Hi Anson,
-> 
-> On Mon, Mar 19, 2018 at 12:14 AM, Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> > Update SAI select input daisy chain value according to Reference
-> > Manual.
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > Signed-off-by: Shengjiu Wang <shengjiu.wang@nxp.com>
-> 
-> Could you please clarify the authorship of this patch? Is this yours or from
-> Shengjiu Wang?
-> 
-> If it is from Shengjiu Wang then his name should appear in the From field and his
-> Signed-off-by tag should appear first and yours should go after it.
+diff --git a/drivers/clk/imx/clk-busy.c b/drivers/clk/imx/clk-busy.c
+index 6df3389..9903652 100644
+--- a/drivers/clk/imx/clk-busy.c
++++ b/drivers/clk/imx/clk-busy.c
+@@ -101,7 +101,7 @@ struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
  
-The original patch is from Shengjiu wang in our internal tree, I modify the commit
-message, yes, I miss changing the from field, resent the V2 patch. Thanks.
-
-Anson. 
+ 	init.name = name;
+ 	init.ops = &clk_busy_divider_ops;
+-	init.flags = CLK_SET_RATE_PARENT;
++	init.flags = CLK_SET_RATE_PARENT | CLK_IS_CRITICAL;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+ 
+@@ -175,7 +175,7 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+ 
+ 	init.name = name;
+ 	init.ops = &clk_busy_mux_ops;
+-	init.flags = 0;
++	init.flags = CLK_IS_CRITICAL;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
+ 
+-- 
+1.9.1
