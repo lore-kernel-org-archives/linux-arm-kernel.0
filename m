@@ -1,41 +1,44 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 20 Mar 2018 14:35:52 -0700
-Subject: [PATCH v2 1/3] dt-bindings: pinctrl: Add a reserved-gpio-ranges
- property
-In-Reply-To: <CACRpkdbAYPpcoyVkMm=yKABMByJuCyXdYifuFdYhV4g6CU3sEg@mail.gmail.com>
-References: <20180126011400.2191-1-sboyd@codeaurora.org>
- <20180126011400.2191-2-sboyd@codeaurora.org>
- <CACRpkdbAYPpcoyVkMm=yKABMByJuCyXdYifuFdYhV4g6CU3sEg@mail.gmail.com>
-Message-ID: <152158175270.198100.17839151793045734833@swboyd.mtv.corp.google.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 20 Mar 2018 14:44:41 -0700
+Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.17, redo
+Message-ID: <7h1sgeqv5i.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2018-03-19 20:36:35)
-> Hi Stephen,
-> 
-> thanks for the patch and hope you have a good time at your new
-> workplace!
-> 
-> On Fri, Jan 26, 2018 at 2:13 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > Some qcom platforms make some GPIOs or pins unavailable for use
-> > by non-secure operating systems, and thus reading or writing the
-> > registers for those pins will cause access control issues.
-> > Introduce a DT property to describe the set of GPIOs that are
-> > available for use so that higher level OSes are able to know what
-> > pins to avoid reading/writing.
-> >
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: <devicetree@vger.kernel.org>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> This looks fine except Andy's note to rename this ranges
-> to gpio-reserved-ranges for namespacing.
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Ok! I'll rename to gpio-reserved-ranges.
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-> 
-> Are you reposting this series as v3 with this fixed or does someone
-> else need to pick it up?
+are available in the git repository at:
 
-Yes I can do it today or tomorrow.
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-1
+
+for you to fetch changes up to 4e461e62fc987ed5edb82e2a902fd93f4dccae8f:
+
+  ARM: dts: meson8b: the CBUS GPIO controller only has 83 GPIOs (2018-03-20 14:32:31 -0700)
+
+----------------------------------------------------------------
+Amlogic 32-bit DT updates for v4.17
+- odroid-c1: add microSD, ethernet, USB reset
+- add reset controller
+- fix requesting GPIOs greater than GPIOZ_3
+
+----------------------------------------------------------------
+Emiliano Ingrassia (2):
+      ARM: dts: meson8b: extend ethernet controller description
+      ARM: dts: meson8b-odroidc1: ethernet support
+
+Linus L?ssing (1):
+      ARM: dts: meson8b-odroidc1: add microSD support
+
+Martin Blumenstingl (5):
+      ARM: dts: meson8b: grow the reset controller memory zone
+      ARM: dts: meson8: add the reset controller
+      ARM: dts: meson8: add the USB reset line
+      ARM: dts: meson8b: add the I2C clocks
+      ARM: dts: meson8b: the CBUS GPIO controller only has 83 GPIOs
+
+ arch/arm/boot/dts/meson8.dtsi          |  9 +++++++++
+ arch/arm/boot/dts/meson8b-odroidc1.dts | 88 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/meson8b.dtsi         | 59 +++++++++++++++++++++++++++++++++++++++++++++++++++++++----
+ 3 files changed, 152 insertions(+), 4 deletions(-)
