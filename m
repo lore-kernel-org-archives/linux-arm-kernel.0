@@ -1,58 +1,46 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 20 Mar 2018 09:28:47 +0530
-Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board data
+Date: Tue, 20 Mar 2018 09:28:50 +0530
+Subject: [PATCH v3 07/13] ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk04.1-c3
+ board file
 In-Reply-To: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
 References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521518336-5467-8-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Adds missing memory, reserved-memory nodes.
-
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 28 +++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/boot/dts/Makefile                      | 1 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts | 8 ++++++++
+ 2 files changed, 9 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-index e413b21e..ad0fbc9 100644
---- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-@@ -20,6 +20,34 @@
- 	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
- 	compatible = "qcom,ipq4019";
- 
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256MB */
-+	};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4f209fb..b71487a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -748,6 +748,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8084-mtp.dtb \
+ 	qcom-ipq4019-ap.dk01.1-c1.dtb \
+ 	qcom-ipq4019-ap.dk04.1-c1.dtb \
++	qcom-ipq4019-ap.dk04.1-c3.dtb \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+new file mode 100644
+index 0000000..0843523
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+@@ -0,0 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
 +
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++#include "qcom-ipq4019-ap.dk04.1.dtsi"
 +
-+		rsvd1 at 87000000 {
-+			/* Reserved for other subsystem */
-+			reg = <0x87000000 0x500000>;
-+			no-map;
-+		};
-+
-+		wifi_dump at 87500000 {
-+			reg = <0x87500000 0x600000>;
-+			no-map;
-+		};
-+
-+		rsvd2 at 87B00000 {
-+			/* Reserved for other subsystem */
-+			reg = <0x87B00000 0x500000>;
-+			no-map;
-+		};
-+	};
-+
- 	soc {
- 		rng at 22000 {
- 			status = "ok";
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C3";
++};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
