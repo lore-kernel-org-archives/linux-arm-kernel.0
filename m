@@ -1,75 +1,81 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 21 Mar 2018 11:18:26 +0100
-Subject: [PATCH] ARM: EXYNOS: Fix coupled CPU idle freeze on Exynos4210
-In-Reply-To: <f1d38d39-59b8-715f-15b3-1933b0971793@arm.com>
-References: <CGME20180321094523eucas1p1a87d146d65d4191ccdb37f1723977011@eucas1p1.samsung.com>
- <20180321094505.25494-1-m.szyprowski@samsung.com>
- <f1d38d39-59b8-715f-15b3-1933b0971793@arm.com>
-Message-ID: <52224d23-e90a-ce1d-3b4d-add7876eb682@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 21 Mar 2018 12:26:42 +0200
+Subject: [PATCH v2] media: omap3isp: fix unbalanced dma_iommu_mapping
+In-Reply-To: <20180314154136.16468-1-s-anna@ti.com>
+References: <20180314154136.16468-1-s-anna@ti.com>
+Message-ID: <5767280.aLITpzbm0N@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Suman,
 
-On 2018-03-21 11:05, Marc Zyngier wrote:
-> On 21/03/18 09:45, Marek Szyprowski wrote:
->> Since commit 04c8b0f82c7d ("irqchip/gic: Make locking a BL_SWITCHER only
->> feature") coupled CPU idle freezes from time to time on Exynos4210. Later
->> commit 313c8c16ee62 ("PM / CPU: replace raw_notifier with atomic_notifier")
->> changed the context in which the CPU idle code is executed, what results
->> in fully reproducible freeze all the time. However, almost the same coupled
->> CPU idle code works fine on Exynos3250 regarless of the changes made in
->> the mentioned commits.
->>
->> It turned out that the IPI call used on Exynos4210 is conflicting with the
->> change done in the first mentioned commit in GIC. Fix this by using the
->> same code path as for Exynos3250, instead of the IPI call for
->> synchronization with second CPU core, call dsb_sev() directly.
->>
->> Tested on Exynos4210-based Trats and Origen boards.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> CC: stable at vger.kernel.org # v4.13+
->> ---
->>   arch/arm/mach-exynos/pm.c | 6 +-----
->>   1 file changed, 1 insertion(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->> index dc4346ecf16d..a1055a2b8d54 100644
->> --- a/arch/arm/mach-exynos/pm.c
->> +++ b/arch/arm/mach-exynos/pm.c
->> @@ -271,11 +271,7 @@ static int exynos_cpu0_enter_aftr(void)
->>   				goto fail;
->>   
->>   			call_firmware_op(cpu_boot, 1);
->> -
->> -			if (soc_is_exynos3250())
->> -				dsb_sev();
->> -			else
->> -				arch_send_wakeup_ipi_mask(cpumask_of(1));
->> +			dsb_sev();
->>   		}
->>   	}
->>   fail:
->>
-> I'm a bit puzzled here.
->
-> If the GIC change broke something on your platform, it probably also
-> broke something for all other users of arch_send_wakeup_ipi_mask. But
-> nobody reported anything until now. Also, it doesn't look like 4210 is a
-> big-little platform, so it is unlikely to use the big-little switcher.
->
-> What is specific to this system that makes misbehave? Were you
-> implicitly relying on the BL lock to perform some serialization?
+Thank you for the patch.
 
-My hypothesis, after some internal discussion, is that dsb_sev() should be
-there from the beginning, but instead there was an 
-arch_send_wakeup_ipi_mask()
-call, which indirectly called dsb_sev() as a part of GIC spinlock internals.
-When spinlock has been removed from GIC, there is no dsb_sev() call anymore,
-what causes synchronization issue.
+On Wednesday, 14 March 2018 17:41:36 EET Suman Anna wrote:
+> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+> ARM DMA backend. The current code creates a dma_iommu_mapping and
+> attaches this to the ISP device, but never detaches the mapping in
+> either the probe failure paths or the driver remove path resulting
+> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+> 
+> Reported-by: Pavel Machek <pavel@ucw.cz>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 
-Best regards
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> ---
+> v2 Changes:
+>  - Dropped the error_attach label, and returned directly from the
+>    first error path (comments from Sakari)
+>  - Added Sakari's Acked-by
+> v1: https://patchwork.kernel.org/patch/10276759/
+> 
+> Pavel,
+> I dropped your Tested-by from v2 since I modified the patch, can you
+> recheck the new patch again? Thanks.
+> 
+> regards
+> Suman
+> 
+>  drivers/media/platform/omap3isp/isp.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/platform/omap3isp/isp.c
+> b/drivers/media/platform/omap3isp/isp.c index 8eb000e3d8fd..f2db5128d786
+> 100644
+> --- a/drivers/media/platform/omap3isp/isp.c
+> +++ b/drivers/media/platform/omap3isp/isp.c
+> @@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device
+> *isp)
+> 
+>  static void isp_detach_iommu(struct isp_device *isp)
+>  {
+> +	arm_iommu_detach_device(isp->dev);
+>  	arm_iommu_release_mapping(isp->mapping);
+>  	isp->mapping = NULL;
+>  }
+> @@ -1961,8 +1962,7 @@ static int isp_attach_iommu(struct isp_device *isp)
+>  	mapping = arm_iommu_create_mapping(&platform_bus_type, SZ_1G, SZ_2G);
+>  	if (IS_ERR(mapping)) {
+>  		dev_err(isp->dev, "failed to create ARM IOMMU mapping\n");
+> -		ret = PTR_ERR(mapping);
+> -		goto error;
+> +		return PTR_ERR(mapping);
+>  	}
+> 
+>  	isp->mapping = mapping;
+> @@ -1977,7 +1977,8 @@ static int isp_attach_iommu(struct isp_device *isp)
+>  	return 0;
+> 
+>  error:
+> -	isp_detach_iommu(isp);
+> +	arm_iommu_release_mapping(isp->mapping);
+> +	isp->mapping = NULL;
+>  	return ret;
+>  }
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Regards,
+
+Laurent Pinchart
