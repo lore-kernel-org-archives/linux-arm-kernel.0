@@ -1,52 +1,49 @@
-From: k.marinushkin@gmail.com (Kirill Marinushkin)
-Date: Wed, 21 Mar 2018 17:58:06 +0100
-Subject: [PATCH v2] staging: bcm2835-audio: Release resources on
- module_exit()
-In-Reply-To: <CAHp75Vfwpwcc6_somOcSMYwmBhnkSwR7vn2piAZwA1GFkGAJRw@mail.gmail.com>
-References: <63ee611d-9fd7-a67a-45aa-229cc4a83ed2@gmail.com>
- <20180313193414.11535-1-k.marinushkin@gmail.com>
- <CAHp75Ve9MRAgSu74Mzr2defd84umyeKpfvX51-Qhk4SvLx3Qng@mail.gmail.com>
- <1a59a938-0381-49f4-dfd9-c7a52bdb0eae@gmail.com>
- <CAHp75Vfwpwcc6_somOcSMYwmBhnkSwR7vn2piAZwA1GFkGAJRw@mail.gmail.com>
-Message-ID: <15cc84cc-a887-7473-d64c-00c23e930e0d@gmail.com>
+From: swboyd@chromium.org (Stephen Boyd)
+Date: Wed, 21 Mar 2018 09:58:45 -0700
+Subject: [PATCH v3 0/3] Support qcom pinctrl protected pins
+Message-ID: <20180321165848.89751-1-swboyd@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/18 16:03, Andy Shevchenko wrote:
-> On Thu, Mar 15, 2018 at 7:57 AM, Kirill Marinushkin
-> <k.marinushkin@gmail.com> wrote:
->> On 03/13/18 22:23, Andy Shevchenko wrote:
->>> On Tue, Mar 13, 2018 at 9:34 PM, Kirill Marinushkin
->>> <k.marinushkin@gmail.com> wrote:
->>>> In the current implementation, `rmmod snd_bcm2835` does not release
->>>> resources properly. It causes an oops when trying to list sound devices.
->>>>
->>>> This commit fixes it.
->>> Nice catch!
->>>
->>> See my comments below.
->>>
->>>>  static void snd_devm_unregister_child(struct device *dev, void *res)
->>>>  {
->>>>         struct device *childdev = *(struct device **)res;
->>>> +       struct bcm2835_chip *chip = dev_get_drvdata(childdev);
->>>> +       struct snd_card *card = chip->card;
->>>> +
->>>> +       snd_card_free(card);
->>>> +       dev_set_drvdata(childdev, NULL);
->>> AFAIU this is done by device core.
->> Maybe you are right. But I don't know, which function in the device core does it.
->> It is safe to have this line. So, I suggest to keep it.
-> Please, remove.
-> If you don't know, perhaps you need to spend more time on doing homework?
+This patchset proposes a solution to describing the valid                                                                           
+pins for a pin controller in a generic way so that qcom                                                                        
+platforms can expose the pins that are really available.                                                                            
+                                                                                                                                    
+Typically, this has been done by having drivers and firmware                                                                        
+descriptions only use pins they know they have access to, and that                                                                  
+still works now because we no longer read the pin direction at                                                                      
+boot. But there are still some userspace drivers and debugfs facilities                                                             
+that don't know what pins are available and attempt to read everything                                                              
+they can. On qcom platforms, this may lead to a system hang, which isn't                                                            
+very nice behavior, even if root is the only user that can trigger it.                                                              
+                                                                                                                                    
+The proposal is to describe the valid pins and then not allow things to                                                             
+cause problems by using the invalid pins. Obviously, the firmware may                                                               
+mess this up, so this is mostly a nice to have feature or a safety net                                                              
+so that things don't blow up easily.                                                                                                
 
-You are right, I actually should pay more attention to this detail.
-I will remove this line and send as a patch v3
+Changes from v2:
+ * Renamed binding to 'gpio-reserved-ranges'
+ * Reworked gpiolib patch to not use irqdomains
+ * Update qcom driver patch to use new valid_mask field
+                                                                                                                                    
+Changes from v1:                                                                                                                    
+ * Pushed into gpiolib-of core under irq valid line logic                                                                           
+ * Fixed up qcom driver patch to free stuff properly and remove custom code                                                         
+ * Dropped export patch as it got picked up                                                                                         
+ * Renamed binding to 'reserved-gpio-ranges'   
 
-> % git grep -n -w dev_set_drvdata -- drivers/base/dd.c
-> drivers/base/dd.c:469:          dev_set_drvdata(dev, NULL);
-> drivers/base/dd.c:499:  dev_set_drvdata(dev, NULL);
-> drivers/base/dd.c:902:          dev_set_drvdata(dev, NULL);
->
-> Last one is the point of your interest.
->
+Stephen Boyd (3):
+  dt-bindings: gpio: Add a gpio-reserved-ranges property
+  gpiolib: Support 'gpio-reserved-ranges' property
+  pinctrl: qcom: Don't allow protected pins to be requested
+
+ .../devicetree/bindings/gpio/gpio.txt         |  7 +-
+ drivers/gpio/gpiolib-of.c                     | 24 +++++++
+ drivers/gpio/gpiolib.c                        | 50 ++++++++++++++
+ drivers/pinctrl/qcom/pinctrl-msm.c            | 69 +++++++++++++++++--
+ include/linux/gpio/driver.h                   | 16 +++++
+ 5 files changed, 159 insertions(+), 7 deletions(-)
+
+-- 
+Sent by a computer through tubes
