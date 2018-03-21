@@ -1,81 +1,61 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 21 Mar 2018 12:26:42 +0200
-Subject: [PATCH v2] media: omap3isp: fix unbalanced dma_iommu_mapping
-In-Reply-To: <20180314154136.16468-1-s-anna@ti.com>
-References: <20180314154136.16468-1-s-anna@ti.com>
-Message-ID: <5767280.aLITpzbm0N@avalon>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Wed, 21 Mar 2018 11:47:27 +0100
+Subject: [RESEND PATCH v1 2/6] i2c: i2c-stm32f7: Add slave support
+In-Reply-To: <c7fa1cc2-a298-967c-6006-942fd631b4f0@st.com>
+References: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
+ <1520852023-27083-3-git-send-email-pierre-yves.mordret@st.com>
+ <20180317205109.gocf5wemtjkyomct@ninjato>
+ <5a3c5b21-bc66-ce73-a997-f686ecc275f3@st.com>
+ <20180320095242.tedafu5wphsx55qx@katana>
+ <c7fa1cc2-a298-967c-6006-942fd631b4f0@st.com>
+Message-ID: <f5389af1-257d-2887-531c-d3bd67b20524@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Hi Wolfram
 
-Thank you for the patch.
+STM32 I2C F7 can be both Master and Slave mode.
+Whenever a master command (I2C or SMBus) a START condition is generated and the
+master flag (master_mode) is set and managed accordingly : sw and ITs/
+Now if a slave is registered it's managed accordingly as long as there is no
+master command on going.
+IRqs are not separated neither Regs bits. The routing is done though out START
+condition.
+This driver is not slave-only driver and can act as master if a master command
+is issued and slave if registered as such.
 
-On Wednesday, 14 March 2018 17:41:36 EET Suman Anna wrote:
-> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
-> ARM DMA backend. The current code creates a dma_iommu_mapping and
-> attaches this to the ISP device, but never detaches the mapping in
-> either the probe failure paths or the driver remove path resulting
-> in an unbalanced mapping refcount and a memory leak. Fix this properly.
-> 
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+Hope it clarifies
+Regards
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
-> v2 Changes:
->  - Dropped the error_attach label, and returned directly from the
->    first error path (comments from Sakari)
->  - Added Sakari's Acked-by
-> v1: https://patchwork.kernel.org/patch/10276759/
+On 03/20/2018 11:17 AM, Pierre Yves MORDRET wrote:
 > 
-> Pavel,
-> I dropped your Tested-by from v2 since I modified the patch, can you
-> recheck the new patch again? Thanks.
 > 
-> regards
-> Suman
+> On 03/20/2018 10:52 AM, Wolfram Sang wrote:
+>>
+>>> I do believe the hw can support it, even it looks odd to me having the same I2C
+>>> in slave and master mode at the same time.
+>>
+>> I2C is multi-master, so it is perfectly valid for a device to be master
+>> and slave. I do have seen designs making use of that more than once.
+>>
+>>> Nevertheless the driver is devised to support either master or slave more but
+>>> not at the same time.
+>>
+>> Why should we limit ourselves here? Also, why should we have an
+>> unnecessary configuration option?
+>>
+>> Unless the HW is broken and does not support it, I usually don't accept
+>> slave-only solutions. If the needs for master and slave arises later,
+>> this is hard to refactor and better done properly right away.
+>>
+>> Is it so hard? Usually you have irqs for master and for slave seperated,
+>> so you can code things quite orthogonal. Check de20d1857dd6 ("i2c: rcar:
+>> add slave support") as an example.
+>>
 > 
->  drivers/media/platform/omap3isp/isp.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+> I need to check at my end but status bits are shared between master and slave in
+> my IP: i.e. Tx Empty, Rx Empty, NAxk, Stop.
+> Both bits have a meaning in either master and slave mode. In your case status
+> bits are separated between master and slave.
+> BTW I need to think about it.
 > 
-> diff --git a/drivers/media/platform/omap3isp/isp.c
-> b/drivers/media/platform/omap3isp/isp.c index 8eb000e3d8fd..f2db5128d786
-> 100644
-> --- a/drivers/media/platform/omap3isp/isp.c
-> +++ b/drivers/media/platform/omap3isp/isp.c
-> @@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device
-> *isp)
-> 
->  static void isp_detach_iommu(struct isp_device *isp)
->  {
-> +	arm_iommu_detach_device(isp->dev);
->  	arm_iommu_release_mapping(isp->mapping);
->  	isp->mapping = NULL;
->  }
-> @@ -1961,8 +1962,7 @@ static int isp_attach_iommu(struct isp_device *isp)
->  	mapping = arm_iommu_create_mapping(&platform_bus_type, SZ_1G, SZ_2G);
->  	if (IS_ERR(mapping)) {
->  		dev_err(isp->dev, "failed to create ARM IOMMU mapping\n");
-> -		ret = PTR_ERR(mapping);
-> -		goto error;
-> +		return PTR_ERR(mapping);
->  	}
-> 
->  	isp->mapping = mapping;
-> @@ -1977,7 +1977,8 @@ static int isp_attach_iommu(struct isp_device *isp)
->  	return 0;
-> 
->  error:
-> -	isp_detach_iommu(isp);
-> +	arm_iommu_release_mapping(isp->mapping);
-> +	isp->mapping = NULL;
->  	return ret;
->  }
-
--- 
-Regards,
-
-Laurent Pinchart
