@@ -1,48 +1,41 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Mar 2018 09:41:41 +0100
-Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
-In-Reply-To: <20180320231309.GJ2743@n2100.armlinux.org.uk>
-References: <20180320230206.25289-1-stefan@agner.ch>
- <20180320230206.25289-4-stefan@agner.ch>
- <20180320231309.GJ2743@n2100.armlinux.org.uk>
-Message-ID: <98806397d62084bf01c475fd210cd186@agner.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Mar 2018 08:52:33 +0000
+Subject: Failed to boot ARM64 boards for recent linux-next
+In-Reply-To: <5AB1F763.3040409@rock-chips.com>
+References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
+ <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+ <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
+ <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
+ <5AB0DEB2.4000803@rock-chips.com>
+ <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
+ <cbc89d68-ba41-1f6a-4ab2-4c9647b48f75@huawei.com>
+ <d18d6f27-7270-d2d7-58b9-3bf16ffe6b0a@arm.com>
+ <ff6cd434-2227-12a6-b3b9-325da78a7fa9@huawei.com>
+ <2aed10a0-ad3d-d9fc-7b6e-3b6877bff0be@arm.com>
+ <13507742-ddb8-0b43-cd09-14a57ec2a07a@rock-chips.com>
+ <5AB1F763.3040409@rock-chips.com>
+Message-ID: <680aba8d-4117-227b-d5a1-ad7121d2565f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2018 00:13, Russell King - ARM Linux wrote:
-> On Wed, Mar 21, 2018 at 12:02:04AM +0100, Stefan Agner wrote:
->> As documented in GCC naked functions should only use Basic asm
->> syntax. The Extended asm or mixture of Basic asm and "C" code is
->> not guaranteed. Currently this works because it was hard coded
->> to follow and check GCC behavior for arguments and register
->> placement.
+Hi Jeffy,
+
+On 21/03/18 06:10, JeffyChen wrote:
+> Hi Shawn,
 > 
-> Those checks have nothing to do with that at all.  The whole point of
-> __asmeq() is to catch situations where you use register variables,
-> specifying which register you want them in, and GCC then ends up
-> passing them to assembly code in some other random register(s).
-> 
-> This was found with older GCCs, and the problem was fixed.  It has
-> nothing to do with naked functions per se.
-> 
+> On 03/21/2018 08:34 AM, Shawn Lin wrote:
+>>
+>> @Jeffy
+>>
+>> Could you help test Marc's latest patch on your RK3399 kevin/Gru or
+>> whatever Chromebook?
+> tested on my chromebook kevin, it works with that patch.
 
-Ok, will reword that part to something like:
+This is very odd. It completely fails on mine, which is aannoying.
+Do you have any special firmware? Or the stock firmware?
 
-As documented in GCC naked functions should only use Basic asm
-syntax. The Extended asm or mixture of Basic asm and "C" code cannot
-be depended upon.
+Thanks,
 
-Furthermore with clang using parameters in Extended asm in a
-naked function is not supported:
-...
-
-> In fact, as you're introducing further register variables, these
-> checks become more important to have than they were with the
-> previous code.
-
-Ok I see, so I definitely have to leave them in.
-
-You generally agree with the change otherwise?
-
---
-Stefan
+	M.
+-- 
+Jazz is not dead. It just smells funny...
