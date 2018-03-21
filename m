@@ -1,103 +1,68 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 21 Mar 2018 10:46:25 +0800
-Subject: [PATCH v2] clk: sunxi-ng: add missing hdmi-slow clock for H6 CCU
-Message-ID: <20180321024625.18516-1-icenowy@aosc.io>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 21 Mar 2018 11:04:13 +0800
+Subject: [PATCH -next] phy: phy-mtk-tphy: fix missing
+ clk_disable_unprepare() on error in mtk_phy_init()
+In-Reply-To: <1521551999-154546-1-git-send-email-weiyongjun1@huawei.com>
+References: <1521551999-154546-1-git-send-email-weiyongjun1@huawei.com>
+Message-ID: <1521601453.3717.117.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner H6 CCU has a "HDMI Slow Clock", which is currently missing
-in the ccu-sun50i-h6 driver.
+On Tue, 2018-03-20 at 13:19 +0000, Wei Yongjun wrote:
+> Fix the missing clk_disable_unprepare() before return
+> from mtk_phy_init() in the error handling case.
+> 
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/phy/mediatek/phy-mtk-tphy.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+> index 38c281b..3ff9020 100644
+> --- a/drivers/phy/mediatek/phy-mtk-tphy.c
+> +++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+> @@ -841,7 +841,7 @@ static int mtk_phy_init(struct phy *phy)
+>  	ret = clk_prepare_enable(instance->ref_clk);
+>  	if (ret) {
+>  		dev_err(tphy->dev, "failed to enable ref_clk\n");
+> -		return ret;
+> +		goto disable_u3phya_ref;
+@u3phya_ref and @ref_clk clocks are mutually exclusive, that means one
+of them must be NULL; so if failed to enable @ref_clk, then @u3phya_ref
+should be NULL, and no need to disable it in fact.
+But it's also no problem to disable it.
+>  	}
 
-Add this missing clock to the driver.
 
-Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-Changes in v2:
-- Rearrange clock slice numbers.
+>  
+>  	switch (instance->type) {
+> @@ -859,10 +859,17 @@ static int mtk_phy_init(struct phy *phy)
+>  		break;
+>  	default:
+>  		dev_err(tphy->dev, "incompatible PHY type\n");
+> -		return -EINVAL;
+> +		ret = -EINVAL;
+> +		goto disable_ref_clk;
+mtk_phy_xlate() has already checked supported type,so usually doesn't
+comes here, otherwise there will be a serious problem about system.
 
- drivers/clk/sunxi-ng/ccu-sun50i-h6.c      |  4 ++++
- drivers/clk/sunxi-ng/ccu-sun50i-h6.h      |  2 +-
- include/dt-bindings/clock/sun50i-h6-ccu.h | 27 ++++++++++++++-------------
- 3 files changed, 19 insertions(+), 14 deletions(-)
+Anyway, it's better to disable these clocks when fail.
+>  	}
+>  
+>  	return 0;
+> +
+> +disable_ref_clk:
+> +	clk_disable_unprepare(instance->ref_clk);
+> +disable_u3phya_ref:
+> +	clk_disable_unprepare(tphy->u3phya_ref);
+> +	return ret;
+>  }
+>  
+>  static int mtk_phy_power_on(struct phy *phy)
+> 
+Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Acked-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-index d5eab49e6350..bdbfe78fe133 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-@@ -643,6 +643,8 @@ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents, 0xb00,
- 				 BIT(31),	/* gate */
- 				 0);
- 
-+static SUNXI_CCU_GATE(hdmi_slow_clk, "hdmi-slow", "osc24M", 0xb04, BIT(31), 0);
-+
- static const char * const hdmi_cec_parents[] = { "osc32k", "pll-periph0-2x" };
- static const struct ccu_mux_fixed_prediv hdmi_cec_predivs[] = {
- 	{ .index = 1, .div = 36621 },
-@@ -876,6 +878,7 @@ static struct ccu_common *sun50i_h6_ccu_clks[] = {
- 	&pcie_aux_clk.common,
- 	&bus_pcie_clk.common,
- 	&hdmi_clk.common,
-+	&hdmi_slow_clk.common,
- 	&hdmi_cec_clk.common,
- 	&bus_hdmi_clk.common,
- 	&bus_tcon_top_clk.common,
-@@ -1017,6 +1020,7 @@ static struct clk_hw_onecell_data sun50i_h6_hw_clks = {
- 		[CLK_PCIE_AUX]		= &pcie_aux_clk.common.hw,
- 		[CLK_BUS_PCIE]		= &bus_pcie_clk.common.hw,
- 		[CLK_HDMI]		= &hdmi_clk.common.hw,
-+		[CLK_HDMI_SLOW]		= &hdmi_slow_clk.common.hw,
- 		[CLK_HDMI_CEC]		= &hdmi_cec_clk.common.hw,
- 		[CLK_BUS_HDMI]		= &bus_hdmi_clk.common.hw,
- 		[CLK_BUS_TCON_TOP]	= &bus_tcon_top_clk.common.hw,
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.h b/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
-index ad6da4aa733c..2ccfe4428260 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
-@@ -51,6 +51,6 @@
- 
- #define CLK_BUS_DRAM		60
- 
--#define CLK_NUMBER		137
-+#define CLK_NUMBER		(CLK_BUS_HDCP + 1)
- 
- #endif /* _CCU_SUN50I_H6_H_ */
-diff --git a/include/dt-bindings/clock/sun50i-h6-ccu.h b/include/dt-bindings/clock/sun50i-h6-ccu.h
-index 6045735a2821..a1545cd60e75 100644
---- a/include/dt-bindings/clock/sun50i-h6-ccu.h
-+++ b/include/dt-bindings/clock/sun50i-h6-ccu.h
-@@ -107,18 +107,19 @@
- #define CLK_PCIE_AUX		121
- #define CLK_BUS_PCIE		122
- #define CLK_HDMI		123
--#define CLK_HDMI_CEC		124
--#define CLK_BUS_HDMI		125
--#define CLK_BUS_TCON_TOP	126
--#define CLK_TCON_LCD0		127
--#define CLK_BUS_TCON_LCD0	128
--#define CLK_TCON_TV0		129
--#define CLK_BUS_TCON_TV0	130
--#define CLK_CSI_CCI		131
--#define CLK_CSI_TOP		132
--#define CLK_CSI_MCLK		133
--#define CLK_BUS_CSI		134
--#define CLK_HDCP		135
--#define CLK_BUS_HDCP		136
-+#define CLK_HDMI_SLOW		124
-+#define CLK_HDMI_CEC		125
-+#define CLK_BUS_HDMI		126
-+#define CLK_BUS_TCON_TOP	127
-+#define CLK_TCON_LCD0		128
-+#define CLK_BUS_TCON_LCD0	129
-+#define CLK_TCON_TV0		130
-+#define CLK_BUS_TCON_TV0	131
-+#define CLK_CSI_CCI		132
-+#define CLK_CSI_TOP		133
-+#define CLK_CSI_MCLK		134
-+#define CLK_BUS_CSI		135
-+#define CLK_HDCP		136
-+#define CLK_BUS_HDCP		137
- 
- #endif /* _DT_BINDINGS_CLK_SUN50I_H6_H_ */
--- 
-2.15.1
+Thanks a lot
+> 
+> 
