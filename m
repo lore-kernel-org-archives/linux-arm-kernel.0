@@ -1,75 +1,56 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 21 Mar 2018 16:28:57 +0100
-Subject: [PATCH 03/10] drm/sun4i: Don't pretend to handle ARGB8888 with the
- frontend
-In-Reply-To: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180321152904.22411-4-paul.kocialkowski@bootlin.com>
+Date: Wed, 21 Mar 2018 16:28:54 +0100
+Subject: [PATCH 00/10] drm/sun4i: Frontend YUV and MB32 tile modifier support
+Message-ID: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that the frontend is not capable of preserving the alpha
-component (that is always set to 0xff), so only support XRGB8888
-instead.
+This introduces support for YUV formats in the sun4i DRM driver, through
+the frontend. In addition to regular YUV formats, a modifier for the
+Allwinner MB32 tiling format is introduced along with a dedicated ioctl
+for allocating buffers (through CMA) with the appropriate constraints.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_backend.c  | 4 ++++
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 3 +--
- drivers/gpu/drm/sun4i/sun4i_layer.c    | 4 ++--
- 3 files changed, 7 insertions(+), 4 deletions(-)
+This ioctl must always be used when allocating buffers to be used with
+the MB32 tiling modifier, as dumb GEM buffer allocation is reserved for
+linear planes.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index b98dafda52f8..274a1db6fa8e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -440,6 +440,10 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
- 	if (IS_ERR(backend->frontend))
- 		return false;
- 
-+	/*
-+	 * TODO: Don't use the frontend for x2/x4 scaling and allow RGB formats
-+	 * with an alpha component then.
-+	 */
- 	return sun4i_backend_plane_uses_scaler(state);
- }
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index ddf6cfa6dd23..3ea925584891 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -107,7 +107,7 @@ EXPORT_SYMBOL(sun4i_frontend_update_buffer);
- static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
- {
- 	switch (fmt) {
--	case DRM_FORMAT_ARGB8888:
-+	case DRM_FORMAT_XRGB8888:
- 		*val = 5;
- 		return 0;
- 
-@@ -120,7 +120,6 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
- {
- 	switch (fmt) {
- 	case DRM_FORMAT_XRGB8888:
--	case DRM_FORMAT_ARGB8888:
- 		*val = 2;
- 		return 0;
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index eb93df445a10..15238211a61a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -100,9 +100,9 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- 		sun4i_frontend_update_coord(frontend, plane);
- 		sun4i_frontend_update_buffer(frontend, plane);
- 		sun4i_frontend_update_formats(frontend, plane,
--					      DRM_FORMAT_ARGB8888);
-+					      DRM_FORMAT_XRGB8888);
- 		sun4i_backend_update_layer_frontend(backend, layer->id, plane,
--						    DRM_FORMAT_ARGB8888);
-+						    DRM_FORMAT_XRGB8888);
- 		sun4i_frontend_enable(frontend);
- 	} else {
- 		sun4i_backend_update_layer_formats(backend, layer->id, plane);
+This series is based on (and requires) the following series:
+* drm/sun4i: backend: Support interleaved YUV planes,
+  from Maxime Ripard: https://patchwork.freedesktop.org/series/39232/
+* drm/sun4i: Support the Display Engine frontend,
+  from Maxime Ripard: https://patchwork.freedesktop.org/series/35292/
+* drm/sun4i: Support more planes, zpos and plane-wide alpha,
+  from Maxime Ripard: https://patchwork.freedesktop.org/series/36183/
+
+Paul Kocialkowski (10):
+  drm/sun4i: Disable frontend video channel before enabling a layer
+  drm/sun4i: Disable YUV channel when using the frontend and set
+    interlace
+  drm/sun4i: Don't pretend to handle ARGB8888 with the frontend
+  drm/sun4i: Explicitly list and check formats supported by the backend
+  drm/sun4i: Explicitly list and check formats supported by the frontend
+  drm/sun4i: Move and extend format-related helpers and tables
+  drm/sun4i: Add support for YUV formats through the frontend
+  drm/fourcc: Add definitions for Allwinner vendor and MB32 tiled format
+  drm/sun4i: Add a dedicated ioctl call for allocating tiled buffers
+  drm/sun4i: Add support for YUV-based formats in MB32 tiles
+
+ drivers/gpu/drm/sun4i/Makefile         |   1 +
+ drivers/gpu/drm/sun4i/sun4i_backend.c  | 148 +++++++++-----
+ drivers/gpu/drm/sun4i/sun4i_backend.h  |   6 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c      | 108 +++++++++-
+ drivers/gpu/drm/sun4i/sun4i_drv.h      |   6 +
+ drivers/gpu/drm/sun4i/sun4i_format.c   | 193 ++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_format.h   |  35 ++++
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 359 +++++++++++++++++++++++++++++----
+ drivers/gpu/drm/sun4i/sun4i_frontend.h |  50 ++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.c    |  58 ++++--
+ include/uapi/drm/drm_fourcc.h          |  10 +
+ include/uapi/drm/sun4i_drm.h           |  42 ++++
+ 12 files changed, 910 insertions(+), 106 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_format.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun4i_format.h
+ create mode 100644 include/uapi/drm/sun4i_drm.h
+
 -- 
 2.16.2
