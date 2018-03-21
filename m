@@ -1,72 +1,44 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Mar 2018 09:22:47 +0100
-Subject: [PATCH 1/5] bus: arm-cci: use asm unreachable
-In-Reply-To: <20180320233046.GL2743@n2100.armlinux.org.uk>
-References: <20180320230206.25289-1-stefan@agner.ch>
- <20180320230206.25289-2-stefan@agner.ch>
- <20180320233046.GL2743@n2100.armlinux.org.uk>
-Message-ID: <23ba28a09df84e723cd38bfc16dfca56@agner.ch>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 21 Mar 2018 10:30:22 +0200
+Subject: [PATCH] dmaengine: edma: Check the memory allocation for the memcpy
+ dma device
+Message-ID: <20180321083022.32616-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2018 00:30, Russell King - ARM Linux wrote:
-> On Wed, Mar 21, 2018 at 12:02:02AM +0100, Stefan Agner wrote:
->> Mixing asm and C code is not recommended in a naked function by
->> gcc and leads to an error when using clang:
->>   drivers/bus/arm-cci.c:2107:2: error: non-ASM statement in naked
->>   function is not supported
->>         unreachable();
->>         ^
->>
->> Instead of using the unreachable() macro use the assember variant
->> ASM_UNREACHABLE.  This will no longer emit __builtin_unreachable(),
->> but since the function is naked and its return type is void it seems
->> not to have aversive effects.
-> 
-> I think that unreachable() there is rather silly - this function
-> *does* return, and the comments say as much.  Just delete the silly
-> "unreachable()", there's no need to put an ASM_UNREACHABLE in there.
-> 
-> The function is not declared as not returning, and nothing in this
-> file uses it anyway - it's called from the mcpm code, which also
-> _does_ expect this function to return (if it doesn't, then we're
-> basically saying the CPU that called it is dead.)
-> 
+If the allocation fails then disable the memcpy support.
 
-Hm, that makes sense. Will just drop unreachable() in the next revision.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ drivers/dma/edma.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Thanks for reviewing!
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 5b197473106b..519e69e81fca 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -1899,6 +1899,11 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+ 
+ 	if (memcpy_channels) {
+ 		m_ddev = devm_kzalloc(ecc->dev, sizeof(*m_ddev), GFP_KERNEL);
++		if (!m_ddev) {
++			dev_warn(ecc->dev, "memcpy is disabled due to OoM\n");
++			memcpy_channels = NULL;
++			goto ch_setup;
++		}
+ 		ecc->dma_memcpy = m_ddev;
+ 
+ 		dma_cap_zero(m_ddev->cap_mask);
+@@ -1926,6 +1931,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
+ 		dev_info(ecc->dev, "memcpy is disabled\n");
+ 	}
+ 
++ch_setup:
+ 	for (i = 0; i < ecc->num_channels; i++) {
+ 		struct edma_chan *echan = &ecc->slave_chans[i];
+ 		echan->ch_num = EDMA_CTLR_CHAN(ecc->id, i);
+-- 
+Peter
 
---
-Stefan
-
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  drivers/bus/arm-cci.c | 3 +--
->>  1 file changed, 1 insertion(+), 2 deletions(-)
->>
->> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
->> index 5426c04fe24b..ee9da86fec47 100644
->> --- a/drivers/bus/arm-cci.c
->> +++ b/drivers/bus/arm-cci.c
->> @@ -2084,6 +2084,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
->>
->>  "	mov	r0, #0 \n"
->>  "	bx	lr \n"
->> +	ASM_UNREACHABLE
->>
->>  "	.align	2 \n"
->>  "5:	.word	cpu_port - . \n"
->> @@ -2103,8 +2104,6 @@ asmlinkage void __naked cci_enable_port_for_self(void)
->>  	[sizeof_struct_cpu_port] "i" (sizeof(struct cpu_port)),
->>  	[sizeof_struct_ace_port] "i" (sizeof(struct cci_ace_port)),
->>  	[offsetof_port_phys] "i" (offsetof(struct cci_ace_port, phys)) );
->> -
->> -	unreachable();
->>  }
->>
->>  /**
->> --
->> 2.16.2
->>
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
