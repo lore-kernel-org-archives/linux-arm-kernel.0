@@ -1,27 +1,19 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 21 Mar 2018 17:23:09 +0100
-Subject: [PATCH] ARM: dts: at91: at91sam9g25: fix mux-mask pinctrl property
-In-Reply-To: <20180313152005.21132-1-nicolas.ferre@microchip.com>
-References: <20180313152005.21132-1-nicolas.ferre@microchip.com>
-Message-ID: <20180321162309.GI3417@piout.net>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 21 Mar 2018 11:23:18 -0500
+Subject: [PATCH 8/8] clk: davinci: kill davinci_clk_reset_assert/deassert()
+In-Reply-To: <20180321120807.18032-9-brgl@bgdev.pl>
+References: <20180321120807.18032-1-brgl@bgdev.pl>
+ <20180321120807.18032-9-brgl@bgdev.pl>
+Message-ID: <eabfd878-bae9-f373-5f97-ab77519aef05@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/2018 at 16:20:05 +0100, Nicolas Ferre wrote:
-> There are only 19 PIOB pins having primary names PB0-PB18. Not all of them
-> have a 'C' function. So the pinctrl property mask ends up being the same as the
-> other SoC of the at91sam9x5 series.
+On 03/21/2018 07:08 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Reported-by: Marek Sieranski <marek.sieranski@microchip.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: <stable@vger.kernel.org> # v3.8+
+> This code is no longer used. Remove it.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  arch/arm/boot/dts/at91sam9g25.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-Applied, thanks.
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Reviewed-by: David Lechner <david@lechnology.com>
