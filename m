@@ -1,67 +1,63 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 21 Mar 2018 19:50:20 +0800
-Subject: [usb-next PATCH] usb: xhci: skip phys initialization of shared hcd
-In-Reply-To: <ae71fdae-43aa-9df3-3f81-8a92460d61b9@ti.com>
-References: <1ece0d5508a00bca67d16e64310a071646b59c7d.1521612280.git.chunfeng.yun@mediatek.com>
- <ae71fdae-43aa-9df3-3f81-8a92460d61b9@ti.com>
-Message-ID: <1521633020.3717.128.camel@mhfsdcap03>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Mar 2018 11:54:49 +0000
+Subject: [PATCH] arm64/sve: Document firmware support requirements in Kconfig
+Message-ID: <1521633289-10504-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Use of SVE by EL2 and below requires explicit support in the
+firmware.  There is no means to hide the presence of SVE from EL2,
+so a kernel configured with CONFIG_ARM64_SVE=y will typically not
+work correctly on SVE capable hardware unless the firmware does
+include the appropriate support.
 
-On Wed, 2018-03-21 at 11:05 +0200, Roger Quadros wrote:
-> Hi Chunfeng,
-> 
-> On 21/03/18 08:12, Chunfeng Yun wrote:
-> > The phys has already been initialized when add primary hcd,
-> > including usb2 phys and usb3 phys also if exist, so needn't
-> > re-parse "phys" property again.
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/usb/host/xhci-mtk.c  | 1 +
-> >  drivers/usb/host/xhci-plat.c | 1 +
-> >  2 files changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> > index 7334da9..6bb23fb 100644
-> > --- a/drivers/usb/host/xhci-mtk.c
-> > +++ b/drivers/usb/host/xhci-mtk.c
-> > @@ -554,6 +554,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
-> >  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
-> >  		xhci->shared_hcd->can_do_streams = 1;
-> >  
-> > +	xhci->shared_hcd->skip_phy_initialization = 1;
-> >  	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
-> >  	if (ret)
-> >  		goto dealloc_usb2_hcd;
-> > diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> > index 6700e5e..65a4294 100644
-> > --- a/drivers/usb/host/xhci-plat.c
-> > +++ b/drivers/usb/host/xhci-plat.c
-> > @@ -294,6 +294,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
-> >  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
-> >  		xhci->shared_hcd->can_do_streams = 1;
-> >  
-> > +	xhci->shared_hcd->skip_phy_initialization = 1;
-> 
-> I think this is unnecessary.
-> There aren't separate PHYs for the primary and shared HCDs right?
-Yes, the primary and shared HCDs will get the same PHYs provided by
-"phys" property.
+This is not expected to pose a problem in the wild, since platform
+integrators are responsible for ensuring that they ship up-to-date
+firmware to support their hardware.  However, developers may hit
+the issue when using mismatched compoments.
 
-> 
-> Also how can you be sure that phy_init() has been done for all platform HCD users?
-Here I assume that "phys" and "usb-phy" properties are not used at the
-same time. There are two cases:
-1. Using "usb-phy": no "phys" to be got by shared HCD.
-2. Using "phys": the primary HCD will get those phys, so shared HCD can
-skip them.
+In order to draw attention to the issue and how to solve it, this
+patch adds some Kconfig text giving a brief explanation and details
+of compatible firmware versions.
 
-> 
-> >  	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
-> >  	if (ret)
-> >  		goto dealloc_usb2_hcd;
-> > 
-> 
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+
+No functional change, but it would be good to get this explanatory text
+merged since developers who try Linux on SVE-enabled models may hit
+this problem, and fixed versions of ARM TF and the bootwrapper are now
+available.
+
+ arch/arm64/Kconfig | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7381eeb..e6fa47b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1104,6 +1104,23 @@ config ARM64_SVE
+ 
+ 	  To enable use of this extension on CPUs that implement it, say Y.
+ 
++	  Note that for architectural reasons, firmware _must_ implement SVE
++	  support when running on SVE capable hardware.  The required support
++	  is present in:
++
++	    * version 1.5 and later of the ARM Trusted Firmware
++	    * the AArch64 boot wrapper since commit 5e1261e08abf
++	      ("bootwrapper: SVE: Enable SVE for EL2 and below").
++
++	  For other firmware implementations, consult the firware documentation
++	  or vendor.
++
++	  If you need the kernel to boot on SVE-capable hardware with broken
++	  firmware, you may need to say N here until you get your firmware
++	  fixed.  Otherwise, you may experience firmware panics or lockups when
++	  booting the kernel.  If unsure and you are not observing these
++	  symptoms, you should assume that it is safe to say Y.
++
+ config ARM64_MODULE_CMODEL_LARGE
+ 	bool
+ 
+-- 
+2.1.4
