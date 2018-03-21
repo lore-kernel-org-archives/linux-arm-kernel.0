@@ -1,35 +1,27 @@
-From: swboyd@chromium.org (Stephen Boyd)
-Date: Wed, 21 Mar 2018 13:17:49 -0700
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 21 Mar 2018 22:30:00 +0200
 Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
  requested
-In-Reply-To: <20180321165848.89751-4-swboyd@chromium.org>
+In-Reply-To: <152166267662.91116.8188392814465278915@swboyd.mtv.corp.google.com>
 References: <20180321165848.89751-1-swboyd@chromium.org>
  <20180321165848.89751-4-swboyd@chromium.org>
-Message-ID: <152166346979.154352.7302935269984897659@swboyd.mtv.corp.google.com>
+ <1521655629.23017.84.camel@linux.intel.com>
+ <152166267662.91116.8188392814465278915@swboyd.mtv.corp.google.com>
+Message-ID: <1521664200.23017.90.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2018-03-21 09:58:48)
-> +       ret = device_property_read_u16_array(pctrl->dev, "gpios", NULL, 0);
-> +       if (ret > 0 && ret < max_gpios) {
-> +               u16 *tmp;
-> +
-> +               len = ret;
-> +               tmp = kmalloc_array(len, sizeof(tmp[0]), GFP_KERNEL);
-> +               if (!tmp)
-> +                       return -ENOMEM;
-> +
-> +               ret = device_property_read_u16_array(pctrl->dev, "gpios", tmp,
-> +                                                    len);
-> +               if (ret < 0) {
-> +                       dev_err(pctrl->dev, "could not read list of GPIOs\n");
-> +                       kfree(tmp);
-> +                       return ret;
-> +               }
-> +
-> +               bitmap_zero(chip->valid_mask, max_gpios);
-> +               for (i = 0; i < len; i++)
-> +                       set_bit(tmp[i], chip->valid_mask);
+On Wed, 2018-03-21 at 13:04 -0700, Stephen Boyd wrote:
+> Quoting Andy Shevchenko (2018-03-21 11:07:09)
+> > On Wed, 2018-03-21 at 09:58 -0700, Stephen Boyd wrote:
+> > > 
 
-This leaks tmp too.. I'll fix that in v4 and resend tomorrow if there
-aren't more comments.
+> Or ternary?
+> 
+>   return gpiochip_line_is_valid(chip, offset) ? 0 : -EINVAL;
+
+Fine with me!
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
