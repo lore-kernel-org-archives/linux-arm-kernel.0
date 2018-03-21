@@ -1,56 +1,51 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 21 Mar 2018 16:28:54 +0100
-Subject: [PATCH 00/10] drm/sun4i: Frontend YUV and MB32 tile modifier support
-Message-ID: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+Date: Wed, 21 Mar 2018 16:29:02 +0100
+Subject: [PATCH 08/10] drm/fourcc: Add definitions for Allwinner vendor and
+ MB32 tiled format
+In-Reply-To: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180321152904.22411-9-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces support for YUV formats in the sun4i DRM driver, through
-the frontend. In addition to regular YUV formats, a modifier for the
-Allwinner MB32 tiling format is introduced along with a dedicated ioctl
-for allocating buffers (through CMA) with the appropriate constraints.
+This introduces specific definitions for vendor Allwinner and its
+specific MB32 tiled format, an NV12-based format with 32x32 tiles.
 
-This ioctl must always be used when allocating buffers to be used with
-the MB32 tiling modifier, as dumb GEM buffer allocation is reserved for
-linear planes.
+This format is the default output format used by the VPU on most
+Allwinner platforms.
 
-This series is based on (and requires) the following series:
-* drm/sun4i: backend: Support interleaved YUV planes,
-  from Maxime Ripard: https://patchwork.freedesktop.org/series/39232/
-* drm/sun4i: Support the Display Engine frontend,
-  from Maxime Ripard: https://patchwork.freedesktop.org/series/35292/
-* drm/sun4i: Support more planes, zpos and plane-wide alpha,
-  from Maxime Ripard: https://patchwork.freedesktop.org/series/36183/
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ include/uapi/drm/drm_fourcc.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Paul Kocialkowski (10):
-  drm/sun4i: Disable frontend video channel before enabling a layer
-  drm/sun4i: Disable YUV channel when using the frontend and set
-    interlace
-  drm/sun4i: Don't pretend to handle ARGB8888 with the frontend
-  drm/sun4i: Explicitly list and check formats supported by the backend
-  drm/sun4i: Explicitly list and check formats supported by the frontend
-  drm/sun4i: Move and extend format-related helpers and tables
-  drm/sun4i: Add support for YUV formats through the frontend
-  drm/fourcc: Add definitions for Allwinner vendor and MB32 tiled format
-  drm/sun4i: Add a dedicated ioctl call for allocating tiled buffers
-  drm/sun4i: Add support for YUV-based formats in MB32 tiles
-
- drivers/gpu/drm/sun4i/Makefile         |   1 +
- drivers/gpu/drm/sun4i/sun4i_backend.c  | 148 +++++++++-----
- drivers/gpu/drm/sun4i/sun4i_backend.h  |   6 +-
- drivers/gpu/drm/sun4i/sun4i_drv.c      | 108 +++++++++-
- drivers/gpu/drm/sun4i/sun4i_drv.h      |   6 +
- drivers/gpu/drm/sun4i/sun4i_format.c   | 193 ++++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_format.h   |  35 ++++
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 359 +++++++++++++++++++++++++++++----
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  50 ++++-
- drivers/gpu/drm/sun4i/sun4i_layer.c    |  58 ++++--
- include/uapi/drm/drm_fourcc.h          |  10 +
- include/uapi/drm/sun4i_drm.h           |  42 ++++
- 12 files changed, 910 insertions(+), 106 deletions(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_format.c
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_format.h
- create mode 100644 include/uapi/drm/sun4i_drm.h
-
+diff --git a/include/uapi/drm/drm_fourcc.h b/include/uapi/drm/drm_fourcc.h
+index e04613d30a13..1b7ef9102582 100644
+--- a/include/uapi/drm/drm_fourcc.h
++++ b/include/uapi/drm/drm_fourcc.h
+@@ -183,6 +183,7 @@ extern "C" {
+ #define DRM_FORMAT_MOD_VENDOR_QCOM    0x05
+ #define DRM_FORMAT_MOD_VENDOR_VIVANTE 0x06
+ #define DRM_FORMAT_MOD_VENDOR_BROADCOM 0x07
++#define DRM_FORMAT_MOD_VENDOR_ALLWINNER 0x08
+ /* add more to the end as needed */
+ 
+ #define DRM_FORMAT_RESERVED	      ((1ULL << 56) - 1)
+@@ -405,6 +406,15 @@ extern "C" {
+  */
+ #define DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED fourcc_mod_code(BROADCOM, 1)
+ 
++/*
++ * Allwinner "MB32" tiled format
++ *
++ * This is the primary layout coming out of the VPU, where pixels are tiled
++ * 32x32.
++ */
++#define DRM_FORMAT_MOD_ALLWINNER_MB32_TILED fourcc_mod_code(ALLWINNER, 1)
++
++
+ #if defined(__cplusplus)
+ }
+ #endif
 -- 
 2.16.2
