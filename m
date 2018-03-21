@@ -1,48 +1,32 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Wed, 21 Mar 2018 13:41:41 -0500
-Subject: WL1837-st on imx6 request_firmware failed with 4.16-RC6
-In-Reply-To: <20180321162749.ammvnmamwknwjonr@tarshish>
-References: <CAHCN7xKQxF34LSy7TZUQ2yCo9KdrKppOvamgna-CHJD_kt=80w@mail.gmail.com>
- <20180321162749.ammvnmamwknwjonr@tarshish>
-Message-ID: <CAHCN7xKN=b5LbsS0ASEO++nLrQ8OQ37znKU9pwifZruu577EDA@mail.gmail.com>
+From: swboyd@chromium.org (Stephen Boyd)
+Date: Wed, 21 Mar 2018 11:48:11 -0700
+Subject: [PATCH] regulator: qcom_smd: Drop regulator/{machine,
+ of_regulator} includes
+Message-ID: <20180321184811.120996-1-swboyd@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 11:27 AM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Adam,
->
-> On Wed, Mar 21, 2018 at 10:31:55AM -0500, Adam Ford wrote:
->> I have an i.MX6 board and I am trying to get Bluetooth operational on
->> 4.16-RC6 using the default imx_v6_v7_defconfig
->>
->> I have my device tree configured as follows:
->>
->> &uart2 {
->>   pinctrl-names = "default";
->>   pinctrl-0 = <&pinctrl_uart2>;
->>   uart-has-rtscts;
->>   status = "okay";
->>
+These seem to be leftovers from previous developments of the driver but
+they never got removed. Dropping them still allows the code to compile
+so everything must be fine.
 
-[snip]
->
-> Is your filesystem mounted at this point? Do you use initramfs?
->
-> baruch
+Signed-off-by: Stephen Boyd <swboyd@chromium.org>
+---
+ drivers/regulator/qcom_smd-regulator.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-That was it.  Thanks.  I feel stupid.  :-)
-
->
->> I was hoping someone might have some insight on what might be the issue.
->>
->> Thanks
->>
->> adam
->>
-
-[snip]
-
-> --
->      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
+index 940fe1b78411..0c6e681c7d89 100644
+--- a/drivers/regulator/qcom_smd-regulator.c
++++ b/drivers/regulator/qcom_smd-regulator.c
+@@ -17,8 +17,6 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/driver.h>
+-#include <linux/regulator/machine.h>
+-#include <linux/regulator/of_regulator.h>
+ #include <linux/soc/qcom/smd-rpm.h>
+ 
+ struct qcom_rpm_reg {
+-- 
+Sent by a computer through tubes
