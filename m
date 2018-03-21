@@ -1,66 +1,59 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 21 Mar 2018 20:04:29 +0800
-Subject: Failed to boot ARM64 boards for recent linux-next
-In-Reply-To: <de4be2ef-ee2c-60f8-a08e-11e378e55343@arm.com>
-References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
- <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
- <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
- <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
- <5AB0DEB2.4000803@rock-chips.com>
- <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
- <cbc89d68-ba41-1f6a-4ab2-4c9647b48f75@huawei.com>
- <d18d6f27-7270-d2d7-58b9-3bf16ffe6b0a@arm.com>
- <ff6cd434-2227-12a6-b3b9-325da78a7fa9@huawei.com>
- <2aed10a0-ad3d-d9fc-7b6e-3b6877bff0be@arm.com>
- <13507742-ddb8-0b43-cd09-14a57ec2a07a@rock-chips.com>
- <5AB1F763.3040409@rock-chips.com>
- <680aba8d-4117-227b-d5a1-ad7121d2565f@arm.com>
- <5AB22377.1000404@rock-chips.com>
- <de4be2ef-ee2c-60f8-a08e-11e378e55343@arm.com>
-Message-ID: <5AB24A4D.6020503@rock-chips.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 21 Mar 2018 13:07:59 +0100
+Subject: [PATCH 0/8] ARM: davinci: complete the conversion to using the reset
+ framework
+Message-ID: <20180321120807.18032-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On 03/21/2018 05:33 PM, Marc Zyngier wrote:
->>>>> >>>>@Jeffy
->>>>> >>>>
->>>>> >>>>Could you help test Marc's latest patch on your RK3399 kevin/Gru or
->>>>> >>>>whatever Chromebook?
->>>> >>>tested on my chromebook kevin, it works with that patch.
->>> >>
->>> >>This is very odd. It completely fails on mine, which is aannoying.
->>> >>Do you have any special firmware? Or the stock firmware?
->>> >>
->> >
->> >hmmm, my kevin's firmware is official:
->> >localhost / # cat /var/log/bios_info.txt
->> >version              | Google_Kevin.8785.241.0
->> >ro bios version      | Google_Kevin.8785.241.0
-> (booting into ChromeOS) Definitely not what I have on mine:
-> 8785.220.0 as the runtime version, and 8785.94.7 as the RO one.
->
-> This is a retail machine, bought in November. So what you have cannot be
-> the stock firmware.
->
-> What changes related to the GIC have been applied to this FW?
+This series converts the only user of the handcoded, mach-specific reset
+routines in the davinci platform to using the reset framework.
 
+Patch 1 modifies the way lookup entries are registered with the reset
+framework.
 
-i tried to flash my firmware back to 8785.220.0, and still works...:
-localhost tmp # head -2 /var/log/bios_info.txt
-version              | Google_Kevin.8785.220.0
-ro bios version      | Google_Kevin.8785.220.0
+Patches 2-4 add necessary lookups/DT-properties.
 
+Patches 5-7 convert the davinci-rproc driver to the reset framework.
 
-dmesg:
-https://emailattachment.net/sites/default/files/files/public/dmesg.dmesg
+Patch 8 removes now dead code.
 
-firmware 8785.220.0:
-https://emailattachment.net/sites/default/files/files/public/image.dev.bin
+Philipp: it turned out that it's indeed better to use the reset
+controller's device name for the entry lookup.
 
->
-> Thanks,
->
-> 	M.
-> -- Jazz is not dead. It just smells funny...
+Tested both in DT and legacy modes by booting the examples from
+ti-ipc-rtos recipe in meta-ti.
+
+This series applies on top of David Lechner's common-clk-v9 branch[1]
+with Philipp Zabel's reset/next branch[2] pulled in.
+
+It can be found in my github tree as well[3].
+
+[1] git://github.com/dlech/ev3dev-kernel.git common-clk-v9
+[2] git://git.pengutronix.de/git/pza/linux reset/next
+[3] git at github.com:brgl/linux.git topic/davinci-reset
+
+Bartosz Golaszewski (8):
+  reset: modify the way reset lookup works for board files
+  ARM: davinci: dts: make psc0 a reset provider
+  ARM: davinci: dts: add a reset control to the dsp node
+  clk: davinci: add a reset lookup table for psc0
+  remoteproc: da8xx: add the missing checke for clk_enable()
+  remoteproc: da8xx: prepare and unprepare the clock where needed
+  remoteproc: da8xx: use the reset framework
+  clk: davinci: kill davinci_clk_reset_assert/deassert()
+
+ arch/arm/boot/dts/da850.dtsi               |  2 ++
+ arch/arm/mach-davinci/include/mach/clock.h | 21 ----------------
+ drivers/clk/davinci/psc-da850.c            |  8 ++++++
+ drivers/clk/davinci/psc.c                  | 19 +-------------
+ drivers/remoteproc/da8xx_remoteproc.c      | 40 ++++++++++++++++++++++++------
+ drivers/reset/core.c                       | 33 +++++++++++++++++++++---
+ include/linux/reset-controller.h           |  8 +++---
+ 7 files changed, 78 insertions(+), 53 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+
+-- 
+2.16.1
