@@ -1,95 +1,254 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 21 Mar 2018 08:34:58 +0800
-Subject: Failed to boot ARM64 boards for recent linux-next
-In-Reply-To: <2aed10a0-ad3d-d9fc-7b6e-3b6877bff0be@arm.com>
-References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
- <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
- <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
- <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
- <5AB0DEB2.4000803@rock-chips.com>
- <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
- <cbc89d68-ba41-1f6a-4ab2-4c9647b48f75@huawei.com>
- <d18d6f27-7270-d2d7-58b9-3bf16ffe6b0a@arm.com>
- <ff6cd434-2227-12a6-b3b9-325da78a7fa9@huawei.com>
- <2aed10a0-ad3d-d9fc-7b6e-3b6877bff0be@arm.com>
-Message-ID: <13507742-ddb8-0b43-cd09-14a57ec2a07a@rock-chips.com>
+From: shunyong.yang@hxt-semitech.com (Yang, Shunyong)
+Date: Wed, 21 Mar 2018 01:20:07 +0000
+Subject: =?utf-8?B?UmU6IFvmraTpgq7ku7blj6/og73lrZjlnKjpo47pmaldICBSZTogW1BBVENI?=
+ =?utf-8?B?IHYyXSBLVk06IGFybS9hcm02NDogdmdpYzogRGlzYWxsb3cgQWN0aXZlK1Bl?=
+ =?utf-8?Q?nding_for_level_interrupts?=
+In-Reply-To: <4be5cde8-ce15-a6e5-385d-b30288f51e5c@redhat.com>
+References: <20180316143015.32055-1-marc.zyngier@arm.com>
+ <4be5cde8-ce15-a6e5-385d-b30288f51e5c@redhat.com>
+Message-ID: <1521595206.3326.8.camel@hxt-semitech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
+Hi, Marc,
 
-On 2018/3/21 1:00, Marc Zyngier wrote:
-> On 20/03/18 16:52, John Garry wrote:
->> On 20/03/2018 16:06, Marc Zyngier wrote:
->>> Hi John,
->>>
->>> On 20/03/18 15:52, John Garry wrote:
->>>> On 20/03/2018 13:34, Marc Zyngier wrote:
->>>>> On 20/03/18 10:13, JeffyChen wrote:
->>>>>> Hi Shawn,
->>>>>>
->>>>>> On 03/20/2018 05:39 PM, Shawn Lin wrote:
->>>>>>>
->>>>>>>
->>>>>>> Also another patch warns a lot when booting the kernel. Is there
->>>>>>> anything else I could do to let it go? Seems I am using broken
->>>>>>> dts for requesting IRQ_TYPE_NONE there?
->>>>>>
->>>>>> could be:
->>>>>> https://github.com/torvalds/linux/blob/master/drivers/irqchip/irq-gic-v3.c#L1145
->>>>>>
->>>>>> 		struct irq_fwspec ppi_fwspec = {
->>>>>> 			.fwnode		= gic_data.fwnode,
->>>>>> 			.param_count	= 3,
->>>>>> 			.param		= {
->>>>>> 				[0]	= 1,
->>>>>> 				[1]	= i,
->>>>>> 				[2]	= IRQ_TYPE_NONE, <--
->>>>>> 			},
->>>>>> 		};
->>>>>>
->>>>>> 		irq = irq_create_fwspec_mapping(&ppi_fwspec);
->>>>>
->>>>> Probably is. Caught at my own game, fun! ;-)
->>>>>
->>>>> Turning that NONE into LEVEL will work, as there is no known PPIs
->>>>> configured as edge (specially in a partitioned system), but the general
->>>>> case isn't pretty. I'll queue a workaround for now, and will look at
->>>>> addressing the more general issue.
->>>>>
->>>>
->>>> JFYI, reverting the original patch mentioned by Shawn resolved the boot
->>>> hang I was seeing on my Huawei D03. My D05 was fine without the revert.
->>>
->>> I guess your D05 doesn't set SCR_EL3.FIQ, meaning that no Group-0
->>> interrupts can reach the firmware. Hopefully it doesn't need them.
->>>
->>> Would you mind testing the last patch I posted earlier today[1]?
->>>
->>
->> Hi Marc,
->>
->> Yes, [1] allows my D03 to boot. D05 is still ok.
->>
->> If you're going to send this same patch to the list then feel free to add:
->> Tested-by: John Garry <john.garry@huawei.com>
+On Tue, 2018-03-20 at 15:25 +0100, Auger Eric wrote:
+> Hi Marc,
 > 
-> OK, thanks for that. There is still a nit on my Chromebook, and I cannot
-> yet explain why.
-
-It works fine now with your updated patch.
-
-For rk3399-sapphire-excavator board,
-Tested-by: Shawn Lin <shawn.lin@rock-chips.com>
-
-
-@Jeffy
-
-Could you help test Marc's latest patch on your RK3399 kevin/Gru or
-whatever Chromebook?
-
+> On 16/03/18 15:30, Marc Zyngier wrote:
+> > 
+> > It was recently reported that VFIO mediated devices, and anything
+> > that VFIO exposes as level interrupts, do no strictly follow the
+> > expected logic of such interrupts as it only lowers the input
+> > line when the guest has EOId the interrupt at the GIC level, rather
+> > than when it Acked the interrupt at the device level.
+> > 
+> > THe GIC's Active+Pending state is fundamentally incompatible with
+> > this behaviour, as it prevents KVM from observing the EOI, and in
+> > turn results in VFIO never dropping the line. This results in an
+> > interrupt storm in the guest, which it really never expected.
+> > 
+> > As we cannot really change VFIO to follow the strict rules of level
+> > signalling, let's forbid the A+P state altogether, as it is in the
+> > end only an optimization. It ensures that we will transition via
+> > an invalid state, which we can use to notify VFIO of the EOI.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Tested-by: Eric Auger <eric.auger@redhat.com>
+> with mdev tty device
 > 
-> Digging.
+> Thanks
 > 
-> 	M.
-> 
+> Eric
+
+Tested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+
+Thanks.
+Shunyong.
+
+> > 
+> > ---
+> > - From v1:
+> > ? * Only clear the latch when going via an invalid state
+> > 
+> > ?virt/kvm/arm/vgic/vgic-v2.c | 54 +++++++++++++++++++++++++------
+> > --------------
+> > ?virt/kvm/arm/vgic/vgic-v3.c | 54 +++++++++++++++++++++++++------
+> > --------------
+> > ?2 files changed, 60 insertions(+), 48 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-
+> > v2.c
+> > index 29556f71b691..8427586760fc 100644
+> > --- a/virt/kvm/arm/vgic/vgic-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> > @@ -105,12 +105,9 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu
+> > *vcpu)
+> > ?
+> > ?		/*
+> > ?		?* Clear soft pending state when level irqs have
+> > been acked.
+> > -		?* Always regenerate the pending state.
+> > ?		?*/
+> > -		if (irq->config == VGIC_CONFIG_LEVEL) {
+> > -			if (!(val & GICH_LR_PENDING_BIT))
+> > -				irq->pending_latch = false;
+> > -		}
+> > +		if (irq->config == VGIC_CONFIG_LEVEL && !(val &
+> > GICH_LR_STATE))
+> > +			irq->pending_latch = false;
+> > ?
+> > ?		/*
+> > ?		?* Level-triggered mapped IRQs are special because
+> > we only
+> > @@ -153,8 +150,35 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu
+> > *vcpu)
+> > ?void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq
+> > *irq, int lr)
+> > ?{
+> > ?	u32 val = irq->intid;
+> > +	bool allow_pending = true;
+> > +
+> > +	if (irq->active)
+> > +		val |= GICH_LR_ACTIVE_BIT;
+> > +
+> > +	if (irq->hw) {
+> > +		val |= GICH_LR_HW;
+> > +		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+> > +		/*
+> > +		?* Never set pending+active on a HW interrupt, as
+> > the
+> > +		?* pending state is kept at the physical
+> > distributor
+> > +		?* level.
+> > +		?*/
+> > +		if (irq->active)
+> > +			allow_pending = false;
+> > +	} else {
+> > +		if (irq->config == VGIC_CONFIG_LEVEL) {
+> > +			val |= GICH_LR_EOI;
+> > ?
+> > -	if (irq_is_pending(irq)) {
+> > +			/*
+> > +			?* Software resampling doesn't work very
+> > well
+> > +			?* if we allow P+A, so let's not do that.
+> > +			?*/
+> > +			if (irq->active)
+> > +				allow_pending = false;
+> > +		}
+> > +	}
+> > +
+> > +	if (allow_pending && irq_is_pending(irq)) {
+> > ?		val |= GICH_LR_PENDING_BIT;
+> > ?
+> > ?		if (irq->config == VGIC_CONFIG_EDGE)
+> > @@ -171,24 +195,6 @@ void vgic_v2_populate_lr(struct kvm_vcpu
+> > *vcpu, struct vgic_irq *irq, int lr)
+> > ?		}
+> > ?	}
+> > ?
+> > -	if (irq->active)
+> > -		val |= GICH_LR_ACTIVE_BIT;
+> > -
+> > -	if (irq->hw) {
+> > -		val |= GICH_LR_HW;
+> > -		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+> > -		/*
+> > -		?* Never set pending+active on a HW interrupt, as
+> > the
+> > -		?* pending state is kept at the physical
+> > distributor
+> > -		?* level.
+> > -		?*/
+> > -		if (irq->active && irq_is_pending(irq))
+> > -			val &= ~GICH_LR_PENDING_BIT;
+> > -	} else {
+> > -		if (irq->config == VGIC_CONFIG_LEVEL)
+> > -			val |= GICH_LR_EOI;
+> > -	}
+> > -
+> > ?	/*
+> > ?	?* Level-triggered mapped IRQs are special because we only
+> > observe
+> > ?	?* rising edges as input to the VGIC.??We therefore lower
+> > the line
+> > diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-
+> > v3.c
+> > index 0ff2006f3781..dd984f726805 100644
+> > --- a/virt/kvm/arm/vgic/vgic-v3.c
+> > +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> > @@ -96,12 +96,9 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu
+> > *vcpu)
+> > ?
+> > ?		/*
+> > ?		?* Clear soft pending state when level irqs have
+> > been acked.
+> > -		?* Always regenerate the pending state.
+> > ?		?*/
+> > -		if (irq->config == VGIC_CONFIG_LEVEL) {
+> > -			if (!(val & ICH_LR_PENDING_BIT))
+> > -				irq->pending_latch = false;
+> > -		}
+> > +		if (irq->config == VGIC_CONFIG_LEVEL && !(val &
+> > ICH_LR_STATE))
+> > +			irq->pending_latch = false;
+> > ?
+> > ?		/*
+> > ?		?* Level-triggered mapped IRQs are special because
+> > we only
+> > @@ -135,8 +132,35 @@ void vgic_v3_populate_lr(struct kvm_vcpu
+> > *vcpu, struct vgic_irq *irq, int lr)
+> > ?{
+> > ?	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+> > ?	u64 val = irq->intid;
+> > +	bool allow_pending = true;
+> > +
+> > +	if (irq->active)
+> > +		val |= ICH_LR_ACTIVE_BIT;
+> > +
+> > +	if (irq->hw) {
+> > +		val |= ICH_LR_HW;
+> > +		val |= ((u64)irq->hwintid) <<
+> > ICH_LR_PHYS_ID_SHIFT;
+> > +		/*
+> > +		?* Never set pending+active on a HW interrupt, as
+> > the
+> > +		?* pending state is kept at the physical
+> > distributor
+> > +		?* level.
+> > +		?*/
+> > +		if (irq->active)
+> > +			allow_pending = false;
+> > +	} else {
+> > +		if (irq->config == VGIC_CONFIG_LEVEL) {
+> > +			val |= ICH_LR_EOI;
+> > ?
+> > -	if (irq_is_pending(irq)) {
+> > +			/*
+> > +			?* Software resampling doesn't work very
+> > well
+> > +			?* if we allow P+A, so let's not do that.
+> > +			?*/
+> > +			if (irq->active)
+> > +				allow_pending = false;
+> > +		}
+> > +	}
+> > +
+> > +	if (allow_pending && irq_is_pending(irq)) {
+> > ?		val |= ICH_LR_PENDING_BIT;
+> > ?
+> > ?		if (irq->config == VGIC_CONFIG_EDGE)
+> > @@ -154,24 +178,6 @@ void vgic_v3_populate_lr(struct kvm_vcpu
+> > *vcpu, struct vgic_irq *irq, int lr)
+> > ?		}
+> > ?	}
+> > ?
+> > -	if (irq->active)
+> > -		val |= ICH_LR_ACTIVE_BIT;
+> > -
+> > -	if (irq->hw) {
+> > -		val |= ICH_LR_HW;
+> > -		val |= ((u64)irq->hwintid) <<
+> > ICH_LR_PHYS_ID_SHIFT;
+> > -		/*
+> > -		?* Never set pending+active on a HW interrupt, as
+> > the
+> > -		?* pending state is kept at the physical
+> > distributor
+> > -		?* level.
+> > -		?*/
+> > -		if (irq->active && irq_is_pending(irq))
+> > -			val &= ~ICH_LR_PENDING_BIT;
+> > -	} else {
+> > -		if (irq->config == VGIC_CONFIG_LEVEL)
+> > -			val |= ICH_LR_EOI;
+> > -	}
+> > -
+> > ?	/*
+> > ?	?* Level-triggered mapped IRQs are special because we only
+> > observe
+> > ?	?* rising edges as input to the VGIC.??We therefore lower
+> > the line
+> > 
