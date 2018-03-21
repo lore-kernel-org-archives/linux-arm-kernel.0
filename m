@@ -1,78 +1,68 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 21 Mar 2018 11:56:55 -0400 (EDT)
-Subject: [PATCH v4 00/17] netdev: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180321.115655.108053425798020503.davem@davemloft.net>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 21 Mar 2018 11:01:54 -0500
+Subject: [PATCH 4/8] clk: davinci: add a reset lookup table for psc0
+In-Reply-To: <20180321120807.18032-5-brgl@bgdev.pl>
+References: <20180321120807.18032-1-brgl@bgdev.pl>
+ <20180321120807.18032-5-brgl@bgdev.pl>
+Message-ID: <4b985ed2-0db0-b4ad-8a9f-b8804e6d4db4@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sinan Kaya <okaya@codeaurora.org>
-Date: Mon, 19 Mar 2018 22:42:15 -0400
-
-> Code includes wmb() followed by writel() in multiple places. writel()
-> already has a barrier on some architectures like arm64.
+On 03/21/2018 07:08 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> This ends up CPU observing two barriers back to back before executing the
-> register write.
+> In order to be able to use the reset framework in legacy boot mode as
+> well, add the reset lookup table to the psc driver for da850 variant.
 > 
-> Since code already has an explicit barrier call, changing writel() to
-> writel_relaxed().
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>   drivers/clk/davinci/psc-da850.c | 8 ++++++++
+>   drivers/clk/davinci/psc.c       | 1 +
+>   2 files changed, 9 insertions(+)
 > 
-> I did a regex search for wmb() followed by writel() in each drivers
-> directory.
-> I scrubbed the ones I care about in this series.
+> diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
+> index ccc7eb17bf3a..395db4b2c0ee 100644
+> --- a/drivers/clk/davinci/psc-da850.c
+> +++ b/drivers/clk/davinci/psc-da850.c
+> @@ -6,6 +6,7 @@
+>    */
+>   
+>   #include <linux/clk-provider.h>
+> +#include <linux/reset-controller.h>
+>   #include <linux/clk.h>
+>   #include <linux/clkdev.h>
+>   #include <linux/init.h>
+> @@ -66,8 +67,15 @@ LPSC_CLKDEV3(ecap_clkdev,	"fck",	"ecap.0",
+>   				"fck",	"ecap.1",
+>   				"fck",	"ecap.2");
+>   
+> +static struct reset_control_lookup da850_psc0_reset_lookup_table[] = {
+> +	RESET_LOOKUP("davinci-rproc.0", NULL, 15),
+> +};
+> +
+>   static int da850_psc0_init(struct device *dev, void __iomem *base)
+>   {
+> +	reset_controller_add_lookup("da850-psc0",
+> +				    da850_psc0_reset_lookup_table,
+> +				    ARRAY_SIZE(da850_psc0_reset_lookup_table));
+
+Could there be a race condition here since you are adding the lookup *before*
+you are adding the actual provider? It seems like reset_controller_add_lookup()
+should be after davinci_psc_register_clocks().
+
+>   	return davinci_psc_register_clocks(dev, da850_psc0_info, 16, base);
+>   }
+>   
+> diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
+> index 3b0e59dfbdd7..063df62381ea 100644
+> --- a/drivers/clk/davinci/psc.c
+> +++ b/drivers/clk/davinci/psc.c
+> @@ -425,6 +425,7 @@ __davinci_psc_register_clocks(struct device *dev,
+>   
+>   	psc->rcdev.ops = &davinci_psc_reset_ops;
+>   	psc->rcdev.owner = THIS_MODULE;
+> +	psc->rcdev.dev = dev;
+>   	psc->rcdev.of_node = dev->of_node;
+>   	psc->rcdev.of_reset_n_cells = 1;
+>   	psc->rcdev.of_xlate = davinci_psc_reset_of_xlate;
 > 
-> I considered "ease of change", "popular usage" and "performance critical
-> path" as the determining criteria for my filtering.
-
-I agree that for performance sensitive operations, specifically writing
-doorbell registers in the hot paths or RX and TX packet processing, this
-is a good change.
-
-However, in configuration paths and whatnot, it is much less urgent and
-useful.
-
-Therefore I think it would work better if you concentrated solely on
-hot code path cases.
-
-You can, on a driver by driver basis, submit the other transformations
-in the slow paths, and let the driver maintainers decide whether to
-take those on or not.
-
-Also, please stick exactly to the case where we have:
-
-	wmb/mb/etc.
-	writel()
-
-Because I see some changes where we have:
-
-	writel()
-
-	barrier()
-
-	writel()
-
-for exmaple, and you are turning that second writel() into a relaxed
-on as well.  The above is using a compile barrier, not a memory
-barrier, so effectively it is two writel()'s in sequence which is
-not what this patch set is about.
-
-If anything, that compile barrier() is superfluous and could be
-removed.  But that is also a separate change from what this patch
-series is doing here.
-
-Finally, it makes it that much easier if we can see the preceeding
-memory barrier in the context of the patch that adjusts the writel
-into a writel_relaxed.
-
-In one case, a macro DOORBELL() is changed to use writel().  This
-makes it so that the patch reviewer has to scan over the entire
-driver in question to see exactly how DOORBELL() is used and whether
-it fits the criteria for the writel_relaxed() transformation.
-
-I would suggest that you adjust the name of the macro in a situation
-like this, f.e. to DOORBELL_RELAXED().
-
-Thank you.
