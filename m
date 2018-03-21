@@ -1,96 +1,157 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Mar 2018 15:09:58 +0100
-Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
-In-Reply-To: <124e16c9-b8ca-9c7e-ade5-b033eed76e14@arm.com>
-References: <20180320230206.25289-1-stefan@agner.ch>
- <20180320230206.25289-4-stefan@agner.ch>
- <124e16c9-b8ca-9c7e-ade5-b033eed76e14@arm.com>
-Message-ID: <302cfd1a4324e064cd4f189e4e0ffc21@agner.ch>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 21 Mar 2018 09:20:10 -0500
+Subject: [PATCHv7 1/3] dt-bindings: documentation: add clock bindings
+ information for Stratix10
+Message-ID: <1521642012-9770-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2018 13:13, Robin Murphy wrote:
-> On 20/03/18 23:02, Stefan Agner wrote:
->> As documented in GCC naked functions should only use Basic asm
->> syntax. The Extended asm or mixture of Basic asm and "C" code is
->> not guaranteed. Currently this works because it was hard coded
->> to follow and check GCC behavior for arguments and register
->> placement.
->>
->> Furthermore with clang using parameters in Extended asm in a
->> naked function is not supported:
->>    arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
->>            references not allowed in naked functions
->>                  : "r" (type), "r" (arg1), "r" (arg2)
->>                         ^
->>
->> Use a regular function to be more portable. This aligns also with
->> the other smc call implementations e.g. in qcom_scm-32.c and
->> bcm_kona_smc.c.
->>
->> Additionally also make sure all callee-saved registers get saved
->> as it has been done before.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>   arch/arm/firmware/trusted_foundations.c | 12 +++++++-----
->>   1 file changed, 7 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
->> index 3fb1b5a1dce9..426d732e6591 100644
->> --- a/arch/arm/firmware/trusted_foundations.c
->> +++ b/arch/arm/firmware/trusted_foundations.c
->> @@ -31,21 +31,23 @@
->>     static unsigned long cpu_boot_addr;
->>   -static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
->> +static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
->>   {
->> +	register u32 r0 asm("r0") = type;
->> +	register u32 r1 asm("r1") = arg1;
->> +	register u32 r2 asm("r2") = arg2;
->> +
->>   	asm volatile(
->>   		".arch_extension	sec\n\t"
->> -		"stmfd	sp!, {r4 - r11, lr}\n\t"
->>   		__asmeq("%0", "r0")
->>   		__asmeq("%1", "r1")
->>   		__asmeq("%2", "r2")
->>   		"mov	r3, #0\n\t"
->>   		"mov	r4, #0\n\t"
->>   		"smc	#0\n\t"
->> -		"ldmfd	sp!, {r4 - r11, pc}"
->>   		:
->> -		: "r" (type), "r" (arg1), "r" (arg2)
->> -		: "memory");
->> +		: "r" (r0), "r" (r1), "r" (r2)
->> +		: "memory", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10");
-> 
-> I may be missing a subtlety, but it looks like we no longer have a
-> guarantee that r11 will be caller-saved as it was previously. I don't
-> know the Trusted Foundations ABI to say whether that matters or not,
-> but if it is the case that it never needed preserving anyway, that
-> might be worth calling out in the commit message.
+Document that Stratix10 clock bindings, and add the clock header file. The
+clock header is an enumeration of all the different clocks on the Stratix10
+platform.
 
-Adding r11 (fp) to the clobber list causes an error when using gcc and
-CONFIG_FRAME_POINTER=y:
-arch/arm/firmware/trusted_foundations.c: In function ?tf_generic_smc?:
-arch/arm/firmware/trusted_foundations.c:51:1: error: fp cannot be used
-in asm here
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+v7:
+- remove the PLL from the clock manager dts node
+v6:
+- no changes
+v5:
+- moved SPDX license header to single line comment
+v4:
+- remove '_' in node names
+- remove stray tab
+- add clock-frequency property for fixed-clocks
+- put SPDX license as the very top line
+v3:
+- s/intc/intel for correct vendor prefix
+- fixup node name to "intel,stratix10-clkmgr"
+- document the required fixed-clock for oscillators
+v2:
+- use a single binding for the clock controller
+---
+ .../devicetree/bindings/clock/intc_stratix10.txt   | 20 ++++++
+ include/dt-bindings/clock/stratix10-clock.h        | 84 ++++++++++++++++++++++
+ 2 files changed, 104 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/intc_stratix10.txt
+ create mode 100644 include/dt-bindings/clock/stratix10-clock.h
 
-Not sure what ABI Trusted Foundations follow.
-
-[adding Stephen, Thierry and Dmitry]
-Maybe someone more familiar with NVIDIA Tegra SoCs can help?
-
-When CONFIG_FRAME_POINTER=y fp gets saved anyway. So we could add r11 to
-clobber list ifndef CONFIG_FRAME_POINTER...
-
---
-Stefan
-
-> 
-> Robin.
-> 
->>   }
->>     static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
->>
+diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+new file mode 100644
+index 0000000..9f4ec5c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+@@ -0,0 +1,20 @@
++Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible : shall be
++	"intel,stratix10-clkmgr"
++
++- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
++
++- #clock-cells : from common clock binding, shall be set to 1.
++
++Example:
++	clkmgr: clock-controller at ffd10000 {
++		compatible = "intel,stratix10-clkmgr";
++		reg = <0xffd10000 0x1000>;
++		#clock-cells = <1>;
++	};
+diff --git a/include/dt-bindings/clock/stratix10-clock.h b/include/dt-bindings/clock/stratix10-clock.h
+new file mode 100644
+index 0000000..0ac1c90
+--- /dev/null
++++ b/include/dt-bindings/clock/stratix10-clock.h
+@@ -0,0 +1,84 @@
++/* SPDX-License-Identifier:	GPL-2.0 */
++/*
++ * Copyright (C) 2017, Intel Corporation
++ */
++
++#ifndef __STRATIX10_CLOCK_H
++#define __STRATIX10_CLOCK_H
++
++/* fixed rate clocks */
++#define STRATIX10_OSC1			0
++#define STRATIX10_CB_INTOSC_HS_DIV2_CLK	1
++#define STRATIX10_CB_INTOSC_LS_CLK	2
++#define STRATIX10_F2S_FREE_CLK		3
++
++/* fixed factor clocks */
++#define STRATIX10_L4_SYS_FREE_CLK	4
++#define STRATIX10_MPU_PERIPH_CLK	5
++#define STRATIX10_MPU_L2RAM_CLK		6
++#define STRATIX10_SDMMC_CIU_CLK		7
++
++/* PLL clocks */
++#define STRATIX10_MAIN_PLL_CLK		8
++#define STRATIX10_PERIPH_PLL_CLK	9
++#define STRATIX10_BOOT_CLK		10
++
++/* Periph clocks */
++#define STRATIX10_MAIN_MPU_BASE_CLK	11
++#define STRATIX10_MAIN_NOC_BASE_CLK	12
++#define STRATIX10_MAIN_EMACA_CLK	13
++#define STRATIX10_MAIN_EMACB_CLK	14
++#define STRATIX10_MAIN_EMAC_PTP_CLK	15
++#define STRATIX10_MAIN_GPIO_DB_CLK	16
++#define STRATIX10_MAIN_SDMMC_CLK	17
++#define STRATIX10_MAIN_S2F_USR0_CLK	18
++#define STRATIX10_MAIN_S2F_USR1_CLK	19
++#define STRATIX10_MAIN_PSI_REF_CLK	20
++
++#define STRATIX10_PERI_MPU_BASE_CLK	21
++#define STRATIX10_PERI_NOC_BASE_CLK	22
++#define STRATIX10_PERI_EMACA_CLK	23
++#define STRATIX10_PERI_EMACB_CLK	24
++#define STRATIX10_PERI_EMAC_PTP_CLK	25
++#define STRATIX10_PERI_GPIO_DB_CLK	26
++#define STRATIX10_PERI_SDMMC_CLK	27
++#define STRATIX10_PERI_S2F_USR0_CLK	28
++#define STRATIX10_PERI_S2F_USR1_CLK	29
++#define STRATIX10_PERI_PSI_REF_CLK	30
++
++#define STRATIX10_MPU_FREE_CLK		31
++#define STRATIX10_NOC_FREE_CLK		32
++#define STRATIX10_S2F_USR0_CLK		33
++#define STRATIX10_NOC_CLK		34
++#define STRATIX10_EMAC_A_FREE_CLK	35
++#define STRATIX10_EMAC_B_FREE_CLK	36
++#define STRATIX10_EMAC_PTP_FREE_CLK	37
++#define STRATIX10_GPIO_DB_FREE_CLK	38
++#define STRATIX10_SDMMC_FREE_CLK	39
++#define STRATIX10_S2F_USER1_FREE_CLK	40
++#define STRATIX10_PSI_REF_FREE_CLK	41
++
++/* Gate clocks */
++#define STRATIX10_MPU_CLK		42
++#define STRATIX10_L4_MAIN_CLK		43
++#define STRATIX10_L4_MP_CLK		44
++#define STRATIX10_L4_SP_CLK		45
++#define STRATIX10_CS_AT_CLK		46
++#define STRATIX10_CS_TRACE_CLK		47
++#define STRATIX10_CS_PDBG_CLK		48
++#define STRATIX10_CS_TIMER_CLK		49
++#define STRATIX10_S2F_USER0_CLK		50
++#define STRATIX10_S2F_USER1_CLK		51
++#define STRATIX10_EMAC0_CLK		52
++#define STRATIX10_EMAC1_CLK		53
++#define STRATIX10_EMAC2_CLK		54
++#define STRATIX10_EMAC_PTP_CLK		55
++#define STRATIX10_GPIO_DB_CLK		56
++#define STRATIX10_SDMMC_CLK		57
++#define STRATIX10_PSI_REF_CLK		58
++#define STRATIX10_USB_CLK		59
++#define STRATIX10_SPI_M_CLK		60
++#define STRATIX10_NAND_CLK		61
++#define STRATIX10_NUM_CLKS		62
++
++#endif	/* __STRATIX10_CLOCK_H */
+-- 
+2.7.4
