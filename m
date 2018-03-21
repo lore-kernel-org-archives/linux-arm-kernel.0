@@ -1,77 +1,62 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 21 Mar 2018 11:35:18 +0800
-Subject: [PATCH] ARM: dts: db600c: add support to pcie refclk
-In-Reply-To: <20180320092840.4600-1-srinivas.kandagatla@linaro.org>
-References: <20180320092840.4600-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180321033518.GB1403@tuxbook-pro>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Tue, 20 Mar 2018 23:09:02 -0500
+Subject: [PATCHv6 3/3] clk: socfpga: stratix10: add clock driver for
+ Stratix10 platform
+In-Reply-To: <152148346040.242365.18406406194344107023@swboyd.mtv.corp.google.com>
+References: <1519656455-14629-1-git-send-email-dinguyen@kernel.org>
+ <1519656455-14629-3-git-send-email-dinguyen@kernel.org>
+ <152148346040.242365.18406406194344107023@swboyd.mtv.corp.google.com>
+Message-ID: <f0d3fc46-5fa1-4e77-ef73-284bf2ee0d61@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 20 Mar 17:28 HKT 2018, Srinivas Kandagatla wrote:
 
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+
+On 03/19/2018 01:17 PM, Stephen Boyd wrote:
+> Quoting Dinh Nguyen (2018-02-26 06:47:35)
+>> diff --git a/drivers/clk/socfpga/Makefile b/drivers/clk/socfpga/Makefile
+>> index 9146c20..87ef977 100644
+>> --- a/drivers/clk/socfpga/Makefile
+>> +++ b/drivers/clk/socfpga/Makefile
+>> @@ -1,6 +1,11 @@
+>>  # SPDX-License-Identifier: GPL-2.0
+>> +ifeq ($(CONFIG_ARCH_SOCFPGA),y)
 > 
-> This patch adds support to external pcie refclk.
+> Ugh, any chance to make this better if we get three?
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8064-db600c.dts | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
+
+I'll try.
+
+...
+
 > 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-db600c.dts
-> index 50151ef6e912..7587088c122f 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-db600c.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-db600c.dts
-> @@ -45,6 +45,18 @@
->  
->  	};
->  
-> +	clocks {
-> +		compatible = "simple-bus";
-> +		pcie_refclk: pcie-refclk {
+>> +{
+>> +       struct stratix10_clock_data *clk_data;
+>> +
+>> +       clk_data = __socfpga_s10_clk_init(node, STRATIX10_NUM_CLKS);
+>> +       if (!clk_data)
+>> +               return;
+>> +
+>> +       s10_clk_register_pll(s10_pll_clks, ARRAY_SIZE(s10_pll_clks), clk_data);
+>> +
+>> +       s10_clk_register_c_perip(s10_main_perip_c_clks,
+>> +                                ARRAY_SIZE(s10_main_perip_c_clks), clk_data);
+>> +
+>> +       s10_clk_register_cnt_perip(s10_main_perip_cnt_clks,
+>> +                                  ARRAY_SIZE(s10_main_perip_cnt_clks),
+>> +                                  clk_data);
+>> +
+>> +       s10_clk_register_gate(s10_gate_clks, ARRAY_SIZE(s10_gate_clks),
+>> +                             clk_data);
+>> +}
+>> +
+>> +CLK_OF_DECLARE(stratix10_clock, "intel,stratix10-clkmgr", socfpga_s10_init);
+> 
+> Can it be a platform device? We prefer those over the CLK_OF_DECLARE
+> style.
+> 
 
-As the si53154 is used to acquire 3 different clocks (2 pcie and 1 sata)
-it would be nice to accurately represent this in the DT. That said,
-exposing this as a clock allow us to change the representation here
-later. (Both pcie_core_clk and pcie_eth_clk use the same gpio pin as
-enable pin, so I don't know how to represent this...)
+Thanks for the review! I'll change it to a platform device and address
+your other comments in v7.
 
-So for now, please name this "pcie_core_clk", per the schematics.
-
-> +			pinctrl-0 = <&pcie_pins>;
-> +			pinctrl-names = "default";
-> +			compatible = "gpio-gate-clock";
-> +	                clocks = <&rpmcc 27>;
-> +			#clock-cells = <0>;
-> +			enable-gpios = <&pm8921_gpio 22 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +
->  	hdmi-out {
->  		compatible = "hdmi-connector";
->  		type = "a";
-> @@ -140,6 +152,16 @@
->  
->  		qcom,ssbi at 500000 {
->  			pmic at 0 {
-> +				gpio at 150 {
-> +					pcie_pins: pcie_pins {
-
-Please label this "pcie_clk_en_pin" and don't use '_' in the name of the
-node.
-
-> +						pios {
-
-You can omit this level and just put the properties in directly in the
-pcie-clk-en node.
-
-> +							pins = "gpio22";
-> +							function = "normal";
-> +							power-source = <PM8921_GPIO_VPH>;
-> +						};
-> +					};
-> +				};
-> +
-
-Regards,
-Bjorn
+Dinh
