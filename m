@@ -1,30 +1,23 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Mar 2018 15:07:14 +0000
-Subject: [PATCH v4 11/22] arm64: capabilities: Group handling of features
- and errata workarounds
-In-Reply-To: <20180313115120.17256-12-suzuki.poulose@arm.com>
-References: <20180313115120.17256-1-suzuki.poulose@arm.com>
- <20180313115120.17256-12-suzuki.poulose@arm.com>
-Message-ID: <20180321150712.GB16308@e103592.cambridge.arm.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 21 Mar 2018 08:07:43 -0700
+Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
+ data
+In-Reply-To: <78806c70c85e3cecaadfc94b173cb139@codeaurora.org>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+ <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
+ <20180320143131.4eenixtbhciq5fwc@localhost>
+ <78806c70c85e3cecaadfc94b173cb139@codeaurora.org>
+Message-ID: <20180321150743.z7edb5xkevsdi4vw@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 11:51:09AM +0000, Suzuki K Poulose wrote:
-> Now that the features and errata workarounds have the same
-> rules and flow, group the handling of the tables.
-> 
-> Cc: Dave Martin <dave.martin@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+On Wed, Mar 21, 2018 at 02:40:43PM +0530, sricharan at codeaurora.org wrote:
+>  Yes, i saw that it was booting out of mainline.
+>  Both DK01 and DK04 boards boots out of mainline.
 
-It looks like nothing signifcant has changed since v3 [1], and I was
-reasonably happy with this last time around [2], so
+Well, that is good news.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Which kernel config did you use?
 
-[...]
-
-Cheers
----Dave
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/558742.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-February/558763.html
+Thanks,
+Richard
