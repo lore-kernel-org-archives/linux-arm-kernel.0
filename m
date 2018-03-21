@@ -1,47 +1,83 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 21 Mar 2018 14:23:45 +0100
-Subject: [PATCH 2/3] arm64: dts: armada-3720-espressobin: make use of
- switch irq line
-In-Reply-To: <20180321131536.GC11206@lunn.ch>
-References: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
- <20180321105005.18426-2-u.kleine-koenig@pengutronix.de>
- <20180321131536.GC11206@lunn.ch>
-Message-ID: <20180321132345.psrs3n7whpjdabeo@pengutronix.de>
+From: lambertarthur22@gmail.com (Arthur LAMBERT)
+Date: Wed, 21 Mar 2018 14:25:48 +0100
+Subject: issue with kexec/kdump on imx6ull
+In-Reply-To: <20180320191259.GI2743@n2100.armlinux.org.uk>
+References: <20180320100427.GA21933@arthur-bzh>
+ <20180320104302.GG2743@n2100.armlinux.org.uk>
+ <20180320150723.GH2743@n2100.armlinux.org.uk>
+ <20180320171608.GB32282@arthur-bzh>
+ <20180320191259.GI2743@n2100.armlinux.org.uk>
+Message-ID: <20180321132548.GA32618@arthur-bzh>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+Le Tuesday 20 Mar 2018 ? 19:12:59 (+0000), Russell King - ARM Linux wrote :
+> They're all included there.  Please try running kexec in debug mode
+> when loading the kernel, and report the output.
 
-On Wed, Mar 21, 2018 at 02:15:36PM +0100, Andrew Lunn wrote:
-> On Wed, Mar 21, 2018 at 11:50:04AM +0100, Uwe Kleine-K?nig wrote:
-> > The switch's INTn line is connected to the CPU's MPP2_23 pad. Wire this
-> > up in the device tree. Note however that up to now the
-> > marvell,armada3710-sb-pinctrl driver doesn't support level irqs, so the
-> > switch driver doesn't make use of this feature.
-> 
-> So that actually happens here, if the interrupt cannot be used? I
-> assume the mv88e6xxx driver does not fail the probe because the IRQ
-> cannot be configured? What does happen?
+No more dtb argument with device tree file path and debug enable now.
 
-Grml, I just tried with all patches applied and it results in:
+Kexec output :
 
-[    4.777524] mv88e6085 d0032004.mdio-mii:01: switch 0x3410 detected: Marvell 88E6341, revision 0
-[    4.794723] genirq: Setting trigger mode 8 for irq 41 failed (armada_37xx_irq_set_type+0x0/0x160)
-[    4.804470] mv88e6085: probe of d0032004.mdio-mii:01 failed with error -22
+# sh kx.sh
+Try gzip decompression.
+kernel: 0x768cf008 kernel_size: 0x64a480
+MEMORY RANGES
+0000000080000000-000000009fffffff (0)
+zImage header: 0x016f2818 0x00000000 0x0064a480
+zImage size 0x64a480, file size 0x64a480
+zImage requires 0x0065b480 bytes
+Reserved memory ranges
+0000000088000000-000000008b1fffff (0)
+Coredump memory ranges
+0000000080000000-0000000087ffffff (0)
+000000008b200000-000000009fffffff (0)
+kernel symbol _stext vaddr =         80100000
+phys offset = 0x80000000, page offset = 80000000
+Using 32-bit ELF core format
+get_crash_notes_per_cpu: crash_notes addr = 8bb3a600, size = 180
+Elf header: p_type = 4, p_offset = 0x8bb3a600 p_paddr = 0x8bb3a600 p_vaddr = 0x0 p_filesz = 0xb4 p_memsz = 0xb4
+vmcoreinfo header: p_type = 4, p_offset = 0x80fd2610 p_paddr = 0x80fd2610 p_vaddr = 0x0 p_filesz = 0x1024 p_memsz = 0x1024
+Elf header: p_type = 1, p_offset = 0x80000000 p_paddr = 0x80000000 p_vaddr = 0x80000000 p_filesz = 0x8000000 p_memsz = 0x8000000
+Elf header: p_type = 1, p_offset = 0x8b200000 p_paddr = 0x8b200000 p_vaddr = 0x8b200000 p_filesz = 0x14e00000 p_memsz = 0x14e00000
+elfcorehdr: 0x8b100000
+crashkernel: [0x88000000 - 0x8b1fffff] (50M)
+memory range: [0x80000000 - 0x87ffffff] (128M)
+memory range: [0x8b200000 - 0x9fffffff] (334M)
+kernel command line: "console=ttymxc0,115200 root=/dev/mmcblk1p2 rootwait rw  maxcpus=1 reset_devices init=/sbin/init elfcorehdr=0x8b100000 mem=50176K"
+Kernel: address=0x88008000 size=0x01fc8680
+DT    : address=0x89fd2000 size=0x0000904c
+kexec_load: entry = 0x88008000 flags = 0x280001
+nr_segments = 3
+segment[0].buf   = 0x768cf008
+segment[0].bufsz = 0x64a484
+segment[0].mem   = 0x88008000
+segment[0].memsz = 0x64b000
+segment[1].buf   = 0x996578
+segment[1].bufsz = 0x904c
+segment[1].mem   = 0x89fd2000
+segment[1].memsz = 0xa000
+segment[2].buf   = 0x996100
+segment[2].bufsz = 0x400
+segment[2].mem   = 0x8b100000
+segment[2].memsz = 0x1000
+kx.sh: kexec: success, dump kernel loaded.
 
-. It (kind of) worked before your patch
+> Also, please run 'size' on the top-level vmlinux and
+> arch/arm/boot/compressed/vmlinux.
 
-	net: dsa: mv88e6xxx: Use the DT IRQ trigger mode
+As said previously in my first mail I am using the same kernel in kexec that in my system.
+So not sure to understand why you are asking me to execute 'size' on two differents vmlinux file
 
-. So I guess this has to change to
+size result of vmlinux + size of zimage :
 
-+               interrupt-parent = <&gpiosb>;
-+		/* actually the irq is active low, but gpiosb doesn't support that and falling edge seems to work just fine */
-+               interrupts = <23 IRQ_TYPE_EDGE_FALLING>;
+[arthur * dreem] size output/build/linux-rel_imx_4.9.x_1.0.0_ga/arch/arm/boot/compressed/vmlinux
+ text	   data	     bss	    dec	    hex	filename
+ 6595649      60      4124	    6599833  64b499	output/build/linux-rel_imx_4.9.x_1.0.0_ga/arch/arm/boot/compressed/vmlinux
+[arthur * dreem] size output/images/zImage
+size: output/images/zImage: File format not recognized
+[arthur * dreem] du -skh output/images/zImage
+ 6,3M   output/images/zImage
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Arthur.
