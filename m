@@ -1,62 +1,151 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 21 Mar 2018 13:08:03 +0100
-Subject: [PATCH 4/8] clk: davinci: add a reset lookup table for psc0
+Date: Wed, 21 Mar 2018 13:08:00 +0100
+Subject: [PATCH 1/8] reset: modify the way reset lookup works for board files
 In-Reply-To: <20180321120807.18032-1-brgl@bgdev.pl>
 References: <20180321120807.18032-1-brgl@bgdev.pl>
-Message-ID: <20180321120807.18032-5-brgl@bgdev.pl>
+Message-ID: <20180321120807.18032-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-In order to be able to use the reset framework in legacy boot mode as
-well, add the reset lookup table to the psc driver for da850 variant.
+Commit 7af1bb19f1d7 ("reset: add support for non-DT systems")
+introduced reset control lookup mechanism for boards that still use
+board files.
+
+The routine used to register lookup entries takes the corresponding
+reset_controlled_dev structure as argument.
+
+It's been determined however that for the first user of this new
+interface - davinci psc driver - it will be easier to register the
+lookup entries using the reset controller device name.
+
+This patch changes the way lookup entries are added.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/clk/davinci/psc-da850.c | 8 ++++++++
- drivers/clk/davinci/psc.c       | 1 +
- 2 files changed, 9 insertions(+)
+ drivers/reset/core.c             | 33 +++++++++++++++++++++++++++++----
+ include/linux/reset-controller.h |  8 +++++---
+ 2 files changed, 34 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
-index ccc7eb17bf3a..395db4b2c0ee 100644
---- a/drivers/clk/davinci/psc-da850.c
-+++ b/drivers/clk/davinci/psc-da850.c
-@@ -6,6 +6,7 @@
+diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+index 06fa4907afc4..f37048e55336 100644
+--- a/drivers/reset/core.c
++++ b/drivers/reset/core.c
+@@ -153,11 +153,11 @@ EXPORT_SYMBOL_GPL(devm_reset_controller_register);
+ 
+ /**
+  * reset_controller_add_lookup - register a set of lookup entries
+- * @rcdev: initialized reset controller device owning the reset line
++ * @provider: name of the reset controller provider
+  * @lookup: array of reset lookup entries
+  * @num_entries: number of entries in the lookup array
   */
- 
- #include <linux/clk-provider.h>
-+#include <linux/reset-controller.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
- #include <linux/init.h>
-@@ -66,8 +67,15 @@ LPSC_CLKDEV3(ecap_clkdev,	"fck",	"ecap.0",
- 				"fck",	"ecap.1",
- 				"fck",	"ecap.2");
- 
-+static struct reset_control_lookup da850_psc0_reset_lookup_table[] = {
-+	RESET_LOOKUP("davinci-rproc.0", NULL, 15),
-+};
-+
- static int da850_psc0_init(struct device *dev, void __iomem *base)
+-void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
++void reset_controller_add_lookup(const char *provider,
+ 				 struct reset_control_lookup *lookup,
+ 				 unsigned int num_entries)
  {
-+	reset_controller_add_lookup("da850-psc0",
-+				    da850_psc0_reset_lookup_table,
-+				    ARRAY_SIZE(da850_psc0_reset_lookup_table));
- 	return davinci_psc_register_clocks(dev, da850_psc0_info, 16, base);
+@@ -174,7 +174,7 @@ void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
+ 			continue;
+ 		}
+ 
+-		entry->rcdev = rcdev;
++		entry->provider = provider;
+ 		list_add_tail(&entry->list, &reset_lookup_list);
+ 	}
+ 	mutex_unlock(&reset_lookup_mutex);
+@@ -526,11 +526,30 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
  }
+ EXPORT_SYMBOL_GPL(__of_reset_control_get);
  
-diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
-index 3b0e59dfbdd7..063df62381ea 100644
---- a/drivers/clk/davinci/psc.c
-+++ b/drivers/clk/davinci/psc.c
-@@ -425,6 +425,7 @@ __davinci_psc_register_clocks(struct device *dev,
++static struct reset_controller_dev *
++__reset_controller_by_name(const char *name)
++{
++	struct reset_controller_dev *rcdev;
++
++	lockdep_assert_held(&reset_list_mutex);
++
++	list_for_each_entry(rcdev, &reset_controller_list, list) {
++		if (!rcdev->dev)
++			continue;
++
++		if (!strcmp(name, dev_name(rcdev->dev)))
++			return rcdev;
++	}
++
++	return NULL;
++}
++
+ static struct reset_control *
+ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
+ 				bool shared, bool optional)
+ {
+ 	const struct reset_control_lookup *lookup;
++	struct reset_controller_dev *rcdev;
+ 	const char *dev_id = dev_name(dev);
+ 	struct reset_control *rstc = NULL;
  
- 	psc->rcdev.ops = &davinci_psc_reset_ops;
- 	psc->rcdev.owner = THIS_MODULE;
-+	psc->rcdev.dev = dev;
- 	psc->rcdev.of_node = dev->of_node;
- 	psc->rcdev.of_reset_n_cells = 1;
- 	psc->rcdev.of_xlate = davinci_psc_reset_of_xlate;
+@@ -547,7 +566,13 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
+ 		    ((con_id && lookup->con_id) &&
+ 		     !strcmp(con_id, lookup->con_id))) {
+ 			mutex_lock(&reset_list_mutex);
+-			rstc = __reset_control_get_internal(lookup->rcdev,
++			rcdev = __reset_controller_by_name(lookup->provider);
++			if (!rcdev) {
++				mutex_unlock(&reset_list_mutex);
++				continue;
++			}
++
++			rstc = __reset_control_get_internal(rcdev,
+ 							    lookup->index,
+ 							    shared);
+ 			mutex_unlock(&reset_list_mutex);
+diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+index 25698f6c1fae..1a6c25d825d3 100644
+--- a/include/linux/reset-controller.h
++++ b/include/linux/reset-controller.h
+@@ -30,14 +30,14 @@ struct of_phandle_args;
+  * struct reset_control_lookup - represents a single lookup entry
+  *
+  * @list: internal list of all reset lookup entries
+- * @rcdev: reset controller device controlling this reset line
++ * @provider: name of the reset controller device controlling this reset line
+  * @index: ID of the reset controller in the reset controller device
+  * @dev_id: name of the device associated with this reset line
+  * @con_id name of the reset line (can be NULL)
+  */
+ struct reset_control_lookup {
+ 	struct list_head list;
+-	struct reset_controller_dev *rcdev;
++	const char *provider;
+ 	unsigned int index;
+ 	const char *dev_id;
+ 	const char *con_id;
+@@ -57,6 +57,7 @@ struct reset_control_lookup {
+  * @owner: kernel module of the reset controller driver
+  * @list: internal list of reset controller devices
+  * @reset_control_head: head of internal list of requested reset controls
++ * @dev: corresponding driver model device struct
+  * @of_node: corresponding device tree node as phandle target
+  * @of_reset_n_cells: number of cells in reset line specifiers
+  * @of_xlate: translation function to translate from specifier as found in the
+@@ -68,6 +69,7 @@ struct reset_controller_dev {
+ 	struct module *owner;
+ 	struct list_head list;
+ 	struct list_head reset_control_head;
++	struct device *dev;
+ 	struct device_node *of_node;
+ 	int of_reset_n_cells;
+ 	int (*of_xlate)(struct reset_controller_dev *rcdev,
+@@ -82,7 +84,7 @@ struct device;
+ int devm_reset_controller_register(struct device *dev,
+ 				   struct reset_controller_dev *rcdev);
+ 
+-void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
++void reset_controller_add_lookup(const char *provider,
+ 				 struct reset_control_lookup *lookup,
+ 				 unsigned int num_entries);
+ 
 -- 
 2.16.1
