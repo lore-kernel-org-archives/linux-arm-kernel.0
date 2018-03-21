@@ -1,63 +1,66 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Mar 2018 11:54:49 +0000
-Subject: [PATCH] arm64/sve: Document firmware support requirements in Kconfig
-Message-ID: <1521633289-10504-1-git-send-email-Dave.Martin@arm.com>
+From: jeffy.chen@rock-chips.com (JeffyChen)
+Date: Wed, 21 Mar 2018 20:04:29 +0800
+Subject: Failed to boot ARM64 boards for recent linux-next
+In-Reply-To: <de4be2ef-ee2c-60f8-a08e-11e378e55343@arm.com>
+References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
+ <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
+ <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
+ <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
+ <5AB0DEB2.4000803@rock-chips.com>
+ <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
+ <cbc89d68-ba41-1f6a-4ab2-4c9647b48f75@huawei.com>
+ <d18d6f27-7270-d2d7-58b9-3bf16ffe6b0a@arm.com>
+ <ff6cd434-2227-12a6-b3b9-325da78a7fa9@huawei.com>
+ <2aed10a0-ad3d-d9fc-7b6e-3b6877bff0be@arm.com>
+ <13507742-ddb8-0b43-cd09-14a57ec2a07a@rock-chips.com>
+ <5AB1F763.3040409@rock-chips.com>
+ <680aba8d-4117-227b-d5a1-ad7121d2565f@arm.com>
+ <5AB22377.1000404@rock-chips.com>
+ <de4be2ef-ee2c-60f8-a08e-11e378e55343@arm.com>
+Message-ID: <5AB24A4D.6020503@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use of SVE by EL2 and below requires explicit support in the
-firmware.  There is no means to hide the presence of SVE from EL2,
-so a kernel configured with CONFIG_ARM64_SVE=y will typically not
-work correctly on SVE capable hardware unless the firmware does
-include the appropriate support.
+Hi Marc,
 
-This is not expected to pose a problem in the wild, since platform
-integrators are responsible for ensuring that they ship up-to-date
-firmware to support their hardware.  However, developers may hit
-the issue when using mismatched compoments.
+On 03/21/2018 05:33 PM, Marc Zyngier wrote:
+>>>>> >>>>@Jeffy
+>>>>> >>>>
+>>>>> >>>>Could you help test Marc's latest patch on your RK3399 kevin/Gru or
+>>>>> >>>>whatever Chromebook?
+>>>> >>>tested on my chromebook kevin, it works with that patch.
+>>> >>
+>>> >>This is very odd. It completely fails on mine, which is aannoying.
+>>> >>Do you have any special firmware? Or the stock firmware?
+>>> >>
+>> >
+>> >hmmm, my kevin's firmware is official:
+>> >localhost / # cat /var/log/bios_info.txt
+>> >version              | Google_Kevin.8785.241.0
+>> >ro bios version      | Google_Kevin.8785.241.0
+> (booting into ChromeOS) Definitely not what I have on mine:
+> 8785.220.0 as the runtime version, and 8785.94.7 as the RO one.
+>
+> This is a retail machine, bought in November. So what you have cannot be
+> the stock firmware.
+>
+> What changes related to the GIC have been applied to this FW?
 
-In order to draw attention to the issue and how to solve it, this
-patch adds some Kconfig text giving a brief explanation and details
-of compatible firmware versions.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
+i tried to flash my firmware back to 8785.220.0, and still works...:
+localhost tmp # head -2 /var/log/bios_info.txt
+version              | Google_Kevin.8785.220.0
+ro bios version      | Google_Kevin.8785.220.0
 
-No functional change, but it would be good to get this explanatory text
-merged since developers who try Linux on SVE-enabled models may hit
-this problem, and fixed versions of ARM TF and the bootwrapper are now
-available.
 
- arch/arm64/Kconfig | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+dmesg:
+https://emailattachment.net/sites/default/files/files/public/dmesg.dmesg
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7381eeb..e6fa47b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1104,6 +1104,23 @@ config ARM64_SVE
- 
- 	  To enable use of this extension on CPUs that implement it, say Y.
- 
-+	  Note that for architectural reasons, firmware _must_ implement SVE
-+	  support when running on SVE capable hardware.  The required support
-+	  is present in:
-+
-+	    * version 1.5 and later of the ARM Trusted Firmware
-+	    * the AArch64 boot wrapper since commit 5e1261e08abf
-+	      ("bootwrapper: SVE: Enable SVE for EL2 and below").
-+
-+	  For other firmware implementations, consult the firware documentation
-+	  or vendor.
-+
-+	  If you need the kernel to boot on SVE-capable hardware with broken
-+	  firmware, you may need to say N here until you get your firmware
-+	  fixed.  Otherwise, you may experience firmware panics or lockups when
-+	  booting the kernel.  If unsure and you are not observing these
-+	  symptoms, you should assume that it is safe to say Y.
-+
- config ARM64_MODULE_CMODEL_LARGE
- 	bool
- 
--- 
-2.1.4
+firmware 8785.220.0:
+https://emailattachment.net/sites/default/files/files/public/image.dev.bin
+
+>
+> Thanks,
+>
+> 	M.
+> -- Jazz is not dead. It just smells funny...
