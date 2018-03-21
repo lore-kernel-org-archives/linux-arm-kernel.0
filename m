@@ -1,44 +1,48 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 21 Mar 2018 10:30:22 +0200
-Subject: [PATCH] dmaengine: edma: Check the memory allocation for the memcpy
- dma device
-Message-ID: <20180321083022.32616-1-peter.ujfalusi@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 21 Mar 2018 09:41:41 +0100
+Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
+In-Reply-To: <20180320231309.GJ2743@n2100.armlinux.org.uk>
+References: <20180320230206.25289-1-stefan@agner.ch>
+ <20180320230206.25289-4-stefan@agner.ch>
+ <20180320231309.GJ2743@n2100.armlinux.org.uk>
+Message-ID: <98806397d62084bf01c475fd210cd186@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the allocation fails then disable the memcpy support.
+On 21.03.2018 00:13, Russell King - ARM Linux wrote:
+> On Wed, Mar 21, 2018 at 12:02:04AM +0100, Stefan Agner wrote:
+>> As documented in GCC naked functions should only use Basic asm
+>> syntax. The Extended asm or mixture of Basic asm and "C" code is
+>> not guaranteed. Currently this works because it was hard coded
+>> to follow and check GCC behavior for arguments and register
+>> placement.
+> 
+> Those checks have nothing to do with that at all.  The whole point of
+> __asmeq() is to catch situations where you use register variables,
+> specifying which register you want them in, and GCC then ends up
+> passing them to assembly code in some other random register(s).
+> 
+> This was found with older GCCs, and the problem was fixed.  It has
+> nothing to do with naked functions per se.
+> 
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/edma.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Ok, will reword that part to something like:
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 5b197473106b..519e69e81fca 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -1899,6 +1899,11 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
- 
- 	if (memcpy_channels) {
- 		m_ddev = devm_kzalloc(ecc->dev, sizeof(*m_ddev), GFP_KERNEL);
-+		if (!m_ddev) {
-+			dev_warn(ecc->dev, "memcpy is disabled due to OoM\n");
-+			memcpy_channels = NULL;
-+			goto ch_setup;
-+		}
- 		ecc->dma_memcpy = m_ddev;
- 
- 		dma_cap_zero(m_ddev->cap_mask);
-@@ -1926,6 +1931,7 @@ static void edma_dma_init(struct edma_cc *ecc, bool legacy_mode)
- 		dev_info(ecc->dev, "memcpy is disabled\n");
- 	}
- 
-+ch_setup:
- 	for (i = 0; i < ecc->num_channels; i++) {
- 		struct edma_chan *echan = &ecc->slave_chans[i];
- 		echan->ch_num = EDMA_CTLR_CHAN(ecc->id, i);
--- 
-Peter
+As documented in GCC naked functions should only use Basic asm
+syntax. The Extended asm or mixture of Basic asm and "C" code cannot
+be depended upon.
 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Furthermore with clang using parameters in Extended asm in a
+naked function is not supported:
+...
+
+> In fact, as you're introducing further register variables, these
+> checks become more important to have than they were with the
+> previous code.
+
+Ok I see, so I definitely have to leave them in.
+
+You generally agree with the change otherwise?
+
+--
+Stefan
