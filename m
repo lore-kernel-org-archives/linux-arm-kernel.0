@@ -1,34 +1,21 @@
-From: colin.king@canonical.com (Colin King)
-Date: Wed, 21 Mar 2018 18:01:58 +0000
-Subject: [PATCH][next] firmware: arm_scmi: remove redundant null check on array
-Message-ID: <20180321180158.2507-1-colin.king@canonical.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 21 Mar 2018 20:02:05 +0200
+Subject: [PATCH v3 2/3] gpiolib: Support 'gpio-reserved-ranges' property
+In-Reply-To: <1521655150.23017.79.camel@linux.intel.com>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-3-swboyd@chromium.org>
+ <1521655150.23017.79.camel@linux.intel.com>
+Message-ID: <1521655325.23017.80.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Wed, 2018-03-21 at 19:59 +0200, Andy Shevchenko wrote:
+> On Wed, 2018-03-21 at 09:58 -0700, Stephen Boyd wrote:
 
-The null check on clk->name is redundant since name is a char array
-and can never be null, so the check is always true.  Remove it.
+After addressing comments,
 
-Detected by CoverityScan, CID#1466117 ("Array compared against 0")
+Reviwed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/firmware/arm_scmi/clock.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/firmware/arm_scmi/clock.c b/drivers/firmware/arm_scmi/clock.c
-index e8ffad33a0ff..0aabffc88599 100644
---- a/drivers/firmware/arm_scmi/clock.c
-+++ b/drivers/firmware/arm_scmi/clock.c
-@@ -283,7 +283,7 @@ scmi_clock_info_get(const struct scmi_handle *handle, u32 clk_id)
- 	struct clock_info *ci = handle->clk_priv;
- 	struct scmi_clock_info *clk = ci->clk + clk_id;
- 
--	if (!clk->name || !clk->name[0])
-+	if (!clk->name[0])
- 		return NULL;
- 
- 	return clk;
 -- 
-2.15.1
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
