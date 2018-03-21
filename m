@@ -1,58 +1,35 @@
 From: rrajk@nvidia.com (Rajkumar Rampelli)
-Date: Wed, 21 Mar 2018 10:10:39 +0530
-Subject: [PATCH V2 4/9] arm64: tegra: Add Tachometer Controller on Tegra186
+Date: Wed, 21 Mar 2018 10:10:44 +0530
+Subject: [PATCH V2 9/9] arm64: defconfig: enable pwm-fan as a loadable module
 In-Reply-To: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
 References: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
-Message-ID: <1521607244-29734-5-git-send-email-rrajk@nvidia.com>
+Message-ID: <1521607244-29734-10-git-send-email-rrajk@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NVIDIA Tegra186 SoC has a Tachometer Controller that analyzes the
-PWM signal of a Fan and reports the period value through pwm interface.
+Enable pwm-fan driver to make use of a PWM interface to
+read speed of a fan in rotations per minute.
 
 Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
 ---
 
-V2: Renamed clock-names/reset-names dt properties values to "tachometer"
-    Renamed compatible property value to "nvidia-tegra186-pwm-tachometer"
+V2: Added pwm-fan driver support as a loadable module.
+    Removed generic-pwm-tachometer driver support which was added as part of v1
 
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |  5 +++++
- arch/arm64/boot/dts/nvidia/tegra186.dtsi           | 11 +++++++++++
- 2 files changed, 16 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-index bd5305a..13c3e59 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-@@ -172,4 +172,9 @@
- 			vin-supply = <&vdd_5v0_sys>;
- 		};
- 	};
-+
-+	tachometer at 39c0000 {
-+		nvidia,pulse-per-rev = <2>;
-+		nvidia,capture-window-len = <2>;
-+	};
- };
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-index 731cd01..19e1afc 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -1042,4 +1042,15 @@
- 		reset-names = "pwm";
- 		status = "disabled";
- 	};
-+
-+	tegra_tachometer: tachometer at 39c0000 {
-+		compatible = "nvidia,tegra186-pwm-tachometer";
-+		reg = <0x0 0x039c0000 0x0 0x10>;
-+		#pwm-cells = <2>;
-+		clocks = <&bpmp TEGRA186_CLK_TACH>;
-+		clock-names = "tachometer";
-+		resets = <&bpmp TEGRA186_RESET_TACH>;
-+		reset-names = "tachometer";
-+		status = "disabled";
-+	};
- };
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 8b2bda7..50aa3bce 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -320,6 +320,7 @@ CONFIG_SYSCON_REBOOT_MODE=y
+ CONFIG_BATTERY_BQ27XXX=y
+ CONFIG_SENSORS_ARM_SCPI=y
+ CONFIG_SENSORS_LM90=m
++CONFIG_SENSORS_PWM_FAN=m
+ CONFIG_SENSORS_INA2XX=m
+ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
 -- 
 2.1.4
