@@ -1,48 +1,111 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 21 Mar 2018 14:56:11 -0400
-Subject: [PATCH REPOST v4 7/7] fm10k: Eliminate duplicate barriers on
+Date: Wed, 21 Mar 2018 14:06:02 -0500
+Subject: [PATCH v4 00/17] netdev: Eliminate duplicate barriers on
  weakly-ordered archs
-In-Reply-To: <1521658572-26354-1-git-send-email-okaya@codeaurora.org>
-References: <1521658572-26354-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521658572-26354-8-git-send-email-okaya@codeaurora.org>
+In-Reply-To: <20180321.115655.108053425798020503.davem@davemloft.net>
+References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
+ <20180321.115655.108053425798020503.davem@davemloft.net>
+Message-ID: <652fd716-6ad2-428d-4bfc-e050f9db3e41@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a
-barrier on some architectures like arm64.
+On 3/21/2018 10:56 AM, David Miller wrote:
+> From: Sinan Kaya <okaya@codeaurora.org>
+> Date: Mon, 19 Mar 2018 22:42:15 -0400
+> 
+>> Code includes wmb() followed by writel() in multiple places. writel()
+>> already has a barrier on some architectures like arm64.
+>>
+>> This ends up CPU observing two barriers back to back before executing the
+>> register write.
+>>
+>> Since code already has an explicit barrier call, changing writel() to
+>> writel_relaxed().
+>>
+>> I did a regex search for wmb() followed by writel() in each drivers
+>> directory.
+>> I scrubbed the ones I care about in this series.
+>>
+>> I considered "ease of change", "popular usage" and "performance critical
+>> path" as the determining criteria for my filtering.
+> 
+> I agree that for performance sensitive operations, specifically writing
+> doorbell registers in the hot paths or RX and TX packet processing, this
+> is a good change.
+> 
+> However, in configuration paths and whatnot, it is much less urgent and
+> useful.
+> 
+> Therefore I think it would work better if you concentrated solely on
+> hot code path cases.
+> 
+> You can, on a driver by driver basis, submit the other transformations
+> in the slow paths, and let the driver maintainers decide whether to
+> take those on or not.
+> 
+> Also, please stick exactly to the case where we have:
+> 
+> 	wmb/mb/etc.
+> 	writel()
+> 
 
-This ends up CPU observing two barriers back to back before executing
-the register write.
+OK
 
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+> Because I see some changes where we have:
+> 
+> 	writel()
+> 
+> 	barrier()
+> 
+> 	writel()
+> 
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/net/ethernet/intel/fm10k/fm10k_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+barrier() on ARM is a write barrier. Apparently, it is a compiler barrier
+on Intel. I briefly discussed the barrier() behavior in rdma mailing list [1].
 
-diff --git a/drivers/net/ethernet/intel/fm10k/fm10k_main.c b/drivers/net/ethernet/intel/fm10k/fm10k_main.c
-index 8e12aae..eebef01 100644
---- a/drivers/net/ethernet/intel/fm10k/fm10k_main.c
-+++ b/drivers/net/ethernet/intel/fm10k/fm10k_main.c
-@@ -179,7 +179,7 @@ void fm10k_alloc_rx_buffers(struct fm10k_ring *rx_ring, u16 cleaned_count)
- 		wmb();
- 
- 		/* notify hardware of new descriptors */
--		writel(i, rx_ring->tail);
-+		writel_relaxed(i, rx_ring->tail);
- 	}
- }
- 
-@@ -1054,7 +1054,7 @@ static void fm10k_tx_map(struct fm10k_ring *tx_ring,
- 
- 	/* notify HW of packet */
- 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
--		writel(i, tx_ring->tail);
-+		writel_relaxed(i, tx_ring->tail);
- 
- 		/* we need this if more than one processor can write to our tail
- 		 * at a time, it synchronizes IO on IA64/Altix systems
+Our conclusion is that code should have used wmb() if it really needed
+to synchronize memory contents to the device and barrier() is already
+wrong. It just guarantees that code doesn't move. writel() already has
+a compiler barrier inside. It won't move to begin with.
+
+Like you suggested, we decided to leave these changes alone and even
+skip those drivers.
+
+I'll take another look at the patches.
+
+> for exmaple, and you are turning that second writel() into a relaxed
+> on as well.  The above is using a compile barrier, not a memory
+> barrier, so effectively it is two writel()'s in sequence which is
+> not what this patch set is about.
+> 
+> If anything, that compile barrier() is superfluous and could be
+> removed.  But that is also a separate change from what this patch
+> series is doing here.
+> 
+
+agreed, I'll remove such changes.
+
+> Finally, it makes it that much easier if we can see the preceeding
+> memory barrier in the context of the patch that adjusts the writel
+> into a writel_relaxed.
+> 
+> In one case, a macro DOORBELL() is changed to use writel().  This
+> makes it so that the patch reviewer has to scan over the entire
+> driver in question to see exactly how DOORBELL() is used and whether
+> it fits the criteria for the writel_relaxed() transformation.
+> 
+> I would suggest that you adjust the name of the macro in a situation
+> like this, f.e. to DOORBELL_RELAXED().
+
+makes sense.
+
+> 
+> Thank you.
+> 
+
+[1] https://patchwork.kernel.org/project/LKML/list/?submitter=145491
+
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
