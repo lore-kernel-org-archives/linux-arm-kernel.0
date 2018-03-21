@@ -1,52 +1,96 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 21 Mar 2018 15:06:16 +0100
-Subject: [PATCH 3/3] arm64: dts: armada-3720-espressobin: wire up LED2
-In-Reply-To: <20180321131930.GD11206@lunn.ch>
-References: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
- <20180321105005.18426-3-u.kleine-koenig@pengutronix.de>
- <20180321131930.GD11206@lunn.ch>
-Message-ID: <20180321140616.6maci3xdiwkz2wma@pengutronix.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 21 Mar 2018 15:09:58 +0100
+Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
+In-Reply-To: <124e16c9-b8ca-9c7e-ade5-b033eed76e14@arm.com>
+References: <20180320230206.25289-1-stefan@agner.ch>
+ <20180320230206.25289-4-stefan@agner.ch>
+ <124e16c9-b8ca-9c7e-ade5-b033eed76e14@arm.com>
+Message-ID: <302cfd1a4324e064cd4f189e4e0ffc21@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 02:19:30PM +0100, Andrew Lunn wrote:
-> On Wed, Mar 21, 2018 at 11:50:05AM +0100, Uwe Kleine-K?nig wrote:
-> > The led is connected to MPP1_2.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Note the LED doesn't work for me on two different boards.
+On 21.03.2018 13:13, Robin Murphy wrote:
+> On 20/03/18 23:02, Stefan Agner wrote:
+>> As documented in GCC naked functions should only use Basic asm
+>> syntax. The Extended asm or mixture of Basic asm and "C" code is
+>> not guaranteed. Currently this works because it was hard coded
+>> to follow and check GCC behavior for arguments and register
+>> placement.
+>>
+>> Furthermore with clang using parameters in Extended asm in a
+>> naked function is not supported:
+>>    arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
+>>            references not allowed in naked functions
+>>                  : "r" (type), "r" (arg1), "r" (arg2)
+>>                         ^
+>>
+>> Use a regular function to be more portable. This aligns also with
+>> the other smc call implementations e.g. in qcom_scm-32.c and
+>> bcm_kona_smc.c.
+>>
+>> Additionally also make sure all callee-saved registers get saved
+>> as it has been done before.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>   arch/arm/firmware/trusted_foundations.c | 12 +++++++-----
+>>   1 file changed, 7 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+>> index 3fb1b5a1dce9..426d732e6591 100644
+>> --- a/arch/arm/firmware/trusted_foundations.c
+>> +++ b/arch/arm/firmware/trusted_foundations.c
+>> @@ -31,21 +31,23 @@
+>>     static unsigned long cpu_boot_addr;
+>>   -static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>> +static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>>   {
+>> +	register u32 r0 asm("r0") = type;
+>> +	register u32 r1 asm("r1") = arg1;
+>> +	register u32 r2 asm("r2") = arg2;
+>> +
+>>   	asm volatile(
+>>   		".arch_extension	sec\n\t"
+>> -		"stmfd	sp!, {r4 - r11, lr}\n\t"
+>>   		__asmeq("%0", "r0")
+>>   		__asmeq("%1", "r1")
+>>   		__asmeq("%2", "r2")
+>>   		"mov	r3, #0\n\t"
+>>   		"mov	r4, #0\n\t"
+>>   		"smc	#0\n\t"
+>> -		"ldmfd	sp!, {r4 - r11, pc}"
+>>   		:
+>> -		: "r" (type), "r" (arg1), "r" (arg2)
+>> -		: "memory");
+>> +		: "r" (r0), "r" (r1), "r" (r2)
+>> +		: "memory", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10");
 > 
-> Do you have a board it does work with?
+> I may be missing a subtlety, but it looks like we no longer have a
+> guarantee that r11 will be caller-saved as it was previously. I don't
+> know the Trusted Foundations ABI to say whether that matters or not,
+> but if it is the case that it never needed preserving anyway, that
+> might be worth calling out in the commit message.
 
-No, it doesn't work anywhere.
+Adding r11 (fp) to the clobber list causes an error when using gcc and
+CONFIG_FRAME_POINTER=y:
+arch/arm/firmware/trusted_foundations.c: In function ?tf_generic_smc?:
+arch/arm/firmware/trusted_foundations.c:51:1: error: fp cannot be used
+in asm here
+
+Not sure what ABI Trusted Foundations follow.
+
+[adding Stephen, Thierry and Dmitry]
+Maybe someone more familiar with NVIDIA Tegra SoCs can help?
+
+When CONFIG_FRAME_POINTER=y fp gets saved anyway. So we could add r11 to
+clobber list ifndef CONFIG_FRAME_POINTER...
+
+--
+Stefan
+
 > 
-> > But the voltage levels on one side of the LED changes from 1.76V to
-> > 0V when enabling the LED. So there is probably something fishy,
-> > don't know if it is hardware or software related.
+> Robin.
 > 
-> I think we should not apply this patch until we get a better idea why
-> it does not work.
-
-Ack. I hoped to get some feedback about this issue.
-
-> Is 1.76V not enough? Is the LED mounted the wrong way around? Not
-> enough current?
-
-There is another LED on the board called LED3 that is connected between
-12V and ground with a R1k that is very bright. It looks identical to the
-non-working LED2 which is connected between 1.8V and MPP1_2 with R100.
-But there is no BOM available that would tell if the led parts are
-different.
-
-With no PSU connected I can make LED1 and LED3 light up with my
-multimeter, but not LED2.
-
-I'll try to contact globalscale and ask there.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>>   }
+>>     static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+>>
