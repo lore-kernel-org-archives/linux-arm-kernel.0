@@ -1,37 +1,40 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 21 Mar 2018 22:31:14 +0200
-Subject: [PATCH v3 2/3] gpiolib: Support 'gpio-reserved-ranges' property
-In-Reply-To: <152166234504.91116.14942145962035607739@swboyd.mtv.corp.google.com>
-References: <20180321165848.89751-1-swboyd@chromium.org>
- <20180321165848.89751-3-swboyd@chromium.org>
- <1521655150.23017.79.camel@linux.intel.com>
- <152166234504.91116.14942145962035607739@swboyd.mtv.corp.google.com>
-Message-ID: <1521664274.23017.92.camel@linux.intel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 21 Mar 2018 21:31:37 +0100
+Subject: 4.16-rc5 on Motorola Droid 4
+In-Reply-To: <20180320170029.rv3u5wlvqxfl7z2v@earth.universe>
+References: <20180318220418.GA22880@amd> <20180320140322.GU5799@atomide.com>
+ <20180320170029.rv3u5wlvqxfl7z2v@earth.universe>
+Message-ID: <20180321203137.GA23637@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-03-21 at 12:59 -0700, Stephen Boyd wrote:
-> Quoting Andy Shevchenko (2018-03-21 10:59:10)
-> > On Wed, 2018-03-21 at 09:58 -0700, Stephen Boyd wrote:
-> > > 
+Hi!
 
-> > 
-> > > +     gpiochip->valid_mask = kcalloc(BITS_TO_LONGS(gpiochip-
-> > > > ngpio),
-> > > 
-> > > +                                    sizeof(long), GFP_KERNEL);
-> > 
-> > Just noticed that kcalloc is superfluous here.
-> > kmalloc_array() would be enough.
-> > 
+> > Maybe get somebody to help you locally with the debug cable
+> > soldering? :)
 > 
-> Ok. I was copying the irqchip style. Should I fold them together into
-> a
-> helper function and also update to kmalloc_array?
+> I suppose people from your hackerspace can help you. It's really
+> easy to do. Soldering can be avoided btw. You can just use a pair
+> of scissors to cut a USB -> Micro USB cable and use a knife to remove
+> isolation. Then screw each of the 4 wires into a terminal strip.
+> There are USB-TTL adapters available, that have an attached cable.
+> If you also cut the connector from such a cable and connect it to
+> the other side of the terminal strip you are done. No soldering
+> involved ;)
 
-Not sure about first part, but definitely makes sense the second one (as
-a separate patch perhaps).
+Hm. How big no-no is connecting USB-TTL adapter to D+/D- pins? Because
+that's what I could do "easily" and seems to work ;-).
+
+								Pavel
+								
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180321/be467d2f/attachment-0001.sig>
