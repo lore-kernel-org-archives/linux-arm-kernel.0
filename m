@@ -1,100 +1,136 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 21 Mar 2018 10:54:53 +0800
-Subject: [PATCH V2 3/4] clk: add managed version of clk_bulk_get_all
+Date: Wed, 21 Mar 2018 10:54:54 +0800
+Subject: [PATCH V2 4/4] video: simplefb: switch to use clk_bulk API to
+ simplify clock operations
 In-Reply-To: <1521600894-29919-1-git-send-email-aisheng.dong@nxp.com>
 References: <1521600894-29919-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1521600894-29919-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1521600894-29919-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces the managed version of clk_bulk_get_all.
+Switching to use clk_bulk API to simplify clock operations.
 
-Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: linux-fbdev at vger.kernel.org
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 v1->v2:
- * new patch
+ * switch to clk_bulk_get_all from of_clk_bulk_get_all
 ---
- drivers/clk/clk-devres.c | 24 ++++++++++++++++++++++++
- include/linux/clk.h      | 23 +++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
+ drivers/video/fbdev/simplefb.c | 69 ++++++++----------------------------------
+ 1 file changed, 13 insertions(+), 56 deletions(-)
 
-diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-index d854e26..6d3ca5e 100644
---- a/drivers/clk/clk-devres.c
-+++ b/drivers/clk/clk-devres.c
-@@ -70,6 +70,30 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
- }
- EXPORT_SYMBOL_GPL(devm_clk_bulk_get);
- 
-+int __must_check devm_clk_bulk_get_all(struct device *dev,
-+				       struct clk_bulk_data **clks)
-+{
-+	struct clk_bulk_devres *devres;
-+	int ret;
-+
-+	devres = devres_alloc(devm_clk_bulk_release,
-+			      sizeof(*devres), GFP_KERNEL);
-+	if (!devres)
-+		return -ENOMEM;
-+
-+	ret = clk_bulk_get_all(dev, clks);
-+	if (ret > 0) {
-+		devres->clks = *clks;
-+		devres->num_clks = ret;
-+		devres_add(dev, devres);
-+	} else {
-+		devres_free(devres);
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(devm_clk_bulk_get_all);
-+
- static int devm_clk_match(struct device *dev, void *res, void *data)
+diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+index a3c44ec..3c8124e 100644
+--- a/drivers/video/fbdev/simplefb.c
++++ b/drivers/video/fbdev/simplefb.c
+@@ -182,7 +182,7 @@ struct simplefb_par {
+ #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
+ 	bool clks_enabled;
+ 	unsigned int clk_count;
+-	struct clk **clks;
++	struct clk_bulk_data *clks;
+ #endif
+ #if defined CONFIG_OF && defined CONFIG_REGULATOR
+ 	bool regulators_enabled;
+@@ -214,37 +214,13 @@ static int simplefb_clocks_get(struct simplefb_par *par,
+ 			       struct platform_device *pdev)
  {
- 	struct clk **c = res;
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index a76fdff..fe48e01 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -313,6 +313,22 @@ int __must_check clk_bulk_get_all(struct device *dev,
-  */
- int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
- 				   struct clk_bulk_data *clks);
-+/**
-+ * devm_clk_bulk_get_all - managed get multiple clk consumers
-+ * @dev: device for clock "consumer"
-+ * @clks: pointer to the clk_bulk_data table of consumer
-+ *
-+ * Returns a positive value for the number of clocks obtained while the
-+ * clock references are stored in the clk_bulk_data table in @clks field.
-+ * Returns 0 if there're none and a negative value if something failed.
-+ *
-+ * This helper function allows drivers to get several clk
-+ * consumers in one operation with management, the clks will
-+ * automatically be freed when the device is unbound.
-+ */
-+
-+int __must_check devm_clk_bulk_get_all(struct device *dev,
-+				       struct clk_bulk_data **clks);
+ 	struct device_node *np = pdev->dev.of_node;
+-	struct clk *clock;
+-	int i;
  
- /**
-  * devm_clk_get - lookup and obtain a managed reference to a clock producer.
-@@ -658,6 +674,13 @@ static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clk
+ 	if (dev_get_platdata(&pdev->dev) || !np)
+ 		return 0;
+ 
+-	par->clk_count = of_clk_get_parent_count(np);
+-	if (!par->clk_count)
+-		return 0;
+-
+-	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
+-	if (!par->clks)
+-		return -ENOMEM;
+-
+-	for (i = 0; i < par->clk_count; i++) {
+-		clock = of_clk_get(np, i);
+-		if (IS_ERR(clock)) {
+-			if (PTR_ERR(clock) == -EPROBE_DEFER) {
+-				while (--i >= 0) {
+-					if (par->clks[i])
+-						clk_put(par->clks[i]);
+-				}
+-				kfree(par->clks);
+-				return -EPROBE_DEFER;
+-			}
+-			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
+-				__func__, i, PTR_ERR(clock));
+-			continue;
+-		}
+-		par->clks[i] = clock;
+-	}
++	par->clk_count = clk_bulk_get_all(&pdev->dev, &par->clks);
++	if ((par->clk_count < 0) && (par->clk_count == -EPROBE_DEFER))
++		return -EPROBE_DEFER;
+ 
  	return 0;
  }
- 
-+static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
-+						     struct clk_bulk_data **clks);
-+{
-+
-+	return 0;
-+}
-+
- static inline struct clk *devm_get_clk_from_child(struct device *dev,
- 				struct device_node *np, const char *con_id)
+@@ -252,45 +228,26 @@ static int simplefb_clocks_get(struct simplefb_par *par,
+ static void simplefb_clocks_enable(struct simplefb_par *par,
+ 				   struct platform_device *pdev)
  {
+-	int i, ret;
++	int ret;
++
++	ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
++	if (ret)
++		dev_warn(&pdev->dev, "failed to enable clocks\n");
+ 
+-	for (i = 0; i < par->clk_count; i++) {
+-		if (par->clks[i]) {
+-			ret = clk_prepare_enable(par->clks[i]);
+-			if (ret) {
+-				dev_err(&pdev->dev,
+-					"%s: failed to enable clock %d: %d\n",
+-					__func__, i, ret);
+-				clk_put(par->clks[i]);
+-				par->clks[i] = NULL;
+-			}
+-		}
+-	}
+ 	par->clks_enabled = true;
+ }
+ 
+ static void simplefb_clocks_destroy(struct simplefb_par *par)
+ {
+-	int i;
+-
+-	if (!par->clks)
+-		return;
++	if (par->clks_enabled)
++		clk_bulk_disable_unprepare(par->clk_count, par->clks);
+ 
+-	for (i = 0; i < par->clk_count; i++) {
+-		if (par->clks[i]) {
+-			if (par->clks_enabled)
+-				clk_disable_unprepare(par->clks[i]);
+-			clk_put(par->clks[i]);
+-		}
+-	}
+-
+-	kfree(par->clks);
++	clk_bulk_put_all(par->clk_count, par->clks);
+ }
+ #else
+ static int simplefb_clocks_get(struct simplefb_par *par,
+ 	struct platform_device *pdev) { return 0; }
+-static void simplefb_clocks_enable(struct simplefb_par *par,
+-	struct platform_device *pdev) { }
++static int simplefb_clocks_enable(struct simplefb_par *par) { }
+ static void simplefb_clocks_destroy(struct simplefb_par *par) { }
+ #endif
+ 
 -- 
 2.7.4
