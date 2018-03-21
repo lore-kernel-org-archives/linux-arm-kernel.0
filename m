@@ -1,327 +1,78 @@
-From: tmaimon77@gmail.com (Tomer Maimon)
-Date: Wed, 21 Mar 2018 17:36:17 +0200
-Subject: [PATCH v1 1/1] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <1521646577-10773-1-git-send-email-tmaimon77@gmail.com>
-References: <1521646577-10773-1-git-send-email-tmaimon77@gmail.com>
-Message-ID: <1521646577-10773-2-git-send-email-tmaimon77@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 21 Mar 2018 11:56:55 -0400 (EDT)
+Subject: [PATCH v4 00/17] netdev: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
+References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180321.115655.108053425798020503.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common device tree for all Nuvoton NPCM7xx BMCs and a board
-specific device tree for the NPCM750 (Poleg) evaluation board.
+From: Sinan Kaya <okaya@codeaurora.org>
+Date: Mon, 19 Mar 2018 22:42:15 -0400
 
-Signed-off-by: Tomer Maimon <tmaimon77@gmail.com>
----
- arch/arm/boot/dts/Makefile                    |   2 +
- arch/arm/boot/dts/nuvoton-common-npcm7xx.dtsi | 187 ++++++++++++++++++++++++++
- arch/arm/boot/dts/nuvoton-npcm750-evb.dts     |  39 ++++++
- arch/arm/boot/dts/nuvoton-npcm750.dtsi        |  45 +++++++
- 4 files changed, 273 insertions(+)
- create mode 100644 arch/arm/boot/dts/nuvoton-common-npcm7xx.dtsi
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
+> Code includes wmb() followed by writel() in multiple places. writel()
+> already has a barrier on some architectures like arm64.
+> 
+> This ends up CPU observing two barriers back to back before executing the
+> register write.
+> 
+> Since code already has an explicit barrier call, changing writel() to
+> writel_relaxed().
+> 
+> I did a regex search for wmb() followed by writel() in each drivers
+> directory.
+> I scrubbed the ones I care about in this series.
+> 
+> I considered "ease of change", "popular usage" and "performance critical
+> path" as the determining criteria for my filtering.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38543dc..ba3bfa674e32 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -304,6 +304,8 @@ dtb-$(CONFIG_ARCH_LPC18XX) += \
- dtb-$(CONFIG_ARCH_LPC32XX) += \
- 	lpc3250-ea3250.dtb \
- 	lpc3250-phy3250.dtb
-+dtb-$(CONFIG_ARCH_NPCM7XX) += \
-+	nuvoton-npcm750-evb.dtb
- dtb-$(CONFIG_MACH_MESON6) += \
- 	meson6-atv1200.dtb
- dtb-$(CONFIG_MACH_MESON8) += \
-diff --git a/arch/arm/boot/dts/nuvoton-common-npcm7xx.dtsi b/arch/arm/boot/dts/nuvoton-common-npcm7xx.dtsi
-new file mode 100644
-index 000000000000..d2d0761295a4
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-common-npcm7xx.dtsi
-@@ -0,0 +1,187 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology tomer.maimon at nuvoton.com
-+// Copyright 2018 Google, Inc.
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+
-+	/* external reference clock */
-+	clk_refclk: clk_refclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;
-+		clock-output-names = "refclk";
-+	};
-+
-+	/* external reference clock for cpu. float in normal operation */
-+	clk_sysbypck: clk_sysbypck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <800000000>;
-+		clock-output-names = "sysbypck";
-+	};
-+
-+	/* external reference clock for MC. float in normal operation */
-+	clk_mcbypck: clk_mcbypck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <800000000>;
-+		clock-output-names = "mcbypck";
-+	};
-+
-+	 /* external clock signal rg1refck, supplied by the phy */
-+	clk_rg1refck: clk_rg1refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clk_rg1refck";
-+	};
-+
-+	 /* external clock signal rg2refck, supplied by the phy */
-+	clk_rg2refck: clk_rg2refck {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clk_rg2refck";
-+	};
-+
-+	clk_xin: clk_xin {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+		clock-output-names = "clk_xin";
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0x0 0xf0000000 0x00900000>;
-+
-+		gcr: gcr at 800000 {
-+			compatible = "nuvoton,npcm750-gcr", "syscon",
-+				"simple-mfd";
-+			reg = <0x800000 0x1000>;
-+		};
-+
-+		scu: scu at 3fe000 {
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0x3fe000 0x1000>;
-+		};
-+
-+		l2: cache-controller at 3fc000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x3fc000 0x1000>;
-+			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+			cache-unified;
-+			cache-level = <2>;
-+			clocks = <&clk 10>;
-+			arm,shared-override;
-+		};
-+
-+		gic: interrupt-controller at 3ff000 {
-+			compatible = "arm,cortex-a9-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x3ff000 0x1000>,
-+				<0x3fe100 0x100>;
-+		};
-+	};
-+
-+	ahb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		clk: clock-controller at f0801000 {
-+			compatible = "nuvoton,npcm750-clk", "syscon";
-+			#clock-cells = <1>;
-+			clock-controller;
-+			reg = <0xf0801000 0x1000>;
-+			clock-names = "refclk", "sysbypck", "mcbypck";
-+			clocks = <&clk_refclk>, <&clk_sysbypck>, <&clk_mcbypck>;
-+		};
-+
-+		apb {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			interrupt-parent = <&gic>;
-+			ranges = <0x0 0xf0000000 0x00300000>;
-+
-+			timer0: timer at 8000 {
-+				compatible = "nuvoton,npcm750-timer";
-+				interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0x8000 0x50>;
-+				clocks = <&clk 5>;
-+			};
-+
-+			watchdog0: watchdog at 801C {
-+				compatible = "nuvoton,npcm750-wdt";
-+				interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0x801C 0x4>;
-+				status = "disabled";
-+				clocks = <&clk 5>;
-+			};
-+
-+			watchdog1: watchdog at 901C {
-+				compatible = "nuvoton,npcm750-wdt";
-+				interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0x901C 0x4>;
-+				status = "disabled";
-+				clocks = <&clk 5>;
-+			};
-+
-+			watchdog2: watchdog at a01C {
-+				compatible = "nuvoton,npcm750-wdt";
-+				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xa01C 0x4>;
-+				status = "disabled";
-+				clocks = <&clk 5>;
-+			};
-+
-+			serial0: serial at 1000 {
-+				compatible = "nuvoton,npcm750-uart";
-+				reg = <0x1000 0x1000>;
-+				clocks = <&clk 6>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial1: serial at 2000 {
-+				compatible = "nuvoton,npcm750-uart";
-+				reg = <0x2000 0x1000>;
-+				clocks = <&clk 6>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial2: serial at 3000 {
-+				compatible = "nuvoton,npcm750-uart";
-+				reg = <0x3000 0x1000>;
-+				clocks = <&clk 6>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			serial3: serial at 4000 {
-+				compatible = "nuvoton,npcm750-uart";
-+				reg = <0x4000 0x1000>;
-+				clocks = <&clk 6>;
-+				interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-new file mode 100644
-index 000000000000..15f744f1beea
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -0,0 +1,39 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology tomer.maimon at nuvoton.com
-+// Copyright 2018 Google, Inc.
-+
-+/dts-v1/;
-+#include "nuvoton-npcm750.dtsi"
-+
-+/ {
-+	model = "Nuvoton npcm750 Development Board (Device Tree)";
-+	compatible = "nuvoton,npcm750";
-+
-+	chosen {
-+		stdout-path = &serial3;
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+};
-+
-+&watchdog1 {
-+	status = "okay";
-+};
-+
-+&serial0 {
-+	status = "okay";
-+};
-+
-+&serial1 {
-+	status = "okay";
-+};
-+
-+&serial2 {
-+	status = "okay";
-+};
-+
-+&serial3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-new file mode 100644
-index 000000000000..5afdc730fc4a
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-@@ -0,0 +1,45 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Nuvoton Technology tomer.maimon at nuvoton.com
-+// Copyright 2018 Google, Inc.
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "nuvoton-common-npcm7xx.dtsi"
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "nuvoton,npcm750-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk 0>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk 0>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&l2>;
-+		};
-+	};
-+	soc {
-+		timer at 3fe600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0x3fe600 0x20>;
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+						  IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&clk 5>;
-+		};
-+	};
-+};
--- 
-2.14.1
+I agree that for performance sensitive operations, specifically writing
+doorbell registers in the hot paths or RX and TX packet processing, this
+is a good change.
+
+However, in configuration paths and whatnot, it is much less urgent and
+useful.
+
+Therefore I think it would work better if you concentrated solely on
+hot code path cases.
+
+You can, on a driver by driver basis, submit the other transformations
+in the slow paths, and let the driver maintainers decide whether to
+take those on or not.
+
+Also, please stick exactly to the case where we have:
+
+	wmb/mb/etc.
+	writel()
+
+Because I see some changes where we have:
+
+	writel()
+
+	barrier()
+
+	writel()
+
+for exmaple, and you are turning that second writel() into a relaxed
+on as well.  The above is using a compile barrier, not a memory
+barrier, so effectively it is two writel()'s in sequence which is
+not what this patch set is about.
+
+If anything, that compile barrier() is superfluous and could be
+removed.  But that is also a separate change from what this patch
+series is doing here.
+
+Finally, it makes it that much easier if we can see the preceeding
+memory barrier in the context of the patch that adjusts the writel
+into a writel_relaxed.
+
+In one case, a macro DOORBELL() is changed to use writel().  This
+makes it so that the patch reviewer has to scan over the entire
+driver in question to see exactly how DOORBELL() is used and whether
+it fits the criteria for the writel_relaxed() transformation.
+
+I would suggest that you adjust the name of the macro in a situation
+like this, f.e. to DOORBELL_RELAXED().
+
+Thank you.
