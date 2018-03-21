@@ -1,63 +1,45 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 21 Mar 2018 18:55:09 +0100
-Subject: [PATCH] ARM: EXYNOS: Fix coupled CPU idle freeze on Exynos4210
-In-Reply-To: <3225655.FLAaRANmer@aspire.rjw.lan>
-References: <CGME20180321094523eucas1p1a87d146d65d4191ccdb37f1723977011@eucas1p1.samsung.com>
- <20180321094505.25494-1-m.szyprowski@samsung.com>
- <3225655.FLAaRANmer@aspire.rjw.lan>
-Message-ID: <20180321175509.jkemst242vv7d4qv@kozik-lap>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 21 Mar 2018 19:59:10 +0200
+Subject: [PATCH v3 2/3] gpiolib: Support 'gpio-reserved-ranges' property
+In-Reply-To: <20180321165848.89751-3-swboyd@chromium.org>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-3-swboyd@chromium.org>
+Message-ID: <1521655150.23017.79.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 02:49:52PM +0100, Rafael J. Wysocki wrote:
-> On Wednesday, March 21, 2018 10:45:05 AM CET Marek Szyprowski wrote:
-> > Since commit 04c8b0f82c7d ("irqchip/gic: Make locking a BL_SWITCHER only
-> > feature") coupled CPU idle freezes from time to time on Exynos4210. Later
-> > commit 313c8c16ee62 ("PM / CPU: replace raw_notifier with atomic_notifier")
-> > changed the context in which the CPU idle code is executed, what results
-> > in fully reproducible freeze all the time. However, almost the same coupled
-> > CPU idle code works fine on Exynos3250 regarless of the changes made in
-> > the mentioned commits.
-> > 
-> > It turned out that the IPI call used on Exynos4210 is conflicting with the
-> > change done in the first mentioned commit in GIC. Fix this by using the
-> > same code path as for Exynos3250, instead of the IPI call for
-> > synchronization with second CPU core, call dsb_sev() directly.
-> > 
-> > Tested on Exynos4210-based Trats and Origen boards.
-> > 
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > CC: stable at vger.kernel.org # v4.13+
-> > ---
-> >  arch/arm/mach-exynos/pm.c | 6 +-----
-> >  1 file changed, 1 insertion(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> > index dc4346ecf16d..a1055a2b8d54 100644
-> > --- a/arch/arm/mach-exynos/pm.c
-> > +++ b/arch/arm/mach-exynos/pm.c
-> > @@ -271,11 +271,7 @@ static int exynos_cpu0_enter_aftr(void)
-> >  				goto fail;
-> >  
-> >  			call_firmware_op(cpu_boot, 1);
-> > -
-> > -			if (soc_is_exynos3250())
-> > -				dsb_sev();
-> > -			else
-> > -				arch_send_wakeup_ipi_mask(cpumask_of(1));
-> > +			dsb_sev();
-> >  		}
-> >  	}
-> >  fail:
-> > 
+On Wed, 2018-03-21 at 09:58 -0700, Stephen Boyd wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> That will be -stable material I believe?
+> Some qcom platforms make some GPIOs or pins unavailable for use by
+> non-secure operating systems, and thus reading or writing the
+> registers
+> for those pins will cause access control issues. Add support for a DT
+> property to describe the set of GPIOs that are available for use so
+> that
+> higher level OSes are able to know what pins to avoid reading/writing.
+> Non-DT platforms can add support by directly updating the
+> chip->valid_mask.
 
-Yes, it is CC-stable.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Stephen Boyd <swboyd@chromium.org>
 
-Marek,
-Thanks, applied (with adjustment of stable address - I believe if some
-text follows it, it makes more readable to put <>).
+Hmm...
 
-Best regards,
-Krzysztof
+> +	gpiochip->valid_mask = kcalloc(BITS_TO_LONGS(gpiochip-
+> >ngpio),
+> +				       sizeof(long), GFP_KERNEL);
+
+Just noticed that kcalloc is superfluous here.
+kmalloc_array() would be enough.
+
+> +	if (!gpiochip->valid_mask)
+> +		return -ENOMEM;
+> +
+> +	/* Assume by default all GPIOs are valid */
+> +	bitmap_fill(gpiochip->valid_mask, gpiochip->ngpio);
+
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
