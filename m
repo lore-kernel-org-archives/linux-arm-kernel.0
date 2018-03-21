@@ -1,43 +1,56 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 21 Mar 2018 14:12:38 +0800
-Subject: [usb-next PATCH] usb: xhci: skip phys initialization of shared hcd
-Message-ID: <1ece0d5508a00bca67d16e64310a071646b59c7d.1521612280.git.chunfeng.yun@mediatek.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Mar 2018 05:26:06 +0000
+Subject: [PATCH] arm/arm64: smccc: Fix CLANG compilation for ARM 64 bit
+ archs
+In-Reply-To: <1521584046-19692-1-git-send-email-isaacm@codeaurora.org>
+References: <1521584046-19692-1-git-send-email-isaacm@codeaurora.org>
+Message-ID: <20180321052555.lfnnhcp5iapwgrzt@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phys has already been initialized when add primary hcd,
-including usb2 phys and usb3 phys also if exist, so needn't
-re-parse "phys" property again.
+Hi,
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/host/xhci-mtk.c  | 1 +
- drivers/usb/host/xhci-plat.c | 1 +
- 2 files changed, 2 insertions(+)
+On Tue, Mar 20, 2018 at 03:14:06PM -0700, Isaac J. Manjarres wrote:
+> Currently, there are references to registers that
+> have had their names changed in 64 bit ARM architectures,
+> such as "r0." While GCC automatically does the conversion of
+> these registers to their 64 bit counterparts, CLANG
+> does not, resulting in compilation failures when
+> building the kernel. Allow for differentiation of
+> which register names to use, based on ARM architecture.
 
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index 7334da9..6bb23fb 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -554,6 +554,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
- 		xhci->shared_hcd->can_do_streams = 1;
- 
-+	xhci->shared_hcd->skip_phy_initialization = 1;
- 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto dealloc_usb2_hcd;
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 6700e5e..65a4294 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -294,6 +294,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
- 		xhci->shared_hcd->can_do_streams = 1;
- 
-+	xhci->shared_hcd->skip_phy_initialization = 1;
- 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
- 	if (ret)
- 		goto dealloc_usb2_hcd;
--- 
-1.9.1
+Please note that the architecture still calls these registers rN, the xN and wN
+names are aliases. The commit message is a little misleading, and it sounds
+like this is a deficiency in clang.
+
+Is there a plan to fix clang to accept this format?
+
+> Change-Id: If89d47b2feb217d97bb61a3f99e61096705a4984
+
+Please remove these tags when submitting patches upstream.
+
+[...]
+
+> +#define R0_STR		"x0"
+> +#define R1_STR		"x1"
+> +#define R2_STR		"x2"
+> +#define R3_STR		"x3"
+> +#define R4_STR		"x4"
+> +#define R5_STR		"x5"
+> +#define R6_STR		"x6"
+> +#define R7_STR		"x7"
+
+This would be simpler if we had:
+
+  /* aarch64 */
+  #define SMCCC_REG(n)		"x" #n
+
+  /* aarch32 */
+  #define SMCCC_REG(n)		"r" #n
+
+... then later we do:
+
+  register <type> rN asm(SMCCC_REG(N));
+
+Thanks,
+Mark.
