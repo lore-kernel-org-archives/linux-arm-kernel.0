@@ -1,52 +1,59 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 21 Mar 2018 11:50:03 +0100
-Subject: [PATCH 1/3] arm64: dts: marvell: armada-37xx: mark the gpio
- controllers as irq controller
-Message-ID: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+Date: Wed, 21 Mar 2018 11:50:04 +0100
+Subject: [PATCH 2/3] arm64: dts: armada-3720-espressobin: make use of switch
+ irq line
+In-Reply-To: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+References: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20180321105005.18426-2-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows to reference these gpio controller as interrupt parent. Also
-add a comment which cpu line names are managed by the controllers
-because "nb" and "sb" usually doesn't appear in schematics, but MPPX_Y
-do.
+The switch's INTn line is connected to the CPU's MPP2_23 pad. Wire this
+up in the device tree. Note however that up to now the
+marvell,armada3710-sb-pinctrl driver doesn't support level irqs, so the
+switch driver doesn't make use of this feature.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 375026867342..6a96404e7c88 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -184,10 +184,13 @@
- 				compatible = "marvell,armada3710-nb-pinctrl",
- 					     "syscon", "simple-mfd";
- 				reg = <0x13800 0x100>, <0x13C00 0x20>;
-+				/* MPP1[19:0] */
- 				gpionb: gpio {
- 					#gpio-cells = <2>;
- 					gpio-ranges = <&pinctrl_nb 0 0 36>;
- 					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
- 					interrupts =
- 					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
- 					<GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-@@ -245,10 +248,13 @@
- 				compatible = "marvell,armada3710-sb-pinctrl",
- 					     "syscon", "simple-mfd";
- 				reg = <0x18800 0x100>, <0x18C00 0x20>;
-+				/* MPP2[23:0] */
- 				gpiosb: gpio {
- 					#gpio-cells = <2>;
- 					gpio-ranges = <&pinctrl_sb 0 0 30>;
- 					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
- 					interrupts =
- 					<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
- 					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+index 6d070b267abe..a88f053d2f28 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -133,6 +133,11 @@
+ 		#size-cells = <0>;
+ 		reg = <1>;
+ 
++		interrupt-parent = <&gpiosb>;
++		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++
+ 		dsa,member = <0 0>;
+ 
+ 		ports {
+@@ -171,12 +176,20 @@
+ 
+ 			switch0phy0: switch0phy0 at 11 {
+ 				reg = <0x11>;
++				interrupt-parent = <&switch0>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
++
+ 			switch0phy1: switch0phy1 at 12 {
+ 				reg = <0x12>;
++				interrupt-parent = <&switch0>;
++				interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
++
+ 			switch0phy2: switch0phy2 at 13 {
+ 				reg = <0x13>;
++				interrupt-parent = <&switch0>;
++				interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 	};
 -- 
 2.16.2
