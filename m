@@ -1,68 +1,75 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 21 Mar 2018 16:01:48 -0500
-Subject: [PATCH v4 3/6] RDMA/i40iw: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180321200253.GA21453@ziepe.ca>
-References: <1521514068-8856-1-git-send-email-okaya@codeaurora.org>
- <1521514068-8856-4-git-send-email-okaya@codeaurora.org>
- <20180321200253.GA21453@ziepe.ca>
-Message-ID: <596af6f5-3668-2545-4d79-b7b8c6713444@codeaurora.org>
+From: pelcan@codeaurora.org (Philip Elcan)
+Date: Wed, 21 Mar 2018 17:02:52 -0400
+Subject: [PATCH] arm64: tlbflush: avoid writing RES0 bits
+Message-ID: <1521666172-2494-1-git-send-email-pelcan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/21/2018 3:02 PM, Jason Gunthorpe wrote:
-> On Mon, Mar 19, 2018 at 10:47:45PM -0400, Sinan Kaya wrote:
->> diff --git a/drivers/infiniband/hw/i40iw/i40iw_uk.c b/drivers/infiniband/hw/i40iw/i40iw_uk.c
->> index 8afa5a6..7f0ebed 100644
->> +++ b/drivers/infiniband/hw/i40iw/i40iw_uk.c
->> @@ -723,7 +723,7 @@ static void i40iw_cq_request_notification(struct i40iw_cq_uk *cq,
->>  
->>  	wmb(); /* make sure WQE is populated before valid bit is set */
->>  
->> -	writel(cq->cq_id, cq->cqe_alloc_reg);
->> +	writel_relaxed(cq->cq_id, cq->cqe_alloc_reg);
->>  }
-> 
-> Ah, this one is probably not OK, i40iw_cq_request_notification is
-> called here:
-> 
-> 	spin_lock_irqsave(&iwcq->lock, flags);
-> 	ukcq->ops.iw_cq_request_notification(ukcq, cq_notify);
-> 	spin_unlock_irqrestore(&iwcq->lock, flags);
-> 
-> So this needs to add mmmiomb(); to keep the same semantics.
-> 
-> Generally I think you need to be very careful to ensure that any
-> conversion to _relaxed isn't contained by a spinlock, or the mmiomb()
-> is present.
-> 
-> Maybe even do a first series with this obviously correct pattern:
-> 
->  wmb();
->  writel() -> writel_relaxed()
->  writel() -> writel_relaxed()
->  [..]
->  mmiowmb();
+Bits [47:44] of the TLBI register operand are RES0 for instructions that
+require a VA, per the ARM ARM spec, so TLBI operations should avoid writing
+non-zero values to these bits.
 
-Good catch. I changed it as follows:
+Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+---
+ arch/arm64/include/asm/tlbflush.h | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
-+++ b/drivers/infiniband/hw/i40iw/i40iw_uk.c
-@@ -723,7 +723,8 @@ static void i40iw_cq_request_notification(struct i40iw_cq_uk *cq,
-
-        wmb(); /* make sure WQE is populated before valid bit is set */
-
--       writel(cq->cq_id, cq->cqe_alloc_reg);
-+       writel_relaxed(cq->cq_id, cq->cqe_alloc_reg);
-+       mmiowb();
- }
-
-
-> 
-> Jason
-> 
-
-
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 9e82dd7..dbd22a9 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -60,6 +60,9 @@
+ 		__tlbi(op, (arg) | USER_ASID_FLAG);				\
+ } while (0)
+ 
++/* This macro masks out RES0 bits in the TLBI operand */
++#define __TLBI_VADDR(addr) (addr & ~GENMASK_ULL(47, 44))
++
+ /*
+  *	TLB Management
+  *	==============
+@@ -128,7 +131,8 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
+ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 				  unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
++	unsigned long addr = __TLBI_VADDR(uaddr >> 12) |
++			     (ASID(vma->vm_mm) << 48);
+ 
+ 	dsb(ishst);
+ 	__tlbi(vale1is, addr);
+@@ -154,8 +158,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 		return;
+ 	}
+ 
+-	start = asid | (start >> 12);
+-	end = asid | (end >> 12);
++	start = asid | __TLBI_VADDR(start >> 12);
++	end = asid | __TLBI_VADDR(end >> 12);
+ 
+ 	dsb(ishst);
+ 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
+@@ -185,8 +189,8 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ 		return;
+ 	}
+ 
+-	start >>= 12;
+-	end >>= 12;
++	start = __TLBI_VADDR(start >> 12);
++	end = __TLBI_VADDR(end >> 12);
+ 
+ 	dsb(ishst);
+ 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
+@@ -202,7 +206,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+ 				       unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
++	unsigned long addr = __TLBI_VADDR(uaddr >> 12) | (ASID(mm) << 48);
+ 
+ 	__tlbi(vae1is, addr);
+ 	__tlbi_user(vae1is, addr);
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
