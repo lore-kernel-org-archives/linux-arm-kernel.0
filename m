@@ -1,78 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Mar 2018 09:02:17 +0100
-Subject: [PATCH] pinctrl: armada-37xx: Add edge both type gpio irq support
-In-Reply-To: <20180320215615.zszlfw5pnecfqhpt@pengutronix.de>
-References: <20171019131003.9684-1-gregory.clement@free-electrons.com>
- <CACRpkdbqjh5U5QoE_B+7GfSyDdHW-NCAvogGq-2n8j6L6nG-Gw@mail.gmail.com>
- <20171031131617.GA11647@lunn.ch>
- <20180320215615.zszlfw5pnecfqhpt@pengutronix.de>
-Message-ID: <CACRpkdaAytp4veUYSYaJ8GB7+1EMbTFz2NMNv4GQrLhiWH8g3A@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 21 Mar 2018 09:22:47 +0100
+Subject: [PATCH 1/5] bus: arm-cci: use asm unreachable
+In-Reply-To: <20180320233046.GL2743@n2100.armlinux.org.uk>
+References: <20180320230206.25289-1-stefan@agner.ch>
+ <20180320230206.25289-2-stefan@agner.ch>
+ <20180320233046.GL2743@n2100.armlinux.org.uk>
+Message-ID: <23ba28a09df84e723cd38bfc16dfca56@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 10:56 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+On 21.03.2018 00:30, Russell King - ARM Linux wrote:
+> On Wed, Mar 21, 2018 at 12:02:02AM +0100, Stefan Agner wrote:
+>> Mixing asm and C code is not recommended in a naked function by
+>> gcc and leads to an error when using clang:
+>>   drivers/bus/arm-cci.c:2107:2: error: non-ASM statement in naked
+>>   function is not supported
+>>         unreachable();
+>>         ^
+>>
+>> Instead of using the unreachable() macro use the assember variant
+>> ASM_UNREACHABLE.  This will no longer emit __builtin_unreachable(),
+>> but since the function is naked and its return type is void it seems
+>> not to have aversive effects.
+> 
+> I think that unreachable() there is rather silly - this function
+> *does* return, and the comments say as much.  Just delete the silly
+> "unreachable()", there's no need to put an ASM_UNREACHABLE in there.
+> 
+> The function is not declared as not returning, and nothing in this
+> file uses it anyway - it's called from the mcpm code, which also
+> _does_ expect this function to return (if it doesn't, then we're
+> basically saying the CPU that called it is dead.)
+> 
 
-> Maybe I'm wrong, but I wonder if there could be a set of helper
-> functions provided by the gpio core that helps implementing this
-> software simulation of IRQ_TYPE_EDGE_BOTH reliably (i.e. as good as
-> possible in software) to prevent common mistakes.
->
-> First draft:
->
->                 disable_irq_nosync(...);
->                 level = gpio_get(...);
->         retry:
->                 if (level)
->                         configure_for_falling_edge();
->                 else
->                         configure_for_raising_edge();
->                 postlevel = gpio_get(...);
->
->                 if (level != postlevel) {
->                         mark_irq_pending(); /* something like desc->istate |= IRQS_PENDING */
->                         level = postlevel;
->                         goto retry;
->                 }
->
->                 enable_irq(...); /* this resends the irq */
->
-> I think this only looses an event if there is an edge between gpio_get
-> and the configure_for_${some}_edge and another before postlevel = ...
-> that make the two events invisible. But I think this is okish, as a
-> short spike might also be missed by a hw-edge-detector. And compared to
-> the current code there should be no way to end in a state where we
-> configured for raising edge and the level is already high.
+Hm, that makes sense. Will just drop unreachable() in the next revision.
 
-This is looking good compared to the solutions people have hacked up.
+Thanks for reviewing!
 
-> When the gpio toggles quickly this might keep the cpu busy in an endless
-> loop, but such a sequence would also block a controller that can trigger
-> on both edges in hardware. Not sure if breaking the loop at some point
-> is sensible anyhow. Also calling the irq handlers would be beneficial,
-> but I don't know if/how this works without (more) racing.
+--
+Stefan
 
-What would make sense (if you want a perfect solution) is to enforce
-some reasonable debouncing on double edges.
-
-That may seem hard to do since not all HW has debounce.
-
-In the past I had the idea to implement also generic debounce with a timer
-in gpiolib, so that gpiod_set_debounce() would never fail, so in effect
-to factor the code from drivers/input/keyboard/gpio_keys.c
-over to gpiolib so they don't need a fallback at all, and then with
-double edges, enforce some debouncing based on HZ.
-
-At one point I tried to bring the debounce code over from the
-input driver, but I hit some snag, I don't remember what though.
-An optional per-gpiod timer can be created in struct gpio_desc
-when needed.
-
-> A similar approach would be great to have to "simulate" level sensitive
-> irqs if the hardware only implements edge logic (which affects
-> armada-37xx, too, which annoys me).
-
-Yes that would be neat too...
-
-Yours,
-Linus Walleij
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  drivers/bus/arm-cci.c | 3 +--
+>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+>> index 5426c04fe24b..ee9da86fec47 100644
+>> --- a/drivers/bus/arm-cci.c
+>> +++ b/drivers/bus/arm-cci.c
+>> @@ -2084,6 +2084,7 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+>>
+>>  "	mov	r0, #0 \n"
+>>  "	bx	lr \n"
+>> +	ASM_UNREACHABLE
+>>
+>>  "	.align	2 \n"
+>>  "5:	.word	cpu_port - . \n"
+>> @@ -2103,8 +2104,6 @@ asmlinkage void __naked cci_enable_port_for_self(void)
+>>  	[sizeof_struct_cpu_port] "i" (sizeof(struct cpu_port)),
+>>  	[sizeof_struct_ace_port] "i" (sizeof(struct cci_ace_port)),
+>>  	[offsetof_port_phys] "i" (offsetof(struct cci_ace_port, phys)) );
+>> -
+>> -	unreachable();
+>>  }
+>>
+>>  /**
+>> --
+>> 2.16.2
+>>
