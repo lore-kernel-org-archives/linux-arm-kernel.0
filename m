@@ -1,71 +1,88 @@
 From: rrajk@nvidia.com (Rajkumar Rampelli)
-Date: Wed, 21 Mar 2018 10:10:35 +0530
-Subject: [PATCH V2 0/9] Implementation of Tegra Tachometer driver
-Message-ID: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
+Date: Wed, 21 Mar 2018 10:10:36 +0530
+Subject: [PATCH V2 1/9] pwm: core: Add support for PWM HW driver with pwm
+ capture only
+In-Reply-To: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
+References: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
+Message-ID: <1521607244-29734-2-git-send-email-rrajk@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches adds support for PWM based Tegra Tachometer driver
-which implements PWM capture interface to analyze the PWM signal of a
-electronic fan and reports it in periods and duty cycles.
+Add support for pwm HW driver which has only capture functionality.
+This helps to implement the PWM based Tachometer driver which reads
+the PWM output signals from electronic fans.
 
-Added fan device attribute fan1_input in pwm-fan driver to monitor the
-speed of fan in rotations per minute using PWM interface.
-RPM of Fan will be exposed to user interface through HWMON sysfs interface
-avialable at location: /sys/class/hwmon/hwmon0/fan1_input
+PWM Tachometer captures the period and duty cycle of the PWM signal
 
-Steps to validate Tachometer on Tegra186 SoC:
-A. push modules pwm-tegra.ko, pwm-tegra-tachometer.ko and pwm-fan.ko to
-   linux device using scp command.
-   scp build/tegra186/drivers/pwm/pwm-tegra.ko ubuntu at 10.19.65.176:/tmp/
-   scp build/tegra186/drivers/pwm/pwm-tegra-tachometer.ko ubuntu at 10.19.65.176:/tmp/
-   scp build/tegra186/drivers/hwmon/pwm-fan.ko ubuntu at 10.19.65.176:/tmp/
-B. On Linux device console, insert these modules using insmod command.
-   insmod /tmp/pwm-tegra.ko
-   insmod /tmp/pwm-tegra-tachometer.ko
-   insmod /tmp/pwm-fan.ko
-C. Read RPM value at below sysfs node
-   cat /sys/calss/hwmon/hwmon0/fan1_input
-D. Change the FAN speed using PWM sysfs interface. Follow below steps for the same:
-   a. cd /sys/class/pwm/pwmchip0
-   b. ls -la (make sure pwm controller is c340000.pwm)
-      Output should be: device -> ../../../c340000.pwm
-   c. echo 0 > export
-   d. cd pwmchip0:0
-   e. echo 8000 > period
-   f. echo 1 > enable
-   g. echo 8000 > duty_cycle # change duty_cycles from 0 to 8000 for FAN speed variation
-   h. cat /sys/calss/hwmon/hwmon0/fan1_input
-   i. echo 4000 > duty_cycle
-   h. cat /sys/calss/hwmon/hwmon0/fan1_input
-   i. echo 2000 > duty_cycle
-   h. cat /sys/calss/hwmon/hwmon0/fan1_input
-   i. echo 0 > duty_cycle
-   h. cat /sys/calss/hwmon/hwmon0/fan1_input
+Add conditional checks for callabacks enable(), disable(), config()
+to check if they are supported by the client driver or not. Skip these
+callbacks if they are not supported.
 
-Rajkumar Rampelli (9):
-  pwm: core: Add support for PWM HW driver with pwm capture only
-  arm64: tegra: Add PWM controller on Tegra186 soc
-  dt-bindings: Tegra186 tachometer device tree bindings
-  arm64: tegra: Add Tachometer Controller on Tegra186
-  pwm: tegra: Add PWM based Tachometer driver
-  arm64: tegra: Add pwm based fan support on Tegra186
-  hwmon: pwm-fan: add sysfs node to read rpm of fan
-  arm64: defconfig: enable Nvidia Tegra Tachometer as a module
-  arm64: defconfig: enable pwm-fan as a loadable module
+Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
+---
 
- .../bindings/pwm/pwm-tegra-tachometer.txt          |  31 +++
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts |   5 +
- arch/arm64/boot/dts/nvidia/tegra186.dtsi           |  28 ++
- arch/arm64/configs/defconfig                       |   2 +
- drivers/hwmon/pwm-fan.c                            |  23 ++
- drivers/pwm/Kconfig                                |  10 +
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/core.c                                 |  21 +-
- drivers/pwm/pwm-tegra-tachometer.c                 | 303 +++++++++++++++++++++
- 9 files changed, 418 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tegra-tachometer.txt
- create mode 100644 drivers/pwm/pwm-tegra-tachometer.c
+V2: Added if conditional checks for pwm callbacks since drivers may
+    implements only pwm capture functionality.
 
+ drivers/pwm/core.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 1581f6a..f70fe68 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -246,6 +246,10 @@ static bool pwm_ops_check(const struct pwm_ops *ops)
+ 	if (ops->apply)
+ 		return true;
+ 
++	/* driver supports capture operation */
++	if (ops->capture)
++		return true;
++
+ 	return false;
+ }
+ 
+@@ -495,7 +499,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
+ 			 * ->apply().
+ 			 */
+ 			if (pwm->state.enabled) {
+-				pwm->chip->ops->disable(pwm->chip, pwm);
++				if (pwm->chip->ops->disable)
++					pwm->chip->ops->disable(pwm->chip, pwm);
+ 				pwm->state.enabled = false;
+ 			}
+ 
+@@ -509,22 +514,26 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
+ 
+ 		if (state->period != pwm->state.period ||
+ 		    state->duty_cycle != pwm->state.duty_cycle) {
+-			err = pwm->chip->ops->config(pwm->chip, pwm,
++			if (pwm->chip->ops->config) {
++				err = pwm->chip->ops->config(pwm->chip, pwm,
+ 						     state->duty_cycle,
+ 						     state->period);
+-			if (err)
+-				return err;
++				if (err)
++					return err;
++			}
+ 
+ 			pwm->state.duty_cycle = state->duty_cycle;
+ 			pwm->state.period = state->period;
+ 		}
+ 
+ 		if (state->enabled != pwm->state.enabled) {
+-			if (state->enabled) {
++			if (state->enabled && pwm->chip->ops->enable) {
+ 				err = pwm->chip->ops->enable(pwm->chip, pwm);
+ 				if (err)
+ 					return err;
+-			} else {
++			}
++
++			if (!state->enabled && pwm->chip->ops->disable) {
+ 				pwm->chip->ops->disable(pwm->chip, pwm);
+ 			}
+ 
 -- 
 2.1.4
