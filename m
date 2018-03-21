@@ -1,136 +1,77 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 21 Mar 2018 11:19:51 +0800
-Subject: [PATCH V2 4/4] video: simplefb: switch to use clk_bulk API to
- simplify clock operations
-In-Reply-To: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
-References: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1521602391-30356-5-git-send-email-aisheng.dong@nxp.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 21 Mar 2018 11:35:18 +0800
+Subject: [PATCH] ARM: dts: db600c: add support to pcie refclk
+In-Reply-To: <20180320092840.4600-1-srinivas.kandagatla@linaro.org>
+References: <20180320092840.4600-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180321033518.GB1403@tuxbook-pro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switching to use clk_bulk API to simplify clock operations.
+On Tue 20 Mar 17:28 HKT 2018, Srinivas Kandagatla wrote:
 
-Cc: Hans de Goede <hdegoede@redhat.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v1->v2:
- * switch to clk_bulk_get_all from of_clk_bulk_get_all
----
- drivers/video/fbdev/simplefb.c | 69 ++++++++----------------------------------
- 1 file changed, 13 insertions(+), 56 deletions(-)
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> This patch adds support to external pcie refclk.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-db600c.dts | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-db600c.dts
+> index 50151ef6e912..7587088c122f 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-db600c.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-db600c.dts
+> @@ -45,6 +45,18 @@
+>  
+>  	};
+>  
+> +	clocks {
+> +		compatible = "simple-bus";
+> +		pcie_refclk: pcie-refclk {
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index a3c44ec..3c8124e 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -182,7 +182,7 @@ struct simplefb_par {
- #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
- 	bool clks_enabled;
- 	unsigned int clk_count;
--	struct clk **clks;
-+	struct clk_bulk_data *clks;
- #endif
- #if defined CONFIG_OF && defined CONFIG_REGULATOR
- 	bool regulators_enabled;
-@@ -214,37 +214,13 @@ static int simplefb_clocks_get(struct simplefb_par *par,
- 			       struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	struct clk *clock;
--	int i;
- 
- 	if (dev_get_platdata(&pdev->dev) || !np)
- 		return 0;
- 
--	par->clk_count = of_clk_get_parent_count(np);
--	if (!par->clk_count)
--		return 0;
--
--	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
--	if (!par->clks)
--		return -ENOMEM;
--
--	for (i = 0; i < par->clk_count; i++) {
--		clock = of_clk_get(np, i);
--		if (IS_ERR(clock)) {
--			if (PTR_ERR(clock) == -EPROBE_DEFER) {
--				while (--i >= 0) {
--					if (par->clks[i])
--						clk_put(par->clks[i]);
--				}
--				kfree(par->clks);
--				return -EPROBE_DEFER;
--			}
--			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
--				__func__, i, PTR_ERR(clock));
--			continue;
--		}
--		par->clks[i] = clock;
--	}
-+	par->clk_count = clk_bulk_get_all(&pdev->dev, &par->clks);
-+	if ((par->clk_count < 0) && (par->clk_count == -EPROBE_DEFER))
-+		return -EPROBE_DEFER;
- 
- 	return 0;
- }
-@@ -252,45 +228,26 @@ static int simplefb_clocks_get(struct simplefb_par *par,
- static void simplefb_clocks_enable(struct simplefb_par *par,
- 				   struct platform_device *pdev)
- {
--	int i, ret;
-+	int ret;
-+
-+	ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
-+	if (ret)
-+		dev_warn(&pdev->dev, "failed to enable clocks\n");
- 
--	for (i = 0; i < par->clk_count; i++) {
--		if (par->clks[i]) {
--			ret = clk_prepare_enable(par->clks[i]);
--			if (ret) {
--				dev_err(&pdev->dev,
--					"%s: failed to enable clock %d: %d\n",
--					__func__, i, ret);
--				clk_put(par->clks[i]);
--				par->clks[i] = NULL;
--			}
--		}
--	}
- 	par->clks_enabled = true;
- }
- 
- static void simplefb_clocks_destroy(struct simplefb_par *par)
- {
--	int i;
--
--	if (!par->clks)
--		return;
-+	if (par->clks_enabled)
-+		clk_bulk_disable_unprepare(par->clk_count, par->clks);
- 
--	for (i = 0; i < par->clk_count; i++) {
--		if (par->clks[i]) {
--			if (par->clks_enabled)
--				clk_disable_unprepare(par->clks[i]);
--			clk_put(par->clks[i]);
--		}
--	}
--
--	kfree(par->clks);
-+	clk_bulk_put_all(par->clk_count, par->clks);
- }
- #else
- static int simplefb_clocks_get(struct simplefb_par *par,
- 	struct platform_device *pdev) { return 0; }
--static void simplefb_clocks_enable(struct simplefb_par *par,
--	struct platform_device *pdev) { }
-+static int simplefb_clocks_enable(struct simplefb_par *par) { }
- static void simplefb_clocks_destroy(struct simplefb_par *par) { }
- #endif
- 
--- 
-2.7.4
+As the si53154 is used to acquire 3 different clocks (2 pcie and 1 sata)
+it would be nice to accurately represent this in the DT. That said,
+exposing this as a clock allow us to change the representation here
+later. (Both pcie_core_clk and pcie_eth_clk use the same gpio pin as
+enable pin, so I don't know how to represent this...)
+
+So for now, please name this "pcie_core_clk", per the schematics.
+
+> +			pinctrl-0 = <&pcie_pins>;
+> +			pinctrl-names = "default";
+> +			compatible = "gpio-gate-clock";
+> +	                clocks = <&rpmcc 27>;
+> +			#clock-cells = <0>;
+> +			enable-gpios = <&pm8921_gpio 22 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+>  	hdmi-out {
+>  		compatible = "hdmi-connector";
+>  		type = "a";
+> @@ -140,6 +152,16 @@
+>  
+>  		qcom,ssbi at 500000 {
+>  			pmic at 0 {
+> +				gpio at 150 {
+> +					pcie_pins: pcie_pins {
+
+Please label this "pcie_clk_en_pin" and don't use '_' in the name of the
+node.
+
+> +						pios {
+
+You can omit this level and just put the properties in directly in the
+pcie-clk-en node.
+
+> +							pins = "gpio22";
+> +							function = "normal";
+> +							power-source = <PM8921_GPIO_VPH>;
+> +						};
+> +					};
+> +				};
+> +
+
+Regards,
+Bjorn
