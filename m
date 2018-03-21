@@ -1,82 +1,86 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Wed, 21 Mar 2018 17:49:00 +0100
-Subject: [PATCH v2 6/6] i2c: i2c-stm32f7: Implement I2C recovery mechanism
+Date: Wed, 21 Mar 2018 17:48:55 +0100
+Subject: [PATCH v2 1/6] i2c: i2c-stm32f7: Add 10-bit address support
 In-Reply-To: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1521650940-11651-7-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1521650940-11651-2-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Feature prevents I2C lock-ups. Mechanism resets I2C state machine
-and releases SCL/SDA signals but preserves I2C registers.
+This patch adds support for 10-bit device address for STM32F7 I2C
 
+Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
   Version history:
-    v1:
-       * Initial
-    v2:
-       * Don't use i2c engine recovery mechanism since driver
-         procedure only recover master and not the slave.
+     v1:
+        * Initial
+     v2:
 ---
 ---
- drivers/i2c/busses/i2c-stm32f7.c | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-stm32f7.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-index 91f73e0..9a9c469 100644
+index f273e28..ae0d15c 100644
 --- a/drivers/i2c/busses/i2c-stm32f7.c
 +++ b/drivers/i2c/busses/i2c-stm32f7.c
-@@ -718,6 +718,20 @@ static void stm32f7_i2c_smbus_reload(struct stm32f7_i2c_dev *i2c_dev)
- 	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
- }
+@@ -65,7 +65,12 @@
+ #define STM32F7_I2C_CR2_NACK			BIT(15)
+ #define STM32F7_I2C_CR2_STOP			BIT(14)
+ #define STM32F7_I2C_CR2_START			BIT(13)
++#define STM32F7_I2C_CR2_HEAD10R			BIT(12)
++#define STM32F7_I2C_CR2_ADD10			BIT(11)
+ #define STM32F7_I2C_CR2_RD_WRN			BIT(10)
++#define STM32F7_I2C_CR2_SADD10_MASK		GENMASK(9, 0)
++#define STM32F7_I2C_CR2_SADD10(n)		(((n) & \
++						STM32F7_I2C_CR2_SADD10_MASK))
+ #define STM32F7_I2C_CR2_SADD7_MASK		GENMASK(7, 1)
+ #define STM32F7_I2C_CR2_SADD7(n)		(((n) & 0x7f) << 1)
  
-+static int stm32f7_i2c_recover_bus(struct i2c_adapter *i2c_adap)
-+{
-+	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
-+
-+	dev_info(i2c_dev->dev, "Trying to recover bus\n");
-+
-+	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
-+			     STM32F7_I2C_CR1_PE);
-+
-+	stm32f7_i2c_hw_config(i2c_dev);
-+
-+	return 0;
-+}
-+
- static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
+@@ -176,14 +181,14 @@ struct stm32f7_i2c_timings {
+ 
+ /**
+  * struct stm32f7_i2c_msg - client specific data
+- * @addr: 8-bit slave addr, including r/w bit
++ * @addr: 8-bit or 10-bit slave addr, including r/w bit
+  * @count: number of bytes to be transferred
+  * @buf: data buffer
+  * @result: result of the transfer
+  * @stop: last I2C msg to be sent, i.e. STOP to be generated
+  */
+ struct stm32f7_i2c_msg {
+-	u8 addr;
++	u16 addr;
+ 	u32 count;
+ 	u8 *buf;
+ 	int result;
+@@ -629,8 +634,15 @@ static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
+ 		cr2 |= STM32F7_I2C_CR2_RD_WRN;
+ 
+ 	/* Set slave address */
+-	cr2 &= ~STM32F7_I2C_CR2_SADD7_MASK;
+-	cr2 |= STM32F7_I2C_CR2_SADD7(f7_msg->addr);
++	cr2 &= ~(STM32F7_I2C_CR2_HEAD10R | STM32F7_I2C_CR2_ADD10);
++	if (msg->flags & I2C_M_TEN) {
++		cr2 &= ~STM32F7_I2C_CR2_SADD10_MASK;
++		cr2 |= STM32F7_I2C_CR2_SADD10(f7_msg->addr);
++		cr2 |= STM32F7_I2C_CR2_ADD10;
++	} else {
++		cr2 &= ~STM32F7_I2C_CR2_SADD7_MASK;
++		cr2 |= STM32F7_I2C_CR2_SADD7(f7_msg->addr);
++	}
+ 
+ 	/* Set nb bytes to transfer and reload if needed */
+ 	cr2 &= ~(STM32F7_I2C_CR2_NBYTES_MASK | STM32F7_I2C_CR2_RELOAD);
+@@ -798,7 +810,7 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 
+ static u32 stm32f7_i2c_func(struct i2c_adapter *adap)
  {
- 	u32 status;
-@@ -727,12 +741,18 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
- 					 status,
- 					 !(status & STM32F7_I2C_ISR_BUSY),
- 					 10, 1000);
-+	if (!ret)
-+		return 0;
-+
-+	dev_info(i2c_dev->dev, "bus busy\n");
-+
-+	ret = stm32f7_i2c_recover_bus(&i2c_dev->adap);
- 	if (ret) {
--		dev_dbg(i2c_dev->dev, "bus busy\n");
--		ret = -EBUSY;
-+		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);
-+		return ret;
- 	}
- 
--	return ret;
-+	return -EBUSY;
+-	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
++	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_10BIT_ADDR;
  }
  
- static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
-@@ -1474,6 +1494,7 @@ static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
- 	if (status & STM32F7_I2C_ISR_BERR) {
- 		dev_err(dev, "<%s>: Bus error\n", __func__);
- 		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
-+		stm32f7_i2c_recover_bus(&i2c_dev->adap);
- 		f7_msg->result = -EIO;
- 	}
- 
+ static struct i2c_algorithm stm32f7_i2c_algo = {
 -- 
 2.7.4
