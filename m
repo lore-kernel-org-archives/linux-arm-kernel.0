@@ -1,157 +1,191 @@
 From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 21 Mar 2018 09:20:10 -0500
-Subject: [PATCHv7 1/3] dt-bindings: documentation: add clock bindings
- information for Stratix10
-Message-ID: <1521642012-9770-1-git-send-email-dinguyen@kernel.org>
+Date: Wed, 21 Mar 2018 09:20:11 -0500
+Subject: [PATCHv7 2/3] arm64: dts: stratix10: use clock bindings for the
+ Stratix10 platform
+In-Reply-To: <1521642012-9770-1-git-send-email-dinguyen@kernel.org>
+References: <1521642012-9770-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <1521642012-9770-2-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document that Stratix10 clock bindings, and add the clock header file. The
-clock header is an enumeration of all the different clocks on the Stratix10
-platform.
+Use the clock bindings for the Stratix10 SoC. This includes changing the old
+binding of "intc,clk-s10-mgr" to "intel,stratix10-clkmgr". The reason that
+this can be done is that there are currently no clock driver for Stratix10,
+thus there are no consumers of the old binding. So changing the binding will
+not break any legacy code.
 
 Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 v7:
-- remove the PLL from the clock manager dts node
+- move PLL out of clkmgr node and into DT root
 v6:
 - no changes
 v5:
-- moved SPDX license header to single line comment
+- no changes
 v4:
-- remove '_' in node names
-- remove stray tab
-- add clock-frequency property for fixed-clocks
-- put SPDX license as the very top line
+- remove '_' in name of clock nodes
+- use clock-controller in SoCDK node in dts file
 v3:
-- s/intc/intel for correct vendor prefix
-- fixup node name to "intel,stratix10-clkmgr"
-- document the required fixed-clock for oscillators
+- use the correct vendor prefix
+- explain the binding change
 v2:
-- use a single binding for the clock controller
+- use a single clock binding for the clock controller
 ---
- .../devicetree/bindings/clock/intc_stratix10.txt   | 20 ++++++
- include/dt-bindings/clock/stratix10-clock.h        | 84 ++++++++++++++++++++++
- 2 files changed, 104 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/intc_stratix10.txt
- create mode 100644 include/dt-bindings/clock/stratix10-clock.h
+ arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 47 +++++++++++++++++++++-
+ .../boot/dts/altera/socfpga_stratix10_socdk.dts    |  8 ++++
+ 2 files changed, 53 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
-new file mode 100644
-index 0000000..9f4ec5c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
-@@ -0,0 +1,20 @@
-+Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+index c89d0c30..0e267c8 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+@@ -17,6 +17,7 @@
+ /dts-v1/;
+ #include <dt-bindings/reset/altr,rst-mgr-s10.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/clock/stratix10-clock.h>
+ 
+ / {
+ 	compatible = "altr,socfpga-stratix10";
+@@ -92,9 +93,32 @@
+ 		interrupt-parent = <&intc>;
+ 		ranges = <0 0 0 0xffffffff>;
+ 
+-		clkmgr at ffd1000 {
+-			compatible = "altr,clk-mgr";
++		clkmgr: clock-controller at ffd10000 {
++			compatible = "intel,stratix10-clkmgr";
+ 			reg = <0xffd10000 0x1000>;
++			#clock-cells = <1>;
++		};
 +
-+This binding uses the common clock binding[1].
++		clocks {
++			cb_intosc_hs_div2_clk: cb-intosc-hs-div2-clk {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
 +
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++			cb_intosc_ls_clk: cb-intosc-ls-clk {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
 +
-+Required properties:
-+- compatible : shall be
-+	"intel,stratix10-clkmgr"
++			f2s_free_clk: f2s-free-clk {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
 +
-+- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
++			osc1: osc1 {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++			};
+ 		};
+ 
+ 		gmac0: ethernet at ff800000 {
+@@ -105,6 +129,8 @@
+ 			mac-address = [00 00 00 00 00 00];
+ 			resets = <&rst EMAC0_RESET>;
+ 			reset-names = "stmmaceth";
++			clocks = <&clkmgr STRATIX10_EMAC0_CLK>;
++			clock-names = "stmmaceth";
+ 			status = "disabled";
+ 		};
+ 
+@@ -116,6 +142,8 @@
+ 			mac-address = [00 00 00 00 00 00];
+ 			resets = <&rst EMAC1_RESET>;
+ 			reset-names = "stmmaceth";
++			clocks = <&clkmgr STRATIX10_EMAC1_CLK>;
++			clock-names = "stmmaceth";
+ 			status = "disabled";
+ 		};
+ 
+@@ -127,6 +155,8 @@
+ 			mac-address = [00 00 00 00 00 00];
+ 			resets = <&rst EMAC2_RESET>;
+ 			reset-names = "stmmaceth";
++			clocks = <&clkmgr STRATIX10_EMAC2_CLK>;
++			clock-names = "stmmaceth";
+ 			status = "disabled";
+ 		};
+ 
+@@ -229,6 +259,9 @@
+ 			fifo-depth = <0x400>;
+ 			resets = <&rst SDMMC_RESET>;
+ 			reset-names = "reset";
++			clocks = <&clkmgr STRATIX10_L4_MP_CLK>,
++				 <&clkmgr STRATIX10_SDMMC_CLK>;
++			clock-names = "biu", "ciu";
+ 			status = "disabled";
+ 		};
+ 
+@@ -288,24 +321,32 @@
+ 			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 113 4>;
+ 			reg = <0xffc03000 0x100>;
++			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
++			clock-names = "timer";
+ 		};
+ 
+ 		timer1: timer1 at ffc03100 {
+ 			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 114 4>;
+ 			reg = <0xffc03100 0x100>;
++			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
++			clock-names = "timer";
+ 		};
+ 
+ 		timer2: timer2 at ffd00000 {
+ 			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 115 4>;
+ 			reg = <0xffd00000 0x100>;
++			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
++			clock-names = "timer";
+ 		};
+ 
+ 		timer3: timer3 at ffd00100 {
+ 			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 116 4>;
+ 			reg = <0xffd00100 0x100>;
++			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
++			clock-names = "timer";
+ 		};
+ 
+ 		uart0: serial0 at ffc02000 {
+@@ -315,6 +356,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			resets = <&rst UART0_RESET>;
++			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -325,6 +367,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			resets = <&rst UART1_RESET>;
++			clocks = <&clkmgr STRATIX10_L4_SP_CLK>;
+ 			status = "disabled";
+ 		};
+ 
+diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+index 0007564..8880190 100644
+--- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
++++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+@@ -50,6 +50,14 @@
+ 		/* We expect the bootloader to fill in the reg */
+ 		reg = <0 0 0 0>;
+ 	};
 +
-+- #clock-cells : from common clock binding, shall be set to 1.
-+
-+Example:
-+	clkmgr: clock-controller at ffd10000 {
-+		compatible = "intel,stratix10-clkmgr";
-+		reg = <0xffd10000 0x1000>;
-+		#clock-cells = <1>;
++	soc {
++		clocks {
++			osc1 {
++				clock-frequency = <25000000>;
++			};
++		};
 +	};
-diff --git a/include/dt-bindings/clock/stratix10-clock.h b/include/dt-bindings/clock/stratix10-clock.h
-new file mode 100644
-index 0000000..0ac1c90
---- /dev/null
-+++ b/include/dt-bindings/clock/stratix10-clock.h
-@@ -0,0 +1,84 @@
-+/* SPDX-License-Identifier:	GPL-2.0 */
-+/*
-+ * Copyright (C) 2017, Intel Corporation
-+ */
-+
-+#ifndef __STRATIX10_CLOCK_H
-+#define __STRATIX10_CLOCK_H
-+
-+/* fixed rate clocks */
-+#define STRATIX10_OSC1			0
-+#define STRATIX10_CB_INTOSC_HS_DIV2_CLK	1
-+#define STRATIX10_CB_INTOSC_LS_CLK	2
-+#define STRATIX10_F2S_FREE_CLK		3
-+
-+/* fixed factor clocks */
-+#define STRATIX10_L4_SYS_FREE_CLK	4
-+#define STRATIX10_MPU_PERIPH_CLK	5
-+#define STRATIX10_MPU_L2RAM_CLK		6
-+#define STRATIX10_SDMMC_CIU_CLK		7
-+
-+/* PLL clocks */
-+#define STRATIX10_MAIN_PLL_CLK		8
-+#define STRATIX10_PERIPH_PLL_CLK	9
-+#define STRATIX10_BOOT_CLK		10
-+
-+/* Periph clocks */
-+#define STRATIX10_MAIN_MPU_BASE_CLK	11
-+#define STRATIX10_MAIN_NOC_BASE_CLK	12
-+#define STRATIX10_MAIN_EMACA_CLK	13
-+#define STRATIX10_MAIN_EMACB_CLK	14
-+#define STRATIX10_MAIN_EMAC_PTP_CLK	15
-+#define STRATIX10_MAIN_GPIO_DB_CLK	16
-+#define STRATIX10_MAIN_SDMMC_CLK	17
-+#define STRATIX10_MAIN_S2F_USR0_CLK	18
-+#define STRATIX10_MAIN_S2F_USR1_CLK	19
-+#define STRATIX10_MAIN_PSI_REF_CLK	20
-+
-+#define STRATIX10_PERI_MPU_BASE_CLK	21
-+#define STRATIX10_PERI_NOC_BASE_CLK	22
-+#define STRATIX10_PERI_EMACA_CLK	23
-+#define STRATIX10_PERI_EMACB_CLK	24
-+#define STRATIX10_PERI_EMAC_PTP_CLK	25
-+#define STRATIX10_PERI_GPIO_DB_CLK	26
-+#define STRATIX10_PERI_SDMMC_CLK	27
-+#define STRATIX10_PERI_S2F_USR0_CLK	28
-+#define STRATIX10_PERI_S2F_USR1_CLK	29
-+#define STRATIX10_PERI_PSI_REF_CLK	30
-+
-+#define STRATIX10_MPU_FREE_CLK		31
-+#define STRATIX10_NOC_FREE_CLK		32
-+#define STRATIX10_S2F_USR0_CLK		33
-+#define STRATIX10_NOC_CLK		34
-+#define STRATIX10_EMAC_A_FREE_CLK	35
-+#define STRATIX10_EMAC_B_FREE_CLK	36
-+#define STRATIX10_EMAC_PTP_FREE_CLK	37
-+#define STRATIX10_GPIO_DB_FREE_CLK	38
-+#define STRATIX10_SDMMC_FREE_CLK	39
-+#define STRATIX10_S2F_USER1_FREE_CLK	40
-+#define STRATIX10_PSI_REF_FREE_CLK	41
-+
-+/* Gate clocks */
-+#define STRATIX10_MPU_CLK		42
-+#define STRATIX10_L4_MAIN_CLK		43
-+#define STRATIX10_L4_MP_CLK		44
-+#define STRATIX10_L4_SP_CLK		45
-+#define STRATIX10_CS_AT_CLK		46
-+#define STRATIX10_CS_TRACE_CLK		47
-+#define STRATIX10_CS_PDBG_CLK		48
-+#define STRATIX10_CS_TIMER_CLK		49
-+#define STRATIX10_S2F_USER0_CLK		50
-+#define STRATIX10_S2F_USER1_CLK		51
-+#define STRATIX10_EMAC0_CLK		52
-+#define STRATIX10_EMAC1_CLK		53
-+#define STRATIX10_EMAC2_CLK		54
-+#define STRATIX10_EMAC_PTP_CLK		55
-+#define STRATIX10_GPIO_DB_CLK		56
-+#define STRATIX10_SDMMC_CLK		57
-+#define STRATIX10_PSI_REF_CLK		58
-+#define STRATIX10_USB_CLK		59
-+#define STRATIX10_SPI_M_CLK		60
-+#define STRATIX10_NAND_CLK		61
-+#define STRATIX10_NUM_CLKS		62
-+
-+#endif	/* __STRATIX10_CLOCK_H */
+ };
+ 
+ &gpio1 {
 -- 
 2.7.4
