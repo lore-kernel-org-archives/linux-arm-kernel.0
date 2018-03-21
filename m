@@ -1,82 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 21 Mar 2018 11:15:00 +0000
-Subject: [PATCH] ARM: EXYNOS: Fix coupled CPU idle freeze on Exynos4210
-In-Reply-To: <52224d23-e90a-ce1d-3b4d-add7876eb682@samsung.com>
-References: <CGME20180321094523eucas1p1a87d146d65d4191ccdb37f1723977011@eucas1p1.samsung.com>
- <20180321094505.25494-1-m.szyprowski@samsung.com>
- <f1d38d39-59b8-715f-15b3-1933b0971793@arm.com>
- <52224d23-e90a-ce1d-3b4d-add7876eb682@samsung.com>
-Message-ID: <00bbd758-f0e3-3b21-9bff-3a08c1dc968b@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 21 Mar 2018 06:14:55 -0500
+Subject: [PATCH] iommu/mediatek: Fix protect memory setting
+In-Reply-To: <1521609504.24119.5.camel@mhfsdcap03>
+References: <1521337974-22112-1-git-send-email-yong.wu@mediatek.com>
+ <20180320185716.ldxs2vvfcchznpnb@8bytes.org>
+ <1521609504.24119.5.camel@mhfsdcap03>
+Message-ID: <20180321111455.djllpdsj35vu5cxc@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/18 10:18, Marek Szyprowski wrote:
-> Hi Marc,
+On Wed, Mar 21, 2018 at 01:18:24PM +0800, Yong Wu wrote:
+> On Tue, 2018-03-20 at 13:57 -0500, Joerg Roedel wrote:
+> > On Sun, Mar 18, 2018 at 09:52:54AM +0800, Yong Wu wrote:
+> > > To avoid adding this complex macro or a new function, I put
+> > > it in the code and backup its value in the suspend registers.
+> > 
+> > Missing Signed-off-by.
 > 
-> On 2018-03-21 11:05, Marc Zyngier wrote:
->> On 21/03/18 09:45, Marek Szyprowski wrote:
->>> Since commit 04c8b0f82c7d ("irqchip/gic: Make locking a BL_SWITCHER only
->>> feature") coupled CPU idle freezes from time to time on Exynos4210. Later
->>> commit 313c8c16ee62 ("PM / CPU: replace raw_notifier with atomic_notifier")
->>> changed the context in which the CPU idle code is executed, what results
->>> in fully reproducible freeze all the time. However, almost the same coupled
->>> CPU idle code works fine on Exynos3250 regarless of the changes made in
->>> the mentioned commits.
->>>
->>> It turned out that the IPI call used on Exynos4210 is conflicting with the
->>> change done in the first mentioned commit in GIC. Fix this by using the
->>> same code path as for Exynos3250, instead of the IPI call for
->>> synchronization with second CPU core, call dsb_sev() directly.
->>>
->>> Tested on Exynos4210-based Trats and Origen boards.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> CC: stable at vger.kernel.org # v4.13+
->>> ---
->>>   arch/arm/mach-exynos/pm.c | 6 +-----
->>>   1 file changed, 1 insertion(+), 5 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
->>> index dc4346ecf16d..a1055a2b8d54 100644
->>> --- a/arch/arm/mach-exynos/pm.c
->>> +++ b/arch/arm/mach-exynos/pm.c
->>> @@ -271,11 +271,7 @@ static int exynos_cpu0_enter_aftr(void)
->>>   				goto fail;
->>>   
->>>   			call_firmware_op(cpu_boot, 1);
->>> -
->>> -			if (soc_is_exynos3250())
->>> -				dsb_sev();
->>> -			else
->>> -				arch_send_wakeup_ipi_mask(cpumask_of(1));
->>> +			dsb_sev();
->>>   		}
->>>   	}
->>>   fail:
->>>
->> I'm a bit puzzled here.
->>
->> If the GIC change broke something on your platform, it probably also
->> broke something for all other users of arch_send_wakeup_ipi_mask. But
->> nobody reported anything until now. Also, it doesn't look like 4210 is a
->> big-little platform, so it is unlikely to use the big-little switcher.
->>
->> What is specific to this system that makes misbehave? Were you
->> implicitly relying on the BL lock to perform some serialization?
+> Signed-off-by and Reported-by have been added above.
 > 
-> My hypothesis, after some internal discussion, is that dsb_sev() should be
-> there from the beginning, but instead there was an 
-> arch_send_wakeup_ipi_mask()
-> call, which indirectly called dsb_sev() as a part of GIC spinlock internals.
-> When spinlock has been removed from GIC, there is no dsb_sev() call anymore,
-> what causes synchronization issue.
+> ====
+> Reported-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ====
 
-That's pretty scary. Glad you pinpointed it in the end.
+Right, sorry. I was in a hurry and missed it. Patch is now applied.
 
-FWIW:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+	Joerg
