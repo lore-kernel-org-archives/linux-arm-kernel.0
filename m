@@ -1,56 +1,100 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 21 Mar 2018 05:26:06 +0000
-Subject: [PATCH] arm/arm64: smccc: Fix CLANG compilation for ARM 64 bit
- archs
-In-Reply-To: <1521584046-19692-1-git-send-email-isaacm@codeaurora.org>
-References: <1521584046-19692-1-git-send-email-isaacm@codeaurora.org>
-Message-ID: <20180321052555.lfnnhcp5iapwgrzt@salmiak>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 21 Mar 2018 10:54:53 +0800
+Subject: [PATCH V2 3/4] clk: add managed version of clk_bulk_get_all
+In-Reply-To: <1521600894-29919-1-git-send-email-aisheng.dong@nxp.com>
+References: <1521600894-29919-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1521600894-29919-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch introduces the managed version of clk_bulk_get_all.
 
-On Tue, Mar 20, 2018 at 03:14:06PM -0700, Isaac J. Manjarres wrote:
-> Currently, there are references to registers that
-> have had their names changed in 64 bit ARM architectures,
-> such as "r0." While GCC automatically does the conversion of
-> these registers to their 64 bit counterparts, CLANG
-> does not, resulting in compilation failures when
-> building the kernel. Allow for differentiation of
-> which register names to use, based on ARM architecture.
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+v1->v2:
+ * new patch
+---
+ drivers/clk/clk-devres.c | 24 ++++++++++++++++++++++++
+ include/linux/clk.h      | 23 +++++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
 
-Please note that the architecture still calls these registers rN, the xN and wN
-names are aliases. The commit message is a little misleading, and it sounds
-like this is a deficiency in clang.
-
-Is there a plan to fix clang to accept this format?
-
-> Change-Id: If89d47b2feb217d97bb61a3f99e61096705a4984
-
-Please remove these tags when submitting patches upstream.
-
-[...]
-
-> +#define R0_STR		"x0"
-> +#define R1_STR		"x1"
-> +#define R2_STR		"x2"
-> +#define R3_STR		"x3"
-> +#define R4_STR		"x4"
-> +#define R5_STR		"x5"
-> +#define R6_STR		"x6"
-> +#define R7_STR		"x7"
-
-This would be simpler if we had:
-
-  /* aarch64 */
-  #define SMCCC_REG(n)		"x" #n
-
-  /* aarch32 */
-  #define SMCCC_REG(n)		"r" #n
-
-... then later we do:
-
-  register <type> rN asm(SMCCC_REG(N));
-
-Thanks,
-Mark.
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index d854e26..6d3ca5e 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -70,6 +70,30 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ }
+ EXPORT_SYMBOL_GPL(devm_clk_bulk_get);
+ 
++int __must_check devm_clk_bulk_get_all(struct device *dev,
++				       struct clk_bulk_data **clks)
++{
++	struct clk_bulk_devres *devres;
++	int ret;
++
++	devres = devres_alloc(devm_clk_bulk_release,
++			      sizeof(*devres), GFP_KERNEL);
++	if (!devres)
++		return -ENOMEM;
++
++	ret = clk_bulk_get_all(dev, clks);
++	if (ret > 0) {
++		devres->clks = *clks;
++		devres->num_clks = ret;
++		devres_add(dev, devres);
++	} else {
++		devres_free(devres);
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(devm_clk_bulk_get_all);
++
+ static int devm_clk_match(struct device *dev, void *res, void *data)
+ {
+ 	struct clk **c = res;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index a76fdff..fe48e01 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -313,6 +313,22 @@ int __must_check clk_bulk_get_all(struct device *dev,
+  */
+ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ 				   struct clk_bulk_data *clks);
++/**
++ * devm_clk_bulk_get_all - managed get multiple clk consumers
++ * @dev: device for clock "consumer"
++ * @clks: pointer to the clk_bulk_data table of consumer
++ *
++ * Returns a positive value for the number of clocks obtained while the
++ * clock references are stored in the clk_bulk_data table in @clks field.
++ * Returns 0 if there're none and a negative value if something failed.
++ *
++ * This helper function allows drivers to get several clk
++ * consumers in one operation with management, the clks will
++ * automatically be freed when the device is unbound.
++ */
++
++int __must_check devm_clk_bulk_get_all(struct device *dev,
++				       struct clk_bulk_data **clks);
+ 
+ /**
+  * devm_clk_get - lookup and obtain a managed reference to a clock producer.
+@@ -658,6 +674,13 @@ static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clk
+ 	return 0;
+ }
+ 
++static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
++						     struct clk_bulk_data **clks);
++{
++
++	return 0;
++}
++
+ static inline struct clk *devm_get_clk_from_child(struct device *dev,
+ 				struct device_node *np, const char *con_id)
+ {
+-- 
+2.7.4
