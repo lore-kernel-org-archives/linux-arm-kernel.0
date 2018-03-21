@@ -1,75 +1,48 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 21 Mar 2018 20:07:09 +0200
-Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
- requested
-In-Reply-To: <20180321165848.89751-4-swboyd@chromium.org>
-References: <20180321165848.89751-1-swboyd@chromium.org>
- <20180321165848.89751-4-swboyd@chromium.org>
-Message-ID: <1521655629.23017.84.camel@linux.intel.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Wed, 21 Mar 2018 13:41:41 -0500
+Subject: WL1837-st on imx6 request_firmware failed with 4.16-RC6
+In-Reply-To: <20180321162749.ammvnmamwknwjonr@tarshish>
+References: <CAHCN7xKQxF34LSy7TZUQ2yCo9KdrKppOvamgna-CHJD_kt=80w@mail.gmail.com>
+ <20180321162749.ammvnmamwknwjonr@tarshish>
+Message-ID: <CAHCN7xKN=b5LbsS0ASEO++nLrQ8OQ37znKU9pwifZruu577EDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-03-21 at 09:58 -0700, Stephen Boyd wrote:
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Some qcom platforms make some GPIOs or pins unavailable for use
-> by non-secure operating systems, and thus reading or writing the
-> registers for those pins will cause access control issues and
-> reset the device. With a DT/ACPI property to describe the set of
-> pins that are available for use, parse the available pins and set
-> the irq valid bits for gpiolib to know what to consider 'valid'.
-> This should avoid any issues with gpiolib. Furthermore, implement
-> the pinmux_ops::request function so that pinmux can also make
-> sure to not use pins that are unavailable.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Stephen Boyd <swboyd@chromium.org>
+On Wed, Mar 21, 2018 at 11:27 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Adam,
+>
+> On Wed, Mar 21, 2018 at 10:31:55AM -0500, Adam Ford wrote:
+>> I have an i.MX6 board and I am trying to get Bluetooth operational on
+>> 4.16-RC6 using the default imx_v6_v7_defconfig
+>>
+>> I have my device tree configured as follows:
+>>
+>> &uart2 {
+>>   pinctrl-names = "default";
+>>   pinctrl-0 = <&pinctrl_uart2>;
+>>   uart-has-rtscts;
+>>   status = "okay";
+>>
 
-Hmm...
+[snip]
+>
+> Is your filesystem mounted at this point? Do you use initramfs?
+>
+> baruch
 
-> +static int msm_pinmux_request(struct pinctrl_dev *pctldev, unsigned
-> offset)
-> +{
-> +	struct msm_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-> +	struct gpio_chip *chip = &pctrl->chip;
-> +
-> +	if (gpiochip_line_is_valid(chip, offset))
-> +		return 0;
-> +
-> +	return -EINVAL;
+That was it.  Thanks.  I feel stupid.  :-)
 
-Perhaps traditional pattern
+>
+>> I was hoping someone might have some insight on what might be the issue.
+>>
+>> Thanks
+>>
+>> adam
+>>
 
-if (!...)
- return -EINVAL;
+[snip]
 
-return 0;
-
-?
-
-> +}
-
->  	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
-> -	seq_printf(s, " %s", pulls[pull]);
-> +	seq_printf(s, " %s\n", pulls[pull]);
-
-I had commented this once, but you ignored by some reason.
-
-I would rather just move 
- seq_puts(s, "\n");
-here.
-
-The rationale behind, besides making diff more neat, is to reduce
-possible burden in the future if someone would like to squeeze more data
-in between.
-
-> +		tmp = kmalloc_array(len, sizeof(tmp[0]), GFP_KERNEL);
-
-sizeof(*tmp) ?
-
-> +		if (!tmp)
-> +			return -ENOMEM;
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+> --
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
