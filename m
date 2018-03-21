@@ -1,73 +1,109 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 21 Mar 2018 16:28:55 +0100
-Subject: [PATCH 01/10] drm/sun4i: Disable frontend video channel before
- enabling a layer
+Date: Wed, 21 Mar 2018 16:28:58 +0100
+Subject: [PATCH 04/10] drm/sun4i: Explicitly list and check formats supported
+ by the backend
 In-Reply-To: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
 References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180321152904.22411-2-paul.kocialkowski@bootlin.com>
+Message-ID: <20180321152904.22411-5-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a dedicated function for disabling the layer video channel
-from the frontend to the backend. It is called automatically on an
-atomic update, as to disable the frontend by default (it will be enabled
-later on in the atomic update if necessary).
+In order to check whether the backend supports a specific format, an
+explicit list and a related helper are introduced.
 
-It fixes an issue when enabling a layer that uses the frontend (e.g. for
-scaling) and then reusing the same layer without the frontend. Since the
-video channel to the frontend was never disabled, the backend was still
-trying to get data from there.
+They are then used to determine whether the frontend should be used for
+a layer, when the format is not supported by the backend.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 8 ++++++++
- drivers/gpu/drm/sun4i/sun4i_backend.h | 2 ++
- drivers/gpu/drm/sun4i/sun4i_layer.c   | 2 ++
- 3 files changed, 12 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 48 ++++++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h |  1 +
+ 2 files changed, 48 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 7e647044cbed..e07a33adc51d 100644
+index 274a1db6fa8e..7703ba989743 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -395,6 +395,14 @@ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
+@@ -172,6 +172,39 @@ static int sun4i_backend_drm_format_to_layer(u32 format, u32 *mode)
  	return 0;
  }
  
-+void sun4i_backend_disable_layer_frontend(struct sun4i_backend *backend,
-+					  int layer)
++static const uint32_t sun4i_backend_formats[] = {
++	/* RGB */
++	DRM_FORMAT_ARGB4444,
++	DRM_FORMAT_RGBA4444,
++	DRM_FORMAT_ARGB1555,
++	DRM_FORMAT_RGBA5551,
++	DRM_FORMAT_RGB565,
++	DRM_FORMAT_RGB888,
++	DRM_FORMAT_XRGB8888,
++	DRM_FORMAT_BGRX8888,
++	DRM_FORMAT_ARGB8888,
++	/* YUV422 */
++	DRM_FORMAT_YUYV,
++	DRM_FORMAT_YVYU,
++	DRM_FORMAT_UYVY,
++	DRM_FORMAT_VYUY,
++};
++
++bool sun4i_backend_format_is_supported(uint32_t fmt)
 +{
-+	regmap_update_bits(backend->engine.regs,
-+			   SUN4I_BACKEND_ATTCTL_REG0(layer),
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN, 0);
++	bool found = false;
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(sun4i_backend_formats); i++) {
++		if (sun4i_backend_formats[i] == fmt) {
++			found = true;
++			break;
++		}
++	}
++
++	return found;
 +}
 +
- static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
+ int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
+ 				     int layer, struct drm_plane *plane)
  {
- 	u16 src_h = state->src_h >> 16;
+@@ -436,15 +469,28 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
+ {
+ 	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
+ 	struct sun4i_backend *backend = layer->backend;
++	struct drm_framebuffer *fb = state->fb;
+ 
+ 	if (IS_ERR(backend->frontend))
+ 		return false;
+ 
++	/*
++	 * Let's pretend that every format is either supported by the backend or
++	 * the frontend. This is not true in practice, as some tiling modes are
++	 * not supported by either. There is still room to check this later in
++	 * the atomic check process.
++	 */
++	if (!sun4i_backend_format_is_supported(fb->format->format))
++		return true;
++
+ 	/*
+ 	 * TODO: Don't use the frontend for x2/x4 scaling and allow RGB formats
+ 	 * with an alpha component then.
+ 	 */
+-	return sun4i_backend_plane_uses_scaler(state);
++	if (sun4i_backend_plane_uses_scaler(state))
++		return true;
++
++	return false;
+ }
+ 
+ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 316f2179e9e1..7ae0f0ffec8c 100644
+index cb6df2b690c0..a7bfc38f12bd 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -204,5 +204,7 @@ int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
- 					int layer, uint32_t in_fmt);
- int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend,
+@@ -207,5 +207,6 @@ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend,
  				    int layer, struct drm_plane *plane);
-+void sun4i_backend_disable_layer_frontend(struct sun4i_backend *backend,
-+					  int layer);
+ void sun4i_backend_disable_layer_frontend(struct sun4i_backend *backend,
+ 					  int layer);
++bool sun4i_backend_format_is_supported(uint32_t fmt);
  
  #endif /* _SUN4I_BACKEND_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 2949a3c912c1..224bb1811e0a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -93,6 +93,8 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- 	struct sun4i_backend *backend = layer->backend;
- 	struct sun4i_frontend *frontend = backend->frontend;
- 
-+	sun4i_backend_disable_layer_frontend(backend, layer->id);
-+
- 	if (layer_state->uses_frontend) {
- 		sun4i_frontend_init(frontend);
- 		sun4i_frontend_update_coord(frontend, plane);
 -- 
 2.16.2
