@@ -1,52 +1,37 @@
-From: sricharan@codeaurora.org (sricharan at codeaurora.org)
-Date: Wed, 21 Mar 2018 14:40:43 +0530
-Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
- data
-In-Reply-To: <20180320143131.4eenixtbhciq5fwc@localhost>
-References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
- <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
- <20180320143131.4eenixtbhciq5fwc@localhost>
-Message-ID: <78806c70c85e3cecaadfc94b173cb139@codeaurora.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 21 Mar 2018 10:11:09 +0100
+Subject: [PATCH v2 0/5] update Mediatek MT2712 clock and scpsys support
+In-Reply-To: <152153061465.254778.3061562183948751301@swboyd.mtv.corp.google.com>
+References: <20180312070342.4335-1-weiyi.lu@mediatek.com>
+ <1521526068.13313.8.camel@mtksdaap41>
+ <152153061465.254778.3061562183948751301@swboyd.mtv.corp.google.com>
+Message-ID: <6c29df1f-f619-5e11-4160-b58e154f6592@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-20 20:01, Richard Cochran wrote:
-> On Tue, Mar 20, 2018 at 09:28:47AM +0530, Sricharan R wrote:
->> Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
->> Adds missing memory, reserved-memory nodes.
->> 
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 28 
->> +++++++++++++++++++++++++++
+
+
+On 03/20/2018 08:23 AM, Stephen Boyd wrote:
+> Quoting Weiyi Lu (2018-03-19 23:07:48)
+>> On Mon, 2018-03-12 at 15:03 +0800, Weiyi Lu wrote:
+>>> This series is based on v4.16-rc1 and composed of scpsys control (PATCH 1-2) and clock control (PATCH 3-5).
+>>> Basically, all changes are for the ECO design change of MT2712.
+>>>
+>>> changes since v1:
+>>> - Avoid renumbering clocks. Append new clocks at the bottom of each own subsystem.
+>>>
+>> Hi Matthias & Stephen,
+>>
+>> Sorry to bother. Just saw patch 1/2 are already pushed to v4.16-next-soc
+>> and patch 3/5 are applied onto clk-next. What about the patch 4(arm64:
+>> dts: add clock device nodes of MT2712). Does there any problem remain or
+>> it cause some problems? Many thanks.
 > 
-> Q: Does mainline Linux even boot on the DK?
+> Patch 4 can go via arm-soc? I'm not planning to apply that patch.
 > 
-> A: No, it doesn't.
 
-  Yes, i saw that it was booting out of mainline.
-  Both DK01 and DK04 boards boots out of mainline.
-
-cat /proc/version
-Linux version 4.16.0-rc6 (srichara at srichara-linux) (gcc version 6.3.1 
-20170109 (Linaro GCC 6.3-2017.02)) #1677 SMP PREEMPT Wed Mar 21 12:58:14 
-IST 2018
-
-  If it does not boot for you, then can you check if your bootloader is 
-passing this bootarg ?
-
-     bootargs=console=ttyMSM0,115200n8
-
-   This is the only one required from bootloader to boot.
-   That said, there should have been a default 'chosen' node in DTS
-   for the serial console atleast which is not there today. I will add 
-this
-   in my v4 along with other changes.
+I can take it through my branch, no problem. But I think it is too late for this
+cycle. CCing Arnd to confirm.
 
 Regards,
-  Sricharan
-
-> 
-> Please add the missing basic board support before hacking random stuff
-> into the DTS.
-> 
+Matthias
