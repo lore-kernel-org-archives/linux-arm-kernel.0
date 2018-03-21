@@ -1,103 +1,59 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 21 Mar 2018 10:03:22 +0100
-Subject: [PATCH 5/5] ARM: add support for building ARM kernel with clang
-In-Reply-To: <20180321002022.GH37438@google.com>
-References: <20180320230206.25289-1-stefan@agner.ch>
- <20180320230206.25289-6-stefan@agner.ch>
- <20180320231832.GK2743@n2100.armlinux.org.uk>
- <20180321002022.GH37438@google.com>
-Message-ID: <602b427702af61a503d9ffe38c35075c@agner.ch>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 21 Mar 2018 11:05:15 +0200
+Subject: [usb-next PATCH] usb: xhci: skip phys initialization of shared hcd
+In-Reply-To: <1ece0d5508a00bca67d16e64310a071646b59c7d.1521612280.git.chunfeng.yun@mediatek.com>
+References: <1ece0d5508a00bca67d16e64310a071646b59c7d.1521612280.git.chunfeng.yun@mediatek.com>
+Message-ID: <ae71fdae-43aa-9df3-3f81-8a92460d61b9@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2018 01:20, Matthias Kaehlcke wrote:
-> El Tue, Mar 20, 2018 at 11:18:33PM +0000 Russell King - ARM Linux ha dit:
+Hi Chunfeng,
+
+On 21/03/18 08:12, Chunfeng Yun wrote:
+> The phys has already been initialized when add primary hcd,
+> including usb2 phys and usb3 phys also if exist, so needn't
+> re-parse "phys" property again.
 > 
->> On Wed, Mar 21, 2018 at 12:02:06AM +0100, Stefan Agner wrote:
->> > Use cc-options call for compiler options which are not available
->> > in clang. With this patch an ARMv7 multi platform kernel can be
->> > successfully build using clang (tested with version 5.0.1).
->> >
->> > Based-on-patches-by: Behan Webster <behanw@converseincode.com>
->> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/usb/host/xhci-mtk.c  | 1 +
+>  drivers/usb/host/xhci-plat.c | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> Great to see your work on bringing clang support for 32-bit ARM
-> upstream!
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index 7334da9..6bb23fb 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -554,6 +554,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+>  		xhci->shared_hcd->can_do_streams = 1;
+>  
+> +	xhci->shared_hcd->skip_phy_initialization = 1;
+>  	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+>  	if (ret)
+>  		goto dealloc_usb2_hcd;
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 6700e5e..65a4294 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -294,6 +294,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+>  		xhci->shared_hcd->can_do_streams = 1;
+>  
+> +	xhci->shared_hcd->skip_phy_initialization = 1;
+
+I think this is unnecessary.
+There aren't separate PHYs for the primary and shared HCDs right?
+
+Also how can you be sure that phy_init() has been done for all platform HCD users?
+
+>  	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+>  	if (ret)
+>  		goto dealloc_usb2_hcd;
 > 
->> > ---
->> >  arch/arm/Makefile                 | 2 +-
->> >  arch/arm/boot/compressed/Makefile | 2 +-
->> >  2 files changed, 2 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->> > index e9e3fde3c657..20e9fee1ccc5 100644
->> > --- a/arch/arm/Makefile
->> > +++ b/arch/arm/Makefile
->> > @@ -39,7 +39,7 @@ KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
->> >  endif
->> >
->> >  ifeq ($(CONFIG_FRAME_POINTER),y)
->> > -KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
->> > +KBUILD_CFLAGS	+=-fno-omit-frame-pointer $(call cc-option,-mapcs,) $(call cc-option,-mno-sched-prolog,)
->>
->> Some of these options here are to ensure that we generate the following
->> code, so we can backtrace:
->>
->> 	mov	ip, sp
->> 	stmfd	sp!, {fp, ip, lr, pc}
->> 	sub	fp, ip, #4
->>
->> If clang isn't producing that code at the start of functions with
->> CONFIG_FRAME_POINTER=y, then backtracing will not work, and arguably
->> CONFIG_FRAME_POINTER=y is useless there.  In that circumstance, it's
->> probably better to fail so the user can configure something more
->> debuggable, rather than having the kernel potentially producing
->> undebuggable oopses.
 
-With clang and -fno-omit-frame-pointer function prologue looks something
-like this:
+-- 
+cheers,
+-roger
 
-   0:   e92d4ff0        push    {r4, r5, r6, r7, r8, r9, sl, fp, lr}    
-                                                                   
-   4:   e28db01c        add     fp, sp, #28
-...
-
-This bug seems to be related:
-https://bugs.llvm.org/show_bug.cgi?id=18505 
-
-It seems that LLVM/clang does not plan to add APCS format/gcc
-interoperability for the same frame layout.
-
-I guess it would be possible to support the LLVM/clang frame layout?
-
-But until then, I am with Russel here: Better just let clang fail on
-CONFIG_FRAME_POINTER=y.
-
-Most configs probably anyway use CONFIG_ARM_UNWIND. At least
-multi_v7_defconfig does.
-
-> 
-> Which option in particular is important to generate the above code for
-> backstracing?
-
-For gcc, I guess really all of them.
-
---
-Stefan
-
-> 
-> According to the gcc doc -mapcs(-frame) is deprecated.
-> 
-> For -mno-sched-prolog the doc says:
-> 
-> "Prevent the reordering of instructions in the function prologue, or
-> the merging of those instruction with the instructions in the
-> function?s body. This means that all functions start with a
-> recognizable set of instructions (or in fact one of a choice from a
-> small set of different function prologues), and this information can
-> be used to locate the start of functions inside an executable piece of
-> code. The default is -msched-prolog."
-> 
-> Thanks
-> 
-> Matthias
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
