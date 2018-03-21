@@ -1,60 +1,44 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 21 Mar 2018 23:13:47 +0100
-Subject: 4.16-rc5 on Motorola Droid 4
-In-Reply-To: <20180321215733.GE5799@atomide.com>
-References: <20180318220418.GA22880@amd> <20180320140322.GU5799@atomide.com>
- <20180320170029.rv3u5wlvqxfl7z2v@earth.universe>
- <20180321203137.GA23637@amd> <20180321215733.GE5799@atomide.com>
-Message-ID: <20180321221346.GA18313@amd>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Wed, 21 Mar 2018 18:14:52 -0400
+Subject: [PATCH REPOST v4 5/7] ixgbevf: keep writel() closer to wmb()
+In-Reply-To: <20180321.175427.1419929873765406157.davem@davemloft.net>
+References: <1521658572-26354-1-git-send-email-okaya@codeaurora.org>
+ <1521658572-26354-6-git-send-email-okaya@codeaurora.org>
+ <1521668888.12746.32.camel@intel.com>
+ <20180321.175427.1419929873765406157.davem@davemloft.net>
+Message-ID: <bbaf3dadb8fb6469f49edae6ce6b7d48@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-03-21 14:57:33, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [180321 20:32]:
-> > Hi!
-> > 
-> > > > Maybe get somebody to help you locally with the debug cable
-> > > > soldering? :)
-> > > 
-> > > I suppose people from your hackerspace can help you. It's really
-> > > easy to do. Soldering can be avoided btw. You can just use a pair
-> > > of scissors to cut a USB -> Micro USB cable and use a knife to remove
-> > > isolation. Then screw each of the 4 wires into a terminal strip.
-> > > There are USB-TTL adapters available, that have an attached cable.
-> > > If you also cut the connector from such a cable and connect it to
-> > > the other side of the terminal strip you are done. No soldering
-> > > involved ;)
-> > 
-> > Hm. How big no-no is connecting USB-TTL adapter to D+/D- pins? Because
-> > that's what I could do "easily" and seems to work ;-).
+On 2018-03-21 17:54, David Miller wrote:
+> From: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
+> Date: Wed, 21 Mar 2018 14:48:08 -0700
 > 
-> Well if the VBUS line is not connected the PMIC is muxed
-> to USB carkit mode so the lines go to the UART on the SoC
-> through some level shifter. If it works it should not cause
-> any issues, the symptoms I saw earlier was corrupted UART
-> console and noticed that what worked best for me was 3.3V
-> ftdi based devices out of the collection of random pl2303
-> and ftdi cables I had around.
+>> On Wed, 2018-03-21 at 14:56 -0400, Sinan Kaya wrote:
+>>> Remove ixgbevf_write_tail() in favor of moving writel() close to
+>>> wmb().
+>>> 
+>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>> Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
+>>> ---
+>>>  drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
+>>>  drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 4 ++--
+>>>  2 files changed, 2 insertions(+), 7 deletions(-)
+>> 
+>> This patch fails to compile because there is a call to
+>> ixgbevf_write_tail() which you missed cleaning up.
+> 
+> For a change with delicate side effects, it doesn't create much
+> confidence if the code does not even compile.
+> 
+> Sinan, please put more care into the changes you are making.
 
-So.. I do have some fun on the UART (^@ inserted).
+I think the issue is the tree that code is getting tested has 
+undelivered code as Alex mentioned.
 
-> I guess somebody could try to measure the uart lines with
-> a scope with nothing connected and sending out data from
-> droid 4. Or look at the carkit spec for the UART voltage
-> levels.
+I was using linux-next 4.16 rc4 for testing.
 
-Voltmeter says Droid4 transmits at 3.3V.
+I will rebase to Jeff's tree.
 
-Anyway, it now works for me well enough that I can attempt to debug
-the .config file :-).
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180321/d282bbf7/attachment.sig>
+> 
+> Thank you.
