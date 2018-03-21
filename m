@@ -1,37 +1,21 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 21 Mar 2018 13:24:22 +0000
-Subject: [PATCH 27/37] iommu/arm-smmu-v3: Register fault workqueue
-In-Reply-To: <f2841aac-4c5e-4ac2-fa4d-81d6b2857503@huawei.com>
-References: <1519280641-30258-1-git-send-email-xieyisheng1@huawei.com>
- <1519280641-30258-27-git-send-email-xieyisheng1@huawei.com>
- <f2841aac-4c5e-4ac2-fa4d-81d6b2857503@huawei.com>
-Message-ID: <cabd71fd-c54c-c21a-a5b7-227e69fa4286@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 21 Mar 2018 14:23:21 +0100
+Subject: [PATCH 1/3] arm64: dts: marvell: armada-37xx: mark the gpio
+ controllers as irq controller
+In-Reply-To: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+References: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20180321132321.GE11206@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yisheng,
-
-On 19/03/18 11:03, Yisheng Xie wrote:
-> Hi Jean,
+On Wed, Mar 21, 2018 at 11:50:03AM +0100, Uwe Kleine-K?nig wrote:
+> This allows to reference these gpio controller as interrupt parent. Also
+> add a comment which cpu line names are managed by the controllers
+> because "nb" and "sb" usually doesn't appear in schematics, but MPPX_Y
+> do.
 > 
-> [...]
->> @@ -3168,6 +3260,13 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->>  	if (ret)
->>  		return ret;
->>  
->> +	if (smmu->features & (ARM_SMMU_FEAT_STALLS | ARM_SMMU_FEAT_PRI)) {
->> +		smmu->faultq_nb.notifier_call = arm_smmu_flush_queues;
->> +		ret = iommu_fault_queue_register(&smmu->faultq_nb);
->> +		if (ret)
->> +			return ret;
-> 
-> I find a case here: CONFIG_IOMMU_FAULT=n, and smmu support feature STALLS or PRI,
-> the device probe will failed here, is this what we want?
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Since CONFIG_ARM_SMMU_V3 selects CONFIG_IOMMU_FAULT, I don't think it
-can happen. I'm not sure what the best practices are, but I feel like it
-would be too much work to guard against config combinations that violate
-an explicit "select" in Kconfig
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks,
-Jean
+    Andrew
