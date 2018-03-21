@@ -1,33 +1,103 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 21 Mar 2018 10:43:11 +0800
-Subject: [PATCH 2/2] dt-bindings: regulator: add QCOM RPMh regulator
- bindings
-In-Reply-To: <b718873e5ad53a2e8df6a5103828a4c04881d564.1521246069.git.collinsd@codeaurora.org>
-References: <cover.1521246069.git.collinsd@codeaurora.org>
- <b718873e5ad53a2e8df6a5103828a4c04881d564.1521246069.git.collinsd@codeaurora.org>
-Message-ID: <20180321024311.GW2186@sirena.org.uk>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 21 Mar 2018 10:46:25 +0800
+Subject: [PATCH v2] clk: sunxi-ng: add missing hdmi-slow clock for H6 CCU
+Message-ID: <20180321024625.18516-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 06:09:11PM -0700, David Collins wrote:
-> Introduce bindings for RPMh regulator devices found on some
-> Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
+The Allwinner H6 CCU has a "HDMI Slow Clock", which is currently missing
+in the ccu-sun50i-h6 driver.
 
-Please use subject lines matching the style for the subsystem.  This
-makes it easier for people to identify relevant patches.
+Add this missing clock to the driver.
 
-> +=========================================
-> +Second Level Nodes - Regulators
-> +=========================================
-> +
-> +- regulator-name
+Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v2:
+- Rearrange clock slice numbers.
 
-This document appears to be reproducing the standard regulator bindings;
-there is no need to do that, just reference them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180321/8014c15f/attachment-0001.sig>
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c      |  4 ++++
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.h      |  2 +-
+ include/dt-bindings/clock/sun50i-h6-ccu.h | 27 ++++++++++++++-------------
+ 3 files changed, 19 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+index d5eab49e6350..bdbfe78fe133 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+@@ -643,6 +643,8 @@ static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents, 0xb00,
+ 				 BIT(31),	/* gate */
+ 				 0);
+ 
++static SUNXI_CCU_GATE(hdmi_slow_clk, "hdmi-slow", "osc24M", 0xb04, BIT(31), 0);
++
+ static const char * const hdmi_cec_parents[] = { "osc32k", "pll-periph0-2x" };
+ static const struct ccu_mux_fixed_prediv hdmi_cec_predivs[] = {
+ 	{ .index = 1, .div = 36621 },
+@@ -876,6 +878,7 @@ static struct ccu_common *sun50i_h6_ccu_clks[] = {
+ 	&pcie_aux_clk.common,
+ 	&bus_pcie_clk.common,
+ 	&hdmi_clk.common,
++	&hdmi_slow_clk.common,
+ 	&hdmi_cec_clk.common,
+ 	&bus_hdmi_clk.common,
+ 	&bus_tcon_top_clk.common,
+@@ -1017,6 +1020,7 @@ static struct clk_hw_onecell_data sun50i_h6_hw_clks = {
+ 		[CLK_PCIE_AUX]		= &pcie_aux_clk.common.hw,
+ 		[CLK_BUS_PCIE]		= &bus_pcie_clk.common.hw,
+ 		[CLK_HDMI]		= &hdmi_clk.common.hw,
++		[CLK_HDMI_SLOW]		= &hdmi_slow_clk.common.hw,
+ 		[CLK_HDMI_CEC]		= &hdmi_cec_clk.common.hw,
+ 		[CLK_BUS_HDMI]		= &bus_hdmi_clk.common.hw,
+ 		[CLK_BUS_TCON_TOP]	= &bus_tcon_top_clk.common.hw,
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.h b/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
+index ad6da4aa733c..2ccfe4428260 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.h
+@@ -51,6 +51,6 @@
+ 
+ #define CLK_BUS_DRAM		60
+ 
+-#define CLK_NUMBER		137
++#define CLK_NUMBER		(CLK_BUS_HDCP + 1)
+ 
+ #endif /* _CCU_SUN50I_H6_H_ */
+diff --git a/include/dt-bindings/clock/sun50i-h6-ccu.h b/include/dt-bindings/clock/sun50i-h6-ccu.h
+index 6045735a2821..a1545cd60e75 100644
+--- a/include/dt-bindings/clock/sun50i-h6-ccu.h
++++ b/include/dt-bindings/clock/sun50i-h6-ccu.h
+@@ -107,18 +107,19 @@
+ #define CLK_PCIE_AUX		121
+ #define CLK_BUS_PCIE		122
+ #define CLK_HDMI		123
+-#define CLK_HDMI_CEC		124
+-#define CLK_BUS_HDMI		125
+-#define CLK_BUS_TCON_TOP	126
+-#define CLK_TCON_LCD0		127
+-#define CLK_BUS_TCON_LCD0	128
+-#define CLK_TCON_TV0		129
+-#define CLK_BUS_TCON_TV0	130
+-#define CLK_CSI_CCI		131
+-#define CLK_CSI_TOP		132
+-#define CLK_CSI_MCLK		133
+-#define CLK_BUS_CSI		134
+-#define CLK_HDCP		135
+-#define CLK_BUS_HDCP		136
++#define CLK_HDMI_SLOW		124
++#define CLK_HDMI_CEC		125
++#define CLK_BUS_HDMI		126
++#define CLK_BUS_TCON_TOP	127
++#define CLK_TCON_LCD0		128
++#define CLK_BUS_TCON_LCD0	129
++#define CLK_TCON_TV0		130
++#define CLK_BUS_TCON_TV0	131
++#define CLK_CSI_CCI		132
++#define CLK_CSI_TOP		133
++#define CLK_CSI_MCLK		134
++#define CLK_BUS_CSI		135
++#define CLK_HDCP		136
++#define CLK_BUS_HDCP		137
+ 
+ #endif /* _DT_BINDINGS_CLK_SUN50I_H6_H_ */
+-- 
+2.15.1
