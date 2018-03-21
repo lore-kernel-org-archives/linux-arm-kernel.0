@@ -1,188 +1,78 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 21 Mar 2018 10:54:52 +0800
-Subject: [PATCH V2 2/4] clk: add new APIs to operate on all available clocks
-In-Reply-To: <1521600894-29919-1-git-send-email-aisheng.dong@nxp.com>
-References: <1521600894-29919-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1521600894-29919-3-git-send-email-aisheng.dong@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Mar 2018 09:02:17 +0100
+Subject: [PATCH] pinctrl: armada-37xx: Add edge both type gpio irq support
+In-Reply-To: <20180320215615.zszlfw5pnecfqhpt@pengutronix.de>
+References: <20171019131003.9684-1-gregory.clement@free-electrons.com>
+ <CACRpkdbqjh5U5QoE_B+7GfSyDdHW-NCAvogGq-2n8j6L6nG-Gw@mail.gmail.com>
+ <20171031131617.GA11647@lunn.ch>
+ <20180320215615.zszlfw5pnecfqhpt@pengutronix.de>
+Message-ID: <CACRpkdaAytp4veUYSYaJ8GB7+1EMbTFz2NMNv4GQrLhiWH8g3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces of_clk_bulk_get_all and clk_bulk_x_all APIs
-to users who just want to handle all available clocks from device tree
-without need to know the detailed clock information likes clock numbers
-and names. This is useful in writing some generic drivers to handle clock
-part.
+On Tue, Mar 20, 2018 at 10:56 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v1->v2:
- * make of_clk_bulk_get_all private
- * add clk_bulk_get/put_all
----
- drivers/clk/clk-bulk.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk.h    | 42 ++++++++++++++++++++++++++++++++++++-
- 2 files changed, 98 insertions(+), 1 deletion(-)
+> Maybe I'm wrong, but I wonder if there could be a set of helper
+> functions provided by the gpio core that helps implementing this
+> software simulation of IRQ_TYPE_EDGE_BOTH reliably (i.e. as good as
+> possible in software) to prevent common mistakes.
+>
+> First draft:
+>
+>                 disable_irq_nosync(...);
+>                 level = gpio_get(...);
+>         retry:
+>                 if (level)
+>                         configure_for_falling_edge();
+>                 else
+>                         configure_for_raising_edge();
+>                 postlevel = gpio_get(...);
+>
+>                 if (level != postlevel) {
+>                         mark_irq_pending(); /* something like desc->istate |= IRQS_PENDING */
+>                         level = postlevel;
+>                         goto retry;
+>                 }
+>
+>                 enable_irq(...); /* this resends the irq */
+>
+> I think this only looses an event if there is an edge between gpio_get
+> and the configure_for_${some}_edge and another before postlevel = ...
+> that make the two events invisible. But I think this is okish, as a
+> short spike might also be missed by a hw-edge-detector. And compared to
+> the current code there should be no way to end in a state where we
+> configured for raising edge and the level is already high.
 
-diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
-index 4b357b2..3293c6b 100644
---- a/drivers/clk/clk-bulk.c
-+++ b/drivers/clk/clk-bulk.c
-@@ -17,9 +17,11 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/device.h>
- #include <linux/export.h>
- #include <linux/of.h>
-+#include <linux/slab.h>
- 
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
- static int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
-@@ -50,6 +52,38 @@ static int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
- 	return ret;
- }
- EXPORT_SYMBOL(of_clk_bulk_get);
-+
-+static int __must_check of_clk_bulk_get_all(struct device_node *np,
-+					    struct clk_bulk_data **clks)
-+{
-+	struct clk_bulk_data *clk_bulk;
-+	int num_clks;
-+	int ret;
-+
-+	num_clks = of_clk_get_parent_count(np);
-+	if (!num_clks)
-+		return 0;
-+
-+	clk_bulk = kcalloc(num_clks, sizeof(*clk_bulk), GFP_KERNEL);
-+	if (!clk_bulk)
-+		return -ENOMEM;
-+
-+	ret = of_clk_bulk_get(np, num_clks, clk_bulk);
-+	if (ret) {
-+		kfree(clk_bulk);
-+		return ret;
-+	}
-+
-+	*clks = clk_bulk;
-+
-+	return num_clks;
-+}
-+#else
-+static int __must_check of_clk_bulk_get_all(struct device_node *np,
-+					    struct clk_bulk_data **clks)
-+{
-+	return -ENOENT;
-+}
- #endif
- 
- void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
-@@ -90,6 +124,29 @@ int __must_check clk_bulk_get(struct device *dev, int num_clks,
- }
- EXPORT_SYMBOL(clk_bulk_get);
- 
-+void clk_bulk_put_all(int num_clks, struct clk_bulk_data *clks)
-+{
-+	if (IS_ERR_OR_NULL(clks))
-+		return;
-+
-+	clk_bulk_put(num_clks, clks);
-+
-+	kfree(clks);
-+}
-+EXPORT_SYMBOL(clk_bulk_put_all);
-+
-+int __must_check clk_bulk_get_all(struct device *dev,
-+				  struct clk_bulk_data **clks)
-+{
-+	struct device_node *np = dev_of_node(dev);
-+
-+	if (!np)
-+		return 0;
-+
-+	return of_clk_bulk_get_all(np, clks);
-+}
-+EXPORT_SYMBOL(clk_bulk_get_all);
-+
- #ifdef CONFIG_HAVE_CLK_PREPARE
- 
- /**
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 0dbd088..a76fdff 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -279,7 +279,26 @@ struct clk *clk_get(struct device *dev, const char *id);
-  */
- int __must_check clk_bulk_get(struct device *dev, int num_clks,
- 			      struct clk_bulk_data *clks);
--
-+/**
-+ * clk_bulk_get_all - lookup and obtain all available references to clock
-+ *		      producer.
-+ * @dev: device for clock "consumer"
-+ * @clks: pointer to the clk_bulk_data table of consumer
-+ *
-+ * This helper function allows drivers to get all clk consumers in one
-+ * operation. If any of the clk cannot be acquired then any clks
-+ * that were obtained will be freed before returning to the caller.
-+ *
-+ * Returns a positive value for the number of clocks obtained while the
-+ * clock references are stored in the clk_bulk_data table in @clks field.
-+ * Returns 0 if there're none and a negative value if something failed.
-+ *
-+ * Drivers must assume that the clock source is not enabled.
-+ *
-+ * clk_bulk_get should not be called from within interrupt context.
-+ */
-+int __must_check clk_bulk_get_all(struct device *dev,
-+				  struct clk_bulk_data **clks);
- /**
-  * devm_clk_bulk_get - managed get multiple clk consumers
-  * @dev: device for clock "consumer"
-@@ -455,6 +474,19 @@ void clk_put(struct clk *clk);
- void clk_bulk_put(int num_clks, struct clk_bulk_data *clks);
- 
- /**
-+ * clk_bulk_put_all - "free" all the clock source
-+ * @num_clks: the number of clk_bulk_data
-+ * @clks: the clk_bulk_data table of consumer
-+ *
-+ * Note: drivers must ensure that all clk_bulk_enable calls made on this
-+ * clock source are balanced by clk_bulk_disable calls prior to calling
-+ * this function.
-+ *
-+ * clk_bulk_put_all should not be called from within interrupt context.
-+ */
-+void clk_bulk_put_all(int num_clks, struct clk_bulk_data *clks);
-+
-+/**
-  * devm_clk_put	- "free" a managed clock source
-  * @dev: device used to acquire the clock
-  * @clk: clock source acquired with devm_clk_get()
-@@ -609,6 +641,12 @@ static inline int __must_check clk_bulk_get(struct device *dev, int num_clks,
- 	return 0;
- }
- 
-+static inline int __must_check clk_bulk_get_all(struct device *dev,
-+					 struct clk_bulk_data **clks)
-+{
-+	return 0;
-+}
-+
- static inline struct clk *devm_clk_get(struct device *dev, const char *id)
- {
- 	return NULL;
-@@ -630,6 +668,8 @@ static inline void clk_put(struct clk *clk) {}
- 
- static inline void clk_bulk_put(int num_clks, struct clk_bulk_data *clks) {}
- 
-+static inline void clk_bulk_put_all(int num_clks, struct clk_bulk_data *clks) {}
-+
- static inline void devm_clk_put(struct device *dev, struct clk *clk) {}
- 
- 
--- 
-2.7.4
+This is looking good compared to the solutions people have hacked up.
+
+> When the gpio toggles quickly this might keep the cpu busy in an endless
+> loop, but such a sequence would also block a controller that can trigger
+> on both edges in hardware. Not sure if breaking the loop at some point
+> is sensible anyhow. Also calling the irq handlers would be beneficial,
+> but I don't know if/how this works without (more) racing.
+
+What would make sense (if you want a perfect solution) is to enforce
+some reasonable debouncing on double edges.
+
+That may seem hard to do since not all HW has debounce.
+
+In the past I had the idea to implement also generic debounce with a timer
+in gpiolib, so that gpiod_set_debounce() would never fail, so in effect
+to factor the code from drivers/input/keyboard/gpio_keys.c
+over to gpiolib so they don't need a fallback at all, and then with
+double edges, enforce some debouncing based on HZ.
+
+At one point I tried to bring the debounce code over from the
+input driver, but I hit some snag, I don't remember what though.
+An optional per-gpiod timer can be created in struct gpio_desc
+when needed.
+
+> A similar approach would be great to have to "simulate" level sensitive
+> irqs if the hardware only implements edge logic (which affects
+> armada-37xx, too, which annoys me).
+
+Yes that would be neat too...
+
+Yours,
+Linus Walleij
