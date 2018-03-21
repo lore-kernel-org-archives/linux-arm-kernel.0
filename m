@@ -1,41 +1,69 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 21 Mar 2018 11:19:47 +0800
-Subject: [PATCH V2 0/4] clk: new APIs to handle all available clocks
-Message-ID: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
+Date: Wed, 21 Mar 2018 11:19:48 +0800
+Subject: [PATCH V2 1/4] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
+References: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1521602391-30356-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is a continue of discussion from here,
-https://patchwork.kernel.org/patch/9986293/
-that some users may want to handle all available clocks from device
-tree without need to know the detailed clock information likes clock
-numbers and names. This is useful in writing some generic drivers to
-handle clock part.
+'clock-names' property is optional in DT, so of_clk_bulk_get() is
+introduced here to handle this for DT users without 'clock-names'
+specified. Later clk_bulk_get_all() will be implemented on top of
+it and this API will be kept private until someone proves they need
+it because they don't have a struct device pointer.
 
-Note:
-This patch series is tested on MX6Q SDB cpufreq driver with a minor change
-to switch to use clk_bulk_get_all.
-But patch 4 only test compiling. Hopefully someone could help test
-the function.
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Reported-by: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ drivers/clk/clk-bulk.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-v1->v2:
- * add clk_bulk_{get|put}_all() which only supports DT platform currently
- * remove _all variants and the wrapper struct clk_bulk
- * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
-   proves they need it because they don't have a struct device pointer.
-
-Dong Aisheng (4):
-  clk: bulk: add of_clk_bulk_get()
-  clk: add new APIs to operate on all available clocks
-  clk: add managed version of clk_bulk_get_all
-  video: simplefb: switch to use clk_bulk API to simplify clock
-    operations
-
- drivers/clk/clk-bulk.c         | 89 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-devres.c       | 24 ++++++++++++
- drivers/video/fbdev/simplefb.c | 69 ++++++--------------------------
- include/linux/clk.h            | 65 +++++++++++++++++++++++++++++-
- 4 files changed, 190 insertions(+), 57 deletions(-)
-
+diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+index 4c10456..4b357b2 100644
+--- a/drivers/clk/clk-bulk.c
++++ b/drivers/clk/clk-bulk.c
+@@ -19,6 +19,38 @@
+ #include <linux/clk.h>
+ #include <linux/device.h>
+ #include <linux/export.h>
++#include <linux/of.h>
++
++#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++static int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
++					struct clk_bulk_data *clks)
++{
++	int ret;
++	int i;
++
++	for (i = 0; i < num_clks; i++)
++		clks[i].clk = NULL;
++
++	for (i = 0; i < num_clks; i++) {
++		clks[i].clk = of_clk_get(np, i);
++		if (IS_ERR(clks[i].clk)) {
++			ret = PTR_ERR(clks[i].clk);
++			pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
++			       np, i, ret);
++			clks[i].clk = NULL;
++			goto err;
++		}
++	}
++
++	return 0;
++
++err:
++	clk_bulk_put(i, clks);
++
++	return ret;
++}
++EXPORT_SYMBOL(of_clk_bulk_get);
++#endif
+ 
+ void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
+ {
 -- 
 2.7.4
