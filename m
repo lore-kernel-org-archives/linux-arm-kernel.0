@@ -1,98 +1,45 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 21 Mar 2018 16:28:56 +0100
-Subject: [PATCH 02/10] drm/sun4i: Disable YUV channel when using the frontend
- and set interlace
-In-Reply-To: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180321152904.22411-3-paul.kocialkowski@bootlin.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 21 Mar 2018 16:35:49 +0100
+Subject: [PATCH 0/3] ARM: dts: at91: cleanup pullup on uarts
+Message-ID: <20180321153552.29213-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The YUV channel was only disabled in sun4i_backend_update_layer_formats,
-which is not called when the frontend is selected.
+Hi!
 
-Thus, creating a layer with a YUV format handled by the backend and then
-switching to a format that requires the frontend would keep the YUV
-channel enabled for the layer.
+I noticed a *LOT* of pointless pullups and missing pullups related
+to uart/usart pins. These patches fixes what I found.
 
-This explicitly disables the YUV channel for the layer when using the
-frontend as well. It also sets the relevant interlace bit, which was
-missing in the frontend path as well.
+I separated out the two changes that had pullup on neither rx nor tx,
+since there might exist some reason for that? But a pullup on tx and
+a missing pullup on rx is a sure sign of confusion, so I lumped all
+those fixes in one big patch.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_backend.c | 17 ++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_backend.h |  3 ++-
- drivers/gpu/drm/sun4i/sun4i_layer.c   |  2 +-
- 3 files changed, 19 insertions(+), 3 deletions(-)
+One or two of the removed comments with duplicate info where wrong
+as well, i.e. the info was supposed to be duplicate but wasn't.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index e07a33adc51d..b98dafda52f8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -294,8 +294,10 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- }
- 
- int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
--					int layer, uint32_t fmt)
-+					int layer, struct drm_plane *plane,
-+					uint32_t fmt)
- {
-+	bool interlaced = false;
- 	u32 val;
- 	int ret;
- 
-@@ -305,11 +307,24 @@ int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
- 		return ret;
- 	}
- 
-+	/* Clear the YUV mode */
-+	regmap_update_bits(backend->engine.regs,
-+			   SUN4I_BACKEND_ATTCTL_REG0(layer),
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN, 0);
-+
- 	regmap_update_bits(backend->engine.regs,
- 			   SUN4I_BACKEND_ATTCTL_REG0(layer),
- 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN,
- 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN);
- 
-+	if (plane->state->crtc)
-+		interlaced = plane->state->crtc->state->adjusted_mode.flags
-+			& DRM_MODE_FLAG_INTERLACE;
-+
-+	regmap_update_bits(backend->engine.regs, SUN4I_BACKEND_MODCTL_REG,
-+			   SUN4I_BACKEND_MODCTL_ITLMOD_EN,
-+			   interlaced ? SUN4I_BACKEND_MODCTL_ITLMOD_EN : 0);
-+
- 	regmap_update_bits(backend->engine.regs,
- 			   SUN4I_BACKEND_ATTCTL_REG1(layer),
- 			   SUN4I_BACKEND_ATTCTL_REG1_LAY_FBFMT, val);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 7ae0f0ffec8c..cb6df2b690c0 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -201,7 +201,8 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 				      int layer, struct drm_plane *plane);
- int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
--					int layer, uint32_t in_fmt);
-+					int layer, struct drm_plane *plane,
-+					uint32_t fmt);
- int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend,
- 				    int layer, struct drm_plane *plane);
- void sun4i_backend_disable_layer_frontend(struct sun4i_backend *backend,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 224bb1811e0a..eb93df445a10 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -101,7 +101,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- 		sun4i_frontend_update_buffer(frontend, plane);
- 		sun4i_frontend_update_formats(frontend, plane,
- 					      DRM_FORMAT_ARGB8888);
--		sun4i_backend_update_layer_frontend(backend, layer->id,
-+		sun4i_backend_update_layer_frontend(backend, layer->id, plane,
- 						    DRM_FORMAT_ARGB8888);
- 		sun4i_frontend_enable(frontend);
- 	} else {
+Cheers,
+Peter
+
+Peter Rosin (3):
+  ARM: dts: at91: fixes uart pinctrl, set pullup on rx, clear pullup on
+    tx
+  ARM: dts: at91rm9200: pullup rx on uart0
+  ARM: dts: at91sam9260: pullup rx on usart0
+
+ arch/arm/boot/dts/at91rm9200.dtsi        | 16 ++++++++--------
+ arch/arm/boot/dts/at91sam9260.dtsi       | 24 ++++++++++++------------
+ arch/arm/boot/dts/at91sam9261.dtsi       | 12 ++++++------
+ arch/arm/boot/dts/at91sam9263.dtsi       | 12 ++++++------
+ arch/arm/boot/dts/at91sam9g45.dtsi       | 16 ++++++++--------
+ arch/arm/boot/dts/at91sam9n12.dtsi       |  4 ++--
+ arch/arm/boot/dts/at91sam9rl.dtsi        | 12 ++++++------
+ arch/arm/boot/dts/at91sam9x5.dtsi        | 12 ++++++------
+ arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  4 ++--
+ arch/arm/boot/dts/sama5d3.dtsi           | 24 ++++++++++++------------
+ arch/arm/boot/dts/sama5d3_uart.dtsi      |  8 ++++----
+ arch/arm/boot/dts/sama5d4.dtsi           | 28 ++++++++++++++--------------
+ 12 files changed, 86 insertions(+), 86 deletions(-)
+
 -- 
-2.16.2
+2.11.0
