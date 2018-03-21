@@ -1,37 +1,103 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 21 Mar 2018 09:54:36 +0100
-Subject: [PATCH 42/52] ARM: dts: r7s72100: add USB device to device tree
-In-Reply-To: <TY1PR01MB1562CEB3464308DFDBA00C6D8AAB0@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-References: <cover.1521208546.git.horms+renesas@verge.net.au>
- <faa6c0071114fd433e83dddd3a42fba547ca9a67.1521208546.git.horms+renesas@verge.net.au>
- <TY1PR01MB1562ED183D137FA48FCBC7DB8AD70@TY1PR01MB1562.jpnprd01.prod.outlook.com>
- <CAMuHMdXdvH4Ywj_3rr8MSi-9AKN=WoDtdwHQdAJF=w0RJ8maaA@mail.gmail.com>
- <TY1PR01MB1562CEB3464308DFDBA00C6D8AAB0@TY1PR01MB1562.jpnprd01.prod.outlook.com>
-Message-ID: <20180321085435.3kvleabhysexdbit@verge.net.au>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 21 Mar 2018 10:03:22 +0100
+Subject: [PATCH 5/5] ARM: add support for building ARM kernel with clang
+In-Reply-To: <20180321002022.GH37438@google.com>
+References: <20180320230206.25289-1-stefan@agner.ch>
+ <20180320230206.25289-6-stefan@agner.ch>
+ <20180320231832.GK2743@n2100.armlinux.org.uk>
+ <20180321002022.GH37438@google.com>
+Message-ID: <602b427702af61a503d9ffe38c35075c@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 11:20:39AM +0000, Chris Brandt wrote:
-> Hi Geert,
+On 21.03.2018 01:20, Matthias Kaehlcke wrote:
+> El Tue, Mar 20, 2018 at 11:18:33PM +0000 Russell King - ARM Linux ha dit:
 > 
-> On Tuesday, March 20, 2018, Geert Uytterhoeven wrote:
-> > > At one point Greg applied it, then reverted it (as requested by Geert),
-> > > but then somehow it still went in.
-> > 
-> > It's not present in upstream:
-> > 
-> > $ git grep usbhs0 v4.16-rc6 -- arch/arm/boot/dts/r7s72100.dtsi
-> > $
+>> On Wed, Mar 21, 2018 at 12:02:06AM +0100, Stefan Agner wrote:
+>> > Use cc-options call for compiler options which are not available
+>> > in clang. With this patch an ARMv7 multi platform kernel can be
+>> > successfully build using clang (tested with version 5.0.1).
+>> >
+>> > Based-on-patches-by: Behan Webster <behanw@converseincode.com>
+>> > Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
+> Great to see your work on bringing clang support for 32-bit ARM
+> upstream!
 > 
-> Yes, you're right. It's not there.
-> 
-> So somehow I found the commit...but in the end it's not in upstream.
-> 
-> I'm sorry Simon, but that patch really does belong in there.
-> 
-> Sorry for the trouble :(
+>> > ---
+>> >  arch/arm/Makefile                 | 2 +-
+>> >  arch/arm/boot/compressed/Makefile | 2 +-
+>> >  2 files changed, 2 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+>> > index e9e3fde3c657..20e9fee1ccc5 100644
+>> > --- a/arch/arm/Makefile
+>> > +++ b/arch/arm/Makefile
+>> > @@ -39,7 +39,7 @@ KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
+>> >  endif
+>> >
+>> >  ifeq ($(CONFIG_FRAME_POINTER),y)
+>> > -KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
+>> > +KBUILD_CFLAGS	+=-fno-omit-frame-pointer $(call cc-option,-mapcs,) $(call cc-option,-mno-sched-prolog,)
+>>
+>> Some of these options here are to ensure that we generate the following
+>> code, so we can backtrace:
+>>
+>> 	mov	ip, sp
+>> 	stmfd	sp!, {fp, ip, lr, pc}
+>> 	sub	fp, ip, #4
+>>
+>> If clang isn't producing that code at the start of functions with
+>> CONFIG_FRAME_POINTER=y, then backtracing will not work, and arguably
+>> CONFIG_FRAME_POINTER=y is useless there.  In that circumstance, it's
+>> probably better to fail so the user can configure something more
+>> debuggable, rather than having the kernel potentially producing
+>> undebuggable oopses.
 
-No problem. I'd rather not respin this pull request for a second time so
-lets leave the patch where it now is, queued up in the renesas tree for
-v4.18.
+With clang and -fno-omit-frame-pointer function prologue looks something
+like this:
+
+   0:   e92d4ff0        push    {r4, r5, r6, r7, r8, r9, sl, fp, lr}    
+                                                                   
+   4:   e28db01c        add     fp, sp, #28
+...
+
+This bug seems to be related:
+https://bugs.llvm.org/show_bug.cgi?id=18505 
+
+It seems that LLVM/clang does not plan to add APCS format/gcc
+interoperability for the same frame layout.
+
+I guess it would be possible to support the LLVM/clang frame layout?
+
+But until then, I am with Russel here: Better just let clang fail on
+CONFIG_FRAME_POINTER=y.
+
+Most configs probably anyway use CONFIG_ARM_UNWIND. At least
+multi_v7_defconfig does.
+
+> 
+> Which option in particular is important to generate the above code for
+> backstracing?
+
+For gcc, I guess really all of them.
+
+--
+Stefan
+
+> 
+> According to the gcc doc -mapcs(-frame) is deprecated.
+> 
+> For -mno-sched-prolog the doc says:
+> 
+> "Prevent the reordering of instructions in the function prologue, or
+> the merging of those instruction with the instructions in the
+> function?s body. This means that all functions start with a
+> recognizable set of instructions (or in fact one of a choice from a
+> small set of different function prologues), and this information can
+> be used to locate the start of functions inside an executable piece of
+> code. The default is -msched-prolog."
+> 
+> Thanks
+> 
+> Matthias
