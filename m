@@ -1,59 +1,52 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 21 Mar 2018 11:05:15 +0200
-Subject: [usb-next PATCH] usb: xhci: skip phys initialization of shared hcd
-In-Reply-To: <1ece0d5508a00bca67d16e64310a071646b59c7d.1521612280.git.chunfeng.yun@mediatek.com>
-References: <1ece0d5508a00bca67d16e64310a071646b59c7d.1521612280.git.chunfeng.yun@mediatek.com>
-Message-ID: <ae71fdae-43aa-9df3-3f81-8a92460d61b9@ti.com>
+From: sricharan@codeaurora.org (sricharan at codeaurora.org)
+Date: Wed, 21 Mar 2018 14:40:43 +0530
+Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
+ data
+In-Reply-To: <20180320143131.4eenixtbhciq5fwc@localhost>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+ <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
+ <20180320143131.4eenixtbhciq5fwc@localhost>
+Message-ID: <78806c70c85e3cecaadfc94b173cb139@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chunfeng,
-
-On 21/03/18 08:12, Chunfeng Yun wrote:
-> The phys has already been initialized when add primary hcd,
-> including usb2 phys and usb3 phys also if exist, so needn't
-> re-parse "phys" property again.
+On 2018-03-20 20:01, Richard Cochran wrote:
+> On Tue, Mar 20, 2018 at 09:28:47AM +0530, Sricharan R wrote:
+>> Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
+>> Adds missing memory, reserved-memory nodes.
+>> 
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 28 
+>> +++++++++++++++++++++++++++
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/usb/host/xhci-mtk.c  | 1 +
->  drivers/usb/host/xhci-plat.c | 1 +
->  2 files changed, 2 insertions(+)
+> Q: Does mainline Linux even boot on the DK?
 > 
-> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-> index 7334da9..6bb23fb 100644
-> --- a/drivers/usb/host/xhci-mtk.c
-> +++ b/drivers/usb/host/xhci-mtk.c
-> @@ -554,6 +554,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
->  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->  		xhci->shared_hcd->can_do_streams = 1;
->  
-> +	xhci->shared_hcd->skip_phy_initialization = 1;
->  	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
->  	if (ret)
->  		goto dealloc_usb2_hcd;
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 6700e5e..65a4294 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -294,6 +294,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
->  	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
->  		xhci->shared_hcd->can_do_streams = 1;
->  
-> +	xhci->shared_hcd->skip_phy_initialization = 1;
+> A: No, it doesn't.
 
-I think this is unnecessary.
-There aren't separate PHYs for the primary and shared HCDs right?
+  Yes, i saw that it was booting out of mainline.
+  Both DK01 and DK04 boards boots out of mainline.
 
-Also how can you be sure that phy_init() has been done for all platform HCD users?
+cat /proc/version
+Linux version 4.16.0-rc6 (srichara at srichara-linux) (gcc version 6.3.1 
+20170109 (Linaro GCC 6.3-2017.02)) #1677 SMP PREEMPT Wed Mar 21 12:58:14 
+IST 2018
 
->  	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
->  	if (ret)
->  		goto dealloc_usb2_hcd;
+  If it does not boot for you, then can you check if your bootloader is 
+passing this bootarg ?
+
+     bootargs=console=ttyMSM0,115200n8
+
+   This is the only one required from bootloader to boot.
+   That said, there should have been a default 'chosen' node in DTS
+   for the serial console atleast which is not there today. I will add 
+this
+   in my v4 along with other changes.
+
+Regards,
+  Sricharan
+
 > 
-
--- 
-cheers,
--roger
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> Please add the missing basic board support before hacking random stuff
+> into the DTS.
+> 
