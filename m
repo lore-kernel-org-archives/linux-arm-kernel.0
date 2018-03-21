@@ -1,15 +1,13 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 21 Mar 2018 14:56:05 -0400
-Subject: [PATCH REPOST v4 1/7] i40e/i40evf: Eliminate duplicate barriers on
+Date: Wed, 21 Mar 2018 14:56:04 -0400
+Subject: [PATCH REPOST v4 0/7] netdev: intel: Eliminate duplicate barriers on
  weakly-ordered archs
-In-Reply-To: <1521658572-26354-1-git-send-email-okaya@codeaurora.org>
-References: <1521658572-26354-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521658572-26354-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521658572-26354-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier
-on some architectures like arm64.
+Code includes wmb() followed by writel() in multiple places. writel()
+already has a barrier on some architectures like arm64.
 
 This ends up CPU observing two barriers back to back before executing the
 register write.
@@ -17,74 +15,53 @@ register write.
 Since code already has an explicit barrier call, changing writel() to
 writel_relaxed().
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
----
- drivers/net/ethernet/intel/i40e/i40e_txrx.c   | 8 ++++----
- drivers/net/ethernet/intel/i40evf/i40e_txrx.c | 4 ++--
- 2 files changed, 6 insertions(+), 6 deletions(-)
+I did a regex search for wmb() followed by writel() in each drivers
+directory.
+I scrubbed the ones I care about in this series.
 
-diff --git a/drivers/net/ethernet/intel/i40e/i40e_txrx.c b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-index e554aa6cf..9455869 100644
---- a/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-+++ b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-@@ -185,7 +185,7 @@ static int i40e_program_fdir_filter(struct i40e_fdir_filter *fdir_data,
- 	/* Mark the data descriptor to be watched */
- 	first->next_to_watch = tx_desc;
- 
--	writel(tx_ring->next_to_use, tx_ring->tail);
-+	writel_relaxed(tx_ring->next_to_use, tx_ring->tail);
- 	return 0;
- 
- dma_fail:
-@@ -1375,7 +1375,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
- 	 * such as IA-64).
- 	 */
- 	wmb();
--	writel(val, rx_ring->tail);
-+	writel_relaxed(val, rx_ring->tail);
- }
- 
- /**
-@@ -2258,7 +2258,7 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
- 		 */
- 		wmb();
- 
--		writel(xdp_ring->next_to_use, xdp_ring->tail);
-+		writel_relaxed(xdp_ring->next_to_use, xdp_ring->tail);
- 	}
- 
- 	rx_ring->skb = skb;
-@@ -3286,7 +3286,7 @@ static inline int i40e_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
- 
- 	/* notify HW of packet */
- 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
--		writel(i, tx_ring->tail);
-+		writel_relaxed(i, tx_ring->tail);
- 
- 		/* we need this if more than one processor can write to our tail
- 		 * at a time, it synchronizes IO on IA64/Altix systems
-diff --git a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
-index 357d605..56eea20 100644
---- a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
-+++ b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
-@@ -667,7 +667,7 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
- 	 * such as IA-64).
- 	 */
- 	wmb();
--	writel(val, rx_ring->tail);
-+	writel_relaxed(val, rx_ring->tail);
- }
- 
- /**
-@@ -2243,7 +2243,7 @@ static inline void i40evf_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
- 
- 	/* notify HW of packet */
- 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
--		writel(i, tx_ring->tail);
-+		writel_relaxed(i, tx_ring->tail);
- 
- 		/* we need this if more than one processor can write to our tail
- 		 * at a time, it synchronizes IO on IA64/Altix systems
+I considered "ease of change", "popular usage" and "performance critical
+path" as the determining criteria for my filtering.
+
+We used relaxed API heavily on ARM for a long time but
+it did not exist on other architectures. For this reason, relaxed
+architectures have been paying double penalty in order to use the common
+drivers.
+
+Now that relaxed API is present on all architectures, we can go and scrub
+all drivers to see what needs to change and what can remain.
+
+We start with mostly used ones and hope to increase the coverage over time.
+It will take a while to cover all drivers.
+
+Feel free to apply patches individually.
+
+repost:
+- split into intel specific patches
+
+Changes since v3:
+- https://www.spinics.net/lists/arm-kernel/msg641851.html
+- group patches together into subsystems net:...
+- collect reviewed and tested bys
+- scrub barrier()
+
+Sinan Kaya (7):
+  i40e/i40evf: Eliminate duplicate barriers on weakly-ordered archs
+  ixgbe: eliminate duplicate barriers on weakly-ordered archs
+  igbvf: eliminate duplicate barriers on weakly-ordered archs
+  igb: eliminate duplicate barriers on weakly-ordered archs
+  ixgbevf: keep writel() closer to wmb()
+  ixgbevf: eliminate duplicate barriers on weakly-ordered archs
+  fm10k: Eliminate duplicate barriers on weakly-ordered archs
+
+ drivers/net/ethernet/intel/fm10k/fm10k_main.c     | 4 ++--
+ drivers/net/ethernet/intel/i40e/i40e_txrx.c       | 8 ++++----
+ drivers/net/ethernet/intel/i40evf/i40e_txrx.c     | 4 ++--
+ drivers/net/ethernet/intel/igb/igb_main.c         | 4 ++--
+ drivers/net/ethernet/intel/igbvf/netdev.c         | 4 ++--
+ drivers/net/ethernet/intel/ixgbe/ixgbe_main.c     | 8 ++++----
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 4 ++--
+ 8 files changed, 18 insertions(+), 23 deletions(-)
+
 -- 
 2.7.4
