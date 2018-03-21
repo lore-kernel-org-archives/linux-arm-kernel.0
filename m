@@ -1,28 +1,40 @@
-From: daniel@fooishbar.org (Daniel Stone)
-Date: Wed, 21 Mar 2018 16:47:01 +0000
-Subject: [PATCH 08/10] drm/fourcc: Add definitions for Allwinner vendor
- and MB32 tiled format
-In-Reply-To: <20180321152904.22411-9-paul.kocialkowski@bootlin.com>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-9-paul.kocialkowski@bootlin.com>
-Message-ID: <CAPj87rPNgga_pspx_0kTiP4itWUOL3O++2ZCiTUFfNBDGzkd0w@mail.gmail.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Wed, 21 Mar 2018 17:48:40 +0100
+Subject: [PATCH v2] i2c: i2c-stm32f7: fix no check on returned setup
+Message-ID: <1521650920-11578-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Before assigning returned setup structure check if not null
 
-On 21 March 2018 at 15:29, Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
-> +/*
-> + * Allwinner "MB32" tiled format
-> + *
-> + * This is the primary layout coming out of the VPU, where pixels are tiled
-> + * 32x32.
-> + */
+Fixes: 463a9215f3ca7600b5ff ("i2c: stm32f7: fix setup structure")
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+  Version history:
+     v1:
+         * Initial
+     v2:
+         * fill "ret" with error statement before go to "clk_free"
+---
+---
+ drivers/i2c/busses/i2c-stm32f7.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Can you please be a bit more specific here, following the other
-examples? In particular, it should list whether the tile order is row-
-or column-major.
-
-Cheers,
-Daniel
+diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+index b445b3b..f273e28 100644
+--- a/drivers/i2c/busses/i2c-stm32f7.c
++++ b/drivers/i2c/busses/i2c-stm32f7.c
+@@ -888,6 +888,11 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	setup = of_device_get_match_data(&pdev->dev);
++	if (!setup) {
++		dev_err(&pdev->dev, "Can't get device data\n");
++		ret = -ENODEV;
++		goto clk_free;
++	}
+ 	i2c_dev->setup = *setup;
+ 
+ 	ret = device_property_read_u32(i2c_dev->dev, "i2c-scl-rising-time-ns",
+-- 
+2.7.4
