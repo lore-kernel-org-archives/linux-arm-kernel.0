@@ -1,61 +1,46 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Wed, 21 Mar 2018 11:47:27 +0100
-Subject: [RESEND PATCH v1 2/6] i2c: i2c-stm32f7: Add slave support
-In-Reply-To: <c7fa1cc2-a298-967c-6006-942fd631b4f0@st.com>
-References: <1520852023-27083-1-git-send-email-pierre-yves.mordret@st.com>
- <1520852023-27083-3-git-send-email-pierre-yves.mordret@st.com>
- <20180317205109.gocf5wemtjkyomct@ninjato>
- <5a3c5b21-bc66-ce73-a997-f686ecc275f3@st.com>
- <20180320095242.tedafu5wphsx55qx@katana>
- <c7fa1cc2-a298-967c-6006-942fd631b4f0@st.com>
-Message-ID: <f5389af1-257d-2887-531c-d3bd67b20524@st.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 21 Mar 2018 11:50:05 +0100
+Subject: [PATCH 3/3] arm64: dts: armada-3720-espressobin: wire up LED2
+In-Reply-To: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+References: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20180321105005.18426-3-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram
+The led is connected to MPP1_2.
 
-STM32 I2C F7 can be both Master and Slave mode.
-Whenever a master command (I2C or SMBus) a START condition is generated and the
-master flag (master_mode) is set and managed accordingly : sw and ITs/
-Now if a slave is registered it's managed accordingly as long as there is no
-master command on going.
-IRqs are not separated neither Regs bits. The routing is done though out START
-condition.
-This driver is not slave-only driver and can act as master if a master command
-is issued and slave if registered as such.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Note the LED doesn't work for me on two different boards. But the
+voltage levels on one side of the LED changes from 1.76V to 0V when
+enabling the LED. So there is probably something fishy, don't know if it
+is hardware or software related.
 
-Hope it clarifies
-Regards
+Best regards
+Uwe
+---
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-On 03/20/2018 11:17 AM, Pierre Yves MORDRET wrote:
-> 
-> 
-> On 03/20/2018 10:52 AM, Wolfram Sang wrote:
->>
->>> I do believe the hw can support it, even it looks odd to me having the same I2C
->>> in slave and master mode at the same time.
->>
->> I2C is multi-master, so it is perfectly valid for a device to be master
->> and slave. I do have seen designs making use of that more than once.
->>
->>> Nevertheless the driver is devised to support either master or slave more but
->>> not at the same time.
->>
->> Why should we limit ourselves here? Also, why should we have an
->> unnecessary configuration option?
->>
->> Unless the HW is broken and does not support it, I usually don't accept
->> slave-only solutions. If the needs for master and slave arises later,
->> this is hard to refactor and better done properly right away.
->>
->> Is it so hard? Usually you have irqs for master and for slave seperated,
->> so you can code things quite orthogonal. Check de20d1857dd6 ("i2c: rcar:
->> add slave support") as an example.
->>
-> 
-> I need to check at my end but status bits are shared between master and slave in
-> my IP: i.e. Tx Empty, Rx Empty, NAxk, Stop.
-> Both bits have a meaning in either master and slave mode. In your case status
-> bits are separated between master and slave.
-> BTW I need to think about it.
-> 
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+index a88f053d2f28..0802d595e0a2 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -77,6 +77,15 @@
+ 			  3300000 0x0>;
+ 		enable-active-high;
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led2 {
++			gpios = <&gpionb 2 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
+ };
+ 
+ /* J9 */
+-- 
+2.16.2
