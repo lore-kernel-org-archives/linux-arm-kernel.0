@@ -1,88 +1,113 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 21 Mar 2018 18:27:49 +0200
-Subject: WL1837-st on imx6 request_firmware failed with 4.16-RC6
-In-Reply-To: <CAHCN7xKQxF34LSy7TZUQ2yCo9KdrKppOvamgna-CHJD_kt=80w@mail.gmail.com>
-References: <CAHCN7xKQxF34LSy7TZUQ2yCo9KdrKppOvamgna-CHJD_kt=80w@mail.gmail.com>
-Message-ID: <20180321162749.ammvnmamwknwjonr@tarshish>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 21 Mar 2018 10:40:36 -0600
+Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
+In-Reply-To: <03de5241-fb69-9097-5020-f9843482318d@gmail.com>
+References: <20180320230206.25289-1-stefan@agner.ch>
+ <20180320230206.25289-4-stefan@agner.ch>
+ <124e16c9-b8ca-9c7e-ade5-b033eed76e14@arm.com>
+ <302cfd1a4324e064cd4f189e4e0ffc21@agner.ch>
+ <03de5241-fb69-9097-5020-f9843482318d@gmail.com>
+Message-ID: <1dd52edb-412c-2d26-7e6a-d567695a89fe@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
+On 03/21/2018 09:26 AM, Dmitry Osipenko wrote:
+> On 21.03.2018 17:09, Stefan Agner wrote:
+>> On 21.03.2018 13:13, Robin Murphy wrote:
+>>> On 20/03/18 23:02, Stefan Agner wrote:
+>>>> As documented in GCC naked functions should only use Basic asm
+>>>> syntax. The Extended asm or mixture of Basic asm and "C" code is
+>>>> not guaranteed. Currently this works because it was hard coded
+>>>> to follow and check GCC behavior for arguments and register
+>>>> placement.
+>>>>
+>>>> Furthermore with clang using parameters in Extended asm in a
+>>>> naked function is not supported:
+>>>>     arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
+>>>>             references not allowed in naked functions
+>>>>                   : "r" (type), "r" (arg1), "r" (arg2)
+>>>>                          ^
+>>>>
+>>>> Use a regular function to be more portable. This aligns also with
+>>>> the other smc call implementations e.g. in qcom_scm-32.c and
+>>>> bcm_kona_smc.c.
+>>>>
+>>>> Additionally also make sure all callee-saved registers get saved
+>>>> as it has been done before.
+>>>>
+>>>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>>>> ---
+>>>>    arch/arm/firmware/trusted_foundations.c | 12 +++++++-----
+>>>>    1 file changed, 7 insertions(+), 5 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+>>>> index 3fb1b5a1dce9..426d732e6591 100644
+>>>> --- a/arch/arm/firmware/trusted_foundations.c
+>>>> +++ b/arch/arm/firmware/trusted_foundations.c
+>>>> @@ -31,21 +31,23 @@
+>>>>      static unsigned long cpu_boot_addr;
+>>>>    -static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>>>> +static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>>>>    {
+>>>> +	register u32 r0 asm("r0") = type;
+>>>> +	register u32 r1 asm("r1") = arg1;
+>>>> +	register u32 r2 asm("r2") = arg2;
+>>>> +
+>>>>    	asm volatile(
+>>>>    		".arch_extension	sec\n\t"
+>>>> -		"stmfd	sp!, {r4 - r11, lr}\n\t"
+>>>>    		__asmeq("%0", "r0")
+>>>>    		__asmeq("%1", "r1")
+>>>>    		__asmeq("%2", "r2")
+>>>>    		"mov	r3, #0\n\t"
+>>>>    		"mov	r4, #0\n\t"
+>>>>    		"smc	#0\n\t"
+>>>> -		"ldmfd	sp!, {r4 - r11, pc}"
+>>>>    		:
+>>>> -		: "r" (type), "r" (arg1), "r" (arg2)
+>>>> -		: "memory");
+>>>> +		: "r" (r0), "r" (r1), "r" (r2)
+>>>> +		: "memory", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10");
+>>>
+>>> I may be missing a subtlety, but it looks like we no longer have a
+>>> guarantee that r11 will be caller-saved as it was previously. I don't
+>>> know the Trusted Foundations ABI to say whether that matters or not,
+>>> but if it is the case that it never needed preserving anyway, that
+>>> might be worth calling out in the commit message.
+>>
+>> Adding r11 (fp) to the clobber list causes an error when using gcc and
+>> CONFIG_FRAME_POINTER=y:
+>> arch/arm/firmware/trusted_foundations.c: In function ?tf_generic_smc?:
+>> arch/arm/firmware/trusted_foundations.c:51:1: error: fp cannot be used
+>> in asm here
+>>
+>> Not sure what ABI Trusted Foundations follow.
+>>
+>> [adding Stephen, Thierry and Dmitry]
+>> Maybe someone more familiar with NVIDIA Tegra SoCs can help?
+>>
+>> When CONFIG_FRAME_POINTER=y fp gets saved anyway. So we could add r11 to
+>> clobber list ifndef CONFIG_FRAME_POINTER...
+> 
+> I have no idea about TF ABI either. Looking at the downstream kernel code, r4 -
+> r12 should be saved. I've CC'd Alexandre as he is the author of the original
+> patch and may still remember the details.
+> 
+> I'm also wondering why original code doesn't have r3 in the clobber list and why
+> r3 is set to '0', downstream sets it to the address of SP and on return from SMC
+> r3 contains the address of SP which should be restored. I'm now wondering how
+> SMC calling worked for me at all on T30, maybe it didn't..
 
-On Wed, Mar 21, 2018 at 10:31:55AM -0500, Adam Ford wrote:
-> I have an i.MX6 board and I am trying to get Bluetooth operational on
-> 4.16-RC6 using the default imx_v6_v7_defconfig
-> 
-> I have my device tree configured as follows:
-> 
-> &uart2 {
->   pinctrl-names = "default";
->   pinctrl-0 = <&pinctrl_uart2>;
->   uart-has-rtscts;
->   status = "okay";
-> 
->   bluetooth {
->     compatible = "ti,wl1837-st";
->     enable-gpios = <&gpio7 8 GPIO_ACTIVE_HIGH>;
->   };
-> };
-> 
-> I have the firmware TIInit_11.8.32  available in /lib/firmware/ti-connectivity
-> 
-> # ls -l /lib/firmware/ti-connectivity/
-> total 2748
-> -rwxrwxrwx    1 root     root         53488 Mar 21  2018 TIInit_10.6.15.bts
-> -rwxrwxrwx    1 root     root         70313 Mar 21  2018 TIInit_11.8.32.bts
-> -rwxrwxrwx    1 root     root         14610 Mar 21  2018 TIInit_12.10.28.bts
-> -rwxrwxrwx    1 root     root         70313 Mar 21  2018 TIInit_12.8.32.bts
-> -rwxrwxrwx    1 root     root         48909 Jan  4  2018 TIInit_7.2.31.bts
-> -rwxrwxrwx    1 root     root         50695 Mar 21  2018 TIInit_7.6.15.bts
-> 
-> However, when the Bluetooth driver loads, it appears it cannot locate
-> the proper firmware image.
-> 
-> [    0.176338] Bluetooth: Core ver 2.22
-> [    0.176453] Bluetooth: HCI device and connection manager initialized
-> [    0.176529] Bluetooth: HCI socket layer initialized
-> [    0.176563] Bluetooth: L2CAP socket layer initialized
-> [    0.176705] Bluetooth: SCO socket layer initialized
-> [    2.043237] Bluetooth: HCI UART driver ver 2.3
-> [    2.047710] Bluetooth: HCI UART protocol H4 registered
-> [    2.055090] Bluetooth: HCI UART protocol LL registered
-> [    2.130658] Bluetooth: hci0: request_firmware failed(errno -2) for
-> ti-connectivity/TIInit_11.8.32.bts
-> [    2.147064] Bluetooth: hci0: download firmware failed, retrying...
-> [    2.218509] Bluetooth: hci0: request_firmware failed(errno -2) for
-> ti-connectivity/TIInit_11.8.32.bts
-> [    2.227752] Bluetooth: hci0: download firmware failed, retrying...
-> [    2.288584] Bluetooth: hci0: request_firmware failed(errno -2) for
-> ti-connectivity/TIInit_11.8.32.bts
-> [    2.306472] Bluetooth: hci0: download firmware failed, retrying...
-> [    2.380161] Bluetooth: hci0: request_firmware failed(errno -2) for
-> ti-connectivity/TIInit_11.8.32.bts
-> [    2.389459] Bluetooth: hci0: download firmware failed, retrying...
+I don't know what the ABI for ATF is. I assume it's documented in the 
+ATF, PSCI, or similar specification, or ATF source code. Hence, I don't 
+know whether ATF restores fp/r11.
 
-Is your filesystem mounted at this point? Do you use initramfs?
+My guess is that r3/r4 are set to 0 because they're defined as inputs by 
+the SMC/ATF ABI, yet nothing the kernel does needed that many 
+parameters, so they're hard-coded to 0 (to ensure they're set to 
+something predictable) rather than also being parameters to 
+tf_generic_smc().
 
-baruch
-
-> I was hoping someone might have some insight on what might be the issue.
-> 
-> Thanks
-> 
-> adam
-> 
-> pinctrl_uart2: uart2grp {
-> fsl,pins = <
-> MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA 0x1b0b1
-> MX6QDL_PAD_SD4_DAT5__UART2_RTS_B 0x1b0b1
-> MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
-> MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA 0x1b0b1
-> MX6QDL_PAD_SD3_RST__GPIO7_IO08 0x13059 /* BT_EN */
-> >;
-> };
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+The original code used to save/restore a lot of registers, including 
+r11/fp. Can't we side-step the issue of including/not-including r11/fp 
+in the clobber list by not removing those stmfd/ldmfd assembly instructions?
