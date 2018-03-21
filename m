@@ -1,119 +1,79 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 21 Mar 2018 13:08:06 +0100
-Subject: [PATCH 7/8] remoteproc: da8xx: use the reset framework
-In-Reply-To: <20180321120807.18032-1-brgl@bgdev.pl>
-References: <20180321120807.18032-1-brgl@bgdev.pl>
-Message-ID: <20180321120807.18032-8-brgl@bgdev.pl>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 21 Mar 2018 12:13:58 +0000
+Subject: [PATCH 3/5] ARM: trusted_foundations: do not use naked function
+In-Reply-To: <20180320230206.25289-4-stefan@agner.ch>
+References: <20180320230206.25289-1-stefan@agner.ch>
+ <20180320230206.25289-4-stefan@agner.ch>
+Message-ID: <124e16c9-b8ca-9c7e-ade5-b033eed76e14@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 20/03/18 23:02, Stefan Agner wrote:
+> As documented in GCC naked functions should only use Basic asm
+> syntax. The Extended asm or mixture of Basic asm and "C" code is
+> not guaranteed. Currently this works because it was hard coded
+> to follow and check GCC behavior for arguments and register
+> placement.
+> 
+> Furthermore with clang using parameters in Extended asm in a
+> naked function is not supported:
+>    arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
+>            references not allowed in naked functions
+>                  : "r" (type), "r" (arg1), "r" (arg2)
+>                         ^
+> 
+> Use a regular function to be more portable. This aligns also with
+> the other smc call implementations e.g. in qcom_scm-32.c and
+> bcm_kona_smc.c.
+> 
+> Additionally also make sure all callee-saved registers get saved
+> as it has been done before.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>   arch/arm/firmware/trusted_foundations.c | 12 +++++++-----
+>   1 file changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+> index 3fb1b5a1dce9..426d732e6591 100644
+> --- a/arch/arm/firmware/trusted_foundations.c
+> +++ b/arch/arm/firmware/trusted_foundations.c
+> @@ -31,21 +31,23 @@
+>   
+>   static unsigned long cpu_boot_addr;
+>   
+> -static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+> +static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>   {
+> +	register u32 r0 asm("r0") = type;
+> +	register u32 r1 asm("r1") = arg1;
+> +	register u32 r2 asm("r2") = arg2;
+> +
+>   	asm volatile(
+>   		".arch_extension	sec\n\t"
+> -		"stmfd	sp!, {r4 - r11, lr}\n\t"
+>   		__asmeq("%0", "r0")
+>   		__asmeq("%1", "r1")
+>   		__asmeq("%2", "r2")
+>   		"mov	r3, #0\n\t"
+>   		"mov	r4, #0\n\t"
+>   		"smc	#0\n\t"
+> -		"ldmfd	sp!, {r4 - r11, pc}"
+>   		:
+> -		: "r" (type), "r" (arg1), "r" (arg2)
+> -		: "memory");
+> +		: "r" (r0), "r" (r1), "r" (r2)
+> +		: "memory", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10");
 
-Switch to using the reset framework instead of handcoded reset routines
-we used so far.
+I may be missing a subtlety, but it looks like we no longer have a 
+guarantee that r11 will be caller-saved as it was previously. I don't 
+know the Trusted Foundations ABI to say whether that matters or not, but 
+if it is the case that it never needed preserving anyway, that might be 
+worth calling out in the commit message.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/remoteproc/da8xx_remoteproc.c | 30 +++++++++++++++++++++++++-----
- 1 file changed, 25 insertions(+), 5 deletions(-)
+Robin.
 
-diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-index 83f2d66ad3a9..fc29b78d0f77 100644
---- a/drivers/remoteproc/da8xx_remoteproc.c
-+++ b/drivers/remoteproc/da8xx_remoteproc.c
-@@ -10,6 +10,7 @@
- 
- #include <linux/bitops.h>
- #include <linux/clk.h>
-+#include <linux/reset.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-@@ -20,8 +21,6 @@
- #include <linux/platform_device.h>
- #include <linux/remoteproc.h>
- 
--#include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
--
- #include "remoteproc_internal.h"
- 
- static char *da8xx_fw_name;
-@@ -72,6 +71,7 @@ struct da8xx_rproc {
- 	struct da8xx_rproc_mem *mem;
- 	int num_mems;
- 	struct clk *dsp_clk;
-+	struct reset_control *dsp_reset;
- 	void (*ack_fxn)(struct irq_data *data);
- 	struct irq_data *irq_data;
- 	void __iomem *chipsig;
-@@ -138,6 +138,7 @@ static int da8xx_rproc_start(struct rproc *rproc)
- 	struct device *dev = rproc->dev.parent;
- 	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
- 	struct clk *dsp_clk = drproc->dsp_clk;
-+	struct reset_control *dsp_reset = drproc->dsp_reset;
- 	int rv;
- 
- 	/* hw requires the start (boot) address be on 1KB boundary */
-@@ -155,7 +156,11 @@ static int da8xx_rproc_start(struct rproc *rproc)
- 		return rv;
- 	}
- 
--	davinci_clk_reset_deassert(dsp_clk);
-+	rv = reset_control_deassert(dsp_reset);
-+	if (rv) {
-+		dev_err(dev, "reset_control_deassert() failed: %d\n", rv);
-+		return rv;
-+	}
- 
- 	return 0;
- }
-@@ -163,8 +168,15 @@ static int da8xx_rproc_start(struct rproc *rproc)
- static int da8xx_rproc_stop(struct rproc *rproc)
- {
- 	struct da8xx_rproc *drproc = rproc->priv;
-+	int rv;
-+
-+	rv = reset_control_assert(drproc->dsp_reset);
-+	if (rv) {
-+		dev_err(rproc->dev.parent,
-+			"reset_control_assert() failed: %d\n", rv);
-+		return rv;
-+	}
- 
--	davinci_clk_reset_assert(drproc->dsp_clk);
- 	clk_disable_unprepare(drproc->dsp_clk);
- 
- 	return 0;
-@@ -232,6 +244,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
- 	struct resource *bootreg_res;
- 	struct resource *chipsig_res;
- 	struct clk *dsp_clk;
-+	struct reset_control *dsp_reset;
- 	void __iomem *chipsig;
- 	void __iomem *bootreg;
- 	int irq;
-@@ -268,6 +281,13 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
- 		return PTR_ERR(dsp_clk);
- 	}
- 
-+	dsp_reset = devm_reset_control_get_exclusive(dev, NULL);
-+	if (IS_ERR(dsp_reset)) {
-+		dev_err(dev, "unable to get reset control: %ld\n",
-+			PTR_ERR(dsp_reset));
-+		return PTR_ERR(dsp_reset);
-+	}
-+
- 	if (dev->of_node) {
- 		ret = of_reserved_mem_device_init(dev);
- 		if (ret) {
-@@ -309,7 +329,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
- 	 * *not* in reset, but da8xx_rproc_start() needs the DSP to be
- 	 * held in reset at the time it is called.
- 	 */
--	ret = davinci_clk_reset_assert(drproc->dsp_clk);
-+	ret = reset_control_assert(dsp_reset);
- 	if (ret)
- 		goto free_rproc;
- 
--- 
-2.16.1
+>   }
+>   
+>   static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+> 
