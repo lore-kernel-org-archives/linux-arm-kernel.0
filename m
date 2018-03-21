@@ -1,62 +1,62 @@
 From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 20 Mar 2018 23:09:02 -0500
-Subject: [PATCHv6 3/3] clk: socfpga: stratix10: add clock driver for
- Stratix10 platform
-In-Reply-To: <152148346040.242365.18406406194344107023@swboyd.mtv.corp.google.com>
+Date: Tue, 20 Mar 2018 23:10:04 -0500
+Subject: [PATCHv6 1/3] dt-bindings: documentation: add clock bindings
+ information for Stratix10
+In-Reply-To: <152148291051.242365.11482305337775703728@swboyd.mtv.corp.google.com>
 References: <1519656455-14629-1-git-send-email-dinguyen@kernel.org>
- <1519656455-14629-3-git-send-email-dinguyen@kernel.org>
- <152148346040.242365.18406406194344107023@swboyd.mtv.corp.google.com>
-Message-ID: <f0d3fc46-5fa1-4e77-ef73-284bf2ee0d61@kernel.org>
+ <152148291051.242365.11482305337775703728@swboyd.mtv.corp.google.com>
+Message-ID: <1b10d9b1-3b2a-9c62-4817-e925fbd3bb77@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 03/19/2018 01:17 PM, Stephen Boyd wrote:
-> Quoting Dinh Nguyen (2018-02-26 06:47:35)
->> diff --git a/drivers/clk/socfpga/Makefile b/drivers/clk/socfpga/Makefile
->> index 9146c20..87ef977 100644
->> --- a/drivers/clk/socfpga/Makefile
->> +++ b/drivers/clk/socfpga/Makefile
->> @@ -1,6 +1,11 @@
->>  # SPDX-License-Identifier: GPL-2.0
->> +ifeq ($(CONFIG_ARCH_SOCFPGA),y)
+On 03/19/2018 01:08 PM, Stephen Boyd wrote:
+> Quoting Dinh Nguyen (2018-02-26 06:47:33)
+>> diff --git a/Documentation/devicetree/bindings/clock/intc_stratix10.txt b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+>> new file mode 100644
+>> index 0000000..0652ff1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/intc_stratix10.txt
+>> @@ -0,0 +1,51 @@
+>> +Device Tree Clock bindings for Intel's SoCFPGA Stratix10 platform
+>> +
+>> +This binding uses the common clock binding[1].
+>> +
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +
+>> +Required properties:
+>> +- compatible : shall be
+>> +       "intel,stratix10-clkmgr"
+>> +
+>> +- reg : shall be the control register offset from CLOCK_MANAGER's base for the clock.
+>> +
+>> +- #clock-cells : from common clock binding, shall be set to 1.
+>> +
+>> +- clocks : Should contain fixed-clock sources, such as oscillators.
+>> +
+>> +Example:
+>> +       clkmgr: clock-controller at ffd10000 {
+>> +               compatible = "intel,stratix10-clkmgr";
+>> +               reg = <0xffd10000 0x1000>;
+>> +               #clock-cells = <1>;
+>> +
+>> +               clocks {
 > 
-> Ugh, any chance to make this better if we get three?
+> Why do we need a subnode for clocks inside of a clock controller node?
+> 
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +
+>> +                       cb_intosc_hs_div2_clk: cb-intosc-hs-div2-clk {
+>> +                               #clock-cells = <0>;
+>> +                               compatible = "fixed-clock";
+>> +                               clock-frequency = <25000000>;
+> 
+> What is this for? I would think oscillators go into the root of the DT
+> because they're on the board, not inside the clock controller.
 > 
 
-I'll try.
-
-...
-
-> 
->> +{
->> +       struct stratix10_clock_data *clk_data;
->> +
->> +       clk_data = __socfpga_s10_clk_init(node, STRATIX10_NUM_CLKS);
->> +       if (!clk_data)
->> +               return;
->> +
->> +       s10_clk_register_pll(s10_pll_clks, ARRAY_SIZE(s10_pll_clks), clk_data);
->> +
->> +       s10_clk_register_c_perip(s10_main_perip_c_clks,
->> +                                ARRAY_SIZE(s10_main_perip_c_clks), clk_data);
->> +
->> +       s10_clk_register_cnt_perip(s10_main_perip_cnt_clks,
->> +                                  ARRAY_SIZE(s10_main_perip_cnt_clks),
->> +                                  clk_data);
->> +
->> +       s10_clk_register_gate(s10_gate_clks, ARRAY_SIZE(s10_gate_clks),
->> +                             clk_data);
->> +}
->> +
->> +CLK_OF_DECLARE(stratix10_clock, "intel,stratix10-clkmgr", socfpga_s10_init);
-> 
-> Can it be a platform device? We prefer those over the CLK_OF_DECLARE
-> style.
-> 
-
-Thanks for the review! I'll change it to a platform device and address
-your other comments in v7.
+Thanks for the review! I'll move the PLLs into the root of the DT.
 
 Dinh
