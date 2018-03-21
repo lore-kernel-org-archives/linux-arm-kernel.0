@@ -1,13 +1,11 @@
 From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Wed, 21 Mar 2018 21:03:11 +0100
-Subject: [PATCH 5/7] dt-bindings: add micronova vendor prefix
-In-Reply-To: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <1521662593-25468-5-git-send-email-giulio.benetti@micronovasrl.com>
+Date: Wed, 21 Mar 2018 21:03:07 +0100
+Subject: [PATCH 1/7] dt-bindings: add cdtech vendor prefix
+Message-ID: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a vendor prefix "micronova" for Micronova srl
+This adds a vendor prefix "cdtech" for CDTech(H.K.) Electronics Limited
 
 Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 ---
@@ -15,16 +13,16 @@ Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
  1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 9854399..b07d1fc 100644
+index ae850d6..9854399 100644
 --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
 +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -217,6 +217,7 @@ micrel	Micrel Inc.
- microchip	Microchip Technology Inc.
- microcrystal	Micro Crystal AG
- micron	Micron Technology Inc.
-+micronova	Micronova srl
- minix	MINIX Technology Ltd.
- miramems	MiraMEMS Sensing Technology Co., Ltd.
- mitsubishi	Mitsubishi Electric Corporation
+@@ -61,6 +61,7 @@ capella	Capella Microsystems, Inc
+ cascoda	Cascoda, Ltd.
+ cavium	Cavium, Inc.
+ cdns	Cadence Design Systems Inc.
++cdtech	CDTech(H.K.) Electronics Limited
+ ceva	Ceva, Inc.
+ chipidea	Chipidea, Inc
+ chipone		ChipOne
 -- 
 2.7.4
