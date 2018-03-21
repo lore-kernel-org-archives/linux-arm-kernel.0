@@ -1,28 +1,43 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 21 Mar 2018 14:10:43 +0800
-Subject: Failed to boot ARM64 boards for recent linux-next
-In-Reply-To: <13507742-ddb8-0b43-cd09-14a57ec2a07a@rock-chips.com>
-References: <dae4b3b8-3da4-4a86-ac4a-0631802fa546@rock-chips.com>
- <077cecdd-7982-dd33-454f-e38cc571366c@arm.com>
- <9cff515e-fcb9-a1c0-329b-a18c3bed0071@rock-chips.com>
- <fe56e7e3-50dd-88de-ce61-f3cbcc1f572b@rock-chips.com>
- <5AB0DEB2.4000803@rock-chips.com>
- <e603186e-b9e8-c7d5-b98a-f5bcce94f7d5@arm.com>
- <cbc89d68-ba41-1f6a-4ab2-4c9647b48f75@huawei.com>
- <d18d6f27-7270-d2d7-58b9-3bf16ffe6b0a@arm.com>
- <ff6cd434-2227-12a6-b3b9-325da78a7fa9@huawei.com>
- <2aed10a0-ad3d-d9fc-7b6e-3b6877bff0be@arm.com>
- <13507742-ddb8-0b43-cd09-14a57ec2a07a@rock-chips.com>
-Message-ID: <5AB1F763.3040409@rock-chips.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 21 Mar 2018 14:12:38 +0800
+Subject: [usb-next PATCH] usb: xhci: skip phys initialization of shared hcd
+Message-ID: <1ece0d5508a00bca67d16e64310a071646b59c7d.1521612280.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The phys has already been initialized when add primary hcd,
+including usb2 phys and usb3 phys also if exist, so needn't
+re-parse "phys" property again.
 
-On 03/21/2018 08:34 AM, Shawn Lin wrote:
->
-> @Jeffy
->
-> Could you help test Marc's latest patch on your RK3399 kevin/Gru or
-> whatever Chromebook?
-tested on my chromebook kevin, it works with that patch.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/host/xhci-mtk.c  | 1 +
+ drivers/usb/host/xhci-plat.c | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 7334da9..6bb23fb 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -554,6 +554,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+ 
++	xhci->shared_hcd->skip_phy_initialization = 1;
+ 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+ 	if (ret)
+ 		goto dealloc_usb2_hcd;
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 6700e5e..65a4294 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -294,6 +294,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+ 
++	xhci->shared_hcd->skip_phy_initialization = 1;
+ 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+ 	if (ret)
+ 		goto dealloc_usb2_hcd;
+-- 
+1.9.1
