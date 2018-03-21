@@ -1,44 +1,56 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Wed, 21 Mar 2018 18:14:52 -0400
-Subject: [PATCH REPOST v4 5/7] ixgbevf: keep writel() closer to wmb()
-In-Reply-To: <20180321.175427.1419929873765406157.davem@davemloft.net>
-References: <1521658572-26354-1-git-send-email-okaya@codeaurora.org>
- <1521658572-26354-6-git-send-email-okaya@codeaurora.org>
- <1521668888.12746.32.camel@intel.com>
- <20180321.175427.1419929873765406157.davem@davemloft.net>
-Message-ID: <bbaf3dadb8fb6469f49edae6ce6b7d48@codeaurora.org>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 21 Mar 2018 23:50:01 +0100
+Subject: [GIT PULL] ARM: at91: DT for 4.17 #2
+Message-ID: <20180321225001.GA27480@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-21 17:54, David Miller wrote:
-> From: Jeff Kirsher <jeffrey.t.kirsher@intel.com>
-> Date: Wed, 21 Mar 2018 14:48:08 -0700
-> 
->> On Wed, 2018-03-21 at 14:56 -0400, Sinan Kaya wrote:
->>> Remove ixgbevf_write_tail() in favor of moving writel() close to
->>> wmb().
->>> 
->>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>> Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
->>> ---
->>>  drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
->>>  drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 4 ++--
->>>  2 files changed, 2 insertions(+), 7 deletions(-)
->> 
->> This patch fails to compile because there is a call to
->> ixgbevf_write_tail() which you missed cleaning up.
-> 
-> For a change with delicate side effects, it doesn't create much
-> confidence if the code does not even compile.
-> 
-> Sinan, please put more care into the changes you are making.
+Arnd, Olof,
 
-I think the issue is the tree that code is getting tested has 
-undelivered code as Alex mentioned.
+A few DT fixes that came in late in the cycle.
 
-I was using linux-next 4.16 rc4 for testing.
+The following changes since commit 6fa65edf87886f85a18680ed7bdedc15cb810065:
 
-I will rebase to Jeff's tree.
+  ARM: dts: at91: use 'atmel' as at24 manufacturer for at91sam9263ek (2018-02-13 17:15:18 +0100)
 
-> 
-> Thank you.
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.17-dt2
+
+for you to fetch changes up to 26f2cacde21b713f7f917d2193a76cc7636ee88e:
+
+  ARM: dts: at91sam9260: pullup rx on usart0 (2018-03-21 21:47:00 +0100)
+
+----------------------------------------------------------------
+AT91 DT for 4.17 #2:
+
+Pinctrl fixes, the UART pullups were discussed back in 2016.
+
+----------------------------------------------------------------
+Nicolas Ferre (1):
+      ARM: dts: at91: at91sam9g25: fix mux-mask pinctrl property
+
+Peter Rosin (3):
+      ARM: dts: at91: fixes uart pinctrl, set pullup on rx, clear pullup on tx
+      ARM: dts: at91rm9200: pullup rx on uart0
+      ARM: dts: at91sam9260: pullup rx on usart0
+
+ arch/arm/boot/dts/at91rm9200.dtsi        | 16 ++++++++--------
+ arch/arm/boot/dts/at91sam9260.dtsi       | 24 ++++++++++++------------
+ arch/arm/boot/dts/at91sam9261.dtsi       | 12 ++++++------
+ arch/arm/boot/dts/at91sam9263.dtsi       | 12 ++++++------
+ arch/arm/boot/dts/at91sam9g25.dtsi       |  2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi       | 16 ++++++++--------
+ arch/arm/boot/dts/at91sam9n12.dtsi       |  4 ++--
+ arch/arm/boot/dts/at91sam9rl.dtsi        | 12 ++++++------
+ arch/arm/boot/dts/at91sam9x5.dtsi        | 12 ++++++------
+ arch/arm/boot/dts/at91sam9x5_usart3.dtsi |  4 ++--
+ arch/arm/boot/dts/sama5d3.dtsi           | 24 ++++++++++++------------
+ arch/arm/boot/dts/sama5d3_uart.dtsi      |  8 ++++----
+ arch/arm/boot/dts/sama5d4.dtsi           | 28 ++++++++++++++--------------
+ 13 files changed, 87 insertions(+), 87 deletions(-)
+
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
