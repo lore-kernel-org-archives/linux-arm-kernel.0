@@ -1,39 +1,48 @@
-From: shashim@codeaurora.org (Shiraz Hashim)
-Date: Thu, 22 Mar 2018 17:44:18 +0530
-Subject: [PATCH 1/1] arm: dma-mapping: DMA buf may not have cpu virtual addr
-Message-ID: <1521720858-9031-1-git-send-email-shashim@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 22 Mar 2018 13:19:06 +0100
+Subject: v4.16-rc5 on droid4: external abort in l2c310_configure+0x38/0x160
+In-Reply-To: <20180322120359.GA12518@amd>
+References: <20180322120359.GA12518@amd>
+Message-ID: <20180322121906.GC12518@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA buffers may not have cpu virtual addresses when
-allocated using DMA_ATTR_NO_KERNEL_MAPPING attribute.
-Page address should therefore be looked up while
-searching for such dma bufs.
+On Thu 2018-03-22 13:03:59, Pavel Machek wrote:
+> Hi!
+> 
+> I'm trying to get something to work on Droid 4.
+> 
+> So far, v4.14 from leste project works, with the right config. I tried
+> v4.16-rc5 next, and am stopped in early boot by:
+> 
+> If someone knows what this is let me know, but I guess it is
+> config-dependend and I'll just try different one...
 
-Signed-off-by: Shiraz Hashim <shashim@codeaurora.org>
----
- arch/arm/mm/dma-mapping.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+With different config it works, I just get storm of
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ada8eb2..c85fc0a 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -883,9 +883,10 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
- 		.page = page,
- 		.want_vaddr = ((attrs & DMA_ATTR_NO_KERNEL_MAPPING) == 0),
- 	};
-+	void *addr = (args.want_vaddr) ? cpu_addr : page;
- 
--	buf = arm_dma_buffer_find(cpu_addr);
--	if (WARN(!buf, "Freeing invalid buffer %p\n", cpu_addr))
-+	buf = arm_dma_buffer_find(addr);
-+	if (WARN(!buf, "Freeing invalid buffer %p\n", addr))
- 		return;
- 
- 	buf->allocator->free(&args);
+^@^??r??????musb-hdrc musb-hdrc.1.auto: VBUS Disconnect
+
+[   39.985656] musb-hdrc musb-hdrc.1.auto: VBUS b_idle, devctl 80
+
+^@^??r????????musb-hdrc musb-hdrc.1.auto: VBUS Disconnect
+
+[   40.005645] musb-hdrc musb-hdrc.1.auto: VBUS b_idle, devctl 80
+
+^@^??r????????musb-hdrc musb-hdrc.1.auto: VBUS Disconnect
+
+[   40.035766] musb-hdrc musb-hdrc.1.auto: VBUS b_idle, devctl 80
+
+
+
+Best regards,
+									Pavel
 -- 
-Shiraz Hashim
-
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
-member of the Code Aurora Forum, hosted by The Linux Foundation
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180322/17c74a28/attachment.sig>
