@@ -1,83 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 22 Mar 2018 18:30:25 +0000
-Subject: [PATCH] arm64: tlbflush: avoid writing RES0 bits
-In-Reply-To: <1521666172-2494-1-git-send-email-pelcan@codeaurora.org>
-References: <1521666172-2494-1-git-send-email-pelcan@codeaurora.org>
-Message-ID: <00ae42df-d0b7-f63b-9cca-4c3e65a3938e@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 22 Mar 2018 18:14:44 +0000
+Subject: [PATCH v2 10/11] mm/memory-failure: increase queued recovery work's
+ priority
+In-Reply-To: <20180322181445.23298-1-james.morse@arm.com>
+References: <20180322181445.23298-1-james.morse@arm.com>
+Message-ID: <20180322181445.23298-11-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/18 21:02, Philip Elcan wrote:
-> Bits [47:44] of the TLBI register operand are RES0 for instructions that
-> require a VA, per the ARM ARM spec, so TLBI operations should avoid writing
-> non-zero values to these bits.
+arm64 can take an NMI-like error notification when user-space steps in
+some corrupt memory. APEI's GHES code will call memory_failure_queue()
+to schedule the recovery work. We then return to user-space, possibly
+taking the fault again.
 
-If we're going to start sanitising addresses to respect RES0 bits, then 
-we should probably do it properly to cope with the cases where bits 
-63:47 are also RES0, and others - I guess we never actually try to do 
-something like VAE1IS with a kernel VA, but AFAICS that would still be 
-busted even after this patch.
+Currently the arch code unconditionally signals user-space from this
+path, so we don't get stuck in this loop, but the affected process
+never benefits from memory_failure()s recovery work. To fix this we
+need to know the recovery work will run before we get back to user-space.
 
-Robin.
+Increase the priority of the recovery work by scheduling it on the
+system_highpri_wq, then try to bump the current task off this CPU
+so that the recover work starts immediately.
 
-> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
-> ---
->   arch/arm64/include/asm/tlbflush.h | 16 ++++++++++------
->   1 file changed, 10 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> index 9e82dd7..dbd22a9 100644
-> --- a/arch/arm64/include/asm/tlbflush.h
-> +++ b/arch/arm64/include/asm/tlbflush.h
-> @@ -60,6 +60,9 @@
->   		__tlbi(op, (arg) | USER_ASID_FLAG);				\
->   } while (0)
->   
-> +/* This macro masks out RES0 bits in the TLBI operand */
-> +#define __TLBI_VADDR(addr) (addr & ~GENMASK_ULL(47, 44))
-> +
->   /*
->    *	TLB Management
->    *	==============
-> @@ -128,7 +131,8 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
->   static inline void flush_tlb_page(struct vm_area_struct *vma,
->   				  unsigned long uaddr)
->   {
-> -	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
-> +	unsigned long addr = __TLBI_VADDR(uaddr >> 12) |
-> +			     (ASID(vma->vm_mm) << 48);
->   
->   	dsb(ishst);
->   	__tlbi(vale1is, addr);
-> @@ -154,8 +158,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
->   		return;
->   	}
->   
-> -	start = asid | (start >> 12);
-> -	end = asid | (end >> 12);
-> +	start = asid | __TLBI_VADDR(start >> 12);
-> +	end = asid | __TLBI_VADDR(end >> 12);
->   
->   	dsb(ishst);
->   	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
-> @@ -185,8 +189,8 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
->   		return;
->   	}
->   
-> -	start >>= 12;
-> -	end >>= 12;
-> +	start = __TLBI_VADDR(start >> 12);
-> +	end = __TLBI_VADDR(end >> 12);
->   
->   	dsb(ishst);
->   	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
-> @@ -202,7 +206,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
->   static inline void __flush_tlb_pgtable(struct mm_struct *mm,
->   				       unsigned long uaddr)
->   {
-> -	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
-> +	unsigned long addr = __TLBI_VADDR(uaddr >> 12) | (ASID(mm) << 48);
->   
->   	__tlbi(vae1is, addr);
->   	__tlbi_user(vae1is, addr);
-> 
+Reported-by: Xie XiuQi <xiexiuqi@huawei.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+CC: Xie XiuQi <xiexiuqi@huawei.com>
+CC: gengdongjiu <gengdongjiu@huawei.com>
+---
+It is possible that the task will migrate to another CPU which will take
+RAS error again until memory_failure() has completed its work. I don't
+think this is any different from a process being scheduled while
+memory_failure() is running, which we should tackle separately.
+
+ mm/memory-failure.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/mm/memory-failure.c b/mm/memory-failure.c
+index 4b80ccee4535..14f44d841e8b 100644
+--- a/mm/memory-failure.c
++++ b/mm/memory-failure.c
+@@ -55,6 +55,7 @@
+ #include <linux/hugetlb.h>
+ #include <linux/memory_hotplug.h>
+ #include <linux/mm_inline.h>
++#include <linux/preempt.h>
+ #include <linux/kfifo.h>
+ #include <linux/ratelimit.h>
+ #include "internal.h"
+@@ -1319,6 +1320,7 @@ static DEFINE_PER_CPU(struct memory_failure_cpu, memory_failure_cpu);
+  */
+ void memory_failure_queue(unsigned long pfn, int flags)
+ {
++	int cpu = smp_processor_id();
+ 	struct memory_failure_cpu *mf_cpu;
+ 	unsigned long proc_flags;
+ 	struct memory_failure_entry entry = {
+@@ -1328,11 +1330,14 @@ void memory_failure_queue(unsigned long pfn, int flags)
+ 
+ 	mf_cpu = &get_cpu_var(memory_failure_cpu);
+ 	spin_lock_irqsave(&mf_cpu->lock, proc_flags);
+-	if (kfifo_put(&mf_cpu->fifo, entry))
+-		schedule_work_on(smp_processor_id(), &mf_cpu->work);
+-	else
++	if (kfifo_put(&mf_cpu->fifo, entry)) {
++		queue_work_on(cpu, system_highpri_wq, &mf_cpu->work);
++		set_tsk_need_resched(current);
++		preempt_set_need_resched();
++	} else {
+ 		pr_err("Memory failure: buffer overflow when queuing memory failure at %#lx\n",
+ 		       pfn);
++	}
+ 	spin_unlock_irqrestore(&mf_cpu->lock, proc_flags);
+ 	put_cpu_var(memory_failure_cpu);
+ }
+-- 
+2.16.2
