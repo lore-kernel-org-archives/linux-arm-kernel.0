@@ -1,30 +1,22 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 22 Mar 2018 09:46:56 -0700
-Subject: [GIT PULL] Allwinner clock changes for 4.17
-In-Reply-To: <20180322160402.o2lon3bbncgss4sv@flea>
-References: <20180322160402.o2lon3bbncgss4sv@flea>
-Message-ID: <152173721645.178046.16783083391543934111@swboyd.mtv.corp.google.com>
+Date: Thu, 22 Mar 2018 09:51:38 -0700
+Subject: [PATCH] clk: ux500: Drop AB8540/9540 support
+In-Reply-To: <20180322101618.9655-1-linus.walleij@linaro.org>
+References: <20180322101618.9655-1-linus.walleij@linaro.org>
+Message-ID: <152173749844.178046.3216641335872815943@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2018-03-22 09:04:02)
-> Hi Mike, Stephen,
+Quoting Linus Walleij (2018-03-22 03:16:18)
+> The AB8540 was an evolved version of the AB8500, but it was never
+> mass produced or put into products, only reference designs exist.
+> The upstream support was never completed and it is unlikely that
+> this will happen so drop the support for now to simplify
+> maintenance of the AB8500.
 > 
-> Here is our usual pull request for the next merge window.
-> 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
-> 
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
-> 
-> are available in the Git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.17
-> 
-> for you to fetch changes up to f422fa558aada511406432bc5974d3a5bf728227:
-> 
->   clk: sunxi-ng: add missing hdmi-slow clock for H6 CCU (2018-03-21 12:27:13 +0100)
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Loic Pallardy <loic.pallardy@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
 
-Thanks. Pulled into clk-next.
+Applied to clk-next
