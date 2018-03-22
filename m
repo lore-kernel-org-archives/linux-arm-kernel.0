@@ -1,15 +1,15 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 22 Mar 2018 12:26:49 -0400
-Subject: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
- weakly-ordered archs #2
+Date: Thu, 22 Mar 2018 12:26:47 -0400
+Subject: [PATCH v5 1/3] RDMA/bnxt_re: Eliminate duplicate barriers on
+ weakly-ordered archs
 In-Reply-To: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
 References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521736009-23387-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel() in multiple places. writel()
-already has a barrier on some architectures like arm64.
+Code includes wmb() followed by writel(). writel() already has a barrier on
+some architectures like arm64.
 
 This ends up CPU observing two barriers back to back before executing the
 register write.
@@ -19,30 +19,28 @@ writel_relaxed().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/infiniband/hw/qedr/verbs.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/infiniband/hw/bnxt_re/qplib_rcfw.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
-index 53f00db..d6bd950 100644
---- a/drivers/infiniband/hw/qedr/verbs.c
-+++ b/drivers/infiniband/hw/qedr/verbs.c
-@@ -860,7 +860,7 @@ static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
+diff --git a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+index 8329ec6..10f9a26 100644
+--- a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
++++ b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+@@ -181,10 +181,11 @@ static int __send_message(struct bnxt_qplib_rcfw *rcfw, struct cmdq_base *req,
+ 
+ 	/* ring CMDQ DB */
  	wmb();
- 	cq->db.data.agg_flags = flags;
- 	cq->db.data.value = cpu_to_le32(cons);
--	writeq(cq->db.raw, cq->db_addr);
-+	writeq_relaxed(cq->db.raw, cq->db_addr);
- 
- 	/* Make sure write would stick */
- 	mmiowb();
-@@ -3338,7 +3338,7 @@ int qedr_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
- 
- 		qp->rq.db_data.data.value++;
- 
--		writel(qp->rq.db_data.raw, qp->rq.db);
-+		writel_relaxed(qp->rq.db_data.raw, qp->rq.db);
- 
- 		/* Make sure write sticks */
- 		mmiowb();
+-	writel(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
+-	       rcfw->cmdq_bar_reg_prod_off);
+-	writel(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
+-	       rcfw->cmdq_bar_reg_trig_off);
++	writel_relaxed(cmdq_prod, rcfw->cmdq_bar_reg_iomem +
++		       rcfw->cmdq_bar_reg_prod_off);
++	writel_relaxed(RCFW_CMDQ_TRIG_VAL, rcfw->cmdq_bar_reg_iomem +
++		       rcfw->cmdq_bar_reg_trig_off);
++	mmiowb();
+ done:
+ 	spin_unlock_irqrestore(&cmdq->lock, flags);
+ 	/* Return the CREQ response pointer */
 -- 
 2.7.4
