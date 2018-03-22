@@ -1,40 +1,113 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Thu, 22 Mar 2018 20:45:11 +0000
-Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180322201649.GC9469@ziepe.ca>
-References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
- <201803221430.P43GJl9U%fengguang.wu@intel.com>
- <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
- <3e9c006e4541acbce11743dbda553e84@codeaurora.org>
- <03d201d3c1eb$b71fb460$255f1d20$@opengridcomputing.com>
- <83484a3f-d3f7-d763-e4f8-e4fec3bb8cc2@codeaurora.org>
- <52cbc9d7-5a6b-5c8b-b930-058f5be62079@opengridcomputing.com>
- <BY2PR1201MB098352CB012D8AE8084882F3C8A90@BY2PR1201MB0983.namprd12.prod.outlook.com>,
- <20180322201649.GC9469@ziepe.ca>
-Message-ID: <BY2PR1201MB098367F8F217A8BF66AE68B6C8A90@BY2PR1201MB0983.namprd12.prod.outlook.com>
+From: isaacm@codeaurora.org (Isaac J. Manjarres)
+Date: Thu, 22 Mar 2018 13:50:38 -0700
+Subject: [PATCH v2] arm/arm64: smccc: Fix CLANG compilation for arm64
+Message-ID: <1521751838-18912-1-git-send-email-isaacm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, but ...
+When CLANG compiles inline assembly for 64 bit ARM
+architectures, it is unable to map register names,
+such as "r0" to the correct alias, such as "x0" for 64
+bit accesses, and "w0" for 32 bit accesses. While GCC
+can perform this mapping, CLANG can not, which results in
+compilation failures when building the kernel. Allow for
+differentiation of which register names to use, based on
+ARM architecture, to compile the kernel with CLANG.
 
-For instance, I see that the x86 writel() has "memory" in its asm(), which
-prevents GCC from reordering generated instructions.  And it ~looks like~
-arm64 ~sort of~ gets that with the inclusion of __iowmb() (which translates
-to wmb() then dsb(st) which finally holds the GCC "memory" barrier).  Is
-this part of the documented semantic of the writel_relaxed()?  The PowerPC
-stuff simply defines writel_relaxed() as writel() and I can't find the
-bottom of that Rabbit Hole ...
+Signed-off-by: Isaac J. Manjarres <isaacm@codeaurora.org>
+---
+ include/linux/arm-smccc.h | 43 +++++++++++++++++++++++--------------------
+ 1 file changed, 23 insertions(+), 20 deletions(-)
 
-I'm guessing~ that this line in the documentation ~may~ imply the GCC
-ordering:
-
-     ... Note that relaxed accesses to
-     the same peripheral are guaranteed to be ordered with respect to each
-     other. ...
-
-In any case, we really only have a few places where we (the various Chelsio
-drivers) need to worry about this: the "Fast Paths" where we have a lot of
-I/O to the device.  I think we should leave everything else alone.
-
-Casey
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index a031897..0f2846e 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -155,6 +155,8 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+ 
+ #define SMCCC_SMC_INST	"smc	#0"
+ #define SMCCC_HVC_INST	"hvc	#0"
++#define SMCCC_REG(n)	"x" #n
++
+ 
+ #elif defined(CONFIG_ARM)
+ #include <asm/opcodes-sec.h>
+@@ -162,6 +164,7 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+ 
+ #define SMCCC_SMC_INST	__SMC(0)
+ #define SMCCC_HVC_INST	__HVC(0)
++#define SMCCC_REG(n)	"r" #n
+ 
+ #endif
+ 
+@@ -194,47 +197,47 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+ 
+ #define __declare_arg_0(a0, res)					\
+ 	struct arm_smccc_res   *___res = res;				\
+-	register u32           r0 asm("r0") = a0;			\
+-	register unsigned long r1 asm("r1");				\
+-	register unsigned long r2 asm("r2");				\
+-	register unsigned long r3 asm("r3")
++	register u32           r0 asm(SMCCC_REG(0)) = a0;		\
++	register unsigned long r1 asm(SMCCC_REG(1));			\
++	register unsigned long r2 asm(SMCCC_REG(2));			\
++	register unsigned long r3 asm(SMCCC_REG(3))
+ 
+ #define __declare_arg_1(a0, a1, res)					\
+ 	struct arm_smccc_res   *___res = res;				\
+-	register u32           r0 asm("r0") = a0;			\
+-	register typeof(a1)    r1 asm("r1") = a1;			\
+-	register unsigned long r2 asm("r2");				\
+-	register unsigned long r3 asm("r3")
++	register u32           r0 asm(SMCCC_REG(0)) = a0;		\
++	register typeof(a1)    r1 asm(SMCCC_REG(1)) = a1;		\
++	register unsigned long r2 asm(SMCCC_REG(2));			\
++	register unsigned long r3 asm(SMCCC_REG(3))
+ 
+ #define __declare_arg_2(a0, a1, a2, res)				\
+ 	struct arm_smccc_res   *___res = res;				\
+-	register u32           r0 asm("r0") = a0;			\
+-	register typeof(a1)    r1 asm("r1") = a1;			\
+-	register typeof(a2)    r2 asm("r2") = a2;			\
+-	register unsigned long r3 asm("r3")
++	register u32           r0 asm(SMCCC_REG(0)) = a0;		\
++	register typeof(a1)    r1 asm(SMCCC_REG(1)) = a1;		\
++	register typeof(a2)    r2 asm(SMCCC_REG(2)) = a2;		\
++	register unsigned long r3 asm(SMCCC_REG(3))
+ 
+ #define __declare_arg_3(a0, a1, a2, a3, res)				\
+ 	struct arm_smccc_res   *___res = res;				\
+-	register u32           r0 asm("r0") = a0;			\
+-	register typeof(a1)    r1 asm("r1") = a1;			\
+-	register typeof(a2)    r2 asm("r2") = a2;			\
+-	register typeof(a3)    r3 asm("r3") = a3
++	register u32           r0 asm(SMCCC_REG(0)) = a0;		\
++	register typeof(a1)    r1 asm(SMCCC_REG(1)) = a1;		\
++	register typeof(a2)    r2 asm(SMCCC_REG(2)) = a2;		\
++	register typeof(a3)    r3 asm(SMCCC_REG(3)) = a3
+ 
+ #define __declare_arg_4(a0, a1, a2, a3, a4, res)			\
+ 	__declare_arg_3(a0, a1, a2, a3, res);				\
+-	register typeof(a4) r4 asm("r4") = a4
++	register typeof(a4) r4 asm(SMCCC_REG(4)) = a4
+ 
+ #define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)			\
+ 	__declare_arg_4(a0, a1, a2, a3, a4, res);			\
+-	register typeof(a5) r5 asm("r5") = a5
++	register typeof(a5) r5 asm(SMCCC_REG(5)) = a5
+ 
+ #define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)		\
+ 	__declare_arg_5(a0, a1, a2, a3, a4, a5, res);			\
+-	register typeof(a6) r6 asm("r6") = a6
++	register typeof(a6) r6 asm(SMCCC_REG(6)) = a6
+ 
+ #define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)		\
+ 	__declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);		\
+-	register typeof(a7) r7 asm("r7") = a7
++	register typeof(a7) r7 asm(SMCCC_REG(7)) = a7
+ 
+ #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
+ #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
