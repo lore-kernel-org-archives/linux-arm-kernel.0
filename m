@@ -1,52 +1,64 @@
-From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Thu, 22 Mar 2018 12:48:33 -0600
-Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <3e9c006e4541acbce11743dbda553e84@codeaurora.org>
-References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
- <201803221430.P43GJl9U%fengguang.wu@intel.com>
- <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
- <3e9c006e4541acbce11743dbda553e84@codeaurora.org>
-Message-ID: <20180322184833.GB9469@ziepe.ca>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Thu, 22 Mar 2018 11:55:24 -0700
+Subject: Clang build of arm64 kernel fails
+In-Reply-To: <20180301103100.GE32331@e103592.cambridge.arm.com>
+References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
+ <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
+ <20180301103100.GE32331@e103592.cambridge.arm.com>
+Message-ID: <20180322185524.GA78232@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 08:48:35AM -0400, okaya at codeaurora.org wrote:
-> On 2018-03-22 08:24, okaya at codeaurora.org wrote:
-> >On 2018-03-22 02:44, kbuild test robot wrote:
-> >>Hi Sinan,
-> >>
-> >>Thank you for the patch! Yet something to improve:
-> >>
-> >>[auto build test ERROR on linus/master]
-> >>[also build test ERROR on v4.16-rc6 next-20180321]
-> >>[if your patch is applied to the wrong git tree, please drop us a note
-> >>to help improve the system]
-> >>
-> >>url:
-> >>https://github.com/0day-ci/linux/commits/Sinan-Kaya/ib-Eliminate-duplicate-barriers-on-weakly-ordered-archs/20180321-091659
-> >>config: xtensa-allyesconfig (attached as .config)
-> >>compiler: xtensa-linux-gcc (GCC) 7.2.0
-> >>reproduce:
-> >>        wget
-> >>https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross
-> >>-O ~/bin/make.cross
-> >>        chmod +x ~/bin/make.cross
-> >>        # save the attached .config to linux build tree
-> >>        make.cross ARCH=xtensa
-> >>
-> >
-> >Jason,
-> >
-> >Can you remove the writeq change if it is too late for me to fix?
-> >
-> >This is an infrastructural issue on xtensa arch.
-> >
-> >Probably, it won't get fixed today.
+El Thu, Mar 01, 2018 at 10:31:02AM +0000 Dave Martin ha dit:
+
+> On Thu, Mar 01, 2018 at 09:45:24AM +0000, Robin Murphy wrote:
+> > Hi Andrey,
+> > 
+> > On 28/02/18 19:32, Andrey Konovalov wrote:
+> > >Hi Marc!
+> > >
+> > >I've tried to pull in new upstream commits and the kernel build
+> > >started failing for me with the following errors (see below).
+> > >
+> > >It seems that the reason is your commit "arm64: Add
+> > >ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
+> > >doesn't like 32 bits registers being used in 64 bits build.
+> > 
+> > I'd say this is really a bug in Clang. Architecturally, the register in
+> > AArch64 state is still named "r0"; "x0"/"w0" are assembler operands which
+> > additionally encode the size of the corresponding *access* to r0.
+> > 
+> > I note that GCC's documentation on register variables[1] does just say "the
+> > name of the register", which implies this code is not incorrect. Given that
+> > Clang already likes to infer the operand size from the argument type in
+> > actual inline asms, it seems funny that its register allocator should care
+> > in this non-instruction context.
 > 
-> AFAIS, even writeq won't compile on this arch. I started questioning this
-> build test.
+> +1
+> 
+> rN is perfectly reasonable here and has always been supported by GCC for
+> AArch64 AFAIK.
+> 
+> (IMHO rN is preferable, because this separates the register allocation
+> specification from how that register is used to encode the data type --
+> GCC has no choice about the latter, but using "w"/"x" gives the
+> misleading impression of control over this.)
+> 
+> > >Would you mind sending a fix?
+> > 
+> > That said, I guess it's a bug we might have to work around anyway. Oh well.
+> 
+> It would be preferable to see evidence of the llvm community committing
+> to fix this before we consider merging a bodge into Linux for it.
+> 
+> Although this one issue is easy-ish to work around, we're on a slippery
+> slope towards allowing the LLVM and GCC inline assemblers to diverge if
+> we don't push back on worthless incompatibilities.
 
-I have the same confusion. Did you figure out an explanation?
+For the record, a LLVM bug was opened to add support for the rN names
+in constraints: https://bugs.llvm.org/show_bug.cgi?id=36862 . I know
+Manoj intends to submit a fix once the scope has been clarified.
 
-Jason
+I plan to send a kernel fix soon, unless someone beats me to it.
+
+Matthias
