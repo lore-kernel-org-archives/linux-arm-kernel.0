@@ -1,62 +1,51 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Wed, 21 Mar 2018 20:00:58 -0400
-Subject: [PATCH v4 12/17] net: cxgb4/cxgb4vf: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <BY2PR1201MB0983417DC5ECAB85834A84DBC8AA0@BY2PR1201MB0983.namprd12.prod.outlook.com>
-References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>,
- <1521513753-7325-13-git-send-email-okaya@codeaurora.org>
- <BY2PR1201MB0983417DC5ECAB85834A84DBC8AA0@BY2PR1201MB0983.namprd12.prod.outlook.com>
-Message-ID: <11820921c76403bca743c382287aee05@codeaurora.org>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 22 Mar 2018 09:09:51 +0800
+Subject: [PATCH 27/37] iommu/arm-smmu-v3: Register fault workqueue
+In-Reply-To: <cabd71fd-c54c-c21a-a5b7-227e69fa4286@arm.com>
+References: <1519280641-30258-1-git-send-email-xieyisheng1@huawei.com>
+ <1519280641-30258-27-git-send-email-xieyisheng1@huawei.com>
+ <f2841aac-4c5e-4ac2-fa4d-81d6b2857503@huawei.com>
+ <cabd71fd-c54c-c21a-a5b7-227e69fa4286@arm.com>
+Message-ID: <c4f0a441-e975-395a-fc38-3686db21227d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-21 19:03, Casey Leedom wrote:
-> [[ Appologies for the DUPLICATE email.  I forgot to tell my Mail Agent 
-> to
->    use Plain Text. -- Casey ]]
+Hi Jean,
+
+On 2018/3/21 21:24, Jean-Philippe Brucker wrote:
+> Hi Yisheng,
 > 
->   I feel very uncomfortable with these proposed changes.  Our team is 
-> right
-> in the middle of trying to tease our way through the various platform
-> implementations of writel(), writel_relaxed(), __raw_writel(), etc. in 
-> order
-> to support x86, PowerPC, ARM, etc. with a single code base.  This is
-> complicated by the somewhat ... "fuzzily defined" semantics and varying
-> platform implementations of all of these APIs.  (And note that I'm just
-> picking writel() as an example.)
+> On 19/03/18 11:03, Yisheng Xie wrote:
+>> Hi Jean,
+>>
+>> [...]
+>>> @@ -3168,6 +3260,13 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+>>>  	if (ret)
+>>>  		return ret;
+>>>  
+>>> +	if (smmu->features & (ARM_SMMU_FEAT_STALLS | ARM_SMMU_FEAT_PRI)) {
+>>> +		smmu->faultq_nb.notifier_call = arm_smmu_flush_queues;
+>>> +		ret = iommu_fault_queue_register(&smmu->faultq_nb);
+>>> +		if (ret)
+>>> +			return ret;
+>>
+>> I find a case here: CONFIG_IOMMU_FAULT=n, and smmu support feature STALLS or PRI,
+>> the device probe will failed here, is this what we want?
 > 
->   Additionally, many of the changes aren't even in fast paths and are 
-> thus
-> unneeded for performance.
+> Since CONFIG_ARM_SMMU_V3 selects CONFIG_IOMMU_FAULT, I don't think it
+> can happen. 
+
+But CONFIG_IOMMU_FAULT can be changed after select, maybe can make it as unchangeable.
+
+Thanks
+Yisheng
+
+> I'm not sure what the best practices are, but I feel like it
+> would be too much work to guard against config combinations that violate
+> an explicit "select" in Kconfig
 > 
->   Please don't make these changes.  We're trying to get this all sussed 
-> out.
+> Thanks,
+> Jean
 > 
-
-I was also given the feedback to look at performance critical path only. 
-I am in the process of revisiting the patches.
-
-If you can point me to the ones that are important, I can try to limit 
-the changes to those only.
-
-If your team wants to do it, I can drop this patch as well.
-
-I think the semantics of write API is clear. What was actually 
-implemented is another story.
-
-I can share a few of my findings.
-
-A portable driver needs to do this.
-
-descriptor update in mem
-wmb ()
-writel_relaxed ()
-mmiowb ()
-
-Using __raw_write() is wrong as it can get reordered.
-
-Using wmb()+writel() is also wrong for performance reasons.
-
-If something is unclear, please ask.
-
+> .
 > 
