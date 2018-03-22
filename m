@@ -1,91 +1,33 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Thu, 22 Mar 2018 08:48:35 -0400
-Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
-References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
- <201803221430.P43GJl9U%fengguang.wu@intel.com>
- <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
-Message-ID: <3e9c006e4541acbce11743dbda553e84@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 22 Mar 2018 13:49:15 +0100
+Subject: [PATCH v2 5/8] arm: rzn1: Add the RZ/N1 arch to the shmobile
+ Kconfig
+In-Reply-To: <1521719091-25157-6-git-send-email-michel.pollet@bp.renesas.com>
+References: <1521719091-25157-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1521719091-25157-6-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdXL+UcjvbG9R=es4rLnOG7RO5H3CM1E0doToaiTR95Vmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-22 08:24, okaya at codeaurora.org wrote:
-> On 2018-03-22 02:44, kbuild test robot wrote:
->> Hi Sinan,
->> 
->> Thank you for the patch! Yet something to improve:
->> 
->> [auto build test ERROR on linus/master]
->> [also build test ERROR on v4.16-rc6 next-20180321]
->> [if your patch is applied to the wrong git tree, please drop us a note
->> to help improve the system]
->> 
->> url:
->> https://github.com/0day-ci/linux/commits/Sinan-Kaya/ib-Eliminate-duplicate-barriers-on-weakly-ordered-archs/20180321-091659
->> config: xtensa-allyesconfig (attached as .config)
->> compiler: xtensa-linux-gcc (GCC) 7.2.0
->> reproduce:
->>         wget
->> https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross
->> -O ~/bin/make.cross
->>         chmod +x ~/bin/make.cross
->>         # save the attached .config to linux build tree
->>         make.cross ARCH=xtensa
->> 
-> 
-> Jason,
-> 
-> Can you remove the writeq change if it is too late for me to fix?
-> 
-> This is an infrastructural issue on xtensa arch.
-> 
-> Probably, it won't get fixed today.
+On Thu, Mar 22, 2018 at 12:44 PM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> Add the RZ/N1 Family (Part #R9A06G0xx) ARCH config to the rest of
+> the Renesas SoC collection.
+>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 
-AFAIS, even writeq won't compile on this arch. I started questioning 
-this build test.
+Subject should be "arm: shmobile: ..."
 
+Apart from that:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> 
-> Sinan
-> 
-> 
->> All errors (new ones prefixed by >>):
->> 
->>    In file included from drivers/infiniband/hw/cxgb4/iw_cxgb4.h:73:0,
->>                     from drivers/infiniband/hw/cxgb4/device.c:40:
->>    drivers/infiniband/hw/cxgb4/t4.h: In function 'pio_copy':
->>>> drivers/infiniband/hw/cxgb4/t4.h:460:3: error: implicit declaration 
->>>> of function 'writeq_relaxed'; did you mean 'writel_relaxed'? 
->>>> [-Werror=implicit-function-declaration]
->>       writeq_relaxed(*src, dst);
->>       ^~~~~~~~~~~~~~
->>       writel_relaxed
->>    cc1: some warnings being treated as errors
->> 
->> vim +460 drivers/infiniband/hw/cxgb4/t4.h
->> 
->>    450
->>    451	/* This function copies 64 byte coalesced work request to 
->> memory
->>    452	 * mapped BAR2 space. For coalesced WRs, the SGE fetches data
->>    453	 * from the FIFO instead of from Host.
->>    454	 */
->>    455	static inline void pio_copy(u64 __iomem *dst, u64 *src)
->>    456	{
->>    457		int count = 8;
->>    458
->>    459		while (count) {
->>  > 460			writeq_relaxed(*src, dst);
->>    461			src++;
->>    462			dst++;
->>    463			count--;
->>    464		}
->>    465	}
->>    466
->> 
->> ---
->> 0-DAY kernel test infrastructure                Open Source Technology 
->> Center
->> https://lists.01.org/pipermail/kbuild-all                   Intel 
->> Corporation
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
