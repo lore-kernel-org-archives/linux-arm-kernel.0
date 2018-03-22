@@ -1,97 +1,45 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 22 Mar 2018 12:26:48 -0400
-Subject: [PATCH v5 2/3] RDMA/i40iw: Eliminate duplicate barriers on
+From: swise@opengridcomputing.com (Steve Wise)
+Date: Thu, 22 Mar 2018 11:28:29 -0500
+Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
  weakly-ordered archs
-In-Reply-To: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
-References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521736009-23387-3-git-send-email-okaya@codeaurora.org>
+In-Reply-To: <83484a3f-d3f7-d763-e4f8-e4fec3bb8cc2@codeaurora.org>
+References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+ <201803221430.P43GJl9U%fengguang.wu@intel.com>
+ <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
+ <3e9c006e4541acbce11743dbda553e84@codeaurora.org>
+ <03d201d3c1eb$b71fb460$255f1d20$@opengridcomputing.com>
+ <83484a3f-d3f7-d763-e4f8-e4fec3bb8cc2@codeaurora.org>
+Message-ID: <52cbc9d7-5a6b-5c8b-b930-058f5be62079@opengridcomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier on
-some architectures like arm64.
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
 
-Create a new wrapper function with relaxed write operator. Use the new
-wrapper when a write is following a wmb().
+On 3/22/2018 9:52 AM, Sinan Kaya wrote:
+> On 3/22/2018 9:40 AM, Steve Wise wrote:
+>> I think all these iw_cxgb4 changes should be reverted until we really have a
+>> plan for multi-platform that works.  
+> I know you are looking to have support for PowerPC. 
+>
+> Isn't this a PowerPC problem? Why penalize other architectures?
+>
+> Do you see anything wrong with the code itself?
 
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+I worry it breaks PPC.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/infiniband/hw/i40iw/i40iw_ctrl.c  |  6 ++++--
- drivers/infiniband/hw/i40iw/i40iw_osdep.h |  1 +
- drivers/infiniband/hw/i40iw/i40iw_uk.c    |  3 ++-
- drivers/infiniband/hw/i40iw/i40iw_utils.c | 11 +++++++++++
- 4 files changed, 18 insertions(+), 3 deletions(-)
+> I started this thread with the PowerPC develoeprs on your request.
+> "RFC on writel and writel_relaxed"
+>
+> They are looking into adding the relaxed API support. Support can come
+> in later. Why block this change now?
+>
+> benh at kernel.crashing.org:
+> "I've been wanting to implement the relaxed accessors for a while but
+> was battling with this to try to also better support WC, and due to
+> other commitments, this somewhat fell down the cracks."
+>
+> I have seen four different responses on this thread. Since this is an
+> architecture change it will take a while to get the semantics right.
+> It won't happen in the new few days.
 
-diff --git a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
-index c74fd33..47f473e 100644
---- a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
-+++ b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
-@@ -706,9 +706,11 @@ static void i40iw_sc_ccq_arm(struct i40iw_sc_cq *ccq)
- 	wmb();       /* make sure shadow area is updated before arming */
- 
- 	if (ccq->dev->is_pf)
--		i40iw_wr32(ccq->dev->hw, I40E_PFPE_CQARM, ccq->cq_uk.cq_id);
-+		i40iw_wr32_relaxed(ccq->dev->hw, I40E_PFPE_CQARM,
-+				   ccq->cq_uk.cq_id);
- 	else
--		i40iw_wr32(ccq->dev->hw, I40E_VFPE_CQARM1, ccq->cq_uk.cq_id);
-+		i40iw_wr32_relaxed(ccq->dev->hw, I40E_VFPE_CQARM1,
-+				   ccq->cq_uk.cq_id);
- }
- 
- /**
-diff --git a/drivers/infiniband/hw/i40iw/i40iw_osdep.h b/drivers/infiniband/hw/i40iw/i40iw_osdep.h
-index f27be3e..e06f4b9 100644
---- a/drivers/infiniband/hw/i40iw/i40iw_osdep.h
-+++ b/drivers/infiniband/hw/i40iw/i40iw_osdep.h
-@@ -213,5 +213,6 @@ void i40iw_hw_stats_start_timer(struct i40iw_sc_vsi *vsi);
- void i40iw_hw_stats_stop_timer(struct i40iw_sc_vsi *vsi);
- #define i40iw_mmiowb() mmiowb()
- void i40iw_wr32(struct i40iw_hw *hw, u32 reg, u32 value);
-+void i40iw_wr32_relaxed(struct i40iw_hw *hw, u32 reg, u32 value);
- u32  i40iw_rd32(struct i40iw_hw *hw, u32 reg);
- #endif				/* _I40IW_OSDEP_H_ */
-diff --git a/drivers/infiniband/hw/i40iw/i40iw_uk.c b/drivers/infiniband/hw/i40iw/i40iw_uk.c
-index 8afa5a6..f936fc2 100644
---- a/drivers/infiniband/hw/i40iw/i40iw_uk.c
-+++ b/drivers/infiniband/hw/i40iw/i40iw_uk.c
-@@ -723,7 +723,8 @@ static void i40iw_cq_request_notification(struct i40iw_cq_uk *cq,
- 
- 	wmb(); /* make sure WQE is populated before valid bit is set */
- 
--	writel(cq->cq_id, cq->cqe_alloc_reg);
-+	writel_relaxed(cq->cq_id, cq->cqe_alloc_reg);
-+	mmiowb();
- }
- 
- /**
-diff --git a/drivers/infiniband/hw/i40iw/i40iw_utils.c b/drivers/infiniband/hw/i40iw/i40iw_utils.c
-index ddc1056..99aa6f8 100644
---- a/drivers/infiniband/hw/i40iw/i40iw_utils.c
-+++ b/drivers/infiniband/hw/i40iw/i40iw_utils.c
-@@ -125,6 +125,17 @@ inline void i40iw_wr32(struct i40iw_hw *hw, u32 reg, u32 value)
- }
- 
- /**
-+ * i40iw_wr32_relaxed - write 32 bits to hw register without ordering
-+ * @hw: hardware information including registers
-+ * @reg: register offset
-+ * @value: vvalue to write to register
-+ */
-+inline void i40iw_wr32_relaxed(struct i40iw_hw *hw, u32 reg, u32 value)
-+{
-+	writel_relaxed(value, hw->hw_addr + reg);
-+}
-+
-+/**
-  * i40iw_rd32 - read a 32 bit hw register
-  * @hw: hardware information including registers
-  * @reg: register offset
--- 
-2.7.4
+I appreciate you doing this.
