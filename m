@@ -1,69 +1,57 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 22 Mar 2018 16:33:47 +0100
-Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
-References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180322153347.GX3417@piout.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 22 Mar 2018 11:42:32 -0400
+Subject: [PATCH v5 2/2] ixgbevf: eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1521733352-25266-1-git-send-email-okaya@codeaurora.org>
+References: <1521733352-25266-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521733352-25266-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Code includes wmb() followed by writel() in multiple places. writel()
+already has a barrier on some architectures like arm64.
 
-I'd really like to get this in the kernel soon as we have platform that
-still can't boot with a mainline kernel because they don't have a PIT.
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
-On 23/02/2018 at 18:15:52 +0100, Alexandre Belloni wrote:
-> Hi,
-> 
-> This series gets back on the TCB drivers rework. It introduces a new driver to
-> handle the clocksource and clockevent devices.
-> 
-> As a reminder, this is necessary because:
->  - the current tcb_clksrc driver is probed too late to be able to be used at
->    boot and we now have SoCs that don't have a PIT. They currently are not able
->    to boot a mainline kernel.
->  - using the PIT doesn't work well with preempt-rt because its interrupt is
->    shared (in particular with the UART and their interrupt flags are
->    incompatible)
->  - the current solution is wasting some TCB channels
-> 
-> The plan is to get this driver upstream, then convert the TCB PWM driver to be
-> able to get rid of the tcb_clksrc driver along with atmel_tclib.
-> 
-> changes in v3:
->  - use SPDX tag in include/soc/at91/atmel_tcb.h
->  - rework option selection to make the clocksource option silent
-> 
-> Main changes in v2:
->  - use direct IO instead of regmap when accessing channel specific registers to
->    avoid the regmap locking
->  - implement suspend/resume
-> 
-> 
-> Alexandre Belloni (6):
->   ARM: at91: add TCB registers definitions
->   clocksource/drivers: Add a new driver for the Atmel ARM TC blocks
->   clocksource/drivers: atmel-pit: make option silent
->   ARM: at91: Implement clocksource selection
->   ARM: configs: at91: use new TCB timer driver
->   ARM: configs: at91: unselect PIT
-> 
->  arch/arm/configs/at91_dt_defconfig    |   2 +-
->  arch/arm/configs/sama5_defconfig      |   2 +-
->  arch/arm/mach-at91/Kconfig            |  25 ++
->  drivers/clocksource/Kconfig           |  13 +-
->  drivers/clocksource/Makefile          |   3 +-
->  drivers/clocksource/timer-atmel-tcb.c | 608 ++++++++++++++++++++++++++++++++++
->  include/soc/at91/atmel_tcb.h          | 216 ++++++++++++
->  7 files changed, 865 insertions(+), 4 deletions(-)
->  create mode 100644 drivers/clocksource/timer-atmel-tcb.c
->  create mode 100644 include/soc/at91/atmel_tcb.h
-> 
-> -- 
-> 2.16.1
-> 
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+index 815cb1a..eaa930e 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+@@ -725,7 +725,7 @@ static void ixgbevf_alloc_rx_buffers(struct ixgbevf_ring *rx_ring,
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		writel(i, rx_ring->tail);
++		writel_relaxed(i, rx_ring->tail);
+ 	}
+ }
+ 
+@@ -1232,7 +1232,7 @@ static int ixgbevf_clean_rx_irq(struct ixgbevf_q_vector *q_vector,
+ 		 * know there are new descriptors to fetch.
+ 		 */
+ 		wmb();
+-		writel(xdp_ring->next_to_use, xdp_ring->tail);
++		writel_relaxed(xdp_ring->next_to_use, xdp_ring->tail);
+ 	}
+ 
+ 	u64_stats_update_begin(&rx_ring->syncp);
+@@ -4004,7 +4004,7 @@ static void ixgbevf_tx_map(struct ixgbevf_ring *tx_ring,
+ 	tx_ring->next_to_use = i;
+ 
+ 	/* notify HW of packet */
+-	writel(i, tx_ring->tail);
++	writel_relaxed(i, tx_ring->tail);
+ 
+ 	return;
+ dma_error:
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.7.4
