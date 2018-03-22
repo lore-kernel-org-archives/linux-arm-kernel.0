@@ -1,50 +1,309 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 22 Mar 2018 22:01:44 +0100
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <6b239ab5-5ded-b32b-eefc-601075d33f25@st.com>
-References: <20180316075629.019b6560@canb.auug.org.au>
- <CAK8P3a2-fUi0nnsLVJ6h_UuJCgwoNs2OEroYed2ofLd=FiPG0g@mail.gmail.com>
- <6b239ab5-5ded-b32b-eefc-601075d33f25@st.com>
-Message-ID: <20180322210144.GB3417@piout.net>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Thu, 22 Mar 2018 22:21:00 +0100
+Subject: [PATCH v3] staging: bcm2835-audio: Release resources on
+ module_exit()
+In-Reply-To: <CAHp75VcwFRVX7RTSWv2R_7Hr=gzrwK1aJA8Unypx6zQ49neGjA@mail.gmail.com>
+References: <15cc84cc-a887-7473-d64c-00c23e930e0d@gmail.com>
+ <20180321184827.1043-1-k.marinushkin@gmail.com>
+ <CAHp75VcwFRVX7RTSWv2R_7Hr=gzrwK1aJA8Unypx6zQ49neGjA@mail.gmail.com>
+Message-ID: <f35d0f86-04b5-6edb-139f-4632edc493b3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/2018 at 07:34:06 +0000, Patrice CHOTARD wrote:
-> Hi Arnd, Stephen
-> 
-> On 03/15/2018 10:06 PM, Arnd Bergmann wrote:
-> > On Thu, Mar 15, 2018 at 9:56 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> >> Hi all,
-> >>
-> >> Commit
-> >>
-> >>    9a5f4879cd8d ("ARM: dts: stih4xx: Add missing #sound-dai-cells")
-> >>
-> >> is missing a Signed-off-by from its committer.
-> > 
-> > Thanks for the report.
-> > 
-> > What script do you use to find those? I guess I should check for
-> > missing signoffs as well when pulling a branch.
-> > 
-> > Patrice, I've dropped the merge now, and picked up the one
-> > patch in it directly, with my signoff. This should fix the issue this
-> > time, but please make sure you always sign off patches when
-> > you apply them from the list.
-> > 
-> >          Arnd
-> > 
-> 
-> Ok i will update my script on my side with Stephen's script to avoid 
-> this in the future.
-> 
+On 03/21/18 20:24, Andy Shevchenko wrote:
+> On Wed, Mar 21, 2018 at 8:48 PM, Kirill Marinushkin
+> <k.marinushkin@gmail.com> wrote:
+>> In the current implementation, `rmmod snd_bcm2835` does not release
+>> resources properly. It causes an oops when trying to list sound devices.
+>>
+>> This commit fixes it.
+>>
+>> The details WRT allocation / free are described below.
+>>
+>> Device structure WRT allocation:
+>>
+>> pdev
+>>   \childdev[]
+>>     \card
+>>       \chip
+>>         \pcm
+>>         \ctl
+>>
+>> Allocation / register sequence:
+>>
+>> * childdev: devm_kzalloc      - freed during driver detach
+>> * childdev: device_initialize - freed during device_unregister
+>> * pdev: devres_alloc          - freed during driver detach
+>> * childdev: device_add        - removed during device_unregister
+>> * pdev, childdev: devres_add  - freed during driver detach
+>> * card: snd_card_new          - freed during snd_card_free
+>> * chip: kzalloc               - freed during kfree
+>> * card, chip: snd_device_new  - freed during snd_device_free
+>> * chip: new_pcm               - TODO: free pcm
+>> * chip: new_ctl               - TODO: free ctl
+>> * card: snd_card_register     - unregistered during snd_card_free
+>>
+>> Free / unregister sequence:
+>>
+>> * card: snd_card_free
+>> * card, chip: snd_device_free
+>> * childdev: device_unregister
+>> * chip: kfree
+>>
+>> Steps to reproduce the issue before this commit:
+>>
+>> ~~~~
+>> $ rmmod snd_bcm2835
+>> $ aplay -L
+>> [  138.648130] Unable to handle kernel paging request at virtual address 7f1343c0
+>> [  138.660415] pgd = ad8f0000
+>> [  138.665567] [7f1343c0] *pgd=3864c811, *pte=00000000, *ppte=00000000
+>> [  138.674887] Internal error: Oops: 7 [#1] SMP ARM
+>> [  138.683571] Modules linked in: sha256_generic cfg80211 rfkill snd_pcm snd_timer
+>>  snd fixed uio_pdrv_genirq uio ip_tables x_tables ipv6 [last unloaded: snd_bcm2835
+>> ]
+>> [  138.706594] CPU: 3 PID: 463 Comm: aplay Tainted: G        WC       4.15.0-rc1-v
+>> 7+ #6
+>> [  138.719833] Hardware name: BCM2835
+>> [  138.726016] task: b877ac00 task.stack: aebec000
+>> [  138.733408] PC is at try_module_get+0x38/0x24c
+>> [  138.740813] LR is at snd_ctl_open+0x58/0x194 [snd]
+>> [  138.748485] pc : [<801c4d5c>]    lr : [<7f0e6b2c>]    psr: 20000013
+>> [  138.757709] sp : aebedd60  ip : aebedd88  fp : aebedd84
+>> [  138.765884] r10: 00000000  r9 : 00000004  r8 : 7f0ed440
+>> [  138.774040] r7 : b7e469b0  r6 : 7f0e6b2c  r5 : afd91900  r4 : 7f1343c0
+>> [  138.783571] r3 : aebec000  r2 : 00000001  r1 : b877ac00  r0 : 7f1343c0
+>> [  138.793084] Flags: nzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+>> [  138.803300] Control: 10c5387d  Table: 2d8f006a  DAC: 00000055
+>> [  138.812064] Process aplay (pid: 463, stack limit = 0xaebec210)
+>> [  138.820868] Stack: (0xaebedd60 to 0xaebee000)
+>> [  138.828207] dd60: 00000000 b848d000 afd91900 00000000 b7e469b0 7f0ed440 aebedda4 aebedd88
+>> [  138.842371] dd80: 7f0e6b2c 801c4d30 afd91900 7f0ea4dc 00000000 b7e469b0 aebeddcc aebedda8
+>> [  138.856611] dda0: 7f0e250c 7f0e6ae0 7f0e2464 b8478ec0 b7e469b0 afd91900 7f0ea388 00000000
+>> [  138.870864] ddc0: aebeddf4 aebeddd0 802ce590 7f0e2470 8090ab64 afd91900 afd91900 b7e469b0
+>> [  138.885301] dde0: afd91908 802ce4e4 aebede1c aebeddf8 802c57b4 802ce4f0 afd91900 aebedea8
+>> [  138.900110] de00: b7fa4c00 00000000 00000000 00000004 aebede3c aebede20 802c6ba8 802c56b4
+>> [  138.915260] de20: aebedea8 00000000 aebedf5c 00000000 aebedea4 aebede40 802d9a68 802c6b58
+>> [  138.930661] de40: b874ddd0 00000000 00000000 00000001 00000041 00000000 afd91900 aebede70
+>> [  138.946402] de60: 00000000 00000000 00000002 b7e469b0 b8a87610 b8d6ab80 801852f8 00080000
+>> [  138.962314] de80: aebedf5c aebedea8 00000001 80108464 aebec000 00000000 aebedf4c aebedea8
+>> [  138.978414] dea0: 802dacd4 802d970c b8a87610 b8d6ab80 a7982bc6 00000009 af363019 b9231480
+>> [  138.994617] dec0: 00000000 b8c038a0 b7e469b0 00000101 00000002 00000238 00000000 00000000
+>> [  139.010823] dee0: 00000000 aebedee8 00080000 0000000f aebedf3c aebedf00 802ed7e4 80843f94
+>> [  139.027025] df00: 00000003 00080000 b9231490 b9231480 00000000 00080000 af363000 00000000
+>> [  139.043229] df20: 00000005 00000002 ffffff9c 00000000 00080000 ffffff9c af363000 00000003
+>> [  139.059430] df40: aebedf94 aebedf50 802c6f70 802dac70 aebec000 00000000 00000001 00000000
+>> [  139.075629] df60: 00020000 00000004 00000100 00000001 7ebe577c 0002e038 00000000 00000005
+>> [  139.091828] df80: 80108464 aebec000 aebedfa4 aebedf98 802c7060 802c6e6c 00000000 aebedfa8
+>> [  139.108025] dfa0: 801082c0 802c7040 7ebe577c 0002e038 7ebe577c 00080000 00000b98 e81c8400
+>> [  139.124222] dfc0: 7ebe577c 0002e038 00000000 00000005 7ebe57e4 00a20af8 7ebe57f0 76f87394
+>> [  139.140419] dfe0: 00000000 7ebe55c4 76ec88e8 76df1d9c 60000010 7ebe577c 00000000 00000000
+>> [  139.156715] [<801c4d5c>] (try_module_get) from [<7f0e6b2c>] (snd_ctl_open+0x58/0x194 [snd])
+>> [  139.173222] [<7f0e6b2c>] (snd_ctl_open [snd]) from [<7f0e250c>] (snd_open+0xa8/0x14c [snd])
+>> [  139.189683] [<7f0e250c>] (snd_open [snd]) from [<802ce590>] (chrdev_open+0xac/0x188)
+>> [  139.205465] [<802ce590>] (chrdev_open) from [<802c57b4>] (do_dentry_open+0x10c/0x314)
+>> [  139.221347] [<802c57b4>] (do_dentry_open) from [<802c6ba8>] (vfs_open+0x5c/0x88)
+>> [  139.236788] [<802c6ba8>] (vfs_open) from [<802d9a68>] (path_openat+0x368/0x944)
+>> [  139.248270] [<802d9a68>] (path_openat) from [<802dacd4>] (do_filp_open+0x70/0xc4)
+>> [  139.263731] [<802dacd4>] (do_filp_open) from [<802c6f70>] (do_sys_open+0x110/0x1d4)
+>> [  139.279378] [<802c6f70>] (do_sys_open) from [<802c7060>] (SyS_open+0x2c/0x30)
+>> [  139.290647] [<802c7060>] (SyS_open) from [<801082c0>] (ret_fast_syscall+0x0/0x28)
+>> [  139.306021] Code: e3c3303f e5932004 e2822001 e5832004 (e5943000)
+>> [  139.316265] ---[ end trace 7f3f7f6193b663ed ]---
+>> [  139.324956] note: aplay[463] exited with preempt_count 1
+>> ~~~~
+>>
+> Sorry, just noticed that devm part doesn't make sense after your patch
+> and misleading.
+> So, after addressing it, FWIW,
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-FWIW, last time this happened in the at91 tree, I've switched to use
-Stephen's script as a pre-push hook:
-https://raw.githubusercontent.com/alexandrebelloni/tools/master/pre-push_signed-off
+I checked that actually devm makes sense and works as expected.
+I don't call snd_devm_release() manually, it is done by the devm resource management.
 
+So, the devm part does it's job correctly, that's why I will keep it as it is.
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Below is the backtrace, which demonstrates that devm does a proper automatic resource management.
+
+~~~~
+[? 207.569694] [<7f12f04c>] (snd_devm_release [snd_bcm2835]) from [<805b5198>] (device_release+0x3c/0xa0)
+[? 207.586486] [<805b5198>] (device_release) from [<8082abe4>] (kobject_put+0x94/0xf0)
+[? 207.601569] [<8082abe4>] (kobject_put) from [<805b66a8>] (device_unregister+0x2c/0x30)
+[? 207.616940] [<805b66a8>] (device_unregister) from [<7f12f09c>] (snd_devm_unregister_child+0x4c/0x5c [snd_bcm2835])
+[? 207.634965] [<7f12f09c>] (snd_devm_unregister_child [snd_bcm2835]) from [<805bda58>] (release_nodes+0x120/0x1e8)
+[? 207.652930] [<805bda58>] (release_nodes) from [<805be55c>] (devres_release_all+0x40/0x5c)
+[? 207.668825] [<805be55c>] (devres_release_all) from [<805baaf8>] (device_release_driver_internal+0x170/0x200)
+[? 207.686573] [<805baaf8>] (device_release_driver_internal) from [<805babf4>] (driver_detach+0x48/0x7c)
+[? 207.703887] [<805babf4>] (driver_detach) from [<805b9b88>] (bus_remove_driver+0x5c/0xb0)
+[? 207.720063] [<805b9b88>] (bus_remove_driver) from [<805bb07c>] (driver_unregister+0x38/0x58)
+[? 207.736660] [<805bb07c>] (driver_unregister) from [<805bc2f4>] (platform_driver_unregister+0x1c/0x20)
+[? 207.754083] [<805bc2f4>] (platform_driver_unregister) from [<7f12f6fc>] (bcm2835_alsa_device_exit+0x1c/0x24 [snd_bcm2835])
+[? 207.773395] [<7f12f6fc>] (bcm2835_alsa_device_exit [snd_bcm2835]) from [<801c72b0>] (SyS_delete_module+0x17c/0x1d4)
+[? 207.792066] [<801c72b0>] (SyS_delete_module) from [<801082c0>] (ret_fast_syscall+0x0/0x28)
+~~~~
+
+> P.S. I didn't get why do you need an empty ->remove() stub. Doesn't
+> work without it?
+
+I checked: it really works fine without the empty remove() function.
+I will get rid of it, and send the result as a patch v4.
+
+>
+>> Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
+>> Cc: Eric Anholt <eric@anholt.net>
+>> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Florian Fainelli <f.fainelli@gmail.com>
+>> Cc: Ray Jui <rjui@broadcom.com>
+>> Cc: Scott Branden <sbranden@broadcom.com>
+>> Cc: bcm-kernel-feedback-list at broadcom.com
+>> Cc: Michael Zoran <mzoran@crowfest.net>
+>> Cc: linux-rpi-kernel at lists.infradead.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devel at driverdev.osuosl.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>  .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 57 ++++++++++++----------
+>>  1 file changed, 30 insertions(+), 27 deletions(-)
+>>
+>> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+>> index 8f2d508183b2..125efc55ecb9 100644
+>> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+>> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+>> @@ -36,6 +36,10 @@ MODULE_PARM_DESC(enable_compat_alsa,
+>>  static void snd_devm_unregister_child(struct device *dev, void *res)
+>>  {
+>>         struct device *childdev = *(struct device **)res;
+>> +       struct bcm2835_chip *chip = dev_get_drvdata(childdev);
+>> +       struct snd_card *card = chip->card;
+>> +
+>> +       snd_card_free(card);
+>>
+>>         device_unregister(childdev);
+>>  }
+>> @@ -61,6 +65,13 @@ static int snd_devm_add_child(struct device *dev, struct device *child)
+>>         return 0;
+>>  }
+>>
+>> +static void snd_devm_release(struct device *dev)
+>> +{
+>> +       struct bcm2835_chip *chip = dev_get_drvdata(dev);
+>> +
+>> +       kfree(chip);
+>> +}
+>> +
+>>  static struct device *
+>>  snd_create_device(struct device *parent,
+>>                   struct device_driver *driver,
+>> @@ -76,6 +87,7 @@ snd_create_device(struct device *parent,
+>>         device_initialize(device);
+>>         device->parent = parent;
+>>         device->driver = driver;
+>> +       device->release = snd_devm_release;
+>>
+>>         dev_set_name(device, "%s", name);
+>>
+>> @@ -86,18 +98,19 @@ snd_create_device(struct device *parent,
+>>         return device;
+>>  }
+>>
+>> -static int snd_bcm2835_free(struct bcm2835_chip *chip)
+>> -{
+>> -       kfree(chip);
+>> -       return 0;
+>> -}
+>> -
+>>  /* component-destructor
+>>   * (see "Management of Cards and Components")
+>>   */
+>>  static int snd_bcm2835_dev_free(struct snd_device *device)
+>>  {
+>> -       return snd_bcm2835_free(device->device_data);
+>> +       struct bcm2835_chip *chip = device->device_data;
+>> +       struct snd_card *card = chip->card;
+>> +
+>> +       /* TODO: free pcm, ctl */
+>> +
+>> +       snd_device_free(card, chip);
+>> +
+>> +       return 0;
+>>  }
+>>
+>>  /* chip-specific constructor
+>> @@ -122,7 +135,7 @@ static int snd_bcm2835_create(struct snd_card *card,
+>>
+>>         err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
+>>         if (err) {
+>> -               snd_bcm2835_free(chip);
+>> +               kfree(chip);
+>>                 return err;
+>>         }
+>>
+>> @@ -130,31 +143,14 @@ static int snd_bcm2835_create(struct snd_card *card,
+>>         return 0;
+>>  }
+>>
+>> -static void snd_devm_card_free(struct device *dev, void *res)
+>> -{
+>> -       struct snd_card *snd_card = *(struct snd_card **)res;
+>> -
+>> -       snd_card_free(snd_card);
+>> -}
+>> -
+>>  static struct snd_card *snd_devm_card_new(struct device *dev)
+>>  {
+>> -       struct snd_card **dr;
+>>         struct snd_card *card;
+>>         int ret;
+>>
+>> -       dr = devres_alloc(snd_devm_card_free, sizeof(*dr), GFP_KERNEL);
+>> -       if (!dr)
+>> -               return ERR_PTR(-ENOMEM);
+>> -
+>>         ret = snd_card_new(dev, -1, NULL, THIS_MODULE, 0, &card);
+>> -       if (ret) {
+>> -               devres_free(dr);
+>> +       if (ret)
+>>                 return ERR_PTR(ret);
+>> -       }
+>> -
+>> -       *dr = card;
+>> -       devres_add(dev, dr);
+>>
+>>         return card;
+>>  }
+>> @@ -313,7 +309,7 @@ static int snd_add_child_device(struct device *device,
+>>                 return err;
+>>         }
+>>
+>> -       dev_set_drvdata(child, card);
+>> +       dev_set_drvdata(child, chip);
+>>         dev_info(child, "card created with %d channels\n", numchans);
+>>
+>>         return 0;
+>> @@ -414,6 +410,12 @@ static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
+>>         return 0;
+>>  }
+>>
+>> +static int snd_bcm2835_alsa_remove(struct platform_device *pdev)
+>> +{
+>> +       /* trigger snd_devm_unregister_child() */
+>> +       return 0;
+>> +}
+>> +
+>>  #ifdef CONFIG_PM
+>>
+>>  static int snd_bcm2835_alsa_suspend(struct platform_device *pdev,
+>> @@ -437,6 +439,7 @@ MODULE_DEVICE_TABLE(of, snd_bcm2835_of_match_table);
+>>
+>>  static struct platform_driver bcm2835_alsa0_driver = {
+>>         .probe = snd_bcm2835_alsa_probe_dt,
+>> +       .remove = snd_bcm2835_alsa_remove,
+>>  #ifdef CONFIG_PM
+>>         .suspend = snd_bcm2835_alsa_suspend,
+>>         .resume = snd_bcm2835_alsa_resume,
+>> --
+>> 2.13.6
+>>
+>
+>
