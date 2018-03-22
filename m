@@ -1,29 +1,18 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 22 Mar 2018 13:51:22 +0100
-Subject: [PATCH v2 8/8] DT: arm: Add the RZN1D-DB Board to Renesas
- Makefile target
-In-Reply-To: <1521719091-25157-9-git-send-email-michel.pollet@bp.renesas.com>
-References: <1521719091-25157-1-git-send-email-michel.pollet@bp.renesas.com>
- <1521719091-25157-9-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <CAMuHMdUjtZnZpVE11-5ECsGs-zuNzwaPR_n+KL3_5tWtq2i+8A@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 22 Mar 2018 13:53:00 +0100
+Subject: [usb-next, v3 PATCH] usb: xhci: skip phys initialization of
+ shared hcd
+In-Reply-To: <643701fef843f91931e3a68779afe053c63c96f6.1521707846.git.chunfeng.yun@mediatek.com>
+References: <643701fef843f91931e3a68779afe053c63c96f6.1521707846.git.chunfeng.yun@mediatek.com>
+Message-ID: <20180322125300.GA22130@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 12:44 PM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> This adds the newly added board to the Renesas built target
->
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+On Thu, Mar 22, 2018 at 08:12:50PM +0800, Chunfeng Yun wrote:
+> The phys has already been initialized when add primary hcd,
+> including usb2 phys and usb3 phys also if exist, so needn't
+> re-parse "phys" property again.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Wait, why does the subject say "xhci", when this is in USB core code?
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I'll go edit that by hand...
