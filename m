@@ -1,96 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Mar 2018 10:23:32 +0800
-Subject: [PATCH v3 6/7] arm: dts: sun8i: a33: Add the DSI-related nodes
-In-Reply-To: <fbb4d14a83ed80e9740c042cd9df58b8132b4c91.1520344489.git-series.maxime.ripard@bootlin.com>
-References: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
- <fbb4d14a83ed80e9740c042cd9df58b8132b4c91.1520344489.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v65AfHHUZ=fUB+TPUZaLdYb4mN3hZ=3n5GOAD39C42+Nag@mail.gmail.com>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Thu, 22 Mar 2018 10:58:38 +0800
+Subject: [PATCH v4 0/5] PINCTRL: Mediatek pinctrl driver for mt2712 
+Message-ID: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 6, 2018 at 9:56 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
->
-> The A33 has a MIPI-DSI block, along with its D-PHY. Let's add it in order
-> to use it in the relevant boards.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun8i-a33.dtsi | 44 +++++++++++++++++++++++++++++++++-
->  1 file changed, 44 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-> index 50eb84fa246a..94cfa7b1bbfa 100644
-> --- a/arch/arm/boot/dts/sun8i-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-> @@ -236,6 +236,11 @@
->                                         #address-cells = <1>;
->                                         #size-cells = <0>;
->                                         reg = <1>;
-> +
-> +                                       tcon0_out_dsi0: endpoint at 1 {
-> +                                               reg = <1>;
-> +                                               remote-endpoint = <&dsi0_in_tcon0>;
-> +                                       };
->                                 };
->                         };
->                 };
-> @@ -280,6 +285,45 @@
->                         #io-channel-cells = <0>;
->                 };
->
-> +               dsi0: dsi at 1ca0000 {
+This series includes five patches:
+1.Add mt2712 pintcrl head file.
+2.Add mt2712 pinctrl device node.
+3.Add mt2712 pinctrl driver.
+4.Support bias-disable of generic and special pins simultaneously.
+5.fix check warnings.
 
-Nit: There's only one so you don't need the numbered suffix. Also,
-is "dsi" specific enough, or should we use "mipi-dsi"
+Changes in patch v4:
+1)fix check warnings for mt2712.
+2)add fix check warnings patch for other ICs.
 
-> +                       compatible = "allwinner,sun6i-a31-mipi-dsi";
-> +                       reg = <0x01ca0000 0x1000>;
-> +                       interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_MIPI_DSI>,
-> +                                <&ccu CLK_DSI_SCLK>;
-> +                       clock-names = "bus", "mod";
-> +                       resets = <&ccu RST_BUS_MIPI_DSI>;
-> +                       phys = <&dphy0>;
-> +                       phy-names = "dphy";
-> +                       status = "disabled";
-> +
-> +                       ports {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +
-> +                               port at 0 {
-> +                                       #address-cells = <1>;
-> +                                       #size-cells = <0>;
-> +                                       reg = <0>;
-> +
-> +                                       dsi0_in_tcon0: endpoint {
-> +                                               remote-endpoint = <&tcon0_out_dsi0>;
-> +                                       };
-> +                               };
-> +                       };
-> +               };
-> +
-> +               dphy0: d-phy at 1ca1000 {
+Changes in patch v3:
+1)Use SPDX identifiers for all new files.
+2)Use right data for Copyright and Author.
+3)Correct some spelling mistake.
+4)Reusing original logic and change solution to support bias-disable of generic and special pins simultaneously.
+5)Add some comments for the speical path of special pins bias-disable.
 
-Same nit, and "dsi-phy" would be better.
+Changes in patch v2:
+1)Separate patch4 for supporting bias-disable of generic and special pins.
+2)GPIO16~17 direction setting is changed as generic pins in mt2712 E2,
+  So remove GPIO16~17 special direction setting and remove apmixedsys node in pinctrl device node.
+3)Add pinmux define in "mt2712-pinfunc.h" and "pinctrl-mtk-mt2712.h" for mt2712 E2 design.
 
-Otherwise,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Zhiyong Tao (5):
+  arm64: dts: mt2712: add pintcrl file
+  arm64: dts: mt2712: add pintcrl device node.
+  pinctrl: add mt2712 pinctrl driver
+  pintcrl: support bias-disable of generic and special pins
+    simultaneously
+  pinctrl: fix check warnings.
 
-> +                       compatible = "allwinner,sun6i-a31-mipi-dphy";
-> +                       reg = <0x01ca1000 0x1000>;
-> +                       clocks = <&ccu CLK_BUS_MIPI_DSI>,
-> +                                <&ccu CLK_DSI_DPHY>;
-> +                       clock-names = "bus", "mod";
-> +                       resets = <&ccu RST_BUS_MIPI_DSI>;
-> +                       status = "disabled";
-> +                       #phy-cells = <0>;
-> +               };
-> +
->                 fe0: display-frontend at 1e00000 {
->                         compatible = "allwinner,sun8i-a33-display-frontend";
->                         reg = <0x01e00000 0x20000>;
-> --
-> git-series 0.9.1
+ arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1123 ++++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi     |   18 +
+ drivers/pinctrl/mediatek/Kconfig              |    7 +
+ drivers/pinctrl/mediatek/Makefile             |    1 +
+ drivers/pinctrl/mediatek/pinctrl-mt2712.c     |  634 +++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    8 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h |  840 ++++--------
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h | 1757 +++++++++++++++++++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt6397.h |  123 +-
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt8127.h |  429 ++----
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h |  609 +++------
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h |  405 ++----
+ 12 files changed, 4348 insertions(+), 1606 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2712.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
+
+--
+2.6.4
