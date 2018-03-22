@@ -1,37 +1,37 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Thu, 22 Mar 2018 11:55:28 +0200
-Subject: [PATCH 3/4] arm: imx: Correct ahb clk parent select
-In-Reply-To: <1521712529-632-1-git-send-email-abel.vesa@nxp.com>
-References: <1521712529-632-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <1521712529-632-4-git-send-email-abel.vesa@nxp.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 22 Mar 2018 13:00:21 +0100
+Subject: [usb-next, v2 PATCH] usb: xhci: skip phys initialization of
+ shared hcd
+In-Reply-To: <1521710486.3717.146.camel@mhfsdcap03>
+References: <643701fef843f91931e3a68779afe053c63c96f6.1521707846.git.chunfeng.yun@mediatek.com>
+ <20180322090127.GA12048@kroah.com>
+ <1521710486.3717.146.camel@mhfsdcap03>
+Message-ID: <20180322120021.GA3304@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anson Huang <anson.huang@nxp.com>
+On Thu, Mar 22, 2018 at 05:21:26PM +0800, Chunfeng Yun wrote:
+> hi, 
+> On Thu, 2018-03-22 at 10:01 +0100, Greg Kroah-Hartman wrote:
+> > On Thu, Mar 22, 2018 at 04:39:20PM +0800, Chunfeng Yun wrote:
+> > > The phys has already been initialized when add primary hcd,
+> > > including usb2 phys and usb3 phys also if exist, so needn't
+> > > re-parse "phys" property again.
+> > > 
+> > > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > > ---
+> > >  drivers/usb/core/hcd.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > What changed from version 1?
+> V1: skip phys initialization when add shared HCD by setting
+> xhci->shared_hcd->skip_phy_initialization=1;
+> for both xhci-plat.c & xhci-mtk.c files.
+> 
+> V2: fix it in hcd.c suggested by Roger
 
-Design team change the ahb's clk parent options but did NOT update the DOC
-accordingly in time, so the AHB/IPG's clk rate in clk tree is incorrect, AHB is
-67.5MHz and IPG is 33.75MHz, but using scope to monitor them, they are actually
-135MHz and 67.5MHz, update the clk parent option to make clk tree info correct.
+Please put it in the patch itself, resend v3 with this info.
 
-Signed-off-by: Anson Huang <anson.huang@nxp.com>
-Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+thanks,
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index d786f98..3553b68 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -74,7 +74,7 @@ static const char *nand_usdhc_bus_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
- 
- static const char *ahb_channel_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
- 	"pll_dram_533m_clk", "pll_sys_pfd0_392m_clk",
--	"pll_enet_125m_clk", "pll_usb_main_clk", "pll_audio_post_div",
-+	"pll_enet_250m_clk", "pll_usb_main_clk", "pll_audio_post_div",
- 	"pll_video_post_div", };
- 
- static const char *dram_phym_sel[] = { "pll_dram_main_clk",
--- 
-2.7.4
+greg k-h
