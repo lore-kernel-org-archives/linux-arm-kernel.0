@@ -1,50 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 22 Mar 2018 05:59:41 +0000
-Subject: [PATCH] arm64: avoid race condition issue in dump_backtrace
-In-Reply-To: <1521687960-3744-1-git-send-email-ji.zhang@mediatek.com>
-References: <1521687960-3744-1-git-send-email-ji.zhang@mediatek.com>
-Message-ID: <20180322055929.z25brvwlmdighz66@salmiak>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 22 Mar 2018 14:08:43 +0800
+Subject: [linux-sunxi] Re: [PATCH 2/7] dt-bindings: add binding for the
+ Allwinner A64 DE2 bus
+In-Reply-To: <2866474.lRHIcLtROC@jernej-laptop>
+References: <20180316175354.21437-1-icenowy@aosc.io>
+ <20180320184646.dynqv6qubzabroe4@flea>
+ <AAC74653-C6EB-4BE3-BB19-210687C1E158@aosc.io>
+ <2866474.lRHIcLtROC@jernej-laptop>
+Message-ID: <9520BDDE-BFE3-4220-B48D-01A00CFA94DE@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 11:06:00AM +0800, Ji Zhang wrote:
-> When we dump the backtrace of some specific task, there is a potential race
-> condition due to the task may be running on other cores if SMP enabled.
-> That is because for current implementation, if the task is not the current
-> task, we will get the registers used for unwind from cpu_context saved in
-> thread_info, which is the snapshot before context switch, but if the task
-> is running on other cores, the registers and the content of stack are
-> changed.
-> This may cause that we get the wrong backtrace or incomplete backtrace or
-> even crash the kernel.
 
-When do we call dump_backtrace() on a running task that is not current?
 
-AFAICT, we don't do that in the arm64-specific callers of dump_backtrace(), and
-this would have to be some caller of show_stack() in generic code.
+? 2018?3?22? GMT+08:00 ??1:13:42, "Jernej ?krabec" <jernej.skrabec@siol.net> ??:
+>Hi all,
+>
+>Dne sreda, 21. marec 2018 ob 03:18:13 CET je Icenowy Zheng napisal(a):
+>> ? 2018?3?21? GMT+08:00 ??2:46:46, Maxime Ripard
+><maxime.ripard@bootlin.com> 
+>??:
+>> >On Sat, Mar 17, 2018 at 01:53:49AM +0800, Icenowy Zheng wrote:
+>> >> All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64
+>SoC
+>> >
+>> >to
+>> >
+>> >> be claimed, otherwise the whole DE2 space is inaccessible.
+>> >> 
+>> >> Add a device tree binding of the DE2 part as a sub-bus.
+>> >
+>> >Where did you get the info that it was a bus?
+>> 
+>> There's no direct evidence, just some guess.
+>> 
+>> The DE2 is a whole part that is just allocated a memory
+>> space at the user manual, and the SRAM controls the
+>> access to all modules in the DE2.
+>> 
+>> So it might be a bus.
+>> 
+>> Implement it as a bus is a clear representation on A64.
+>
+>Since there is already syscon for same mmio region, we migh as well use
+>it 
+>when loading ccu-sun8i-de2 driver on A64.
+>
+>Other options, like SRAM driver or bus driver, might better represent
+>HW, but 
 
-We pin the task's stack via try_get_task_stack(), so this cannot be unmapped
-while we walk it. In unwind_frame() we check that the frame record falls
-entirely within the task's stack. So AFAICT, we cannot crash the kernel here,
-though the backtrace may be misleading (and we could potentially get stuck in
-an infinite loop).
+I think the device tree should properly represent the HW,
+it's a basic requirment.
 
-> To avoid this case, do not dump the backtrace of the tasks which are
-> running on other cores.
-> This patch cannot solve the issue completely but can shrink the window of
-> race condition.
+>then we would have two DT nodes covering same mmio region, which I
+>think is 
+>not really acceptable.
 
-> @@ -113,6 +113,9 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->  	if (tsk == current) {
->  		frame.fp = (unsigned long)__builtin_frame_address(0);
->  		frame.pc = (unsigned long)dump_backtrace;
-> +	else if (tsk->state == TASK_RUNNING) {
-> +		pr_notice("Do not dump other running tasks\n");
-> +		return;
+It's acceptable, and DE2 is not the only user of SRAM controller so far.
 
-As you note, if we can race with the task being scheduled, this doesn't help.
+VE will also need a SRAM region to be claimed.
 
-Can we rule this out at a higher level?
-
-Thanks,
-Mark.
+>
+>Any suggestions?
+>
+>BTW, H6 has same design in this regard.
+>
+>Best regards,
+>Jernej
