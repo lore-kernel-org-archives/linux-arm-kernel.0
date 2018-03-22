@@ -1,48 +1,83 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 22 Mar 2018 13:19:06 +0100
-Subject: v4.16-rc5 on droid4: external abort in l2c310_configure+0x38/0x160
-In-Reply-To: <20180322120359.GA12518@amd>
-References: <20180322120359.GA12518@amd>
-Message-ID: <20180322121906.GC12518@amd>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Thu, 22 Mar 2018 08:24:42 -0400
+Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <201803221430.P43GJl9U%fengguang.wu@intel.com>
+References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+ <201803221430.P43GJl9U%fengguang.wu@intel.com>
+Message-ID: <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2018-03-22 13:03:59, Pavel Machek wrote:
-> Hi!
+On 2018-03-22 02:44, kbuild test robot wrote:
+> Hi Sinan,
 > 
-> I'm trying to get something to work on Droid 4.
+> Thank you for the patch! Yet something to improve:
 > 
-> So far, v4.14 from leste project works, with the right config. I tried
-> v4.16-rc5 next, and am stopped in early boot by:
+> [auto build test ERROR on linus/master]
+> [also build test ERROR on v4.16-rc6 next-20180321]
+> [if your patch is applied to the wrong git tree, please drop us a note
+> to help improve the system]
 > 
-> If someone knows what this is let me know, but I guess it is
-> config-dependend and I'll just try different one...
+> url:
+> https://github.com/0day-ci/linux/commits/Sinan-Kaya/ib-Eliminate-duplicate-barriers-on-weakly-ordered-archs/20180321-091659
+> config: xtensa-allyesconfig (attached as .config)
+> compiler: xtensa-linux-gcc (GCC) 7.2.0
+> reproduce:
+>         wget
+> https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross
+> -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=xtensa
+> 
 
-With different config it works, I just get storm of
+Jason,
 
-^@^??r??????musb-hdrc musb-hdrc.1.auto: VBUS Disconnect
+Can you remove the writeq change if it is too late for me to fix?
 
-[   39.985656] musb-hdrc musb-hdrc.1.auto: VBUS b_idle, devctl 80
+This is an infrastructural issue on xtensa arch.
 
-^@^??r????????musb-hdrc musb-hdrc.1.auto: VBUS Disconnect
+Probably, it won't get fixed today.
 
-[   40.005645] musb-hdrc musb-hdrc.1.auto: VBUS b_idle, devctl 80
-
-^@^??r????????musb-hdrc musb-hdrc.1.auto: VBUS Disconnect
-
-[   40.035766] musb-hdrc musb-hdrc.1.auto: VBUS b_idle, devctl 80
+Sinan
 
 
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180322/17c74a28/attachment.sig>
+> All errors (new ones prefixed by >>):
+> 
+>    In file included from drivers/infiniband/hw/cxgb4/iw_cxgb4.h:73:0,
+>                     from drivers/infiniband/hw/cxgb4/device.c:40:
+>    drivers/infiniband/hw/cxgb4/t4.h: In function 'pio_copy':
+>>> drivers/infiniband/hw/cxgb4/t4.h:460:3: error: implicit declaration 
+>>> of function 'writeq_relaxed'; did you mean 'writel_relaxed'? 
+>>> [-Werror=implicit-function-declaration]
+>       writeq_relaxed(*src, dst);
+>       ^~~~~~~~~~~~~~
+>       writel_relaxed
+>    cc1: some warnings being treated as errors
+> 
+> vim +460 drivers/infiniband/hw/cxgb4/t4.h
+> 
+>    450
+>    451	/* This function copies 64 byte coalesced work request to memory
+>    452	 * mapped BAR2 space. For coalesced WRs, the SGE fetches data
+>    453	 * from the FIFO instead of from Host.
+>    454	 */
+>    455	static inline void pio_copy(u64 __iomem *dst, u64 *src)
+>    456	{
+>    457		int count = 8;
+>    458
+>    459		while (count) {
+>  > 460			writeq_relaxed(*src, dst);
+>    461			src++;
+>    462			dst++;
+>    463			count--;
+>    464		}
+>    465	}
+>    466
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology 
+> Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel 
+> Corporation
