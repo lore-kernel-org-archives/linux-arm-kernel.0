@@ -1,74 +1,52 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 22 Mar 2018 18:35:29 +0100
-Subject: [PATCH v3] serial: mvebu-uart: fix tx lost characters
-In-Reply-To: <3B588D51285A4A4D8D39C94212E07826279E39@SPQCMBX02.exfo.com>
-References: <3B588D51285A4A4D8D39C94212E07826279E39@SPQCMBX02.exfo.com>
-Message-ID: <20180322173529.GA24597@kroah.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Thu, 22 Mar 2018 18:38:40 +0100
+Subject: [PATCH] arm64: defconfig: Enable ChromeOS EC drivers for supported
+ Chromebooks.
+Message-ID: <20180322173840.26062-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 04:09:38PM +0000, Gabriel Matni wrote:
-> From: Gabriel Matni <gabriel.matni@exfo.com>
-> 
-> Fixes missing characters on kernel console at low baud rates (i.e.9600).
-> The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
-> that the transmitter holding register (THR) is ready to receive a new byte.
-> 
-> TX_EMP tells us when it is possible to send a break sequence via
-> SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
-> empty, it does not guarantee that a new byte can be written just yet.
-> 
-> Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700 serial port")
-> Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
-> Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
-> Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
-> ---
-> Changes since v2:
-> - use one line for the "Fixes" entry
-> - removed trailing space between Signed-off-by entry and ---
-> - start using versioning, previous fixes in v1
-> 
-> Changes since v1:
-> - patch was corrupt, could not be applied
-> - fixed line indent
-> ---
->  drivers/tty/serial/mvebu-uart.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
-> index a100e98259d7..f0df0640208e 100644
-> --- a/drivers/tty/serial/mvebu-uart.c
-> +++ b/drivers/tty/serial/mvebu-uart.c
-> @@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
->  	u32 val;
->  
->  	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
-> -				  (val & STAT_TX_EMP), 1, 10000);
-> +				  (val & STAT_TX_RDY(port)), 1, 10000);
->  }
->  
->  static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
-> -- 
-> 2.7.4
-> 
-> 
-> > -----Original Message-----
-> > From: gregkh at linuxfoundation.org <gregkh@linuxfoundation.org>
-> > Sent: March 20, 2018 5:32 AM
-> > To: Gabriel Matni <gabriel.matni@exfo.com>
-> > Cc: Miquel Raynal <miquel.raynal@bootlin.com>; linux-
-> > serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > stable at vger.kernel.org; Gr?gory Clement <gregory.clement@bootlin.com>;
-> > Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> > Subject: Re: [PATCH] serial: mvebu-uart: fix tx lost characters
+Enable following drivers for merged devices:
+- ChromeOS EC RTC driver.
+- ChromeOS EC userspace interface.
+- ChromeOS EC light and proximity sensors.
+- ChromeOS EC Barometer Sensor driver.
 
-<snip>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+ arch/arm64/configs/defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-What is all of this below the patch for?
-
-Please clean up and send this properly, in a clean email, with no "Re:"
-on the subject line, as a new patch/email.
-
-thanks,
-
-greg k-h
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index d65d53b1ff77..3c2188f8c1fb 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -341,6 +341,7 @@ CONFIG_MFD_AXP20X_RSB=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_I2C=y
+ CONFIG_MFD_CROS_EC_SPI=y
++CONFIG_MFD_CROS_EC_CHARDEV=m
+ CONFIG_MFD_EXYNOS_LPASS=m
+ CONFIG_MFD_HI6421_PMIC=y
+ CONFIG_MFD_HI655X_PMIC=y
+@@ -492,6 +493,7 @@ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_ARMADA38X=y
+ CONFIG_RTC_DRV_TEGRA=y
+ CONFIG_RTC_DRV_XGENE=y
++CONFIG_RTC_DRV_CROS_EC=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DMA_BCM2835=m
+ CONFIG_K3_DMA=y
+@@ -546,6 +548,10 @@ CONFIG_EXTCON_USBC_CROS_EC=y
+ CONFIG_IIO=y
+ CONFIG_EXYNOS_ADC=y
+ CONFIG_ROCKCHIP_SARADC=m
++CONFIG_IIO_CROS_EC_SENSORS_CORE=m
++CONFIG_IIO_CROS_EC_SENSORS=m
++CONFIG_IIO_CROS_EC_LIGHT_PROX=m
++CONFIG_IIO_CROS_EC_BARO=m
+ CONFIG_PWM=y
+ CONFIG_PWM_BCM2835=m
+ CONFIG_PWM_CROS_EC=m
+-- 
+2.16.2
