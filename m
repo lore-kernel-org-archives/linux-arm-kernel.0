@@ -1,44 +1,57 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 22 Mar 2018 13:35:18 +0100
-Subject: v4.16-rc5 on Motorola Droid 4
-Message-ID: <20180322123518.GA27004@amd>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 22 Mar 2018 13:37:07 +0100
+Subject: [PATCH v2 3/8] DT: arm: renesas, r9a06g032: add the RZ/N1 bindings
+In-Reply-To: <1521719091-25157-4-git-send-email-michel.pollet@bp.renesas.com>
+References: <1521719091-25157-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1521719091-25157-4-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdXaRarxors3E-Jv7TLjka-p9XGYCTKyF7jM3p+UemgO+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Michel,
 
-Just... I got recent mainline to work on Motorola Droid 4. (Thanks for
-all the help).
+On Thu, Mar 22, 2018 at 12:44 PM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> This documents the RZ/N1 bindings for both the RZ/N1 and the RZN1D400-DB
+> board.
+>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 
-Tree is at kernel.org:
+Thanks for your patch!
 
-kernel.org:pub/scm/linux/kernel/git/pavel/linux-n900.git all-v4.16:all-v4.16
+> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -47,7 +47,8 @@ SoCs:
+>      compatible = "renesas,r8a77980"
+>    - R-Car D3 (R8A77995)
+>      compatible = "renesas,r8a77995"
+> -
+> +  - RZ/N1D (R9A06G032)
+> +    compatible = "renesas,r9a06g032"
+>
+>  Boards:
+>
+> @@ -104,6 +105,8 @@ Boards:
+>      compatible = "renesas,porter", "renesas,r8a7791"
+>    - RSKRZA1 (YR0K77210C000BE)
+>      compatible = "renesas,rskrza1", "renesas,r7s72100"
+> +  - RZN1D-DB (RZ/N1D Demo Board for the RZ/N1D 400 pins package)
 
-branch all-v4.16 contains config.4 (which is config I'm using) and the
-patches I used. (But I did not do anything special).
+The official board part number (between parentheses) should be
+YCONNECT-IT-RZN1D?
 
-What does _not_ yet work is battery charging, and I'm not sure if the
-phone will actually shut down itself or if it will drain & damage the
-battery.
+> +    compatible = "renesas,rzn1d400-db", "renesas,r9a06g032"
+>    - Salvator-X (RTP0RC7795SIPB0010S)
+>      compatible = "renesas,salvator-x", "renesas,r8a7795"
+>    - Salvator-X (RTP0RC7796SIPB0011S)
 
-user at devuan:/my/unicsy_demo$ lib/hardware.py
-Battery 3.67V 3.67V 3.82V 15% 49% 0% 0/0 mAh Discharging -353/-1/-1 mA
-user at devuan:/my/unicsy_demo$ lib/hardware.py
-Battery 3.65V 3.65V 3.88V 15% 61% 0% 0/0 mAh Discharging -534/-1/-1 mA
+Gr{oetje,eeting}s,
 
-Usb networking works with that config, and I can boot useful system
-with maemo leste.
+                        Geert
 
-Good luck,
-    	       	     	       	       	     	 			Pavel
-	
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180322/7b95b086/attachment.sig>
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
