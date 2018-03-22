@@ -1,54 +1,79 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 22 Mar 2018 12:30:44 -0400
-Subject: [PATCH v6] RDMA/qedr: eliminate duplicate barriers on weakly-ordered
- archs #2
-Message-ID: <1521736245-23662-1-git-send-email-okaya@codeaurora.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 22 Mar 2018 16:42:14 +0000
+Subject: [PATCH v4 22/22] arm64: Add work around for Arm Cortex-A55
+ Erratum 1024718
+In-Reply-To: <20180321153118.GE16308@e103592.cambridge.arm.com>
+References: <20180313115120.17256-1-suzuki.poulose@arm.com>
+ <20180313115120.17256-23-suzuki.poulose@arm.com>
+ <20180321153118.GE16308@e103592.cambridge.arm.com>
+Message-ID: <d701a5ec-d8fe-3fe0-bb1f-20968403bf6a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel() in multiple places. writel()
-already has a barrier on some architectures like arm64.
+On 21/03/18 15:31, Dave Martin wrote:
+> On Tue, Mar 13, 2018 at 11:51:20AM +0000, Suzuki K Poulose wrote:
+>> Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
+>> from an erratum 1024718, which causes incorrect updates when DBM/AP
+>> bits in a page table entry is modified without a break-before-make
+>> sequence. The work around is to skip enabling the hardware DBM feature
+>> on the affected cores. The hardware Access Flag management features
+>> is not affected. There are some other cores suffering from this
+>> errata, which could be added to the midr_list to trigger the work
+>> around.
+>>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: ckadabi at codeaurora.org
+>> Cc: Dave Martin <dave.martin@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+> [...]
+> 
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 4e73c610a409..0fc097e2b72e 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -963,9 +963,23 @@ static inline void __cpu_enable_hw_dbm(void)
+>>   	isb();
+>>   }
+>>   
+>> +static bool cpu_has_broken_dbm(void)
+>> +{
+>> +	/* List of CPUs which have broken DBM support. */
+>> +	static const struct midr_range cpus[] = {
+>> +#ifdef CONFIG_ARM64_ERRATUM_1024718
+>> +		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),  // A55 r0p0 -r1p0
+>> +#endif
+>> +		{},
+>> +	};
+>> +
+>> +	return is_midr_in_range_list(read_cpuid_id(), cpus);
+>> +}
+>> +
+>>   static bool cpu_can_use_dbm(const struct arm64_cpu_capabilities *cap)
+>>   {
+>> -	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU);
+>> +	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU) &&
+>> +	       !cpu_has_broken_dbm();
+> 
+> This refactoring seems sensbile to me.  The mapping between erratum IDs
+> and features that don't work is never guaranteed to be 1:1, so it
+> makes sense for the check function to have a generic name and to paste
+> in the relevant erratum ID ranges depending on the kernel config.
+> 
 
-This ends up CPU observing two barriers back to back before executing the
-register write.
+Thanks Dave. Apologies for the lost change log for the patch. It looked
+like this (before it was lost in a rebase :-()
 
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/infiniband/hw/qedr/verbs.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Changes since v3:
+  - Renamed cpu_has_erratum_1024718() to cpu_has_broken_dbm() to
+    allow for different CPU Errata configs to share a single routine
+    for black listing CPUs. Dropped Dave's Reviewed-by
 
-diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
-index 53f00db..d1cf9a0 100644
---- a/drivers/infiniband/hw/qedr/verbs.c
-+++ b/drivers/infiniband/hw/qedr/verbs.c
-@@ -35,6 +35,7 @@
- #include <net/ipv6.h>
- #include <net/udp.h>
- #include <linux/iommu.h>
-+#include <linux/io-64-nonatomic-hi-lo.h>
- 
- #include <rdma/ib_verbs.h>
- #include <rdma/ib_user_verbs.h>
-@@ -860,7 +861,7 @@ static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
- 	wmb();
- 	cq->db.data.agg_flags = flags;
- 	cq->db.data.value = cpu_to_le32(cons);
--	writeq(cq->db.raw, cq->db_addr);
-+	writeq_relaxed(cq->db.raw, cq->db_addr);
- 
- 	/* Make sure write would stick */
- 	mmiowb();
-@@ -3338,7 +3339,7 @@ int qedr_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
- 
- 		qp->rq.db_data.data.value++;
- 
--		writel(qp->rq.db_data.raw, qp->rq.db);
-+		writel_relaxed(qp->rq.db_data.raw, qp->rq.db);
- 
- 		/* Make sure write sticks */
- 		mmiowb();
--- 
-2.7.4
+
+> [...]
+> 
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+Cheers
+Suzuki
