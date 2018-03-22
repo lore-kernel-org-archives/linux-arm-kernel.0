@@ -1,59 +1,50 @@
 From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Thu, 22 Mar 2018 10:58:38 +0800
-Subject: [PATCH v4 0/5] PINCTRL: Mediatek pinctrl driver for mt2712 
-Message-ID: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
+Date: Thu, 22 Mar 2018 10:58:42 +0800
+Subject: [PATCH v4 4/5] pintcrl: support bias-disable of generic and special
+ pins simultaneously
+In-Reply-To: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
+References: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <1521687523-1604-5-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes five patches:
-1.Add mt2712 pintcrl head file.
-2.Add mt2712 pinctrl device node.
-3.Add mt2712 pinctrl driver.
-4.Support bias-disable of generic and special pins simultaneously.
-5.fix check warnings.
+For generic pins, parameter "arg" is 0 or 1.
+For special pins, bias-disable is set by R0R1,
+so we need transmited "00" to set bias-disable
+When we set "bias-disable" as high-z property,
+the parameter should be "MTK_PUPD_SET_R1R0_00".
 
-Changes in patch v4:
-1)fix check warnings for mt2712.
-2)add fix check warnings patch for other ICs.
+Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Changes in patch v3:
-1)Use SPDX identifiers for all new files.
-2)Use right data for Copyright and Author.
-3)Correct some spelling mistake.
-4)Reusing original logic and change solution to support bias-disable of generic and special pins simultaneously.
-5)Add some comments for the speical path of special pins bias-disable.
-
-Changes in patch v2:
-1)Separate patch4 for supporting bias-disable of generic and special pins.
-2)GPIO16~17 direction setting is changed as generic pins in mt2712 E2,
-  So remove GPIO16~17 special direction setting and remove apmixedsys node in pinctrl device node.
-3)Add pinmux define in "mt2712-pinfunc.h" and "pinctrl-mtk-mt2712.h" for mt2712 E2 design.
-
-
-Zhiyong Tao (5):
-  arm64: dts: mt2712: add pintcrl file
-  arm64: dts: mt2712: add pintcrl device node.
-  pinctrl: add mt2712 pinctrl driver
-  pintcrl: support bias-disable of generic and special pins
-    simultaneously
-  pinctrl: fix check warnings.
-
- arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1123 ++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi     |   18 +
- drivers/pinctrl/mediatek/Kconfig              |    7 +
- drivers/pinctrl/mediatek/Makefile             |    1 +
- drivers/pinctrl/mediatek/pinctrl-mt2712.c     |  634 +++++++++
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    8 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h |  840 ++++--------
- drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h | 1757 +++++++++++++++++++++++++
- drivers/pinctrl/mediatek/pinctrl-mtk-mt6397.h |  123 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8127.h |  429 ++----
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h |  609 +++------
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h |  405 ++----
- 12 files changed, 4348 insertions(+), 1606 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2712.c
- create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
-
---
-2.6.4
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index 3cf384f..f991ff3 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -293,7 +293,7 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
+ 		unsigned int pin, bool enable, bool isup, unsigned int arg)
+ {
+ 	unsigned int bit;
+-	unsigned int reg_pullen, reg_pullsel;
++	unsigned int reg_pullen, reg_pullsel, r1r0;
+ 	int ret;
+ 
+ 	/* Some pins' pull setting are very different,
+@@ -301,8 +301,12 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
+ 	 * resistor bit, so we need this special handle.
+ 	 */
+ 	if (pctl->devdata->spec_pull_set) {
++		/* For special pins, bias-disable is set by R1R0,
++		 * the parameter should be "MTK_PUPD_SET_R1R0_00".
++		 */
++		r1r0 = enable ? arg : MTK_PUPD_SET_R1R0_00;
+ 		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
+-			pin, pctl->devdata->port_align, isup, arg);
++			pin, pctl->devdata->port_align, isup, r1r0);
+ 		if (!ret)
+ 			return 0;
+ 	}
+-- 
+1.9.1
