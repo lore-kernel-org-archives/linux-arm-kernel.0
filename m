@@ -1,129 +1,90 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 22 Mar 2018 14:27:05 -0700
-Subject: [PATCH] arm/arm64: smccc: Use xN for arm64 register constraints with
- clang
-Message-ID: <20180322212705.141175-1-mka@chromium.org>
+From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
+Date: Thu, 22 Mar 2018 21:30:40 +0000
+Subject: [PATCH v6] ARM: dts: wheat: Fix ADV7513 address usage
+Message-ID: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMCCC v1.1 inline primitive code added by commit f2d3b2e8759a
-("arm/arm64: smccc: Implement SMCCC v1.1 inline primitive") uses
-register names r0, r1, ... for constraints. This breaks clang builds
-for arm64, since clang currently only accepts x0, x1, ... in this
-context. Use xN names for register constrains when building for arm64
-with clang.
+The r8a7792 Wheat board has two ADV7513 devices sharing a single I2C
+bus, however in low power mode the ADV7513 will reset it's slave maps to
+use the hardware defined default addresses.
 
-Fixes: f2d3b2e8759a ("arm/arm64: smccc: Implement SMCCC v1.1 inline primitive")
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+The ADV7511 driver was adapted to allow the two devices to be registered
+correctly - but it did not take into account the fault whereby the
+devices reset the addresses.
+
+This results in an address conflict between the device using the default
+addresses, and the other device if it is in low-power-mode.
+
+Repair this issue by moving both devices away from the default address
+definitions.
+
+Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
-Note: Support for rN in future versions of clang is underway:
-  https://bugs.llvm.org/show_bug.cgi?id=36862
+v2:
+ - Addition to series
 
- include/linux/arm-smccc.h | 54 ++++++++++++++++++++++-----------------
- 1 file changed, 30 insertions(+), 24 deletions(-)
+v3:
+ - Split map register addresses into individual declarations.
 
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index a031897fca76..5c55d9e8c2ef 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -155,6 +155,11 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+v4:
+ - Normalise I2C usage
+
+v5:
+ - Repost without [RFT] now that it has been tested
+
+v6:
+ - s/low power power/low power/ correction from Laurent.
+
+Testing on a wheat board shows the addresses correctly assigned, and the
+default addresses (0x38, 0x3e, 0x3f which would otherwise conflict) are
+shown as actively returning data in low power mode during the scan.
+(they return 0)
+
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- UU -- -- -- UU -- --
+30: -- -- -- -- -- -- -- -- 38 UU -- -- -- UU 3e 3f
+40: -- -- -- -- -- -- -- -- -- UU -- -- -- UU -- --
+50: -- -- -- -- -- -- -- -- -- UU -- -- -- UU -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+
+ arch/arm/boot/dts/r8a7792-wheat.dts | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
+index 293b9e3b3e70..db01de7a3811 100644
+--- a/arch/arm/boot/dts/r8a7792-wheat.dts
++++ b/arch/arm/boot/dts/r8a7792-wheat.dts
+@@ -245,9 +245,15 @@
+ 	status = "okay";
+ 	clock-frequency = <400000>;
  
- #define SMCCC_SMC_INST	"smc	#0"
- #define SMCCC_HVC_INST	"hvc	#0"
-+#ifndef __clang__
-+#define __reg__ "r"
-+#else
-+#define __reg__ "x"
-+#endif
++	/*
++	 * The adv75xx resets its addresses to defaults during low power mode.
++	 * Because we have two ADV7513 devices on the same bus, we must change
++	 * both of them away from the defaults so that they do not conflict.
++	 */
+ 	hdmi at 3d {
+ 		compatible = "adi,adv7513";
+-		reg = <0x3d>;
++		reg = <0x3d>, <0x2d>, <0x4d>, <0x5d>;
++		reg-names = "main", "cec", "edid", "packet";
  
- #elif defined(CONFIG_ARM)
- #include <asm/opcodes-sec.h>
-@@ -162,6 +167,7 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
+ 		adi,input-depth = <8>;
+ 		adi,input-colorspace = "rgb";
+@@ -277,7 +283,8 @@
  
- #define SMCCC_SMC_INST	__SMC(0)
- #define SMCCC_HVC_INST	__HVC(0)
-+#define __reg__ "r"
+ 	hdmi at 39 {
+ 		compatible = "adi,adv7513";
+-		reg = <0x39>;
++		reg = <0x39>, <0x29>, <0x49>, <0x59>;
++		reg-names = "main", "cec", "edid", "packet";
  
- #endif
- 
-@@ -187,54 +193,54 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
- #define __constraint_read_1
- #define __constraint_read_2
- #define __constraint_read_3
--#define __constraint_read_4	"r" (r4)
--#define __constraint_read_5	__constraint_read_4, "r" (r5)
--#define __constraint_read_6	__constraint_read_5, "r" (r6)
--#define __constraint_read_7	__constraint_read_6, "r" (r7)
-+#define __constraint_read_4	__reg__ (r4)
-+#define __constraint_read_5	__constraint_read_4, __reg__ (r5)
-+#define __constraint_read_6	__constraint_read_5, __reg__ (r6)
-+#define __constraint_read_7	__constraint_read_6, __reg__ (r7)
- 
- #define __declare_arg_0(a0, res)					\
- 	struct arm_smccc_res   *___res = res;				\
--	register u32           r0 asm("r0") = a0;			\
--	register unsigned long r1 asm("r1");				\
--	register unsigned long r2 asm("r2");				\
--	register unsigned long r3 asm("r3")
-+	register u32           r0 asm(__reg__"0") = a0;			\
-+	register unsigned long r1 asm(__reg__"1");			\
-+	register unsigned long r2 asm(__reg__"2");			\
-+	register unsigned long r3 asm(__reg__"3")
- 
- #define __declare_arg_1(a0, a1, res)					\
- 	struct arm_smccc_res   *___res = res;				\
--	register u32           r0 asm("r0") = a0;			\
--	register typeof(a1)    r1 asm("r1") = a1;			\
--	register unsigned long r2 asm("r2");				\
--	register unsigned long r3 asm("r3")
-+	register u32           r0 asm(__reg__"0") = a0;			\
-+	register typeof(a1)    r1 asm(__reg__"1") = a1;			\
-+	register unsigned long r2 asm(__reg__"2");			\
-+	register unsigned long r3 asm(__reg__"3")
- 
- #define __declare_arg_2(a0, a1, a2, res)				\
- 	struct arm_smccc_res   *___res = res;				\
--	register u32           r0 asm("r0") = a0;			\
--	register typeof(a1)    r1 asm("r1") = a1;			\
--	register typeof(a2)    r2 asm("r2") = a2;			\
--	register unsigned long r3 asm("r3")
-+	register u32           r0 asm(__reg__"0") = a0;			\
-+	register typeof(a1)    r1 asm(__reg__"1") = a1;			\
-+	register typeof(a2)    r2 asm(__reg__"2") = a2;			\
-+	register unsigned long r3 asm(__reg__"3")
- 
- #define __declare_arg_3(a0, a1, a2, a3, res)				\
- 	struct arm_smccc_res   *___res = res;				\
--	register u32           r0 asm("r0") = a0;			\
--	register typeof(a1)    r1 asm("r1") = a1;			\
--	register typeof(a2)    r2 asm("r2") = a2;			\
--	register typeof(a3)    r3 asm("r3") = a3
-+	register u32           r0 asm(__reg__"0") = a0;			\
-+	register typeof(a1)    r1 asm(__reg__"1") = a1;			\
-+	register typeof(a2)    r2 asm(__reg__"2") = a2;			\
-+	register typeof(a3)    r3 asm(__reg__"3") = a3
- 
- #define __declare_arg_4(a0, a1, a2, a3, a4, res)			\
- 	__declare_arg_3(a0, a1, a2, a3, res);				\
--	register typeof(a4) r4 asm("r4") = a4
-+	register typeof(a4) r4 asm(__reg__"4") = a4
- 
- #define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)			\
- 	__declare_arg_4(a0, a1, a2, a3, a4, res);			\
--	register typeof(a5) r5 asm("r5") = a5
-+	register typeof(a5) r5 asm(__reg__"5") = a5
- 
- #define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)		\
- 	__declare_arg_5(a0, a1, a2, a3, a4, a5, res);			\
--	register typeof(a6) r6 asm("r6") = a6
-+	register typeof(a6) r6 asm(__reg__"6") = a6
- 
- #define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)		\
- 	__declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);		\
--	register typeof(a7) r7 asm("r7") = a7
-+	register typeof(a7) r7 asm(__reg__"7") = a7
- 
- #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
- #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
+ 		adi,input-depth = <8>;
+ 		adi,input-colorspace = "rgb";
 -- 
-2.17.0.rc0.231.g781580f067-goog
+2.7.4
