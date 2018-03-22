@@ -1,11 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 22 Mar 2018 13:49:47 +0100
-Subject: [PATCH v2 6/8] DT: arm: Add Renesas RZ/N1 SoC base device tree
- file
-In-Reply-To: <1521719091-25157-7-git-send-email-michel.pollet@bp.renesas.com>
+Date: Thu, 22 Mar 2018 13:51:01 +0100
+Subject: [PATCH v2 7/8] DT: arm: Add Renesas RZN1D-DB Board base file
+In-Reply-To: <1521719091-25157-8-git-send-email-michel.pollet@bp.renesas.com>
 References: <1521719091-25157-1-git-send-email-michel.pollet@bp.renesas.com>
- <1521719091-25157-7-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <CAMuHMdWG5gy25MXn2kEP0XO0xWg5Ztou2DrzLXwZWfhYRBTbCg@mail.gmail.com>
+ <1521719091-25157-8-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdUBS2+7UeAD9ZraOKY99o2YmLJgPEcuTGwLXPTj9Cfs_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,54 +12,34 @@ Hi Michel,
 
 On Thu, Mar 22, 2018 at 12:44 PM, Michel Pollet
 <michel.pollet@bp.renesas.com> wrote:
-> This adds the Renesas RZ/N1 Family (Part #R9A06G0xx) SoC
-> bare bone support.
->
-> This currently only handles generic parts (gic, architected timer)
-> and a UART.
-> For simplicity sake, this also relies on the bootloader to set the
-> pinctrl and clocks.
+> This adds a base device tree file for the RZN1-DB board, with only the
+> basic support allowing the system to boot to a prompt. Only one UART is
+> used, with only a single CPU running.
 >
 > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 
 Thanks for your patch!
 
 > --- /dev/null
-> +++ b/arch/arm/boot/dts/r9a06g0xx.dtsi
-> @@ -0,0 +1,96 @@
+> +++ b/arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts
+> @@ -0,0 +1,26 @@
 > +// SPDX-License-Identifier: GPL-2.0
 > +/*
-> + * Base Device Tree Source for the Renesas RZ/N1 SoC Family of devices
+> + * Device Tree Source for the RZN1D-DB Board
 > + *
 > + * Copyright (C) 2018 Renesas Electronics Europe Limited
 > + *
 > + */
 > +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +/dts-v1/;
+> +
+> +#include "r9a06g0xx.dtsi"
 > +
 > +/ {
-> +       compatible = "renesas,rzn1";
+> +       model = "RZN1D-DB Board";
+> +       compatible = "renesas,rzn1d400-db", "renesas,r9a06g032", "renesas,rzn1";
 
-As per your binding, this should be "renesas,r9a06g032"
-
-> +       soc {
-
-> +               sysctrl: sysctrl at 4000c000 {
-> +                       compatible = "renesas,rzn1-sysctrl", "syscon",
-
-Missing "renesas,r9a06g032-sysctrl".
-
-> +                                       "simple-mfd";
-> +                       reg = <0x4000c000 0x1000>;
-> +
-> +                       reboot {
-> +                               compatible = "renesas,rzn1-reboot";
-
-Missing "renesas,r9a06g032-reboot".
-
-> +                       };
-> +               };
-
+"renesas,rzn1" is not documented.
 
 Gr{oetje,eeting}s,
 
