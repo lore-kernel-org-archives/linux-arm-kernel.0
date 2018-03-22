@@ -1,164 +1,83 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 22 Mar 2018 18:14:42 +0000
-Subject: [PATCH v2 08/11] firmware: arm_sdei: Add ACPI GHES registration helper
-In-Reply-To: <20180322181445.23298-1-james.morse@arm.com>
-References: <20180322181445.23298-1-james.morse@arm.com>
-Message-ID: <20180322181445.23298-9-james.morse@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 22 Mar 2018 18:30:25 +0000
+Subject: [PATCH] arm64: tlbflush: avoid writing RES0 bits
+In-Reply-To: <1521666172-2494-1-git-send-email-pelcan@codeaurora.org>
+References: <1521666172-2494-1-git-send-email-pelcan@codeaurora.org>
+Message-ID: <00ae42df-d0b7-f63b-9cca-4c3e65a3938e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-APEI's Generic Hardware Error Source structures do not describe
-whether the SDEI event is shared or private, as this information is
-discoverable via the API.
+On 21/03/18 21:02, Philip Elcan wrote:
+> Bits [47:44] of the TLBI register operand are RES0 for instructions that
+> require a VA, per the ARM ARM spec, so TLBI operations should avoid writing
+> non-zero values to these bits.
 
-GHES needs to know whether an event is normal or critical to avoid
-sharing locks or fixmap entries.
+If we're going to start sanitising addresses to respect RES0 bits, then 
+we should probably do it properly to cope with the cases where bits 
+63:47 are also RES0, and others - I guess we never actually try to do 
+something like VAE1IS with a kernel VA, but AFAICS that would still be 
+busted even after this patch.
 
-Add a helper to ask firmware for this information so it can initialise
-the struct ghes and register then enable the event.
+Robin.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
----
-Changes since v1:
- * ghes->fixmap_idx variable rename
- * Typos
-
- arch/arm64/include/asm/fixmap.h |  4 +++
- drivers/firmware/arm_sdei.c     | 75 +++++++++++++++++++++++++++++++++++++++++
- include/linux/arm_sdei.h        |  5 +++
- 3 files changed, 84 insertions(+)
-
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index c3974517c2cb..e2b423a5feaf 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -58,6 +58,10 @@ enum fixed_addresses {
- #ifdef CONFIG_ACPI_APEI_SEA
- 	FIX_APEI_GHES_SEA,
- #endif
-+#ifdef CONFIG_ARM_SDE_INTERFACE
-+	FIX_APEI_GHES_SDEI_NORMAL,
-+	FIX_APEI_GHES_SDEI_CRITICAL,
-+#endif
- #endif /* CONFIG_ACPI_APEI_GHES */
- 
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index 1ea71640fdc2..8e37c34ef733 100644
---- a/drivers/firmware/arm_sdei.c
-+++ b/drivers/firmware/arm_sdei.c
-@@ -2,6 +2,7 @@
- // Copyright (C) 2017 Arm Ltd.
- #define pr_fmt(fmt) "sdei: " fmt
- 
-+#include <acpi/ghes.h>
- #include <linux/acpi.h>
- #include <linux/arm_sdei.h>
- #include <linux/arm-smccc.h>
-@@ -887,6 +888,80 @@ static void sdei_smccc_hvc(unsigned long function_id,
- 	arm_smccc_hvc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
- }
- 
-+#ifdef CONFIG_ACPI
-+/* These stop private notifications using the fixmap entries simultaneously */
-+static DEFINE_RAW_SPINLOCK(sdei_ghes_fixmap_lock_normal);
-+static DEFINE_RAW_SPINLOCK(sdei_ghes_fixmap_lock_critical);
-+
-+int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *cb)
-+{
-+	int err;
-+	u32 event_num;
-+	u64 result;
-+
-+	if (acpi_disabled)
-+		return -EOPNOTSUPP;
-+
-+	event_num = ghes->generic->notify.vector;
-+	if (event_num == 0) {
-+		/*
-+		 * Event 0 is reserved by the specification for
-+		 * SDEI_EVENT_SIGNAL.
-+		 */
-+		return -EINVAL;
-+	}
-+
-+	err = sdei_api_event_get_info(event_num, SDEI_EVENT_INFO_EV_PRIORITY,
-+				      &result);
-+	if (err)
-+		return err;
-+
-+	if (result == SDEI_EVENT_PRIORITY_CRITICAL) {
-+		ghes->nmi_fixmap_lock = &sdei_ghes_fixmap_lock_critical;
-+		ghes->nmi_fixmap_idx = FIX_APEI_GHES_SDEI_CRITICAL;
-+	} else {
-+		ghes->nmi_fixmap_lock = &sdei_ghes_fixmap_lock_normal;
-+		ghes->nmi_fixmap_idx = FIX_APEI_GHES_SDEI_NORMAL;
-+	}
-+
-+	err = sdei_event_register(event_num, cb, ghes);
-+	if (!err)
-+		err = sdei_event_enable(event_num);
-+
-+	return err;
-+}
-+
-+int sdei_unregister_ghes(struct ghes *ghes)
-+{
-+	int i;
-+	int err;
-+	u32 event_num = ghes->generic->notify.vector;
-+
-+	might_sleep();
-+
-+	if (acpi_disabled)
-+		return -EOPNOTSUPP;
-+
-+	/*
-+	 * The event may be running on another CPU. Disable it
-+	 * to stop new events, then try to unregister a few times.
-+	 */
-+	err = sdei_event_disable(event_num);
-+	if (err)
-+		return err;
-+
-+	for (i = 0; i < 3; i++) {
-+		err = sdei_event_unregister(event_num);
-+		if (err != -EINPROGRESS)
-+			break;
-+
-+		schedule();
-+	}
-+
-+	return err;
-+}
-+#endif /* CONFIG_ACPI */
-+
- static int sdei_get_conduit(struct platform_device *pdev)
- {
- 	const char *method;
-diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
-index 942afbd544b7..5fdf799be026 100644
---- a/include/linux/arm_sdei.h
-+++ b/include/linux/arm_sdei.h
-@@ -11,6 +11,7 @@ enum sdei_conduit_types {
- 	CONDUIT_HVC,
- };
- 
-+#include <acpi/ghes.h>
- #include <asm/sdei.h>
- 
- /* Arch code should override this to set the entry point from firmware... */
-@@ -39,6 +40,10 @@ int sdei_event_unregister(u32 event_num);
- int sdei_event_enable(u32 event_num);
- int sdei_event_disable(u32 event_num);
- 
-+/* GHES register/unregister helpers */
-+int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *cb);
-+int sdei_unregister_ghes(struct ghes *ghes);
-+
- #ifdef CONFIG_ARM_SDE_INTERFACE
- /* For use by arch code when CPU hotplug notifiers are not appropriate. */
- int sdei_mask_local_cpu(void);
--- 
-2.16.2
+> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+> ---
+>   arch/arm64/include/asm/tlbflush.h | 16 ++++++++++------
+>   1 file changed, 10 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> index 9e82dd7..dbd22a9 100644
+> --- a/arch/arm64/include/asm/tlbflush.h
+> +++ b/arch/arm64/include/asm/tlbflush.h
+> @@ -60,6 +60,9 @@
+>   		__tlbi(op, (arg) | USER_ASID_FLAG);				\
+>   } while (0)
+>   
+> +/* This macro masks out RES0 bits in the TLBI operand */
+> +#define __TLBI_VADDR(addr) (addr & ~GENMASK_ULL(47, 44))
+> +
+>   /*
+>    *	TLB Management
+>    *	==============
+> @@ -128,7 +131,8 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
+>   static inline void flush_tlb_page(struct vm_area_struct *vma,
+>   				  unsigned long uaddr)
+>   {
+> -	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
+> +	unsigned long addr = __TLBI_VADDR(uaddr >> 12) |
+> +			     (ASID(vma->vm_mm) << 48);
+>   
+>   	dsb(ishst);
+>   	__tlbi(vale1is, addr);
+> @@ -154,8 +158,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+>   		return;
+>   	}
+>   
+> -	start = asid | (start >> 12);
+> -	end = asid | (end >> 12);
+> +	start = asid | __TLBI_VADDR(start >> 12);
+> +	end = asid | __TLBI_VADDR(end >> 12);
+>   
+>   	dsb(ishst);
+>   	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
+> @@ -185,8 +189,8 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+>   		return;
+>   	}
+>   
+> -	start >>= 12;
+> -	end >>= 12;
+> +	start = __TLBI_VADDR(start >> 12);
+> +	end = __TLBI_VADDR(end >> 12);
+>   
+>   	dsb(ishst);
+>   	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
+> @@ -202,7 +206,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+>   static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+>   				       unsigned long uaddr)
+>   {
+> -	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
+> +	unsigned long addr = __TLBI_VADDR(uaddr >> 12) | (ASID(mm) << 48);
+>   
+>   	__tlbi(vae1is, addr);
+>   	__tlbi_user(vae1is, addr);
+> 
