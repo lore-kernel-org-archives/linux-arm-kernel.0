@@ -1,65 +1,172 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 22 Mar 2018 11:42:31 -0400
-Subject: [PATCH v5 1/2] ixgbevf: keep writel() closer to wmb()
-Message-ID: <1521733352-25266-1-git-send-email-okaya@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 22 Mar 2018 15:51:14 +0000
+Subject: [PATCH v3] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
+ observed before enabling
+In-Reply-To: <1521683929-15644-1-git-send-email-shankerd@codeaurora.org>
+References: <1521683929-15644-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <d1161c2d-e16d-14e6-5450-be26d348100d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove ixgbevf_write_tail() in favor of moving writel() close to
-wmb().
+On 22/03/18 01:58, Shanker Donthineni wrote:
+> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
+> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
+> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
+> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
+> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+> Changes since v2:
+>   -Revert readl_relaxed_poll() usage since it's not usable in GICv3 probe().
+>   -Changes to pr_xxx messages.
+> 
+> Changes since v1:
+>   -Moved LPI disable code to a seperate function as Marc suggested.
+>   -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
+> 
+>  drivers/irqchip/irq-gic-v3-its.c   | 75 +++++++++++++++++++++++++++++++-------
+>  include/linux/irqchip/arm-gic-v3.h |  1 +
+>  2 files changed, 62 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 2cbb19c..c1e8a8e 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/percpu.h>
+>  #include <linux/slab.h>
+> +#include <linux/time64.h>
+>  
+>  #include <linux/irqchip.h>
+>  #include <linux/irqchip/arm-gic-v3.h>
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
- drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 6 +++---
- 2 files changed, 3 insertions(+), 8 deletions(-)
+This hunk doesn't apply to my -next branch, but I don't think it is
+actually required either...
 
-diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-index f712646..f97091d 100644
---- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-+++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
-@@ -312,11 +312,6 @@ static inline u16 ixgbevf_desc_unused(struct ixgbevf_ring *ring)
- 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
- }
- 
--static inline void ixgbevf_write_tail(struct ixgbevf_ring *ring, u32 value)
--{
--	writel(value, ring->tail);
--}
--
- #define IXGBEVF_RX_DESC(R, i)	\
- 	(&(((union ixgbe_adv_rx_desc *)((R)->desc))[i]))
- #define IXGBEVF_TX_DESC(R, i)	\
-diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-index 3d9033f..815cb1a 100644
---- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-+++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
-@@ -725,7 +725,7 @@ static void ixgbevf_alloc_rx_buffers(struct ixgbevf_ring *rx_ring,
- 		 * such as IA-64).
- 		 */
- 		wmb();
--		ixgbevf_write_tail(rx_ring, i);
-+		writel(i, rx_ring->tail);
- 	}
- }
- 
-@@ -1232,7 +1232,7 @@ static int ixgbevf_clean_rx_irq(struct ixgbevf_q_vector *q_vector,
- 		 * know there are new descriptors to fetch.
- 		 */
- 		wmb();
--		ixgbevf_write_tail(xdp_ring, xdp_ring->next_to_use);
-+		writel(xdp_ring->next_to_use, xdp_ring->tail);
- 	}
- 
- 	u64_stats_update_begin(&rx_ring->syncp);
-@@ -4004,7 +4004,7 @@ static void ixgbevf_tx_map(struct ixgbevf_ring *tx_ring,
- 	tx_ring->next_to_use = i;
- 
- 	/* notify HW of packet */
--	ixgbevf_write_tail(tx_ring, i);
-+	writel(i, tx_ring->tail);
- 
- 	return;
- dma_error:
+> @@ -1875,16 +1876,6 @@ static void its_cpu_init_lpis(void)
+>  		gic_data_rdist()->pend_page = pend_page;
+>  	}
+>  
+> -	/* Disable LPIs */
+> -	val = readl_relaxed(rbase + GICR_CTLR);
+> -	val &= ~GICR_CTLR_ENABLE_LPIS;
+> -	writel_relaxed(val, rbase + GICR_CTLR);
+> -
+> -	/*
+> -	 * Make sure any change to the table is observable by the GIC.
+> -	 */
+> -	dsb(sy);
+> -
+>  	/* set PROPBASE */
+>  	val = (page_to_phys(gic_rdists->prop_page) |
+>  	       GICR_PROPBASER_InnerShareable |
+> @@ -3287,13 +3278,69 @@ static bool gic_rdists_supports_plpis(void)
+>  	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
+>  }
+>  
+> +static int redist_disable_lpis(void)
+> +{
+> +	void __iomem *rbase = gic_data_rdist_rd_base();
+> +	u64 timeout = USEC_PER_SEC;
+> +	u64 val;
+> +
+> +	if (!gic_rdists_supports_plpis()) {
+> +		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+> +		return -ENXIO;
+> +	}
+> +
+> +	val = readl_relaxed(rbase + GICR_CTLR);
+> +	if (!(val & GICR_CTLR_ENABLE_LPIS))
+> +		return 0;
+> +
+> +	pr_warn("CPU%d: Booted with LPIs enabled, memory probably corrupted\n",
+> +		smp_processor_id());
+> +	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
+> +
+> +	/* Disable LPIs */
+> +	val &= ~GICR_CTLR_ENABLE_LPIS;
+> +	writel_relaxed(val, rbase + GICR_CTLR);
+> +
+> +	/* Make sure any change to GICR_CTLR is observable by the GIC */
+> +	dsb(sy);
+> +
+> +	/**
+> +	 * Software must observe RWP==0 after clearing GICR_CTLR.EnableLPIs
+> +	 * from 1 to 0 before programming GICR_PEND{PROP}BASER registers.
+> +	 * Bail out the driver probe() in case of timeout.
+> +	 */
+> +	while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
+> +		if (!timeout) {
+> +			pr_err("CPU%d: Failed to observe RWP==0 after disabling LPIs\n",
+
+I think you can simplify the message with something like:
+
+	"Time-out disabling LPIs\n"
+
+Nobody apart from you and I really want to know about RWP...
+
+> +			       smp_processor_id());
+> +			return -ETIMEDOUT;
+> +		}
+> +		udelay(1);
+> +		timeout--;
+> +	}
+> +
+> +	/**
+> +	 * After it has been written to 1, it is IMPLEMENTATION DEFINED whether
+> +	 * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to 0.
+> +	 * Bail out the driver probe() on systems where it's RES1.
+> +	 */
+> +	if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
+> +		pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
+> +		return -EBUSY;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  int its_cpu_init(void)
+>  {
+>  	if (!list_empty(&its_nodes)) {
+> -		if (!gic_rdists_supports_plpis()) {
+> -			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+> -			return -ENXIO;
+> -		}
+> +		int ret;
+> +
+> +		ret = redist_disable_lpis();
+> +		if (ret)
+> +			return ret;
+
+Just realised that this is totally broken.
+
+Why do we have this in the loop? Checking the LPI support for each ITS
+was admittedly braindead (we only need to check it once per CPU), but
+now trying to disable the LPIs each time we encounter an ITS is going to
+make it go crazy and taint the kernel for no reason.
+
+> +
+>  		its_cpu_init_lpis();
+>  		its_cpu_init_collection();
+>  	}
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index b26eccc..c6f4c48 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -106,6 +106,7 @@
+>  #define GICR_PIDR2			GICD_PIDR2
+>  
+>  #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
+> +#define GICR_CTLR_RWP			(1UL << 3)
+>  
+>  #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
+>  
+> 
+
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
