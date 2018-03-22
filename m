@@ -1,145 +1,93 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 22 Mar 2018 18:28:52 +0530
-Subject: [PATCH v4 13/13] ARM: dts: ipq8074: Enable few peripherals for hk01
- board
-In-Reply-To: <1521723532-28361-1-git-send-email-sricharan@codeaurora.org>
-References: <1521723532-28361-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521723532-28361-14-git-send-email-sricharan@codeaurora.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 22 Mar 2018 14:06:39 +0100
+Subject: [PATCH v2] usb: dwc2: dwc2_vbus_supply_init: fix error check
+In-Reply-To: <20180322093943.49717-1-tomeu.vizoso@collabora.com>
+References: <20180322093943.49717-1-tomeu.vizoso@collabora.com>
+Message-ID: <20180322130639.9957-1-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 103 ++++++++++++++++++++++++++++++
- 1 file changed, 103 insertions(+)
+devm_regulator_get_optional returns -ENODEV if the regulator isn't
+there, so if that's the case we have to make sure not to leave -ENODEV
+in the regulator pointer.
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-index 6a838b5..dbca7ec 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-+++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-@@ -21,6 +21,7 @@
+Also, make sure we return 0 in that case, but correctly propagate any
+other errors. Also propagate the error from _dwc2_hcd_start.
+
+Fixes: 531ef5ebea96 ("usb: dwc2: add support for host mode external vbus supply")
+Cc: Amelie Delaunay <amelie.delaunay@st.com>
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+
+---
+
+v2: Only overwrite the error in the pointer after checking it (Heiko
+    St?bner <heiko@sntech.de>)
+---
+ arch/arm/configs/multi_v7_defconfig |  3 +++
+ drivers/usb/dwc2/hcd.c              | 11 +++++++----
+ scripts/setlocalversion             |  9 ---------
+ 3 files changed, 10 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 846ce7bb24bc..33148fcabd17 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -1029,3 +1029,6 @@ CONFIG_VIRTIO=y
+ CONFIG_VIRTIO_PCI=y
+ CONFIG_VIRTIO_PCI_LEGACY=y
+ CONFIG_VIRTIO_MMIO=y
++CONFIG_LOCALVERSION_AUTO=n
++CONFIG_LOCALVERSION=""
++
+diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
+index dcfda5eb4cac..863aed20517f 100644
+--- a/drivers/usb/dwc2/hcd.c
++++ b/drivers/usb/dwc2/hcd.c
+@@ -359,8 +359,13 @@ static void dwc2_gusbcfg_init(struct dwc2_hsotg *hsotg)
+ static int dwc2_vbus_supply_init(struct dwc2_hsotg *hsotg)
+ {
+ 	hsotg->vbus_supply = devm_regulator_get_optional(hsotg->dev, "vbus");
+-	if (IS_ERR(hsotg->vbus_supply))
++	if (PTR_ERR(hsotg->vbus_supply) == -ENODEV) {
++		hsotg->vbus_supply = NULL;
+ 		return 0;
++	} else if (IS_ERR(hsotg->vbus_supply)) {
++		hsotg->vbus_supply = NULL;
++		return PTR_ERR(hsotg->vbus_supply);
++	}
  
- 	aliases {
- 		serial0 = &blsp1_uart5;
-+		serial1 = &serial_blsp2;
- 	};
+ 	return regulator_enable(hsotg->vbus_supply);
+ }
+@@ -4342,9 +4347,7 @@ static int _dwc2_hcd_start(struct usb_hcd *hcd)
  
- 	chosen {
-@@ -41,6 +42,47 @@
- 					bias-disable;
- 				};
- 			};
-+
-+			 i2c_0_pins: i2c_0_pinmux {
-+				  mux {
-+					   pins = "gpio42", "gpio43";
-+					   function = "blsp1_i2c";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 spi_0_pins: spi_0_pins {
-+				  mux {
-+					   pins = "gpio38", "gpio39", "gpio40", "gpio41";
-+					   function = "blsp0_spi";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 hsuart_pins: hsuart_pins {
-+				  mux {
-+					   pins = "gpio46", "gpio47", "gpio48", "gpio49";
-+					   function = "blsp2_uart";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 qpic_pins: qpic_pins {
-+				mux {
-+					   pins = "gpio1", "gpio3", "gpio4",
-+						  "gpio5", "gpio6", "gpio7",
-+						  "gpio8", "gpio10", "gpio11",
-+						  "gpio12", "gpio13", "gpio14",
-+						  "gpio15", "gpio16", "gpio17";
-+					   function = "qpic";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			};
-+
- 		};
+ 	spin_unlock_irqrestore(&hsotg->lock, flags);
  
- 		serial at 78b3000 {
-@@ -48,5 +90,66 @@
- 			pinctrl-names = "default";
- 			status = "ok";
- 		};
-+
-+		spi at 78b5000 {
-+			 pinctrl-0 = <&spi_0_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+
-+			 m25p80 at 0 {
-+				  #address-cells = <1>;
-+				  #size-cells = <1>;
-+				  compatible = "n25q128a11", "jedec,spi-nor";
-+				  reg = <0>;
-+				  spi-max-frequency = <50000000>;
-+			 };
-+		};
-+
-+		serial at 78b1000 {
-+			 pinctrl-0 = <&hsuart_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+		};
-+
-+		i2c at 78b6000 {
-+			 pinctrl-0 = <&i2c_0_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+		};
-+
-+		dma at 7984000 {
-+			 status = "ok";
-+		};
-+
-+		nand at 79b0000 {
-+			pinctrl-0 = <&qpic_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+
-+			nand at 0 {
-+				reg = <0>;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+				nand-bus-width = <8>;
-+			};
-+		};
-+
-+		phy at 86000 {
-+			status = "ok";
-+		};
-+
-+		phy at 8e000 {
-+			status = "ok";
-+		};
-+
-+		pci at 20000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 58 0x1>;
-+		};
-+
-+		pci at 10000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 61 0x1>;
-+		};
- 	};
- };
+-	dwc2_vbus_supply_init(hsotg);
+-
+-	return 0;
++	return dwc2_vbus_supply_init(hsotg);
+ }
+ 
+ /*
+diff --git a/scripts/setlocalversion b/scripts/setlocalversion
+index 71f39410691b..cbc36d3b4d0f 100755
+--- a/scripts/setlocalversion
++++ b/scripts/setlocalversion
+@@ -161,15 +161,6 @@ res="${res}${CONFIG_LOCALVERSION}${LOCALVERSION}"
+ if test "$CONFIG_LOCALVERSION_AUTO" = "y"; then
+ 	# full scm version string
+ 	res="$res$(scm_version)"
+-else
+-	# append a plus sign if the repository is not in a clean
+-	# annotated or signed tagged state (as git describe only
+-	# looks at signed or annotated tags - git tag -a/-s) and
+-	# LOCALVERSION= is not specified
+-	if test "${LOCALVERSION+set}" != "set"; then
+-		scm=$(scm_version --short)
+-		res="$res${scm:++}"
+-	fi
+ fi
+ 
+ echo "$res"
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+2.14.3
