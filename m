@@ -1,197 +1,60 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu, 22 Mar 2018 14:41:09 -0500
-Subject: [PATCH v3] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
- observed before enabling
-In-Reply-To: <d1161c2d-e16d-14e6-5450-be26d348100d@arm.com>
-References: <1521683929-15644-1-git-send-email-shankerd@codeaurora.org>
- <d1161c2d-e16d-14e6-5450-be26d348100d@arm.com>
-Message-ID: <8087e009-4eca-ab92-cbca-23ccfb3fafac@codeaurora.org>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Thu, 22 Mar 2018 19:44:51 +0000
+Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <52cbc9d7-5a6b-5c8b-b930-058f5be62079@opengridcomputing.com>
+References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+ <201803221430.P43GJl9U%fengguang.wu@intel.com>
+ <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
+ <3e9c006e4541acbce11743dbda553e84@codeaurora.org>
+ <03d201d3c1eb$b71fb460$255f1d20$@opengridcomputing.com>
+ <83484a3f-d3f7-d763-e4f8-e4fec3bb8cc2@codeaurora.org>,
+ <52cbc9d7-5a6b-5c8b-b930-058f5be62079@opengridcomputing.com>
+Message-ID: <BY2PR1201MB098352CB012D8AE8084882F3C8A90@BY2PR1201MB0983.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+| From: Steve Wise <swise@opengridcomputing.com>
+| Sent: Thursday, March 22, 2018 9:28 AM
+|
+| | From: Sinan Kaya <okaya@codeaurora.org>
+| | Date: Thursday, March 22, 2018 7:52 AM
+| |
+| | Isn't this a PowerPC problem? Why penalize other architectures?
+| 
+| I worry it breaks PPC.
 
-On 03/22/2018 10:51 AM, Marc Zyngier wrote:
-> On 22/03/18 01:58, Shanker Donthineni wrote:
->> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
->> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
->> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
->> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
->> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
->>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->> Changes since v2:
->>   -Revert readl_relaxed_poll() usage since it's not usable in GICv3 probe().
->>   -Changes to pr_xxx messages.
->>
->> Changes since v1:
->>   -Moved LPI disable code to a seperate function as Marc suggested.
->>   -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
->>
->>  drivers/irqchip/irq-gic-v3-its.c   | 75 +++++++++++++++++++++++++++++++-------
->>  include/linux/irqchip/arm-gic-v3.h |  1 +
->>  2 files changed, 62 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 2cbb19c..c1e8a8e 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -33,6 +33,7 @@
->>  #include <linux/of_platform.h>
->>  #include <linux/percpu.h>
->>  #include <linux/slab.h>
->> +#include <linux/time64.h>
->>  
->>  #include <linux/irqchip.h>
->>  #include <linux/irqchip/arm-gic-v3.h>
-> 
-> This hunk doesn't apply to my -next branch, but I don't think it is
-> actually required either...
-> 
+And all other architectures.  Aparraently there isn't a formal API
+description for writel_relaxed() and Co., nor __raw_writel(), etc.  What I
+think we need is a formal semantic definition of exactly what these APIs is
+supposed to do and then we can make sure that they all do that.  Till we
+have a consistent definition/implementation, trying to use these APIs in
+multi-platform code will be a problem.
 
-I'll try to drop "#include <linux/time64.h>" in next patch if USEC_PER_SEC
-included by other header files or rebase to -next branch.
+For instance, and this is merely an example not a prescription of what I'm
+talking about:
 
->> @@ -1875,16 +1876,6 @@ static void its_cpu_init_lpis(void)
->>  		gic_data_rdist()->pend_page = pend_page;
->>  	}
->>  
->> -	/* Disable LPIs */
->> -	val = readl_relaxed(rbase + GICR_CTLR);
->> -	val &= ~GICR_CTLR_ENABLE_LPIS;
->> -	writel_relaxed(val, rbase + GICR_CTLR);
->> -
->> -	/*
->> -	 * Make sure any change to the table is observable by the GIC.
->> -	 */
->> -	dsb(sy);
->> -
->>  	/* set PROPBASE */
->>  	val = (page_to_phys(gic_rdists->prop_page) |
->>  	       GICR_PROPBASER_InnerShareable |
->> @@ -3287,13 +3278,69 @@ static bool gic_rdists_supports_plpis(void)
->>  	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
->>  }
->>  
->> +static int redist_disable_lpis(void)
->> +{
->> +	void __iomem *rbase = gic_data_rdist_rd_base();
->> +	u64 timeout = USEC_PER_SEC;
->> +	u64 val;
->> +
->> +	if (!gic_rdists_supports_plpis()) {
->> +		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
->> +		return -ENXIO;
->> +	}
->> +
->> +	val = readl_relaxed(rbase + GICR_CTLR);
->> +	if (!(val & GICR_CTLR_ENABLE_LPIS))
->> +		return 0;
->> +
->> +	pr_warn("CPU%d: Booted with LPIs enabled, memory probably corrupted\n",
->> +		smp_processor_id());
->> +	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
->> +
->> +	/* Disable LPIs */
->> +	val &= ~GICR_CTLR_ENABLE_LPIS;
->> +	writel_relaxed(val, rbase + GICR_CTLR);
->> +
->> +	/* Make sure any change to GICR_CTLR is observable by the GIC */
->> +	dsb(sy);
->> +
->> +	/**
->> +	 * Software must observe RWP==0 after clearing GICR_CTLR.EnableLPIs
->> +	 * from 1 to 0 before programming GICR_PEND{PROP}BASER registers.
->> +	 * Bail out the driver probe() in case of timeout.
->> +	 */
->> +	while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
->> +		if (!timeout) {
->> +			pr_err("CPU%d: Failed to observe RWP==0 after disabling LPIs\n",
-> 
-> I think you can simplify the message with something like:
-> 
-> 	"Time-out disabling LPIs\n"
-> 
-> Nobody apart from you and I really want to know about RWP...
-> 
+    writel():
+      -- Ensures correct byte ordering.
+      -- Ensures no compiler reordering.
+      -- Ensures instruction level synchronization with respect
+      --   to previous and succeeding reads and writes.
 
-I'll change.
+    writel_relaxed():
+      -- Ensures correct byte ordering.
+      -- Ensures no compiler reordering.
+      -- Ensures instruction level synchronization with respect
+      --   to previous writes.
 
->> +			       smp_processor_id());
->> +			return -ETIMEDOUT;
->> +		}
->> +		udelay(1);
->> +		timeout--;
->> +	}
->> +
->> +	/**
->> +	 * After it has been written to 1, it is IMPLEMENTATION DEFINED whether
->> +	 * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to 0.
->> +	 * Bail out the driver probe() on systems where it's RES1.
->> +	 */
->> +	if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
->> +		pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
->> +		return -EBUSY;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->>  int its_cpu_init(void)
->>  {
->>  	if (!list_empty(&its_nodes)) {
->> -		if (!gic_rdists_supports_plpis()) {
->> -			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
->> -			return -ENXIO;
->> -		}
->> +		int ret;
->> +
->> +		ret = redist_disable_lpis();
->> +		if (ret)
->> +			return ret;
-> 
-> Just realised that this is totally broken.
-> 
-> Why do we have this in the loop? Checking the LPI support for each ITS
-> was admittedly braindead (we only need to check it once per CPU), but
-> now trying to disable the LPIs each time we encounter an ITS is going to
-> make it go crazy and taint the kernel for no reason.
-> 
+    __raw_writel():
+      -- Ensures correct byte ordering.
+      -- Ensures no compiler reordering.
+ 
+| I appreciate you doing this.
 
-Sorry, I didn't quite understand suggestions you're recommending. I don't
-see any loop here, it just checks the ITS_LIST_EMPTY.
+As do I!  I'm just worried that because the API semantic definitions don't
+seem to be formalized for writel_relaxed() and Co., we're in danger of
+getting wildly different results on one platform or another based on
+differring implementation semantics.
 
-The function its_cpu_init() is being called for each CPU coming online.
-We're trying to disable GICR LPI before calling its_cpu_init_lpis() and
-its_cpu_init_collection(). Newly added function redist_disable_lpis()
-will be called only once per CPU but not per each ITS hardware instance.
-Is something I'm missing here?
-
->> +
->>  		its_cpu_init_lpis();
->>  		its_cpu_init_collection();
->>  	}
->> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->> index b26eccc..c6f4c48 100644
->> --- a/include/linux/irqchip/arm-gic-v3.h
->> +++ b/include/linux/irqchip/arm-gic-v3.h
->> @@ -106,6 +106,7 @@
->>  #define GICR_PIDR2			GICD_PIDR2
->>  
->>  #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
->> +#define GICR_CTLR_RWP			(1UL << 3)
->>  
->>  #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
->>  
->>
-> 
-> Thanks,
-> 
-> 	M.
-> 
-
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Casey
