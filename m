@@ -1,68 +1,87 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 22 Mar 2018 14:44:00 +0800
-Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
-References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <201803221430.P43GJl9U%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 22 Mar 2018 14:47:44 +0800
+Subject: [PATCH 03/10] drm/sun4i: Don't pretend to handle ARGB8888 with
+ the frontend
+In-Reply-To: <20180321152904.22411-4-paul.kocialkowski@bootlin.com>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-4-paul.kocialkowski@bootlin.com>
+Message-ID: <CAGb2v65JqT2go2kX+yEWeWiQX6U5PFoXEbbatBXRyLyujxyouw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+On Wed, Mar 21, 2018 at 11:28 PM, Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+> It turns out that the frontend is not capable of preserving the alpha
+> component (that is always set to 0xff), so only support XRGB8888
+> instead.
+>
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_backend.c  | 4 ++++
+>  drivers/gpu/drm/sun4i/sun4i_frontend.c | 3 +--
+>  drivers/gpu/drm/sun4i/sun4i_layer.c    | 4 ++--
+>  3 files changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> index b98dafda52f8..274a1db6fa8e 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> @@ -440,6 +440,10 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
+>         if (IS_ERR(backend->frontend))
+>                 return false;
+>
+> +       /*
+> +        * TODO: Don't use the frontend for x2/x4 scaling and allow RGB formats
+> +        * with an alpha component then.
 
-Thank you for the patch! Yet something to improve:
+This and the commit log are kind of conflicting. Is it just the scalar
+that doesn't
+work with an alpha component, or the whole frontend?
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.16-rc6 next-20180321]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks
+ChenYu
 
-url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/ib-Eliminate-duplicate-barriers-on-weakly-ordered-archs/20180321-091659
-config: xtensa-allyesconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
-
-All errors (new ones prefixed by >>):
-
-   In file included from drivers/infiniband/hw/cxgb4/iw_cxgb4.h:73:0,
-                    from drivers/infiniband/hw/cxgb4/device.c:40:
-   drivers/infiniband/hw/cxgb4/t4.h: In function 'pio_copy':
->> drivers/infiniband/hw/cxgb4/t4.h:460:3: error: implicit declaration of function 'writeq_relaxed'; did you mean 'writel_relaxed'? [-Werror=implicit-function-declaration]
-      writeq_relaxed(*src, dst);
-      ^~~~~~~~~~~~~~
-      writel_relaxed
-   cc1: some warnings being treated as errors
-
-vim +460 drivers/infiniband/hw/cxgb4/t4.h
-
-   450	
-   451	/* This function copies 64 byte coalesced work request to memory
-   452	 * mapped BAR2 space. For coalesced WRs, the SGE fetches data
-   453	 * from the FIFO instead of from Host.
-   454	 */
-   455	static inline void pio_copy(u64 __iomem *dst, u64 *src)
-   456	{
-   457		int count = 8;
-   458	
-   459		while (count) {
- > 460			writeq_relaxed(*src, dst);
-   461			src++;
-   462			dst++;
-   463			count--;
-   464		}
-   465	}
-   466	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 53070 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180322/6a0011b7/attachment-0001.gz>
+> +        */
+>         return sun4i_backend_plane_uses_scaler(state);
+>  }
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> index ddf6cfa6dd23..3ea925584891 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+> @@ -107,7 +107,7 @@ EXPORT_SYMBOL(sun4i_frontend_update_buffer);
+>  static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
+>  {
+>         switch (fmt) {
+> -       case DRM_FORMAT_ARGB8888:
+> +       case DRM_FORMAT_XRGB8888:
+>                 *val = 5;
+>                 return 0;
+>
+> @@ -120,7 +120,6 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
+>  {
+>         switch (fmt) {
+>         case DRM_FORMAT_XRGB8888:
+> -       case DRM_FORMAT_ARGB8888:
+>                 *val = 2;
+>                 return 0;
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> index eb93df445a10..15238211a61a 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> @@ -100,9 +100,9 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+>                 sun4i_frontend_update_coord(frontend, plane);
+>                 sun4i_frontend_update_buffer(frontend, plane);
+>                 sun4i_frontend_update_formats(frontend, plane,
+> -                                             DRM_FORMAT_ARGB8888);
+> +                                             DRM_FORMAT_XRGB8888);
+>                 sun4i_backend_update_layer_frontend(backend, layer->id, plane,
+> -                                                   DRM_FORMAT_ARGB8888);
+> +                                                   DRM_FORMAT_XRGB8888);
+>                 sun4i_frontend_enable(frontend);
+>         } else {
+>                 sun4i_backend_update_layer_formats(backend, layer->id, plane);
+> --
+> 2.16.2
+>
