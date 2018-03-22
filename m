@@ -1,31 +1,23 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 22 Mar 2018 13:58:46 -0500
-Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180322184833.GB9469@ziepe.ca>
-References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
- <201803221430.P43GJl9U%fengguang.wu@intel.com>
- <3664b253c730dbf83f4528acaedb3a88@codeaurora.org>
- <3e9c006e4541acbce11743dbda553e84@codeaurora.org>
- <20180322184833.GB9469@ziepe.ca>
-Message-ID: <2c575798-53d8-6ae3-5f54-f697abf067bb@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 22 Mar 2018 15:07:46 -0400 (EDT)
+Subject: [RFC PATCH] net: stmmac: dwmac-sun8i: sun8i_syscon_reg_field
+ can be static
+In-Reply-To: <20180322074217.GA7358@ivytown2.lkp.intel.com>
+References: <20180317092857.4396-7-wens@csie.org>
+ <20180322074217.GA7358@ivytown2.lkp.intel.com>
+Message-ID: <20180322.150746.1491738155292875468.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/22/2018 1:48 PM, Jason Gunthorpe wrote:
->> AFAIS, even writeq won't compile on this arch. I started questioning this
->> build test.
-> I have the same confusion. Did you figure out an explanation?
+From: kbuild test robot <lkp@intel.com>
+Date: Thu, 22 Mar 2018 15:42:18 +0800
 
-I did a compile test without the relaxed change. It built just fine.
-CONFIG_64BIT is also not defined in the .config file from kbuild.
-I also dropped this patch on v5 due to Steve's request.
+> 
+> Fixes: e3c10deef23c ("net: stmmac: dwmac-sun8i: Use regmap_field for syscon register access")
+> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
 
-However, I think I still need an answer for 
-v6: RDMA/qedr: eliminate duplicate barriers on weakly-ordered archs #2
-I can switch to #include <linux/io-64-nonatomic-lo-hi.h> there.
+This commit ID and this symbol are both not present in any of my trees.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Please avoid using SHA1 IDs which don't actually exist in an upstream
+tree.  When I see a "Fixes: " tag like this, I expect that it is for a
+change in my tree.
