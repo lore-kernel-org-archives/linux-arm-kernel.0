@@ -1,65 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 22 Mar 2018 13:30:37 +0100
-Subject: [PATCH v2 2/8] DT: reset: renesas,rzn1-reboot: document RZ/N1
- reboot driver
-In-Reply-To: <1521719091-25157-3-git-send-email-michel.pollet@bp.renesas.com>
-References: <1521719091-25157-1-git-send-email-michel.pollet@bp.renesas.com>
- <1521719091-25157-3-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <CAMuHMdUzW221ppgR=BW0iiLNRr8KQbgTPoRbTKRKU8wnXavVtA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 22 Mar 2018 09:31:03 -0300
+Subject: [PATCH 2/4] arm: imx: Correct dram pll type
+In-Reply-To: <1521712529-632-3-git-send-email-abel.vesa@nxp.com>
+References: <1521712529-632-1-git-send-email-abel.vesa@nxp.com>
+ <1521712529-632-3-git-send-email-abel.vesa@nxp.com>
+Message-ID: <CAOMZO5BVxp7pq44pUp444CqsYcJ5QQFqrgdRyFbaxRi0_d0ssg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michel,
+Hi Abel,
 
-On Thu, Mar 22, 2018 at 12:44 PM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> The Renesas RZ/N1 Family (Part #R9A06G0xx) requires a driver
-> as part of the sysctrl MFD to handle rebooting the CA7 cores.
-> This documents the driver bindings.
+On Thu, Mar 22, 2018 at 6:55 AM, Abel Vesa <abel.vesa@nxp.com> wrote:
+> From: Anson Huang <anson.huang@nxp.com>
 >
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> DRAM PLL is a audio/video type PLL, need to correct it to get correct ops of
+> PLL.
+>
+> There is a test_div placed before DRAM PLL's gate, so add this test div clk.
+>
+> Signed-off-by: Anson Huang <anson.huang@nxp.com>
+> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
 
-Thanks for your patch!
+This has already been applied in linux-next as commit:
 
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
-> @@ -0,0 +1,22 @@
-> +DT bindings for the Renesas RZ-N1 Reboot Driver
-> +
-> +== Reboot Driver Node ==
-> +
-> +The reboot driver is always a subnode of the system controller node, see
-> +renesas,rzn1-sysctrl.txt for details.
-> +
-> +Bindings:
-> ++ Optional:
-> +       compatible = "renesas,r9a06g032-reboot";
-> ++ Required:
-> +       compatible = "renesas,rzn1-reboot";
+commit b716aad97eb5 ("clk: imx: imx7d: correct video pll clock tree)
 
-Please mark both the SoC-specific and the family-specific values required.
+Nit: the prefix in the Subject lines of all these patches should not
+be "arm:imx".
 
-> +
-> +Example:
-> +       sysctrl: sysctrl at 4000c000 {
-> +               compatible = "renesas,r9a06g032-sysctrl", "syscon", "simple-mfd";
-> +               reg = <0x4000c000 0x1000>;
-> +
-> +               reboot {
-> +                       compatible = "renesas,r9a06g032-reboot";
-
-"renesas,r9a06g032-reboot", "renesas,rzn1-reboot".
-
-> +               };
-> +       };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+"clk: imx: imx7d" is better suited to reflect the subsystem that thes
+patches touch.
