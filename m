@@ -1,64 +1,62 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 22 Mar 2018 11:55:24 -0700
-Subject: Clang build of arm64 kernel fails
-In-Reply-To: <20180301103100.GE32331@e103592.cambridge.arm.com>
-References: <CAAeHK+wRcZ1o53CEpeOQ-J5AayVAd8nm-ASj8HsTy1vOzHQAqQ@mail.gmail.com>
- <d601e0ca-dd91-3dd4-c610-dd2ae49aa1b6@arm.com>
- <20180301103100.GE32331@e103592.cambridge.arm.com>
-Message-ID: <20180322185524.GA78232@google.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 22 Mar 2018 18:56:42 +0000
+Subject: [PATCH v3 08/10] clk: qcom: Add ACD path to CPU clock driver for
+ msm8996
+In-Reply-To: <152149448251.242365.16980775001987673274@swboyd.mtv.corp.google.com>
+References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
+ <1518616792-29028-9-git-send-email-ilialin@codeaurora.org>
+ <152147863176.242365.17292287330283256524@swboyd.mtv.corp.google.com>
+ <41f3b246-43f4-450d-5c6b-34cdad7b15dd@arm.com>
+ <152149448251.242365.16980775001987673274@swboyd.mtv.corp.google.com>
+Message-ID: <d9e9e276-ba8c-7d8c-b110-da0a0b778e6d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Thu, Mar 01, 2018 at 10:31:02AM +0000 Dave Martin ha dit:
+On 19/03/18 21:21, Stephen Boyd wrote:
+> Quoting Robin Murphy (2018-03-19 11:16:15)
+>> On 19/03/18 16:57, Stephen Boyd wrote:
+>> [...]
+>>>> +
+>>>
+>>>> +                       writel_relaxed(SSSCTL_VAL, vbases[APC_BASE] +
+>>>> +                                       PWRCL_REG_OFFSET + SSSCTL_OFFSET);
+>>>> +               /* Ensure SSSCTL config goes through before enabling ACD. */
+>>>> +               mb();
+>>>
+>>> Use writel instead.
+>>
+>> Note that writel() only gives an implicit wmb() *before* the store to
+>> ensure ordering against any previous writes. If this code really needs
+>> to ensure that the given write has definitely completed before any other
+>> accesses happen, then it still needs an explicit barrier *after* the
+>> write*(), unless perhaps the next access is always guaranteed to be a
+>> non-relaxed write (thus implicitly providing a suitable DSB).
+>>
+> 
+> Ah right. So this should be a wmb() too? I suspect it's to order with
+> the write to the l2 indirect registers, but reading that register before
+> the MMIO write is not a problem. The comment above the l2 accessors
+> could be slightly more specific here and it would help immensely.
 
-> On Thu, Mar 01, 2018 at 09:45:24AM +0000, Robin Murphy wrote:
-> > Hi Andrey,
-> > 
-> > On 28/02/18 19:32, Andrey Konovalov wrote:
-> > >Hi Marc!
-> > >
-> > >I've tried to pull in new upstream commits and the kernel build
-> > >started failing for me with the following errors (see below).
-> > >
-> > >It seems that the reason is your commit "arm64: Add
-> > >ARM_SMCCC_ARCH_WORKAROUND_1 BP hardening support". It seems that Clang
-> > >doesn't like 32 bits registers being used in 64 bits build.
-> > 
-> > I'd say this is really a bug in Clang. Architecturally, the register in
-> > AArch64 state is still named "r0"; "x0"/"w0" are assembler operands which
-> > additionally encode the size of the corresponding *access* to r0.
-> > 
-> > I note that GCC's documentation on register variables[1] does just say "the
-> > name of the register", which implies this code is not incorrect. Given that
-> > Clang already likes to infer the operand size from the argument type in
-> > actual inline asms, it seems funny that its register allocator should care
-> > in this non-instruction context.
-> 
-> +1
-> 
-> rN is perfectly reasonable here and has always been supported by GCC for
-> AArch64 AFAIK.
-> 
-> (IMHO rN is preferable, because this separates the register allocation
-> specification from how that register is used to encode the data type --
-> GCC has no choice about the latter, but using "w"/"x" gives the
-> misleading impression of control over this.)
-> 
-> > >Would you mind sending a fix?
-> > 
-> > That said, I guess it's a bug we might have to work around anyway. Oh well.
-> 
-> It would be preferable to see evidence of the llvm community committing
-> to fix this before we consider merging a bodge into Linux for it.
-> 
-> Although this one issue is easy-ish to work around, we're on a slippery
-> slope towards allowing the LLVM and GCC inline assemblers to diverge if
-> we don't push back on worthless incompatibilities.
+It depends a bit on what exactly the hardware requires. If it's merely 
+that write(s) to register A (and perhaps others) arrive before any write 
+to register B, then the sensible thing to do would be to just make the 
+write to B non-relaxed, i.e.:
 
-For the record, a LLVM bug was opened to add support for the rN names
-in constraints: https://bugs.llvm.org/show_bug.cgi?id=36862 . I know
-Manoj intends to submit a fix once the scope has been clarified.
+	writel_relaxed(x, base + A);
+	...
+	writel(y, base + B);
 
-I plan to send a kernel fix soon, unless someone beats me to it.
+That still only guarantees that the previous write(s) have been pushed 
+all the way to the endpoint before the write to B is issued, though - 
+for many devices that's sufficient, but in some cases the only way to be 
+totally sure that the write has both been received *and* taken effect is 
+by reading back some suitable indicator before proceeding.
 
-Matthias
+If we only care about making sure writes are pushed out, rather than 
+synchronising more complicated memory accesses between multiple agents, 
+then a full mb() is probably overkill (as ordering against outstanding 
+loads too only adds more overhead in the interconnect), and wmb() 
+(ideally implicit in a subsequent writel() as above) should be enough.
+
+Robin.
