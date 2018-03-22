@@ -1,23 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 22 Mar 2018 15:07:46 -0400 (EDT)
-Subject: [RFC PATCH] net: stmmac: dwmac-sun8i: sun8i_syscon_reg_field
- can be static
-In-Reply-To: <20180322074217.GA7358@ivytown2.lkp.intel.com>
-References: <20180317092857.4396-7-wens@csie.org>
- <20180322074217.GA7358@ivytown2.lkp.intel.com>
-Message-ID: <20180322.150746.1491738155292875468.davem@davemloft.net>
+From: gabriel.matni@exfo.com (Gabriel Matni)
+Date: Thu, 22 Mar 2018 19:15:12 +0000
+Subject: [PATCH v4] serial: mvebu-uart: fix tx lost characters
+Message-ID: <3B588D51285A4A4D8D39C94212E0782627AA23@SPQCMBX02.exfo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: kbuild test robot <lkp@intel.com>
-Date: Thu, 22 Mar 2018 15:42:18 +0800
+From: Gabriel Matni <gabriel.matni@exfo.com>
 
-> 
-> Fixes: e3c10deef23c ("net: stmmac: dwmac-sun8i: Use regmap_field for syscon register access")
-> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+Fixes missing characters on kernel console at low baud rates (i.e.9600).
+The driver should poll TX_RDY or TX_FIFO_EMP instead of TX_EMP to ensure
+that the transmitter holding register (THR) is ready to receive a new byte.
 
-This commit ID and this symbol are both not present in any of my trees.
+TX_EMP tells us when it is possible to send a break sequence via
+SND_BRK_SEQ. While this also indicates that both the THR and the TSR are
+empty, it does not guarantee that a new byte can be written just yet.
 
-Please avoid using SHA1 IDs which don't actually exist in an upstream
-tree.  When I see a "Fixes: " tag like this, I expect that it is for a
-change in my tree.
+Fixes: 30530791a7a0 ("serial: mvebu-uart: initial support for Armada-3700 serial port")
+Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com> 
+Acked-by: Gregory CLEMENT <gregory.clement@bootlin.com>  
+Signed-off-by: Gabriel Matni <gabriel.matni@exfo.com> 
+---
+Changes since v3:
+- mail the patch in a clean email
+- fix the subject line accordingly (no Re:)
+
+Changes since v2:
+- use one line for the "Fixes" entry
+- removed trailing space between Signed-off-by entry and ---
+- start using versioning, previous fixes in v1
+
+Changes since v1:
+- patch was corrupt, could not be applied
+- fixed line indent
+---
+ drivers/tty/serial/mvebu-uart.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/mvebu-uart.c b/drivers/tty/serial/mvebu-uart.c
+index a100e98259d7..f0df0640208e 100644
+--- a/drivers/tty/serial/mvebu-uart.c
++++ b/drivers/tty/serial/mvebu-uart.c
+@@ -618,7 +618,7 @@ static void wait_for_xmitr(struct uart_port *port)
+ 	u32 val;
+ 
+ 	readl_poll_timeout_atomic(port->membase + UART_STAT, val,
+-				  (val & STAT_TX_EMP), 1, 10000);
++				  (val & STAT_TX_RDY(port)), 1, 10000);
+ }
+ 
+ static void mvebu_uart_console_putchar(struct uart_port *port, int ch)
+-- 
+2.7.4
