@@ -1,108 +1,96 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 22 Mar 2018 10:17:53 +0800
-Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
-In-Reply-To: <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
-References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
- <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
-Message-ID: <1521685073.28226.10.camel@mtkswgap22>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 22 Mar 2018 10:23:32 +0800
+Subject: [PATCH v3 6/7] arm: dts: sun8i: a33: Add the DSI-related nodes
+In-Reply-To: <fbb4d14a83ed80e9740c042cd9df58b8132b4c91.1520344489.git-series.maxime.ripard@bootlin.com>
+References: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
+ <fbb4d14a83ed80e9740c042cd9df58b8132b4c91.1520344489.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v65AfHHUZ=fUB+TPUZaLdYb4mN3hZ=3n5GOAD39C42+Nag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Dmitry and Lee
+On Tue, Mar 6, 2018 at 9:56 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> The A33 has a MIPI-DSI block, along with its D-PHY. Let's add it in order
+> to use it in the relevant boards.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a33.dtsi | 44 +++++++++++++++++++++++++++++++++-
+>  1 file changed, 44 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+> index 50eb84fa246a..94cfa7b1bbfa 100644
+> --- a/arch/arm/boot/dts/sun8i-a33.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+> @@ -236,6 +236,11 @@
+>                                         #address-cells = <1>;
+>                                         #size-cells = <0>;
+>                                         reg = <1>;
+> +
+> +                                       tcon0_out_dsi0: endpoint at 1 {
+> +                                               reg = <1>;
+> +                                               remote-endpoint = <&dsi0_in_tcon0>;
+> +                                       };
+>                                 };
+>                         };
+>                 };
+> @@ -280,6 +285,45 @@
+>                         #io-channel-cells = <0>;
+>                 };
+>
+> +               dsi0: dsi at 1ca0000 {
 
-The series seems not being got merged. Are they good enough to be ready
-into the your tree?
+Nit: There's only one so you don't need the numbered suffix. Also,
+is "dsi" specific enough, or should we use "mipi-dsi"
 
-Recently I've tested the series with focusing on pwrkey event generated
-through interrupt when push and release the key on bpi-r2 board and then
-finally it's working fine. but for homekey it cannot be found on the
-board and thus I cannot have more tests more about it.
+> +                       compatible = "allwinner,sun6i-a31-mipi-dsi";
+> +                       reg = <0x01ca0000 0x1000>;
+> +                       interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&ccu CLK_BUS_MIPI_DSI>,
+> +                                <&ccu CLK_DSI_SCLK>;
+> +                       clock-names = "bus", "mod";
+> +                       resets = <&ccu RST_BUS_MIPI_DSI>;
+> +                       phys = <&dphy0>;
+> +                       phy-names = "dphy";
+> +                       status = "disabled";
+> +
+> +                       ports {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +
+> +                               port at 0 {
+> +                                       #address-cells = <1>;
+> +                                       #size-cells = <0>;
+> +                                       reg = <0>;
+> +
+> +                                       dsi0_in_tcon0: endpoint {
+> +                                               remote-endpoint = <&tcon0_out_dsi0>;
+> +                                       };
+> +                               };
+> +                       };
+> +               };
+> +
+> +               dphy0: d-phy at 1ca1000 {
 
-Tested-by: Sean Wang <sean.wang@mediatek.com>
+Same nit, and "dsi-phy" would be better.
 
-	Sean
+Otherwise,
 
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-On Thu, 2018-03-22 at 10:03 +0800, Sean Wang (???) wrote:
-> 
-> > -----Original Message-----
-> > From: Linux-mediatek [mailto:linux-mediatek-bounces at lists.infradead.org] On
-> > Behalf Of Chen Zhong
-> > Sent: Wednesday, October 25, 2017 9:16 PM
-> > To: Dmitry Torokhov <dmitry.torokhov@gmail.com>; Rob Herring
-> > <robh+dt@kernel.org>; Lee Jones <lee.jones@linaro.org>; Alexandre Belloni
-> > <alexandre.belloni@free-electrons.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>; Alessandro Zummo
-> > <a.zummo@towertech.it>; devicetree at vger.kernel.org; Linus Walleij
-> > <linus.walleij@linaro.org>; Jaechul Lee <jcsing.lee@samsung.com>; linux-
-> > kernel at vger.kernel.org; Krzysztof Kozlowski <krzk@kernel.org>; Javier
-> > Martinez Canillas <javier@osg.samsung.com>; linux-
-> > mediatek at lists.infradead.org; linux-arm-kernel at lists.infradead.org; linux-
-> > input at vger.kernel.org; Matthias Brugger <matthias.bgg@gmail.com>; Eddie
-> > Huang (S?) <eddie.huang@mediatek.com>; Chen Zhong (??)
-> > <Chen.Zhong@mediatek.com>; Beomho Seo <beomho.seo@samsung.com>;
-> > linux-rtc at vger.kernel.org
-> > Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
-> > 
-> > MediaTek PMIC are multi-function devices that can handle key interrupts,
-> > typically there are two keys attached to PMIC, which called pwrkey and
-> > homekey. PWRKEY usually used to wake up system from sleep. Homekey can
-> > used as volume down key due to board design. Long press keys can shutdown
-> > PMIC, the mode can be choose to be one key only or two keys together.
-> > This series add support for key functions for MediaTek PMIC MT6397/MT6323.
-> > 
-> > Changes since v5:
-> > - use __maybe_unused annotation instead of #ifdef guard
-> > - use of_* API instead of device_* API
-> > 
-> > Changes since v4:
-> > - rebase to Linux 4.14-rc1
-> > - add a common keyboard binding document
-> > - use child device tree node to define each key
-> > 
-> > Changes since v3:
-> > - make the naming to be consistent as mtk_pmic or MTK_PMIC
-> > - add suspend/resume functions to enable/disable irq
-> > - change binding properties to define wakeup sources
-> > 
-> > Changes since v2:
-> > - use standard properties for keycodes and debounce time
-> > - change to use platform_get_irq in leaf drivers
-> > - use better ways to define IRQ resources
-> > 
-> > Changes since v1:
-> > - create irq mappings in mfd core driver instead of leaf drivers
-> > - remove some unused parts in mtk-pmic-keys driver
-> > 
-> > Chen Zhong (6):
-> >   mfd: mt6397: create irq mappings in mfd core driver
-> >   dt-bindings: input: Add common keyboard document bindings
-> >   dt-bindings: input: Add document bindings for mtk-pmic-keys
-> >   dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
-> >   input: Add MediaTek PMIC keys support
-> >   mfd: mt6397: Add PMIC keys support to MT6397 driver
-> > 
-> >  Documentation/devicetree/bindings/input/keys.txt   |   8 +
-> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |  43 +++
-> >  Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
-> >  drivers/input/keyboard/Kconfig                     |   9 +
-> >  drivers/input/keyboard/Makefile                    |   1 +
-> >  drivers/input/keyboard/mtk-pmic-keys.c             | 339
-> > +++++++++++++++++++++
-> >  drivers/mfd/mt6397-core.c                          |  26 +-
-> >  drivers/rtc/rtc-mt6397.c                           |   7 +-
-> >  8 files changed, 432 insertions(+), 7 deletions(-)  create mode 100644
-> > Documentation/devicetree/bindings/input/keys.txt
-> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-
-> > keys.txt
-> >  create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
-> > 
-> > --
-> > 1.9.1
-> > 
-> > 
-> > 
-> > _______________________________________________
-> > Linux-mediatek mailing list
-> > Linux-mediatek at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> +                       compatible = "allwinner,sun6i-a31-mipi-dphy";
+> +                       reg = <0x01ca1000 0x1000>;
+> +                       clocks = <&ccu CLK_BUS_MIPI_DSI>,
+> +                                <&ccu CLK_DSI_DPHY>;
+> +                       clock-names = "bus", "mod";
+> +                       resets = <&ccu RST_BUS_MIPI_DSI>;
+> +                       status = "disabled";
+> +                       #phy-cells = <0>;
+> +               };
+> +
+>                 fe0: display-frontend at 1e00000 {
+>                         compatible = "allwinner,sun8i-a33-display-frontend";
+>                         reg = <0x01e00000 0x20000>;
+> --
+> git-series 0.9.1
