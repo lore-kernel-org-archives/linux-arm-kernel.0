@@ -1,55 +1,91 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 22 Mar 2018 18:28:45 +0530
-Subject: [PATCH v4 06/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.1-c1 board
- file
+Date: Thu, 22 Mar 2018 18:28:47 +0530
+Subject: [PATCH v4 08/13] ARM: dts: ipq4019: Add ipq4019-ap.dk07.1 common data
 In-Reply-To: <1521723532-28361-1-git-send-email-sricharan@codeaurora.org>
 References: <1521723532-28361-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521723532-28361-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521723532-28361-9-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Add the common data for all dk07 based boards.
 
 Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts | 20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi | 68 +++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ade7a38..b6c62c6 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -747,6 +747,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8084-ifc6540.dtb \
- 	qcom-apq8084-mtp.dtb \
- 	qcom-ipq4019-ap.dk01.1-c1.dtb \
-+	qcom-ipq4019-ap.dk04.1-c1.dtb \
- 	qcom-ipq8064-ap148.dtb \
- 	qcom-msm8660-surf.dtb \
- 	qcom-msm8960-cdp.dtb \
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
 new file mode 100644
-index 0000000..526b7f8
+index 0000000..8072c8c
 --- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
-@@ -0,0 +1,20 @@
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
+@@ -0,0 +1,68 @@
 +// SPDX-License-Identifier: GPL-2.0
 +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
 +
-+#include "qcom-ipq4019-ap.dk04.1.dtsi"
++#include "qcom-ipq4019.dtsi"
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C1";
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK07.1";
++	compatible = "qcom,ipq4019";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x20000000>; /* 512MB */
++	};
++
++	aliases {
++		serial0 = &blsp1_uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
 +
 +	soc {
++		pinctrl at 1000000 {
++			serial_0_pins: serial0_pinmux {
++				mux {
++					pins = "gpio16", "gpio17";
++					function = "blsp_uart0";
++					bias-disable;
++				};
++			};
++
++			i2c_0_pins: i2c_0_pinmux {
++				mux {
++					pins = "gpio20", "gpio21";
++					function = "blsp_i2c0";
++					bias-disable;
++				};
++			};
++		};
++
++		serial at 78af000 {
++			pinctrl-0 = <&serial_0_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++		};
++
++		dma at 7884000 {
++			status = "ok";
++		};
++
++		i2c at 78b7000 { /* BLSP1 QUP2 */
++			pinctrl-0 = <&i2c_0_pins>;
++			pinctrl-names = "default";
++			status = "ok";
++		};
++
 +		dma at 7984000 {
 +			status = "ok";
 +		};
 +
 +		qpic-nand at 79b0000 {
-+			pinctrl-0 = <&nand_pins>;
-+			pinctrl-names = "default";
 +			status = "ok";
 +		};
 +	};
