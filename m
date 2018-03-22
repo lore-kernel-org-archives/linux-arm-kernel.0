@@ -1,139 +1,95 @@
 From: abel.vesa@nxp.com (Abel Vesa)
-Date: Thu, 22 Mar 2018 11:55:26 +0200
-Subject: [PATCH 1/4] arm: imx: Update clk driver API
+Date: Thu, 22 Mar 2018 11:55:29 +0200
+Subject: [PATCH 4/4] arm: imx: Update clk driver for imx7d
 In-Reply-To: <1521712529-632-1-git-send-email-abel.vesa@nxp.com>
 References: <1521712529-632-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <1521712529-632-2-git-send-email-abel.vesa@nxp.com>
+Message-ID: <1521712529-632-5-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the following new wrappers:
- - imx_clk_gate2_flag
- - imx_clk_set_parent
+From: Anson Huang <anson.huang@nxp.com>
 
-It also updates the flags for the old wrappers.
+This patch updates the imx7d clk driver to make use of the new imx clk API.
 
 Signed-off-by: Anson Huang <anson.huang@nxp.com>
 Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
 ---
- drivers/clk/imx/clk.h | 42 +++++++++++++++++++++++++++++++-----------
- 1 file changed, 31 insertions(+), 11 deletions(-)
+ drivers/clk/imx/clk-imx7d.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index d69c4bb..466c37f3 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -4,6 +4,7 @@
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 3553b68..255563b 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -433,13 +433,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_PLL_AUDIO_MAIN_BYPASS] = imx_clk_mux_flags("pll_audio_main_bypass", base + 0xf0, 16, 1, pll_audio_bypass_sel, ARRAY_SIZE(pll_audio_bypass_sel), CLK_SET_RATE_PARENT);
+ 	clks[IMX7D_PLL_VIDEO_MAIN_BYPASS] = imx_clk_mux_flags("pll_video_main_bypass", base + 0x130, 16, 1, pll_video_bypass_sel, ARRAY_SIZE(pll_video_bypass_sel), CLK_SET_RATE_PARENT);
  
- #include <linux/spinlock.h>
- #include <linux/clk-provider.h>
-+#include <linux/clk.h>
+-	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
+-	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
+-	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
+-	clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
+-	clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
+-	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
+-
+ 	clks[IMX7D_PLL_ARM_MAIN_CLK] = imx_clk_gate("pll_arm_main_clk", "pll_arm_main_bypass", base + 0x60, 13);
+ 	clks[IMX7D_PLL_DRAM_MAIN_CLK] = imx_clk_gate("pll_dram_main_clk", "pll_dram_test_div", base + 0x70, 13);
+ 	clks[IMX7D_PLL_SYS_MAIN_CLK] = imx_clk_gate("pll_sys_main_clk", "pll_sys_main_bypass", base + 0xb0, 13);
+@@ -525,7 +518,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_PCIE_CTRL_ROOT_SRC] = imx_clk_mux2("pcie_ctrl_src", base + 0xa180, 24, 3, pcie_ctrl_sel, ARRAY_SIZE(pcie_ctrl_sel));
+ 	clks[IMX7D_PCIE_PHY_ROOT_SRC] = imx_clk_mux2("pcie_phy_src", base + 0xa200, 24, 3, pcie_phy_sel, ARRAY_SIZE(pcie_phy_sel));
+ 	clks[IMX7D_EPDC_PIXEL_ROOT_SRC] = imx_clk_mux2("epdc_pixel_src", base + 0xa280, 24, 3, epdc_pixel_sel, ARRAY_SIZE(epdc_pixel_sel));
+-	clks[IMX7D_LCDIF_PIXEL_ROOT_SRC] = imx_clk_mux2("lcdif_pixel_src", base + 0xa300, 24, 3, lcdif_pixel_sel, ARRAY_SIZE(lcdif_pixel_sel));
++	clks[IMX7D_LCDIF_PIXEL_ROOT_SRC] = imx_clk_mux_flags("lcdif_pixel_src", base + 0xa300, 24, 3, lcdif_pixel_sel, ARRAY_SIZE(lcdif_pixel_sel), CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
+ 	clks[IMX7D_MIPI_DSI_ROOT_SRC] = imx_clk_mux2("mipi_dsi_src", base + 0xa380, 24, 3,  mipi_dsi_sel, ARRAY_SIZE(mipi_dsi_sel));
+ 	clks[IMX7D_MIPI_CSI_ROOT_SRC] = imx_clk_mux2("mipi_csi_src", base + 0xa400, 24, 3, mipi_csi_sel, ARRAY_SIZE(mipi_csi_sel));
+ 	clks[IMX7D_MIPI_DPHY_ROOT_SRC] = imx_clk_mux2("mipi_dphy_src", base + 0xa480, 24, 3, mipi_dphy_sel, ARRAY_SIZE(mipi_dphy_sel));
+@@ -719,13 +712,13 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_CLKO1_ROOT_PRE_DIV] = imx_clk_divider2("clko1_pre_div", "clko1_cg", base + 0xbd80, 16, 3);
+ 	clks[IMX7D_CLKO2_ROOT_PRE_DIV] = imx_clk_divider2("clko2_pre_div", "clko2_cg", base + 0xbe00, 16, 3);
  
- extern spinlock_t imx_ccm_lock;
+-	clks[IMX7D_ARM_A7_ROOT_DIV] = imx_clk_divider2("arm_a7_div", "arm_a7_cg", base + 0x8000, 0, 3);
++	clks[IMX7D_ARM_A7_ROOT_DIV] = imx_clk_divider_flags("arm_a7_div", "arm_a7_cg", base + 0x8000, 0, 3, CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
+ 	clks[IMX7D_ARM_M4_ROOT_DIV] = imx_clk_divider2("arm_m4_div", "arm_m4_cg", base + 0x8080, 0, 3);
+-	clks[IMX7D_MAIN_AXI_ROOT_DIV] = imx_clk_divider2("axi_post_div", "axi_pre_div", base + 0x8800, 0, 6);
++	clks[IMX7D_MAIN_AXI_ROOT_DIV] = imx_clk_divider_flags("axi_post_div", "axi_pre_div", base + 0x8800, 0, 6, CLK_OPS_PARENT_ENABLE);
+ 	clks[IMX7D_DISP_AXI_ROOT_DIV] = imx_clk_divider2("disp_axi_post_div", "disp_axi_pre_div", base + 0x8880, 0, 6);
+ 	clks[IMX7D_ENET_AXI_ROOT_DIV] = imx_clk_divider2("enet_axi_post_div", "enet_axi_pre_div", base + 0x8900, 0, 6);
+ 	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_divider2("nand_usdhc_root_clk", "nand_usdhc_pre_div", base + 0x8980, 0, 6);
+-	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] = imx_clk_divider2("ahb_root_clk", "ahb_pre_div", base + 0x9000, 0, 6);
++	clks[IMX7D_AHB_CHANNEL_ROOT_CLK] = imx_clk_divider_flags("ahb_root_clk", "ahb_pre_div", base + 0x9000, 0, 6, CLK_OPS_PARENT_ENABLE);
+ 	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider2("ipg_root_clk", "ahb_root_clk", base + 0x9080, 0, 2);
+ 	clks[IMX7D_DRAM_ROOT_DIV] = imx_clk_divider2("dram_post_div", "dram_cg", base + 0x9880, 0, 3);
+ 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_DIV] = imx_clk_divider2("dram_phym_alt_post_div", "dram_phym_alt_pre_div", base + 0xa000, 0, 3);
+@@ -790,7 +783,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_CLKO1_ROOT_DIV] = imx_clk_divider2("clko1_post_div", "clko1_pre_div", base + 0xbd80, 0, 6);
+ 	clks[IMX7D_CLKO2_ROOT_DIV] = imx_clk_divider2("clko2_post_div", "clko2_pre_div", base + 0xbe00, 0, 6);
  
-@@ -54,6 +55,15 @@ struct clk * imx_obtain_fixed_clock(
- struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
- 	 void __iomem *reg, u8 shift, u32 exclusive_mask);
+-	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0);
++	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate2_flags("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0, CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
+ 	clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
+ 	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate4("main_axi_root_clk", "axi_post_div", base + 0x4040, 0);
+ 	clks[IMX7D_DISP_AXI_ROOT_CLK] = imx_clk_gate4("disp_axi_root_clk", "disp_axi_post_div", base + 0x4050, 0);
+@@ -886,11 +879,18 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
  
-+static inline void imx_clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	int ret = clk_set_parent(clk, parent);
++	imx_clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
++	imx_clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
++	imx_clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
++	imx_clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
++	imx_clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
++	imx_clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
 +
-+	if (ret)
-+		pr_err("failed to set parent of clk %s to %s: %d\n",
-+			__clk_get_name(clk), __clk_get_name(parent), ret);
-+}
-+
- struct clk *imx_clk_pfd(const char *name, const char *parent_name,
- 		void __iomem *reg, u8 idx);
+ 	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
+-	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
++	imx_clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
  
-@@ -96,7 +106,8 @@ static inline struct clk *imx_clk_fixed_factor(const char *name,
- static inline struct clk *imx_clk_divider(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift, u8 width)
- {
--	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
-+	return clk_register_divider(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
+ 	/* set uart module clock's parent clock source that must be great then 80MHz */
+-	clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
++	imx_clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
  
-@@ -112,7 +123,7 @@ static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift, u8 width)
- {
- 	return clk_register_divider(NULL, name, parent,
--			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
-+		CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
+ 	imx_register_uart_clocks(uart_clks);
  
-@@ -133,7 +144,15 @@ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+	return clk_register_gate2(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
-+			shift, 0x3, 0, &imx_ccm_lock, NULL);
-+}
-+
-+static inline struct clk *imx_clk_gate2_flags(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift, unsigned long flags)
-+{
-+	return clk_register_gate2(NULL, name, parent, flags, reg,
- 			shift, 0x3, 0, &imx_ccm_lock, NULL);
- }
- 
-@@ -141,7 +160,8 @@ static inline struct clk *imx_clk_gate2_shared(const char *name,
- 		const char *parent, void __iomem *reg, u8 shift,
- 		unsigned int *share_count)
- {
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+	return clk_register_gate2(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
- 			shift, 0x3, 0, &imx_ccm_lock, share_count);
- }
- 
-@@ -150,8 +170,8 @@ static inline struct clk *imx_clk_gate2_shared2(const char *name,
- 		unsigned int *share_count)
- {
- 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT |
--				  CLK_OPS_PARENT_ENABLE, reg, shift, 0x3, 0,
--				  &imx_ccm_lock, share_count);
-+			CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
-+			reg, shift, 0x3, 0, &imx_ccm_lock, share_count);
- }
- 
- static inline struct clk *imx_clk_gate2_cgr(const char *name,
-@@ -173,7 +193,7 @@ static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
- 	return clk_register_gate2(NULL, name, parent,
--			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
-+		CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
- 			reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
- }
- 
-@@ -181,8 +201,8 @@ static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
- 		u8 shift, u8 width, const char **parents, int num_parents)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
--			CLK_SET_RATE_NO_REPARENT, reg, shift,
--			width, 0, &imx_ccm_lock);
-+			CLK_SET_RATE_NO_REPARENT | CLK_SET_PARENT_GATE,
-+			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
- static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
-@@ -198,8 +218,8 @@ static inline struct clk *imx_clk_mux_flags(const char *name,
- 		int num_parents, unsigned long flags)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
--			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
--			&imx_ccm_lock);
-+			flags | CLK_SET_RATE_NO_REPARENT | CLK_SET_PARENT_GATE,
-+			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
- struct clk *imx_clk_cpu(const char *name, const char *parent_name,
 -- 
 2.7.4
