@@ -1,35 +1,46 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 22 Mar 2018 15:42:17 +0800
-Subject: [PATCH net-next 06/12] net: stmmac: dwmac-sun8i: Use
- regmap_field for syscon register access
-In-Reply-To: <20180317092857.4396-7-wens@csie.org>
-References: <20180317092857.4396-7-wens@csie.org>
-Message-ID: <201803221541.uip2NtFU%fengguang.wu@intel.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 22 Mar 2018 09:05:49 +0100
+Subject: [PATCH 08/10] drm/fourcc: Add definitions for Allwinner vendor
+ and MB32 tiled format
+In-Reply-To: <CAPj87rPNgga_pspx_0kTiP4itWUOL3O++2ZCiTUFfNBDGzkd0w@mail.gmail.com>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-9-paul.kocialkowski@bootlin.com>
+ <CAPj87rPNgga_pspx_0kTiP4itWUOL3O++2ZCiTUFfNBDGzkd0w@mail.gmail.com>
+Message-ID: <1521705949.1175.0.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi,
 
-I love your patch! Perhaps something to improve:
+On Wed, 2018-03-21 at 16:47 +0000, Daniel Stone wrote:
+> Hi Paul,
+> 
+> On 21 March 2018 at 15:29, Paul Kocialkowski
+> <paul.kocialkowski@bootlin.com> wrote:
+> > +/*
+> > + * Allwinner "MB32" tiled format
+> > + *
+> > + * This is the primary layout coming out of the VPU, where pixels
+> > are tiled
+> > + * 32x32.
+> > + */
+> 
+> Can you please be a bit more specific here, following the other
+> examples? In particular, it should list whether the tile order is row-
+> or column-major.
 
-[auto build test WARNING on next-20180309]
-[also build test WARNING on v4.16-rc6]
-[cannot apply to v4.16-rc4 v4.16-rc3 v4.16-rc2]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Yes that would definitely make sense, I'll do that in v2.
 
-url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-sun8i-r40-Add-Ethernet-support/20180318-161723
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+Thanks for the review!
 
-
-sparse warnings: (new ones prefixed by >>)
-
->> drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c:82:24: sparse: symbol 'sun8i_syscon_reg_field' was not declared. Should it be static?
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180322/27150a88/attachment.sig>
