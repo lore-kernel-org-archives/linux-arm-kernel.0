@@ -1,45 +1,135 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 22 Mar 2018 09:33:26 +0100
-Subject: [PATCH v2] i2c: i2c-stm32f7: fix no check on returned setup
-In-Reply-To: <1521650920-11578-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1521650920-11578-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <f6763dfd-9535-1206-fed0-a611b9ea81b7@st.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 22 Mar 2018 16:37:01 +0800
+Subject: [PATCH 03/10] drm/sun4i: Don't pretend to handle ARGB8888 with
+ the frontend
+In-Reply-To: <1521706988.1175.4.camel@bootlin.com>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-4-paul.kocialkowski@bootlin.com>
+ <CAGb2v65JqT2go2kX+yEWeWiQX6U5PFoXEbbatBXRyLyujxyouw@mail.gmail.com>
+ <1521706988.1175.4.camel@bootlin.com>
+Message-ID: <CAGb2v66ih3VaMcqUcuEQC9WKoULgFPUx8o7GjECGeuUv8a7d+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 22, 2018 at 4:23 PM, Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+> Hi Chen-Yu,
+>
+> On Thu, 2018-03-22 at 14:47 +0800, Chen-Yu Tsai wrote:
+>> On Wed, Mar 21, 2018 at 11:28 PM, Paul Kocialkowski
+>> <paul.kocialkowski@bootlin.com> wrote:
+>> > It turns out that the frontend is not capable of preserving the
+>> > alpha
+>> > component (that is always set to 0xff), so only support XRGB8888
+>> > instead.
+>> >
+>> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+>> > ---
+>> >  drivers/gpu/drm/sun4i/sun4i_backend.c  | 4 ++++
+>> >  drivers/gpu/drm/sun4i/sun4i_frontend.c | 3 +--
+>> >  drivers/gpu/drm/sun4i/sun4i_layer.c    | 4 ++--
+>> >  3 files changed, 7 insertions(+), 4 deletions(-)
+>> >
+>> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c
+>> > b/drivers/gpu/drm/sun4i/sun4i_backend.c
+>> > index b98dafda52f8..274a1db6fa8e 100644
+>> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+>> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+>> > @@ -440,6 +440,10 @@ static bool
+>> > sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
+>> >         if (IS_ERR(backend->frontend))
+>> >                 return false;
+>> >
+>> > +       /*
+>> > +        * TODO: Don't use the frontend for x2/x4 scaling and allow
+>> > RGB formats
+>> > +        * with an alpha component then.
+>>
+>> This and the commit log are kind of conflicting. Is it just the scalar
+>> that doesn't
+>> work with an alpha component, or the whole frontend?
+>
+> It's the whole frontend that does not support alpha in its output
+> formats. I'm talking about scaling here because that's still the main
+> reason to use the frontend. On the other hand, the backend allows
+> integer scaling with an alpha component, hence the comment.
 
+I see. I parsed the TODO note incorrectly.
 
-On 03/21/2018 05:48 PM, Pierre-Yves MORDRET wrote:
-> Before assigning returned setup structure check if not null
-> 
-> Fixes: 463a9215f3ca7600b5ff ("i2c: stm32f7: fix setup structure")
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->    Version history:
->       v1:
->           * Initial
->       v2:
->           * fill "ret" with error statement before go to "clk_free"
-> ---
-> ---
->   drivers/i2c/busses/i2c-stm32f7.c | 5 +++++
->   1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-> index b445b3b..f273e28 100644
-> --- a/drivers/i2c/busses/i2c-stm32f7.c
-> +++ b/drivers/i2c/busses/i2c-stm32f7.c
-> @@ -888,6 +888,11 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
->   	}
->   
->   	setup = of_device_get_match_data(&pdev->dev);
-> +	if (!setup) {
-> +		dev_err(&pdev->dev, "Can't get device data\n");
-> +		ret = -ENODEV;
-> +		goto clk_free;
-> +	}
->   	i2c_dev->setup = *setup;
->   
->   	ret = device_property_read_u32(i2c_dev->dev, "i2c-scl-rising-time-ns",
-> 
-Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> Do you think I need to rework the comment/commit log?
+
+I think
+
+    Allow integer scaling with alpha using just the backend.
+
+would be slightly clearer.
+
+Thanks
+ChenYu
+
+> Thanks for the review,
+>
+> Paul
+>
+>> > +        */
+>> >         return sun4i_backend_plane_uses_scaler(state);
+>> >  }
+>> >
+>> > diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c
+>> > b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+>> > index ddf6cfa6dd23..3ea925584891 100644
+>> > --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
+>> > +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+>> > @@ -107,7 +107,7 @@ EXPORT_SYMBOL(sun4i_frontend_update_buffer);
+>> >  static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32
+>> > *val)
+>> >  {
+>> >         switch (fmt) {
+>> > -       case DRM_FORMAT_ARGB8888:
+>> > +       case DRM_FORMAT_XRGB8888:
+>> >                 *val = 5;
+>> >                 return 0;
+>> >
+>> > @@ -120,7 +120,6 @@ static int
+>> > sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
+>> >  {
+>> >         switch (fmt) {
+>> >         case DRM_FORMAT_XRGB8888:
+>> > -       case DRM_FORMAT_ARGB8888:
+>> >                 *val = 2;
+>> >                 return 0;
+>> >
+>> > diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c
+>> > b/drivers/gpu/drm/sun4i/sun4i_layer.c
+>> > index eb93df445a10..15238211a61a 100644
+>> > --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
+>> > +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+>> > @@ -100,9 +100,9 @@ static void
+>> > sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+>> >                 sun4i_frontend_update_coord(frontend, plane);
+>> >                 sun4i_frontend_update_buffer(frontend, plane);
+>> >                 sun4i_frontend_update_formats(frontend, plane,
+>> > -                                             DRM_FORMAT_ARGB8888);
+>> > +                                             DRM_FORMAT_XRGB8888);
+>> >                 sun4i_backend_update_layer_frontend(backend, layer-
+>> > >id, plane,
+>> > -                                                   DRM_FORMAT_ARGB8
+>> > 888);
+>> > +                                                   DRM_FORMAT_XRGB8
+>> > 888);
+>> >                 sun4i_frontend_enable(frontend);
+>> >         } else {
+>> >                 sun4i_backend_update_layer_formats(backend, layer-
+>> > >id, plane);
+>> > --
+>> > 2.16.2
+>> >
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> --
+> Paul Kocialkowski, Bootlin (formerly Free Electrons)
+> Embedded Linux and kernel engineering
+> https://bootlin.com
