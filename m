@@ -1,41 +1,47 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 22 Mar 2018 15:44:56 -0700
+From: ghackmann@google.com (Greg Hackmann)
+Date: Thu, 22 Mar 2018 16:19:42 -0700
 Subject: [PATCH] arm/arm64: smccc: Use xN for arm64 register constraints
  with clang
-In-Reply-To: <CAKwvOdk4Tos1Q8dyQvic4PUX3cjy3q1hn3FkK=xiVSChht+gEg@mail.gmail.com>
+In-Reply-To: <20180322224456.GB78232@google.com>
 References: <20180322212705.141175-1-mka@chromium.org>
  <CAKwvOdk4Tos1Q8dyQvic4PUX3cjy3q1hn3FkK=xiVSChht+gEg@mail.gmail.com>
-Message-ID: <20180322224456.GB78232@google.com>
+ <20180322224456.GB78232@google.com>
+Message-ID: <fc921bfb-1f49-08f9-515c-07bd442a1e11@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Thu, Mar 22, 2018 at 10:26:18PM +0000 Nick Desaulniers ha dit:
+On 03/22/2018 03:44 PM, Matthias Kaehlcke wrote:
+> El Thu, Mar 22, 2018 at 10:26:18PM +0000 Nick Desaulniers ha dit:
+> 
+>> Note that a patch in this form has previously been implemented by:
+>>
+>> Andrey Konovalov <andreyknvl@google.com>:
+>> https://gist.github.com/xairy/ee11682ea86044a45c0291c528cd936f
+>>
+>> and another by:
+>>
+>> Greg Hackmann <ghackmann@google.com>:
+>> https://android-review.googlesource.com/c/kernel/common/+/645181
+>>
+>> If you used either as a reference, you may want to credit them with a
+>> `Suggested-by:` in the commit message.
+> 
+> Not really, but I think I prefer Greg's version over mine and might
+> use it in a respin if nobody raises objections.
 
-> Note that a patch in this form has previously been implemented by:
-> 
-> Andrey Konovalov <andreyknvl@google.com>:
-> https://gist.github.com/xairy/ee11682ea86044a45c0291c528cd936f
-> 
-> and another by:
-> 
-> Greg Hackmann <ghackmann@google.com>:
-> https://android-review.googlesource.com/c/kernel/common/+/645181
-> 
-> If you used either as a reference, you may want to credit them with a
-> `Suggested-by:` in the commit message.
+NAK.  There's a reason I didn't send my change upstream.
 
-Not really, but I think I prefer Greg's version over mine and might
-use it in a respin if nobody raises objections.
+As Marc pointed out (https://lkml.org/lkml/2018/3/16/987), the "r"
+prefix tells gcc to pick the appropriate register width.  "x" makes it
+unconditionally use the entire 64-bit register width.  Just swapping out
+one for the other changes the macro's semantics.
 
-> On Thu, Mar 22, 2018 at 2:28 PM Matthias Kaehlcke <mka@chromium.org> wrote:
-> > +#ifndef __clang__
-> > +#define __reg__ "r"
-> > +#else
-> > +#define __reg__ "x"
-> > +#endif
-> 
-> Can this be flipped to #ifdef __clang__ ?  having an if...else where the
-> conditional negated is kind of funny.
+Unfortunately since this was breaking builds in android-4.14 and we
+didn't have an immediate-term fix, I bit the bullet and added the above
+commit -- but *only* as a short-term workaround.  For the one caller we
+currently have in 4.14.y, gcc was using the entire 64-bit width for all
+its inputs anyway, so "r" vs. "x" didn't make a difference.  But that
+might not be true if/when someone introduces other SMCCC 1.1 callers.
 
-Sure, my thought was "common case first", but I agree that the negated
-condition isn't ideal either.
+Unfortunately I don't see a better way to deal with this than waiting
+for clang to support "r"-style constraints on ARM64.
