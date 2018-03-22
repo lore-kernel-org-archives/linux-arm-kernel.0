@@ -1,18 +1,68 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 22 Mar 2018 13:53:00 +0100
-Subject: [usb-next, v3 PATCH] usb: xhci: skip phys initialization of
- shared hcd
-In-Reply-To: <643701fef843f91931e3a68779afe053c63c96f6.1521707846.git.chunfeng.yun@mediatek.com>
-References: <643701fef843f91931e3a68779afe053c63c96f6.1521707846.git.chunfeng.yun@mediatek.com>
-Message-ID: <20180322125300.GA22130@kroah.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 22 Mar 2018 18:28:39 +0530
+Subject: [PATCH v4 00/13] ARM: dts: ipq: updates to enable a few peripherals
+Message-ID: <1521723532-28361-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 08:12:50PM +0800, Chunfeng Yun wrote:
-> The phys has already been initialized when add primary hcd,
-> including usb2 phys and usb3 phys also if exist, so needn't
-> re-parse "phys" property again.
+[v4]
+    * Fixed more comments.
+    * Dropped reserved-memory nodes from board files as
+      that might break existing users whose u-boot do not
+      specify the fdt_high accordingly.
+    * Added chosen serial node for all boards to have
+      the default serial console specified from DT.
 
-Wait, why does the subject say "xhci", when this is in USB core code?
+[v3]
+????* Fixed minor comments from v2,
+??????https://www.spinics.net/lists/arm-kernel/msg641480.html
 
-I'll go edit that by hand...
+????* Added Abhishek's review tags
+
+[v2]
+????* Addressed all comments from Abhishek
+????* Removed dk01-c2 and dk04-c5 spinand based boards
+??????as support for spinand is not complete
+????* Based all patches on top of Andy's for-next branch
+
+[V1]
+????* https://www.spinics.net/lists/arm-kernel/msg631318.html
+
+Sricharan R (13):
+  firmware: qcom: scm: Add ipq4019 soc compatible
+  ARM: dts: ipq4019: Add a default chosen node
+  ARM: dts: ipq4019: Add a few peripheral nodes
+  ARM: dts: ipq4019: Change the max opp frequency
+  ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
+  ARM: dts: ipq4019: Add ipq4019-ap.dk04.1-c1 board file
+  ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk04.1-c3 board file
+  ARM: dts: ipq4019: Add ipq4019-ap.dk07.1 common data
+  ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c1 board file
+  ARM: dts: ipq4019: Add qcom-ipq4019-ap.dk07.1-c2 board file
+  ARM: dts: ipq8074: Add peripheral nodes
+  ARM: dts: ipq8074: Add pcie nodes
+  ARM: dts: ipq8074: Enable few peripherals for hk01 board
+
+ .../devicetree/bindings/firmware/qcom,scm.txt      |   3 +-
+ arch/arm/boot/dts/Makefile                         |   4 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi      |   8 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts    |  20 ++
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts    |   8 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi      | 115 +++++++++
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c1.dts    |  65 +++++
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts    |  26 ++
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi      |  68 ++++++
+ arch/arm/boot/dts/qcom-ipq4019.dtsi                | 140 ++++++++++-
+ arch/arm64/boot/dts/qcom/ipq8074-hk01.dts          | 103 ++++++++
+ arch/arm64/boot/dts/qcom/ipq8074.dtsi              | 262 ++++++++++++++++++++-
+ drivers/firmware/qcom_scm.c                        |   3 +
+ 13 files changed, 820 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c3.dts
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c1.dts
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1-c2.dts
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
