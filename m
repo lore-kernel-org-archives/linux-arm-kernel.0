@@ -1,69 +1,68 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 22 Mar 2018 14:08:43 +0800
-Subject: [linux-sunxi] Re: [PATCH 2/7] dt-bindings: add binding for the
- Allwinner A64 DE2 bus
-In-Reply-To: <2866474.lRHIcLtROC@jernej-laptop>
-References: <20180316175354.21437-1-icenowy@aosc.io>
- <20180320184646.dynqv6qubzabroe4@flea>
- <AAC74653-C6EB-4BE3-BB19-210687C1E158@aosc.io>
- <2866474.lRHIcLtROC@jernej-laptop>
-Message-ID: <9520BDDE-BFE3-4220-B48D-01A00CFA94DE@aosc.io>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 22 Mar 2018 14:44:00 +0800
+Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers
+ on weakly-ordered archs
+In-Reply-To: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <201803221430.P43GJl9U%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sinan,
 
+Thank you for the patch! Yet something to improve:
 
-? 2018?3?22? GMT+08:00 ??1:13:42, "Jernej ?krabec" <jernej.skrabec@siol.net> ??:
->Hi all,
->
->Dne sreda, 21. marec 2018 ob 03:18:13 CET je Icenowy Zheng napisal(a):
->> ? 2018?3?21? GMT+08:00 ??2:46:46, Maxime Ripard
-><maxime.ripard@bootlin.com> 
->??:
->> >On Sat, Mar 17, 2018 at 01:53:49AM +0800, Icenowy Zheng wrote:
->> >> All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64
->SoC
->> >
->> >to
->> >
->> >> be claimed, otherwise the whole DE2 space is inaccessible.
->> >> 
->> >> Add a device tree binding of the DE2 part as a sub-bus.
->> >
->> >Where did you get the info that it was a bus?
->> 
->> There's no direct evidence, just some guess.
->> 
->> The DE2 is a whole part that is just allocated a memory
->> space at the user manual, and the SRAM controls the
->> access to all modules in the DE2.
->> 
->> So it might be a bus.
->> 
->> Implement it as a bus is a clear representation on A64.
->
->Since there is already syscon for same mmio region, we migh as well use
->it 
->when loading ccu-sun8i-de2 driver on A64.
->
->Other options, like SRAM driver or bus driver, might better represent
->HW, but 
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.16-rc6 next-20180321]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I think the device tree should properly represent the HW,
-it's a basic requirment.
+url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/ib-Eliminate-duplicate-barriers-on-weakly-ordered-archs/20180321-091659
+config: xtensa-allyesconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
->then we would have two DT nodes covering same mmio region, which I
->think is 
->not really acceptable.
+All errors (new ones prefixed by >>):
 
-It's acceptable, and DE2 is not the only user of SRAM controller so far.
+   In file included from drivers/infiniband/hw/cxgb4/iw_cxgb4.h:73:0,
+                    from drivers/infiniband/hw/cxgb4/device.c:40:
+   drivers/infiniband/hw/cxgb4/t4.h: In function 'pio_copy':
+>> drivers/infiniband/hw/cxgb4/t4.h:460:3: error: implicit declaration of function 'writeq_relaxed'; did you mean 'writel_relaxed'? [-Werror=implicit-function-declaration]
+      writeq_relaxed(*src, dst);
+      ^~~~~~~~~~~~~~
+      writel_relaxed
+   cc1: some warnings being treated as errors
 
-VE will also need a SRAM region to be claimed.
+vim +460 drivers/infiniband/hw/cxgb4/t4.h
 
->
->Any suggestions?
->
->BTW, H6 has same design in this regard.
->
->Best regards,
->Jernej
+   450	
+   451	/* This function copies 64 byte coalesced work request to memory
+   452	 * mapped BAR2 space. For coalesced WRs, the SGE fetches data
+   453	 * from the FIFO instead of from Host.
+   454	 */
+   455	static inline void pio_copy(u64 __iomem *dst, u64 *src)
+   456	{
+   457		int count = 8;
+   458	
+   459		while (count) {
+ > 460			writeq_relaxed(*src, dst);
+   461			src++;
+   462			dst++;
+   463			count--;
+   464		}
+   465	}
+   466	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 53070 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180322/6a0011b7/attachment-0001.gz>
