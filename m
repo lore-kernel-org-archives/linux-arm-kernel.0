@@ -1,172 +1,183 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Mar 2018 15:51:14 +0000
-Subject: [PATCH v3] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
- observed before enabling
-In-Reply-To: <1521683929-15644-1-git-send-email-shankerd@codeaurora.org>
-References: <1521683929-15644-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <d1161c2d-e16d-14e6-5450-be26d348100d@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 22 Mar 2018 16:56:23 +0100
+Subject: [GIT PULL] Allwinner H3/H5 DT changes for 4.17
+Message-ID: <20180322155623.gr44ltpzfo33kpas@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/03/18 01:58, Shanker Donthineni wrote:
-> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
-> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
-> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
-> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
-> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
-> Changes since v2:
->   -Revert readl_relaxed_poll() usage since it's not usable in GICv3 probe().
->   -Changes to pr_xxx messages.
-> 
-> Changes since v1:
->   -Moved LPI disable code to a seperate function as Marc suggested.
->   -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
-> 
->  drivers/irqchip/irq-gic-v3-its.c   | 75 +++++++++++++++++++++++++++++++-------
->  include/linux/irqchip/arm-gic-v3.h |  1 +
->  2 files changed, 62 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 2cbb19c..c1e8a8e 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -33,6 +33,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/percpu.h>
->  #include <linux/slab.h>
-> +#include <linux/time64.h>
->  
->  #include <linux/irqchip.h>
->  #include <linux/irqchip/arm-gic-v3.h>
+Hi Arnd, Olof,
 
-This hunk doesn't apply to my -next branch, but I don't think it is
-actually required either...
+Here is the usual bunch of changes shared between arm and arm64 for
+the merge window.
 
-> @@ -1875,16 +1876,6 @@ static void its_cpu_init_lpis(void)
->  		gic_data_rdist()->pend_page = pend_page;
->  	}
->  
-> -	/* Disable LPIs */
-> -	val = readl_relaxed(rbase + GICR_CTLR);
-> -	val &= ~GICR_CTLR_ENABLE_LPIS;
-> -	writel_relaxed(val, rbase + GICR_CTLR);
-> -
-> -	/*
-> -	 * Make sure any change to the table is observable by the GIC.
-> -	 */
-> -	dsb(sy);
-> -
->  	/* set PROPBASE */
->  	val = (page_to_phys(gic_rdists->prop_page) |
->  	       GICR_PROPBASER_InnerShareable |
-> @@ -3287,13 +3278,69 @@ static bool gic_rdists_supports_plpis(void)
->  	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
->  }
->  
-> +static int redist_disable_lpis(void)
-> +{
-> +	void __iomem *rbase = gic_data_rdist_rd_base();
-> +	u64 timeout = USEC_PER_SEC;
-> +	u64 val;
-> +
-> +	if (!gic_rdists_supports_plpis()) {
-> +		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-> +		return -ENXIO;
-> +	}
-> +
-> +	val = readl_relaxed(rbase + GICR_CTLR);
-> +	if (!(val & GICR_CTLR_ENABLE_LPIS))
-> +		return 0;
-> +
-> +	pr_warn("CPU%d: Booted with LPIs enabled, memory probably corrupted\n",
-> +		smp_processor_id());
-> +	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
-> +
-> +	/* Disable LPIs */
-> +	val &= ~GICR_CTLR_ENABLE_LPIS;
-> +	writel_relaxed(val, rbase + GICR_CTLR);
-> +
-> +	/* Make sure any change to GICR_CTLR is observable by the GIC */
-> +	dsb(sy);
-> +
-> +	/**
-> +	 * Software must observe RWP==0 after clearing GICR_CTLR.EnableLPIs
-> +	 * from 1 to 0 before programming GICR_PEND{PROP}BASER registers.
-> +	 * Bail out the driver probe() in case of timeout.
-> +	 */
-> +	while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
-> +		if (!timeout) {
-> +			pr_err("CPU%d: Failed to observe RWP==0 after disabling LPIs\n",
+Thanks!
+Maxime
 
-I think you can simplify the message with something like:
+PS: I've just noticed that I forgot to cc the LAKML on my previous
+PRs. I'll bounce the mails to the ML.
 
-	"Time-out disabling LPIs\n"
+The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
-Nobody apart from you and I really want to know about RWP...
+  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
 
-> +			       smp_processor_id());
-> +			return -ETIMEDOUT;
-> +		}
-> +		udelay(1);
-> +		timeout--;
-> +	}
-> +
-> +	/**
-> +	 * After it has been written to 1, it is IMPLEMENTATION DEFINED whether
-> +	 * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to 0.
-> +	 * Bail out the driver probe() on systems where it's RES1.
-> +	 */
-> +	if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
-> +		pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
-> +		return -EBUSY;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  int its_cpu_init(void)
->  {
->  	if (!list_empty(&its_nodes)) {
-> -		if (!gic_rdists_supports_plpis()) {
-> -			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
-> -			return -ENXIO;
-> -		}
-> +		int ret;
-> +
-> +		ret = redist_disable_lpis();
-> +		if (ret)
-> +			return ret;
+are available in the Git repository at:
 
-Just realised that this is totally broken.
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-h3-h5-for-4.17
 
-Why do we have this in the loop? Checking the LPI support for each ITS
-was admittedly braindead (we only need to check it once per CPU), but
-now trying to disable the LPIs each time we encounter an ITS is going to
-make it go crazy and taint the kernel for no reason.
+for you to fetch changes up to a7affb13b271a3e451efe15e911c0c0ab2db4859:
 
-> +
->  		its_cpu_init_lpis();
->  		its_cpu_init_collection();
->  	}
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index b26eccc..c6f4c48 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -106,6 +106,7 @@
->  #define GICR_PIDR2			GICD_PIDR2
->  
->  #define GICR_CTLR_ENABLE_LPIS		(1UL << 0)
-> +#define GICR_CTLR_RWP			(1UL << 3)
->  
->  #define GICR_TYPER_CPU_NUMBER(r)	(((r) >> 8) & 0xffff)
->  
-> 
+  arm64: allwinner: H5: Add Xunlong Orange Pi Zero Plus (2018-03-20 11:43:41 +0100)
 
-Thanks,
+----------------------------------------------------------------
+Allwinner H3/H5 changes for 4.17
 
-	M.
+Here is our usual bunch of changes to the common DTSI shared between arm
+and arm64, and their associated device trees.
+
+Even though the diffstat is quite big, it's been mostly just cleanups. The
+big feature is that the HDMI is now suported on H3 and H5 boards.
+
+----------------------------------------------------------------
+Giulio Benetti (1):
+      ARM: dts: sun8i-h3: Add Mali node
+
+Hauke Mehrtens (1):
+      arm64: allwinner: H5: Add Xunlong Orange Pi Zero Plus
+
+Icenowy Zheng (1):
+      ARM: dts: sun8i: h2+: add support for Banana Pi M2 Zero board
+
+Jelle van der Waa (1):
+      ARM: dts: nanopi-neo-air: Add WiFi / eMMC
+
+Jernej Skrabec (3):
+      ARM: dts: sunxi: h3/h5: Add HDMI pipeline
+      ARM: dts: sun8i: h3: Enable HDMI output on H3 boards
+      ARM64: dts: sun50i: h5: Enable HDMI output on H5 boards
+
+Joonas Kylm?l? (5):
+      ARM: dts: sunxi: h3-h5: remove mmc0 card detection pin from pinctrl
+      ARM: dts: sunxi: h3-h5: Move pinctrl of mmc0 from dts to dtsi
+      ARM: dts: sunxi: h3-h5: Move pinctrl of mmc1 from dts to dtsi
+      ARM: dts: sunxi: h3-h5: rename mmc0_pins_a and mmc1_pins_a
+      ARM: dts: sun8i: h2-plus: remove unnecessary mmc1_pins node
+
+Tuomas Tynkkynen (1):
+      ARM: dts: sunxi: Switch MMC nodes away from cd-inverted property
+
+ .../devicetree/bindings/gpu/arm,mali-utgard.txt    |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/sun4i-a10-a1000.dts              |   3 +-
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts         |   3 +-
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts    |   3 +-
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |   3 +-
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts   |   3 +-
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts           |   3 +-
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |   3 +-
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts       |   3 +-
+ arch/arm/boot/dts/sun4i-a10-inet1.dts              |   3 +-
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts          |   3 +-
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts       |   3 +-
+ .../boot/dts/sun4i-a10-itead-iteaduino-plus.dts    |   3 +-
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts         |   3 +-
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts          |   3 +-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts         |   3 +-
+ arch/arm/boot/dts/sun4i-a10-mk802.dts              |   3 +-
+ arch/arm/boot/dts/sun4i-a10-mk802ii.dts            |   3 +-
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts     |   3 +-
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts            |   3 +-
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts   |   3 +-
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts       |   3 +-
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts       |   3 +-
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts             |   3 +-
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |   6 +-
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts      |   3 +-
+ arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts           |   3 +-
+ .../boot/dts/sun5i-a13-empire-electronix-d709.dts  |   3 +-
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts           |   3 +-
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts    |   3 +-
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |   3 +-
+ arch/arm/boot/dts/sun5i-gr8-evb.dts                |   3 +-
+ .../boot/dts/sun5i-reference-design-tablet.dtsi    |   3 +-
+ arch/arm/boot/dts/sun6i-a31-colombus.dts           |   3 +-
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts        |   3 +-
+ arch/arm/boot/dts/sun6i-a31-i7.dts                 |   3 +-
+ arch/arm/boot/dts/sun6i-a31-m9.dts                 |   3 +-
+ arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts   |   3 +-
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts           |   3 +-
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts           |   3 +-
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts   |   3 +-
+ .../dts/sun6i-a31s-yones-toptech-bs1078-v2.dts     |   3 +-
+ .../boot/dts/sun6i-reference-design-tablet.dtsi    |   3 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts   |   3 +-
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts           |   3 +-
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts          |   3 +-
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |   3 +-
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |   3 +-
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts        |   3 +-
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts          |   3 +-
+ arch/arm/boot/dts/sun7i-a20-icnova-swac.dts        |   3 +-
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts         |   3 +-
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts          |   3 +-
+ arch/arm/boot/dts/sun7i-a20-m3.dts                 |   3 +-
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts             |   3 +-
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts     |   6 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts     |   3 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts    |   3 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |   6 +-
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts      |   6 +-
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts           |   3 +-
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts      |   3 +-
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts           |   3 +-
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts     |   3 +-
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts   |   3 +-
+ arch/arm/boot/dts/sun8i-a23-evb.dts                |   3 +-
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts          |   3 +-
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   3 +-
+ .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts  |   3 +-
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts       |   3 +-
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts   |   3 +-
+ .../boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts    | 121 +++++++++++++++++
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts  |  11 +-
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  32 ++++-
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts          |  32 ++++-
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts |  30 ++++-
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts      |   2 -
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts           |  25 ++++
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts      |  27 +++-
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi             |   5 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  32 ++++-
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts       |  32 ++++-
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts        |  29 ++++-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts    |   2 -
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  30 ++++-
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  27 ++++
+ arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts       |   3 +-
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |   3 +-
+ .../boot/dts/sun8i-reference-design-tablet.dtsi    |   3 +-
+ arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts  |   3 +-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        |   3 +-
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            |   3 +-
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 122 ++++++++++++++++--
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   |   4 -
+ .../boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts   |   2 -
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  |  27 +++-
+ .../dts/allwinner/sun50i-h5-orangepi-prime.dts     |  29 ++++-
+ .../dts/allwinner/sun50i-h5-orangepi-zero-plus.dts | 143 +++++++++++++++++++++
+ .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    |  29 ++++-
+ 101 files changed, 794 insertions(+), 242 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-h2-plus-bananapi-m2-zero.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180322/011d4b3c/attachment-0001.sig>
