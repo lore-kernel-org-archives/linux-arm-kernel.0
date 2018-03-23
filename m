@@ -1,88 +1,61 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 23 Mar 2018 10:07:30 +0100
-Subject: [PATCH 4/8] clk: davinci: add a reset lookup table for psc0
-In-Reply-To: <a4ca0ba3-5d31-2d8c-7fa6-f8e9ba9b4535@lechnology.com>
-References: <20180321120807.18032-1-brgl@bgdev.pl>
- <20180321120807.18032-5-brgl@bgdev.pl>
- <4b985ed2-0db0-b4ad-8a9f-b8804e6d4db4@lechnology.com>
- <CAMpxmJUELxNGv5fL1gdNM4nRxdJ9t39G2Nc29yjZRnS0fRyHYg@mail.gmail.com>
- <a4ca0ba3-5d31-2d8c-7fa6-f8e9ba9b4535@lechnology.com>
-Message-ID: <CAMRc=Mf_nT3WDzPwMxhNcmk5=BUXBj2SobUcad809knqaWyGBQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Mar 2018 17:12:46 +0800
+Subject: [PATCH v3] arch/arm/Kconfig: default ARM_MODULE_PLTS to 'y'
+In-Reply-To: <20180305143405.12187-1-anders.roxell@linaro.org>
+References: <20180305143405.12187-1-anders.roxell@linaro.org>
+Message-ID: <CAKv+Gu-chQCu83yS-Pjh2f=CLSD-TUKSTMU_833ZurR9TSnrXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-21 17:17 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 03/21/2018 11:08 AM, Bartosz Golaszewski wrote:
->>
->> 2018-03-21 17:01 GMT+01:00 David Lechner <david@lechnology.com>:
->>>
->>> On 03/21/2018 07:08 AM, Bartosz Golaszewski wrote:
->>>>
->>>>
->>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>
->>>> In order to be able to use the reset framework in legacy boot mode as
->>>> well, add the reset lookup table to the psc driver for da850 variant.
->>>>
->>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>> ---
->>>>    drivers/clk/davinci/psc-da850.c | 8 ++++++++
->>>>    drivers/clk/davinci/psc.c       | 1 +
->>>>    2 files changed, 9 insertions(+)
->>>>
->>>> diff --git a/drivers/clk/davinci/psc-da850.c
->>>> b/drivers/clk/davinci/psc-da850.c
->>>> index ccc7eb17bf3a..395db4b2c0ee 100644
->>>> --- a/drivers/clk/davinci/psc-da850.c
->>>> +++ b/drivers/clk/davinci/psc-da850.c
->>>> @@ -6,6 +6,7 @@
->>>>     */
->>>>      #include <linux/clk-provider.h>
->>>> +#include <linux/reset-controller.h>
->>>>    #include <linux/clk.h>
->>>>    #include <linux/clkdev.h>
->>>>    #include <linux/init.h>
->>>> @@ -66,8 +67,15 @@ LPSC_CLKDEV3(ecap_clkdev,    "fck",  "ecap.0",
->>>>                                  "fck",  "ecap.1",
->>>>                                  "fck",  "ecap.2");
->>>>    +static struct reset_control_lookup da850_psc0_reset_lookup_table[] =
->>>> {
->>>> +       RESET_LOOKUP("davinci-rproc.0", NULL, 15),
->>>> +};
->>>> +
->>>>    static int da850_psc0_init(struct device *dev, void __iomem *base)
->>>>    {
->>>> +       reset_controller_add_lookup("da850-psc0",
->>>> +                                   da850_psc0_reset_lookup_table,
->>>> +
->>>> ARRAY_SIZE(da850_psc0_reset_lookup_table));
->>>
->>>
->>>
->>> Could there be a race condition here since you are adding the lookup
->>> *before*
->>> you are adding the actual provider? It seems like
->>> reset_controller_add_lookup()
->>> should be after davinci_psc_register_clocks().
->>>
->>
->> I don't think so, because reset_controller_add_lookup() only adds the
->> lookup structure to the list in reset/core.c. The actual reset
->> controller struct is only located and used when reset_control_get_*()
->> is called, so after probing the user. And it's all protected with
->> mutexes.
->>
->> This made me think though - maybe if we can't locate the controller,
->> we should return -EPROBE_DEFER from probe in davinci-rproc?
->>
->> Bart
->>
+On 5 March 2018 at 22:34, Anders Roxell <anders.roxell@linaro.org> wrote:
+> While testing multi_v7_defconfig with config fragments that makes the
+> kernel size to grow. The kernel fails to load simple modules, as
+> reported by kselftest:
 >
-> Yes, especially since we know that the PSC driver itself does get
-> deferred already.
+> [   34.107620] test_printf: section 4 reloc 2 sym 'memset': relocation
+> 28 out of range (0xbf046044 -> 0xc109f720)
+> selftests: printf.sh [FAIL]
+>
+> The problem that is seen when enabling too much in the kernel without
+> enabling ARM_MODULE_PLTS, is that the top of the kernel gets out of
+> reach from the bottom of the module area.
+>
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
 
-On the other hand if clk_get() succeeded, than the psc driver is
-already initialized and the subsequent call to reset_control_get()
-must succeed. But this is probably too machine-specific for a driver.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Bart
+> ---
+>  arch/arm/Kconfig | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 7e3d53575486..6831f2d4ee75 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1701,6 +1701,7 @@ config ARCH_WANT_GENERAL_HUGETLB
+>  config ARM_MODULE_PLTS
+>         bool "Use PLTs to allow module memory to spill over into vmalloc area"
+>         depends on MODULES
+> +       default y
+>         help
+>           Allocate PLTs when loading modules so that jumps and calls whose
+>           targets are too far away for their relative offsets to be encoded
+> @@ -1711,7 +1712,8 @@ config ARM_MODULE_PLTS
+>           rounding up to page size, the actual memory footprint is usually
+>           the same.
+>
+> -         Say y if you are getting out of memory errors while loading modules
+> +         Disabling this is usually safe for small single-platform
+> +         configurations. If unsure, say y.
+>
+>  source "mm/Kconfig"
+>
+> --
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
