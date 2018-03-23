@@ -1,39 +1,61 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 23 Mar 2018 09:49:47 -0700
-Subject: [PATCH v4 0/8] ARM: davinci: complete the conversion to using the
- reset framework
-In-Reply-To: <20180323130455.11470-1-brgl@bgdev.pl>
-References: <20180323130455.11470-1-brgl@bgdev.pl>
-Message-ID: <152182378792.178046.3747112581117251857@swboyd.mtv.corp.google.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 23 Mar 2018 12:51:47 -0400
+Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <20180323.124326.2170503491903886041.davem@davemloft.net>
+References: <1521738603-23596-4-git-send-email-okaya@codeaurora.org>
+ <20180323.122035.1380806748695640531.davem@davemloft.net>
+ <cb6a0522-2c53-b252-49db-5779d24963c6@codeaurora.org>
+ <20180323.124326.2170503491903886041.davem@davemloft.net>
+Message-ID: <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bartosz Golaszewski (2018-03-23 06:04:47)
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 3/23/2018 12:43 PM, David Miller wrote:
+> From: Sinan Kaya <okaya@codeaurora.org>
+> Date: Fri, 23 Mar 2018 12:31:12 -0400
 > 
-> This series converts the only user of the handcoded, mach-specific reset
-> routines in the davinci platform to using the reset framework.
+>> Sorry, you got me confused now.
+>>
+>> If you look at the code closer, you'll see this.
+>>
+>> 	wmb();
+>>
+>> 	txdata->tx_db.data.prod += nbd;
+>> 	barrier();
+>>
+>> 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
+>>
+>> and you also asked me to rename DOORBELL to DOORBELL_RELAXED() to make
+>> it obvious that we have a relaxed operator inside the macro.
 > 
-> Patch 1 modifies the way lookup entries are registered with the reset
-> framework.
+> This still doesn't match the stated pattern.
+
+I can certainly update the commit text for this or spin into its own
+patch to make it obvious.
+
 > 
-> Patches 2-4 add necessary lookups/DT-properties.
+> 	wmb();
+> 	/* no other memory or I/O or IOMEM operation */
+> 	writel();
 > 
-> Patches 5-7 convert the davinci-rproc driver to the reset framework.
+> There is a write to a producer index there and then no non-compiler
+> barrier or any kind before the writel().
 > 
-> Patch 8 removes now dead code.
-> 
-> Philipp: it turned out that it's indeed better to use the reset
-> controller's device name for the entry lookup.
-> 
-> Tested both in DT and legacy modes by booting the examples from
-> ti-ipc-rtos recipe in meta-ti.
-> 
-> This series applies on top of David Lechner's common-clk-v9 branch[1]
-> with Philipp Zabel's reset/next branch[2] pulled in.
-> 
-> It can be found in my github tree as well[3].
+> So, in fact, it might really need that implicit writel() barrier here!
 > 
 
-What's the merge strategy for the rest of the patches? I should apply
-the clk ones after the next -rc1?
+It could if txdata->tx_db was not a union. There is a data dependency
+between txdata->tx_db.data.prod and txdata->tx_db.raw. 
+
+So, no reordering.
+
+I can argue that barrier() here is useless in fact.
+
+Anyhow, I'll spin this piece out of this patch so that we pay special
+attention with a better description.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
