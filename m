@@ -1,104 +1,186 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 23 Mar 2018 10:19:09 +0100
-Subject: [PATCH v2] arm64: dts: renesas: r8a77965: Add all MSIOF device nodes
-Message-ID: <1521796749-26376-1-git-send-email-geert+renesas@glider.be>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Mar 2018 09:19:35 +0000
+Subject: [PATCH v3] irqchip/gic-v3: Ensure GICR_CTLR.EnableLPI=0 is
+ observed before enabling
+In-Reply-To: <8087e009-4eca-ab92-cbca-23ccfb3fafac@codeaurora.org>
+References: <1521683929-15644-1-git-send-email-shankerd@codeaurora.org>
+ <d1161c2d-e16d-14e6-5450-be26d348100d@arm.com>
+ <8087e009-4eca-ab92-cbca-23ccfb3fafac@codeaurora.org>
+Message-ID: <86o9jf174o.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On Thu, 22 Mar 2018 19:41:09 +0000,
+Shanker Donthineni wrote:
+> 
+> Hi Marc,
+> 
+> On 03/22/2018 10:51 AM, Marc Zyngier wrote:
+> > On 22/03/18 01:58, Shanker Donthineni wrote:
+> >> The definition of the GICR_CTLR.RWP control bit was expanded to indicate
+> >> status of changing GICR_CTLR.EnableLPI from 1 to 0 is being in progress
+> >> or completed. Software must observe GICR_CTLR.RWP==0 after clearing
+> >> GICR_CTLR.EnableLPI from 1 to 0 and before writing GICR_PENDBASER and/or
+> >> GICR_PROPBASER, otherwise behavior is UNPREDICTABLE.
+> >>
+> >> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> >> ---
+> >> Changes since v2:
+> >>   -Revert readl_relaxed_poll() usage since it's not usable in GICv3 probe().
+> >>   -Changes to pr_xxx messages.
+> >>
+> >> Changes since v1:
+> >>   -Moved LPI disable code to a seperate function as Marc suggested.
+> >>   -Mark's suggestion to use readl_relaxed_poll_timeout() helper functions.
+> >>
+> >>  drivers/irqchip/irq-gic-v3-its.c   | 75 +++++++++++++++++++++++++++++++-------
+> >>  include/linux/irqchip/arm-gic-v3.h |  1 +
+> >>  2 files changed, 62 insertions(+), 14 deletions(-)
+> >>
+> >> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> >> index 2cbb19c..c1e8a8e 100644
+> >> --- a/drivers/irqchip/irq-gic-v3-its.c
+> >> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> >> @@ -33,6 +33,7 @@
+> >>  #include <linux/of_platform.h>
+> >>  #include <linux/percpu.h>
+> >>  #include <linux/slab.h>
+> >> +#include <linux/time64.h>
+> >>  
+> >>  #include <linux/irqchip.h>
+> >>  #include <linux/irqchip/arm-gic-v3.h>
+> > 
+> > This hunk doesn't apply to my -next branch, but I don't think it is
+> > actually required either...
+> > 
+> 
+> I'll try to drop "#include <linux/time64.h>" in next patch if USEC_PER_SEC
+> included by other header files or rebase to -next branch.
+> 
+> >> @@ -1875,16 +1876,6 @@ static void its_cpu_init_lpis(void)
+> >>  		gic_data_rdist()->pend_page = pend_page;
+> >>  	}
+> >>  
+> >> -	/* Disable LPIs */
+> >> -	val = readl_relaxed(rbase + GICR_CTLR);
+> >> -	val &= ~GICR_CTLR_ENABLE_LPIS;
+> >> -	writel_relaxed(val, rbase + GICR_CTLR);
+> >> -
+> >> -	/*
+> >> -	 * Make sure any change to the table is observable by the GIC.
+> >> -	 */
+> >> -	dsb(sy);
+> >> -
+> >>  	/* set PROPBASE */
+> >>  	val = (page_to_phys(gic_rdists->prop_page) |
+> >>  	       GICR_PROPBASER_InnerShareable |
+> >> @@ -3287,13 +3278,69 @@ static bool gic_rdists_supports_plpis(void)
+> >>  	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
+> >>  }
+> >>  
+> >> +static int redist_disable_lpis(void)
+> >> +{
+> >> +	void __iomem *rbase = gic_data_rdist_rd_base();
+> >> +	u64 timeout = USEC_PER_SEC;
+> >> +	u64 val;
+> >> +
+> >> +	if (!gic_rdists_supports_plpis()) {
+> >> +		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+> >> +		return -ENXIO;
+> >> +	}
+> >> +
+> >> +	val = readl_relaxed(rbase + GICR_CTLR);
+> >> +	if (!(val & GICR_CTLR_ENABLE_LPIS))
+> >> +		return 0;
+> >> +
+> >> +	pr_warn("CPU%d: Booted with LPIs enabled, memory probably corrupted\n",
+> >> +		smp_processor_id());
+> >> +	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
+> >> +
+> >> +	/* Disable LPIs */
+> >> +	val &= ~GICR_CTLR_ENABLE_LPIS;
+> >> +	writel_relaxed(val, rbase + GICR_CTLR);
+> >> +
+> >> +	/* Make sure any change to GICR_CTLR is observable by the GIC */
+> >> +	dsb(sy);
+> >> +
+> >> +	/**
+> >> +	 * Software must observe RWP==0 after clearing GICR_CTLR.EnableLPIs
+> >> +	 * from 1 to 0 before programming GICR_PEND{PROP}BASER registers.
+> >> +	 * Bail out the driver probe() in case of timeout.
+> >> +	 */
+> >> +	while (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_RWP) {
+> >> +		if (!timeout) {
+> >> +			pr_err("CPU%d: Failed to observe RWP==0 after disabling LPIs\n",
+> > 
+> > I think you can simplify the message with something like:
+> > 
+> > 	"Time-out disabling LPIs\n"
+> > 
+> > Nobody apart from you and I really want to know about RWP...
+> > 
+> 
+> I'll change.
+> 
+> >> +			       smp_processor_id());
+> >> +			return -ETIMEDOUT;
+> >> +		}
+> >> +		udelay(1);
+> >> +		timeout--;
+> >> +	}
+> >> +
+> >> +	/**
+> >> +	 * After it has been written to 1, it is IMPLEMENTATION DEFINED whether
+> >> +	 * the bit GICR_CTLR.EnableLPI becomes RES1 or can be cleared to 0.
+> >> +	 * Bail out the driver probe() on systems where it's RES1.
+> >> +	 */
+> >> +	if (readl_relaxed(rbase + GICR_CTLR) & GICR_CTLR_ENABLE_LPIS) {
+> >> +		pr_err("CPU%d: Failed to disable LPIs\n", smp_processor_id());
+> >> +		return -EBUSY;
+> >> +	}
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >>  int its_cpu_init(void)
+> >>  {
+> >>  	if (!list_empty(&its_nodes)) {
+> >> -		if (!gic_rdists_supports_plpis()) {
+> >> -			pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+> >> -			return -ENXIO;
+> >> -		}
+> >> +		int ret;
+> >> +
+> >> +		ret = redist_disable_lpis();
+> >> +		if (ret)
+> >> +			return ret;
+> > 
+> > Just realised that this is totally broken.
+> > 
+> > Why do we have this in the loop? Checking the LPI support for each ITS
+> > was admittedly braindead (we only need to check it once per CPU), but
+> > now trying to disable the LPIs each time we encounter an ITS is going to
+> > make it go crazy and taint the kernel for no reason.
+> > 
+> 
+> Sorry, I didn't quite understand suggestions you're recommending. I don't
+> see any loop here, it just checks the ITS_LIST_EMPTY.
+> 
+> The function its_cpu_init() is being called for each CPU coming online.
+> We're trying to disable GICR LPI before calling its_cpu_init_lpis() and
+> its_cpu_init_collection(). Newly added function redist_disable_lpis()
+> will be called only once per CPU but not per each ITS hardware instance.
+> Is something I'm missing here?
 
-Add the device nodes for all MSIOF SPI controllers.
+No you're not. I just got confused with my own patches and completely
+misread yours.
 
-Based on several similar patches of the R8A7796 device tree
-by Geert Uytterhoeven <geert+renesas@glider.be>
-and Simon Horman <horms+renesas@verge.net.au>.
+Sorry about that. I'll apply the patch directly with the above
+changes.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[geert: Use numerical power domain indices for initial r8a77965.dtsi]
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - Add missing "renesas" to one line summary prefix.
+Thanks,
 
-Tested with arch/arm64/boot/dts/renesas/salvator-x-exio-d-msiof3a-2xHC595.dtso
-https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git/commit/?h=topic/renesas-overlays&id=b52ff2b481438cedd68effcad7ea2fc85b14f5f2
-and blinkenlights.
+	M.
 
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 62 +++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 6f748e94a9016e01..4371be3e869a258f 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -805,6 +805,68 @@
- 			/* placeholder */
- 		};
- 
-+		msiof0: spi at e6e90000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6e90000 0 0x0064>;
-+			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 211>;
-+			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
-+			       <&dmac2 0x41>, <&dmac2 0x40>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 211>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		msiof1: spi at e6ea0000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6ea0000 0 0x0064>;
-+			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 210>;
-+			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
-+			       <&dmac2 0x43>, <&dmac2 0x42>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 210>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		msiof2: spi at e6c00000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6c00000 0 0x0064>;
-+			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 209>;
-+			dmas = <&dmac0 0x45>, <&dmac0 0x44>;
-+			dma-names = "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 209>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		msiof3: spi at e6c10000 {
-+			compatible = "renesas,msiof-r8a77965",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6c10000 0 0x0064>;
-+			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 208>;
-+			dmas = <&dmac0 0x47>, <&dmac0 0x46>;
-+			dma-names = "tx", "rx";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 208>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		du: display at feb00000 {
- 			reg = <0 0xfeb00000 0 0x80000>,
- 			      <0 0xfeb90000 0 0x14>;
 -- 
-2.7.4
+Jazz is not dead, it just smell funny.
