@@ -1,63 +1,76 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 23 Mar 2018 16:04:20 +0100
-Subject: [PATCH V7 00/13] drivers: Boot Constraint core
-In-Reply-To: <20180322012606.vuaemu3pvpeojtwr@vireshk-mac-ubuntu>
-References: <cover.1519380923.git.viresh.kumar@linaro.org>
- <20180322012606.vuaemu3pvpeojtwr@vireshk-mac-ubuntu>
-Message-ID: <20180323150420.GA21152@kroah.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Mar 2018 15:21:12 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic-its: Fix potential overrun in
+ vgic_copy_lpi_list
+Message-ID: <20180323152112.19054-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 09:26:06AM +0800, Viresh Kumar wrote:
-> On 23-02-18, 15:53, Viresh Kumar wrote:
-> > Problem statement:
-> > 
-> > Some devices are powered ON by the bootloader before the bootloader
-> > handovers control to Linux. It maybe important for some of those devices
-> > to keep working until the time a Linux device driver probes the device
-> > and reconfigure its resources.
-> > 
-> > A typical example of that can be the LCD controller, which is used by
-> > the bootloaders to show image(s) while the platform is booting into
-> > Linux.  The LCD controller can be using some resources, like clk,
-> > regulators, etc, that are shared between several devices. These shared
-> > resources should be configured to satisfy need of all the users.  If
-> > another device's (X) driver gets probed before the LCD controller driver
-> > in this case, then it may end up disabling or reconfiguring these
-> > resources to ranges satisfying the current users (only device X) and
-> > that can make the LCD screen unstable.
-> > 
-> > Another case can be a debug serial port enabled from the bootloader.
-> > 
-> > Of course we can have more complex cases where the same resource is
-> > getting used by two devices while the kernel boots and the order in
-> > which devices get probed wouldn't matter as the other device will surely
-> > break then.
-> 
-> And we have a _real_ use case for this complex scenario as well.
-> 
-> Georgi (cc'd) is currently working[1] on implementing generic support for the
-> interconnect bus, which tries to play with the bandwidth of the bus based on how
-> much are the requirements from different parts of the SoC. The 4th version was
-> posted recently by him, and things are looking good/positive.
-> 
-> The bootloader configures the interconnect to provide sufficient bandwidth for
-> all the devices which are used during boot, few of them are the CPUs, serial and
-> the LCD controller. As the kernel starts taking control of things, the drivers
-> being probed start putting their requirements on the interconnect bus.  Because
-> the interconnect doesn't have any representation from the devices which are not
-> yet initialized by the kernel, the interconnect core incorrectly reduces the
-> bandwidth of the bus to a level unacceptable to the devices running currently,
-> like the CPUs and this makes kernel boot awfully slow. This is not an ordering
-> problem as no matter which device we probe first, we are going to break
-> something else.
-> 
-> Georgi already tried using the boot constraint patches to solve this complex
-> problem, and its a perfect fit.
+vgic_copy_lpi_list() parses the LPI list and picks LPIs targetting
+a given vcpu. We allocate the array containing the intids before taking
+the lpi_list_lock, which means we can have an array size that is not
+equal to the number of LPIs.
 
-I'm delaying this as I still don't see that "perfect fit" yet.  If there
-are add-on patches that take better advantage of this, great, let's see
-those, but right now, it feels like you are the only one wanting this.
-And the increased complexity overall seems not really worth it yet :(
+This is particularily obvious when looking at the path coming from
+vgic_enable_lpis, which is not a command, and thus can run in parallel
+with commands:
 
-greg k-h
+vcpu 0:                                        vcpu 1:
+vgic_enable_lpis
+  its_sync_lpi_pending_table
+    vgic_copy_lpi_list
+      intids = kmalloc_array(irq_count)
+                                               MAPI(lpi targeting vcpu 0)
+      list_for_each_entry(lpi_list_head)
+        intids[i++] = irq->intid;
+
+At that stage, we will happily overrun the intids array. Boo. An easy
+fix is is to break once the array is full. The MAPI command will update
+the config anyway, and we won't miss a thing. We also make sure that
+lpi_list_count is read exactly once, so that further updates of that
+value will not affect the array bound check.
+
+Cc: stable at vger.kernel.org
+Fixes: ccb1d791ab9e ("KVM: arm64: vgic-its: Fix pending table sync")
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 465095355666..44ee2f336440 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -316,21 +316,24 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_irq *irq;
+ 	u32 *intids;
+-	int irq_count = dist->lpi_list_count, i = 0;
++	int irq_count, i = 0;
+ 
+ 	/*
+-	 * We use the current value of the list length, which may change
+-	 * after the kmalloc. We don't care, because the guest shouldn't
+-	 * change anything while the command handling is still running,
+-	 * and in the worst case we would miss a new IRQ, which one wouldn't
+-	 * expect to be covered by this command anyway.
++	 * There is an obvious race between allocating the array and LPIs
++	 * being mapped/unmapped. If we ended up here as a result of a
++	 * command, we're safe (locks are held, preventing another
++	 * command). If coming from another path (such as enabling LPIs),
++	 * we must be carefull not to overrun the array.
+ 	 */
++	irq_count = READ_ONCE(dist->lpi_list_count);
+ 	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
+ 	if (!intids)
+ 		return -ENOMEM;
+ 
+ 	spin_lock(&dist->lpi_list_lock);
+ 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
++		if (i == irq_count)
++			break;
+ 		/* We don't need to "get" the IRQ, as we hold the list lock. */
+ 		if (irq->target_vcpu != vcpu)
+ 			continue;
+-- 
+2.14.2
