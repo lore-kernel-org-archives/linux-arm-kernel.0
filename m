@@ -1,61 +1,79 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 23 Mar 2018 14:04:51 +0100
-Subject: [PATCH v4 4/8] clk: davinci: add a reset lookup table for psc0
+Date: Fri, 23 Mar 2018 14:04:55 +0100
+Subject: [PATCH v4 8/8] clk: davinci: kill davinci_clk_reset_assert/deassert()
 In-Reply-To: <20180323130455.11470-1-brgl@bgdev.pl>
 References: <20180323130455.11470-1-brgl@bgdev.pl>
-Message-ID: <20180323130455.11470-5-brgl@bgdev.pl>
+Message-ID: <20180323130455.11470-9-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-In order to be able to use the reset framework in legacy boot mode as
-well, add the reset lookup table to the psc driver for da850 variant.
+This code is no longer used. Remove it.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: David Lechner <david@lechnology.com>
 ---
- drivers/clk/davinci/psc-da850.c | 7 +++++++
- drivers/clk/davinci/psc.c       | 1 +
- 2 files changed, 8 insertions(+)
+ arch/arm/mach-davinci/include/mach/clock.h | 21 ---------------------
+ drivers/clk/davinci/psc.c                  | 18 ------------------
+ 2 files changed, 39 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
 
-diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
-index ccc7eb17bf3a..d196dcbed560 100644
---- a/drivers/clk/davinci/psc-da850.c
-+++ b/drivers/clk/davinci/psc-da850.c
-@@ -6,6 +6,7 @@
-  */
- 
- #include <linux/clk-provider.h>
-+#include <linux/reset-controller.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
- #include <linux/init.h>
-@@ -66,8 +67,14 @@ LPSC_CLKDEV3(ecap_clkdev,	"fck",	"ecap.0",
- 				"fck",	"ecap.1",
- 				"fck",	"ecap.2");
- 
-+static struct reset_control_lookup da850_psc0_reset_lookup_table[] = {
-+	RESET_LOOKUP("da850-psc0", 15, "davinci-rproc.0", NULL),
-+};
-+
- static int da850_psc0_init(struct device *dev, void __iomem *base)
- {
-+	reset_controller_add_lookup(da850_psc0_reset_lookup_table,
-+				    ARRAY_SIZE(da850_psc0_reset_lookup_table));
- 	return davinci_psc_register_clocks(dev, da850_psc0_info, 16, base);
- }
- 
+diff --git a/arch/arm/mach-davinci/include/mach/clock.h b/arch/arm/mach-davinci/include/mach/clock.h
+deleted file mode 100644
+index 42ed4f2f5ce4..000000000000
+--- a/arch/arm/mach-davinci/include/mach/clock.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * arch/arm/mach-davinci/include/mach/clock.h
+- *
+- * Clock control driver for DaVinci - header file
+- *
+- * Authors: Vladimir Barinov <source@mvista.com>
+- *
+- * 2007 (c) MontaVista Software, Inc. This file is licensed under
+- * the terms of the GNU General Public License version 2. This program
+- * is licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- */
+-#ifndef __ASM_ARCH_DAVINCI_CLOCK_H
+-#define __ASM_ARCH_DAVINCI_CLOCK_H
+-
+-struct clk;
+-
+-int davinci_clk_reset_assert(struct clk *c);
+-int davinci_clk_reset_deassert(struct clk *c);
+-
+-#endif
 diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
-index 3b0e59dfbdd7..063df62381ea 100644
+index 063df62381ea..75c4bc6f23e3 100644
 --- a/drivers/clk/davinci/psc.c
 +++ b/drivers/clk/davinci/psc.c
-@@ -425,6 +425,7 @@ __davinci_psc_register_clocks(struct device *dev,
+@@ -295,24 +295,6 @@ static int davinci_lpsc_clk_reset(struct clk *clk, bool reset)
+ 	return 0;
+ }
  
- 	psc->rcdev.ops = &davinci_psc_reset_ops;
- 	psc->rcdev.owner = THIS_MODULE;
-+	psc->rcdev.dev = dev;
- 	psc->rcdev.of_node = dev->of_node;
- 	psc->rcdev.of_reset_n_cells = 1;
- 	psc->rcdev.of_xlate = davinci_psc_reset_of_xlate;
+-/*
+- * REVISIT: These exported functions can be removed after a non-DT lookup is
+- * added to the reset controller framework and the davinci-rproc driver is
+- * updated to use the generic reset controller framework.
+- */
+-
+-int davinci_clk_reset_assert(struct clk *clk)
+-{
+-	return davinci_lpsc_clk_reset(clk, true);
+-}
+-EXPORT_SYMBOL(davinci_clk_reset_assert);
+-
+-int davinci_clk_reset_deassert(struct clk *clk)
+-{
+-	return davinci_lpsc_clk_reset(clk, false);
+-}
+-EXPORT_SYMBOL(davinci_clk_reset_deassert);
+-
+ static int davinci_psc_reset_assert(struct reset_controller_dev *rcdev,
+ 				    unsigned long id)
+ {
 -- 
 2.16.1
