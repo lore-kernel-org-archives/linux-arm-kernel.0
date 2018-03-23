@@ -1,166 +1,65 @@
-From: chinnikishore369@gmail.com (chinnikishore369 at gmail.com)
-Date: Sun, 25 Mar 2018 00:40:59 +0530
-Subject: [RFC 1/2] docs: dts: Added documentation for Xilinx zynqmp Reset
- Controller bindings.
-Message-ID: <20180324191100.18363-1-chinnikishore369@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 23 Mar 2018 15:13:15 -0400
+Subject: [PATCH v6] RDMA/qedr: eliminate duplicate barriers on
+ weakly-ordered archs #2
+In-Reply-To: <1521736245-23662-1-git-send-email-okaya@codeaurora.org>
+References: <1521736245-23662-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <d15cde17-9c09-4812-3adc-940027ba0db6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nava kishore Manne <navam@xilinx.com>
+On 3/22/2018 12:30 PM, Sinan Kaya wrote:
+> Code includes wmb() followed by writel() in multiple places. writel()
+> already has a barrier on some architectures like arm64.
+> 
+> This ends up CPU observing two barriers back to back before executing the
+> register write.
+> 
+> Since code already has an explicit barrier call, changing writel() to
+> writel_relaxed().
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/infiniband/hw/qedr/verbs.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
+> index 53f00db..d1cf9a0 100644
+> --- a/drivers/infiniband/hw/qedr/verbs.c
+> +++ b/drivers/infiniband/hw/qedr/verbs.c
+> @@ -35,6 +35,7 @@
+>  #include <net/ipv6.h>
+>  #include <net/udp.h>
+>  #include <linux/iommu.h>
+> +#include <linux/io-64-nonatomic-hi-lo.h>
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
----
- .../devicetree/bindings/reset/zynqmp-reset.txt     | 142 +++++++++++++++++++++
- 1 file changed, 142 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/zynqmp-reset.txt
+what should we do here? change include? drop writeq_relaxed?
 
-diff --git a/Documentation/devicetree/bindings/reset/zynqmp-reset.txt b/Documentation/devicetree/bindings/reset/zynqmp-reset.txt
-new file mode 100644
-index 000000000000..161bbf5d1cae
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/zynqmp-reset.txt
-@@ -0,0 +1,142 @@
-+Xilinx Zynqmp Reset Manager
-+
-+The Zynq UltraScale+ MPSoC has several different resets.
-+
-+See Chapter 36 of the Zynq UltraScale+ MPSoC TRM (UG) for more information
-+about zynqmp resets.
-+
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
-+
-+Required Properties:
-+- compatible: "xlnx,zynqmp-reset"
-+- #reset-cells : Specifies the number of cells needed to encode reset
-+		line, should be 1
-+
-+Reset outputs:
-+	0   :PCIE config reset.
-+	1   :PCIE bridge block level reset (AXI interface).
-+	2   :PCIE control block level,reset.
-+	3   :Display Port block level reset (includes DPDMA).
-+	4   :FPD WDT reset.
-+	5   :AF_FM5 block level reset.
-+	6   :AF_FM4 block level reset.
-+	7   :AF_FM3 block level reset.
-+	8   :AF_FM2 block level reset.
-+	9   :AF_FM1 block level reset.
-+	10  :AF_FM0 block level reset.
-+	11  :GDMA block level reset.
-+	12  :Pixel Processor (GPU_PP1) block level reset.
-+	13  :Pixel Processor (GPU_PP0) block level reset.
-+	14  :GPU block level reset.
-+	15  :GT block level reset.
-+	16  :Sata block level reset.
-+	17  :ACPU3 power on reset.
-+	18  :ACPU2 power on reset.
-+	19  :ACPU1 power on reset.
-+	20  :ACPU0 power on reset.
-+	21  :APU L2 reset.
-+	22  :ACPU3 reset.
-+	23  :ACPU2 reset.
-+	24  :ACPU1 reset.
-+	25  :ACPU0 reset.
-+	26  :DDR block level reset inside of the DDR Sub System.
-+	27  :APM block level reset inside of the DDR Sub System.
-+	28  :soft reset.
-+	29  :GEM 0 reset.
-+	30  :GEM 1 reset.
-+	31  :GEM 2 reset.
-+	32  :GEM 3 reset.
-+	33  :qspi reset.
-+	34  :uart0 reset.
-+	35  :uart1 reset.
-+	36  :spi0 reset.
-+	37  :spi1 reset.
-+	38  :sdio0 reset.
-+	39  :sdio1 reset.
-+	40  :can0 reset.
-+	41  :can1 reset.
-+	42  :i2c0 reset.
-+	43  :i2c1 reset.
-+	44  :ttc0 reset.
-+	45  :ttc1 reset.
-+	46  :ttc2 reset.
-+	47  :ttc3 reset.
-+	48  :swdt reset.
-+	49  :nand reset.
-+	50  :adma reset.
-+	51  :gpio reset.
-+	52  :iou_cc reset.
-+	53  :timestamp reset.
-+	54  :rpu_r50 reset.
-+	55  :rpu r51 reset.
-+	56  :rpu_amba reset.
-+	57  :ocm reset.
-+	58  :rpu_pge reset.
-+	59  :usb0_core reset.
-+	60  :usb1_core reset.
-+	61  :usb0_hiber reset.
-+	62  :usb1_hiber reset.
-+	63  :usb0_apb reset.
-+	64  :usb1_apb reset.
-+	65  :ipi reset.
-+	66  :apm reset.
-+	67  :rtc reset.
-+	68  :sysmon reset.
-+	69  :afi_fm6 reset.
-+	70  :lpd_swdt reset.
-+	71  :fpd_reset.
-+	72  :rpu_dbg1 reset.
-+	73  :rpu_dbg0 reset.
-+	74  :dbg_lpd reset.
-+	75  :dbg_fpd reset.
-+	76  :apll reset.
-+	77  :dpll reset.
-+	78  :vpll reset.
-+	79  :iopll reset.
-+	80  :rpll reset.
-+	81  :gpio_pl_0 reset.
-+	82  :gpio_pl_1 reset.
-+	83  :gpio_pl_2 reset.
-+	84  :gpio_pl_3 reset.
-+	85  :gpio_pl_4 reset.
-+	86  :gpio_pl_5 reset.
-+	87  :gpio_pl_6 reset.
-+	88  :gpio_pl_7 reset.
-+	89  :gpio_pl_8 reset.
-+	90  :gpio_pl_9 reset.
-+	91  :gpio_pl_10 reset.
-+	92  :gpio_pl_11 reset.
-+	93  :gpio_pl_12 reset.
-+	94  :gpio_pl_13 reset.
-+	95  :gpio_pl_14 reset.
-+	96  :gpio_pl_15 reset.
-+	97  :gpio_pl_16 reset.
-+	98  :gpio_pl_17 reset.
-+	99  :gpio_pl_18 reset.
-+	100 :gpio_pl_19 reset
-+	101 :gpio_pl_20 reset.
-+	102 :gpio_pl_21 reset.
-+	103 :gpio_pl_22 reset.
-+	104 :gpio_pl_23 reset.
-+	105 :gpio_pl_24 reset.
-+	106 :gpio_pl_25 reset.
-+	107 :gpio_pl_26 reset.
-+	108 :gpio_pl_27 reset.
-+	109 :gpio_pl_28 reset.
-+	110 :gpio_pl_29 reset.
-+	111 :gpio_pl_30 reset.
-+	112 :gpio_pl_31 reset.
-+	113 :rpu_ls reset.
-+	114 :ps_only reset.
-+	115 :pl reset.
-+	116 :ps_pl0 reset
-+	117 :ps_pl1 reset
-+	118 :ps_pl2 reset
-+	119 :ps_pl3 reset
-+
-+Example:
-+	reset-controller:reset-controller at 0 {
-+		compatible = "xlnx,zynqmp-reset";
-+		#reset-cells = <1>;
-+	};
+>  
+>  #include <rdma/ib_verbs.h>
+>  #include <rdma/ib_user_verbs.h>
+> @@ -860,7 +861,7 @@ static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
+>  	wmb();
+>  	cq->db.data.agg_flags = flags;
+>  	cq->db.data.value = cpu_to_le32(cons);
+> -	writeq(cq->db.raw, cq->db_addr);
+> +	writeq_relaxed(cq->db.raw, cq->db_addr);
+>  
+>  	/* Make sure write would stick */
+>  	mmiowb();
+> @@ -3338,7 +3339,7 @@ int qedr_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
+>  
+>  		qp->rq.db_data.data.value++;
+>  
+> -		writel(qp->rq.db_data.raw, qp->rq.db);
+> +		writel_relaxed(qp->rq.db_data.raw, qp->rq.db);
+>  
+>  		/* Make sure write sticks */
+>  		mmiowb();
+> 
+
+
 -- 
-2.16.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
