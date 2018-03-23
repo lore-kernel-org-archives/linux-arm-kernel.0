@@ -1,51 +1,88 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Mar 2018 10:05:00 +0100
-Subject: [PATCH v2 2/4] arm64: dts: renesas: r8a7795: sort subnodes of
- the soc node
-In-Reply-To: <CAMuHMdWz9wr0iVVqJ=abm1LRZ3QcfWTk02bKk-MpkVP=mBX52w@mail.gmail.com>
-References: <20180322102423.18269-1-horms+renesas@verge.net.au>
- <20180322102423.18269-3-horms+renesas@verge.net.au>
- <CAMuHMdWz9wr0iVVqJ=abm1LRZ3QcfWTk02bKk-MpkVP=mBX52w@mail.gmail.com>
-Message-ID: <20180323090459.xmzcihmln6bxynzk@verge.net.au>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 23 Mar 2018 10:07:30 +0100
+Subject: [PATCH 4/8] clk: davinci: add a reset lookup table for psc0
+In-Reply-To: <a4ca0ba3-5d31-2d8c-7fa6-f8e9ba9b4535@lechnology.com>
+References: <20180321120807.18032-1-brgl@bgdev.pl>
+ <20180321120807.18032-5-brgl@bgdev.pl>
+ <4b985ed2-0db0-b4ad-8a9f-b8804e6d4db4@lechnology.com>
+ <CAMpxmJUELxNGv5fL1gdNM4nRxdJ9t39G2Nc29yjZRnS0fRyHYg@mail.gmail.com>
+ <a4ca0ba3-5d31-2d8c-7fa6-f8e9ba9b4535@lechnology.com>
+Message-ID: <CAMRc=Mf_nT3WDzPwMxhNcmk5=BUXBj2SobUcad809knqaWyGBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 09:41:29AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Thu, Mar 22, 2018 at 11:24 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Sort subnodes of the soc node.
-> > - The primary key is the bus address.
-> > - The secondary key is the IP block.
-> > - The tertiary key is the node name.
-> >
-> > This is part of an ongoing effort to provide consistent node
-> > order in the DT of Renesas SoCs to improve maintainability.
-> >
-> > This should not have any run-time effect.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > v2
-> > * Rebase
-> 
-> Thanks for the update!
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> using dtx_diff, and "grep '@.*{', which tells me
-> 
-> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> 
-> >                 pciec0: pcie at fe000000 {
-> > @@ -2097,6 +2090,23 @@
-> >                         status = "disabled";
-> >                 };
-> >
-> > +               gic: interrupt-controller at f1010000 {
-> 
-> Probably gic should be before pciec0.
-> Currently it's after pciec1, which has a lower address than pciec1.
+2018-03-21 17:17 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 03/21/2018 11:08 AM, Bartosz Golaszewski wrote:
+>>
+>> 2018-03-21 17:01 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>
+>>> On 03/21/2018 07:08 AM, Bartosz Golaszewski wrote:
+>>>>
+>>>>
+>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>
+>>>> In order to be able to use the reset framework in legacy boot mode as
+>>>> well, add the reset lookup table to the psc driver for da850 variant.
+>>>>
+>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>> ---
+>>>>    drivers/clk/davinci/psc-da850.c | 8 ++++++++
+>>>>    drivers/clk/davinci/psc.c       | 1 +
+>>>>    2 files changed, 9 insertions(+)
+>>>>
+>>>> diff --git a/drivers/clk/davinci/psc-da850.c
+>>>> b/drivers/clk/davinci/psc-da850.c
+>>>> index ccc7eb17bf3a..395db4b2c0ee 100644
+>>>> --- a/drivers/clk/davinci/psc-da850.c
+>>>> +++ b/drivers/clk/davinci/psc-da850.c
+>>>> @@ -6,6 +6,7 @@
+>>>>     */
+>>>>      #include <linux/clk-provider.h>
+>>>> +#include <linux/reset-controller.h>
+>>>>    #include <linux/clk.h>
+>>>>    #include <linux/clkdev.h>
+>>>>    #include <linux/init.h>
+>>>> @@ -66,8 +67,15 @@ LPSC_CLKDEV3(ecap_clkdev,    "fck",  "ecap.0",
+>>>>                                  "fck",  "ecap.1",
+>>>>                                  "fck",  "ecap.2");
+>>>>    +static struct reset_control_lookup da850_psc0_reset_lookup_table[] =
+>>>> {
+>>>> +       RESET_LOOKUP("davinci-rproc.0", NULL, 15),
+>>>> +};
+>>>> +
+>>>>    static int da850_psc0_init(struct device *dev, void __iomem *base)
+>>>>    {
+>>>> +       reset_controller_add_lookup("da850-psc0",
+>>>> +                                   da850_psc0_reset_lookup_table,
+>>>> +
+>>>> ARRAY_SIZE(da850_psc0_reset_lookup_table));
+>>>
+>>>
+>>>
+>>> Could there be a race condition here since you are adding the lookup
+>>> *before*
+>>> you are adding the actual provider? It seems like
+>>> reset_controller_add_lookup()
+>>> should be after davinci_psc_register_clocks().
+>>>
+>>
+>> I don't think so, because reset_controller_add_lookup() only adds the
+>> lookup structure to the list in reset/core.c. The actual reset
+>> controller struct is only located and used when reset_control_get_*()
+>> is called, so after probing the user. And it's all protected with
+>> mutexes.
+>>
+>> This made me think though - maybe if we can't locate the controller,
+>> we should return -EPROBE_DEFER from probe in davinci-rproc?
+>>
+>> Bart
+>>
+>
+> Yes, especially since we know that the PSC driver itself does get
+> deferred already.
 
-Thanks, I will fix this in v3.
+On the other hand if clk_get() succeeded, than the psc driver is
+already initialized and the subsequent call to reset_control_get()
+must succeed. But this is probably too machine-specific for a driver.
+
+Bart
