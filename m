@@ -1,65 +1,31 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 23 Mar 2018 18:08:31 +0000
-Subject: [PATCH v2] arm64/sve: Document firmware support requirements in
- Kconfig
-Message-ID: <1521828511-30946-1-git-send-email-Dave.Martin@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Mar 2018 11:14:53 -0700
+Subject: Regression with arm in next with stack protector
+Message-ID: <20180323181452.GJ5799@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use of SVE by EL2 and below requires explicit support in the
-firmware.  There is no means to hide the presence of SVE from EL2,
-so a kernel configured with CONFIG_ARM64_SVE=y will typically not
-work correctly on SVE capable hardware unless the firmware does
-include the appropriate support.
+Hi,
 
-This is not expected to pose a problem in the wild, since platform
-integrators are responsible for ensuring that they ship up-to-date
-firmware to support their hardware.  However, developers may hit
-the issue when using mismatched compoments.
+Looks like commit 5638790dadae ("zboot: fix stack protector in
+compressed boot phase") breaks booting on arm.
 
-In order to draw attention to the issue and how to solve it, this
-patch adds some Kconfig text giving a brief explanation and details
-of compatible firmware versions.
+This is all I get from the bootloader on omap3:
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Starting kernel ...
 
----
+data abort
+pc : [<810002d0>]          lr : [<100110a8>]
+reloc pc : [<9d6002d0>]    lr : [<2c6110a8>]
+sp : 81467c18  ip : 81466bf0     fp : 81466bf0
+r10: 80fc2c40  r9 : 81000258     r8 : 86fec000
+r7 : ffffffff  r6 : 81466bf8     r5 : 00000000  r4 : 80008000
+r3 : 81466c14  r2 : 81466c18     r1 : 000a0dff  r0 : 00466bf8
+Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
+Resetting CPU ...
 
-Changes since v1:
+resetting ...
 
- * Fixed a typo ("firware") reported by Suzuki
----
- arch/arm64/Kconfig | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Regards,
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7381eeb..4fc7057 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1104,6 +1104,23 @@ config ARM64_SVE
- 
- 	  To enable use of this extension on CPUs that implement it, say Y.
- 
-+	  Note that for architectural reasons, firmware _must_ implement SVE
-+	  support when running on SVE capable hardware.  The required support
-+	  is present in:
-+
-+	    * version 1.5 and later of the ARM Trusted Firmware
-+	    * the AArch64 boot wrapper since commit 5e1261e08abf
-+	      ("bootwrapper: SVE: Enable SVE for EL2 and below").
-+
-+	  For other firmware implementations, consult the firmware documentation
-+	  or vendor.
-+
-+	  If you need the kernel to boot on SVE-capable hardware with broken
-+	  firmware, you may need to say N here until you get your firmware
-+	  fixed.  Otherwise, you may experience firmware panics or lockups when
-+	  booting the kernel.  If unsure and you are not observing these
-+	  symptoms, you should assume that it is safe to say Y.
-+
- config ARM64_MODULE_CMODEL_LARGE
- 	bool
- 
--- 
-2.1.4
+Tony
