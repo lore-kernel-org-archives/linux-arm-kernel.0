@@ -1,92 +1,62 @@
-From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
-Date: Fri, 23 Mar 2018 16:58:16 -0700
-Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
-References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
- <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
-Message-ID: <1521849496.15055.16.camel@intel.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 24 Mar 2018 07:58:31 +0800
+Subject: [xlnx:master 1545/1550] drivers/misc/xilinx_sdfec.c:1038:31: sparse:
+ dereference of noderef expression
+Message-ID: <201803240729.pmaoRTrv%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-03-23 at 14:53 -0700, Alexander Duyck wrote:
-> On Fri, Mar 23, 2018 at 11:52 AM, Sinan Kaya <okaya@codeaurora.org>
-> wrote:
-> > Code includes wmb() followed by writel() in multiple places. writel()
-> > already has a barrier on some architectures like arm64.
-> > 
-> > This ends up CPU observing two barriers back to back before executing
-> > the
-> > register write.
-> > 
-> > Since code already has an explicit barrier call, changing writel() to
-> > writel_relaxed().
-> > 
-> > I did a regex search for wmb() followed by writel() in each drivers
-> > directory.
-> > I scrubbed the ones I care about in this series.
-> > 
-> > I considered "ease of change", "popular usage" and "performance
-> > critical
-> > path" as the determining criteria for my filtering.
-> > 
-> > We used relaxed API heavily on ARM for a long time but
-> > it did not exist on other architectures. For this reason, relaxed
-> > architectures have been paying double penalty in order to use the
-> > common
-> > drivers.
-> > 
-> > Now that relaxed API is present on all architectures, we can go and
-> > scrub
-> > all drivers to see what needs to change and what can remain.
-> > 
-> > We start with mostly used ones and hope to increase the coverage over
-> > time.
-> > It will take a while to cover all drivers.
-> > 
-> > Feel free to apply patches individually.
-> 
-> I looked over the set and they seem good.
-> 
-> Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   6e1f0e8ae0acb992560a4e3206a372de271aa8b6
+commit: a595ceb6c6d2a8d8517720e3757eb06b76859500 [1545/1550] misc: xilinx-sdfec: Add IOCTL XSDFEC_SET_ORDER
+reproduce:
+        # apt-get install sparse
+        git checkout a595ceb6c6d2a8d8517720e3757eb06b76859500
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-Grrr, patch 1 does not apply cleanly to my next-queue tree (dev-queue
-branch).  I will deal with this series in a day or two, after I have dealt
-with my driver pull requests.
 
-> > 
-> > Changes since v6:
-> > clean up between 2..6 and then make your Alex's changes on 1 and 7
-> >     The mmiowb shouldn't be needed for Rx. Only one CPU will be running
-> >     NAPI for the queue and we will synchronize this with a full writel
-> >     anyway when we re-enable the interrupts.
-> > 
-> > Sinan Kaya (7):
-> >   i40e/i40evf: Eliminate duplicate barriers on weakly-ordered archs
-> >   ixgbe: eliminate duplicate barriers on weakly-ordered archs
-> >   igbvf: eliminate duplicate barriers on weakly-ordered archs
-> >   igb: eliminate duplicate barriers on weakly-ordered archs
-> >   fm10k: Eliminate duplicate barriers on weakly-ordered archs
-> >   ixgbevf: keep writel() closer to wmb()
-> >   ixgbevf: eliminate duplicate barriers on weakly-ordered archs
-> > 
-> >  drivers/net/ethernet/intel/fm10k/fm10k_main.c     |  4 ++--
-> >  drivers/net/ethernet/intel/i40e/i40e_txrx.c       | 14 ++++++++++----
-> >  drivers/net/ethernet/intel/i40evf/i40e_txrx.c     |  4 ++--
-> >  drivers/net/ethernet/intel/igb/igb_main.c         |  4 ++--
-> >  drivers/net/ethernet/intel/igbvf/netdev.c         |  4 ++--
-> >  drivers/net/ethernet/intel/ixgbe/ixgbe_main.c     |  8 ++++----
-> >  drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      |  5 -----
-> >  drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 11 ++++++++---
-> >  8 files changed, 30 insertions(+), 24 deletions(-)
-> > 
-> > --
-> > 2.7.4
-> > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180323/777698b2/attachment-0001.sig>
+sparse warnings: (new ones prefixed by >>)
+
+>> drivers/misc/xilinx_sdfec.c:1038:31: sparse: dereference of noderef expression
+   drivers/misc/xilinx_sdfec.c:1039:31: sparse: dereference of noderef expression
+   drivers/misc/xilinx_sdfec.c:1043:35: sparse: dereference of noderef expression
+   drivers/misc/xilinx_sdfec.c:1055:53: sparse: dereference of noderef expression
+   drivers/misc/xilinx_sdfec.c:1057:25: sparse: dereference of noderef expression
+
+vim +1038 drivers/misc/xilinx_sdfec.c
+
+  1032	
+  1033	static int
+  1034	xsdfec_set_order(struct xsdfec_dev *xsdfec, enum xsdfec_order __user order)
+  1035	{
+  1036		bool order_out_of_range;
+  1037	
+> 1038		order_out_of_range = (order <= XSDFEC_INVALID_ORDER) ||
+  1039				     (order >= XSDFEC_ORDER_MAX);
+  1040		if (order_out_of_range) {
+  1041			dev_err(xsdfec->dev,
+  1042				"%s invalid order value %d for SDFEC%d",
+  1043				__func__, order, xsdfec->fec_id);
+  1044			return -EINVAL;
+  1045		}
+  1046	
+  1047		/* Verify Device has not started */
+  1048		if (xsdfec->state == XSDFEC_STARTED) {
+  1049			dev_err(xsdfec->dev,
+  1050				"%s attempting to set Order while started for SDFEC%d",
+  1051				__func__, xsdfec->fec_id);
+  1052			return -EIO;
+  1053		}
+  1054	
+  1055		xsdfec_regwrite(xsdfec, XSDFEC_ORDER_ADDR, (order - 1));
+  1056	
+  1057		xsdfec->order = order;
+  1058	
+  1059		return 0;
+  1060	}
+  1061	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
