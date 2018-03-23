@@ -1,143 +1,262 @@
-From: chinnikishore369@gmail.com (chinnikishore369 at gmail.com)
-Date: Sat, 24 Mar 2018 23:16:38 +0530
-Subject: [RFC 2/2] nvmem: zynqmp: Added zynqmp nvmem firmware driver
-In-Reply-To: <20180324174638.12621-1-chinnikishore369@gmail.com>
-References: <20180324174638.12621-1-chinnikishore369@gmail.com>
-Message-ID: <20180324174638.12621-2-chinnikishore369@gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 23 Mar 2018 10:58:56 -0700
+Subject: [PATCH v11 2/2] clk: npcm7xx: Nuvoton NPCM7XX Clock Controller
+ driver
+In-Reply-To: <1521553249-6971-3-git-send-email-tali.perry1@gmail.com>
+References: <1521553249-6971-1-git-send-email-tali.perry1@gmail.com>
+ <1521553249-6971-3-git-send-email-tali.perry1@gmail.com>
+Message-ID: <152182793651.178046.13824776927497999970@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nava kishore Manne <navam@xilinx.com>
+Quoting tali.perry1 at gmail.com (2018-03-20 06:40:49)
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 71ec41e6364f..353e94f2c25a 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -21,6 +21,7 @@ endif
+>  obj-$(CONFIG_MACH_ASM9260)             += clk-asm9260.o
+>  obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)    += clk-axi-clkgen.o
+>  obj-$(CONFIG_ARCH_AXXIA)               += clk-axm5516.o
+> +obj-$(CONFIG_ARCH_NPCM7XX)             += clk-npcm7xx.o
 
-This patch adds zynqmp nvmem firmware driver to access the
-SoC revision information from the hardware register.
+Please sort this by filename, not config name.
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
----
- drivers/nvmem/Kconfig        |  9 +++++
- drivers/nvmem/Makefile       |  2 ++
- drivers/nvmem/zynqmp_nvmem.c | 85 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+)
- create mode 100644 drivers/nvmem/zynqmp_nvmem.c
+>  obj-$(CONFIG_COMMON_CLK_CDCE706)       += clk-cdce706.o
+>  obj-$(CONFIG_COMMON_CLK_CDCE925)       += clk-cdce925.o
+>  obj-$(CONFIG_ARCH_CLPS711X)            += clk-clps711x.o
+> diff --git a/drivers/clk/clk-npcm7xx.c b/drivers/clk/clk-npcm7xx.c
+> new file mode 100644
+> index 000000000000..0d373f8f114b
+> --- /dev/null
+> +++ b/drivers/clk/clk-npcm7xx.c
+> @@ -0,0 +1,757 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Nuvoton NPCM7xx Clock Generator
+[..]
+> +
+> +
+> +static struct clk_hw_onecell_data *npcm7xx_clk_data;
+> +static void __iomem *clk_base;
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index ff505af064ba..a9349281d05a 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -175,4 +175,13 @@ config NVMEM_SNVS_LPGPR
- 	  This driver can also be built as a module. If so, the module
- 	  will be called nvmem-snvs-lpgpr.
- 
-+config NVMEM_ZYNQMP
-+        bool "Xilinx ZYNQMP SoC nvmem firmware support"
-+        depends on ARCH_ZYNQMP
-+        help
-+          This is a driver to access hardware related data like soc revision,
-+          IDCODE... etc.
-+
-+          If sure, say yes. If unsure, say no.
-+
- endif
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index e54dcfa6565a..932b4cebcb6c 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -37,3 +37,5 @@ obj-$(CONFIG_MESON_MX_EFUSE)	+= nvmem_meson_mx_efuse.o
- nvmem_meson_mx_efuse-y		:= meson-mx-efuse.o
- obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
- nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
-+obj-$(CONFIG_NVMEM_ZYNQMP)	+= nvmem_zynqmp_nvmem.o
-+nvmem_zynqmp_nvmem-y		:= zynqmp_nvmem.o
-diff --git a/drivers/nvmem/zynqmp_nvmem.c b/drivers/nvmem/zynqmp_nvmem.c
-new file mode 100644
-index 000000000000..206ec9bd775d
---- /dev/null
-+++ b/drivers/nvmem/zynqmp_nvmem.c
-@@ -0,0 +1,85 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018 Xilinx, Inc.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/firmware/xilinx/zynqmp/firmware.h>
-+
-+#define SILICON_REVISION_MASK 0xF
-+
-+static int zynqmp_nvmem_read(void *context, unsigned int offset,
-+					void *val, size_t bytes)
-+{
-+	int ret;
-+	int idcode, version;
-+	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-+
-+	if (!eemi_ops || !eemi_ops->get_chipid)
-+		return -ENXIO;
-+
-+	ret = eemi_ops->get_chipid(&idcode, &version);
-+	if (ret < 0)
-+		return ret;
-+
-+	pr_debug("Read chipid val %x %x\n", idcode, version);
-+	*(int *)val = version & SILICON_REVISION_MASK;
-+
-+	return 0;
-+}
-+
-+static struct nvmem_config econfig = {
-+	.name = "zynqmp-nvmem",
-+	.owner = THIS_MODULE,
-+	.word_size = 1,
-+	.size = 1,
-+	.read_only = true,
-+};
-+
-+static const struct of_device_id zynqmp_nvmem_match[] = {
-+	{ .compatible = "xlnx,zynqmp-nvmem-fw", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, zynqmp_nvmem_match);
-+
-+static int zynqmp_nvmem_probe(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem;
-+
-+	econfig.dev = &pdev->dev;
-+	econfig.reg_read = zynqmp_nvmem_read;
-+
-+	nvmem = nvmem_register(&econfig);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int zynqmp_nvmem_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static struct platform_driver zynqmp_nvmem_driver = {
-+	.probe = zynqmp_nvmem_probe,
-+	.remove = zynqmp_nvmem_remove,
-+	.driver = {
-+		.name = "zynqmp-nvmem",
-+		.of_match_table = zynqmp_nvmem_match,
-+	},
-+};
-+
-+module_platform_driver(zynqmp_nvmem_driver);
-+
-+MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>, Nava kishore Manne <navam@xilinx.com>");
-+MODULE_DESCRIPTION("ZynqMP NVMEM driver");
-+MODULE_LICENSE("GPL");
--- 
-2.16.1
+Please remove static singletons and allocate them during init.
+
+> +static DEFINE_SPINLOCK(lock);
+
+Please give 'lock' a better name so that lockdep reports are
+meaningful.
+
+> +
+> +
+> +static const struct of_device_id npcm7xx_clk_match_table[] = {
+> +                               { .compatible = "nuvoton,npcm750-clk"},
+> +                               {},
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, npcm7xx_clk_match_table);
+
+Is this used?
+
+> +
+> +
+> +static void __init npcm7xx_clk_init(struct device_node *clk_np)
+> +{
+> +
+> +       struct resource res;
+> +       struct clk_hw *hw;
+> +       struct clk *clk;
+> +       int ret;
+> +       int i;
+> +
+> +       pr_debug("NPCM750: clock init: ");
+> +
+> +       clk_base = NULL;
+> +
+> +       ret = of_address_to_resource(clk_np, 0, &res);
+> +       if (ret) {
+> +               pr_err("\t%s: failed to get resource, ret %d\n", clk_np->name,
+> +                       ret);
+> +               return;
+> +       }
+> +
+> +
+> +       clk_base = ioremap(res.start, resource_size(&res));
+> +       if (IS_ERR(clk_base)) {
+> +               pr_err("\tnpcm7xx_clk_init: resource error\n");
+> +               goto npcm7xx_init_error;
+> +       }
+> +
+> +
+> +       npcm7xx_clk_data = kzalloc(sizeof(*npcm7xx_clk_data->hws) *
+> +               NPCM7XX_NUM_CLOCKS + sizeof(npcm7xx_clk_data), GFP_KERNEL);
+> +
+> +       npcm7xx_clk_data->num = 0;
+> +
+> +       if (!npcm7xx_clk_data->hws) {
+> +               pr_err("Can't alloc npcm7xx_clk_data\n");
+
+We don't need allocation error messages, kmalloc already prints a bunch
+of info.
+
+> +               goto npcm7xx_init_np_err;
+> +       }
+> +
+> +       npcm7xx_clk_data->num = NPCM7XX_NUM_CLOCKS;
+> +
+> +
+> +       /*
+> +        * This way all clock fetched before the platform device probes,
+
+What platform device?
+
+> +        * except those we assign here for early use, will be deferred.
+> +        */
+> +       pr_debug("\tclk init hws\n");
+> +       for (i = 0; i < NPCM7XX_NUM_CLOCKS; i++)
+> +               npcm7xx_clk_data->hws[i] = ERR_PTR(-EPROBE_DEFER);
+> +
+> +       /* Read fixed clocks. These 3 clocks must be defined in DT */
+> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_REFCLK);
+> +       if (!IS_ERR(clk)) {
+> +               pr_err("failed to find external REFCLK: %ld\n",
+> +                       PTR_ERR(clk));
+> +               clk_put(clk);
+> +       }
+> +
+> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_SYSBYPCK);
+> +       if (!IS_ERR(clk)) {
+> +               pr_err("failed to find external SYSBYPCK: %ld\n",
+> +                       PTR_ERR(clk));
+> +               clk_put(clk);
+> +       }
+> +
+> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_MCBYPCK);
+> +       if (!IS_ERR(clk)) {
+> +               pr_err("failed to find external MCBYPCK: %ld\n",
+> +                       PTR_ERR(clk));
+> +               clk_put(clk);
+> +       }
+> +
+> +       /* Register plls */
+> +       pr_debug("\tclk register pll\n");
+> +       for (i = 0; i < ARRAY_SIZE(npcm7xx_plls); i++) {
+> +               const struct npcm7xx_clk_pll_data *pll_data = &npcm7xx_plls[i];
+> +
+> +               pr_debug("\tclk reg pll%d, reg=0x%x, name=%s, p=%s\n", i,
+> +               (unsigned int)pll_data->reg, pll_data->name,
+> +               pll_data->parent_name);
+> +
+> +               hw = npcm7xx_clk_register_pll(clk_base + pll_data->reg,
+> +                       pll_data->name, pll_data->parent_name, pll_data->flags);
+> +               if (IS_ERR(hw)) {
+> +                       pr_err("npcm7xx_clk: Can't register pll\n");
+> +                       goto npcm7xx_init_fail;
+> +               }
+> +
+> +               if (pll_data->onecell_idx >= 0)
+> +                       npcm7xx_clk_data->hws[pll_data->onecell_idx] = hw;
+> +       }
+> +
+> +       /* Register fixed dividers */
+> +       pr_debug("\tclk register fixed divs\n");
+> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL1_DIV2,
+> +                       NPCM7XX_CLK_S_PLL1, 0, 1, 2);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("npcm7xx_clk: Can't register fixed div\n");
+> +               goto npcm7xx_init_fail;
+> +       }
+> +
+> +
+> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL2_DIV2,
+> +                       NPCM7XX_CLK_S_PLL2, 0, 1, 2);
+> +
+> +       if (IS_ERR(clk)) {
+> +               pr_err("npcm7xx_clk: Can't register div2\n");
+> +               goto npcm7xx_init_fail;
+> +       }
+> +
+> +       /* Register muxes */
+> +       for (i = 0; i < ARRAY_SIZE(npcm7xx_muxes); i++) {
+> +               const struct npcm7xx_clk_mux_data *mux_data = &npcm7xx_muxes[i];
+> +
+> +               pr_debug("\tadd mux%d reg=0x%x name=%s p=%s num_p=%d\n",
+> +                   i, ((u32)clk_base + (u32)NPCM7XX_CLKSEL), mux_data->name,
+> +                       mux_data->parent_names[0], mux_data->num_parents);
+> +
+> +               hw = clk_hw_register_mux_table(NULL,
+> +                       mux_data->name,
+> +                       mux_data->parent_names, mux_data->num_parents,
+> +                       mux_data->flags, clk_base + NPCM7XX_CLKSEL,
+> +                       mux_data->shift, mux_data->mask, 0,
+> +                       mux_data->table, &lock);
+> +
+> +               if (IS_ERR(hw)) {
+> +                       pr_err("npcm7xx_clk: Can't register mux\n");
+> +                       goto npcm7xx_init_fail;
+> +               }
+> +
+> +               if (mux_data->onecell_idx >= 0)
+> +                       npcm7xx_clk_data->hws[mux_data->onecell_idx] = hw;
+> +       }
+> +
+> +       /* Register clock dividers specified in npcm7xx_divs. */
+> +       pr_debug("\tclk register divs\n");
+> +       for (i = 0; i < ARRAY_SIZE(npcm7xx_divs); i++) {
+> +               const struct npcm7xx_clk_div_data *div_data = &npcm7xx_divs[i];
+> +
+> +               pr_debug("\tadd div%d reg=0x%x name=%s, parent=%s\n",
+> +                               i, (unsigned int)div_data->reg,
+> +                               div_data->name, div_data->parent_name);
+
+Please remove all these debug prints.
+
+> +
+> +               hw = clk_hw_register_divider(NULL, div_data->name,
+> +                               div_data->parent_name,
+> +                               div_data->flags,
+> +                               clk_base + div_data->reg,
+> +                               div_data->shift, div_data->width,
+> +                               div_data->clk_divider_flags, &lock);
+> +               if (IS_ERR(hw)) {
+> +                       pr_err("npcm7xx_clk: Can't register div table\n");
+> +                       goto npcm7xx_init_fail;
+> +               }
+> +
+> +               if (div_data->onecell_idx >= 0)
+> +                       npcm7xx_clk_data->hws[div_data->onecell_idx] = hw;
+> +       }
+> +
+> +       ret = of_clk_add_hw_provider(clk_np, of_clk_hw_onecell_get,
+> +                                       npcm7xx_clk_data);
+> +       if (ret)
+> +               pr_err("failed to add DT provider: %d\n", ret);
+> +
+> +       pr_info("npcm7xx clk: %d dividers, %d muxes and %d plls registered.\n",
+> +               ARRAY_SIZE(npcm7xx_divs), ARRAY_SIZE(npcm7xx_muxes),
+> +               ARRAY_SIZE(npcm7xx_plls));
+
+Please remove this "I'm alive!" message.
+
+> +
+> +       of_node_put(clk_np);
+> +
+> +       return;
+> +
+> +npcm7xx_init_fail:
+> +       pr_debug("\tclk setup fail\n");
+
+Please don't put tabs at the beginning of printks.
+
+> +       if (npcm7xx_clk_data->num)
+> +               kfree(npcm7xx_clk_data->hws);
+> +npcm7xx_init_np_err:
+> +       if (clk_base != NULL)
+> +               iounmap(clk_base);
+> +npcm7xx_init_error:
+> +       of_node_put(clk_np);
+> +}
+> +
+> +CLK_OF_DECLARE(npcm7xx_clk_init, "nuvoton,npcm750-clk", npcm7xx_clk_init);
+
+Any reason this can't be a platform driver?
