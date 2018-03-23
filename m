@@ -1,44 +1,83 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 Mar 2018 12:20:35 -0400 (EDT)
-Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521738603-23596-4-git-send-email-okaya@codeaurora.org>
-References: <1521738603-23596-1-git-send-email-okaya@codeaurora.org>
- <1521738603-23596-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180323.122035.1380806748695640531.davem@davemloft.net>
+From: swboyd@chromium.org (Stephen Boyd)
+Date: Fri, 23 Mar 2018 09:21:47 -0700
+Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
+ requested
+In-Reply-To: <1521804964.23017.96.camel@linux.intel.com>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-4-swboyd@chromium.org>
+ <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
+ <1521804964.23017.96.camel@linux.intel.com>
+Message-ID: <152182210780.178046.13284917877743312593@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sinan Kaya <okaya@codeaurora.org>
-Date: Thu, 22 Mar 2018 13:10:00 -0400
+Quoting Andy Shevchenko (2018-03-23 04:36:04)
+> On Thu, 2018-03-22 at 19:16 -0500, Timur Tabi wrote:
+> > On 03/21/2018 11:58 AM, Stephen Boyd wrote:
+> > > +static int msm_gpio_init_valid_mask(struct gpio_chip *chip,
+> > > +                               struct msm_pinctrl *pctrl)
+> > > +{
+> > > +   int ret;
+> > > +   unsigned int len, i;
+> > > +   unsigned int max_gpios = pctrl->soc->ngpios;
+> > > +
+> > > +   /* The number of GPIOs in the ACPI tables */
+> > > +   ret = device_property_read_u16_array(pctrl->dev, "gpios",
+> > > NULL, 0);
+> > > +   if (ret > 0 && ret < max_gpios) {
+> > 
+> > This needs to be ret <= max_gpios, otherwise it will fail if every
+> > GPIO 
+> > is available.
+> > 
+> > And it should print an error message and return an error code if ret
+> > > 
+> > max_gpios.
+> 
+> Perhaps makes sense to do the opposite condition
+> 
+> if (ret < 0 || ret > max_gpios) {
+>  ... error handling ...
+> }
+> 
 
-> Code includes wmb() followed by writel(). writel() already has a
-> barrier on some architectures like arm64.
- ...
-> @@ -4155,7 +4155,7 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev)
->  	txdata->tx_db.data.prod += nbd;
->  	barrier();
->  
-> -	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
-> +	DOORBELL_RELAXED(bp, txdata->cid, txdata->tx_db.raw);
->  
->  	mmiowb();
- ...
-> @@ -2592,7 +2592,7 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
->  
->  	txdata->tx_db.data.prod += 2;
->  	barrier();
-> -	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
-> +	DOORBELL_RELAXED(bp, txdata->cid, txdata->tx_db.raw);
+Indeed. I already rewrote it like this two days ago:
 
-These are compiler barriers being used here, not wmb().
+static int msm_gpio_init_valid_mask(struct gpio_chip *chip,
+                                   struct msm_pinctrl *pctrl)
+{
+       int ret;
+       unsigned int len, i;
+       unsigned int max_gpios = pctrl->soc->ngpios;
+       u16 *tmp;
 
-Look, if I can't see a clear:
+       /* The number of GPIOs in the ACPI tables */
+       len = ret = device_property_read_u16_array(pctrl->dev, "gpios",
+ULL, 0);
+       if (ret < 0)
+               return 0;
 
-	wmb()
-	writel()
+       if (ret > max_gpios)
+               return -EINVAL;
 
-sequence in the patch hunks, I am going to keep pushing back on
-these changes.
+       tmp = kmalloc_array(len, sizeof(*tmp), GFP_KERNEL);
+       if (!tmp)
+               return -ENOMEM;
 
-Thank you.
+       ret = device_property_read_u16_array(pctrl->dev, "gpios", tmp,
+en);
+       if (ret < 0) {
+               dev_err(pctrl->dev, "could not read list of GPIOs\n");
+               goto out;
+       }
+
+       bitmap_zero(chip->valid_mask, max_gpios);
+       for (i = 0; i < len; i++)
+               set_bit(tmp[i], chip->valid_mask);
+
+out:
+       kfree(tmp);
+       return ret;
+}
+
+I'll send the updated patches now.
