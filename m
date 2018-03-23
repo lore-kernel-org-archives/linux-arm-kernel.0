@@ -1,36 +1,27 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Fri, 23 Mar 2018 08:56:17 -0500
-Subject: [PATCH] arm: dts: socfpga: fix GIC PPI warning
-In-Reply-To: <20180323092215.1307-1-pp@emlix.com>
-References: <20180323092215.1307-1-pp@emlix.com>
-Message-ID: <3b6eabf8-1d6b-7a58-03b1-3bff14c4127e@kernel.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 23 Mar 2018 09:03:37 -0500
+Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
+ requested
+In-Reply-To: <1521804875.23017.95.camel@linux.intel.com>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-4-swboyd@chromium.org>
+ <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
+ <b5dac2f7-eabb-6e09-2146-775b09d4eca8@codeaurora.org>
+ <59df3700-c0bd-6ee8-eeab-6a49cb92d1db@codeaurora.org>
+ <1521804875.23017.95.camel@linux.intel.com>
+Message-ID: <819014ea-d375-5830-e32f-eeba73e6fa08@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/23/2018 04:22 AM, Philipp Puschmann wrote:
-> Fixes the warning "GIC: PPI13 is secure or misconfigured" by
-> changing the interrupt type from level_low to edge_raising
+On 3/23/18 6:34 AM, Andy Shevchenko wrote:
+> No, it seems you missed %p vs. %px discussion.
 > 
-> Signed-off-by: Philipp Puschmann <pp@emlix.com>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 595eb4f1a761..e9417551d7ea 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -815,7 +815,7 @@
->  		timer at fffec600 {
->  			compatible = "arm,cortex-a9-twd-timer";
->  			reg = <0xfffec600 0x100>;
-> -			interrupts = <1 13 0xf04>;
-> +			interrupts = <1 13 0xf01>;
->  			clocks = <&mpu_periph_clk>;
->  		};
+> The pointers printed by %p nowadays are hashed values, not the original
+> ones.
 
-Applied, thanks!
+I totally forgot about that, thanks.
 
-Dinh
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
