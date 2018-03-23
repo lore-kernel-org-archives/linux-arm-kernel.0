@@ -1,48 +1,123 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Mar 2018 14:52:58 -0400
-Subject: [PATCH v7 5/7] fm10k: Eliminate duplicate barriers on weakly-ordered
- archs
-In-Reply-To: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
-References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521831180-25014-6-git-send-email-okaya@codeaurora.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 23 Mar 2018 11:54:18 -0700
+Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
+In-Reply-To: <1521685073.28226.10.camel@mtkswgap22>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+ <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
+ <1521685073.28226.10.camel@mtkswgap22>
+Message-ID: <20180323185418.GD255819@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a
-barrier on some architectures like arm64.
+Hi Sean,
 
-This ends up CPU observing two barriers back to back before executing
-the register write.
+On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
+> Hi, Dmitry and Lee
+> 
+> The series seems not being got merged. Are they good enough to be ready
+> into the your tree?
+> 
+> Recently I've tested the series with focusing on pwrkey event generated
+> through interrupt when push and release the key on bpi-r2 board and then
+> finally it's working fine. but for homekey it cannot be found on the
+> board and thus I cannot have more tests more about it.
+> 
+> Tested-by: Sean Wang <sean.wang@mediatek.com>
 
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+You have my Ack on the input patch; I expect it go through Lee's tree as
+there are some dependencies on mfd core piece.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/net/ethernet/intel/fm10k/fm10k_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks.
 
-diff --git a/drivers/net/ethernet/intel/fm10k/fm10k_main.c b/drivers/net/ethernet/intel/fm10k/fm10k_main.c
-index 409554d..bb94f04 100644
---- a/drivers/net/ethernet/intel/fm10k/fm10k_main.c
-+++ b/drivers/net/ethernet/intel/fm10k/fm10k_main.c
-@@ -180,7 +180,7 @@ void fm10k_alloc_rx_buffers(struct fm10k_ring *rx_ring, u16 cleaned_count)
- 		wmb();
- 
- 		/* notify hardware of new descriptors */
--		writel(i, rx_ring->tail);
-+		writel_relaxed(i, rx_ring->tail);
- 	}
- }
- 
-@@ -1055,7 +1055,7 @@ static void fm10k_tx_map(struct fm10k_ring *tx_ring,
- 
- 	/* notify HW of packet */
- 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
--		writel(i, tx_ring->tail);
-+		writel_relaxed(i, tx_ring->tail);
- 
- 		/* we need this if more than one processor can write to our tail
- 		 * at a time, it synchronizes IO on IA64/Altix systems
+> 
+> 	Sean
+> 
+> 
+> On Thu, 2018-03-22 at 10:03 +0800, Sean Wang (???) wrote:
+> > 
+> > > -----Original Message-----
+> > > From: Linux-mediatek [mailto:linux-mediatek-bounces at lists.infradead.org] On
+> > > Behalf Of Chen Zhong
+> > > Sent: Wednesday, October 25, 2017 9:16 PM
+> > > To: Dmitry Torokhov <dmitry.torokhov@gmail.com>; Rob Herring
+> > > <robh+dt@kernel.org>; Lee Jones <lee.jones@linaro.org>; Alexandre Belloni
+> > > <alexandre.belloni@free-electrons.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>; Alessandro Zummo
+> > > <a.zummo@towertech.it>; devicetree at vger.kernel.org; Linus Walleij
+> > > <linus.walleij@linaro.org>; Jaechul Lee <jcsing.lee@samsung.com>; linux-
+> > > kernel at vger.kernel.org; Krzysztof Kozlowski <krzk@kernel.org>; Javier
+> > > Martinez Canillas <javier@osg.samsung.com>; linux-
+> > > mediatek at lists.infradead.org; linux-arm-kernel at lists.infradead.org; linux-
+> > > input at vger.kernel.org; Matthias Brugger <matthias.bgg@gmail.com>; Eddie
+> > > Huang (S?) <eddie.huang@mediatek.com>; Chen Zhong (??)
+> > > <Chen.Zhong@mediatek.com>; Beomho Seo <beomho.seo@samsung.com>;
+> > > linux-rtc at vger.kernel.org
+> > > Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
+> > > 
+> > > MediaTek PMIC are multi-function devices that can handle key interrupts,
+> > > typically there are two keys attached to PMIC, which called pwrkey and
+> > > homekey. PWRKEY usually used to wake up system from sleep. Homekey can
+> > > used as volume down key due to board design. Long press keys can shutdown
+> > > PMIC, the mode can be choose to be one key only or two keys together.
+> > > This series add support for key functions for MediaTek PMIC MT6397/MT6323.
+> > > 
+> > > Changes since v5:
+> > > - use __maybe_unused annotation instead of #ifdef guard
+> > > - use of_* API instead of device_* API
+> > > 
+> > > Changes since v4:
+> > > - rebase to Linux 4.14-rc1
+> > > - add a common keyboard binding document
+> > > - use child device tree node to define each key
+> > > 
+> > > Changes since v3:
+> > > - make the naming to be consistent as mtk_pmic or MTK_PMIC
+> > > - add suspend/resume functions to enable/disable irq
+> > > - change binding properties to define wakeup sources
+> > > 
+> > > Changes since v2:
+> > > - use standard properties for keycodes and debounce time
+> > > - change to use platform_get_irq in leaf drivers
+> > > - use better ways to define IRQ resources
+> > > 
+> > > Changes since v1:
+> > > - create irq mappings in mfd core driver instead of leaf drivers
+> > > - remove some unused parts in mtk-pmic-keys driver
+> > > 
+> > > Chen Zhong (6):
+> > >   mfd: mt6397: create irq mappings in mfd core driver
+> > >   dt-bindings: input: Add common keyboard document bindings
+> > >   dt-bindings: input: Add document bindings for mtk-pmic-keys
+> > >   dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
+> > >   input: Add MediaTek PMIC keys support
+> > >   mfd: mt6397: Add PMIC keys support to MT6397 driver
+> > > 
+> > >  Documentation/devicetree/bindings/input/keys.txt   |   8 +
+> > >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |  43 +++
+> > >  Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
+> > >  drivers/input/keyboard/Kconfig                     |   9 +
+> > >  drivers/input/keyboard/Makefile                    |   1 +
+> > >  drivers/input/keyboard/mtk-pmic-keys.c             | 339
+> > > +++++++++++++++++++++
+> > >  drivers/mfd/mt6397-core.c                          |  26 +-
+> > >  drivers/rtc/rtc-mt6397.c                           |   7 +-
+> > >  8 files changed, 432 insertions(+), 7 deletions(-)  create mode 100644
+> > > Documentation/devicetree/bindings/input/keys.txt
+> > >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-
+> > > keys.txt
+> > >  create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
+> > > 
+> > > --
+> > > 1.9.1
+> > > 
+> > > 
+> > > 
+> > > _______________________________________________
+> > > Linux-mediatek mailing list
+> > > Linux-mediatek at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> 
+> 
+
 -- 
-2.7.4
+Dmitry
