@@ -1,60 +1,82 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 23 Mar 2018 14:49:24 +0800
-Subject: [PATCH V2 3/4] clk: add managed version of clk_bulk_get_all
-In-Reply-To: <1521602391-30356-4-git-send-email-aisheng.dong@nxp.com>
-References: <1521602391-30356-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <201803231452.YBWTInPr%fengguang.wu@intel.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Fri, 23 Mar 2018 15:38:00 +0800
+Subject: [PATCH v8 00/14] iommu/rockchip: Use OF_IOMMU
+Message-ID: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
 
-Thank you for the patch! Yet something to improve:
+This series fixes some issues in rockchip iommu driver, and add of_iommu
+support in it.
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.16-rc6 next-20180322]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Changes in v8:
+Rebase on newest for-next.
+Don't introduce the additional return.
+Rename startup()/shutdown() to enable()/disable().
+Do runtime PM suspend in .shutdown().
+Modify pm_runtime_get_if_in_use()/pm_runtime_put() as Tomasz suggested.
 
-url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-new-APIs-to-handle-all-available-clocks/20180323-122451
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: powerpc-defconfig (attached as .config)
-compiler: powerpc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=powerpc 
+Changes in v7:
+Use iommu_group_ref_get to avoid ref leak
 
-All errors (new ones prefixed by >>):
+Changes in v6:
+Add clk names, and modify all iommu nodes in all existing rockchip dts
+Fix dt-binding as Robin suggested.
+Use aclk and iface clk as Rob and Robin suggested, and split binding
+patch.
 
-   In file included from include/linux/cpufreq.h:14:0,
-                    from arch/powerpc/platforms/cell/cpufreq_spudemand.c:23:
-   include/linux/clk.h:679:1: error: expected identifier or '(' before '{' token
-    {
-    ^
->> include/linux/clk.h:677:32: error: 'devm_clk_bulk_get_all' declared 'static' but never defined [-Werror=unused-function]
-    static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
-                                   ^~~~~~~~~~~~~~~~~~~~~
-   cc1: all warnings being treated as errors
+Changes in v5:
+Use out labels to save the duplication between the error and success paths.
+Use RK_MMU_POLL_PERIOD_US instead of 100.
+Remove clk names.
+Use clk_bulk APIs.
+Avoid race about pm_runtime_get_if_in_use() and pm_runtime_enabled().
 
-vim +677 include/linux/clk.h
+Changes in v4:
+Rewrite commit message.
 
-   676	
- > 677	static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
-   678							     struct clk_bulk_data **clks);
- > 679	{
-   680	
-   681		return 0;
-   682	}
-   683	
+Changes in v3:
+Also remove remove() and module_exit() as Tomasz suggested.
+Loop platform_get_irq() as Robin suggested.
+Add struct rk_iommudata.
+Squash iommu/rockchip: Use iommu_group_get_for_dev() for add_device
+Only call startup() and shutdown() when iommu attached.
+Remove pm_mutex.
+Check runtime PM disabled.
+Check pm_runtime in rk_iommu_irq().
+Remove rk_iommudata->domain.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 24187 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180323/8215e30e/attachment-0001.gz>
+Changes in v2:
+Move irq request to probe(in patch[0])
+Move bus_set_iommu() to rk_iommu_probe().
+
+Jeffy Chen (10):
+  iommu/rockchip: Prohibit unbind and remove
+  iommu/rockchip: Fix error handling in probe
+  iommu/rockchip: Request irqs in rk_iommu_probe()
+  ARM: dts: rockchip: add clocks in iommu nodes
+  dt-bindings: iommu/rockchip: Add clock property
+  iommu/rockchip: Use IOMMU device for dma mapping operations
+  iommu/rockchip: Use OF_IOMMU to attach devices automatically
+  iommu/rockchip: Fix error handling in init
+  iommu/rockchip: Add runtime PM support
+  iommu/rockchip: Support sharing IOMMU between masters
+
+Tomasz Figa (4):
+  iommu/rockchip: Fix error handling in attach
+  iommu/rockchip: Use iopoll helpers to wait for hardware
+  iommu/rockchip: Fix TLB flush of secondary IOMMUs
+  iommu/rockchip: Control clocks needed to access the IOMMU
+
+ .../devicetree/bindings/iommu/rockchip,iommu.txt   |   7 +
+ arch/arm/boot/dts/rk3036.dtsi                      |   2 +
+ arch/arm/boot/dts/rk322x.dtsi                      |   8 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  12 +
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  10 +
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  10 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  14 +-
+ drivers/iommu/rockchip-iommu.c                     | 600 +++++++++++----------
+ 8 files changed, 363 insertions(+), 300 deletions(-)
+
+-- 
+2.11.0
