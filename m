@@ -1,77 +1,63 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Fri, 23 Mar 2018 15:33:26 +0200
-Subject: [PATCH] clk: imx: Set CLK_SET_RATE_GATE for gate and divider clocks
-Message-ID: <1521812006-6173-1-git-send-email-abel.vesa@nxp.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 23 Mar 2018 16:04:20 +0100
+Subject: [PATCH V7 00/13] drivers: Boot Constraint core
+In-Reply-To: <20180322012606.vuaemu3pvpeojtwr@vireshk-mac-ubuntu>
+References: <cover.1519380923.git.viresh.kumar@linaro.org>
+ <20180322012606.vuaemu3pvpeojtwr@vireshk-mac-ubuntu>
+Message-ID: <20180323150420.GA21152@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add flag CLK_SET_RATE_GATE for i.MX gate and divider clocks on which the
-client drivers usually make clk_set_rate() call, so that the call will fail
-when clock is still on instead of standing the risk of running into glitch
-issue. Rate cannot be changed when the clock is enabled due to the glitchy
-multiplexers.
+On Thu, Mar 22, 2018 at 09:26:06AM +0800, Viresh Kumar wrote:
+> On 23-02-18, 15:53, Viresh Kumar wrote:
+> > Problem statement:
+> > 
+> > Some devices are powered ON by the bootloader before the bootloader
+> > handovers control to Linux. It maybe important for some of those devices
+> > to keep working until the time a Linux device driver probes the device
+> > and reconfigure its resources.
+> > 
+> > A typical example of that can be the LCD controller, which is used by
+> > the bootloaders to show image(s) while the platform is booting into
+> > Linux.  The LCD controller can be using some resources, like clk,
+> > regulators, etc, that are shared between several devices. These shared
+> > resources should be configured to satisfy need of all the users.  If
+> > another device's (X) driver gets probed before the LCD controller driver
+> > in this case, then it may end up disabling or reconfiguring these
+> > resources to ranges satisfying the current users (only device X) and
+> > that can make the LCD screen unstable.
+> > 
+> > Another case can be a debug serial port enabled from the bootloader.
+> > 
+> > Of course we can have more complex cases where the same resource is
+> > getting used by two devices while the kernel boots and the order in
+> > which devices get probed wouldn't matter as the other device will surely
+> > break then.
+> 
+> And we have a _real_ use case for this complex scenario as well.
+> 
+> Georgi (cc'd) is currently working[1] on implementing generic support for the
+> interconnect bus, which tries to play with the bandwidth of the bus based on how
+> much are the requirements from different parts of the SoC. The 4th version was
+> posted recently by him, and things are looking good/positive.
+> 
+> The bootloader configures the interconnect to provide sufficient bandwidth for
+> all the devices which are used during boot, few of them are the CPUs, serial and
+> the LCD controller. As the kernel starts taking control of things, the drivers
+> being probed start putting their requirements on the interconnect bus.  Because
+> the interconnect doesn't have any representation from the devices which are not
+> yet initialized by the kernel, the interconnect core incorrectly reduces the
+> bandwidth of the bus to a level unacceptable to the devices running currently,
+> like the CPUs and this makes kernel boot awfully slow. This is not an ordering
+> problem as no matter which device we probe first, we are going to break
+> something else.
+> 
+> Georgi already tried using the boot constraint patches to solve this complex
+> problem, and its a perfect fit.
 
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-[initial patch from imx internal repo]
-Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-[carried over from 3.14 and also applied the flag to newer functions]
----
- drivers/clk/imx/clk.h | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+I'm delaying this as I still don't see that "perfect fit" yet.  If there
+are add-on patches that take better advantage of this, great, let's see
+those, but right now, it feels like you are the only one wanting this.
+And the increased complexity overall seems not really worth it yet :(
 
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index d69c4bb..4411719 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -96,7 +96,8 @@ static inline struct clk *imx_clk_fixed_factor(const char *name,
- static inline struct clk *imx_clk_divider(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift, u8 width)
- {
--	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
-+	return clk_register_divider(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-@@ -133,7 +134,8 @@ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+	return clk_register_gate2(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
- 			shift, 0x3, 0, &imx_ccm_lock, NULL);
- }
- 
-@@ -141,7 +143,8 @@ static inline struct clk *imx_clk_gate2_shared(const char *name,
- 		const char *parent, void __iomem *reg, u8 shift,
- 		unsigned int *share_count)
- {
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+	return clk_register_gate2(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
- 			shift, 0x3, 0, &imx_ccm_lock, share_count);
- }
- 
-@@ -150,8 +153,8 @@ static inline struct clk *imx_clk_gate2_shared2(const char *name,
- 		unsigned int *share_count)
- {
- 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT |
--				  CLK_OPS_PARENT_ENABLE, reg, shift, 0x3, 0,
--				  &imx_ccm_lock, share_count);
-+			CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
-+			reg, shift, 0x3, 0, &imx_ccm_lock, share_count);
- }
- 
- static inline struct clk *imx_clk_gate2_cgr(const char *name,
-@@ -173,7 +176,7 @@ static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
- 	return clk_register_gate2(NULL, name, parent,
--			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
-+		CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
- 			reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
- }
- 
--- 
-2.7.4
+greg k-h
