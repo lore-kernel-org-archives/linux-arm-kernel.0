@@ -1,55 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Mar 2018 09:49:08 +0100
-Subject: [PATCH v2 4/4] arm64: dts: renesas: r8a7796: sort subnodes of the
- soc node
-In-Reply-To: <20180322102423.18269-5-horms+renesas@verge.net.au>
-References: <20180322102423.18269-1-horms+renesas@verge.net.au>
- <20180322102423.18269-5-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdX-Sm2fnnw7DRxNHgJqppjKuWgS6M_uE38URxM6GwHdBg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Mar 2018 09:51:40 +0100
+Subject: [PATCH v6] ARM: dts: wheat: Fix ADV7513 address usage
+In-Reply-To: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
+References: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
+Message-ID: <20180323085140.g3golwdtpezo7fhi@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Thu, Mar 22, 2018 at 09:30:40PM +0000, Kieran Bingham wrote:
+> The r8a7792 Wheat board has two ADV7513 devices sharing a single I2C
+> bus, however in low power mode the ADV7513 will reset it's slave maps to
+> use the hardware defined default addresses.
+> 
+> The ADV7511 driver was adapted to allow the two devices to be registered
+> correctly - but it did not take into account the fault whereby the
+> devices reset the addresses.
+> 
+> This results in an address conflict between the device using the default
+> addresses, and the other device if it is in low-power-mode.
+> 
+> Repair this issue by moving both devices away from the default address
+> definitions.
 
-On Thu, Mar 22, 2018 at 11:24 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Sort subnodes of the soc node.
-> - The primary key is the bus address.
-> - The secondary key is the IP block.
-> - The tertiary key is the node name.
->
-> This is part of an ongoing effort to provide consistent node
-> order in the DT of Renesas SoCs to improve maintainability.
->
-> This should not have any run-time effect.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Kierean,
 
-Thanks for your patch!
-
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-using dtx_diff, and "grep '@.*{', which tells me
-
-> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-
->                 pciec0: pcie at fe000000 {
-> @@ -1860,6 +1838,43 @@
->                         /* placeholder */
->                 };
->
-> +               gic: interrupt-controller at f1010000 {
-
-Probably gic should be before pciec0.
-Currently it's after pciec1, which has a lower address than pciec1.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+as this is a fix
+a) Does it warrant a fixes tag?
+   Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
+b) Does it warrant being posted as a fix for v4.16;
+c) or v4.17?
