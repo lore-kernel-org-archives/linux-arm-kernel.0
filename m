@@ -1,61 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Mar 2018 12:51:47 -0400
-Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180323.124326.2170503491903886041.davem@davemloft.net>
-References: <1521738603-23596-4-git-send-email-okaya@codeaurora.org>
- <20180323.122035.1380806748695640531.davem@davemloft.net>
- <cb6a0522-2c53-b252-49db-5779d24963c6@codeaurora.org>
- <20180323.124326.2170503491903886041.davem@davemloft.net>
-Message-ID: <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 23 Mar 2018 09:53:13 -0700
+Subject: [PATCH V2 1/4] clk: bulk: add of_clk_bulk_get()
+In-Reply-To: <1521602391-30356-2-git-send-email-aisheng.dong@nxp.com>
+References: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
+ <1521602391-30356-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <152182399342.178046.13139513462419815903@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/23/2018 12:43 PM, David Miller wrote:
-> From: Sinan Kaya <okaya@codeaurora.org>
-> Date: Fri, 23 Mar 2018 12:31:12 -0400
-> 
->> Sorry, you got me confused now.
->>
->> If you look at the code closer, you'll see this.
->>
->> 	wmb();
->>
->> 	txdata->tx_db.data.prod += nbd;
->> 	barrier();
->>
->> 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
->>
->> and you also asked me to rename DOORBELL to DOORBELL_RELAXED() to make
->> it obvious that we have a relaxed operator inside the macro.
-> 
-> This still doesn't match the stated pattern.
+Quoting Dong Aisheng (2018-03-20 20:19:48)
+> diff --git a/drivers/clk/clk-bulk.c b/drivers/clk/clk-bulk.c
+> index 4c10456..4b357b2 100644
+> --- a/drivers/clk/clk-bulk.c
+> +++ b/drivers/clk/clk-bulk.c
+> @@ -19,6 +19,38 @@
+>  #include <linux/clk.h>
+>  #include <linux/device.h>
+>  #include <linux/export.h>
+> +#include <linux/of.h>
+> +
+> +#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
 
-I can certainly update the commit text for this or spin into its own
-patch to make it obvious.
+Do we need these defines? of_clk_get() is a stub function when these
+configs are false.
 
-> 
-> 	wmb();
-> 	/* no other memory or I/O or IOMEM operation */
-> 	writel();
-> 
-> There is a write to a producer index there and then no non-compiler
-> barrier or any kind before the writel().
-> 
-> So, in fact, it might really need that implicit writel() barrier here!
-> 
+> +static int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
+> +                                       struct clk_bulk_data *clks)
+> +{
+> +       int ret;
+> +       int i;
+> +
+> +       for (i = 0; i < num_clks; i++)
+> +               clks[i].clk = NULL;
+> +
+> +       for (i = 0; i < num_clks; i++) {
+> +               clks[i].clk = of_clk_get(np, i);
+> +               if (IS_ERR(clks[i].clk)) {
+> +                       ret = PTR_ERR(clks[i].clk);
+> +                       pr_err("%pOF: Failed to get clk index: %d ret: %d\n",
+> +                              np, i, ret);
+> +                       clks[i].clk = NULL;
+> +                       goto err;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +
+> +err:
+> +       clk_bulk_put(i, clks);
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL(of_clk_bulk_get);
 
-It could if txdata->tx_db was not a union. There is a data dependency
-between txdata->tx_db.data.prod and txdata->tx_db.raw. 
-
-So, no reordering.
-
-I can argue that barrier() here is useless in fact.
-
-Anyhow, I'll spin this piece out of this patch so that we pay special
-attention with a better description.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+It's static, so don't export it.
