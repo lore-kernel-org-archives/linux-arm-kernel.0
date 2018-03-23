@@ -1,32 +1,32 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Fri, 23 Mar 2018 22:38:10 +0800
-Subject: [PATCH v2 1/7] clk: meson: drop meson_aoclk_gate_regmap_ops
+Date: Fri, 23 Mar 2018 22:38:12 +0800
+Subject: [PATCH v2 3/7] dt-bindings: clock: axg-aoclkc: New binding for
+ Meson-AXG SoC
 In-Reply-To: <20180323143816.200573-1-yixun.lan@amlogic.com>
 References: <20180323143816.200573-1-yixun.lan@amlogic.com>
-Message-ID: <20180323143816.200573-2-yixun.lan@amlogic.com>
+Message-ID: <20180323143816.200573-4-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-let's remove the unused meson_aoclk_gate_regmap_ops
+Update the dt-binding documentation to support new compatible string
+for the Amlogic's Meson-AXG SoC.
 
-Fixes: 1f932d99710d ("clk: meson: remove superseded aoclk_gate_regmap")
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- drivers/clk/meson/gxbb-aoclk.h | 2 --
- 1 file changed, 2 deletions(-)
+ Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/meson/gxbb-aoclk.h b/drivers/clk/meson/gxbb-aoclk.h
-index 0be78383f257..badc4c22b4ee 100644
---- a/drivers/clk/meson/gxbb-aoclk.h
-+++ b/drivers/clk/meson/gxbb-aoclk.h
-@@ -17,8 +17,6 @@
- #define AO_RTC_ALT_CLK_CNTL0	0x94
- #define AO_RTC_ALT_CLK_CNTL1	0x98
+diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+index 786dc39ca904..3a880528030e 100644
+--- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
++++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+@@ -9,6 +9,7 @@ Required Properties:
+ 	- GXBB (S905) : "amlogic,meson-gxbb-aoclkc"
+ 	- GXL (S905X, S905D) : "amlogic,meson-gxl-aoclkc"
+ 	- GXM (S912) : "amlogic,meson-gxm-aoclkc"
++	- AXG (A113D, A113X) : "amlogic,meson-axg-aoclkc"
+ 	followed by the common "amlogic,meson-gx-aoclkc"
  
--extern const struct clk_ops meson_aoclk_gate_regmap_ops;
--
- struct aoclk_cec_32k {
- 	struct clk_hw hw;
- 	struct regmap *regmap;
+ - #clock-cells: should be 1.
 -- 
 2.15.1
