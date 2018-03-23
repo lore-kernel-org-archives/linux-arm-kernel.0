@@ -1,86 +1,32 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 23 Mar 2018 09:56:57 -0700
-Subject: [PATCH V2 2/4] clk: add new APIs to operate on all available
- clocks
-In-Reply-To: <1521602391-30356-3-git-send-email-aisheng.dong@nxp.com>
-References: <1521602391-30356-1-git-send-email-aisheng.dong@nxp.com>
- <1521602391-30356-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <152182421754.178046.7553203878044979411@swboyd.mtv.corp.google.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 23 Mar 2018 13:04:18 -0400 (EDT)
+Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
+References: <cb6a0522-2c53-b252-49db-5779d24963c6@codeaurora.org>
+ <20180323.124326.2170503491903886041.davem@davemloft.net>
+ <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
+Message-ID: <20180323.130418.2223623186761161723.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dong Aisheng (2018-03-20 20:19:49)
-> @@ -50,6 +52,38 @@ static int __must_check of_clk_bulk_get(struct device_node *np, int num_clks,
->         return ret;
->  }
->  EXPORT_SYMBOL(of_clk_bulk_get);
-> +
-> +static int __must_check of_clk_bulk_get_all(struct device_node *np,
-> +                                           struct clk_bulk_data **clks)
-> +{
-> +       struct clk_bulk_data *clk_bulk;
-> +       int num_clks;
-> +       int ret;
-> +
-> +       num_clks = of_clk_get_parent_count(np);
-> +       if (!num_clks)
-> +               return 0;
-> +
-> +       clk_bulk = kcalloc(num_clks, sizeof(*clk_bulk), GFP_KERNEL);
+From: Sinan Kaya <okaya@codeaurora.org>
+Date: Fri, 23 Mar 2018 12:51:47 -0400
 
-Can be kmalloc_array? of_clk_bulk_get() already clears things out
-appropriately.
+> It could if txdata->tx_db was not a union. There is a data dependency
+> between txdata->tx_db.data.prod and txdata->tx_db.raw. 
+> 
+> So, no reordering.
 
-> +       if (!clk_bulk)
-> +               return -ENOMEM;
-> +
-> +       ret = of_clk_bulk_get(np, num_clks, clk_bulk);
-> +       if (ret) {
-> +               kfree(clk_bulk);
-> +               return ret;
-> +       }
-> +
-> +       *clks = clk_bulk;
-> +
-> +       return num_clks;
-> +}
-> +#else
-> +static int __must_check of_clk_bulk_get_all(struct device_node *np,
-> +                                           struct clk_bulk_data **clks)
-> +{
-> +       return -ENOENT;
-> +}
->  #endif
+I don't see it that way, the code requires that:
 
-This else can probably be dropped too.
+ 	txdata->tx_db.data.prod += nbd;
 
->  
->  void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
-> @@ -90,6 +124,29 @@ int __must_check clk_bulk_get(struct device *dev, int num_clks,
->  }
->  EXPORT_SYMBOL(clk_bulk_get);
->  
-> +void clk_bulk_put_all(int num_clks, struct clk_bulk_data *clks)
-> +{
-> +       if (IS_ERR_OR_NULL(clks))
-> +               return;
-> +
-> +       clk_bulk_put(num_clks, clks);
-> +
-> +       kfree(clks);
-> +}
-> +EXPORT_SYMBOL(clk_bulk_put_all);
-> +
-> +int __must_check clk_bulk_get_all(struct device *dev,
-> +                                 struct clk_bulk_data **clks)
-> +{
-> +       struct device_node *np = dev_of_node(dev);
-> +
-> +       if (!np)
-> +               return 0;
-> +
-> +       return of_clk_bulk_get_all(np, clks);
-> +}
-> +EXPORT_SYMBOL(clk_bulk_get_all);
+is visible before the doorbell update.
 
-Looks better!
+barrier() doesn't provide that.
+
+Neither does writel_relaxed().  However plain writel() does.
+
+Therefore the code is only correct as-is, and your change potentially
+adds a reordering problem.
