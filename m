@@ -1,40 +1,75 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 23 Mar 2018 18:32:37 +0200
-Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
- requested
-In-Reply-To: <CAHp75VeTxGu-pxqde_egsqUkLBdZujoJv=0YEj9cv8ujnthyPA@mail.gmail.com>
-References: <20180321165848.89751-1-swboyd@chromium.org>
- <20180321165848.89751-4-swboyd@chromium.org>
- <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
- <1521804964.23017.96.camel@linux.intel.com>
- <152182210780.178046.13284917877743312593@swboyd.mtv.corp.google.com>
- <CAHp75VeTxGu-pxqde_egsqUkLBdZujoJv=0YEj9cv8ujnthyPA@mail.gmail.com>
-Message-ID: <CAHp75Vcw9VkihRzwZXAvLEGYbVhrXgvDCEPyciU7d4a5G-uUow@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 23 Mar 2018 17:34:38 +0100
+Subject: [PATCH 1/3] arm64: dts: marvell: armada-37xx: mark the gpio
+ controllers as irq controller
+In-Reply-To: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de> ("Uwe
+ =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Wed, 21 Mar 2018 11:50:03
+ +0100")
+References: <20180321105005.18426-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <87zi2yvjhd.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 6:31 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Fri, Mar 23, 2018 at 6:21 PM, Stephen Boyd <swboyd@chromium.org> wrote:
+Hi Uwe,
+ 
+ On mer., mars 21 2018, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+
+> This allows to reference these gpio controller as interrupt parent. Also
+> add a comment which cpu line names are managed by the controllers
+> because "nb" and "sb" usually doesn't appear in schematics, but MPPX_Y
+> do.
 >
->>        bitmap_zero(chip->valid_mask, max_gpios);
->>        for (i = 0; i < len; i++)
->>                set_bit(tmp[i], chip->valid_mask);
->
-> Looking to this code I just realized it would be nice to have
->
-> {of,device}_property_read_bitmask() where bitmask_parse() is called.
->
-> Since it related to change a binding, I would really take couple of
-> days to hear other opinions.
->
-> In the above case, you need to supply a string, like
->
-> "1-5,16,18,25"
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
 
-s/bitmask/bitmap/g
+Applied on mvebu/dt-for-4.18 (I wonders why I didn't updated the dtsi
+earlier...)
+
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index 375026867342..6a96404e7c88 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -184,10 +184,13 @@
+>  				compatible = "marvell,armada3710-nb-pinctrl",
+>  					     "syscon", "simple-mfd";
+>  				reg = <0x13800 0x100>, <0x13C00 0x20>;
+> +				/* MPP1[19:0] */
+>  				gpionb: gpio {
+>  					#gpio-cells = <2>;
+>  					gpio-ranges = <&pinctrl_nb 0 0 36>;
+>  					gpio-controller;
+> +					interrupt-controller;
+> +					#interrupt-cells = <2>;
+>  					interrupts =
+>  					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+>  					<GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> @@ -245,10 +248,13 @@
+>  				compatible = "marvell,armada3710-sb-pinctrl",
+>  					     "syscon", "simple-mfd";
+>  				reg = <0x18800 0x100>, <0x18C00 0x20>;
+> +				/* MPP2[23:0] */
+>  				gpiosb: gpio {
+>  					#gpio-cells = <2>;
+>  					gpio-ranges = <&pinctrl_sb 0 0 30>;
+>  					gpio-controller;
+> +					interrupt-controller;
+> +					#interrupt-cells = <2>;
+>  					interrupts =
+>  					<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+>  					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>,
+> -- 
+> 2.16.2
+>
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
