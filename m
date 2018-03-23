@@ -1,22 +1,51 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 23 Mar 2018 12:15:30 -0700
-Subject: Regression with arm in next with stack protector
-In-Reply-To: <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
-References: <20180323181452.GJ5799@atomide.com>
- <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
-Message-ID: <20180323121530.f28dc29939d9395268911a4e@linux-foundation.org>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Fri, 23 Mar 2018 20:22:09 +0100
+Subject: [PATCH v4] staging: bcm2835-audio: Release resources on
+ module_exit()
+In-Reply-To: <CAHp75VdYiySBzu99MYoBAZ8tORGP1R43z9d+=VRdktg+U=_ZDw@mail.gmail.com>
+References: <f35d0f86-04b5-6edb-139f-4632edc493b3@gmail.com>
+ <20180322213722.31822-1-k.marinushkin@gmail.com>
+ <CAHp75VdYiySBzu99MYoBAZ8tORGP1R43z9d+=VRdktg+U=_ZDw@mail.gmail.com>
+Message-ID: <0524fb43-ed08-6c54-39ed-32bd96ccaca4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Mar 2018 15:45:27 -0300 Fabio Estevam <festevam@gmail.com> wrote:
+On 03/23/18 17:23, Andy Shevchenko wrote:
+> On Thu, Mar 22, 2018 at 11:37 PM, Kirill Marinushkin
+> <k.marinushkin@gmail.com> wrote:
+>
+>
+>> +static void snd_devm_release(struct device *dev)
+>> +{
+>> +       struct bcm2835_chip *chip = dev_get_drvdata(dev);
+>> +
+>> +       kfree(chip);
+>> +}
+>> +       device->release = snd_devm_release;
+> This is not devm function, so, it would be rather called
+> snd_bcm2835_release().
 
-> On Fri, Mar 23, 2018 at 3:14 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > Hi,
-> >
-> > Looks like commit 5638790dadae ("zboot: fix stack protector in
-> > compressed boot phase") breaks booting on arm.
-> 
-> Yes, almost all imx are broken in linux-next due to this commit:
-> https://kernelci.org/soc/imx/job/next/kernel/next-20180323/
+Ah, you mean "devm" in the names. Now I got it.
+Agree, I will rename it to "snd_bcm2835_release()"
 
-Thanks, I dropped it and I expect Stephen will also do that.
+>
+>>  static struct snd_card *snd_devm_card_new(struct device *dev)
+>>  {
+>>         struct snd_card *card;
+>>         int ret;
+>>
+>>         ret = snd_card_new(dev, -1, NULL, THIS_MODULE, 0, &card);
+>> +       if (ret)
+>>                 return ERR_PTR(ret);
+>>
+>>         return card;
+>>  }
+> Same here. You removed anything related to devm here, so, please make
+> function name consistent.
+
+Good, I will rename it to "snd_bcm2835_card_new()"
+
+> After addressing above, FWIW,
+>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+>
