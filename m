@@ -1,124 +1,36 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 23 Mar 2018 14:46:18 +0100
-Subject: [PATCH v4 1/8] reset: modify the way reset lookup works for board
- files
-In-Reply-To: <1521812598.3406.8.camel@pengutronix.de>
-References: <20180323130455.11470-1-brgl@bgdev.pl>
- <20180323130455.11470-2-brgl@bgdev.pl>
- <1521812598.3406.8.camel@pengutronix.de>
-Message-ID: <CAMpxmJUOUvBH6bArXDn1TkS0ZXttD2CCk-cMw0TH52FoRNRdmA@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri, 23 Mar 2018 08:56:17 -0500
+Subject: [PATCH] arm: dts: socfpga: fix GIC PPI warning
+In-Reply-To: <20180323092215.1307-1-pp@emlix.com>
+References: <20180323092215.1307-1-pp@emlix.com>
+Message-ID: <3b6eabf8-1d6b-7a58-03b1-3bff14c4127e@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-23 14:43 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> On Fri, 2018-03-23 at 14:04 +0100, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> Commit 7af1bb19f1d7 ("reset: add support for non-DT systems")
->> introduced reset control lookup mechanism for boards that still use
->> board files.
->>
->> The routine used to register lookup entries takes the corresponding
->> reset_controlled_dev structure as argument.
->>
->> It's been determined however that for the first user of this new
->> interface - davinci psc driver - it will be easier to register the
->> lookup entries using the reset controller device name.
->>
->> This patch changes the way lookup entries are added.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  drivers/reset/core.c             | 38 +++++++++++++++++++++++++++++++-------
->>  include/linux/reset-controller.h | 14 ++++++++------
->>  2 files changed, 39 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
->> index 06fa4907afc4..f4a29c046995 100644
->> --- a/drivers/reset/core.c
->> +++ b/drivers/reset/core.c
->> @@ -153,12 +153,10 @@ EXPORT_SYMBOL_GPL(devm_reset_controller_register);
->>
->>  /**
->>   * reset_controller_add_lookup - register a set of lookup entries
->> - * @rcdev: initialized reset controller device owning the reset line
->>   * @lookup: array of reset lookup entries
->>   * @num_entries: number of entries in the lookup array
->>   */
->> -void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
->> -                              struct reset_control_lookup *lookup,
->> +void reset_controller_add_lookup(struct reset_control_lookup *lookup,
->>                                unsigned int num_entries)
->>  {
->>       struct reset_control_lookup *entry;
->> @@ -168,13 +166,12 @@ void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
->>       for (i = 0; i < num_entries; i++) {
->>               entry = &lookup[i];
->>
->> -             if (!entry->dev_id) {
->> -                     pr_warn("%s(): reset lookup entry has no dev_id, skipping\n",
->> +             if (!entry->dev_id || !entry->provider) {
->> +                     pr_warn("%s(): reset lookup entry badly specified, skipping\n",
->>                               __func__);
->>                       continue;
->>               }
->>
->> -             entry->rcdev = rcdev;
->>               list_add_tail(&entry->list, &reset_lookup_list);
->>       }
->>       mutex_unlock(&reset_lookup_mutex);
->> @@ -526,11 +523,30 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
->>  }
->>  EXPORT_SYMBOL_GPL(__of_reset_control_get);
->>
->> +static struct reset_controller_dev *
->> +__reset_controller_by_name(const char *name)
->> +{
->> +     struct reset_controller_dev *rcdev;
->> +
->> +     lockdep_assert_held(&reset_list_mutex);
->> +
->> +     list_for_each_entry(rcdev, &reset_controller_list, list) {
->> +             if (!rcdev->dev)
->> +                     continue;
->> +
->> +             if (!strcmp(name, dev_name(rcdev->dev)))
->> +                     return rcdev;
->> +     }
->> +
->> +     return NULL;
->> +}
->> +
->>  static struct reset_control *
->>  __reset_control_get_from_lookup(struct device *dev, const char *con_id,
->>                               bool shared, bool optional)
->>  {
->>       const struct reset_control_lookup *lookup;
->> +     struct reset_controller_dev *rcdev;
->>       const char *dev_id = dev_name(dev);
->>       struct reset_control *rstc = NULL;
->>
->> @@ -547,7 +563,15 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
->>                   ((con_id && lookup->con_id) &&
->>                    !strcmp(con_id, lookup->con_id))) {
->>                       mutex_lock(&reset_list_mutex);
->> -                     rstc = __reset_control_get_internal(lookup->rcdev,
->> +                     rcdev = __reset_controller_by_name(lookup->provider);
->> +                     if (!rcdev) {
->> +                             mutex_unlock(&reset_list_mutex);
->> +                             mutex_unlock(&reset_lookup_mutex);
->> +                             /* Reset provider may not be ready yet. */
->> +                             return -EPROBE_DEFER;
->
-> Thanks, I've applied this patch to reset/next with the following change:
->
-> -                               return -EPROBE_DEFER;
-> +                               return ERR_PTR(-EPROBE_DEFER);
->
-> regards
-> Philipp
 
-Oops, thanks for spotting that.
 
-Thanks,
-Bart
+On 03/23/2018 04:22 AM, Philipp Puschmann wrote:
+> Fixes the warning "GIC: PPI13 is secure or misconfigured" by
+> changing the interrupt type from level_low to edge_raising
+> 
+> Signed-off-by: Philipp Puschmann <pp@emlix.com>
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+> index 595eb4f1a761..e9417551d7ea 100644
+> --- a/arch/arm/boot/dts/socfpga.dtsi
+> +++ b/arch/arm/boot/dts/socfpga.dtsi
+> @@ -815,7 +815,7 @@
+>  		timer at fffec600 {
+>  			compatible = "arm,cortex-a9-twd-timer";
+>  			reg = <0xfffec600 0x100>;
+> -			interrupts = <1 13 0xf04>;
+> +			interrupts = <1 13 0xf01>;
+>  			clocks = <&mpu_periph_clk>;
+>  		};
+
+Applied, thanks!
+
+Dinh
