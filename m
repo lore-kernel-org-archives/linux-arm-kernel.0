@@ -1,29 +1,60 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 23 Mar 2018 18:50:18 -0500
-Subject: [PATCH v4 0/5] Support qcom pinctrl protected pins
-In-Reply-To: <20180323163453.96495-1-swboyd@chromium.org>
-References: <20180323163453.96495-1-swboyd@chromium.org>
-Message-ID: <d7e0d2e1-c0d8-f751-7a73-71d5ab15bf52@codeaurora.org>
+From: ckadabi@codeaurora.org (Channa)
+Date: Fri, 23 Mar 2018 16:57:52 -0700
+Subject: [PATCH 2/2] drivers: soc: Add LLCC driver
+In-Reply-To: <20180319145525.GD28808@jcrouse-lnx.qualcomm.com>
+References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
+ <1516924513-20183-3-git-send-email-ckadabi@codeaurora.org>
+ <20180319145525.GD28808@jcrouse-lnx.qualcomm.com>
+Message-ID: <5f71be17214a8c54d59555be6f67517f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2018 11:34 AM, Stephen Boyd wrote:
-> Stephen Boyd (5):
->    dt-bindings: gpio: Add a gpio-reserved-ranges property
->    gpiolib: Extract mask allocation into subroutine
->    gpiolib: Change bitmap allocation to kmalloc_array
->    gpiolib: Support 'gpio-reserved-ranges' property
->    pinctrl: qcom: Don't allow protected pins to be requested
+On 2018-03-19 07:55, Jordan Crouse wrote:
+> On Thu, Jan 25, 2018 at 03:55:13PM -0800, Channagoud Kadabi wrote:
+>> LLCC (Last Level Cache Controller) provides additional cache memory
+>> in the system. LLCC is partitioned into muliple slices and each
+>> slice gets its own priority, size, ID and other config parameters.
+>> LLCC driver programs these parameters for each slice. Clients that
+>> are assigned to use LLCC need to get information such size & ID of the
+>> slice for their usecase and activate or deactivate the slice as 
+>> needed.
+>> LLCC driver provides API interfaces for the clients to perform these
+>> operations.
+> 
+> <snip>
+> 
+>> +/**
+>> + * llcc_slice_deactivate - Deactivate the llcc slice
+>> + * @desc: Pointer to llcc slice descriptor
+>> + *
+>> + * A value zero will be returned on success and a negative errno will
+>> + * be returned in error cases
+>> + */
+>> +int llcc_slice_deactivate(struct llcc_slice_desc *desc)
+>> +{
+>> +	u32 act_ctrl_val;
+>> +	int rc = -EINVAL;
+>> +	struct llcc_drv_data *drv;
+>> +
+>> +	if (desc == NULL) {
+>> +		pr_err("Input descriptor supplied is invalid\n");
+> 
+> Sorry that this is out of the blue, but I was reviewing a client driver 
+> that
+> uses this API. This should not print an error - we should be allowed to 
+> safely
+> pass a null pointer from an aborted sequence in the driver without the
+> conditional checks and it shouldn't generate a bit of log spam as it 
+> goes about
+> it's business.
 
-ACPI parts:
+Thanks Jordan. I will incorporate this change in my next patchset.
 
-Tested-by: Timur Tabi <timur@codeaurora.org>
-
-I posted a pair of patches that should be applied on top of yours.  The 
-first one fixed pinctrl-msm when there is more than one TLMM device. 
-The second adds support for my SOC.
+> 
+> Jordan
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+--
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+a Linux Foundation Collaborative Project
