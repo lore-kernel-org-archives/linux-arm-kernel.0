@@ -1,262 +1,65 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 23 Mar 2018 10:58:56 -0700
-Subject: [PATCH v11 2/2] clk: npcm7xx: Nuvoton NPCM7XX Clock Controller
- driver
-In-Reply-To: <1521553249-6971-3-git-send-email-tali.perry1@gmail.com>
-References: <1521553249-6971-1-git-send-email-tali.perry1@gmail.com>
- <1521553249-6971-3-git-send-email-tali.perry1@gmail.com>
-Message-ID: <152182793651.178046.13824776927497999970@swboyd.mtv.corp.google.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 23 Mar 2018 18:08:31 +0000
+Subject: [PATCH v2] arm64/sve: Document firmware support requirements in
+ Kconfig
+Message-ID: <1521828511-30946-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting tali.perry1 at gmail.com (2018-03-20 06:40:49)
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 71ec41e6364f..353e94f2c25a 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -21,6 +21,7 @@ endif
->  obj-$(CONFIG_MACH_ASM9260)             += clk-asm9260.o
->  obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)    += clk-axi-clkgen.o
->  obj-$(CONFIG_ARCH_AXXIA)               += clk-axm5516.o
-> +obj-$(CONFIG_ARCH_NPCM7XX)             += clk-npcm7xx.o
+Use of SVE by EL2 and below requires explicit support in the
+firmware.  There is no means to hide the presence of SVE from EL2,
+so a kernel configured with CONFIG_ARM64_SVE=y will typically not
+work correctly on SVE capable hardware unless the firmware does
+include the appropriate support.
 
-Please sort this by filename, not config name.
+This is not expected to pose a problem in the wild, since platform
+integrators are responsible for ensuring that they ship up-to-date
+firmware to support their hardware.  However, developers may hit
+the issue when using mismatched compoments.
 
->  obj-$(CONFIG_COMMON_CLK_CDCE706)       += clk-cdce706.o
->  obj-$(CONFIG_COMMON_CLK_CDCE925)       += clk-cdce925.o
->  obj-$(CONFIG_ARCH_CLPS711X)            += clk-clps711x.o
-> diff --git a/drivers/clk/clk-npcm7xx.c b/drivers/clk/clk-npcm7xx.c
-> new file mode 100644
-> index 000000000000..0d373f8f114b
-> --- /dev/null
-> +++ b/drivers/clk/clk-npcm7xx.c
-> @@ -0,0 +1,757 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Nuvoton NPCM7xx Clock Generator
-[..]
-> +
-> +
-> +static struct clk_hw_onecell_data *npcm7xx_clk_data;
-> +static void __iomem *clk_base;
+In order to draw attention to the issue and how to solve it, this
+patch adds some Kconfig text giving a brief explanation and details
+of compatible firmware versions.
 
-Please remove static singletons and allocate them during init.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-> +static DEFINE_SPINLOCK(lock);
+---
 
-Please give 'lock' a better name so that lockdep reports are
-meaningful.
+Changes since v1:
 
-> +
-> +
-> +static const struct of_device_id npcm7xx_clk_match_table[] = {
-> +                               { .compatible = "nuvoton,npcm750-clk"},
-> +                               {},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, npcm7xx_clk_match_table);
+ * Fixed a typo ("firware") reported by Suzuki
+---
+ arch/arm64/Kconfig | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Is this used?
-
-> +
-> +
-> +static void __init npcm7xx_clk_init(struct device_node *clk_np)
-> +{
-> +
-> +       struct resource res;
-> +       struct clk_hw *hw;
-> +       struct clk *clk;
-> +       int ret;
-> +       int i;
-> +
-> +       pr_debug("NPCM750: clock init: ");
-> +
-> +       clk_base = NULL;
-> +
-> +       ret = of_address_to_resource(clk_np, 0, &res);
-> +       if (ret) {
-> +               pr_err("\t%s: failed to get resource, ret %d\n", clk_np->name,
-> +                       ret);
-> +               return;
-> +       }
-> +
-> +
-> +       clk_base = ioremap(res.start, resource_size(&res));
-> +       if (IS_ERR(clk_base)) {
-> +               pr_err("\tnpcm7xx_clk_init: resource error\n");
-> +               goto npcm7xx_init_error;
-> +       }
-> +
-> +
-> +       npcm7xx_clk_data = kzalloc(sizeof(*npcm7xx_clk_data->hws) *
-> +               NPCM7XX_NUM_CLOCKS + sizeof(npcm7xx_clk_data), GFP_KERNEL);
-> +
-> +       npcm7xx_clk_data->num = 0;
-> +
-> +       if (!npcm7xx_clk_data->hws) {
-> +               pr_err("Can't alloc npcm7xx_clk_data\n");
-
-We don't need allocation error messages, kmalloc already prints a bunch
-of info.
-
-> +               goto npcm7xx_init_np_err;
-> +       }
-> +
-> +       npcm7xx_clk_data->num = NPCM7XX_NUM_CLOCKS;
-> +
-> +
-> +       /*
-> +        * This way all clock fetched before the platform device probes,
-
-What platform device?
-
-> +        * except those we assign here for early use, will be deferred.
-> +        */
-> +       pr_debug("\tclk init hws\n");
-> +       for (i = 0; i < NPCM7XX_NUM_CLOCKS; i++)
-> +               npcm7xx_clk_data->hws[i] = ERR_PTR(-EPROBE_DEFER);
-> +
-> +       /* Read fixed clocks. These 3 clocks must be defined in DT */
-> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_REFCLK);
-> +       if (!IS_ERR(clk)) {
-> +               pr_err("failed to find external REFCLK: %ld\n",
-> +                       PTR_ERR(clk));
-> +               clk_put(clk);
-> +       }
-> +
-> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_SYSBYPCK);
-> +       if (!IS_ERR(clk)) {
-> +               pr_err("failed to find external SYSBYPCK: %ld\n",
-> +                       PTR_ERR(clk));
-> +               clk_put(clk);
-> +       }
-> +
-> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_MCBYPCK);
-> +       if (!IS_ERR(clk)) {
-> +               pr_err("failed to find external MCBYPCK: %ld\n",
-> +                       PTR_ERR(clk));
-> +               clk_put(clk);
-> +       }
-> +
-> +       /* Register plls */
-> +       pr_debug("\tclk register pll\n");
-> +       for (i = 0; i < ARRAY_SIZE(npcm7xx_plls); i++) {
-> +               const struct npcm7xx_clk_pll_data *pll_data = &npcm7xx_plls[i];
-> +
-> +               pr_debug("\tclk reg pll%d, reg=0x%x, name=%s, p=%s\n", i,
-> +               (unsigned int)pll_data->reg, pll_data->name,
-> +               pll_data->parent_name);
-> +
-> +               hw = npcm7xx_clk_register_pll(clk_base + pll_data->reg,
-> +                       pll_data->name, pll_data->parent_name, pll_data->flags);
-> +               if (IS_ERR(hw)) {
-> +                       pr_err("npcm7xx_clk: Can't register pll\n");
-> +                       goto npcm7xx_init_fail;
-> +               }
-> +
-> +               if (pll_data->onecell_idx >= 0)
-> +                       npcm7xx_clk_data->hws[pll_data->onecell_idx] = hw;
-> +       }
-> +
-> +       /* Register fixed dividers */
-> +       pr_debug("\tclk register fixed divs\n");
-> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL1_DIV2,
-> +                       NPCM7XX_CLK_S_PLL1, 0, 1, 2);
-> +       if (IS_ERR(clk)) {
-> +               pr_err("npcm7xx_clk: Can't register fixed div\n");
-> +               goto npcm7xx_init_fail;
-> +       }
-> +
-> +
-> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL2_DIV2,
-> +                       NPCM7XX_CLK_S_PLL2, 0, 1, 2);
-> +
-> +       if (IS_ERR(clk)) {
-> +               pr_err("npcm7xx_clk: Can't register div2\n");
-> +               goto npcm7xx_init_fail;
-> +       }
-> +
-> +       /* Register muxes */
-> +       for (i = 0; i < ARRAY_SIZE(npcm7xx_muxes); i++) {
-> +               const struct npcm7xx_clk_mux_data *mux_data = &npcm7xx_muxes[i];
-> +
-> +               pr_debug("\tadd mux%d reg=0x%x name=%s p=%s num_p=%d\n",
-> +                   i, ((u32)clk_base + (u32)NPCM7XX_CLKSEL), mux_data->name,
-> +                       mux_data->parent_names[0], mux_data->num_parents);
-> +
-> +               hw = clk_hw_register_mux_table(NULL,
-> +                       mux_data->name,
-> +                       mux_data->parent_names, mux_data->num_parents,
-> +                       mux_data->flags, clk_base + NPCM7XX_CLKSEL,
-> +                       mux_data->shift, mux_data->mask, 0,
-> +                       mux_data->table, &lock);
-> +
-> +               if (IS_ERR(hw)) {
-> +                       pr_err("npcm7xx_clk: Can't register mux\n");
-> +                       goto npcm7xx_init_fail;
-> +               }
-> +
-> +               if (mux_data->onecell_idx >= 0)
-> +                       npcm7xx_clk_data->hws[mux_data->onecell_idx] = hw;
-> +       }
-> +
-> +       /* Register clock dividers specified in npcm7xx_divs. */
-> +       pr_debug("\tclk register divs\n");
-> +       for (i = 0; i < ARRAY_SIZE(npcm7xx_divs); i++) {
-> +               const struct npcm7xx_clk_div_data *div_data = &npcm7xx_divs[i];
-> +
-> +               pr_debug("\tadd div%d reg=0x%x name=%s, parent=%s\n",
-> +                               i, (unsigned int)div_data->reg,
-> +                               div_data->name, div_data->parent_name);
-
-Please remove all these debug prints.
-
-> +
-> +               hw = clk_hw_register_divider(NULL, div_data->name,
-> +                               div_data->parent_name,
-> +                               div_data->flags,
-> +                               clk_base + div_data->reg,
-> +                               div_data->shift, div_data->width,
-> +                               div_data->clk_divider_flags, &lock);
-> +               if (IS_ERR(hw)) {
-> +                       pr_err("npcm7xx_clk: Can't register div table\n");
-> +                       goto npcm7xx_init_fail;
-> +               }
-> +
-> +               if (div_data->onecell_idx >= 0)
-> +                       npcm7xx_clk_data->hws[div_data->onecell_idx] = hw;
-> +       }
-> +
-> +       ret = of_clk_add_hw_provider(clk_np, of_clk_hw_onecell_get,
-> +                                       npcm7xx_clk_data);
-> +       if (ret)
-> +               pr_err("failed to add DT provider: %d\n", ret);
-> +
-> +       pr_info("npcm7xx clk: %d dividers, %d muxes and %d plls registered.\n",
-> +               ARRAY_SIZE(npcm7xx_divs), ARRAY_SIZE(npcm7xx_muxes),
-> +               ARRAY_SIZE(npcm7xx_plls));
-
-Please remove this "I'm alive!" message.
-
-> +
-> +       of_node_put(clk_np);
-> +
-> +       return;
-> +
-> +npcm7xx_init_fail:
-> +       pr_debug("\tclk setup fail\n");
-
-Please don't put tabs at the beginning of printks.
-
-> +       if (npcm7xx_clk_data->num)
-> +               kfree(npcm7xx_clk_data->hws);
-> +npcm7xx_init_np_err:
-> +       if (clk_base != NULL)
-> +               iounmap(clk_base);
-> +npcm7xx_init_error:
-> +       of_node_put(clk_np);
-> +}
-> +
-> +CLK_OF_DECLARE(npcm7xx_clk_init, "nuvoton,npcm750-clk", npcm7xx_clk_init);
-
-Any reason this can't be a platform driver?
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7381eeb..4fc7057 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1104,6 +1104,23 @@ config ARM64_SVE
+ 
+ 	  To enable use of this extension on CPUs that implement it, say Y.
+ 
++	  Note that for architectural reasons, firmware _must_ implement SVE
++	  support when running on SVE capable hardware.  The required support
++	  is present in:
++
++	    * version 1.5 and later of the ARM Trusted Firmware
++	    * the AArch64 boot wrapper since commit 5e1261e08abf
++	      ("bootwrapper: SVE: Enable SVE for EL2 and below").
++
++	  For other firmware implementations, consult the firmware documentation
++	  or vendor.
++
++	  If you need the kernel to boot on SVE-capable hardware with broken
++	  firmware, you may need to say N here until you get your firmware
++	  fixed.  Otherwise, you may experience firmware panics or lockups when
++	  booting the kernel.  If unsure and you are not observing these
++	  symptoms, you should assume that it is safe to say Y.
++
+ config ARM64_MODULE_CMODEL_LARGE
+ 	bool
+ 
+-- 
+2.1.4
