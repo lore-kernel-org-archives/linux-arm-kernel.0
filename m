@@ -1,30 +1,45 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 23 Mar 2018 21:30:36 +0900
-Subject: [PATCH 1/2] dt-bindings: net: ave: add PXs3 support
+Date: Fri, 23 Mar 2018 21:30:37 +0900
+Subject: [PATCH 2/2] net: ethernet: ave: add UniPhier PXs3 support
 In-Reply-To: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1521808237-3623-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1521808237-3623-3-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a compatible string for ethernet controller on UniPhier PXs3 SoC.
+Add a compatible string and SoC data for ethernet controller on
+UniPhier PXs3 SoC.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
- Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/socionext/sni_ave.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-index 270ea4e..96398cc 100644
---- a/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-+++ b/Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt
-@@ -9,6 +9,7 @@ Required properties:
- 	- "socionext,uniphier-pxs2-ave4" : for PXs2 SoC
- 	- "socionext,uniphier-ld11-ave4" : for LD11 SoC
- 	- "socionext,uniphier-ld20-ave4" : for LD20 SoC
-+	- "socionext,uniphier-pxs3-ave4" : for PXs3 SoC
-  - reg: Address where registers are mapped and size of region.
-  - interrupts: Should contain the MAC interrupt.
-  - phy-mode: See ethernet.txt in the same directory. Allow to choose
+diff --git a/drivers/net/ethernet/socionext/sni_ave.c b/drivers/net/ethernet/socionext/sni_ave.c
+index f5c5984..0b3b7a4 100644
+--- a/drivers/net/ethernet/socionext/sni_ave.c
++++ b/drivers/net/ethernet/socionext/sni_ave.c
+@@ -1701,6 +1701,10 @@ static const struct ave_soc_data ave_ld20_data = {
+ 	.is_desc_64bit = true,
+ };
+ 
++static const struct ave_soc_data ave_pxs3_data = {
++	.is_desc_64bit = false,
++};
++
+ static const struct of_device_id of_ave_match[] = {
+ 	{
+ 		.compatible = "socionext,uniphier-pro4-ave4",
+@@ -1718,6 +1722,10 @@ static const struct of_device_id of_ave_match[] = {
+ 		.compatible = "socionext,uniphier-ld20-ave4",
+ 		.data = &ave_ld20_data,
+ 	},
++	{
++		.compatible = "socionext,uniphier-pxs3-ave4",
++		.data = &ave_pxs3_data,
++	},
+ 	{ /* Sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, of_ave_match);
 -- 
 2.7.4
