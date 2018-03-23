@@ -1,79 +1,52 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 23 Mar 2018 10:36:09 +0100
-Subject: [PATCH v2 8/8] clk: davinci: kill davinci_clk_reset_assert/deassert()
-In-Reply-To: <20180323093609.24576-1-brgl@bgdev.pl>
-References: <20180323093609.24576-1-brgl@bgdev.pl>
-Message-ID: <20180323093609.24576-9-brgl@bgdev.pl>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 23 Mar 2018 17:44:22 +0800
+Subject: [PATCH v4 4/5] pintcrl: support bias-disable of generic and
+ special pins simultaneously
+In-Reply-To: <1521687523-1604-5-git-send-email-zhiyong.tao@mediatek.com>
+References: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1521687523-1604-5-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <1521798262.28226.12.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Thu, 2018-03-22 at 10:58 +0800, Zhiyong Tao wrote:
+> For generic pins, parameter "arg" is 0 or 1.
+> For special pins, bias-disable is set by R0R1,
+> so we need transmited "00" to set bias-disable
+> When we set "bias-disable" as high-z property,
+> the parameter should be "MTK_PUPD_SET_R1R0_00".
+> 
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> ---
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index 3cf384f..f991ff3 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -293,7 +293,7 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
+>  		unsigned int pin, bool enable, bool isup, unsigned int arg)
+>  {
+>  	unsigned int bit;
+> -	unsigned int reg_pullen, reg_pullsel;
+> +	unsigned int reg_pullen, reg_pullsel, r1r0;
+>  	int ret;
+>  
+>  	/* Some pins' pull setting are very different,
+> @@ -301,8 +301,12 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
+>  	 * resistor bit, so we need this special handle.
+>  	 */
+>  	if (pctl->devdata->spec_pull_set) {
+> +		/* For special pins, bias-disable is set by R1R0,
+> +		 * the parameter should be "MTK_PUPD_SET_R1R0_00".
+> +		 */
+> +		r1r0 = enable ? arg : MTK_PUPD_SET_R1R0_00;
+>  		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
+> -			pin, pctl->devdata->port_align, isup, arg);
+> +			pin, pctl->devdata->port_align, isup, r1r0);
+>  		if (!ret)
+>  			return 0;
+>  	}
 
-This code is no longer used. Remove it.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: David Lechner <david@lechnology.com>
----
- arch/arm/mach-davinci/include/mach/clock.h | 21 ---------------------
- drivers/clk/davinci/psc.c                  | 18 ------------------
- 2 files changed, 39 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
-
-diff --git a/arch/arm/mach-davinci/include/mach/clock.h b/arch/arm/mach-davinci/include/mach/clock.h
-deleted file mode 100644
-index 42ed4f2f5ce4..000000000000
---- a/arch/arm/mach-davinci/include/mach/clock.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- * arch/arm/mach-davinci/include/mach/clock.h
-- *
-- * Clock control driver for DaVinci - header file
-- *
-- * Authors: Vladimir Barinov <source@mvista.com>
-- *
-- * 2007 (c) MontaVista Software, Inc. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--#ifndef __ASM_ARCH_DAVINCI_CLOCK_H
--#define __ASM_ARCH_DAVINCI_CLOCK_H
--
--struct clk;
--
--int davinci_clk_reset_assert(struct clk *c);
--int davinci_clk_reset_deassert(struct clk *c);
--
--#endif
-diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
-index 063df62381ea..75c4bc6f23e3 100644
---- a/drivers/clk/davinci/psc.c
-+++ b/drivers/clk/davinci/psc.c
-@@ -295,24 +295,6 @@ static int davinci_lpsc_clk_reset(struct clk *clk, bool reset)
- 	return 0;
- }
- 
--/*
-- * REVISIT: These exported functions can be removed after a non-DT lookup is
-- * added to the reset controller framework and the davinci-rproc driver is
-- * updated to use the generic reset controller framework.
-- */
--
--int davinci_clk_reset_assert(struct clk *clk)
--{
--	return davinci_lpsc_clk_reset(clk, true);
--}
--EXPORT_SYMBOL(davinci_clk_reset_assert);
--
--int davinci_clk_reset_deassert(struct clk *clk)
--{
--	return davinci_lpsc_clk_reset(clk, false);
--}
--EXPORT_SYMBOL(davinci_clk_reset_deassert);
--
- static int davinci_psc_reset_assert(struct reset_controller_dev *rcdev,
- 				    unsigned long id)
- {
--- 
-2.16.1
+Reviewed-by: Sean Wang <sean.wang@mediatek.com>
