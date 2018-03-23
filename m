@@ -1,60 +1,92 @@
-From: ckadabi@codeaurora.org (Channa)
-Date: Fri, 23 Mar 2018 16:57:52 -0700
-Subject: [PATCH 2/2] drivers: soc: Add LLCC driver
-In-Reply-To: <20180319145525.GD28808@jcrouse-lnx.qualcomm.com>
-References: <1516924513-20183-1-git-send-email-ckadabi@codeaurora.org>
- <1516924513-20183-3-git-send-email-ckadabi@codeaurora.org>
- <20180319145525.GD28808@jcrouse-lnx.qualcomm.com>
-Message-ID: <5f71be17214a8c54d59555be6f67517f@codeaurora.org>
+From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
+Date: Fri, 23 Mar 2018 16:58:16 -0700
+Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
+References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
+ <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
+Message-ID: <1521849496.15055.16.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-19 07:55, Jordan Crouse wrote:
-> On Thu, Jan 25, 2018 at 03:55:13PM -0800, Channagoud Kadabi wrote:
->> LLCC (Last Level Cache Controller) provides additional cache memory
->> in the system. LLCC is partitioned into muliple slices and each
->> slice gets its own priority, size, ID and other config parameters.
->> LLCC driver programs these parameters for each slice. Clients that
->> are assigned to use LLCC need to get information such size & ID of the
->> slice for their usecase and activate or deactivate the slice as 
->> needed.
->> LLCC driver provides API interfaces for the clients to perform these
->> operations.
+On Fri, 2018-03-23 at 14:53 -0700, Alexander Duyck wrote:
+> On Fri, Mar 23, 2018 at 11:52 AM, Sinan Kaya <okaya@codeaurora.org>
+> wrote:
+> > Code includes wmb() followed by writel() in multiple places. writel()
+> > already has a barrier on some architectures like arm64.
+> > 
+> > This ends up CPU observing two barriers back to back before executing
+> > the
+> > register write.
+> > 
+> > Since code already has an explicit barrier call, changing writel() to
+> > writel_relaxed().
+> > 
+> > I did a regex search for wmb() followed by writel() in each drivers
+> > directory.
+> > I scrubbed the ones I care about in this series.
+> > 
+> > I considered "ease of change", "popular usage" and "performance
+> > critical
+> > path" as the determining criteria for my filtering.
+> > 
+> > We used relaxed API heavily on ARM for a long time but
+> > it did not exist on other architectures. For this reason, relaxed
+> > architectures have been paying double penalty in order to use the
+> > common
+> > drivers.
+> > 
+> > Now that relaxed API is present on all architectures, we can go and
+> > scrub
+> > all drivers to see what needs to change and what can remain.
+> > 
+> > We start with mostly used ones and hope to increase the coverage over
+> > time.
+> > It will take a while to cover all drivers.
+> > 
+> > Feel free to apply patches individually.
 > 
-> <snip>
+> I looked over the set and they seem good.
 > 
->> +/**
->> + * llcc_slice_deactivate - Deactivate the llcc slice
->> + * @desc: Pointer to llcc slice descriptor
->> + *
->> + * A value zero will be returned on success and a negative errno will
->> + * be returned in error cases
->> + */
->> +int llcc_slice_deactivate(struct llcc_slice_desc *desc)
->> +{
->> +	u32 act_ctrl_val;
->> +	int rc = -EINVAL;
->> +	struct llcc_drv_data *drv;
->> +
->> +	if (desc == NULL) {
->> +		pr_err("Input descriptor supplied is invalid\n");
-> 
-> Sorry that this is out of the blue, but I was reviewing a client driver 
-> that
-> uses this API. This should not print an error - we should be allowed to 
-> safely
-> pass a null pointer from an aborted sequence in the driver without the
-> conditional checks and it shouldn't generate a bit of log spam as it 
-> goes about
-> it's business.
+> Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
 
-Thanks Jordan. I will incorporate this change in my next patchset.
+Grrr, patch 1 does not apply cleanly to my next-queue tree (dev-queue
+branch).  I will deal with this series in a day or two, after I have dealt
+with my driver pull requests.
 
-> 
-> Jordan
-
--- 
---
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-a Linux Foundation Collaborative Project
+> > 
+> > Changes since v6:
+> > clean up between 2..6 and then make your Alex's changes on 1 and 7
+> >     The mmiowb shouldn't be needed for Rx. Only one CPU will be running
+> >     NAPI for the queue and we will synchronize this with a full writel
+> >     anyway when we re-enable the interrupts.
+> > 
+> > Sinan Kaya (7):
+> >   i40e/i40evf: Eliminate duplicate barriers on weakly-ordered archs
+> >   ixgbe: eliminate duplicate barriers on weakly-ordered archs
+> >   igbvf: eliminate duplicate barriers on weakly-ordered archs
+> >   igb: eliminate duplicate barriers on weakly-ordered archs
+> >   fm10k: Eliminate duplicate barriers on weakly-ordered archs
+> >   ixgbevf: keep writel() closer to wmb()
+> >   ixgbevf: eliminate duplicate barriers on weakly-ordered archs
+> > 
+> >  drivers/net/ethernet/intel/fm10k/fm10k_main.c     |  4 ++--
+> >  drivers/net/ethernet/intel/i40e/i40e_txrx.c       | 14 ++++++++++----
+> >  drivers/net/ethernet/intel/i40evf/i40e_txrx.c     |  4 ++--
+> >  drivers/net/ethernet/intel/igb/igb_main.c         |  4 ++--
+> >  drivers/net/ethernet/intel/igbvf/netdev.c         |  4 ++--
+> >  drivers/net/ethernet/intel/ixgbe/ixgbe_main.c     |  8 ++++----
+> >  drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      |  5 -----
+> >  drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 11 ++++++++---
+> >  8 files changed, 30 insertions(+), 24 deletions(-)
+> > 
+> > --
+> > 2.7.4
+> > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180323/777698b2/attachment-0001.sig>
