@@ -1,107 +1,300 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Mar 2018 11:03:30 +0100
-Subject: [PATCH 04/10] drm/sun4i: Explicitly list and check formats
- supported by the backend
-In-Reply-To: <20180321152904.22411-5-paul.kocialkowski@bootlin.com>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-5-paul.kocialkowski@bootlin.com>
-Message-ID: <20180323100330.2sijtsp5bdyyel5a@flea>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 23 Mar 2018 11:04:05 +0100
+Subject: [PATCH v3 1/4] arm64: dts: renesas: r8a7795: sort subnodes of the
+ root node
+In-Reply-To: <20180323100408.14448-1-horms+renesas@verge.net.au>
+References: <20180323100408.14448-1-horms+renesas@verge.net.au>
+Message-ID: <20180323100408.14448-2-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 04:28:58PM +0100, Paul Kocialkowski wrote:
-> In order to check whether the backend supports a specific format, an
-> explicit list and a related helper are introduced.
-> 
-> They are then used to determine whether the frontend should be used for
-> a layer, when the format is not supported by the backend.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 48 ++++++++++++++++++++++++++++++++++-
->  drivers/gpu/drm/sun4i/sun4i_backend.h |  1 +
->  2 files changed, 48 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index 274a1db6fa8e..7703ba989743 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -172,6 +172,39 @@ static int sun4i_backend_drm_format_to_layer(u32 format, u32 *mode)
->  	return 0;
->  }
->  
-> +static const uint32_t sun4i_backend_formats[] = {
-> +	/* RGB */
-> +	DRM_FORMAT_ARGB4444,
-> +	DRM_FORMAT_RGBA4444,
-> +	DRM_FORMAT_ARGB1555,
-> +	DRM_FORMAT_RGBA5551,
-> +	DRM_FORMAT_RGB565,
-> +	DRM_FORMAT_RGB888,
-> +	DRM_FORMAT_XRGB8888,
-> +	DRM_FORMAT_BGRX8888,
-> +	DRM_FORMAT_ARGB8888,
-> +	/* YUV422 */
-> +	DRM_FORMAT_YUYV,
-> +	DRM_FORMAT_YVYU,
-> +	DRM_FORMAT_UYVY,
-> +	DRM_FORMAT_VYUY,
+Sort subnodes of the root node alphanumerically.
 
-Ordering them by alphabetical order would be better.
+This is part of an ongoing effort to provide consistent node
+order in the DT of Renesas SoCs to improve maintainability.
 
-> +};
-> +
-> +bool sun4i_backend_format_is_supported(uint32_t fmt)
-> +{
-> +	bool found = false;
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(sun4i_backend_formats); i++) {
-> +		if (sun4i_backend_formats[i] == fmt) {
-> +			found = true;
-> +			break;
+Also remove excessive line-wrapping of interrupts-extended property of
+timer node.
 
-return true?
+This should not have any run-time effect.
 
-> +		}
-> +	}
-> +
-> +	return found;
-> +}
-> +
->  int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
->  				     int layer, struct drm_plane *plane)
->  {
-> @@ -436,15 +469,28 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
->  {
->  	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
->  	struct sun4i_backend *backend = layer->backend;
-> +	struct drm_framebuffer *fb = state->fb;
->  
->  	if (IS_ERR(backend->frontend))
->  		return false;
->  
-> +	/*
-> +	 * Let's pretend that every format is either supported by the backend or
-> +	 * the frontend. This is not true in practice, as some tiling modes are
-> +	 * not supported by either. There is still room to check this later in
-> +	 * the atomic check process.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3
+* Add review tag from Geert
+* Move clusterX_opp should be before cpus
+* Move thermal_zones should be before timer
 
-Then I guess there these tiling modes will not be exposed and we won't
-ever get that far, wouldn't we?
+v2
+* Also sort clock nodes
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 218 +++++++++++++++----------------
+ 1 file changed, 105 insertions(+), 113 deletions(-)
 
-> +	 */
-> +	if (!sun4i_backend_format_is_supported(fb->format->format))
-> +		return true;
-
-Even though there's a comment, this is not really natural. We are
-checking whether the frontend supports the current plane_state, so it
-just makes more sense to check whether the frontend supports the
-format, rather than if the backend doesn't support them.
-
-Maxime
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 1d5e3ac0231c..bb96c7e23370 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -30,6 +30,91 @@
+ 		i2c7 = &i2c_dvfs;
+ 	};
+ 
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clk_a: audio_clk_a {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_b: audio_clk_b {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_c: audio_clk_c {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	/* External CAN clock - to be overridden by boards that provide it */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp-1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp-1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp-1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp-1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <960000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster1_opp: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-800000000 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <820000>;
++			clock-latency-ns = <300000>;
++		};
++		opp-1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <820000>;
++			clock-latency-ns = <300000>;
++		};
++		opp-1200000000 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <820000>;
++			clock-latency-ns = <300000>;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -155,91 +240,6 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
+-	/*
+-	 * The external audio clocks are configured as 0 Hz fixed frequency
+-	 * clocks by default.
+-	 * Boards that provide audio clocks should override them.
+-	 */
+-	audio_clk_a: audio_clk_a {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	audio_clk_b: audio_clk_b {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	audio_clk_c: audio_clk_c {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	/* External CAN clock - to be overridden by boards that provide it */
+-	can_clk: can {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <0>;
+-	};
+-
+-	cluster0_opp: opp_table0 {
+-		compatible = "operating-points-v2";
+-		opp-shared;
+-
+-		opp-500000000 {
+-			opp-hz = /bits/ 64 <500000000>;
+-			opp-microvolt = <830000>;
+-			clock-latency-ns = <300000>;
+-		};
+-		opp-1000000000 {
+-			opp-hz = /bits/ 64 <1000000000>;
+-			opp-microvolt = <830000>;
+-			clock-latency-ns = <300000>;
+-		};
+-		opp-1500000000 {
+-			opp-hz = /bits/ 64 <1500000000>;
+-			opp-microvolt = <830000>;
+-			clock-latency-ns = <300000>;
+-			opp-suspend;
+-		};
+-		opp-1600000000 {
+-			opp-hz = /bits/ 64 <1600000000>;
+-			opp-microvolt = <900000>;
+-			clock-latency-ns = <300000>;
+-			turbo-mode;
+-		};
+-		opp-1700000000 {
+-			opp-hz = /bits/ 64 <1700000000>;
+-			opp-microvolt = <960000>;
+-			clock-latency-ns = <300000>;
+-			turbo-mode;
+-		};
+-	};
+-
+-	cluster1_opp: opp_table1 {
+-		compatible = "operating-points-v2";
+-		opp-shared;
+-
+-		opp-800000000 {
+-			opp-hz = /bits/ 64 <800000000>;
+-			opp-microvolt = <820000>;
+-			clock-latency-ns = <300000>;
+-		};
+-		opp-1000000000 {
+-			opp-hz = /bits/ 64 <1000000000>;
+-			opp-microvolt = <820000>;
+-			clock-latency-ns = <300000>;
+-		};
+-		opp-1200000000 {
+-			opp-hz = /bits/ 64 <1200000000>;
+-			opp-microvolt = <820000>;
+-			clock-latency-ns = <300000>;
+-		};
+-	};
+-
+ 	/* External PCIe clock - can be overridden by the board */
+ 	pcie_bus_clk: pcie_bus {
+ 		compatible = "fixed-clock";
+@@ -247,18 +247,6 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
+-	pmu_a57 {
+-		compatible = "arm,cortex-a57-pmu";
+-		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+-		                      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
+-				      <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
+-				      <&gic GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-affinity = <&a57_0>,
+-				     <&a57_1>,
+-				     <&a57_2>,
+-				     <&a57_3>;
+-	};
+-
+ 	pmu_a53 {
+ 		compatible = "arm,cortex-a53-pmu";
+ 		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
+@@ -271,6 +259,18 @@
+ 				     <&a53_3>;
+ 	};
+ 
++	pmu_a57 {
++		compatible = "arm,cortex-a57-pmu";
++		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
++		                      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
++				      <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
++				      <&gic GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&a57_0>,
++				     <&a57_1>,
++				     <&a57_2>,
++				     <&a57_3>;
++	};
++
+ 	psci {
+ 		compatible = "arm,psci-1.0", "arm,psci-0.2";
+ 		method = "smc";
+@@ -2428,22 +2428,6 @@
+ 		};
+ 	};
+ 
+-	timer {
+-		compatible = "arm,armv8-timer";
+-		interrupts-extended = <&gic GIC_PPI 13
+-				       (GIC_CPU_MASK_SIMPLE(8) |
+-				       IRQ_TYPE_LEVEL_LOW)>,
+-				      <&gic GIC_PPI 14
+-				       (GIC_CPU_MASK_SIMPLE(8) |
+-				       IRQ_TYPE_LEVEL_LOW)>,
+-				      <&gic GIC_PPI 11
+-				       (GIC_CPU_MASK_SIMPLE(8) |
+-				       IRQ_TYPE_LEVEL_LOW)>,
+-				      <&gic GIC_PPI 10
+-				       (GIC_CPU_MASK_SIMPLE(8) |
+-				       IRQ_TYPE_LEVEL_LOW)>;
+-	};
+-
+ 	thermal-zones {
+ 		sensor_thermal1: sensor-thermal1 {
+ 			polling-delay-passive = <250>;
+@@ -2524,6 +2508,14 @@
+ 		};
+ 	};
+ 
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
+ 	/* External USB clocks - can be overridden by the board */
+ 	usb3s0_clk: usb3s0 {
+ 		compatible = "fixed-clock";
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.11.0
