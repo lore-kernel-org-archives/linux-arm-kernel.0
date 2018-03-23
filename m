@@ -1,57 +1,61 @@
 From: swboyd@chromium.org (Stephen Boyd)
-Date: Fri, 23 Mar 2018 09:34:48 -0700
-Subject: [PATCH v4 0/5] Support qcom pinctrl protected pins
-Message-ID: <20180323163453.96495-1-swboyd@chromium.org>
+Date: Fri, 23 Mar 2018 09:34:50 -0700
+Subject: [PATCH v4 2/5] gpiolib: Extract mask allocation into subroutine
+In-Reply-To: <20180323163453.96495-1-swboyd@chromium.org>
+References: <20180323163453.96495-1-swboyd@chromium.org>
+Message-ID: <20180323163453.96495-3-swboyd@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset proposes a solution to describing the valid                                                                           
-pins for a pin controller in a generic way so that qcom                                                                        
-platforms can expose the pins that are really available.                                                                            
-                                                                                                                                    
-Typically, this has been done by having drivers and firmware                                                                        
-descriptions only use pins they know they have access to, and that                                                                  
-still works now because we no longer read the pin direction at                                                                      
-boot. But there are still some userspace drivers and debugfs facilities                                                             
-that don't know what pins are available and attempt to read everything                                                              
-they can. On qcom platforms, this may lead to a system hang, which isn't                                                            
-very nice behavior, even if root is the only user that can trigger it.                                                              
-                                                                                                                                    
-The proposal is to describe the valid pins and then not allow things to                                                             
-cause problems by using the invalid pins. Obviously, the firmware may                                                               
-mess this up, so this is mostly a nice to have feature or a safety net                                                              
-so that things don't blow up easily.                                                                                                
+We're going to use similar code to allocate and set all the bits in a
+mask for valid gpios to use. Extract the code from the irqchip version
+so it can be reused.
 
-Changes from v3:
- * Split out allocation of mask into subroutine
- * Moved that allocation to kmalloc_array()
- * Updated qcom driver to simplifiy ACPI logic and fix mem leak
+Signed-off-by: Stephen Boyd <swboyd@chromium.org>
+---
+ drivers/gpio/gpiolib.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
-Changes from v2:
- * Renamed binding to 'gpio-reserved-ranges'
- * Reworked gpiolib patch to not use irqdomains
- * Update qcom driver patch to use new valid_mask field
-                                                                                                                                    
-Changes from v1:                                                                                                                    
- * Pushed into gpiolib-of core under irq valid line logic                                                                           
- * Fixed up qcom driver patch to free stuff properly and remove custom code                                                         
- * Dropped export patch as it got picked up                                                                                         
- * Renamed binding to 'reserved-gpio-ranges'   
-
-
-Stephen Boyd (5):
-  dt-bindings: gpio: Add a gpio-reserved-ranges property
-  gpiolib: Extract mask allocation into subroutine
-  gpiolib: Change bitmap allocation to kmalloc_array
-  gpiolib: Support 'gpio-reserved-ranges' property
-  pinctrl: qcom: Don't allow protected pins to be requested
-
- .../devicetree/bindings/gpio/gpio.txt         |  7 +-
- drivers/gpio/gpiolib-of.c                     | 24 +++++++
- drivers/gpio/gpiolib.c                        | 66 +++++++++++++++++--
- drivers/pinctrl/qcom/pinctrl-msm.c            | 65 +++++++++++++++++-
- include/linux/gpio/driver.h                   | 16 +++++
- 5 files changed, 167 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index d66de67ef307..cc0e1519da45 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -337,6 +337,20 @@ static int gpiochip_set_desc_names(struct gpio_chip *gc)
+ 	return 0;
+ }
+ 
++static unsigned long *gpiochip_allocate_mask(struct gpio_chip *chip)
++{
++	unsigned long *p;
++
++	p = kcalloc(BITS_TO_LONGS(chip->ngpio), sizeof(long), GFP_KERNEL);
++	if (!p)
++		return NULL;
++
++	/* Assume by default all GPIOs are valid */
++	bitmap_fill(p, chip->ngpio);
++
++	return p;
++}
++
+ /*
+  * GPIO line handle management
+  */
+@@ -1506,14 +1520,10 @@ static int gpiochip_irqchip_init_valid_mask(struct gpio_chip *gpiochip)
+ 	if (!gpiochip->irq.need_valid_mask)
+ 		return 0;
+ 
+-	gpiochip->irq.valid_mask = kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
+-					   sizeof(long), GFP_KERNEL);
++	gpiochip->irq.valid_mask = gpiochip_allocate_mask(gpiochip);
+ 	if (!gpiochip->irq.valid_mask)
+ 		return -ENOMEM;
+ 
+-	/* Assume by default all GPIOs are valid */
+-	bitmap_fill(gpiochip->irq.valid_mask, gpiochip->ngpio);
+-
+ 	return 0;
+ }
+ 
 -- 
 Sent by a computer through tubes
