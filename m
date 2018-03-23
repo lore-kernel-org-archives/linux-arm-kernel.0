@@ -1,43 +1,48 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 23 Mar 2018 13:36:04 +0200
-Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
- requested
-In-Reply-To: <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
-References: <20180321165848.89751-1-swboyd@chromium.org>
- <20180321165848.89751-4-swboyd@chromium.org>
- <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
-Message-ID: <1521804964.23017.96.camel@linux.intel.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 23 Mar 2018 12:47:07 +0100
+Subject: [PATCH v3 6/8] remoteproc: da8xx: prepare and unprepare the clock
+ where needed
+In-Reply-To: <20180323114709.20330-1-brgl@bgdev.pl>
+References: <20180323114709.20330-1-brgl@bgdev.pl>
+Message-ID: <20180323114709.20330-7-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-03-22 at 19:16 -0500, Timur Tabi wrote:
-> On 03/21/2018 11:58 AM, Stephen Boyd wrote:
-> > +static int msm_gpio_init_valid_mask(struct gpio_chip *chip,
-> > +				    struct msm_pinctrl *pctrl)
-> > +{
-> > +	int ret;
-> > +	unsigned int len, i;
-> > +	unsigned int max_gpios = pctrl->soc->ngpios;
-> > +
-> > +	/* The number of GPIOs in the ACPI tables */
-> > +	ret = device_property_read_u16_array(pctrl->dev, "gpios",
-> > NULL, 0);
-> > +	if (ret > 0 && ret < max_gpios) {
-> 
-> This needs to be ret <= max_gpios, otherwise it will fail if every
-> GPIO 
-> is available.
-> 
-> And it should print an error message and return an error code if ret
-> > 
-> max_gpios.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Perhaps makes sense to do the opposite condition
+We're currently switching the platform to using the common clock
+framework. We need to explicitly prepare and unprepare the rproc
+clock.
 
-if (ret < 0 || ret > max_gpios) {
- ... error handling ...
-}
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/remoteproc/da8xx_remoteproc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+index 2b24291337b7..f134192922e0 100644
+--- a/drivers/remoteproc/da8xx_remoteproc.c
++++ b/drivers/remoteproc/da8xx_remoteproc.c
+@@ -149,9 +149,9 @@ static int da8xx_rproc_start(struct rproc *rproc)
+ 
+ 	writel(rproc->bootaddr, drproc->bootreg);
+ 
+-	ret = clk_enable(dsp_clk);
++	ret = clk_prepare_enable(dsp_clk);
+ 	if (ret) {
+-		dev_err(dev, "clk_enable() failed: %d\n", ret);
++		dev_err(dev, "clk_prepare_enable() failed: %d\n", ret);
+ 		return ret;
+ 	}
+ 
+@@ -165,7 +165,7 @@ static int da8xx_rproc_stop(struct rproc *rproc)
+ 	struct da8xx_rproc *drproc = rproc->priv;
+ 
+ 	davinci_clk_reset_assert(drproc->dsp_clk);
+-	clk_disable(drproc->dsp_clk);
++	clk_disable_unprepare(drproc->dsp_clk);
+ 
+ 	return 0;
+ }
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.16.1
