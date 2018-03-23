@@ -1,48 +1,67 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Mar 2018 14:52:57 -0400
-Subject: [PATCH v7 4/7] igb: eliminate duplicate barriers on weakly-ordered
- archs
+Date: Fri, 23 Mar 2018 14:52:59 -0400
+Subject: [PATCH v7 6/7] ixgbevf: keep writel() closer to wmb()
 In-Reply-To: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
 References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521831180-25014-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521831180-25014-7-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code includes wmb() followed by writel(). writel() already has a barrier
-on some architectures like arm64.
-
-This ends up CPU observing two barriers back to back before executing the
-register write.
-
-Since code already has an explicit barrier call, changing writel() to
-writel_relaxed().
+Remove ixgbevf_write_tail() in favor of moving writel() close to
+wmb().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/intel/igb/igb_main.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      | 5 -----
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 6 +++---
+ 2 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
-index 3d4ff3c..c501378 100644
---- a/drivers/net/ethernet/intel/igb/igb_main.c
-+++ b/drivers/net/ethernet/intel/igb/igb_main.c
-@@ -5674,7 +5674,7 @@ static int igb_tx_map(struct igb_ring *tx_ring,
- 	igb_maybe_stop_tx(tx_ring, DESC_NEEDED);
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
+index f712646..f97091d 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf.h
+@@ -312,11 +312,6 @@ static inline u16 ixgbevf_desc_unused(struct ixgbevf_ring *ring)
+ 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
+ }
  
- 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
--		writel(i, tx_ring->tail);
-+		writel_relaxed(i, tx_ring->tail);
- 
- 		/* we need this if more than one processor can write to our tail
- 		 * at a time, it synchronizes IO on IA64/Altix systems
-@@ -8079,7 +8079,7 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
+-static inline void ixgbevf_write_tail(struct ixgbevf_ring *ring, u32 value)
+-{
+-	writel(value, ring->tail);
+-}
+-
+ #define IXGBEVF_RX_DESC(R, i)	\
+ 	(&(((union ixgbe_adv_rx_desc *)((R)->desc))[i]))
+ #define IXGBEVF_TX_DESC(R, i)	\
+diff --git a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+index 3d9033f..815cb1a 100644
+--- a/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
++++ b/drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c
+@@ -725,7 +725,7 @@ static void ixgbevf_alloc_rx_buffers(struct ixgbevf_ring *rx_ring,
  		 * such as IA-64).
  		 */
  		wmb();
--		writel(i, rx_ring->tail);
-+		writel_relaxed(i, rx_ring->tail);
+-		ixgbevf_write_tail(rx_ring, i);
++		writel(i, rx_ring->tail);
  	}
  }
  
+@@ -1232,7 +1232,7 @@ static int ixgbevf_clean_rx_irq(struct ixgbevf_q_vector *q_vector,
+ 		 * know there are new descriptors to fetch.
+ 		 */
+ 		wmb();
+-		ixgbevf_write_tail(xdp_ring, xdp_ring->next_to_use);
++		writel(xdp_ring->next_to_use, xdp_ring->tail);
+ 	}
+ 
+ 	u64_stats_update_begin(&rx_ring->syncp);
+@@ -4004,7 +4004,7 @@ static void ixgbevf_tx_map(struct ixgbevf_ring *tx_ring,
+ 	tx_ring->next_to_use = i;
+ 
+ 	/* notify HW of packet */
+-	ixgbevf_write_tail(tx_ring, i);
++	writel(i, tx_ring->tail);
+ 
+ 	return;
+ dma_error:
 -- 
 2.7.4
