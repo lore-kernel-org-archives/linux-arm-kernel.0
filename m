@@ -1,83 +1,49 @@
-From: swboyd@chromium.org (Stephen Boyd)
-Date: Fri, 23 Mar 2018 09:21:47 -0700
-Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
- requested
-In-Reply-To: <1521804964.23017.96.camel@linux.intel.com>
-References: <20180321165848.89751-1-swboyd@chromium.org>
- <20180321165848.89751-4-swboyd@chromium.org>
- <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
- <1521804964.23017.96.camel@linux.intel.com>
-Message-ID: <152182210780.178046.13284917877743312593@swboyd.mtv.corp.google.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 23 Mar 2018 18:23:54 +0200
+Subject: [PATCH v4] staging: bcm2835-audio: Release resources on
+ module_exit()
+In-Reply-To: <20180322213722.31822-1-k.marinushkin@gmail.com>
+References: <f35d0f86-04b5-6edb-139f-4632edc493b3@gmail.com>
+ <20180322213722.31822-1-k.marinushkin@gmail.com>
+Message-ID: <CAHp75VdYiySBzu99MYoBAZ8tORGP1R43z9d+=VRdktg+U=_ZDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Andy Shevchenko (2018-03-23 04:36:04)
-> On Thu, 2018-03-22 at 19:16 -0500, Timur Tabi wrote:
-> > On 03/21/2018 11:58 AM, Stephen Boyd wrote:
-> > > +static int msm_gpio_init_valid_mask(struct gpio_chip *chip,
-> > > +                               struct msm_pinctrl *pctrl)
-> > > +{
-> > > +   int ret;
-> > > +   unsigned int len, i;
-> > > +   unsigned int max_gpios = pctrl->soc->ngpios;
-> > > +
-> > > +   /* The number of GPIOs in the ACPI tables */
-> > > +   ret = device_property_read_u16_array(pctrl->dev, "gpios",
-> > > NULL, 0);
-> > > +   if (ret > 0 && ret < max_gpios) {
-> > 
-> > This needs to be ret <= max_gpios, otherwise it will fail if every
-> > GPIO 
-> > is available.
-> > 
-> > And it should print an error message and return an error code if ret
-> > > 
-> > max_gpios.
-> 
-> Perhaps makes sense to do the opposite condition
-> 
-> if (ret < 0 || ret > max_gpios) {
->  ... error handling ...
-> }
-> 
+On Thu, Mar 22, 2018 at 11:37 PM, Kirill Marinushkin
+<k.marinushkin@gmail.com> wrote:
 
-Indeed. I already rewrote it like this two days ago:
 
-static int msm_gpio_init_valid_mask(struct gpio_chip *chip,
-                                   struct msm_pinctrl *pctrl)
-{
-       int ret;
-       unsigned int len, i;
-       unsigned int max_gpios = pctrl->soc->ngpios;
-       u16 *tmp;
+> +static void snd_devm_release(struct device *dev)
+> +{
+> +       struct bcm2835_chip *chip = dev_get_drvdata(dev);
+> +
+> +       kfree(chip);
+> +}
 
-       /* The number of GPIOs in the ACPI tables */
-       len = ret = device_property_read_u16_array(pctrl->dev, "gpios",
-ULL, 0);
-       if (ret < 0)
-               return 0;
+> +       device->release = snd_devm_release;
 
-       if (ret > max_gpios)
-               return -EINVAL;
+This is not devm function, so, it would be rather called
+snd_bcm2835_release().
 
-       tmp = kmalloc_array(len, sizeof(*tmp), GFP_KERNEL);
-       if (!tmp)
-               return -ENOMEM;
+>  static struct snd_card *snd_devm_card_new(struct device *dev)
+>  {
+>         struct snd_card *card;
+>         int ret;
+>
+>         ret = snd_card_new(dev, -1, NULL, THIS_MODULE, 0, &card);
+> +       if (ret)
+>                 return ERR_PTR(ret);
+>
+>         return card;
+>  }
 
-       ret = device_property_read_u16_array(pctrl->dev, "gpios", tmp,
-en);
-       if (ret < 0) {
-               dev_err(pctrl->dev, "could not read list of GPIOs\n");
-               goto out;
-       }
+Same here. You removed anything related to devm here, so, please make
+function name consistent.
 
-       bitmap_zero(chip->valid_mask, max_gpios);
-       for (i = 0; i < len; i++)
-               set_bit(tmp[i], chip->valid_mask);
+After addressing above, FWIW,
 
-out:
-       kfree(tmp);
-       return ret;
-}
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-I'll send the updated patches now.
+-- 
+With Best Regards,
+Andy Shevchenko
