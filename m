@@ -1,62 +1,67 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 23 Mar 2018 10:36:05 +0100
-Subject: [PATCH v2 4/8] clk: davinci: add a reset lookup table for psc0
-In-Reply-To: <20180323093609.24576-1-brgl@bgdev.pl>
-References: <20180323093609.24576-1-brgl@bgdev.pl>
-Message-ID: <20180323093609.24576-5-brgl@bgdev.pl>
+Date: Fri, 23 Mar 2018 10:36:01 +0100
+Subject: [PATCH v2 0/8] ARM: davinci: complete the conversion to using the
+ reset framework
+Message-ID: <20180323093609.24576-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-In order to be able to use the reset framework in legacy boot mode as
-well, add the reset lookup table to the psc driver for da850 variant.
+This series converts the only user of the handcoded, mach-specific reset
+routines in the davinci platform to using the reset framework.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/clk/davinci/psc-da850.c | 8 ++++++++
- drivers/clk/davinci/psc.c       | 1 +
- 2 files changed, 9 insertions(+)
+Patch 1 modifies the way lookup entries are registered with the reset
+framework.
 
-diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
-index ccc7eb17bf3a..395db4b2c0ee 100644
---- a/drivers/clk/davinci/psc-da850.c
-+++ b/drivers/clk/davinci/psc-da850.c
-@@ -6,6 +6,7 @@
-  */
- 
- #include <linux/clk-provider.h>
-+#include <linux/reset-controller.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
- #include <linux/init.h>
-@@ -66,8 +67,15 @@ LPSC_CLKDEV3(ecap_clkdev,	"fck",	"ecap.0",
- 				"fck",	"ecap.1",
- 				"fck",	"ecap.2");
- 
-+static struct reset_control_lookup da850_psc0_reset_lookup_table[] = {
-+	RESET_LOOKUP("davinci-rproc.0", NULL, 15),
-+};
-+
- static int da850_psc0_init(struct device *dev, void __iomem *base)
- {
-+	reset_controller_add_lookup("da850-psc0",
-+				    da850_psc0_reset_lookup_table,
-+				    ARRAY_SIZE(da850_psc0_reset_lookup_table));
- 	return davinci_psc_register_clocks(dev, da850_psc0_info, 16, base);
- }
- 
-diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
-index 3b0e59dfbdd7..063df62381ea 100644
---- a/drivers/clk/davinci/psc.c
-+++ b/drivers/clk/davinci/psc.c
-@@ -425,6 +425,7 @@ __davinci_psc_register_clocks(struct device *dev,
- 
- 	psc->rcdev.ops = &davinci_psc_reset_ops;
- 	psc->rcdev.owner = THIS_MODULE;
-+	psc->rcdev.dev = dev;
- 	psc->rcdev.of_node = dev->of_node;
- 	psc->rcdev.of_reset_n_cells = 1;
- 	psc->rcdev.of_xlate = davinci_psc_reset_of_xlate;
+Patches 2-4 add necessary lookups/DT-properties.
+
+Patches 5-7 convert the davinci-rproc driver to the reset framework.
+
+Patch 8 removes now dead code.
+
+Philipp: it turned out that it's indeed better to use the reset
+controller's device name for the entry lookup.
+
+Tested both in DT and legacy modes by booting the examples from
+ti-ipc-rtos recipe in meta-ti.
+
+This series applies on top of David Lechner's common-clk-v9 branch[1]
+with Philipp Zabel's reset/next branch[2] pulled in.
+
+It can be found in my github tree as well[3].
+
+[1] git://github.com/dlech/ev3dev-kernel.git common-clk-v9
+[2] git://git.pengutronix.de/git/pza/linux reset/next
+[3] git at github.com:brgl/linux.git topic/davinci-reset
+
+v1 -> v2:
+- fixed the device tree patches the descriptions of which were mixed up
+- return -EPROBE_DEFER from davinci-rproc's probe() if we can't get the
+  reset provider, since it's possible that the lookup table was not yet
+  registered
+- made the local variable naming consistent in the davinci-rproc driver
+- fixed a typo in PATCH 5/8
+
+Bartosz Golaszewski (8):
+  reset: modify the way reset lookup works for board files
+  ARM: davinci: dts: make psc0 a reset provider
+  ARM: davinci: dts: add a reset control to the dsp node
+  clk: davinci: add a reset lookup table for psc0
+  remoteproc: da8xx: add the missing retval check for clk_enable()
+  remoteproc: da8xx: prepare and unprepare the clock where needed
+  remoteproc: da8xx: use the reset framework
+  clk: davinci: kill davinci_clk_reset_assert/deassert()
+
+ arch/arm/boot/dts/da850.dtsi               |  2 ++
+ arch/arm/mach-davinci/include/mach/clock.h | 21 --------------
+ drivers/clk/davinci/psc-da850.c            |  8 ++++++
+ drivers/clk/davinci/psc.c                  | 19 +------------
+ drivers/remoteproc/da8xx_remoteproc.c      | 44 +++++++++++++++++++++++++-----
+ drivers/reset/core.c                       | 33 +++++++++++++++++++---
+ include/linux/reset-controller.h           |  8 ++++--
+ 7 files changed, 82 insertions(+), 53 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+
 -- 
 2.16.1
