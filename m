@@ -1,45 +1,44 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 23 Mar 2018 21:30:37 +0900
-Subject: [PATCH 2/2] net: ethernet: ave: add UniPhier PXs3 support
-In-Reply-To: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1521808237-3623-3-git-send-email-hayashi.kunihiko@socionext.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Fri, 23 Mar 2018 08:57:20 -0400
+Subject: [PATCH] media: fimc-capture: get rid of two warnings
+Message-ID: <6ccd228e0cfce2a4f44558422d25c60fcb1a6710.1521809837.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a compatible string and SoC data for ethernet controller on
-UniPhier PXs3 SoC.
+Smatch produces two warnings when building this file:
+	./arch/x86/include/asm/bitops.h:433:22: warning: asm output is not an lvalue
+	./arch/x86/include/asm/bitops.h:433:22: warning: asm output is not an lvalue
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+On some asm instructions.
+
+I suspect that those asm instructions might not be producing the
+right code, so, better to use two intermediate vars, get rid of
+the warnings and of the risk of producing a wrong code.
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 ---
- drivers/net/ethernet/socionext/sni_ave.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/media/platform/exynos4-is/fimc-capture.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/socionext/sni_ave.c b/drivers/net/ethernet/socionext/sni_ave.c
-index f5c5984..0b3b7a4 100644
---- a/drivers/net/ethernet/socionext/sni_ave.c
-+++ b/drivers/net/ethernet/socionext/sni_ave.c
-@@ -1701,6 +1701,10 @@ static const struct ave_soc_data ave_ld20_data = {
- 	.is_desc_64bit = true,
- };
- 
-+static const struct ave_soc_data ave_pxs3_data = {
-+	.is_desc_64bit = false,
-+};
+diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
+index ed9302caa004..a3cdac188190 100644
+--- a/drivers/media/platform/exynos4-is/fimc-capture.c
++++ b/drivers/media/platform/exynos4-is/fimc-capture.c
+@@ -670,10 +670,13 @@ static void fimc_capture_try_selection(struct fimc_ctx *ctx,
+ 		return;
+ 	}
+ 	if (target == V4L2_SEL_TGT_COMPOSE) {
++		u32 tmp_min_h = ffs(sink->width) - 3;
++		u32 tmp_min_v = ffs(sink->height) - 1;
 +
- static const struct of_device_id of_ave_match[] = {
- 	{
- 		.compatible = "socionext,uniphier-pro4-ave4",
-@@ -1718,6 +1722,10 @@ static const struct of_device_id of_ave_match[] = {
- 		.compatible = "socionext,uniphier-ld20-ave4",
- 		.data = &ave_ld20_data,
- 	},
-+	{
-+		.compatible = "socionext,uniphier-pxs3-ave4",
-+		.data = &ave_pxs3_data,
-+	},
- 	{ /* Sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, of_ave_match);
+ 		if (ctx->rotation != 90 && ctx->rotation != 270)
+ 			align_h = 1;
+-		max_sc_h = min(SCALER_MAX_HRATIO, 1 << (ffs(sink->width) - 3));
+-		max_sc_v = min(SCALER_MAX_VRATIO, 1 << (ffs(sink->height) - 1));
++		max_sc_h = min(SCALER_MAX_HRATIO, 1 << tmp_min_h);
++		max_sc_v = min(SCALER_MAX_VRATIO, 1 << tmp_min_v);
+ 		min_sz = var->min_out_pixsize;
+ 	} else {
+ 		u32 depth = fimc_get_format_depth(sink->fmt);
 -- 
-2.7.4
+2.14.3
