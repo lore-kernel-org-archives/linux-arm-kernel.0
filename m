@@ -1,52 +1,38 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 23 Mar 2018 17:44:22 +0800
-Subject: [PATCH v4 4/5] pintcrl: support bias-disable of generic and
- special pins simultaneously
-In-Reply-To: <1521687523-1604-5-git-send-email-zhiyong.tao@mediatek.com>
-References: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
- <1521687523-1604-5-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <1521798262.28226.12.camel@mtkswgap22>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Fri, 23 Mar 2018 09:49:38 +0000
+Subject: Return checks for clock calls
+Message-ID: <20180323094937.5wx5exah6tfyl43u@fsr-ub1664-175>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-03-22 at 10:58 +0800, Zhiyong Tao wrote:
-> For generic pins, parameter "arg" is 0 or 1.
-> For special pins, bias-disable is set by R0R1,
-> so we need transmited "00" to set bias-disable
-> When we set "bias-disable" as high-z property,
-> the parameter should be "MTK_PUPD_SET_R1R0_00".
-> 
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index 3cf384f..f991ff3 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -293,7 +293,7 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
->  		unsigned int pin, bool enable, bool isup, unsigned int arg)
->  {
->  	unsigned int bit;
-> -	unsigned int reg_pullen, reg_pullsel;
-> +	unsigned int reg_pullen, reg_pullsel, r1r0;
->  	int ret;
->  
->  	/* Some pins' pull setting are very different,
-> @@ -301,8 +301,12 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
->  	 * resistor bit, so we need this special handle.
->  	 */
->  	if (pctl->devdata->spec_pull_set) {
-> +		/* For special pins, bias-disable is set by R1R0,
-> +		 * the parameter should be "MTK_PUPD_SET_R1R0_00".
-> +		 */
-> +		r1r0 = enable ? arg : MTK_PUPD_SET_R1R0_00;
->  		ret = pctl->devdata->spec_pull_set(mtk_get_regmap(pctl, pin),
-> -			pin, pctl->devdata->port_align, isup, arg);
-> +			pin, pctl->devdata->port_align, isup, r1r0);
->  		if (!ret)
->  			return 0;
->  	}
+Hi Shawn, Fabio,
 
-Reviewed-by: Sean Wang <sean.wang@mediatek.com>
+I'm trying to get the imx clks changes upstreamed. To that end, I reached this
+old commit that adds some wrappers over the generic clk API. Here is the commit
+message:
+
+	ARM: imx6: add return check for clock calls
+
+	There are a bunch of clk_enable_prepare, clk_set_parent and clk_set_rate
+	calls in imx6 clock driver's initialization.  They are called without
+	retunr check.  If there is something going wrong with the calls, they
+	will just fail silently.
+
+	The patch creates a set of helper functions imx_clk_enable_prepare,
+	imx_clk_set_parent and imx_clk_set_rate, and use them instead from clock
+	initialization to check the return and print error message to tell
+	failures if any.
+
+	Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+
+And it adds the imx_clk_set_parent, imx_clk_prepare_enable and
+imx_clk_set_rate which basically just print an error message if the generic
+functions have failed.
+
+The only plus of these wrappers is that we at least see that the generic
+functions have failed, but the behaviour is not changed in any way.
+
+Question is, do we want this upstreamed considering that we need to replace the
+calls throughout all the older imx socs ?
+
+Abel
