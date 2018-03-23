@@ -1,30 +1,62 @@
-From: pp@emlix.com (Philipp Puschmann)
-Date: Fri, 23 Mar 2018 10:22:15 +0100
-Subject: [PATCH] arm: dts: socfpga: fix GIC PPI warning
-Message-ID: <20180323092215.1307-1-pp@emlix.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 23 Mar 2018 10:36:05 +0100
+Subject: [PATCH v2 4/8] clk: davinci: add a reset lookup table for psc0
+In-Reply-To: <20180323093609.24576-1-brgl@bgdev.pl>
+References: <20180323093609.24576-1-brgl@bgdev.pl>
+Message-ID: <20180323093609.24576-5-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the warning "GIC: PPI13 is secure or misconfigured" by
-changing the interrupt type from level_low to edge_raising
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Signed-off-by: Philipp Puschmann <pp@emlix.com>
+In order to be able to use the reset framework in legacy boot mode as
+well, add the reset lookup table to the psc driver for da850 variant.
+
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/davinci/psc-da850.c | 8 ++++++++
+ drivers/clk/davinci/psc.c       | 1 +
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 595eb4f1a761..e9417551d7ea 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -815,7 +815,7 @@
- 		timer at fffec600 {
- 			compatible = "arm,cortex-a9-twd-timer";
- 			reg = <0xfffec600 0x100>;
--			interrupts = <1 13 0xf04>;
-+			interrupts = <1 13 0xf01>;
- 			clocks = <&mpu_periph_clk>;
- 		};
+diff --git a/drivers/clk/davinci/psc-da850.c b/drivers/clk/davinci/psc-da850.c
+index ccc7eb17bf3a..395db4b2c0ee 100644
+--- a/drivers/clk/davinci/psc-da850.c
++++ b/drivers/clk/davinci/psc-da850.c
+@@ -6,6 +6,7 @@
+  */
  
+ #include <linux/clk-provider.h>
++#include <linux/reset-controller.h>
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+ #include <linux/init.h>
+@@ -66,8 +67,15 @@ LPSC_CLKDEV3(ecap_clkdev,	"fck",	"ecap.0",
+ 				"fck",	"ecap.1",
+ 				"fck",	"ecap.2");
+ 
++static struct reset_control_lookup da850_psc0_reset_lookup_table[] = {
++	RESET_LOOKUP("davinci-rproc.0", NULL, 15),
++};
++
+ static int da850_psc0_init(struct device *dev, void __iomem *base)
+ {
++	reset_controller_add_lookup("da850-psc0",
++				    da850_psc0_reset_lookup_table,
++				    ARRAY_SIZE(da850_psc0_reset_lookup_table));
+ 	return davinci_psc_register_clocks(dev, da850_psc0_info, 16, base);
+ }
+ 
+diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
+index 3b0e59dfbdd7..063df62381ea 100644
+--- a/drivers/clk/davinci/psc.c
++++ b/drivers/clk/davinci/psc.c
+@@ -425,6 +425,7 @@ __davinci_psc_register_clocks(struct device *dev,
+ 
+ 	psc->rcdev.ops = &davinci_psc_reset_ops;
+ 	psc->rcdev.owner = THIS_MODULE;
++	psc->rcdev.dev = dev;
+ 	psc->rcdev.of_node = dev->of_node;
+ 	psc->rcdev.of_reset_n_cells = 1;
+ 	psc->rcdev.of_xlate = davinci_psc_reset_of_xlate;
 -- 
-2.16.2
+2.16.1
