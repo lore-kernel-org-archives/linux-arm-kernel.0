@@ -1,171 +1,121 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 23 Mar 2018 12:47:02 +0100
-Subject: [PATCH v3 1/8] reset: modify the way reset lookup works for board
- files
+Date: Fri, 23 Mar 2018 12:47:08 +0100
+Subject: [PATCH v3 7/8] remoteproc: da8xx: use the reset framework
 In-Reply-To: <20180323114709.20330-1-brgl@bgdev.pl>
 References: <20180323114709.20330-1-brgl@bgdev.pl>
-Message-ID: <20180323114709.20330-2-brgl@bgdev.pl>
+Message-ID: <20180323114709.20330-8-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Commit 7af1bb19f1d7 ("reset: add support for non-DT systems")
-introduced reset control lookup mechanism for boards that still use
-board files.
-
-The routine used to register lookup entries takes the corresponding
-reset_controlled_dev structure as argument.
-
-It's been determined however that for the first user of this new
-interface - davinci psc driver - it will be easier to register the
-lookup entries using the reset controller device name.
-
-This patch changes the way lookup entries are added.
+Switch to using the reset framework instead of handcoded reset routines
+we used so far.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/reset/core.c             | 38 +++++++++++++++++++++++++++++++-------
- include/linux/reset-controller.h | 12 +++++++-----
- 2 files changed, 38 insertions(+), 12 deletions(-)
+ drivers/remoteproc/da8xx_remoteproc.c | 32 +++++++++++++++++++++++++++-----
+ 1 file changed, 27 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-index 06fa4907afc4..f4a29c046995 100644
---- a/drivers/reset/core.c
-+++ b/drivers/reset/core.c
-@@ -153,12 +153,10 @@ EXPORT_SYMBOL_GPL(devm_reset_controller_register);
+diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+index f134192922e0..3689473f8b49 100644
+--- a/drivers/remoteproc/da8xx_remoteproc.c
++++ b/drivers/remoteproc/da8xx_remoteproc.c
+@@ -10,6 +10,7 @@
  
- /**
-  * reset_controller_add_lookup - register a set of lookup entries
-- * @rcdev: initialized reset controller device owning the reset line
-  * @lookup: array of reset lookup entries
-  * @num_entries: number of entries in the lookup array
-  */
--void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
--				 struct reset_control_lookup *lookup,
-+void reset_controller_add_lookup(struct reset_control_lookup *lookup,
- 				 unsigned int num_entries)
- {
- 	struct reset_control_lookup *entry;
-@@ -168,13 +166,12 @@ void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
- 	for (i = 0; i < num_entries; i++) {
- 		entry = &lookup[i];
+ #include <linux/bitops.h>
+ #include <linux/clk.h>
++#include <linux/reset.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -20,8 +21,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/remoteproc.h>
  
--		if (!entry->dev_id) {
--			pr_warn("%s(): reset lookup entry has no dev_id, skipping\n",
-+		if (!entry->dev_id || !entry->provider) {
-+			pr_warn("%s(): reset lookup entry badly specified, skipping\n",
- 				__func__);
- 			continue;
- 		}
+-#include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
+-
+ #include "remoteproc_internal.h"
  
--		entry->rcdev = rcdev;
- 		list_add_tail(&entry->list, &reset_lookup_list);
+ static char *da8xx_fw_name;
+@@ -72,6 +71,7 @@ struct da8xx_rproc {
+ 	struct da8xx_rproc_mem *mem;
+ 	int num_mems;
+ 	struct clk *dsp_clk;
++	struct reset_control *dsp_reset;
+ 	void (*ack_fxn)(struct irq_data *data);
+ 	struct irq_data *irq_data;
+ 	void __iomem *chipsig;
+@@ -138,6 +138,7 @@ static int da8xx_rproc_start(struct rproc *rproc)
+ 	struct device *dev = rproc->dev.parent;
+ 	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
+ 	struct clk *dsp_clk = drproc->dsp_clk;
++	struct reset_control *dsp_reset = drproc->dsp_reset;
+ 	int ret;
+ 
+ 	/* hw requires the start (boot) address be on 1KB boundary */
+@@ -155,7 +156,11 @@ static int da8xx_rproc_start(struct rproc *rproc)
+ 		return ret;
  	}
- 	mutex_unlock(&reset_lookup_mutex);
-@@ -526,11 +523,30 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
- }
- EXPORT_SYMBOL_GPL(__of_reset_control_get);
  
-+static struct reset_controller_dev *
-+__reset_controller_by_name(const char *name)
-+{
-+	struct reset_controller_dev *rcdev;
+-	davinci_clk_reset_deassert(dsp_clk);
++	ret = reset_control_deassert(dsp_reset);
++	if (ret) {
++		dev_err(dev, "reset_control_deassert() failed: %d\n", ret);
++		return ret;
++	}
+ 
+ 	return 0;
+ }
+@@ -163,8 +168,15 @@ static int da8xx_rproc_start(struct rproc *rproc)
+ static int da8xx_rproc_stop(struct rproc *rproc)
+ {
+ 	struct da8xx_rproc *drproc = rproc->priv;
++	int ret;
 +
-+	lockdep_assert_held(&reset_list_mutex);
++	ret = reset_control_assert(drproc->dsp_reset);
++	if (ret) {
++		dev_err(rproc->dev.parent,
++			"reset_control_assert() failed: %d\n", ret);
++		return ret;
++	}
+ 
+-	davinci_clk_reset_assert(drproc->dsp_clk);
+ 	clk_disable_unprepare(drproc->dsp_clk);
+ 
+ 	return 0;
+@@ -232,6 +244,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 	struct resource *bootreg_res;
+ 	struct resource *chipsig_res;
+ 	struct clk *dsp_clk;
++	struct reset_control *dsp_reset;
+ 	void __iomem *chipsig;
+ 	void __iomem *bootreg;
+ 	int irq;
+@@ -268,6 +281,15 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(dsp_clk);
+ 	}
+ 
++	dsp_reset = devm_reset_control_get_exclusive(dev, NULL);
++	if (IS_ERR(dsp_reset)) {
++		if (PTR_ERR(dsp_reset) != -EPROBE_DEFER)
++			dev_err(dev, "unable to get reset control: %ld\n",
++				PTR_ERR(dsp_reset));
 +
-+	list_for_each_entry(rcdev, &reset_controller_list, list) {
-+		if (!rcdev->dev)
-+			continue;
-+
-+		if (!strcmp(name, dev_name(rcdev->dev)))
-+			return rcdev;
++		return PTR_ERR(dsp_reset);
 +	}
 +
-+	return NULL;
-+}
-+
- static struct reset_control *
- __reset_control_get_from_lookup(struct device *dev, const char *con_id,
- 				bool shared, bool optional)
- {
- 	const struct reset_control_lookup *lookup;
-+	struct reset_controller_dev *rcdev;
- 	const char *dev_id = dev_name(dev);
- 	struct reset_control *rstc = NULL;
+ 	if (dev->of_node) {
+ 		ret = of_reserved_mem_device_init(dev);
+ 		if (ret) {
+@@ -309,7 +331,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 	 * *not* in reset, but da8xx_rproc_start() needs the DSP to be
+ 	 * held in reset at the time it is called.
+ 	 */
+-	ret = davinci_clk_reset_assert(drproc->dsp_clk);
++	ret = reset_control_assert(dsp_reset);
+ 	if (ret)
+ 		goto free_rproc;
  
-@@ -547,7 +563,15 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
- 		    ((con_id && lookup->con_id) &&
- 		     !strcmp(con_id, lookup->con_id))) {
- 			mutex_lock(&reset_list_mutex);
--			rstc = __reset_control_get_internal(lookup->rcdev,
-+			rcdev = __reset_controller_by_name(lookup->provider);
-+			if (!rcdev) {
-+				mutex_unlock(&reset_list_mutex);
-+				mutex_unlock(&reset_lookup_mutex);
-+				/* Reset provider may not be ready yet. */
-+				return -EPROBE_DEFER;
-+			}
-+
-+			rstc = __reset_control_get_internal(rcdev,
- 							    lookup->index,
- 							    shared);
- 			mutex_unlock(&reset_list_mutex);
-diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
-index 25698f6c1fae..c870acaa2e07 100644
---- a/include/linux/reset-controller.h
-+++ b/include/linux/reset-controller.h
-@@ -30,21 +30,22 @@ struct of_phandle_args;
-  * struct reset_control_lookup - represents a single lookup entry
-  *
-  * @list: internal list of all reset lookup entries
-- * @rcdev: reset controller device controlling this reset line
-+ * @provider: name of the reset controller device controlling this reset line
-  * @index: ID of the reset controller in the reset controller device
-  * @dev_id: name of the device associated with this reset line
-  * @con_id name of the reset line (can be NULL)
-  */
- struct reset_control_lookup {
- 	struct list_head list;
--	struct reset_controller_dev *rcdev;
-+	const char *provider;
- 	unsigned int index;
- 	const char *dev_id;
- 	const char *con_id;
- };
- 
--#define RESET_LOOKUP(_dev_id, _con_id, _index)				\
-+#define RESET_LOOKUP(_provider, _dev_id, _con_id, _index)		\
- 	{								\
-+		.provider = _provider,					\
- 		.dev_id = _dev_id,					\
- 		.con_id = _con_id,					\
- 		.index = _index,					\
-@@ -57,6 +58,7 @@ struct reset_control_lookup {
-  * @owner: kernel module of the reset controller driver
-  * @list: internal list of reset controller devices
-  * @reset_control_head: head of internal list of requested reset controls
-+ * @dev: corresponding driver model device struct
-  * @of_node: corresponding device tree node as phandle target
-  * @of_reset_n_cells: number of cells in reset line specifiers
-  * @of_xlate: translation function to translate from specifier as found in the
-@@ -68,6 +70,7 @@ struct reset_controller_dev {
- 	struct module *owner;
- 	struct list_head list;
- 	struct list_head reset_control_head;
-+	struct device *dev;
- 	struct device_node *of_node;
- 	int of_reset_n_cells;
- 	int (*of_xlate)(struct reset_controller_dev *rcdev,
-@@ -82,8 +85,7 @@ struct device;
- int devm_reset_controller_register(struct device *dev,
- 				   struct reset_controller_dev *rcdev);
- 
--void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
--				 struct reset_control_lookup *lookup,
-+void reset_controller_add_lookup(struct reset_control_lookup *lookup,
- 				 unsigned int num_entries);
- 
- #endif
 -- 
 2.16.1
