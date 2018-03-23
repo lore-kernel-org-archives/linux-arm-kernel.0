@@ -1,51 +1,47 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Mar 2018 18:23:08 -0400
-Subject: [PATCH v6 3/6] bnx2x: Replace doorbell barrier() with wmb()
+Date: Fri, 23 Mar 2018 18:23:06 -0400
+Subject: [PATCH v6 1/6] net: qla3xxx: Eliminate duplicate barriers on
+ weakly-ordered archs
 In-Reply-To: <1521843791-21201-1-git-send-email-okaya@codeaurora.org>
 References: <1521843791-21201-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521843791-21201-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521843791-21201-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-barrier() doesn't guarantee memory writes to be observed by the hardware on
-all architectures. barrier() only tells compiler not to move this code
-with respect to other read/writes.
+Code includes wmb() followed by writel(). writel() already has a
+barrier on some architectures like arm64.
 
-If memory write needs to be observed by the HW, wmb() is the right choice.
+This ends up CPU observing two barriers back to back before executing
+the register write.
+
+Since code already has an explicit barrier call, changing code to
+
+wmb()
+writel_relaxed()
+mmiowb()
+
+for multi-arch support.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c     | 3 ++-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/qlogic/qla3xxx.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-index d7c98e8..b97820f 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-@@ -4153,7 +4153,8 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev)
- 	wmb();
+diff --git a/drivers/net/ethernet/qlogic/qla3xxx.c b/drivers/net/ethernet/qlogic/qla3xxx.c
+index 9e5264d..b48f761 100644
+--- a/drivers/net/ethernet/qlogic/qla3xxx.c
++++ b/drivers/net/ethernet/qlogic/qla3xxx.c
+@@ -1858,8 +1858,9 @@ static void ql_update_small_bufq_prod_index(struct ql3_adapter *qdev)
+ 			qdev->small_buf_release_cnt -= 8;
+ 		}
+ 		wmb();
+-		writel(qdev->small_buf_q_producer_index,
+-			&port_regs->CommonRegs.rxSmallQProducerIndex);
++		writel_relaxed(qdev->small_buf_q_producer_index,
++			       &port_regs->CommonRegs.rxSmallQProducerIndex);
++		mmiowb();
+ 	}
+ }
  
- 	txdata->tx_db.data.prod += nbd;
--	barrier();
-+	/* make sur edescriptor update is observed by HW */
-+	wmb();
- 
- 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
- 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c
-index 1e33abd..39af4f8 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c
-@@ -2591,7 +2591,8 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
- 	wmb();
- 
- 	txdata->tx_db.data.prod += 2;
--	barrier();
-+	/* make sure descriptor update is observed by the HW */
-+	wmb();
- 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
- 
- 	mmiowb();
 -- 
 2.7.4
