@@ -1,189 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Mar 2018 11:20:53 +0000
-Subject: [PATCH] KVM: arm/arm64 : add lpi info in vgic-debug
-In-Reply-To: <1521801365-63266-1-git-send-email-peng.hao2@zte.com.cn>
-References: <1521801365-63266-1-git-send-email-peng.hao2@zte.com.cn>
-Message-ID: <620e27fa-7bf7-ee68-1a76-3f8f0789b4f0@arm.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 23 Mar 2018 13:34:35 +0200
+Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
+ requested
+In-Reply-To: <59df3700-c0bd-6ee8-eeab-6a49cb92d1db@codeaurora.org>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-4-swboyd@chromium.org>
+ <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
+ <b5dac2f7-eabb-6e09-2146-775b09d4eca8@codeaurora.org>
+ <59df3700-c0bd-6ee8-eeab-6a49cb92d1db@codeaurora.org>
+Message-ID: <1521804875.23017.95.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/18 10:36, Peng Hao wrote:
-> Add lpi debug info to vgic-stat.
-> the printed info like this:
->      SPI  287      0 000001        0        0   0 160      -1
->      LPI 8192      2 000100        0        0   0 160      -1
+On Thu, 2018-03-22 at 19:59 -0500, Timur Tabi wrote:
+> On 03/22/2018 07:23 PM, Timur Tabi wrote:
+> > 
+> > Also, you don't allocate chip->valid_mask anywhere.
 > 
-> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> ---
->  virt/kvm/arm/vgic/vgic-debug.c | 61 ++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 56 insertions(+), 5 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-> index 10b3817..444115e 100644
-> --- a/virt/kvm/arm/vgic/vgic-debug.c
-> +++ b/virt/kvm/arm/vgic/vgic-debug.c
-> @@ -36,9 +36,12 @@
->  struct vgic_state_iter {
->  	int nr_cpus;
->  	int nr_spis;
-> +	int nr_lpis;
->  	int dist_id;
->  	int vcpu_id;
->  	int intid;
-> +	int lpi_print_count;
-> +	struct vgic_irq **lpi_irqs;
->  };
->  
->  static void iter_next(struct vgic_state_iter *iter)
-> @@ -52,6 +55,40 @@ static void iter_next(struct vgic_state_iter *iter)
->  	if (iter->intid == VGIC_NR_PRIVATE_IRQS &&
->  	    ++iter->vcpu_id < iter->nr_cpus)
->  		iter->intid = 0;
-> +
-> +	if (iter->intid >= VGIC_NR_PRIVATE_IRQS + iter->nr_spis) {
-> +		if (iter->lpi_print_count < iter->nr_lpis)
-> +			iter->intid = iter->lpi_irqs[iter->lpi_print_count]->intid;
-> +		iter->lpi_print_count++;
-> +	}
-> +}
-> +
-> +static void vgic_debug_get_lpis(struct kvm *kvm, struct vgic_state_iter *iter)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	int i = 0;
-> +	struct vgic_irq *irq = NULL, **lpi_irqs;
-> +
-> +again:
-> +	iter->nr_lpis = dist->lpi_list_count;
-> +	lpi_irqs = kmalloc_array(iter->nr_lpis, sizeof(irq), GFP_KERNEL);
-> +	if (!lpi_irqs) {
-> +		iter->nr_lpis = 0;
-> +		return;
-> +	}
-> +	spin_lock(&dist->lpi_list_lock);
-> +	if (iter->nr_lpis != dist->lpi_list_count) {
-> +		kfree(lpi_irqs);
-> +		spin_unlock(&dist->lpi_list_lock);
-> +		goto again;
-> +	}
+> So I see now where it's allocated, but something is fishy.
 
-Why do we need an exact count? It is fine to have a transient count, and
-the debug code should be able to come with that without performing this
-terrible loop.
+No, it seems you missed %p vs. %px discussion.
 
-We also already have some code that snapshot the the LPIs (see
-vgic_copy_lpi_list), so please consider reusing that instead.
+The pointers printed by %p nowadays are hashed values, not the original
+ones.
 
-> +
-> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> +		vgic_get_irq_kref(irq);
-> +		lpi_irqs[i++] = irq;
-> +	}
-> +	spin_unlock(&dist->lpi_list_lock);
-> +	iter->lpi_irqs = lpi_irqs;
-
-Messing with the internals of the refcounts is really a bad idea. Please
-use vgic_get_irq() in conjunction with the above, and allow it to fail
-gracefully.
-
->  }
->  
->  static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
-> @@ -64,6 +101,8 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
->  	iter->nr_cpus = nr_cpus;
->  	iter->nr_spis = kvm->arch.vgic.nr_spis;
->  
-> +	if (vgic_supports_direct_msis(kvm) && !pos)
-> +		vgic_debug_get_lpis(kvm, iter);
->  	/* Fast forward to the right position if needed */
->  	while (pos--)
->  		iter_next(iter);
-> @@ -73,7 +112,9 @@ static bool end_of_vgic(struct vgic_state_iter *iter)
->  {
->  	return iter->dist_id > 0 &&
->  		iter->vcpu_id == iter->nr_cpus &&
-> -		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
-> +		(iter->intid - VGIC_NR_PRIVATE_IRQS) >= iter->nr_spis &&
-> +		((iter->nr_lpis == 0) ||
-> +		(iter->lpi_print_count == iter->nr_lpis + 1));
->  }
->  
->  static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
-> @@ -130,6 +171,7 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
->  
->  	mutex_lock(&kvm->lock);
->  	iter = kvm->arch.vgic.iter;
-> +	kfree(iter->lpi_irqs);
->  	kfree(iter);
->  	kvm->arch.vgic.iter = NULL;
->  	mutex_unlock(&kvm->lock);
-> @@ -154,7 +196,7 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
->  			 struct kvm_vcpu *vcpu)
->  {
->  	int id = 0;
-> -	char *hdr = "SPI ";
-> +	char *hdr = "S/LPI ";
->  
->  	if (vcpu) {
->  		hdr = "VCPU";
-> @@ -162,7 +204,10 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
->  	}
->  
->  	seq_printf(s, "\n");
-> -	seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-> +	if (vcpu)
-> +		seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-> +	else
-> +		seq_printf(s, "%s TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr);
-
-This feels like an unnecessary change. But if you really want that kind
-of detail, change your "S/LPI" to say something more generic, such as
-"Global".
-
->  	seq_printf(s, "---------------------------------------------------------------\n");
->  }
->  
-> @@ -174,8 +219,10 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
->  		type = "SGI";
->  	else if (irq->intid < VGIC_NR_PRIVATE_IRQS)
->  		type = "PPI";
-> -	else
-> +	else if (irq->intid < VGIC_MAX_SPI)
->  		type = "SPI";
-> +	else if (irq->intid >= VGIC_MIN_LPI)
-> +		type = "LPI";
->  
->  	if (irq->intid ==0 || irq->intid == VGIC_NR_PRIVATE_IRQS)
->  		print_header(s, irq, vcpu);
-> @@ -220,7 +267,9 @@ static int vgic_debug_show(struct seq_file *s, void *v)
->  	if (!kvm->arch.vgic.initialized)
->  		return 0;
->  
-> -	if (iter->vcpu_id < iter->nr_cpus) {
-> +	if (iter->intid >= VGIC_MIN_LPI)
-> +		irq = iter->lpi_irqs[iter->lpi_print_count - 1];
-> +	else if (iter->vcpu_id < iter->nr_cpus) {
->  		vcpu = kvm_get_vcpu(kvm, iter->vcpu_id);
->  		irq = &vcpu->arch.vgic_cpu.private_irqs[iter->intid];
->  	} else {
-> @@ -230,6 +279,8 @@ static int vgic_debug_show(struct seq_file *s, void *v)
->  	spin_lock(&irq->irq_lock);
->  	print_irq_state(s, irq, vcpu);
->  	spin_unlock(&irq->irq_lock);
-> +	if (iter->intid >= VGIC_MIN_LPI)
-> +		vgic_put_irq(kvm, irq);
-
-If you adopt the scheme I outlined above, you can have a balanced
-get/put behaviour, irrespective of the interrupt type, and a much nicer
-result.
-
->  
->  	return 0;
->  }
-> 
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
