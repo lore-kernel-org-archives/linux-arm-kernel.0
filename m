@@ -1,52 +1,44 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Fri, 23 Mar 2018 07:38:43 +0000
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <20180322210144.GB3417@piout.net>
-References: <20180316075629.019b6560@canb.auug.org.au>
- <CAK8P3a2-fUi0nnsLVJ6h_UuJCgwoNs2OEroYed2ofLd=FiPG0g@mail.gmail.com>
- <6b239ab5-5ded-b32b-eefc-601075d33f25@st.com>
- <20180322210144.GB3417@piout.net>
-Message-ID: <e8eefe22-c1d1-d27b-68bb-036f6abb9814@st.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Fri, 23 Mar 2018 15:38:02 +0800
+Subject: [PATCH v8 02/14] iommu/rockchip: Fix error handling in probe
+In-Reply-To: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
+References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
+Message-ID: <20180323073814.5802-3-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2018 10:01 PM, Alexandre Belloni wrote:
-> On 16/03/2018 at 07:34:06 +0000, Patrice CHOTARD wrote:
->> Hi Arnd, Stephen
->>
->> On 03/15/2018 10:06 PM, Arnd Bergmann wrote:
->>> On Thu, Mar 15, 2018 at 9:56 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>>> Hi all,
->>>>
->>>> Commit
->>>>
->>>>     9a5f4879cd8d ("ARM: dts: stih4xx: Add missing #sound-dai-cells")
->>>>
->>>> is missing a Signed-off-by from its committer.
->>>
->>> Thanks for the report.
->>>
->>> What script do you use to find those? I guess I should check for
->>> missing signoffs as well when pulling a branch.
->>>
->>> Patrice, I've dropped the merge now, and picked up the one
->>> patch in it directly, with my signoff. This should fix the issue this
->>> time, but please make sure you always sign off patches when
->>> you apply them from the list.
->>>
->>>           Arnd
->>>
->>
->> Ok i will update my script on my side with Stephen's script to avoid
->> this in the future.
->>
-> 
-> FWIW, last time this happened in the at91 tree, I've switched to use
-> Stephen's script as a pre-push hook:
-> https://raw.githubusercontent.com/alexandrebelloni/tools/master/pre-push_signed-off
-> 
-> 
+Add missing iommu_device_sysfs_remove in error path.
 
-Thanks Alexandre
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+Acked-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Patrice
+Changes in v8:
+Don't introduce the additional return.
+
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
+
+ drivers/iommu/rockchip-iommu.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index e7fb824d123e..73117dbe839e 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1193,6 +1193,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 
+ 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+ 	err = iommu_device_register(&iommu->iommu);
++	if (err)
++		iommu_device_sysfs_remove(&iommu->iommu);
+ 
+ 	return err;
+ }
+-- 
+2.11.0
