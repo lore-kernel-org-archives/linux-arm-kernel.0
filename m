@@ -1,34 +1,22 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Mar 2018 15:15:04 -0400
-Subject: [PATCH v5 2/3] RDMA/i40iw: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <1521736009-23387-3-git-send-email-okaya@codeaurora.org>
-References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
- <1521736009-23387-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <352b0adc-5489-c919-fa0a-2a3a3b2d37a0@codeaurora.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 23 Mar 2018 12:15:30 -0700
+Subject: Regression with arm in next with stack protector
+In-Reply-To: <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
+References: <20180323181452.GJ5799@atomide.com>
+ <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
+Message-ID: <20180323121530.f28dc29939d9395268911a4e@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/22/2018 12:26 PM, Sinan Kaya wrote:
-> +++ b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
-> @@ -706,9 +706,11 @@ static void i40iw_sc_ccq_arm(struct i40iw_sc_cq *ccq)
->  	wmb();       /* make sure shadow area is updated before arming */
->  
->  	if (ccq->dev->is_pf)
-> -		i40iw_wr32(ccq->dev->hw, I40E_PFPE_CQARM, ccq->cq_uk.cq_id);
-> +		i40iw_wr32_relaxed(ccq->dev->hw, I40E_PFPE_CQARM,
-> +				   ccq->cq_uk.cq_id);
->  	else
-> -		i40iw_wr32(ccq->dev->hw, I40E_VFPE_CQARM1, ccq->cq_uk.cq_id);
-> +		i40iw_wr32_relaxed(ccq->dev->hw, I40E_VFPE_CQARM1,
-> +				   ccq->cq_uk.cq_id);
+On Fri, 23 Mar 2018 15:45:27 -0300 Fabio Estevam <festevam@gmail.com> wrote:
 
-do we want an mmiowb() here?
+> On Fri, Mar 23, 2018 at 3:14 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > Hi,
+> >
+> > Looks like commit 5638790dadae ("zboot: fix stack protector in
+> > compressed boot phase") breaks booting on arm.
+> 
+> Yes, almost all imx are broken in linux-next due to this commit:
+> https://kernelci.org/soc/imx/job/next/kernel/next-20180323/
 
->  }
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks, I dropped it and I expect Stephen will also do that.
