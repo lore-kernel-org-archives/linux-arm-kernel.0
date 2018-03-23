@@ -1,44 +1,62 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Mar 2018 17:12:34 +0000
-Subject: [PATCH] arm64/sve: Document firmware support requirements in
- Kconfig
-In-Reply-To: <1521633289-10504-1-git-send-email-Dave.Martin@arm.com>
-References: <1521633289-10504-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180323171233.rmsm2mgxufgu52bz@armageddon.cambridge.arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 23 Mar 2018 13:13:46 -0400
+Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <20180323.130418.2223623186761161723.davem@davemloft.net>
+References: <cb6a0522-2c53-b252-49db-5779d24963c6@codeaurora.org>
+ <20180323.124326.2170503491903886041.davem@davemloft.net>
+ <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
+ <20180323.130418.2223623186761161723.davem@davemloft.net>
+Message-ID: <b4553d26-b326-15be-dcac-12594ea7c5b5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 11:54:49AM +0000, Dave P Martin wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7381eeb..e6fa47b 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1104,6 +1104,23 @@ config ARM64_SVE
->  
->  	  To enable use of this extension on CPUs that implement it, say Y.
->  
-> +	  Note that for architectural reasons, firmware _must_ implement SVE
-> +	  support when running on SVE capable hardware.  The required support
-> +	  is present in:
-> +
-> +	    * version 1.5 and later of the ARM Trusted Firmware
-> +	    * the AArch64 boot wrapper since commit 5e1261e08abf
-> +	      ("bootwrapper: SVE: Enable SVE for EL2 and below").
-> +
-> +	  For other firmware implementations, consult the firware documentation
-> +	  or vendor.
-> +
-> +	  If you need the kernel to boot on SVE-capable hardware with broken
-> +	  firmware, you may need to say N here until you get your firmware
-> +	  fixed.  Otherwise, you may experience firmware panics or lockups when
-> +	  booting the kernel.  If unsure and you are not observing these
-> +	  symptoms, you should assume that it is safe to say Y.
+On 3/23/2018 1:04 PM, David Miller wrote:
+> From: Sinan Kaya <okaya@codeaurora.org>
+> Date: Fri, 23 Mar 2018 12:51:47 -0400
+> 
+>> It could if txdata->tx_db was not a union. There is a data dependency
+>> between txdata->tx_db.data.prod and txdata->tx_db.raw. 
+>>
+>> So, no reordering.
+> 
+> I don't see it that way, the code requires that:
+> 
+>  	txdata->tx_db.data.prod += nbd;
+> 
+> is visible before the doorbell update.> 
+> barrier() doesn't provide that.
+> 
+> Neither does writel_relaxed().  However plain writel() does.
 
-It's a shame that we can't detect this architecturally but the
-alternative would be to ask the firmware to describe the presence of SVE
-via DT or ACPI (which I don't particularly like since it's a CPU feature
-rather than an SoC one).
+Correct for some architectures including ARM but not correct universally.
 
-I'm personally fine with the warning in Kconfig.
+writel() just guarantees register read/writes before and after to be
+ordered when HW observes it. 
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+writel() doesn't guarantee that the memory update is visible to the HW
+on all architectures.
+
+If you need memory update visibility, that barrier() should have been a
+wmb()
+
+A correct multi-arch pattern is
+
+wmb()
+writel_relaxed()
+mmiowb()
+
+We have decided to drop a similar patch on Infiniband due to incorrect
+usage of barrier(). If you feel strongly about it, I can remove the
+DOORBELL change.
+
+> 
+> Therefore the code is only correct as-is, and your change potentially
+> adds a reordering problem.
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
