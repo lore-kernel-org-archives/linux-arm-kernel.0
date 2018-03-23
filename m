@@ -1,145 +1,176 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 23 Mar 2018 15:48:56 +0530
-Subject: [PATCH v5 13/13] ARM: dts: ipq8074: Enable few peripherals for hk01
- board
-In-Reply-To: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
-References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521800336-19266-14-git-send-email-sricharan@codeaurora.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 23 Mar 2018 11:24:30 +0100
+Subject: [PATCH v2 1/8] reset: modify the way reset lookup works for
+ board files
+In-Reply-To: <20180323093609.24576-2-brgl@bgdev.pl>
+References: <20180323093609.24576-1-brgl@bgdev.pl>
+ <20180323093609.24576-2-brgl@bgdev.pl>
+Message-ID: <1521800670.3406.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 103 ++++++++++++++++++++++++++++++
- 1 file changed, 103 insertions(+)
+Hi Bartosz,
 
-diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-index 6a838b5..dbca7ec 100644
---- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-+++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
-@@ -21,6 +21,7 @@
- 
- 	aliases {
- 		serial0 = &blsp1_uart5;
-+		serial1 = &serial_blsp2;
- 	};
- 
- 	chosen {
-@@ -41,6 +42,47 @@
- 					bias-disable;
- 				};
- 			};
-+
-+			 i2c_0_pins: i2c_0_pinmux {
-+				  mux {
-+					   pins = "gpio42", "gpio43";
-+					   function = "blsp1_i2c";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 spi_0_pins: spi_0_pins {
-+				  mux {
-+					   pins = "gpio38", "gpio39", "gpio40", "gpio41";
-+					   function = "blsp0_spi";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 hsuart_pins: hsuart_pins {
-+				  mux {
-+					   pins = "gpio46", "gpio47", "gpio48", "gpio49";
-+					   function = "blsp2_uart";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			 };
-+
-+			 qpic_pins: qpic_pins {
-+				mux {
-+					   pins = "gpio1", "gpio3", "gpio4",
-+						  "gpio5", "gpio6", "gpio7",
-+						  "gpio8", "gpio10", "gpio11",
-+						  "gpio12", "gpio13", "gpio14",
-+						  "gpio15", "gpio16", "gpio17";
-+					   function = "qpic";
-+					   drive-strength = <8>;
-+					   bias-disable;
-+				  };
-+			};
-+
- 		};
- 
- 		serial at 78b3000 {
-@@ -48,5 +90,66 @@
- 			pinctrl-names = "default";
- 			status = "ok";
- 		};
-+
-+		spi at 78b5000 {
-+			 pinctrl-0 = <&spi_0_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+
-+			 m25p80 at 0 {
-+				  #address-cells = <1>;
-+				  #size-cells = <1>;
-+				  compatible = "n25q128a11", "jedec,spi-nor";
-+				  reg = <0>;
-+				  spi-max-frequency = <50000000>;
-+			 };
-+		};
-+
-+		serial at 78b1000 {
-+			 pinctrl-0 = <&hsuart_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+		};
-+
-+		i2c at 78b6000 {
-+			 pinctrl-0 = <&i2c_0_pins>;
-+			 pinctrl-names = "default";
-+			 status = "ok";
-+		};
-+
-+		dma at 7984000 {
-+			 status = "ok";
-+		};
-+
-+		nand at 79b0000 {
-+			pinctrl-0 = <&qpic_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+
-+			nand at 0 {
-+				reg = <0>;
-+				nand-ecc-strength = <4>;
-+				nand-ecc-step-size = <512>;
-+				nand-bus-width = <8>;
-+			};
-+		};
-+
-+		phy at 86000 {
-+			status = "ok";
-+		};
-+
-+		phy at 8e000 {
-+			status = "ok";
-+		};
-+
-+		pci at 20000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 58 0x1>;
-+		};
-+
-+		pci at 10000000 {
-+			status = "ok";
-+			perst-gpio = <&tlmm 61 0x1>;
-+		};
- 	};
- };
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+On Fri, 2018-03-23 at 10:36 +0100, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Commit 7af1bb19f1d7 ("reset: add support for non-DT systems")
+> introduced reset control lookup mechanism for boards that still use
+> board files.
+> 
+> The routine used to register lookup entries takes the corresponding
+> reset_controlled_dev structure as argument.
+> 
+> It's been determined however that for the first user of this new
+> interface - davinci psc driver - it will be easier to register the
+> lookup entries using the reset controller device name.
+
+Thank you, this is what I expected in the first place.
+
+> This patch changes the way lookup entries are added.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  drivers/reset/core.c             | 33 +++++++++++++++++++++++++++++----
+>  include/linux/reset-controller.h |  8 +++++---
+>  2 files changed, 34 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+> index 06fa4907afc4..f37048e55336 100644
+> --- a/drivers/reset/core.c
+> +++ b/drivers/reset/core.c
+> @@ -153,11 +153,11 @@ EXPORT_SYMBOL_GPL(devm_reset_controller_register);
+>  
+>  /**
+>   * reset_controller_add_lookup - register a set of lookup entries
+> - * @rcdev: initialized reset controller device owning the reset line
+> + * @provider: name of the reset controller provider
+>   * @lookup: array of reset lookup entries
+>   * @num_entries: number of entries in the lookup array
+>   */
+> -void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
+> +void reset_controller_add_lookup(const char *provider,
+
+Is there any reason not to drop the provider parameter completely?
+I'd just let the user add the provider device id to the lookup, see
+below.
+
+>  				 struct reset_control_lookup *lookup,
+>  				 unsigned int num_entries)
+>  {
+> @@ -174,7 +174,7 @@ void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
+>  			continue;
+>  		}
+>  
+> -		entry->rcdev = rcdev;
+> +		entry->provider = provider;
+>  		list_add_tail(&entry->list, &reset_lookup_list);
+>  	}
+>  	mutex_unlock(&reset_lookup_mutex);
+> @@ -526,11 +526,30 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
+>  }
+>  EXPORT_SYMBOL_GPL(__of_reset_control_get);
+>  
+> +static struct reset_controller_dev *
+> +__reset_controller_by_name(const char *name)
+> +{
+> +	struct reset_controller_dev *rcdev;
+> +
+> +	lockdep_assert_held(&reset_list_mutex);
+> +
+> +	list_for_each_entry(rcdev, &reset_controller_list, list) {
+> +		if (!rcdev->dev)
+> +			continue;
+> +
+> +		if (!strcmp(name, dev_name(rcdev->dev)))
+> +			return rcdev;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+>  static struct reset_control *
+>  __reset_control_get_from_lookup(struct device *dev, const char *con_id,
+>  				bool shared, bool optional)
+>  {
+>  	const struct reset_control_lookup *lookup;
+> +	struct reset_controller_dev *rcdev;
+>  	const char *dev_id = dev_name(dev);
+>  	struct reset_control *rstc = NULL;
+>  
+> @@ -547,7 +566,13 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
+>  		    ((con_id && lookup->con_id) &&
+>  		     !strcmp(con_id, lookup->con_id))) {
+>  			mutex_lock(&reset_list_mutex);
+> -			rstc = __reset_control_get_internal(lookup->rcdev,
+> +			rcdev = __reset_controller_by_name(lookup->provider);
+> +			if (!rcdev) {
+> +				mutex_unlock(&reset_list_mutex);
+> +				continue;
+
+What is the reason to continue here? If we've found a matching lookup
+that contains a rcdev dev_id for which there is no reset controller,
+shouldn't we just return an error?
+
+> +			}
+> +
+> +			rstc = __reset_control_get_internal(rcdev,
+>  							    lookup->index,
+>  							    shared);
+>  			mutex_unlock(&reset_list_mutex);
+> diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+> index 25698f6c1fae..1a6c25d825d3 100644
+> --- a/include/linux/reset-controller.h
+> +++ b/include/linux/reset-controller.h
+> @@ -30,14 +30,14 @@ struct of_phandle_args;
+>   * struct reset_control_lookup - represents a single lookup entry
+>   *
+>   * @list: internal list of all reset lookup entries
+> - * @rcdev: reset controller device controlling this reset line
+> + * @provider: name of the reset controller device controlling this reset line
+>   * @index: ID of the reset controller in the reset controller device
+>   * @dev_id: name of the device associated with this reset line
+>   * @con_id name of the reset line (can be NULL)
+>   */
+>  struct reset_control_lookup {
+>  	struct list_head list;
+> -	struct reset_controller_dev *rcdev;
+> +	const char *provider;
+
+Looks good to me, but I'd also extend RESET_LOOKUP to set the provider
+instead of passing it to the reset_controller_add_lookup function,
+similarly to PWM_LOOKUP:
+
+#define RESET_LOOKUP(_provider, _index, _dev_id, _con_id)
+
+>  	unsigned int index;
+>  	const char *dev_id;
+>  	const char *con_id;
+> @@ -57,6 +57,7 @@ struct reset_control_lookup {
+>   * @owner: kernel module of the reset controller driver
+>   * @list: internal list of reset controller devices
+>   * @reset_control_head: head of internal list of requested reset controls
+> + * @dev: corresponding driver model device struct
+>   * @of_node: corresponding device tree node as phandle target
+>   * @of_reset_n_cells: number of cells in reset line specifiers
+>   * @of_xlate: translation function to translate from specifier as found in the
+> @@ -68,6 +69,7 @@ struct reset_controller_dev {
+>  	struct module *owner;
+>  	struct list_head list;
+>  	struct list_head reset_control_head;
+> +	struct device *dev;
+>  	struct device_node *of_node;
+>  	int of_reset_n_cells;
+>  	int (*of_xlate)(struct reset_controller_dev *rcdev,
+> @@ -82,7 +84,7 @@ struct device;
+>  int devm_reset_controller_register(struct device *dev,
+>  				   struct reset_controller_dev *rcdev);
+>  
+> -void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
+> +void reset_controller_add_lookup(const char *provider,
+>  				 struct reset_control_lookup *lookup,
+>  				 unsigned int num_entries);
+>  
+
+regards
+Philipp
