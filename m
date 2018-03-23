@@ -1,31 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Mar 2018 09:51:40 +0100
-Subject: [PATCH v6] ARM: dts: wheat: Fix ADV7513 address usage
-In-Reply-To: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
-References: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
-Message-ID: <20180323085140.g3golwdtpezo7fhi@verge.net.au>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Fri, 23 Mar 2018 09:51:53 +0100
+Subject: linux-next: please clean up the alpine tree
+In-Reply-To: <20180323083315.58976d73@canb.auug.org.au>
+References: <20180323083315.58976d73@canb.auug.org.au>
+Message-ID: <20180323085153.GB9682@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 09:30:40PM +0000, Kieran Bingham wrote:
-> The r8a7792 Wheat board has two ADV7513 devices sharing a single I2C
-> bus, however in low power mode the ADV7513 will reset it's slave maps to
-> use the hardware defined default addresses.
-> 
-> The ADV7511 driver was adapted to allow the two devices to be registered
-> correctly - but it did not take into account the fault whereby the
-> devices reset the addresses.
-> 
-> This results in an address conflict between the device using the default
-> addresses, and the other device if it is in low-power-mode.
-> 
-> Repair this issue by moving both devices away from the default address
-> definitions.
+Hi Stephen,
 
-Hi Kierean,
+On Fri, Mar 23, 2018 at 08:33:15AM +1100, Stephen Rothwell wrote:
+> 
+> The alpine tree
+> (git://git.kernel.org/pub/scm/linux/kernel/git/atenart/linux.git#alpine/for-next)
+> only contains commits that have been upstreamed as different commits.
+> It also hasn't been updated since late March 2017.  Please clean it up
+> (it takes some time to merge - presumably just because of its age).
+> 
+> Or, if it is no longer being used, please let me know and I will remove
+> it from linux-next.
 
-as this is a fix
-a) Does it warrant a fixes tag?
-   Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
-b) Does it warrant being posted as a fix for v4.16;
-c) or v4.17?
+Thanks for pointing this out, and sorry for the inconvenience. The
+Alpine tree isn't very active and I haven't got patches for quite
+some time.
+
+I updated alpine/next to point to v4.16-rc1 to fix the issue. It's not
+completely dead, but as it's not active you can also remove the
+alpine/for-next tree from linux-next. And when/if I get patches to merge
+in the future I'll ask to add it back. As you wish :)
+
+Thank you for making linux-next!
+Antoine
+
+-- 
+Antoine T?nart, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
