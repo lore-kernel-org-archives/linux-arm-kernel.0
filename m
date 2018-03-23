@@ -1,28 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Mar 2018 04:01:16 +0100
-Subject: [PATCH v2] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
- bits_per_mux != 0
-In-Reply-To: <1519077427-30165-1-git-send-email-david@lechnology.com>
-References: <1519077427-30165-1-git-send-email-david@lechnology.com>
-Message-ID: <CACRpkdanFFwPBhkDNRTdns9cPebH3drBZNhqZLBzF78U3XdRgw@mail.gmail.com>
+Date: Fri, 23 Mar 2018 04:03:12 +0100
+Subject: [PATCH] pinctrl: mediatek: mtk-common: use true and false for
+ boolean values
+In-Reply-To: <20180305234906.GA32058@embeddedgus>
+References: <20180305234906.GA32058@embeddedgus>
+Message-ID: <CACRpkdZdzgVmyMmzOWHr2=oS3XYejmF+sqs4pjf4PDxDkqGd4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 19, 2018 at 10:57 PM, David Lechner <david@lechnology.com> wrote:
+On Tue, Mar 6, 2018 at 12:49 AM, Gustavo A. R. Silva
+<gustavo@embeddedor.com> wrote:
 
-> This fixes pcs_request_gpio() in the pinctrl-single driver when
-> bits_per_mux != 0. It appears this was overlooked when the multiple
-> pins per register feature was added.
+> Assign true or false to boolean variables instead of an integer value.
 >
-> Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
+> This issue was detected with the help of Coccinelle.
 >
-> v2 changes:
-> - don't wrap Fixes: line in commit message since it is a special machine-
->   readable line.
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 
-Tony/Haojian: are you OK with this change?
+Patch applied.
 
 Yours,
 Linus Walleij
