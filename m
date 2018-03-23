@@ -1,153 +1,77 @@
-From: peng.hao2@zte.com.cn (Peng Hao)
-Date: Sat, 24 Mar 2018 07:01:14 +0800
-Subject: [PATCH v2] KVM: arm/arm64 : add lpi info in vgic-debug
-Message-ID: <1521846074-66914-1-git-send-email-peng.hao2@zte.com.cn>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Fri, 23 Mar 2018 15:33:26 +0200
+Subject: [PATCH] clk: imx: Set CLK_SET_RATE_GATE for gate and divider clocks
+Message-ID: <1521812006-6173-1-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add lpi debug info to vgic-stat.
-the printed info like this:
-    SPI  287      0 000001        0        0   0 160      -1
-    LPI 8192      2 000100        0        0   0 160      -1
+Add flag CLK_SET_RATE_GATE for i.MX gate and divider clocks on which the
+client drivers usually make clk_set_rate() call, so that the call will fail
+when clock is still on instead of standing the risk of running into glitch
+issue. Rate cannot be changed when the clock is enabled due to the glitchy
+multiplexers.
 
-Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+[initial patch from imx internal repo]
+Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+[carried over from 3.14 and also applied the flag to newer functions]
 ---
- virt/kvm/arm/vgic/vgic-debug.c | 56 ++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 51 insertions(+), 5 deletions(-)
+ drivers/clk/imx/clk.h | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-index 10b3817..cb85550 100644
---- a/virt/kvm/arm/vgic/vgic-debug.c
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -36,9 +36,12 @@
- struct vgic_state_iter {
- 	int nr_cpus;
- 	int nr_spis;
-+	int nr_lpis;
- 	int dist_id;
- 	int vcpu_id;
- 	int intid;
-+	int lpi_print_count;
-+	struct vgic_irq **lpi_irqs;
- };
- 
- static void iter_next(struct vgic_state_iter *iter)
-@@ -52,6 +55,35 @@ static void iter_next(struct vgic_state_iter *iter)
- 	if (iter->intid == VGIC_NR_PRIVATE_IRQS &&
- 	    ++iter->vcpu_id < iter->nr_cpus)
- 		iter->intid = 0;
-+
-+	if (iter->intid >= VGIC_NR_PRIVATE_IRQS + iter->nr_spis) {
-+		if (iter->lpi_print_count < iter->nr_lpis)
-+			iter->intid = iter->lpi_irqs[iter->lpi_print_count]->intid;
-+		iter->lpi_print_count++;
-+	}
-+}
-+
-+static void vgic_debug_get_lpis(struct kvm *kvm, struct vgic_state_iter *iter)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	int i = 0;
-+	struct vgic_irq *irq = NULL, **lpi_irqs;
-+
-+	iter->nr_lpis = dist->lpi_list_count;
-+	lpi_irqs = kmalloc_array(iter->nr_lpis, sizeof(irq), GFP_KERNEL);
-+	if (!lpi_irqs) {
-+		iter->nr_lpis = 0;
-+		return;
-+	}
-+	spin_lock(&dist->lpi_list_lock);
-+	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-+		vgic_get_irq_kref(irq);
-+		if (i < iter->nr_lpis)
-+			lpi_irqs[i++] = irq;
-+	}
-+	iter->nr_lpis = i;
-+	spin_unlock(&dist->lpi_list_lock);
-+	iter->lpi_irqs = lpi_irqs;
- }
- 
- static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
-@@ -64,6 +96,8 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
- 	iter->nr_cpus = nr_cpus;
- 	iter->nr_spis = kvm->arch.vgic.nr_spis;
- 
-+	if (vgic_supports_direct_msis(kvm) && !pos)
-+		vgic_debug_get_lpis(kvm, iter);
- 	/* Fast forward to the right position if needed */
- 	while (pos--)
- 		iter_next(iter);
-@@ -73,7 +107,9 @@ static bool end_of_vgic(struct vgic_state_iter *iter)
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index d69c4bb..4411719 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -96,7 +96,8 @@ static inline struct clk *imx_clk_fixed_factor(const char *name,
+ static inline struct clk *imx_clk_divider(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift, u8 width)
  {
- 	return iter->dist_id > 0 &&
- 		iter->vcpu_id == iter->nr_cpus &&
--		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
-+		(iter->intid - VGIC_NR_PRIVATE_IRQS) >= iter->nr_spis &&
-+		((iter->nr_lpis == 0) ||
-+		(iter->lpi_print_count == iter->nr_lpis + 1));
+-	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
++	return clk_register_divider(NULL, name, parent,
++			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE,
+ 			reg, shift, width, 0, &imx_ccm_lock);
  }
  
- static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
-@@ -130,6 +166,7 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
- 
- 	mutex_lock(&kvm->lock);
- 	iter = kvm->arch.vgic.iter;
-+	kfree(iter->lpi_irqs);
- 	kfree(iter);
- 	kvm->arch.vgic.iter = NULL;
- 	mutex_unlock(&kvm->lock);
-@@ -154,7 +191,7 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
- 			 struct kvm_vcpu *vcpu)
+@@ -133,7 +134,8 @@ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
+ static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
  {
- 	int id = 0;
--	char *hdr = "SPI ";
-+	char *hdr = "Global";
- 
- 	if (vcpu) {
- 		hdr = "VCPU";
-@@ -162,7 +199,10 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
- 	}
- 
- 	seq_printf(s, "\n");
--	seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-+	if (vcpu)
-+		seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-+	else
-+		seq_printf(s, "%s TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr);
- 	seq_printf(s, "---------------------------------------------------------------\n");
+-	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++	return clk_register_gate2(NULL, name, parent,
++			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
+ 			shift, 0x3, 0, &imx_ccm_lock, NULL);
  }
  
-@@ -174,8 +214,10 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
- 		type = "SGI";
- 	else if (irq->intid < VGIC_NR_PRIVATE_IRQS)
- 		type = "PPI";
--	else
-+	else if (irq->intid < VGIC_MAX_SPI)
- 		type = "SPI";
-+	else if (irq->intid >= VGIC_MIN_LPI)
-+		type = "LPI";
- 
- 	if (irq->intid ==0 || irq->intid == VGIC_NR_PRIVATE_IRQS)
- 		print_header(s, irq, vcpu);
-@@ -220,7 +262,9 @@ static int vgic_debug_show(struct seq_file *s, void *v)
- 	if (!kvm->arch.vgic.initialized)
- 		return 0;
- 
--	if (iter->vcpu_id < iter->nr_cpus) {
-+	if (iter->intid >= VGIC_MIN_LPI)
-+		irq = iter->lpi_irqs[iter->lpi_print_count - 1];
-+	else if (iter->vcpu_id < iter->nr_cpus) {
- 		vcpu = kvm_get_vcpu(kvm, iter->vcpu_id);
- 		irq = &vcpu->arch.vgic_cpu.private_irqs[iter->intid];
- 	} else {
-@@ -230,6 +274,8 @@ static int vgic_debug_show(struct seq_file *s, void *v)
- 	spin_lock(&irq->irq_lock);
- 	print_irq_state(s, irq, vcpu);
- 	spin_unlock(&irq->irq_lock);
-+
-+	vgic_put_irq(kvm, irq);
- 
- 	return 0;
+@@ -141,7 +143,8 @@ static inline struct clk *imx_clk_gate2_shared(const char *name,
+ 		const char *parent, void __iomem *reg, u8 shift,
+ 		unsigned int *share_count)
+ {
+-	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
++	return clk_register_gate2(NULL, name, parent,
++			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
+ 			shift, 0x3, 0, &imx_ccm_lock, share_count);
  }
+ 
+@@ -150,8 +153,8 @@ static inline struct clk *imx_clk_gate2_shared2(const char *name,
+ 		unsigned int *share_count)
+ {
+ 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT |
+-				  CLK_OPS_PARENT_ENABLE, reg, shift, 0x3, 0,
+-				  &imx_ccm_lock, share_count);
++			CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
++			reg, shift, 0x3, 0, &imx_ccm_lock, share_count);
+ }
+ 
+ static inline struct clk *imx_clk_gate2_cgr(const char *name,
+@@ -173,7 +176,7 @@ static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
+ 		void __iomem *reg, u8 shift)
+ {
+ 	return clk_register_gate2(NULL, name, parent,
+-			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
++		CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
+ 			reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
+ }
+ 
 -- 
-1.8.3.1
+2.7.4
