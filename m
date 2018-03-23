@@ -1,44 +1,59 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 23 Mar 2018 18:19:03 +0100
-Subject: [PATCH] [media] vcodec: fix error return value from
- mtk_jpeg_clk_init()
-In-Reply-To: <f9295ecafa4c845ef5d9414fca47b2dc0fc6640d.1521776018.git.ryder.lee@mediatek.com>
-References: <f9295ecafa4c845ef5d9414fca47b2dc0fc6640d.1521776018.git.ryder.lee@mediatek.com>
-Message-ID: <6431ba94-5e7d-0df5-40bb-04f9af203586@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 23 Mar 2018 17:27:32 +0000
+Subject: [PATCH] arm64/sve: Document firmware support requirements in
+ Kconfig
+In-Reply-To: <1521633289-10504-1-git-send-email-Dave.Martin@arm.com>
+References: <1521633289-10504-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <4dc6666d-e293-026a-e4fd-93238c1daf61@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/23/2018 04:44 AM, Ryder Lee wrote:
-> The error return value should be fixed as it may return EPROBE_DEFER.
+On 21/03/18 11:54, Dave Martin wrote:
+> Use of SVE by EL2 and below requires explicit support in the
+> firmware.  There is no means to hide the presence of SVE from EL2,
+> so a kernel configured with CONFIG_ARM64_SVE=y will typically not
+> work correctly on SVE capable hardware unless the firmware does
+> include the appropriate support.
 > 
-> Cc: Rick Chang <rick.chang@mediatek.com>
-> Cc: Bin Liu <bin.liu@mediatek.com>
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-
+> This is not expected to pose a problem in the wild, since platform
+> integrators are responsible for ensuring that they ship up-to-date
+> firmware to support their hardware.  However, developers may hit
+> the issue when using mismatched compoments.
+> 
+> In order to draw attention to the issue and how to solve it, this
+> patch adds some Kconfig text giving a brief explanation and details
+> of compatible firmware versions.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > ---
->  drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> index 226f908..af17aaa 100644
-> --- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> +++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-> @@ -1081,11 +1081,11 @@ static int mtk_jpeg_clk_init(struct mtk_jpeg_dev *jpeg)
->  
->  	jpeg->clk_jdec = devm_clk_get(jpeg->dev, "jpgdec");
->  	if (IS_ERR(jpeg->clk_jdec))
-> -		return -EINVAL;
-> +		return PTR_ERR(jpeg->clk_jdec);
->  
->  	jpeg->clk_jdec_smi = devm_clk_get(jpeg->dev, "jpgdec-smi");
->  	if (IS_ERR(jpeg->clk_jdec_smi))
-> -		return -EINVAL;
-> +		return PTR_ERR(jpeg->clk_jdec_smi);
->  
->  	return 0;
->  }
+> No functional change, but it would be good to get this explanatory text
+> merged since developers who try Linux on SVE-enabled models may hit
+> this problem, and fixed versions of ARM TF and the bootwrapper are now
+> available.
 > 
+>   arch/arm64/Kconfig | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7381eeb..e6fa47b 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1104,6 +1104,23 @@ config ARM64_SVE
+>   
+>   	  To enable use of this extension on CPUs that implement it, say Y.
+>   
+> +	  Note that for architectural reasons, firmware _must_ implement SVE
+> +	  support when running on SVE capable hardware.  The required support
+> +	  is present in:
+> +
+> +	    * version 1.5 and later of the ARM Trusted Firmware
+> +	    * the AArch64 boot wrapper since commit 5e1261e08abf
+> +	      ("bootwrapper: SVE: Enable SVE for EL2 and below").
+> +
+> +	  For other firmware implementations, consult the firware documentation
+
+minor nit: 	s/firware/firmware/
+
+
+Suzuki
