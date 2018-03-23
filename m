@@ -1,183 +1,170 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 23 Mar 2018 11:48:57 +0100
-Subject: [PATCH 09/10] drm/sun4i: Add a dedicated ioctl call for
- allocating tiled buffers
-In-Reply-To: <20180321152904.22411-10-paul.kocialkowski@bootlin.com>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-10-paul.kocialkowski@bootlin.com>
-Message-ID: <20180323104856.qo7w376xr3gcznmm@flea>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 23 Mar 2018 12:08:21 +0100
+Subject: [PATCH v2 1/8] reset: modify the way reset lookup works for
+ board files
+In-Reply-To: <CAMRc=Mcf18jmRAM6WFBnuuOen11+5uzy4yo3xwvLQzLBSSNvHQ@mail.gmail.com>
+References: <20180323093609.24576-1-brgl@bgdev.pl>
+ <20180323093609.24576-2-brgl@bgdev.pl>
+ <1521800670.3406.1.camel@pengutronix.de>
+ <CAMRc=Mcf18jmRAM6WFBnuuOen11+5uzy4yo3xwvLQzLBSSNvHQ@mail.gmail.com>
+Message-ID: <1521803301.3406.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Mar 21, 2018 at 04:29:03PM +0100, Paul Kocialkowski wrote:
-> This introduces a dedicated ioctl for allocating tiled buffers in the
-> Allwinner MB32 format, that comes with a handful of specific
-> constraints. In particular, the stride of the buffers is expected to be
-> aligned to 32 bytes.
-
-You should have more details here. What are those constraints, what is
-the expected user? Can you use it only for the scanout, like the dumb
-buffers, or also for the other devices in the system?
-
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_drv.c | 96 +++++++++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/sun4i/sun4i_drv.h |  2 +
->  include/uapi/drm/sun4i_drm.h      | 42 +++++++++++++++++
->  3 files changed, 140 insertions(+)
->  create mode 100644 include/uapi/drm/sun4i_drm.h
+On Fri, 2018-03-23 at 11:46 +0100, Bartosz Golaszewski wrote:
+> 2018-03-23 11:24 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> > Hi Bartosz,
+> > 
+> > On Fri, 2018-03-23 at 10:36 +0100, Bartosz Golaszewski wrote:
+> > > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > > 
+> > > Commit 7af1bb19f1d7 ("reset: add support for non-DT systems")
+> > > introduced reset control lookup mechanism for boards that still use
+> > > board files.
+> > > 
+> > > The routine used to register lookup entries takes the corresponding
+> > > reset_controlled_dev structure as argument.
+> > > 
+> > > It's been determined however that for the first user of this new
+> > > interface - davinci psc driver - it will be easier to register the
+> > > lookup entries using the reset controller device name.
+> > 
+> > Thank you, this is what I expected in the first place.
+> > 
+> > > This patch changes the way lookup entries are added.
+> > > 
+> > > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > > ---
+> > >  drivers/reset/core.c             | 33 +++++++++++++++++++++++++++++----
+> > >  include/linux/reset-controller.h |  8 +++++---
+> > >  2 files changed, 34 insertions(+), 7 deletions(-)
+> > > 
+> > > diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+> > > index 06fa4907afc4..f37048e55336 100644
+> > > --- a/drivers/reset/core.c
+> > > +++ b/drivers/reset/core.c
+> > > @@ -153,11 +153,11 @@ EXPORT_SYMBOL_GPL(devm_reset_controller_register);
+> > > 
+> > >  /**
+> > >   * reset_controller_add_lookup - register a set of lookup entries
+> > > - * @rcdev: initialized reset controller device owning the reset line
+> > > + * @provider: name of the reset controller provider
+> > >   * @lookup: array of reset lookup entries
+> > >   * @num_entries: number of entries in the lookup array
+> > >   */
+> > > -void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
+> > > +void reset_controller_add_lookup(const char *provider,
+> > 
+> > Is there any reason not to drop the provider parameter completely?
+> > I'd just let the user add the provider device id to the lookup, see
+> > below.
+> > 
+> > >                                struct reset_control_lookup *lookup,
+> > >                                unsigned int num_entries)
+> > >  {
+> > > @@ -174,7 +174,7 @@ void reset_controller_add_lookup(struct reset_controller_dev *rcdev,
+> > >                       continue;
+> > >               }
+> > > 
+> > > -             entry->rcdev = rcdev;
+> > > +             entry->provider = provider;
+> > >               list_add_tail(&entry->list, &reset_lookup_list);
+> > >       }
+> > >       mutex_unlock(&reset_lookup_mutex);
+> > > @@ -526,11 +526,30 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(__of_reset_control_get);
+> > > 
+> > > +static struct reset_controller_dev *
+> > > +__reset_controller_by_name(const char *name)
+> > > +{
+> > > +     struct reset_controller_dev *rcdev;
+> > > +
+> > > +     lockdep_assert_held(&reset_list_mutex);
+> > > +
+> > > +     list_for_each_entry(rcdev, &reset_controller_list, list) {
+> > > +             if (!rcdev->dev)
+> > > +                     continue;
+> > > +
+> > > +             if (!strcmp(name, dev_name(rcdev->dev)))
+> > > +                     return rcdev;
+> > > +     }
+> > > +
+> > > +     return NULL;
+> > > +}
+> > > +
+> > >  static struct reset_control *
+> > >  __reset_control_get_from_lookup(struct device *dev, const char *con_id,
+> > >                               bool shared, bool optional)
+> > >  {
+> > >       const struct reset_control_lookup *lookup;
+> > > +     struct reset_controller_dev *rcdev;
+> > >       const char *dev_id = dev_name(dev);
+> > >       struct reset_control *rstc = NULL;
+> > > 
+> > > @@ -547,7 +566,13 @@ __reset_control_get_from_lookup(struct device *dev, const char *con_id,
+> > >                   ((con_id && lookup->con_id) &&
+> > >                    !strcmp(con_id, lookup->con_id))) {
+> > >                       mutex_lock(&reset_list_mutex);
+> > > -                     rstc = __reset_control_get_internal(lookup->rcdev,
+> > > +                     rcdev = __reset_controller_by_name(lookup->provider);
+> > > +                     if (!rcdev) {
+> > > +                             mutex_unlock(&reset_list_mutex);
+> > > +                             continue;
+> > 
+> > What is the reason to continue here? If we've found a matching lookup
+> > that contains a rcdev dev_id for which there is no reset controller,
+> > shouldn't we just return an error?
+> > 
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> index d374bb61c565..e9cb03d34b44 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> @@ -21,11 +21,18 @@
->  #include <drm/drm_gem_cma_helper.h>
->  #include <drm/drm_fb_helper.h>
->  #include <drm/drm_of.h>
-> +#include <drm/sun4i_drm.h>
->  
->  #include "sun4i_drv.h"
->  #include "sun4i_frontend.h"
->  #include "sun4i_framebuffer.h"
->  #include "sun4i_tcon.h"
-> +#include "sun4i_format.h"
-> +
-> +static const struct drm_ioctl_desc sun4i_drv_ioctls[] = {
-> +	DRM_IOCTL_DEF_DRV(SUN4I_GEM_CREATE_TILED, drm_sun4i_gem_create_tiled,
-> +			  DRM_AUTH | DRM_RENDER_ALLOW),
+> Indeed. This could be used to indicate to drivers that the reset
+> controller may not have yet been probed() or its probe() failed. How
+> about returning -EPROBE_DEFER here?
 
-Why do you need DRM_RENDER_ALLOW? as far as I know, this is only
-useful for render-nodes.
+That is a good point. The framework doesn't know whether the
+lookup->provider is bogus or whether it's correct and the corresponding
+driver just hasn't registered its reset controller yet. So we have to
+assume the latter and return -EPROBE_DEFER here.
 
-> +};
->  
->  DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
->  
-> @@ -34,6 +41,8 @@ static struct drm_driver sun4i_drv_driver = {
->  
->  	/* Generic Operations */
->  	.lastclose		= drm_fb_helper_lastclose,
-> +	.ioctls			= sun4i_drv_ioctls,
-> +	.num_ioctls		= ARRAY_SIZE(sun4i_drv_ioctls),
->  	.fops			= &sun4i_drv_fops,
->  	.name			= "sun4i-drm",
->  	.desc			= "Allwinner sun4i Display Engine",
-> @@ -69,6 +78,93 @@ int drm_sun4i_gem_dumb_create(struct drm_file *file_priv,
->  	return drm_gem_cma_dumb_create_internal(file_priv, drm, args);
->  }
->  
-> +int drm_sun4i_gem_create_tiled(struct drm_device *drm, void *data,
-> +			       struct drm_file *file_priv)
-> +{
-> +	struct drm_sun4i_gem_create_tiled *args = data;
-> +	struct drm_gem_cma_object *cma_obj;
-> +	struct drm_gem_object *gem_obj;
-> +	uint32_t luma_stride, chroma_stride;
-> +	uint32_t luma_height, chroma_height;
-> +	int ret;
-> +
-> +	if (!sun4i_format_supports_tiling(args->format))
-> +		return -EINVAL;
-> +
-> +	memset(args->pitches, 0, sizeof(args->pitches));
-> +	memset(args->offsets, 0, sizeof(args->offsets));
-> +
-> +	/* Stride and height are aligned to 32 bytes for MB32 tiled format. */
-> +	luma_stride = ALIGN(args->width, 32);
-> +	luma_height = ALIGN(args->height, 32);
-> +
-> +	if (sun4i_format_is_semiplanar(args->format)) {
-> +		chroma_stride = luma_stride;
-> +
-> +		if (sun4i_format_is_yuv420(args->format))
-> +			chroma_height = ALIGN(DIV_ROUND_UP(args->height, 2), 32);
-> +		else if (sun4i_format_is_yuv422(args->format))
-> +			chroma_height = luma_height;
-> +		else
-> +			return -EINVAL;
-> +
-> +		args->pitches[0] = luma_stride;
-> +		args->pitches[1] = chroma_stride;
-> +
-> +		args->offsets[0] = 0;
-> +		args->offsets[1] = luma_stride * luma_height;
-> +
-> +		args->size = luma_stride * luma_height +
-> +			     chroma_stride * chroma_height;
-> +	} else if (sun4i_format_is_planar(args->format)) {
-> +		if (sun4i_format_is_yuv411(args->format)) {
-> +			chroma_stride = ALIGN(DIV_ROUND_UP(args->width, 4), 32);
-> +			chroma_height = luma_height;
-> +		} if (sun4i_format_is_yuv420(args->format)) {
-> +			chroma_stride = ALIGN(DIV_ROUND_UP(args->width, 2), 32);
-> +			chroma_height = ALIGN(DIV_ROUND_UP(args->height, 2), 32);
-> +		} else if (sun4i_format_is_yuv422(args->format)) {
-> +			chroma_stride = ALIGN(DIV_ROUND_UP(args->width, 2), 32);
-> +			chroma_height = luma_height;
-> +		} else {
-> +			return -EINVAL;
-> +		}
-> +
-> +		args->pitches[0] = luma_stride;
-> +		args->pitches[1] = chroma_stride;
-> +		args->pitches[2] = chroma_stride;
-> +
-> +		args->offsets[0] = 0;
-> +		args->offsets[1] = luma_stride * luma_height;
-> +		args->offsets[2] = luma_stride * luma_height +
-> +				   chroma_stride * chroma_height;
-> +
-> +		args->size = luma_stride * luma_height +
-> +			     chroma_stride * chroma_height * 2;
-> +	} else {
-> +		/* No support for packed formats in tiled mode. */
-> +		return -EINVAL;
-> +	}
-> +
-> +	cma_obj = drm_gem_cma_create(drm, args->size);
-> +	if (IS_ERR(cma_obj))
-> +		return PTR_ERR(cma_obj);
-> +
-> +	gem_obj = &cma_obj->base;
-> +
-> +	/*
-> +	 * allocate a id of idr table where the obj is registered
-> +	 * and handle has the id what user can see.
-> +	 */
-> +	ret = drm_gem_handle_create(file_priv, gem_obj, &args->handle);
-> +	/* drop reference from allocate - handle holds it now. */
-> +	drm_gem_object_put_unlocked(gem_obj);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return PTR_ERR_OR_ZERO(cma_obj);
-> +}
-> +
->  static void sun4i_remove_framebuffers(void)
->  {
->  	struct apertures_struct *ap;
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
-> index 47969711a889..308ff4bfcdd5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
-> @@ -26,5 +26,7 @@ struct sun4i_drv {
->  int drm_sun4i_gem_dumb_create(struct drm_file *file_priv,
->  			      struct drm_device *drm,
->  			      struct drm_mode_create_dumb *args);
-> +int drm_sun4i_gem_create_tiled(struct drm_device *dev, void *data,
-> +			       struct drm_file *file_priv);
+> Bart
+> 
+> > > +                     }
+> > > +
+> > > +                     rstc = __reset_control_get_internal(rcdev,
+> > >                                                           lookup->index,
+> > >                                                           shared);
+> > >                       mutex_unlock(&reset_list_mutex);
+> > > diff --git a/include/linux/reset-controller.h b/include/linux/reset-controller.h
+> > > index 25698f6c1fae..1a6c25d825d3 100644
+> > > --- a/include/linux/reset-controller.h
+> > > +++ b/include/linux/reset-controller.h
+> > > @@ -30,14 +30,14 @@ struct of_phandle_args;
+> > >   * struct reset_control_lookup - represents a single lookup entry
+> > >   *
+> > >   * @list: internal list of all reset lookup entries
+> > > - * @rcdev: reset controller device controlling this reset line
+> > > + * @provider: name of the reset controller device controlling this reset line
+> > >   * @index: ID of the reset controller in the reset controller device
+> > >   * @dev_id: name of the device associated with this reset line
+> > >   * @con_id name of the reset line (can be NULL)
+> > >   */
+> > >  struct reset_control_lookup {
+> > >       struct list_head list;
+> > > -     struct reset_controller_dev *rcdev;
+> > > +     const char *provider;
+> > 
+> > Looks good to me, but I'd also extend RESET_LOOKUP to set the provider
+> > instead of passing it to the reset_controller_add_lookup function,
+> > similarly to PWM_LOOKUP:
+> > 
+> > #define RESET_LOOKUP(_provider, _index, _dev_id, _con_id)
+> > 
+> 
+> I did it mostly for brevity - I don't mind changing it if you prefer
+> this version.
 
-Do you need it to be non-static, and part of the header as well?
+Yes, please. I like the consistency, and seeing provider and index right
+next to each other will make the lookups easier to read and understand.
 
-I'll let the DRM-misc maintainers comment on the validity of the new
-ioctl.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+regards
+Philipp
