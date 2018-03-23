@@ -1,96 +1,46 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 23 Mar 2018 15:38:14 +0800
-Subject: [PATCH v8 14/14] iommu/rockchip: Support sharing IOMMU between masters
-In-Reply-To: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
-References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180323073814.5802-15-jeffy.chen@rock-chips.com>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Fri, 23 Mar 2018 07:59:33 +0000
+Subject: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness supports
+In-Reply-To: <20180312081128.8195-1-prabhakar.kushwaha@nxp.com>
+References: <20180312081128.8195-1-prabhakar.kushwaha@nxp.com>
+Message-ID: <VI1PR0402MB385471846E1D3B747C67B48D97A80@VI1PR0402MB3854.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There would be some masters sharing the same IOMMU device. Put them in
-the same iommu group and share the same iommu domain.
+Hi Boris,
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
----
 
-Changes in v8: None
-Changes in v7:
-Use iommu_group_ref_get to avoid ref leak
+> -----Original Message-----
+> From: Prabhakar Kushwaha
+> Sent: Monday, March 12, 2018 1:41 PM
+> To: linux-mtd at lists.infradead.org; devicetree at vger.kernel.org;
+> robh at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org
+> Cc: boris.brezillon at free-electrons.com; computersforpeace at gmail.com;
+> oss at buserror.net; Leo Li <leoyang.li@nxp.com>; linux-arm-
+> kernel at lists.infradead.org; Prabhakar Kushwaha
+> <prabhakar.kushwaha@nxp.com>
+> Subject: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness
+> supports
+> 
+> Connection between flash and controller is not necessary to be always of
+> same type. It may varies from platform to platform.
+> 
+> Adding endianness (optional) property to provide connection type
+> information.
+> 
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes for v2: updated subject
+> Changes for v3: fixed typo for "big-endian"
+> Changes for v4: Moved binding definition in mtd-physmap.txt as discussed at
+> https://patchwork.ozlabs.org/patch/842543/
+> Changes for v5: Sending as it is
+> Changes for v6: Updated binding when endianness property is absent
+> 
 
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-Remove rk_iommudata->domain.
+I hope this version is good enough to be accepted. 
 
-Changes in v2: None
+May I go ahead and send device tree changes for other NXP SoCs.
 
- drivers/iommu/rockchip-iommu.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 9f6f74689464..5fc8656c60f9 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -104,6 +104,7 @@ struct rk_iommu {
- 	struct iommu_device iommu;
- 	struct list_head node; /* entry in rk_iommu_domain.iommus */
- 	struct iommu_domain *domain; /* domain to which iommu is attached */
-+	struct iommu_group *group;
- };
- 
- struct rk_iommudata {
-@@ -1073,6 +1074,15 @@ static void rk_iommu_remove_device(struct device *dev)
- 	iommu_group_remove_device(dev);
- }
- 
-+static struct iommu_group *rk_iommu_device_group(struct device *dev)
-+{
-+	struct rk_iommu *iommu;
-+
-+	iommu = rk_iommu_from_dev(dev);
-+
-+	return iommu_group_ref_get(iommu->group);
-+}
-+
- static int rk_iommu_of_xlate(struct device *dev,
- 			     struct of_phandle_args *args)
- {
-@@ -1104,7 +1114,7 @@ static const struct iommu_ops rk_iommu_ops = {
- 	.add_device = rk_iommu_add_device,
- 	.remove_device = rk_iommu_remove_device,
- 	.iova_to_phys = rk_iommu_iova_to_phys,
--	.device_group = generic_device_group,
-+	.device_group = rk_iommu_device_group,
- 	.pgsize_bitmap = RK_IOMMU_PGSIZE_BITMAP,
- 	.of_xlate = rk_iommu_of_xlate,
- };
-@@ -1173,9 +1183,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
-+	iommu->group = iommu_group_alloc();
-+	if (IS_ERR(iommu->group)) {
-+		err = PTR_ERR(iommu->group);
-+		goto err_unprepare_clocks;
-+	}
-+
- 	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
- 	if (err)
--		goto err_unprepare_clocks;
-+		goto err_put_group;
- 
- 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
- 	iommu_device_set_fwnode(&iommu->iommu, &dev->of_node->fwnode);
-@@ -1199,6 +1215,8 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	return 0;
- err_remove_sysfs:
- 	iommu_device_sysfs_remove(&iommu->iommu);
-+err_put_group:
-+	iommu_group_put(iommu->group);
- err_unprepare_clocks:
- 	clk_bulk_unprepare(iommu->num_clocks, iommu->clocks);
- 	return err;
--- 
-2.11.0
+--pk
