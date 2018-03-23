@@ -1,38 +1,32 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri, 23 Mar 2018 09:51:53 +0100
-Subject: linux-next: please clean up the alpine tree
-In-Reply-To: <20180323083315.58976d73@canb.auug.org.au>
-References: <20180323083315.58976d73@canb.auug.org.au>
-Message-ID: <20180323085153.GB9682@kwain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Mar 2018 08:52:01 +0000
+Subject: [PATCH v2] arm/arm64: smccc: Fix CLANG compilation for arm64
+In-Reply-To: <1521751838-18912-1-git-send-email-isaacm@codeaurora.org>
+References: <1521751838-18912-1-git-send-email-isaacm@codeaurora.org>
+Message-ID: <29721ee6-25bf-5067-f774-aa1c919873d6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Fri, Mar 23, 2018 at 08:33:15AM +1100, Stephen Rothwell wrote:
+On 22/03/18 20:50, Isaac J. Manjarres wrote:
+> When CLANG compiles inline assembly for 64 bit ARM
+> architectures, it is unable to map register names,
+> such as "r0" to the correct alias, such as "x0" for 64
+> bit accesses, and "w0" for 32 bit accesses. While GCC
+> can perform this mapping, CLANG can not, which results in
+> compilation failures when building the kernel. Allow for
+> differentiation of which register names to use, based on
+> ARM architecture, to compile the kernel with CLANG.
 > 
-> The alpine tree
-> (git://git.kernel.org/pub/scm/linux/kernel/git/atenart/linux.git#alpine/for-next)
-> only contains commits that have been upstreamed as different commits.
-> It also hasn't been updated since late March 2017.  Please clean it up
-> (it takes some time to merge - presumably just because of its age).
-> 
-> Or, if it is no longer being used, please let me know and I will remove
-> it from linux-next.
+> Signed-off-by: Isaac J. Manjarres <isaacm@codeaurora.org>
+Please see the other 2 threads on the list. There is a fix under way for
+Clang, so I don't think there is a need for this hack.
 
-Thanks for pointing this out, and sorry for the inconvenience. The
-Alpine tree isn't very active and I haven't got patches for quite
-some time.
+If you're using Clang to compile the kernel, you're already carrying a
+number of extra patches, so adding this one shouldn't be a big deal.
+Once Clang gains feature parity with GCC, you'll be able to drop it.
 
-I updated alpine/next to point to v4.16-rc1 to fix the issue. It's not
-completely dead, but as it's not active you can also remove the
-alpine/for-next tree from linux-next. And when/if I get patches to merge
-in the future I'll ask to add it back. As you wish :)
+Thanks,
 
-Thank you for making linux-next!
-Antoine
-
+	M.
 -- 
-Antoine T?nart, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Jazz is not dead. It just smells funny...
