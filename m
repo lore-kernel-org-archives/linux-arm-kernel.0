@@ -1,88 +1,185 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 23 Mar 2018 15:38:01 +0800
-Subject: [PATCH v8 01/14] iommu/rockchip: Prohibit unbind and remove
+Date: Fri, 23 Mar 2018 15:38:08 +0800
+Subject: [PATCH v8 08/14] iommu/rockchip: Control clocks needed to access the
+ IOMMU
 In-Reply-To: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
 References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180323073814.5802-2-jeffy.chen@rock-chips.com>
+Message-ID: <20180323073814.5802-9-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removal of IOMMUs cannot be done reliably.
+From: Tomasz Figa <tfiga@chromium.org>
 
-This is similar to exynos iommu driver.
+Current code relies on master driver enabling necessary clocks before
+IOMMU is accessed, however there are cases when the IOMMU should be
+accessed while the master is not running yet, for example allocating
+V4L2 videobuf2 buffers, which is done by the VB2 framework using DMA
+mapping API and doesn't engage the master driver at all.
 
+This patch fixes the problem by letting clocks needed for IOMMU
+operation to be listed in Device Tree and making the driver enable them
+for the time of accessing the hardware.
+
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Tomasz Figa <tfiga@chromium.org>
 Acked-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
-Changes in v8:
-Rebase on newest for-next.
-
+Changes in v8: None
 Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4:
-Rewrite commit message.
+Changes in v6:
+Fix dt-binding as Robin suggested.
+Use aclk and iface clk as Rob and Robin suggested, and split binding
+patch.
 
-Changes in v3:
-Also remove remove() and module_exit() as Tomasz suggested.
+Changes in v5:
+Use clk_bulk APIs.
 
+Changes in v4: None
+Changes in v3: None
 Changes in v2: None
 
- drivers/iommu/rockchip-iommu.c | 21 +--------------------
- 1 file changed, 1 insertion(+), 20 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 50 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 47 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 6a3719e118da..e7fb824d123e 100644
+index c3df53e480ea..50ab9fd4eeb0 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -1197,18 +1197,6 @@ static int rk_iommu_probe(struct platform_device *pdev)
+@@ -4,6 +4,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/compiler.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
+@@ -87,10 +88,17 @@ struct rk_iommu_domain {
+ 	struct iommu_domain domain;
+ };
+ 
++/* list of clocks required by IOMMU */
++static const char * const rk_iommu_clocks[] = {
++	"aclk", "iface",
++};
++
+ struct rk_iommu {
+ 	struct device *dev;
+ 	void __iomem **bases;
+ 	int num_mmu;
++	struct clk_bulk_data *clocks;
++	int num_clocks;
+ 	bool reset_disabled;
+ 	struct iommu_device iommu;
+ 	struct list_head node; /* entry in rk_iommu_domain.iommus */
+@@ -506,6 +514,8 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+ 	irqreturn_t ret = IRQ_NONE;
+ 	int i;
+ 
++	WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
++
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+ 		int_status = rk_iommu_read(iommu->bases[i], RK_MMU_INT_STATUS);
+ 		if (int_status == 0)
+@@ -552,6 +562,8 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_INT_CLEAR, int_status);
+ 	}
+ 
++	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
++
+ 	return ret;
+ }
+ 
+@@ -594,7 +606,9 @@ static void rk_iommu_zap_iova(struct rk_iommu_domain *rk_domain,
+ 	list_for_each(pos, &rk_domain->iommus) {
+ 		struct rk_iommu *iommu;
+ 		iommu = list_entry(pos, struct rk_iommu, node);
++		WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
+ 		rk_iommu_zap_lines(iommu, iova, size);
++		clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+ 	}
+ 	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+ }
+@@ -823,10 +837,14 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 	if (!iommu)
+ 		return 0;
+ 
+-	ret = rk_iommu_enable_stall(iommu);
++	ret = clk_bulk_enable(iommu->num_clocks, iommu->clocks);
+ 	if (ret)
+ 		return ret;
+ 
++	ret = rk_iommu_enable_stall(iommu);
++	if (ret)
++		goto out_disable_clocks;
++
+ 	ret = rk_iommu_force_reset(iommu);
+ 	if (ret)
+ 		goto out_disable_stall;
+@@ -852,6 +870,8 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 
+ out_disable_stall:
+ 	rk_iommu_disable_stall(iommu);
++out_disable_clocks:
++	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+ 	return ret;
+ }
+ 
+@@ -873,6 +893,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ 	spin_unlock_irqrestore(&rk_domain->iommus_lock, flags);
+ 
+ 	/* Ignore error while disabling, just keep going */
++	WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks));
+ 	rk_iommu_enable_stall(iommu);
+ 	rk_iommu_disable_paging(iommu);
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+@@ -880,6 +901,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, 0);
+ 	}
+ 	rk_iommu_disable_stall(iommu);
++	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+ 
+ 	iommu->domain = NULL;
+ 
+@@ -1172,15 +1194,37 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	iommu->reset_disabled = device_property_read_bool(dev,
+ 					"rockchip,disable-mmu-reset");
+ 
+-	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
++	iommu->num_clocks = ARRAY_SIZE(rk_iommu_clocks);
++	iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
++				     sizeof(*iommu->clocks), GFP_KERNEL);
++	if (!iommu->clocks)
++		return -ENOMEM;
++
++	for (i = 0; i < iommu->num_clocks; ++i)
++		iommu->clocks[i].id = rk_iommu_clocks[i];
++
++	err = devm_clk_bulk_get(iommu->dev, iommu->num_clocks, iommu->clocks);
++	if (err)
++		return err;
++
++	err = clk_bulk_prepare(iommu->num_clocks, iommu->clocks);
+ 	if (err)
+ 		return err;
+ 
++	err = iommu_device_sysfs_add(&iommu->iommu, dev, NULL, dev_name(dev));
++	if (err)
++		goto err_unprepare_clocks;
++
+ 	iommu_device_set_ops(&iommu->iommu, &rk_iommu_ops);
+ 	err = iommu_device_register(&iommu->iommu);
+ 	if (err)
+-		iommu_device_sysfs_remove(&iommu->iommu);
++		goto err_remove_sysfs;
+ 
++	return 0;
++err_remove_sysfs:
++	iommu_device_sysfs_remove(&iommu->iommu);
++err_unprepare_clocks:
++	clk_bulk_unprepare(iommu->num_clocks, iommu->clocks);
  	return err;
  }
  
--static int rk_iommu_remove(struct platform_device *pdev)
--{
--	struct rk_iommu *iommu = platform_get_drvdata(pdev);
--
--	if (iommu) {
--		iommu_device_sysfs_remove(&iommu->iommu);
--		iommu_device_unregister(&iommu->iommu);
--	}
--
--	return 0;
--}
--
- static void rk_iommu_shutdown(struct platform_device *pdev)
- {
- 	struct rk_iommu *iommu = platform_get_drvdata(pdev);
-@@ -1234,11 +1222,11 @@ MODULE_DEVICE_TABLE(of, rk_iommu_dt_ids);
- 
- static struct platform_driver rk_iommu_driver = {
- 	.probe = rk_iommu_probe,
--	.remove = rk_iommu_remove,
- 	.shutdown = rk_iommu_shutdown,
- 	.driver = {
- 		   .name = "rk_iommu",
- 		   .of_match_table = rk_iommu_dt_ids,
-+		   .suppress_bind_attrs = true,
- 	},
- };
- 
-@@ -1266,14 +1254,7 @@ static int __init rk_iommu_init(void)
- 		platform_driver_unregister(&rk_iommu_domain_driver);
- 	return ret;
- }
--static void __exit rk_iommu_exit(void)
--{
--	platform_driver_unregister(&rk_iommu_driver);
--	platform_driver_unregister(&rk_iommu_domain_driver);
--}
--
- subsys_initcall(rk_iommu_init);
--module_exit(rk_iommu_exit);
- 
- MODULE_DESCRIPTION("IOMMU API for Rockchip");
- MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
 -- 
 2.11.0
