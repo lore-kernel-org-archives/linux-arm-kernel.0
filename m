@@ -1,17 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 23 Mar 2018 15:45:27 -0300
-Subject: Regression with arm in next with stack protector
-In-Reply-To: <20180323181452.GJ5799@atomide.com>
-References: <20180323181452.GJ5799@atomide.com>
-Message-ID: <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 23 Mar 2018 14:52:55 -0400
+Subject: [PATCH v7 2/7] ixgbe: eliminate duplicate barriers on weakly-ordered
+ archs
+In-Reply-To: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
+References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521831180-25014-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 3:14 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> Looks like commit 5638790dadae ("zboot: fix stack protector in
-> compressed boot phase") breaks booting on arm.
+Code includes wmb() followed by writel() in multiple places. writel()
+already has a barrier on some architectures like arm64.
 
-Yes, almost all imx are broken in linux-next due to this commit:
-https://kernelci.org/soc/imx/job/next/kernel/next-20180323/
+This ends up CPU observing two barriers back to back before executing the
+register write.
+
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/net/ethernet/intel/ixgbe/ixgbe_main.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
+index e3b32ea..fb80edb 100644
+--- a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
++++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
+@@ -1701,7 +1701,7 @@ void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
+ 		 * such as IA-64).
+ 		 */
+ 		wmb();
+-		writel(i, rx_ring->tail);
++		writel_relaxed(i, rx_ring->tail);
+ 	}
+ }
+ 
+@@ -2470,7 +2470,7 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
+ 		 * know there are new descriptors to fetch.
+ 		 */
+ 		wmb();
+-		writel(ring->next_to_use, ring->tail);
++		writel_relaxed(ring->next_to_use, ring->tail);
+ 
+ 		xdp_do_flush_map();
+ 	}
+@@ -8101,7 +8101,7 @@ static int ixgbe_tx_map(struct ixgbe_ring *tx_ring,
+ 	ixgbe_maybe_stop_tx(tx_ring, DESC_NEEDED);
+ 
+ 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
+-		writel(i, tx_ring->tail);
++		writel_relaxed(i, tx_ring->tail);
+ 
+ 		/* we need this if more than one processor can write to our tail
+ 		 * at a time, it synchronizes IO on IA64/Altix systems
+@@ -10038,7 +10038,7 @@ static void ixgbe_xdp_flush(struct net_device *dev)
+ 	 * are new descriptors to fetch.
+ 	 */
+ 	wmb();
+-	writel(ring->next_to_use, ring->tail);
++	writel_relaxed(ring->next_to_use, ring->tail);
+ 
+ 	return;
+ }
+-- 
+2.7.4
