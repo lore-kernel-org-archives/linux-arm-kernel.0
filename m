@@ -1,37 +1,60 @@
-From: jhogan@kernel.org (James Hogan)
-Date: Fri, 23 Mar 2018 21:08:12 +0000
-Subject: [PATCH V3] ZBOOT: fix stack protector in compressed boot phase
-In-Reply-To: <1521777055.1510.9.camel@flygoat.com>
-References: <1521186916-13745-1-git-send-email-chenhc@lemote.com>
- <20180322222107.GJ13126@saruman>
- <1521777055.1510.9.camel@flygoat.com>
-Message-ID: <20180323210811.GD11796@saruman>
+From: kieran.bingham+renesas@ideasonboard.com (Kieran Bingham)
+Date: Fri, 23 Mar 2018 21:16:13 +0000
+Subject: [PATCH v6] ARM: dts: wheat: Fix ADV7513 address usage
+In-Reply-To: <20180323085140.g3golwdtpezo7fhi@verge.net.au>
+References: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
+ <20180323085140.g3golwdtpezo7fhi@verge.net.au>
+Message-ID: <a771042b-f63a-d00f-73a1-91a7e6089fe4@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 11:50:55AM +0800, Jiaxun Yang wrote:
-> ? 2018-03-22?? 22:21 +0000?James Hogan???
-> > Also I think it worth mentioning in the commit message the MIPS
-> > configuration you hit this with, presumably a Loongson one? For me
-> > decompress_kernel() gets a stack guard on loongson3_defconfig, but
-> > not
-> > malta_defconfig or malta_defconfig + 64-bit. I presume its sensitive
-> > to
-> > the compiler inlining stuff into decompress_kernel() or something
-> > such
-> > that it suddenly qualifies for a stack guard.
+Hi Simon,
+
+On 23/03/18 08:51, Simon Horman wrote:
+> On Thu, Mar 22, 2018 at 09:30:40PM +0000, Kieran Bingham wrote:
+>> The r8a7792 Wheat board has two ADV7513 devices sharing a single I2C
+>> bus, however in low power mode the ADV7513 will reset it's slave maps to
+>> use the hardware defined default addresses.
+>>
+>> The ADV7511 driver was adapted to allow the two devices to be registered
+>> correctly - but it did not take into account the fault whereby the
+>> devices reset the addresses.
+>>
+>> This results in an address conflict between the device using the default
+>> addresses, and the other device if it is in low-power-mode.
+>>
+>> Repair this issue by moving both devices away from the default address
+>> definitions.
 > 
-> Have you tested with CONFIG_CC_STACKPROTECTOR_STRONG=y ?
+> Hi Kierean,
+> 
+> as this is a fix
+> a) Does it warrant a fixes tag?
+>    Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
+> b) Does it warrant being posted as a fix for v4.16;
+> c) or v4.17?
 
-Yes. for malta_defconfig I could only reproduce by adding an array to
-decompress_kernel() so that it would get the guard.
+Tricky one, yes it could but this DTS fix, will only actually 'fix' the issue if
+the corresponding driver updates to allow secondary addresses to be parsed are
+also backported.
 
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180323/6a2e96af/attachment.sig>
+It should be safe to back port the dts fix without the driver updates, but the
+addresses specified by this patch will simply be ignored.
+
+Thus if this is marked with the fixes tag the corresponding patch "drm: adv7511:
+Add support for i2c_new_secondary_device" should also be marked.
+
+It looks like that patch has yet to be picked up by the DRM subsystem, so how
+about I bundle both of these two patches together in a repost along with the
+fixes tag.
+
+In fact, I don't think the ADV7511 dt-bindings update has made any progress
+either. (dt-bindings: adv7511: Extend bindings to allow specifying slave map
+addresses). The media tree variants for the adv7604 have already been picked up
+by Mauro I believe though.
+
+I presume it would be acceptable for this dts patch (or rather all three patches
+mentioned) to get integrated through the DRM tree ?
+
+--
+Kieran
