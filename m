@@ -1,32 +1,57 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 Mar 2018 13:04:18 -0400 (EDT)
-Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
-References: <cb6a0522-2c53-b252-49db-5779d24963c6@codeaurora.org>
- <20180323.124326.2170503491903886041.davem@davemloft.net>
- <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
-Message-ID: <20180323.130418.2223623186761161723.davem@davemloft.net>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri, 23 Mar 2018 22:36:35 +0530
+Subject: [PATCH v3 0/7] drm/sun4i: Allwinner MIPI-DSI support
+In-Reply-To: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
+References: <cover.14d017af44a2140bea674731b60a0dd7f992f5f6.1520344489.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAD6G_RSfiPC2qPjFFukqx6ihzS=_qBOdsP1KnWTP8BJ9Zsekew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sinan Kaya <okaya@codeaurora.org>
-Date: Fri, 23 Mar 2018 12:51:47 -0400
+Hi Maxime,
 
-> It could if txdata->tx_db was not a union. There is a data dependency
-> between txdata->tx_db.data.prod and txdata->tx_db.raw. 
-> 
-> So, no reordering.
+On Tue, Mar 6, 2018 at 7:25 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> Hi,
+>
+> Here is an preliminary version of the MIPI-DSI support for the Allwinner
+> SoCs.
+>
+> This controller can be found on a number of recent SoCs, such as the
+> A31, A33 or the A64.
+>
+> Given the sparse documentation, there's a number of obscure areas, but
+> the current implementation has been tested with a 4-lanes DSI panel on
+> an A33.
+>
+> The support is a bit rough around the edges at the time, and some artifacts
+> are still shown on the screen for some reasons. Wider testing with
+> different display will hopefully nail those down.
+>
+> Let me know what you think,
+> Maxime
+>
+> Changes from v2:
+>   - Added a ports node under the DSI node
+>   - Changed the huarui panel driver to an ili9881c driver
+>   - Changed the panel vendor to bananapi
+>   - Made the init table static in the panel driver
+>   - Dropped the huarui vendor patch for the DT doc.
+>
+> Changes from v1:
+>   - Rebased on 4.16-rc1
+>   - Constified a few function arguments and structures
+>   - Reworked the DT binding example a bit
+>   - Reworked the panel driver to check for DSI return codes, and use DCS
+>     helpers when possible
+>
+> Maxime Ripard (7):
+>   drm/sun4i: tcon: Add TRI finish interrupt for vblank
+>   dt-bindings: display: Add Allwinner MIPI-DSI bindings
+>   drm/sun4i: Add Allwinner A31 MIPI-DSI controller support
+>   dt-bindings: panel: Add the Ilitek ILI9881c panel documentation
+>   drm/panel: Add Ilitek ILI9881c panel driver
+>   arm: dts: sun8i: a33: Add the DSI-related nodes
+>   [DO NOT MERGE] arm: dts: sun8i: bpi-m2m: Add DSI display
 
-I don't see it that way, the code requires that:
+Any dependencies for this series on linux-next? it is not applying directly.
 
- 	txdata->tx_db.data.prod += nbd;
-
-is visible before the doorbell update.
-
-barrier() doesn't provide that.
-
-Neither does writel_relaxed().  However plain writel() does.
-
-Therefore the code is only correct as-is, and your change potentially
-adds a reordering problem.
+Jagan.
