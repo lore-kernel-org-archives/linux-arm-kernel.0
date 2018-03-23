@@ -1,25 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Mar 2018 03:44:38 +0100
-Subject: [PATCH v2] pinctrl: sunxi: always look for apb block
-In-Reply-To: <20180303122554.20984-1-andre.przywara@arm.com>
-References: <20180303122554.20984-1-andre.przywara@arm.com>
-Message-ID: <CACRpkdaCkE_hAyLm+XM2mGKrOe5iFO2gM9eTXbMVAqFKPgB6Jw@mail.gmail.com>
+Date: Fri, 23 Mar 2018 03:58:00 +0100
+Subject: [PATCH v4 0/5] PINCTRL: Mediatek pinctrl driver for mt2712
+In-Reply-To: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
+References: <1521687523-1604-1-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <CACRpkdZHuNytoq_PnLJa5SWJzPruMC29XE7GH_JxsH0uZmBabQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 3, 2018 at 1:25 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+On Thu, Mar 22, 2018 at 3:58 AM, Zhiyong Tao <zhiyong.tao@mediatek.com> wrote:
 
-> The Allwinner pinctrl device tree binding suggests that a clock named
-> "apb" would drive the pin controller IP. However (for legacy reasons) we
-> rely on this clock actually being the first clock defined.
-> Since named clocks can be in any order, let's explicitly check for a
-> clock called "apb" if there is more than one clock referenced.
+> This series includes five patches:
+> 1.Add mt2712 pintcrl head file.
+> 2.Add mt2712 pinctrl device node.
+> 3.Add mt2712 pinctrl driver.
+> 4.Support bias-disable of generic and special pins simultaneously.
+> 5.fix check warnings.
 >
-> Kudo to Maxime for suggesting this much more elegant approach.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Changes in patch v4:
+> 1)fix check warnings for mt2712.
+> 2)add fix check warnings patch for other ICs.
 
-Patch applied with Maxime's ACK.
+This looks good to me.
+
+Can I get some ACK/Reviewed-by's from Sean so I can
+merge the driver for v4.17?
 
 Yours,
 Linus Walleij
