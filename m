@@ -1,98 +1,54 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 23 Mar 2018 15:58:15 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic-its: Fix potential overrun in
- vgic_copy_lpi_list
-In-Reply-To: <20180323152112.19054-1-marc.zyngier@arm.com>
-References: <20180323152112.19054-1-marc.zyngier@arm.com>
-Message-ID: <60af90b6-ee60-b7ed-b39c-a160c9c84f24@arm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 24 Mar 2018 00:01:49 +0800
+Subject: [PATCH 0/3] crypto: inside-secure: improve clock management
+In-Reply-To: <20180313164842.20042-1-gregory.clement@bootlin.com>
+References: <20180313164842.20042-1-gregory.clement@bootlin.com>
+Message-ID: <20180323160149.GC2186@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 23/03/18 15:21, Marc Zyngier wrote:
-> vgic_copy_lpi_list() parses the LPI list and picks LPIs targetting
-
-							  targeting
-
-> a given vcpu. We allocate the array containing the intids before taking
-> the lpi_list_lock, which means we can have an array size that is not
-> equal to the number of LPIs.
+On Tue, Mar 13, 2018 at 05:48:39PM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> This is particularily obvious when looking at the path coming from
-
-          particularly
-
-kudos go to Thunderbird's spell checker for underlining those ;-)
-
-> vgic_enable_lpis, which is not a command, and thus can run in parallel
-> with commands:
+> This short series fixes the way the clocks are used for the SafeXcel
+> EIP-197 controller embedded in the Marvell Armada 7K/8K SoCs. On these
+> SoCs a second one is needed in order to clock the registers. It was
+> not noticed until now because we relied on the bootloader and also
+> because the clock driver was wrong.
 > 
-> vcpu 0:                                        vcpu 1:
-> vgic_enable_lpis
->   its_sync_lpi_pending_table
->     vgic_copy_lpi_list
->       intids = kmalloc_array(irq_count)
->                                                MAPI(lpi targeting vcpu 0)
->       list_for_each_entry(lpi_list_head)
->         intids[i++] = irq->intid;
+> Thanks to this fix, it would be possible to fix the clock driver
+> without introducing a regression.
 > 
-> At that stage, we will happily overrun the intids array. Boo. An easy
-> fix is is to break once the array is full. The MAPI command will update
-> the config anyway, and we won't miss a thing. We also make sure that
-> lpi_list_count is read exactly once, so that further updates of that
-> value will not affect the array bound check.
+> While I was working on the clocks I found a bug in the clock
+> management which was fixed with the first patch and should be applied
+> to v4.16.
+
+I haven't applied it to the crypto 4.16 tree because your other
+patches depend on it and I don't think the issue doesn't seem to
+be that severe.
+
+In future it would help if you can avoid such dependencies if you
+wish the patches to go in as soon as possible.
+
+> The second patch is a small improvement which is aim for v4.17 as well
+> as the last patch.
 > 
-> Cc: stable at vger.kernel.org
-> Fixes: ccb1d791ab9e ("KVM: arm64: vgic-its: Fix pending table sync")
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
+> Thanks,
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 465095355666..44ee2f336440 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -316,21 +316,24 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	struct vgic_irq *irq;
->  	u32 *intids;
-> -	int irq_count = dist->lpi_list_count, i = 0;
-> +	int irq_count, i = 0;
->  
->  	/*
-> -	 * We use the current value of the list length, which may change
-> -	 * after the kmalloc. We don't care, because the guest shouldn't
-> -	 * change anything while the command handling is still running,
-> -	 * and in the worst case we would miss a new IRQ, which one wouldn't
-> -	 * expect to be covered by this command anyway.
-> +	 * There is an obvious race between allocating the array and LPIs
-> +	 * being mapped/unmapped. If we ended up here as a result of a
-> +	 * command, we're safe (locks are held, preventing another
-> +	 * command). If coming from another path (such as enabling LPIs),
-> +	 * we must be carefull not to overrun the array.
-
-                      careful
-
-But enough of Friday afternoon nits. Since I can't find anything else:
-
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-
-Thanks!
-Andre
-
->  	 */
-> +	irq_count = READ_ONCE(dist->lpi_list_count);
->  	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
->  	if (!intids)
->  		return -ENOMEM;
->  
->  	spin_lock(&dist->lpi_list_lock);
->  	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-> +		if (i == irq_count)
-> +			break;
->  		/* We don't need to "get" the IRQ, as we hold the list lock. */
->  		if (irq->target_vcpu != vcpu)
->  			continue;
+> Gregory
 > 
+> Gregory CLEMENT (3):
+>   crypto: inside-secure - fix clock management
+>   crypto: inside-secure - improve clock initialization
+>   crypto: inside-secure - fix clock resource by adding a register clock
+> 
+>  .../bindings/crypto/inside-secure-safexcel.txt     |  6 ++-
+>  drivers/crypto/inside-secure/safexcel.c            | 47 +++++++++++++++-------
+>  drivers/crypto/inside-secure/safexcel.h            |  1 +
+>  3 files changed, 38 insertions(+), 16 deletions(-)
+
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
