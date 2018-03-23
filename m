@@ -1,72 +1,40 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Mar 2018 12:31:12 -0400
-Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180323.122035.1380806748695640531.davem@davemloft.net>
-References: <1521738603-23596-1-git-send-email-okaya@codeaurora.org>
- <1521738603-23596-4-git-send-email-okaya@codeaurora.org>
- <20180323.122035.1380806748695640531.davem@davemloft.net>
-Message-ID: <cb6a0522-2c53-b252-49db-5779d24963c6@codeaurora.org>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 23 Mar 2018 18:32:37 +0200
+Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
+ requested
+In-Reply-To: <CAHp75VeTxGu-pxqde_egsqUkLBdZujoJv=0YEj9cv8ujnthyPA@mail.gmail.com>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-4-swboyd@chromium.org>
+ <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
+ <1521804964.23017.96.camel@linux.intel.com>
+ <152182210780.178046.13284917877743312593@swboyd.mtv.corp.google.com>
+ <CAHp75VeTxGu-pxqde_egsqUkLBdZujoJv=0YEj9cv8ujnthyPA@mail.gmail.com>
+Message-ID: <CAHp75Vcw9VkihRzwZXAvLEGYbVhrXgvDCEPyciU7d4a5G-uUow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/23/2018 12:20 PM, David Miller wrote:
-> From: Sinan Kaya <okaya@codeaurora.org>
-> Date: Thu, 22 Mar 2018 13:10:00 -0400
-> 
->> Code includes wmb() followed by writel(). writel() already has a
->> barrier on some architectures like arm64.
->  ...
->> @@ -4155,7 +4155,7 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev)
->>  	txdata->tx_db.data.prod += nbd;
->>  	barrier();
->>  
->> -	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
->> +	DOORBELL_RELAXED(bp, txdata->cid, txdata->tx_db.raw);
->>  
->>  	mmiowb();
->  ...
->> @@ -2592,7 +2592,7 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
->>  
->>  	txdata->tx_db.data.prod += 2;
->>  	barrier();
->> -	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
->> +	DOORBELL_RELAXED(bp, txdata->cid, txdata->tx_db.raw);
-> 
-> These are compiler barriers being used here, not wmb().
-> 
-> Look, if I can't see a clear:
-> 
-> 	wmb()
-> 	writel()
-> 
-> sequence in the patch hunks, I am going to keep pushing back on
-> these changes.
+On Fri, Mar 23, 2018 at 6:31 PM, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
+> On Fri, Mar 23, 2018 at 6:21 PM, Stephen Boyd <swboyd@chromium.org> wrote:
+>
+>>        bitmap_zero(chip->valid_mask, max_gpios);
+>>        for (i = 0; i < len; i++)
+>>                set_bit(tmp[i], chip->valid_mask);
+>
+> Looking to this code I just realized it would be nice to have
+>
+> {of,device}_property_read_bitmask() where bitmask_parse() is called.
+>
+> Since it related to change a binding, I would really take couple of
+> days to hear other opinions.
+>
+> In the above case, you need to supply a string, like
+>
+> "1-5,16,18,25"
 
-Sorry, you got me confused now.
 
-If you look at the code closer, you'll see this.
-
-	wmb();
-
-	txdata->tx_db.data.prod += nbd;
-	barrier();
-
-	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
-
-and you also asked me to rename DOORBELL to DOORBELL_RELAXED() to make
-it obvious that we have a relaxed operator inside the macro.
-
-Did I miss something?
-
-of course, treating barrier() universally as a write barrier is wrong.
-
-> 
-> Thank you.
-> 
-
+s/bitmask/bitmap/g
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+With Best Regards,
+Andy Shevchenko
