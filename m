@@ -1,28 +1,17 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 23 Mar 2018 14:45:13 -0400
-Subject: [Intel-wired-lan] [PATCH v6 7/7] ixgbevf: eliminate duplicate
- barriers on weakly-ordered archs
-In-Reply-To: <CAKgT0UeAJOdvqXfRw1xF+LnpGo3K7NQt_3DcJGUkiPMF+O8PTg@mail.gmail.com>
-References: <1521829277-9398-1-git-send-email-okaya@codeaurora.org>
- <1521829277-9398-8-git-send-email-okaya@codeaurora.org>
- <CAKgT0UfCm4SJAhwyHKrHZnoJWKpp6-DWWVUb-YKgA2NTQhx=RA@mail.gmail.com>
- <cf6191c0-07cc-226b-d780-f488a0d7c779@codeaurora.org>
- <CAKgT0UeAJOdvqXfRw1xF+LnpGo3K7NQt_3DcJGUkiPMF+O8PTg@mail.gmail.com>
-Message-ID: <66c73568-460d-6e6f-5068-e5740757c2e9@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 23 Mar 2018 15:45:27 -0300
+Subject: Regression with arm in next with stack protector
+In-Reply-To: <20180323181452.GJ5799@atomide.com>
+References: <20180323181452.GJ5799@atomide.com>
+Message-ID: <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/23/2018 2:31 PM, Alexander Duyck wrote:
->> Please point me to the redundant ones.
-> So from what I can tell only this file and i40e needed any additional
-> mmiowb calls added. The rest are not needed.
+On Fri, Mar 23, 2018 at 3:14 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> Looks like commit 5638790dadae ("zboot: fix stack protector in
+> compressed boot phase") breaks booting on arm.
 
-
-Thanks, I'll clean up between 2..6 and then make your suggested changes
-on 1 and 7.
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Yes, almost all imx are broken in linux-next due to this commit:
+https://kernelci.org/soc/imx/job/next/kernel/next-20180323/
