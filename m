@@ -1,31 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Mar 2018 11:14:53 -0700
-Subject: Regression with arm in next with stack protector
-Message-ID: <20180323181452.GJ5799@atomide.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 23 Mar 2018 14:21:13 -0400
+Subject: [PATCH v6 3/7] igbvf: eliminate duplicate barriers on weakly-ordered
+ archs
+In-Reply-To: <1521829277-9398-1-git-send-email-okaya@codeaurora.org>
+References: <1521829277-9398-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1521829277-9398-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Code includes wmb() followed by writel(). writel() already has a barrier
+on some architectures like arm64.
 
-Looks like commit 5638790dadae ("zboot: fix stack protector in
-compressed boot phase") breaks booting on arm.
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
-This is all I get from the bootloader on omap3:
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
-Starting kernel ...
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/net/ethernet/intel/igbvf/netdev.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-data abort
-pc : [<810002d0>]          lr : [<100110a8>]
-reloc pc : [<9d6002d0>]    lr : [<2c6110a8>]
-sp : 81467c18  ip : 81466bf0     fp : 81466bf0
-r10: 80fc2c40  r9 : 81000258     r8 : 86fec000
-r7 : ffffffff  r6 : 81466bf8     r5 : 00000000  r4 : 80008000
-r3 : 81466c14  r2 : 81466c18     r1 : 000a0dff  r0 : 00466bf8
-Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
-Resetting CPU ...
-
-resetting ...
-
-Regards,
-
-Tony
+diff --git a/drivers/net/ethernet/intel/igbvf/netdev.c b/drivers/net/ethernet/intel/igbvf/netdev.c
+index fa07876..6dfd3dc 100644
+--- a/drivers/net/ethernet/intel/igbvf/netdev.c
++++ b/drivers/net/ethernet/intel/igbvf/netdev.c
+@@ -252,7 +252,12 @@ static void igbvf_alloc_rx_buffers(struct igbvf_ring *rx_ring,
+ 		 * such as IA-64).
+ 		*/
+ 		wmb();
+-		writel(i, adapter->hw.hw_addr + rx_ring->tail);
++		writel_relaxed(i, adapter->hw.hw_addr + rx_ring->tail);
++
++		/* We need this if more than one processor can write to our tail
++		 * at a time, it synchronizes IO on IA64/Altix systems
++		 */
++		mmiowb();
+ 	}
+ }
+ 
+@@ -2298,7 +2303,7 @@ static inline void igbvf_tx_queue_adv(struct igbvf_adapter *adapter,
+ 
+ 	tx_ring->buffer_info[first].next_to_watch = tx_desc;
+ 	tx_ring->next_to_use = i;
+-	writel(i, adapter->hw.hw_addr + tx_ring->tail);
++	writel_relaxed(i, adapter->hw.hw_addr + tx_ring->tail);
+ 	/* we need this if more than one processor can write to our tail
+ 	 * at a time, it synchronizes IO on IA64/Altix systems
+ 	 */
+-- 
+2.7.4
