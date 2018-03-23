@@ -1,50 +1,52 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Fri, 23 Mar 2018 14:46:08 +0800
-Subject: [v2] staging:fsl-mc: Move DPIO from staging to drivers/soc/fsl
-In-Reply-To: <1521643299-18231-1-git-send-email-roy.pledge@nxp.com>
-References: <1521643299-18231-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <201803231411.1XijNmJc%fengguang.wu@intel.com>
+Date: Fri, 23 Mar 2018 14:49:24 +0800
+Subject: [PATCH V2 3/4] clk: add managed version of clk_bulk_get_all
+In-Reply-To: <1521602391-30356-4-git-send-email-aisheng.dong@nxp.com>
+References: <1521602391-30356-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <201803231452.YBWTInPr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roy,
+Hi Dong,
 
-I love your patch! Yet something to improve:
+Thank you for the patch! Yet something to improve:
 
-[auto build test ERROR on staging/staging-testing]
-[also build test ERROR on next-20180322]
-[cannot apply to linus/master v4.16-rc6]
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.16-rc6 next-20180322]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Roy-Pledge/staging-fsl-mc-Move-DPIO-from-staging-to-drivers-soc-fsl/20180323-102325
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+url:    https://github.com/0day-ci/linux/commits/Dong-Aisheng/clk-new-APIs-to-handle-all-available-clocks/20180323-122451
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: powerpc-defconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+        make.cross ARCH=powerpc 
 
 All errors (new ones prefixed by >>):
 
-   In file included from drivers/crypto/caam/sg_sw_sec4.h:14:0,
-                    from drivers/crypto/caam/caamalg.c:55:
->> drivers/crypto/caam/sg_sw_qm2.h:38:10: fatal error: ../../../drivers/staging/fsl-mc/include/dpaa2-fd.h: No such file or directory
-    #include "../../../drivers/staging/fsl-mc/include/dpaa2-fd.h"
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   compilation terminated.
+   In file included from include/linux/cpufreq.h:14:0,
+                    from arch/powerpc/platforms/cell/cpufreq_spudemand.c:23:
+   include/linux/clk.h:679:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+>> include/linux/clk.h:677:32: error: 'devm_clk_bulk_get_all' declared 'static' but never defined [-Werror=unused-function]
+    static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
+                                   ^~~~~~~~~~~~~~~~~~~~~
+   cc1: all warnings being treated as errors
 
-vim +38 drivers/crypto/caam/sg_sw_qm2.h
+vim +677 include/linux/clk.h
 
-297b9ceb Horia Geant? 2017-07-18  37  
-297b9ceb Horia Geant? 2017-07-18 @38  #include "../../../drivers/staging/fsl-mc/include/dpaa2-fd.h"
-297b9ceb Horia Geant? 2017-07-18  39  
-
-:::::: The code at line 38 was first introduced by commit
-:::::: 297b9cebd2fc020f0bd3e0aac68b0758ab84e8d8 crypto: caam/jr - add support for DPAA2 parts
-
-:::::: TO: Horia Geant? <horia.geanta@nxp.com>
-:::::: CC: Herbert Xu <herbert@gondor.apana.org.au>
+   676	
+ > 677	static inline int __must_check devm_clk_bulk_get_all(struct device *dev,
+   678							     struct clk_bulk_data **clks);
+ > 679	{
+   680	
+   681		return 0;
+   682	}
+   683	
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -53,6 +55,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 64967 bytes
+Size: 24187 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180323/312a4afa/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180323/8215e30e/attachment-0001.gz>
