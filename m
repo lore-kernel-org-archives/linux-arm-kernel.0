@@ -1,25 +1,44 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 Mar 2018 13:16:56 -0400 (EDT)
-Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <b4553d26-b326-15be-dcac-12594ea7c5b5@codeaurora.org>
-References: <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
- <20180323.130418.2223623186761161723.davem@davemloft.net>
- <b4553d26-b326-15be-dcac-12594ea7c5b5@codeaurora.org>
-Message-ID: <20180323.131656.2151525994998240049.davem@davemloft.net>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 23 Mar 2018 18:19:03 +0100
+Subject: [PATCH] [media] vcodec: fix error return value from
+ mtk_jpeg_clk_init()
+In-Reply-To: <f9295ecafa4c845ef5d9414fca47b2dc0fc6640d.1521776018.git.ryder.lee@mediatek.com>
+References: <f9295ecafa4c845ef5d9414fca47b2dc0fc6640d.1521776018.git.ryder.lee@mediatek.com>
+Message-ID: <6431ba94-5e7d-0df5-40bb-04f9af203586@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sinan Kaya <okaya@codeaurora.org>
-Date: Fri, 23 Mar 2018 13:13:46 -0400
 
-> We have decided to drop a similar patch on Infiniband due to incorrect
-> usage of barrier(). If you feel strongly about it, I can remove the
-> DOORBELL change.
 
-Either remove the DOORBELL change or properly adjust the barrier() to
-be a wmb().
+On 03/23/2018 04:44 AM, Ryder Lee wrote:
+> The error return value should be fixed as it may return EPROBE_DEFER.
+> 
+> Cc: Rick Chang <rick.chang@mediatek.com>
+> Cc: Bin Liu <bin.liu@mediatek.com>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 
-Be sure to mention this in the commit message, explicitly.
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Thank you.
+> ---
+>  drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+> index 226f908..af17aaa 100644
+> --- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+> +++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+> @@ -1081,11 +1081,11 @@ static int mtk_jpeg_clk_init(struct mtk_jpeg_dev *jpeg)
+>  
+>  	jpeg->clk_jdec = devm_clk_get(jpeg->dev, "jpgdec");
+>  	if (IS_ERR(jpeg->clk_jdec))
+> -		return -EINVAL;
+> +		return PTR_ERR(jpeg->clk_jdec);
+>  
+>  	jpeg->clk_jdec_smi = devm_clk_get(jpeg->dev, "jpgdec-smi");
+>  	if (IS_ERR(jpeg->clk_jdec_smi))
+> -		return -EINVAL;
+> +		return PTR_ERR(jpeg->clk_jdec_smi);
+>  
+>  	return 0;
+>  }
+> 
