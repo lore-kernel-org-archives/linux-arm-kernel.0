@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Mar 2018 09:36:16 +0100
-Subject: [PATCH v2 1/4] arm64: dts: renesas: r8a7795: sort subnodes of the
+Date: Fri, 23 Mar 2018 09:37:41 +0100
+Subject: [PATCH v2 3/4] arm64: dts: renesas: r8a7796: sort subnodes of the
  root node
-In-Reply-To: <20180322102423.18269-2-horms+renesas@verge.net.au>
+In-Reply-To: <20180322102423.18269-4-horms+renesas@verge.net.au>
 References: <20180322102423.18269-1-horms+renesas@verge.net.au>
- <20180322102423.18269-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVng6MvW5meEjx_FYttvyDytOh9d17zZMja8LoefUDZ5Q@mail.gmail.com>
+ <20180322102423.18269-4-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdX51Uqr=2aN+EC8wnEqNoDWYOVdOXA=aWhC-uX1k5p4sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,11 +21,8 @@ On Thu, Mar 22, 2018 at 11:24 AM, Simon Horman
 > This should not have any run-time effect.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-> v2
-> * Also sort clock nodes
 
-Thanks for the update!
+Thanks for your patch!
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 using "grep '{' | grep -v @", which tells me
