@@ -1,53 +1,32 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 23 Mar 2018 15:48:45 +0530
-Subject: [PATCH v5 02/13] ARM: dts: ipq4019: Add a default chosen node
+Date: Fri, 23 Mar 2018 15:48:47 +0530
+Subject: [PATCH v5 04/13] ARM: dts: ipq4019: Change the max opp frequency
 In-Reply-To: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
 References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1521800336-19266-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1521800336-19266-5-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a 'chosen' node to select the serial console.
-This is needed when bootloaders do not pass the
-'console=' bootargs.
+The max opp frequency is 716MHZ. So update that.
 
+Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 8 ++++++++
- arch/arm/boot/dts/qcom-ipq4019.dtsi           | 2 +-
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-ipq4019.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-index e413b21e..ef8d8c8 100644
---- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-@@ -20,6 +20,14 @@
- 	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
- 	compatible = "qcom,ipq4019";
- 
-+	aliases {
-+		serial0 = &blsp1_uart1;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
- 	soc {
- 		rng at 22000 {
- 			status = "ok";
 diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index 10d112a..ea9202a 100644
+index f985518..1c3b0ff 100644
 --- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
 +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -256,7 +256,7 @@
-                         regulator;
-                 };
- 
--		serial at 78af000 {
-+		blsp1_uart1: serial at 78af000 {
- 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
- 			reg = <0x78af000 0x200>;
- 			interrupts = <0 107 0>;
+@@ -47,7 +47,7 @@
+ 				48000	1100000
+ 				200000	1100000
+ 				500000	1100000
+-				666000	1100000
++				716000  1100000
+ 			>;
+ 			clock-latency = <256000>;
+ 		};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
