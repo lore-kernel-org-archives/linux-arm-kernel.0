@@ -1,37 +1,68 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Fri, 23 Mar 2018 11:44:13 +0800
-Subject: [PATCH] [media] vcodec: fix error return value from
- mtk_jpeg_clk_init()
-Message-ID: <f9295ecafa4c845ef5d9414fca47b2dc0fc6640d.1521776018.git.ryder.lee@mediatek.com>
+From: jiaxun.yang@flygoat.com (Jiaxun Yang)
+Date: Fri, 23 Mar 2018 11:50:55 +0800
+Subject: [PATCH V3] ZBOOT: fix stack protector in compressed boot phase
+In-Reply-To: <20180322222107.GJ13126@saruman>
+References: <1521186916-13745-1-git-send-email-chenhc@lemote.com>
+ <20180322222107.GJ13126@saruman>
+Message-ID: <1521777055.1510.9.camel@flygoat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The error return value should be fixed as it may return EPROBE_DEFER.
+? 2018-03-22?? 22:21 +0000?James Hogan???
+> On Fri, Mar 16, 2018 at 03:55:16PM +0800, Huacai Chen wrote:
+> > diff --git a/arch/mips/boot/compressed/decompress.c
+> > b/arch/mips/boot/compressed/decompress.c
+> > index fdf99e9..5ba431c 100644
+> > --- a/arch/mips/boot/compressed/decompress.c
+> > +++ b/arch/mips/boot/compressed/decompress.c
+> > @@ -78,11 +78,6 @@ void error(char *x)
+> >  
+> >  unsigned long __stack_chk_guard;
+> 
+> ...
+> 
+> > diff --git a/arch/mips/boot/compressed/head.S
+> > b/arch/mips/boot/compressed/head.S
+> > index 409cb48..00d0ee0 100644
+> > --- a/arch/mips/boot/compressed/head.S
+> > +++ b/arch/mips/boot/compressed/head.S
+> > @@ -32,6 +32,10 @@ start:
+> >  	bne	a2, a0, 1b
+> >  	 addiu	a0, a0, 4
+> >  
+> > +	PTR_LA	a0, __stack_chk_guard
+> > +	PTR_LI	a1, 0x000a0dff
+> > +	sw	a1, 0(a0)
+> 
 
-Cc: Rick Chang <rick.chang@mediatek.com>
-Cc: Bin Liu <bin.liu@mediatek.com>
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Hi James
 
-diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-index 226f908..af17aaa 100644
---- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-+++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-@@ -1081,11 +1081,11 @@ static int mtk_jpeg_clk_init(struct mtk_jpeg_dev *jpeg)
- 
- 	jpeg->clk_jdec = devm_clk_get(jpeg->dev, "jpgdec");
- 	if (IS_ERR(jpeg->clk_jdec))
--		return -EINVAL;
-+		return PTR_ERR(jpeg->clk_jdec);
- 
- 	jpeg->clk_jdec_smi = devm_clk_get(jpeg->dev, "jpgdec-smi");
- 	if (IS_ERR(jpeg->clk_jdec_smi))
--		return -EINVAL;
-+		return PTR_ERR(jpeg->clk_jdec_smi);
- 
- 	return 0;
- }
--- 
-1.9.1
+Huacai Can't reply this mail. His chenhc at lemote.com is blcoked by
+Linux-MIPS mailing list while his Gmail didn't receive this email, so
+I'm replying for him.
+
+> Should that not be LONG_S? Otherwise big endian MIPS64 would get a
+> word-swapped canary (which is probably mostly harmless, but still).
+
+Yes, he said it's considerable.
+
+> 
+> Also I think it worth mentioning in the commit message the MIPS
+> configuration you hit this with, presumably a Loongson one? For me
+> decompress_kernel() gets a stack guard on loongson3_defconfig, but
+> not
+> malta_defconfig or malta_defconfig + 64-bit. I presume its sensitive
+> to
+> the compiler inlining stuff into decompress_kernel() or something
+> such
+> that it suddenly qualifies for a stack guard.
+
+Have you tested with CONFIG_CC_STACKPROTECTOR_STRONG=y ?
+Huacai reproduced the issue by this[1] config with GCC 4.9.
+
+[1] https://github.com/loongson-community/linux-stable/blob/rebase-4.14
+/arch/mips/configs/loongson3_defconfig
+
+> 
+> Cheers
+> James
