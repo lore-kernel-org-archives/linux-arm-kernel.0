@@ -1,20 +1,17 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 23 Mar 2018 15:38:06 +0800
-Subject: [PATCH v8 06/14] iommu/rockchip: Fix TLB flush of secondary IOMMUs
+Date: Fri, 23 Mar 2018 15:38:03 +0800
+Subject: [PATCH v8 03/14] iommu/rockchip: Request irqs in rk_iommu_probe()
 In-Reply-To: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
 References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
-Message-ID: <20180323073814.5802-7-jeffy.chen@rock-chips.com>
+Message-ID: <20180323073814.5802-4-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+Move request_irq to the end of rk_iommu_probe().
 
-Due to the bug in current code, only first IOMMU has the TLB lines
-flushed in rk_iommu_zap_lines. This patch fixes the inner loop to
-execute for all IOMMUs and properly flush the TLB.
-
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Suggested-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 ---
 
 Changes in v8: None
@@ -22,42 +19,91 @@ Changes in v7: None
 Changes in v6: None
 Changes in v5: None
 Changes in v4: None
-Changes in v3: None
+Changes in v3:
+Loop platform_get_irq() as Robin suggested.
+
 Changes in v2: None
 
- drivers/iommu/rockchip-iommu.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/iommu/rockchip-iommu.c | 38 +++++++++-----------------------------
+ 1 file changed, 9 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 7130d92ff79c..c3df53e480ea 100644
+index 73117dbe839e..ec3ff936aa60 100644
 --- a/drivers/iommu/rockchip-iommu.c
 +++ b/drivers/iommu/rockchip-iommu.c
-@@ -274,19 +274,21 @@ static void rk_iommu_base_command(void __iomem *base, u32 command)
- {
- 	writel(command, base + RK_MMU_COMMAND);
- }
--static void rk_iommu_zap_lines(struct rk_iommu *iommu, dma_addr_t iova,
-+static void rk_iommu_zap_lines(struct rk_iommu *iommu, dma_addr_t iova_start,
- 			       size_t size)
- {
- 	int i;
--
--	dma_addr_t iova_end = iova + size;
-+	dma_addr_t iova_end = iova_start + size;
- 	/*
- 	 * TODO(djkurtz): Figure out when it is more efficient to shootdown the
- 	 * entire iotlb rather than iterate over individual iovas.
- 	 */
--	for (i = 0; i < iommu->num_mmu; i++)
--		for (; iova < iova_end; iova += SPAGE_SIZE)
-+	for (i = 0; i < iommu->num_mmu; i++) {
-+		dma_addr_t iova;
-+
-+		for (iova = iova_start; iova < iova_end; iova += SPAGE_SIZE)
- 			rk_iommu_write(iommu->bases[i], RK_MMU_ZAP_ONE_LINE, iova);
-+	}
- }
+@@ -90,8 +90,6 @@ struct rk_iommu {
+ 	struct device *dev;
+ 	void __iomem **bases;
+ 	int num_mmu;
+-	int *irq;
+-	int num_irq;
+ 	bool reset_disabled;
+ 	struct iommu_device iommu;
+ 	struct list_head node; /* entry in rk_iommu_domain.iommus */
+@@ -830,13 +828,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
  
- static bool rk_iommu_is_stall_active(struct rk_iommu *iommu)
+ 	iommu->domain = domain;
+ 
+-	for (i = 0; i < iommu->num_irq; i++) {
+-		ret = devm_request_irq(iommu->dev, iommu->irq[i], rk_iommu_irq,
+-				       IRQF_SHARED, dev_name(dev), iommu);
+-		if (ret)
+-			return ret;
+-	}
+-
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
+ 			       rk_domain->dt_dma);
+@@ -885,9 +876,6 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ 	}
+ 	rk_iommu_disable_stall(iommu);
+ 
+-	for (i = 0; i < iommu->num_irq; i++)
+-		devm_free_irq(iommu->dev, iommu->irq[i], iommu);
+-
+ 	iommu->domain = NULL;
+ 
+ 	dev_dbg(dev, "Detached from iommu domain\n");
+@@ -1138,7 +1126,7 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	struct rk_iommu *iommu;
+ 	struct resource *res;
+ 	int num_res = pdev->num_resources;
+-	int err, i;
++	int err, i, irq;
+ 
+ 	iommu = devm_kzalloc(dev, sizeof(*iommu), GFP_KERNEL);
+ 	if (!iommu)
+@@ -1165,23 +1153,15 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 	if (iommu->num_mmu == 0)
+ 		return PTR_ERR(iommu->bases[0]);
+ 
+-	iommu->num_irq = platform_irq_count(pdev);
+-	if (iommu->num_irq < 0)
+-		return iommu->num_irq;
+-	if (iommu->num_irq == 0)
+-		return -ENXIO;
++	i = 0;
++	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO) {
++		if (irq < 0)
++			return irq;
+ 
+-	iommu->irq = devm_kcalloc(dev, iommu->num_irq, sizeof(*iommu->irq),
+-				  GFP_KERNEL);
+-	if (!iommu->irq)
+-		return -ENOMEM;
+-
+-	for (i = 0; i < iommu->num_irq; i++) {
+-		iommu->irq[i] = platform_get_irq(pdev, i);
+-		if (iommu->irq[i] < 0) {
+-			dev_err(dev, "Failed to get IRQ, %d\n", iommu->irq[i]);
+-			return -ENXIO;
+-		}
++		err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
++				       IRQF_SHARED, dev_name(dev), iommu);
++		if (err)
++			return err;
+ 	}
+ 
+ 	iommu->reset_disabled = device_property_read_bool(dev,
 -- 
 2.11.0
