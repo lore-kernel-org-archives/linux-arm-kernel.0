@@ -1,72 +1,34 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 23 Mar 2018 17:30:46 +0100
-Subject: [PATCH 0/3] crypto: inside-secure: improve clock management
-In-Reply-To: <20180323160149.GC2186@gondor.apana.org.au> (Herbert Xu's message
- of "Sat, 24 Mar 2018 00:01:49 +0800")
-References: <20180313164842.20042-1-gregory.clement@bootlin.com>
- <20180323160149.GC2186@gondor.apana.org.au>
-Message-ID: <874ll6wy89.fsf@bootlin.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 23 Mar 2018 18:31:05 +0200
+Subject: [PATCH v3 3/3] pinctrl: qcom: Don't allow protected pins to be
+ requested
+In-Reply-To: <152182210780.178046.13284917877743312593@swboyd.mtv.corp.google.com>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-4-swboyd@chromium.org>
+ <97380342-c3aa-5d34-7b22-f6ebbab4bafe@codeaurora.org>
+ <1521804964.23017.96.camel@linux.intel.com>
+ <152182210780.178046.13284917877743312593@swboyd.mtv.corp.google.com>
+Message-ID: <CAHp75VeTxGu-pxqde_egsqUkLBdZujoJv=0YEj9cv8ujnthyPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
- 
- On sam., mars 24 2018, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+On Fri, Mar 23, 2018 at 6:21 PM, Stephen Boyd <swboyd@chromium.org> wrote:
 
-> On Tue, Mar 13, 2018 at 05:48:39PM +0100, Gregory CLEMENT wrote:
->> Hi,
->> 
->> This short series fixes the way the clocks are used for the SafeXcel
->> EIP-197 controller embedded in the Marvell Armada 7K/8K SoCs. On these
->> SoCs a second one is needed in order to clock the registers. It was
->> not noticed until now because we relied on the bootloader and also
->> because the clock driver was wrong.
->> 
->> Thanks to this fix, it would be possible to fix the clock driver
->> without introducing a regression.
->> 
->> While I was working on the clocks I found a bug in the clock
->> management which was fixed with the first patch and should be applied
->> to v4.16.
->
-> I haven't applied it to the crypto 4.16 tree because your other
-> patches depend on it and I don't think the issue doesn't seem to
-> be that severe.
->
-> In future it would help if you can avoid such dependencies if you
-> wish the patches to go in as soon as possible.
+>        bitmap_zero(chip->valid_mask, max_gpios);
+>        for (i = 0; i < len; i++)
+>                set_bit(tmp[i], chip->valid_mask);
 
-Yes sure. And I agree with you, the issue is not that severe, so it can
-wait for 4.17.
+Looking to this code I just realized it would be nice to have
 
->
->> The second patch is a small improvement which is aim for v4.17 as well
->> as the last patch.
->> 
->> Thanks,
->> 
->> Gregory
->> 
->> Gregory CLEMENT (3):
->>   crypto: inside-secure - fix clock management
->>   crypto: inside-secure - improve clock initialization
->>   crypto: inside-secure - fix clock resource by adding a register clock
->> 
->>  .../bindings/crypto/inside-secure-safexcel.txt     |  6 ++-
->>  drivers/crypto/inside-secure/safexcel.c            | 47 +++++++++++++++-------
->>  drivers/crypto/inside-secure/safexcel.h            |  1 +
->>  3 files changed, 38 insertions(+), 16 deletions(-)
->
-> All applied.  Thanks.
+{of,device}_property_read_bitmask() where bitmask_parse() is called.
 
-Thanks
+Since it related to change a binding, I would really take couple of
+days to hear other opinions.
 
-> -- 
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+In the above case, you need to supply a string, like
+
+"1-5,16,18,25"
 
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+With Best Regards,
+Andy Shevchenko
