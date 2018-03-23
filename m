@@ -1,68 +1,75 @@
-From: jiaxun.yang@flygoat.com (Jiaxun Yang)
-Date: Fri, 23 Mar 2018 11:50:55 +0800
-Subject: [PATCH V3] ZBOOT: fix stack protector in compressed boot phase
-In-Reply-To: <20180322222107.GJ13126@saruman>
-References: <1521186916-13745-1-git-send-email-chenhc@lemote.com>
- <20180322222107.GJ13126@saruman>
-Message-ID: <1521777055.1510.9.camel@flygoat.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 23 Mar 2018 12:14:18 +0800
+Subject: [PATCH v4 4/6] infiniband: cxgb4: Eliminate duplicate barriers
+ on weakly-ordered archs
+In-Reply-To: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+References: <1521514068-8856-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <201803231138.06xQIU3w%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-03-22?? 22:21 +0000?James Hogan???
-> On Fri, Mar 16, 2018 at 03:55:16PM +0800, Huacai Chen wrote:
-> > diff --git a/arch/mips/boot/compressed/decompress.c
-> > b/arch/mips/boot/compressed/decompress.c
-> > index fdf99e9..5ba431c 100644
-> > --- a/arch/mips/boot/compressed/decompress.c
-> > +++ b/arch/mips/boot/compressed/decompress.c
-> > @@ -78,11 +78,6 @@ void error(char *x)
-> >  
-> >  unsigned long __stack_chk_guard;
-> 
-> ...
-> 
-> > diff --git a/arch/mips/boot/compressed/head.S
-> > b/arch/mips/boot/compressed/head.S
-> > index 409cb48..00d0ee0 100644
-> > --- a/arch/mips/boot/compressed/head.S
-> > +++ b/arch/mips/boot/compressed/head.S
-> > @@ -32,6 +32,10 @@ start:
-> >  	bne	a2, a0, 1b
-> >  	 addiu	a0, a0, 4
-> >  
-> > +	PTR_LA	a0, __stack_chk_guard
-> > +	PTR_LI	a1, 0x000a0dff
-> > +	sw	a1, 0(a0)
-> 
+Hi Sinan,
 
-Hi James
+Thank you for the patch! Yet something to improve:
 
-Huacai Can't reply this mail. His chenhc at lemote.com is blcoked by
-Linux-MIPS mailing list while his Gmail didn't receive this email, so
-I'm replying for him.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.16-rc6 next-20180322]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> Should that not be LONG_S? Otherwise big endian MIPS64 would get a
-> word-swapped canary (which is probably mostly harmless, but still).
+url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/ib-Eliminate-duplicate-barriers-on-weakly-ordered-archs/20180321-091659
+config: i386-allyesconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Yes, he said it's considerable.
+All errors (new ones prefixed by >>):
 
-> 
-> Also I think it worth mentioning in the commit message the MIPS
-> configuration you hit this with, presumably a Loongson one? For me
-> decompress_kernel() gets a stack guard on loongson3_defconfig, but
-> not
-> malta_defconfig or malta_defconfig + 64-bit. I presume its sensitive
-> to
-> the compiler inlining stuff into decompress_kernel() or something
-> such
-> that it suddenly qualifies for a stack guard.
+   In file included from drivers/infiniband/hw/cxgb4/iw_cxgb4.h:73:0,
+                    from drivers/infiniband/hw/cxgb4/device.c:40:
+   drivers/infiniband/hw/cxgb4/t4.h: In function 'pio_copy':
+>> drivers/infiniband/hw/cxgb4/t4.h:460:3: error: implicit declaration of function 'writeq_relaxed'; did you mean 'write_pnet'? [-Werror=implicit-function-declaration]
+      writeq_relaxed(*src, dst);
+      ^~~~~~~~~~~~~~
+      write_pnet
+   cc1: some warnings being treated as errors
+--
+   In file included from drivers/infiniband/hw/cxgb4/iw_cxgb4.h:73:0,
+                    from drivers/infiniband/hw/cxgb4/cm.c:53:
+   drivers/infiniband/hw/cxgb4/t4.h: In function 'pio_copy':
+>> drivers/infiniband/hw/cxgb4/t4.h:460:3: error: implicit declaration of function 'writeq_relaxed'; did you mean 'rt6_release'? [-Werror=implicit-function-declaration]
+      writeq_relaxed(*src, dst);
+      ^~~~~~~~~~~~~~
+      rt6_release
+   cc1: some warnings being treated as errors
 
-Have you tested with CONFIG_CC_STACKPROTECTOR_STRONG=y ?
-Huacai reproduced the issue by this[1] config with GCC 4.9.
+vim +460 drivers/infiniband/hw/cxgb4/t4.h
 
-[1] https://github.com/loongson-community/linux-stable/blob/rebase-4.14
-/arch/mips/configs/loongson3_defconfig
+   450	
+   451	/* This function copies 64 byte coalesced work request to memory
+   452	 * mapped BAR2 space. For coalesced WRs, the SGE fetches data
+   453	 * from the FIFO instead of from Host.
+   454	 */
+   455	static inline void pio_copy(u64 __iomem *dst, u64 *src)
+   456	{
+   457		int count = 8;
+   458	
+   459		while (count) {
+ > 460			writeq_relaxed(*src, dst);
+   461			src++;
+   462			dst++;
+   463			count--;
+   464		}
+   465	}
+   466	
 
-> 
-> Cheers
-> James
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62176 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180323/6e4cc2e2/attachment-0001.gz>
