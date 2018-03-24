@@ -1,26 +1,28 @@
-From: sricharan@codeaurora.org (sricharan at codeaurora.org)
-Date: Sat, 24 Mar 2018 11:42:32 +0530
-Subject: [PATCH v5 00/13] ARM: dts: ipq: updates to enable a few
- peripherals
-In-Reply-To: <20180324021708.onpakgbxc544cwz2@localhost>
-References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
- <20180324021708.onpakgbxc544cwz2@localhost>
-Message-ID: <f5e3729f5de2693144d1667812b61c5d@codeaurora.org>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Sat, 24 Mar 2018 09:42:24 +0300
+Subject: sun6i spi driver issue
+Message-ID: <16d32ee2-886a-a169-a1a8-f05ee6a09a66@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-24 07:47, Richard Cochran wrote:
-> On Fri, Mar 23, 2018 at 03:48:43PM +0530, Sricharan R wrote:
->> [v5]
->>     * Fixed a minor comment that i missed earlier.
-> 
-> I tried booting this series with qcom_defconfig on my custom,
-> dk07-like board.  It works!
+Hi,
 
-  Thanks.
-  Can i take that as a Tested-by: Richard Cochran 
-<richardcochran@gmail.com>
-  on DK07 ?
+the following patch [1] isn't working on my BPi M2, OPi PC, OPi PC+. I 
+have no more boards to test currently but I am sure it will fail on 
+others too. As soon as the max transfer size is set to a value MORE THAN 
+FIFO then most of transfers would end up with -110 (timeout).
 
-Regards,
-  Sricharan
+[1] https://patchwork.kernel.org/patch/9634315/
+
+I have reverted the patch back in my local kernel and it works well on 
+all the boards mentioned. It works fine too without subtracting 1 byte 
+from FIFO, i.e. one could use the code below:
+
+static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
+{
+ ??????? struct sun6i_spi *sspi = spi_master_get_devdata(spi->master);
+
+ ??????? return sspi->fifo_depth;
+}
+
+Thanks
