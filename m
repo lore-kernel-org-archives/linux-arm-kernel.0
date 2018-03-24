@@ -1,123 +1,166 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 23 Mar 2018 11:54:18 -0700
-Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
-In-Reply-To: <1521685073.28226.10.camel@mtkswgap22>
-References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
- <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
- <1521685073.28226.10.camel@mtkswgap22>
-Message-ID: <20180323185418.GD255819@dtor-ws>
+From: chinnikishore369@gmail.com (chinnikishore369 at gmail.com)
+Date: Sun, 25 Mar 2018 00:40:59 +0530
+Subject: [RFC 1/2] docs: dts: Added documentation for Xilinx zynqmp Reset
+ Controller bindings.
+Message-ID: <20180324191100.18363-1-chinnikishore369@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+From: Nava kishore Manne <navam@xilinx.com>
 
-On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
-> Hi, Dmitry and Lee
-> 
-> The series seems not being got merged. Are they good enough to be ready
-> into the your tree?
-> 
-> Recently I've tested the series with focusing on pwrkey event generated
-> through interrupt when push and release the key on bpi-r2 board and then
-> finally it's working fine. but for homekey it cannot be found on the
-> board and thus I cannot have more tests more about it.
-> 
-> Tested-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+---
+ .../devicetree/bindings/reset/zynqmp-reset.txt     | 142 +++++++++++++++++++++
+ 1 file changed, 142 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/zynqmp-reset.txt
 
-You have my Ack on the input patch; I expect it go through Lee's tree as
-there are some dependencies on mfd core piece.
-
-Thanks.
-
-> 
-> 	Sean
-> 
-> 
-> On Thu, 2018-03-22 at 10:03 +0800, Sean Wang (???) wrote:
-> > 
-> > > -----Original Message-----
-> > > From: Linux-mediatek [mailto:linux-mediatek-bounces at lists.infradead.org] On
-> > > Behalf Of Chen Zhong
-> > > Sent: Wednesday, October 25, 2017 9:16 PM
-> > > To: Dmitry Torokhov <dmitry.torokhov@gmail.com>; Rob Herring
-> > > <robh+dt@kernel.org>; Lee Jones <lee.jones@linaro.org>; Alexandre Belloni
-> > > <alexandre.belloni@free-electrons.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>; Alessandro Zummo
-> > > <a.zummo@towertech.it>; devicetree at vger.kernel.org; Linus Walleij
-> > > <linus.walleij@linaro.org>; Jaechul Lee <jcsing.lee@samsung.com>; linux-
-> > > kernel at vger.kernel.org; Krzysztof Kozlowski <krzk@kernel.org>; Javier
-> > > Martinez Canillas <javier@osg.samsung.com>; linux-
-> > > mediatek at lists.infradead.org; linux-arm-kernel at lists.infradead.org; linux-
-> > > input at vger.kernel.org; Matthias Brugger <matthias.bgg@gmail.com>; Eddie
-> > > Huang (S?) <eddie.huang@mediatek.com>; Chen Zhong (??)
-> > > <Chen.Zhong@mediatek.com>; Beomho Seo <beomho.seo@samsung.com>;
-> > > linux-rtc at vger.kernel.org
-> > > Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
-> > > 
-> > > MediaTek PMIC are multi-function devices that can handle key interrupts,
-> > > typically there are two keys attached to PMIC, which called pwrkey and
-> > > homekey. PWRKEY usually used to wake up system from sleep. Homekey can
-> > > used as volume down key due to board design. Long press keys can shutdown
-> > > PMIC, the mode can be choose to be one key only or two keys together.
-> > > This series add support for key functions for MediaTek PMIC MT6397/MT6323.
-> > > 
-> > > Changes since v5:
-> > > - use __maybe_unused annotation instead of #ifdef guard
-> > > - use of_* API instead of device_* API
-> > > 
-> > > Changes since v4:
-> > > - rebase to Linux 4.14-rc1
-> > > - add a common keyboard binding document
-> > > - use child device tree node to define each key
-> > > 
-> > > Changes since v3:
-> > > - make the naming to be consistent as mtk_pmic or MTK_PMIC
-> > > - add suspend/resume functions to enable/disable irq
-> > > - change binding properties to define wakeup sources
-> > > 
-> > > Changes since v2:
-> > > - use standard properties for keycodes and debounce time
-> > > - change to use platform_get_irq in leaf drivers
-> > > - use better ways to define IRQ resources
-> > > 
-> > > Changes since v1:
-> > > - create irq mappings in mfd core driver instead of leaf drivers
-> > > - remove some unused parts in mtk-pmic-keys driver
-> > > 
-> > > Chen Zhong (6):
-> > >   mfd: mt6397: create irq mappings in mfd core driver
-> > >   dt-bindings: input: Add common keyboard document bindings
-> > >   dt-bindings: input: Add document bindings for mtk-pmic-keys
-> > >   dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
-> > >   input: Add MediaTek PMIC keys support
-> > >   mfd: mt6397: Add PMIC keys support to MT6397 driver
-> > > 
-> > >  Documentation/devicetree/bindings/input/keys.txt   |   8 +
-> > >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |  43 +++
-> > >  Documentation/devicetree/bindings/mfd/mt6397.txt   |   6 +
-> > >  drivers/input/keyboard/Kconfig                     |   9 +
-> > >  drivers/input/keyboard/Makefile                    |   1 +
-> > >  drivers/input/keyboard/mtk-pmic-keys.c             | 339
-> > > +++++++++++++++++++++
-> > >  drivers/mfd/mt6397-core.c                          |  26 +-
-> > >  drivers/rtc/rtc-mt6397.c                           |   7 +-
-> > >  8 files changed, 432 insertions(+), 7 deletions(-)  create mode 100644
-> > > Documentation/devicetree/bindings/input/keys.txt
-> > >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-
-> > > keys.txt
-> > >  create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
-> > > 
-> > > --
-> > > 1.9.1
-> > > 
-> > > 
-> > > 
-> > > _______________________________________________
-> > > Linux-mediatek mailing list
-> > > Linux-mediatek at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
-> 
-
+diff --git a/Documentation/devicetree/bindings/reset/zynqmp-reset.txt b/Documentation/devicetree/bindings/reset/zynqmp-reset.txt
+new file mode 100644
+index 000000000000..161bbf5d1cae
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/zynqmp-reset.txt
+@@ -0,0 +1,142 @@
++Xilinx Zynqmp Reset Manager
++
++The Zynq UltraScale+ MPSoC has several different resets.
++
++See Chapter 36 of the Zynq UltraScale+ MPSoC TRM (UG) for more information
++about zynqmp resets.
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Required Properties:
++- compatible: "xlnx,zynqmp-reset"
++- #reset-cells : Specifies the number of cells needed to encode reset
++		line, should be 1
++
++Reset outputs:
++	0   :PCIE config reset.
++	1   :PCIE bridge block level reset (AXI interface).
++	2   :PCIE control block level,reset.
++	3   :Display Port block level reset (includes DPDMA).
++	4   :FPD WDT reset.
++	5   :AF_FM5 block level reset.
++	6   :AF_FM4 block level reset.
++	7   :AF_FM3 block level reset.
++	8   :AF_FM2 block level reset.
++	9   :AF_FM1 block level reset.
++	10  :AF_FM0 block level reset.
++	11  :GDMA block level reset.
++	12  :Pixel Processor (GPU_PP1) block level reset.
++	13  :Pixel Processor (GPU_PP0) block level reset.
++	14  :GPU block level reset.
++	15  :GT block level reset.
++	16  :Sata block level reset.
++	17  :ACPU3 power on reset.
++	18  :ACPU2 power on reset.
++	19  :ACPU1 power on reset.
++	20  :ACPU0 power on reset.
++	21  :APU L2 reset.
++	22  :ACPU3 reset.
++	23  :ACPU2 reset.
++	24  :ACPU1 reset.
++	25  :ACPU0 reset.
++	26  :DDR block level reset inside of the DDR Sub System.
++	27  :APM block level reset inside of the DDR Sub System.
++	28  :soft reset.
++	29  :GEM 0 reset.
++	30  :GEM 1 reset.
++	31  :GEM 2 reset.
++	32  :GEM 3 reset.
++	33  :qspi reset.
++	34  :uart0 reset.
++	35  :uart1 reset.
++	36  :spi0 reset.
++	37  :spi1 reset.
++	38  :sdio0 reset.
++	39  :sdio1 reset.
++	40  :can0 reset.
++	41  :can1 reset.
++	42  :i2c0 reset.
++	43  :i2c1 reset.
++	44  :ttc0 reset.
++	45  :ttc1 reset.
++	46  :ttc2 reset.
++	47  :ttc3 reset.
++	48  :swdt reset.
++	49  :nand reset.
++	50  :adma reset.
++	51  :gpio reset.
++	52  :iou_cc reset.
++	53  :timestamp reset.
++	54  :rpu_r50 reset.
++	55  :rpu r51 reset.
++	56  :rpu_amba reset.
++	57  :ocm reset.
++	58  :rpu_pge reset.
++	59  :usb0_core reset.
++	60  :usb1_core reset.
++	61  :usb0_hiber reset.
++	62  :usb1_hiber reset.
++	63  :usb0_apb reset.
++	64  :usb1_apb reset.
++	65  :ipi reset.
++	66  :apm reset.
++	67  :rtc reset.
++	68  :sysmon reset.
++	69  :afi_fm6 reset.
++	70  :lpd_swdt reset.
++	71  :fpd_reset.
++	72  :rpu_dbg1 reset.
++	73  :rpu_dbg0 reset.
++	74  :dbg_lpd reset.
++	75  :dbg_fpd reset.
++	76  :apll reset.
++	77  :dpll reset.
++	78  :vpll reset.
++	79  :iopll reset.
++	80  :rpll reset.
++	81  :gpio_pl_0 reset.
++	82  :gpio_pl_1 reset.
++	83  :gpio_pl_2 reset.
++	84  :gpio_pl_3 reset.
++	85  :gpio_pl_4 reset.
++	86  :gpio_pl_5 reset.
++	87  :gpio_pl_6 reset.
++	88  :gpio_pl_7 reset.
++	89  :gpio_pl_8 reset.
++	90  :gpio_pl_9 reset.
++	91  :gpio_pl_10 reset.
++	92  :gpio_pl_11 reset.
++	93  :gpio_pl_12 reset.
++	94  :gpio_pl_13 reset.
++	95  :gpio_pl_14 reset.
++	96  :gpio_pl_15 reset.
++	97  :gpio_pl_16 reset.
++	98  :gpio_pl_17 reset.
++	99  :gpio_pl_18 reset.
++	100 :gpio_pl_19 reset
++	101 :gpio_pl_20 reset.
++	102 :gpio_pl_21 reset.
++	103 :gpio_pl_22 reset.
++	104 :gpio_pl_23 reset.
++	105 :gpio_pl_24 reset.
++	106 :gpio_pl_25 reset.
++	107 :gpio_pl_26 reset.
++	108 :gpio_pl_27 reset.
++	109 :gpio_pl_28 reset.
++	110 :gpio_pl_29 reset.
++	111 :gpio_pl_30 reset.
++	112 :gpio_pl_31 reset.
++	113 :rpu_ls reset.
++	114 :ps_only reset.
++	115 :pl reset.
++	116 :ps_pl0 reset
++	117 :ps_pl1 reset
++	118 :ps_pl2 reset
++	119 :ps_pl3 reset
++
++Example:
++	reset-controller:reset-controller at 0 {
++		compatible = "xlnx,zynqmp-reset";
++		#reset-cells = <1>;
++	};
 -- 
-Dmitry
+2.16.1
