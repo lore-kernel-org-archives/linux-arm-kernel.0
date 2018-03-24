@@ -1,43 +1,194 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 24 Mar 2018 19:01:50 +0530
-Subject: [PATCH v6 02/11] arm64: dts: actions: Source CMU clock for UART5
+Date: Sat, 24 Mar 2018 19:01:52 +0530
+Subject: [PATCH v6 04/11] clk: actions: Add gate clock support
 In-Reply-To: <20180324133159.4824-1-manivannan.sadhasivam@linaro.org>
 References: <20180324133159.4824-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180324133159.4824-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180324133159.4824-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove fixed clock and source CMU (Clock Management Unit) clock for
-UART5 driver in Actions Semi S900 SoC.
+Add support for Actions Semi gate clock together with helper
+functions to be used in composite clock.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/actions/s900-bubblegum-96.dts | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ drivers/clk/actions/Makefile   |  1 +
+ drivers/clk/actions/owl-gate.c | 77 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/actions/owl-gate.h | 73 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 151 insertions(+)
+ create mode 100644 drivers/clk/actions/owl-gate.c
+ create mode 100644 drivers/clk/actions/owl-gate.h
 
-diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-index 21ca80f9941c..ff043c961d75 100644
---- a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-+++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-@@ -24,12 +24,6 @@
- 		device_type = "memory";
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
--
--	uart5_clk: uart5-clk {
--		compatible = "fixed-clock";
--		clock-frequency = <921600>;
--		#clock-cells = <0>;
--	};
- };
+diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
+index 64a50fc2d335..1f0917872c9d 100644
+--- a/drivers/clk/actions/Makefile
++++ b/drivers/clk/actions/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_CLK_ACTIONS)	+= clk-owl.o
  
- &timer {
-@@ -38,5 +32,5 @@
- 
- &uart5 {
- 	status = "okay";
--	clocks = <&uart5_clk>;
-+	clocks = <&cmu CLK_UART5>;
- };
+ clk-owl-y			+= owl-common.o
++clk-owl-y			+= owl-gate.o
+diff --git a/drivers/clk/actions/owl-gate.c b/drivers/clk/actions/owl-gate.c
+new file mode 100644
+index 000000000000..b87b76e17472
+--- /dev/null
++++ b/drivers/clk/actions/owl-gate.c
+@@ -0,0 +1,77 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL gate clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
++
++#include "owl-gate.h"
++
++void owl_gate_set(const struct owl_clk_common *common,
++		 const struct owl_gate_hw *gate_hw, bool enable)
++{
++	int set = gate_hw->gate_flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
++	u32 reg;
++
++	set ^= enable;
++
++	regmap_read(common->regmap, gate_hw->reg, &reg);
++
++	if (set)
++		reg |= BIT(gate_hw->bit_idx);
++	else
++		reg &= ~BIT(gate_hw->bit_idx);
++
++	regmap_write(common->regmap, gate_hw->reg, reg);
++}
++
++static void owl_gate_disable(struct clk_hw *hw)
++{
++	struct owl_gate *gate = hw_to_owl_gate(hw);
++	struct owl_clk_common *common = &gate->common;
++
++	owl_gate_set(common, &gate->gate_hw, false);
++}
++
++static int owl_gate_enable(struct clk_hw *hw)
++{
++	struct owl_gate *gate = hw_to_owl_gate(hw);
++	struct owl_clk_common *common = &gate->common;
++
++	owl_gate_set(common, &gate->gate_hw, true);
++
++	return 0;
++}
++
++int owl_clk_is_enabled(const struct owl_clk_common *common,
++		   const struct owl_gate_hw *gate_hw)
++{
++	u32 reg;
++
++	regmap_read(common->regmap, gate_hw->reg, &reg);
++
++	if (gate_hw->gate_flags & CLK_GATE_SET_TO_DISABLE)
++		reg ^= BIT(gate_hw->bit_idx);
++
++	return !!(reg & BIT(gate_hw->bit_idx));
++}
++
++static int owl_gate_is_enabled(struct clk_hw *hw)
++{
++	struct owl_gate *gate = hw_to_owl_gate(hw);
++	struct owl_clk_common *common = &gate->common;
++
++	return owl_clk_is_enabled(common, &gate->gate_hw);
++}
++
++const struct clk_ops owl_gate_ops = {
++	.disable	= owl_gate_disable,
++	.enable		= owl_gate_enable,
++	.is_enabled	= owl_gate_is_enabled,
++};
+diff --git a/drivers/clk/actions/owl-gate.h b/drivers/clk/actions/owl-gate.h
+new file mode 100644
+index 000000000000..f37b33a1be6b
+--- /dev/null
++++ b/drivers/clk/actions/owl-gate.h
+@@ -0,0 +1,73 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL gate clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#ifndef _OWL_GATE_H_
++#define _OWL_GATE_H_
++
++#include "owl-common.h"
++
++struct owl_gate_hw {
++	u32			reg;
++	u8			bit_idx;
++	u8			gate_flags;
++};
++
++struct owl_gate {
++	struct owl_gate_hw	gate_hw;
++	struct owl_clk_common	common;
++};
++
++#define OWL_GATE_HW(_reg, _bit_idx, _gate_flags)	\
++	{						\
++		.reg		= _reg,			\
++		.bit_idx	= _bit_idx,		\
++		.gate_flags	= _gate_flags,		\
++	}
++
++#define OWL_GATE(_struct, _name, _parent, _reg,				\
++		_bit_idx, _gate_flags, _flags)				\
++	struct owl_gate _struct = {					\
++		.gate_hw = OWL_GATE_HW(_reg, _bit_idx, _gate_flags),	\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						      _parent,		\
++						      &owl_gate_ops,	\
++						      _flags),		\
++		}							\
++	}								\
++
++#define OWL_GATE_NO_PARENT(_struct, _name, _reg,			\
++		_bit_idx, _gate_flags, _flags)				\
++	struct owl_gate _struct = {					\
++		.gate_hw = OWL_GATE_HW(_reg, _bit_idx, _gate_flags),	\
++		.common = {						\
++			.regmap		= NULL,				\
++			.hw.init	= CLK_HW_INIT_NO_PARENT(_name,	\
++						      &owl_gate_ops,	\
++						      _flags),		\
++		},							\
++	}								\
++
++static inline struct owl_gate *hw_to_owl_gate(const struct clk_hw *hw)
++{
++	struct owl_clk_common *common = hw_to_owl_clk_common(hw);
++
++	return container_of(common, struct owl_gate, common);
++}
++
++void owl_gate_set(const struct owl_clk_common *common,
++		 const struct owl_gate_hw *gate_hw, bool enable);
++int owl_gate_is_enabled(const struct owl_clk_common *common,
++		   const struct owl_gate_hw *gate_hw);
++
++extern const struct clk_ops owl_gate_ops;
++
++#endif /* _OWL_GATE_H_ */
 -- 
 2.14.1
