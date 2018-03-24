@@ -1,45 +1,44 @@
-From: rishabhb@codeaurora.org (Rishabh Bhatnagar)
-Date: Sat, 24 Mar 2018 18:29:14 -0700
-Subject: [PATCH v2 0/2] SDM845 System Cache Driver
-Message-ID: <1521941356-12361-1-git-send-email-rishabhb@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 24 Mar 2018 23:49:11 +0100
+Subject: [PATCH v2 3/6] i2c: i2c-stm32f7: Add initial SMBus protocols
+ support
+In-Reply-To: <1521650940-11651-4-git-send-email-pierre-yves.mordret@st.com>
+References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
+ <1521650940-11651-4-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20180324224911.xz3fz2jojcdrovb4@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements system cache or LLCC(Last Level Cache Controller) driver
-for SDM845 SOC. The purpose of the driver is to partition the system cache and
-program the settings such as priortiy, lines to probe while doing a look up
-in the system cache, low power related settings etc. The partitions are called
-cache slices. Each cache slice is associated with size and SCID(System Cache ID)
-The driver also provides API for clients to query the cache slice details,
-activate and deactivate them.
+On Wed, Mar 21, 2018 at 05:48:57PM +0100, Pierre-Yves MORDRET wrote:
+> This patch adds SMBus support for I2C controller embedded in STM32F7 Soc.
 
-The driver can be broadly classified into:
-* SOC specific driver: llcc-sdm845.c: Cache partitioning and cache slice
-properties for usecases on sdm845 that need to use system cache.
+> All SMBus protocols are implemented except SMBus-specific protocols.
 
-* API : llcc-slice.c: Exports APIs to clients to query cache slice details,
-activate and deactivate cache slices. Register the child devices using platform 
-APIs.
+What does that mean?
 
-Changes since v1:
-* Added Makefile and Kconfig.
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> ---
+>   Version history:
+>     v1:
+>        * Initial
+>     v2:
+>        * fix Kbuild test robot issue (Unneeded semicolon)
+> ---
+> 
+> fixup! i2c: i2c-stm32f7: Add initial SMBus protocols support
+> ---
+>  drivers/i2c/busses/i2c-stm32f7.c | 377 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 368 insertions(+), 9 deletions(-)
 
-ckadabi at codeaurora.org (2):
-  Documentation: Documentaion for qcom, llcc
-  drivers: soc: Add LLCC driver
+That is quite some complexity considering we have I2C_FUNC_SMBUS_EMUL. I
+don't mind, but you really want that?
 
- .../devicetree/bindings/arm/msm/qcom,llcc.txt      |  70 ++++
- drivers/soc/qcom/Kconfig                           |  16 +
- drivers/soc/qcom/Makefile                          |   2 +
- drivers/soc/qcom/llcc-sdm845.c                     | 120 ++++++
- drivers/soc/qcom/llcc-slice.c                      | 454 +++++++++++++++++++++
- include/linux/soc/qcom/llcc-qcom.h                 | 178 ++++++++
- 6 files changed, 840 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
- create mode 100644 drivers/soc/qcom/llcc-sdm845.c
- create mode 100644 drivers/soc/qcom/llcc-slice.c
- create mode 100644 include/linux/soc/qcom/llcc-qcom.h
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180324/aef8ebae/attachment-0001.sig>
