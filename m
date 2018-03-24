@@ -1,99 +1,103 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 24 Mar 2018 10:57:38 -0400
-Subject: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <DM2PR07MB685FD0A0877865A41EE723889AF0@DM2PR07MB685.namprd07.prod.outlook.com>
-References: <cb6a0522-2c53-b252-49db-5779d24963c6@codeaurora.org>
- <20180323.124326.2170503491903886041.davem@davemloft.net>
- <4bd9ccd2-df8f-acad-2513-eefe065dc852@codeaurora.org>
- <20180323.130418.2223623186761161723.davem@davemloft.net>
- <b4553d26-b326-15be-dcac-12594ea7c5b5@codeaurora.org>
- <DM2PR07MB685FD0A0877865A41EE723889AF0@DM2PR07MB685.namprd07.prod.outlook.com>
-Message-ID: <02335376-ca3c-e026-8649-8cb855f96216@codeaurora.org>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Sat, 24 Mar 2018 15:02:37 +0000
+Subject: [PATCH 2/2] MAINTAINERS: demote ARM port to "odd fixes"
+Message-ID: <E1ezkgn-0002fO-52@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/24/2018 10:30 AM, Chopra, Manish wrote:
->> -----Original Message-----
->> From: Sinan Kaya [mailto:okaya at codeaurora.org]
->> Sent: Friday, March 23, 2018 10:44 PM
->> To: David Miller <davem@davemloft.net>
->> Cc: netdev at vger.kernel.org; timur at codeaurora.org; sulrich at codeaurora.org;
->> linux-arm-msm at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Elior,
->> Ariel <Ariel.Elior@cavium.com>; Dept-Eng Everest Linux L2 <Dept-
->> EngEverestLinuxL2 at cavium.com>; linux-kernel at vger.kernel.org
->> Subject: Re: [PATCH v5 3/5] bnx2x: Eliminate duplicate barriers on weakly-
->> ordered archs
->>
->> On 3/23/2018 1:04 PM, David Miller wrote:
->>> From: Sinan Kaya <okaya@codeaurora.org>
->>> Date: Fri, 23 Mar 2018 12:51:47 -0400
->>>
->>>> It could if txdata->tx_db was not a union. There is a data dependency
->>>> between txdata->tx_db.data.prod and txdata->tx_db.raw.
->>>>
->>>> So, no reordering.
->>>
->>> I don't see it that way, the code requires that:
->>>
->>>  	txdata->tx_db.data.prod += nbd;
->>>
->>> is visible before the doorbell update.>
->>> barrier() doesn't provide that.
->>>
->>> Neither does writel_relaxed().  However plain writel() does.
->>
->> Correct for some architectures including ARM but not correct universally.
->>
->> writel() just guarantees register read/writes before and after to be ordered
->> when HW observes it.
->>
->> writel() doesn't guarantee that the memory update is visible to the HW on all
->> architectures.
->>
->> If you need memory update visibility, that barrier() should have been a
->> wmb()
->>
->> A correct multi-arch pattern is
->>
->> wmb()
->> writel_relaxed()
->> mmiowb()
->>
-> 
-> Sinan,  Since you have mentioned the use of mmiowb() here after writel_relaxed().
-> I believe this is not always correct for all types of IO mapped memory [Specially if IO memory is mapped using write combined (for ex. Ioremap_wc())].
-> We have a current issue on our NIC (qede) driver on x86 for which the patch is already been sent more than a week ago [Still awaiting to hear from David on that].
-> where mmiowb() seems to be useless since we use write combined mapped doorbell and mmiowb() just seems to be a compiler barrier() there.
-> So in order to flush write combined buffer we really need writel_relaxed() followed by a wmb() to synchronize writes among CPU cores.
-> I think  the correct pattern in such cases (for write combined IO) would have been like below - 
-> 
-> wmb();
-> writel_relaxed();
-> wmb(); -> To flush the writes actually.
+As of the start of 2018, I am no longer paid to support the core 32-bit
+ARM architecture code.  This means that this code is no longer
+commercially supported, and is now only supported through voluntary
+effort.
 
-You actually have good points. It is the same problem with barrier() description above.
+I will continue to merge patches as and when able, but this will be at
+a lower priority than before (which means a longer latency.)  I have
+also be scaled back the amount of time spent reading email, so email
+that is intended for my attention needs to make itself plainly
+obvious, or I will miss it.
 
-The answer really depends on what you are doing/expecting after mmiowb(). If you expect
-that some memory content to be observed by HW, you definitely need a wmb() like
-you mentioned. 
+In an attempt to reduce the amount of email Cc'd to me, exclude
+arch/arm/boot/dts from the maintainers patterns, but add entries for
+the SolidRun platforms I look after.
 
-If you just want writes to be flushed but you don't expect any memory content to be
-updated, you need a mmiowb(). 
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ MAINTAINERS | 28 +++++++++++++++++++++-------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
 
-https://lwn.net/Articles/198988/
-"There is mmiowb(), but its real purpose is to enforce ordering between MMIO operations only."
-
-> 
-> Thanks.
-> 
-> 
-> 
-> 
-> 
-
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c4399af21986..fcb49a81a92b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1060,41 +1060,42 @@ ARM PORT
+ M:	Russell King <linux@armlinux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ W:	http://www.armlinux.org.uk/
+-S:	Maintained
++S:	Odd Fixes
+ T:	git git://git.armlinux.org.uk/~rmk/linux-arm.git
+ F:	arch/arm/
++X:	arch/arm/boot/dts/
+ 
+ ARM PRIMECELL AACI PL041 DRIVER
+ M:	Russell King <linux@armlinux.org.uk>
+-S:	Maintained
++S:	Odd Fixes
+ F:	sound/arm/aaci.*
+ 
+ ARM PRIMECELL BUS SUPPORT
+ M:	Russell King <linux@armlinux.org.uk>
+-S:	Maintained
++S:	Odd Fixes
+ F:	drivers/amba/
+ F:	include/linux/amba/bus.h
+ 
+ ARM PRIMECELL CLCD PL110 DRIVER
+ M:	Russell King <linux@armlinux.org.uk>
+-S:	Maintained
++S:	Odd Fixes
+ F:	drivers/video/fbdev/amba-clcd.*
+ 
+ ARM PRIMECELL KMI PL050 DRIVER
+ M:	Russell King <linux@armlinux.org.uk>
+-S:	Maintained
++S:	Odd Fixes
+ F:	drivers/input/serio/ambakmi.*
+ F:	include/linux/amba/kmi.h
+ 
+ ARM PRIMECELL MMCI PL180/1 DRIVER
+ M:	Russell King <linux@armlinux.org.uk>
+-S:	Maintained
++S:	Odd Fixes
+ F:	drivers/mmc/host/mmci.*
+ F:	include/linux/amba/mmci.h
+ 
+ ARM PRIMECELL UART PL010 AND PL011 DRIVERS
+ M:	Russell King <linux@armlinux.org.uk>
+-S:	Maintained
++S:	Odd Fixes
+ F:	drivers/tty/serial/amba-pl01*.c
+ F:	include/linux/amba/serial.h
+ 
+@@ -12859,6 +12860,19 @@ S:	Maintained
+ F:	drivers/net/ethernet/socionext/netsec.c
+ F:	Documentation/devicetree/bindings/net/socionext-netsec.txt
+ 
++SOLIDRUN CLEARFOG SUPPORT
++M:	Russell King <linux@armlinux.org.uk>
++S:	Maintained
++F:	arch/arm/boot/dts/armada-388-clearfog*
++F:	arch/arm/boot/dts/armada-38x-solidrun-*
++
++SOLIDRUN CUBOX-I/HUMMINGBOARD SUPPORT
++M:	Russell King <linux@armlinux.org.uk>
++S:	Maintained
++F:	arch/arm/boot/dts/imx6*-cubox-i*
++F:	arch/arm/boot/dts/imx6*-hummingboard*
++F:	arch/arm/boot/dts/imx6*-sr-*
++
+ SONIC NETWORK DRIVER
+ M:	Thomas Bogendoerfer <tsbogend@alpha.franken.de>
+ L:	netdev at vger.kernel.org
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
