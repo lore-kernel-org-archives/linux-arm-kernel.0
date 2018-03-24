@@ -1,267 +1,110 @@
-From: arushisinghal19971997@gmail.com (Arushi Singhal)
-Date: Sat, 24 Mar 2018 12:43:05 +0530
-Subject: [PATCH] mtd: switch to mtd_device_register()
-Message-ID: <20180324071305.GA6446@seema-Inspiron-15-3567>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 24 Mar 2018 10:15:26 +0000
+Subject: [PATCH v3] KVM: arm/arm64 : add lpi info in vgic-debug
+In-Reply-To: <201803241008543904320@zte.com.cn>
+References: <201803241008543904320@zte.com.cn>
+Message-ID: <86muyx230h.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use mtd_device_register() instead of mtd_device_parse_register() to
-eliminate two unused parameters.
+On Sat, 24 Mar 2018 02:08:54 +0000,
+peng hao wrote:
+> 
+> [1  <multipart/alternative (7bit)>]
+> [1.1  <text/plain; UTF-8 (base64)>]
+> >On 24/03/18 00:42, Peng Hao wrote:
+> >> Add lpi debug info to vgic-stat.
+> >> The printed info like this:
+> >>     SPI  287      0 000001        0        0   0 160      -1
+> >>     LPI 8192      2 000100        0        0   0 160      -1
+> >> 
+> >> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+> >> ---
+> >>  virt/kvm/arm/vgic/vgic-debug.c | 59 ++++++++++++++++++++++++++++++++++++++----
+> >>  virt/kvm/arm/vgic/vgic-its.c   | 16 ++++++------
+> >>  virt/kvm/arm/vgic/vgic.h       |  1 +
+> >>  3 files changed, 63 insertions(+), 13 deletions(-)
+> >> 
+> .....
+> >> +    for (i = 0; i < irq_count; i++) {
+> >> +        irq = vgic_get_irq(kvm, NULL, intids[i]);
+> >> +        if (!irq)
+> >> +            continue;
+> >> +        lpi_irqs[iter->nr_lpis++] = irq;
+> >> +    }
+> >> +    iter->lpi_irqs = lpi_irqs;
+> >> +    kfree(intids);
+> 
+> >You are still completely missing the point. Why are you allocating this
+> >array of pointers while you have a perfectly sensible array of intids,
+> >allowing you do treat all the irqs uniformly?
+> 
+> >>  }
+> >>  
+> >>  static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
+> >> @@ -64,6 +100,8 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
+> >>      iter->nr_cpus = nr_cpus;
+> >>      iter->nr_spis = kvm->arch.vgic.nr_spis;
+> >>  
+> > +    if (vgic_supports_direct_msis(kvm) && !pos)
+> >> +        vgic_debug_get_lpis(kvm, iter);
+> 
+> >Again: What is the point of this?
+> 
+> >>      /* Fast forward to the right position if needed */
+> >>      while (pos--)
+> >>          iter_next(iter);
+> >> @@ -73,7 +111,9 @@ static bool end_of_vgic(struct vgic_state_iter *iter)
+> >>  {
+> >>      return iter->dist_id > 0 &&
+> >>          iter->vcpu_id == iter->nr_cpus &&
+> >> -        (iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
+> >> +        (iter->intid - VGIC_NR_PRIVATE_IRQS) >= iter->nr_spis &&
+> >> +        ((iter->nr_lpis == 0) ||
+> >> +        (iter->lpi_print_count == iter->nr_lpis + 1));
+> >>  }
+> >>  
+> >>  static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
+> >> @@ -130,6 +170,7 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
+> >>  
+> >>      mutex_lock(&kvm->lock);
+> >>      iter = kvm->arch.vgic.iter;
+> >> +    kfree(iter->lpi_irqs);
+> >>      kfree(iter);
+> >>      kvm->arch.vgic.iter = NULL;
+> >>      mutex_unlock(&kvm->lock);
+> >> @@ -154,7 +195,7 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
+> >>               struct kvm_vcpu *vcpu)
+> >>  {
+> >>      int id = 0;
+> >> -    char *hdr = "SPI ";
+> >> +    char *hdr = "Global";
+> >>  
+> >>      if (vcpu) {
+> >>          hdr = "VCPU";
+> >> @@ -162,7 +203,10 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
+> >>      }
+> >>  
+> >>      seq_printf(s, "\n");
+> ....
+> >>      print_irq_state(s, irq, vcpu);
+> >>      spin_unlock(&irq->irq_lock);
+> >> +    vgic_put_irq(kvm, irq);
+> 
+> >Doesn't it shock you that you're doing a "put" on something you haven't
+> >done a "get" on?
+> 
+> >[...]
+> 
+> >Here's what I mean[1]. No double allocation, uniform access to the irq
+> >pointer, no imbalance in reference management.
+> Thanks for your help.
+> By the way, I want to know which device you use for testing vgic-v4 function.
+> I passthrough one VF to VM,but it just says "timeout".
 
-Signed-off-by: Arushi Singhal <arushisinghal19971997@gmail.com>
----
- drivers/mtd/devices/sst25l.c        | 5 ++---
- drivers/mtd/lpddr/lpddr2_nvm.c      | 2 +-
- drivers/mtd/maps/impa7.c            | 5 ++---
- drivers/mtd/maps/intel_vr_nor.c     | 2 +-
- drivers/mtd/maps/latch-addr-flash.c | 5 ++---
- drivers/mtd/maps/rbtx4939-flash.c   | 4 ++--
- drivers/mtd/nand/cmx270_nand.c      | 4 ++--
- drivers/mtd/nand/cs553x_nand.c      | 3 +--
- drivers/mtd/nand/davinci_nand.c     | 4 ++--
- drivers/mtd/nand/jz4740_nand.c      | 5 ++---
- drivers/mtd/nand/mtk_nand.c         | 2 +-
- drivers/mtd/nand/s3c2410.c          | 4 ++--
- drivers/mtd/nand/txx9ndfmc.c        | 2 +-
- drivers/mtd/onenand/generic.c       | 5 ++---
- drivers/mtd/onenand/samsung.c       | 5 ++---
- drivers/mtd/spi-nor/intel-spi.c     | 2 +-
- 16 files changed, 26 insertions(+), 33 deletions(-)
+I use both a software model (FastModel) and a HiSilicon D05 system.
 
-diff --git a/drivers/mtd/devices/sst25l.c b/drivers/mtd/devices/sst25l.c
-index 5b84d71..bc14aca 100644
---- a/drivers/mtd/devices/sst25l.c
-+++ b/drivers/mtd/devices/sst25l.c
-@@ -397,9 +397,8 @@ static int sst25l_probe(struct spi_device *spi)
- 	      flash->mtd.numeraseregions);
- 
- 
--	ret = mtd_device_parse_register(&flash->mtd, NULL, NULL,
--					data ? data->parts : NULL,
--					data ? data->nr_parts : 0);
-+	ret = mtd_device_register(&flash->mtd, data ? data->parts : NULL,
-+				  data ? data->nr_parts : 0);
- 	if (ret)
- 		return -ENODEV;
- 
-diff --git a/drivers/mtd/lpddr/lpddr2_nvm.c b/drivers/mtd/lpddr/lpddr2_nvm.c
-index 2342277..3a60316 100644
---- a/drivers/mtd/lpddr/lpddr2_nvm.c
-+++ b/drivers/mtd/lpddr/lpddr2_nvm.c
-@@ -482,7 +482,7 @@ static int lpddr2_nvm_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 	/* Parse partitions and register the MTD device */
--	return mtd_device_parse_register(mtd, NULL, NULL, NULL, 0);
-+	return mtd_device_register(mtd, NULL, 0);
- }
- 
- /*
-diff --git a/drivers/mtd/maps/impa7.c b/drivers/mtd/maps/impa7.c
-index a0b8fa7..815e2db 100644
---- a/drivers/mtd/maps/impa7.c
-+++ b/drivers/mtd/maps/impa7.c
-@@ -88,9 +88,8 @@ static int __init init_impa7(void)
- 		if (impa7_mtd[i]) {
- 			impa7_mtd[i]->owner = THIS_MODULE;
- 			devicesfound++;
--			mtd_device_parse_register(impa7_mtd[i], NULL, NULL,
--						  partitions,
--						  ARRAY_SIZE(partitions));
-+			mtd_device_register(impa7_mtd[i], partitions,
-+					    ARRAY_SIZE(partitions));
- 		} else {
- 			iounmap((void __iomem *)impa7_map[i].virt);
- 		}
-diff --git a/drivers/mtd/maps/intel_vr_nor.c b/drivers/mtd/maps/intel_vr_nor.c
-index dd5d685..69503ae 100644
---- a/drivers/mtd/maps/intel_vr_nor.c
-+++ b/drivers/mtd/maps/intel_vr_nor.c
-@@ -71,7 +71,7 @@ static int vr_nor_init_partitions(struct vr_nor_mtd *p)
- {
- 	/* register the flash bank */
- 	/* partition the flash bank */
--	return mtd_device_parse_register(p->info, NULL, NULL, NULL, 0);
-+	return mtd_device_register(p->info, NULL, 0);
- }
- 
- static void vr_nor_destroy_mtd_setup(struct vr_nor_mtd *p)
-diff --git a/drivers/mtd/maps/latch-addr-flash.c b/drivers/mtd/maps/latch-addr-flash.c
-index 6dc97aa..51db24b 100644
---- a/drivers/mtd/maps/latch-addr-flash.c
-+++ b/drivers/mtd/maps/latch-addr-flash.c
-@@ -197,9 +197,8 @@ static int latch_addr_flash_probe(struct platform_device *dev)
- 	}
- 	info->mtd->dev.parent = &dev->dev;
- 
--	mtd_device_parse_register(info->mtd, NULL, NULL,
--				  latch_addr_data->parts,
--				  latch_addr_data->nr_parts);
-+	mtd_device_register(info->mtd, latch_addr_data->parts,
-+			    latch_addr_data->nr_parts);
- 	return 0;
- 
- iounmap:
-diff --git a/drivers/mtd/maps/rbtx4939-flash.c b/drivers/mtd/maps/rbtx4939-flash.c
-index 3a06ecf..7a91533 100644
---- a/drivers/mtd/maps/rbtx4939-flash.c
-+++ b/drivers/mtd/maps/rbtx4939-flash.c
-@@ -97,8 +97,8 @@ static int rbtx4939_flash_probe(struct platform_device *dev)
- 		goto err_out;
- 	}
- 	info->mtd->dev.parent = &dev->dev;
--	err = mtd_device_parse_register(info->mtd, NULL, NULL, pdata->parts,
--					pdata->nr_parts);
-+	err = mtd_device_register(info->mtd, pdata->parts,
-+				  pdata->nr_parts);
- 
- 	if (err)
- 		goto err_out;
-diff --git a/drivers/mtd/nand/cmx270_nand.c b/drivers/mtd/nand/cmx270_nand.c
-index b01c980..05d73920 100644
---- a/drivers/mtd/nand/cmx270_nand.c
-+++ b/drivers/mtd/nand/cmx270_nand.c
-@@ -202,8 +202,8 @@ static int __init cmx270_init(void)
- 	}
- 
- 	/* Register the partitions */
--	ret = mtd_device_parse_register(cmx270_nand_mtd, NULL, NULL,
--					partition_info, NUM_PARTITIONS);
-+	ret = mtd_device_register(cmx270_nand_mtd, partition_info,
-+				  NUM_PARTITIONS);
- 	if (ret)
- 		goto err_scan;
- 
-diff --git a/drivers/mtd/nand/cs553x_nand.c b/drivers/mtd/nand/cs553x_nand.c
-index d488775..5913638 100644
---- a/drivers/mtd/nand/cs553x_nand.c
-+++ b/drivers/mtd/nand/cs553x_nand.c
-@@ -311,8 +311,7 @@ static int __init cs553x_init(void)
- 	for (i = 0; i < NR_CS553X_CONTROLLERS; i++) {
- 		if (cs553x_mtd[i]) {
- 			/* If any devices registered, return success. Else the last error. */
--			mtd_device_parse_register(cs553x_mtd[i], NULL, NULL,
--						  NULL, 0);
-+			mtd_device_register(cs553x_mtd[i], NULL, 0);
- 			err = 0;
- 		}
- 	}
-diff --git a/drivers/mtd/nand/davinci_nand.c b/drivers/mtd/nand/davinci_nand.c
-index ccc8c43..0ef4d46 100644
---- a/drivers/mtd/nand/davinci_nand.c
-+++ b/drivers/mtd/nand/davinci_nand.c
-@@ -821,8 +821,8 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 		goto err;
- 
- 	if (pdata->parts)
--		ret = mtd_device_parse_register(mtd, NULL, NULL,
--					pdata->parts, pdata->nr_parts);
-+		ret = mtd_device_register(mtd, pdata->parts,
-+					  pdata->nr_parts);
- 	else
- 		ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret < 0)
-diff --git a/drivers/mtd/nand/jz4740_nand.c b/drivers/mtd/nand/jz4740_nand.c
-index 613b00a..e04597a 100644
---- a/drivers/mtd/nand/jz4740_nand.c
-+++ b/drivers/mtd/nand/jz4740_nand.c
-@@ -466,9 +466,8 @@ static int jz_nand_probe(struct platform_device *pdev)
- 		goto err_unclaim_banks;
- 	}
- 
--	ret = mtd_device_parse_register(mtd, NULL, NULL,
--					pdata ? pdata->partitions : NULL,
--					pdata ? pdata->num_partitions : 0);
-+	ret = mtd_device_register(mtd, pdata ? pdata->partitions : NULL,
-+				  pdata ? pdata->num_partitions : 0);
- 
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to add mtd device\n");
-diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
-index 6977da3..28ec2c0 100644
---- a/drivers/mtd/nand/mtk_nand.c
-+++ b/drivers/mtd/nand/mtk_nand.c
-@@ -1357,7 +1357,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
- 	if (ret)
- 		return ret;
- 
--	ret = mtd_device_parse_register(mtd, NULL, NULL, NULL, 0);
-+	ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret) {
- 		dev_err(dev, "mtd parse partition error\n");
- 		nand_release(mtd);
-diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-index 4c383ee..4b472aa 100644
---- a/drivers/mtd/nand/s3c2410.c
-+++ b/drivers/mtd/nand/s3c2410.c
-@@ -805,8 +805,8 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
- 
- 		mtdinfo->name = set->name;
- 
--		return mtd_device_parse_register(mtdinfo, NULL, NULL,
--					 set->partitions, set->nr_partitions);
-+		return mtd_device_register(mtdinfo, set->partitions,
-+					   set->nr_partitions);
- 	}
- 
- 	return -ENODEV;
-diff --git a/drivers/mtd/nand/txx9ndfmc.c b/drivers/mtd/nand/txx9ndfmc.c
-index b567d21..fe954e2 100644
---- a/drivers/mtd/nand/txx9ndfmc.c
-+++ b/drivers/mtd/nand/txx9ndfmc.c
-@@ -366,7 +366,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		}
- 		mtd->name = txx9_priv->mtdname;
- 
--		mtd_device_parse_register(mtd, NULL, NULL, NULL, 0);
-+		mtd_device_register(mtd, NULL, 0);
- 		drvdata->mtds[i] = mtd;
- 	}
- 
-diff --git a/drivers/mtd/onenand/generic.c b/drivers/mtd/onenand/generic.c
-index 125da34..b7f54d4 100644
---- a/drivers/mtd/onenand/generic.c
-+++ b/drivers/mtd/onenand/generic.c
-@@ -68,9 +68,8 @@ static int generic_onenand_probe(struct platform_device *pdev)
- 		goto out_iounmap;
- 	}
- 
--	err = mtd_device_parse_register(&info->mtd, NULL, NULL,
--					pdata ? pdata->parts : NULL,
--					pdata ? pdata->nr_parts : 0);
-+	err = mtd_device_register(&info->mtd, pdata ? pdata->parts : NULL,
-+				  pdata ? pdata->nr_parts : 0);
- 
- 	platform_set_drvdata(pdev, info);
- 
-diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
-index 2e9d076..b914578 100644
---- a/drivers/mtd/onenand/samsung.c
-+++ b/drivers/mtd/onenand/samsung.c
-@@ -933,9 +933,8 @@ static int s3c_onenand_probe(struct platform_device *pdev)
- 	if (s3c_read_reg(MEM_CFG_OFFSET) & ONENAND_SYS_CFG1_SYNC_READ)
- 		dev_info(&onenand->pdev->dev, "OneNAND Sync. Burst Read enabled\n");
- 
--	err = mtd_device_parse_register(mtd, NULL, NULL,
--					pdata ? pdata->parts : NULL,
--					pdata ? pdata->nr_parts : 0);
-+	err = mtd_device_register(mtd, pdata ? pdata->parts : NULL,
-+				  pdata ? pdata->nr_parts : 0);
- 	if (err) {
- 		dev_err(&pdev->dev, "failed to parse partitions and register the MTD device\n");
- 		onenand_release(mtd);
-diff --git a/drivers/mtd/spi-nor/intel-spi.c b/drivers/mtd/spi-nor/intel-spi.c
-index 6999515..2de7854 100644
---- a/drivers/mtd/spi-nor/intel-spi.c
-+++ b/drivers/mtd/spi-nor/intel-spi.c
-@@ -850,7 +850,7 @@ struct intel_spi *intel_spi_probe(struct device *dev,
- 	if (!ispi->writeable || !writeable)
- 		ispi->nor.mtd.flags &= ~MTD_WRITEABLE;
- 
--	ret = mtd_device_parse_register(&ispi->nor.mtd, NULL, NULL, &part, 1);
-+	ret = mtd_device_register(&ispi->nor.mtd, &part, 1);
- 	if (ret)
- 		return ERR_PTR(ret);
- 
+	M.
+
 -- 
-2.7.4
+Jazz is not dead, it just smell funny.
