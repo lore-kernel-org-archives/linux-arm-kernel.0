@@ -1,51 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 25 Mar 2018 10:39:17 -0400
-Subject: [PATCH v7 3/7] bnx2x: Replace doorbell barrier() with wmb()
-In-Reply-To: <1521988761-30344-1-git-send-email-okaya@codeaurora.org>
-References: <1521988761-30344-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1521988761-30344-4-git-send-email-okaya@codeaurora.org>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Sun, 25 Mar 2018 15:54:04 +0200
+Subject: [PATCH v4] staging: bcm2835-audio: Release resources on
+ module_exit()
+In-Reply-To: <CAHp75Vc0ok40nr0OXp4JcnQ77W_BK4PvDPtOY5ObkTXfwpW9cw@mail.gmail.com>
+References: <f35d0f86-04b5-6edb-139f-4632edc493b3@gmail.com>
+ <20180322213722.31822-1-k.marinushkin@gmail.com>
+ <CAHp75VdYiySBzu99MYoBAZ8tORGP1R43z9d+=VRdktg+U=_ZDw@mail.gmail.com>
+ <0524fb43-ed08-6c54-39ed-32bd96ccaca4@gmail.com>
+ <CAHp75VfJjCHd5U1D22NANLCA1kAoTKLnDGSQPj3ay6OhKSoZxg@mail.gmail.com>
+ <4e473a93-317a-5777-7444-6deb105c8f66@gmail.com>
+ <CAHp75Vc0ok40nr0OXp4JcnQ77W_BK4PvDPtOY5ObkTXfwpW9cw@mail.gmail.com>
+Message-ID: <864c8503-0226-80cf-0140-9e9e33882b22@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-barrier() doesn't guarantee memory writes to be observed by the hardware on
-all architectures. barrier() only tells compiler not to move this code
-with respect to other read/writes.
+On 03/25/18 15:03, Andy Shevchenko wrote:
+> On Sun, Mar 25, 2018 at 1:44 PM, Kirill Marinushkin
+> <k.marinushkin@gmail.com> wrote:
+>> On 03/25/18 12:33, Andy Shevchenko wrote:
+>>> On Fri, Mar 23, 2018 at 9:22 PM, Kirill Marinushkin
+>>> <k.marinushkin@gmail.com> wrote:
+>>>> On 03/23/18 17:23, Andy Shevchenko wrote:
+>>>>> After addressing above, FWIW,
+>>>>>
+>>>>> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+>>> Seems you missed my tag in new version.
+>>> When someone gives you a tag and you are going to send a new version
+>>> (w/o drastic changes), it's your responsibility to append it
+>>>
+>>> I will send a new mail with it, so, this time no need to resend. Just
+>>> keep it for the future contributions.
+>>>
+>> What is a "tag"?
+>> I added in-reply-to this email, I added you as CC.
+>> Isn't it enough to keep track of the versioning within a mailing list?
+>>
+>> Could you please clarify: what "tag" should I usually attach in addition?
+> Section 13) in Submitting Patches [1] explains that.
+>
+> [1]: https://elixir.bootlin.com/linux/v4.16-rc6/source/Documentation/process/submitting-patches.rst
+>
 
-If memory write needs to be observed by the HW, wmb() is the right choice.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c     | 3 ++-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-index d7c98e8..0f86f18 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
-@@ -4153,7 +4153,8 @@ netdev_tx_t bnx2x_start_xmit(struct sk_buff *skb, struct net_device *dev)
- 	wmb();
- 
- 	txdata->tx_db.data.prod += nbd;
--	barrier();
-+	/* make sure descriptor update is observed by HW */
-+	wmb();
- 
- 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
- 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c
-index 1e33abd..39af4f8 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_ethtool.c
-@@ -2591,7 +2591,8 @@ static int bnx2x_run_loopback(struct bnx2x *bp, int loopback_mode)
- 	wmb();
- 
- 	txdata->tx_db.data.prod += 2;
--	barrier();
-+	/* make sure descriptor update is observed by the HW */
-+	wmb();
- 	DOORBELL(bp, txdata->cid, txdata->tx_db.raw);
- 
- 	mmiowb();
--- 
-2.7.4
+Thanks!
