@@ -1,19 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 25 Mar 2018 18:52:05 -0500
-Subject: [PATCH v8 09/14] dt-bindings: iommu/rockchip: Add clock property
-In-Reply-To: <20180323073814.5802-10-jeffy.chen@rock-chips.com>
-References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
- <20180323073814.5802-10-jeffy.chen@rock-chips.com>
-Message-ID: <20180325235205.fkrz3chbkfj7eo64@rob-hp-laptop>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon, 26 Mar 2018 10:28:30 +1030
+Subject: [PATCH v2 0/7] KASan for arm
+In-Reply-To: <20180318125342.4278-1-liuwenliang@huawei.com>
+References: <20180318125342.4278-1-liuwenliang@huawei.com>
+Message-ID: <CACPK8XemuC+uACYp=tP1gJ8=9k-S69saebOLmq8nrZtqPxWRjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 03:38:09PM +0800, Jeffy Chen wrote:
-> Add clock property, since we are going to control clocks in rockchip
-> iommu driver.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> ---
+On 18 March 2018 at 23:23, Abbott Liu <liuwenliang@huawei.com> wrote:
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+>    These patches add arch specific code for kernel address sanitizer
+> (see Documentation/kasan.txt).
+
+Thanks for implementing this. I gave the series a spin on an ASPEED
+ast2500 (ARMv5) system with aspeed_g5_defconfig.
+
+It found a bug in the NCSI code (https://github.com/openbmc/linux/issues/146).
+
+Tested-by: Joel Stanley <joel@jms.id.au>
+
+Cheers,
+
+Joel
