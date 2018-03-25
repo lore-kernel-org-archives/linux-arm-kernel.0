@@ -1,70 +1,152 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 25 Mar 2018 16:09:13 +0200
-Subject: [PATCH 4/7] ARM: dts: sun7i: Add pinmux settings for LCD0
- RGB888 output.
-In-Reply-To: <1521662593-25468-4-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-4-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <1521986953.5301.4.camel@paulk.fr>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Sun, 25 Mar 2018 09:33:35 -0400
+Subject: [PATCH v4 17/17] net: ena: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <7BF039D2-9E0F-45BE-9F40-8E785814C17D@amazon.com>
+References: <1521513753-7325-1-git-send-email-okaya@codeaurora.org>
+ <1521513753-7325-18-git-send-email-okaya@codeaurora.org>
+ <7BF039D2-9E0F-45BE-9F40-8E785814C17D@amazon.com>
+Message-ID: <bf9846e1234f0211476d2e709a64b1fe@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2018-03-25 08:06, Belgazal, Netanel wrote:
+> I think you should either add a parameter to
+> ena_com_write_sq_doorbell() or add ena_com_write_sq_doorbell_rel().
+> Right now, you have unused function.
 
-Le mercredi 21 mars 2018 ? 21:03 +0100, Giulio Benetti a ?crit :
-> The A20 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
-> for the needed pins.
+That is true. I got rid of ena_com_write_sq_doorbell_rel.
+
 > 
-> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> ?On 3/20/18, 4:43 AM, "Sinan Kaya" <okaya@codeaurora.org> wrote:
 > 
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi
-> b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index efb5607..bfe6728 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -922,6 +922,14 @@
->  				pins = "PI20", "PI21";
->  				function = "uart7";
->  			};
-> +
-> +			lcd0_rgb888_pins: lcd0-rgb888-pins {
-
-It would be more consistent with other pins definitions to have
-underscores in both names and to indicate the index, such as:
-lcd0_rgb888_pins: lcd0_rgb888_pins at 0 {
-
-This way, other set of pins for LCD (PH0-PH27) can be declared as @1
-when they are needed in the future.
-
-> +				pins = "PD0", "PD1", "PD2", "PD3",
-> "PD4", "PD5", "PD6", "PD7",
-> +				       "PD8", "PD9", "PD10", "PD11",
-> "PD12", "PD13", "PD14", "PD15",
-> +				       "PD16", "PD17", "PD18",
-> "PD19", "PD20", "PD21", "PD22", "PD23",
-> +				       "PD24", "PD25", "PD26",
-> "PD27";
-> +				function = "lcd0";
-> +			};
->  		};
->  
->  		timer at 1c20c00 {
-
--- 
-Paul Kocialkowski,
-
-developer of free digital technology and hardware support.
-
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180325/54c13b55/attachment-0001.sig>
+>     Code includes barrier() followed by writel(). writel() already has 
+> a
+>     barrier
+>     on some architectures like arm64.
+> 
+>     This ends up CPU observing two barriers back to back before 
+> executing the
+>     register write.
+> 
+>     Create a new wrapper function with relaxed write operator. Use the 
+> new
+>     wrapper when a write is following a barrier().
+> 
+>     Since code already has an explicit barrier call, changing writel() 
+> to
+>     writel_relaxed().
+> 
+>     Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>     ---
+>      drivers/net/ethernet/amazon/ena/ena_com.c     |  6 ++++--
+>      drivers/net/ethernet/amazon/ena/ena_eth_com.h | 22 
+> ++++++++++++++++++++--
+>      drivers/net/ethernet/amazon/ena/ena_netdev.c  |  4 ++--
+>      3 files changed, 26 insertions(+), 6 deletions(-)
+> 
+>     diff --git a/drivers/net/ethernet/amazon/ena/ena_com.c
+> b/drivers/net/ethernet/amazon/ena/ena_com.c
+>     index bf2de52..b6e628f 100644
+>     --- a/drivers/net/ethernet/amazon/ena/ena_com.c
+>     +++ b/drivers/net/ethernet/amazon/ena/ena_com.c
+>     @@ -631,7 +631,8 @@ static u32 ena_com_reg_bar_read32(struct
+> ena_com_dev *ena_dev, u16 offset)
+>      	 */
+>      	wmb();
+> 
+>     -	writel(mmio_read_reg, ena_dev->reg_bar + 
+> ENA_REGS_MMIO_REG_READ_OFF);
+>     +	writel_relaxed(mmio_read_reg,
+>     +		       ena_dev->reg_bar + ENA_REGS_MMIO_REG_READ_OFF);
+> 
+>      	for (i = 0; i < timeout; i++) {
+>      		if (read_resp->req_id == mmio_read->seq_num)
+>     @@ -1826,7 +1827,8 @@ void ena_com_aenq_intr_handler(struct
+> ena_com_dev *dev, void *data)
+> 
+>      	/* write the aenq doorbell after all AENQ descriptors were read 
+> */
+>      	mb();
+>     -	writel((u32)aenq->head, dev->reg_bar + 
+> ENA_REGS_AENQ_HEAD_DB_OFF);
+>     +	writel_relaxed((u32)aenq->head,
+>     +		       dev->reg_bar + ENA_REGS_AENQ_HEAD_DB_OFF);
+>      }
+> 
+>      int ena_com_dev_reset(struct ena_com_dev *ena_dev,
+>     diff --git a/drivers/net/ethernet/amazon/ena/ena_eth_com.h
+> b/drivers/net/ethernet/amazon/ena/ena_eth_com.h
+>     index 2f76572..09ef7cd 100644
+>     --- a/drivers/net/ethernet/amazon/ena/ena_eth_com.h
+>     +++ b/drivers/net/ethernet/amazon/ena/ena_eth_com.h
+>     @@ -107,7 +107,8 @@ static inline int
+> ena_com_sq_empty_space(struct ena_com_io_sq *io_sq)
+>      	return io_sq->q_depth - 1 - cnt;
+>      }
+> 
+>     -static inline int ena_com_write_sq_doorbell(struct ena_com_io_sq 
+> *io_sq)
+>     +static inline int ena_com_write_sq_doorbell(struct ena_com_io_sq 
+> *io_sq,
+>     +					    bool relaxed)
+>      {
+>      	u16 tail;
+> 
+>     @@ -116,7 +117,24 @@ static inline int
+> ena_com_write_sq_doorbell(struct ena_com_io_sq *io_sq)
+>      	pr_debug("write submission queue doorbell for queue: %d tail: 
+> %d\n",
+>      		 io_sq->qid, tail);
+> 
+>     -	writel(tail, io_sq->db_addr);
+>     +	if (relaxed)
+>     +		writel_relaxed(tail, io_sq->db_addr);
+>     +	else
+>     +		writel(tail, io_sq->db_addr);
+>     +
+>     +	return 0;
+>     +}
+>     +
+>     +static inline int ena_com_write_sq_doorbell_rel(struct
+> ena_com_io_sq *io_sq)
+>     +{
+>     +	u16 tail;
+>     +
+>     +	tail = io_sq->tail;
+>     +
+>     +	pr_debug("write submission queue doorbell for queue: %d tail: 
+> %d\n",
+>     +		 io_sq->qid, tail);
+>     +
+>     +	writel_relaxed(tail, io_sq->db_addr);
+> 
+>      	return 0;
+>      }
+>     diff --git a/drivers/net/ethernet/amazon/ena/ena_netdev.c
+> b/drivers/net/ethernet/amazon/ena/ena_netdev.c
+>     index 6975150..0530201 100644
+>     --- a/drivers/net/ethernet/amazon/ena/ena_netdev.c
+>     +++ b/drivers/net/ethernet/amazon/ena/ena_netdev.c
+>     @@ -556,7 +556,7 @@ static int ena_refill_rx_bufs(struct ena_ring
+> *rx_ring, u32 num)
+>      		 * issue a doorbell
+>      		 */
+>      		wmb();
+>     -		ena_com_write_sq_doorbell(rx_ring->ena_com_io_sq);
+>     +		ena_com_write_sq_doorbell(rx_ring->ena_com_io_sq, true);
+>      	}
+> 
+>      	rx_ring->next_to_use = next_to_use;
+>     @@ -2151,7 +2151,7 @@ static netdev_tx_t ena_start_xmit(struct
+> sk_buff *skb, struct net_device *dev)
+> 
+>      	if (netif_xmit_stopped(txq) || !skb->xmit_more) {
+>      		/* trigger the dma engine */
+>     -		ena_com_write_sq_doorbell(tx_ring->ena_com_io_sq);
+>     +		ena_com_write_sq_doorbell(tx_ring->ena_com_io_sq, false);
+>      		u64_stats_update_begin(&tx_ring->syncp);
+>      		tx_ring->tx_stats.doorbells++;
+>      		u64_stats_update_end(&tx_ring->syncp);
+>     --
+>     2.7.4
