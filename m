@@ -1,74 +1,37 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 25 Mar 2018 20:09:56 +0200
-Subject: [PATCH v2 3/6] ARM: trusted_foundations: do not use naked function
+Date: Sun, 25 Mar 2018 20:09:58 +0200
+Subject: [PATCH v2 5/6] ARM: add support for building ARM kernel with clang
 In-Reply-To: <20180325180959.28008-1-stefan@agner.ch>
 References: <20180325180959.28008-1-stefan@agner.ch>
-Message-ID: <20180325180959.28008-4-stefan@agner.ch>
+Message-ID: <20180325180959.28008-6-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As documented in GCC naked functions should only use Basic asm
-syntax. The Extended asm or mixture of Basic asm and "C" code is
-not guaranteed. Currently this works because it was hard coded
-to follow and check GCC behavior for arguments and register
-placement.
+Use cc-options call for compiler options which are not available
+in clang. With this patch an ARMv7 multi platform kernel can be
+successfully build using clang (tested with version 5.0.1).
 
-Furthermore with clang using parameters in Extended asm in a
-naked function is not supported:
-  arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
-          references not allowed in naked functions
-                : "r" (type), "r" (arg1), "r" (arg2)
-                       ^
-
-Use a regular function to be more portable. This aligns also with
-the other smc call implementations e.g. in qcom_scm-32.c and
-bcm_kona_smc.c.
-
-Cc: Dmitry Osipenko <digetx@gmail.com>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Thierry Reding <treding@nvidia.com>
+Based-on-patches-by: Behan Webster <behanw@converseincode.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
 Changes in v2:
-- Keep stmfd/ldmfd to avoid potential ABI issues
+- Drop cc-options in CONFIG_FRAME_POINTER=y case
 
- arch/arm/firmware/trusted_foundations.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/boot/compressed/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-index 3fb1b5a1dce9..689e6565abfc 100644
---- a/arch/arm/firmware/trusted_foundations.c
-+++ b/arch/arm/firmware/trusted_foundations.c
-@@ -31,21 +31,25 @@
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 45a6b9b7af2a..6a5c4ac97703 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -113,7 +113,7 @@ CFLAGS_fdt_ro.o := $(nossp_flags)
+ CFLAGS_fdt_rw.o := $(nossp_flags)
+ CFLAGS_fdt_wip.o := $(nossp_flags)
  
- static unsigned long cpu_boot_addr;
+-ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
++ccflags-y := -fpic $(call cc-option,-mno-single-pic-base,) -fno-builtin -I$(obj)
+ asflags-y := -DZIMAGE
  
--static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
-+static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
- {
-+	register u32 r0 asm("r0") = type;
-+	register u32 r1 asm("r1") = arg1;
-+	register u32 r2 asm("r2") = arg2;
-+
- 	asm volatile(
- 		".arch_extension	sec\n\t"
--		"stmfd	sp!, {r4 - r11, lr}\n\t"
-+		"stmfd	sp!, {r4 - r11}\n\t"
- 		__asmeq("%0", "r0")
- 		__asmeq("%1", "r1")
- 		__asmeq("%2", "r2")
- 		"mov	r3, #0\n\t"
- 		"mov	r4, #0\n\t"
- 		"smc	#0\n\t"
--		"ldmfd	sp!, {r4 - r11, pc}"
-+		"ldmfd	sp!, {r4 - r11}\n\t"
- 		:
--		: "r" (type), "r" (arg1), "r" (arg2)
--		: "memory");
-+		: "r" (r0), "r" (r1), "r" (r2)
-+		: "memory", "r3", "r12", "lr");
- }
- 
- static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+ # Supply kernel BSS size to the decompressor via a linker symbol.
 -- 
 2.16.2
