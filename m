@@ -1,117 +1,49 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 25 Mar 2018 00:19:10 +0100
-Subject: [PATCH v5 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <20180302083123.7259-3-ard.biesheuvel@linaro.org>
-References: <20180302083123.7259-1-ard.biesheuvel@linaro.org>
- <20180302083123.7259-3-ard.biesheuvel@linaro.org>
-Message-ID: <20180324231910.unzvwty3xia4mqu2@ninjato>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 26 Mar 2018 04:35:02 +0800
+Subject: [PATCH v6 11/11] clk: actions: Add S900 SoC clock support
+In-Reply-To: <20180324133159.4824-12-manivannan.sadhasivam@linaro.org>
+References: <20180324133159.4824-12-manivannan.sadhasivam@linaro.org>
+Message-ID: <201803260403.yVM0I8Zk%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi Manivannan,
 
-> +static int synquacer_i2c_master_start(struct synquacer_i2c *i2c,
-> +				      struct i2c_msg *pmsg)
-> +{
-> +	unsigned char bsr, bcr;
-> +
-> +	if (pmsg->flags & I2C_M_RD)
-> +		writeb((pmsg->addr << 1) | 1,
-> +		       i2c->base + SYNQUACER_I2C_REG_DAR);
-> +	else
-> +		writeb(pmsg->addr << 1,
-> +		       i2c->base + SYNQUACER_I2C_REG_DAR);
+Thank you for the patch! Yet something to improve:
 
-writeb(i2c_8bit_addr_from_msg(pmsg), i2c->base + SYNQUACER_I2C_REG_DAR);
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.16-rc6]
+[cannot apply to clk/clk-next next-20180323]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-?
+url:    https://github.com/0day-ci/linux/commits/Manivannan-Sadhasivam/Add-clock-driver-for-Actions-S900-SoC/20180325-231339
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-> +static int synquacer_i2c_master_recover(struct synquacer_i2c *i2c)
-> +{
+All errors (new ones prefixed by >>):
 
-This is the bus recovery mechanism with toggling SCL pulses, right?
-That should be implemented using a 'struct i2c_bus_recovery_info' and
-the core helpers.
+>> drivers/clk/actions/owl-s900.c:23:10: fatal error: dt-bindings/clock/actions,s900-cmu.h: No such file or directory
+    #include <dt-bindings/clock/actions,s900-cmu.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
 
-> +static int synquacer_i2c_doxfer(struct synquacer_i2c *i2c,
-> +				struct i2c_msg *msgs, int num)
-> +{
-> +	unsigned char bsr;
-> +	unsigned long timeout, bb_timeout;
-> +	int ret;
-> +
-> +	if (i2c->is_suspended)
-> +		return -EBUSY;
-> +
-> +	synquacer_i2c_hw_init(i2c);
-> +	bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
-> +	if (bsr & SYNQUACER_I2C_BSR_BB) {
-> +		dev_err(i2c->dev, "cannot get bus (bus busy)\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	init_completion(&i2c->completion);
+vim +23 drivers/clk/actions/owl-s900.c
 
-reinit_completion? And init_completion() in probe()?
+    22	
+  > 23	#include <dt-bindings/clock/actions,s900-cmu.h>
+    24	
 
-> +	/* ensure the stop has been through the bus */
-> +	bb_timeout = jiffies + HZ;
-> +	do {
-> +		bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
-> +		if (!(bsr & SYNQUACER_I2C_BSR_BB))
-> +			return 0;
-> +	} while (time_before(jiffies, bb_timeout));
-
-Busy looping for one second? And won't the bus_free detection at the
-beginning of a transfer do?
-
-> +static int synquacer_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
-> +			      int num)
-> +{
-> +	struct synquacer_i2c *i2c;
-> +	int retry;
-> +	int ret;
-> +
-> +	if (!msgs)
-> +		return -EINVAL;
-> +	if (num <= 0)
-> +		return -EINVAL;
-
-Hmm, this should be done by the core. I am surprised it doesn't do that yet :/
-
-> +
-> +	i2c = i2c_get_adapdata(adap);
-> +	i2c->timeout_ms = calc_timeout_ms(i2c, msgs, num);
-> +
-> +	dev_dbg(i2c->dev, "calculated timeout %d ms\n", i2c->timeout_ms);
-> +
-> +	for (retry = 0; retry < adap->retries; retry++) {
-> +
-> +		ret = synquacer_i2c_doxfer(i2c, msgs, num);
-> +		if (ret != -EAGAIN)
-> +			return ret;
-> +
-> +		dev_dbg(i2c->dev, "Retrying transmission (%d)\n", retry);
-> +
-> +		synquacer_i2c_master_recover(i2c);
-
-Recovery is only when SDA is stuck low, held by a client. That is
-nothing you should do just on any error.
-
-If you want the driver in v4.17, I'd suggest to drop
-synquacer_i2c_master_recover() now and add it incrementally later, using
-the existing recovery infrastructure. The rest is only minor stuff and
-needs not much further discussion IMO.
-
-Regards,
-
-   Wolfram
-
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 63116 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180325/d7e0d664/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180326/0df88011/attachment-0001.gz>
