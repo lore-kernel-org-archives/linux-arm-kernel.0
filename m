@@ -1,56 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 25 Mar 2018 12:07:44 +0100
-Subject: [PATCH v6 0/3] add support for Socionext SynQuacer I2C controller
-Message-ID: <20180325110747.8852-1-ard.biesheuvel@linaro.org>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Sun, 25 Mar 2018 12:44:44 +0200
+Subject: [PATCH v4] staging: bcm2835-audio: Release resources on
+ module_exit()
+In-Reply-To: <CAHp75VfJjCHd5U1D22NANLCA1kAoTKLnDGSQPj3ay6OhKSoZxg@mail.gmail.com>
+References: <f35d0f86-04b5-6edb-139f-4632edc493b3@gmail.com>
+ <20180322213722.31822-1-k.marinushkin@gmail.com>
+ <CAHp75VdYiySBzu99MYoBAZ8tORGP1R43z9d+=VRdktg+U=_ZDw@mail.gmail.com>
+ <0524fb43-ed08-6c54-39ed-32bd96ccaca4@gmail.com>
+ <CAHp75VfJjCHd5U1D22NANLCA1kAoTKLnDGSQPj3ay6OhKSoZxg@mail.gmail.com>
+Message-ID: <4e473a93-317a-5777-7444-6deb105c8f66@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a binding and a driver for the I2C IP found in the Socionext SynQuacer
-SoC, which is essentially a rebranded version of the Fujitsu F_I2C controller.
+On 03/25/18 12:33, Andy Shevchenko wrote:
+> On Fri, Mar 23, 2018 at 9:22 PM, Kirill Marinushkin
+> <k.marinushkin@gmail.com> wrote:
+>> On 03/23/18 17:23, Andy Shevchenko wrote:
+>>> After addressing above, FWIW,
+>>>
+>>> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Seems you missed my tag in new version.
+> When someone gives you a tag and you are going to send a new version
+> (w/o drastic changes), it's your responsibility to append it
+>
+> I will send a new mail with it, so, this time no need to resend. Just
+> keep it for the future contributions.
+>
 
-v6:
-- use i2c_8bit_addr_from_msg() instead of open coding the address generation
-- switch to generic recovery using minimal helpers to drive the SDA/SCL lines
-  directly
-- use reinit_completion() and move init_completion() to probe function
-- replace bus free detection at the end of a transfer with a simple udelay()
-  for 2 clock periods
-- don't recover on every error
-- don't call synquacer_i2c_hw_init() from synquacer_i2c_hw_reset(), since it
-  will be always called twice in that case
-- add patch to sanity check i2c_transfer() arguments in core code (#3)
+What is a "tag"?
+I added in-reply-to this email, I added you as CC.
+Isn't it enough to keep track of the versioning within a mailing list?
 
-v5:
-- add Rob's ack to #1
-- drop unnecessary 'platform_set_drvdata(pdev, NULL)' in remove path (#2)
+Could you please clarify: what "tag" should I usually attach in addition?
 
-v4:
-- clarify binding that only a single interrupt specifier is expected (#1)
-- check return value of clk_prepare_enable() on probe path (#2)
-- add Andy's R-b to patch #2
-
-v3:
-- incorporate more of Andy's review comments (#2), especially regarding the
-  bus speed and clock source handling for ACPI
-- patch #1 unchanged.
-
-v2:
-- incorporate Andy's review comments (#2)
-- patch #1 unchanged.
-
-Ard Biesheuvel (3):
-  dt-bindings: i2c: add binding for Socionext SynQuacer I2C
-  i2c: add support for Socionext SynQuacer I2C controller
-  i2c: add param sanity check to i2c_transfer()
-
- Documentation/devicetree/bindings/i2c/i2c-synquacer.txt |  29 +
- drivers/i2c/busses/Kconfig                              |  10 +
- drivers/i2c/busses/Makefile                             |   1 +
- drivers/i2c/busses/i2c-synquacer.c                      | 739 ++++++++++++++++++++
- drivers/i2c/i2c-core-base.c                             |   3 +
- 5 files changed, 782 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
- create mode 100644 drivers/i2c/busses/i2c-synquacer.c
-
--- 
-2.15.1
+Best Regards,
+Kirill
