@@ -1,56 +1,49 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 25 Mar 2018 20:09:59 +0200
-Subject: [PATCH v2 6/6] ARM: uaccess: remove const to avoid duplicate specifier
-In-Reply-To: <20180325180959.28008-1-stefan@agner.ch>
-References: <20180325180959.28008-1-stefan@agner.ch>
-Message-ID: <20180325180959.28008-7-stefan@agner.ch>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sun, 25 Mar 2018 20:50:02 +0300
+Subject: [PATCH 0/2] smp: don't kick CPUs running idle or nohz_full tasks 
+Message-ID: <20180325175004.28162-1-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some users of get_user use the macro with an argument p which
-is already specified as static. When using clang this leads to
-a duplicate specifier:
-    CC      arch/arm/kernel/process.o
-  In file included from init/do_mounts.c:15:
-  In file included from ./include/linux/tty.h:7:
-  In file included from ./include/uapi/linux/termios.h:6:
-  In file included from ./arch/arm/include/generated/uapi/asm/termios.h:1:
-  ./include/asm-generic/termios.h:25:6: warning: duplicate 'const' declaration
-          specifier [-Wduplicate-decl-specifier]
-          if (get_user(tmp, &termio->c_iflag) < 0)
-              ^
-  ./arch/arm/include/asm/uaccess.h:195:3: note: expanded from macro 'get_user'
-                  __get_user_check(x, p);                                 \
-                  ^
-  ./arch/arm/include/asm/uaccess.h:155:12: note: expanded from macro
-          '__get_user_check'
-                  register const typeof(*(p)) __user *__p asm("r0") = (p);\
+kick_all_cpus_sync() is used to broadcast IPIs to all online CPUs to force
+them sync caches, TLB etc. It is is called only 3 times - from mm/slab,
+arm64 and powerpc code.
 
-Remove the const attribute from the register declaration
-to avoid the duplicate const specifier. In a test with ptrace.c
-and traps.c (both using get_user with non-const arguments for p)
-the generated code was exactly the same.
+With framework introduced in patch b8c17e6664c46 ("rcu: Maintain special
+bits at bottom of ->dynticks counter") we can delay synchrosization work
+for CPUs in extended quiescent state (idle or nohz_full userspace). 
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Similar issue has already been discussed here:
-https://patchwork.kernel.org/patch/9693821/
+As Paul E. McKenney wrote: 
 
- arch/arm/include/asm/uaccess.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+--
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 0bf2347495f1..3d614e90c19f 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -152,7 +152,7 @@ extern int __get_user_64t_4(void *);
- #define __get_user_check(x, p)						\
- 	({								\
- 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
--		register const typeof(*(p)) __user *__p asm("r0") = (p);\
-+		register typeof(*(p)) __user *__p asm("r0") = (p);	\
- 		register typeof(x) __r2 asm("r2");			\
- 		register unsigned long __l asm("r1") = __limit;		\
- 		register int __e asm("r0");				\
+Currently, IPIs are used to force other CPUs to invalidate their TLBs
+in response to a kernel virtual-memory mapping change.  This works, but 
+degrades both battery lifetime (for idle CPUs) and real-time response
+(for nohz_full CPUs), and in addition results in unnecessary IPIs due to
+the fact that CPUs executing in usermode are unaffected by stale kernel
+mappings.  It would be better to cause a CPU executing in usermode to
+wait until it is entering kernel mode to do the flush, first to avoid
+interrupting usemode tasks and second to handle multiple flush requests
+with a single flush in the case of a long-running user task.
+
+--
+
+For mm/slab and arm64 it looks safe to delay synchronization. This is done
+in patch #2 by introducing kick_active_cpus_sync() function. For powerpc -
+I'm not sure, and I'd like to ask powerpc people, is it safe to do same
+also for that code? If so, we can completely drop kick_all_cpus_sync().
+
+Yury Norov (2):
+  rcu: declare rcu_eqs_special_set() in public header
+  smp: introduce kick_active_cpus_sync()
+
+ arch/arm64/kernel/insn.c |  2 +-
+ include/linux/rcutree.h  |  1 +
+ include/linux/smp.h      |  2 ++
+ kernel/smp.c             | 24 ++++++++++++++++++++++++
+ mm/slab.c                |  2 +-
+ 5 files changed, 29 insertions(+), 2 deletions(-)
+
 -- 
-2.16.2
+2.14.1
