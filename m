@@ -1,105 +1,124 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 25 Mar 2018 15:24:09 +0200
-Subject: [PATCH 5/5] ARM: add support for building ARM kernel with clang
-In-Reply-To: <20180320231832.GK2743@n2100.armlinux.org.uk>
-References: <20180320230206.25289-1-stefan@agner.ch>
- <20180320230206.25289-6-stefan@agner.ch>
- <20180320231832.GK2743@n2100.armlinux.org.uk>
-Message-ID: <83b9fadfc294ef195b6aff54f000d9a6@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 25 Mar 2018 15:28:40 +0200
+Subject: Possible kernel bug in torvalds/linux/master
+In-Reply-To: <CAKdteOZLZDkpZ0HMSOVQOc6eRxFzkHyLM=sHm7e0bMV-zeUdVQ@mail.gmail.com>
+References: <CAKdteOZLZDkpZ0HMSOVQOc6eRxFzkHyLM=sHm7e0bMV-zeUdVQ@mail.gmail.com>
+Message-ID: <CAK8P3a2ud6LxxuPC1K_nf-Swdn86UThUL2676UFcM6X0JSpptg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.03.2018 00:18, Russell King - ARM Linux wrote:
-> On Wed, Mar 21, 2018 at 12:02:06AM +0100, Stefan Agner wrote:
->> Use cc-options call for compiler options which are not available
->> in clang. With this patch an ARMv7 multi platform kernel can be
->> successfully build using clang (tested with version 5.0.1).
->>
->> Based-on-patches-by: Behan Webster <behanw@converseincode.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  arch/arm/Makefile                 | 2 +-
->>  arch/arm/boot/compressed/Makefile | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
->> index e9e3fde3c657..20e9fee1ccc5 100644
->> --- a/arch/arm/Makefile
->> +++ b/arch/arm/Makefile
->> @@ -39,7 +39,7 @@ KBUILD_CFLAGS	+= $(call cc-option,-mno-unaligned-access)
->>  endif
->>
->>  ifeq ($(CONFIG_FRAME_POINTER),y)
->> -KBUILD_CFLAGS	+=-fno-omit-frame-pointer -mapcs -mno-sched-prolog
->> +KBUILD_CFLAGS	+=-fno-omit-frame-pointer $(call cc-option,-mapcs,) $(call cc-option,-mno-sched-prolog,)
-> 
-> Some of these options here are to ensure that we generate the following
-> code, so we can backtrace:
-> 
-> 	mov	ip, sp
-> 	stmfd	sp!, {fp, ip, lr, pc}
-> 	sub	fp, ip, #4
-> 
-> If clang isn't producing that code at the start of functions with
-> CONFIG_FRAME_POINTER=y, then backtracing will not work, and arguably
-> CONFIG_FRAME_POINTER=y is useless there.  In that circumstance, it's
-> probably better to fail so the user can configure something more
-> debuggable, rather than having the kernel potentially producing
-> undebuggable oopses.
+On Sun, Mar 25, 2018 at 3:03 PM, Christophe Lyon
+<christophe.lyon@linaro.org> wrote:
+> Hi Arnd,
+>
+> We have a Jenkins jobs that builds the kernel from torvalds/linux
+> master branch mutli_v7 defconfig every day, using our last GCC release
+> (7.2-2017-11), and boots a beaglebone-black board.
+>
+> Last week it started to fail, I first suspected a Lava problem, but
+> the job now fails every time, and Remi Duraffort from the Lava team
+> thinks it's really a kernel problem.
+>
+> Is this something you are interested in investigating? Or should we
+> switch to another "less-edge" branch?
+>
+> The last successful run:
+> https://ci.linaro.org/job/tcwg-buildapp/app=linux+multi_v7,label=tcwg-x86_64-build,target=arm-linux-gnueabihf/75/
+> The next one failed:
+> https://ci.linaro.org/job/tcwg-buildapp/app=linux+multi_v7,label=tcwg-x86_64-build,target=arm-linux-gnueabihf/76
+>
+> Build 75 was with this kernel commit:
+> Merge branch 'for-4.16-fixes'
+> 1b5f3ba415fe4cf8b8b39c8d104ed44cde330658
+>
+> Build 76 was with:
+> Merge tag 'clk-fixes-for-linus'
+> 3215b9d57a2c75c4305a3956ca303d7004485200
 
-Just for the records, compiled with clang, this patchset applied and
-CONFIG_FRAME_POINTER=y as expected leads to a non functional backtrace:
+Hi Christophe,
 
-[    4.583711] ------------[ cut here ]------------
-[    4.588347] WARNING: CPU: 0 PID: 1 at init/main.c:1012
-kernel_init+0x60/0x238
-[    4.595505] Modules linked in:
-[    4.598590] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       
-4.16.0-rc5-00019-g686ee524148e-dirty #42
-[    4.608514] Hardware name: Freescale i.MX7 Dual (Device Tree)
-[    4.614266] Backtrace: 
-[    4.616728] [<dc063f34>] (0xdc063f34) from [<00000000>] (  (null))
-[    4.622918] Backtrace aborted due to bad frame pointer <8c0165e4>
-[    4.629046] ---[ end trace 200951c950497708 ]---
+This branch is certainly the right one to test, thanks for the report!
+>From looking at the output above, it seems that the kernel no longer
+boots at all, and fails to even print any messages. Between the
+two runs, I see the following commits:
 
-clang with CONFIG_FRAME_POINTER=y should really error out. Without the
-cc-option calls building witih clang will print the following errors:
+3215b9d57a2c Merge tag 'clk-fixes-for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux
+303851e14a8f Merge tag 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/rdma/rdma
+76c0b6a36a12 Merge tag 'scsi-fixes' of
+git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi
+645102eac15e Merge tag 'nfsd-4.16-1' of git://linux-nfs.org/~bfields/linux
+32d43cd391ba kvm/x86: fix icebp instruction handling
+e8980d67d601 RDMA/ucma: Ensure that CM_ID exists prior to access it
+68ef3bc31664 nfsd: remove blocked locks on client teardown
+80cf79ae4f68 RDMA/verbs: Remove restrack entry from XRCD structure
+ed65a4dc2208 RDMA/ucma: Fix use-after-free access in ucma_close
+7997f3b2df75 clk: bcm2835: Protect sections updating shared registers
+49012d1bf5f7 clk: bcm2835: Fix ana->maskX definitions
+2975d5de6428 RDMA/ucma: Check AF family prior resolving address
+8a53fc511c5e clk: aspeed: Prevent reset if clock is enabled
+d90c76bb6112 clk: aspeed: Fix is_enabled for certain clocks
+bd8602ca42f6 infiniband: bnxt_re: use BIT_ULL() for 64-bit bit masks
+5388a508479d infiniband: qplib_fp: fix pointer cast
+42cea83f9524 IB/mlx5: Fix cleanup order on unload
+0c81ffc60d52 RDMA/ucma: Don't allow join attempts for unsupported AF family
+7688f2c3bbf5 RDMA/ucma: Fix access to non-initialized CM_ID object
+9dea9a2ff61c RDMA/core: Do not use invalid destination in determining port reuse
+f3f134f5260a RDMA/mlx5: Fix crash while accessing garbage pointer and
+freed memory
+c2b37f76485f IB/mlx5: Fix integer overflows in mlx5_ib_create_srq
+2c292dbb398e IB/mlx5: Fix out-of-bounds read in create_raw_packet_qp_rq
+14bc1dff7427 scsi: qla2xxx: Remove FC_NO_LOOP_ID for FCP and FC-NVMe Discovery
+318aaf34f117 scsi: libsas: defer ata device eh commands to libata
+55c19eee3b47 clk: qcom: msm8916: Fix return value check in
+qcom_apcs_msm8916_clk_probe()
+9903e41ae1f5 clk: hisilicon: hi3660?Fix potential NULL dereference in
+hi3660_stub_clk_probe()
+56e1ee353943 Merge branch 'clk-helpers' (early part) into clk-fixes
+04bf9ab3359f clk: fix determine rate error with pass-through clock
+91584eb51b47 Merge branch 'clk-phase' into clk-fixes
+bd13c6cbd3c0 Merge tag 'ti-clk-fixes-4.16' of
+https://github.com/t-kristo/linux-pm into clk-fixes
+a88bb86d58ce Merge tag 'clk-imx-fixes-4.16' of
+git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into
+clk-fixes
+957a42e8599a Merge tag 'sunxi-clk-fixes-for-4.16' of
+https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into
+clk-fixes
+99652a469df1 clk: migrate the count of orphaned clocks at init
+7f95beea3608 clk: update cached phase to respect the fact when setting phase
+762790b75210 clk: ti: am43xx: add set-rate-parent support for display
+clkctrl clock
+c083dc5f3738 clk: ti: am33xx: add set-rate-parent support for display
+clkctrl clock
+49159a9dc3da clk: ti: clkctrl: add support for CLK_SET_RATE_PARENT flag
+a275b315334d clk: imx51-imx53: Fix UART4/5 registration on i.MX50 and i.MX53
+5682e268350f clk: sunxi-ng: a31: Fix CLK_OUT_* clock ops
 
-...
-  CC      kernel/bounds.s
-clang-6.0: error: unknown argument: '-mapcs'
-clang-6.0: error: unknown argument: '-mno-sched-prolog'
-...
+Out of these, All the interesting ones are clk related:
 
-Using CONFIG_ARM_UNWIND=y compiles fine and backtraces do work fine too:
+56e1ee353943 Merge branch 'clk-helpers' (early part) into clk-fixes
+04bf9ab3359f clk: fix determine rate error with pass-through clock
+91584eb51b47 Merge branch 'clk-phase' into clk-fixes
+bd13c6cbd3c0 Merge tag 'ti-clk-fixes-4.16' of
+https://github.com/t-kristo/linux-pm into clk-fixes
+99652a469df1 clk: migrate the count of orphaned clocks at init
+7f95beea3608 clk: update cached phase to respect the fact when setting phase
+762790b75210 clk: ti: am43xx: add set-rate-parent support for display
+clkctrl clock
+c083dc5f3738 clk: ti: am33xx: add set-rate-parent support for display
+clkctrl clock
+49159a9dc3da clk: ti: clkctrl: add support for CLK_SET_RATE_PARENT flag
 
-[    4.630877] ------------[ cut here ]------------
-[    4.635515] WARNING: CPU: 0 PID: 1 at init/main.c:1012
-kernel_init+0x5c/0x234
-[    4.642672] Modules linked in:
-[    4.645742] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W       
-4.16.0-rc5-00019-g686ee524148e-dirty #41
-[    4.655666] Hardware name: Freescale i.MX7 Dual (Device Tree)
-[    4.661437] [<c0110a9c>] (unwind_backtrace) from [<c010ca6c>]
-(show_stack+0x10/0x14)
-[    4.669200] [<c010ca6c>] (show_stack) from [<c0959ebc>]
-(dump_stack+0x9c/0xac)
-[    4.676442] [<c0959ebc>] (dump_stack) from [<c01214c4>]
-(__warn+0xb4/0x120)
-[    4.683419] [<c01214c4>] (__warn) from [<c01215f4>]
-(warn_slowpath_null+0x40/0x48)
-[    4.691003] [<c01215f4>] (warn_slowpath_null) from [<c096e7b8>]
-(kernel_init+0x5c/0x234)
-[    4.699111] [<c096e7b8>] (kernel_init) from [<c01010e8>]
-(ret_from_fork+0x14/0x2c)
-[    4.706691] Exception stack(0xdc063fb0 to 0xdc063ff8)
-[    4.711752] 3fa0:                                     00000000
-00000000 00000000 00000000
-[    4.719943] 3fc0: 00000000 00000000 00000000 00000000 00000000
-00000000 00000000 00000000
-[    4.728133] 3fe0: 00000000 00000000 00000000 00000000 00000013
-00000000
-[    4.734792] ---[ end trace 200951c950497708 ]---
+I've added the involved parties to Cc. We also see the same thing on
+kernelci, where many OMAP based systems now fail to boot, with the
+problem starting at the same commit:
 
---
-Stefan
+https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.16-rc6-431-gbcfc1f455466/
+
+It's possible that this has already been debugged and a fix is being worked on,
+but I'm not aware of anything, since I have not followed my email
+while travelling.
+
+        Arnd
