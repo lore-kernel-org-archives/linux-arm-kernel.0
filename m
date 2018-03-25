@@ -1,35 +1,36 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 25 Mar 2018 20:09:55 +0200
-Subject: [PATCH v2 2/6] efi/libstub/arm: add support for building with clang
+Date: Sun, 25 Mar 2018 20:09:57 +0200
+Subject: [PATCH v2 4/6] ARM: drop no-thumb-interwork in EABI mode
 In-Reply-To: <20180325180959.28008-1-stefan@agner.ch>
 References: <20180325180959.28008-1-stefan@agner.ch>
-Message-ID: <20180325180959.28008-3-stefan@agner.ch>
+Message-ID: <20180325180959.28008-5-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use cc-options call for -mno-single-pic-base since the option is
-not available in clang. LLVM/clang always assumes a fixed
-displacement between text/data and hence uses PC relative
-addressing.
+According to GCC documentation -m(no-)thumb-interwork is
+meaningless in AAPCS configurations. Also clang does not
+support the flag:
+  clang-5.0: error: unknown argument: '-mno-thumb-interwork'
+
+Just drop -mno-thumb-interwork in AEABI configuration.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/firmware/efi/libstub/Makefile | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index 7b3ba40f0745..2bf69cca0d87 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -13,7 +13,8 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__KERNEL__ -O2 \
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e83f5161fdd8..e9e3fde3c657 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -106,7 +106,7 @@ tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+ tune-y := $(tune-y)
  
- cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie
- cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
--				   -fno-builtin -fpic -mno-single-pic-base
-+				   -fno-builtin -fpic \
-+				   $(call cc-option,-mno-single-pic-base,)
- 
- cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
- 
+ ifeq ($(CONFIG_AEABI),y)
+-CFLAGS_ABI	:=-mabi=aapcs-linux -mno-thumb-interwork -mfpu=vfp
++CFLAGS_ABI	:=-mabi=aapcs-linux -mfpu=vfp
+ else
+ CFLAGS_ABI	:=$(call cc-option,-mapcs-32,-mabi=apcs-gnu) $(call cc-option,-mno-thumb-interwork,)
+ endif
 -- 
 2.16.2
