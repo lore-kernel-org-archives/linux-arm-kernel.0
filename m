@@ -1,112 +1,99 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 25 Mar 2018 11:30:21 +0100
-Subject: [PATCH v5 2/2] i2c: add support for Socionext SynQuacer I2C
- controller
-In-Reply-To: <20180324231910.unzvwty3xia4mqu2@ninjato>
-References: <20180302083123.7259-1-ard.biesheuvel@linaro.org>
- <20180302083123.7259-3-ard.biesheuvel@linaro.org>
- <20180324231910.unzvwty3xia4mqu2@ninjato>
-Message-ID: <CAKv+Gu_ERB+nhhrWJ6=mLRPFvjTZD5NutgX5JDzWfS8tHiDx7Q@mail.gmail.com>
+From: rishabhb@codeaurora.org (Rishabh Bhatnagar)
+Date: Sat, 24 Mar 2018 18:29:15 -0700
+Subject: [PATCH v2 1/2] Documentation: Documentation for qcom, llcc
+In-Reply-To: <1521941356-12361-1-git-send-email-rishabhb@codeaurora.org>
+References: <1521941356-12361-1-git-send-email-rishabhb@codeaurora.org>
+Message-ID: <1521941356-12361-2-git-send-email-rishabhb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2018 at 23:19, Wolfram Sang <wsa@the-dreams.de> wrote:
-> Hi Ard,
->
->> +static int synquacer_i2c_master_start(struct synquacer_i2c *i2c,
->> +                                   struct i2c_msg *pmsg)
->> +{
->> +     unsigned char bsr, bcr;
->> +
->> +     if (pmsg->flags & I2C_M_RD)
->> +             writeb((pmsg->addr << 1) | 1,
->> +                    i2c->base + SYNQUACER_I2C_REG_DAR);
->> +     else
->> +             writeb(pmsg->addr << 1,
->> +                    i2c->base + SYNQUACER_I2C_REG_DAR);
->
-> writeb(i2c_8bit_addr_from_msg(pmsg), i2c->base + SYNQUACER_I2C_REG_DAR);
->
-> ?
->
->> +static int synquacer_i2c_master_recover(struct synquacer_i2c *i2c)
->> +{
->
-> This is the bus recovery mechanism with toggling SCL pulses, right?
-> That should be implemented using a 'struct i2c_bus_recovery_info' and
-> the core helpers.
->
->> +static int synquacer_i2c_doxfer(struct synquacer_i2c *i2c,
->> +                             struct i2c_msg *msgs, int num)
->> +{
->> +     unsigned char bsr;
->> +     unsigned long timeout, bb_timeout;
->> +     int ret;
->> +
->> +     if (i2c->is_suspended)
->> +             return -EBUSY;
->> +
->> +     synquacer_i2c_hw_init(i2c);
->> +     bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
->> +     if (bsr & SYNQUACER_I2C_BSR_BB) {
->> +             dev_err(i2c->dev, "cannot get bus (bus busy)\n");
->> +             return -EBUSY;
->> +     }
->> +
->> +     init_completion(&i2c->completion);
->
-> reinit_completion? And init_completion() in probe()?
->
->> +     /* ensure the stop has been through the bus */
->> +     bb_timeout = jiffies + HZ;
->> +     do {
->> +             bsr = readb(i2c->base + SYNQUACER_I2C_REG_BSR);
->> +             if (!(bsr & SYNQUACER_I2C_BSR_BB))
->> +                     return 0;
->> +     } while (time_before(jiffies, bb_timeout));
->
-> Busy looping for one second? And won't the bus_free detection at the
-> beginning of a transfer do?
->
->> +static int synquacer_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
->> +                           int num)
->> +{
->> +     struct synquacer_i2c *i2c;
->> +     int retry;
->> +     int ret;
->> +
->> +     if (!msgs)
->> +             return -EINVAL;
->> +     if (num <= 0)
->> +             return -EINVAL;
->
-> Hmm, this should be done by the core. I am surprised it doesn't do that yet :/
->
->> +
->> +     i2c = i2c_get_adapdata(adap);
->> +     i2c->timeout_ms = calc_timeout_ms(i2c, msgs, num);
->> +
->> +     dev_dbg(i2c->dev, "calculated timeout %d ms\n", i2c->timeout_ms);
->> +
->> +     for (retry = 0; retry < adap->retries; retry++) {
->> +
->> +             ret = synquacer_i2c_doxfer(i2c, msgs, num);
->> +             if (ret != -EAGAIN)
->> +                     return ret;
->> +
->> +             dev_dbg(i2c->dev, "Retrying transmission (%d)\n", retry);
->> +
->> +             synquacer_i2c_master_recover(i2c);
->
-> Recovery is only when SDA is stuck low, held by a client. That is
-> nothing you should do just on any error.
->
-> If you want the driver in v4.17, I'd suggest to drop
-> synquacer_i2c_master_recover() now and add it incrementally later, using
-> the existing recovery infrastructure. The rest is only minor stuff and
-> needs not much further discussion IMO.
->
+Documentation for last level cache controller device tree bindings,
+client bindings usage examples.
 
-Thanks Wolfram.
+Change-Id: Ic2d6d6154ab8269cfce6828e9f2250320a0572e8
+Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+---
+ .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 70 ++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
 
-I have fixed all these up and am about to send out the v6.
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+new file mode 100644
+index 0000000..ceb20a4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+@@ -0,0 +1,70 @@
++== Introduction==
++
++LLCC (Last Level Cache Controller) driver is implemented as a platform device.
++The driver Programs the SCT (system configuration table). The SCT programming 
++divides the system cache into slices. Each slice is assigned an ID A.K.A 
++SCID(Sub-cache ID).				
++HW modules that are designated to use the system cache are known as clients.	
++Each client must also be represented as a node in the device tree just like	
++any other hw module.		
++One client can have multiple SCID's assigned meaning each client could get		
++multiple slices in the cache. Client can use the slices for various pre-defined
++usecases. Each client defines a set of names for these usecases in its		
++device tree binding.				
++Client makes a request to LLCC device to get cache-slices properties for each	
++of its usecase. Client gets the information like cache slice ID and size of the
++cache slice.
++
++== llcc device ==
++
++Properties:
++- compatible:
++	 Usage: required
++	 Value type: <string>
++	 Definition: must be "qcom,sdm855-llcc"
++
++- reg:
++	 Usage: required
++	 Value Type: <prop-encoded-array>
++	 Definition: must be addresses and sizes of the LLCC registers
++
++- #cache-cells:
++	 Usage: required
++	 Value Type: <u32>
++	 Definition: Number of cache cells, must be 1
++
++- max-slices:
++	 usage: required
++	 Value Type: <u32>
++	 Definition: Number of cache slices supported by hardware
++
++Example:
++
++	llcc: qcom,sdm855-llcc at 01100000 {
++		compatible = "qcom,sdm845-llcc";
++		reg = <0x01100000 0x250000>;
++		#cache-cells = <1>;
++		max-slices = <32>;
++	};
++
++== Client ==
++
++Required properties:
++- cache-slice-names:
++	 Usage: required
++	 Value type: <stringlist>
++	 Definition: A set of names that identify the usecase names of a client that
++			uses cache slice. These strings are used to look up the cache slice
++		    entries by name.
++
++- cache-slices:
++	 Usage: required
++	 Value type: <prop-encoded-array>
++	 Definition: The tuple has phandle to llcc device as the first argument and 
++			the second argument is the usecase id of the client.
++For Example:
++
++	 venus {
++	 	cache-slice-names = "vidsc0", "vidsc1";
++	 	cache-slices = <&llcc 2>, <&llcc 3>;
++	 };
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
