@@ -1,34 +1,82 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Mon, 26 Mar 2018 14:19:27 +0300
-Subject: [RFC PATCH 2/2] i2c: at91: provide bus_freq_hz
-In-Reply-To: <20180326111927.16040-1-tudor.ambarus@microchip.com>
-References: <20180326111927.16040-1-tudor.ambarus@microchip.com>
-Message-ID: <20180326111927.16040-2-tudor.ambarus@microchip.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Mon, 26 Mar 2018 13:27:05 +0200
+Subject: [PATCH 4/7] ARM: dts: sun7i: Add pinmux settings for LCD0 RGB888
+ output.
+In-Reply-To: <20180326100114.fa7vjw342ad6vrb6@flea>
+References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1521662593-25468-4-git-send-email-giulio.benetti@micronovasrl.com>
+ <1521986953.5301.4.camel@paulk.fr> <20180326100114.fa7vjw342ad6vrb6@flea>
+Message-ID: <e3e51afb-bb32-7f2f-877e-b6c74d71ab06@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock-frequency property is not mandatory for the i2c buses. If it's
-not present in device tree, the buses usually assume that is 100kHZ.
-There are i2c clients that need to know the clock frequency in order to
-compute their wake token. Spare the clients of making (wrong) assumptions
-and provide the bus frequency in adapter.
+Hi,
 
-Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
----
- drivers/i2c/busses/i2c-at91.c | 1 +
- 1 file changed, 1 insertion(+)
+Il 26/03/2018 12:01, Maxime Ripard ha scritto:
+> Hi,
+> 
+> On Sun, Mar 25, 2018 at 04:09:13PM +0200, Paul Kocialkowski wrote:
+>> Le mercredi 21 mars 2018 ? 21:03 +0100, Giulio Benetti a ?crit :
+>>> The A20 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
+>>> for the needed pins.
+>>>
+>>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+>>> ---
+>>>   arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+>>>   1 file changed, 8 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi
+>>> b/arch/arm/boot/dts/sun7i-a20.dtsi
+>>> index efb5607..bfe6728 100644
+>>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+>>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+>>> @@ -922,6 +922,14 @@
+>>>   				pins = "PI20", "PI21";
+>>>   				function = "uart7";
+>>>   			};
+>>> +
+>>> +			lcd0_rgb888_pins: lcd0-rgb888-pins {
+>>
+>> It would be more consistent with other pins definitions to have
+>> underscores in both names and to indicate the index, such as:
+>> lcd0_rgb888_pins: lcd0_rgb888_pins at 0 {
+> 
+> Both your suggestions will generate DTC warnings, and we'd like to get
+> rid of them eventually :)
+> 
+>> This way, other set of pins for LCD (PH0-PH27) can be declared as @1
+>> when they are needed in the future.
+> 
+> A better idea would be to call it lcd0-rgb888-pd-pins, and introduce
+> the ph variant when it's done.
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index bfd1fdf..d3cd84e 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -1116,6 +1116,7 @@ static int at91_twi_probe(struct platform_device *pdev)
- 	dev->adapter.quirks = &at91_twi_quirks;
- 	dev->adapter.dev.parent = dev->dev;
- 	dev->adapter.nr = pdev->id;
-+	dev->adapter.bus_freq_hz = bus_clk_rate;
- 	dev->adapter.timeout = AT91_I2C_TIMEOUT;
- 	dev->adapter.dev.of_node = pdev->dev.of_node;
- 
+As I know, only PD is muxed with LCD0.
+And PH is for LCD1 only.
+
+And LCD0 seems to come out only from PD port according to datasheet,
+this is why I didn't put @0 after lcd0-rgb888-pins.
+
+So I don't think it makes sense to handle pins in the way Paul suggests.
+
+What do you all think?
+
+Giulio
+
+> 
+> Maxime
+> 
+> 
+> 
+
+
 -- 
-2.9.4
+Giulio Benetti
+CTO
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
