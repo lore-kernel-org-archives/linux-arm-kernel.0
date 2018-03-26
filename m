@@ -1,161 +1,182 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 26 Mar 2018 13:35:14 +0100
-Subject: [PATCH v3 6/7] iommu/arm-smmu-v3: Support 52-bit physical address
-In-Reply-To: <cover.1522065583.git.robin.murphy@arm.com>
-References: <cover.1522065583.git.robin.murphy@arm.com>
-Message-ID: <ac6480ad02818a46e560a714633ffb194acff5f2.1522065584.git.robin.murphy@arm.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 26 Mar 2018 05:45:55 -0700
+Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
+In-Reply-To: <20180325201154.icdcyl4nw2jootqq@yury-thinkpad>
+References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
+ <20180325175004.28162-3-ynorov@caviumnetworks.com>
+ <20180325192328.GI3675@linux.vnet.ibm.com>
+ <20180325201154.icdcyl4nw2jootqq@yury-thinkpad>
+Message-ID: <20180326124555.GJ3675@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement SMMUv3.1 support for 52-bit physical addresses. Since a 52-bit
-OAS implies 64KB translation granule support, permitting level 1 block
-entries there is simple, and the rest is just extending address fields.
+On Sun, Mar 25, 2018 at 11:11:54PM +0300, Yury Norov wrote:
+> On Sun, Mar 25, 2018 at 12:23:28PM -0700, Paul E. McKenney wrote:
+> > On Sun, Mar 25, 2018 at 08:50:04PM +0300, Yury Norov wrote:
+> > > kick_all_cpus_sync() forces all CPUs to sync caches by sending broadcast IPI.
+> > > If CPU is in extended quiescent state (idle task or nohz_full userspace), this
+> > > work may be done at the exit of this state. Delaying synchronization helps to
+> > > save power if CPU is in idle state and decrease latency for real-time tasks.
+> > > 
+> > > This patch introduces kick_active_cpus_sync() and uses it in mm/slab and arm64
+> > > code to delay syncronization.
+> > > 
+> > > For task isolation (https://lkml.org/lkml/2017/11/3/589), IPI to the CPU running
+> > > isolated task would be fatal, as it breaks isolation. The approach with delaying
+> > > of synchronization work helps to maintain isolated state.
+> > > 
+> > > I've tested it with test from task isolation series on ThunderX2 for more than
+> > > 10 hours (10k giga-ticks) without breaking isolation.
+> > > 
+> > > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > > ---
+> > >  arch/arm64/kernel/insn.c |  2 +-
+> > >  include/linux/smp.h      |  2 ++
+> > >  kernel/smp.c             | 24 ++++++++++++++++++++++++
+> > >  mm/slab.c                |  2 +-
+> > >  4 files changed, 28 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> > > index 2718a77da165..9d7c492e920e 100644
+> > > --- a/arch/arm64/kernel/insn.c
+> > > +++ b/arch/arm64/kernel/insn.c
+> > > @@ -291,7 +291,7 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+> > >  			 * synchronization.
+> > >  			 */
+> > >  			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
+> > > -			kick_all_cpus_sync();
+> > > +			kick_active_cpus_sync();
+> > >  			return ret;
+> > >  		}
+> > >  	}
+> > > diff --git a/include/linux/smp.h b/include/linux/smp.h
+> > > index 9fb239e12b82..27215e22240d 100644
+> > > --- a/include/linux/smp.h
+> > > +++ b/include/linux/smp.h
+> > > @@ -105,6 +105,7 @@ int smp_call_function_any(const struct cpumask *mask,
+> > >  			  smp_call_func_t func, void *info, int wait);
+> > > 
+> > >  void kick_all_cpus_sync(void);
+> > > +void kick_active_cpus_sync(void);
+> > >  void wake_up_all_idle_cpus(void);
+> > > 
+> > >  /*
+> > > @@ -161,6 +162,7 @@ smp_call_function_any(const struct cpumask *mask, smp_call_func_t func,
+> > >  }
+> > > 
+> > >  static inline void kick_all_cpus_sync(void) {  }
+> > > +static inline void kick_active_cpus_sync(void) {  }
+> > >  static inline void wake_up_all_idle_cpus(void) {  }
+> > > 
+> > >  #ifdef CONFIG_UP_LATE_INIT
+> > > diff --git a/kernel/smp.c b/kernel/smp.c
+> > > index 084c8b3a2681..0358d6673850 100644
+> > > --- a/kernel/smp.c
+> > > +++ b/kernel/smp.c
+> > > @@ -724,6 +724,30 @@ void kick_all_cpus_sync(void)
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
+> > > 
+> > > +/**
+> > > + * kick_active_cpus_sync - Force CPUs that are not in extended
+> > > + * quiescent state (idle or nohz_full userspace) sync by sending
+> > > + * IPI. Extended quiescent state CPUs will sync at the exit of
+> > > + * that state.
+> > > + */
+> > > +void kick_active_cpus_sync(void)
+> > > +{
+> > > +	int cpu;
+> > > +	struct cpumask kernel_cpus;
+> > > +
+> > > +	smp_mb();
+> > > +
+> > > +	cpumask_clear(&kernel_cpus);
+> > > +	preempt_disable();
+> > > +	for_each_online_cpu(cpu) {
+> > > +		if (!rcu_eqs_special_set(cpu))
+> > 
+> > If we get here, the CPU is not in a quiescent state, so we therefore
+> > must IPI it, correct?
+> > 
+> > But don't you also need to define rcu_eqs_special_exit() so that RCU
+> > can invoke it when it next leaves its quiescent state?  Or are you able
+> > to ignore the CPU in that case?  (If you are able to ignore the CPU in
+> > that case, I could give you a lower-cost function to get your job done.)
+> > 
+> > 							Thanx, Paul
+> 
+> What's actually needed for synchronization is issuing memory barrier on target
+> CPUs before we start executing kernel code.
+> 
+> smp_mb() is implicitly called in smp_call_function*() path for it. In
+> rcu_eqs_special_set() -> rcu_dynticks_eqs_exit() path, smp_mb__after_atomic()
+> is called just before rcu_eqs_special_exit().
+> 
+> So I think, rcu_eqs_special_exit() may be left untouched. Empty
+> rcu_eqs_special_exit() in new RCU path corresponds empty do_nothing() in old
+> IPI path.
+> 
+> Or my understanding of smp_mb__after_atomic() is wrong? By default, 
+> smp_mb__after_atomic() is just alias to smp_mb(). But some
+> architectures define it differently. x86, for example, aliases it to
+> just barrier() with a comment: "Atomic operations are already
+> serializing on x86".
+> 
+> I was initially thinking that it's also fine to leave
+> rcu_eqs_special_exit() empty in this case, but now I'm not sure...
+> 
+> Anyway, answering to your question, we shouldn't ignore quiescent
+> CPUs, and rcu_eqs_special_set() path is really needed as it issues
+> memory barrier on them.
 
-Tested-by: Nate Watterson <nwatters@codeaurora.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+An alternative approach would be for me to make something like this
+and export it:
 
-v3: No change
+	bool rcu_cpu_in_eqs(int cpu)
+	{
+		struct rcu_dynticks *rdtp = &per_cpu(rcu_dynticks, cpu);
+		int snap;
 
- drivers/iommu/arm-smmu-v3.c | 35 ++++++++++++++++++++---------------
- 1 file changed, 20 insertions(+), 15 deletions(-)
+		smp_mb(); /* Obtain consistent snapshot, pairs with update. */
+		snap = READ_ONCE(&rdtp->dynticks);
+		smp_mb(); /* See above. */
+		return !(snap & RCU_DYNTICK_CTRL_CTR);
+	}
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4e0ffda217f6..e0d46661c153 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -91,6 +91,7 @@
- #define IDR5_OAS_42_BIT			3
- #define IDR5_OAS_44_BIT			4
- #define IDR5_OAS_48_BIT			5
-+#define IDR5_OAS_52_BIT			6
- 
- #define ARM_SMMU_CR0			0x20
- #define CR0_CMDQEN			(1 << 3)
-@@ -147,7 +148,7 @@
- 
- #define ARM_SMMU_STRTAB_BASE		0x80
- #define STRTAB_BASE_RA			(1UL << 62)
--#define STRTAB_BASE_ADDR_MASK		GENMASK_ULL(47, 6)
-+#define STRTAB_BASE_ADDR_MASK		GENMASK_ULL(51, 6)
- 
- #define ARM_SMMU_STRTAB_BASE_CFG	0x88
- #define STRTAB_BASE_CFG_FMT		GENMASK(17, 16)
-@@ -175,7 +176,7 @@
- #define ARM_SMMU_PRIQ_IRQ_CFG2		0xdc
- 
- /* Common MSI config fields */
--#define MSI_CFG0_ADDR_MASK		GENMASK_ULL(47, 2)
-+#define MSI_CFG0_ADDR_MASK		GENMASK_ULL(51, 2)
- #define MSI_CFG2_SH			GENMASK(5, 4)
- #define MSI_CFG2_MEMATTR		GENMASK(3, 0)
- 
-@@ -194,7 +195,7 @@
- 					 Q_IDX(q, p) * (q)->ent_dwords)
- 
- #define Q_BASE_RWA			(1UL << 62)
--#define Q_BASE_ADDR_MASK		GENMASK_ULL(47, 5)
-+#define Q_BASE_ADDR_MASK		GENMASK_ULL(51, 5)
- #define Q_BASE_LOG2SIZE			GENMASK(4, 0)
- 
- /*
-@@ -209,7 +210,7 @@
- 
- #define STRTAB_L1_DESC_DWORDS		1
- #define STRTAB_L1_DESC_SPAN		GENMASK_ULL(4, 0)
--#define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(47, 6)
-+#define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(51, 6)
- 
- #define STRTAB_STE_DWORDS		8
- #define STRTAB_STE_0_V			(1UL << 0)
-@@ -221,7 +222,7 @@
- 
- #define STRTAB_STE_0_S1FMT		GENMASK_ULL(5, 4)
- #define STRTAB_STE_0_S1FMT_LINEAR	0
--#define STRTAB_STE_0_S1CTXPTR_MASK	GENMASK_ULL(47, 6)
-+#define STRTAB_STE_0_S1CTXPTR_MASK	GENMASK_ULL(51, 6)
- #define STRTAB_STE_0_S1CDMAX		GENMASK_ULL(63, 59)
- 
- #define STRTAB_STE_1_S1C_CACHE_NC	0UL
-@@ -253,7 +254,7 @@
- #define STRTAB_STE_2_S2PTW		(1UL << 54)
- #define STRTAB_STE_2_S2R		(1UL << 58)
- 
--#define STRTAB_STE_3_S2TTB_MASK		GENMASK_ULL(47, 4)
-+#define STRTAB_STE_3_S2TTB_MASK		GENMASK_ULL(51, 4)
- 
- /* Context descriptor (stage-1 only) */
- #define CTXDESC_CD_DWORDS		8
-@@ -287,7 +288,7 @@
- #define CTXDESC_CD_0_ASET		(1UL << 47)
- #define CTXDESC_CD_0_ASID		GENMASK_ULL(63, 48)
- 
--#define CTXDESC_CD_1_TTB0_MASK		GENMASK_ULL(47, 4)
-+#define CTXDESC_CD_1_TTB0_MASK		GENMASK_ULL(51, 4)
- 
- /* Convert between AArch64 (CPU) TCR format and SMMU CD format */
- #define ARM_SMMU_TCR2CD(tcr, fld)	FIELD_PREP(CTXDESC_CD_0_TCR_##fld, \
-@@ -317,7 +318,7 @@
- #define CMDQ_TLBI_0_ASID		GENMASK_ULL(63, 48)
- #define CMDQ_TLBI_1_LEAF		(1UL << 0)
- #define CMDQ_TLBI_1_VA_MASK		GENMASK_ULL(63, 12)
--#define CMDQ_TLBI_1_IPA_MASK		GENMASK_ULL(47, 12)
-+#define CMDQ_TLBI_1_IPA_MASK		GENMASK_ULL(51, 12)
- 
- #define CMDQ_PRI_0_SSID			GENMASK_ULL(31, 12)
- #define CMDQ_PRI_0_SID			GENMASK_ULL(63, 32)
-@@ -331,7 +332,7 @@
- #define CMDQ_SYNC_0_MSH			GENMASK_ULL(23, 22)
- #define CMDQ_SYNC_0_MSIATTR		GENMASK_ULL(27, 24)
- #define CMDQ_SYNC_0_MSIDATA		GENMASK_ULL(63, 32)
--#define CMDQ_SYNC_1_MSIADDR_MASK	GENMASK_ULL(47, 2)
-+#define CMDQ_SYNC_1_MSIADDR_MASK	GENMASK_ULL(51, 2)
- 
- /* Event queue */
- #define EVTQ_ENT_DWORDS			4
-@@ -1622,7 +1623,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 		return -ENOMEM;
- 
- 	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
--	domain->geometry.aperture_end = (1UL << ias) - 1;
-+	domain->geometry.aperture_end = (1UL << pgtbl_cfg.ias) - 1;
- 	domain->geometry.force_aperture = true;
- 
- 	ret = finalise_stage_fn(smmu_domain, &pgtbl_cfg);
-@@ -2633,11 +2634,6 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 	if (reg & IDR5_GRAN4K)
- 		smmu->pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
- 
--	if (arm_smmu_ops.pgsize_bitmap == -1UL)
--		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
--	else
--		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
--
- 	/* Output address size */
- 	switch (FIELD_GET(IDR5_OAS, reg)) {
- 	case IDR5_OAS_32_BIT:
-@@ -2655,6 +2651,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 	case IDR5_OAS_44_BIT:
- 		smmu->oas = 44;
- 		break;
-+	case IDR5_OAS_52_BIT:
-+		smmu->oas = 52;
-+		smmu->pgsize_bitmap |= 1ULL << 42; /* 4TB */
-+		break;
- 	default:
- 		dev_info(smmu->dev,
- 			"unknown output address size. Truncating to 48-bit\n");
-@@ -2663,6 +2663,11 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 		smmu->oas = 48;
- 	}
- 
-+	if (arm_smmu_ops.pgsize_bitmap == -1UL)
-+		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
-+	else
-+		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
-+
- 	/* Set the DMA mask for our table walker */
- 	if (dma_set_mask_and_coherent(smmu->dev, DMA_BIT_MASK(smmu->oas)))
- 		dev_warn(smmu->dev,
--- 
-2.16.1.dirty
+Then you could replace your use of rcu_cpu_in_eqs() above with
+the new rcu_cpu_in_eqs().  This would avoid the RMW atomic, and, more
+important, the unnecessary write to ->dynticks.
+
+Or am I missing something?
+
+							Thanx, Paul
+
+> Yury
+> 
+> > > +			cpumask_set_cpu(cpu, &kernel_cpus);
+> > > +	}
+> > > +	smp_call_function_many(&kernel_cpus, do_nothing, NULL, 1);
+> > > +	preempt_enable();
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(kick_active_cpus_sync);
+> > > +
+> > >  /**
+> > >   * wake_up_all_idle_cpus - break all cpus out of idle
+> > >   * wake_up_all_idle_cpus try to break all cpus which is in idle state even
+> > > diff --git a/mm/slab.c b/mm/slab.c
+> > > index 324446621b3e..678d5dbd6f46 100644
+> > > --- a/mm/slab.c
+> > > +++ b/mm/slab.c
+> > > @@ -3856,7 +3856,7 @@ static int __do_tune_cpucache(struct kmem_cache *cachep, int limit,
+> > >  	 * cpus, so skip the IPIs.
+> > >  	 */
+> > >  	if (prev)
+> > > -		kick_all_cpus_sync();
+> > > +		kick_active_cpus_sync();
+> > > 
+> > >  	check_irq_on();
+> > >  	cachep->batchcount = batchcount;
+> > > -- 
+> > > 2.14.1
+> > > 
+> 
