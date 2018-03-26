@@ -1,34 +1,49 @@
-From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Mon, 26 Mar 2018 14:50:00 -0500
-Subject: [PATCH] ARM: socfpga_defconfig: Remove QSPI Sector 4K size force
-Message-ID: <1522093800-7822-1-git-send-email-thor.thayer@linux.intel.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 26 Mar 2018 16:15:11 -0400
+Subject: [net-next PATCH 4/5] Revert "net: netcp: remove dead code from the
+ driver"
+In-Reply-To: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
+References: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1522095312-23249-5-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
+As the probe sequence is not guaranteed contrary to the assumption
+of the commit 2d8e276a9030, same has to be reverted.
 
-Remove QSPI Sector 4K size force which is causing QSPI boot
-problems with the JFFS2 root filesystem.
+commit 2d8e276a9030 ("net: netcp: remove dead code from the driver")
 
-Fixes the following error:
-     "Magic bitmask 0x1985 not found at ..."
-
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- arch/arm/configs/socfpga_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/ti/netcp_core.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index 2620ce790db0..371fca4e1ab7 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -57,6 +57,7 @@ CONFIG_MTD_M25P80=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_DENALI_DT=y
- CONFIG_MTD_SPI_NOR=y
-+# CONFIG_MTD_SPI_NOR_USE_4K_SECTORS is not set
- CONFIG_SPI_CADENCE_QUADSPI=y
- CONFIG_OF_OVERLAY=y
- CONFIG_OF_CONFIGFS=y
+diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
+index f5a7eb2..9c51b25 100644
+--- a/drivers/net/ethernet/ti/netcp_core.c
++++ b/drivers/net/ethernet/ti/netcp_core.c
+@@ -2155,6 +2155,7 @@ static int netcp_probe(struct platform_device *pdev)
+ 	struct device_node *child, *interfaces;
+ 	struct netcp_device *netcp_device;
+ 	struct device *dev = &pdev->dev;
++	struct netcp_module *module;
+ 	int ret;
+ 
+ 	if (!node) {
+@@ -2203,6 +2204,14 @@ static int netcp_probe(struct platform_device *pdev)
+ 	/* Add the device instance to the list */
+ 	list_add_tail(&netcp_device->device_list, &netcp_devices);
+ 
++	/* Probe & attach any modules already registered */
++	mutex_lock(&netcp_modules_lock);
++	for_each_netcp_module(module) {
++		ret = netcp_module_probe(netcp_device, module);
++		if (ret < 0)
++			dev_err(dev, "module(%s) probe failed\n", module->name);
++	}
++	mutex_unlock(&netcp_modules_lock);
+ 	return 0;
+ 
+ probe_quit_interface:
 -- 
-2.7.4
+1.9.1
