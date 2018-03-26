@@ -1,75 +1,132 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Tue, 27 Mar 2018 00:20:33 +0300
-Subject: [PATCH v2 3/6] ARM: trusted_foundations: do not use naked function
-In-Reply-To: <20180325180959.28008-4-stefan@agner.ch>
-References: <20180325180959.28008-1-stefan@agner.ch>
- <20180325180959.28008-4-stefan@agner.ch>
-Message-ID: <704c863a-0b5a-6396-d7da-f0ed17b7cca2@gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 26 Mar 2018 23:24:42 +0200
+Subject: [PATCH v2 0/5] allow override of bus format in bridges
+Message-ID: <20180326212447.7380-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.03.2018 21:09, Stefan Agner wrote:
-> As documented in GCC naked functions should only use Basic asm
-> syntax. The Extended asm or mixture of Basic asm and "C" code is
-> not guaranteed. Currently this works because it was hard coded
-> to follow and check GCC behavior for arguments and register
-> placement.
-> 
-> Furthermore with clang using parameters in Extended asm in a
-> naked function is not supported:
->   arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
->           references not allowed in naked functions
->                 : "r" (type), "r" (arg1), "r" (arg2)
->                        ^
-> 
-> Use a regular function to be more portable. This aligns also with
-> the other smc call implementations e.g. in qcom_scm-32.c and
-> bcm_kona_smc.c.
-> 
-> Cc: Dmitry Osipenko <digetx@gmail.com>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Thierry Reding <treding@nvidia.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Changes in v2:
-> - Keep stmfd/ldmfd to avoid potential ABI issues
-> 
->  arch/arm/firmware/trusted_foundations.c | 14 +++++++++-----
->  1 file changed, 9 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-> index 3fb1b5a1dce9..689e6565abfc 100644
-> --- a/arch/arm/firmware/trusted_foundations.c
-> +++ b/arch/arm/firmware/trusted_foundations.c
-> @@ -31,21 +31,25 @@
->  
->  static unsigned long cpu_boot_addr;
->  
-> -static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
-> +static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
->  {
-> +	register u32 r0 asm("r0") = type;
-> +	register u32 r1 asm("r1") = arg1;
-> +	register u32 r2 asm("r2") = arg2;
-> +
->  	asm volatile(
->  		".arch_extension	sec\n\t"
-> -		"stmfd	sp!, {r4 - r11, lr}\n\t"
-> +		"stmfd	sp!, {r4 - r11}\n\t"
->  		__asmeq("%0", "r0")
->  		__asmeq("%1", "r1")
->  		__asmeq("%2", "r2")
->  		"mov	r3, #0\n\t"
->  		"mov	r4, #0\n\t"
->  		"smc	#0\n\t"
-> -		"ldmfd	sp!, {r4 - r11, pc}"
-> +		"ldmfd	sp!, {r4 - r11}\n\t"
->  		:
-> -		: "r" (type), "r" (arg1), "r" (arg2)
-> -		: "memory");
-> +		: "r" (r0), "r" (r1), "r" (r2)
-> +		: "memory", "r3", "r12", "lr");
+Hi!
 
-Although seems "lr" won't be affected by SMC invocation because it should be
-banked and hence could be omitted entirely from the code. Maybe somebody could
-confirm this.
+[I got to v2 sooner than expected]
+
+I have an Atmel sama5d31 hooked up to an lvds encoder and then
+on to an lvds panel. Which seems like something that has been
+done one or two times before...
+
+The problem is that the bus_format of the SoC and the panel do
+not agree. The SoC driver (atmel-hlcdc) can handle the
+rgb444, rgb565, rgb666 and rgb888 bus formats. The hardware is
+wired for the rgb565 case. The lvds encoder supports rgb888 on
+its input side with the LSB wires for each color simply pulled
+down internally in the encoder in my case which means that the
+rgb565 bus_format is the format that works best. And the panel
+is expecting lvds (vesa-24), which is what the encoder outputs.
+
+The reason I "blame" the bus_format of the drm_connector is that
+with the below DT snippet, things do not work *exactly* due to
+that. At least, it starts to work if I hack the panel-lvds driver
+to report the rgb565 bus_format instead of vesa-24.
+
+	panel: panel {
+		compatible = "panel-lvds";
+
+		width-mm = <304>;
+		height-mm = <228;
+
+		data-mapping = "vesa-24";
+
+		panel-timing {
+			// 1024x768 @ 60Hz (typical)
+			clock-frequency = <52140000 65000000 71100000>;
+			hactive = <1024>;
+			vactive = <768>;
+			hfront-porch = <48 88 88>;
+			hback-porch = <96 168 168>;
+			hsync-len = <32 64 64>;
+			vfront-porch = <8 13 14>;
+			vback-porch = <8 13 14>;
+			vsync-len = <8 12 14>;
+		};
+
+		port {
+			panel_input: endpoint {
+				remote-endpoint = <&lvds_encoder_output>;
+			};
+		};
+	};
+
+	lvds-encoder {
+		compatible = "ti,ds90c185", "lvds-encoder";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port at 0 {
+				reg = <0>;
+
+				lvds_encoder_input: endpoint {
+					remote-endpoint = <&hlcdc_output>;
+				};
+			};
+
+			port at 1 {
+				reg = <1>;
+
+				lvds_encoder_output: endpoint {
+					remote-endpoint = <&panel_input>;
+				};
+			};
+		};
+	};
+
+But, instead of perverting the panel-lvds driver with support
+for a totally fake non-lvds bus_format, I intruduce an API that allows
+display controller drivers to query the required bus_format of any
+intermediate bridges, and match up with that instead of the formats
+given by the drm_connector. I trigger this with this addition to the
+lvds-encoder DT node:
+
+		interface-pix-fmt = "rgb565";
+
+Naming is hard though, so I'm not sure if that's good?
+
+I threw in the first patch, since that is the actual lvds encoder
+I have in this case.
+
+Suggestions welcome.
+
+Cheers,
+Peter
+
+Changes since v1 https://lkml.org/lkml/2018/3/17/221
+- Add a proper bridge API to query the bus_format instead of abusing
+  the ->get_modes part of the code. This is cleaner but requires
+  changes to all display controller drivers wishing to participate.
+- Add patch to adjust the atmel-hlcdc driver according to the above.
+- Hook the new info into the bridge local to the lvds-encoder instead
+  of messing about with new interfaces for the panel-bridge driver.
+- Add patch with a DT parsing function of bus_formats in a central place.
+- Rephrase the addition of ti,ds90c185 to the lvds-transmitter binding.
+
+Peter Rosin (5):
+  dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+  drm: bridge: add API to query the expected input formats of bridges
+  drm: of: add display bus-format parser
+  drm: bridge: lvds-encoder: allow specifying the input bus format
+  drm/atmel-hlcdc: take bridges into account when selecting output
+    format
+
+ .../bindings/display/bridge/lvds-transmitter.txt   | 14 ++++-
+ .../devicetree/bindings/display/bus-format.txt     | 35 +++++++++++++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 49 ++++++++++++++++--
+ drivers/gpu/drm/bridge/lvds-encoder.c              | 25 +++++++++
+ drivers/gpu/drm/drm_bridge.c                       | 32 ++++++++++++
+ drivers/gpu/drm/drm_of.c                           | 59 ++++++++++++++++++++++
+ include/drm/drm_bridge.h                           | 18 +++++++
+ include/drm/drm_of.h                               |  9 ++++
+ 8 files changed, 237 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bus-format.txt
+
+-- 
+2.11.0
