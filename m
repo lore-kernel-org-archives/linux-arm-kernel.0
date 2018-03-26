@@ -1,97 +1,74 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 26 Mar 2018 14:57:35 -0400
-Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
-In-Reply-To: <20180326085313.GA4016@andrea>
-References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
- <20180325175004.28162-3-ynorov@caviumnetworks.com>
- <20180326085313.GA4016@andrea>
-Message-ID: <20180326145735.57ba306b@gandalf.local.home>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Mon, 26 Mar 2018 15:05:30 -0400
+Subject: [PATCH v3 0/4] drives/soc/fsl: Move DPIO driver out of staging
+Message-ID: <1522091134-24646-1-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Mar 2018 10:53:13 +0200
-Andrea Parri <andrea.parri@amarulasolutions.com> wrote:
+This patchset moves the NXP DPIO (Datapath I/O Driver) out of the
+drivers/staging directory and into the drivers/soc/fsl directory.
 
-> > --- a/kernel/smp.c
-> > +++ b/kernel/smp.c
-> > @@ -724,6 +724,30 @@ void kick_all_cpus_sync(void)
-> >  }
-> >  EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
-> >  
-> > +/**
-> > + * kick_active_cpus_sync - Force CPUs that are not in extended
-> > + * quiescent state (idle or nohz_full userspace) sync by sending
-> > + * IPI. Extended quiescent state CPUs will sync at the exit of
-> > + * that state.
-> > + */
-> > +void kick_active_cpus_sync(void)
-> > +{
-> > +	int cpu;
-> > +	struct cpumask kernel_cpus;
-> > +
-> > +	smp_mb();  
-> 
-> (A general remark only:)
-> 
-> checkpatch.pl should have warned about the fact that this barrier is
-> missing an accompanying comment (which accesses are being "ordered",
-> what is the pairing barrier, etc.).
+The DPIO driver enables access to Queue and Buffer Manager (QBMAN)
+hardware on NXP DPAA2 devices. This is a prerequiset to moving the
+DPAA2 Etherney driver out of staging.
 
-He could have simply copied the comment above the smp_mb() for
-kick_all_cpus_sync():
+Changes in v3:
+	- Update caam files that use dpaa2 frame header files
+	- Fix spare errors and memory leak
+	- Remove empty staging/drivers/fsl-mc directory
 
-	/* Make sure the change is visible before we kick the cpus */
-
-The kick itself is pretty much a synchronization primitive.
-
-That is, you make some changes and then you need all CPUs to see it,
-and you call: kick_active_cpus_synch(), which is the barrier to make
-sure you previous changes are seen on all CPUS before you proceed
-further. Note, the matching barrier is implicit in the IPI itself.
-
--- Steve
+Changes in v2:
+	- Fix minor conflict in latest linux-next branch
+	- Generate patch using -M
 
 
-> 
-> Moreover if, as your reply above suggested, your patch is relying on
-> "implicit barriers" (something I would not recommend) then even more
-> so you should comment on these requirements.
-> 
-> This could: (a) force you to reason about the memory ordering stuff,
-> (b) easy the task of reviewing and adopting your patch, (c) easy the
-> task of preserving those requirements (as implementations changes).
-> 
->   Andrea
-> 
-> 
-> > +
-> > +	cpumask_clear(&kernel_cpus);
-> > +	preempt_disable();
-> > +	for_each_online_cpu(cpu) {
-> > +		if (!rcu_eqs_special_set(cpu))
-> > +			cpumask_set_cpu(cpu, &kernel_cpus);
-> > +	}
-> > +	smp_call_function_many(&kernel_cpus, do_nothing, NULL, 1);
-> > +	preempt_enable();
-> > +}
-> > +EXPORT_SYMBOL_GPL(kick_active_cpus_sync);
-> > +
-> >  /**
-> >   * wake_up_all_idle_cpus - break all cpus out of idle
-> >   * wake_up_all_idle_cpus try to break all cpus which is in idle state even
-> > diff --git a/mm/slab.c b/mm/slab.c
-> > index 324446621b3e..678d5dbd6f46 100644
-> > --- a/mm/slab.c
-> > +++ b/mm/slab.c
-> > @@ -3856,7 +3856,7 @@ static int __do_tune_cpucache(struct kmem_cache *cachep, int limit,
-> >  	 * cpus, so skip the IPIs.
-> >  	 */
-> >  	if (prev)
-> > -		kick_all_cpus_sync();
-> > +		kick_active_cpus_sync();
-> >  
-> >  	check_irq_on();
-> >  	cachep->batchcount = batchcount;
-> > -- 
-> > 2.14.1
-> >   
+Roy Pledge (4):
+  drivers/staging/fsl-mc: Use memremap for DPIO cache enabled area
+  drivers/staging/fsl-mc: Fix DPIO error path issues
+  staging:fsl-mc: Move DPIO from staging to drivers/soc/fsl
+  drivers/staging: Remove fsl-mc driver from staging
+
+ MAINTAINERS                                        |  2 +-
+ drivers/crypto/caam/sg_sw_qm2.h                    |  2 +-
+ drivers/crypto/caam/sg_sw_sec4.h                   |  2 +-
+ drivers/soc/fsl/Kconfig                            | 10 +++++
+ drivers/soc/fsl/Makefile                           |  1 +
+ .../{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile  |  0
+ .../fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h         |  0
+ .../fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c      | 51 +++++++++++++++-------
+ .../fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt    |  0
+ .../fsl-mc/bus => soc/fsl}/dpio/dpio-service.c     |  2 +-
+ .../{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c    |  0
+ .../{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h    |  0
+ .../fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c     |  2 +-
+ .../fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h     |  6 +--
+ drivers/staging/Kconfig                            |  2 -
+ drivers/staging/Makefile                           |  1 -
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     |  4 +-
+ drivers/staging/fsl-mc/Kconfig                     |  2 -
+ drivers/staging/fsl-mc/Makefile                    |  3 --
+ drivers/staging/fsl-mc/bus/Kconfig                 | 16 -------
+ drivers/staging/fsl-mc/bus/Makefile                |  9 ----
+ .../fsl-mc/include => include/soc/fsl}/dpaa2-fd.h  |  0
+ .../include => include/soc/fsl}/dpaa2-global.h     |  0
+ .../fsl-mc/include => include/soc/fsl}/dpaa2-io.h  |  2 +-
+ 24 files changed, 58 insertions(+), 59 deletions(-)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c (83%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h (99%)
+ delete mode 100644 drivers/staging/fsl-mc/Kconfig
+ delete mode 100644 drivers/staging/fsl-mc/Makefile
+ delete mode 100644 drivers/staging/fsl-mc/bus/Kconfig
+ delete mode 100644 drivers/staging/fsl-mc/bus/Makefile
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h (99%)
+
+--
+2.7.4
