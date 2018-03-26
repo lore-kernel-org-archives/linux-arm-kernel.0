@@ -1,99 +1,67 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Mon, 26 Mar 2018 10:21:19 +0200
-Subject: [PATCH v2 6/6] i2c: i2c-stm32f7: Implement I2C recovery mechanism
-In-Reply-To: <20180324225630.6jen6mvboxbhyp7n@ninjato>
-References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
- <1521650940-11651-7-git-send-email-pierre-yves.mordret@st.com>
- <20180324225630.6jen6mvboxbhyp7n@ninjato>
-Message-ID: <ad11f5a5-4552-eb4a-7d7f-e0966bc340ea@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Mar 2018 10:31:43 +0200
+Subject: [PATCH v6] ARM: dts: wheat: Fix ADV7513 address usage
+In-Reply-To: <a771042b-f63a-d00f-73a1-91a7e6089fe4@ideasonboard.com>
+References: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
+ <20180323085140.g3golwdtpezo7fhi@verge.net.au>
+ <a771042b-f63a-d00f-73a1-91a7e6089fe4@ideasonboard.com>
+Message-ID: <20180326083143.r6jz6csckd4ljnpu@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/24/2018 11:56 PM, Wolfram Sang wrote:
-> On Wed, Mar 21, 2018 at 05:49:00PM +0100, Pierre-Yves MORDRET wrote:
->> Feature prevents I2C lock-ups. Mechanism resets I2C state machine
->> and releases SCL/SDA signals but preserves I2C registers.
->>
->> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
->> ---
->>   Version history:
->>     v1:
->>        * Initial
->>     v2:
->>        * Don't use i2c engine recovery mechanism since driver
->>          procedure only recover master and not the slave.
+On Fri, Mar 23, 2018 at 09:16:13PM +0000, Kieran Bingham wrote:
+> Hi Simon,
 > 
-> s/recovery/release/ throughout the patch, please. Recovery is really
-> something else. Also, I think the dev_info's are too noisy in the log
-> files. I'd think the whole driver could be lifted from quite some
-> logging...
+> On 23/03/18 08:51, Simon Horman wrote:
+> > On Thu, Mar 22, 2018 at 09:30:40PM +0000, Kieran Bingham wrote:
+> >> The r8a7792 Wheat board has two ADV7513 devices sharing a single I2C
+> >> bus, however in low power mode the ADV7513 will reset it's slave maps to
+> >> use the hardware defined default addresses.
+> >>
+> >> The ADV7511 driver was adapted to allow the two devices to be registered
+> >> correctly - but it did not take into account the fault whereby the
+> >> devices reset the addresses.
+> >>
+> >> This results in an address conflict between the device using the default
+> >> addresses, and the other device if it is in low-power-mode.
+> >>
+> >> Repair this issue by moving both devices away from the default address
+> >> definitions.
+> > 
+> > Hi Kierean,
+> > 
+> > as this is a fix
+> > a) Does it warrant a fixes tag?
+> >    Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
+> > b) Does it warrant being posted as a fix for v4.16;
+> > c) or v4.17?
 > 
+> Tricky one, yes it could but this DTS fix, will only actually 'fix' the issue if
+> the corresponding driver updates to allow secondary addresses to be parsed are
+> also backported.
+> 
+> It should be safe to back port the dts fix without the driver updates, but the
+> addresses specified by this patch will simply be ignored.
 
-ok. will do.
-Do you have example of info's that we should get rid of ?
+In that case I think its safe to add the fixes tag and take the DTS patch
+via the renesas tree. Perhaps applying it for v4.18 and allowing automatic
+backporting to take its course is the cleanest option.
 
->> ---
->> ---
->>  drivers/i2c/busses/i2c-stm32f7.c | 27 ++++++++++++++++++++++++---
->>  1 file changed, 24 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
->> index 91f73e0..9a9c469 100644
->> --- a/drivers/i2c/busses/i2c-stm32f7.c
->> +++ b/drivers/i2c/busses/i2c-stm32f7.c
->> @@ -718,6 +718,20 @@ static void stm32f7_i2c_smbus_reload(struct stm32f7_i2c_dev *i2c_dev)
->>  	writel_relaxed(cr2, i2c_dev->base + STM32F7_I2C_CR2);
->>  }
->>  
->> +static int stm32f7_i2c_recover_bus(struct i2c_adapter *i2c_adap)
->> +{
->> +	struct stm32f7_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
->> +
->> +	dev_info(i2c_dev->dev, "Trying to recover bus\n");
->> +
->> +	stm32f7_i2c_clr_bits(i2c_dev->base + STM32F7_I2C_CR1,
->> +			     STM32F7_I2C_CR1_PE);
->> +
->> +	stm32f7_i2c_hw_config(i2c_dev);
->> +
->> +	return 0;
->> +}
->> +
->>  static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
->>  {
->>  	u32 status;
->> @@ -727,12 +741,18 @@ static int stm32f7_i2c_wait_free_bus(struct stm32f7_i2c_dev *i2c_dev)
->>  					 status,
->>  					 !(status & STM32F7_I2C_ISR_BUSY),
->>  					 10, 1000);
->> +	if (!ret)
->> +		return 0;
->> +
->> +	dev_info(i2c_dev->dev, "bus busy\n");
->> +
->> +	ret = stm32f7_i2c_recover_bus(&i2c_dev->adap);
->>  	if (ret) {
->> -		dev_dbg(i2c_dev->dev, "bus busy\n");
->> -		ret = -EBUSY;
->> +		dev_err(i2c_dev->dev, "Failed to recover the bus (%d)\n", ret);
->> +		return ret;
->>  	}
->>  
->> -	return ret;
->> +	return -EBUSY;
->>  }
->>  
->>  static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
->> @@ -1474,6 +1494,7 @@ static irqreturn_t stm32f7_i2c_isr_error(int irq, void *data)
->>  	if (status & STM32F7_I2C_ISR_BERR) {
->>  		dev_err(dev, "<%s>: Bus error\n", __func__);
->>  		writel_relaxed(STM32F7_I2C_ICR_BERRCF, base + STM32F7_I2C_ICR);
->> +		stm32f7_i2c_recover_bus(&i2c_dev->adap);
->>  		f7_msg->result = -EIO;
->>  	}
->>  
->> -- 
->> 2.7.4
->>
+> Thus if this is marked with the fixes tag the corresponding patch "drm: adv7511:
+> Add support for i2c_new_secondary_device" should also be marked.
+> 
+> It looks like that patch has yet to be picked up by the DRM subsystem, so how
+> about I bundle both of these two patches together in a repost along with the
+> fixes tag.
+> 
+> In fact, I don't think the ADV7511 dt-bindings update has made any progress
+> either. (dt-bindings: adv7511: Extend bindings to allow specifying slave map
+> addresses). The media tree variants for the adv7604 have already been picked up
+> by Mauro I believe though.
+> 
+> I presume it would be acceptable for this dts patch (or rather all three patches
+> mentioned) to get integrated through the DRM tree ?
+
+Unless there is a strong reason I would prefer the dts patch to go via
+my tree. The reason is to avoid merge conflicts bubbling up to Linus,
+which really is something best avoided.
