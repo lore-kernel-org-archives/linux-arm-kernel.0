@@ -1,94 +1,87 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 26 Mar 2018 17:22:01 +0100
-Subject: [PATCH 33/38] arm64: Implement thread_struct whitelist for
- hardened usercopy
-In-Reply-To: <CAGXu5jLHb3BQ9U7g6suoVZwVeETiXiCRbxsprpLNiFxcjcWk1A@mail.gmail.com>
-References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
- <1515636190-24061-34-git-send-email-keescook@chromium.org>
- <20180115122458.GI12608@e103592.cambridge.arm.com>
- <CAGXu5jLHb3BQ9U7g6suoVZwVeETiXiCRbxsprpLNiFxcjcWk1A@mail.gmail.com>
-Message-ID: <20180326162158.GH16308@e103592.cambridge.arm.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 26 Mar 2018 11:40:58 -0500
+Subject: [PATCH v2] media: omap3isp: fix unbalanced dma_iommu_mapping
+In-Reply-To: <5767280.aLITpzbm0N@avalon>
+References: <20180314154136.16468-1-s-anna@ti.com> <5767280.aLITpzbm0N@avalon>
+Message-ID: <e0151287-f294-3540-9b12-a96e05db61c0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Dropped most of the original Cc list, since most people are unlikely to
-care about this thread archaeology.]
+Hi Mauro,
 
-On Mon, Jan 15, 2018 at 12:06:17PM -0800, Kees Cook wrote:
-> On Mon, Jan 15, 2018 at 4:24 AM, Dave P Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Jan 11, 2018 at 02:03:05AM +0000, Kees Cook wrote:
-> >> This whitelists the FPU register state portion of the thread_struct for
-> >> copying to userspace, instead of the default entire structure.
-> >>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-> >> Cc: Ingo Molnar <mingo@kernel.org>
-> >> Cc: James Morse <james.morse@arm.com>
-> >> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
-> >> Cc: Dave Martin <Dave.Martin@arm.com>
-> >> Cc: zijun_hu <zijun_hu@htc.com>
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Signed-off-by: Kees Cook <keescook@chromium.org>
-> >> ---
-> >>  arch/arm64/Kconfig                 | 1 +
-> >>  arch/arm64/include/asm/processor.h | 8 ++++++++
-> >>  2 files changed, 9 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >> index a93339f5178f..c84477e6a884 100644
-> >> --- a/arch/arm64/Kconfig
-> >> +++ b/arch/arm64/Kconfig
-> >> @@ -90,6 +90,7 @@ config ARM64
-> >>       select HAVE_ARCH_MMAP_RND_BITS
-> >>       select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
-> >>       select HAVE_ARCH_SECCOMP_FILTER
-> >> +     select HAVE_ARCH_THREAD_STRUCT_WHITELIST
-> >>       select HAVE_ARCH_TRACEHOOK
-> >>       select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-> >>       select HAVE_ARCH_VMAP_STACK
-> >> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> >> index 023cacb946c3..e58a5864ec89 100644
-> >> --- a/arch/arm64/include/asm/processor.h
-> >> +++ b/arch/arm64/include/asm/processor.h
-> >> @@ -113,6 +113,14 @@ struct thread_struct {
-> >>       struct debug_info       debug;          /* debugging */
-> >>  };
-> >>
-> >> +/* Whitelist the fpsimd_state for copying to userspace. */
-> >> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
-> >> +                                             unsigned long *size)
-> >> +{
-> >> +     *offset = offsetof(struct thread_struct, fpsimd_state);
-> >> +     *size = sizeof(struct fpsimd_state);
-> >
-> > This should be fpsimd_state.user_fpsimd (fpsimd_state.cpu is important
-> > for correctly context switching and not supposed to be user-accessible.
-> > A user copy that encompasses that is definitely a bug).
+On 03/21/2018 05:26 AM, Laurent Pinchart wrote:
+> Hi Suman,
 > 
-> So, I actually spent some more time looking at this due to the
-> comments from rmk on arm32, and I don't think any whitelist is needed
-> here at all. (i.e. it can be *offset = *size = 0) This is because all
-> the usercopying I could find uses static sizes or bounce buffers, both
-> of which bypass the dynamic-size hardened usercopy checks.
+> Thank you for the patch.
 > 
-> I've been running some arm64 builds now with this change, and I
-> haven't tripped over any problems yet...
+> On Wednesday, 14 March 2018 17:41:36 EET Suman Anna wrote:
+>> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+>> ARM DMA backend. The current code creates a dma_iommu_mapping and
+>> attaches this to the ISP device, but never detaches the mapping in
+>> either the probe failure paths or the driver remove path resulting
+>> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+>>
+>> Reported-by: Pavel Machek <pavel@ucw.cz>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Hmmm, it looks like we may be hitting this with user_regset_copyout()
-when reading the fp regs via ptrace.  This is maybe not surprising,
-since the size comes from userspace for PTRACE_{GET,SET}REGSET.
-Also, while we copy into a bounce buffer for SETREGSET here, we do copy
-straight out of task_struct for GETREGSET here.
+I don't see this patch in -next yet, can you pick up this patch at your
+earliest?
 
-This suggests we should have:
+Thanks,
+Suman
 
-	*offset = offsetof(struct thread_struct, fpsimd_state);
-	*size = sizeof(struct user_fpsimd_state);
-
-Thoughts?
-
-I'm making some assumptions about how the usercopy hardening works.
-
-Cheers
----Dave
+> 
+>> ---
+>> v2 Changes:
+>>  - Dropped the error_attach label, and returned directly from the
+>>    first error path (comments from Sakari)
+>>  - Added Sakari's Acked-by
+>> v1: https://patchwork.kernel.org/patch/10276759/
+>>
+>> Pavel,
+>> I dropped your Tested-by from v2 since I modified the patch, can you
+>> recheck the new patch again? Thanks.
+>>
+>> regards
+>> Suman
+>>
+>>  drivers/media/platform/omap3isp/isp.c | 7 ++++---
+>>  1 file changed, 4 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/omap3isp/isp.c
+>> b/drivers/media/platform/omap3isp/isp.c index 8eb000e3d8fd..f2db5128d786
+>> 100644
+>> --- a/drivers/media/platform/omap3isp/isp.c
+>> +++ b/drivers/media/platform/omap3isp/isp.c
+>> @@ -1945,6 +1945,7 @@ static int isp_initialize_modules(struct isp_device
+>> *isp)
+>>
+>>  static void isp_detach_iommu(struct isp_device *isp)
+>>  {
+>> +	arm_iommu_detach_device(isp->dev);
+>>  	arm_iommu_release_mapping(isp->mapping);
+>>  	isp->mapping = NULL;
+>>  }
+>> @@ -1961,8 +1962,7 @@ static int isp_attach_iommu(struct isp_device *isp)
+>>  	mapping = arm_iommu_create_mapping(&platform_bus_type, SZ_1G, SZ_2G);
+>>  	if (IS_ERR(mapping)) {
+>>  		dev_err(isp->dev, "failed to create ARM IOMMU mapping\n");
+>> -		ret = PTR_ERR(mapping);
+>> -		goto error;
+>> +		return PTR_ERR(mapping);
+>>  	}
+>>
+>>  	isp->mapping = mapping;
+>> @@ -1977,7 +1977,8 @@ static int isp_attach_iommu(struct isp_device *isp)
+>>  	return 0;
+>>
+>>  error:
+>> -	isp_detach_iommu(isp);
+>> +	arm_iommu_release_mapping(isp->mapping);
+>> +	isp->mapping = NULL;
+>>  	return ret;
+>>  }
+> 
