@@ -1,77 +1,88 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 26 Mar 2018 10:03:49 +0200
-Subject: [PATCH] spi: spi-atmel: Use correct enum for DMA transfer
- direction
-In-Reply-To: <20180324104800.9934-1-stefan@agner.ch>
-References: <20180324104800.9934-1-stefan@agner.ch>
-Message-ID: <b3fff78d-2a1e-b05a-483a-f2707fece63f@microchip.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 26 Mar 2018 13:35:53 +0530
+Subject: [PATCH v4] ARM: dts: imx6q-icore-ofcap12: Switch LVDS timings from
+ panel-simple
+Message-ID: <20180326080554.11559-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/2018 at 11:48, Stefan Agner wrote:
-> Use enum dma_transfer_direction as required by the functions
-> dmaengine_prep_slave_(sg|single)() instead of enum dma_data_direction.
-> This won't change behavior in practice as the enum values are
-> equivalent.
-> 
-> This fixes two warnings when building with clang:
->    drivers/spi/spi-atmel.c:771:12: warning: implicit conversion from enumeration
->        type 'enum dma_data_direction' to different enumeration type
->        'enum dma_transfer_direction'
->        [-Wenum-conversion]
->                                                       DMA_FROM_DEVICE,
->                                                       ^~~~~~~~~~~~~~~
->    ...
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Switch to use koe_tx31d200vm0baa LVDS timings from
+panel-simple instead hard coding the same in dts.
 
-Ok:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v4:
+- Send as seprate patch from previous series
+  https://patchwork.kernel.org/patch/10199423/
+Changes for v3, v2:
+- none
 
-> ---
->   drivers/spi/spi-atmel.c | 8 ++++----
->   1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 4a11fc0d4136..6a7844616c65 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -768,14 +768,14 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
->   		rxdesc = dmaengine_prep_slave_single(rxchan,
->   						     as->dma_addr_rx_bbuf,
->   						     xfer->len,
-> -						     DMA_FROM_DEVICE,
-> +						     DMA_DEV_TO_MEM,
->   						     DMA_PREP_INTERRUPT |
->   						     DMA_CTRL_ACK);
->   	} else {
->   		rxdesc = dmaengine_prep_slave_sg(rxchan,
->   						 xfer->rx_sg.sgl,
->   						 xfer->rx_sg.nents,
-> -						 DMA_FROM_DEVICE,
-> +						 DMA_DEV_TO_MEM,
->   						 DMA_PREP_INTERRUPT |
->   						 DMA_CTRL_ACK);
->   	}
-> @@ -787,14 +787,14 @@ static int atmel_spi_next_xfer_dma_submit(struct spi_master *master,
->   		memcpy(as->addr_tx_bbuf, xfer->tx_buf, xfer->len);
->   		txdesc = dmaengine_prep_slave_single(txchan,
->   						     as->dma_addr_tx_bbuf,
-> -						     xfer->len, DMA_TO_DEVICE,
-> +						     xfer->len, DMA_MEM_TO_DEV,
->   						     DMA_PREP_INTERRUPT |
->   						     DMA_CTRL_ACK);
->   	} else {
->   		txdesc = dmaengine_prep_slave_sg(txchan,
->   						 xfer->tx_sg.sgl,
->   						 xfer->tx_sg.nents,
-> -						 DMA_TO_DEVICE,
-> +						 DMA_MEM_TO_DEV,
->   						 DMA_PREP_INTERRUPT |
->   						 DMA_CTRL_ACK);
->   	}
-> 
+ arch/arm/boot/dts/imx6q-icore-ofcap12.dts | 31 +++++++++++++++++--------------
+ arch/arm/boot/dts/imx6qdl-icore.dtsi      |  2 +-
+ 2 files changed, 18 insertions(+), 15 deletions(-)
 
-
+diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap12.dts b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
+index 9e230f56c5fb..6e27c8143f82 100644
+--- a/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
++++ b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
+@@ -48,28 +48,31 @@
+ / {
+ 	model = "Engicam i.CoreM6 Quad/Dual OpenFrame Capacitive touch 12 Kit";
+ 	compatible = "engicam,imx6-icore", "fsl,imx6q";
++
++	panel {
++		compatible = "koe,tx31d200vm0baa";
++		backlight = <&backlight_lvds>;
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
+ };
+ 
+ &ldb {
+ 	status = "okay";
+ 
+ 	lvds-channel at 0 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <18>;
++		reg = <0>;
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: timing0 {
+-				clock-frequency = <46800000>;
+-				hactive = <1280>;
+-				vactive = <480>;
+-				hback-porch = <353>;
+-				hfront-porch = <47>;
+-				vback-porch = <39>;
+-				vfront-porch = <4>;
+-				hsync-len = <8>;
+-				vsync-len = <2>;
++		port at 4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+index b3a463a5908b..1bce85c3376b 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+@@ -49,7 +49,7 @@
+ 		reg = <0x10000000 0x80000000>;
+ 	};
+ 
+-	backlight {
++	backlight_lvds: backlight-lvds {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm3 0 100000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
 -- 
-Nicolas Ferre
+2.14.3
