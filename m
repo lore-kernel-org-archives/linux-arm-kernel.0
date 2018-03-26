@@ -1,39 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 26 Mar 2018 10:50:17 +0200
-Subject: [PATCH v2] pinctrl: pinctrl-single: Fix pcs_request_gpio() when
- bits_per_mux != 0
-In-Reply-To: <20180323142234.GH5799@atomide.com>
-References: <1519077427-30165-1-git-send-email-david@lechnology.com>
- <CACRpkdanFFwPBhkDNRTdns9cPebH3drBZNhqZLBzF78U3XdRgw@mail.gmail.com>
- <20180323142234.GH5799@atomide.com>
-Message-ID: <CACRpkdYpv2EZj6a0_KJN+BdSRT=HRCnh8PGDTqQkKpgX1mEm0g@mail.gmail.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Mon, 26 Mar 2018 10:52:14 +0200
+Subject: [PATCH 2/2] arm64: defconfig: Raise NR_CPUS to 256
+In-Reply-To: <20180306140201.GB7428@hc>
+References: <20180302143737.10788-1-jglauber@cavium.com>
+ <20180302143737.10788-2-jglauber@cavium.com>
+ <CAK8P3a2ORBU-_7=JeCHSuM8YtC7zeO1VPxQzny_8BrpyVGCKKw@mail.gmail.com>
+ <20180306140201.GB7428@hc>
+Message-ID: <20180326085214.GB5991@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 3:22 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [180323 03:02]:
->> On Mon, Feb 19, 2018 at 10:57 PM, David Lechner <david@lechnology.com> wrote:
->>
->> > This fixes pcs_request_gpio() in the pinctrl-single driver when
->> > bits_per_mux != 0. It appears this was overlooked when the multiple
->> > pins per register feature was added.
->> >
->> > Fixes: 4e7e8017a80e ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
->> > Signed-off-by: David Lechner <david@lechnology.com>
->> > ---
->> >
->> > v2 changes:
->> > - don't wrap Fixes: line in commit message since it is a special machine-
->> >   readable line.
->>
->> Tony/Haojian: are you OK with this change?
->
-> No objections from me, would be good if Haojian could
-> test it with his test cases though.
+On Tue, Mar 06, 2018 at 03:02:01PM +0100, Jan Glauber wrote:
+> On Tue, Mar 06, 2018 at 02:12:29PM +0100, Arnd Bergmann wrote:
+> > On Fri, Mar 2, 2018 at 3:37 PM, Jan Glauber <jglauber@cavium.com> wrote:
+> > > ThunderX1 dual socket has 96 CPUs and ThunderX2 has 224 CPUs.
+> > 
+> > Are you sure about those numbers? From my counting, I would have expected
+> > twice that number in both cases: 48 cores, 2 chips and 2x SMT for ThunderX
+> > vs 52 Cores, 2 chips and 4x SMT for ThunderX2.
+> 
+> That's what I have on those machines. I counted SMT as normal CPUs as it
+> doesn't make a difference for the config. I've not seen SMT on ThunderX.
+> 
+> The ThunderX2 number of 224 is already with 4x SMT (and 2 chips) but
+> there may be other versions planned that I'm not aware of.
+> 
+> > > Therefore raise the default number of CPUs from 64 to 256
+> > > by adding an arm64 specific option to override the generic default.
+> > 
+> > Regardless of what the correct numbers for your chips are, I'd like
+> > to hear some other opinions on how high we should raise that default
+> > limit, both in arch/arm64/Kconfig and in the defconfig file.
+> > 
+> > As I remember it, there is a noticeable cost for taking the limit beyond
+> > BITS_PER_LONG, both in terms of memory consumption and also
+> > runtime performance (copying and comparing CPU masks).
+> 
+> OK, that explains the default. My unverified assumption is that
+> increasing the CPU masks wont be a noticable performance hit.
+> 
+> Also, I don't think that anyone who wants performance will use
+> defconfig. All server distributions would bump up the NR_CPUS anyway
+> and really small systems will probably need to tune the config
+> anyway.
+> 
+> For me defconfig should produce a usable system, not with every last
+> driver configured but with all the basics like CPUs, networking, etc.
+> fully present.
+> 
+> > I'm sure someone will keep coming up with even larger configurations
+> > in the future, so we should try to decide how far we can take the
+> > defaults for the moment without impacting users of the smallest
+> > systems. Alternatively, you could add some measurements that
+> > show how much memory and CPU time is used up on a typical
+> > configuration for a small system (4 cores, no SMT, 512 MB RAM).
+> > If that's low enough, we could just do it anyway.
+> 
+> OK, I'll take a look.
 
-I applied it for v4.17 recording this as an ACK :)
+I've made some measurements on a 4 core board (Cavium 81xx) with
+NR_CPUS set to 64 or 256:
 
-If there are problems I bet we will notice in the -rc phase.
+- vmlinux grows by 0.04 % with 256 CPUs
 
-Yours,
-Linus Walleij
+- Kernel compile time was a bit faster with 256 CPUS (which does
+  not make sense, but at least is seems to not suffer from the change).
+  Is there a benchmark that will be better suited? Maybe even a
+  microbenchmark that will suffer from the longer cpumasks?
+
+- Available memory decreased by 0.13% (restricted memory to 512 MB),
+  BSS increased 5.3 %
+
+Cheers,
+Jan
