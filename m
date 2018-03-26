@@ -1,69 +1,40 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Mon, 26 Mar 2018 17:59:09 +0300
-Subject: in-kernel user of ecdsa
-In-Reply-To: <0f698592-8ade-14d4-7891-1c35501c6285@microchip.com>
-References: <0f698592-8ade-14d4-7891-1c35501c6285@microchip.com>
-Message-ID: <4ce3391f-aa02-a157-bce1-754a6a87c8ed@microchip.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 26 Mar 2018 16:11:22 +0100
+Subject: [PATCH v2 04/11] KVM: arm/arm64: Add kvm_ras.h to collect kvm
+ specific RAS plumbing
+In-Reply-To: <20180322181445.23298-5-james.morse@arm.com>
+References: <20180322181445.23298-1-james.morse@arm.com>
+ <20180322181445.23298-5-james.morse@arm.com>
+Message-ID: <790d3e45-26c2-6095-7adf-1d59fda4541e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 22/03/18 18:14, James Morse wrote:
+> To split up APEIs in_nmi() path, we need any nmi-like callers to always
+> be in_nmi(). KVM shouldn't have to know about this, pull the RAS plumbing
+> out into a header file.
+> 
+> Currently guest synchronous external aborts are claimed as RAS
+> notifications by handle_guest_sea(), which is hidden in the arch codes
+> mm/fault.c. 32bit gets a dummy declaration in system_misc.h.
+> 
+> There is going to be more of this in the future if/when we support
+> the SError-based firmware-first notification mechanism and/or
+> kernel-first notifications for both synchronous external abort and
+> SError. Each of these will come with some Kconfig symbols and a
+> handful of header files.
+> 
+> Create a header file for all this.
+> 
+> This patch gives handle_guest_sea() a 'kvm_' prefix, and moves the
+> declarations to kvm_ras.h as preparation for a future patch that moves
+> the ACPI-specific RAS code out of mm/fault.c.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On 03/12/2018 07:07 PM, Tudor Ambarus wrote:
-
-> Would you consider using ECDSA in the kernel module signing facility?
-
-Any feedback is good. I can invest some time to make this happen, if
-needed.
-
-> When compared with RSA, ECDSA has shorter keys, the key generation
-> process is faster, the sign operation is faster, but the verify
-> operation is slower than with RSA.
-> 
-> Smaller key sizes imply reduced memory footprint and bandwidth that are
-> especially attractive for memory constrained devices. I'm working with
-> such a device, capable of generating ecc keys, secure key storage and
-> ecdsa/ecdh crypto acceleration. I'm trying to find an in-kernel user of
-> ecdsa.
-> 
-> 
-> ECDSA and RSA comparison
-> ------------------------
-> -> ECDSA requires a much smaller key length in order to provide the same
-> security strength as RSA [1]:
-> 
-> Security Strength    RSA (bits)        ECDSA (bits)
-> 112                   2048             224 - 255
-> 128                   3072             256 - 383
-> 192                   7680             384 - 511
-> 256                  15360             512+
-> 
-> 7680 and 15360  keys are not included in the NIST standards for
-> interoperability and efficiency reasons, the keys are just too big.
-> 
-> -> key generation: ECC key generation is faster than IFC (Integer -
-> Factorization Cryptography). RSA private key is based on large prime
-> numbers, while for ECDSA any positive integer less than n is a valid
-> private key.
-> 
-> -> ECDSA sign operations are faster than RSA, but verify operations are
-> slower. Here's an openssl speed test that I've run on my computer:
-> 
->                    sign    verify    sign/s verify/s
-> rsa 2048 bits 0.000604s 0.000018s   1656.3  56813.7
-> rsa 4096 bits 0.004027s 0.000062s    248.3  16052.5
-> 
->                               sign    verify    sign/s verify/s
-> 256 bit ecdsa (nistp256)   0.0000s   0.0001s  28986.4  13516.3
-> 384 bit ecdsa (nistp384)   0.0002s   0.0008s   5541.0   1322.2
-> 521 bit ecdsa (nistp521)   0.0003s   0.0006s   3104.2   1756.2
-> 
-> Best,
-> ta
-> 
-> [1] NIST SP 800-57 Pt. 1 Rev. 4, Recommendation for key management
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe keyrings" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
