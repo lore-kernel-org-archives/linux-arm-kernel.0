@@ -1,75 +1,138 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Mon, 26 Mar 2018 10:52:14 +0200
-Subject: [PATCH 2/2] arm64: defconfig: Raise NR_CPUS to 256
-In-Reply-To: <20180306140201.GB7428@hc>
-References: <20180302143737.10788-1-jglauber@cavium.com>
- <20180302143737.10788-2-jglauber@cavium.com>
- <CAK8P3a2ORBU-_7=JeCHSuM8YtC7zeO1VPxQzny_8BrpyVGCKKw@mail.gmail.com>
- <20180306140201.GB7428@hc>
-Message-ID: <20180326085214.GB5991@hc>
+From: andrea.parri@amarulasolutions.com (Andrea Parri)
+Date: Mon, 26 Mar 2018 10:53:13 +0200
+Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
+In-Reply-To: <20180325175004.28162-3-ynorov@caviumnetworks.com>
+References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
+ <20180325175004.28162-3-ynorov@caviumnetworks.com>
+Message-ID: <20180326085313.GA4016@andrea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 06, 2018 at 03:02:01PM +0100, Jan Glauber wrote:
-> On Tue, Mar 06, 2018 at 02:12:29PM +0100, Arnd Bergmann wrote:
-> > On Fri, Mar 2, 2018 at 3:37 PM, Jan Glauber <jglauber@cavium.com> wrote:
-> > > ThunderX1 dual socket has 96 CPUs and ThunderX2 has 224 CPUs.
-> > 
-> > Are you sure about those numbers? From my counting, I would have expected
-> > twice that number in both cases: 48 cores, 2 chips and 2x SMT for ThunderX
-> > vs 52 Cores, 2 chips and 4x SMT for ThunderX2.
-> 
-> That's what I have on those machines. I counted SMT as normal CPUs as it
-> doesn't make a difference for the config. I've not seen SMT on ThunderX.
-> 
-> The ThunderX2 number of 224 is already with 4x SMT (and 2 chips) but
-> there may be other versions planned that I'm not aware of.
-> 
-> > > Therefore raise the default number of CPUs from 64 to 256
-> > > by adding an arm64 specific option to override the generic default.
-> > 
-> > Regardless of what the correct numbers for your chips are, I'd like
-> > to hear some other opinions on how high we should raise that default
-> > limit, both in arch/arm64/Kconfig and in the defconfig file.
-> > 
-> > As I remember it, there is a noticeable cost for taking the limit beyond
-> > BITS_PER_LONG, both in terms of memory consumption and also
-> > runtime performance (copying and comparing CPU masks).
-> 
-> OK, that explains the default. My unverified assumption is that
-> increasing the CPU masks wont be a noticable performance hit.
-> 
-> Also, I don't think that anyone who wants performance will use
-> defconfig. All server distributions would bump up the NR_CPUS anyway
-> and really small systems will probably need to tune the config
-> anyway.
-> 
-> For me defconfig should produce a usable system, not with every last
-> driver configured but with all the basics like CPUs, networking, etc.
-> fully present.
-> 
-> > I'm sure someone will keep coming up with even larger configurations
-> > in the future, so we should try to decide how far we can take the
-> > defaults for the moment without impacting users of the smallest
-> > systems. Alternatively, you could add some measurements that
-> > show how much memory and CPU time is used up on a typical
-> > configuration for a small system (4 cores, no SMT, 512 MB RAM).
-> > If that's low enough, we could just do it anyway.
-> 
-> OK, I'll take a look.
+Hi Yury,
 
-I've made some measurements on a 4 core board (Cavium 81xx) with
-NR_CPUS set to 64 or 256:
+On Sun, Mar 25, 2018 at 08:50:04PM +0300, Yury Norov wrote:
+> kick_all_cpus_sync() forces all CPUs to sync caches by sending broadcast IPI.
+> If CPU is in extended quiescent state (idle task or nohz_full userspace), this
+> work may be done at the exit of this state. Delaying synchronization helps to
+> save power if CPU is in idle state and decrease latency for real-time tasks.
+> 
+> This patch introduces kick_active_cpus_sync() and uses it in mm/slab and arm64
+> code to delay syncronization.
+> 
+> For task isolation (https://lkml.org/lkml/2017/11/3/589), IPI to the CPU running
+> isolated task would be fatal, as it breaks isolation. The approach with delaying
+> of synchronization work helps to maintain isolated state.
+> 
+> I've tested it with test from task isolation series on ThunderX2 for more than
+> 10 hours (10k giga-ticks) without breaking isolation.
+> 
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ---
+>  arch/arm64/kernel/insn.c |  2 +-
+>  include/linux/smp.h      |  2 ++
+>  kernel/smp.c             | 24 ++++++++++++++++++++++++
+>  mm/slab.c                |  2 +-
+>  4 files changed, 28 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 2718a77da165..9d7c492e920e 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -291,7 +291,7 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+>  			 * synchronization.
+>  			 */
+>  			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
+> -			kick_all_cpus_sync();
+> +			kick_active_cpus_sync();
+>  			return ret;
+>  		}
+>  	}
+> diff --git a/include/linux/smp.h b/include/linux/smp.h
+> index 9fb239e12b82..27215e22240d 100644
+> --- a/include/linux/smp.h
+> +++ b/include/linux/smp.h
+> @@ -105,6 +105,7 @@ int smp_call_function_any(const struct cpumask *mask,
+>  			  smp_call_func_t func, void *info, int wait);
+>  
+>  void kick_all_cpus_sync(void);
+> +void kick_active_cpus_sync(void);
+>  void wake_up_all_idle_cpus(void);
+>  
+>  /*
+> @@ -161,6 +162,7 @@ smp_call_function_any(const struct cpumask *mask, smp_call_func_t func,
+>  }
+>  
+>  static inline void kick_all_cpus_sync(void) {  }
+> +static inline void kick_active_cpus_sync(void) {  }
+>  static inline void wake_up_all_idle_cpus(void) {  }
+>  
+>  #ifdef CONFIG_UP_LATE_INIT
+> diff --git a/kernel/smp.c b/kernel/smp.c
+> index 084c8b3a2681..0358d6673850 100644
+> --- a/kernel/smp.c
+> +++ b/kernel/smp.c
+> @@ -724,6 +724,30 @@ void kick_all_cpus_sync(void)
+>  }
+>  EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
+>  
+> +/**
+> + * kick_active_cpus_sync - Force CPUs that are not in extended
+> + * quiescent state (idle or nohz_full userspace) sync by sending
+> + * IPI. Extended quiescent state CPUs will sync at the exit of
+> + * that state.
+> + */
+> +void kick_active_cpus_sync(void)
+> +{
+> +	int cpu;
+> +	struct cpumask kernel_cpus;
+> +
+> +	smp_mb();
 
-- vmlinux grows by 0.04 % with 256 CPUs
+(A general remark only:)
 
-- Kernel compile time was a bit faster with 256 CPUS (which does
-  not make sense, but at least is seems to not suffer from the change).
-  Is there a benchmark that will be better suited? Maybe even a
-  microbenchmark that will suffer from the longer cpumasks?
+checkpatch.pl should have warned about the fact that this barrier is
+missing an accompanying comment (which accesses are being "ordered",
+what is the pairing barrier, etc.).
 
-- Available memory decreased by 0.13% (restricted memory to 512 MB),
-  BSS increased 5.3 %
+Moreover if, as your reply above suggested, your patch is relying on
+"implicit barriers" (something I would not recommend) then even more
+so you should comment on these requirements.
 
-Cheers,
-Jan
+This could: (a) force you to reason about the memory ordering stuff,
+(b) easy the task of reviewing and adopting your patch, (c) easy the
+task of preserving those requirements (as implementations changes).
+
+  Andrea
+
+
+> +
+> +	cpumask_clear(&kernel_cpus);
+> +	preempt_disable();
+> +	for_each_online_cpu(cpu) {
+> +		if (!rcu_eqs_special_set(cpu))
+> +			cpumask_set_cpu(cpu, &kernel_cpus);
+> +	}
+> +	smp_call_function_many(&kernel_cpus, do_nothing, NULL, 1);
+> +	preempt_enable();
+> +}
+> +EXPORT_SYMBOL_GPL(kick_active_cpus_sync);
+> +
+>  /**
+>   * wake_up_all_idle_cpus - break all cpus out of idle
+>   * wake_up_all_idle_cpus try to break all cpus which is in idle state even
+> diff --git a/mm/slab.c b/mm/slab.c
+> index 324446621b3e..678d5dbd6f46 100644
+> --- a/mm/slab.c
+> +++ b/mm/slab.c
+> @@ -3856,7 +3856,7 @@ static int __do_tune_cpucache(struct kmem_cache *cachep, int limit,
+>  	 * cpus, so skip the IPIs.
+>  	 */
+>  	if (prev)
+> -		kick_all_cpus_sync();
+> +		kick_active_cpus_sync();
+>  
+>  	check_irq_on();
+>  	cachep->batchcount = batchcount;
+> -- 
+> 2.14.1
+> 
