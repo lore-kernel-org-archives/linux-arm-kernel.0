@@ -1,15 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 26 Mar 2018 11:29:36 -0400 (EDT)
-Subject: [PATCH 0/2] net: ethernet: ave: add UniPhier PXs3 support
-In-Reply-To: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20180326.112936.1452797374585013536.davem@davemloft.net>
+From: ilina@codeaurora.org (Lina Iyer)
+Date: Mon, 26 Mar 2018 09:35:20 -0600
+Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
+References: <cover.1521246069.git.collinsd@codeaurora.org>
+ <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
+ <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
+ <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
+Message-ID: <20180326153520.GC22084@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Date: Fri, 23 Mar 2018 21:30:35 +0900
+On Thu, Mar 22 2018 at 19:30 -0600, David Collins wrote:
+>Hello Stephen,
+>
+>Thank you for the very detailed review feedback.
+>
+>On 03/21/2018 12:07 PM, Stephen Boyd wrote:
+>> Quoting David Collins (2018-03-16 18:09:10)
 
-> Add ethernet controller support on UniPhier PXs3 SoC.
+>>> +static int rpmh_regulator_remove(struct platform_device *pdev)
+>>> +{
+>>> +       struct rpmh_pmic *pmic = platform_get_drvdata(pdev);
+>>> +
+>>> +       rpmh_release(pmic->rpmh_client);
+>>
+>> I'm still lost on what rpmh_client is giving us besides more code we
+>> don't need. I'll ping the rpmh thread again.
+>
+>Let's see if Lina is willing to add some devm_* calls so that no cleanup
+>is required.
+>
+I will look into this.
 
-Series applied to net-next, thank you.
+-- Lina
