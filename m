@@ -1,82 +1,90 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Mon, 26 Mar 2018 13:27:05 +0200
-Subject: [PATCH 4/7] ARM: dts: sun7i: Add pinmux settings for LCD0 RGB888
- output.
-In-Reply-To: <20180326100114.fa7vjw342ad6vrb6@flea>
-References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
- <1521662593-25468-4-git-send-email-giulio.benetti@micronovasrl.com>
- <1521986953.5301.4.camel@paulk.fr> <20180326100114.fa7vjw342ad6vrb6@flea>
-Message-ID: <e3e51afb-bb32-7f2f-877e-b6c74d71ab06@micronovasrl.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Mar 2018 12:39:33 +0100
+Subject: [PATCH] arm64: avoid race condition issue in dump_backtrace
+In-Reply-To: <1521711329.26617.31.camel@mtksdccf07>
+References: <1521687960-3744-1-git-send-email-ji.zhang@mediatek.com>
+ <20180322055929.z25brvwlmdighz66@salmiak>
+ <1521711329.26617.31.camel@mtksdccf07>
+Message-ID: <20180326113932.2i6qp3776jtmcqk4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 22, 2018 at 05:35:29PM +0800, Ji.Zhang wrote:
+> On Thu, 2018-03-22 at 05:59 +0000, Mark Rutland wrote:
+> > On Thu, Mar 22, 2018 at 11:06:00AM +0800, Ji Zhang wrote:
+> > > When we dump the backtrace of some specific task, there is a potential race
+> > > condition due to the task may be running on other cores if SMP enabled.
+> > > That is because for current implementation, if the task is not the current
+> > > task, we will get the registers used for unwind from cpu_context saved in
+> > > thread_info, which is the snapshot before context switch, but if the task
+> > > is running on other cores, the registers and the content of stack are
+> > > changed.
+> > > This may cause that we get the wrong backtrace or incomplete backtrace or
+> > > even crash the kernel.
+> > 
+> > When do we call dump_backtrace() on a running task that is not current?
+> > 
+> > AFAICT, we don't do that in the arm64-specific callers of dump_backtrace(), and
+> > this would have to be some caller of show_stack() in generic code.
+> Yes, show_stack() can make caller specify a task and dump its backtrace.
+> For example, SysRq-T (echo t > /proc/sysrq-trigger) will use this to
+> dump the backtrace of specific tasks.
 
-Il 26/03/2018 12:01, Maxime Ripard ha scritto:
-> Hi,
-> 
-> On Sun, Mar 25, 2018 at 04:09:13PM +0200, Paul Kocialkowski wrote:
->> Le mercredi 21 mars 2018 ? 21:03 +0100, Giulio Benetti a ?crit :
->>> The A20 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
->>> for the needed pins.
->>>
->>> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->>> ---
->>>   arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
->>>   1 file changed, 8 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi
->>> b/arch/arm/boot/dts/sun7i-a20.dtsi
->>> index efb5607..bfe6728 100644
->>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
->>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
->>> @@ -922,6 +922,14 @@
->>>   				pins = "PI20", "PI21";
->>>   				function = "uart7";
->>>   			};
->>> +
->>> +			lcd0_rgb888_pins: lcd0-rgb888-pins {
->>
->> It would be more consistent with other pins definitions to have
->> underscores in both names and to indicate the index, such as:
->> lcd0_rgb888_pins: lcd0_rgb888_pins at 0 {
-> 
-> Both your suggestions will generate DTC warnings, and we'd like to get
-> rid of them eventually :)
-> 
->> This way, other set of pins for LCD (PH0-PH27) can be declared as @1
->> when they are needed in the future.
-> 
-> A better idea would be to call it lcd0-rgb888-pd-pins, and introduce
-> the ph variant when it's done.
+Ok. I see that this eventually calls show_state_filter(0), where we call
+sched_show_task() for every task.
 
-As I know, only PD is muxed with LCD0.
-And PH is for LCD1 only.
+> > We pin the task's stack via try_get_task_stack(), so this cannot be unmapped
+> > while we walk it. In unwind_frame() we check that the frame record falls
+> > entirely within the task's stack. So AFAICT, we cannot crash the kernel here,
+> > though the backtrace may be misleading (and we could potentially get stuck in
+> > an infinite loop).
+> You are right, I have checked the code and it seems that the check for
+> fp in unwind_frame() is strong enough to handle the case which stack
+> being changed due to task running. And as you mentioned, if
+> unfortunately fp is point to the address of itself, the unwind will be
+> an infinite loop, but it is a very small probability event, so we can
+> ignore this, is that right?
 
-And LCD0 seems to come out only from PD port according to datasheet,
-this is why I didn't put @0 after lcd0-rgb888-pins.
+I think that it would be preferable to try to avoid the inifinite loop
+case. We could hit that by accident if we're tracing a live task.
 
-So I don't think it makes sense to handle pins in the way Paul suggests.
+It's a little tricky to ensure that we don't loop, since we can have
+traces that span several stacks, e.g. overflow -> irq -> task, so we
+need to know where the last frame was, and we need to defnie a strict
+order for stack nesting.
 
-What do you all think?
+> > > To avoid this case, do not dump the backtrace of the tasks which are
+> > > running on other cores.
+> > > This patch cannot solve the issue completely but can shrink the window of
+> > > race condition.
+> > 
+> > > @@ -113,6 +113,9 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+> > >  	if (tsk == current) {
+> > >  		frame.fp = (unsigned long)__builtin_frame_address(0);
+> > >  		frame.pc = (unsigned long)dump_backtrace;
+> > > +	else if (tsk->state == TASK_RUNNING) {
+> > > +		pr_notice("Do not dump other running tasks\n");
+> > > +		return;
+> > 
+> > As you note, if we can race with the task being scheduled, this doesn't help.
+> > 
+> > Can we rule this out at a higher level?
+> > Thanks,
+> > Mark.
+> Actually, according to my previous understanding, the low level function
+> should be transparent to callers and should provide the right result and
+> handle some unexpected cases, which means that if the result may be
+> misleading, we should drop it. That is why I bypass all TASK_RUNNING
+> tasks. I am not sure if this understanding is reasonable for this case.
 
-Giulio
+Given that this can change under our feet, I think this only provides a
+false sense of security and complicates the code.
 
-> 
-> Maxime
-> 
-> 
-> 
+> And as you mentioned that rule this out at a higher level, is there any
+> suggestions, handle this in the caller of show_stack()?
 
+Unfortunately, it doesn't look like we can do this in general given
+cases like sysrq-t.
 
--- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
+Thanks,
+Mark.
