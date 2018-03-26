@@ -1,67 +1,15 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Tue, 27 Mar 2018 00:27:11 +0900
-Subject: [PATCH] pinctrl: samsung: add pin_dbg_show callback for debugfs
-Message-ID: <20180326152711.7780-1-parkch98@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 26 Mar 2018 11:29:36 -0400 (EDT)
+Subject: [PATCH 0/2] net: ethernet: ave: add UniPhier PXs3 support
+In-Reply-To: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1521808237-3623-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180326.112936.1452797374585013536.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a samsung_pin_dbg_show function to implement the
-pin_dbg_show callback function which can be used to show pin
-confuration values. Basically, it can show pin setting values by
-accessing the "pins" node like below:
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Date: Fri, 23 Mar 2018 21:30:35 +0900
 
-$ cat pins
-pin 0 (gpy7-0)  CON(0x0) DAT(0x1) PUD(0x1) DRV(0x0) CON_PDN(0x0) PUD_PDN(0x0)
+> Add ethernet controller support on UniPhier PXs3 SoC.
 
-Signed-off-by: Chanho Park <parkch98@gmail.com>
----
- drivers/pinctrl/samsung/pinctrl-samsung.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 336e88d7bdb9..bdec0cbd64f1 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -279,6 +279,30 @@ static int samsung_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_DEBUG_FS
-+/* Forward declaration which can be used by samsung_pin_dbg_show */
-+static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
-+				unsigned long *config, bool set);
-+static char *reg_names[] = {"CON", "DAT", "PUD", "DRV", "CON_PDN", "PUD_PDN"};
-+static void samsung_pin_dbg_show(struct pinctrl_dev *pctldev,
-+				struct seq_file *s, unsigned int pin)
-+{
-+	enum pincfg_type cfg_type;
-+	unsigned long config;
-+	int ret;
-+
-+	for (cfg_type = 0; cfg_type < PINCFG_TYPE_NUM; cfg_type++) {
-+		config = PINCFG_PACK(cfg_type, 0);
-+		ret = samsung_pinconf_rw(pctldev, pin, &config, false);
-+		if (ret == -EINVAL)
-+			continue;
-+
-+		seq_printf(s, " %s(0x%lx)", reg_names[cfg_type],
-+			   PINCFG_UNPACK_VALUE(config));
-+	}
-+}
-+#endif
-+
- /* list of pinctrl callbacks for the pinctrl core */
- static const struct pinctrl_ops samsung_pctrl_ops = {
- 	.get_groups_count	= samsung_get_group_count,
-@@ -286,6 +310,9 @@ static const struct pinctrl_ops samsung_pctrl_ops = {
- 	.get_group_pins		= samsung_get_group_pins,
- 	.dt_node_to_map		= samsung_dt_node_to_map,
- 	.dt_free_map		= samsung_dt_free_map,
-+#ifdef CONFIG_DEBUG_FS
-+	.pin_dbg_show		= samsung_pin_dbg_show,
-+#endif
- };
- 
- /* check if the selector is a valid pin function selector */
--- 
-2.14.1
+Series applied to net-next, thank you.
