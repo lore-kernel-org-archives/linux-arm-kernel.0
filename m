@@ -1,137 +1,145 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 26 Mar 2018 15:12:35 +0100
-Subject: [PATCH v5 08/22] arm64: capabilities: Prepare for grouping features
- and errata work arounds
+Date: Mon, 26 Mar 2018 15:12:33 +0100
+Subject: [PATCH v5 06/22] arm64: capabilities: Unify the verification
 In-Reply-To: <1522073569-29174-1-git-send-email-suzuki.poulose@arm.com>
 References: <1522073569-29174-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1522073569-29174-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1522073569-29174-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to group the handling of all capabilities (features
-and errata workarounds). This patch open codes the wrapper routines
-to make it easier to merge the handling.
+Now that each capability describes how to treat the conflicts
+of CPU cap state vs System wide cap state, we can unify the
+verification logic to a single place.
 
 Reviewed-by: Dave Martin <dave.martin@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 58 +++++++++++++-----------------------------
- 1 file changed, 18 insertions(+), 40 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 91 +++++++++++++++++++++++++++---------------
+ 1 file changed, 58 insertions(+), 33 deletions(-)
 
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index c49535d..703215f 100644
+index 0b8e6b9..1fda957 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -510,7 +510,8 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
+@@ -1306,6 +1306,58 @@ enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
  }
  
- extern const struct arm64_cpu_capabilities arm64_errata[];
--static void update_cpu_errata_workarounds(void);
-+static void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+				    u16 scope_mask, const char *info);
- 
- void __init init_cpu_features(struct cpuinfo_arm64 *info)
- {
-@@ -559,7 +560,8 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 	 * Run the errata work around checks on the boot CPU, once we have
- 	 * initialised the cpu feature infrastructure.
- 	 */
--	update_cpu_errata_workarounds();
-+	update_cpu_capabilities(arm64_errata, SCOPE_ALL,
-+				"enabling workaround for");
- }
- 
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-@@ -1389,12 +1391,6 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
+ /*
++ * Run through the list of capabilities to check for conflicts.
++ * If the system has already detected a capability, take necessary
++ * action on this CPU.
++ *
++ * Returns "false" on conflicts.
++ */
++static bool
++__verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_list)
++{
++	bool cpu_has_cap, system_has_cap;
++	const struct arm64_cpu_capabilities *caps;
++
++	for (caps = caps_list; caps->matches; caps++) {
++		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
++		system_has_cap = cpus_have_cap(caps->capability);
++
++		if (system_has_cap) {
++			/*
++			 * Check if the new CPU misses an advertised feature,
++			 * which is not safe to miss.
++			 */
++			if (!cpu_has_cap && !cpucap_late_cpu_optional(caps))
++				break;
++			/*
++			 * We have to issue cpu_enable() irrespective of
++			 * whether the CPU has it or not, as it is enabeld
++			 * system wide. It is upto the call back to take
++			 * appropriate action on this CPU.
++			 */
++			if (caps->cpu_enable)
++				caps->cpu_enable(caps);
++		} else {
++			/*
++			 * Check if the CPU has this capability if it isn't
++			 * safe to have when the system doesn't.
++			 */
++			if (cpu_has_cap && !cpucap_late_cpu_permitted(caps))
++				break;
++		}
++	}
++
++	if (caps->matches) {
++		pr_crit("CPU%d: Detected conflict for capability %d (%s), System: %d, CPU: %d\n",
++			smp_processor_id(), caps->capability,
++			caps->desc, system_has_cap, cpu_has_cap);
++		return false;
++	}
++
++	return true;
++}
++
++/*
+  * Check for CPU features that are used in early boot
+  * based on the Boot CPU value.
+  */
+@@ -1327,25 +1379,10 @@ verify_local_elf_hwcaps(const struct arm64_cpu_capabilities *caps)
  		}
  }
  
--static void verify_local_cpu_features(void)
--{
--	if (!__verify_local_cpu_caps(arm64_features, SCOPE_ALL))
--		cpu_die_early();
--}
--
- static void verify_sve_features(void)
+-static void
+-verify_local_cpu_features(const struct arm64_cpu_capabilities *caps_list)
++static void verify_local_cpu_features(void)
  {
- 	u64 safe_zcr = read_sanitised_ftr_reg(SYS_ZCR_EL1);
-@@ -1412,27 +1408,6 @@ static void verify_sve_features(void)
- 	/* Add checks on other ZCR bits here if necessary */
+-	const struct arm64_cpu_capabilities *caps = caps_list;
+-	for (; caps->matches; caps++) {
+-		if (!cpus_have_cap(caps->capability))
+-			continue;
+-		/*
+-		 * If the new CPU misses an advertised feature, we cannot proceed
+-		 * further, park the cpu.
+-		 */
+-		if (!__this_cpu_has_cap(caps_list, caps->capability)) {
+-			pr_crit("CPU%d: missing feature: %s\n",
+-					smp_processor_id(), caps->desc);
+-			cpu_die_early();
+-		}
+-		if (caps->cpu_enable)
+-			caps->cpu_enable(caps);
+-	}
++	if (!__verify_local_cpu_caps(arm64_features))
++		cpu_die_early();
  }
  
--/*
-- * The CPU Errata work arounds are detected and applied at boot time
-- * and the related information is freed soon after. If the new CPU requires
-- * an errata not detected at boot, fail this CPU.
-- */
--static void verify_local_cpu_errata_workarounds(void)
--{
--	if (!__verify_local_cpu_caps(arm64_errata, SCOPE_ALL))
--		cpu_die_early();
--}
--
--static void update_cpu_errata_workarounds(void)
--{
--	update_cpu_capabilities(arm64_errata, SCOPE_ALL,
--				"enabling workaround for");
--}
--
--static void __init enable_errata_workarounds(void)
--{
--	enable_cpu_capabilities(arm64_errata, SCOPE_ALL);
--}
- 
- /*
-  * Run through the enabled system capabilities and enable() it on this CPU.
-@@ -1444,8 +1419,15 @@ static void __init enable_errata_workarounds(void)
+ static void verify_sve_features(void)
+@@ -1372,20 +1409,8 @@ static void verify_sve_features(void)
   */
+ static void verify_local_cpu_errata_workarounds(void)
+ {
+-	const struct arm64_cpu_capabilities *caps = arm64_errata;
+-
+-	for (; caps->matches; caps++) {
+-		if (cpus_have_cap(caps->capability)) {
+-			if (caps->cpu_enable)
+-				caps->cpu_enable(caps);
+-		} else if (caps->matches(caps, SCOPE_LOCAL_CPU)) {
+-			pr_crit("CPU%d: Requires work around for %s, not detected"
+-					" at boot time\n",
+-				smp_processor_id(),
+-				caps->desc ? : "an erratum");
+-			cpu_die_early();
+-		}
+-	}
++	if (!__verify_local_cpu_caps(arm64_errata))
++		cpu_die_early();
+ }
+ 
+ static void update_cpu_errata_workarounds(void)
+@@ -1409,7 +1434,7 @@ static void __init enable_errata_workarounds(void)
  static void verify_local_cpu_capabilities(void)
  {
--	verify_local_cpu_errata_workarounds();
--	verify_local_cpu_features();
-+	/*
-+	 * The CPU Errata work arounds are detected and applied at boot time
-+	 * and the related information is freed soon after. If the new CPU
-+	 * requires an errata not detected at boot, fail this CPU.
-+	 */
-+	if (!__verify_local_cpu_caps(arm64_errata, SCOPE_ALL))
-+		cpu_die_early();
-+	if (!__verify_local_cpu_caps(arm64_features, SCOPE_ALL))
-+		cpu_die_early();
+ 	verify_local_cpu_errata_workarounds();
+-	verify_local_cpu_features(arm64_features);
++	verify_local_cpu_features();
  	verify_local_elf_hwcaps(arm64_elf_hwcaps);
  
  	if (system_supports_32bit_el0())
-@@ -1470,17 +1452,12 @@ void check_local_cpu_capabilities(void)
- 	 * advertised capabilities.
- 	 */
- 	if (!sys_caps_initialised)
--		update_cpu_errata_workarounds();
-+		update_cpu_capabilities(arm64_errata, SCOPE_ALL,
-+					"enabling workaround for");
- 	else
- 		verify_local_cpu_capabilities();
- }
- 
--static void __init setup_feature_capabilities(void)
--{
--	update_cpu_capabilities(arm64_features, SCOPE_ALL, "detected:");
--	enable_cpu_capabilities(arm64_features, SCOPE_ALL);
--}
--
- DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
- EXPORT_SYMBOL(arm64_const_caps_ready);
- 
-@@ -1502,8 +1479,9 @@ void __init setup_cpu_features(void)
- 	u32 cwg;
- 
- 	/* Set the CPU feature capabilies */
--	setup_feature_capabilities();
--	enable_errata_workarounds();
-+	update_cpu_capabilities(arm64_features, SCOPE_ALL, "detected:");
-+	enable_cpu_capabilities(arm64_features, SCOPE_ALL);
-+	enable_cpu_capabilities(arm64_errata, SCOPE_ALL);
- 	mark_const_caps_ready();
- 	setup_elf_hwcaps(arm64_elf_hwcaps);
- 
 -- 
 2.7.4
