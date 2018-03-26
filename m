@@ -1,59 +1,24 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 26 Mar 2018 15:46:00 -0600
-Subject: [PATCH] coresight: use put_device() instead of kfree()
-In-Reply-To: <d5a326b6c284f7389301b265716dc58fda492c98.1521358552.git.arvind.yadav.cs@gmail.com>
-References: <d5a326b6c284f7389301b265716dc58fda492c98.1521358552.git.arvind.yadav.cs@gmail.com>
-Message-ID: <CANLsYkymOF2oG7TmKbRTakYKw0ECN_DXfkX5b8WjmS0Lz0sfig@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 26 Mar 2018 14:49:36 -0700
+Subject: [PATCH 2/2] MAINTAINERS: demote ARM port to "odd fixes"
+In-Reply-To: <CAKv+Gu-pgj_T6NC9==TjbbAZ0cgZkf6dQKi0AyQBHEGnzYGQBw@mail.gmail.com>
+References: <E1ezkgn-0002fO-52@rmk-PC.armlinux.org.uk>
+ <CAKv+Gu8v_+P-VwggmUfE5zq353YN6RqG63YQs+xDZVYUtqc=4Q@mail.gmail.com>
+ <20180325180931.GF10980@n2100.armlinux.org.uk>
+ <CAKv+Gu-pgj_T6NC9==TjbbAZ0cgZkf6dQKi0AyQBHEGnzYGQBw@mail.gmail.com>
+Message-ID: <20180326144936.44f11e7105b8536ada593a6c@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/hwtracing/coresight/coresight.c
-On 18 March 2018 at 01:38, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
-> Never directly free @dev after calling device_register(), even
-> if it returned an error. Always use put_device() to give up the
-> reference initialized.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/hwtracing/coresight/coresight.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-> index 389c4ba..132dfbc 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight.c
-> @@ -1026,8 +1026,10 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
->         dev_set_name(&csdev->dev, "%s", desc->pdata->name);
->
->         ret = device_register(&csdev->dev);
-> -       if (ret)
-> -               goto err_device_register;
-> +       if (ret) {
-> +               put_device(&csdev->dev);
-> +               goto err_kzalloc_csdev;
-> +       }
->
->         mutex_lock(&coresight_mutex);
->
-> @@ -1038,8 +1040,6 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
->
->         return csdev;
->
-> -err_device_register:
-> -       kfree(conns);
+On Sun, 25 Mar 2018 19:41:49 +0100 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Apologies for the late reply, I was travelling.
+> Nobody is asking you to prioritise voluntary work over paid work. I am
+> asking you to consider offloading some of the responsibility to others
+> if you are failing to cope by yourself.
 
-I suggest to simply replace kfree() with put_device() in order to
-concentrate the error handling code in the same area and make sure
-that memory allocated for @conns and @refcnts is freed.
+That's a sensible proposal and it can be discussed in the appropriate
+venue at an appropriate time (if it is found that we actually have a
+problem!).
 
-Thanks,
-Mathieu
-
->  err_kzalloc_conns:
->         kfree(refcnts);
->  err_kzalloc_refcnts:
-> --
-> 2.7.4
->
+But all of this seems unrelated to altering the MAINTAINERS file today,
+so I'll scoop up Russell's patches.
