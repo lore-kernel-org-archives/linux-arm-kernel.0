@@ -1,69 +1,77 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Mar 2018 11:13:54 +0200
-Subject: [PATCH v2 2/3] arm64: dts: renesas: salvator-common: Configure
- PMIC for DDR Backup Power
-In-Reply-To: <20180326090625.espsuzblp7gy767t@verge.net.au>
-References: <1521029386-29975-1-git-send-email-geert+renesas@glider.be>
- <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
- <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
- <CAMuHMdUO-Op4u44naZJ37VgzN1GJBL33yRWnF11D9a24y8+x1g@mail.gmail.com>
- <1ae32fee-578e-1091-561a-200a8036b670@cogentembedded.com>
- <20180326090625.espsuzblp7gy767t@verge.net.au>
-Message-ID: <CAMuHMdW5ox34+_Z76T+cDyZeuJJE4OZ8=hEpdjbCcg+TwSX61A@mail.gmail.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 26 Mar 2018 17:21:17 +0800
+Subject: [PATCH] ARM64: dts: meson-axg: add saradc support
+Message-ID: <20180326092117.208416-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+From: Xingyu Chen <xingyu.chen@amlogic.com>
 
-On Mon, Mar 26, 2018 at 11:06 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Mar 16, 2018 at 03:08:13PM +0300, Sergei Shtylyov wrote:
->> On 03/16/2018 03:00 PM, Geert Uytterhoeven wrote:
->>
->> >>> On Salvator-X(S), all of the DDR0, DDR1, DDR0C, and DDR1C power rails
->> >>> need to be kept powered when backup mode is enabled.  Reflect this in
->> >>> the "rohm,ddr-backup-power" property for the BD9571MWV PMIC node.
->> >>>
->> >>> The accessory power switch (SW23) is a toggle switch, hense specify
->> >>> "rohm,rstbmode-level".
->> >>>
->> >>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >>> ---
->> >>> v2:
->> >>>   - Add rohm,rstbmode-level.
->> >>> ---
->> >>>  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 ++
->> >>>  1 file changed, 2 insertions(+)
->> >>>
->> >>> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
->> >>> index 2a7f36abd2dd85c6..80794c38c2669d75 100644
->> >>> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
->> >>> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
->> >>> @@ -376,6 +376,8 @@
->> >>>               #interrupt-cells = <2>;
->> >>>               gpio-controller;
->> >>>               #gpio-cells = <2>;
->> >>> +             rohm,ddr-backup-power = <15>;
->> >>
->> >>   Why not 0xf if those are all bit flags?
->> >
->> > Because it's a small number?
->> > Does it matter?
->>
->>    I think hex is preferable for the bit flags. Decimal makes one think it's something
->> else -- some magnitude, etc...
->
-> Geert, it seems that Rob Herring is of the same opinion.
-> Would you care to respin this series?
+Add the DT info for SAR ADC of the Amlogic's Meson-AXG SoC.
 
-Sure, after the respun driver series has been accepted.
+Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-Gr{oetje,eeting}s,
+---
+Hi Kevin:
 
-                        Geert
+  Please note, the saradc driver in Meson-AXG platfrom actually
+depend on the AO clock driver [0] & saradc patch itself [1].
+  And I've rebased this patch on top of your v4.17/dt64 branch
 
+[0] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
+[1] https://lkml.kernel.org/r/20180326084629.100070-1-yixun.lan at amlogic.com
+
+Yixun
+---
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  5 +++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 21 +++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index 57eedced5a51..bbb88debbc04 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -47,3 +47,8 @@
+ 	pinctrl-0 = <&i2c1_z_pins>;
+ 	pinctrl-names = "default";
+ };
++
++&saradc {
++	status = "okay";
++	vref-supply = <&vddio_ao18>;
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 40ca49fb94a6..105884efc033 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -818,6 +818,27 @@
+ 				interrupts = <GIC_SPI 196 IRQ_TYPE_EDGE_RISING>;
+ 				status = "disabled";
+ 			};
++
++			saradc: adc at 9000 {
++				compatible = "amlogic,meson-axg-saradc",
++					"amlogic,meson-saradc";
++				reg = <0x0 0x9000 0x0 0x38>;
++				#io-channel-cells = <1>;
++				interrupts = <GIC_SPI 73 IRQ_TYPE_EDGE_RISING>;
++				clocks = <&xtal>,
++					<&clkc_AO CLKID_AO_SAR_ADC>,
++					<&clkc_AO CLKID_AO_SAR_ADC_CLK>,
++					<&clkc_AO CLKID_AO_SAR_ADC_SEL>;
++				clock-names = "clkin", "core", "adc_clk", "adc_sel";
++				status = "disabled";
++			};
+ 		};
+ 	};
++
++	vddio_ao18: regulator-vddio_ao18 {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDIO_AO18";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++	};
+ };
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.15.1
