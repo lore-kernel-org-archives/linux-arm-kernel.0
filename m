@@ -1,47 +1,87 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 26 Mar 2018 16:18:08 +0800
-Subject: [PATCH 2/3] clk: meson: drop CLK_IGNORE_UNUSED flag
+Date: Mon, 26 Mar 2018 16:18:09 +0800
+Subject: [PATCH 3/3] ARM64: dts: meson: fix clock source of the pclk for
+ UART_AO
 In-Reply-To: <20180326081809.49493-1-yixun.lan@amlogic.com>
 References: <20180326081809.49493-1-yixun.lan@amlogic.com>
-Message-ID: <20180326081809.49493-3-yixun.lan@amlogic.com>
+Message-ID: <20180326081809.49493-4-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rely on drivers to request the clock explicitly.
+>From the hardware perspective, the clk81 is the parent of
+the UART_AO clocks. So it make more sense to mark
+the CLKID_AO_UART1/2 as the pclk.
 
-Previous the kernel will leave the clock on while
-bootloader adready initilized the clock, this wasn't
-optimal way, so fix it here.
+Previous we had flag=CLK_IGNORE_UNUSED in AO clock driver.
+This will make kernel leave clock as it is while bootloader
+set the clock on.
 
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- drivers/clk/meson/axg-aoclk.c  | 1 -
- drivers/clk/meson/gxbb-aoclk.c | 1 -
- 2 files changed, 2 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi  | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/meson/axg-aoclk.c b/drivers/clk/meson/axg-aoclk.c
-index 121ecb45264f..026b2fe56a29 100644
---- a/drivers/clk/meson/axg-aoclk.c
-+++ b/drivers/clk/meson/axg-aoclk.c
-@@ -27,7 +27,6 @@ static struct clk_regmap _name##_ao = {					\
- 		.ops = &clk_regmap_gate_ops,				\
- 		.parent_names = (const char *[]){ "clk81" },		\
- 		.num_parents = 1,					\
--		.flags = CLK_IGNORE_UNUSED,				\
- 	},								\
- }
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 48584d5a329b..e538e2448bb5 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -533,7 +533,7 @@
+ 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+ 				reg = <0x0 0x3000 0x0 0x18>;
+ 				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
+-				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
+ 				clock-names = "xtal", "pclk", "baud";
+ 				status = "disabled";
+ 			};
+@@ -542,7 +542,7 @@
+ 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+ 				reg = <0x0 0x4000 0x0 0x18>;
+ 				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
+-				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
+ 				clock-names = "xtal", "pclk", "baud";
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 3290a4dc3522..a458ea50c2ef 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -783,12 +783,12 @@
+ };
  
-diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
-index e7bc04d3e24f..005d84ff590d 100644
---- a/drivers/clk/meson/gxbb-aoclk.c
-+++ b/drivers/clk/meson/gxbb-aoclk.c
-@@ -70,7 +70,6 @@ static struct clk_regmap _name##_ao = {					\
- 		.ops = &clk_regmap_gate_ops,				\
- 		.parent_names = (const char *[]){ "clk81" },		\
- 		.num_parents = 1,					\
--		.flags = CLK_IGNORE_UNUSED,				\
- 	},								\
- }
+ &uart_AO {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_AO_B {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index 4f355f17eed6..474f4f9630e4 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -733,12 +733,12 @@
+ };
+ 
+ &uart_AO {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_AO_B {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
  
 -- 
 2.15.1
