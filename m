@@ -1,34 +1,69 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 26 Mar 2018 13:45:56 +0200
-Subject: sun6i SPI driver issue
-In-Reply-To: <536bf3b1-4440-d060-b22f-2ce7321f4c13@orpaltech.com>
-References: <536bf3b1-4440-d060-b22f-2ce7321f4c13@orpaltech.com>
-Message-ID: <20180326114556.6xgxzq3jrbpah47n@flea>
+Date: Mon, 26 Mar 2018 13:46:45 +0200
+Subject: [PATCH 4/7] ARM: dts: sun7i: Add pinmux settings for LCD0 RGB888
+ output.
+In-Reply-To: <e3e51afb-bb32-7f2f-877e-b6c74d71ab06@micronovasrl.com>
+References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1521662593-25468-4-git-send-email-giulio.benetti@micronovasrl.com>
+ <1521986953.5301.4.camel@paulk.fr>
+ <20180326100114.fa7vjw342ad6vrb6@flea>
+ <e3e51afb-bb32-7f2f-877e-b6c74d71ab06@micronovasrl.com>
+Message-ID: <20180326114645.lxvw5twhfzwfsswz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 06:43:43PM +0300, Sergey Suloev wrote:
-> I have recently found a critical issue with sun6i SPI driver. It actually
-> found it long time ago while using spidev but I didn't considered it as
-> something important. Now it seems like a blocking issue that prevents using
-> the driver in any serious application.
-
-So is it "critical" or "not important"?
-
-> I have created a DRM driver for a ili9488-based display, its source is
-> available here [1] and device tree overlay [2]. The driver has been
-> successfully verified on RPi3, but? it is failing on sunxi: the driver gets
-> loaded, display seems working but SPI transfers are periodically failing
-> with error -110 (timeout). Due to the issue the picture is frozen and
-> completely refreshed again from time to time.
-
-On which kernel version was this tested?
-
-Do you have any additional details on what exactly is happening?
-
-Is it timeouting because you never received any interrupts? Is the
-first part of your transfer (the one that would fit in the FIFO
-actually done, and it's the second part that fails? Something else?
+On Mon, Mar 26, 2018 at 01:27:05PM +0200, Giulio Benetti wrote:
+> Hi,
+> 
+> Il 26/03/2018 12:01, Maxime Ripard ha scritto:
+> > Hi,
+> > 
+> > On Sun, Mar 25, 2018 at 04:09:13PM +0200, Paul Kocialkowski wrote:
+> > > Le mercredi 21 mars 2018 ? 21:03 +0100, Giulio Benetti a ?crit :
+> > > > The A20 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
+> > > > for the needed pins.
+> > > > 
+> > > > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> > > > ---
+> > > >   arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+> > > >   1 file changed, 8 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi
+> > > > b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > > > index efb5607..bfe6728 100644
+> > > > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> > > > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > > > @@ -922,6 +922,14 @@
+> > > >   				pins = "PI20", "PI21";
+> > > >   				function = "uart7";
+> > > >   			};
+> > > > +
+> > > > +			lcd0_rgb888_pins: lcd0-rgb888-pins {
+> > > 
+> > > It would be more consistent with other pins definitions to have
+> > > underscores in both names and to indicate the index, such as:
+> > > lcd0_rgb888_pins: lcd0_rgb888_pins at 0 {
+> > 
+> > Both your suggestions will generate DTC warnings, and we'd like to get
+> > rid of them eventually :)
+> > 
+> > > This way, other set of pins for LCD (PH0-PH27) can be declared as @1
+> > > when they are needed in the future.
+> > 
+> > A better idea would be to call it lcd0-rgb888-pd-pins, and introduce
+> > the ph variant when it's done.
+> 
+> As I know, only PD is muxed with LCD0.
+> And PH is for LCD1 only.
+> 
+> And LCD0 seems to come out only from PD port according to datasheet,
+> this is why I didn't put @0 after lcd0-rgb888-pins.
+> 
+> So I don't think it makes sense to handle pins in the way Paul suggests.
+> 
+> What do you all think?
+y
+That seems sensible in this case, yes.
 
 Maxime
 
@@ -42,4 +77,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180326/d6ef926f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180326/163e9c0e/attachment-0001.sig>
