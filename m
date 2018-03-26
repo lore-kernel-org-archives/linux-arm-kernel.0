@@ -1,100 +1,69 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 26 Mar 2018 15:12:49 +0100
-Subject: [PATCH v5 22/22] arm64: Add work around for Arm Cortex-A55 Erratum
- 1024718
-In-Reply-To: <1522073569-29174-1-git-send-email-suzuki.poulose@arm.com>
-References: <1522073569-29174-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1522073569-29174-23-git-send-email-suzuki.poulose@arm.com>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Mon, 26 Mar 2018 17:59:09 +0300
+Subject: in-kernel user of ecdsa
+In-Reply-To: <0f698592-8ade-14d4-7891-1c35501c6285@microchip.com>
+References: <0f698592-8ade-14d4-7891-1c35501c6285@microchip.com>
+Message-ID: <4ce3391f-aa02-a157-bce1-754a6a87c8ed@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some variants of the Arm Cortex-55 cores (r0p0, r0p1, r1p0) suffer
-from an erratum 1024718, which causes incorrect updates when DBM/AP
-bits in a page table entry is modified without a break-before-make
-sequence. The work around is to skip enabling the hardware DBM feature
-on the affected cores. The hardware Access Flag management features
-is not affected. There are some other cores suffering from this
-errata, which could be added to the midr_list to trigger the work
-around.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: ckadabi at codeaurora.org
-Reviewed-by: Dave Martin <dave.martin@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
-Changes since V4:
- - Added Reviewed-by from Dave
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 14 ++++++++++++++
- arch/arm64/kernel/cpufeature.c         | 16 +++++++++++++++-
- 3 files changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index c1d520d..3b2f2dd 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -55,6 +55,7 @@ stable kernels.
- | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220        |
- | ARM            | Cortex-A72      | #853709         | N/A                         |
- | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
-+| ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
- | ARM            | MMU-500         | #841119,#826419 | N/A                         |
- |                |                 |                 |                             |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0f350b8..9331baf 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -465,6 +465,20 @@ config ARM64_ERRATUM_843419
- 
- 	  If unsure, say Y.
- 
-+config ARM64_ERRATUM_1024718
-+	bool "Cortex-A55: 1024718: Update of DBM/AP bits without break before make might result in incorrect update"
-+	default y
-+	help
-+	  This option adds work around for Arm Cortex-A55 Erratum 1024718.
-+
-+	  Affected Cortex-A55 cores (r0p0, r0p1, r1p0) could cause incorrect
-+	  update of the hardware dirty bit when the DBM/AP bits are updated
-+	  without a break-before-make. The work around is to disable the usage
-+	  of hardware DBM locally on the affected cores. CPUs not affected by
-+	  erratum will continue to use the feature.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_22375
- 	bool "Cavium erratum 22375, 24313"
- 	default y
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 35e7ae8..381bb40 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -966,9 +966,23 @@ static inline void __cpu_enable_hw_dbm(void)
- 	isb();
- }
- 
-+static bool cpu_has_broken_dbm(void)
-+{
-+	/* List of CPUs which have broken DBM support. */
-+	static const struct midr_range cpus[] = {
-+#ifdef CONFIG_ARM64_ERRATUM_1024718
-+		MIDR_RANGE(MIDR_CORTEX_A55, 0, 0, 1, 0),  // A55 r0p0 -r1p0
-+#endif
-+		{},
-+	};
-+
-+	return is_midr_in_range_list(read_cpuid_id(), cpus);
-+}
-+
- static bool cpu_can_use_dbm(const struct arm64_cpu_capabilities *cap)
- {
--	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU);
-+	return has_cpuid_feature(cap, SCOPE_LOCAL_CPU) &&
-+	       !cpu_has_broken_dbm();
- }
- 
- static void cpu_enable_hw_dbm(struct arm64_cpu_capabilities const *cap)
--- 
-2.7.4
+On 03/12/2018 07:07 PM, Tudor Ambarus wrote:
+
+> Would you consider using ECDSA in the kernel module signing facility?
+
+Any feedback is good. I can invest some time to make this happen, if
+needed.
+
+> When compared with RSA, ECDSA has shorter keys, the key generation
+> process is faster, the sign operation is faster, but the verify
+> operation is slower than with RSA.
+> 
+> Smaller key sizes imply reduced memory footprint and bandwidth that are
+> especially attractive for memory constrained devices. I'm working with
+> such a device, capable of generating ecc keys, secure key storage and
+> ecdsa/ecdh crypto acceleration. I'm trying to find an in-kernel user of
+> ecdsa.
+> 
+> 
+> ECDSA and RSA comparison
+> ------------------------
+> -> ECDSA requires a much smaller key length in order to provide the same
+> security strength as RSA [1]:
+> 
+> Security Strength    RSA (bits)        ECDSA (bits)
+> 112                   2048             224 - 255
+> 128                   3072             256 - 383
+> 192                   7680             384 - 511
+> 256                  15360             512+
+> 
+> 7680 and 15360  keys are not included in the NIST standards for
+> interoperability and efficiency reasons, the keys are just too big.
+> 
+> -> key generation: ECC key generation is faster than IFC (Integer -
+> Factorization Cryptography). RSA private key is based on large prime
+> numbers, while for ECDSA any positive integer less than n is a valid
+> private key.
+> 
+> -> ECDSA sign operations are faster than RSA, but verify operations are
+> slower. Here's an openssl speed test that I've run on my computer:
+> 
+>                    sign    verify    sign/s verify/s
+> rsa 2048 bits 0.000604s 0.000018s   1656.3  56813.7
+> rsa 4096 bits 0.004027s 0.000062s    248.3  16052.5
+> 
+>                               sign    verify    sign/s verify/s
+> 256 bit ecdsa (nistp256)   0.0000s   0.0001s  28986.4  13516.3
+> 384 bit ecdsa (nistp384)   0.0002s   0.0008s   5541.0   1322.2
+> 521 bit ecdsa (nistp521)   0.0003s   0.0006s   3104.2   1756.2
+> 
+> Best,
+> ta
+> 
+> [1] NIST SP 800-57 Pt. 1 Rev. 4, Recommendation for key management
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe keyrings" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
