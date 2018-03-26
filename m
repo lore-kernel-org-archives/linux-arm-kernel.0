@@ -1,60 +1,45 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 26 Mar 2018 19:42:32 +0800
-Subject: [GIT PULL v2 6/6] i.MX defconfig updates for 4.17
-In-Reply-To: <1521113800-16401-6-git-send-email-shawnguo@kernel.org>
-References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
- <1521113800-16401-6-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180326114230.GD8857@dragon>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 26 Mar 2018 13:45:56 +0200
+Subject: sun6i SPI driver issue
+In-Reply-To: <536bf3b1-4440-d060-b22f-2ce7321f4c13@orpaltech.com>
+References: <536bf3b1-4440-d060-b22f-2ce7321f4c13@orpaltech.com>
+Message-ID: <20180326114556.6xgxzq3jrbpah47n@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes for v2:
- - Update commit log of patch "ARM: mxs_defconfig: Re-sync defconfig"
-   to explain the option changes a bit.
+On Mon, Mar 19, 2018 at 06:43:43PM +0300, Sergey Suloev wrote:
+> I have recently found a critical issue with sun6i SPI driver. It actually
+> found it long time ago while using spidev but I didn't considered it as
+> something important. Now it seems like a blocking issue that prevents using
+> the driver in any serious application.
 
+So is it "critical" or "not important"?
 
-The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+> I have created a DRM driver for a ili9488-based display, its source is
+> available here [1] and device tree overlay [2]. The driver has been
+> successfully verified on RPi3, but? it is failing on sunxi: the driver gets
+> loaded, display seems working but SPI transfers are periodically failing
+> with error -110 (timeout). Due to the issue the picture is frozen and
+> completely refreshed again from time to time.
 
-  Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+On which kernel version was this tested?
 
-are available in the git repository at:
+Do you have any additional details on what exactly is happening?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.17
+Is it timeouting because you never received any interrupts? Is the
+first part of your transfer (the one that would fit in the FIFO
+actually done, and it's the second part that fails? Something else?
 
-for you to fetch changes up to 8bc2c29b550c1c9bb923079cca13c4669572ce6a:
+Maxime
 
-  ARM: mxs_defconfig: Re-sync defconfig (2018-03-26 19:23:47 +0800)
-
-----------------------------------------------------------------
-i.MX defconfig updates for 4.17:
- - Re-sync defconfig files by running savedefconfig.
- - Enable generic fsl-asoc-card driver for imx_v4_v5_defconfig.
- - Enable MAG3110 magnetometer sensor driver, AC97 and WM8962 codec
-   driver, DA9062/63 PMIC, RTC and Watchdog support for
-   imx_v6_v7_defconfig.
-
-----------------------------------------------------------------
-Anson Huang (1):
-      ARM: imx_v6_v7_defconfig: select the CONFIG_CPUFREQ_DT
-
-Fabio Estevam (6):
-      ARM: imx_v6_v7_defconfig: Enable AC97 codec support
-      ARM: imx_v6_v7_defconfig: Re-sync defconfig
-      ARM: imx_v6_v7_defconfig: Select CONFIG_SND_SOC_WM8962 explicitly
-      ARM: imx_v4_v5_defconfig: Re-sync defconfig
-      ARM: imx_v4_v5_defconfig: Use the generic fsl-asoc-card driver
-      ARM: mxs_defconfig: Re-sync defconfig
-
-Marco Franchi (1):
-      ARM: imx: Update imx_v6_v7_defconfig for mag3110 support
-
-Peng Fan (1):
-      ARM: imx_v6_v7_defconfig: enable OP-TEE
-
-Stefan Riedmueller (1):
-      ARM: imx_v6_v7_defconfig: Enable Dialog Semiconductor DA9062 driver
-
- arch/arm/configs/imx_v4_v5_defconfig |  9 +++------
- arch/arm/configs/imx_v6_v7_defconfig | 28 +++++++++++++++-------------
- arch/arm/configs/mxs_defconfig       | 14 ++++----------
- 3 files changed, 22 insertions(+), 29 deletions(-)
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180326/d6ef926f/attachment.sig>
