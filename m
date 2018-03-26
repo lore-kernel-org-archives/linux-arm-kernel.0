@@ -1,22 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Mar 2018 17:23:00 -0500
-Subject: [PATCH 1/2] dt-bindings: Document qcom,adreno-gmu
-In-Reply-To: <20180316185152.32020-2-jcrouse@codeaurora.org>
-References: <20180316185152.32020-1-jcrouse@codeaurora.org>
- <20180316185152.32020-2-jcrouse@codeaurora.org>
-Message-ID: <20180326222300.tls7bsnr4pz7ri2t@rob-hp-laptop>
+Date: Mon, 26 Mar 2018 17:23:01 -0500
+Subject: [PATCH net-next 04/12] dt-bindings: net: dwmac-sun8i: Sort
+ syscon compatibles by alphabetical order
+In-Reply-To: <20180317092857.4396-5-wens@csie.org>
+References: <20180317092857.4396-1-wens@csie.org>
+ <20180317092857.4396-5-wens@csie.org>
+Message-ID: <20180326222301.h4bnjovhulclgnok@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 12:51:51PM -0600, Jordan Crouse wrote:
-> Document the device tree bindings for the Adreno GMU device
-> available on Adreno a6xx targets.
+On Sat, Mar 17, 2018 at 05:28:49PM +0800, Chen-Yu Tsai wrote:
+> The A83T syscon compatible was appended to the syscon compatibles list,
+> instead of inserted in to preserve the ordering.
 > 
-> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> Move it to the proper place to keep the list sorted.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/display/msm/gmu.txt        | 54 ++++++++++++++++++++++
->  .../devicetree/bindings/display/msm/gpu.txt        | 10 +++-
->  2 files changed, 62 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
+>  Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
