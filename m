@@ -1,61 +1,94 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 26 Mar 2018 13:20:43 -0300
-Subject: [PATCH v2 2/2] Revert "dt-bindings: ifc: Fix the unit address format
- in the examples"
-In-Reply-To: <1522081243-30871-1-git-send-email-festevam@gmail.com>
-References: <1522081243-30871-1-git-send-email-festevam@gmail.com>
-Message-ID: <1522081243-30871-2-git-send-email-festevam@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 26 Mar 2018 17:22:01 +0100
+Subject: [PATCH 33/38] arm64: Implement thread_struct whitelist for
+ hardened usercopy
+In-Reply-To: <CAGXu5jLHb3BQ9U7g6suoVZwVeETiXiCRbxsprpLNiFxcjcWk1A@mail.gmail.com>
+References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
+ <1515636190-24061-34-git-send-email-keescook@chromium.org>
+ <20180115122458.GI12608@e103592.cambridge.arm.com>
+ <CAGXu5jLHb3BQ9U7g6suoVZwVeETiXiCRbxsprpLNiFxcjcWk1A@mail.gmail.com>
+Message-ID: <20180326162158.GH16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+[Dropped most of the original Cc list, since most people are unlikely to
+care about this thread archaeology.]
 
-This reverts commit 4e017f1419397473cf3db6e9fa020013998b1aa4.
+On Mon, Jan 15, 2018 at 12:06:17PM -0800, Kees Cook wrote:
+> On Mon, Jan 15, 2018 at 4:24 AM, Dave P Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Jan 11, 2018 at 02:03:05AM +0000, Kees Cook wrote:
+> >> This whitelists the FPU register state portion of the thread_struct for
+> >> copying to userspace, instead of the default entire structure.
+> >>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> >> Cc: Ingo Molnar <mingo@kernel.org>
+> >> Cc: James Morse <james.morse@arm.com>
+> >> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+> >> Cc: Dave Martin <Dave.Martin@arm.com>
+> >> Cc: zijun_hu <zijun_hu@htc.com>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Signed-off-by: Kees Cook <keescook@chromium.org>
+> >> ---
+> >>  arch/arm64/Kconfig                 | 1 +
+> >>  arch/arm64/include/asm/processor.h | 8 ++++++++
+> >>  2 files changed, 9 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index a93339f5178f..c84477e6a884 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -90,6 +90,7 @@ config ARM64
+> >>       select HAVE_ARCH_MMAP_RND_BITS
+> >>       select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+> >>       select HAVE_ARCH_SECCOMP_FILTER
+> >> +     select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+> >>       select HAVE_ARCH_TRACEHOOK
+> >>       select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+> >>       select HAVE_ARCH_VMAP_STACK
+> >> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> >> index 023cacb946c3..e58a5864ec89 100644
+> >> --- a/arch/arm64/include/asm/processor.h
+> >> +++ b/arch/arm64/include/asm/processor.h
+> >> @@ -113,6 +113,14 @@ struct thread_struct {
+> >>       struct debug_info       debug;          /* debugging */
+> >>  };
+> >>
+> >> +/* Whitelist the fpsimd_state for copying to userspace. */
+> >> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
+> >> +                                             unsigned long *size)
+> >> +{
+> >> +     *offset = offsetof(struct thread_struct, fpsimd_state);
+> >> +     *size = sizeof(struct fpsimd_state);
+> >
+> > This should be fpsimd_state.user_fpsimd (fpsimd_state.cpu is important
+> > for correctly context switching and not supposed to be user-accessible.
+> > A user copy that encompasses that is definitely a bug).
+> 
+> So, I actually spent some more time looking at this due to the
+> comments from rmk on arm32, and I don't think any whitelist is needed
+> here at all. (i.e. it can be *offset = *size = 0) This is because all
+> the usercopying I could find uses static sizes or bounce buffers, both
+> of which bypass the dynamic-size hardened usercopy checks.
+> 
+> I've been running some arm64 builds now with this change, and I
+> haven't tripped over any problems yet...
 
-As explained by Rob Herring:
+Hmmm, it looks like we may be hitting this with user_regset_copyout()
+when reading the fp regs via ptrace.  This is maybe not surprising,
+since the size comes from userspace for PTRACE_{GET,SET}REGSET.
+Also, while we copy into a bounce buffer for SETREGSET here, we do copy
+straight out of task_struct for GETREGSET here.
 
-"This "fix" is wrong. Memory controllers with chip selects should have
-the chip select in the unit-address. The correct fix here is you should drop
-"simple-bus"."
+This suggests we should have:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Only send the revert patches for now.
+	*offset = offsetof(struct thread_struct, fpsimd_state);
+	*size = sizeof(struct user_fpsimd_state);
 
- Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Thoughts?
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt b/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
-index a4d4b6a..89427b0 100644
---- a/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
-+++ b/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
-@@ -43,7 +43,7 @@ Example:
- 			  0x1 0x0 0x0 0xffa00000 0x00010000
- 			  0x3 0x0 0x0 0xffb00000 0x00020000>;
- 
--		flash at 0 {
-+		flash at 0,0 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "cfi-flash";
-@@ -58,7 +58,7 @@ Example:
- 			};
- 		};
- 
--		flash at 100000000 {
-+		flash at 1,0 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "fsl,ifc-nand";
-@@ -73,7 +73,7 @@ Example:
- 			};
- 		};
- 
--		cpld@@300000000 {
-+		cpld at 3,0 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "fsl,p1010rdb-cpld";
--- 
-2.7.4
+I'm making some assumptions about how the usercopy hardening works.
+
+Cheers
+---Dave
