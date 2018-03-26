@@ -1,86 +1,47 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 26 Mar 2018 18:09:37 +0800
-Subject: [PATCH 1/2] ASoC: mediatek: remove redundant MODULE_ALIAS entries
-Message-ID: <da30b7c1ac29e1d3668a5713cd096a73a8c8dd7d.1522055433.git.sean.wang@mediatek.com>
+Date: Mon, 26 Mar 2018 18:09:38 +0800
+Subject: [PATCH 2/2] ASoC: mediatek: fix module autoloading for OF platform
+ drivers
+In-Reply-To: <da30b7c1ac29e1d3668a5713cd096a73a8c8dd7d.1522055433.git.sean.wang@mediatek.com>
+References: <da30b7c1ac29e1d3668a5713cd096a73a8c8dd7d.1522055433.git.sean.wang@mediatek.com>
+Message-ID: <7b8f10225cef6aef8c623c2c5ddc0a95bce247aa.1522055433.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-MODULE_ALIAS exports information to allow the module to be auto-loaded at
-boot for the drivers registered using legacy platform registration.
-
-However, currently the driver is always used by DT-only platform,
-MODULE_ALIAS is redundant and should be removed properly.
+It's required to create a modules.alias via MODULE_DEVICE_TABLE helper
+for the OF platform driver. Otherwise, module autoloading cannot work.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- sound/soc/mediatek/mt2701/mt2701-cs42448.c       | 1 -
- sound/soc/mediatek/mt2701/mt2701-wm8960.c        | 1 -
- sound/soc/mediatek/mt8173/mt8173-max98090.c      | 1 -
- sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c | 1 -
- sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c | 1 -
- sound/soc/mediatek/mt8173/mt8173-rt5650.c        | 1 -
- 6 files changed, 6 deletions(-)
+ sound/soc/mediatek/mt2701/mt2701-cs42448.c | 1 +
+ sound/soc/mediatek/mt2701/mt2701-wm8960.c  | 1 +
+ 2 files changed, 2 insertions(+)
 
 diff --git a/sound/soc/mediatek/mt2701/mt2701-cs42448.c b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
-index 70f61d5..f664b9d 100644
+index f664b9d..d37a6e1a 100644
 --- a/sound/soc/mediatek/mt2701/mt2701-cs42448.c
 +++ b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
-@@ -409,4 +409,3 @@ module_platform_driver(mt2701_cs42448_machine);
- MODULE_DESCRIPTION("MT2701 CS42448 ALSA SoC machine driver");
- MODULE_AUTHOR("Ir Lian <ir.lian@mediatek.com>");
- MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("mt2701 cs42448 soc card");
+@@ -391,6 +391,7 @@ static const struct of_device_id mt2701_cs42448_machine_dt_match[] = {
+ 	{.compatible = "mediatek,mt2701-cs42448-machine",},
+ 	{}
+ };
++MODULE_DEVICE_TABLE(of, mt2701_cs42448_machine_dt_match);
+ #endif
+ 
+ static struct platform_driver mt2701_cs42448_machine = {
 diff --git a/sound/soc/mediatek/mt2701/mt2701-wm8960.c b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
-index a08ce23..a137057 100644
+index a137057..cbee02e 100644
 --- a/sound/soc/mediatek/mt2701/mt2701-wm8960.c
 +++ b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
-@@ -172,5 +172,4 @@ module_platform_driver(mt2701_wm8960_machine);
- MODULE_DESCRIPTION("MT2701 WM8960 ALSA SoC machine driver");
- MODULE_AUTHOR("Ryder Lee <ryder.lee@mediatek.com>");
- MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("mt2701 wm8960 soc card");
+@@ -153,6 +153,7 @@ static const struct of_device_id mt2701_wm8960_machine_dt_match[] = {
+ 	{.compatible = "mediatek,mt2701-wm8960-machine",},
+ 	{}
+ };
++MODULE_DEVICE_TABLE(of, mt2701_wm8960_machine_dt_match);
+ #endif
  
-diff --git a/sound/soc/mediatek/mt8173/mt8173-max98090.c b/sound/soc/mediatek/mt8173/mt8173-max98090.c
-index e0c2b23..6e58af6 100644
---- a/sound/soc/mediatek/mt8173/mt8173-max98090.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-max98090.c
-@@ -203,5 +203,4 @@ module_platform_driver(mt8173_max98090_driver);
- MODULE_DESCRIPTION("MT8173 MAX98090 ALSA SoC machine driver");
- MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
- MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:mt8173-max98090");
- 
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-index 5a9a548..addbbb3 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-@@ -251,5 +251,4 @@ module_platform_driver(mt8173_rt5650_rt5514_driver);
- MODULE_DESCRIPTION("MT8173 RT5650 and RT5514 SoC machine driver");
- MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
- MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:mtk-rt5650-rt5514");
- 
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-index b724808..f46e4c8 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-@@ -308,5 +308,4 @@ module_platform_driver(mt8173_rt5650_rt5676_driver);
- MODULE_DESCRIPTION("MT8173 RT5650 and RT5676 SoC machine driver");
- MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
- MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:mtk-rt5650-rt5676");
- 
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650.c b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-index 679fc8b..e2e42e6 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-@@ -335,5 +335,4 @@ module_platform_driver(mt8173_rt5650_driver);
- MODULE_DESCRIPTION("MT8173 RT5650 SoC machine driver");
- MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
- MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:mtk-rt5650");
- 
+ static struct platform_driver mt2701_wm8960_machine = {
 -- 
 2.7.4
