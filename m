@@ -1,35 +1,98 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 26 Mar 2018 16:34:41 +0800
-Subject: [PATCH v2] ARM: mxs_defconfig: Re-sync defconfig
-In-Reply-To: <1521220209-27621-1-git-send-email-festevam@gmail.com>
-References: <1521220209-27621-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180326083439.GC8857@dragon>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 26 Mar 2018 11:39:04 +0300
+Subject: [PATCH v4 0/5] Support qcom pinctrl protected pins
+In-Reply-To: <20180323163453.96495-1-swboyd@chromium.org>
+References: <20180323163453.96495-1-swboyd@chromium.org>
+Message-ID: <1522053544.23017.109.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 02:10:09PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Re-sync the defconfig by doing:
-> 
-> make savedefconfig
-> cp defconfig arch/arm/configs/mxs_defconfig
-> 
-> So keep it in sync to help further changes in defconfig.
-> 
-> The explanation for removing the Kconfig symbols:
-> 
-> CONFIG_FHANDLE=y: verified that it is still selected
-> # CONFIG_INPUT_MOUSEDEV_PSAUX is not set: verified that it is still not
-> selected
-> CONFIG_DEVPTS_MULTIPLE_INSTANCES=y: does not exist anymore
-> # CONFIG_DEVKMEM is not set: verified that it is still not selected
-> CONFIG_NVMEM=y: verified that it is still selected
-> CONFIG_LOCKUP_DETECTOR=y: need to select CONFIG_SOFTLOCKUP_DETECTOR now
-> CONFIG_TIMER_STATS=y: does not exist anymore
-> 
-> Boot tested on a imx28evk.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Fri, 2018-03-23 at 09:34 -0700, Stephen Boyd wrote:
+> This patchset proposes a solution to describing the
+> valid                                                                 
+>           
+> pins for a pin controller in a generic way so that
+> qcom                                                                  
+>       
+> platforms can expose the pins that are really
+> available.                                                            
+>                 
+>                                                                       
+>                                                               
+> Typically, this has been done by having drivers and
+> firmware                                                              
+>           
+> descriptions only use pins they know they have access to, and
+> that                                                                  
+> still works now because we no longer read the pin direction
+> at                                                                    
+>   
+> boot. But there are still some userspace drivers and debugfs
+> facilities                                                            
+>  
+> that don't know what pins are available and attempt to read
+> everything                                                            
+>   
+> they can. On qcom platforms, this may lead to a system hang, which
+> isn't                                                            
+> very nice behavior, even if root is the only user that can trigger
+> it.                                                              
+>                                                                       
+>                                                               
+> The proposal is to describe the valid pins and then not allow things
+> to                                                             
+> cause problems by using the invalid pins. Obviously, the firmware
+> may                                                               
+> mess this up, so this is mostly a nice to have feature or a safety
+> net                                                              
+> so that things don't blow up
+> easily.                                                               
 
-Applied, thanks.
+FWIW,
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+
+
+> Changes from v3:
+>  * Split out allocation of mask into subroutine
+>  * Moved that allocation to kmalloc_array()
+>  * Updated qcom driver to simplifiy ACPI logic and fix mem leak
+> 
+> Changes from v2:
+>  * Renamed binding to 'gpio-reserved-ranges'
+>  * Reworked gpiolib patch to not use irqdomains
+>  * Update qcom driver patch to use new valid_mask field
+>                                                                       
+>                                                               
+> Changes from
+> v1:                                                                   
+>                                                  
+>  * Pushed into gpiolib-of core under irq valid line
+> logic                                                                 
+>           
+>  * Fixed up qcom driver patch to free stuff properly and remove custom
+> code                                                         
+>  * Dropped export patch as it got picked
+> up                                                                    
+>                      
+>  * Renamed binding to 'reserved-gpio-ranges'   
+> 
+> 
+> Stephen Boyd (5):
+>   dt-bindings: gpio: Add a gpio-reserved-ranges property
+>   gpiolib: Extract mask allocation into subroutine
+>   gpiolib: Change bitmap allocation to kmalloc_array
+>   gpiolib: Support 'gpio-reserved-ranges' property
+>   pinctrl: qcom: Don't allow protected pins to be requested
+> 
+>  .../devicetree/bindings/gpio/gpio.txt         |  7 +-
+>  drivers/gpio/gpiolib-of.c                     | 24 +++++++
+>  drivers/gpio/gpiolib.c                        | 66 +++++++++++++++++-
+> -
+>  drivers/pinctrl/qcom/pinctrl-msm.c            | 65 +++++++++++++++++-
+>  include/linux/gpio/driver.h                   | 16 +++++
+>  5 files changed, 167 insertions(+), 11 deletions(-)
+> 
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
