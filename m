@@ -1,35 +1,29 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 26 Mar 2018 16:15:12 -0400
-Subject: [net-next PATCH 5/5] net: netcp: support probe deferral
-In-Reply-To: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 26 Mar 2018 22:28:42 +0200
+Subject: [net-next PATCH 3/5] net: netcp: ethss enhancements to support
+ 2u cpsw h/w on K2G SoC
+In-Reply-To: <1522095312-23249-4-git-send-email-m-karicheri2@ti.com>
 References: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1522095312-23249-6-git-send-email-m-karicheri2@ti.com>
+ <1522095312-23249-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20180326202842.GB5862@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The netcp driver shouldn't proceed until the knav qmss and dma
-devices are ready. So return -EPROBE_DEFER if these devices are not
-ready.
+On Mon, Mar 26, 2018 at 04:15:10PM -0400, Murali Karicheri wrote:
+> K2G SoC uses 2u cpsw h/w. It uses RGMII instead of SGMII to interface with
+> Phy. This patch enhances the driver to check RGMII status instead of SGMII
+> status for link state determination. Also map all of the vlan priorities
+> to zero as the packet DMA is enabled to receive only flow id 0 which maps
+> to priority zero.
+> 
+> Additionally, When a phy with rgmii interface requires internal delay, the
+> same is set in the phy driver. To support such phy devices, add a phy-mode
+> handling code in the driver using of_get_phy_mode() and pass the obtained
+> phy mode to of_phy_connect()
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/net/ethernet/ti/netcp_core.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Hi Murali
 
-diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
-index 9c51b25..736f6f7 100644
---- a/drivers/net/ethernet/ti/netcp_core.c
-+++ b/drivers/net/ethernet/ti/netcp_core.c
-@@ -2158,6 +2158,10 @@ static int netcp_probe(struct platform_device *pdev)
- 	struct netcp_module *module;
- 	int ret;
- 
-+	if (!knav_dma_device_ready() ||
-+	    !knav_qmss_device_ready())
-+		return -EPROBE_DEFER;
-+
- 	if (!node) {
- 		dev_err(dev, "could not find device info\n");
- 		return -ENODEV;
--- 
-1.9.1
+Please break this patch up. One patch should do one thing. That makes
+it easy to review. There are too many things going on at once here.
+
+   Andrew
