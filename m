@@ -1,24 +1,40 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 26 Mar 2018 14:49:36 -0700
-Subject: [PATCH 2/2] MAINTAINERS: demote ARM port to "odd fixes"
-In-Reply-To: <CAKv+Gu-pgj_T6NC9==TjbbAZ0cgZkf6dQKi0AyQBHEGnzYGQBw@mail.gmail.com>
-References: <E1ezkgn-0002fO-52@rmk-PC.armlinux.org.uk>
- <CAKv+Gu8v_+P-VwggmUfE5zq353YN6RqG63YQs+xDZVYUtqc=4Q@mail.gmail.com>
- <20180325180931.GF10980@n2100.armlinux.org.uk>
- <CAKv+Gu-pgj_T6NC9==TjbbAZ0cgZkf6dQKi0AyQBHEGnzYGQBw@mail.gmail.com>
-Message-ID: <20180326144936.44f11e7105b8536ada593a6c@linux-foundation.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 27 Mar 2018 09:10:26 +1100
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+Message-ID: <20180327091026.3facbb9d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 25 Mar 2018 19:41:49 +0100 Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+Hi Shawn,
 
-> Nobody is asking you to prioritise voluntary work over paid work. I am
-> asking you to consider offloading some of the responsibility to others
-> if you are failing to cope by yourself.
+Today's linux-next merge of the imx-mxs tree got a conflict in:
 
-That's a sensible proposal and it can be discussed in the appropriate
-venue at an appropriate time (if it is found that we actually have a
-problem!).
+  arch/arm/configs/mxs_defconfig
 
-But all of this seems unrelated to altering the MAINTAINERS file today,
-so I'll scoop up Russell's patches.
+between commit:
+
+  e3e583e7a293 ("ARM: mxs_defconfig: Re-sync defconfig")
+
+from the arm-soc tree and commit:
+
+  8bc2c29b550c ("ARM: mxs_defconfig: Re-sync defconfig")
+
+from the imx-mxs tree.
+
+I fixed it up (I just used the latter version) and can carry the fix as
+necessary. This is now fixed as far as linux-next is concerned, but any
+non trivial conflicts should be mentioned to your upstream maintainer
+when your tree is submitted for merging.  You may also want to consider
+cooperating with the maintainer of the conflicting tree to minimise any
+particularly complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/bde2c949/attachment.sig>
