@@ -1,46 +1,29 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 26 Mar 2018 16:46:29 +0800
-Subject: [PATCH 3/3] iio: adc: meson-axg: add saradc driver
-In-Reply-To: <20180326084629.100070-1-yixun.lan@amlogic.com>
-References: <20180326084629.100070-1-yixun.lan@amlogic.com>
-Message-ID: <20180326084629.100070-4-yixun.lan@amlogic.com>
+From: peng.hao2@zte.com.cn (Peng Hao)
+Date: Tue, 27 Mar 2018 01:07:17 +0800
+Subject: [PATCH] KVM: arm/armv4 : merge the same case handler
+Message-ID: <1522084037-85559-1-git-send-email-peng.hao2@zte.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xingyu Chen <xingyu.chen@amlogic.com>
+The two switch cases have the same handler, so merge them.
 
-Add the SAR ADC driver for the Amlogic Meson-AXG SoC.
-
-Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
 ---
- drivers/iio/adc/meson_saradc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-index 799ed929ab99..a5d481a2b4ef 100644
---- a/drivers/iio/adc/meson_saradc.c
-+++ b/drivers/iio/adc/meson_saradc.c
-@@ -935,6 +935,11 @@ static const struct meson_sar_adc_data meson_sar_adc_gxm_data = {
- 	.name = "meson-gxm-saradc",
- };
- 
-+static const struct meson_sar_adc_data meson_sar_adc_axg_data = {
-+	.param = &meson_sar_adc_gxl_param,
-+	.name = "meson-axg-saradc",
-+};
-+
- static const struct of_device_id meson_sar_adc_of_match[] = {
- 	{
- 		.compatible = "amlogic,meson8-saradc",
-@@ -953,6 +958,9 @@ static const struct of_device_id meson_sar_adc_of_match[] = {
- 	}, {
- 		.compatible = "amlogic,meson-gxm-saradc",
- 		.data = &meson_sar_adc_gxm_data,
-+	}, {
-+		.compatible = "amlogic,meson-axg-saradc",
-+		.data = &meson_sar_adc_axg_data,
- 	},
- 	{},
- };
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 4650953..aa41b29 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1242,8 +1242,6 @@ static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
+ 		ret = vgic_its_cmd_handle_mapc(kvm, its, its_cmd);
+ 		break;
+ 	case GITS_CMD_MAPI:
+-		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
+-		break;
+ 	case GITS_CMD_MAPTI:
+ 		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
+ 		break;
 -- 
-2.15.1
+1.8.3.1
