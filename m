@@ -1,86 +1,156 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 26 Mar 2018 15:05:31 -0400
-Subject: [PATCH v3 1/4] drivers/staging/fsl-mc: Use memremap for DPIO cache
- enabled area
+Date: Mon, 26 Mar 2018 15:05:32 -0400
+Subject: [PATCH v3 2/4] drivers/staging/fsl-mc: Fix DPIO error path issues
 In-Reply-To: <1522091134-24646-1-git-send-email-roy.pledge@nxp.com>
 References: <1522091134-24646-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1522091134-24646-2-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1522091134-24646-3-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the mapping of the QBMan cache enabled area from using ioremap_wc()
-to memremap(). This allows the __iomem attribute to be removed from the
-pointer (which makes sense as accesses try this as cacheable memory not
-IO memory).  These changes allow sparse checks to pass.
+The error path in the dpaa2_dpio_probe() function was not properly
+unmapping the QBMan device memory on the error path. This was also
+missing from the dpaa2_dpio_release() function.
+
+Also addresses a memory leak of the device private data structure.
 
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dpio/dpio-driver.c  | 8 +++++---
- drivers/staging/fsl-mc/bus/dpio/qbman-portal.h | 4 ++--
- drivers/staging/fsl-mc/include/dpaa2-io.h      | 2 +-
- 3 files changed, 8 insertions(+), 6 deletions(-)
+ drivers/staging/fsl-mc/bus/dpio/dpio-driver.c | 49 +++++++++++++++++++--------
+ 1 file changed, 34 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
-index 182b384..e00f473 100644
+index e00f473..e7a0009 100644
 --- a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
 +++ b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
-@@ -13,6 +13,7 @@
- #include <linux/msi.h>
- #include <linux/dma-mapping.h>
- #include <linux/delay.h>
-+#include <linux/io.h>
+@@ -28,6 +28,7 @@ MODULE_DESCRIPTION("DPIO Driver");
  
- #include <linux/fsl/mc.h>
- #include "../../include/dpaa2-io.h"
-@@ -146,10 +147,11 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ struct dpio_priv {
+ 	struct dpaa2_io *io;
++	struct dpaa2_io_desc desc;
+ };
+ 
+ static irqreturn_t dpio_irq_handler(int irq_num, void *arg)
+@@ -85,7 +86,6 @@ static int register_dpio_irq_handlers(struct fsl_mc_device *dpio_dev, int cpu)
+ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ {
+ 	struct dpio_attr dpio_attrs;
+-	struct dpaa2_io_desc desc;
+ 	struct dpio_priv *priv;
+ 	int err = -ENOMEM;
+ 	struct device *dev = &dpio_dev->dev;
+@@ -117,7 +117,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 		dev_err(dev, "dpio_get_attributes() failed %d\n", err);
+ 		goto err_get_attr;
+ 	}
+-	desc.qman_version = dpio_attrs.qbman_version;
++	priv->desc.qman_version = dpio_attrs.qbman_version;
+ 
+ 	err = dpio_enable(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+ 	if (err) {
+@@ -126,9 +126,9 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 	}
+ 
+ 	/* initialize DPIO descriptor */
+-	desc.receives_notifications = dpio_attrs.num_priorities ? 1 : 0;
+-	desc.has_8prio = dpio_attrs.num_priorities == 8 ? 1 : 0;
+-	desc.dpio_id = dpio_dev->obj_desc.id;
++	priv->desc.receives_notifications = dpio_attrs.num_priorities ? 1 : 0;
++	priv->desc.has_8prio = dpio_attrs.num_priorities == 8 ? 1 : 0;
++	priv->desc.dpio_id = dpio_dev->obj_desc.id;
+ 
+ 	/* get the cpu to use for the affinity hint */
+ 	if (next_cpu == -1)
+@@ -139,19 +139,28 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 	if (!cpu_possible(next_cpu)) {
+ 		dev_err(dev, "probe failed. Number of DPIOs exceeds NR_CPUS.\n");
+ 		err = -ERANGE;
+-		goto err_allocate_irqs;
++		goto err_too_many_cpu;
+ 	}
+-	desc.cpu = next_cpu;
++	priv->desc.cpu = next_cpu;
+ 
+ 	/*
  	 * Set the CENA regs to be the cache inhibited area of the portal to
  	 * avoid coherency issues if a user migrates to another core.
  	 */
--	desc.regs_cena = ioremap_wc(dpio_dev->regions[1].start,
--		resource_size(&dpio_dev->regions[1]));
-+	desc.regs_cena = memremap(dpio_dev->regions[1].start,
-+				  resource_size(&dpio_dev->regions[1]),
-+				  MEMREMAP_WC);
- 	desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
--		resource_size(&dpio_dev->regions[1]));
-+				 resource_size(&dpio_dev->regions[1]));
+-	desc.regs_cena = memremap(dpio_dev->regions[1].start,
+-				  resource_size(&dpio_dev->regions[1]),
+-				  MEMREMAP_WC);
+-	desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
+-				 resource_size(&dpio_dev->regions[1]));
++	priv->desc.regs_cena = memremap(dpio_dev->regions[1].start,
++					resource_size(&dpio_dev->regions[1]),
++					MEMREMAP_WC);
++	if (!priv->desc.regs_cena) {
++		dev_err(dev, "memremap failed\n");
++		goto err_too_many_cpu;
++	}
++
++	priv->desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
++				       resource_size(&dpio_dev->regions[1]));
++	if (!priv->desc.regs_cinh) {
++		dev_err(dev, "ioremap failed\n");
++		goto err_ioremap_failed;
++	}
  
  	err = fsl_mc_allocate_irqs(dpio_dev);
  	if (err) {
-diff --git a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h b/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
-index 4488a44..69db3c8 100644
---- a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
-+++ b/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
-@@ -15,7 +15,7 @@ struct qbman_swp;
- /* qbman software portal descriptor structure */
- struct qbman_swp_desc {
- 	void *cena_bar; /* Cache-enabled portal base address */
--	void *cinh_bar; /* Cache-inhibited portal base address */
-+	void __iomem *cinh_bar; /* Cache-inhibited portal base address */
- 	u32 qman_version;
- };
+@@ -159,11 +168,11 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 		goto err_allocate_irqs;
+ 	}
  
-@@ -102,7 +102,7 @@ struct qbman_release_desc {
- /* portal data structure */
- struct qbman_swp {
- 	const struct qbman_swp_desc *desc;
--	void __iomem *addr_cena;
-+	void *addr_cena;
- 	void __iomem *addr_cinh;
+-	err = register_dpio_irq_handlers(dpio_dev, desc.cpu);
++	err = register_dpio_irq_handlers(dpio_dev, priv->desc.cpu);
+ 	if (err)
+ 		goto err_register_dpio_irq;
  
- 	/* Management commands */
-diff --git a/drivers/staging/fsl-mc/include/dpaa2-io.h b/drivers/staging/fsl-mc/include/dpaa2-io.h
-index f71227d..ab51e40 100644
---- a/drivers/staging/fsl-mc/include/dpaa2-io.h
-+++ b/drivers/staging/fsl-mc/include/dpaa2-io.h
-@@ -52,7 +52,7 @@ struct dpaa2_io_desc {
- 	int has_8prio;
- 	int cpu;
- 	void *regs_cena;
--	void *regs_cinh;
-+	void __iomem *regs_cinh;
- 	int dpio_id;
- 	u32 qman_version;
- };
+-	priv->io = dpaa2_io_create(&desc);
++	priv->io = dpaa2_io_create(&priv->desc);
+ 	if (!priv->io) {
+ 		dev_err(dev, "dpaa2_io_create failed\n");
+ 		goto err_dpaa2_io_create;
+@@ -171,7 +180,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 
+ 	dev_info(dev, "probed\n");
+ 	dev_dbg(dev, "   receives_notifications = %d\n",
+-		desc.receives_notifications);
++		priv->desc.receives_notifications);
+ 	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+ 	fsl_mc_portal_free(dpio_dev->mc_io);
+ 
+@@ -182,6 +191,10 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ err_register_dpio_irq:
+ 	fsl_mc_free_irqs(dpio_dev);
+ err_allocate_irqs:
++	iounmap(priv->desc.regs_cinh);
++err_ioremap_failed:
++	memunmap(priv->desc.regs_cena);
++err_too_many_cpu:
+ 	dpio_disable(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+ err_get_attr:
+ 	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+@@ -189,6 +202,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 	fsl_mc_portal_free(dpio_dev->mc_io);
+ err_mcportal:
+ 	dev_set_drvdata(dev, NULL);
++	devm_kfree(dev, priv);
+ err_priv_alloc:
+ 	return err;
+ }
+@@ -230,8 +244,13 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+ 
+ 	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+ 
++	iounmap(priv->desc.regs_cinh);
++	memunmap(priv->desc.regs_cena);
++
+ 	fsl_mc_portal_free(dpio_dev->mc_io);
+ 
++	devm_kfree(dev, priv);
++
+ 	dev_set_drvdata(dev, NULL);
+ 
+ 	return 0;
 -- 
 2.7.4
