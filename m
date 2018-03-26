@@ -1,61 +1,75 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 26 Mar 2018 16:19:33 -0500
-Subject: [PATCH v4 6/8] remoteproc: da8xx: prepare and unprepare the clock
- where needed
-In-Reply-To: <20180323130455.11470-7-brgl@bgdev.pl>
-References: <20180323130455.11470-1-brgl@bgdev.pl>
- <20180323130455.11470-7-brgl@bgdev.pl>
-Message-ID: <07c2258c-b4ca-5dd6-0a9b-47c5a3fac826@ti.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Tue, 27 Mar 2018 00:20:33 +0300
+Subject: [PATCH v2 3/6] ARM: trusted_foundations: do not use naked function
+In-Reply-To: <20180325180959.28008-4-stefan@agner.ch>
+References: <20180325180959.28008-1-stefan@agner.ch>
+ <20180325180959.28008-4-stefan@agner.ch>
+Message-ID: <704c863a-0b5a-6396-d7da-f0ed17b7cca2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2018 08:04 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 25.03.2018 21:09, Stefan Agner wrote:
+> As documented in GCC naked functions should only use Basic asm
+> syntax. The Extended asm or mixture of Basic asm and "C" code is
+> not guaranteed. Currently this works because it was hard coded
+> to follow and check GCC behavior for arguments and register
+> placement.
 > 
-> We're currently switching the platform to using the common clock
-> framework. We need to explicitly prepare and unprepare the rproc
-> clock.
+> Furthermore with clang using parameters in Extended asm in a
+> naked function is not supported:
+>   arch/arm/firmware/trusted_foundations.c:47:10: error: parameter
+>           references not allowed in naked functions
+>                 : "r" (type), "r" (arg1), "r" (arg2)
+>                        ^
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-
-FWIW, I have been able to use this patch even without the CCF adaptation
-as clk_prepare()/clk_unprepare() are stubs returning 0, and the
-effective code would be same as before. Prefer "remoteproc/davinci: ..."
-on the patch subject as was being done previously.
-
-With that,
-Acked-by: Suman Anna <s-anna@ti.com>
-
-regards
-Suman
-
+> Use a regular function to be more portable. This aligns also with
+> the other smc call implementations e.g. in qcom_scm-32.c and
+> bcm_kona_smc.c.
+> 
+> Cc: Dmitry Osipenko <digetx@gmail.com>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Thierry Reding <treding@nvidia.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
->  drivers/remoteproc/da8xx_remoteproc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> Changes in v2:
+> - Keep stmfd/ldmfd to avoid potential ABI issues
 > 
-> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-> index 2b24291337b7..f134192922e0 100644
-> --- a/drivers/remoteproc/da8xx_remoteproc.c
-> +++ b/drivers/remoteproc/da8xx_remoteproc.c
-> @@ -149,9 +149,9 @@ static int da8xx_rproc_start(struct rproc *rproc)
->  
->  	writel(rproc->bootaddr, drproc->bootreg);
->  
-> -	ret = clk_enable(dsp_clk);
-> +	ret = clk_prepare_enable(dsp_clk);
->  	if (ret) {
-> -		dev_err(dev, "clk_enable() failed: %d\n", ret);
-> +		dev_err(dev, "clk_prepare_enable() failed: %d\n", ret);
->  		return ret;
->  	}
->  
-> @@ -165,7 +165,7 @@ static int da8xx_rproc_stop(struct rproc *rproc)
->  	struct da8xx_rproc *drproc = rproc->priv;
->  
->  	davinci_clk_reset_assert(drproc->dsp_clk);
-> -	clk_disable(drproc->dsp_clk);
-> +	clk_disable_unprepare(drproc->dsp_clk);
->  
->  	return 0;
->  }
+>  arch/arm/firmware/trusted_foundations.c | 14 +++++++++-----
+>  1 file changed, 9 insertions(+), 5 deletions(-)
 > 
+> diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+> index 3fb1b5a1dce9..689e6565abfc 100644
+> --- a/arch/arm/firmware/trusted_foundations.c
+> +++ b/arch/arm/firmware/trusted_foundations.c
+> @@ -31,21 +31,25 @@
+>  
+>  static unsigned long cpu_boot_addr;
+>  
+> -static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+> +static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+>  {
+> +	register u32 r0 asm("r0") = type;
+> +	register u32 r1 asm("r1") = arg1;
+> +	register u32 r2 asm("r2") = arg2;
+> +
+>  	asm volatile(
+>  		".arch_extension	sec\n\t"
+> -		"stmfd	sp!, {r4 - r11, lr}\n\t"
+> +		"stmfd	sp!, {r4 - r11}\n\t"
+>  		__asmeq("%0", "r0")
+>  		__asmeq("%1", "r1")
+>  		__asmeq("%2", "r2")
+>  		"mov	r3, #0\n\t"
+>  		"mov	r4, #0\n\t"
+>  		"smc	#0\n\t"
+> -		"ldmfd	sp!, {r4 - r11, pc}"
+> +		"ldmfd	sp!, {r4 - r11}\n\t"
+>  		:
+> -		: "r" (type), "r" (arg1), "r" (arg2)
+> -		: "memory");
+> +		: "r" (r0), "r" (r1), "r" (r2)
+> +		: "memory", "r3", "r12", "lr");
+
+Although seems "lr" won't be affected by SMC invocation because it should be
+banked and hence could be omitted entirely from the code. Maybe somebody could
+confirm this.
