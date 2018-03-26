@@ -1,56 +1,44 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 26 Mar 2018 23:28:19 +0200
-Subject: [PATCH v2 1/2] arm: dts: sun8i: a23/a33: declare NAND pins
-In-Reply-To: <20180326212820.20637-1-miquel.raynal@bootlin.com>
-References: <20180326212820.20637-1-miquel.raynal@bootlin.com>
-Message-ID: <20180326212820.20637-2-miquel.raynal@bootlin.com>
+Date: Mon, 26 Mar 2018 23:28:18 +0200
+Subject: [PATCH v2 0/2] Add Nintendo NES/SuperNES classic support
+Message-ID: <20180326212820.20637-1-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare NAND pins (bus, chip select and ready/busy) for a23/a33 SoCs.
+This series adds support for the NES/SuperNES classic consoles from
+Nintendo. Changes are done in A23/A33 DTSI to add NAND support.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Thanks,
+Miqu?l
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 971f9be699a7..0308e8b21ea5 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -315,6 +315,33 @@
- 				bias-pull-up;
- 			};
- 
-+			nand_pins: nand-pins {
-+				pins = "PC0", "PC1", "PC2", "PC5",
-+				       "PC8", "PC9", "PC10", "PC11",
-+				       "PC12", "PC13", "PC14", "PC15";
-+				function = "nand0";
-+			};
-+
-+			nand_pins_cs0: nand-pins-cs0 {
-+				pins = "PC4";
-+				function = "nand0";
-+			};
-+
-+			nand_pins_cs1: nand-pins-cs1 {
-+				pins = "PC3";
-+				function = "nand0";
-+			};
-+
-+			nand_pins_rb0: nand-pins-rb0 {
-+				pins = "PC6";
-+				function = "nand0";
-+			};
-+
-+			nand_pins_rb1: nand-pins-rb1 {
-+				pins = "PC7";
-+				function = "nand0";
-+			};
-+
- 			pwm0_pins: pwm0 {
- 				pins = "PH0";
- 				function = "pwm0";
+Changes since v1
+================
+
+arm: dts: sun8i: a23/a33: declare NAND pins
+ * Patch created by splitting the v1 in two
+ * Removed the trailing '@0' after the NAND pins declarations
+ * Changed the name of these declarations
+ * Declared all CS/RB lines
+ * Reorganized the pins entry of nand_pins
+
+arm: dts: nes: add Nintendo NES/SuperNES Classic Edition support
+ * Created two DTS: nes-classic and supernes-classic
+ * Moved the NAND pinctrl declaration into the DTSI
+ * Removed the USB hackery explanation
+ * Explained why one UART port is preferred to the other
+
+
+Miquel Raynal (2):
+  arm: dts: sun8i: a23/a33: declare NAND pins
+  arm: dts: nes: add Nintendo NES/SuperNES Classic Edition support
+
+ arch/arm/boot/dts/Makefile                         |  2 +
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 29 ++++++++++
+ .../boot/dts/sun8i-r16-nintendo-nes-classic.dts    | 62 ++++++++++++++++++++++
+ .../dts/sun8i-r16-nintendo-supernes-classic.dts    | 17 ++++++
+ 4 files changed, 110 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts
+ create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-supernes-classic.dts
+
 -- 
 2.14.1
