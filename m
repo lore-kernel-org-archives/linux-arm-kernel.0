@@ -1,95 +1,56 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 26 Mar 2018 23:24:47 +0200
-Subject: [PATCH v2 5/5] drm/atmel-hlcdc: take bridges into account when
- selecting output format
-In-Reply-To: <20180326212447.7380-1-peda@axentia.se>
-References: <20180326212447.7380-1-peda@axentia.se>
-Message-ID: <20180326212447.7380-6-peda@axentia.se>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon, 26 Mar 2018 23:28:19 +0200
+Subject: [PATCH v2 1/2] arm: dts: sun8i: a23/a33: declare NAND pins
+In-Reply-To: <20180326212820.20637-1-miquel.raynal@bootlin.com>
+References: <20180326212820.20637-1-miquel.raynal@bootlin.com>
+Message-ID: <20180326212820.20637-2-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bridges may affect the required bus output format of the encoder, in
-which case it may be wrong to use the output format of the panel or
-connector as is. So, examine if any of the intermediate bridges needs
-specific bus formats (if there are intermediate bridges).
+Declare NAND pins (bus, chip select and ready/busy) for a23/a33 SoCs.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 49 ++++++++++++++++++++++++--
- 1 file changed, 46 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-index d73281095fac..920eb16c0213 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-@@ -226,6 +226,45 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
- #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
- #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 971f9be699a7..0308e8b21ea5 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -315,6 +315,33 @@
+ 				bias-pull-up;
+ 			};
  
-+/* We know that our connectors will only ever have one encoder. Find it. */
-+static struct drm_encoder *atmel_hlcdc_encoder(struct drm_connector *connector)
-+{
-+	struct drm_encoder *encoder;
-+	int i;
++			nand_pins: nand-pins {
++				pins = "PC0", "PC1", "PC2", "PC5",
++				       "PC8", "PC9", "PC10", "PC11",
++				       "PC12", "PC13", "PC14", "PC15";
++				function = "nand0";
++			};
 +
-+	for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
-+		if (!connector->encoder_ids[i])
-+			break;
++			nand_pins_cs0: nand-pins-cs0 {
++				pins = "PC4";
++				function = "nand0";
++			};
 +
-+		encoder = drm_encoder_find(connector->dev, NULL,
-+					   connector->encoder_ids[i]);
-+		if (encoder)
-+			return encoder;
-+	}
++			nand_pins_cs1: nand-pins-cs1 {
++				pins = "PC3";
++				function = "nand0";
++			};
 +
-+	return NULL;
-+}
++			nand_pins_rb0: nand-pins-rb0 {
++				pins = "PC6";
++				function = "nand0";
++			};
 +
-+static int atmel_hlcdc_output_formats(struct drm_connector *connector,
-+				      const u32 **bus_formats)
-+{
-+	struct drm_encoder *encoder = atmel_hlcdc_encoder(connector);
-+	int num_bus_formats;
++			nand_pins_rb1: nand-pins-rb1 {
++				pins = "PC7";
++				function = "nand0";
++			};
 +
-+	if (!encoder)
-+		return 0;
-+
-+	if (encoder->bridge) {
-+		num_bus_formats = drm_bridge_input_formats(encoder->bridge,
-+							   bus_formats);
-+		if (num_bus_formats)
-+			return num_bus_formats;
-+	}
-+
-+	*bus_formats = connector->display_info.bus_formats;
-+	return connector->display_info.num_bus_formats;
-+}
-+
- static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
- {
- 	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
-@@ -238,15 +277,19 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
- 	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
- 
- 	for_each_new_connector_in_state(state->state, connector, cstate, i) {
--		struct drm_display_info *info = &connector->display_info;
-+		int num_bus_formats;
-+		const u32 *bus_formats;
- 		unsigned int supported_fmts = 0;
- 		int j;
- 
-+		num_bus_formats = atmel_hlcdc_output_formats(connector,
-+							     &bus_formats);
-+
- 		if (!cstate->crtc)
- 			continue;
- 
--		for (j = 0; j < info->num_bus_formats; j++) {
--			switch (info->bus_formats[j]) {
-+		for (j = 0; j < num_bus_formats; j++) {
-+			switch (bus_formats[j]) {
- 			case MEDIA_BUS_FMT_RGB444_1X12:
- 				supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
- 				break;
+ 			pwm0_pins: pwm0 {
+ 				pins = "PH0";
+ 				function = "pwm0";
 -- 
-2.11.0
+2.14.1
