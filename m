@@ -1,170 +1,24 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 26 Mar 2018 11:01:57 +0200
-Subject: [RFC 2/2] reset: reset-zynqmp: Adding support for Xilinx zynqmp
- reset controller.
-In-Reply-To: <20180324191100.18363-2-chinnikishore369@gmail.com>
-References: <20180324191100.18363-1-chinnikishore369@gmail.com>
- <20180324191100.18363-2-chinnikishore369@gmail.com>
-Message-ID: <1522054917.5851.2.camel@pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Mar 2018 11:03:20 +0200
+Subject: [PATCH v2] arm64: dts: renesas: eagle: add EtherAVB pins
+In-Reply-To: <382aeecb-c484-ec27-1ef1-8da1673c2c14@cogentembedded.com>
+References: <382aeecb-c484-ec27-1ef1-8da1673c2c14@cogentembedded.com>
+Message-ID: <20180326090319.567udho6m3gsfy6r@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, 2018-03-25 at 00:41 +0530, chinnikishore369 at gmail.com wrote:
-> From: Nava kishore Manne <navam@xilinx.com>
+On Wed, Mar 14, 2018 at 10:58:33PM +0300, Sergei Shtylyov wrote:
+> Add the (previously omitted) EtherAVB pin data to the Eagle board's
+> device tree.
 > 
-> Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-> The zynqmp reset-controller has the ability to reset lines
-> connected to different blocks and peripheral in the Soc.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-
-Thank you for the patch, this driver looks mostly fine to me.
-I just have a few nitpicks below:
-
 > ---
->   drivers/reset/Makefile       |   1 +
->  drivers/reset/reset-zynqmp.c | 106 +++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 107 insertions(+)
->  create mode 100644 drivers/reset/reset-zynqmp.c
-> 
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 132c24f5ddb5..4e1a94acf83f 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -20,4 +20,5 @@ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
->  obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
->  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
->  obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-> +obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
-> 
-> diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
-> new file mode 100644
-> index 000000000000..c8510fa93ad9
-> --- /dev/null
-> +++ b/drivers/reset/reset-zynqmp.c
-> @@ -0,0 +1,106 @@
-[...]
-> +#include <linux/firmware/xilinx/zynqmp/firmware.h>
-> +
-> +#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
-> +#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
-> +
-> +static const struct zynqmp_eemi_ops *eemi_ops;
+> The patch is against the 'renesas-devel-20180314-v4.16-rc5' tag of Simon's
+> 'renesas.git repo. It depends on the R8A77970 PFC driver patch adding EtherAVB
+> pin groups (posted yesterday) in order to work properly...
 
-This seems to depend on some other patches for the EEMI API support.
-Could you point them out to me? I'd just like to see whether the
-ZYNQMP_PM_RESET_* defines agree with the zynqmp-reset.txt DT docs.
-
-> +struct zynqmp_reset {
-> +	struct reset_controller_dev rcdev;
-> +};
-> +
-> +static int zynqmp_reset_assert(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-
-This is not a hard requirement, but it would be nice if you could align
-with the open parentheses such that checkpatch.pl --strict doesn't warn.
-Same for the others below.
-
-> +{
-> +	return eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-> +						PM_RESET_ACTION_ASSERT);
-> +}
-> +
-> +static int zynqmp_reset_deassert(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-> +{
-> +	return eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-> +						PM_RESET_ACTION_RELEASE);
-> +}
-> +
-> +static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-> +{
-> +	int val;
-> +
-> +	eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
-
-Can reset_get_status return an error? If so, please propagate it.
-
-> +	return val;
-> +}
-> +
-> +static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
-> +				unsigned long id)
-> +{
-> +	return eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-> +						PM_RESET_ACTION_PULSE);
-> +}
-> +
-> +static struct reset_control_ops zynqmp_reset_ops = {
-> +	.reset = zynqmp_reset_reset,
-> +	.assert = zynqmp_reset_assert,
-> +	.deassert = zynqmp_reset_deassert,
-> +	.status = zynqmp_reset_status,
-> +};
-> +
-> +static int zynqmp_reset_probe(struct platform_device *pdev)
-> +{
-> +	struct zynqmp_reset *zynqmp_reset;
-> +	int ret;
-> +
-> +	zynqmp_reset = devm_kzalloc(&pdev->dev,
-> +				sizeof(*zynqmp_reset), GFP_KERNEL);
-> +	if (!zynqmp_reset)
-> +		return -ENOMEM;
-> +
-> +	eemi_ops = zynqmp_pm_get_eemi_ops();
-
-Not sure if this can ever happen, but if there are two xlnx,zynqmp-reset 
-in the DT by accident, the probing the second would presumably return an
-error here, thereby overwriting eemi_ops for the first one.
-Perhaps it is safer to either use a local variable and only assign on
-success, or better: move eemi_ops into the zynqmp_reset structure.
-
-> +	if (!eemi_ops)
-> +		return -ENXIO;
-> +
-> +	platform_set_drvdata(pdev, zynqmp_reset);
-> +
-> +	zynqmp_reset->rcdev.ops = &zynqmp_reset_ops;
-> +	zynqmp_reset->rcdev.owner = THIS_MODULE;
-> +	zynqmp_reset->rcdev.of_node = pdev->dev.of_node;
-> +	zynqmp_reset->rcdev.of_reset_n_cells = 1;
-
-This line is not needed. If of_xlate is not set, the core will use
-of_reset_simple_xlate and set of_reset_n_cells to 1.
-
-> +	zynqmp_reset->rcdev.nr_resets = ZYNQMP_NR_RESETS;
-> +
-> +	ret = reset_controller_register(&zynqmp_reset->rcdev);
-> +	if (!ret)
-> +		dev_info(&pdev->dev, "Xilinx zynqmp reset driver probed\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static const struct of_device_id zynqmp_reset_dt_ids[] = {
-> +	{ .compatible = "xlnx,zynqmp-reset", },
-> +	{ },
-> +};
-> +
-> +static struct platform_driver zynqmp_reset_driver = {
-> +	.probe	= zynqmp_reset_probe,
-> +	.driver = {
-> +		.name		= KBUILD_MODNAME,
-> +		.of_match_table	= zynqmp_reset_dt_ids,
-> +	},
-> +};
-> +
-> +static int __init zynqmp_reset_init(void)
-> +{
-> +	return platform_driver_register(&zynqmp_reset_driver);
-> +}
-> +
-> +arch_initcall(zynqmp_reset_init);
-
-regards
-Philipp
+Thanks, I have marked this as deferred, please either:
+* repost or ping me once the dependency is in an RC release or;
+* let me know that its safe to apply this change - that is, it won't cause
+  a regression - without the dependency
