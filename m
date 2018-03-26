@@ -1,75 +1,101 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 26 Mar 2018 09:49:51 +0200
-Subject: [PATCH 1/4] dt-bindings: clock: meson: update documentation with
- hhi syscon
-In-Reply-To: <CAL_JsqKPFbA4duG8tUKwdJTtxXOG+3kMTwu2qAVxb9zgPckL3g@mail.gmail.com>
-References: <20180315115545.1884-1-jbrunet@baylibre.com>
- <20180315115545.1884-2-jbrunet@baylibre.com>
- <20180318125222.kqtybu4hiwvsx3om@rob-hp-laptop>
- <1521385797.6569.90.camel@baylibre.com>
- <CAL_JsqKPFbA4duG8tUKwdJTtxXOG+3kMTwu2qAVxb9zgPckL3g@mail.gmail.com>
-Message-ID: <8712ae70-9771-4438-68e2-9e4b37332de8@baylibre.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Mon, 26 Mar 2018 09:56:40 +0200
+Subject: [PATCH v2 1/6] i2c: i2c-stm32f7: Add 10-bit address support
+In-Reply-To: <20180324224332.apsixpklrgtelak7@ninjato>
+References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
+ <1521650940-11651-2-git-send-email-pierre-yves.mordret@st.com>
+ <20180324224332.apsixpklrgtelak7@ninjato>
+Message-ID: <fd463a3d-354c-d4e9-16a8-2829ccc04adc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/2018 04:04, Rob Herring wrote:
-> On Sun, Mar 18, 2018 at 10:09 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
->> On Sun, 2018-03-18 at 07:52 -0500, Rob Herring wrote:
->>> On Thu, Mar 15, 2018 at 12:55:42PM +0100, Jerome Brunet wrote:
->>>> The HHI register region hosts more than just clocks and needs to
->>>> accessed drivers other than the clock controller, such as the display
->>>> driver.
->>>>
->>>> This register region should be managed by syscon. It is already the case
->>>> on gxbb/gxl and it soon will be on axg. The clock controllers must use
->>>> this system controller instead of directly mapping the registers.
->>>
->>> Sounds like a kernel problem, not a DT one.
->>
->> It's a platform problem, so it has much a kernel problem (solution already
->> merged) as a DT problem
->>
->> DT wise, we've got two devices mapping the same region
->>
->> in arch/arm64/boot/dts/amlogic/meson-gx.dtsi:
->>> system-controller at 0
->>
->> which is used by the display device.
->>
->> and in arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi (same for gxl)
->>> clock-controller at 0
->>
->> It has worked so far because the clock controller claims the region w/o
->> reserving it but it remains unsafe since both device may access the same region.
->> The fix is to have the clock controller go through the existing syscon.
-> 
-> We certainly want to avoid multiple nodes using the same mmio region.
-> 
-> 
->>> With a single child, there is really no point to this change. A single
->>> node can provide multiple functions. Look at nodes that are both reset
->>> and clock providers.
->>
->> There is more than a single user, as explained above and in the cover letter of
->> this series.
-> 
-> Right, but a single node can support more than a single user (or
-> provider). You don't have to have multiple nodes to have multiple
-> users/providers.
-> 
-> Rob
-> 
 
-Hi Rob,
 
-It's a question about user/provider, the syscon node represents the entire mmio
-region which has multiple sparse registers for multiple features, is used
-indirectly by the display driver, ... and has multiple features, non limited to,
-clock controller, multiple power domains,... and it is simpler to represent these
-as subnodes instead of a big fat node.
+On 03/24/2018 11:43 PM, Wolfram Sang wrote:
+> On Wed, Mar 21, 2018 at 05:48:55PM +0100, Pierre-Yves MORDRET wrote:
+>> This patch adds support for 10-bit device address for STM32F7 I2C
+>>
+>> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> 
+> Out of curiosity: how did you test this patch? I never managed to find a
+> 10-bit client (except for an SoC with 10-bit slave mode).
 
-Today, it is already represented like this within the Documentation/devicetree/bindings/power/amlogic,meson-gx-pwrc.txt
-So this binding is only an extension for the clock controller which was mis-architectured
-at the time due to a mis-knowledge of the HW architecture.
+I don't have a 10-bit device either. For testing 10-bit I'm using 2 I2C
+instances from the SoC, one in master mode and the other in slave mode.
 
-Neil
+> 
+>> ---
+>>   Version history:
+>>      v1:
+>>         * Initial
+>>      v2:
+>> ---
+>> ---
+>>  drivers/i2c/busses/i2c-stm32f7.c | 22 +++++++++++++++++-----
+>>  1 file changed, 17 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+>> index f273e28..ae0d15c 100644
+>> --- a/drivers/i2c/busses/i2c-stm32f7.c
+>> +++ b/drivers/i2c/busses/i2c-stm32f7.c
+>> @@ -65,7 +65,12 @@
+>>  #define STM32F7_I2C_CR2_NACK			BIT(15)
+>>  #define STM32F7_I2C_CR2_STOP			BIT(14)
+>>  #define STM32F7_I2C_CR2_START			BIT(13)
+>> +#define STM32F7_I2C_CR2_HEAD10R			BIT(12)
+>> +#define STM32F7_I2C_CR2_ADD10			BIT(11)
+>>  #define STM32F7_I2C_CR2_RD_WRN			BIT(10)
+>> +#define STM32F7_I2C_CR2_SADD10_MASK		GENMASK(9, 0)
+>> +#define STM32F7_I2C_CR2_SADD10(n)		(((n) & \
+>> +						STM32F7_I2C_CR2_SADD10_MASK))
+>>  #define STM32F7_I2C_CR2_SADD7_MASK		GENMASK(7, 1)
+>>  #define STM32F7_I2C_CR2_SADD7(n)		(((n) & 0x7f) << 1)
+>>  
+>> @@ -176,14 +181,14 @@ struct stm32f7_i2c_timings {
+>>  
+>>  /**
+>>   * struct stm32f7_i2c_msg - client specific data
+>> - * @addr: 8-bit slave addr, including r/w bit
+>> + * @addr: 8-bit or 10-bit slave addr, including r/w bit
+>>   * @count: number of bytes to be transferred
+>>   * @buf: data buffer
+>>   * @result: result of the transfer
+>>   * @stop: last I2C msg to be sent, i.e. STOP to be generated
+>>   */
+>>  struct stm32f7_i2c_msg {
+>> -	u8 addr;
+>> +	u16 addr;
+>>  	u32 count;
+>>  	u8 *buf;
+>>  	int result;
+>> @@ -629,8 +634,15 @@ static void stm32f7_i2c_xfer_msg(struct stm32f7_i2c_dev *i2c_dev,
+>>  		cr2 |= STM32F7_I2C_CR2_RD_WRN;
+>>  
+>>  	/* Set slave address */
+>> -	cr2 &= ~STM32F7_I2C_CR2_SADD7_MASK;
+>> -	cr2 |= STM32F7_I2C_CR2_SADD7(f7_msg->addr);
+>> +	cr2 &= ~(STM32F7_I2C_CR2_HEAD10R | STM32F7_I2C_CR2_ADD10);
+>> +	if (msg->flags & I2C_M_TEN) {
+>> +		cr2 &= ~STM32F7_I2C_CR2_SADD10_MASK;
+>> +		cr2 |= STM32F7_I2C_CR2_SADD10(f7_msg->addr);
+>> +		cr2 |= STM32F7_I2C_CR2_ADD10;
+>> +	} else {
+>> +		cr2 &= ~STM32F7_I2C_CR2_SADD7_MASK;
+>> +		cr2 |= STM32F7_I2C_CR2_SADD7(f7_msg->addr);
+>> +	}
+>>  
+>>  	/* Set nb bytes to transfer and reload if needed */
+>>  	cr2 &= ~(STM32F7_I2C_CR2_NBYTES_MASK | STM32F7_I2C_CR2_RELOAD);
+>> @@ -798,7 +810,7 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
+>>  
+>>  static u32 stm32f7_i2c_func(struct i2c_adapter *adap)
+>>  {
+>> -	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+>> +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_10BIT_ADDR;
+>>  }
+>>  
+>>  static struct i2c_algorithm stm32f7_i2c_algo = {
+>> -- 
+>> 2.7.4
+>>
