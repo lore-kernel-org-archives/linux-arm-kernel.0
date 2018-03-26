@@ -1,7 +1,7 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 26 Mar 2018 18:04:18 +0800
-Subject: [PATCH] spi: mediatek: remove redundant MODULE_ALIAS entries
-Message-ID: <58fc8553bdc3cbad8d107a905947b7e4d9c12b92.1522054975.git.sean.wang@mediatek.com>
+Date: Mon, 26 Mar 2018 18:09:37 +0800
+Subject: [PATCH 1/2] ASoC: mediatek: remove redundant MODULE_ALIAS entries
+Message-ID: <da30b7c1ac29e1d3668a5713cd096a73a8c8dd7d.1522055433.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,17 +15,72 @@ MODULE_ALIAS is redundant and should be removed properly.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/spi/spi-mt65xx.c | 1 -
- 1 file changed, 1 deletion(-)
+ sound/soc/mediatek/mt2701/mt2701-cs42448.c       | 1 -
+ sound/soc/mediatek/mt2701/mt2701-wm8960.c        | 1 -
+ sound/soc/mediatek/mt8173/mt8173-max98090.c      | 1 -
+ sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c | 1 -
+ sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c | 1 -
+ sound/soc/mediatek/mt8173/mt8173-rt5650.c        | 1 -
+ 6 files changed, 6 deletions(-)
 
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 86bf456..9fdc2e5 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -856,4 +856,3 @@ module_platform_driver(mtk_spi_driver);
- MODULE_DESCRIPTION("MTK SPI Controller driver");
- MODULE_AUTHOR("Leilk Liu <leilk.liu@mediatek.com>");
+diff --git a/sound/soc/mediatek/mt2701/mt2701-cs42448.c b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
+index 70f61d5..f664b9d 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-cs42448.c
++++ b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
+@@ -409,4 +409,3 @@ module_platform_driver(mt2701_cs42448_machine);
+ MODULE_DESCRIPTION("MT2701 CS42448 ALSA SoC machine driver");
+ MODULE_AUTHOR("Ir Lian <ir.lian@mediatek.com>");
  MODULE_LICENSE("GPL v2");
--MODULE_ALIAS("platform:mtk-spi");
+-MODULE_ALIAS("mt2701 cs42448 soc card");
+diff --git a/sound/soc/mediatek/mt2701/mt2701-wm8960.c b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
+index a08ce23..a137057 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-wm8960.c
++++ b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
+@@ -172,5 +172,4 @@ module_platform_driver(mt2701_wm8960_machine);
+ MODULE_DESCRIPTION("MT2701 WM8960 ALSA SoC machine driver");
+ MODULE_AUTHOR("Ryder Lee <ryder.lee@mediatek.com>");
+ MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("mt2701 wm8960 soc card");
+ 
+diff --git a/sound/soc/mediatek/mt8173/mt8173-max98090.c b/sound/soc/mediatek/mt8173/mt8173-max98090.c
+index e0c2b23..6e58af6 100644
+--- a/sound/soc/mediatek/mt8173/mt8173-max98090.c
++++ b/sound/soc/mediatek/mt8173/mt8173-max98090.c
+@@ -203,5 +203,4 @@ module_platform_driver(mt8173_max98090_driver);
+ MODULE_DESCRIPTION("MT8173 MAX98090 ALSA SoC machine driver");
+ MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
+ MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("platform:mt8173-max98090");
+ 
+diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
+index 5a9a548..addbbb3 100644
+--- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
++++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
+@@ -251,5 +251,4 @@ module_platform_driver(mt8173_rt5650_rt5514_driver);
+ MODULE_DESCRIPTION("MT8173 RT5650 and RT5514 SoC machine driver");
+ MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
+ MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("platform:mtk-rt5650-rt5514");
+ 
+diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
+index b724808..f46e4c8 100644
+--- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
++++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
+@@ -308,5 +308,4 @@ module_platform_driver(mt8173_rt5650_rt5676_driver);
+ MODULE_DESCRIPTION("MT8173 RT5650 and RT5676 SoC machine driver");
+ MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
+ MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("platform:mtk-rt5650-rt5676");
+ 
+diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650.c b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
+index 679fc8b..e2e42e6 100644
+--- a/sound/soc/mediatek/mt8173/mt8173-rt5650.c
++++ b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
+@@ -335,5 +335,4 @@ module_platform_driver(mt8173_rt5650_driver);
+ MODULE_DESCRIPTION("MT8173 RT5650 SoC machine driver");
+ MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
+ MODULE_LICENSE("GPL v2");
+-MODULE_ALIAS("platform:mtk-rt5650");
+ 
 -- 
 2.7.4
