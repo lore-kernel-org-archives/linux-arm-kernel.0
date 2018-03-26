@@ -1,29 +1,24 @@
-From: peng.hao2@zte.com.cn (Peng Hao)
-Date: Tue, 27 Mar 2018 01:07:17 +0800
-Subject: [PATCH] KVM: arm/armv4 : merge the same case handler
-Message-ID: <1522084037-85559-1-git-send-email-peng.hao2@zte.com.cn>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 26 Mar 2018 10:49:22 +0200
+Subject: [PATCH v2] arm64: dts: renesas: r8a77965: Add all MSIOF device
+ nodes
+In-Reply-To: <1521796749-26376-1-git-send-email-geert+renesas@glider.be>
+References: <1521796749-26376-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20180326084921.srkxhjh7uk5ziuss@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two switch cases have the same handler, so merge them.
+On Fri, Mar 23, 2018 at 10:19:09AM +0100, Geert Uytterhoeven wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> 
+> Add the device nodes for all MSIOF SPI controllers.
+> 
+> Based on several similar patches of the R8A7796 device tree
+> by Geert Uytterhoeven <geert+renesas@glider.be>
+> and Simon Horman <horms+renesas@verge.net.au>.
+> 
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> [geert: Use numerical power domain indices for initial r8a77965.dtsi]
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
----
- virt/kvm/arm/vgic/vgic-its.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4650953..aa41b29 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1242,8 +1242,6 @@ static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
- 		ret = vgic_its_cmd_handle_mapc(kvm, its, its_cmd);
- 		break;
- 	case GITS_CMD_MAPI:
--		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
--		break;
- 	case GITS_CMD_MAPTI:
- 		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
- 		break;
--- 
-1.8.3.1
+Thanks, applied.
