@@ -1,21 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Mar 2018 17:25:04 -0500
-Subject: [PATCH v2 3/7] dt-bindings: clock: axg-aoclkc: New binding for
- Meson-AXG SoC
-In-Reply-To: <20180323143816.200573-4-yixun.lan@amlogic.com>
-References: <20180323143816.200573-1-yixun.lan@amlogic.com>
- <20180323143816.200573-4-yixun.lan@amlogic.com>
-Message-ID: <20180326222504.mdsmhxfqlf2fkv3x@rob-hp-laptop>
+Date: Mon, 26 Mar 2018 17:25:11 -0500
+Subject: [PATCH v4 1/5] dt-bindings: gpio: Add a gpio-reserved-ranges
+ property
+In-Reply-To: <20180323163453.96495-2-swboyd@chromium.org>
+References: <20180323163453.96495-1-swboyd@chromium.org>
+ <20180323163453.96495-2-swboyd@chromium.org>
+Message-ID: <20180326222511.hc6tzwb7n3svum2a@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 10:38:12PM +0800, Yixun Lan wrote:
-> Update the dt-binding documentation to support new compatible string
-> for the Amlogic's Meson-AXG SoC.
+On Fri, Mar 23, 2018 at 09:34:49AM -0700, Stephen Boyd wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Some qcom platforms make some GPIOs or pins unavailable for use
+> by non-secure operating systems, and thus reading or writing the
+> registers for those pins will cause access control issues.
+> Introduce a DT property to describe the set of GPIOs that are
+> available for use so that higher level OSes are able to know what
+> pins to avoid reading/writing.
+> 
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Stephen Boyd <swboyd@chromium.org>
 > ---
->  Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/gpio/gpio.txt | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
