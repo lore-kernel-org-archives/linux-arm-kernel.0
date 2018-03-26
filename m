@@ -1,35 +1,34 @@
-From: ilina@codeaurora.org (Lina Iyer)
-Date: Mon, 26 Mar 2018 09:35:20 -0600
-Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
-References: <cover.1521246069.git.collinsd@codeaurora.org>
- <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
- <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
- <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
-Message-ID: <20180326153520.GC22084@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Mar 2018 08:37:14 -0700
+Subject: Regression with arm in next with stack protector
+In-Reply-To: <tencent_79FD53B203715FD7439C6EAB@qq.com>
+References: <20180323181452.GJ5799@atomide.com>
+ <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
+ <20180323121530.f28dc29939d9395268911a4e@linux-foundation.org>
+ <tencent_79FD53B203715FD7439C6EAB@qq.com>
+Message-ID: <20180326153714.GG5700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22 2018 at 19:30 -0600, David Collins wrote:
->Hello Stephen,
->
->Thank you for the very detailed review feedback.
->
->On 03/21/2018 12:07 PM, Stephen Boyd wrote:
->> Quoting David Collins (2018-03-16 18:09:10)
+* ??? <chenhc@lemote.com> [180326 06:59]:
+> Hi, Tony and Fabio,
+> 
+> Could you please upload your kernel binary to somewhere for me? I don't understand why some ARM boards is OK while others are broken.
 
->>> +static int rpmh_regulator_remove(struct platform_device *pdev)
->>> +{
->>> +       struct rpmh_pmic *pmic = platform_get_drvdata(pdev);
->>> +
->>> +       rpmh_release(pmic->rpmh_client);
->>
->> I'm still lost on what rpmh_client is giving us besides more code we
->> don't need. I'll ping the rpmh thread again.
->
->Let's see if Lina is willing to add some devm_* calls so that no cleanup
->is required.
->
-I will look into this.
+Well the kernel I'm testing is just current Linux next cross
+compiled omap2plus_defconfig kernel. I do have few more config
+options enabled like LOCKDEP and DEBUG_ATOMIC_SLEEP, but I
+doubt they matter here :)
 
--- Lina
+Then I'm using gcc-7.3.0 and binutils-2.30 built with the
+buildall.git scripts:
+
+git://git.infradead.org/users/segher/buildall.git
+
+If you still need binaries, let me know.
+
+Do you know which arm devices are working with your patch?
+
+Regards,
+
+Tony
