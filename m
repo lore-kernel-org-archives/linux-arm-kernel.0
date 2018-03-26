@@ -1,130 +1,129 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 26 Mar 2018 10:41:09 -0700
-Subject: [PATCH 33/38] arm64: Implement thread_struct whitelist for
- hardened usercopy
-In-Reply-To: <20180326162158.GH16308@e103592.cambridge.arm.com>
-References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
- <1515636190-24061-34-git-send-email-keescook@chromium.org>
- <20180115122458.GI12608@e103592.cambridge.arm.com>
- <CAGXu5jLHb3BQ9U7g6suoVZwVeETiXiCRbxsprpLNiFxcjcWk1A@mail.gmail.com>
- <20180326162158.GH16308@e103592.cambridge.arm.com>
-Message-ID: <CAGXu5jL1S+CFEruBOaN_yJa7cY+a9gr8cBQgFcYowW=gT5VfSA@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 26 Mar 2018 23:08:54 +0530
+Subject: [PATCH v7 00/11] Add clock driver for Actions S900 SoC
+Message-ID: <20180326173905.22313-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 9:22 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> [Dropped most of the original Cc list, since most people are unlikely to
-> care about this thread archaeology.]
->
-> On Mon, Jan 15, 2018 at 12:06:17PM -0800, Kees Cook wrote:
->> On Mon, Jan 15, 2018 at 4:24 AM, Dave P Martin <Dave.Martin@arm.com> wrote:
->> > On Thu, Jan 11, 2018 at 02:03:05AM +0000, Kees Cook wrote:
->> >> This whitelists the FPU register state portion of the thread_struct for
->> >> copying to userspace, instead of the default entire structure.
->> >>
->> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> >> Cc: Will Deacon <will.deacon@arm.com>
->> >> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
->> >> Cc: Ingo Molnar <mingo@kernel.org>
->> >> Cc: James Morse <james.morse@arm.com>
->> >> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
->> >> Cc: Dave Martin <Dave.Martin@arm.com>
->> >> Cc: zijun_hu <zijun_hu@htc.com>
->> >> Cc: linux-arm-kernel at lists.infradead.org
->> >> Signed-off-by: Kees Cook <keescook@chromium.org>
->> >> ---
->> >>  arch/arm64/Kconfig                 | 1 +
->> >>  arch/arm64/include/asm/processor.h | 8 ++++++++
->> >>  2 files changed, 9 insertions(+)
->> >>
->> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> >> index a93339f5178f..c84477e6a884 100644
->> >> --- a/arch/arm64/Kconfig
->> >> +++ b/arch/arm64/Kconfig
->> >> @@ -90,6 +90,7 @@ config ARM64
->> >>       select HAVE_ARCH_MMAP_RND_BITS
->> >>       select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->> >>       select HAVE_ARCH_SECCOMP_FILTER
->> >> +     select HAVE_ARCH_THREAD_STRUCT_WHITELIST
->> >>       select HAVE_ARCH_TRACEHOOK
->> >>       select HAVE_ARCH_TRANSPARENT_HUGEPAGE
->> >>       select HAVE_ARCH_VMAP_STACK
->> >> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
->> >> index 023cacb946c3..e58a5864ec89 100644
->> >> --- a/arch/arm64/include/asm/processor.h
->> >> +++ b/arch/arm64/include/asm/processor.h
->> >> @@ -113,6 +113,14 @@ struct thread_struct {
->> >>       struct debug_info       debug;          /* debugging */
->> >>  };
->> >>
->> >> +/* Whitelist the fpsimd_state for copying to userspace. */
->> >> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
->> >> +                                             unsigned long *size)
->> >> +{
->> >> +     *offset = offsetof(struct thread_struct, fpsimd_state);
->> >> +     *size = sizeof(struct fpsimd_state);
->> >
->> > This should be fpsimd_state.user_fpsimd (fpsimd_state.cpu is important
->> > for correctly context switching and not supposed to be user-accessible.
->> > A user copy that encompasses that is definitely a bug).
->>
->> So, I actually spent some more time looking at this due to the
->> comments from rmk on arm32, and I don't think any whitelist is needed
->> here at all. (i.e. it can be *offset = *size = 0) This is because all
->> the usercopying I could find uses static sizes or bounce buffers, both
->> of which bypass the dynamic-size hardened usercopy checks.
->>
->> I've been running some arm64 builds now with this change, and I
->> haven't tripped over any problems yet...
->
-> Hmmm, it looks like we may be hitting this with user_regset_copyout()
-> when reading the fp regs via ptrace.  This is maybe not surprising,
+This patchset adds clock support for Actions Semi OWL series
+S900 SoC with relevant clock bindings and device tree info.
 
-Did you get one of the WARNs for it?
+Driver has been validated on Bubblegum-96 board.
 
-> since the size comes from userspace for PTRACE_{GET,SET}REGSET.
-> Also, while we copy into a bounce buffer for SETREGSET here, we do copy
-> straight out of task_struct for GETREGSET here.
+Thanks,
+Mani
 
-Hm, yeah,
+Changes in V7:
 
-> This suggests we should have:
->
->         *offset = offsetof(struct thread_struct, fpsimd_state);
->         *size = sizeof(struct user_fpsimd_state);
+* Fixed gate clock function naming issue reported by Kbuild bot
 
-This is what I had originally for arm64, but when I tried exercising
-this code more recently, it didn't need the whitelist. It really looks
-like I forgot what I had tested the first time, though. :P
+Changes in V6: (https://lkml.org/lkml/2018/3/17/43)
 
-> Thoughts?
+* Fixed warnings generated by Kbuild bot
+* Reused generic fixed factor clk ops for owl-fixed-factor.c
+* Moved S900 register definitions to owl-s900.c
+* Dropped dt-bindings since it got applied
+* Addressed Stephen's comments on whole
 
-Seems like it would be tripped by:
+Changes in V5:
 
-static int __fpr_get(struct task_struct *target,
-                     const struct user_regset *regset,
-                     unsigned int pos, unsigned int count,
-                     void *kbuf, void __user *ubuf, unsigned int start_pos)
-{
-        struct user_fpsimd_state *uregs;
+* Changed I2C clocks to fixed factor clocks
+* Fixed minor issue in S900 PLL clock names
+* Fixed S900 Kconfig
+* Rebased on top of 4.16-rc5
 
-        sve_sync_to_fpsimd(target);
+Changes in V4:
 
-        uregs = &target->thread.fpsimd_state.user_fpsimd;
+* Moved to SPDX license tag for dt-bindings
+* Fixed a warning in owl-common.h
+* Rebased on top of 4.16-rc3
 
-        return user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
-                                   start_pos, start_pos + sizeof(*uregs));
-}
+Changes in V3:
 
-And similarly __fpr_set(), compat_vfp_get(), compat_vfp_set(),
-sve_get(), and sve_set(), ?
+* Completely refactored the clock driver based on sunxi-ng
+  clock structure
+* Removed all owl_ prefixed functions for registering the
+  clock driver and used the registration functions directly
+* Moved to SPDX based license tag
+* Removed module dependencies from the driver
+* Made I2C clocks as simple gate clocks due to the lack of
+  information about factor rates
+* Added Ack from Rob for DT bindings
+* Sourced CMU clock for UART5
 
-> I'm making some assumptions about how the usercopy hardening works.
+Changes in V2: (https://lkml.org/lkml/2017/11/6/840)
 
-I think you're right -- I just tricked myself after looking at arm32.
+* Changed the directory structure to actions/ and used owl- prefix
+  for sources.
+* Fixed MAINTAINERS and added Andreas as Designated Reviewer (R:).
+* Introduced new Kconfig for S900 code part (CONFIG_CLK_OWL_S900).
+* Changed the license from GPLv2 to GPLv2+.
+* Moved fixed clock sources to DT
+* Changed clock-controller node name to cmu in DT
+* Added clocks property to cmu node in DT
+* Changed compatible property value to "actions,s900-cmu"
+* Fixed example UART controller node in documentation
+* Fixed tab vs space issue
 
--Kees
+Changes in V1: (https://lkml.org/lkml/2017/10/31/808)
+
+* Addressed last year's review comments from Stephen
+* https://patchwork.kernel.org/patch/9254471/
+
+Manivannan Sadhasivam (11):
+  arm64: dts: actions: Add S900 clock management unit nodes
+  arm64: dts: actions: Source CMU clock for UART5
+  clk: actions: Add common clock driver support
+  clk: actions: Add gate clock support
+  clk: actions: Add mux clock support
+  clk: actions: Add divider clock support
+  clk: actions: Add factor clock support
+  clk: actions: Add fixed factor clock support
+  clk: actions: Add composite clock support
+  clk: actions: Add pll clock support
+  clk: actions: Add S900 SoC clock support
+
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts |   8 +-
+ arch/arm64/boot/dts/actions/s900.dtsi             |  20 +
+ drivers/clk/Kconfig                               |   1 +
+ drivers/clk/Makefile                              |   1 +
+ drivers/clk/actions/Kconfig                       |  14 +
+ drivers/clk/actions/Makefile                      |  12 +
+ drivers/clk/actions/owl-common.c                  |  89 +++
+ drivers/clk/actions/owl-common.h                  |  41 ++
+ drivers/clk/actions/owl-composite.c               | 199 ++++++
+ drivers/clk/actions/owl-composite.h               | 124 ++++
+ drivers/clk/actions/owl-divider.c                 |  94 +++
+ drivers/clk/actions/owl-divider.h                 |  75 +++
+ drivers/clk/actions/owl-factor.c                  | 222 +++++++
+ drivers/clk/actions/owl-factor.h                  |  83 +++
+ drivers/clk/actions/owl-fixed-factor.h            |  28 +
+ drivers/clk/actions/owl-gate.c                    |  77 +++
+ drivers/clk/actions/owl-gate.h                    |  73 +++
+ drivers/clk/actions/owl-mux.c                     |  60 ++
+ drivers/clk/actions/owl-mux.h                     |  61 ++
+ drivers/clk/actions/owl-pll.c                     | 194 ++++++
+ drivers/clk/actions/owl-pll.h                     |  92 +++
+ drivers/clk/actions/owl-s900.c                    | 721 ++++++++++++++++++++++
+ 22 files changed, 2282 insertions(+), 7 deletions(-)
+ create mode 100644 drivers/clk/actions/Kconfig
+ create mode 100644 drivers/clk/actions/Makefile
+ create mode 100644 drivers/clk/actions/owl-common.c
+ create mode 100644 drivers/clk/actions/owl-common.h
+ create mode 100644 drivers/clk/actions/owl-composite.c
+ create mode 100644 drivers/clk/actions/owl-composite.h
+ create mode 100644 drivers/clk/actions/owl-divider.c
+ create mode 100644 drivers/clk/actions/owl-divider.h
+ create mode 100644 drivers/clk/actions/owl-factor.c
+ create mode 100644 drivers/clk/actions/owl-factor.h
+ create mode 100644 drivers/clk/actions/owl-fixed-factor.h
+ create mode 100644 drivers/clk/actions/owl-gate.c
+ create mode 100644 drivers/clk/actions/owl-gate.h
+ create mode 100644 drivers/clk/actions/owl-mux.c
+ create mode 100644 drivers/clk/actions/owl-mux.h
+ create mode 100644 drivers/clk/actions/owl-pll.c
+ create mode 100644 drivers/clk/actions/owl-pll.h
+ create mode 100644 drivers/clk/actions/owl-s900.c
 
 -- 
-Kees Cook
-Pixel Security
+2.14.1
