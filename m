@@ -1,24 +1,93 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 26 Mar 2018 15:32:15 +0800
-Subject: [PATCH 1/7] ARM: multi_v7_defconfig: add OCOTP driver for NXP SoCs
-In-Reply-To: <20180318203442.19759-1-stefan@agner.ch>
-References: <20180318203442.19759-1-stefan@agner.ch>
-Message-ID: <20180326073214.GB8857@dragon>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 26 Mar 2018 09:35:02 +0200
+Subject: [PATCH] drm/atmel-hlcdc: add command line option to specify preferred
+ depth
+Message-ID: <20180326073502.19259-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 18, 2018 at 09:34:36PM +0100, Stefan Agner wrote:
-> Enable on-chip OTP NVMEM support for NXP i.MX and VF610 SoCs.
-> Since OTP values might be required by drivers required during
-> boot, make sure the driver is built-in (e.g. i.MX thermal
-> driver).
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+I have an sama5d31-based system with 64MB of memory and a 1920x1080
+LVDS display wired for 16-bpp. When I enable legacy fbdev support,
+the contiguous memory allocator invariably fails with the order-11
+allocation for a 1920x1080 at 24-bpp buffer (~6MB). But this HW can never
+make any good use of RGB888, so that is a wasted attempt anyway that
+would also waste precious memory should it succeed.
 
-Arnd,
+Sure, I could rewrite user-space to go directly to KMS etc, and that
+makes the (attempted) order-11 allocation go away, replacing it with
+one order-10 allocation per application restart for a 1920x1080 at 16-bpp
+buffer (<4MB). But after a few restarts, order-10 allocations start to
+fail as well, which is only to be expected AFAIU.
 
-The series looks good to me.  In general, I keep myself away from
-multi_v7_defconfig changes, but if you expect a pull-request from me, I
-can do that.  Let me know how you want to apply the patches.
+So, I'd rather not change user-space (which was originally written
+to target a smaller display) so that I at the same time get the
+benefit of an early pre-allocated fbdev frame-buffer that can be
+reused over and over. But to do that I need to tell the driver that
+16-bpp is the preferred depth. Add a module parameter to do just that.
 
-Shawn
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+I found some inspiration regarding naming and implementation here:
+https://patchwork.kernel.org/patch/9848631/
+
+I have found no feedback on that patch though, which makes me wonder if
+I'm perhaps barking up the wronig tree?
+
+Cheers,
+Peter
+
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+index c1ea5c36b006..f0148627c221 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+@@ -29,6 +29,11 @@
+ 
+ #define ATMEL_HLCDC_LAYER_IRQS_OFFSET		8
+ 
++static int atmel_hlcdc_preferred_depth __read_mostly;
++
++MODULE_PARM_DESC(preferreddepth, "Set preferred bpp");
++module_param_named(preferreddepth, atmel_hlcdc_preferred_depth, int, 0400);
++
+ static const struct atmel_hlcdc_layer_desc atmel_hlcdc_at91sam9n12_layers[] = {
+ 	{
+ 		.name = "base",
+@@ -590,6 +595,7 @@ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
+ 	dev->mode_config.min_height = dc->desc->min_height;
+ 	dev->mode_config.max_width = dc->desc->max_width;
+ 	dev->mode_config.max_height = dc->desc->max_height;
++	dev->mode_config.preferred_depth = 24;
+ 	dev->mode_config.funcs = &mode_config_funcs;
+ 
+ 	return 0;
+@@ -658,7 +664,7 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
+ 
+ 	platform_set_drvdata(pdev, dev);
+ 
+-	drm_fb_cma_fbdev_init(dev, 24, 0);
++	drm_fb_cma_fbdev_init(dev, atmel_hlcdc_preferred_depth, 0);
+ 
+ 	drm_kms_helper_poll_init(dev);
+ 
+@@ -756,6 +762,16 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
+ 	struct drm_device *ddev;
+ 	int ret;
+ 
++	switch (atmel_hlcdc_preferred_depth) {
++	case 0: /* driver default */
++	case 8:
++	case 16:
++	case 24:
++		break;
++	default:
++		return -EINVAL;
++	}
++
+ 	ddev = drm_dev_alloc(&atmel_hlcdc_dc_driver, &pdev->dev);
+ 	if (IS_ERR(ddev))
+ 		return PTR_ERR(ddev);
+-- 
+2.11.0
