@@ -1,43 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Mar 2018 10:55:41 +0100
-Subject: [PATCH v4 2/3] arm64: Implement page table free interfaces
-In-Reply-To: <1521546314-31753-3-git-send-email-cpandya@codeaurora.org>
-References: <1521546314-31753-1-git-send-email-cpandya@codeaurora.org>
- <1521546314-31753-3-git-send-email-cpandya@codeaurora.org>
-Message-ID: <20180326095541.izogc4iak6d7nerm@lakrids.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 26 Mar 2018 12:01:14 +0200
+Subject: [PATCH 4/7] ARM: dts: sun7i: Add pinmux settings for LCD0 RGB888
+ output.
+In-Reply-To: <1521986953.5301.4.camel@paulk.fr>
+References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <1521662593-25468-4-git-send-email-giulio.benetti@micronovasrl.com>
+ <1521986953.5301.4.camel@paulk.fr>
+Message-ID: <20180326100114.fa7vjw342ad6vrb6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 05:15:13PM +0530, Chintan Pandya wrote:
-> +static int __pmd_free_pte_page(pmd_t *pmd, unsigned long addr, bool tlb_inv)
-> +{
-> +	pmd_t *table;
-> +
-> +	if (pmd_val(*pmd)) {
-> +		table = __va(pmd_val(*pmd));
-> +		pmd_clear(pmd);
-> +		/*
-> +		 * FIXME: __flush_tlb_pgtable(&init_mm, addr) is
-> +		 *        ideal candidate here, which exactly
-> +		 *        flushes intermediate pgtables. But,
-> +		 *        this is broken (evident from tests).
-> +		 *        So, use safe TLB op unless that is fixed.
-> +		 */
-> +		if (tlb_inv)
-> +			flush_tlb_kernel_range(addr, addr + PMD_SIZE);
+Hi,
 
-I don't think that __flush_tlb_pgtable() is broken. It's only valid to
-call it for user page tables, since it doesn't affect all ASIDs.
+On Sun, Mar 25, 2018 at 04:09:13PM +0200, Paul Kocialkowski wrote:
+> Le mercredi 21 mars 2018 ? 21:03 +0100, Giulio Benetti a ?crit :
+> > The A20 supports RGB888 with H/V sync from LCD0. Add a pinmux setting
+> > for the needed pins.
+> > 
+> > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> > ---
+> >  arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi
+> > b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > index efb5607..bfe6728 100644
+> > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > @@ -922,6 +922,14 @@
+> >  				pins = "PI20", "PI21";
+> >  				function = "uart7";
+> >  			};
+> > +
+> > +			lcd0_rgb888_pins: lcd0-rgb888-pins {
+> 
+> It would be more consistent with other pins definitions to have
+> underscores in both names and to indicate the index, such as:
+> lcd0_rgb888_pins: lcd0_rgb888_pins at 0 {
 
-We can add a simlar helper for kernel mappings, which affects all ASIDs,
-e.g.
+Both your suggestions will generate DTC warnings, and we'd like to get
+rid of them eventually :)
 
-static inline void __flush_tlb_kernel_pgtable(unsigned long addr)
-{
-	addr >>= 12;
-	__tlbi(vaae1is, addr);
-	dsb(ish);
-}
+> This way, other set of pins for LCD (PH0-PH27) can be declared as @1
+> when they are needed in the future.
 
-Thanks,
-Mark.
+A better idea would be to call it lcd0-rgb888-pd-pins, and introduce
+the ph variant when it's done.
+
+Maxime
+
+
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180326/ea41503e/attachment.sig>
