@@ -1,166 +1,130 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 26 Mar 2018 18:49:01 +0200
-Subject: [PATCH v3] mtd: nand: marvell: Fix clock resource by adding a
- register clock
-In-Reply-To: <20180313103016.7695-1-gregory.clement@bootlin.com>
-References: <20180313103016.7695-1-gregory.clement@bootlin.com>
-Message-ID: <20180326184901.3a3e5fdd@bbrezillon>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 26 Mar 2018 10:41:09 -0700
+Subject: [PATCH 33/38] arm64: Implement thread_struct whitelist for
+ hardened usercopy
+In-Reply-To: <20180326162158.GH16308@e103592.cambridge.arm.com>
+References: <1515636190-24061-1-git-send-email-keescook@chromium.org>
+ <1515636190-24061-34-git-send-email-keescook@chromium.org>
+ <20180115122458.GI12608@e103592.cambridge.arm.com>
+ <CAGXu5jLHb3BQ9U7g6suoVZwVeETiXiCRbxsprpLNiFxcjcWk1A@mail.gmail.com>
+ <20180326162158.GH16308@e103592.cambridge.arm.com>
+Message-ID: <CAGXu5jL1S+CFEruBOaN_yJa7cY+a9gr8cBQgFcYowW=gT5VfSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Mar 2018 11:30:16 +0100
-Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+On Mon, Mar 26, 2018 at 9:22 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> [Dropped most of the original Cc list, since most people are unlikely to
+> care about this thread archaeology.]
+>
+> On Mon, Jan 15, 2018 at 12:06:17PM -0800, Kees Cook wrote:
+>> On Mon, Jan 15, 2018 at 4:24 AM, Dave P Martin <Dave.Martin@arm.com> wrote:
+>> > On Thu, Jan 11, 2018 at 02:03:05AM +0000, Kees Cook wrote:
+>> >> This whitelists the FPU register state portion of the thread_struct for
+>> >> copying to userspace, instead of the default entire structure.
+>> >>
+>> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> >> Cc: Will Deacon <will.deacon@arm.com>
+>> >> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+>> >> Cc: Ingo Molnar <mingo@kernel.org>
+>> >> Cc: James Morse <james.morse@arm.com>
+>> >> Cc: "Peter Zijlstra (Intel)" <peterz@infradead.org>
+>> >> Cc: Dave Martin <Dave.Martin@arm.com>
+>> >> Cc: zijun_hu <zijun_hu@htc.com>
+>> >> Cc: linux-arm-kernel at lists.infradead.org
+>> >> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> >> ---
+>> >>  arch/arm64/Kconfig                 | 1 +
+>> >>  arch/arm64/include/asm/processor.h | 8 ++++++++
+>> >>  2 files changed, 9 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> >> index a93339f5178f..c84477e6a884 100644
+>> >> --- a/arch/arm64/Kconfig
+>> >> +++ b/arch/arm64/Kconfig
+>> >> @@ -90,6 +90,7 @@ config ARM64
+>> >>       select HAVE_ARCH_MMAP_RND_BITS
+>> >>       select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+>> >>       select HAVE_ARCH_SECCOMP_FILTER
+>> >> +     select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+>> >>       select HAVE_ARCH_TRACEHOOK
+>> >>       select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+>> >>       select HAVE_ARCH_VMAP_STACK
+>> >> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+>> >> index 023cacb946c3..e58a5864ec89 100644
+>> >> --- a/arch/arm64/include/asm/processor.h
+>> >> +++ b/arch/arm64/include/asm/processor.h
+>> >> @@ -113,6 +113,14 @@ struct thread_struct {
+>> >>       struct debug_info       debug;          /* debugging */
+>> >>  };
+>> >>
+>> >> +/* Whitelist the fpsimd_state for copying to userspace. */
+>> >> +static inline void arch_thread_struct_whitelist(unsigned long *offset,
+>> >> +                                             unsigned long *size)
+>> >> +{
+>> >> +     *offset = offsetof(struct thread_struct, fpsimd_state);
+>> >> +     *size = sizeof(struct fpsimd_state);
+>> >
+>> > This should be fpsimd_state.user_fpsimd (fpsimd_state.cpu is important
+>> > for correctly context switching and not supposed to be user-accessible.
+>> > A user copy that encompasses that is definitely a bug).
+>>
+>> So, I actually spent some more time looking at this due to the
+>> comments from rmk on arm32, and I don't think any whitelist is needed
+>> here at all. (i.e. it can be *offset = *size = 0) This is because all
+>> the usercopying I could find uses static sizes or bounce buffers, both
+>> of which bypass the dynamic-size hardened usercopy checks.
+>>
+>> I've been running some arm64 builds now with this change, and I
+>> haven't tripped over any problems yet...
+>
+> Hmmm, it looks like we may be hitting this with user_regset_copyout()
+> when reading the fp regs via ptrace.  This is maybe not surprising,
 
-> On Armada 7K/8K we need to explicitly enable the register clock. This
-> clock is optional because not all the SoCs using this IP need it but at
-> least for Armada 7K/8K it is actually mandatory.
-> 
-> The binding documentation is updated accordingly.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+Did you get one of the WARNs for it?
 
-Applied after fixing the typo and the binding doc.
+> since the size comes from userspace for PTRACE_{GET,SET}REGSET.
+> Also, while we copy into a bounce buffer for SETREGSET here, we do copy
+> straight out of task_struct for GETREGSET here.
 
-Thanks,
+Hm, yeah,
 
-Boris
+> This suggests we should have:
+>
+>         *offset = offsetof(struct thread_struct, fpsimd_state);
+>         *size = sizeof(struct user_fpsimd_state);
 
-> ---
-> Changelog:
-> v2 -> v3
->  - Updating the kerneldoc
->  - Renaming unprepare_clk to unprepare_ecc_clk
->  - Adding extra test on the presence of "core" clock to make Boris happy
-> 
-> v1 -> v2
-> 
->  - Removed the unnecessary IS_ERR() call
->  - Skip the reg clock only if it is not present by checking "-ENOENT"
->  - Add a label for uninitializing the reg clock.
-> 
->  .../devicetree/bindings/mtd/marvell-nand.txt       |  6 +++-
->  drivers/mtd/nand/marvell_nand.c                    | 34 ++++++++++++++++++----
->  2 files changed, 33 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> index c08fb477b3c6..4ee9813bf88f 100644
-> --- a/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> +++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-> @@ -14,7 +14,11 @@ Required properties:
->  - #address-cells: shall be set to 1. Encode the NAND CS.
->  - #size-cells: shall be set to 0.
->  - interrupts: shall define the NAND controller interrupt.
-> -- clocks: shall reference the NAND controller clock.
-> +- clocks: shall reference the NAND controller clocks, the second one is
-> +  optional but needed for the Armada 7K/8K SoCs
-> +- clock-names: mandatory if there is a second clock, in this case the
-> +   name must be "core" for the first clock and "reg" for the second
-> +   one
->  - marvell,system-controller: Set to retrieve the syscon node that handles
->    NAND controller related registers (only required with the
->    "marvell,armada-8k-nand[-controller]" compatibles).
-> diff --git a/drivers/mtd/nand/marvell_nand.c b/drivers/mtd/nand/marvell_nand.c
-> index 2196f2a233d6..0e7e8017046a 100644
-> --- a/drivers/mtd/nand/marvell_nand.c
-> +++ b/drivers/mtd/nand/marvell_nand.c
-> @@ -308,6 +308,7 @@ struct marvell_nfc_caps {
->   * @dev:		Parent device (used to print error messages)
->   * @regs:		NAND controller registers
->   * @ecc_clk:		ECC block clock, two times the NAND controller clock
-> + * @reg_clk:		Regsiters clock
->   * @complete:		Completion object to wait for NAND controller events
->   * @assigned_cs:	Bitmask describing already assigned CS lines
->   * @chips:		List containing all the NAND chips attached to
-> @@ -321,6 +322,7 @@ struct marvell_nfc {
->  	struct device *dev;
->  	void __iomem *regs;
->  	struct clk *ecc_clk;
-> +	struct clk *reg_clk;
->  	struct completion complete;
->  	unsigned long assigned_cs;
->  	struct list_head chips;
-> @@ -2739,7 +2741,12 @@ static int marvell_nfc_probe(struct platform_device *pdev)
->  		return irq;
->  	}
->  
-> -	nfc->ecc_clk = devm_clk_get(&pdev->dev, NULL);
-> +	nfc->ecc_clk = devm_clk_get(&pdev->dev, "core");
-> +
-> +	/* Managed the legacy case (when the first clock was not named) */
-> +	if (nfc->ecc_clk == ERR_PTR(-ENOENT))
-> +		nfc->ecc_clk = devm_clk_get(&pdev->dev, NULL);
-> +
->  	if (IS_ERR(nfc->ecc_clk))
->  		return PTR_ERR(nfc->ecc_clk);
->  
-> @@ -2747,12 +2754,24 @@ static int marvell_nfc_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> +	nfc->reg_clk = devm_clk_get(&pdev->dev, "reg");
-> +	if (PTR_ERR(nfc->reg_clk) != -ENOENT) {
-> +		if (!IS_ERR(nfc->reg_clk)) {
-> +			ret = clk_prepare_enable(nfc->reg_clk);
-> +			if (ret)
-> +				goto unprepare_ecc_clk;
-> +		} else {
-> +			ret = PTR_ERR(nfc->reg_clk);
-> +			goto unprepare_ecc_clk;
-> +		}
-> +	}
-> +
->  	marvell_nfc_disable_int(nfc, NDCR_ALL_INT);
->  	marvell_nfc_clear_int(nfc, NDCR_ALL_INT);
->  	ret = devm_request_irq(dev, irq, marvell_nfc_isr,
->  			       0, "marvell-nfc", nfc);
->  	if (ret)
-> -		goto unprepare_clk;
-> +		goto unprepare_reg_clk;
->  
->  	/* Get NAND controller capabilities */
->  	if (pdev->id_entry)
-> @@ -2763,23 +2782,25 @@ static int marvell_nfc_probe(struct platform_device *pdev)
->  	if (!nfc->caps) {
->  		dev_err(dev, "Could not retrieve NFC caps\n");
->  		ret = -EINVAL;
-> -		goto unprepare_clk;
-> +		goto unprepare_reg_clk;
->  	}
->  
->  	/* Init the controller and then probe the chips */
->  	ret = marvell_nfc_init(nfc);
->  	if (ret)
-> -		goto unprepare_clk;
-> +		goto unprepare_reg_clk;
->  
->  	platform_set_drvdata(pdev, nfc);
->  
->  	ret = marvell_nand_chips_init(dev, nfc);
->  	if (ret)
-> -		goto unprepare_clk;
-> +		goto unprepare_reg_clk;
->  
->  	return 0;
->  
-> -unprepare_clk:
-> +unprepare_reg_clk:
-> +	clk_disable_unprepare(nfc->reg_clk);
-> +unprepare_ecc_clk:
->  	clk_disable_unprepare(nfc->ecc_clk);
->  
->  	return ret;
-> @@ -2796,6 +2817,7 @@ static int marvell_nfc_remove(struct platform_device *pdev)
->  		dma_release_channel(nfc->dma_chan);
->  	}
->  
-> +	clk_disable_unprepare(nfc->reg_clk);
->  	clk_disable_unprepare(nfc->ecc_clk);
->  
->  	return 0;
+This is what I had originally for arm64, but when I tried exercising
+this code more recently, it didn't need the whitelist. It really looks
+like I forgot what I had tested the first time, though. :P
 
+> Thoughts?
 
+Seems like it would be tripped by:
+
+static int __fpr_get(struct task_struct *target,
+                     const struct user_regset *regset,
+                     unsigned int pos, unsigned int count,
+                     void *kbuf, void __user *ubuf, unsigned int start_pos)
+{
+        struct user_fpsimd_state *uregs;
+
+        sve_sync_to_fpsimd(target);
+
+        uregs = &target->thread.fpsimd_state.user_fpsimd;
+
+        return user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
+                                   start_pos, start_pos + sizeof(*uregs));
+}
+
+And similarly __fpr_set(), compat_vfp_get(), compat_vfp_set(),
+sve_get(), and sve_set(), ?
+
+> I'm making some assumptions about how the usercopy hardening works.
+
+I think you're right -- I just tricked myself after looking at arm32.
+
+-Kees
 
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Kees Cook
+Pixel Security
