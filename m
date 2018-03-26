@@ -1,32 +1,34 @@
 From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Mon, 26 Mar 2018 14:19:26 +0300
-Subject: [RFC PATCH 1/2] i2c: add bus_freq_hz in i2c_adapter
-Message-ID: <20180326111927.16040-1-tudor.ambarus@microchip.com>
+Date: Mon, 26 Mar 2018 14:19:27 +0300
+Subject: [RFC PATCH 2/2] i2c: at91: provide bus_freq_hz
+In-Reply-To: <20180326111927.16040-1-tudor.ambarus@microchip.com>
+References: <20180326111927.16040-1-tudor.ambarus@microchip.com>
+Message-ID: <20180326111927.16040-2-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The clock-frequency property is not mandatory for the i2c buses. If it's
-not present in device tree, the buses usually asume that it is 100kHZ.
-There are i2c clients that need to know the i2c bus frequency in order to
+not present in device tree, the buses usually assume that is 100kHZ.
+There are i2c clients that need to know the clock frequency in order to
 compute their wake token. Spare the clients of making (wrong) assumptions
-and save the bus frequency in the i2c_adapter structure.
+and provide the bus frequency in adapter.
 
 Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 ---
- include/linux/i2c.h | 1 +
+ drivers/i2c/busses/i2c-at91.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index 44ad14e..7a1f26e 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -671,6 +671,7 @@ struct i2c_adapter {
- 	struct rt_mutex bus_lock;
- 	struct rt_mutex mux_lock;
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index bfd1fdf..d3cd84e 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -1116,6 +1116,7 @@ static int at91_twi_probe(struct platform_device *pdev)
+ 	dev->adapter.quirks = &at91_twi_quirks;
+ 	dev->adapter.dev.parent = dev->dev;
+ 	dev->adapter.nr = pdev->id;
++	dev->adapter.bus_freq_hz = bus_clk_rate;
+ 	dev->adapter.timeout = AT91_I2C_TIMEOUT;
+ 	dev->adapter.dev.of_node = pdev->dev.of_node;
  
-+	u32 bus_freq_hz;
- 	int timeout;			/* in jiffies */
- 	int retries;
- 	struct device dev;		/* the adapter device */
 -- 
 2.9.4
