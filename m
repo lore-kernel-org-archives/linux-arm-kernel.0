@@ -1,22 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Mar 2018 17:23:27 -0500
-Subject: [PATCH V2] ARM: dts: imx7d-pinfunc: update sai select input value
-In-Reply-To: <1521511720-17598-1-git-send-email-Anson.Huang@nxp.com>
-References: <1521511720-17598-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180326055217.bieahycbplgyashh@rob-hp-laptop>
+Date: Mon, 26 Mar 2018 17:24:28 -0500
+Subject: [PATCH 1/7] dt-bindings: add cdtech vendor prefix
+In-Reply-To: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1521662593-25468-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20180326222428.wblragf6dqj6q2xo@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 10:08:40AM +0800, Anson Huang wrote:
-> From: Shengjiu Wang <shengjiu.wang@nxp.com>
+On Wed, Mar 21, 2018 at 09:03:07PM +0100, Giulio Benetti wrote:
+> This adds a vendor prefix "cdtech" for CDTech(H.K.) Electronics Limited
+
+Would be good to have website and/or info about what this company does.
+
 > 
-> Update SAI select input daisy chain value according to
-> Reference Manual.
-> 
-> Signed-off-by: Shengjiu Wang <shengjiu.wang@nxp.com>
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 > ---
->  arch/arm/boot/dts/imx7d-pinfunc.h | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+
+In any case,
 
 Reviewed-by: Rob Herring <robh@kernel.org>
