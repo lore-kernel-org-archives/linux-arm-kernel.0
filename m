@@ -1,247 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Mar 2018 18:49:00 +0100
-Subject: [PATCH v2 05/11] arm64: KVM/mm: Move SEA handling behind a single
- 'claim' interface
-In-Reply-To: <20180322181445.23298-6-james.morse@arm.com>
-References: <20180322181445.23298-1-james.morse@arm.com>
- <20180322181445.23298-6-james.morse@arm.com>
-Message-ID: <08744114-27c0-dc8c-0943-df3dcb80f4a6@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 26 Mar 2018 14:57:35 -0400
+Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
+In-Reply-To: <20180326085313.GA4016@andrea>
+References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
+ <20180325175004.28162-3-ynorov@caviumnetworks.com>
+ <20180326085313.GA4016@andrea>
+Message-ID: <20180326145735.57ba306b@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/03/18 18:14, James Morse wrote:
-> To ensure APEI always takes the same locks when processing a notification
-> we need the nmi-like callers to always call APEI in_nmi(). Add a helper
-> to do the work and claim the notification.
-> 
-> When KVM or the arch code takes an exception that might be a RAS
-> notification, it asks the APEI firmware-first code whether it wants
-> to claim the exception. We can then go on to see if (a future)
-> kernel-first mechanism wants to claim the notification, before
-> falling through to the existing default behaviour.
-> 
-> The NOTIFY_SEA code was merged before we had multiple, possibly
-> interacting, NMI-like notifications and the need to consider kernel
-> first in the future. Make the 'claiming' behaviour explicit.
-> 
-> As we're restructuring the APEI code to allow multiple NMI-like
-> notifications, any notification that might interrupt interrupts-masked
-> code must always be wrapped in nmi_enter()/nmi_exit(). This allows APEI
-> to use in_nmi() to choose between the raw/regular spinlock routines.
-> 
-> We mask SError over this window to prevent an asynchronous RAS error
-> arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> Why does apei_claim_sea() take a pt_regs? This gets used later to take
-> APEI by the hand through NMI->IRQ context, depending on what we
-> interrupted. See patch 11.
-> 
-> Changes since v1:
->  * Tinkered with the commit message
-> 
->  arch/arm64/include/asm/acpi.h      |  3 +++
->  arch/arm64/include/asm/daifflags.h |  1 +
->  arch/arm64/include/asm/kvm_ras.h   | 20 +++++++++++++++++++-
->  arch/arm64/kernel/acpi.c           | 30 ++++++++++++++++++++++++++++++
->  arch/arm64/mm/fault.c              | 31 +++++++------------------------
->  5 files changed, 60 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 32f465a80e4e..256811cd4b8b 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -16,6 +16,7 @@
->  #include <linux/psci.h>
->  
->  #include <asm/cputype.h>
-> +#include <asm/ptrace.h>
->  #include <asm/smp_plat.h>
->  #include <asm/tlbflush.h>
->  
-> @@ -94,6 +95,8 @@ void __init acpi_init_cpus(void);
->  static inline void acpi_init_cpus(void) { }
->  #endif /* CONFIG_ACPI */
->  
-> +int apei_claim_sea(struct pt_regs *regs);
-> +
->  #ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
->  bool acpi_parking_protocol_valid(int cpu);
->  void __init
-> diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-> index 22e4c83de5a5..cbd753855bf3 100644
-> --- a/arch/arm64/include/asm/daifflags.h
-> +++ b/arch/arm64/include/asm/daifflags.h
-> @@ -20,6 +20,7 @@
->  
->  #define DAIF_PROCCTX		0
->  #define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
-> +#define DAIF_ERRCTX		(PSR_I_BIT | PSR_A_BIT)
->  
->  /* mask/save/unmask/restore all exceptions, including interrupts. */
->  static inline void local_daif_mask(void)
-> diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
-> index 5f72b07b7912..9d52bc333110 100644
-> --- a/arch/arm64/include/asm/kvm_ras.h
-> +++ b/arch/arm64/include/asm/kvm_ras.h
-> @@ -4,8 +4,26 @@
->  #ifndef __ARM64_KVM_RAS_H__
->  #define __ARM64_KVM_RAS_H__
->  
-> +#include <linux/acpi.h>
-> +#include <linux/errno.h>
->  #include <linux/types.h>
->  
-> -int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
-> +#include <asm/acpi.h>
-> +
-> +/*
-> + * Was this synchronous external abort a RAS notification?
-> + * Returns '0' for errors handled by some RAS subsystem, or -ENOENT.
-> + *
-> + * Call with irqs unmaksed.
-> + */
-> +static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
-> +{
-> +	int ret = -ENOENT;
-> +
-> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
-> +		ret = apei_claim_sea(NULL);
+On Mon, 26 Mar 2018 10:53:13 +0200
+Andrea Parri <andrea.parri@amarulasolutions.com> wrote:
 
-Nit: it is a bit odd to see this "IS_ENABLED(CONFIG_ACPI_APEI_SEA)"
-check both in this function and in the only other function this calls
-(apei_claim_sea). Could this somehow be improved by having a dummy
-apei_claim_sea if CONFIG_ACPI_APEI doesn't exist?
-
-> +
-> +	return ret;
-> +}
->  
->  #endif /* __ARM64_KVM_RAS_H__ */
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 7b09487ff8fb..6a4823a3eb5e 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -33,6 +33,8 @@
->  
->  #ifdef CONFIG_ACPI_APEI
->  # include <linux/efi.h>
-> +# include <acpi/ghes.h>
-> +# include <asm/daifflags.h>
->  # include <asm/pgtable.h>
->  #endif
->  
-> @@ -261,4 +263,32 @@ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->  		return __pgprot(PROT_NORMAL_NC);
->  	return __pgprot(PROT_DEVICE_nGnRnE);
->  }
-> +
-> +
-> +/*
-> + * Claim Synchronous External Aborts as a firmware first notification.
-> + *
-> + * Used by KVM and the arch do_sea handler.
-> + * @regs may be NULL when called from process context.
-> + */
-> +int apei_claim_sea(struct pt_regs *regs)
-> +{
-> +	int err = -ENOENT;
-> +	unsigned long current_flags = arch_local_save_flags();
-> +
-> +	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
-> +		return err;
-> +
-> +	/*
-> +	 * APEI expects an NMI-like notification to always be called
-> +	 * in NMI context.
-> +	 */
-> +	local_daif_restore(DAIF_ERRCTX);
-> +	nmi_enter();
-> +	err = ghes_notify_sea();
-> +	nmi_exit();
-> +	local_daif_restore(current_flags);
-> +
-> +	return err;
-> +}
->  #endif
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index adac28ce9be3..303c8b425c82 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -18,6 +18,7 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  
-> +#include <linux/acpi.h>
->  #include <linux/extable.h>
->  #include <linux/signal.h>
->  #include <linux/mm.h>
-> @@ -33,6 +34,7 @@
->  #include <linux/preempt.h>
->  #include <linux/hugetlb.h>
->  
-> +#include <asm/acpi.h>
->  #include <asm/bug.h>
->  #include <asm/cmpxchg.h>
->  #include <asm/cpufeature.h>
-> @@ -44,8 +46,6 @@
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
->  
-> -#include <acpi/ghes.h>
-> -
->  struct fault_info {
->  	int	(*fn)(unsigned long addr, unsigned int esr,
->  		      struct pt_regs *regs);
-> @@ -579,19 +579,12 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->  		inf->name, esr, addr);
->  
-> -	/*
-> -	 * Synchronous aborts may interrupt code which had interrupts masked.
-> -	 * Before calling out into the wider kernel tell the interested
-> -	 * subsystems.
-> -	 */
->  	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
-> -		if (interrupts_enabled(regs))
-> -			nmi_enter();
-> -
-> -		ghes_notify_sea();
-> -
-> -		if (interrupts_enabled(regs))
-> -			nmi_exit();
-> +		/*
-> +		 * Return value ignored as we rely on signal merging.
-> +		 * Future patches will make this more robust.
-> +		 */
-> +		apei_claim_sea(regs);
->  	}
->  
->  	info.si_signo = SIGBUS;
-> @@ -673,16 +666,6 @@ static const struct fault_info fault_info[] = {
->  	{ do_bad,		SIGBUS,  BUS_FIXME,	"unknown 63"			},
->  };
->  
-> -int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
-> -{
-> -	int ret = -ENOENT;
-> -
-> -	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
-> -		ret = ghes_notify_sea();
-> -
-> -	return ret;
-> -}
-> -
->  asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
->  					 struct pt_regs *regs)
->  {
+> > --- a/kernel/smp.c
+> > +++ b/kernel/smp.c
+> > @@ -724,6 +724,30 @@ void kick_all_cpus_sync(void)
+> >  }
+> >  EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
+> >  
+> > +/**
+> > + * kick_active_cpus_sync - Force CPUs that are not in extended
+> > + * quiescent state (idle or nohz_full userspace) sync by sending
+> > + * IPI. Extended quiescent state CPUs will sync at the exit of
+> > + * that state.
+> > + */
+> > +void kick_active_cpus_sync(void)
+> > +{
+> > +	int cpu;
+> > +	struct cpumask kernel_cpus;
+> > +
+> > +	smp_mb();  
 > 
+> (A general remark only:)
+> 
+> checkpatch.pl should have warned about the fact that this barrier is
+> missing an accompanying comment (which accesses are being "ordered",
+> what is the pairing barrier, etc.).
 
-Otherwise:
+He could have simply copied the comment above the smp_mb() for
+kick_all_cpus_sync():
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+	/* Make sure the change is visible before we kick the cpus */
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+The kick itself is pretty much a synchronization primitive.
+
+That is, you make some changes and then you need all CPUs to see it,
+and you call: kick_active_cpus_synch(), which is the barrier to make
+sure you previous changes are seen on all CPUS before you proceed
+further. Note, the matching barrier is implicit in the IPI itself.
+
+-- Steve
+
+
+> 
+> Moreover if, as your reply above suggested, your patch is relying on
+> "implicit barriers" (something I would not recommend) then even more
+> so you should comment on these requirements.
+> 
+> This could: (a) force you to reason about the memory ordering stuff,
+> (b) easy the task of reviewing and adopting your patch, (c) easy the
+> task of preserving those requirements (as implementations changes).
+> 
+>   Andrea
+> 
+> 
+> > +
+> > +	cpumask_clear(&kernel_cpus);
+> > +	preempt_disable();
+> > +	for_each_online_cpu(cpu) {
+> > +		if (!rcu_eqs_special_set(cpu))
+> > +			cpumask_set_cpu(cpu, &kernel_cpus);
+> > +	}
+> > +	smp_call_function_many(&kernel_cpus, do_nothing, NULL, 1);
+> > +	preempt_enable();
+> > +}
+> > +EXPORT_SYMBOL_GPL(kick_active_cpus_sync);
+> > +
+> >  /**
+> >   * wake_up_all_idle_cpus - break all cpus out of idle
+> >   * wake_up_all_idle_cpus try to break all cpus which is in idle state even
+> > diff --git a/mm/slab.c b/mm/slab.c
+> > index 324446621b3e..678d5dbd6f46 100644
+> > --- a/mm/slab.c
+> > +++ b/mm/slab.c
+> > @@ -3856,7 +3856,7 @@ static int __do_tune_cpucache(struct kmem_cache *cachep, int limit,
+> >  	 * cpus, so skip the IPIs.
+> >  	 */
+> >  	if (prev)
+> > -		kick_all_cpus_sync();
+> > +		kick_active_cpus_sync();
+> >  
+> >  	check_irq_on();
+> >  	cachep->batchcount = batchcount;
+> > -- 
+> > 2.14.1
+> >   
