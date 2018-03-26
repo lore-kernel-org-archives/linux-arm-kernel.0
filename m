@@ -1,51 +1,30 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Mon, 26 Mar 2018 10:13:06 +0200
-Subject: [PATCH v2 3/6] i2c: i2c-stm32f7: Add initial SMBus protocols
- support
-In-Reply-To: <20180324224911.xz3fz2jojcdrovb4@ninjato>
-References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
- <1521650940-11651-4-git-send-email-pierre-yves.mordret@st.com>
- <20180324224911.xz3fz2jojcdrovb4@ninjato>
-Message-ID: <2fadcd7f-3bfc-997e-a30e-808f6d854f2c@st.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 26 Mar 2018 16:18:06 +0800
+Subject: [PATCH 0/3] clk: meson: drop unnecessary AO clock flags
+Message-ID: <20180326081809.49493-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+  This first two patches will drop unnecessary flags for
+the AO clock driver.
+  The third DTS patch is a follow-up fix for the second patch,
+and I've tested them on P200, P212, Q200, S400 boards.
 
+ Note: this patch series was made on top of patch [0]
 
-On 03/24/2018 11:49 PM, Wolfram Sang wrote:
-> On Wed, Mar 21, 2018 at 05:48:57PM +0100, Pierre-Yves MORDRET wrote:
->> This patch adds SMBus support for I2C controller embedded in STM32F7 Soc.
-> 
->> All SMBus protocols are implemented except SMBus-specific protocols.
-> 
-> What does that mean?
+[0] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
 
-It miss SMBus Host Notification and SMBBus Alert. They are almost ready but I'm
-struggling to put them back to operational state after recent changes related to
-SMBust Host Notification. A more "classic" interrupt base solution has been put
-in place but I fail to use implement it in my side.
-Another patch set is going to be delivered for these 2 commands.
+Yixun Lan (3):
+  clk: meson: drop CLK_SET_RATE_PARENT flag
+  clk: meson: drop CLK_IGNORE_UNUSED flag
+  ARM64: dts: meson: fix clock source of the pclk for UART_AO
 
-> 
->>
->> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
->> ---
->>   Version history:
->>     v1:
->>        * Initial
->>     v2:
->>        * fix Kbuild test robot issue (Unneeded semicolon)
->> ---
->>
->> fixup! i2c: i2c-stm32f7: Add initial SMBus protocols support
->> ---
->>  drivers/i2c/busses/i2c-stm32f7.c | 377 ++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 368 insertions(+), 9 deletions(-)
-> 
-> That is quite some complexity considering we have I2C_FUNC_SMBUS_EMUL. I
-> don't mind, but you really want that?
-> 
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi  | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
+ drivers/clk/meson/axg-aoclk.c               | 1 -
+ drivers/clk/meson/gxbb-aoclk.c              | 1 -
+ 5 files changed, 6 insertions(+), 8 deletions(-)
 
-All SMBBus commands are implemented as such. I never try to emulation commands.
-Should we use emulation SMBus commands or real commands... Don't know.
+-- 
+2.15.1
