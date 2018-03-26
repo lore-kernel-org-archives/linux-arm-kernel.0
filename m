@@ -1,40 +1,22 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 27 Mar 2018 09:10:26 +1100
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-Message-ID: <20180327091026.3facbb9d@canb.auug.org.au>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 26 Mar 2018 17:22:56 -0500
+Subject: [PATCH 1/7] dt-bindings: add compatible string for the A64 DE2 CCU
+In-Reply-To: <20180316175354.21437-2-icenowy@aosc.io>
+References: <20180316175354.21437-1-icenowy@aosc.io>
+ <20180316175354.21437-2-icenowy@aosc.io>
+Message-ID: <20180326222256.fhdcodfx7ff4zyij@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Sat, Mar 17, 2018 at 01:53:48AM +0800, Icenowy Zheng wrote:
+> The Allwinner A64 SoC has a DE2 CCU like the one in the DE2 of Allwinner
+> H5 SoC.
+> 
+> Add a compatible string for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  Documentation/devicetree/bindings/clock/sun8i-de2.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Today's linux-next merge of the imx-mxs tree got a conflict in:
-
-  arch/arm/configs/mxs_defconfig
-
-between commit:
-
-  e3e583e7a293 ("ARM: mxs_defconfig: Re-sync defconfig")
-
-from the arm-soc tree and commit:
-
-  8bc2c29b550c ("ARM: mxs_defconfig: Re-sync defconfig")
-
-from the imx-mxs tree.
-
-I fixed it up (I just used the latter version) and can carry the fix as
-necessary. This is now fixed as far as linux-next is concerned, but any
-non trivial conflicts should be mentioned to your upstream maintainer
-when your tree is submitted for merging.  You may also want to consider
-cooperating with the maintainer of the conflicting tree to minimise any
-particularly complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/bde2c949/attachment.sig>
+Reviewed-by: Rob Herring <robh@kernel.org>
