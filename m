@@ -1,32 +1,49 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 26 Mar 2018 18:02:01 +0800
-Subject: [PATCH] pwm: mediatek: remove redundant MODULE_ALIAS entries
-Message-ID: <0fbf589c69bc584c46c683ee7fa38d80e04624f6.1522055092.git.sean.wang@mediatek.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Mar 2018 11:02:21 +0100
+Subject: [PATCH] arm64: tlbflush: avoid writing RES0 bits
+In-Reply-To: <1521666172-2494-1-git-send-email-pelcan@codeaurora.org>
+References: <1521666172-2494-1-git-send-email-pelcan@codeaurora.org>
+Message-ID: <20180326100220.zbu4dfojofmbesp4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Wed, Mar 21, 2018 at 05:02:52PM -0400, Philip Elcan wrote:
+> Bits [47:44] of the TLBI register operand are RES0 for instructions that
+> require a VA, per the ARM ARM spec, so TLBI operations should avoid writing
+> non-zero values to these bits.
+> 
+> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/tlbflush.h | 16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> index 9e82dd7..dbd22a9 100644
+> --- a/arch/arm64/include/asm/tlbflush.h
+> +++ b/arch/arm64/include/asm/tlbflush.h
+> @@ -60,6 +60,9 @@
+>  		__tlbi(op, (arg) | USER_ASID_FLAG);				\
+>  } while (0)
+>  
+> +/* This macro masks out RES0 bits in the TLBI operand */
+> +#define __TLBI_VADDR(addr) (addr & ~GENMASK_ULL(47, 44))
 
-MODULE_ALIAS exports information to allow the module to be auto-loaded at
-boot for the drivers registered using legacy platform registration.
+If we're going to mask the address bits, it would be simpler to keep the
+valid bits than to clear the invalid bits. i.e.
 
-However, currently the driver is always used by DT-only platform,
-MODULE_ALIAS is redundant and should be removed properly.
+#define __TLBI_VADDR(addr) (addr & GENMASK_ULL(43, 0))
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/pwm/pwm-mediatek.c | 1 -
- 1 file changed, 1 deletion(-)
+Maybe we want a helper that does all of the addr / asid shifting and
+masking, so we do that in one place rather than spreading it across all
+helpers, e.g.
 
-diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-index 98b0a93..328c1247 100644
---- a/drivers/pwm/pwm-mediatek.c
-+++ b/drivers/pwm/pwm-mediatek.c
-@@ -305,5 +305,4 @@ static struct platform_driver mtk_pwm_driver = {
- module_platform_driver(mtk_pwm_driver);
- 
- MODULE_AUTHOR("John Crispin <blogic@openwrt.org>");
--MODULE_ALIAS("platform:mtk-pwm");
- MODULE_LICENSE("GPL");
--- 
-2.7.4
+#define __tlbi_addr(addr, asid)				\
+({							\
+	unsigned long __ta = (addr) >> 12;		\
+	__ta &= GENMASK_ULL(43, 0);			\
+	__ta |= (asid) << 48;				\
+	__ta;						\
+})
+
+Thanks,
+Mark.
