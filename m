@@ -1,64 +1,213 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 26 Mar 2018 23:08:55 +0530
-Subject: [PATCH v7 01/11] arm64: dts: actions: Add S900 clock management unit
- nodes
+Date: Mon, 26 Mar 2018 23:08:57 +0530
+Subject: [PATCH v7 03/11] clk: actions: Add common clock driver support
 In-Reply-To: <20180326173905.22313-1-manivannan.sadhasivam@linaro.org>
 References: <20180326173905.22313-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180326173905.22313-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180326173905.22313-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Actions Semi S900 Clock Management Unit (CMU) nodes
+Add support for Actions Semi common clock driver with generic structures
+and interface functions.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/actions/s900.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/clk/Kconfig              |  1 +
+ drivers/clk/Makefile             |  1 +
+ drivers/clk/actions/Kconfig      |  4 ++
+ drivers/clk/actions/Makefile     |  3 ++
+ drivers/clk/actions/owl-common.c | 89 ++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/actions/owl-common.h | 41 ++++++++++++++++++
+ 6 files changed, 139 insertions(+)
+ create mode 100644 drivers/clk/actions/Kconfig
+ create mode 100644 drivers/clk/actions/Makefile
+ create mode 100644 drivers/clk/actions/owl-common.c
+ create mode 100644 drivers/clk/actions/owl-common.h
 
-diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
-index 11406f6d3a6d..fee0c9557656 100644
---- a/arch/arm64/boot/dts/actions/s900.dtsi
-+++ b/arch/arm64/boot/dts/actions/s900.dtsi
-@@ -4,6 +4,7 @@
-  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 98ce9fc6e6c0..6313a4f4327a 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -238,6 +238,7 @@ config COMMON_CLK_VC5
+ 	  This driver supports the IDT VersaClock 5 and VersaClock 6
+ 	  programmable clock generators.
  
-+#include <dt-bindings/clock/actions,s900-cmu.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
++source "drivers/clk/actions/Kconfig"
+ source "drivers/clk/bcm/Kconfig"
+ source "drivers/clk/hisilicon/Kconfig"
+ source "drivers/clk/imgtec/Kconfig"
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 71ec41e6364f..b7909df532ed 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -56,6 +56,7 @@ obj-$(CONFIG_COMMON_CLK_WM831X)		+= clk-wm831x.o
+ obj-$(CONFIG_COMMON_CLK_XGENE)		+= clk-xgene.o
  
- / {
-@@ -88,6 +89,18 @@
- 		#clock-cells = <0>;
- 	};
- 
-+	losc: losc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+		#clock-cells = <0>;
-+	};
+ # please keep this section sorted lexicographically by directory path name
++obj-y					+= actions/
+ obj-$(CONFIG_COMMON_CLK_AT91)		+= at91/
+ obj-$(CONFIG_ARCH_ARTPEC)		+= axis/
+ obj-$(CONFIG_ARC_PLAT_AXS10X)		+= axs10x/
+diff --git a/drivers/clk/actions/Kconfig b/drivers/clk/actions/Kconfig
+new file mode 100644
+index 000000000000..13a3e5083d43
+--- /dev/null
++++ b/drivers/clk/actions/Kconfig
+@@ -0,0 +1,4 @@
++config CLK_ACTIONS
++	bool "Clock driver for Actions Semi SoCs"
++	depends on ARCH_ACTIONS || COMPILE_TEST
++	default ARCH_ACTIONS
+diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
+new file mode 100644
+index 000000000000..64a50fc2d335
+--- /dev/null
++++ b/drivers/clk/actions/Makefile
+@@ -0,0 +1,3 @@
++obj-$(CONFIG_CLK_ACTIONS)	+= clk-owl.o
 +
-+	diff24M: diff24M {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		#clock-cells = <0>;
-+	};
++clk-owl-y			+= owl-common.o
+diff --git a/drivers/clk/actions/owl-common.c b/drivers/clk/actions/owl-common.c
+new file mode 100644
+index 000000000000..61c1071b5180
+--- /dev/null
++++ b/drivers/clk/actions/owl-common.c
+@@ -0,0 +1,89 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL common clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 +
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
-@@ -154,6 +167,13 @@
- 			status = "disabled";
- 		};
- 
-+		cmu: clock-controller at e0160000 {
-+			compatible = "actions,s900-cmu";
-+			reg = <0x0 0xe0160000 0x0 0x1000>;
-+			clocks = <&hosc>, <&losc>;
-+			#clock-cells = <1>;
-+		};
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
 +
- 		timer: timer at e0228000 {
- 			compatible = "actions,s900-timer";
- 			reg = <0x0 0xe0228000 0x0 0x8000>;
++#include "owl-common.h"
++
++static const struct regmap_config owl_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
++	.max_register	= 0x00cc,
++	.fast_io	= true,
++};
++
++static void owl_clk_set_regmap(const struct owl_clk_desc *desc,
++			 struct regmap *regmap)
++{
++	int i;
++	struct owl_clk_common *clks;
++
++	for (i = 0; i < desc->num_clks; i++) {
++		clks = desc->clks[i];
++		if (!clks)
++			continue;
++
++		clks->regmap = regmap;
++	}
++}
++
++int owl_clk_regmap_init(struct platform_device *pdev,
++			 const struct owl_clk_desc *desc)
++{
++	void __iomem *base;
++	struct regmap *regmap;
++	struct resource *res;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	regmap = devm_regmap_init_mmio(&pdev->dev, base, &owl_regmap_config);
++	if (IS_ERR(regmap)) {
++		pr_err("failed to init regmap\n");
++		return PTR_ERR(regmap);
++	}
++
++	owl_clk_set_regmap(desc, regmap);
++
++	return 0;
++}
++
++int owl_clk_probe(struct device *dev, struct clk_hw_onecell_data *hw_clks)
++{
++	int i, ret;
++	struct clk_hw *hw;
++
++	for (i = 0; i < hw_clks->num; i++) {
++
++		hw = hw_clks->hws[i];
++
++		if (IS_ERR_OR_NULL(hw))
++			continue;
++
++		ret = devm_clk_hw_register(dev, hw);
++		if (ret) {
++			dev_err(dev, "Couldn't register clock %d - %s\n",
++				i, hw->init->name);
++			return ret;
++		}
++	}
++
++	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, hw_clks);
++	if (ret)
++		dev_err(dev, "Failed to add clock provider\n");
++
++	return ret;
++}
+diff --git a/drivers/clk/actions/owl-common.h b/drivers/clk/actions/owl-common.h
+new file mode 100644
+index 000000000000..4fd726ec54a6
+--- /dev/null
++++ b/drivers/clk/actions/owl-common.h
+@@ -0,0 +1,41 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// OWL common clock driver
++//
++// Copyright (c) 2014 Actions Semi Inc.
++// Author: David Liu <liuwei@actions-semi.com>
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#ifndef _OWL_COMMON_H_
++#define _OWL_COMMON_H_
++
++#include <linux/clk-provider.h>
++#include <linux/of_platform.h>
++#include <linux/regmap.h>
++
++struct device_node;
++
++struct owl_clk_common {
++	struct regmap			*regmap;
++	struct clk_hw			hw;
++};
++
++struct owl_clk_desc {
++	struct owl_clk_common		**clks;
++	unsigned long			num_clks;
++	struct clk_hw_onecell_data	*hw_clks;
++};
++
++static inline struct owl_clk_common *
++	hw_to_owl_clk_common(const struct clk_hw *hw)
++{
++	return container_of(hw, struct owl_clk_common, hw);
++}
++
++int owl_clk_regmap_init(struct platform_device *pdev,
++			 const struct owl_clk_desc *desc);
++int owl_clk_probe(struct device *dev, struct clk_hw_onecell_data *hw_clks);
++
++#endif /* _OWL_COMMON_H_ */
 -- 
 2.14.1
