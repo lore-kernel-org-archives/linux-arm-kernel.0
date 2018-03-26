@@ -1,87 +1,29 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 26 Mar 2018 16:18:09 +0800
-Subject: [PATCH 3/3] ARM64: dts: meson: fix clock source of the pclk for
- UART_AO
-In-Reply-To: <20180326081809.49493-1-yixun.lan@amlogic.com>
-References: <20180326081809.49493-1-yixun.lan@amlogic.com>
-Message-ID: <20180326081809.49493-4-yixun.lan@amlogic.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Mon, 26 Mar 2018 10:20:05 +0200
+Subject: [PATCH v2 4/6] i2c: i2c-stm32: Add generic DMA API
+In-Reply-To: <20180324225138.d5yipagxiouoyqtl@ninjato>
+References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
+ <1521650940-11651-5-git-send-email-pierre-yves.mordret@st.com>
+ <20180324225138.d5yipagxiouoyqtl@ninjato>
+Message-ID: <43b6d8d7-37e6-1fe8-6a53-0202ab25cfb1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From the hardware perspective, the clk81 is the parent of
-the UART_AO clocks. So it make more sense to mark
-the CLKID_AO_UART1/2 as the pclk.
+Thanks for the heads-up !
+My driver supports DMA, but hardly used in the system.
 
-Previous we had flag=CLK_IGNORE_UNUSED in AO clock driver.
-This will make kernel leave clock as it is while bootloader
-set the clock on.
+But it's worth to mentioned it.
 
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi  | 4 ++--
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 48584d5a329b..e538e2448bb5 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -533,7 +533,7 @@
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
- 				reg = <0x0 0x3000 0x0 0x18>;
- 				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
--				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
- 				clock-names = "xtal", "pclk", "baud";
- 				status = "disabled";
- 			};
-@@ -542,7 +542,7 @@
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
- 				reg = <0x0 0x4000 0x0 0x18>;
- 				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
--				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
- 				clock-names = "xtal", "pclk", "baud";
- 				status = "disabled";
- 			};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 3290a4dc3522..a458ea50c2ef 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -783,12 +783,12 @@
- };
- 
- &uart_AO {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
- &uart_AO_B {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 4f355f17eed6..474f4f9630e4 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -733,12 +733,12 @@
- };
- 
- &uart_AO {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
- &uart_AO_B {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
--- 
-2.15.1
+On 03/24/2018 11:51 PM, Wolfram Sang wrote:
+> On Wed, Mar 21, 2018 at 05:48:58PM +0100, Pierre-Yves MORDRET wrote:
+>> This patch adds a generic DMA API to implement DMA support for i2c-stm32fx
+>> drivers
+>>
+>> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> 
+> In case you haven't read it so far, there is a new document about I2C &
+> DMA -> Documentation/i2c/DMA-considerations
+> 
+> Just so you know...
+> 
