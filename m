@@ -1,101 +1,156 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Mon, 26 Mar 2018 23:24:44 +0200
-Subject: [PATCH v2 2/5] drm: bridge: add API to query the expected input
- formats of bridges
+Date: Mon, 26 Mar 2018 23:24:45 +0200
+Subject: [PATCH v2 3/5] drm: of: add display bus-format parser
 In-Reply-To: <20180326212447.7380-1-peda@axentia.se>
 References: <20180326212447.7380-1-peda@axentia.se>
-Message-ID: <20180326212447.7380-3-peda@axentia.se>
+Message-ID: <20180326212447.7380-4-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bridges may affect the required bus output format of the encoder, in
-which case it may be wrong to use the output format of the panel or
-connector as is. Add infrastructure to address this problem.
+Add a common API to parse display bus format strings into fourcc codes.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/gpu/drm/drm_bridge.c | 32 ++++++++++++++++++++++++++++++++
- include/drm/drm_bridge.h     | 18 ++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ .../devicetree/bindings/display/bus-format.txt     | 35 +++++++++++++
+ drivers/gpu/drm/drm_of.c                           | 59 ++++++++++++++++++++++
+ include/drm/drm_of.h                               |  9 ++++
+ 3 files changed, 103 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bus-format.txt
 
-diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
-index 1638bfe9627c..f85e61b7416e 100644
---- a/drivers/gpu/drm/drm_bridge.c
-+++ b/drivers/gpu/drm/drm_bridge.c
-@@ -348,6 +348,38 @@ void drm_bridge_enable(struct drm_bridge *bridge)
+diff --git a/Documentation/devicetree/bindings/display/bus-format.txt b/Documentation/devicetree/bindings/display/bus-format.txt
+new file mode 100644
+index 000000000000..590e6c73f3dc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bus-format.txt
+@@ -0,0 +1,35 @@
++Bus formats in the display pipe
++===============================
++
++Various encoders in display controllers output the pixels in different
++formats. Circuits handling display connectors and hardwired panels also
++expect pixel input in various formats. We call these formats bus formats.
++
++Some bus formats are:
++
++Parallel
++--------
++
++rgb888
++	8 parallel lines for red, green and blue respectively. There are
++	also lines for the pixel-clock, horizontal-sync, vertical-sync
++	and data-enable.
++
++rgb666
++	Same as rgb888, but with 6 lines per color.
++
++rgb565
++	Same as rgb888, but with 6 green lines and 5 red and blue lines.
++
++rgb444
++	Same as rgb888, but with 4 lines per color.
++
++
++LVDS
++----
++
++jeida-18
++jeida-24
++vesa-24
++	These are LVDS bus formats, see the data-mapping property in
++	panel/panel-lvds.txt for a description of these bus formats.
+diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+index 4c191c050e7d..5f65471225bb 100644
+--- a/drivers/gpu/drm/drm_of.c
++++ b/drivers/gpu/drm/drm_of.c
+@@ -262,3 +262,62 @@ int drm_of_find_panel_or_bridge(const struct device_node *np,
+ 	return ret;
  }
- EXPORT_SYMBOL(drm_bridge_enable);
- 
-+/**
-+ * drm_bridge_input_formats - get the expected bus input format of the bridge
-+ * @bridge: bridge control structure
-+ * @bus_formats: where to store a pointer to the bus input formats
+ EXPORT_SYMBOL_GPL(drm_of_find_panel_or_bridge);
++
++/*
++ * drm_of_bus_formats - parse list of bus format strings into drm fourcc
++ * @np: device tree node containing bus format property
++ * @propname: name of bus format property
++ * @bus_formats: array of parsed fourcc codes
 + *
-+ * Calls the &drm_bridge_funcs.input_formats op for the frist bridge in the
-+ * chain that has registered this op.
++ * On success, @bus_formats points to a location where the actual drm
++ * fourcc codes are.
++ * WARNING: The caller is responsible for freeing this memory with kfree.
 + *
-+ * Note that the bridge passed should normally be the bridge closest to the
-+ * encoder, but possibly the bridge closest to an intermediate bridge in
-+ * convoluted cases.
-+ *
-+ * RETURNS:
-+ * The number of bus input formats the bridge accepts. Zero means that
-+ * the chain of bridges are not converting the bus format and that the
-+ * format of the drm_connector should be used.
++ * Returns the number of parsed bus format entries, or one of the standard
++ * error codes on failure.
 + */
-+int drm_bridge_input_formats(struct drm_bridge *bridge,
-+			     const u32 **bus_formats)
++int drm_of_bus_formats(const struct device_node *np, const char *propname,
++		       u32 **bus_formats)
 +{
-+	int ret = 0;
++	int num_bus_formats = of_property_count_strings(np, propname);
++	const char *fmt;
++	int ret;
++	int i;
 +
-+	if (!bridge)
-+		return 0;
++	if (num_bus_formats <= 0)
++		return num_bus_formats;
 +
-+	if (bridge->funcs->input_formats)
-+		ret = bridge->funcs->input_formats(bridge, bus_formats);
++	*bus_formats = kmalloc(num_bus_formats * sizeof(**bus_formats),
++			       GFP_KERNEL);
++	if (!*bus_formats)
++		return -ENOMEM;
 +
-+	return ret ?: drm_bridge_input_formats(bridge->next, bus_formats);
++	for (i = 0; i < num_bus_formats; ++i) {
++		ret = of_property_read_string_index(np, propname, i, &fmt);
++		if (ret < 0)
++			return ret;
++
++		if (!strcmp(fmt, "rgb444")) {
++			*bus_formats[i] = MEDIA_BUS_FMT_RGB444_1X12;
++		} else if (!strcmp(fmt, "rgb565")) {
++			*bus_formats[i] = MEDIA_BUS_FMT_RGB565_1X16;
++		} else if (!strcmp(fmt, "rgb666")) {
++			*bus_formats[i] = MEDIA_BUS_FMT_RGB666_1X18;
++		} else if (!strcmp(fmt, "rgb888")) {
++			*bus_formats[i] = MEDIA_BUS_FMT_RGB888_1X24;
++		} else if (!strcmp(fmt, "jeida-18")) {
++			*bus_formats[i] = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG;
++		} else if (!strcmp(fmt, "jeida-24")) {
++			*bus_formats[i] = MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA;
++		} else if (!strcmp(fmt, "vesa-24")) {
++			*bus_formats[i] = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG;
++		} else {
++			kfree(*bus_formats);
++			*bus_formats = NULL;
++			return -EINVAL;
++		}
++	}
++
++	return num_bus_formats;
 +}
-+EXPORT_SYMBOL(drm_bridge_input_formats);
++EXPORT_SYMBOL_GPL(drm_of_bus_formats);
+diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+index b93c239afb60..ccacddc03a2e 100644
+--- a/include/drm/drm_of.h
++++ b/include/drm/drm_of.h
+@@ -33,6 +33,8 @@ int drm_of_find_panel_or_bridge(const struct device_node *np,
+ 				int port, int endpoint,
+ 				struct drm_panel **panel,
+ 				struct drm_bridge **bridge);
++int drm_of_bus_formats(const struct device_node *np, const char *propname,
++		       u32 **bus_formats);
+ #else
+ static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+ 						  struct device_node *port)
+@@ -69,6 +71,13 @@ static inline int drm_of_find_panel_or_bridge(const struct device_node *np,
+ {
+ 	return -EINVAL;
+ }
 +
- #ifdef CONFIG_OF
- /**
-  * of_drm_find_bridge - find the bridge corresponding to the device node in
-diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-index 682d01ba920c..ae8d3c4af0b8 100644
---- a/include/drm/drm_bridge.h
-+++ b/include/drm/drm_bridge.h
-@@ -220,6 +220,22 @@ struct drm_bridge_funcs {
- 	 * The enable callback is optional.
- 	 */
- 	void (*enable)(struct drm_bridge *bridge);
-+
-+	/**
-+	 * @input_formats:
-+	 *
-+	 * The callback reports the expected bus input formats of the bridge.
-+	 *
-+	 * The @input_formats callback is optional. The bridge is assumed to
-+	 * not convert the bus format if the callback is not installed.
-+	 *
-+	 * RETURNS:
-+	 *
-+	 * Zero if the bridge does not convert the bus format, otherwise the
-+	 * number of bus input formats returned in &bus_formats.
-+	 */
-+	int (*input_formats)(struct drm_bridge *bridge,
-+			     const u32 **bus_formats);
- };
++static inline int drm_of_bus_formats(const struct device_node *np,
++				     const char *propname,
++				     u32 **bus_formats)
++{
++	return -EINVAL;
++}
+ #endif
  
- /**
-@@ -263,6 +279,8 @@ void drm_bridge_mode_set(struct drm_bridge *bridge,
- 			struct drm_display_mode *adjusted_mode);
- void drm_bridge_pre_enable(struct drm_bridge *bridge);
- void drm_bridge_enable(struct drm_bridge *bridge);
-+int drm_bridge_input_formats(struct drm_bridge *bridge,
-+			     const u32 **bus_formats);
- 
- #ifdef CONFIG_DRM_PANEL_BRIDGE
- struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel,
+ /*
 -- 
 2.11.0
