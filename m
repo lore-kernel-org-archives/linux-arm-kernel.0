@@ -1,99 +1,50 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Tue, 27 Mar 2018 14:13:31 -0400
-Subject: [PATCH v4 1/4] drivers/staging/fsl-mc: Use devm_memremap/devm_ioremap
- for DPIO
+Date: Tue, 27 Mar 2018 14:13:32 -0400
+Subject: [PATCH v4 2/4] drivers/staging/fsl-mc: Fix DPIO error path issue
 In-Reply-To: <1522174414-30380-1-git-send-email-roy.pledge@nxp.com>
 References: <1522174414-30380-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1522174414-30380-2-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1522174414-30380-3-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the mapping of the QBMan cache enabled area from using ioremap_wc()
-to devm_memremap(). This allows the __iomem attribute to be removed from
-the pointer (which makes sense as accesses treat this as cacheable memory
-not IO memory).  These changes allow sparse checks to pass.
-
-Also use devm_ioremap() for the cache inhibited area so unmap occurs
-automatically when the device is released.
+Remove unneeded call to dev_set_drvdata(dev, NULL) since the device
+will be deallocated in any case.
 
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dpio/dpio-driver.c  | 19 +++++++++++++++----
- drivers/staging/fsl-mc/bus/dpio/qbman-portal.h |  4 ++--
- drivers/staging/fsl-mc/include/dpaa2-io.h      |  2 +-
- 3 files changed, 18 insertions(+), 7 deletions(-)
+ drivers/staging/fsl-mc/bus/dpio/dpio-driver.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
-index 182b384..ffcbd5a 100644
+index ffcbd5a..9e12576 100644
 --- a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
 +++ b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
-@@ -13,6 +13,7 @@
- #include <linux/msi.h>
- #include <linux/dma-mapping.h>
- #include <linux/delay.h>
-+#include <linux/io.h>
- 
- #include <linux/fsl/mc.h>
- #include "../../include/dpaa2-io.h"
-@@ -146,10 +147,20 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
- 	 * Set the CENA regs to be the cache inhibited area of the portal to
- 	 * avoid coherency issues if a user migrates to another core.
- 	 */
--	desc.regs_cena = ioremap_wc(dpio_dev->regions[1].start,
--		resource_size(&dpio_dev->regions[1]));
--	desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
--		resource_size(&dpio_dev->regions[1]));
-+	desc.regs_cena = devm_memremap(dev, dpio_dev->regions[1].start,
-+				       resource_size(&dpio_dev->regions[1]),
-+				       MEMREMAP_WC);
-+	if (!desc.regs_cena) {
-+		dev_err(dev, "devm_memremap failed\n");
-+		goto err_allocate_irqs;
-+	}
-+
-+	desc.regs_cinh = devm_ioremap(dev, dpio_dev->regions[1].start,
-+				      resource_size(&dpio_dev->regions[1]));
-+	if (!desc.regs_cinh) {
-+		dev_err(dev, "devm_ioremap failed\n");
-+		goto err_allocate_irqs;
-+	}
- 
- 	err = fsl_mc_allocate_irqs(dpio_dev);
+@@ -101,7 +101,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
  	if (err) {
-diff --git a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h b/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
-index 4488a44..69db3c8 100644
---- a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
-+++ b/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
-@@ -15,7 +15,7 @@ struct qbman_swp;
- /* qbman software portal descriptor structure */
- struct qbman_swp_desc {
- 	void *cena_bar; /* Cache-enabled portal base address */
--	void *cinh_bar; /* Cache-inhibited portal base address */
-+	void __iomem *cinh_bar; /* Cache-inhibited portal base address */
- 	u32 qman_version;
- };
+ 		dev_dbg(dev, "MC portal allocation failed\n");
+ 		err = -EPROBE_DEFER;
+-		goto err_mcportal;
++		goto err_priv_alloc;
+ 	}
  
-@@ -102,7 +102,7 @@ struct qbman_release_desc {
- /* portal data structure */
- struct qbman_swp {
- 	const struct qbman_swp_desc *desc;
--	void __iomem *addr_cena;
-+	void *addr_cena;
- 	void __iomem *addr_cinh;
+ 	err = dpio_open(dpio_dev->mc_io, 0, dpio_dev->obj_desc.id,
+@@ -196,8 +196,6 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+ 	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+ err_open:
+ 	fsl_mc_portal_free(dpio_dev->mc_io);
+-err_mcportal:
+-	dev_set_drvdata(dev, NULL);
+ err_priv_alloc:
+ 	return err;
+ }
+@@ -241,8 +239,6 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
  
- 	/* Management commands */
-diff --git a/drivers/staging/fsl-mc/include/dpaa2-io.h b/drivers/staging/fsl-mc/include/dpaa2-io.h
-index f71227d..ab51e40 100644
---- a/drivers/staging/fsl-mc/include/dpaa2-io.h
-+++ b/drivers/staging/fsl-mc/include/dpaa2-io.h
-@@ -52,7 +52,7 @@ struct dpaa2_io_desc {
- 	int has_8prio;
- 	int cpu;
- 	void *regs_cena;
--	void *regs_cinh;
-+	void __iomem *regs_cinh;
- 	int dpio_id;
- 	u32 qman_version;
- };
+ 	fsl_mc_portal_free(dpio_dev->mc_io);
+ 
+-	dev_set_drvdata(dev, NULL);
+-
+ 	return 0;
+ 
+ err_open:
 -- 
 2.7.4
