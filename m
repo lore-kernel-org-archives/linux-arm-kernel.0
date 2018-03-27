@@ -1,214 +1,114 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 27 Mar 2018 14:12:42 +0200
-Subject: [PATCH v2 2/5] drm: bridge: add API to query the expected input
- formats of bridges
-In-Reply-To: <20180327094743.GL27746@w540>
-References: <20180326212447.7380-1-peda@axentia.se>
- <20180326212447.7380-3-peda@axentia.se> <20180327094743.GL27746@w540>
-Message-ID: <fcc47402-d758-4062-0565-f5977b85b206@axentia.se>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 27 Mar 2018 14:12:54 +0200
+Subject: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness supports
+In-Reply-To: <VI1PR0402MB385456DB28FE27FCF9ACCAB997AC0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
+References: <20180312081128.8195-1-prabhakar.kushwaha@nxp.com>
+ <20180323093408.230a61c1@bbrezillon>
+ <VI1PR0402MB385456DB28FE27FCF9ACCAB997AC0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
+Message-ID: <20180327141254.56051a74@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacopo,
+On Tue, 27 Mar 2018 12:06:41 +0000
+Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
 
-Thanks for the feedback!
-
-On 2018-03-27 11:47, jacopo mondi wrote:
-> Hi Peter,
->    thanks for the patches
+> Hi Boris,
 > 
-> On Mon, Mar 26, 2018 at 11:24:44PM +0200, Peter Rosin wrote:
->> Bridges may affect the required bus output format of the encoder, in
->> which case it may be wrong to use the output format of the panel or
->> connector as is. Add infrastructure to address this problem.
+> > -----Original Message-----
+> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> > Sent: Friday, March 23, 2018 2:04 PM
+> > To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
+> > robh at kernel.org
+> > Cc: linux-mtd at lists.infradead.org; devicetree at vger.kernel.org;
+> > mark.rutland at arm.com; shawnguo at kernel.org; boris.brezillon at free-
+> > electrons.com; computersforpeace at gmail.com; oss at buserror.net; Leo Li
+> > <leoyang.li@nxp.com>; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness
+> > supports
+> > 
+> > On Mon, 12 Mar 2018 13:41:28 +0530
+> > Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
+> >   
+> > > Connection between flash and controller is not necessary to be always
+> > > of same type. It may varies from platform to platform.
+> > >
+> > > Adding endianness (optional) property to provide connection type
+> > > information.
+> > >
+> > > Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> > > Reviewed-by: Rob Herring <robh@kernel.org>
+> > > ---
+> > > Changes for v2: updated subject
+> > > Changes for v3: fixed typo for "big-endian"
+> > > Changes for v4: Moved binding definition in mtd-physmap.txt as
+> > > discussed at
+> > >  
+> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpat  
+> > >  
+> > chwork.ozlabs.org%2Fpatch%2F842543%2F&data=02%7C01%7Cprabhakar.ku
+> > shwah  
+> > >  
+> > a%40nxp.com%7C4e3c62614d144bdbb76408d59098d999%7C686ea1d3bc2b4c
+> > 6fa92cd  
+> > >  
+> > 99c5c301635%7C0%7C0%7C636573908516332353&sdata=Od7aqu%2BqV4RHB
+> > EmT08UOb  
+> > > H2EFGgWmGfftCRKlOlj1kY%3D&reserved=0
+> > > Changes for v5: Sending as it is
+> > > Changes for v6: Updated binding when endianness property is absent
+> > >
+> > >  Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> > > b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> > > index 4a0a48bf4ecb..691c98f7301d 100644
+> > > --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> > > +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> > > @@ -41,6 +41,11 @@ additional (optional) property is defined:
+> > >
+> > >   - erase-size : The chip's physical erase block size in bytes.
+> > >
+> > > + The device tree may optionally contain endianness property.
+> > > + little-endian or big-endian : It represents connection between
+> > > + controller and  
+> > 
+> > You still haven't answered the comments I made on your v5. To me, this does
+> > not represent how the controller and chip pins are connected, but how the
+> > chip was programmed and which endianness should be used by the
+> > controller to correctly read the data back. Maybe I'm wrong, hence my
+> > question.
+> >   
 > 
-> Bridges not only affect the format expected by the connector at the
-> end of the display pipeline, they may perform encoding/decoding
-> between protocols and their accepted input formats may be unrelated to
-> the connector at the end of the pipeline as there may an arbitrary
-> number of bridges in between.
+> NXP's ARM SoC has IFC module which interface with NOR flash. Here IFC is big endian module connected with NOR flash. 
+> As SoC has ARM processor(Littler Endian),  CONFIG_MTD_CFI_BE_BYTE_SWAP needs to be enabled  to make sure data is read correctly.  
+> This is the reason, I wrote about connection between controller and flash.
 > 
-> Eg.
+> In a way, I agree with you.  It is not about connection. 
+> It is about how controller read the data (inherently ARM processor)
 > 
-> ENCODER                                                CONNECTOR
->   |                                                         |
-> |DU LVDS| ->lvds-> |THC63| ->rgb-> |ADV7511| ->hdmi-> |HDMI connector|
+> So I am planning to write below text
+> little-endian or big-endian: It represents endianness of controller for correct data reading from flash.
+
+"
+ Represents the endianness that should be used by the controller to
+ properly read/write data from/to the flash.
+"
+
+>                                                  If this property is missing, the endianness is chosen by the system (potentially based
+>                                                 on extra configuration options).
+
+This part is good.
+
 > 
-> The fact that THC63 wants a specific LVDS input format is unrelated to
-> the format required by the HDMI connector at the end of the pipeline.
+> please let me know if above definition requires more changes. 
 > 
-> I would just state here that bridges need a way to report their
-> accepted media bus formats, and this patch extends the DRM Bridge APIs
-> to implement that.
+> Regards,
+> Prabhakar
 
-Yes, I can add some words, but I would like to clear up the naming
-before re-spinning.
 
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  drivers/gpu/drm/drm_bridge.c | 32 ++++++++++++++++++++++++++++++++
->>  include/drm/drm_bridge.h     | 18 ++++++++++++++++++
->>  2 files changed, 50 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
->> index 1638bfe9627c..f85e61b7416e 100644
->> --- a/drivers/gpu/drm/drm_bridge.c
->> +++ b/drivers/gpu/drm/drm_bridge.c
->> @@ -348,6 +348,38 @@ void drm_bridge_enable(struct drm_bridge *bridge)
->>  }
->>  EXPORT_SYMBOL(drm_bridge_enable);
->>
->> +/**
->> + * drm_bridge_input_formats - get the expected bus input format of the bridge
-> 
-> I may be biased by the V4L2 APIs, but this seems to me very much like
-> similar to g_fmt/s_fmt callbacks we have there. Bridges have an input and
 
-g_fmt/s_fmt says nothing to me. Graphics format? Source Format? I have
-no idea if those guesses are even close? So, that seems like poor naming
-to me. The only reason I see to go that way is for the sake of consistency.
-
-> an output formats, and that calls for something that takes that into
-> account, as well as they may have different input ports with different
-> accepted formats but I would for now simplify this to just 'g_fmt()'
-
-You mean rename the function to drm_bridge_g_fmt(), right?
-
-As indicated above, I'm not that fond of it, but don't really care
-either. Maintainers?
-
->> + * @bridge: bridge control structure
->> + * @bus_formats: where to store a pointer to the bus input formats
->> + *
->> + * Calls the &drm_bridge_funcs.input_formats op for the frist bridge in the
->> + * chain that has registered this op.
-> 
-> I'm not sure passing the call down the pipeline is desirable. Each
-> component should make sure its output format is accepted as the next
-> bridge input format, passing the call to the next bridge is not
-> different that getting to the connector at the end of the pipeline and
-> return to the initial caller its supported format. Do you agree with this?
-
-Not passing down the call does one of two things. Either all bridges have
-to implement the call or all users have to walk the pipeline "manually".
-I don't like either or those options, so I still think it is good to
-pass the call down the pipeline.
-
-*time passes*
-
-Oh, you do not think it is useful for the bridge to have a callback but
-still report "no format change", and that the call down to pipeline
-should only happen for bridges that have not implemented the op. But I
-do think that is useful, see below.
-
->> + *
->> + * Note that the bridge passed should normally be the bridge closest to the
->> + * encoder, but possibly the bridge closest to an intermediate bridge in
->> + * convoluted cases.
->> + *
-> 
-> As I see this, any bridge in the arbitrary long pipeline should call
-> this operation on next bridge if it supports different output formats.
-> Ie. I would not name here the encoder nor refer to the bridge position
-> in the pipeline.
-
-Ok, I can change that, it just seemed like a convoluted case to me.
-I mean, if this was a real issue and complicated pipelines were
-common, something along the lines of this patch series would be
-available already. Right? I guess not, but how the &#/%# have people
-been coping?
-
->> + * RETURNS:
->> + * The number of bus input formats the bridge accepts. Zero means that
->> + * the chain of bridges are not converting the bus format and that the
->> + * format of the drm_connector should be used.
-> 
-> How do we get to the connector format from a bridge that has maybe
-> other components in between in the pipeline?
-> 
-> If a bridge do not report any supported format, it won't implement
-> this callback and things will work as they work today.
-
-Unless the bridge optionally changes the format. If the bridge has no
-way to say "no format change" even with the callback in place, it
-has to juggle different ops structs, which seems like a big hammer.
-So, I'm in favor of calling down the pipeline in two cases. A) when
-a bridge does not implement the op and B) when the op returns zero.
-
-Maintainers?
-
->> + */
->> +int drm_bridge_input_formats(struct drm_bridge *bridge,
->> +			     const u32 **bus_formats)
->> +{
->> +	int ret = 0;
->> +
->> +	if (!bridge)
->> +		return 0;
->> +
->> +	if (bridge->funcs->input_formats)
->> +		ret = bridge->funcs->input_formats(bridge, bus_formats);
->> +
->> +	return ret ?: drm_bridge_input_formats(bridge->next, bus_formats);
-> 
-> See my comment on the call propagation down in the pipeline.
-> 
->> +}
->> +EXPORT_SYMBOL(drm_bridge_input_formats);
->> +
->>  #ifdef CONFIG_OF
->>  /**
->>   * of_drm_find_bridge - find the bridge corresponding to the device node in
->> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
->> index 682d01ba920c..ae8d3c4af0b8 100644
->> --- a/include/drm/drm_bridge.h
->> +++ b/include/drm/drm_bridge.h
->> @@ -220,6 +220,22 @@ struct drm_bridge_funcs {
->>  	 * The enable callback is optional.
->>  	 */
->>  	void (*enable)(struct drm_bridge *bridge);
->> +
->> +	/**
->> +	 * @input_formats:
->> +	 *
->> +	 * The callback reports the expected bus input formats of the bridge.
->> +	 *
->> +	 * The @input_formats callback is optional. The bridge is assumed to
->> +	 * not convert the bus format if the callback is not installed.
->> +	 *
->> +	 * RETURNS:
->> +	 *
->> +	 * Zero if the bridge does not convert the bus format, otherwise the
->> +	 * number of bus input formats returned in &bus_formats.
->> +	 */
->> +	int (*input_formats)(struct drm_bridge *bridge,
->> +			     const u32 **bus_formats);
-> 
-> Consider g_fmt() here as well, or a function name that captures that we want
-> to know the supported format (and possibly configure it as well one
-> day, if ever possible).
-
-The naming here should obviously follow the naming of the exported function.
-
-Cheers,
-Peter
-
-> Thanks
->    j
-> 
->>  };
->>
->>  /**
->> @@ -263,6 +279,8 @@ void drm_bridge_mode_set(struct drm_bridge *bridge,
->>  			struct drm_display_mode *adjusted_mode);
->>  void drm_bridge_pre_enable(struct drm_bridge *bridge);
->>  void drm_bridge_enable(struct drm_bridge *bridge);
->> +int drm_bridge_input_formats(struct drm_bridge *bridge,
->> +			     const u32 **bus_formats);
->>
->>  #ifdef CONFIG_DRM_PANEL_BRIDGE
->>  struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel,
->> --
->> 2.11.0
->>
+-- 
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
