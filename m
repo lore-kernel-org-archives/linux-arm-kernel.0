@@ -1,54 +1,76 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 27 Mar 2018 10:12:25 +0800
-Subject: [PATCH v2 0/2] Add Nintendo NES/SuperNES classic support
-In-Reply-To: <20180326212820.20637-1-miquel.raynal@bootlin.com>
-References: <20180326212820.20637-1-miquel.raynal@bootlin.com>
-Message-ID: <CAGb2v67_9oTTR30jPPmXO35bqZjif-jvR7z0CHPPu_xwrujriw@mail.gmail.com>
+From: arvind.yadav.cs@gmail.com (arvindY)
+Date: Tue, 27 Mar 2018 08:00:50 +0530
+Subject: [PATCH] coresight: use put_device() instead of kfree()
+In-Reply-To: <CANLsYkymOF2oG7TmKbRTakYKw0ECN_DXfkX5b8WjmS0Lz0sfig@mail.gmail.com>
+References: <d5a326b6c284f7389301b265716dc58fda492c98.1521358552.git.arvind.yadav.cs@gmail.com>
+ <CANLsYkymOF2oG7TmKbRTakYKw0ECN_DXfkX5b8WjmS0Lz0sfig@mail.gmail.com>
+Message-ID: <5AB9ACDA.9090207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 5:28 AM, Miquel Raynal
-<miquel.raynal@bootlin.com> wrote:
-> This series adds support for the NES/SuperNES classic consoles from
-> Nintendo. Changes are done in A23/A33 DTSI to add NAND support.
+
+
+On Tuesday 27 March 2018 03:16 AM, Mathieu Poirier wrote:
+> drivers/hwtracing/coresight/coresight.c
+> On 18 March 2018 at 01:38, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+>> Never directly free @dev after calling device_register(), even
+>> if it returned an error. Always use put_device() to give up the
+>> reference initialized.
+>>
+>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>> ---
+>>   drivers/hwtracing/coresight/coresight.c | 8 ++++----
+>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+>> index 389c4ba..132dfbc 100644
+>> --- a/drivers/hwtracing/coresight/coresight.c
+>> +++ b/drivers/hwtracing/coresight/coresight.c
+>> @@ -1026,8 +1026,10 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+>>          dev_set_name(&csdev->dev, "%s", desc->pdata->name);
+>>
+>>          ret = device_register(&csdev->dev);
+>> -       if (ret)
+>> -               goto err_device_register;
+>> +       if (ret) {
+>> +               put_device(&csdev->dev);
+>> +               goto err_kzalloc_csdev;
+>> +       }
+>>
+>>          mutex_lock(&coresight_mutex);
+>>
+>> @@ -1038,8 +1040,6 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+>>
+>>          return csdev;
+>>
+>> -err_device_register:
+>> -       kfree(conns);
+> Apologies for the late reply, I was travelling.
+>
+> I suggest to simply replace kfree() with put_device() in order to
+> concentrate the error handling code in the same area and make sure
+> that memory allocated for @conns and @refcnts is freed.
 >
 > Thanks,
-> Miqu?l
->
-> Changes since v1
-> ================
->
-> arm: dts: sun8i: a23/a33: declare NAND pins
->  * Patch created by splitting the v1 in two
->  * Removed the trailing '@0' after the NAND pins declarations
->  * Changed the name of these declarations
->  * Declared all CS/RB lines
->  * Reorganized the pins entry of nand_pins
->
-> arm: dts: nes: add Nintendo NES/SuperNES Classic Edition support
->  * Created two DTS: nes-classic and supernes-classic
->  * Moved the NAND pinctrl declaration into the DTSI
->  * Removed the USB hackery explanation
->  * Explained why one UART port is preferred to the other
->
->
-> Miquel Raynal (2):
->   arm: dts: sun8i: a23/a33: declare NAND pins
->   arm: dts: nes: add Nintendo NES/SuperNES Classic Edition support
+> Mathieu
 
-"ARM" should be uppercase. However, "arm64" should be lowercase.
+If you will see the comment for device_register(drivers/base/core.c)
+there is mentioned that 'NOTE: _Never_ directly free @dev
+after calling this function, even if it returned an error!
+Always use put_device() to give up the reference initialized
+in this function instead.
+Here  put_device() will decrement the last reference and then
+free the memory by calling dev->release.  Internally
+put_device() -> kobject_put() -> kobject_cleanup() which is
+responsible to call 'dev -> release' and also free other kobject
+resources. we should always avoid kfree() if device_register()
+returned an error. Otherwise it'll not do clean up of other
+kobject resources.
 
-ChenYu
-
->
->  arch/arm/boot/dts/Makefile                         |  2 +
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 29 ++++++++++
->  .../boot/dts/sun8i-r16-nintendo-nes-classic.dts    | 62 ++++++++++++++++++++++
->  .../dts/sun8i-r16-nintendo-supernes-classic.dts    | 17 ++++++
->  4 files changed, 110 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts
->  create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-supernes-classic.dts
->
-> --
-> 2.14.1
->
+~arvind
+>>   err_kzalloc_conns:
+>>          kfree(refcnts);
+>>   err_kzalloc_refcnts:
+>> --
+>> 2.7.4
+>>
