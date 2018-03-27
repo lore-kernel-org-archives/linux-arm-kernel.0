@@ -1,55 +1,77 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Tue, 27 Mar 2018 17:23:27 +0300
-Subject: [PATCH] clk: imx7d: Move clks_init_on before any clock operations
-Message-ID: <1522160607-7104-1-git-send-email-abel.vesa@nxp.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 27 Mar 2018 17:11:04 +0300
+Subject: [PATCH v2 02/17] virtio: pci-legacy: Validate queue pfn
+In-Reply-To: <1522156531-28348-3-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180327170823-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <b29396@freescale.com>
+On Tue, Mar 27, 2018 at 02:15:12PM +0100, Suzuki K Poulose wrote:
+> Legacy PCI over virtio uses a 32bit PFN for the queue. If the
+> queue pfn is too large to fit in 32bits, which we could hit on
+> arm64 systems with 52bit physical addresses (even with 64K page
+> size), we simply miss out a proper link to the other side of
+> the queue.
+> 
+> Add a check to validate the PFN, rather than silently breaking
+> the devices.
+> 
+> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> Cc: Jason Wang <jasowang@redhat.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Peter Maydel <peter.maydell@linaro.org>
+> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/virtio/virtio_pci_legacy.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/virtio/virtio_pci_legacy.c b/drivers/virtio/virtio_pci_legacy.c
+> index 2780886..4b84a75 100644
+> --- a/drivers/virtio/virtio_pci_legacy.c
+> +++ b/drivers/virtio/virtio_pci_legacy.c
+> @@ -122,6 +122,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+>  	struct virtqueue *vq;
+>  	u16 num;
+>  	int err;
+> +	u64 q_pfn;
+>  
+>  	/* Select the queue we're interested in */
+>  	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
+> @@ -141,9 +142,15 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+>  	if (!vq)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> +	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
+> +	if (q_pfn >> 32) {
+> +		dev_err(&vp_dev->pci_dev->dev, "virtio-pci queue PFN too large\n");
+> +		err = -ENOMEM;
 
-For init on clocks we should move it at the first place in imx7d_clocks_init()
-before any clock operations, else the clock operation may fail in case the clock
-is still not on.
+ENOMEM seems wrong here. E2BIG?
 
-Acked-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
-Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+> +		goto out_del_vq;
+> +	}
+> +
+>  	/* activate the queue */
+> -	iowrite32(virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT,
+> -		  vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+> +	iowrite32((u32)q_pfn, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 89bfa75..9b17805 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -433,13 +433,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_PLL_AUDIO_MAIN_BYPASS] = imx_clk_mux_flags("pll_audio_main_bypass", base + 0xf0, 16, 1, pll_audio_bypass_sel, ARRAY_SIZE(pll_audio_bypass_sel), CLK_SET_RATE_PARENT);
- 	clks[IMX7D_PLL_VIDEO_MAIN_BYPASS] = imx_clk_mux_flags("pll_video_main_bypass", base + 0x130, 16, 1, pll_video_bypass_sel, ARRAY_SIZE(pll_video_bypass_sel), CLK_SET_RATE_PARENT);
- 
--	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
--	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
--	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
--	clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
--	clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
--	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
--
- 	clks[IMX7D_PLL_ARM_MAIN_CLK] = imx_clk_gate("pll_arm_main_clk", "pll_arm_main_bypass", base + 0x60, 13);
- 	clks[IMX7D_PLL_DRAM_MAIN_CLK] = imx_clk_gate("pll_dram_main_clk", "pll_dram_main_bypass", base + 0x70, 13);
- 	clks[IMX7D_PLL_SYS_MAIN_CLK] = imx_clk_gate("pll_sys_main_clk", "pll_sys_main_bypass", base + 0xb0, 13);
-@@ -886,6 +879,13 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
- 
-+	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
-+	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
-+	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
-+	clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
-+	clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
-+	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
-+
- 	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
- 	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
- 
--- 
-2.7.4
+Is the cast really necessary here?
+
+>  
+>  	vq->priv = (void __force *)vp_dev->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY;
+>  
+> @@ -160,6 +167,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+>  
+>  out_deactivate:
+>  	iowrite32(0, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+> +out_del_vq:
+>  	vring_del_virtqueue(vq);
+>  	return ERR_PTR(err);
+>  }
+> -- 
+> 2.7.4
