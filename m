@@ -1,33 +1,57 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 27 Mar 2018 16:20:16 +0200
-Subject: [PATCH v3 0/6] PCI: aardvark: misc fixes and improvements
-In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
-References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180327162016.7df5c684@windsurf.home>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 27 Mar 2018 10:23:32 -0400
+Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <trinity-6d247cd1-94e3-4a58-a762-77724e895644-1522159460624@3c-app-gmx-bs61>
+References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
+ <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
+ <1521849496.15055.16.camel@intel.com>
+ <862cdbeafb9cfd272a426b010943ffc5@codeaurora.org>
+ <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
+ <trinity-6d247cd1-94e3-4a58-a762-77724e895644-1522159460624@3c-app-gmx-bs61>
+Message-ID: <dcbd4406-73f7-4afa-850d-5f5d9f97ab02@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
+On 3/27/2018 10:04 AM, Lino Sanfilippo wrote:
+> Hi,
+> 
+>> Double sorry now.
+>>
+>> I don't know if you have been following "RFC on writel and writel_relaxed" thread
+>> or not but there are some new developments about wmb() requirement. 
+> 
+> Just out of interest: Where can this thread be found?
 
-On Tue, 27 Mar 2018 16:08:06 +0200, Thomas Petazzoni wrote:
+https://www.spinics.net/lists/linux-rdma/msg62570.html
 
-> This patch series brings a number of improvements to the aardvark
-> PCIe. Sorry for being so slow at sending the v3 after the v2 sent in
-> January. Hopefully this time around the series will be fine.
+https://patchwork.kernel.org/patch/10309913/
 
-Sorry, I screwed up. I'm not sure how, but I did. The series was sent
-twice, and only the second iteration is correct, the first one lacked
-some Cc: to stable.
 
-I have marked the bogus patches as Superseded in patchwork, so if you
-look at patchwork, you will only see the patches worth considering.
+> 
+>>
+>> Basically, wmb() should never be used before writel() as writel() seem to
+>> provide coherency and observability guarantee.
+>>
+> 
+> AFAIU memory-barriers.txt writel() only guarantees correct order of accesses to
+> IO-memory not RAM vs. IO-memory (this may be the case for some architectures 
+> where the writel() implementation contains a wmb() but not for all).
+> For the RAM vs. IO-memory case at least a a wmb()/rmb() has to be used. 
+> Is this not correct? 
 
-Let me know if you would like to resend anyway.
+We are being told that if you use writel(), then you don't need a wmb() on
+all architectures.
 
-Sorry again for the mess,
+Jason is seeking behavior clarification for write combined buffers.
 
-Thomas Petazzoni
+> 
+> Regards,
+> Lino
+> 
+
+
 -- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
