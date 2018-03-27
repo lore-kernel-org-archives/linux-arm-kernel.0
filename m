@@ -1,93 +1,76 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 27 Mar 2018 11:01:04 +0530
-Subject: [PATCH v5 3/3] arm64: allwinner: a64: bananapi-m64: add usb otg
-In-Reply-To: <20180327053104.3812-1-jagan@amarulasolutions.com>
-References: <20180327053104.3812-1-jagan@amarulasolutions.com>
-Message-ID: <20180327053104.3812-3-jagan@amarulasolutions.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 27 Mar 2018 08:09:11 +0200
+Subject: [PATCH v2,10/10] kbuild: mark $(targets) as .SECONDARY and
+ remove .PRECIOUS markers
+In-Reply-To: <1522079634-5947-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1522079634-5947-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20180327060911.iljk66zfuqnl472e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb otg support for bananapi-m64 board,
-- USB-ID connected with PH9
-- USB-DRVVBUS controlled by N_VBUSEN pin from PMIC
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes for v5:
-- Kept reg_drivevbus node in alphabetical order.
-- Collect Chen-Yu reviewed-by tag
-Changes for v4:
-- rebase on master
-- tested otg host mode.
-Changes for v3:
-- Move the position of reg_drivevbus as per binding documentation.
-Changes for v2:
-- add drvvbus regulator
-- add N_VBUSEN pin
+* Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
 
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts  | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+> GNU Make automatically deletes intermediate files that are updated
+> in a chain of pattern rules.
+> 
+> Example 1) %.dtb.o <- %.dtb.S <- %.dtb <- %.dts
+> Example 2) %.o <- %.c <- %.c_shipped
+> 
+> A couple of makefiles mark such targets as .PRECIOUS to prevent Make
+> from deleting them, but the correct way is to use .SECONDARY.
+> 
+>   .SECONDARY
+>     Prerequisites of this special target are treated as intermediate
+>     files but are never automatically deleted.
+> 
+>   .PRECIOUS
+>     When make is interrupted during execution, it may delete the target
+>     file it is updating if the file was modified since make started.
+>     If you mark the file as precious, make will never delete the file
+>     if interrupted.
+> 
+> Both can avoid deletion of intermediate files, but the difference is
+> the behavior when Make is interrupted; .SECONDARY deletes the target,
+> but .PRECIOUS does not.
+> 
+> The use of .PRECIOUS is relatively rare since we do not want to keep
+> partially constructed (possibly corrupted) targets.
+> 
+> Another difference is that .PRECIOUS works with pattern rules whereas
+> .SECONDARY does not.
+> 
+>   .PRECIOUS: $(obj)/%.lex.c
+> 
+> works, but
+> 
+>   .SECONDARY: $(obj)/%.lex.c
+> 
+> has no effect.  However, for the reason above, I do not want to use
+> .PRECIOUS which could cause obscure build breakage.
+> 
+> The targets specified as .SECONDARY must be explicit.  $(targets)
+> contains all targets that need to include .*.cmd files.  So, the
+> intermediates you want to keep are mostly in there.  Therefore, mark
+> $(targets) as .SECONDARY.  It means primary targets are also marked
+> as .SECONDARY, but I do not see any drawback for this.
+> 
+> I replaced some .SECONDARY / .PRECIOUS markers with 'targets'.  This
+> will make Kbuild search for non-existing .*.cmd files, but this is
+> not a noticeable performance issue.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Frank Rowand <frowand.list@gmail.com>
+> ---
+>  arch/arc/boot/dts/Makefile        |  2 --
+>  arch/arm/crypto/Makefile          |  2 +-
+>  arch/arm64/crypto/Makefile        |  2 +-
+>  arch/metag/boot/dts/Makefile      |  2 --
+>  arch/sparc/vdso/Makefile          |  4 +---
+>  arch/x86/entry/vdso/Makefile      |  4 +---
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 2250dec9974c..0716b1441187 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -86,6 +86,10 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -155,6 +159,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
-@@ -167,6 +175,7 @@
- 		reg = <0x3a3>;
- 		interrupt-parent = <&r_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		x-powers,drive-vbus-en; /* set N_VBUSEN as output pin */
- 	};
- };
- 
-@@ -254,6 +263,11 @@
- 	regulator-name = "vcc-wifi-io";
- };
- 
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
- &reg_eldo1 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
-@@ -294,6 +308,13 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	usb0_vbus-supply = <&reg_drivevbus>;
- 	status = "okay";
- };
--- 
-2.14.3
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
