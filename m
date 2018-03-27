@@ -1,35 +1,56 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Tue, 27 Mar 2018 14:07:46 +1030
-Subject: [PATCH] ARM: dts: aspeed: Add default memory node
-In-Reply-To: <CAK8P3a3XTqFHw4SQMt9zq3QLEhGM6944xQ_n3myOK08YZCbkAA@mail.gmail.com>
-References: <20180314071312.17492-1-joel@jms.id.au>
- <CAK8P3a3XTqFHw4SQMt9zq3QLEhGM6944xQ_n3myOK08YZCbkAA@mail.gmail.com>
-Message-ID: <CACPK8Xe-5EFsHBUnfbf8vT-fPxnQnf-muAMmLFWD4=t16YR9uw@mail.gmail.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Tue, 27 Mar 2018 10:08:02 +0530
+Subject: [PATCH v4 2/3] arm64: Implement page table free interfaces
+In-Reply-To: <20180326095541.izogc4iak6d7nerm@lakrids.cambridge.arm.com>
+References: <1521546314-31753-1-git-send-email-cpandya@codeaurora.org>
+ <1521546314-31753-3-git-send-email-cpandya@codeaurora.org>
+ <20180326095541.izogc4iak6d7nerm@lakrids.cambridge.arm.com>
+Message-ID: <b5427cbd-28f8-e561-cfca-751006e60da1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 March 2018 at 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wed, Mar 14, 2018 at 8:13 AM, Joel Stanley <joel@jms.id.au> wrote:
->> When we removed the inclusion of skeleton.dtsi from the device trees, we
->> broke booting for systems with bootloaders that aren't device tre aware.
->> This can be seen, for example, when appending the device tree blob to
->> the kernel image.
->>
->> The reason booting broke was that the kernel lacked the device_type
->> label in the memory node. Add in a default memory node wth the
->> device_type. It can contain the memory address as the location is fixed
->> for each SoC generation, but the size needs to be added by the
->> bootloader or the board specific dts.
->>
->> Fixes: 73102d6fdc32 ("ARM: dts: aspeed: Remove skeleton.dtsi")
->> Cc: <stable@vger.kernel.org>
->> Reported-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
->> Signed-off-by: Joel Stanley <joel@jms.id.au>
->> ---
->> Arnd, can you please merge this as a fix for 4.16?
->
-> Sure, applied to fixes branch now.
 
-Thanks!
 
-Has this been sent to Linus?
+On 3/26/2018 3:25 PM, Mark Rutland wrote:
+> On Tue, Mar 20, 2018 at 05:15:13PM +0530, Chintan Pandya wrote:
+>> +static int __pmd_free_pte_page(pmd_t *pmd, unsigned long addr, bool tlb_inv)
+>> +{
+>> +	pmd_t *table;
+>> +
+>> +	if (pmd_val(*pmd)) {
+>> +		table = __va(pmd_val(*pmd));
+>> +		pmd_clear(pmd);
+>> +		/*
+>> +		 * FIXME: __flush_tlb_pgtable(&init_mm, addr) is
+>> +		 *        ideal candidate here, which exactly
+>> +		 *        flushes intermediate pgtables. But,
+>> +		 *        this is broken (evident from tests).
+>> +		 *        So, use safe TLB op unless that is fixed.
+>> +		 */
+>> +		if (tlb_inv)
+>> +			flush_tlb_kernel_range(addr, addr + PMD_SIZE);
+> 
+> I don't think that __flush_tlb_pgtable() is broken. It's only valid to
+> call it for user page tables, since it doesn't affect all ASIDs.
+> 
+> We can add a simlar helper for kernel mappings, which affects all ASIDs,
+> e.g.
+> 
+Okay. I will test it and update v5.
+
+> static inline void __flush_tlb_kernel_pgtable(unsigned long addr)
+> {
+> 	addr >>= 12;
+> 	__tlbi(vaae1is, addr);
+> 	dsb(ish);
+> }
+> 
+> Thanks,
+> Mark.
+> 
+
+Chintan
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
