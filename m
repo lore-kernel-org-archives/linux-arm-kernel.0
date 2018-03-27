@@ -1,34 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Mar 2018 15:11:09 +0200
-Subject: [PATCH v4 4/9] pinctrl: sunxi: add support for the Allwinner H6
- main pin controller
-In-Reply-To: <20180316140215.28663-5-icenowy@aosc.io>
-References: <20180316140215.28663-1-icenowy@aosc.io>
- <20180316140215.28663-5-icenowy@aosc.io>
-Message-ID: <CACRpkdafFgRvFXwJ=5s5a_VmvUfJGC3na0zUdU95Dg5451X_0A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2018 15:11:11 +0200
+Subject: [GIT PULL v2 6/6] i.MX defconfig updates for 4.17
+In-Reply-To: <20180326114230.GD8857@dragon>
+References: <1521113800-16401-1-git-send-email-shawnguo@kernel.org>
+ <1521113800-16401-6-git-send-email-shawnguo@kernel.org>
+ <20180326114230.GD8857@dragon>
+Message-ID: <CAK8P3a2seTMBN5wBX1rVLt62YfeDHDf_VtzqOqwfpu8N3yiPbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 3:02 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Mon, Mar 26, 2018 at 1:42 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Changes for v2:
+>  - Update commit log of patch "ARM: mxs_defconfig: Re-sync defconfig"
+>    to explain the option changes a bit.
 
-> The Allwinner H6 SoC has two pin controllers, one main controller
-> (called CPUX-PORT in user manual) and one controller in CPUs power
-> domain (called CPUS-PORT in user manual).
->
-> This commit introduces support for the main pin controller on H6.
->
-> The pin bank A and B are not wired out and hidden from the SoC's
-> documents, however it's shown that the "ATE" (an AC200 chip
-> co-packaged with the H6 die) is connected to the main SoC die via these
-> pin banks. The information about these banks is just copied from the BSP
-> pinctrl driver, but re-formatted to fit the mainline pinctrl driver
-> format. The GPIO functions are dropped, as they're impossible to use --
-> except a GPIO&IRQ only pin (PB20) which might be the IRQ of ATE.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Acked-by: Rob Herring <robh@kernel.org>
+Pulled it into next/soc, replacing the old version now, thanks!
 
-Patch applied with all the ACKs.
-
-Yours,
-Linus Walleij
+     Arnd
