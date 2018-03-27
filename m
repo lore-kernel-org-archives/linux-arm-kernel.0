@@ -1,84 +1,30 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 27 Mar 2018 10:00:43 +0200
-Subject: [PATCH 02/10] drm/sun4i: Disable YUV channel when using the
- frontend and set interlace
-In-Reply-To: <20180323095529.5nptn5achjt3esog@flea>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-3-paul.kocialkowski@bootlin.com>
- <20180323095529.5nptn5achjt3esog@flea>
-Message-ID: <1522137643.1110.4.camel@bootlin.com>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Tue, 27 Mar 2018 08:02:04 +0000 (UTC)
+Subject: [2/4] wireless: Use octal not symbolic permissions
+In-Reply-To: <a368e1c4878619172f3da4849cb211b4dfad0a58.1521845237.git.joe@perches.com>
+References: <a368e1c4878619172f3da4849cb211b4dfad0a58.1521845237.git.joe@perches.com>
+Message-ID: <20180327080205.07AD26030F@smtp.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Joe Perches <joe@perches.com> wrote:
 
-On Fri, 2018-03-23 at 10:55 +0100, Maxime Ripard wrote:
-> On Wed, Mar 21, 2018 at 04:28:56PM +0100, Paul Kocialkowski wrote:
-> > The YUV channel was only disabled in
-> > sun4i_backend_update_layer_formats,
-> > which is not called when the frontend is selected.
-> > 
-> > Thus, creating a layer with a YUV format handled by the backend and
-> > then
-> > switching to a format that requires the frontend would keep the YUV
-> > channel enabled for the layer.
-> > 
-> > This explicitly disables the YUV channel for the layer when using
-> > the
-> > frontend as well. It also sets the relevant interlace bit, which was
-> > missing in the frontend path as well.
+> Prefer the direct use of octal for permissions.
 > 
-> This should be part of a separate patch. Usually, if you write "it
-> also does..." at the end of your commit log, it's a pretty good
-> indication that it should be another patch :)
-
-I must say, I figured that this part was missing in the frontend path by
-chance and couldn't really test the feature, so I'm also tempted to drop
-it altogether. What do you think?
-
-Also, is interlacing actually used on any of the video outputs we
-support? Perhaps RGB?
-
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 17 ++++++++++++++++-
-> >  drivers/gpu/drm/sun4i/sun4i_backend.h |  3 ++-
-> >  drivers/gpu/drm/sun4i/sun4i_layer.c   |  2 +-
-> >  3 files changed, 19 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > index e07a33adc51d..b98dafda52f8 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> > @@ -294,8 +294,10 @@ int sun4i_backend_update_layer_formats(struct
-> > sun4i_backend *backend,
-> >  }
-> >  
-> >  int sun4i_backend_update_layer_frontend(struct sun4i_backend
-> > *backend,
-> > -					int layer, uint32_t fmt)
-> > +					int layer, struct drm_plane
-> > *plane,
-> > +					uint32_t fmt)
-> >  {
-> > +	bool interlaced = false;
+> Done with checkpatch -f --types=SYMBOLIC_PERMS --fix-inplace
+> and some typing.
 > 
-> There's no need to pass the full drm_plane pointer, you can just pass
-> a boolean to tell if it is interlaced or not.
+> Miscellanea:
+> 
+> o Whitespace neatening around these conversions.
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-Yes that'll do just as well.
+Patch applied to wireless-drivers-next.git, thanks.
 
-Thanks,
+2ef00c53049b wireless: Use octal not symbolic permissions
 
 -- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/82778e66/attachment.sig>
+https://patchwork.kernel.org/patch/10305719/
+
+https://wireless.wiki.kernel.org/en/developers/documentation/submittingpatches
