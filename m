@@ -1,268 +1,47 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 27 Mar 2018 09:01:54 -0700
-Subject: [PATCH 2/2] arm64: dts: qcom: msm8998: Add rpm and regulators for MTP
-In-Reply-To: <20180327160154.1938-1-bjorn.andersson@linaro.org>
-References: <20180327160154.1938-1-bjorn.andersson@linaro.org>
-Message-ID: <20180327160154.1938-2-bjorn.andersson@linaro.org>
+From: oss@buserror.net (Scott Wood)
+Date: Tue, 27 Mar 2018 11:03:16 -0500
+Subject: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness supports
+In-Reply-To: <VI1PR0402MB385456DB28FE27FCF9ACCAB997AC0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
+References: <20180312081128.8195-1-prabhakar.kushwaha@nxp.com>
+ <20180323093408.230a61c1@bbrezillon>
+ <VI1PR0402MB385456DB28FE27FCF9ACCAB997AC0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
+Message-ID: <1522166596.5274.6.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the rpm and rpm regulators to the msm8998 platform and mtp.
+On Tue, 2018-03-27 at 12:06 +0000, Prabhakar Kushwaha wrote:
+> Hi Boris,
+> 
+> > -----Original Message-----
+> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> > Sent: Friday, March 23, 2018 2:04 PM
+> > To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
+> > robh at kernel.org
+> > Cc: linux-mtd at lists.infradead.org; devicetree at vger.kernel.org;
+> > mark.rutland at arm.com; shawnguo at kernel.org; boris.brezillon at free-
+> > electrons.com; computersforpeace at gmail.com; oss at buserror.net; Leo Li
+> > <leoyang.li@nxp.com>; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness
+> > supports
+> > 
+> > You still haven't answered the comments I made on your v5. To me, this
+> > does
+> > not represent how the controller and chip pins are connected, but how the
+> > chip was programmed and which endianness should be used by the
+> > controller to correctly read the data back. Maybe I'm wrong, hence my
+> > question.
+> > 
+> 
+> NXP's ARM SoC has IFC module which interface with NOR flash. Here IFC is big
+> endian module connected with NOR flash. 
+> As SoC has ARM processor(Littler Endian),  CONFIG_MTD_CFI_BE_BYTE_SWAP needs
+> to be enabled  to make sure data is read correctly.  
+> This is the reason, I wrote about connection between controller and flash.
+> 
+> In a way, I agree with you.  It is not about connection. 
+> It is about how controller read the data (inherently ARM processor)
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi | 142 ++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/msm8998.dtsi     |  83 +++++++++++++++++
- 2 files changed, 225 insertions(+)
+It is not about anything inherent to ARM (which, like PPC, is a bi-endian
+arch).  It's about the programming model of IFC on certain SoCs.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
-index 0f2f0e0de74f..292c2dd2cb49 100644
---- a/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
-@@ -18,3 +18,145 @@
- 		status = "okay";
- 	};
- };
-+
-+&rpm_glink {
-+	rpm_requests {
-+		pm8998-regulators {
-+			s2 {
-+				regulator-min-microvolt = <1128000>;
-+				regulator-max-microvolt = <1128000>;
-+			};
-+			s3 {
-+				regulator-min-microvolt = <1352000>;
-+				regulator-max-microvolt = <1352000>;
-+			};
-+			s4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			s5 {
-+				regulator-min-microvolt = <1904000>;
-+				regulator-max-microvolt = <2040000>;
-+			};
-+			s7 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1028000>;
-+			};
-+			s8 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <800000>;
-+			};
-+			l1 {
-+				regulator-min-microvolt = <880000>;
-+				regulator-max-microvolt = <880000>;
-+			};
-+			l2 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+			l3 {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
-+			l5 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <800000>;
-+			};
-+			l6 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <1808000>;
-+			};
-+			l7 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			l8 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+			l9 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l10 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l11 {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
-+			l12 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			l13 {
-+				regulator-min-microvolt = <1808000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l14 {
-+				regulator-min-microvolt = <1880000>;
-+				regulator-max-microvolt = <1880000>;
-+			};
-+			l15 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+			l16 {
-+				regulator-min-microvolt = <2704000>;
-+				regulator-max-microvolt = <2704000>;
-+			};
-+			l17 {
-+				regulator-min-microvolt = <1304000>;
-+				regulator-max-microvolt = <1304000>;
-+			};
-+			l18 {
-+				regulator-min-microvolt = <2704000>;
-+				regulator-max-microvolt = <2704000>;
-+			};
-+			l19 {
-+				regulator-min-microvolt = <3008000>;
-+				regulator-max-microvolt = <3008000>;
-+			};
-+			l20 {
-+				regulator-min-microvolt = <2960000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l21 {
-+				regulator-min-microvolt = <2960000>;
-+				regulator-max-microvolt = <2960000>;
-+			};
-+			l22 {
-+				regulator-min-microvolt = <2864000>;
-+				regulator-max-microvolt = <2864000>;
-+			};
-+			l23 {
-+				regulator-min-microvolt = <3312000>;
-+				regulator-max-microvolt = <3312000>;
-+			};
-+			l24 {
-+				regulator-min-microvolt = <3088000>;
-+				regulator-max-microvolt = <3088000>;
-+			};
-+			l25 {
-+				regulator-min-microvolt = <3104000>;
-+				regulator-max-microvolt = <3312000>;
-+			};
-+			l26 {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+			l28 {
-+				regulator-min-microvolt = <3008000>;
-+				regulator-max-microvolt = <3008000>;
-+			};
-+		};
-+
-+		pmi8998-regulators {
-+			bob {
-+				regulator-min-microvolt = <3312000>;
-+				regulator-max-microvolt = <3600000>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-index 9e2c0ff7457f..69c069dbbf90 100644
---- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
-@@ -223,6 +223,16 @@
- 		method = "smc";
- 	};
- 
-+	rpm_glink: rpm-glink {
-+		compatible = "qcom,glink-rpm";
-+
-+		interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
-+
-+		qcom,rpm-msg-ram = <&rpm_msg_ram>;
-+
-+		mboxes = <&apcs_glb 0>;
-+	};
-+
- 	soc: soc {};
- };
- 
-@@ -341,4 +351,77 @@
- 		#interrupt-cells = <4>;
- 		cell-index = <0>;
- 	};
-+
-+	rpm_msg_ram: memory at 68000 {
-+		compatible = "qcom,rpm-msg-ram";
-+		reg = <0x778000 0x7000>;
-+	};
-+
-+	apcs_glb: mailbox at 9820000 {
-+		compatible = "qcom,msm8998-apcs-hmss-global";
-+		reg = <0x17911000 0x1000>;
-+
-+		#mbox-cells = <1>;
-+	};
-+};
-+
-+&rpm_glink {
-+	rpm_requests {
-+		compatible = "qcom,rpm-msm8998";
-+		qcom,glink-channels = "rpm_requests";
-+
-+		pm8998-regulators {
-+			compatible = "qcom,rpm-pm8998-regulators";
-+
-+			pm8998_s1: s1 {};
-+			pm8998_s2: s2 {};
-+			pm8998_s3: s3 {};
-+			pm8998_s4: s4 {};
-+			pm8998_s5: s5 {};
-+			pm8998_s6: s6 {};
-+			pm8998_s7: s7 {};
-+			pm8998_s8: s8 {};
-+			pm8998_s9: s9 {};
-+			pm8998_s10: s10 {};
-+			pm8998_s11: s11 {};
-+			pm8998_s12: s12 {};
-+			pm8998_s13: s13 {};
-+			pm8998_l1: l1 {};
-+			pm8998_l2: l2 {};
-+			pm8998_l3: l3 {};
-+			pm8998_l4: l4 {};
-+			pm8998_l5: l5 {};
-+			pm8998_l6: l6 {};
-+			pm8998_l7: l7 {};
-+			pm8998_l8: l8 {};
-+			pm8998_l9: l9 {};
-+			pm8998_l10: l10 {};
-+			pm8998_l11: l11 {};
-+			pm8998_l12: l12 {};
-+			pm8998_l13: l13 {};
-+			pm8998_l14: l14 {};
-+			pm8998_l15: l15 {};
-+			pm8998_l16: l16 {};
-+			pm8998_l17: l17 {};
-+			pm8998_l18: l18 {};
-+			pm8998_l19: l19 {};
-+			pm8998_l20: l20 {};
-+			pm8998_l21: l21 {};
-+			pm8998_l22: l22 {};
-+			pm8998_l23: l23 {};
-+			pm8998_l24: l24 {};
-+			pm8998_l25: l25 {};
-+			pm8998_l26: l26 {};
-+			pm8998_l27: l27 {};
-+			pm8998_l28: l28 {};
-+			pm8998_lvs1: lvs1 {};
-+			pm8998_lvs2: lvs2 {};
-+		};
-+
-+		pmi8998-regulators {
-+			compatible = "qcom,rpm-pmi8998-regulators";
-+
-+			pmi8998_bob: bob {};
-+		};
-+	};
- };
--- 
-2.16.2
+-Scott
