@@ -1,50 +1,124 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 27 Mar 2018 16:08:15 +0200
-Subject: [PATCH v3 2/6] PCI: aardvark: fix logic in advk_pcie_valid_device()
+Date: Tue, 27 Mar 2018 16:08:12 +0200
+Subject: [PATCH v3 6/6] PCI: aardvark: remove PCIe outbound window
+ configuration
 In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
 References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180327140819.23501-10-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327140819.23501-7-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+From: Evan Wang <xswang@marvell.com>
 
-The PCI configuration space read/write functions were special casing
-the situation where PCI_SLOT(devfn) != 0, and returned
-PCIBIOS_DEVICE_NOT_FOUND in this case.
+Outbound window is used to translate CPU space addresses to PCIe space
+addresses when the CPU initiates PCIe transactions.
 
-However, while this is what is intended for the root bus, it is not
-intended for the child busses, as it prevents discovering devices with
-PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
-if we're on the root bus.
+According to the suggestion of the HW designers, the recommended
+solution is to use the default outbound parameters, even though the
+current outbound window setting does not cause any known functional
+issue.
 
-Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Wilson Ding <dingwei@marvell.com>
+This patch doesn't address any known functional issue, but aligns to
+HW design guidelines, and removes code that isn't needed.
+
+Signed-off-by: Evan Wang <xswang@marvell.com>
+Reviewed-by: Victor Gu <xigu@marvell.com>
 Reviewed-by: Nadav Haklai <nadavh@marvell.com>
 [Thomas: tweak commit log.]
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-Changes since v2:
- - The logic has been factorized into a advk_pcie_valid_device()
-   helper in a previous patch, so this patch was adjusted accordingly.
----
- drivers/pci/host/pci-aardvark.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/host/pci-aardvark.c | 55 -----------------------------------------
+ 1 file changed, 55 deletions(-)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index ccd0304a0c21..be140dc7109b 100644
+index d0688dc6b6d9..d0559152b8e1 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -433,7 +433,7 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
- static int advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
- 				  int devfn)
- {
--	if (PCI_SLOT(devfn) != 0)
-+	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0)
- 		return false;
+@@ -109,24 +109,6 @@
+ #define PCIE_MSI_MASK_REG			(CONTROL_BASE_ADDR + 0x5C)
+ #define PCIE_MSI_PAYLOAD_REG			(CONTROL_BASE_ADDR + 0x9C)
  
- 	return true;
+-/* PCIe window configuration */
+-#define OB_WIN_BASE_ADDR			0x4c00
+-#define OB_WIN_BLOCK_SIZE			0x20
+-#define OB_WIN_REG_ADDR(win, offset)		(OB_WIN_BASE_ADDR + \
+-						 OB_WIN_BLOCK_SIZE * (win) + \
+-						 (offset))
+-#define OB_WIN_MATCH_LS(win)			OB_WIN_REG_ADDR(win, 0x00)
+-#define OB_WIN_MATCH_MS(win)			OB_WIN_REG_ADDR(win, 0x04)
+-#define OB_WIN_REMAP_LS(win)			OB_WIN_REG_ADDR(win, 0x08)
+-#define OB_WIN_REMAP_MS(win)			OB_WIN_REG_ADDR(win, 0x0c)
+-#define OB_WIN_MASK_LS(win)			OB_WIN_REG_ADDR(win, 0x10)
+-#define OB_WIN_MASK_MS(win)			OB_WIN_REG_ADDR(win, 0x14)
+-#define OB_WIN_ACTIONS(win)			OB_WIN_REG_ADDR(win, 0x18)
+-
+-/* PCIe window types */
+-#define OB_PCIE_MEM				0x0
+-#define OB_PCIE_IO				0x4
+-
+ /* LMI registers base address and register offsets */
+ #define LMI_BASE_ADDR				0x6000
+ #define CFG_REG					(LMI_BASE_ADDR + 0x0)
+@@ -245,34 +227,9 @@ static int advk_pcie_wait_for_link(struct advk_pcie *pcie)
+ 	return -ETIMEDOUT;
+ }
+ 
+-/*
+- * Set PCIe address window register which could be used for memory
+- * mapping.
+- */
+-static void advk_pcie_set_ob_win(struct advk_pcie *pcie,
+-				 u32 win_num, u32 match_ms,
+-				 u32 match_ls, u32 mask_ms,
+-				 u32 mask_ls, u32 remap_ms,
+-				 u32 remap_ls, u32 action)
+-{
+-	advk_writel(pcie, match_ls, OB_WIN_MATCH_LS(win_num));
+-	advk_writel(pcie, match_ms, OB_WIN_MATCH_MS(win_num));
+-	advk_writel(pcie, mask_ms, OB_WIN_MASK_MS(win_num));
+-	advk_writel(pcie, mask_ls, OB_WIN_MASK_LS(win_num));
+-	advk_writel(pcie, remap_ms, OB_WIN_REMAP_MS(win_num));
+-	advk_writel(pcie, remap_ls, OB_WIN_REMAP_LS(win_num));
+-	advk_writel(pcie, action, OB_WIN_ACTIONS(win_num));
+-	advk_writel(pcie, match_ls | BIT(0), OB_WIN_MATCH_LS(win_num));
+-}
+-
+ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
+ {
+ 	u32 reg;
+-	int i;
+-
+-	/* Point PCIe unit MBUS decode windows to DRAM space */
+-	for (i = 0; i < 8; i++)
+-		advk_pcie_set_ob_win(pcie, i, 0, 0, 0, 0, 0, 0, 0);
+ 
+ 	/* Set to Direct mode */
+ 	reg = advk_readl(pcie, CTRL_CONFIG_REG);
+@@ -851,12 +808,6 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
+ 
+ 		switch (resource_type(res)) {
+ 		case IORESOURCE_IO:
+-			advk_pcie_set_ob_win(pcie, 1,
+-					     upper_32_bits(res->start),
+-					     lower_32_bits(res->start),
+-					     0,	0xF8000000, 0,
+-					     lower_32_bits(res->start),
+-					     OB_PCIE_IO);
+ 			err = pci_remap_iospace(res, iobase);
+ 			if (err) {
+ 				dev_warn(dev, "error %d: failed to map resource %pR\n",
+@@ -865,12 +816,6 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
+ 			}
+ 			break;
+ 		case IORESOURCE_MEM:
+-			advk_pcie_set_ob_win(pcie, 0,
+-					     upper_32_bits(res->start),
+-					     lower_32_bits(res->start),
+-					     0x0, 0xF8000000, 0,
+-					     lower_32_bits(res->start),
+-					     (2 << 20) | OB_PCIE_MEM);
+ 			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
+ 			break;
+ 		case IORESOURCE_BUS:
 -- 
 2.14.3
