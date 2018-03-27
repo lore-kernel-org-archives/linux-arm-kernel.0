@@ -1,76 +1,79 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 27 Mar 2018 08:09:11 +0200
-Subject: [PATCH v2,10/10] kbuild: mark $(targets) as .SECONDARY and
- remove .PRECIOUS markers
-In-Reply-To: <1522079634-5947-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1522079634-5947-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20180327060911.iljk66zfuqnl472e@gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 27 Mar 2018 11:39:54 +0530
+Subject: [PATCH v4 0/8] ARM: davinci: complete the conversion to using the
+ reset framework
+In-Reply-To: <CAMRc=MdmTAwPAAnL1+n+OXSycnyjuQ1hKmts158mPcgat1NUYQ@mail.gmail.com>
+References: <20180323130455.11470-1-brgl@bgdev.pl>
+ <152182378792.178046.3747112581117251857@swboyd.mtv.corp.google.com>
+ <CAMRc=MfEebDk4D=t-ybRgbn+HaY7RUfOFCDAf9H8F3cZRchJmA@mail.gmail.com>
+ <152182490783.178046.1191965992600877708@swboyd.mtv.corp.google.com>
+ <CAMRc=MdmTAwPAAnL1+n+OXSycnyjuQ1hKmts158mPcgat1NUYQ@mail.gmail.com>
+Message-ID: <6c55e081-57ba-6c39-8494-cda5022aa927@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bart,
 
-* Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+On Friday 23 March 2018 10:46 PM, Bartosz Golaszewski wrote:
+> 2018-03-23 18:08 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
+>> Quoting Bartosz Golaszewski (2018-03-23 09:55:47)
+>>> 2018-03-23 17:49 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
+>>>> Quoting Bartosz Golaszewski (2018-03-23 06:04:47)
+>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>
+>>>>> This series converts the only user of the handcoded, mach-specific reset
+>>>>> routines in the davinci platform to using the reset framework.
+>>>>>
+>>>>> Patch 1 modifies the way lookup entries are registered with the reset
+>>>>> framework.
+>>>>>
+>>>>> Patches 2-4 add necessary lookups/DT-properties.
+>>>>>
+>>>>> Patches 5-7 convert the davinci-rproc driver to the reset framework.
+>>>>>
+>>>>> Patch 8 removes now dead code.
+>>>>>
+>>>>> Philipp: it turned out that it's indeed better to use the reset
+>>>>> controller's device name for the entry lookup.
+>>>>>
+>>>>> Tested both in DT and legacy modes by booting the examples from
+>>>>> ti-ipc-rtos recipe in meta-ti.
+>>>>>
+>>>>> This series applies on top of David Lechner's common-clk-v9 branch[1]
+>>>>> with Philipp Zabel's reset/next branch[2] pulled in.
+>>>>>
+>>>>> It can be found in my github tree as well[3].
+>>>>>
+>>>>
+>>>> What's the merge strategy for the rest of the patches? I should apply
+>>>> the clk ones after the next -rc1?
+>>>
+>>> Or maybe Philipp can provide us with an immutable branch with the reset patches?
+>>>
+>>> The you could apply the driver patches and let Sekhar take all the
+>>> platform code?
+>>>
+>>
+>> Ok that could work too.
+> 
+> Ohad, Bjorn can you ack the remoteproc patches? Are you OK with
+> Stephen taking them through the clock tree? Otherwise it would get
+> complicated since they depend on the first clk patch and the last clk
+> patch depends on them.
 
-> GNU Make automatically deletes intermediate files that are updated
-> in a chain of pattern rules.
-> 
-> Example 1) %.dtb.o <- %.dtb.S <- %.dtb <- %.dts
-> Example 2) %.o <- %.c <- %.c_shipped
-> 
-> A couple of makefiles mark such targets as .PRECIOUS to prevent Make
-> from deleting them, but the correct way is to use .SECONDARY.
-> 
->   .SECONDARY
->     Prerequisites of this special target are treated as intermediate
->     files but are never automatically deleted.
-> 
->   .PRECIOUS
->     When make is interrupted during execution, it may delete the target
->     file it is updating if the file was modified since make started.
->     If you mark the file as precious, make will never delete the file
->     if interrupted.
-> 
-> Both can avoid deletion of intermediate files, but the difference is
-> the behavior when Make is interrupted; .SECONDARY deletes the target,
-> but .PRECIOUS does not.
-> 
-> The use of .PRECIOUS is relatively rare since we do not want to keep
-> partially constructed (possibly corrupted) targets.
-> 
-> Another difference is that .PRECIOUS works with pattern rules whereas
-> .SECONDARY does not.
-> 
->   .PRECIOUS: $(obj)/%.lex.c
-> 
-> works, but
-> 
->   .SECONDARY: $(obj)/%.lex.c
-> 
-> has no effect.  However, for the reason above, I do not want to use
-> .PRECIOUS which could cause obscure build breakage.
-> 
-> The targets specified as .SECONDARY must be explicit.  $(targets)
-> contains all targets that need to include .*.cmd files.  So, the
-> intermediates you want to keep are mostly in there.  Therefore, mark
-> $(targets) as .SECONDARY.  It means primary targets are also marked
-> as .SECONDARY, but I do not see any drawback for this.
-> 
-> I replaced some .SECONDARY / .PRECIOUS markers with 'targets'.  This
-> will make Kbuild search for non-existing .*.cmd files, but this is
-> not a noticeable performance issue.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Acked-by: Frank Rowand <frowand.list@gmail.com>
-> ---
->  arch/arc/boot/dts/Makefile        |  2 --
->  arch/arm/crypto/Makefile          |  2 +-
->  arch/arm64/crypto/Makefile        |  2 +-
->  arch/metag/boot/dts/Makefile      |  2 --
->  arch/sparc/vdso/Makefile          |  4 +---
->  arch/x86/entry/vdso/Makefile      |  4 +---
+I will not be queuing the DTS patches for v4.17. They depend on clock
+framework DTS patches which itself I plan to queue for v4.18. Given
+this, I think the best bet is:
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+Ohad/Bjorn queue remoteproc patches already acked by Suman and having no
+dependencies. That is, 5/8 and 6/8.
+
+If Philipp can provide an immutable branch with reset changes, it will
+be great and Stephen can queue 4/8. If not, its best to resend that
+patch to Stephen once v4.17-rc1 is out.
+
+The remaining patches need to wait till v4.18 (or even v4.19 if
+dependencies don't pan out well).
 
 Thanks,
-
-	Ingo
+Sekhar
