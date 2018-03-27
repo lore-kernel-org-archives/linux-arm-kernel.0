@@ -1,49 +1,93 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 27 Mar 2018 14:29:35 +0900
-Subject: [PATCH v2 21/21] arm64: move GCC version check for
- ARCH_SUPPORTS_INT128 to Kconfig
-In-Reply-To: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1522128575-5326-22-git-send-email-yamada.masahiro@socionext.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 27 Mar 2018 11:01:04 +0530
+Subject: [PATCH v5 3/3] arm64: allwinner: a64: bananapi-m64: add usb otg
+In-Reply-To: <20180327053104.3812-1-jagan@amarulasolutions.com>
+References: <20180327053104.3812-1-jagan@amarulasolutions.com>
+Message-ID: <20180327053104.3812-3-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This becomes much neater in Kconfig.
+Add usb otg support for bananapi-m64 board,
+- USB-ID connected with PH9
+- USB-DRVVBUS controlled by N_VBUSEN pin from PMIC
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
+Changes for v5:
+- Kept reg_drivevbus node in alphabetical order.
+- Collect Chen-Yu reviewed-by tag
+Changes for v4:
+- rebase on master
+- tested otg host mode.
+Changes for v3:
+- Move the position of reg_drivevbus as per binding documentation.
+Changes for v2:
+- add drvvbus regulator
+- add N_VBUSEN pin
 
-Changes in v2:
-  - Newly added
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts  | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
- arch/arm64/Kconfig  | 1 +
- arch/arm64/Makefile | 2 --
- 2 files changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7381eeb..0c97f40 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -43,6 +43,7 @@ config ARM64
- 	select ARCH_USE_QUEUED_RWLOCKS
- 	select ARCH_SUPPORTS_MEMORY_FAILURE
- 	select ARCH_SUPPORTS_ATOMIC_RMW
-+	select ARCH_SUPPORTS_INT128 if GCC_VERSION >= 50000
- 	select ARCH_SUPPORTS_NUMA_BALANCING
- 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
- 	select ARCH_WANT_FRAME_POINTERS
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b481b4a..7318165 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -57,8 +57,6 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
- KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
- KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 2250dec9974c..0716b1441187 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -86,6 +86,10 @@
+ 	};
+ };
  
--KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
--
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
++&ehci0 {
++	status = "okay";
++};
++
+ &ehci1 {
+ 	status = "okay";
+ };
+@@ -155,6 +159,10 @@
+ 	status = "okay";
+ };
+ 
++&ohci0 {
++	status = "okay";
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
+@@ -167,6 +175,7 @@
+ 		reg = <0x3a3>;
+ 		interrupt-parent = <&r_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		x-powers,drive-vbus-en; /* set N_VBUSEN as output pin */
+ 	};
+ };
+ 
+@@ -254,6 +263,11 @@
+ 	regulator-name = "vcc-wifi-io";
+ };
+ 
++&reg_drivevbus {
++	regulator-name = "usb0-vbus";
++	status = "okay";
++};
++
+ &reg_eldo1 {
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
+@@ -294,6 +308,13 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
++	usb0_vbus-supply = <&reg_drivevbus>;
+ 	status = "okay";
+ };
 -- 
-2.7.4
+2.14.3
