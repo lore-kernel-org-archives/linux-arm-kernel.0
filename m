@@ -1,71 +1,44 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 27 Mar 2018 15:32:37 +0300
-Subject: [PATCH v2 04/10] iio: inkern: add module put/get on iio dev module
- when requesting channels
+Date: Tue, 27 Mar 2018 15:32:43 +0300
+Subject: [PATCH v2 10/10] ARM: dts: at91: sama5d2: Add resistive touch device
 In-Reply-To: <1522153963-1121-1-git-send-email-eugen.hristev@microchip.com>
 References: <1522153963-1121-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1522153963-1121-5-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1522153963-1121-11-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When requesting channels for a particular consumer device,
-besides requesting the device (incrementing the reference counter), also
-do it for the driver module of the iio dev. This will avoid the situation
-where the producer IIO device can be removed and the consumer is still
-present in the kernel.
+Add generic resistive touch device which is connected to ADC block
+inside the SAMA5D2 SoC
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- drivers/iio/inkern.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Changes in v2:
+ - now added a generic resistive touchscreen node instead of architecture
+specific
 
-diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
-index ec98790..68d9b87 100644
---- a/drivers/iio/inkern.c
-+++ b/drivers/iio/inkern.c
-@@ -11,6 +11,7 @@
- #include <linux/slab.h>
- #include <linux/mutex.h>
- #include <linux/of.h>
-+#include <linux/module.h>
+ arch/arm/boot/dts/sama5d2.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index f06ba99..0d87dc0 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1442,6 +1442,16 @@
+ 				status = "disabled";
+ 			};
  
- #include <linux/iio/iio.h>
- #include "iio_core.h"
-@@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
- 	if (index < 0)
- 		goto err_put;
- 	channel->channel = &indio_dev->channels[index];
-+	try_module_get(channel->indio_dev->driver_module);
- 
- 	return 0;
- 
-@@ -256,8 +258,10 @@ static struct iio_channel *of_iio_channel_get_all(struct device *dev)
- 	return chans;
- 
- error_free_chans:
--	for (i = 0; i < mapind; i++)
-+	for (i = 0; i < mapind; i++) {
-+		module_put(chans[i].indio_dev->driver_module);
- 		iio_device_put(chans[i].indio_dev);
-+	}
- 	kfree(chans);
- 	return ERR_PTR(ret);
- }
-@@ -351,6 +355,7 @@ void iio_channel_release(struct iio_channel *channel)
- {
- 	if (!channel)
- 		return;
-+	module_put(channel->indio_dev->driver_module);
- 	iio_device_put(channel->indio_dev);
- 	kfree(channel);
- }
-@@ -482,6 +487,7 @@ void iio_channel_release_all(struct iio_channel *channels)
- 	struct iio_channel *chan = &channels[0];
- 
- 	while (chan->indio_dev) {
-+		module_put(chan->indio_dev->driver_module);
- 		iio_device_put(chan->indio_dev);
- 		chan++;
- 	}
++			resistive_touch: resistive-touch {
++				compatible = "generic-resistive-adc-touch";
++				io-channels = <&adc AT91_SAMA5D2_ADC_X_CHANNEL>,
++					      <&adc AT91_SAMA5D2_ADC_Y_CHANNEL>,
++					      <&adc AT91_SAMA5D2_ADC_P_CHANNEL>;
++				io-channel-names = "x", "y", "pressure";
++				generic-resistive-adc-touch,pressure-threshold = <10000>;
++				status = "disabled";
++			};
++
+ 			pioA: pinctrl at fc038000 {
+ 				compatible = "atmel,sama5d2-pinctrl";
+ 				reg = <0xfc038000 0x600>;
 -- 
 2.7.4
