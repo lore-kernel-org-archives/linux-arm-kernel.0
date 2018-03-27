@@ -1,66 +1,64 @@
-From: dalias@libc.org (Rich Felker)
-Date: Tue, 27 Mar 2018 11:36:28 -0400
-Subject: Regression with arm in next with stack protector
-In-Reply-To: <20180327113453.GC10990@n2100.armlinux.org.uk>
-References: <20180323181452.GJ5799@atomide.com>
- <20180327090409.GA10990@n2100.armlinux.org.uk>
- <20180327113453.GC10990@n2100.armlinux.org.uk>
-Message-ID: <20180327153628.GJ1436@brightrain.aerifal.cx>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 27 Mar 2018 08:44:21 -0700
+Subject: [PATCH script] hwmon: Use octal not symbolic permissions
+In-Reply-To: <1522151285.12357.78.camel@perches.com>
+References: <1522096136.12357.21.camel@perches.com>
+ <9b112651-d0cf-5f3b-b643-3328028a95cd@roeck-us.net>
+ <1522136107.12357.58.camel@perches.com>
+ <5ec8703b-2979-7a1d-fbc3-bd528d7a5e29@roeck-us.net>
+ <1522151285.12357.78.camel@perches.com>
+Message-ID: <9e908abe-2dc8-dbba-97f9-d9614fa4b199@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 12:34:53PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Mar 27, 2018 at 10:04:10AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Mar 23, 2018 at 11:14:53AM -0700, Tony Lindgren wrote:
-> > > Hi,
-> > > 
-> > > Looks like commit 5638790dadae ("zboot: fix stack protector in
-> > > compressed boot phase") breaks booting on arm.
-> > > 
-> > > This is all I get from the bootloader on omap3:
-> > > 
-> > > Starting kernel ...
-> > > 
-> > > data abort
-> > > pc : [<810002d0>]          lr : [<100110a8>]
-> > > reloc pc : [<9d6002d0>]    lr : [<2c6110a8>]
-> > > sp : 81467c18  ip : 81466bf0     fp : 81466bf0
-> > > r10: 80fc2c40  r9 : 81000258     r8 : 86fec000
-> > > r7 : ffffffff  r6 : 81466bf8     r5 : 00000000  r4 : 80008000
-> > > r3 : 81466c14  r2 : 81466c18     r1 : 000a0dff  r0 : 00466bf8
-> > > Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
-> > > Resetting CPU ...
-> > > 
-> > > resetting ...
-> > 
-> > The reason for this is the following code that was introduced by the
-> > referenced patch:
-> > 
-> > +               ldr     r0, =__stack_chk_guard
-> > +               ldr     r1, =0x000a0dff
-> > +               str     r1, [r0]
-> > 
-> > This uses the absolute address of __stack_chk_guard in the decompressor,
-> > which is a self-relocatable image.  As with all constructs like the
-> > above, this absolute address doesn't get fixed up, and so it ends up
-> > pointing at invalid memory (in this case 0x466bf8) vs RAM at 0x80000000,
-> > and the decompressor looks to be around 0x81000000.
-> > 
-> > Such constructs can not be used in the decompressor for exactly this
-> > reason - they need to use PC-relative addressing instead just like
-> > everything else does in head.S.
+On 03/27/2018 04:48 AM, Joe Perches wrote:
+> On Tue, 2018-03-27 at 03:28 -0700, Guenter Roeck wrote:
+>> On 03/27/2018 12:35 AM, Joe Perches wrote:
+>>> On Mon, 2018-03-26 at 23:33 -0700, Guenter Roeck wrote:
+>>>> Since the hwmon subsystem has been labeled as both "obsolete" and "obscure",
+>>>
+>>> fyi: It's marked Maintained in MAINTAINERS
+>>>
+>>
+>> I did not say that it was not maintained, and I am aware of the information
+>> in the MAINTAINERS file, thanks.
 > 
-> Is there any reason we can't do this in misc.c:
+> As am I.
 > 
-> const unsigned int __stack_chk_guard = 0x000a0dff;
+> I do agree that hwmon is obscure.  Almost everything about
+> anything is obscure to those that don't fully understand it.
 > 
-> ?  That would save having runtime code to set that value up, and after
-> all, it is constant.  Arguments about it potentially ending up at a
-> fixed offset into the image need not be said - that's already the case
-> with placing it in the early assembly code, and as has been established,
-> it needs to be initialised prior to any C code being called.
+> I am unaware though of any use of "obsolete" in drivers/hwmon/
+> or in Documentation/ about hwmon or the wiki/
+> 
+> In what sense do you mean hwmon is obsolete?
+> 
 
-I've asked this multiple times in this thread and as far as I know
-nobody has answered.
+_I_ did not say it was obsolete. It was described as obsolete by a maintainer
+of a different subsystem at a conference a couple of years ago. If I wasn't too
+lazy, I could try to find the presentation, but I don't see the point.
 
-Rich
+> And the cocci script?
+> 
+> Anything later than:
+> https://systeme.lip6.fr/pipermail/cocci/2016-December/003887.html
+> https://github.com/groeck/coccinelle-patches/tree/master/hwmon
+> ?
+> 
+I don't think I ever published it. If I recall correctly, it required
+some cleanup patches to be applied first, but then I gave up on the idea
+because I didn't want to proceed without code reviews.
+
+> btw: I think the perl scripts I posted for DEV_ATTR_<RW|RO|WO>
+> transforms are simpler and less prone to tool versioning
+> issues.
+> 
+> https://lkml.org/lkml/2017/12/22/844
+> 
+> It'd be fairly simple to add SENSOR_ support.
+> 
+
+I'll keep it in mind.
+
+Thanks,
+Guenter
