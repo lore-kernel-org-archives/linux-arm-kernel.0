@@ -1,26 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 14:18:22 +0200
-Subject: [GIT PULL] ARM: mediatek: dts32 updates for v4.16-next
-In-Reply-To: <c1fa5369-4aef-1e51-80cd-ef4d2fb136c6@gmail.com>
-References: <c1fa5369-4aef-1e51-80cd-ef4d2fb136c6@gmail.com>
-Message-ID: <CAK8P3a2L2G_oDRG0EuAdUc3u8oxBnpULrz5J5SX77ueXioBvGA@mail.gmail.com>
+Date: Tue, 27 Mar 2018 14:19:21 +0200
+Subject: [GIT PUL] ARM: mediatek: dts64 updates for v4.16-next
+In-Reply-To: <e006b345-5711-3c1b-cd06-d75d87beefef@gmail.com>
+References: <e006b345-5711-3c1b-cd06-d75d87beefef@gmail.com>
+Message-ID: <CAK8P3a1XTkk5NRrVtm=jhOkpTCBDj9ri4ctoKKE8x1udbZGPww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 11:18 AM, Matthias Brugger
+On Mon, Mar 19, 2018 at 11:20 AM, Matthias Brugger
 <matthias.bgg@gmail.com> wrote:
-> mt7623:
-> - fix style issues of the dts
-> - add cpu clock properties
-> - add PCI controller
-> - add mt7623 reference board
+> - mt2712e add auxadc devcie
 >
-> banapi-r2:
-> - enable missing uarts
-> - fix regulator for mmc
-> - fix USB initialization
->
+> mt7622:
+> - fix clock bindings description
+> - add nodes for mmc, usb, SATA, PCI, ethernet, cpufreq, PMIC mt6380,
+> pinctrl, scpsys and clock devices
 
 Pulled into next/dt, thanks!
 
-      Arnd
+       Arnd
