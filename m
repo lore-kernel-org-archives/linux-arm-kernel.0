@@ -1,90 +1,41 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Tue, 27 Mar 2018 12:41:08 +0200
-Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
-References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
-Message-ID: <9761072.pX2B0LJlSJ@ada>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 27 Mar 2018 12:47:42 +0200
+Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
+In-Reply-To: <20180327080507.pgil6pw2mn4y2f4d@dell>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+ <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
+ <1521685073.28226.10.camel@mtkswgap22> <20180323185418.GD255819@dtor-ws>
+ <20180327080507.pgil6pw2mn4y2f4d@dell>
+Message-ID: <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alexandre,
 
-Am Freitag, 23. Februar 2018, 18:15:52 CEST schrieb Alexandre Belloni:
->  - using the PIT doesn't work well with preempt-rt because its interrupt is
->    shared (in particular with the UART and their interrupt flags are
->    incompatible)
 
-This is actually quite annoying when using the UART as a serial console, 
-producing garbage when you type too fast. That's why I tested this patch 
-series (on top of v4.16-rc7). Target is a at91sam9g20 based board, quite close 
-to, but not actually an at91sam9g20-ek.
+On 03/27/2018 10:05 AM, Lee Jones wrote:
+> On Fri, 23 Mar 2018, Dmitry Torokhov wrote:
+>> On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
+>>> Hi, Dmitry and Lee
+>>>
+>>> The series seems not being got merged. Are they good enough to be ready
+>>> into the your tree?
+>>>
+>>> Recently I've tested the series with focusing on pwrkey event generated
+>>> through interrupt when push and release the key on bpi-r2 board and then
+>>> finally it's working fine. but for homekey it cannot be found on the
+>>> board and thus I cannot have more tests more about it.
+>>>
+>>> Tested-by: Sean Wang <sean.wang@mediatek.com>
+>>
+>> You have my Ack on the input patch; I expect it go through Lee's tree as
+>> there are some dependencies on mfd core piece.
+> 
+> Are you happy for me to merge the Input dt-bindings without your Ack?
+> 
 
-First test was with the previous kernel config updated by oldconfig, so 
-basically still using the PIT:
+They got both Acked in v5, but the commit message was not updated:
+https://patchwork.kernel.org/patch/9973721/
+https://patchwork.kernel.org/patch/9973723/
 
-  +CONFIG_ATMEL_CLOCKSOURCE_PIT=y
-
-On the serial console with v4.16 and the patch set without switching to the 
-new options, I see this on boot (no surprise, this is what it also prints with 
-v4.9):
-
-  clocksource: pit: mask: 0xfffffff max_cycles: 0xfffffff, max_idle_ns: 
-14468723050 ns
-  ?
-  clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 
-19112604462750000 ns
-  ?
-  clocksource: tcb_clksrc: mask: 0xffffffff max_cycles: 0xffffffff, 
-max_idle_ns: 115749784805 ns
-  ?
-  clocksource: Switched to clocksource tcb_clksrc
-
-Interrupts here:
-
-  $ cat /proc/interrupts 
-             CPU0       
-   16:       4802  atmel-aic   1 Level     at91_tick, rtc0, ttyS0
-   19:      24041  atmel-aic  19 Level     tc_clkevt
-   26:        124  atmel-aic  21 Level     eth0
-   28:          1      GPIO  11 Edge      reset
-  Err:          0
-
-Second test with tcb block added to dts like in 
-32ce250b0af3b6971fc746445fce87861a9f5628 and with changed kernel config 
-according to defconfig changes in patch 5 and 6:
-
-  +# CONFIG_ATMEL_CLOCKSOURCE_PIT is not set
-  +CONFIG_ATMEL_CLOCKSOURCE_TCB=y
-  -CONFIG_ATMEL_TCLIB=y
-  -CONFIG_ATMEL_TCB_CLKSRC=y
-  -CONFIG_ATMEL_TCB_CLKSRC_BLOCK=0
-  +# CONFIG_ATMEL_TCLIB is not set
-  -CONFIG_ATMEL_PIT=y
-  +CONFIG_ATMEL_ARM_TCB_CLKSRC=y
-  -CONFIG_PWM_ATMEL_TCB=m
-
-The output on the serial console contains this:
-
-  clocksource: timer at fffa0000:0,1: mask: 0xffffffff max_cycles: 0xffffffff, 
-max_idle_ns: 115749784805 ns
-  ?
-  clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 
-19112604462750000 ns
-  ?
-  clocksource: Switched to clocksource timer at fffa0000:0,1
-
-Interrupts here:
-
-  $ cat /proc/interrupts 
-             CPU0       
-   17:    5727291  atmel-aic  19 Level     timer at fffa0000:2
-   18:       5523  atmel-aic   1 Level     rtc0, ttyS0
-   26:       5031  atmel-aic  21 Level     eth0
-   28:          1      GPIO  11 Edge      reset
-  Err:          0
-
-So, the board boots and runs like usual. I don't know if that qualifies for a 
-Tested-by? Hope that helps.
-
-Greets
-Alex
+Regards,
+Matthias
