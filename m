@@ -1,19 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 14:59:08 +0200
-Subject: [GIT PULL] Allwinner H3/H5 DT changes for 4.17
-In-Reply-To: <20180322155623.gr44ltpzfo33kpas@flea>
-References: <20180322155623.gr44ltpzfo33kpas@flea>
-Message-ID: <CAK8P3a1xXceWjN5nuejeCZcuYUBBQaMm-8McOxC+8y1=08+qkQ@mail.gmail.com>
+Date: Tue, 27 Mar 2018 15:01:15 +0200
+Subject: [GIT PULL 1/2] SoCFPGA DTS updates for v4.17
+In-Reply-To: <1521834884-23795-1-git-send-email-dinguyen@kernel.org>
+References: <1521834884-23795-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <CAK8P3a1qP2ZNZ-4jUT=0X2NeCny4zqK1zxSB1m2L0sCBH9HmqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 4:56 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> Hi Arnd, Olof,
+On Fri, Mar 23, 2018 at 8:54 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
+> SoCFPGA DTS updates for v4.17
+> - Fix GIC PPI warning
+> - Stratix10 platform updates
+>   - Disable over-current for Arria10 devkit
+>   - Enable watchdog timer
 >
-> Here is the usual bunch of changes shared between arm and arm64 for
-> the merge window.
 
 Pulled into next/dt, thanks!
 
-      Arnd
+       Arnd
