@@ -1,51 +1,39 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Mar 2018 09:23:36 -0400
-Subject: [net-next PATCH 3/5] net: netcp: ethss enhancements to support 2u
- cpsw h/w on K2G SoC
-In-Reply-To: <20180326202842.GB5862@lunn.ch>
-References: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
- <1522095312-23249-4-git-send-email-m-karicheri2@ti.com>
- <20180326202842.GB5862@lunn.ch>
-Message-ID: <be58cf50-2148-cbfa-c7a2-8f4fbe6930e5@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Mar 2018 15:24:16 +0200
+Subject: [PATCH v3 2/3] gpiolib: Support 'gpio-reserved-ranges' property
+In-Reply-To: <152166234504.91116.14942145962035607739@swboyd.mtv.corp.google.com>
+References: <20180321165848.89751-1-swboyd@chromium.org>
+ <20180321165848.89751-3-swboyd@chromium.org>
+ <1521655150.23017.79.camel@linux.intel.com>
+ <152166234504.91116.14942145962035607739@swboyd.mtv.corp.google.com>
+Message-ID: <CACRpkdbg40yaKVbo-b6UKAYfGpT2ZLDdXaPKgEn-4zGL4mKuag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2018 04:28 PM, Andrew Lunn wrote:
-> On Mon, Mar 26, 2018 at 04:15:10PM -0400, Murali Karicheri wrote:
->> K2G SoC uses 2u cpsw h/w. It uses RGMII instead of SGMII to interface with
->> Phy. This patch enhances the driver to check RGMII status instead of SGMII
->> status for link state determination. Also map all of the vlan priorities
->> to zero as the packet DMA is enabled to receive only flow id 0 which maps
->> to priority zero.
+On Wed, Mar 21, 2018 at 8:59 PM, Stephen Boyd <swboyd@chromium.org> wrote:
+> Quoting Andy Shevchenko (2018-03-21 10:59:10)
+>> On Wed, 2018-03-21 at 09:58 -0700, Stephen Boyd wrote:
+>> > From: Stephen Boyd <sboyd@codeaurora.org>
+>> >
+>> > Some qcom platforms make some GPIOs or pins unavailable for use by
+>> > non-secure operating systems, and thus reading or writing the
+>> > registers
+>> > for those pins will cause access control issues. Add support for a DT
+>> > property to describe the set of GPIOs that are available for use so
+>> > that
+>> > higher level OSes are able to know what pins to avoid reading/writing.
+>> > Non-DT platforms can add support by directly updating the
+>> > chip->valid_mask.
 >>
->> Additionally, When a phy with rgmii interface requires internal delay, the
->> same is set in the phy driver. To support such phy devices, add a phy-mode
->> handling code in the driver using of_get_phy_mode() and pass the obtained
->> phy mode to of_phy_connect()
-> 
-> Hi Murali
-> 
-> Please break this patch up. One patch should do one thing. That makes
-> it easy to review. There are too many things going on at once here.
-> 
->    Andrew
-> 
-Hello Andrew,
+>> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> > Signed-off-by: Stephen Boyd <swboyd@chromium.org>
+>>
+>> Hmm...
+>
+> Don't look closely! :P
 
-Thanks for the comment. But I am not sure how to break this up as this is 
-an enhancement to the driver to support a newer version of the cspw 
-hardware. Without all these pieces together, the driver can't
-function. Probably I can make the below break up based on different functions
-added. Let me know if this looks good to you. Beware that patch #2 and
-#3 are small patches and majority of code change will be in patch #1
-which has to go together. 
+Same physical person acting on behalf of two different legal
+entities right? Seems OK to me.
 
-Patch #1. Add support new link interface, RGMII_LINK_MAC_PHY, for K2G
-          - Most of the code is for this
-Patch #2. Add support for configuring phy_mode 
-          - This just add phy_mode handling code 
-Patch #3. map all vlan priorities to flow id 0
-
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Yours,
+Linus Walleij
