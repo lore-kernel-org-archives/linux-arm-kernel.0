@@ -1,34 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 15:28:04 +0200
-Subject: [GIT PULL 3/3] droid4 defconfig changes for v4.17
-In-Reply-To: <pull-1521736966-849602@atomide.com-3>
-References: <pull-1521736966-849602@atomide.com>
- <pull-1521736966-849602@atomide.com-3>
-Message-ID: <CAK8P3a30V7Y7qJhGWVQoe=joDg4tUWwq3UNU13jkj0ZVNnLMng@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 27 Mar 2018 09:32:56 -0400
+Subject: [net-next PATCH 2/5] soc: ti: K2G: provide APIs to support driver
+ probe deferral
+In-Reply-To: <20180326204802.GC5862@lunn.ch>
+References: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
+ <1522095312-23249-3-git-send-email-m-karicheri2@ti.com>
+ <20180326204802.GC5862@lunn.ch>
+Message-ID: <4aeeda56-c68b-cb64-1314-a669f721ff20@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 5:43 PM, Tony Lindgren <tony@atomide.com> wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
->
-> The following changes since commit 740c01f76ab3712a45c2f02233c800829626e9ba:
->
->   ARM: multi_v7_defconfig: Enable USB gadget configfs as loadable module (2018-03-06 11:25:37 -0800)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/defconfig-pt2-signed
->
-> for you to fetch changes up to 372bed66bfbbc867c085c655b927a4c7fdb4870c:
->
->   ARM: multi_v7_defconfig: Enable CPCAP related options mostly as loadable modules (2018-03-20 07:10:24 -0700)
->
-> ----------------------------------------------------------------
-> Second set of defconfig changes for omap variants for v4.17
->
-> This series enables more devices working on droid4 to make it easier
-> for people and distros to use out of the box.
+Hello Andrew,
 
-Pulled into next/soc, thanks!
+On 03/26/2018 04:48 PM, Andrew Lunn wrote:
+> On Mon, Mar 26, 2018 at 04:15:09PM -0400, Murali Karicheri wrote:
+>> This patch provide APIs to allow client drivers to support
+>> probe deferral. On K2G SoC, devices can be probed only
+>> after the ti_sci_pm_domains driver is probed and ready.
+>> As drivers may get probed at different order, any driver
+>> that depends on knav dma and qmss drivers, for example
+>> netcp network driver, needs to defer probe until
+>> knav devices are probed and ready to service. To do this,
+>> add an API to query the device ready status from the knav
+>> dma and qmss devices.
+> 
+> Hi Murali 
+> 
+> Shouldn't you really re-write this to be a dma driver?  You would then
+> do something like of_dma_request_slave_channel() in the ethernet
+> driver probe function. That probably correctly returns EPROBE_DEFER.
+> 
+>        Andrew
+> 
 
-      Arnd
+Could you please elaborate? These knav dma and qmss drivers are
+introduced to support packet DMA hardware available in Keystone
+NetCP which couldn't be implemented using the DMA APIs available
+at the time this driver was introduced. Another reason was that
+the performance was really bad. We had an internal implementation
+based on DMA API before which couldn't be upstreamed at that time
+due to the reason that we were mis-using the API for this driver.
+So we introduced these knav_dma driver to support NetCP. We don't
+have any plan to re-write the driver at this time.
+
+If your question is about EPROBE_DEFER being returned from an
+existing knav_dma API and using the return code to achieve probe
+defer instead of introducing these APIs, I can take a look into
+that and respond. So please clarify.
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
