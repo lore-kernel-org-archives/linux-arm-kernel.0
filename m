@@ -1,33 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 28 Mar 2018 00:33:35 +0200
-Subject: [PATCH] pwm: mediatek: remove redundant MODULE_ALIAS entries
-In-Reply-To: <0fbf589c69bc584c46c683ee7fa38d80e04624f6.1522055092.git.sean.wang@mediatek.com>
-References: <0fbf589c69bc584c46c683ee7fa38d80e04624f6.1522055092.git.sean.wang@mediatek.com>
-Message-ID: <20180327223334.GI28163@mithrandir>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 27 Mar 2018 19:45:53 -0300
+Subject: [PATCH] ARM: dts: imx6ull: add UART5 input select register
+ definition
+In-Reply-To: <1522189496-27837-1-git-send-email-gerg@linux-m68k.org>
+References: <1522189496-27837-1-git-send-email-gerg@linux-m68k.org>
+Message-ID: <CAOMZO5CB=JkNqtkSf+QE_rjwNsOutfsS4=nWW0uVZdV63Op+eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 06:02:01PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> MODULE_ALIAS exports information to allow the module to be auto-loaded at
-> boot for the drivers registered using legacy platform registration.
-> 
-> However, currently the driver is always used by DT-only platform,
-> MODULE_ALIAS is redundant and should be removed properly.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  drivers/pwm/pwm-mediatek.c | 1 -
->  1 file changed, 1 deletion(-)
+On Tue, Mar 27, 2018 at 7:24 PM, Greg Ungerer <gerg@linux-m68k.org> wrote:
+> The iMX6ULL UART5_RX_DATA_SELECT_INPUT DAISY Register has some different
+> bit definitions to that same register in the iMX6UL.
+>
+> The bits for the iMX6UL:
+>
+> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
+> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
+> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
+> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
+> 100 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT
+> 101 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT
+>
+> But for the iMX6ULL:
+>
+> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
+> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
+> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
+> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
+> 100 UART1_TX_DATA_ALT9 ? Selecting Pad: UART1_TX_DATA for Mode: ALT9
+> 101 UART1_RX_DATA_ALT9 ? Selecting Pad: UART1_RX_DATA for Mode: ALT9
+> 110 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT0
+> 111 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT0
+>
+> Specifically for a board I am working on with the serial console on UART5
+> I need to be able to enable UART5_RX_DATA_ALT0 mode. There is no definition
+> for the iMX6ULL version of that in imx6ul-pinfunc.h or imx6ull-pinfunc.h.
+>
+> Create a new definition specific to the iMX6ULL so that is settable.
+>
+> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
 
-Applied, thanks.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180328/9459297d/attachment.sig>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
