@@ -1,39 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Mar 2018 15:24:16 +0200
-Subject: [PATCH v3 2/3] gpiolib: Support 'gpio-reserved-ranges' property
-In-Reply-To: <152166234504.91116.14942145962035607739@swboyd.mtv.corp.google.com>
-References: <20180321165848.89751-1-swboyd@chromium.org>
- <20180321165848.89751-3-swboyd@chromium.org>
- <1521655150.23017.79.camel@linux.intel.com>
- <152166234504.91116.14942145962035607739@swboyd.mtv.corp.google.com>
-Message-ID: <CACRpkdbg40yaKVbo-b6UKAYfGpT2ZLDdXaPKgEn-4zGL4mKuag@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2018 15:24:28 +0200
+Subject: [GIT PULL] Amlogic deconfig updates for v4.17
+In-Reply-To: <7hlgenr4mj.fsf@baylibre.com>
+References: <7hlgenr4mj.fsf@baylibre.com>
+Message-ID: <CAK8P3a16sN-JQLpBJTxeLvb7LyDE_gUv5YLz0WgXggpziaa6vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 8:59 PM, Stephen Boyd <swboyd@chromium.org> wrote:
-> Quoting Andy Shevchenko (2018-03-21 10:59:10)
->> On Wed, 2018-03-21 at 09:58 -0700, Stephen Boyd wrote:
->> > From: Stephen Boyd <sboyd@codeaurora.org>
->> >
->> > Some qcom platforms make some GPIOs or pins unavailable for use by
->> > non-secure operating systems, and thus reading or writing the
->> > registers
->> > for those pins will cause access control issues. Add support for a DT
->> > property to describe the set of GPIOs that are available for use so
->> > that
->> > higher level OSes are able to know what pins to avoid reading/writing.
->> > Non-DT platforms can add support by directly updating the
->> > chip->valid_mask.
->>
->> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> > Signed-off-by: Stephen Boyd <swboyd@chromium.org>
->>
->> Hmm...
+On Tue, Mar 20, 2018 at 1:07 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 >
-> Don't look closely! :P
+>   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-defconfig
+>
+> for you to fetch changes up to 266c157de3b21b6da3e015085dda48cfa9f0f76d:
+>
+>   arm64: defconfig: enable MESON EFUSE (2018-02-12 14:20:43 -0800)
+>
+> ----------------------------------------------------------------
+> Amlogic defconfig fixes for v4.17
 
-Same physical person acting on behalf of two different legal
-entities right? Seems OK to me.
+Pulled into next/soc, thanks!
 
-Yours,
-Linus Walleij
+      Arnd
