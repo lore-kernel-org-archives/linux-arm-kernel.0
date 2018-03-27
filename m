@@ -1,205 +1,70 @@
 From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Tue, 27 Mar 2018 08:07:32 -0700
-Subject: [PATCH 3/7] net: thunderx: add multicast filter management support
+Date: Tue, 27 Mar 2018 08:07:33 -0700
+Subject: [PATCH 4/7] net: thunderx: add new messages for handle
+ ndo_set_rx_mode callback
 In-Reply-To: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180327150736.10718-4-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180327150736.10718-5-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-The ThunderX NIC could be partitioned to up to 128 VFs and thus
-represented to system. Each VF is mapped to pair BGX:LMAC, and each of VF
-is configured by kernel individually. Eventually the bunch of VFs could be
-mapped onto same pair BGX:LMAC and thus could cause several multicast
-filtering configuration requests to LMAC with the same MAC addresses.
+The kernel calls ndo_set_rx_mode() callback supplying it will all necessary
+info, such as device state flags, multicast mac addresses list and so on.
+Since we have only 128 bits to communicate with PF we need to initiate
+several requests to PF with small/short operation each based on input data.
 
-This commit is to add ThunderX NIC BGX filtering manipulation routines.
+So this commit implements following PF messages codes along with new
+data structures for them:
+NIC_MBOX_MSG_RESET_XCAST to flush all filters configured for this
+                          particular network interface (VF)
+NIC_MBOX_MSG_ADD_MCAST   to add new MAC address to DMAC filter registers
+                          for this particular network interface (VF)
+NIC_MBOX_MSG_SET_XCAST   to apply filtering configuration to filter control
+                          register
 
 Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 141 ++++++++++++++++++++++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h |   8 ++
- 2 files changed, 149 insertions(+)
+ drivers/net/ethernet/cavium/thunder/nic.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index cf0cc19c03c5..52fef3dab0a3 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -256,6 +256,147 @@ static void bgx_flush_dmac_cam_filter(struct bgx *bgx, int lmacid)
- 		bgx_reg_write(bgx, 0, BGX_CMR_RX_DMACX_CAM + ((lmacid * lmac->dmacs_count) + idx) * sizeof(u64), 0);
- }
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 4cacce5d2b16..069289b4f968 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -403,6 +403,9 @@ struct nicvf {
+ #define	NIC_MBOX_MSG_PTP_CFG		0x19	/* HW packet timestamp */
+ #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
+ #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
++#define	NIC_MBOX_MSG_RESET_XCAST	0xF2    /* Reset DCAM filtering mode */
++#define	NIC_MBOX_MSG_ADD_MCAST		0xF3    /* Add MAC to DCAM filters */
++#define	NIC_MBOX_MSG_SET_XCAST		0xF4    /* Set MCAST/BCAST RX mode */
  
-+static void bgx_lmac_remove_filters(struct lmac *lmac, u8 vf_id)
-+{
-+	int i = 0;
-+
-+	if (!lmac)
-+		return;
-+
-+	/* We've got reset filters request from some of attached VF, while the
-+	 * others might want to keep their configuration. So in this case lets
-+	 * iterate over all of configured filters and decrease number of
-+	 * referencies. if some addresses get zero refs remove them from list
-+	 */
-+	for (i = lmac->dmacs_cfg - 1; i >= 0; i--) {
-+		lmac->dmacs[i].vf_map &= ~BIT_ULL(vf_id);
-+		if (!lmac->dmacs[i].vf_map) {
-+			lmac->dmacs_cfg--;
-+			lmac->dmacs[i].dmac = 0;
-+			lmac->dmacs[i].vf_map = 0;
-+		}
-+	}
-+}
-+
-+static int bgx_lmac_save_filter(struct lmac *lmac, u64 dmac, u8 vf_id)
-+{
-+	u8 i = 0;
-+
-+	if (!lmac)
-+		return;
-+
-+	/* At the same time we could have several VFs 'attached' to some
-+	 * particular LMAC, and each VF is represented as network interface
-+	 * for kernel. So from user perspective it should be possible to
-+	 * manipulate with its' (VF) receive modes. However from PF
-+	 * driver perspective we need to keep track of filter configurations
-+	 * for different VFs to prevent filter values dupes
-+	 */
-+	for (i = 0; i < lmac->dmacs_cfg; i++) {
-+		if (lmac->dmacs[i].dmac == dmac) {
-+			lmac->dmacs[i].vf_map |= BIT_ULL(vf_id);
-+			return -1;
-+		}
-+	}
-+
-+	if (!(lmac->dmacs_cfg < lmac->dmacs_count))
-+		return -1;
-+
-+	/* keep it for further tracking */
-+	lmac->dmacs[lmac->dmacs_cfg].dmac = dmac;
-+	lmac->dmacs[lmac->dmacs_cfg].vf_map = BIT_ULL(vf_id);
-+	lmac->dmacs_cfg++;
-+	return 0;
-+}
-+
-+static int bgx_set_dmac_cam_filter_mac(struct bgx *bgx, int lmacid, u64 cam_dmac, u8 idx)
-+{
-+	struct lmac *lmac = NULL;
-+	u64 cfg = 0;
-+
-+	/* skip zero addresses as meaningless */
-+	if (!cam_dmac || !bgx)
-+		return -1;
-+
-+	lmac = &bgx->lmac[lmacid];
-+
-+	/* configure DCAM filtering for designated LMAC */
-+	cfg = RX_DMACX_CAM_LMACID(lmacid & LMAC_ID_MASK) |
-+		RX_DMACX_CAM_EN | cam_dmac;
-+	bgx_reg_write(bgx, 0, BGX_CMR_RX_DMACX_CAM + ((lmacid * lmac->dmacs_count) + idx) * sizeof(u64), cfg);
-+	return 0;
-+}
-+
-+void bgx_set_dmac_cam_filter(int node, int bgx_idx, int lmacid, u64 cam_dmac, u8 vf_id)
-+{
-+	struct bgx *bgx = get_bgx(node, bgx_idx);
-+	struct lmac *lmac = NULL;
-+
-+	if (!bgx)
-+		return;
-+
-+	lmac = &bgx->lmac[lmacid];
-+
-+	if (!cam_dmac)
-+		cam_dmac = ether_addr_to_u64(lmac->mac);
-+
-+	/* since we might have several VFs attached to particular LMAC
-+	 * and kernel could call mcast config for each of them with the
-+	 * same MAC, check if requested MAC is already in filtering list and
-+	 * updare/prepare list of MACs to be applied later to HW filters
-+	 */
-+	bgx_lmac_save_filter(lmac, cam_dmac, vf_id);
-+}
-+EXPORT_SYMBOL(bgx_set_dmac_cam_filter);
-+
-+void bgx_set_xcast_mode(int node, int bgx_idx, int lmacid, u8 mode)
-+{
-+	struct bgx *bgx = get_bgx(node, bgx_idx);
-+	struct lmac *lmac = NULL;
-+	u64 cfg = 0;
-+	u8 i = 0;
-+
-+	if (!bgx)
-+		return;
-+
-+	lmac = &bgx->lmac[lmacid];
-+
-+	cfg = bgx_reg_read(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL);
-+	if (mode & BGX_XCAST_BCAST_ACCEPT)
-+		cfg |= BCAST_ACCEPT;
-+	else
-+		cfg &= ~BCAST_ACCEPT;
-+
-+	/* disable all MCASTs and DMAC filtering */
-+	cfg &= ~(CAM_ACCEPT | BGX_MCAST_MODE(MCAST_MODE_MASK));
-+
-+	/* check requested bits and set filtergin mode appropriately */
-+	if (mode & (BGX_XCAST_MCAST_ACCEPT)) {
-+		cfg |= (BGX_MCAST_MODE(MCAST_MODE_ACCEPT));
-+	} else if (mode & BGX_XCAST_MCAST_FILTER) {
-+		cfg |= (BGX_MCAST_MODE(MCAST_MODE_CAM_FILTER) | CAM_ACCEPT);
-+		for (i = 0; i < lmac->dmacs_cfg; i++)
-+			bgx_set_dmac_cam_filter_mac(bgx, lmacid,
-+						    lmac->dmacs[i].dmac, i);
-+	}
-+	bgx_reg_write(bgx, lmacid, BGX_CMRX_RX_DMAC_CTL, cfg);
-+}
-+EXPORT_SYMBOL(bgx_set_xcast_mode);
-+
-+void bgx_reset_xcast_mode(int node, int bgx_idx, int lmacid, u8 vf_id)
-+{
-+	struct bgx *bgx = get_bgx(node, bgx_idx);
-+
-+	if (!bgx)
-+		return;
-+
-+	bgx_lmac_remove_filters(&bgx->lmac[lmacid], vf_id);
-+	bgx_flush_dmac_cam_filter(bgx, lmacid);
-+	bgx_set_xcast_mode(node, bgx_idx, lmacid,
-+			   (BGX_XCAST_BCAST_ACCEPT | BGX_XCAST_MCAST_ACCEPT));
-+}
-+EXPORT_SYMBOL(bgx_reset_xcast_mode);
-+
- void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable)
- {
- 	struct bgx *bgx = get_bgx(node, bgx_idx);
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 52439da62c97..f5de44bc3bdb 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -30,6 +30,7 @@
- #define    DEFAULT_PAUSE_TIME			0xFFFF
+ struct nic_cfg_msg {
+ 	u8    msg;
+@@ -556,6 +559,14 @@ struct set_ptp {
+ 	bool  enable;
+ };
  
- #define	   BGX_ID_MASK				0x3
-+#define	   LMAC_ID_MASK				0x3
- 
- #define    MAX_DMAC_PER_LMAC_TNS_BYPASS_MODE	2
- 
-@@ -205,6 +206,13 @@
- #define LMAC_INTR_LINK_UP	BIT(0)
- #define LMAC_INTR_LINK_DOWN	BIT(1)
- 
-+#define BGX_XCAST_BCAST_ACCEPT  BIT(0)
-+#define BGX_XCAST_MCAST_ACCEPT  BIT(1)
-+#define BGX_XCAST_MCAST_FILTER  BIT(2)
++struct xcast {
++	u8    msg;
++	union {
++		u8    mode;
++		u64   mac;
++	} data;
++};
 +
-+void bgx_set_dmac_cam_filter(int node, int bgx_idx, int lmacid, u64 mac, u8 vf);
-+void bgx_reset_xcast_mode(int node, int bgx_idx, int lmacid, u8 vf);
-+void bgx_set_xcast_mode(int node, int bgx_idx, int lmacid, u8 mode);
- void octeon_mdiobus_force_mod_depencency(void);
- void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
- void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
+ /* 128 bit shared memory between PF and each VF */
+ union nic_mbx {
+ 	struct { u8 msg; }	msg;
+@@ -576,6 +587,7 @@ union nic_mbx {
+ 	struct reset_stat_cfg	reset_stat;
+ 	struct pfc		pfc;
+ 	struct set_ptp		ptp;
++	struct xcast            xcast;
+ };
+ 
+ #define NIC_NODE_ID_MASK	0x03
 -- 
 2.14.3
