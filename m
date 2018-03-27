@@ -1,490 +1,99 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 27 Mar 2018 19:08:43 +0100
-Subject: [PATCH 2/2] arm64: uaccess: Fix omissions from usercopy whitelist
-In-Reply-To: <1522174123-13987-1-git-send-email-Dave.Martin@arm.com>
-References: <1522174123-13987-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1522174123-13987-3-git-send-email-Dave.Martin@arm.com>
+Date: Tue, 27 Mar 2018 19:08:41 +0100
+Subject: [PATCH 0/2] arm64: uaccess: Fix omissions from usercopy whitelist
+Message-ID: <1522174123-13987-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 When the hardend usercopy support was added for arm64, it was
-concluded that all cases of usercopy into and out of thread_struct
-were statically sized and so didn't require explicit whitelisting
-of the appropriate fields in thread_struct.
+concluded [1] that all cases of usercopy into and out of
+thread_struct were statically sized and so didn't require explicit
+whitelisting of the appropriate fields in thread_struct.
 
-Testing with usercopy hardening enabled has revealed that this is
-not the case for certain ptrace regset manipulation calls on arm64.
-This occurs because the sizes of usercopies associated with the
-regset API are dynamic by construction, and because arm64 does not
-always stage such copies via the stack: indeed the regset API is
-designed to avoid the need for that by adding some bounds checking.
+Testing with usercopy hardening enabled has revealed that this is not
+the case for certain ptrace regset manipulation calls on arm64.  This
+series attempts to fix the usercopy whitelist so that such copies can
+be policed correctly.  See patch 2 for a more detailed explanation of
+the change.
 
-This is currently believed to affect only the fpsimd and TLS
-registers.
+I wrote patch 1 recently for unrelated reasons, but it turns out to be
+useful here since it splits the user-copiable cpu field out from
+struct fpsimd_state.  Mixing user and non-user fields in that struct
+has proven awkard in a variety of situations now, so it is a good
+opportunity to separate them.
 
-Because the whitelisted fields in thread_struct must be contiguous,
-this patch groups them together in a nested struct.  It is also
-necessary to be able to determine the location and size of that
-struct, so rather than making the struct anonymous (which would
-save on edits elsewhere) or adding an anonymous union containing
-named and unnamed instances of the same struct (gross), this patch
-gives the struct a name and makes the necessary edits to code that
-references it (noisy but simple).
 
-Care is needed to ensure that the new struct does not contain
-padding (which the usercopy hardening would fail to protect).
+Bug reproduced, and fix tested, on Arm Juno r0, with defconfig +
+CONFIG_HARDENED_USERCOPY=y
+CONFIG_HARDENED_USERCOPY_FALLBACK=y
 
-For this reason, the presence of tp2_value is made unconditional,
-since a padding field would be needed there in any case.  This pads
-up to the 16-byte alignment required by struct user_fpsimd_state.
+Not tested in many configurations.  Edits were done by the equivalent of
+the following shell commands (plus some rewrapping and a few manual
+fixups).
 
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: 9e8084d3f761 ("arm64: Implement thread_struct whitelist for hardened usercopy")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/processor.h | 28 +++++++++++++++--------
- arch/arm64/kernel/fpsimd.c         | 47 +++++++++++++++++++-------------------
- arch/arm64/kernel/process.c        |  6 ++---
- arch/arm64/kernel/ptrace.c         | 30 ++++++++++++------------
- arch/arm64/kernel/signal.c         |  3 ++-
- arch/arm64/kernel/signal32.c       |  3 ++-
+	s='\(\.\|->\)\(fpsimd_state\|tp2\?_value\)'
+	git grep -l "$s" -- arch/arm64/ | xargs -d'\n' sed -i "s/$s/\1uw.\2/g"
+
+
+The bug can be reproduced by running up to a breakpoint in gdb (or
+anything else that does a PTRACE_GETREGSET on NT_PRFPREG or
+NT_ARM_TLS).
+
+Without the fix, reading an affected regset resulting in a WARN_ON()
+splat from the usercopy hardening code, similar to the following:
+
+[   37.429560] ------------[ cut here ]------------
+[   37.434220] Bad or missing usercopy whitelist? Kernel memory exposure attempt detected from SLUB object 'task_struct' (offset 2664, size 8)!
+[   37.446895] WARNING: CPU: 4 PID: 2431 at mm/usercopy.c:81 usercopy_warn+0x7c/0xc8
+[   37.454387] Modules linked in:
+[   37.457449] CPU: 4 PID: 2431 Comm: gdb Not tainted 4.16.0-rc6 #10
+[   37.463550] Hardware name: ARM LTD ARM Juno Development Platform/ARM Juno Development Platform, BIOS EDK II Dec 15 2016
+[   37.474352] pstate: 60000005 (nZCv daif -PAN -UAO)
+[   37.479149] pc : usercopy_warn+0x7c/0xc8
+[   37.483075] lr : usercopy_warn+0x7c/0xc8
+[   37.486998] sp : ffff00000e0fbcb0
+[   37.490313] x29: ffff00000e0fbcc0 x28: ffff8009759c0000
+[   37.495637] x27: ffff000008a71000 x26: 0000000000000075
+[   37.500959] x25: 0000000000000124 x24: 0000000000000015
+[   37.506280] x23: ffff7e0025d04880 x22: ffff800974122670
+[   37.511601] x21: 0000000000000001 x20: 0000000000000008
+[   37.516923] x19: ffff800974122668 x18: 0000000000000006
+[   37.522244] x17: 0000ffff8f89ed40 x16: ffff0000080deb58
+[   37.527565] x15: ffff0000091864dd x14: 6620646574636574
+[   37.532885] x13: 65642074706d6574 x12: 746120657275736f
+[   37.538206] x11: ffff0000085c5960 x10: ffff000009029df8
+[   37.543527] x9 : 4b203f7473696c65 x8 : 657a6973202c3436
+[   37.548848] x7 : 3632207465736666 x6 : 000000000000012f
+[   37.554169] x5 : 0000000000000000 x4 : 0000000000000000
+[   37.559489] x3 : 0000000000000000 x2 : ffff8009759c0000
+[   37.564810] x1 : 73ce9fcbba171400 x0 : 0000000000000000
+[   37.570131] Call trace:
+[   37.572577]  usercopy_warn+0x7c/0xc8
+[   37.576156]  __check_heap_object+0xc4/0x130
+[   37.580343]  __check_object_size+0x184/0x1e0
+[   37.584618]  tls_get+0x6c/0xd0
+[   37.587674]  ptrace_regset+0x11c/0x160
+[   37.591426]  ptrace_request+0x590/0x638
+[   37.595265]  arch_ptrace+0xc/0x18
+[   37.598581]  SyS_ptrace+0xc8/0x120
+[   37.601985]  el0_svc_naked+0x30/0x34
+[   37.605561] ---[ end trace 28b009f07d48b579 ]---
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-January/554362.html
+
+Dave Martin (2):
+  arm64: fpsimd: Split cpu field out from struct fpsimd_state
+  arm64: uaccess: Fix omissions from usercopy whitelist
+
+ arch/arm64/include/asm/fpsimd.h    | 29 ++-------------
+ arch/arm64/include/asm/processor.h | 30 ++++++++++------
+ arch/arm64/kernel/fpsimd.c         | 73 ++++++++++++++++++++------------------
+ arch/arm64/kernel/process.c        |  6 ++--
+ arch/arm64/kernel/ptrace.c         | 30 ++++++++--------
+ arch/arm64/kernel/signal.c         |  2 +-
+ arch/arm64/kernel/signal32.c       |  2 +-
  arch/arm64/kernel/sys_compat.c     |  2 +-
- 7 files changed, 66 insertions(+), 53 deletions(-)
+ 8 files changed, 82 insertions(+), 92 deletions(-)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 4a04535..5b06769 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -102,11 +102,18 @@ struct cpu_context {
- 
- struct thread_struct {
- 	struct cpu_context	cpu_context;	/* cpu context */
--	unsigned long		tp_value;	/* TLS register */
--#ifdef CONFIG_COMPAT
--	unsigned long		tp2_value;
--#endif
--	struct user_fpsimd_state fpsimd_state;
-+
-+	/*
-+	 * Whitelisted fields for hardened usercopy:
-+	 * Maintainers must ensure manually that this contains no
-+	 * implicit padding.
-+	 */
-+	struct {
-+		unsigned long	tp_value;	/* TLS register */
-+		unsigned long	tp2_value;
-+		struct user_fpsimd_state fpsimd_state;
-+	} uw;
-+
- 	unsigned int		fpsimd_cpu;
- 	void			*sve_state;	/* SVE registers, if any */
- 	unsigned int		sve_vl;		/* SVE vector length */
-@@ -123,7 +130,10 @@ struct thread_struct {
- static inline void arch_thread_struct_whitelist(unsigned long *offset,
- 						unsigned long *size)
- {
--	*offset = *size = 0;
-+	struct thread_struct *t;
-+
-+	*offset = offsetof(struct thread_struct, uw);
-+	*size = sizeof(t->uw);
- }
- 
- #ifdef CONFIG_COMPAT
-@@ -131,13 +141,13 @@ static inline void arch_thread_struct_whitelist(unsigned long *offset,
- ({									\
- 	unsigned long *__tls;						\
- 	if (is_compat_thread(task_thread_info(t)))			\
--		__tls = &(t)->thread.tp2_value;				\
-+		__tls = &(t)->thread.uw.tp2_value;			\
- 	else								\
--		__tls = &(t)->thread.tp_value;				\
-+		__tls = &(t)->thread.uw.tp_value;			\
- 	__tls;								\
-  })
- #else
--#define task_user_tls(t)	(&(t)->thread.tp_value)
-+#define task_user_tls(t)	(&(t)->thread.uw.tp_value)
- #endif
- 
- /* Sync TPIDR_EL0 back to thread_struct for current */
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index c4be311..7a8ac960b6 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -222,7 +222,7 @@ static void sve_user_enable(void)
-  *    sets TIF_SVE.
-  *
-  *    When stored, FPSIMD registers V0-V31 are encoded in
-- *    task->fpsimd_state; bits [max : 128] for each of Z0-Z31 are
-+ *    task->thread.uw.fpsimd_state; bits [max : 128] for each of Z0-Z31 are
-  *    logically zero but not stored anywhere; P0-P15 and FFR are not
-  *    stored and have unspecified values from userspace's point of
-  *    view.  For hygiene purposes, the kernel zeroes them on next use,
-@@ -231,9 +231,9 @@ static void sve_user_enable(void)
-  *    task->thread.sve_state does not need to be non-NULL, valid or any
-  *    particular size: it must not be dereferenced.
-  *
-- *  * FPSR and FPCR are always stored in task->fpsimd_state irrespctive of
-- *    whether TIF_SVE is clear or set, since these are not vector length
-- *    dependent.
-+ *  * FPSR and FPCR are always stored in task->thread.uw.fpsimd_state
-+ *    irrespective of whether TIF_SVE is clear or set, since these are
-+ *    not vector length dependent.
-  */
- 
- /*
-@@ -251,10 +251,10 @@ static void task_fpsimd_load(void)
- 
- 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
- 		sve_load_state(sve_pffr(current),
--			       &current->thread.fpsimd_state.fpsr,
-+			       &current->thread.uw.fpsimd_state.fpsr,
- 			       sve_vq_from_vl(current->thread.sve_vl) - 1);
- 	else
--		fpsimd_load_state(&current->thread.fpsimd_state);
-+		fpsimd_load_state(&current->thread.uw.fpsimd_state);
- 
- 	if (system_supports_sve()) {
- 		/* Toggle SVE trapping for userspace if needed */
-@@ -291,9 +291,9 @@ static void task_fpsimd_save(void)
- 			}
- 
- 			sve_save_state(sve_pffr(current),
--				       &current->thread.fpsimd_state.fpsr);
-+				       &current->thread.uw.fpsimd_state.fpsr);
- 		} else
--			fpsimd_save_state(&current->thread.fpsimd_state);
-+			fpsimd_save_state(&current->thread.uw.fpsimd_state);
- 	}
- }
- 
-@@ -404,20 +404,21 @@ static int __init sve_sysctl_init(void) { return 0; }
- 	(SVE_SIG_ZREG_OFFSET(vq, n) - SVE_SIG_REGS_OFFSET))
- 
- /*
-- * Transfer the FPSIMD state in task->thread.fpsimd_state to
-+ * Transfer the FPSIMD state in task->thread.uw.fpsimd_state to
-  * task->thread.sve_state.
-  *
-  * Task can be a non-runnable task, or current.  In the latter case,
-  * softirqs (and preemption) must be disabled.
-  * task->thread.sve_state must point to at least sve_state_size(task)
-  * bytes of allocated kernel memory.
-- * task->thread.fpsimd_state must be up to date before calling this function.
-+ * task->thread.uw.fpsimd_state must be up to date before calling this
-+ * function.
-  */
- static void fpsimd_to_sve(struct task_struct *task)
- {
- 	unsigned int vq;
- 	void *sst = task->thread.sve_state;
--	struct user_fpsimd_state const *fst = &task->thread.fpsimd_state;
-+	struct user_fpsimd_state const *fst = &task->thread.uw.fpsimd_state;
- 	unsigned int i;
- 
- 	if (!system_supports_sve())
-@@ -431,7 +432,7 @@ static void fpsimd_to_sve(struct task_struct *task)
- 
- /*
-  * Transfer the SVE state in task->thread.sve_state to
-- * task->thread.fpsimd_state.
-+ * task->thread.uw.fpsimd_state.
-  *
-  * Task can be a non-runnable task, or current.  In the latter case,
-  * softirqs (and preemption) must be disabled.
-@@ -443,7 +444,7 @@ static void sve_to_fpsimd(struct task_struct *task)
- {
- 	unsigned int vq;
- 	void const *sst = task->thread.sve_state;
--	struct user_fpsimd_state *fst = &task->thread.fpsimd_state;
-+	struct user_fpsimd_state *fst = &task->thread.uw.fpsimd_state;
- 	unsigned int i;
- 
- 	if (!system_supports_sve())
-@@ -510,7 +511,7 @@ void fpsimd_sync_to_sve(struct task_struct *task)
- }
- 
- /*
-- * Ensure that task->thread.fpsimd_state is up to date with respect to
-+ * Ensure that task->thread.uw.fpsimd_state is up to date with respect to
-  * the user task, irrespective of whether SVE is in use or not.
-  *
-  * This should only be called by ptrace.  task must be non-runnable.
-@@ -525,21 +526,21 @@ void sve_sync_to_fpsimd(struct task_struct *task)
- 
- /*
-  * Ensure that task->thread.sve_state is up to date with respect to
-- * the task->thread.fpsimd_state.
-+ * the task->thread.uw.fpsimd_state.
-  *
-  * This should only be called by ptrace to merge new FPSIMD register
-  * values into a task for which SVE is currently active.
-  * task must be non-runnable.
-  * task->thread.sve_state must point to at least sve_state_size(task)
-  * bytes of allocated kernel memory.
-- * task->thread.fpsimd_state must already have been initialised with
-+ * task->thread.uw.fpsimd_state must already have been initialised with
-  * the new FPSIMD register values to be merged in.
-  */
- void sve_sync_from_fpsimd_zeropad(struct task_struct *task)
- {
- 	unsigned int vq;
- 	void *sst = task->thread.sve_state;
--	struct user_fpsimd_state const *fst = &task->thread.fpsimd_state;
-+	struct user_fpsimd_state const *fst = &task->thread.uw.fpsimd_state;
- 	unsigned int i;
- 
- 	if (!test_tsk_thread_flag(task, TIF_SVE))
-@@ -909,7 +910,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 		 * upon the next return to userland.
- 		 */
- 		if (__this_cpu_read(fpsimd_last_state.st) ==
--			&next->thread.fpsimd_state
-+			&next->thread.uw.fpsimd_state
- 		    && next->thread.fpsimd_cpu == smp_processor_id())
- 			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 		else
-@@ -926,8 +927,8 @@ void fpsimd_flush_thread(void)
- 
- 	local_bh_disable();
- 
--	memset(&current->thread.fpsimd_state, 0,
--	       sizeof current->thread.fpsimd_state);
-+	memset(&current->thread.uw.fpsimd_state, 0,
-+	       sizeof current->thread.uw.fpsimd_state);
- 	fpsimd_flush_task_state(current);
- 
- 	if (system_supports_sve()) {
-@@ -986,7 +987,7 @@ void fpsimd_preserve_current_state(void)
- 
- /*
-  * Like fpsimd_preserve_current_state(), but ensure that
-- * current->thread.fpsimd_state is updated so that it can be copied to
-+ * current->thread.uw.fpsimd_state is updated so that it can be copied to
-  * the signal frame.
-  */
- void fpsimd_signal_preserve_current_state(void)
-@@ -1005,7 +1006,7 @@ static void fpsimd_bind_to_cpu(void)
- 	struct fpsimd_last_state_struct *last =
- 		this_cpu_ptr(&fpsimd_last_state);
- 
--	last->st = &current->thread.fpsimd_state;
-+	last->st = &current->thread.uw.fpsimd_state;
- 	last->sve_in_use = test_thread_flag(TIF_SVE);
- 	current->thread.fpsimd_cpu = smp_processor_id();
- }
-@@ -1042,7 +1043,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
- 
- 	local_bh_disable();
- 
--	current->thread.fpsimd_state = *state;
-+	current->thread.uw.fpsimd_state = *state;
- 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
- 		fpsimd_to_sve(current);
- 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index c0da6ef..f08a2ed 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -257,7 +257,7 @@ static void tls_thread_flush(void)
- 	write_sysreg(0, tpidr_el0);
- 
- 	if (is_compat_task()) {
--		current->thread.tp_value = 0;
-+		current->thread.uw.tp_value = 0;
- 
- 		/*
- 		 * We need to ensure ordering between the shadow state and the
-@@ -351,7 +351,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		 * for the new thread.
- 		 */
- 		if (clone_flags & CLONE_SETTLS)
--			p->thread.tp_value = childregs->regs[3];
-+			p->thread.uw.tp_value = childregs->regs[3];
- 	} else {
- 		memset(childregs, 0, sizeof(struct pt_regs));
- 		childregs->pstate = PSR_MODE_EL1h;
-@@ -379,7 +379,7 @@ static void tls_thread_switch(struct task_struct *next)
- 	tls_preserve_current_state();
- 
- 	if (is_compat_thread(task_thread_info(next)))
--		write_sysreg(next->thread.tp_value, tpidrro_el0);
-+		write_sysreg(next->thread.uw.tp_value, tpidrro_el0);
- 	else if (!arm64_kernel_unmapped_at_el0())
- 		write_sysreg(0, tpidrro_el0);
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index fdeaba0de..436a132 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -629,7 +629,7 @@ static int __fpr_get(struct task_struct *target,
- 
- 	sve_sync_to_fpsimd(target);
- 
--	uregs = &target->thread.fpsimd_state;
-+	uregs = &target->thread.uw.fpsimd_state;
- 
- 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
- 				   start_pos, start_pos + sizeof(*uregs));
-@@ -655,19 +655,19 @@ static int __fpr_set(struct task_struct *target,
- 	struct user_fpsimd_state newstate;
- 
- 	/*
--	 * Ensure target->thread.fpsimd_state is up to date, so that a
-+	 * Ensure target->thread.uw.fpsimd_state is up to date, so that a
- 	 * short copyin can't resurrect stale data.
- 	 */
- 	sve_sync_to_fpsimd(target);
- 
--	newstate = target->thread.fpsimd_state;
-+	newstate = target->thread.uw.fpsimd_state;
- 
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &newstate,
- 				 start_pos, start_pos + sizeof(newstate));
- 	if (ret)
- 		return ret;
- 
--	target->thread.fpsimd_state = newstate;
-+	target->thread.uw.fpsimd_state = newstate;
- 
- 	return ret;
- }
-@@ -692,7 +692,7 @@ static int tls_get(struct task_struct *target, const struct user_regset *regset,
- 		   unsigned int pos, unsigned int count,
- 		   void *kbuf, void __user *ubuf)
- {
--	unsigned long *tls = &target->thread.tp_value;
-+	unsigned long *tls = &target->thread.uw.tp_value;
- 
- 	if (target == current)
- 		tls_preserve_current_state();
-@@ -705,13 +705,13 @@ static int tls_set(struct task_struct *target, const struct user_regset *regset,
- 		   const void *kbuf, const void __user *ubuf)
- {
- 	int ret;
--	unsigned long tls = target->thread.tp_value;
-+	unsigned long tls = target->thread.uw.tp_value;
- 
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &tls, 0, -1);
- 	if (ret)
- 		return ret;
- 
--	target->thread.tp_value = tls;
-+	target->thread.uw.tp_value = tls;
- 	return ret;
- }
- 
-@@ -842,7 +842,7 @@ static int sve_get(struct task_struct *target,
- 	start = end;
- 	end = SVE_PT_SVE_FPCR_OFFSET(vq) + SVE_PT_SVE_FPCR_SIZE;
- 	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
--				  &target->thread.fpsimd_state.fpsr,
-+				  &target->thread.uw.fpsimd_state.fpsr,
- 				  start, end);
- 	if (ret)
- 		return ret;
-@@ -941,7 +941,7 @@ static int sve_set(struct task_struct *target,
- 	start = end;
- 	end = SVE_PT_SVE_FPCR_OFFSET(vq) + SVE_PT_SVE_FPCR_SIZE;
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
--				 &target->thread.fpsimd_state.fpsr,
-+				 &target->thread.uw.fpsimd_state.fpsr,
- 				 start, end);
- 
- out:
-@@ -1169,7 +1169,7 @@ static int compat_vfp_get(struct task_struct *target,
- 	compat_ulong_t fpscr;
- 	int ret, vregs_end_pos;
- 
--	uregs = &target->thread.fpsimd_state;
-+	uregs = &target->thread.uw.fpsimd_state;
- 
- 	if (target == current)
- 		fpsimd_preserve_current_state();
-@@ -1202,7 +1202,7 @@ static int compat_vfp_set(struct task_struct *target,
- 	compat_ulong_t fpscr;
- 	int ret, vregs_end_pos;
- 
--	uregs = &target->thread.fpsimd_state;
-+	uregs = &target->thread.uw.fpsimd_state;
- 
- 	vregs_end_pos = VFP_STATE_SIZE - sizeof(compat_ulong_t);
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, uregs, 0,
-@@ -1225,7 +1225,7 @@ static int compat_tls_get(struct task_struct *target,
- 			  const struct user_regset *regset, unsigned int pos,
- 			  unsigned int count, void *kbuf, void __user *ubuf)
- {
--	compat_ulong_t tls = (compat_ulong_t)target->thread.tp_value;
-+	compat_ulong_t tls = (compat_ulong_t)target->thread.uw.tp_value;
- 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &tls, 0, -1);
- }
- 
-@@ -1235,13 +1235,13 @@ static int compat_tls_set(struct task_struct *target,
- 			  const void __user *ubuf)
- {
- 	int ret;
--	compat_ulong_t tls = target->thread.tp_value;
-+	compat_ulong_t tls = target->thread.uw.tp_value;
- 
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &tls, 0, -1);
- 	if (ret)
- 		return ret;
- 
--	target->thread.tp_value = tls;
-+	target->thread.uw.tp_value = tls;
- 	return ret;
- }
- 
-@@ -1538,7 +1538,7 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
- 			break;
- 
- 		case COMPAT_PTRACE_GET_THREAD_AREA:
--			ret = put_user((compat_ulong_t)child->thread.tp_value,
-+			ret = put_user((compat_ulong_t)child->thread.uw.tp_value,
- 				       (compat_ulong_t __user *)datap);
- 			break;
- 
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index d026615..a0c4138 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -178,7 +178,8 @@ static void __user *apply_user_offset(
- 
- static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- {
--	struct user_fpsimd_state const *fpsimd = &current->thread.fpsimd_state;
-+	struct user_fpsimd_state const *fpsimd =
-+		&current->thread.uw.fpsimd_state;
- 	int err;
- 
- 	/* copy the FP and status/control registers */
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 4ea38d3..884177a 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -148,7 +148,8 @@ union __fpsimd_vreg {
- 
- static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
- {
--	struct user_fpsimd_state const *fpsimd = &current->thread.fpsimd_state;
-+	struct user_fpsimd_state const *fpsimd =
-+		&current->thread.uw.fpsimd_state;
- 	compat_ulong_t magic = VFP_MAGIC;
- 	compat_ulong_t size = VFP_STORAGE_SIZE;
- 	compat_ulong_t fpscr, fpexc;
-diff --git a/arch/arm64/kernel/sys_compat.c b/arch/arm64/kernel/sys_compat.c
-index a382b2a..9155989 100644
---- a/arch/arm64/kernel/sys_compat.c
-+++ b/arch/arm64/kernel/sys_compat.c
-@@ -88,7 +88,7 @@ long compat_arm_syscall(struct pt_regs *regs)
- 		return do_compat_cache_op(regs->regs[0], regs->regs[1], regs->regs[2]);
- 
- 	case __ARM_NR_compat_set_tls:
--		current->thread.tp_value = regs->regs[0];
-+		current->thread.uw.tp_value = regs->regs[0];
- 
- 		/*
- 		 * Protect against register corruption from context switch.
 -- 
 2.1.4
