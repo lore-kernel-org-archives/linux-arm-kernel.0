@@ -1,26 +1,96 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Mar 2018 13:55:10 -0700
-Subject: [PATCH] clk: ti: fix flag space conflict with clkctrl clocks
-In-Reply-To: <1522172824-14094-1-git-send-email-t-kristo@ti.com>
-References: <1522172824-14094-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20180327205510.GJ5700@atomide.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 27 Mar 2018 17:07:35 -0400
+Subject: [net-next PATCH v2 05/10] net: netcp: ethss: use rgmii link
+ status for 2u cpsw hardware
+In-Reply-To: <20180327172953.GP5862@lunn.ch>
+References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+ <1522168309-12338-6-git-send-email-m-karicheri2@ti.com>
+ <20180327172953.GP5862@lunn.ch>
+Message-ID: <33e89328-4f0b-cc9f-96cc-4b45747b9f34@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [180327 17:48]:
-> The introduction of support for CLK_SET_RATE_PARENT flag for clkctrl
-> clocks used a generic clock flag, which causes a conflict with the
-> rest of the clkctrl flags, namely the NO_IDLEST flag. This can cause
-> boot failures on certain platforms where this flag is introduced, by
-> omitting the wait for the clockctrl module to be fully enabled before
-> proceeding with rest of the code.
+On 03/27/2018 01:29 PM, Andrew Lunn wrote:
+> On Tue, Mar 27, 2018 at 12:31:44PM -0400, Murali Karicheri wrote:
+>> Introduce rgmii link status to handle link state events for 2u
+>> cpsw hardware on K2G.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>  drivers/net/ethernet/ti/netcp_ethss.c | 27 +++++++++++++++++++++++----
+>>  1 file changed, 23 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+>> index ab9d369..078a1b8 100644
+>> --- a/drivers/net/ethernet/ti/netcp_ethss.c
+>> +++ b/drivers/net/ethernet/ti/netcp_ethss.c
+>> @@ -552,6 +552,7 @@ struct gbe_ss_regs {
+>>  struct gbe_ss_regs_ofs {
+>>  	u16	id_ver;
+>>  	u16	control;
+>> +	u16	rgmii_status; /* 2U */
+>>  };
+>>  
+>>  struct gbe_switch_regs {
+>> @@ -2120,23 +2121,39 @@ static bool gbe_phy_link_status(struct gbe_slave *slave)
+>>  	 return !slave->phy || slave->phy->link;
+>>  }
+>>  
+>> +#define RGMII_REG_STATUS_LINK	BIT(0)
+>> +
+>> +static void netcp_2u_rgmii_get_port_link(struct gbe_priv *gbe_dev, bool *status)
+>> +{
+>> +	u32 val = 0;
+>> +
+>> +	val = readl(GBE_REG_ADDR(gbe_dev, ss_regs, rgmii_status));
+>> +	*status = false;
+>> +	if ((val & RGMII_REG_STATUS_LINK) != 0)
+>> +		*status = true;
 > 
-> Fix this by moving all the clkctrl specific flags to their own bit-range.
+>   *status = !!(val & RGMII_REG_STATUS_LINK);
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Fixes: 49159a9dc3da ("clk: ti: add support for CLK_SET_RATE_PARENT flag")
-> Reported-by: Christophe Lyon <christophe.lyon@linaro.org>
+> 
+>> +}
+>> +
+>>  static void netcp_ethss_update_link_state(struct gbe_priv *gbe_dev,
+>>  					  struct gbe_slave *slave,
+>>  					  struct net_device *ndev)
+>>  {
+>> -	int sp = slave->slave_num;
+>> -	int phy_link_state, sgmii_link_state = 1, link_state;
+>> +	bool sw_link_state = true, phy_link_state;
+>> +	int sp = slave->slave_num, link_state;
+>>  
+>>  	if (!slave->open)
+>>  		return;
+>>  
+>>  	if (!SLAVE_LINK_IS_XGMII(slave)) {
+>> -		sgmii_link_state =
+>> +		if (SLAVE_LINK_IS_RGMII(slave))
+>> +			netcp_2u_rgmii_get_port_link(gbe_dev,
+>> +						     &sw_link_state);
+>> +		else
+>> +			sw_link_state =
+>>  			netcp_sgmii_get_port_link(SGMII_BASE(gbe_dev, sp), sp);
+> 
+> This would be more readable as
+> 
+>      if (SLAVE_LINK_IS_RGMII(slave))
+> 		netcp_2u_rgmii_get_port_link(gbe_dev,
+> 					     &sw_link_state);
+>      if (SLAVE_LINK_IS_SGMII(slave))
+> 	sw_link_state = netcp_sgmii_get_port_link(
+> 	   SGMII_BASE(gbe_dev, sp), sp);
+> 
+Probably better to use a switch statement in this case for better readability?
+handle only SGMII and RGMII cases in the switch statement.
 
-I boot tested this on am437x-idk and bbb with multi_v7_defconfig, so:
+Murali
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+>    Andrew
+> 
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
