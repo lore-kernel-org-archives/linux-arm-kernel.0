@@ -1,35 +1,104 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 27 Mar 2018 15:32:34 +0300
-Subject: [PATCH v2 01/10] MAINTAINERS: add generic resistive touchscreen adc
+Date: Tue, 27 Mar 2018 15:32:38 +0300
+Subject: [PATCH v2 05/10] iio: adc: at91-sama5d2_adc: fix channel
+ configuration for differential channels
 In-Reply-To: <1522153963-1121-1-git-send-email-eugen.hristev@microchip.com>
 References: <1522153963-1121-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1522153963-1121-2-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1522153963-1121-6-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MAINTAINERS entry for generic resistive touchscreen adc
+When iterating through the channels, the index in the array is not the
+scan index. Added an xlate function to translate to the proper index.
+This will be used also for devicetree channel xlate
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/iio/adc/at91-sama5d2_adc.c | 41 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 37 insertions(+), 4 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 36f1442..ba227cc 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5943,6 +5943,12 @@ F:	drivers/base/power/domain*.c
- F:	include/linux/pm_domain.h
- F:	Documentation/devicetree/bindings/power/power_domain.txt
+diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+index 4eff835..8729d65 100644
+--- a/drivers/iio/adc/at91-sama5d2_adc.c
++++ b/drivers/iio/adc/at91-sama5d2_adc.c
+@@ -333,6 +333,27 @@ static const struct iio_chan_spec at91_adc_channels[] = {
+ 				+ AT91_SAMA5D2_DIFF_CHAN_CNT + 1),
+ };
  
-+GENERIC RESISTIVE TOUCHSCREEN ADC DRIVER
-+M:	Eugen Hristev <eugen.hristev@microchip.com>
-+L:	linux-input at vger.kernel.org
-+S:	Maintained
-+F:	drivers/input/touchscreen/touch_adc.c
++static int at91_adc_chan_xlate(struct iio_dev *indio_dev, int chan)
++{
++	int i;
 +
- GENERIC UIO DRIVER FOR PCI DEVICES
- M:	"Michael S. Tsirkin" <mst@redhat.com>
- L:	kvm at vger.kernel.org
++	for (i = 0; i < indio_dev->num_channels; i++) {
++		if (indio_dev->channels[i].scan_index == chan)
++			return i;
++	}
++	return -EINVAL;
++}
++
++static inline struct iio_chan_spec const *
++at91_adc_chan_get(struct iio_dev *indio_dev, int chan)
++{
++	int index = at91_adc_chan_xlate(indio_dev, chan);
++
++	if (index < 0)
++		return NULL;
++	return indio_dev->channels + index;
++}
++
+ static int at91_adc_configure_trigger(struct iio_trigger *trig, bool state)
+ {
+ 	struct iio_dev *indio = iio_trigger_get_drvdata(trig);
+@@ -350,8 +371,10 @@ static int at91_adc_configure_trigger(struct iio_trigger *trig, bool state)
+ 	at91_adc_writel(st, AT91_SAMA5D2_TRGR, status);
+ 
+ 	for_each_set_bit(bit, indio->active_scan_mask, indio->num_channels) {
+-		struct iio_chan_spec const *chan = indio->channels + bit;
++		struct iio_chan_spec const *chan = at91_adc_chan_get(indio, bit);
+ 
++		if (!chan)
++			continue;
+ 		if (state) {
+ 			at91_adc_writel(st, AT91_SAMA5D2_CHER,
+ 					BIT(chan->channel));
+@@ -448,7 +471,11 @@ static int at91_adc_dma_start(struct iio_dev *indio_dev)
+ 
+ 	for_each_set_bit(bit, indio_dev->active_scan_mask,
+ 			 indio_dev->num_channels) {
+-		struct iio_chan_spec const *chan = indio_dev->channels + bit;
++		struct iio_chan_spec const *chan =
++					 at91_adc_chan_get(indio_dev, bit);
++
++		if (!chan)
++			continue;
+ 
+ 		st->dma_st.rx_buf_sz += chan->scan_type.storagebits / 8;
+ 	}
+@@ -526,8 +553,11 @@ static int at91_adc_buffer_predisable(struct iio_dev *indio_dev)
+ 	 */
+ 	for_each_set_bit(bit, indio_dev->active_scan_mask,
+ 			 indio_dev->num_channels) {
+-		struct iio_chan_spec const *chan = indio_dev->channels + bit;
++		struct iio_chan_spec const *chan =
++					at91_adc_chan_get(indio_dev, bit);
+ 
++		if (!chan)
++			continue;
+ 		if (st->dma_st.dma_chan)
+ 			at91_adc_readl(st, chan->address);
+ 	}
+@@ -587,8 +617,11 @@ static void at91_adc_trigger_handler_nodma(struct iio_dev *indio_dev,
+ 
+ 	for_each_set_bit(bit, indio_dev->active_scan_mask,
+ 			 indio_dev->num_channels) {
+-		struct iio_chan_spec const *chan = indio_dev->channels + bit;
++		struct iio_chan_spec const *chan =
++					at91_adc_chan_get(indio_dev, bit);
+ 
++		if (!chan)
++			continue;
+ 		st->buffer[i] = at91_adc_readl(st, chan->address);
+ 		i++;
+ 	}
 -- 
 2.7.4
