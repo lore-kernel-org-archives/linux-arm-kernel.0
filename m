@@ -1,86 +1,40 @@
-From: dalias@libc.org (Rich Felker)
-Date: Tue, 27 Mar 2018 13:27:36 -0400
-Subject: Regression with arm in next with stack protector
-In-Reply-To: <20180327172027.GA14598@n2100.armlinux.org.uk>
-References: <20180323181452.GJ5799@atomide.com>
- <20180327090409.GA10990@n2100.armlinux.org.uk>
- <20180327153525.GI1436@brightrain.aerifal.cx>
- <20180327172027.GA14598@n2100.armlinux.org.uk>
-Message-ID: <20180327172736.GK1436@brightrain.aerifal.cx>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 27 Mar 2018 13:28:22 -0400 (EDT)
+Subject: [PATCH 0/7] net: thunderx: implement DMAC filtering support
+In-Reply-To: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180327.132822.403377635482599502.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 06:20:27PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Mar 27, 2018 at 11:35:25AM -0400, Rich Felker wrote:
-> > On Tue, Mar 27, 2018 at 10:04:10AM +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Mar 23, 2018 at 11:14:53AM -0700, Tony Lindgren wrote:
-> > > > Hi,
-> > > > 
-> > > > Looks like commit 5638790dadae ("zboot: fix stack protector in
-> > > > compressed boot phase") breaks booting on arm.
-> > > > 
-> > > > This is all I get from the bootloader on omap3:
-> > > > 
-> > > > Starting kernel ...
-> > > > 
-> > > > data abort
-> > > > pc : [<810002d0>]          lr : [<100110a8>]
-> > > > reloc pc : [<9d6002d0>]    lr : [<2c6110a8>]
-> > > > sp : 81467c18  ip : 81466bf0     fp : 81466bf0
-> > > > r10: 80fc2c40  r9 : 81000258     r8 : 86fec000
-> > > > r7 : ffffffff  r6 : 81466bf8     r5 : 00000000  r4 : 80008000
-> > > > r3 : 81466c14  r2 : 81466c18     r1 : 000a0dff  r0 : 00466bf8
-> > > > Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
-> > > > Resetting CPU ...
-> > > > 
-> > > > resetting ...
-> > > 
-> > > The reason for this is the following code that was introduced by the
-> > > referenced patch:
-> > > 
-> > > +               ldr     r0, =__stack_chk_guard
-> > > +               ldr     r1, =0x000a0dff
-> > > +               str     r1, [r0]
-> > > 
-> > > This uses the absolute address of __stack_chk_guard in the decompressor,
-> > > which is a self-relocatable image.  As with all constructs like the
-> > > above, this absolute address doesn't get fixed up, and so it ends up
-> > > pointing at invalid memory (in this case 0x466bf8) vs RAM at 0x80000000,
-> > > and the decompressor looks to be around 0x81000000.
-> > > 
-> > > Such constructs can not be used in the decompressor for exactly this
-> > > reason - they need to use PC-relative addressing instead just like
-> > > everything else does in head.S.
-> > 
-> > Can someone please answer why this is even needed to begin with? I
-> > don't see any compelling reason __stack_chk_guard needs a particular
-> > value in the decompressor, which is not dealing with any non-constant
-> > input.
+From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+Date: Tue, 27 Mar 2018 08:07:29 -0700
+
+> From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 > 
-> Untrue - it can do some parsing of the DT and updating/appending
-> information from ATAGs.  However, all that should be coming from
-> a trusted environment, so I don't see much of a "trust" issue here.
-> (If the parent environment is not trusted, then the environment we're
-> running in is not trusted.)
-
-OK, I was considering DT constant, but it doesn't really matter as you
-say since the input comes from a trusted environment and could subvert
-the system in much more direct ways than blowing away the
-decompressor's stack buffers if it wanted to.
-
-> > Just putting __stack_chk_guard in its bss should be fine and
-> > would eliminate all the risks of wrong code to load a value into it.
-> > Alternatively put it in initialized data with the desired value.
+> By default CN88XX BGX accepts all incoming multicast and broadcast
+> packets and filtering is disabled. The nic driver doesn't provide
+> an ability to change such behaviour.
 > 
-> I'm no expert with this, so I can't comment.  I build my kernels
-> with gcc 4.7.4, which I don't think supports this feature.
+> This series is to implement DMAC filtering management for CN88XX
+> nic driver allowing user to enable/disable filtering and configure
+> specific MAC addresses to filter traffic.
 
-By "this feature" do you mean stack protector? I still have a 4.7.3
-for x86 around and -fstack-protector-all works fine on it. Not sure if
-there are issues using stack protector with kernel, or on ARM, for
-older GCCs. In any case defining __stack_chk_guard as initialized data
-should work on any gcc version regardless of whether stack protector
-is actually used; it doesn't require any compiler features just basic
-C.
+This doesn't even compile:
 
-Rich
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function ?bgx_lmac_save_filter?:
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c:286:3: warning: ?return? with no value, in function returning non-void [-Wreturn-type]
+   return;
+   ^~~~~~
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c:281:12: note: declared here
+ static int bgx_lmac_save_filter(struct lmac *lmac, u64 dmac, u8 vf_id)
+            ^~~~~~~~~~~~~~~~~~~~
+In file included from drivers/net/ethernet/cavium/thunder/nic.h:15:0,
+                 from drivers/net/ethernet/cavium/thunder/thunder_bgx.c:21:
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function ?bgx_set_dmac_cam_filter_mac?:
+drivers/net/ethernet/cavium/thunder/thunder_bgx.h:61:38: warning: left shift count >= width of type [-Wshift-count-overflow]
+ #define  RX_DMACX_CAM_LMACID(x)   (x << 49)
+                                      ^
+drivers/net/ethernet/cavium/thunder/thunder_bgx.c:324:8: note: in expansion of macro ?RX_DMACX_CAM_LMACID?
+  cfg = RX_DMACX_CAM_LMACID(lmacid & LMAC_ID_MASK) |
+        ^~~~~~~~~~~~~~~~~~~
