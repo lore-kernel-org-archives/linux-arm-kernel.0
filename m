@@ -1,101 +1,85 @@
-From: arvind.yadav.cs@gmail.com (arvindY)
-Date: Tue, 27 Mar 2018 21:58:01 +0530
-Subject: [PATCH] coresight: use put_device() instead of kfree()
-In-Reply-To: <CANLsYkw0v-vVpf1M1Ae+y=Hq5cqqp+_Sjq41pDS+=Xv9zesHAw@mail.gmail.com>
-References: <d5a326b6c284f7389301b265716dc58fda492c98.1521358552.git.arvind.yadav.cs@gmail.com>
- <CANLsYkymOF2oG7TmKbRTakYKw0ECN_DXfkX5b8WjmS0Lz0sfig@mail.gmail.com>
- <5AB9ACDA.9090207@gmail.com>
- <CANLsYkw0v-vVpf1M1Ae+y=Hq5cqqp+_Sjq41pDS+=Xv9zesHAw@mail.gmail.com>
-Message-ID: <5ABA7111.3020908@gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 27 Mar 2018 12:31:44 -0400
+Subject: [net-next PATCH v2 05/10] net: netcp: ethss: use rgmii link status
+ for 2u cpsw hardware
+In-Reply-To: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1522168309-12338-6-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Introduce rgmii link status to handle link state events for 2u
+cpsw hardware on K2G.
 
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ drivers/net/ethernet/ti/netcp_ethss.c | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
 
-On Tuesday 27 March 2018 09:37 PM, Mathieu Poirier wrote:
-> On 26 March 2018 at 20:30, arvindY <arvind.yadav.cs@gmail.com> wrote:
->>
->> On Tuesday 27 March 2018 03:16 AM, Mathieu Poirier wrote:
->>> drivers/hwtracing/coresight/coresight.c
->>> On 18 March 2018 at 01:38, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
->>>> Never directly free @dev after calling device_register(), even
->>>> if it returned an error. Always use put_device() to give up the
->>>> reference initialized.
->>>>
->>>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>>> ---
->>>>    drivers/hwtracing/coresight/coresight.c | 8 ++++----
->>>>    1 file changed, 4 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/drivers/hwtracing/coresight/coresight.c
->>>> b/drivers/hwtracing/coresight/coresight.c
->>>> index 389c4ba..132dfbc 100644
->>>> --- a/drivers/hwtracing/coresight/coresight.c
->>>> +++ b/drivers/hwtracing/coresight/coresight.c
->>>> @@ -1026,8 +1026,10 @@ struct coresight_device *coresight_register(struct
->>>> coresight_desc *desc)
->>>>           dev_set_name(&csdev->dev, "%s", desc->pdata->name);
->>>>
->>>>           ret = device_register(&csdev->dev);
->>>> -       if (ret)
->>>> -               goto err_device_register;
->>>> +       if (ret) {
->>>> +               put_device(&csdev->dev);
->>>> +               goto err_kzalloc_csdev;
->>>> +       }
->>>>
->>>>           mutex_lock(&coresight_mutex);
->>>>
->>>> @@ -1038,8 +1040,6 @@ struct coresight_device *coresight_register(struct
->>>> coresight_desc *desc)
->>>>
->>>>           return csdev;
->>>>
->>>> -err_device_register:
->>>> -       kfree(conns);
->>> Apologies for the late reply, I was travelling.
->>>
->>> I suggest to simply replace kfree() with put_device() in order to
->>> concentrate the error handling code in the same area and make sure
->>> that memory allocated for @conns and @refcnts is freed.
->>>
->>> Thanks,
->>> Mathieu
->>
->> If you will see the comment for device_register(drivers/base/core.c)
->> there is mentioned that 'NOTE: _Never_ directly free @dev
->> after calling this function, even if it returned an error!
->> Always use put_device() to give up the reference initialized
->> in this function instead.
-> I have read the notice and in full agreement with the put_device() part.
->
->> Here  put_device() will decrement the last reference and then
->> free the memory by calling dev->release.  Internally
->> put_device() -> kobject_put() -> kobject_cleanup() which is
->> responsible to call 'dev -> release' and also free other kobject
->> resources.
-> Memory would be automatically freed if it would have been allocated
-> with the devm_XYZ() helpers but it is not the case here.  As such it
-> has to be freed explicitly.  Reading your patch again (and the jetlag
-> somewhat fading) I think you've done the right thing except for the
-> "goto" that should still point to "err_device_register".
->
-
-Take rest :)
-'goto' should not point to "err_device_register" because
-put_device() will call 'dev->release' which is coresight_device_release().
-It's release @conns, @refcnt and @csdev . If we will keep same 'goto
-then kfree() will be redundant for all.
-
-
->> we should always avoid kfree() if device_register()
->> returned an error. Otherwise it'll not do clean up of other
->> kobject resources.
->>
->> ~arvind
->>>>    err_kzalloc_conns:
->>>>           kfree(refcnts);
->>>>    err_kzalloc_refcnts:
->>>> --
->>>> 2.7.4
->>>>
+diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+index ab9d369..078a1b8 100644
+--- a/drivers/net/ethernet/ti/netcp_ethss.c
++++ b/drivers/net/ethernet/ti/netcp_ethss.c
+@@ -552,6 +552,7 @@ struct gbe_ss_regs {
+ struct gbe_ss_regs_ofs {
+ 	u16	id_ver;
+ 	u16	control;
++	u16	rgmii_status; /* 2U */
+ };
+ 
+ struct gbe_switch_regs {
+@@ -2120,23 +2121,39 @@ static bool gbe_phy_link_status(struct gbe_slave *slave)
+ 	 return !slave->phy || slave->phy->link;
+ }
+ 
++#define RGMII_REG_STATUS_LINK	BIT(0)
++
++static void netcp_2u_rgmii_get_port_link(struct gbe_priv *gbe_dev, bool *status)
++{
++	u32 val = 0;
++
++	val = readl(GBE_REG_ADDR(gbe_dev, ss_regs, rgmii_status));
++	*status = false;
++	if ((val & RGMII_REG_STATUS_LINK) != 0)
++		*status = true;
++}
++
+ static void netcp_ethss_update_link_state(struct gbe_priv *gbe_dev,
+ 					  struct gbe_slave *slave,
+ 					  struct net_device *ndev)
+ {
+-	int sp = slave->slave_num;
+-	int phy_link_state, sgmii_link_state = 1, link_state;
++	bool sw_link_state = true, phy_link_state;
++	int sp = slave->slave_num, link_state;
+ 
+ 	if (!slave->open)
+ 		return;
+ 
+ 	if (!SLAVE_LINK_IS_XGMII(slave)) {
+-		sgmii_link_state =
++		if (SLAVE_LINK_IS_RGMII(slave))
++			netcp_2u_rgmii_get_port_link(gbe_dev,
++						     &sw_link_state);
++		else
++			sw_link_state =
+ 			netcp_sgmii_get_port_link(SGMII_BASE(gbe_dev, sp), sp);
+ 	}
+ 
+ 	phy_link_state = gbe_phy_link_status(slave);
+-	link_state = phy_link_state & sgmii_link_state;
++	link_state = phy_link_state & sw_link_state;
+ 
+ 	if (atomic_xchg(&slave->link_state, link_state) != link_state)
+ 		netcp_ethss_link_state_action(gbe_dev, ndev, slave,
+@@ -3432,6 +3449,8 @@ static int set_gbenu_ethss_priv(struct gbe_priv *gbe_dev,
+ 
+ 	/* Subsystem registers */
+ 	GBENU_SET_REG_OFS(gbe_dev, ss_regs, id_ver);
++	/* ok to set for MU, but used by 2U only */
++	GBENU_SET_REG_OFS(gbe_dev, ss_regs, rgmii_status);
+ 
+ 	/* Switch module registers */
+ 	GBENU_SET_REG_OFS(gbe_dev, switch_regs, id_ver);
+-- 
+1.9.1
