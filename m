@@ -1,102 +1,49 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 27 Mar 2018 09:53:16 -0500
-Subject: [PATCH V2] arm64: tlbflush: avoid writing RES0 bits
-In-Reply-To: <985a0edd-e388-dade-8824-30cc58a236f3@arm.com>
-References: <1522120877-9136-1-git-send-email-pelcan@codeaurora.org>
- <985a0edd-e388-dade-8824-30cc58a236f3@arm.com>
-Message-ID: <56b560a5-6e57-8e01-32ca-9d3c95ccd2e5@codeaurora.org>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 27 Mar 2018 14:57:28 +0000
+Subject: [PATCH  12/12] ARM: multi_v7_defconfig: Enable r8a77470 SoC
+In-Reply-To: <TY1PR01MB1770FC01BEB7430AE352F5D0C0AC0@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+References: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
+ <1522161443-54428-13-git-send-email-biju.das@bp.renesas.com>
+ <TY1PR01MB1770FC01BEB7430AE352F5D0C0AC0@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+Message-ID: <OSBPR01MB21032F67E2F7463BF4CEA875B8AC0@OSBPR01MB2103.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Fabrizio,
 
-On 03/27/2018 06:34 AM, Robin Murphy wrote:
-> On 27/03/18 04:21, Philip Elcan wrote:
->> Several of the bits of the TLBI register operand are RES0 per the ARM
->> ARM, so TLBI operations should avoid writing non-zero values to these
->> bits.
->>
->> This patch adds a macro __TLBI_VADDR(addr, asid) that creates the
->> operand register in the correct format and honors the RES0 bits.
->>
->> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
->> ---
->> ? arch/arm64/include/asm/tlbflush.h | 23 ++++++++++++++++-------
->> ? 1 file changed, 16 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
->> index 9e82dd7..b1205e9 100644
->> --- a/arch/arm64/include/asm/tlbflush.h
->> +++ b/arch/arm64/include/asm/tlbflush.h
->> @@ -60,6 +60,15 @@
->> ????????? __tlbi(op, (arg) | USER_ASID_FLAG);??????????????? \
->> ? } while (0)
->> ? +/* This macro creates a properly formatted VA operand for the TLBI */
->> +#define __TLBI_VADDR(addr, asid)??????????????? \
->> +??? ({??????????????????????????? \
->> +??????? unsigned long __ta = (addr) >> 12;??????? \
->> +??????? __ta &= GENMASK_ULL(43, 0);??????????? \
->> +??????? __ta |= (unsigned long)(asid) << 48;??????? \
->> +??????? __ta;??????????????????????? \
->> +??? })
-> 
-> I'd be inclined to make this a static inline function rather than a macro, since it doesn't need to do any wacky type-dodging, but either way the overall change now looks appropriate;
-> 
-> Acked-by: Robin Murphy <robin.murphy@arm.com>
-> 
+Thanks for the feedback.
 
-Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
+> > Subject: [PATCH 12/12] ARM: multi_v7_defconfig: Enable r8a77470 SoC
+> >
+> > Enable recently added r8a77470 (RZ/G1C) SoC.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > ---
+> >  arch/arm/configs/multi_v7_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/configs/multi_v7_defconfig
+> > b/arch/arm/configs/multi_v7_defconfig
+> > index c1e045a..3623900 100644
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@ -90,6 +90,7 @@ CONFIG_ARCH_R8A73A4=y
+> CONFIG_ARCH_R8A7740=y
+> > CONFIG_ARCH_R8A7743=y  CONFIG_ARCH_R8A7745=y
+> > +CONFIG_ARCH_R8A7747=y
+>
+> s/CONFIG_ARCH_R8A7747/CONFIG_ARCH_R8A77470/
 
-> Thanks,
-> Robin.
-> 
->> +
->> ? /*
->> ?? *??? TLB Management
->> ?? *??? ==============
->> @@ -117,7 +126,7 @@ static inline void flush_tlb_all(void)
->> ? ? static inline void flush_tlb_mm(struct mm_struct *mm)
->> ? {
->> -??? unsigned long asid = ASID(mm) << 48;
->> +??? unsigned long asid = __TLBI_VADDR(0, ASID(mm));
->> ? ????? dsb(ishst);
->> ????? __tlbi(aside1is, asid);
->> @@ -128,7 +137,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
->> ? static inline void flush_tlb_page(struct vm_area_struct *vma,
->> ??????????????????? unsigned long uaddr)
->> ? {
->> -??? unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
->> +??? unsigned long addr = __TLBI_VADDR(uaddr, ASID(vma->vm_mm));
->> ? ????? dsb(ishst);
->> ????? __tlbi(vale1is, addr);
->> @@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
->> ????????? return;
->> ????? }
->> ? -??? start = asid | (start >> 12);
->> -??? end = asid | (end >> 12);
->> +??? start = __TLBI_VADDR(start, asid);
->> +??? end = __TLBI_VADDR(end, asid);
->> ? ????? dsb(ishst);
->> ????? for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
->> @@ -185,8 +194,8 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
->> ????????? return;
->> ????? }
->> ? -??? start >>= 12;
->> -??? end >>= 12;
->> +??? start = __TLBI_VADDR(start, 0);
->> +??? end = __TLBI_VADDR(end, 0);
->> ? ????? dsb(ishst);
->> ????? for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
->> @@ -202,7 +211,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
->> ? static inline void __flush_tlb_pgtable(struct mm_struct *mm,
->> ???????????????????????? unsigned long uaddr)
->> ? {
->> -??? unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
->> +??? unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
->> ? ????? __tlbi(vae1is, addr);
->> ????? __tlbi_user(vae1is, addr);
->>
+Will send V2.
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> >  CONFIG_ARCH_R8A7778=y
+> >  CONFIG_ARCH_R8A7779=y
+> >  CONFIG_ARCH_R8A7790=y
+> > --
+> > 2.7.4
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
