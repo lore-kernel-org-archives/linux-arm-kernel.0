@@ -1,43 +1,49 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 27 Mar 2018 11:01:03 +0530
-Subject: [PATCH v5 2/3] arm64: allwinner: axp803: Add drivevbus regulator
-In-Reply-To: <20180327053104.3812-1-jagan@amarulasolutions.com>
-References: <20180327053104.3812-1-jagan@amarulasolutions.com>
-Message-ID: <20180327053104.3812-2-jagan@amarulasolutions.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 27 Mar 2018 14:29:35 +0900
+Subject: [PATCH v2 21/21] arm64: move GCC version check for
+ ARCH_SUPPORTS_INT128 to Kconfig
+In-Reply-To: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1522128575-5326-22-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reg_drivevbus regualtor for boards which are using
-external regulator to drive the OTG VBus through N_VBUSEN
-PMIC pin.
+This becomes much neater in Kconfig.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
-Changes for v5:
-- Collect Chen-Yu reviewed-by tag
-Changes for v4:
-- rebase on master
-Changes for v3:
-- none
 
- arch/arm64/boot/dts/allwinner/axp803.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Changes in v2:
+  - Newly added
 
-diff --git a/arch/arm64/boot/dts/allwinner/axp803.dtsi b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-index ff8af52743ff..e5eae8bafc42 100644
---- a/arch/arm64/boot/dts/allwinner/axp803.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/axp803.dtsi
-@@ -146,5 +146,10 @@
- 			regulator-max-microvolt = <3000000>;
- 			regulator-name = "rtc-ldo";
- 		};
-+
-+		reg_drivevbus: drivevbus {
-+			regulator-name = "drivevbus";
-+			status = "disabled";
-+		};
- 	};
- };
+ arch/arm64/Kconfig  | 1 +
+ arch/arm64/Makefile | 2 --
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7381eeb..0c97f40 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -43,6 +43,7 @@ config ARM64
+ 	select ARCH_USE_QUEUED_RWLOCKS
+ 	select ARCH_SUPPORTS_MEMORY_FAILURE
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
++	select ARCH_SUPPORTS_INT128 if GCC_VERSION >= 50000
+ 	select ARCH_SUPPORTS_NUMA_BALANCING
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index b481b4a..7318165 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -57,8 +57,6 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+ KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+ 
+-KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
+-
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ CHECKFLAGS	+= -D__AARCH64EB__
 -- 
-2.14.3
+2.7.4
