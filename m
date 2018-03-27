@@ -1,75 +1,50 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Tue, 27 Mar 2018 17:07:27 +0300
-Subject: [PATCH v2 01/17] virtio: mmio-v1: Validate queue PFN
-In-Reply-To: <1522156531-28348-2-git-send-email-suzuki.poulose@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180327170119-mutt-send-email-mst@kernel.org>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Tue, 27 Mar 2018 16:08:08 +0200
+Subject: [PATCH v3 2/6] PCI: aardvark: fix logic in advk_pcie_valid_device()
+In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
+References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327140819.23501-3-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 02:15:11PM +0100, Suzuki K Poulose wrote:
-> virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
-> If the queue pfn is too large to fit in 32bits, which
-> we could hit on arm64 systems with 52bit physical addresses
-> (even with 64K page size), we simply miss out a proper link
-> to the other side of the queue.
-> 
-> Add a check to validate the PFN, rather than silently breaking
-> the devices.
-> 
-> Cc: "Michael S. Tsirkin" <mst@redhat.com>
-> Cc: Jason Wang <jasowang@redhat.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Cc: Peter Maydel <peter.maydell@linaro.org>
-> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Victor Gu <xigu@marvell.com>
 
-OK - seems harmless so I will queue this.
-But I really think effort should be spent on
-adding v1.0 support in QEMU.
+The PCI configuration space read/write functions were special casing
+the situation where PCI_SLOT(devfn) != 0, and returned
+PCIBIOS_DEVICE_NOT_FOUND in this case.
 
-> ---
->  drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
->  1 file changed, 16 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-> index 67763d3..b2f9b5c 100644
-> --- a/drivers/virtio/virtio_mmio.c
-> +++ b/drivers/virtio/virtio_mmio.c
-> @@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
->  	/* Activate the queue */
->  	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
->  	if (vm_dev->version == 1) {
-> +		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
-> +
-> +		/*
-> +		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
-> +		 * that doesn't fit in 32bit, fail the setup rather than
-> +		 * pretending to be successful.
-> +		 */
-> +		if (q_pfn >> 32) {
-> +			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
-> +			err = -ENOMEM;
-> +			goto error_bad_pfn;
-> +		}
-> +
->  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
-> -		writel(virtqueue_get_desc_addr(vq) >> PAGE_SHIFT,
-> -				vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-> +		writel(q_pfn, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
->  	} else {
->  		u64 addr;
->  
-> @@ -430,6 +442,8 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
->  
->  	return vq;
->  
-> +error_bad_pfn:
-> +	vring_del_virtqueue(vq);
->  error_new_virtqueue:
->  	if (vm_dev->version == 1) {
->  		writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-> -- 
-> 2.7.4
+However, while this is what is intended for the root bus, it is not
+intended for the child busses, as it prevents discovering devices with
+PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
+if we're on the root bus.
+
+Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+[Thomas: tweak commit log.]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes since v2:
+ - The logic has been factorized into a advk_pcie_valid_device()
+   helper in a previous patch, so this patch was adjusted accordingly.
+---
+ drivers/pci/host/pci-aardvark.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+index ccd0304a0c21..be140dc7109b 100644
+--- a/drivers/pci/host/pci-aardvark.c
++++ b/drivers/pci/host/pci-aardvark.c
+@@ -433,7 +433,7 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
+ static int advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
+ 				  int devfn)
+ {
+-	if (PCI_SLOT(devfn) != 0)
++	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0)
+ 		return false;
+ 
+ 	return true;
+-- 
+2.14.3
