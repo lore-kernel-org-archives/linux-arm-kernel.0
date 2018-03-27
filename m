@@ -1,34 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Mar 2018 14:57:24 -0500
-Subject: [PATCH v3 0/6] PCI: aardvark: misc fixes and improvements
-In-Reply-To: <20180327162016.7df5c684@windsurf.home>
-References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
- <20180327162016.7df5c684@windsurf.home>
-Message-ID: <20180327195723.GG7759@bhelgaas-glaptop.roam.corp.google.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 27 Mar 2018 22:09:14 +0200
+Subject: [PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
+In-Reply-To: <alpine.DEB.2.21.1802121206440.1158@nanos.tec.linutronix.de>
+References: <20180212105642.8662-1-lionel.debieve@st.com>
+ <20180212105642.8662-2-lionel.debieve@st.com>
+ <alpine.DEB.2.21.1802121206440.1158@nanos.tec.linutronix.de>
+Message-ID: <CA+M3ks4RMeicX_AAPVwPgULTEg3nbHrm9bkj7ev3XX1No2OQvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 04:20:16PM +0200, Thomas Petazzoni wrote:
-> On Tue, 27 Mar 2018 16:08:06 +0200, Thomas Petazzoni wrote:
-> 
-> > This patch series brings a number of improvements to the aardvark
-> > PCIe. Sorry for being so slow at sending the v3 after the v2 sent in
-> > January. Hopefully this time around the series will be fine.
-> 
-> Sorry, I screwed up. I'm not sure how, but I did. The series was sent
-> twice, and only the second iteration is correct, the first one lacked
-> some Cc: to stable.
-> 
-> I have marked the bogus patches as Superseded in patchwork, so if you
-> look at patchwork, you will only see the patches worth considering.
-> 
-> Let me know if you would like to resend anyway.
+2018-02-12 12:08 GMT+01:00 Thomas Gleixner <tglx@linutronix.de>:
+> On Mon, 12 Feb 2018, Lionel Debieve wrote:
+>
+>> Update license template using SPDX. Move the global layout
+>> of UBI headers to dual license helping UBI to be the standard
+>> solution for raw NAND management.
 
-No worries, no need to resend for that.  And also no need to resend to
-rebase them.
+Hi Frank,
 
-Lorenzo is out this week, but I'm sure he'll look at them when he
-returns.  They all look pretty straightforward and obviously only
-affect aardvark, so we may still be able to squeeze them in for v4.17.
+May I ask you your point of view on this license evolution ?
 
-Bjorn
+Regards,
+Benjamin
+
+>
+> No objections from my side, but you really need to poke IBM about that. And
+> if that happens then the kernel header. where this is copied from needs to
+> be updated as well....
+>
+> Thanks,
+>
+>         tglx
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
