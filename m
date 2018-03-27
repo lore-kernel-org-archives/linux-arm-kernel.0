@@ -1,19 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 15:45:58 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.17
-In-Reply-To: <cover.1521211738.git.horms+renesas@verge.net.au>
-References: <cover.1521211738.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a1bsBrFHXwtsNSPo0phSePV_zde=RV4+6gu6wCu4s=j5g@mail.gmail.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 27 Mar 2018 06:46:15 -0700
+Subject: [PATCH 10/10] dt-bindings: thermal: Remove
+ "cooling-{min|max}-level" properties
+In-Reply-To: <1521550190.2781.3.camel@intel.com>
+References: <cover.1518166039.git.viresh.kumar@linaro.org>
+ <0ec53640f1a09e6e0d7aa1a21d1a3266c3c209c7.1518166039.git.viresh.kumar@linaro.org>
+ <20180312043815.GW6842@vireshk-i7>
+ <1521550190.2781.3.camel@intel.com>
+Message-ID: <20180327134613.GA10890@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 3:53 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
->
-> Please consider these Renesas ARM based SoC updates for v4.17.
->
+On Tue, Mar 20, 2018 at 08:49:50PM +0800, Zhang Rui wrote:
+> On ?, 2018-03-12 at 10:08 +0530, Viresh Kumar wrote:
+> > On 09-02-18, 14:28, Viresh Kumar wrote:
+> > > 
+> > > The "cooling-min-level" and "cooling-max-level" properties are not
+> > > parsed by any part of kernel currently and the max cooling state of
+> > > a
+> > > CPU cooling device is found by referring to the cpufreq table
+> > > instead.
+> > > 
+> > > Remove the unused bindings.
+> > > 
+> > > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > > ---
+> > > ?Documentation/devicetree/bindings/thermal/thermal.txt | 16 +----
+> > > -----------
+> > > ?1 file changed, 1 insertion(+), 15 deletions(-)
+> > @Zhang/Eduardo: Can you please pick this patch (10/10) as almost
+> > everything else
+> > is already lined up for 4.17 ?
+> 
+> I think Eduardo should have reviewed all the DT thermal patches in the
+> list, but I didn't see his response about this one.
+> 
+> Eduardo,
+> did you miss this one?
 
-Pulled into next/soc, thanks!
+just applied and sending it in my pull request.
 
-     Arnd
+> 
+> thanks,
+> rui
+> > 
