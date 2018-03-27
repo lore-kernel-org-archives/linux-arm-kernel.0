@@ -1,47 +1,53 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Mar 2018 14:50:54 -0500
-Subject: [PATCH v3 0/6] PCI: aardvark: misc fixes and improvements
-In-Reply-To: <20180327140819.23501-8-thomas.petazzoni@bootlin.com>
+Date: Tue, 27 Mar 2018 14:53:10 -0500
+Subject: [PATCH v3 1/6] PCI: aardvark: introduce an
+ advk_pcie_valid_device() helper
+In-Reply-To: <20180327140819.23501-9-thomas.petazzoni@bootlin.com>
 References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
- <20180327140819.23501-8-thomas.petazzoni@bootlin.com>
-Message-ID: <20180327195054.GE7759@bhelgaas-glaptop.roam.corp.google.com>
+ <20180327140819.23501-9-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327195310.GF7759@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Lorenzo, who is now maintaining drivers/pci/host/]
-
-On Tue, Mar 27, 2018 at 04:08:13PM +0200, Thomas Petazzoni wrote:
-> Hello Bjorn,
+On Tue, Mar 27, 2018 at 04:08:14PM +0200, Thomas Petazzoni wrote:
+> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> This patch series brings a number of improvements to the aardvark
-> PCIe. Sorry for being so slow at sending the v3 after the v2 sent in
-> January. Hopefully this time around the series will be fine.
+> In other to mimic other PCIe host controller drivers, introduce an
+> advk_pcie_valid_device() helper, used in the configuration read/write
+> functions.
 > 
+> This patch by itself is not a fix, but it is required for a follow-up
+> patch that is a fix, hence the Fixes tag and the Cc to stable.
+> 
+> Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
 > Changes since v2:
+>  - New patch
+> ---
+>  drivers/pci/host/pci-aardvark.c | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
 > 
->  - Rebased on v4.16-rc7
+> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+> index b04d37b3c5de..ccd0304a0c21 100644
+> --- a/drivers/pci/host/pci-aardvark.c
+> +++ b/drivers/pci/host/pci-aardvark.c
+> @@ -430,6 +430,15 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
+>  	return -ETIMEDOUT;
+>  }
+>  
+> +static int advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
+> +				  int devfn)
+> +{
+> +	if (PCI_SLOT(devfn) != 0)
+> +		return false;
+> +
+> +	return true;
+> +}
 
-No need to rebase to anything other than "master" unless your series
-depends on something already merged.
+Thanks for following the style of the other drivers.
 
-> Evan Wang (2):
->   PCI: aardvark: fix PCIe max read request size setting
->   PCI: aardvark: remove PCIe outbound window configuration
-> 
-> Thomas Petazzoni (1):
->   PCI: aardvark: introduce an advk_pcie_valid_device() helper
-> 
-> Victor Gu (3):
->   PCI: aardvark: fix logic in advk_pcie_valid_device()
->   PCI: aardvark: set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
->   PCI: aardvark: use isr1 instead of isr0 interrupt in legacy irq mode
-
-Please capitalize the first word of every title, e.g.,
-
-  PCI: aardvark: Remove PCIe outbound window configuration
-
-and proper nouns, e.g., things directly defined by the spec, as "Max
-Read Request Size", as a hint that this has specific meaning and can
-be looked up:
-
-  PCI: aardvark: Fix PCIe Max Read Request Size setting
+Some of them return int, some return bool.  I don't really care which
+you use , but you should probably use one consistently, e.g., declare
+this as a bool function, or declare it as int and return 0/1.
