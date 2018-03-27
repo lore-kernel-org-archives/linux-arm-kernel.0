@@ -1,26 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Mar 2018 15:15:28 +0200
-Subject: [PATCH] pinctrl: uniphier: add UART hardware flow control pin-mux
- settings
-In-Reply-To: <1521447194-26514-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1521447194-26514-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CACRpkdatq6B7Of1DZAq0RcwcHxf6Qy1HcMaCC=3Wb_ogYsYfvw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2018 15:15:33 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.17
+In-Reply-To: <CAK8P3a1x9_st4vN7cuMyWk3GrgHYgs8ca5A7ZArM2vEA8ttCgQ@mail.gmail.com>
+References: <cover.1521201256.git.horms+renesas@verge.net.au>
+ <CAK8P3a1x9_st4vN7cuMyWk3GrgHYgs8ca5A7ZArM2vEA8ttCgQ@mail.gmail.com>
+Message-ID: <CAK8P3a0UkYS9B3cerVX3o6fT9i-+=ieO5aNLjxtAd=sLed9=VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 9:13 AM, Kunihiko Hayashi
-<hayashi.kunihiko@socionext.com> wrote:
-
-> UniPhier SoCs have the following pins for hardware flow control of UART:
->   XRTS, XCTS
-> and for modem control of UART:
->   XDTR, XDSR, XDCD, XRI
+On Tue, Mar 27, 2018 at 3:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Mar 16, 2018 at 3:50 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+>> Renesas ARM64 Based SoC Defconfig Updates for v4.17
+>>
+>> Enable the following to allow them to be more widely exercised:
+>> * Newly added R8A77965 and R8A77980 SoCs
+>> * PWM and USB as used on R-Car Gen3 SoCs
+>>
 >
-> The port number with the flow control is SoC-dependent.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Pulled into next/defconfig, thanks!
 
-Patch applied with Masahiro's ACK!
+This was actually next/soc of course.
 
-Yours,
-Linus Walleij
+      Arnd
