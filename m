@@ -1,52 +1,60 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Tue, 27 Mar 2018 18:55:00 +0530
-Subject: [PATCH v5 4/4] Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
-In-Reply-To: <1522157100-16879-1-git-send-email-cpandya@codeaurora.org>
-References: <1522157100-16879-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1522157100-16879-5-git-send-email-cpandya@codeaurora.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 27 Mar 2018 15:25:24 +0200
+Subject: [PATCH v2 0/4] Introduce PMSAv8 memory protection unit
+In-Reply-To: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
+References: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <4407b88a-ce0d-38c6-1f33-7aac56af94f4@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit 15122ee2c515a ("arm64: Enforce BBM for huge
-IO/VMAP mappings") is a temporary work-around until the
-issues with CONFIG_HAVE_ARCH_HUGE_VMAP gets fixed.
+Hi Vlad,
 
-Revert this change as we have fixes for the issue.
+On 02/16/2018 03:14 PM, Vladimir Murzin wrote:
+> Hi,
+> 
+> This series adds support for PMSAv8 MPU defined by ARMv8R/M
+> architecture.
+> 
+> Changelog:
+> 
+>       v1 -> v2
+>          - Included missed patch.
+> 	- Folded "ARM: NOMMU: Make _stext and _end meet PMSAv8 alignment
+> 	  restrictions" into "ARM: NOMMU: Support PMSAv8 MPU" since it
+> 	  allows us to refer PMSAv8_MINALIGN in linker scripts.
+> 	- Improved and tested XIP support
+> 
+>      RFC -> v1
+>          - Rebased on v4.16-rc1
+> 	- Added Tested-by for v7M bits from Andras
+> 
+> Thanks!
+> 
+> Vladimir Murzin (4):
+>    ARM: NOMMU: Move PMSAv7 MPU under it's own namespace
+>    ARM: NOMMU: Reorganise __setup_mpu
+>    ARM: NOMMU: Postpone MPU activation till __after_proc_init
+>    ARM: NOMMU: Support PMSAv8 MPU
+> 
+>   arch/arm/include/asm/mpu.h        | 112 +++++++++-----
+>   arch/arm/include/asm/v7m.h        |  14 +-
+>   arch/arm/kernel/asm-offsets.c     |   8 +-
+>   arch/arm/kernel/head-nommu.S      | 289 ++++++++++++++++++++++++++++-------
+>   arch/arm/kernel/vmlinux-xip.lds.S |   4 +
+>   arch/arm/kernel/vmlinux.lds.S     |   7 +
+>   arch/arm/mm/Makefile              |   2 +-
+>   arch/arm/mm/nommu.c               |  32 ++++
+>   arch/arm/mm/pmsa-v7.c             |  59 +++-----
+>   arch/arm/mm/pmsa-v8.c             | 307 ++++++++++++++++++++++++++++++++++++++
+>   10 files changed, 701 insertions(+), 133 deletions(-)
+>   create mode 100644 arch/arm/mm/pmsa-v8.c
+> 
 
-Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
----
-No change in v5
+Just tested on stm32f769-disco board on stm32-next branch. I don't see 
+regressions.
 
- arch/arm64/mm/mmu.c | 8 --------
- 1 file changed, 8 deletions(-)
+Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 3552c7a..11a24a1 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -935,10 +935,6 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
- 
--	/* ioremap_page_range doesn't honour BBM */
--	if (pud_present(READ_ONCE(*pudp)))
--		return 0;
--
- 	BUG_ON(phys & ~PUD_MASK);
- 	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
- 	return 1;
-@@ -949,10 +945,6 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
- 
--	/* ioremap_page_range doesn't honour BBM */
--	if (pmd_present(READ_ONCE(*pmdp)))
--		return 0;
--
- 	BUG_ON(phys & ~PMD_MASK);
- 	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
- 	return 1;
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation
-Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
-Collaborative Project
+Thanks
+
+Alex
