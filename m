@@ -1,67 +1,47 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 27 Mar 2018 16:48:01 +0800
-Subject: [PATCH 02/10] drm/sun4i: Disable YUV channel when using the
- frontend and set interlace
-In-Reply-To: <1522140259.1110.43.camel@bootlin.com>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-3-paul.kocialkowski@bootlin.com>
- <20180323095529.5nptn5achjt3esog@flea>
- <1522137643.1110.4.camel@bootlin.com> <20180327081731.he3lhnvqffuimsi5@flea>
- <1522140259.1110.43.camel@bootlin.com>
-Message-ID: <CAGb2v67bykhv6oTO0dQTyUOcB0CZZUPHg06F8K0oN5C_PH3E7A@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 27 Mar 2018 11:00:49 +0200
+Subject: [PATCH v2 7/7] ARM64: dts: meson-axg: add an 32K alt aoclk
+In-Reply-To: <20180323143816.200573-8-yixun.lan@amlogic.com>
+References: <20180323143816.200573-1-yixun.lan@amlogic.com>
+ <20180323143816.200573-8-yixun.lan@amlogic.com>
+Message-ID: <1522141249.2632.25.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 4:44 PM, Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
-> Hi,
->
-> On Tue, 2018-03-27 at 10:17 +0200, Maxime Ripard wrote:
->> On Tue, Mar 27, 2018 at 10:00:43AM +0200, Paul Kocialkowski wrote:
->> > Hi,
->> >
->> > On Fri, 2018-03-23 at 10:55 +0100, Maxime Ripard wrote:
->> > > On Wed, Mar 21, 2018 at 04:28:56PM +0100, Paul Kocialkowski wrote:
->> > > > The YUV channel was only disabled in
->> > > > sun4i_backend_update_layer_formats,
->> > > > which is not called when the frontend is selected.
->> > > >
->> > > > Thus, creating a layer with a YUV format handled by the backend
->> > > > and
->> > > > then
->> > > > switching to a format that requires the frontend would keep the
->> > > > YUV
->> > > > channel enabled for the layer.
->> > > >
->> > > > This explicitly disables the YUV channel for the layer when
->> > > > using
->> > > > the
->> > > > frontend as well. It also sets the relevant interlace bit, which
->> > > > was
->> > > > missing in the frontend path as well.
->> > >
->> > > This should be part of a separate patch. Usually, if you write "it
->> > > also does..." at the end of your commit log, it's a pretty good
->> > > indication that it should be another patch :)
->> >
->> > I must say, I figured that this part was missing in the frontend
->> > path by
->> > chance and couldn't really test the feature, so I'm also tempted to
->> > drop
->> > it altogether. What do you think?
->>
->> If you haven't been able to test it, then yeah, don't submit it.
->
-> Alright, noted.
->
->> > Also, is interlacing actually used on any of the video outputs we
->> > support? Perhaps RGB?
->>
->> Composite would be a better guess :)
->
-> Oh and I was wondering what CVBS was about. Now I know!
-> It seems that we don't support it for now apparently, anyway.
+On Fri, 2018-03-23 at 22:38 +0800, Yixun Lan wrote:
+> The ao_clk81 in AO domain have two clock source,
+> one from a 32K alt crystal we name it as ao_alt_clk,
+> another is the clk81 signal from EE domain.
+> 
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index b3d394f5d95a..48584d5a329b 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -109,6 +109,13 @@
+>  		#clock-cells = <0>;
+>  	};
+>  
+> +	ao_alt_xtal: ao_alt_xtal-clk {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <32000000>;
+> +		clock-output-names = "ao_alt_xtal";
+> +		#clock-cells = <0>;
+> +	};
 
-You could also try adding interlaced modes to HDMI.
+In DT, we seem to be using 'ao' and 'AO' to designate the Always On domain.
+Maybe we should be try be consistent about this.
 
-ChenYu
+Anyway, this patch looks good but does not need to be part of the clkc_ao
+series, it could go in independently.
+
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+
+> +
+>  	soc {
+>  		compatible = "simple-bus";
+>  		#address-cells = <2>;
