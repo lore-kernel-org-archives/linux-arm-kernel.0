@@ -1,81 +1,101 @@
 From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Tue, 27 Mar 2018 08:07:30 -0700
-Subject: [PATCH 1/7] net: thunderx: move filter register related macro into
- proper place
+Date: Tue, 27 Mar 2018 08:07:34 -0700
+Subject: [PATCH 5/7] net: thunderx: add XCAST messages handlers for PF
 In-Reply-To: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180327150736.10718-2-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180327150736.10718-6-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-The ThunderX NIC has set of registers which allows to configure
-filter policy for ingress packets. There are three possible regimes
-of filtering multicasts, broadcasts and unicasts: accept all, reject all
-and accept filter allowed only.
-
-Current implementation has enum with all of them and two generic macro
-for enabling filtering et all (CAM_ACCEPT) and enabling/disabling
-broadcast packets, which also should be corrected in order to represent
-register bits properly. All these values are private for driver and
-there is no need to ?publish? them via header file.
-
-This commit is to move filtering register manipulation values from
-header file into source with explicit assignment of exact register
-values to them to be used while register configuring.
+This commit is to add message handling for ndo_set_rx_mode()
+callback at PF side.
 
 Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 13 +++++++++++++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 11 -----------
- 2 files changed, 13 insertions(+), 11 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c | 45 +++++++++++++++++++++++---
+ 1 file changed, 41 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 91d34ea40e2c..0dd211605eb1 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -24,6 +24,19 @@
- #define DRV_NAME	"thunder_bgx"
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index 7ff66a8194e2..55af04fa03a7 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -21,6 +21,8 @@
+ #define DRV_NAME	"nicpf"
  #define DRV_VERSION	"1.0"
  
-+/* RX_DMAC_CTL configuration */
-+enum MCAST_MODE {
-+		MCAST_MODE_REJECT = 0x0,
-+		MCAST_MODE_ACCEPT = 0x1,
-+		MCAST_MODE_CAM_FILTER = 0x2,
-+		RSVD = 0x3
-+};
++#define NIC_VF_PER_MBX_REG      64
 +
-+#define BCAST_ACCEPT      BIT(0)
-+#define CAM_ACCEPT        BIT(3)
-+#define MCAST_MODE_MASK   0x3
-+#define BGX_MCAST_MODE(x) (x << 1)
+ struct hw_info {
+ 	u8		bgx_cnt;
+ 	u8		chans_per_lmac;
+@@ -1072,6 +1074,40 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 	case NIC_MBOX_MSG_PTP_CFG:
+ 		nic_config_timestamp(nic, vf, &mbx.ptp);
+ 		break;
++	case NIC_MBOX_MSG_RESET_XCAST:
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
++			break;
++		}
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		bgx_reset_xcast_mode(nic->node, bgx, lmac,
++				     vf < NIC_VF_PER_MBX_REG ? vf :
++				     vf - NIC_VF_PER_MBX_REG);
++		break;
 +
- struct lmac {
- 	struct bgx		*bgx;
- 	int			dmac;
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 5a7567d31138..52439da62c97 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -205,17 +205,6 @@
- #define LMAC_INTR_LINK_UP	BIT(0)
- #define LMAC_INTR_LINK_DOWN	BIT(1)
++	case NIC_MBOX_MSG_ADD_MCAST:
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
++			break;
++		}
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		bgx_set_dmac_cam_filter(nic->node, bgx, lmac,
++					mbx.xcast.data.mac,
++					vf < NIC_VF_PER_MBX_REG ? vf :
++					vf - NIC_VF_PER_MBX_REG);
++		break;
++
++	case NIC_MBOX_MSG_SET_XCAST:
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
++			break;
++		}
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		bgx_set_xcast_mode(nic->node, bgx, lmac, mbx.xcast.data.mode);
++		break;
+ 	default:
+ 		dev_err(&nic->pdev->dev,
+ 			"Invalid msg from VF%d, msg 0x%x\n", vf, mbx.msg.msg);
+@@ -1094,7 +1130,7 @@ static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
+ 	struct nicpf *nic = (struct nicpf *)nic_irq;
+ 	int mbx;
+ 	u64 intr;
+-	u8  vf, vf_per_mbx_reg = 64;
++	u8  vf;
  
--/*  RX_DMAC_CTL configuration*/
--enum MCAST_MODE {
--		MCAST_MODE_REJECT,
--		MCAST_MODE_ACCEPT,
--		MCAST_MODE_CAM_FILTER,
--		RSVD
--};
--
--#define BCAST_ACCEPT	1
--#define CAM_ACCEPT	1
--
- void octeon_mdiobus_force_mod_depencency(void);
- void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
- void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
+ 	if (irq == pci_irq_vector(nic->pdev, NIC_PF_INTR_ID_MBOX0))
+ 		mbx = 0;
+@@ -1103,12 +1139,13 @@ static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
+ 
+ 	intr = nic_reg_read(nic, NIC_PF_MAILBOX_INT + (mbx << 3));
+ 	dev_dbg(&nic->pdev->dev, "PF interrupt Mbox%d 0x%llx\n", mbx, intr);
+-	for (vf = 0; vf < vf_per_mbx_reg; vf++) {
++	for (vf = 0; vf < NIC_VF_PER_MBX_REG; vf++) {
+ 		if (intr & (1ULL << vf)) {
+ 			dev_dbg(&nic->pdev->dev, "Intr from VF %d\n",
+-				vf + (mbx * vf_per_mbx_reg));
++				vf + (mbx * NIC_VF_PER_MBX_REG));
+ 
+-			nic_handle_mbx_intr(nic, vf + (mbx * vf_per_mbx_reg));
++			nic_handle_mbx_intr(nic, vf +
++					    (mbx * NIC_VF_PER_MBX_REG));
+ 			nic_clear_mbx_intr(nic, vf, mbx);
+ 		}
+ 	}
 -- 
 2.14.3
