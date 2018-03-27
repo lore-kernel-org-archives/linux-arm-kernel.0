@@ -1,43 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 27 Mar 2018 19:45:53 -0300
-Subject: [PATCH] ARM: dts: imx6ull: add UART5 input select register
- definition
-In-Reply-To: <1522189496-27837-1-git-send-email-gerg@linux-m68k.org>
-References: <1522189496-27837-1-git-send-email-gerg@linux-m68k.org>
-Message-ID: <CAOMZO5CB=JkNqtkSf+QE_rjwNsOutfsS4=nWW0uVZdV63Op+eA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 28 Mar 2018 00:51:02 +0200
+Subject: [RESEND PATCH v2 0/8] Add support for PWM input capture on STM32
+In-Reply-To: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180327225101.GJ28163@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 7:24 PM, Greg Ungerer <gerg@linux-m68k.org> wrote:
-> The iMX6ULL UART5_RX_DATA_SELECT_INPUT DAISY Register has some different
-> bit definitions to that same register in the iMX6UL.
->
-> The bits for the iMX6UL:
->
-> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-> 100 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT
-> 101 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT
->
-> But for the iMX6ULL:
->
-> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-> 100 UART1_TX_DATA_ALT9 ? Selecting Pad: UART1_TX_DATA for Mode: ALT9
-> 101 UART1_RX_DATA_ALT9 ? Selecting Pad: UART1_RX_DATA for Mode: ALT9
-> 110 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT0
-> 111 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT0
->
-> Specifically for a board I am working on with the serial console on UART5
-> I need to be able to enable UART5_RX_DATA_ALT0 mode. There is no definition
-> for the iMX6ULL version of that in imx6ul-pinfunc.h or imx6ull-pinfunc.h.
->
-> Create a new definition specific to the iMX6ULL so that is settable.
->
-> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
+On Wed, Feb 14, 2018 at 11:04:31AM +0100, Fabrice Gasnier wrote:
+> This series adds support for capture to stm32-pwm driver.
+> Capture is based on DMAs.
+> - First two patches are precursor patches
+> - Subsequent two patches add support for requesting DMAs to MFD core
+> - Next three patches add support for capture to stm32-pwm driver
+> - This has been tested on stm32429i-eval board.
+> 
+> ---
+> Resend v2:
+> - Add collected Acks
+> 
+> Changes in v2:
+> - Abstract DMA handling from child driver: move it to MFD core
+> - Rework pwm capture routines to adopt this change
+> - Comment on optional dma support, beautify DMAs probe
+> 
+> Fabrice Gasnier (8):
+>   pwm: stm32: fix, remove unused struct device
+>   pwm: stm32: protect common prescaler for all channels
+>   dt-bindings: mfd: stm32-timers: add support for dmas
+>   mfd: stm32-timers: add support for dmas
+>   pwm: stm32: add capture support
+>   pwm: stm32: improve capture by tuning counter prescaler
+>   pwm: stm32: use input prescaler to improve period capture
+>   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+> 
+>  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
+>  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
+>  drivers/mfd/stm32-timers.c                         | 215 +++++++++++++++-
+>  drivers/pwm/pwm-stm32.c                            | 276 ++++++++++++++++++++-
+>  include/linux/mfd/stm32-timers.h                   |  39 +++
+>  5 files changed, 547 insertions(+), 6 deletions(-)
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+I can't apply patches 1-2 and 5-6 since they depend on patches 3-4 for
+which I'd need an Acked-by: from Lee if I'm to pick them up. Same goes
+for patch 7.
+
+By the looks of it there are minor conflicts with the MFD tree, but no
+major ones. Perhaps it'd be better for Lee to pick up 3-4 for v4.17-rc1
+and ack patch 7, then I can take the rest after v4.17-rc1?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180328/6a00be68/attachment-0001.sig>
