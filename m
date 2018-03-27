@@ -1,31 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 14:52:37 +0200
-Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.17, redo
-In-Reply-To: <7h1sgeqv5i.fsf@baylibre.com>
-References: <7h1sgeqv5i.fsf@baylibre.com>
-Message-ID: <CAK8P3a37TQ4RGi6KKpjpnK=xudyyug5=DpT8fuTfUWtyVfHBQw@mail.gmail.com>
+Date: Tue, 27 Mar 2018 14:53:40 +0200
+Subject: [GIT PULL] ARM: at91: DT for 4.17 #2
+In-Reply-To: <20180321225001.GA27480@piout.net>
+References: <20180321225001.GA27480@piout.net>
+Message-ID: <CAK8P3a1vih1nLSVZsAZabnVNq6icuJ6Qu7pAGVVQG2z3ZW2Uxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 10:44 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+On Wed, Mar 21, 2018 at 11:50 PM, Alexandre Belloni
+<alexandre.belloni@bootlin.com> wrote:
+> Arnd, Olof,
 >
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+> A few DT fixes that came in late in the cycle.
 >
-> are available in the git repository at:
+> The following changes since commit 6fa65edf87886f85a18680ed7bdedc15cb810065:
 >
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt-1
+>   ARM: dts: at91: use 'atmel' as at24 manufacturer for at91sam9263ek (2018-02-13 17:15:18 +0100)
 >
-> for you to fetch changes up to 4e461e62fc987ed5edb82e2a902fd93f4dccae8f:
+> are available in the Git repository at:
 >
->   ARM: dts: meson8b: the CBUS GPIO controller only has 83 GPIOs (2018-03-20 14:32:31 -0700)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.17-dt2
+>
+> for you to fetch changes up to 26f2cacde21b713f7f917d2193a76cc7636ee88e:
+>
+>   ARM: dts: at91sam9260: pullup rx on usart0 (2018-03-21 21:47:00 +0100)
 >
 > ----------------------------------------------------------------
-> Amlogic 32-bit DT updates for v4.17
-> - odroid-c1: add microSD, ethernet, USB reset
-> - add reset controller
-> - fix requesting GPIOs greater than GPIOZ_3
+> AT91 DT for 4.17 #2:
+>
+> Pinctrl fixes, the UART pullups were discussed back in 2016.
+>
 
 Pulled into next/dt, thanks!
 
-      Arnd
+     Arnd
