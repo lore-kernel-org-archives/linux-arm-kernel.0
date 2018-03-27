@@ -1,30 +1,24 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Tue, 27 Mar 2018 08:02:04 +0000 (UTC)
-Subject: [2/4] wireless: Use octal not symbolic permissions
-In-Reply-To: <a368e1c4878619172f3da4849cb211b4dfad0a58.1521845237.git.joe@perches.com>
-References: <a368e1c4878619172f3da4849cb211b4dfad0a58.1521845237.git.joe@perches.com>
-Message-ID: <20180327080205.07AD26030F@smtp.codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 27 Mar 2018 16:01:47 +0800
+Subject: [PATCH v2 1/2] Revert "arm64: dts: fsl: fix ifc simple-bus unit
+ address format warnings"
+In-Reply-To: <1522081243-30871-1-git-send-email-festevam@gmail.com>
+References: <1522081243-30871-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180327080145.GF8857@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joe Perches <joe@perches.com> wrote:
-
-> Prefer the direct use of octal for permissions.
+On Mon, Mar 26, 2018 at 01:20:42PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Done with checkpatch -f --types=SYMBOLIC_PERMS --fix-inplace
-> and some typing.
+> This reverts commit f81d7af7957539b7808961f929f945381530acb9.
 > 
-> Miscellanea:
+> As explained by Rob Herring:
 > 
-> o Whitespace neatening around these conversions.
+> "This "fix" is wrong. Memory controllers with chip selects should have
+> the chip select in the unit-address. The correct fix here is you should
+> drop "simple-bus"."
 > 
-> Signed-off-by: Joe Perches <joe@perches.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Patch applied to wireless-drivers-next.git, thanks.
-
-2ef00c53049b wireless: Use octal not symbolic permissions
-
--- 
-https://patchwork.kernel.org/patch/10305719/
-
-https://wireless.wiki.kernel.org/en/developers/documentation/submittingpatches
+Applied both, thanks.
