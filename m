@@ -1,99 +1,179 @@
 From: palmer@sifive.com (Palmer Dabbelt)
-Date: Tue, 27 Mar 2018 09:19:03 -0700
-Subject: Make set_handle_irq and handle_arch_irq generic, v4
-Message-ID: <20180327161911.14086-1-palmer@sifive.com>
+Date: Tue, 27 Mar 2018 09:19:06 -0700
+Subject: [PATCH v4 3/8] irq: Add CONFIG_GENERIC_IRQ_MULTI_HANDLER
+In-Reply-To: <20180327161911.14086-1-palmer@sifive.com>
+References: <20180327161911.14086-1-palmer@sifive.com>
+Message-ID: <20180327161911.14086-4-palmer@sifive.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is my third version of this patch set, but the original cover
-letter is still the most relevant description I can come up with.
+It looks like the arm irqchip registration mechanism has been copied
+into a handful of ports, including arm64 and openrisc.  I want to use
+this in the RISC-V port, so I thought it would be good to make this
+generic instead.
 
-    This patch set has been sitting around for a while, but it got a bit lost
-    in the shuffle.  In RISC-V land we currently couple do_IRQ (the C entry
-    point for interrupt handling) to our first-level interrupt controller.
-    While this isn't completely crazy (as the first-level interrupt controller
-    is specified by the ISA), it is a bit awkward.
+This patch copies the arm definition of CONFIG_MULTI_IRQ_HANDLER into
+kernel/irq under CONFIG_GENERIC_IRQ_MULTI_HANDLER.  This patch is
+currently all dead code, but it will be enabled in the various other
+architectures in subsequent patches.
 
-    This patch set decouples our trap handler from our first-level IRQ chip
-    driver by copying what a handful of other architectures are doing.  This
-    does add an additional load to the interrupt handling path, but there's a
-    handful of performance problems in there that I've been meaning to look at
-    so I don't mind adding another one for now.  The advantage is that our
-    irqchip driver is decoupled from our arch port, at least at compile time.
+GENERIC_IRQ_MULTI_HANDLER is incompatible with MULTI_IRQ_HANDLER because
+they define the same symbols.  Multiple generic irqchip drivers select
+MULTI_IRQ_HANDLER, which is now defined on all architectures that
+provide set_handle_irq().  This patch selects GENERIC_IRQ_MULTI_HANDLER
+for all drivers that used to select MULTI_IRQ_HANDLER, but only when
+MULTI_IRQ_HANDLER doesn't exist.  I'll then convert every architecture
+over from MULTI_IRQ_HANDLER to GENERIC_IRQ_MULTI_HANDLER before removing
+the extra MULTI_IRQ_HANDLER scaffolding.
 
-Hopefully this time I've managed to produce a properly bisectable patch
-set.  There were two big bugs in the last version:
+CC: Shea Levy <shea@shealevy.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Palmer Dabbelt <palmer@sifive.com>
+---
+ drivers/irqchip/Kconfig |  8 ++++++++
+ include/linux/irq.h     | 18 ++++++++++++++++++
+ kernel/irq/Kconfig      |  6 ++++++
+ kernel/irq/handle.c     | 15 +++++++++++++++
+ 4 files changed, 47 insertions(+)
 
-* I missed the generic irqchip drivers that set MULTI_IRQ_HANDLER.  This
-  caused all sorts of non-defconfig ARM builds to fail.
-* MULTI_IRQ_HANDLER and GENERIC_IRQ_MULTI_HANDLER could both get set by
-  randconfig builds.  This caused the patch set to be non-bisectable.
-
-I've gone through a bit of a song-and-dance to work around these, but I
-think it's sound.  The patch set works as follows (the order is
-important):
-
-* MULTI_IRQ_HANDLER is added to the arm64 and openriscv ports,
-  forced to true.  Nothing in these ports actually looks at
-  CONFIG_MULTI_IRQ_HANDLER (it's forced to true anyway, so there's no
-  point in looking), it's just there to indicate that set_handle_irq()
-  is defined by these ports.
-* Every generic irqchip driver is modified to set
-  GENERIC_IRQ_MULTI_HANDLER, but only if MULTI_IRQ_HANDLER is false.
-  These generic drivers depend on set_handle_irq() so they need one of
-  these symbols to be set, but the two Kconfig symbols are mutually
-  exclusive so I can't just select both (I just found out that select
-  ignores dependencies :)).
-* GENERIC_IRQ_MULTI_HANDLER is added to all ports, with a dependency on
-  !MULTI_IRQ_HANDLER as they define the same symbols.
-* Support for GENERIC_IRQ_MULTI_HANDLER is added to the RISC-V, arm,
-  arm64, and openrisc ports.  This is a pretty mechanical change for
-  the other ports (just changing the #ifdefs), and a simple one for the
-  RISC-V port.
-
-This patch set assumes that the two patches currently on tip are
-dropped, but if that's not OK then I can create another patch set based
-on those two.  Of course, it won't be fully bisectable (arm randconfig
-will still be broken somewhere in the middle).
-
-I built this patch set after patches 3, 7, and 8 on arm, arm64, and
-openrisc defconfigs as well as an arm randconfig that broke my v3 patch
-set.
-
-Sorry for breaking things, hopefully it works this time!
-
-Changes since v3:
-
-* There's now three new patches: #1 and #2 add MULTI_IRQ_HANDLER on
-  arm64 and openrisc so they match ARM, while #8 removes all
-  MULTI_IRQ_HANDLER references.
-* All the generic irqchip drivers have been converted from
-  MULTI_IRQ_HANDLER to GENERIC_IRQ_MULTI_HANDLER.
-* A handful of commit messages have been cleaned up.
-
-Changes since v2:
-
-* This is now called CONFIG_GENERIC_IRQ_MULTI_HANDLER instead of
-  MULTI_IRQ_HANDLER.
-* Rather than converting the ARM code to generic code, this adds new
-  generic code (based on the ARM implementation) and then provides
-  separate patches to convert each architecture over to use
-  CONFIG_GENERIC_IRQ_MULTI_HANDLER.
-
-Changes since v1:
-
-* I based this on arm instead of arm64, which means we guard the selection of
-  these routines with CONFIG_MULTI_IRQ_HANDLER.
-* The changes are in kernel/irq/handle.c and include/linux/irq.h instead of
-  lib.
-* I've converted the arm, arm64, and openrisc ports to use the generic versions
-  of these routines.
-
-[PATCH v4 1/8] arm64: Set CONFIG_MULTI_IRQ_HANDLER
-[PATCH v4 2/8] openrisc: Set CONFIG_MULTI_IRQ_HANDLER
-[PATCH v4 3/8] irq: Add CONFIG_GENERIC_IRQ_MULTI_HANDLER
-[PATCH v4 4/8] RISC-V: Move to the new GENERIC_IRQ_MULTI_HANDLER
-[PATCH v4 5/8] arm: Convert to GENERIC_IRQ_MULTI_HANDLER
-[PATCH v4 6/8] arm64: Use the new GENERIC_IRQ_MULTI_HANDLER
-[PATCH v4 7/8] openrisc: Use the new GENERIC_IRQ_MULTI_HANDLER
-[PATCH v4 8/8] irq: Remove MULTI_IRQ_HANDLER as it's now obselete
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index d913aec85109..5af28ac6ce35 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -9,6 +9,7 @@ config ARM_GIC
+ 	select IRQ_DOMAIN
+ 	select IRQ_DOMAIN_HIERARCHY
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 	select GENERIC_IRQ_EFFECTIVE_AFF_MASK
+ 
+ config ARM_GIC_PM
+@@ -35,6 +36,7 @@ config ARM_GIC_V3
+ 	bool
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 	select IRQ_DOMAIN_HIERARCHY
+ 	select PARTITION_PERCPU
+ 	select GENERIC_IRQ_EFFECTIVE_AFF_MASK
+@@ -61,6 +63,7 @@ config ARM_VIC
+ 	bool
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 
+ config ARM_VIC_NR
+ 	int
+@@ -88,6 +91,7 @@ config ATMEL_AIC_IRQ
+ 	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+ 
+ config ATMEL_AIC5_IRQ
+@@ -95,6 +99,7 @@ config ATMEL_AIC5_IRQ
+ 	select GENERIC_IRQ_CHIP
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+ 
+ config I8259
+@@ -132,6 +137,7 @@ config FARADAY_FTINTC010
+ 	bool
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+ 
+ config HISILICON_IRQ_MBIGEN
+@@ -157,6 +163,7 @@ config CLPS711X_IRQCHIP
+ 	depends on ARCH_CLPS711X
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+ 	default y
+ 
+@@ -176,6 +183,7 @@ config ORION_IRQCHIP
+ 	bool
+ 	select IRQ_DOMAIN
+ 	select MULTI_IRQ_HANDLER
++	select GENERIC_IRQ_MULTI_HANDLER if !MULTI_IRQ_HANDLER
+ 
+ config PIC32_EVIC
+ 	bool
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index a0231e96a578..77e97872a13e 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -1170,4 +1170,22 @@ int __ipi_send_mask(struct irq_desc *desc, const struct cpumask *dest);
+ int ipi_send_single(unsigned int virq, unsigned int cpu);
+ int ipi_send_mask(unsigned int virq, const struct cpumask *dest);
+ 
++#ifdef CONFIG_GENERIC_IRQ_MULTI_HANDLER
++/*
++ * Registers a generic IRQ handling function as the top-level IRQ handler in
++ * the system, which is generally the first C code called from an assembly
++ * architecture-specific interrupt handler.
++ *
++ * Returns 0 on success, or -EBUSY if an IRQ handler has already been
++ * registered.
++ */
++int __init set_handle_irq(void (*handle_irq)(struct pt_regs *));
++
++/*
++ * Allows interrupt handlers to find the irqchip that's been registered as the
++ * top-level IRQ handler.
++ */
++extern void (*handle_arch_irq)(struct pt_regs *) __ro_after_init;
++#endif
++
+ #endif /* _LINUX_IRQ_H */
+diff --git a/kernel/irq/Kconfig b/kernel/irq/Kconfig
+index 6fc87ccda1d7..8596baa8e53d 100644
+--- a/kernel/irq/Kconfig
++++ b/kernel/irq/Kconfig
+@@ -132,3 +132,9 @@ config GENERIC_IRQ_DEBUGFS
+ 	  If you don't know what to do here, say N.
+ 
+ endmenu
++
++config GENERIC_IRQ_MULTI_HANDLER
++	depends on !MULTI_IRQ_HANDLER
++	bool
++	help
++	  Allow each machine to specify it's own IRQ handler at run time.
+diff --git a/kernel/irq/handle.c b/kernel/irq/handle.c
+index 79f987b942b8..3570c715c3e7 100644
+--- a/kernel/irq/handle.c
++++ b/kernel/irq/handle.c
+@@ -20,6 +20,10 @@
+ 
+ #include "internals.h"
+ 
++#ifdef CONFIG_GENERIC_IRQ_MULTI_HANDLER
++void (*handle_arch_irq)(struct pt_regs *) __ro_after_init;
++#endif
++
+ /**
+  * handle_bad_irq - handle spurious and unhandled irqs
+  * @desc:      description of the interrupt
+@@ -207,3 +211,14 @@ irqreturn_t handle_irq_event(struct irq_desc *desc)
+ 	irqd_clear(&desc->irq_data, IRQD_IRQ_INPROGRESS);
+ 	return ret;
+ }
++
++#ifdef CONFIG_GENERIC_IRQ_MULTI_HANDLER
++int __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
++{
++	if (handle_arch_irq)
++		return -EBUSY;
++
++	handle_arch_irq = handle_irq;
++	return 0;
++}
++#endif
+-- 
+2.16.1
