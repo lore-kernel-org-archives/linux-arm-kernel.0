@@ -1,44 +1,52 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 27 Mar 2018 19:25:10 +0200
-Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <5AAFC939.3010309@arm.com>
-References: <20180215185606.26736-1-james.morse@arm.com>
- <20180215185606.26736-3-james.morse@arm.com>
- <20180301150144.GA4215@pd.tnic>
- <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
- <20180301223529.GA28811@pd.tnic> <5AA02C26.10803@arm.com>
- <20180308104408.GB21166@pd.tnic> <5AAFC939.3010309@arm.com>
-Message-ID: <20180327172510.GB32184@pd.tnic>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Mar 2018 18:28:15 +0100
+Subject: [PATCH v2 21/21] arm64: move GCC version check for
+ ARCH_SUPPORTS_INT128 to Kconfig
+In-Reply-To: <1522128575-5326-22-git-send-email-yamada.masahiro@socionext.com>
+References: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
+ <1522128575-5326-22-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20180327172815.GH18435@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Tue, Mar 27, 2018 at 02:29:35PM +0900, Masahiro Yamada wrote:
+> This becomes much neater in Kconfig.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+> Changes in v2:
+>   - Newly added
+> 
+>  arch/arm64/Kconfig  | 1 +
+>  arch/arm64/Makefile | 2 --
+>  2 files changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7381eeb..0c97f40 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -43,6 +43,7 @@ config ARM64
+>  	select ARCH_USE_QUEUED_RWLOCKS
+>  	select ARCH_SUPPORTS_MEMORY_FAILURE
+>  	select ARCH_SUPPORTS_ATOMIC_RMW
+> +	select ARCH_SUPPORTS_INT128 if GCC_VERSION >= 50000
+>  	select ARCH_SUPPORTS_NUMA_BALANCING
+>  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+>  	select ARCH_WANT_FRAME_POINTERS
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index b481b4a..7318165 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -57,8 +57,6 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+>  KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+>  KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+>  
+> -KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
+> -
 
-On Mon, Mar 19, 2018 at 02:29:13PM +0000, James Morse wrote:
-> I don't think the die_lock really helps here, do we really want to wait for a
-> remote CPU to finish printing an OOPs about user-space's bad memory accesses,
-> before we bring the machine down due to this system-wide fatal RAS error? The
-> presence of firmware-first means we know this error, and any other oops are
-> unrelated.
+If this does what it claims to do, then I agree that it's much cleaner!
 
-Hmm, now that you put it this way...
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> I'd like to leave this under the x86-ifdef for now. For arm64 it would be an
-> APEI specific arch hook to stop the arch code from printing some messages,
-
-... I'm thinking we should ignore the whole serializing of oopses and
-really dump that hw error ASAP. If it really is a fatal error, our main
-and only goal is to get it out as fast as possible so that it has the
-highest chance to appear on some screen or logging facility and thus the
-system can be serviced successfully.
-
-And the other oopses have lower prio.
-
-Hmmm?
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Will
