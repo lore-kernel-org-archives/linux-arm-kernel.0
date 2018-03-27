@@ -1,55 +1,34 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Mar 2018 12:31:39 -0400
-Subject: [net-next PATCH v2 00/10] Add support for netcp driver on K2G SoC
-Message-ID: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+Date: Tue, 27 Mar 2018 12:31:46 -0400
+Subject: [net-next PATCH v2 07/10] net: netcp: ethss: re-use stats handling
+ code for 2u hardware
+In-Reply-To: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1522168309-12338-8-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-K2G SoC is another variant of Keystone family of SoCs. This patch
-series add support for NetCP driver on this SoC. The QMSS found on
-K2G SoC is a cut down version of the QMSS found on other keystone
-devices with less number of queues, internal link ram etc. The patch
-series has 2 patch sets that goes into the drivers/soc and the
-rest has to be applied to net sub system. Please review and merge
-if this looks good.
+The stats block in 2u cpsw hardware is similar to the one on nu
+and hence handle it in a similar way by using a macro that includes
+2u hardware as well.
 
-Thanks
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ drivers/net/ethernet/ti/netcp_ethss.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The boot logs on K2G ICE board (tftp boot over Ethernet)
-is at https://pastebin.ubuntu.com/p/VQTv3c2XBS/
-
-The boot logs on K2G GP board (tftp boot over Ethernet)
-is at https://pastebin.ubuntu.com/p/6Vh55DW8vT/
-
-This series applies to net-next master branch.
-
-Change history:
-  v2 - Addressed following comments on initial version
-       - split patch 3/5 to multiple patches from Andrew Lunn
-
-Murali Karicheri (10):
-  soc: ti: K2G: enhancement to support QMSS in NSS
-  soc: ti: K2G: provide APIs to support driver probe deferral
-  net: netcp: ethss: make call to gbe_sgmii_config() conditional
-  net: netcp: ethss: add support for handling sgmii link interface
-  net: netcp: ethss: use rgmii link status for 2u cpsw hardware
-  net: netcp: ethss: map vlan priorities to zero flow
-  net: netcp: ethss: re-use stats handling code for 2u hardware
-  net: netcp: ethss: use of_get_phy_mode() to support different RGMII
-    modes
-  Revert "net: netcp: remove dead code from the driver"
-  net: netcp: support probe deferral
-
- .../bindings/soc/ti/keystone-navigator-qmss.txt    |  7 ++
- drivers/net/ethernet/ti/netcp.h                    |  2 +
- drivers/net/ethernet/ti/netcp_core.c               | 13 +++
- drivers/net/ethernet/ti/netcp_ethss.c              | 75 ++++++++++++++---
- drivers/soc/ti/knav_dma.c                          |  8 ++
- drivers/soc/ti/knav_qmss.h                         |  6 ++
- drivers/soc/ti/knav_qmss_queue.c                   | 98 +++++++++++++++++-----
- include/linux/soc/ti/knav_dma.h                    | 12 +++
- include/linux/soc/ti/knav_qmss.h                   |  1 +
- 9 files changed, 189 insertions(+), 33 deletions(-)
-
+diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+index 828243d..26ccddb 100644
+--- a/drivers/net/ethernet/ti/netcp_ethss.c
++++ b/drivers/net/ethernet/ti/netcp_ethss.c
+@@ -3394,7 +3394,7 @@ static int set_gbenu_ethss_priv(struct gbe_priv *gbe_dev,
+ 	gbe_dev->num_stats_mods = gbe_dev->max_num_ports;
+ 	gbe_dev->et_stats = gbenu_et_stats;
+ 
+-	if (IS_SS_ID_NU(gbe_dev))
++	if (IS_SS_ID_MU(gbe_dev))
+ 		gbe_dev->num_et_stats = GBENU_ET_STATS_HOST_SIZE +
+ 			(gbe_dev->max_num_slaves * GBENU_ET_STATS_PORT_SIZE);
+ 	else
 -- 
 1.9.1
