@@ -1,18 +1,215 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 27 Mar 2018 10:40:44 +0200
-Subject: [PATCH v2 1/7] clk: meson: drop meson_aoclk_gate_regmap_ops
-In-Reply-To: <20180323143816.200573-2-yixun.lan@amlogic.com>
-References: <20180323143816.200573-1-yixun.lan@amlogic.com>
- <20180323143816.200573-2-yixun.lan@amlogic.com>
-Message-ID: <1522140044.2632.19.camel@baylibre.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Tue, 27 Mar 2018 10:41:38 +0200
+Subject: [PATCH 09/10] drm/sun4i: Add a dedicated ioctl call for
+ allocating tiled buffers
+In-Reply-To: <20180323104856.qo7w376xr3gcznmm@flea>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-10-paul.kocialkowski@bootlin.com>
+ <20180323104856.qo7w376xr3gcznmm@flea>
+Message-ID: <1522140098.1110.40.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-03-23 at 22:38 +0800, Yixun Lan wrote:
-> let's remove the unused meson_aoclk_gate_regmap_ops
+On Fri, 2018-03-23 at 11:48 +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Fixes: 1f932d99710d ("clk: meson: remove superseded aoclk_gate_regmap")
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
+> On Wed, Mar 21, 2018 at 04:29:03PM +0100, Paul Kocialkowski wrote:
+> > This introduces a dedicated ioctl for allocating tiled buffers in
+> > the
+> > Allwinner MB32 format, that comes with a handful of specific
+> > constraints. In particular, the stride of the buffers is expected to
+> > be
+> > aligned to 32 bytes.
+> 
+> You should have more details here. What are those constraints, what is
+> the expected user? Can you use it only for the scanout, like the dumb
+> buffers, or also for the other devices in the system?
 
-Applied, Thx
+Agreed.
+
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_drv.c | 96
+> > +++++++++++++++++++++++++++++++++++++++
+> >  drivers/gpu/drm/sun4i/sun4i_drv.h |  2 +
+> >  include/uapi/drm/sun4i_drm.h      | 42 +++++++++++++++++
+> >  3 files changed, 140 insertions(+)
+> >  create mode 100644 include/uapi/drm/sun4i_drm.h
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > index d374bb61c565..e9cb03d34b44 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > @@ -21,11 +21,18 @@
+> >  #include <drm/drm_gem_cma_helper.h>
+> >  #include <drm/drm_fb_helper.h>
+> >  #include <drm/drm_of.h>
+> > +#include <drm/sun4i_drm.h>
+> >  
+> >  #include "sun4i_drv.h"
+> >  #include "sun4i_frontend.h"
+> >  #include "sun4i_framebuffer.h"
+> >  #include "sun4i_tcon.h"
+> > +#include "sun4i_format.h"
+> > +
+> > +static const struct drm_ioctl_desc sun4i_drv_ioctls[] = {
+> > +	DRM_IOCTL_DEF_DRV(SUN4I_GEM_CREATE_TILED,
+> > drm_sun4i_gem_create_tiled,
+> > +			  DRM_AUTH | DRM_RENDER_ALLOW),
+> 
+> Why do you need DRM_RENDER_ALLOW? as far as I know, this is only
+> useful for render-nodes.
+
+It's probably undeeded indeed.
+
+> > +};
+> >  
+> >  DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
+> >  
+> > @@ -34,6 +41,8 @@ static struct drm_driver sun4i_drv_driver = {
+> >  
+> >  	/* Generic Operations */
+> >  	.lastclose		= drm_fb_helper_lastclose,
+> > +	.ioctls			= sun4i_drv_ioctls,
+> > +	.num_ioctls		= ARRAY_SIZE(sun4i_drv_ioctls),
+> >  	.fops			= &sun4i_drv_fops,
+> >  	.name			= "sun4i-drm",
+> >  	.desc			= "Allwinner sun4i Display
+> > Engine",
+> > @@ -69,6 +78,93 @@ int drm_sun4i_gem_dumb_create(struct drm_file
+> > *file_priv,
+> >  	return drm_gem_cma_dumb_create_internal(file_priv, drm,
+> > args);
+> >  }
+> >  
+> > +int drm_sun4i_gem_create_tiled(struct drm_device *drm, void *data,
+> > +			       struct drm_file *file_priv)
+> > +{
+> > +	struct drm_sun4i_gem_create_tiled *args = data;
+> > +	struct drm_gem_cma_object *cma_obj;
+> > +	struct drm_gem_object *gem_obj;
+> > +	uint32_t luma_stride, chroma_stride;
+> > +	uint32_t luma_height, chroma_height;
+> > +	int ret;
+> > +
+> > +	if (!sun4i_format_supports_tiling(args->format))
+> > +		return -EINVAL;
+> > +
+> > +	memset(args->pitches, 0, sizeof(args->pitches));
+> > +	memset(args->offsets, 0, sizeof(args->offsets));
+> > +
+> > +	/* Stride and height are aligned to 32 bytes for MB32 tiled
+> > format. */
+> > +	luma_stride = ALIGN(args->width, 32);
+> > +	luma_height = ALIGN(args->height, 32);
+> > +
+> > +	if (sun4i_format_is_semiplanar(args->format)) {
+> > +		chroma_stride = luma_stride;
+> > +
+> > +		if (sun4i_format_is_yuv420(args->format))
+> > +			chroma_height = ALIGN(DIV_ROUND_UP(args-
+> > >height, 2), 32);
+> > +		else if (sun4i_format_is_yuv422(args->format))
+> > +			chroma_height = luma_height;
+> > +		else
+> > +			return -EINVAL;
+> > +
+> > +		args->pitches[0] = luma_stride;
+> > +		args->pitches[1] = chroma_stride;
+> > +
+> > +		args->offsets[0] = 0;
+> > +		args->offsets[1] = luma_stride * luma_height;
+> > +
+> > +		args->size = luma_stride * luma_height +
+> > +			     chroma_stride * chroma_height;
+> > +	} else if (sun4i_format_is_planar(args->format)) {
+> > +		if (sun4i_format_is_yuv411(args->format)) {
+> > +			chroma_stride = ALIGN(DIV_ROUND_UP(args-
+> > >width, 4), 32);
+> > +			chroma_height = luma_height;
+> > +		} if (sun4i_format_is_yuv420(args->format)) {
+> > +			chroma_stride = ALIGN(DIV_ROUND_UP(args-
+> > >width, 2), 32);
+> > +			chroma_height = ALIGN(DIV_ROUND_UP(args-
+> > >height, 2), 32);
+> > +		} else if (sun4i_format_is_yuv422(args->format)) {
+> > +			chroma_stride = ALIGN(DIV_ROUND_UP(args-
+> > >width, 2), 32);
+> > +			chroma_height = luma_height;
+> > +		} else {
+> > +			return -EINVAL;
+> > +		}
+> > +
+> > +		args->pitches[0] = luma_stride;
+> > +		args->pitches[1] = chroma_stride;
+> > +		args->pitches[2] = chroma_stride;
+> > +
+> > +		args->offsets[0] = 0;
+> > +		args->offsets[1] = luma_stride * luma_height;
+> > +		args->offsets[2] = luma_stride * luma_height +
+> > +				   chroma_stride * chroma_height;
+> > +
+> > +		args->size = luma_stride * luma_height +
+> > +			     chroma_stride * chroma_height * 2;
+> > +	} else {
+> > +		/* No support for packed formats in tiled mode. */
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	cma_obj = drm_gem_cma_create(drm, args->size);
+> > +	if (IS_ERR(cma_obj))
+> > +		return PTR_ERR(cma_obj);
+> > +
+> > +	gem_obj = &cma_obj->base;
+> > +
+> > +	/*
+> > +	 * allocate a id of idr table where the obj is registered
+> > +	 * and handle has the id what user can see.
+> > +	 */
+> > +	ret = drm_gem_handle_create(file_priv, gem_obj, &args-
+> > >handle);
+> > +	/* drop reference from allocate - handle holds it now. */
+> > +	drm_gem_object_put_unlocked(gem_obj);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	return PTR_ERR_OR_ZERO(cma_obj);
+> > +}
+> > +
+> >  static void sun4i_remove_framebuffers(void)
+> >  {
+> >  	struct apertures_struct *ap;
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h
+> > b/drivers/gpu/drm/sun4i/sun4i_drv.h
+> > index 47969711a889..308ff4bfcdd5 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_drv.h
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+> > @@ -26,5 +26,7 @@ struct sun4i_drv {
+> >  int drm_sun4i_gem_dumb_create(struct drm_file *file_priv,
+> >  			      struct drm_device *drm,
+> >  			      struct drm_mode_create_dumb *args);
+> > +int drm_sun4i_gem_create_tiled(struct drm_device *dev, void *data,
+> > +			       struct drm_file *file_priv);
+> 
+> Do you need it to be non-static, and part of the header as well?
+
+Here as well, I just find that it looks more readable that way, below
+the drm driver structure definition instead of above it.
+
+> I'll let the DRM-misc maintainers comment on the validity of the new
+> ioctl.
+
+Cheers,
+
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/5e5fd6e6/attachment.sig>
