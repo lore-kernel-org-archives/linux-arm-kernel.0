@@ -1,49 +1,34 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 27 Mar 2018 11:20:27 +0200
-Subject: [PATCH v3 4/8] remoteproc/davinci: add the missing retval check for
- clk_enable()
+Date: Tue, 27 Mar 2018 11:20:29 +0200
+Subject: [PATCH v3 6/8] remoteproc/davinci: use octal permissions for
+ module_param()
 In-Reply-To: <20180327092031.11251-1-brgl@bgdev.pl>
 References: <20180327092031.11251-1-brgl@bgdev.pl>
-Message-ID: <20180327092031.11251-5-brgl@bgdev.pl>
+Message-ID: <20180327092031.11251-7-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-The davinci platform is being switched to using the common clock
-framework, where clk_enable() can fail. Add the return value check.
+Checkpatch recommends to use octal perms instead of S_IRUGO.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/remoteproc/da8xx_remoteproc.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/remoteproc/da8xx_remoteproc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-index bf3b9034c319..2b24291337b7 100644
+index f134192922e0..b668e32996e2 100644
 --- a/drivers/remoteproc/da8xx_remoteproc.c
 +++ b/drivers/remoteproc/da8xx_remoteproc.c
-@@ -138,6 +138,7 @@ static int da8xx_rproc_start(struct rproc *rproc)
- 	struct device *dev = rproc->dev.parent;
- 	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
- 	struct clk *dsp_clk = drproc->dsp_clk;
-+	int ret;
+@@ -25,7 +25,7 @@
+ #include "remoteproc_internal.h"
  
- 	/* hw requires the start (boot) address be on 1KB boundary */
- 	if (rproc->bootaddr & 0x3ff) {
-@@ -148,7 +149,12 @@ static int da8xx_rproc_start(struct rproc *rproc)
+ static char *da8xx_fw_name;
+-module_param(da8xx_fw_name, charp, S_IRUGO);
++module_param(da8xx_fw_name, charp, 0444);
+ MODULE_PARM_DESC(da8xx_fw_name,
+ 		 "Name of DSP firmware file in /lib/firmware (if not specified defaults to 'rproc-dsp-fw')");
  
- 	writel(rproc->bootaddr, drproc->bootreg);
- 
--	clk_enable(dsp_clk);
-+	ret = clk_enable(dsp_clk);
-+	if (ret) {
-+		dev_err(dev, "clk_enable() failed: %d\n", ret);
-+		return ret;
-+	}
-+
- 	davinci_clk_reset_deassert(dsp_clk);
- 
- 	return 0;
 -- 
 2.16.1
