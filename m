@@ -1,37 +1,43 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 27 Mar 2018 11:21:49 +0200
-Subject: [PATCH 0/3] clk: meson: drop unnecessary AO clock flags
-In-Reply-To: <20180326081809.49493-1-yixun.lan@amlogic.com>
-References: <20180326081809.49493-1-yixun.lan@amlogic.com>
-Message-ID: <1522142509.2632.42.camel@baylibre.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Tue, 27 Mar 2018 11:21:19 +0200
+Subject: [PATCH 02/10] drm/sun4i: Disable YUV channel when using the
+ frontend and set interlace
+In-Reply-To: <20180327091823.sbmvvo4jsh3x7p4i@flea>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-3-paul.kocialkowski@bootlin.com>
+ <20180323095529.5nptn5achjt3esog@flea>
+ <1522137643.1110.4.camel@bootlin.com>
+ <20180327081731.he3lhnvqffuimsi5@flea>
+ <1522140259.1110.43.camel@bootlin.com>
+ <20180327091823.sbmvvo4jsh3x7p4i@flea>
+Message-ID: <1522142479.1110.45.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-03-26 at 16:18 +0800, Yixun Lan wrote:
->   This first two patches will drop unnecessary flags for
-> the AO clock driver.
->   The third DTS patch is a follow-up fix for the second patch,
-> and I've tested them on P200, P212, Q200, S400 boards.
+On Tue, 2018-03-27 at 11:18 +0200, Maxime Ripard wrote:
+> On Tue, Mar 27, 2018 at 10:44:19AM +0200, Paul Kocialkowski wrote:
+> > > > Also, is interlacing actually used on any of the video outputs
+> > > > we
+> > > > support? Perhaps RGB?
+> > > 
+> > > Composite would be a better guess :)
+> > 
+> > Oh and I was wondering what CVBS was about. Now I know!
+> > It seems that we don't support it for now apparently, anyway.
 > 
->  Note: this patch series was made on top of patch [0]
-> 
-> [0] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
-> 
-> Yixun Lan (3):
->   clk: meson: drop CLK_SET_RATE_PARENT flag
->   clk: meson: drop CLK_IGNORE_UNUSED flag
->   ARM64: dts: meson: fix clock source of the pclk for UART_AO
+> What do you mean? We do support it.
 
-Please add patch 1 and 2 to the next version of your clkc_ao series
+Sorry, I think I was remembering the status for A10/A20 only. Glad to
+see that it works on A13!
 
-Patch 3 should sent independently to Kevin, with note warning about the
-different dependencies (see comment in patch 3)
-
-> 
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi  | 4 ++--
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
->  drivers/clk/meson/axg-aoclk.c               | 1 -
->  drivers/clk/meson/gxbb-aoclk.c              | 1 -
->  5 files changed, 6 insertions(+), 8 deletions(-)
-> 
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/16749523/attachment.sig>
