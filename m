@@ -1,40 +1,22 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 27 Mar 2018 22:09:14 +0200
+From: richard.weinberger@gmail.com (Richard Weinberger)
+Date: Tue, 27 Mar 2018 22:18:51 +0200
 Subject: [PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
-In-Reply-To: <alpine.DEB.2.21.1802121206440.1158@nanos.tec.linutronix.de>
+In-Reply-To: <20180212105642.8662-2-lionel.debieve@st.com>
 References: <20180212105642.8662-1-lionel.debieve@st.com>
  <20180212105642.8662-2-lionel.debieve@st.com>
- <alpine.DEB.2.21.1802121206440.1158@nanos.tec.linutronix.de>
-Message-ID: <CA+M3ks4RMeicX_AAPVwPgULTEg3nbHrm9bkj7ev3XX1No2OQvQ@mail.gmail.com>
+Message-ID: <CAFLxGvxcWLxHyTzgbGssqOEUp2=TU07mLk1-XHavL4HU8N7caQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-02-12 12:08 GMT+01:00 Thomas Gleixner <tglx@linutronix.de>:
-> On Mon, 12 Feb 2018, Lionel Debieve wrote:
->
->> Update license template using SPDX. Move the global layout
->> of UBI headers to dual license helping UBI to be the standard
->> solution for raw NAND management.
+On Mon, Feb 12, 2018 at 11:56 AM, Lionel Debieve <lionel.debieve@st.com> wrote:
+> Update license template using SPDX. Move the global layout
+> of UBI headers to dual license helping UBI to be the standard
+> solution for raw NAND management.
 
-Hi Frank,
+So the goal is re-implementing UBI under a non-GPL license?
 
-May I ask you your point of view on this license evolution ?
+If we get a clear ack from all major UBI copyright holders, fine by me.
 
-Regards,
-Benjamin
-
->
-> No objections from my side, but you really need to poke IBM about that. And
-> if that happens then the kernel header. where this is copied from needs to
-> be updated as well....
->
-> Thanks,
->
->         tglx
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Thanks,
+//richard
