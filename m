@@ -1,55 +1,47 @@
-From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Wed, 28 Mar 2018 08:24:56 +1000
-Subject: [PATCH] ARM: dts: imx6ull: add UART5 input select register definition
-Message-ID: <1522189496-27837-1-git-send-email-gerg@linux-m68k.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 28 Mar 2018 00:30:48 +0200
+Subject: [PATCH v3] pwm: mediatek: fix up PWM4 and PWM5 malfunction on
+ MT7623
+In-Reply-To: <1520030090.8089.186.camel@mtkswgap22>
+References: <051f401bcca48ece188023ccf10b2cedc7a25a64.1519891948.git.sean.wang@mediatek.com>
+ <20180302105719.GC27178@ulmo>
+ <1520030090.8089.186.camel@mtkswgap22>
+Message-ID: <20180327223047.GG28163@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iMX6ULL UART5_RX_DATA_SELECT_INPUT DAISY Register has some different
-bit definitions to that same register in the iMX6UL.
+On Sat, Mar 03, 2018 at 06:34:50AM +0800, Sean Wang wrote:
+> On Fri, 2018-03-02 at 11:57 +0100, Thierry Reding wrote:
+> > On Thu, Mar 01, 2018 at 04:19:12PM +0800, sean.wang at mediatek.com wrote:
+> > > From: Sean Wang <sean.wang@mediatek.com>
+> > > 
+> > > Since the offset for both registers, PWMDWIDTH and PWMTHRES, used to
+> > > control PWM4 or PWM5 are distinct from the other PWMs, whose wrong
+> > > programming on PWM hardware causes waveform cannot be output as expected.
+> > > Thus, the patch adds the extra condition for fixing up the weird case to
+> > > let PWM4 or PWM5 able to work on MT7623.
+> > > 
+> > > v1 -> v2: use pwm45_fixup naming instead of pwm45_quirk
+> > > v2 -> v3: add more tags for Reviewed-by, Fixes, and Cc stable
+> > > 
+> > > Cc: stable at vger.kernel.org
+> > > Fixes: caf065f8fd58 ("pwm: Add MediaTek PWM support")
+> > > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > > Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> > > Cc: Zhi Mao <zhi.mao@mediatek.com>
+> > > Cc: John Crispin <john@phrozen.org>
+> > > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > > ---
+> > >  drivers/pwm/pwm-mediatek.c | 24 +++++++++++++++++++++---
+> > >  1 file changed, 21 insertions(+), 3 deletions(-)
 
-The bits for the iMX6UL:
+Applied, thanks.
 
-000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-100 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT
-101 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT
-
-But for the iMX6ULL:
-
-000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-100 UART1_TX_DATA_ALT9 ? Selecting Pad: UART1_TX_DATA for Mode: ALT9
-101 UART1_RX_DATA_ALT9 ? Selecting Pad: UART1_RX_DATA for Mode: ALT9
-110 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT0
-111 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT0
-
-Specifically for a board I am working on with the serial console on UART5
-I need to be able to enable UART5_RX_DATA_ALT0 mode. There is no definition
-for the iMX6ULL version of that in imx6ul-pinfunc.h or imx6ull-pinfunc.h.
-
-Create a new definition specific to the iMX6ULL so that is settable.
-
-Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
----
- arch/arm/boot/dts/imx6ull-pinfunc.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
-index 1182023..19100b5 100644
---- a/arch/arm/boot/dts/imx6ull-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
-@@ -14,6 +14,7 @@
-  * The pin function ID is a tuple of
-  * <mux_reg conf_reg input_reg mux_mode input_val>
-  */
-+#define MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
- #define MX6ULL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
- #define MX6ULL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
- #define MX6ULL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
--- 
-1.9.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180328/13ef4738/attachment.sig>
