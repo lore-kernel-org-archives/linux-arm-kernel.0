@@ -1,50 +1,50 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Mar 2018 18:57:36 +0200
-Subject: [RFC PATCH v2 0/6] arm64: untag user pointers passed to the kernel
-Message-ID: <cover.1522169685.git.andreyknvl@google.com>
+Date: Tue, 27 Mar 2018 18:57:41 +0200
+Subject: [RFC PATCH v2 5/6] lib,
+ arm64: untag addrs passed to strncpy_from_user and strnlen_user
+In-Reply-To: <cover.1522169685.git.andreyknvl@google.com>
+References: <cover.1522169685.git.andreyknvl@google.com>
+Message-ID: <1a761b77620457f3bb57d327343765068cd652eb.1522169685.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+strncpy_from_user and strnlen_user accept user addresses as arguments, and
+do not go through the same path as copy_from_user and others, so here we
+need to separately handle the case of tagged user addresses as well.
 
-arm64 has a feature called Top Byte Ignore, which allows to embed pointer
-tags into the top byte of each pointer. Userspace programs (such as
-HWASan, a memory debugging tool [1]) might use this feature and pass
-tagged user pointers to the kernel through syscalls or other interfaces.
+Untag user pointers passed to these functions.
 
-This patch makes a few of the kernel interfaces accept tagged user
-pointers. The kernel is already able to handle user faults with tagged
-pointers and has the untagged_addr macro, which this patchset reuses.
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ lib/strncpy_from_user.c | 2 ++
+ lib/strnlen_user.c      | 2 ++
+ 2 files changed, 4 insertions(+)
 
-We're not trying to cover all possible ways the kernel accepts user
-pointers in one patchset, so this one should be considered as a start.
-
-Thanks!
-
-[1] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
-
-Changes in RFC v2:
-- Added "#ifndef untagged_addr..." fallback in linux/uaccess.h instead of
-  defining it for each arch individually.
-- Updated Documentation/arm64/tagged-pointers.txt.
-- Dropped ?mm, arm64: untag user addresses in memory syscalls?.
-- Rebased onto 3eb2ce82 (4.16-rc7).
-
-Andrey Konovalov (6):
-  arm64: add type casts to untagged_addr macro
-  uaccess: add untagged_addr definition for other arches
-  arm64: untag user addresses in copy_from_user and others
-  mm, arm64: untag user addresses in mm/gup.c
-  lib, arm64: untag addrs passed to strncpy_from_user and strnlen_user
-  arm64: update Documentation/arm64/tagged-pointers.txt
-
- Documentation/arm64/tagged-pointers.txt |  5 +++--
- arch/arm64/include/asm/uaccess.h        |  9 +++++++--
- include/linux/uaccess.h                 |  4 ++++
- lib/strncpy_from_user.c                 |  2 ++
- lib/strnlen_user.c                      |  2 ++
- mm/gup.c                                | 12 ++++++++++++
- 6 files changed, 30 insertions(+), 4 deletions(-)
-
+diff --git a/lib/strncpy_from_user.c b/lib/strncpy_from_user.c
+index b53e1b5d80f4..97467cd2bc59 100644
+--- a/lib/strncpy_from_user.c
++++ b/lib/strncpy_from_user.c
+@@ -106,6 +106,8 @@ long strncpy_from_user(char *dst, const char __user *src, long count)
+ 	if (unlikely(count <= 0))
+ 		return 0;
+ 
++	src = untagged_addr(src);
++
+ 	max_addr = user_addr_max();
+ 	src_addr = (unsigned long)src;
+ 	if (likely(src_addr < max_addr)) {
+diff --git a/lib/strnlen_user.c b/lib/strnlen_user.c
+index 60d0bbda8f5e..8b5f56466e00 100644
+--- a/lib/strnlen_user.c
++++ b/lib/strnlen_user.c
+@@ -108,6 +108,8 @@ long strnlen_user(const char __user *str, long count)
+ 	if (unlikely(count <= 0))
+ 		return 0;
+ 
++	str = untagged_addr(str);
++
+ 	max_addr = user_addr_max();
+ 	src_addr = (unsigned long)str;
+ 	if (likely(src_addr < max_addr)) {
 -- 
 2.17.0.rc0.231.g781580f067-goog
