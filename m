@@ -1,52 +1,43 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 27 Mar 2018 09:14:56 -0500
-Subject: [GIT PULL 2/2] arm64: stratix10: defconfig update for v4.17
-In-Reply-To: <CAK8P3a0TTKEsmMavojQQcFG4-Y3EiDNtavLV2QdyHjNXHTE2Lw@mail.gmail.com>
-References: <1521834884-23795-1-git-send-email-dinguyen@kernel.org>
- <1521834884-23795-2-git-send-email-dinguyen@kernel.org>
- <CAK8P3a0TTKEsmMavojQQcFG4-Y3EiDNtavLV2QdyHjNXHTE2Lw@mail.gmail.com>
-Message-ID: <c2860375-961a-65c4-ff23-6a2c4485699b@kernel.org>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Tue, 27 Mar 2018 17:15:59 +0300
+Subject: [PATCH] clk: imx7d: Correct dram pll type
+Message-ID: <1522160159-25250-1-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Anson Huang <b20788@freescale.com>
 
+DRAM PLL is a audio/video type PLL, need to correct
+it to get correct ops of PLL.
 
-On 03/27/2018 08:31 AM, Arnd Bergmann wrote:
-> On Fri, Mar 23, 2018 at 8:54 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
-> 
->> ----------------------------------------------------------------
->> ARM64: stratix10: defconfig updates for 4.17
->> -enables STMMAC_ETH controller that is present on Stratix10
-> 
-> I got a conflict against an earlier patch that enabled CONFIG_STMMAC_ETH=m
-> and kept that version, as I see no need to have it built-in, see below for the
-> merge conflict resolution.
-> 
->      Arnd
-> 
-> diff --cc arch/arm64/configs/defconfig
-> index 1d3b40615efb,a3ea32e4312f..5e4ff17a3ad8
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@@ -220,8 -209,12 +220,13 @@@ CONFIG_QCOM_EMAC=
->   CONFIG_RAVB=y
->   CONFIG_SMC91X=y
->   CONFIG_SMSC911X=y
->  -CONFIG_STMMAC_ETH=y
->  +CONFIG_SNI_NETSEC=y
->  +CONFIG_STMMAC_ETH=m
-> + CONFIG_DWMAC_IPQ806X=m
-> + CONFIG_DWMAC_MESON=m
-> + CONFIG_DWMAC_ROCKCHIP=m
-> + CONFIG_DWMAC_SUNXI=m
-> + CONFIG_DWMAC_SUN8I=m
->   CONFIG_MDIO_BUS_MUX_MMIOREG=y
->   CONFIG_AT803X_PHY=m
->   CONFIG_MARVELL_PHY=m
-> 
+There is a test_div placed before DRAM PLL's gate, so
+add this test div clk.
 
-The Stratix10 SoC needs to use the stmmac ethernet driver if it the user
-wants to mount a filesystem over NFS. Is there a way to load the
-ethernet module during boot-up before trying to mount into a RFS?
+Signed-off-by: Anson Huang <b20788@freescale.com>
+Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
+Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+---
+ drivers/clk/imx/clk-imx7d.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Dinh
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 89bfa75..45c83b6 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -441,11 +441,13 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
+ 
+ 	clks[IMX7D_PLL_ARM_MAIN_CLK] = imx_clk_gate("pll_arm_main_clk", "pll_arm_main_bypass", base + 0x60, 13);
+-	clks[IMX7D_PLL_DRAM_MAIN_CLK] = imx_clk_gate("pll_dram_main_clk", "pll_dram_main_bypass", base + 0x70, 13);
++	clks[IMX7D_PLL_DRAM_MAIN_CLK] = imx_clk_gate("pll_dram_main_clk", "pll_dram_test_div", base + 0x70, 13);
+ 	clks[IMX7D_PLL_SYS_MAIN_CLK] = imx_clk_gate("pll_sys_main_clk", "pll_sys_main_bypass", base + 0xb0, 13);
+ 	clks[IMX7D_PLL_AUDIO_MAIN_CLK] = imx_clk_gate("pll_audio_main_clk", "pll_audio_main_bypass", base + 0xf0, 13);
+ 	clks[IMX7D_PLL_VIDEO_MAIN_CLK] = imx_clk_gate("pll_video_main_clk", "pll_video_main_bypass", base + 0x130, 13);
+ 
++	clks[IMX7D_PLL_DRAM_TEST_DIV]  = clk_register_divider_table(NULL, "pll_dram_test_div", "pll_dram_main_bypass",
++				CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, base + 0x70, 21, 2, 0, test_div_table, &imx_ccm_lock);
+ 	clks[IMX7D_PLL_AUDIO_TEST_DIV]  = clk_register_divider_table(NULL, "pll_audio_test_div", "pll_audio_main_clk",
+ 				CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, base + 0xf0, 19, 2, 0, test_div_table, &imx_ccm_lock);
+ 	clks[IMX7D_PLL_AUDIO_POST_DIV] = clk_register_divider_table(NULL, "pll_audio_post_div", "pll_audio_test_div",
+-- 
+2.7.4
