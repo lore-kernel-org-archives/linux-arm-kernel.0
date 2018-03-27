@@ -1,28 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 15:24:28 +0200
-Subject: [GIT PULL] Amlogic deconfig updates for v4.17
-In-Reply-To: <7hlgenr4mj.fsf@baylibre.com>
-References: <7hlgenr4mj.fsf@baylibre.com>
-Message-ID: <CAK8P3a16sN-JQLpBJTxeLvb7LyDE_gUv5YLz0WgXggpziaa6vw@mail.gmail.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Tue, 27 Mar 2018 18:54:56 +0530
+Subject: [PATCH v5 0/4] Fix issues with huge mapping in ioremap for ARM64
+Message-ID: <1522157100-16879-1-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 1:07 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
->
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-defconfig
->
-> for you to fetch changes up to 266c157de3b21b6da3e015085dda48cfa9f0f76d:
->
->   arm64: defconfig: enable MESON EFUSE (2018-02-12 14:20:43 -0800)
->
-> ----------------------------------------------------------------
-> Amlogic defconfig fixes for v4.17
+This series of patches are follow up work (and depends on)
+Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
+panic in ioremap huge pages".
 
-Pulled into next/soc, thanks!
+This series of patches are tested on 4.9 kernel with Cortex-A75
+based SoC.
 
-      Arnd
+These patches can also go into '-stable' branch.
+
+Chintan Pandya (4):
+  ioremap: Update pgtable free interfaces with addr
+  arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+  arm64: Implement page table free interfaces
+  Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+
+>From V4->V5:
+ - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+   for kernel addresses
+
+>From V3->V4:
+ - Add header for 'addr' in x86 implementation
+ - Re-order pmd/pud clear and table free
+ - Avoid redundant TLB invalidatation in one perticular case
+
+>From V2->V3:
+ - Use the exisiting page table free interface to do arm64
+   specific things
+
+>From V1->V2:
+ - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+   Add interfaces to free unmapped page table"
+ - Honored BBM for ARM64
+
+
+ arch/arm64/include/asm/tlbflush.h |  6 ++++++
+ arch/arm64/mm/mmu.c               | 45 ++++++++++++++++++++++++++++-----------
+ arch/x86/mm/pgtable.c             |  6 ++++--
+ include/asm-generic/pgtable.h     |  8 +++----
+ lib/ioremap.c                     |  4 ++--
+ 5 files changed, 49 insertions(+), 20 deletions(-)
+
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
