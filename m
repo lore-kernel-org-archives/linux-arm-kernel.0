@@ -1,31 +1,52 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue, 27 Mar 2018 15:37:23 +0100
-Subject: [PATCH  12/12] ARM: multi_v7_defconfig: Enable r8a77470 SoC
-In-Reply-To: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
-References: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1522161443-54428-13-git-send-email-biju.das@bp.renesas.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Mar 2018 16:47:48 +0200
+Subject: [PATCH 06/10] drm/sun4i: Move and extend format-related helpers
+ and tables
+In-Reply-To: <1522139264.1110.28.camel@bootlin.com>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-7-paul.kocialkowski@bootlin.com>
+ <20180323101338.z422gpxcsdre5hgj@flea>
+ <1522139264.1110.28.camel@bootlin.com>
+Message-ID: <20180327144748.xxpn4s3wjpt6hw4j@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable recently added r8a77470 (RZ/G1C) SoC.
+On Tue, Mar 27, 2018 at 10:27:44AM +0200, Paul Kocialkowski wrote:
+> > > +bool sun4i_format_is_rgb(uint32_t format);
+> > > +bool sun4i_format_is_yuv(uint32_t format);
+> > > +bool sun4i_format_is_yuv411(uint32_t format);
+> > > +bool sun4i_format_is_yuv420(uint32_t format);
+> > > +bool sun4i_format_is_yuv422(uint32_t format);
+> > > +bool sun4i_format_is_yuv444(uint32_t format);
+> > > +bool sun4i_format_is_packed(uint32_t format);
+> > > +bool sun4i_format_is_semiplanar(uint32_t format);
+> > > +bool sun4i_format_is_planar(uint32_t format);
+> > > +bool sun4i_format_supports_tiling(uint32_t format);
+> > 
+> > If we're going to add so many of them, then we should really consider
+> > to move them to drm_fourcc.c instead. Every one has some variation of
+> > some of these functions, we don't really need to duplicate it all the
+> > time.
+> 
+> Should I try to get that through in this patchset and have sun4i-drm
+> be their first user? Also, does introducing such a change require
+> identifying duplicates of these functions in each DRM driver's
+> codebase?
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+I guess converting at least one of them would prove how usable it
+would be to other drivers, but I won't ask you to convert all of them
+as part of this serie :)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index c1e045a..3623900 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -90,6 +90,7 @@ CONFIG_ARCH_R8A73A4=y
- CONFIG_ARCH_R8A7740=y
- CONFIG_ARCH_R8A7743=y
- CONFIG_ARCH_R8A7745=y
-+CONFIG_ARCH_R8A7747=y
- CONFIG_ARCH_R8A7778=y
- CONFIG_ARCH_R8A7779=y
- CONFIG_ARCH_R8A7790=y
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/4fc84eb8/attachment.sig>
