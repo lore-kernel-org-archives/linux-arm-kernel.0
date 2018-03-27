@@ -1,20 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 15:53:45 +0200
-Subject: [GIT PULL] ARM: mediatek: updates for soc drivers for v4.16-next
-In-Reply-To: <8e4c1ec7-4e07-f1a6-0307-56accf2941e9@gmail.com>
-References: <8e4c1ec7-4e07-f1a6-0307-56accf2941e9@gmail.com>
-Message-ID: <CAK8P3a0ze-K2mayXaB0nL03Jf1GNAQ2QRL9j5Op+SfO=8wy-kQ@mail.gmail.com>
+Date: Tue, 27 Mar 2018 15:54:58 +0200
+Subject: [GIT PULL] Amlogic driver updates for v4.17
+In-Reply-To: <7hpo3zr4qv.fsf@baylibre.com>
+References: <7hpo3zr4qv.fsf@baylibre.com>
+Message-ID: <CAK8P3a3US9rGzXXLic2gL2Czakv9jogNoXVPCOXAtCnT_znEvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 11:21 AM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> scpsy:
-> - mt2712: update power domains to reflect design changes in the SoC
-> - fix initialisation of power subdomains
-> - add support for mt7623a SoC
-> - use defines for mt2701 bus protection mask
+On Tue, Mar 20, 2018 at 1:05 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Amlogic driver updates for v4.17
+> - socinfo: add more IDs for newer SoC detection
+> - firmware: update init to use module_platform_driver_probe
+> - soc: mix. VPU power controller fixes
 
 Pulled into next/drivers, thanks!
 
-      Arnd
+       Arnd
