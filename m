@@ -1,22 +1,22 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 27 Mar 2018 03:28:10 -0700
-Subject: [PATCH script] hwmon: Use octal not symbolic permissions
-In-Reply-To: <1522136107.12357.58.camel@perches.com>
-References: <1522096136.12357.21.camel@perches.com>
- <9b112651-d0cf-5f3b-b643-3328028a95cd@roeck-us.net>
- <1522136107.12357.58.camel@perches.com>
-Message-ID: <5ec8703b-2979-7a1d-fbc3-bd528d7a5e29@roeck-us.net>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue, 27 Mar 2018 19:32:44 +0900
+Subject: [PATCH 0/2] add ethernet nodes for UniPhier PXs3 SoC
+Message-ID: <1522146766-14435-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2018 12:35 AM, Joe Perches wrote:
-> On Mon, 2018-03-26 at 23:33 -0700, Guenter Roeck wrote:
->> Since the hwmon subsystem has been labeled as both "obsolete" and "obscure",
-> 
-> fyi: It's marked Maintained in MAINTAINERS
-> 
+This series adds ethernet nodes for UniPhier PXs3 SoC and the board,
+and adds pinctrl groups for second ethernet instances because PXs3 has two
+ethernet instances.
 
-I did not say that it was not maintained, and I am aware of the information
-in the MAINTAINERS file, thanks.
+Kunihiko Hayashi (2):
+  ARM: dts: uniphier: add pinctrl groups of ethernet for second instance
+  arm64: dts: uniphier: add ethernet node for PXs3
 
-Guenter
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi            | 10 ++++++
+ .../arm64/boot/dts/socionext/uniphier-pxs3-ref.dts | 22 +++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi   | 36 ++++++++++++++++++++++
+ 3 files changed, 68 insertions(+)
+
+-- 
+2.7.4
