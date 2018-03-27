@@ -1,52 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Mar 2018 18:28:15 +0100
-Subject: [PATCH v2 21/21] arm64: move GCC version check for
- ARCH_SUPPORTS_INT128 to Kconfig
-In-Reply-To: <1522128575-5326-22-git-send-email-yamada.masahiro@socionext.com>
-References: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
- <1522128575-5326-22-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20180327172815.GH18435@arm.com>
+From: dalias@libc.org (Rich Felker)
+Date: Tue, 27 Mar 2018 13:27:36 -0400
+Subject: Regression with arm in next with stack protector
+In-Reply-To: <20180327172027.GA14598@n2100.armlinux.org.uk>
+References: <20180323181452.GJ5799@atomide.com>
+ <20180327090409.GA10990@n2100.armlinux.org.uk>
+ <20180327153525.GI1436@brightrain.aerifal.cx>
+ <20180327172027.GA14598@n2100.armlinux.org.uk>
+Message-ID: <20180327172736.GK1436@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 02:29:35PM +0900, Masahiro Yamada wrote:
-> This becomes much neater in Kconfig.
+On Tue, Mar 27, 2018 at 06:20:27PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Mar 27, 2018 at 11:35:25AM -0400, Rich Felker wrote:
+> > On Tue, Mar 27, 2018 at 10:04:10AM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Mar 23, 2018 at 11:14:53AM -0700, Tony Lindgren wrote:
+> > > > Hi,
+> > > > 
+> > > > Looks like commit 5638790dadae ("zboot: fix stack protector in
+> > > > compressed boot phase") breaks booting on arm.
+> > > > 
+> > > > This is all I get from the bootloader on omap3:
+> > > > 
+> > > > Starting kernel ...
+> > > > 
+> > > > data abort
+> > > > pc : [<810002d0>]          lr : [<100110a8>]
+> > > > reloc pc : [<9d6002d0>]    lr : [<2c6110a8>]
+> > > > sp : 81467c18  ip : 81466bf0     fp : 81466bf0
+> > > > r10: 80fc2c40  r9 : 81000258     r8 : 86fec000
+> > > > r7 : ffffffff  r6 : 81466bf8     r5 : 00000000  r4 : 80008000
+> > > > r3 : 81466c14  r2 : 81466c18     r1 : 000a0dff  r0 : 00466bf8
+> > > > Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
+> > > > Resetting CPU ...
+> > > > 
+> > > > resetting ...
+> > > 
+> > > The reason for this is the following code that was introduced by the
+> > > referenced patch:
+> > > 
+> > > +               ldr     r0, =__stack_chk_guard
+> > > +               ldr     r1, =0x000a0dff
+> > > +               str     r1, [r0]
+> > > 
+> > > This uses the absolute address of __stack_chk_guard in the decompressor,
+> > > which is a self-relocatable image.  As with all constructs like the
+> > > above, this absolute address doesn't get fixed up, and so it ends up
+> > > pointing at invalid memory (in this case 0x466bf8) vs RAM at 0x80000000,
+> > > and the decompressor looks to be around 0x81000000.
+> > > 
+> > > Such constructs can not be used in the decompressor for exactly this
+> > > reason - they need to use PC-relative addressing instead just like
+> > > everything else does in head.S.
+> > 
+> > Can someone please answer why this is even needed to begin with? I
+> > don't see any compelling reason __stack_chk_guard needs a particular
+> > value in the decompressor, which is not dealing with any non-constant
+> > input.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> Changes in v2:
->   - Newly added
-> 
->  arch/arm64/Kconfig  | 1 +
->  arch/arm64/Makefile | 2 --
->  2 files changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7381eeb..0c97f40 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -43,6 +43,7 @@ config ARM64
->  	select ARCH_USE_QUEUED_RWLOCKS
->  	select ARCH_SUPPORTS_MEMORY_FAILURE
->  	select ARCH_SUPPORTS_ATOMIC_RMW
-> +	select ARCH_SUPPORTS_INT128 if GCC_VERSION >= 50000
->  	select ARCH_SUPPORTS_NUMA_BALANCING
->  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
->  	select ARCH_WANT_FRAME_POINTERS
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index b481b4a..7318165 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -57,8 +57,6 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
->  KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
->  KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
->  
-> -KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-> -
+> Untrue - it can do some parsing of the DT and updating/appending
+> information from ATAGs.  However, all that should be coming from
+> a trusted environment, so I don't see much of a "trust" issue here.
+> (If the parent environment is not trusted, then the environment we're
+> running in is not trusted.)
 
-If this does what it claims to do, then I agree that it's much cleaner!
+OK, I was considering DT constant, but it doesn't really matter as you
+say since the input comes from a trusted environment and could subvert
+the system in much more direct ways than blowing away the
+decompressor's stack buffers if it wanted to.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> > Just putting __stack_chk_guard in its bss should be fine and
+> > would eliminate all the risks of wrong code to load a value into it.
+> > Alternatively put it in initialized data with the desired value.
+> 
+> I'm no expert with this, so I can't comment.  I build my kernels
+> with gcc 4.7.4, which I don't think supports this feature.
 
-Will
+By "this feature" do you mean stack protector? I still have a 4.7.3
+for x86 around and -fstack-protector-all works fine on it. Not sure if
+there are issues using stack protector with kernel, or on ARM, for
+older GCCs. In any case defining __stack_chk_guard as initialized data
+should work on any gcc version regardless of whether stack protector
+is actually used; it doesn't require any compiler features just basic
+C.
+
+Rich
