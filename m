@@ -1,92 +1,35 @@
-From: pelcan@codeaurora.org (Philip Elcan)
-Date: Mon, 26 Mar 2018 23:21:17 -0400
-Subject: [PATCH V2] arm64: tlbflush: avoid writing RES0 bits
-Message-ID: <1522120877-9136-1-git-send-email-pelcan@codeaurora.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 27 Mar 2018 14:07:46 +1030
+Subject: [PATCH] ARM: dts: aspeed: Add default memory node
+In-Reply-To: <CAK8P3a3XTqFHw4SQMt9zq3QLEhGM6944xQ_n3myOK08YZCbkAA@mail.gmail.com>
+References: <20180314071312.17492-1-joel@jms.id.au>
+ <CAK8P3a3XTqFHw4SQMt9zq3QLEhGM6944xQ_n3myOK08YZCbkAA@mail.gmail.com>
+Message-ID: <CACPK8Xe-5EFsHBUnfbf8vT-fPxnQnf-muAMmLFWD4=t16YR9uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several of the bits of the TLBI register operand are RES0 per the ARM
-ARM, so TLBI operations should avoid writing non-zero values to these
-bits.
+On 14 March 2018 at 19:33, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wed, Mar 14, 2018 at 8:13 AM, Joel Stanley <joel@jms.id.au> wrote:
+>> When we removed the inclusion of skeleton.dtsi from the device trees, we
+>> broke booting for systems with bootloaders that aren't device tre aware.
+>> This can be seen, for example, when appending the device tree blob to
+>> the kernel image.
+>>
+>> The reason booting broke was that the kernel lacked the device_type
+>> label in the memory node. Add in a default memory node wth the
+>> device_type. It can contain the memory address as the location is fixed
+>> for each SoC generation, but the size needs to be added by the
+>> bootloader or the board specific dts.
+>>
+>> Fixes: 73102d6fdc32 ("ARM: dts: aspeed: Remove skeleton.dtsi")
+>> Cc: <stable@vger.kernel.org>
+>> Reported-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>> ---
+>> Arnd, can you please merge this as a fix for 4.16?
+>
+> Sure, applied to fixes branch now.
 
-This patch adds a macro __TLBI_VADDR(addr, asid) that creates the
-operand register in the correct format and honors the RES0 bits.
+Thanks!
 
-Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
----
- arch/arm64/include/asm/tlbflush.h | 23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index 9e82dd7..b1205e9 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -60,6 +60,15 @@
- 		__tlbi(op, (arg) | USER_ASID_FLAG);				\
- } while (0)
- 
-+/* This macro creates a properly formatted VA operand for the TLBI */
-+#define __TLBI_VADDR(addr, asid)				\
-+	({							\
-+		unsigned long __ta = (addr) >> 12;		\
-+		__ta &= GENMASK_ULL(43, 0);			\
-+		__ta |= (unsigned long)(asid) << 48;		\
-+		__ta;						\
-+	})
-+
- /*
-  *	TLB Management
-  *	==============
-@@ -117,7 +126,7 @@ static inline void flush_tlb_all(void)
- 
- static inline void flush_tlb_mm(struct mm_struct *mm)
- {
--	unsigned long asid = ASID(mm) << 48;
-+	unsigned long asid = __TLBI_VADDR(0, ASID(mm));
- 
- 	dsb(ishst);
- 	__tlbi(aside1is, asid);
-@@ -128,7 +137,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
- static inline void flush_tlb_page(struct vm_area_struct *vma,
- 				  unsigned long uaddr)
- {
--	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
-+	unsigned long addr = __TLBI_VADDR(uaddr, ASID(vma->vm_mm));
- 
- 	dsb(ishst);
- 	__tlbi(vale1is, addr);
-@@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 		return;
- 	}
- 
--	start = asid | (start >> 12);
--	end = asid | (end >> 12);
-+	start = __TLBI_VADDR(start, asid);
-+	end = __TLBI_VADDR(end, asid);
- 
- 	dsb(ishst);
- 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
-@@ -185,8 +194,8 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
- 		return;
- 	}
- 
--	start >>= 12;
--	end >>= 12;
-+	start = __TLBI_VADDR(start, 0);
-+	end = __TLBI_VADDR(end, 0);
- 
- 	dsb(ishst);
- 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
-@@ -202,7 +211,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
- static inline void __flush_tlb_pgtable(struct mm_struct *mm,
- 				       unsigned long uaddr)
- {
--	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
-+	unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
- 
- 	__tlbi(vae1is, addr);
- 	__tlbi_user(vae1is, addr);
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Has this been sent to Linus?
