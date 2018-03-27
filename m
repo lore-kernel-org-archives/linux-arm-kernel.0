@@ -1,43 +1,83 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 27 Mar 2018 11:21:19 +0200
-Subject: [PATCH 02/10] drm/sun4i: Disable YUV channel when using the
- frontend and set interlace
-In-Reply-To: <20180327091823.sbmvvo4jsh3x7p4i@flea>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-3-paul.kocialkowski@bootlin.com>
- <20180323095529.5nptn5achjt3esog@flea>
- <1522137643.1110.4.camel@bootlin.com>
- <20180327081731.he3lhnvqffuimsi5@flea>
- <1522140259.1110.43.camel@bootlin.com>
- <20180327091823.sbmvvo4jsh3x7p4i@flea>
-Message-ID: <1522142479.1110.45.camel@bootlin.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 Mar 2018 11:23:46 +0200
+Subject: [PATCH v4 0/8] ARM: davinci: complete the conversion to using
+ the reset framework
+In-Reply-To: <6c55e081-57ba-6c39-8494-cda5022aa927@ti.com>
+References: <20180323130455.11470-1-brgl@bgdev.pl>
+ <152182378792.178046.3747112581117251857@swboyd.mtv.corp.google.com>
+ <CAMRc=MfEebDk4D=t-ybRgbn+HaY7RUfOFCDAf9H8F3cZRchJmA@mail.gmail.com>
+ <152182490783.178046.1191965992600877708@swboyd.mtv.corp.google.com>
+ <CAMRc=MdmTAwPAAnL1+n+OXSycnyjuQ1hKmts158mPcgat1NUYQ@mail.gmail.com>
+ <6c55e081-57ba-6c39-8494-cda5022aa927@ti.com>
+Message-ID: <1522142626.3345.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-03-27 at 11:18 +0200, Maxime Ripard wrote:
-> On Tue, Mar 27, 2018 at 10:44:19AM +0200, Paul Kocialkowski wrote:
-> > > > Also, is interlacing actually used on any of the video outputs
-> > > > we
-> > > > support? Perhaps RGB?
-> > > 
-> > > Composite would be a better guess :)
-> > 
-> > Oh and I was wondering what CVBS was about. Now I know!
-> > It seems that we don't support it for now apparently, anyway.
+On Tue, 2018-03-27 at 11:39 +0530, Sekhar Nori wrote:
+> Hi Bart,
 > 
-> What do you mean? We do support it.
+> On Friday 23 March 2018 10:46 PM, Bartosz Golaszewski wrote:
+> > 2018-03-23 18:08 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
+> > > Quoting Bartosz Golaszewski (2018-03-23 09:55:47)
+> > > > 2018-03-23 17:49 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
+> > > > > Quoting Bartosz Golaszewski (2018-03-23 06:04:47)
+> > > > > > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > > > > > 
+> > > > > > This series converts the only user of the handcoded, mach-specific reset
+> > > > > > routines in the davinci platform to using the reset framework.
+> > > > > > 
+> > > > > > Patch 1 modifies the way lookup entries are registered with the reset
+> > > > > > framework.
+> > > > > > 
+> > > > > > Patches 2-4 add necessary lookups/DT-properties.
+> > > > > > 
+> > > > > > Patches 5-7 convert the davinci-rproc driver to the reset framework.
+> > > > > > 
+> > > > > > Patch 8 removes now dead code.
+> > > > > > 
+> > > > > > Philipp: it turned out that it's indeed better to use the reset
+> > > > > > controller's device name for the entry lookup.
+> > > > > > 
+> > > > > > Tested both in DT and legacy modes by booting the examples from
+> > > > > > ti-ipc-rtos recipe in meta-ti.
+> > > > > > 
+> > > > > > This series applies on top of David Lechner's common-clk-v9 branch[1]
+> > > > > > with Philipp Zabel's reset/next branch[2] pulled in.
+> > > > > > 
+> > > > > > It can be found in my github tree as well[3].
+> > > > > > 
+> > > > > 
+> > > > > What's the merge strategy for the rest of the patches? I should apply
+> > > > > the clk ones after the next -rc1?
+> > > > 
+> > > > Or maybe Philipp can provide us with an immutable branch with the reset patches?
+> > > > 
+> > > > The you could apply the driver patches and let Sekhar take all the
+> > > > platform code?
+> > > > 
+> > > 
+> > > Ok that could work too.
+> > 
+> > Ohad, Bjorn can you ack the remoteproc patches? Are you OK with
+> > Stephen taking them through the clock tree? Otherwise it would get
+> > complicated since they depend on the first clk patch and the last clk
+> > patch depends on them.
+> 
+> I will not be queuing the DTS patches for v4.17. They depend on clock
+> framework DTS patches which itself I plan to queue for v4.18. Given
+> this, I think the best bet is:
+> 
+> Ohad/Bjorn queue remoteproc patches already acked by Suman and having no
+> dependencies. That is, 5/8 and 6/8.
+> 
+> If Philipp can provide an immutable branch with reset changes, it will
+> be great and Stephen can queue 4/8. If not, its best to resend that
+> patch to Stephen once v4.17-rc1 is out.
 
-Sorry, I think I was remembering the status for A10/A20 only. Glad to
-see that it works on A13!
+I have shuffled reset/next a bit and moved Bartosz' patches onto a
+separate, immutable branch:
 
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/16749523/attachment.sig>
+  git://git.pengutronix.de/git/pza/linux.git reset/lookup
+
+regards
+Philipp
