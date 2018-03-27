@@ -1,173 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 27 Mar 2018 16:07:12 +0200
-Subject: [GIT PULL] ARM: mvebu: dt for v4.17 (#spdx)
-Message-ID: <87o9j9txwv.fsf@bootlin.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Tue, 27 Mar 2018 17:07:27 +0300
+Subject: [PATCH v2 01/17] virtio: mmio-v1: Validate queue PFN
+In-Reply-To: <1522156531-28348-2-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180327170119-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 27, 2018 at 02:15:11PM +0100, Suzuki K Poulose wrote:
+> virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
+> If the queue pfn is too large to fit in 32bits, which
+> we could hit on arm64 systems with 52bit physical addresses
+> (even with 64K page size), we simply miss out a proper link
+> to the other side of the queue.
+> 
+> Add a check to validate the PFN, rather than silently breaking
+> the devices.
+> 
+> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> Cc: Jason Wang <jasowang@redhat.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Peter Maydel <peter.maydell@linaro.org>
+> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Here is the SPDX pull request for dt for mvebu for v4.17.
+OK - seems harmless so I will queue this.
+But I really think effort should be spent on
+adding v1.0 support in QEMU.
 
-Gregory
-
-The following changes since commit 29e36c1f63d16c6fe895fa4e33b01e45a11f96de:
-
-  ARM: dts: armada388-clearfog: add SFP module support (2018-03-27 15:07:46 +0200)
-
-are available in the Git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.17-spdx
-
-for you to fetch changes up to eb59e09203312de2112b63e0f4c4b4278e4daab9:
-
-  arm: dts: kirkwood*.dts: use SPDX-License-Identifier for board using GPL-2.0+ (2018-03-27 15:43:12 +0200)
-
-----------------------------------------------------------------
-mvebu SPDX dt for 4.17
-
-convert to the SPDX-License-Identifier for the Kirkwood and the Armada
-based device tree files.
-
-Compared to the series submitted most of the patch have been squashed:
-the result is grouped by SoC, boards, type of licenses and the patches
-that were explicitly acked on the mailing list.
-
-----------------------------------------------------------------
-Gregory CLEMENT (12):
-      arm: dts: armada-*.dtsi: use SPDX-License-Identifier for most of the Armada SoCs
-      arm: dts: armada-xp-98dx: use SPDX-License-Identifier for prestara 98d SoCs
-      arm: dts: armada-*.dts: use SPDX-License-Identifier for most of the Armada based board
-      arm: dts: armada-370-db: use SPDX-License-Identifier
-      arm: dts: armada-xp-db-dxbc2: use SPDX-License-Identifier
-      arm: dts: armada-xp-db-xc3-24g4xg: use SPDX-License-Identifier
-      arm: dts: armada-388-rd: use SPDX-License-Identifier
-      arm: dts: armada-385-db-ap: use SPDX-License-Identifier
-      arm: dts: armada-385-turris-omnia: use SPDX-License-Identifier
-      arm: dts: kirkwood*.dts: use SPDX-License-Identifier for boards using GPL-2.0
-      arm: dts: kirkwood*.dts: use SPDX-License-Identifier for boards using GPL-2.0+/MIT
-      arm: dts: kirkwood*.dts: use SPDX-License-Identifier for board using GPL-2.0+
-
- arch/arm/boot/dts/armada-370-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-370-dlink-dns327l.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-370-mirabox.dts           | 39 +---------------------
- arch/arm/boot/dts/armada-370-netgear-rn102.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-370-netgear-rn104.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-370-rd.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-370-seagate-nas-2bay.dts  |  5 +--
- arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  |  5 +--
- arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |  5 +--
- .../dts/armada-370-seagate-personal-cloud-2bay.dts |  5 +--
- .../boot/dts/armada-370-seagate-personal-cloud.dts |  5 +--
- .../dts/armada-370-seagate-personal-cloud.dtsi     |  5 +--
- arch/arm/boot/dts/armada-370-synology-ds213j.dts   | 39 +---------------------
- arch/arm/boot/dts/armada-370-xp.dtsi               | 39 +---------------------
- arch/arm/boot/dts/armada-370.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-375-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-375.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-380.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-385-db-ap.dts             | 33 +-----------------
- arch/arm/boot/dts/armada-385-linksys-caiman.dts    | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys-cobra.dts     | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys-rango.dts     | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys-shelby.dts    | 34 +------------------
- arch/arm/boot/dts/armada-385-linksys.dtsi          | 34 +------------------
- arch/arm/boot/dts/armada-385-synology-ds116.dts    | 33 +-----------------
- arch/arm/boot/dts/armada-385-turris-omnia.dts      | 35 +------------------
- arch/arm/boot/dts/armada-385.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-388-clearfog-base.dts     | 38 +--------------------
- arch/arm/boot/dts/armada-388-clearfog-pro.dts      | 38 +--------------------
- arch/arm/boot/dts/armada-388-clearfog.dts          | 38 +--------------------
- arch/arm/boot/dts/armada-388-clearfog.dtsi         | 38 +--------------------
- arch/arm/boot/dts/armada-388-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-388-gp.dts                | 33 +-----------------
- arch/arm/boot/dts/armada-388-rd.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-388.dtsi                  | 34 +------------------
- .../arm/boot/dts/armada-38x-solidrun-microsom.dtsi | 38 +--------------------
- arch/arm/boot/dts/armada-38x.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-390-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-390.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-395-gp.dts                | 33 +-----------------
- arch/arm/boot/dts/armada-395.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-398-db.dts                | 39 +---------------------
- arch/arm/boot/dts/armada-398.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-39x.dtsi                  | 39 +---------------------
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-98dx3336.dtsi          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-98dx4251.dtsi          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-axpwifiap.dts          | 39 +---------------------
- arch/arm/boot/dts/armada-xp-db-dxbc2.dts           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      | 39 +---------------------
- arch/arm/boot/dts/armada-xp-db.dts                 | 38 +--------------------
- arch/arm/boot/dts/armada-xp-gp.dts                 | 39 +---------------------
- arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    | 39 +---------------------
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts      | 33 +-----------------
- arch/arm/boot/dts/armada-xp-matrix.dts             | 39 +---------------------
- arch/arm/boot/dts/armada-xp-mv78230.dtsi           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-mv78260.dtsi           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-mv78460.dtsi           | 39 +---------------------
- arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   | 39 +---------------------
- arch/arm/boot/dts/armada-xp-synology-ds414.dts     | 39 +---------------------
- arch/arm/boot/dts/armada-xp.dtsi                   | 39 +---------------------
- arch/arm/boot/dts/kirkwood-b3.dts                  |  5 +--
- arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts   |  3 +-
- arch/arm/boot/dts/kirkwood-d2net.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-db-88f6281.dts          |  4 +--
- arch/arm/boot/dts/kirkwood-db-88f6282.dts          |  4 +--
- arch/arm/boot/dts/kirkwood-db.dtsi                 |  5 +--
- arch/arm/boot/dts/kirkwood-dir665.dts              |  4 +--
- arch/arm/boot/dts/kirkwood-ds109.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds110jv10.dts           |  4 +--
- arch/arm/boot/dts/kirkwood-ds111.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds112.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds209.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds210.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds212.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds212j.dts              |  4 +--
- arch/arm/boot/dts/kirkwood-ds409.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds409slim.dts           |  4 +--
- arch/arm/boot/dts/kirkwood-ds411.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ds411j.dts              |  4 +--
- arch/arm/boot/dts/kirkwood-ds411slim.dts           |  4 +--
- arch/arm/boot/dts/kirkwood-laplug.dts              |  4 +--
- arch/arm/boot/dts/kirkwood-linkstation-6282.dtsi   | 39 +---------------------
- .../boot/dts/kirkwood-linkstation-duo-6281.dtsi    | 39 +---------------------
- arch/arm/boot/dts/kirkwood-linkstation-lsqvl.dts   | 39 +---------------------
- arch/arm/boot/dts/kirkwood-linkstation-lsvl.dts    | 39 +---------------------
- arch/arm/boot/dts/kirkwood-linkstation-lswsxl.dts  | 39 +---------------------
- arch/arm/boot/dts/kirkwood-linkstation-lswvl.dts   | 39 +---------------------
- arch/arm/boot/dts/kirkwood-linkstation-lswxl.dts   | 39 +---------------------
- arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 39 +---------------------
- arch/arm/boot/dts/kirkwood-linksys-viper.dts       |  4 +--
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     |  5 +--
- arch/arm/boot/dts/kirkwood-nas2big.dts             |  4 +--
- arch/arm/boot/dts/kirkwood-net2big.dts             |  4 +--
- arch/arm/boot/dts/kirkwood-net5big.dts             |  4 +--
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |  6 +---
- .../boot/dts/kirkwood-netgear_readynas_nv+_v2.dts  |  6 +---
- arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  4 +--
- arch/arm/boot/dts/kirkwood-nsa320.dts              |  5 +--
- arch/arm/boot/dts/kirkwood-nsa325.dts              |  5 +--
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts       |  4 +--
- arch/arm/boot/dts/kirkwood-openrd-base.dts         |  5 +--
- arch/arm/boot/dts/kirkwood-openrd-client.dts       |  5 +--
- arch/arm/boot/dts/kirkwood-openrd-ultimate.dts     |  5 +--
- arch/arm/boot/dts/kirkwood-openrd.dtsi             |  5 +--
- arch/arm/boot/dts/kirkwood-pogo_e02.dts            |  4 +--
- arch/arm/boot/dts/kirkwood-rd88f6192.dts           |  5 +--
- arch/arm/boot/dts/kirkwood-rd88f6281-a.dts         |  5 +--
- arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts        |  5 +--
- arch/arm/boot/dts/kirkwood-rd88f6281.dtsi          |  5 +--
- arch/arm/boot/dts/kirkwood-rs212.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-rs409.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-rs411.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |  3 +-
- arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts    |  3 +-
- arch/arm/boot/dts/kirkwood-sheevaplug.dts          |  3 +-
- arch/arm/boot/dts/kirkwood-synology.dtsi           |  4 +--
- arch/arm/boot/dts/kirkwood-t5325.dts               |  4 +--
- arch/arm/boot/dts/kirkwood-ts419-6281.dts          |  6 +---
- arch/arm/boot/dts/kirkwood-ts419-6282.dts          |  6 +---
- arch/arm/boot/dts/kirkwood-ts419.dtsi              |  6 +---
- 122 files changed, 122 insertions(+), 2561 deletions(-)
+> ---
+>  drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+> index 67763d3..b2f9b5c 100644
+> --- a/drivers/virtio/virtio_mmio.c
+> +++ b/drivers/virtio/virtio_mmio.c
+> @@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+>  	/* Activate the queue */
+>  	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+>  	if (vm_dev->version == 1) {
+> +		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
+> +
+> +		/*
+> +		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
+> +		 * that doesn't fit in 32bit, fail the setup rather than
+> +		 * pretending to be successful.
+> +		 */
+> +		if (q_pfn >> 32) {
+> +			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
+> +			err = -ENOMEM;
+> +			goto error_bad_pfn;
+> +		}
+> +
+>  		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
+> -		writel(virtqueue_get_desc_addr(vq) >> PAGE_SHIFT,
+> -				vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+> +		writel(q_pfn, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+>  	} else {
+>  		u64 addr;
+>  
+> @@ -430,6 +442,8 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+>  
+>  	return vq;
+>  
+> +error_bad_pfn:
+> +	vring_del_virtqueue(vq);
+>  error_new_virtqueue:
+>  	if (vm_dev->version == 1) {
+>  		writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+> -- 
+> 2.7.4
