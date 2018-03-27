@@ -1,46 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
+From: andrew@lunn.ch (Andrew Lunn)
 Date: Tue, 27 Mar 2018 16:03:10 +0200
-Subject: [PATCH v2 0/4] Introduce PMSAv8 memory protection unit
-In-Reply-To: <2749c3e2-1046-a23f-b91c-f456f304d5c3@arm.com>
-References: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
- <2415fbb7-a171-2917-35bc-4f2ee128f7c3@arm.com>
- <2749c3e2-1046-a23f-b91c-f456f304d5c3@arm.com>
-Message-ID: <CAK8P3a0BGZqP2edQcd3xO7Dozg-=7qpP4qfXeGd1PWkvsLMUVA@mail.gmail.com>
+Subject: [net-next PATCH 2/5] soc: ti: K2G: provide APIs to support
+ driver probe deferral
+In-Reply-To: <4aeeda56-c68b-cb64-1314-a669f721ff20@ti.com>
+References: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
+ <1522095312-23249-3-git-send-email-m-karicheri2@ti.com>
+ <20180326204802.GC5862@lunn.ch>
+ <4aeeda56-c68b-cb64-1314-a669f721ff20@ti.com>
+Message-ID: <20180327140310.GK5862@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 11:06 AM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> On 08/03/18 13:36, Vladimir Murzin wrote:
->> On 16/02/18 14:14, Vladimir Murzin wrote:
->>> Hi,
->>>
->>> This series adds support for PMSAv8 MPU defined by ARMv8R/M
->>> architecture.
->>>
->>> Changelog:
->>>
->>>      v1 -> v2
->>>      - Included missed patch.
->>>      - Folded "ARM: NOMMU: Make _stext and _end meet PMSAv8 alignment
->>>        restrictions" into "ARM: NOMMU: Support PMSAv8 MPU" since it
->>>        allows us to refer PMSAv8_MINALIGN in linker scripts.
->>>      - Improved and tested XIP support
->>>
->>>     RFC -> v1
->>>      - Rebased on v4.16-rc1
->>>      - Added Tested-by for v7M bits from Andras
->>>
->>> Thanks!
->>
->> OK for patch tracker?
->
-> The patches were on the list for a month and half without much attention
-> except v7M folks (thanks them for testing!) and I'm afraid it would be even
-> harder to make progress with them in nearby feature.
->
-> I'm wondering if ARM SoC team can pick the patches?
+> Could you please elaborate? These knav dma and qmss drivers are
+> introduced to support packet DMA hardware available in Keystone
+> NetCP which couldn't be implemented using the DMA APIs available
+> at the time this driver was introduced. Another reason was that
+> the performance was really bad. We had an internal implementation
+> based on DMA API before which couldn't be upstreamed at that time
+> due to the reason that we were mis-using the API for this driver.
+> So we introduced these knav_dma driver to support NetCP. We don't
+> have any plan to re-write the driver at this time.
+> 
+> If your question is about EPROBE_DEFER being returned from an
+> existing knav_dma API and using the return code to achieve probe
+> defer instead of introducing these APIs, I can take a look into
+> that and respond. So please clarify.
+ 
+Hi Murali
 
-This is really core code that should go through Russell's tree.
+So if i understood you right, at the time these drivers were written,
+the linux DMA API did not do what you wanted. You could hack something
+together by using the API wrongly, but that could not be mainlined. So
+rather than fixing the DMA API to make it work for this hardware, you
+ignored it, and made up your own API? This API now has its own
+problems, it does not correctly handle ordering? So you are hacking
+your own API further.
 
-      Arnd
+Does the Linux DMA API correctly handle probing order issues? Has the
+Linux DMA API evolved so that it now does do what is needed by your
+hardware?
+
+If this was an old hardware which is slowly going away, it would not
+be an issue. But it seems like there are new variants of the hardware
+being released. So maybe you should go back and re-write the DMA
+driver, rather than paper over the cracks?
+
+	Andrew
