@@ -1,96 +1,122 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 27 Mar 2018 07:31:18 +0800
-Subject: [linux-sunxi] Re: [PATCH 2/7] dt-bindings: add binding for the
- Allwinner A64 DE2 bus
-In-Reply-To: <20180326222258.uxpgj4bk4pg56b7o@rob-hp-laptop>
-References: <20180316175354.21437-1-icenowy@aosc.io>
- <20180320184646.dynqv6qubzabroe4@flea>
- <AAC74653-C6EB-4BE3-BB19-210687C1E158@aosc.io>
- <2866474.lRHIcLtROC@jernej-laptop>
- <9520BDDE-BFE3-4220-B48D-01A00CFA94DE@aosc.io>
- <20180326222258.uxpgj4bk4pg56b7o@rob-hp-laptop>
-Message-ID: <9A6A8961-D45C-4033-962E-83CCE8F01651@aosc.io>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 26 Mar 2018 19:42:34 -0500
+Subject: [PATCH v4 0/8] ARM: davinci: complete the conversion to using the
+ reset framework
+In-Reply-To: <c78817f9-02fd-0ded-609e-5014efdd4a77@ti.com>
+References: <20180323130455.11470-1-brgl@bgdev.pl>
+ <152182378792.178046.3747112581117251857@swboyd.mtv.corp.google.com>
+ <CAMRc=MfEebDk4D=t-ybRgbn+HaY7RUfOFCDAf9H8F3cZRchJmA@mail.gmail.com>
+ <152182490783.178046.1191965992600877708@swboyd.mtv.corp.google.com>
+ <CAMRc=MdmTAwPAAnL1+n+OXSycnyjuQ1hKmts158mPcgat1NUYQ@mail.gmail.com>
+ <c78817f9-02fd-0ded-609e-5014efdd4a77@ti.com>
+Message-ID: <0683b11c-fefa-5fc7-793e-1a662a5f0480@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bart,
 
+On 03/23/2018 07:30 PM, Suman Anna wrote:
+> Hi Bart,
+> 
+> On 03/23/2018 12:16 PM, Bartosz Golaszewski wrote:
+>> 2018-03-23 18:08 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
+>>> Quoting Bartosz Golaszewski (2018-03-23 09:55:47)
+>>>> 2018-03-23 17:49 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
+>>>>> Quoting Bartosz Golaszewski (2018-03-23 06:04:47)
+>>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>>
+>>>>>> This series converts the only user of the handcoded, mach-specific reset
+>>>>>> routines in the davinci platform to using the reset framework.
+>>>>>>
+>>>>>> Patch 1 modifies the way lookup entries are registered with the reset
+>>>>>> framework.
+>>>>>>
+>>>>>> Patches 2-4 add necessary lookups/DT-properties.
+>>>>>>
+>>>>>> Patches 5-7 convert the davinci-rproc driver to the reset framework.
+>>>>>>
+>>>>>> Patch 8 removes now dead code.
+>>>>>>
+>>>>>> Philipp: it turned out that it's indeed better to use the reset
+>>>>>> controller's device name for the entry lookup.
+>>>>>>
+>>>>>> Tested both in DT and legacy modes by booting the examples from
+>>>>>> ti-ipc-rtos recipe in meta-ti.
+>>>>>>
+>>>>>> This series applies on top of David Lechner's common-clk-v9 branch[1]
+>>>>>> with Philipp Zabel's reset/next branch[2] pulled in.
+>>>>>>
+>>>>>> It can be found in my github tree as well[3].
+>>>>>>
+>>>>>
+>>>>> What's the merge strategy for the rest of the patches? I should apply
+>>>>> the clk ones after the next -rc1?
+>>>>
+>>>> Or maybe Philipp can provide us with an immutable branch with the reset patches?
+>>>>
+>>>> The you could apply the driver patches and let Sekhar take all the
+>>>> platform code?
+>>>>
+>>>
+>>> Ok that could work too.
+>>
+>> Ohad, Bjorn can you ack the remoteproc patches? Are you OK with
+>> Stephen taking them through the clock tree? Otherwise it would get
+>> complicated since they depend on the first clk patch and the last clk
+>> patch depends on them.
+> 
+> I will take a closer look and test on Mon. A quick glance of the
+> remoteproc changes seem to be fine. I will let Bjorn comment on the
+> patch flow.
+> 
+> The only reason I had to use the clock in the driver was for the reset
+> before, and hopefully this will allow me to actually switch to using
+> pm_runtime API like I do with the rest of the TI remoteproc drivers
+> (Keystone remoteproc driver also uses PSC for clock and reset but then
+> it goes through different set of drivers).
+> 
+> So, I see a mix of driver and dts patches in the series, are all the dts
+> patches coming through Sekhar?
 
-? 2018?3?27? GMT+08:00 ??6:22:58, Rob Herring <robh@kernel.org> ??:
->On Thu, Mar 22, 2018 at 02:08:43PM +0800, Icenowy Zheng wrote:
->> 
->> 
->> ? 2018?3?22? GMT+08:00 ??1:13:42, "Jernej ?krabec"
-><jernej.skrabec@siol.net> ??:
->> >Hi all,
->> >
->> >Dne sreda, 21. marec 2018 ob 03:18:13 CET je Icenowy Zheng
->napisal(a):
->> >> ? 2018?3?21? GMT+08:00 ??2:46:46, Maxime Ripard
->> ><maxime.ripard@bootlin.com> 
->> >??:
->> >> >On Sat, Mar 17, 2018 at 01:53:49AM +0800, Icenowy Zheng wrote:
->> >> >> All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64
->> >SoC
->> >> >
->> >> >to
->> >> >
->> >> >> be claimed, otherwise the whole DE2 space is inaccessible.
->> >> >> 
->> >> >> Add a device tree binding of the DE2 part as a sub-bus.
->> >> >
->> >> >Where did you get the info that it was a bus?
->> >> 
->> >> There's no direct evidence, just some guess.
->> >> 
->> >> The DE2 is a whole part that is just allocated a memory
->> >> space at the user manual, and the SRAM controls the
->> >> access to all modules in the DE2.
->> >> 
->> >> So it might be a bus.
->> >> 
->> >> Implement it as a bus is a clear representation on A64.
->> >
->> >Since there is already syscon for same mmio region, we migh as well
->use
->> >it 
->> >when loading ccu-sun8i-de2 driver on A64.
->> >
->> >Other options, like SRAM driver or bus driver, might better
->represent
->> >HW, but 
->> 
->> I think the device tree should properly represent the HW,
->> it's a basic requirment.
->> 
->> >then we would have two DT nodes covering same mmio region, which I
->> >think is 
->> >not really acceptable.
->> 
->> It's acceptable, and DE2 is not the only user of SRAM controller so
->far.
->
->No, it's not acceptable. Don't create overlapping mmio regions in DT.
+I tried booting your tree [3] on the OMAPL138-LCDK board. I am using
+NFS, and I am unable to get to the console. I don't have any issues
+booting latest -next branch (next-20180326) which only has the reset and
+clock driver related changes.
 
-Then should the SRAM controller driver be configured to take the syscon?
+Here's the log towards the end of the boot..
+---
+pinctrl-single 1c14120.pinmux: 160 pins, size 80
+Serial: 8250/16550 driver, 3 ports, IRQ sharing disabled
+console [ttyS2] disabled
+1d0d000.serial: ttyS2 at MMIO 0x1d0d000 (irq = 61, base_baud = 8250000)
+is a TI DA8xx/66AK2x
+console [ttyS2] enabled
+brd: module loaded
+libphy: Fixed MDIO Bus: probed
+davinci_mdio 1e24000.mdio: davinci mdio revision 1.5, bus freq 2200000
+davinci_mdio 1e24000.mdio: no live phy, scanning all
+davinci_mdio: probe of 1e24000.mdio failed with error -5
+i2c /dev entries driver
+<nothing after this>
 
->
->> 
->> VE will also need a SRAM region to be claimed.
->> 
->> >
->> >Any suggestions?
->> >
->> >BTW, H6 has same design in this regard.
->> >
->> >Best regards,
->> >Jernej
+regards
+Suman
+
+> 
+> regards
+> Suman
+> 
+>>
+>> Thanks,
+>> Bart
 >> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree"
->in
+>> To unsubscribe from this list: send the line "unsubscribe linux-remoteproc" in
 >> the body of a message to majordomo at vger.kernel.org
 >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-remoteproc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
