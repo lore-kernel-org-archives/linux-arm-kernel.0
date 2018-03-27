@@ -1,177 +1,24 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 28 Mar 2018 01:39:13 +0900
-Subject: [PATCH v2 00/21] kconfig: move compiler capability tests to
- Kconfig
-In-Reply-To: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1522128575-5326-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAR89KNWVbUBZiOP1Yv7V-0rGO3L3xKvza9hnHjn0DFJcw@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 27 Mar 2018 11:48:47 -0500
+Subject: [PATCH v3 0/8] ARM: davinci: complete the conversion to using the
+ reset framework
+In-Reply-To: <20180327092031.11251-1-brgl@bgdev.pl>
+References: <20180327092031.11251-1-brgl@bgdev.pl>
+Message-ID: <6166e140-b417-dd22-10cf-843db3958226@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-27 14:29 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->
-> Here is v2 to start to move compiler capability tests to Kconfig.
->
-> V1:
-> https://lkml.org/lkml/2018/2/16/610
->
-> I brushed up the implementation even more.
->
-> Major changes for v2:
-> [1] Environments and functions are expanded in the lexer (zconf.l)
->     The parser (zconf.y) receives expanded tokens.  This simplifies
->     the implementation.
->
-> [2] Implement only one built-in function 'shell'.  This returns
->     stdout from the command.  We need something to return 'y' or 'n'.
->     This is now implemented as a macro 'success'.
->
-> [3] Macros (user-defined function) are defined by 'macro' keyword
->     instead of string type symbol.
->
->     ex1) macro success $(shell ($(1) && echo y) || echo n)
->     ex2) macro cc-option $(success $CC -Werror $(1) -c -x c /dev/null -o /dev/null)
->
-> My plan for v3
-> --------------
->
-> The MW is approaching, but I'd like to make it more lovely if
-> I have some time.
->
-> While I was writing these patches, I noticed a kind of similarity
-> between Makefile and Kconfig.
->
-> Makefile can define variables and functions to do text processing
-> during the parse phase.  After parsing, it builds up dependency
-> graph, and moves on to the execution phase.  Then, it generates
-> objects as needed by checking time-stamps.
->
-> [Makefile]
->
->   OBJ := foo.o
->   SRC := foo.c
->   CC := gcc
->
->   $(OBJ): $(SRC)
->             $(CC) -c -o $(OBJ) $(SRC)
->
-> [Makefile after text processing]
->
->   foo.o: foo.c
->           gcc -c -o foo.o foo.c
->
-> Now, we are adding tools for text processing to Kconfig.  Functions
-> are statically expanded by the lexer.  After all source files are
-> parsed, Kconfig moves on to the evaluation phase.  Then, users can
-> tweak symbol values from menus.
->
-> So, we should be able to describe Kconfig like follows:
->
-> [Kconfig]
->
->    MY_SYMBOL := CC_STACKPROTECTOR
->    MY_PROMPT := "Stackprotector"
->    success = $(shell ($(1) && echo y) || echo n)
->    cc-option = $(success $CC -Werror $(1) -c -x c /dev/null -o /dev/null)
->
->    config $(MY_SYMBOL)
->            bool $(MY_PROMPT)
->            depends on $(cc-option -fstack-protector)
->
-> [Kconfig after text processing]
->
->    config CC_STACKPROTECTOR
->            bool "Stackptector"
->            depends on y
->
-> So, I think it is better to use '=' assignment for defining functions.
-> I will remove the 'macro' keyword.
-> Also, support variables.  A variable is a function with no argument.
-> So, it will be easy to implement it as a sub-set of function feature.
-> It is better to support two flavors of assignments, '=' and ':=' as well.
->
-> Masahiro Yamada (21):
->   kbuild: remove kbuild cache
->   kbuild: remove CONFIG_CROSS_COMPILE support
->   kconfig: move and rename sym_expand_string_value()
->   kconfig: reference environments directly and remove 'option env='
->     syntax
->   kconfig: remove string expansion in file_lookup()
->   kconfig: remove string expansion for mainmenu after yyparse()
->   kconfig: add function support and implement 'shell' function
->   kconfig: replace $UNAME_RELEASE with function call
->   kconfig: add 'macro' keyword to support user-defined function
->   kconfig: add 'success' and 'cc-option' macros
->   stack-protector: test compiler capability in Kconfig and drop AUTO
->     mode
->   kconfig: show compiler version text in the top comment
->   kconfig: add CC_IS_GCC and GCC_VERSION
->   kconfig: add CC_IS_CLANG and CLANG_VERSION
->   gcov: remove CONFIG_GCOV_FORMAT_AUTODETECT
->   kcov: imply GCC_PLUGINS and GCC_PLUGIN_SANCOV instead of select'ing
->     them
->   gcc-plugins: always build plugins with C++
->   gcc-plugins: move GCC version check for PowerPC to Kconfig
->   gcc-plugins: test GCC plugin support in Kconfig
->   gcc-plugins: enable GCC_PLUGINS for COMPILE_TEST
->   arm64: move GCC version check for ARCH_SUPPORTS_INT128 to Kconfig
->
->  Documentation/kbuild/kconfig-language.txt |   8 --
->  Kconfig                                   |   4 +-
->  Makefile                                  | 103 ++------------
->  arch/Kconfig                              |  37 ++---
->  arch/arm64/Kconfig                        |   1 +
->  arch/arm64/Makefile                       |   2 -
->  arch/powerpc/Kconfig                      |   2 +-
->  arch/sh/Kconfig                           |   4 +-
->  arch/sparc/Kconfig                        |   4 +-
->  arch/tile/Kconfig                         |   2 +-
->  arch/um/Kconfig.common                    |   4 -
->  arch/x86/Kconfig                          |  12 +-
->  arch/x86/um/Kconfig                       |   4 +-
->  init/Kconfig                              |  44 +++---
->  kernel/gcov/Kconfig                       |  17 +--
->  kernel/gcov/Makefile                      |   2 -
->  lib/Kconfig.debug                         |   7 +-
->  scripts/Kbuild.include                    | 101 ++------------
->  scripts/Makefile.gcc-plugins              |  95 ++++---------
->  scripts/clang-version.sh                  |  24 ++--
->  scripts/gcc-plugin.sh                     |  37 +----
->  scripts/gcc-plugins/Makefile              |  15 +-
->  scripts/gcc-x86_32-has-stack-protector.sh |   7 +-
->  scripts/gcc-x86_64-has-stack-protector.sh |   5 -
->  scripts/kconfig/confdata.c                |  31 +---
->  scripts/kconfig/env.c                     |  95 +++++++++++++
->  scripts/kconfig/function.c                | 225 ++++++++++++++++++++++++++++++
->  scripts/kconfig/kconf_id.c                |   1 -
->  scripts/kconfig/lkc.h                     |   9 +-
->  scripts/kconfig/lkc_proto.h               |   7 +-
->  scripts/kconfig/menu.c                    |   3 -
->  scripts/kconfig/symbol.c                  | 109 ---------------
->  scripts/kconfig/util.c                    |  96 ++++++++++---
->  scripts/kconfig/zconf.l                   |  51 ++++++-
->  scripts/kconfig/zconf.y                   |  35 ++---
->  35 files changed, 608 insertions(+), 595 deletions(-)
->  create mode 100644 scripts/kconfig/env.c
->  create mode 100644 scripts/kconfig/function.c
->
-> --
-> 2.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Wasn't there a v4 already? Is this really v5 instead of v3?
 
 
+On 03/27/2018 04:20 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> This series converts the only user of the handcoded, mach-specific reset
+> routines in the davinci platform to using the reset framework.
+> 
+> Patches 1-3 add necessary lookups/DT-properties.
 
-For convenience, the whole of this series is available at
-the following branch.
-
-git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-kbuild.git
- kconfig-shell-v2
-
-
--- 
-Best Regards
-Masahiro Yamada
+Should I just squash the DT changes into my common-clock-v9 branch
+since those patches haven't been picked up yet anyway? That will be
+2 fewer patches to keep track of.
