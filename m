@@ -1,36 +1,43 @@
-From: LinoSanfilippo@gmx.de (Lino Sanfilippo)
-Date: Tue, 27 Mar 2018 16:04:20 +0200
-Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers
- on weakly-ordered archs
-In-Reply-To: <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
-References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
- <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
- <1521849496.15055.16.camel@intel.com>
- <862cdbeafb9cfd272a426b010943ffc5@codeaurora.org>
- <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
-Message-ID: <trinity-6d247cd1-94e3-4a58-a762-77724e895644-1522159460624@3c-app-gmx-bs61>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 27 Mar 2018 16:05:23 +0200
+Subject: [GIT PULL] ARM: mvebu: dt for v4.17 (#2)
+Message-ID: <87po3ptxzw.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-> Double sorry now.
-> 
-> I don't know if you have been following "RFC on writel and writel_relaxed" thread
-> or not but there are some new developments about wmb() requirement. 
+Here is the second pull request for dt for mvebu for v4.17.
 
-Just out of interest: Where can this thread be found?
+Gregory
 
-> 
-> Basically, wmb() should never be used before writel() as writel() seem to
-> provide coherency and observability guarantee.
-> 
+The following changes since commit a83aeb3836b1cd65770b20eafefbef7467972fa2:
 
-AFAIU memory-barriers.txt writel() only guarantees correct order of accesses to
-IO-memory not RAM vs. IO-memory (this may be the case for some architectures 
-where the writel() implementation contains a wmb() but not for all).
-For the RAM vs. IO-memory case at least a a wmb()/rmb() has to be used. 
-Is this not correct? 
+  ARM: dts: armada388-clearfog: increase speed of i2c0 to 400kHz (2018-03-05 17:33:42 +0100)
 
-Regards,
-Lino
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.17-2
+
+for you to fetch changes up to 29e36c1f63d16c6fe895fa4e33b01e45a11f96de:
+
+  ARM: dts: armada388-clearfog: add SFP module support (2018-03-27 15:07:46 +0200)
+
+----------------------------------------------------------------
+mvebu dt for 4.17 (part 2)
+
+ - add SFP module support on the clearfog (Armada 388 based board)
+
+ - disable internal RTC node for Linksys boards (Armada 38x based
+   boards)
+
+----------------------------------------------------------------
+Hauke Mehrtens (1):
+      ARM: dts: armada-385-linksys: Disable internal RTC
+
+Russell King (1):
+      ARM: dts: armada388-clearfog: add SFP module support
+
+ arch/arm/boot/dts/armada-385-linksys.dtsi  |  5 ++++
+ arch/arm/boot/dts/armada-388-clearfog.dtsi | 45 ++++++++----------------------
+ 2 files changed, 17 insertions(+), 33 deletions(-)
