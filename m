@@ -1,75 +1,65 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 27 Mar 2018 11:56:47 -0700
-Subject: [PATCH 2/2] arm64: uaccess: Fix omissions from usercopy whitelist
-In-Reply-To: <1522174123-13987-3-git-send-email-Dave.Martin@arm.com>
-References: <1522174123-13987-1-git-send-email-Dave.Martin@arm.com>
- <1522174123-13987-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAGXu5jJ6qon=W7=WXtJ47Rb5nxqCSiZnE+m6v2rYx_7htpUG+A@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 27 Mar 2018 15:20:46 -0400
+Subject: [net-next PATCH v2 03/10] net: netcp: ethss: make call to
+ gbe_sgmii_config() conditional
+In-Reply-To: <20180327171343.GN5862@lunn.ch>
+References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+ <1522168309-12338-4-git-send-email-m-karicheri2@ti.com>
+ <20180327171343.GN5862@lunn.ch>
+Message-ID: <98f5d69b-5b2f-bf50-09ca-026b4c1ed15e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 11:08 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> When the hardend usercopy support was added for arm64, it was
-> concluded that all cases of usercopy into and out of thread_struct
-> were statically sized and so didn't require explicit whitelisting
-> of the appropriate fields in thread_struct.
->
-> Testing with usercopy hardening enabled has revealed that this is
-> not the case for certain ptrace regset manipulation calls on arm64.
-> This occurs because the sizes of usercopies associated with the
-> regset API are dynamic by construction, and because arm64 does not
-> always stage such copies via the stack: indeed the regset API is
-> designed to avoid the need for that by adding some bounds checking.
->
-> This is currently believed to affect only the fpsimd and TLS
-> registers.
->
-> Because the whitelisted fields in thread_struct must be contiguous,
-> this patch groups them together in a nested struct.  It is also
-> necessary to be able to determine the location and size of that
-> struct, so rather than making the struct anonymous (which would
-> save on edits elsewhere) or adding an anonymous union containing
-> named and unnamed instances of the same struct (gross), this patch
-> gives the struct a name and makes the necessary edits to code that
-> references it (noisy but simple).
->
-> Care is needed to ensure that the new struct does not contain
-> padding (which the usercopy hardening would fail to protect).
->
-> For this reason, the presence of tp2_value is made unconditional,
-> since a padding field would be needed there in any case.  This pads
-> up to the 16-byte alignment required by struct user_fpsimd_state.
->
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Fixes: 9e8084d3f761 ("arm64: Implement thread_struct whitelist for hardened usercopy")
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+On 03/27/2018 01:13 PM, Andrew Lunn wrote:
+> On Tue, Mar 27, 2018 at 12:31:42PM -0400, Murali Karicheri wrote:
+>> As a preparatory patch to add support for 2u cpsw hardware found on
+>> K2G SoC, make call to gbe_sgmii_config() conditional. This is required
+>> since 2u uses RGMII interface instead of SGMII and to allow for driver
+>> re-use.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>  drivers/net/ethernet/ti/netcp_ethss.c | 7 +++++--
+>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+>> index 56dbc0b..1dea891 100644
+>> --- a/drivers/net/ethernet/ti/netcp_ethss.c
+>> +++ b/drivers/net/ethernet/ti/netcp_ethss.c
+>> @@ -2271,7 +2271,8 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
+>>  
+>>  	void (*hndlr)(struct net_device *) = gbe_adjust_link;
+>>  
+>> -	gbe_sgmii_config(priv, slave);
+>> +	if ((priv->ss_version == GBE_SS_VERSION_14) || IS_SS_ID_NU(priv))
+>> +		gbe_sgmii_config(priv, slave);
+> 
+> Hi Murali
+> 
+> So you have:
+> 
+> #define IS_SS_ID_NU(d) \
+> 	(GBE_IDENT((d)->ss_version) == GBE_SS_ID_NU)
+> 
+> 
+> Does version 14 have a name? Could you add another IS_SS_ID_XX(d)
+> macro for it? That would make these statements more consistent.
+> 
+unfortunately not being the first version :)
 
-This looks great; thanks for tackling it!
+Probably we can add
 
-Acked-by: Kees Cook <keescook@chromium.org>
+#define IS_SS_ID_VER_14(d) \
+	(GBE_IDENT((d)->ss_version) == GBE_SS_VERSION_14)
 
-> +       /*
-> +        * Whitelisted fields for hardened usercopy:
-> +        * Maintainers must ensure manually that this contains no
-> +        * implicit padding.
-> +        */
-> +       struct {
-> +               unsigned long   tp_value;       /* TLS register */
-> +               unsigned long   tp2_value;
-> +               struct user_fpsimd_state fpsimd_state;
-> +       } uw;
+and replace all instances of (priv->ss_version == GBE_SS_VERSION_14) with
+	if (IS_SS_ID_VER_14(priv)) or equivalent. 
 
-I assume "uw" means "usercopy whitelist"?
 
-To enforce the padding check, maybe add something like:
+> 	Andrew
+> 
 
-BUILD_BUG_ON(sizeof_field(struct thread_struct, uw) !=
-        sizeof_field(struct thread_struct, uw.tp_value) +
-        sizeof_field(struct thread_struct, uw.tp2_value) +
-        sizeof_field(struct thread_struct, uw.fpsimd_state))
-
--Kees
 
 -- 
-Kees Cook
-Pixel Security
+Murali Karicheri
+Linux Kernel, Keystone
