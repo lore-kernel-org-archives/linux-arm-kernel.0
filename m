@@ -1,83 +1,62 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 27 Mar 2018 10:16:52 +0200
-Subject: [PATCH v6] ARM: dts: wheat: Fix ADV7513 address usage
-In-Reply-To: <d2c5d935-da1f-038b-a0e6-ce390273e21a@ideasonboard.com>
-References: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
- <20180323085140.g3golwdtpezo7fhi@verge.net.au>
- <a771042b-f63a-d00f-73a1-91a7e6089fe4@ideasonboard.com>
- <20180326083143.r6jz6csckd4ljnpu@verge.net.au>
- <d2c5d935-da1f-038b-a0e6-ce390273e21a@ideasonboard.com>
-Message-ID: <20180327081652.5v6wqwfjyb2kvimc@verge.net.au>
+Date: Tue, 27 Mar 2018 10:17:16 +0200
+Subject: [PATCH v2 2/3] arm64: dts: renesas: salvator-common: Configure
+ PMIC for DDR Backup Power
+In-Reply-To: <CAMuHMdW5ox34+_Z76T+cDyZeuJJE4OZ8=hEpdjbCcg+TwSX61A@mail.gmail.com>
+References: <1521029386-29975-1-git-send-email-geert+renesas@glider.be>
+ <1521029386-29975-3-git-send-email-geert+renesas@glider.be>
+ <9c6289e4-23dd-c79b-bd1f-058d843739d2@cogentembedded.com>
+ <CAMuHMdUO-Op4u44naZJ37VgzN1GJBL33yRWnF11D9a24y8+x1g@mail.gmail.com>
+ <1ae32fee-578e-1091-561a-200a8036b670@cogentembedded.com>
+ <20180326090625.espsuzblp7gy767t@verge.net.au>
+ <CAMuHMdW5ox34+_Z76T+cDyZeuJJE4OZ8=hEpdjbCcg+TwSX61A@mail.gmail.com>
+Message-ID: <20180327081715.rab6rr4xobmgwofl@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 10:04:24AM +0100, Kieran Bingham wrote:
+On Mon, Mar 26, 2018 at 11:13:54AM +0200, Geert Uytterhoeven wrote:
 > Hi Simon,
 > 
-> On 26/03/18 09:31, Simon Horman wrote:
-> > On Fri, Mar 23, 2018 at 09:16:13PM +0000, Kieran Bingham wrote:
-> >> Hi Simon,
+> On Mon, Mar 26, 2018 at 11:06 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Mar 16, 2018 at 03:08:13PM +0300, Sergei Shtylyov wrote:
+> >> On 03/16/2018 03:00 PM, Geert Uytterhoeven wrote:
 > >>
-> >> On 23/03/18 08:51, Simon Horman wrote:
-> >>> On Thu, Mar 22, 2018 at 09:30:40PM +0000, Kieran Bingham wrote:
-> >>>> The r8a7792 Wheat board has two ADV7513 devices sharing a single I2C
-> >>>> bus, however in low power mode the ADV7513 will reset it's slave maps to
-> >>>> use the hardware defined default addresses.
-> >>>>
-> >>>> The ADV7511 driver was adapted to allow the two devices to be registered
-> >>>> correctly - but it did not take into account the fault whereby the
-> >>>> devices reset the addresses.
-> >>>>
-> >>>> This results in an address conflict between the device using the default
-> >>>> addresses, and the other device if it is in low-power-mode.
-> >>>>
-> >>>> Repair this issue by moving both devices away from the default address
-> >>>> definitions.
-> >>>
-> >>> Hi Kierean,
-> >>>
-> >>> as this is a fix
-> >>> a) Does it warrant a fixes tag?
-> >>>    Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
-> >>> b) Does it warrant being posted as a fix for v4.16;
-> >>> c) or v4.17?
+> >> >>> On Salvator-X(S), all of the DDR0, DDR1, DDR0C, and DDR1C power rails
+> >> >>> need to be kept powered when backup mode is enabled.  Reflect this in
+> >> >>> the "rohm,ddr-backup-power" property for the BD9571MWV PMIC node.
+> >> >>>
+> >> >>> The accessory power switch (SW23) is a toggle switch, hense specify
+> >> >>> "rohm,rstbmode-level".
+> >> >>>
+> >> >>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> >>> ---
+> >> >>> v2:
+> >> >>>   - Add rohm,rstbmode-level.
+> >> >>> ---
+> >> >>>  arch/arm64/boot/dts/renesas/salvator-common.dtsi | 2 ++
+> >> >>>  1 file changed, 2 insertions(+)
+> >> >>>
+> >> >>> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> >> >>> index 2a7f36abd2dd85c6..80794c38c2669d75 100644
+> >> >>> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> >> >>> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+> >> >>> @@ -376,6 +376,8 @@
+> >> >>>               #interrupt-cells = <2>;
+> >> >>>               gpio-controller;
+> >> >>>               #gpio-cells = <2>;
+> >> >>> +             rohm,ddr-backup-power = <15>;
+> >> >>
+> >> >>   Why not 0xf if those are all bit flags?
+> >> >
+> >> > Because it's a small number?
+> >> > Does it matter?
 > >>
-> >> Tricky one, yes it could but this DTS fix, will only actually 'fix' the issue if
-> >> the corresponding driver updates to allow secondary addresses to be parsed are
-> >> also backported.
-> >>
-> >> It should be safe to back port the dts fix without the driver updates, but the
-> >> addresses specified by this patch will simply be ignored.
-> > 
-> > In that case I think its safe to add the fixes tag and take the DTS patch
-> > via the renesas tree. Perhaps applying it for v4.18 and allowing automatic
-> > backporting to take its course is the cleanest option.
-> > 
-> >> Thus if this is marked with the fixes tag the corresponding patch "drm: adv7511:
-> >> Add support for i2c_new_secondary_device" should also be marked.
-> >>
-> >> It looks like that patch has yet to be picked up by the DRM subsystem, so how
-> >> about I bundle both of these two patches together in a repost along with the
-> >> fixes tag.
-> >>
-> >> In fact, I don't think the ADV7511 dt-bindings update has made any progress
-> >> either. (dt-bindings: adv7511: Extend bindings to allow specifying slave map
-> >> addresses). The media tree variants for the adv7604 have already been picked up
-> >> by Mauro I believe though.
-> >>
-> >> I presume it would be acceptable for this dts patch (or rather all three patches
-> >> mentioned) to get integrated through the DRM tree ?
-> > 
-> > Unless there is a strong reason I would prefer the dts patch to go via
-> > my tree. The reason is to avoid merge conflicts bubbling up to Linus,
-> > which really is something best avoided.
+> >>    I think hex is preferable for the bit flags. Decimal makes one think it's something
+> >> else -- some magnitude, etc...
+> >
+> > Geert, it seems that Rob Herring is of the same opinion.
+> > Would you care to respin this series?
 > 
-> That's perfectly fine with me.
-> 
-> Feel free to add:
-> 
-> Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
-> 
-> as you suggested when you apply, or alternatively let me know if you need a repost.
+> Sure, after the respun driver series has been accepted.
 
-Thanks, applied for v4.18 with the fixes tag.
+Perfect, thanks!
