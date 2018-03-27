@@ -1,42 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 16:10:53 +0200
-Subject: [GIT PULL] ARM: mvebu: dt for v4.17 (#spdx)
-In-Reply-To: <87o9j9txwv.fsf@bootlin.com>
-References: <87o9j9txwv.fsf@bootlin.com>
-Message-ID: <CAK8P3a1DavH9uQuB3JTvPY5e_T79MDeXXwZ_zM2ZeUwFtCQyDg@mail.gmail.com>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Tue, 27 Mar 2018 17:11:20 +0300
+Subject: [PATCH] clk: imx7d: Add USB clock information
+Message-ID: <1522159880-16694-1-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 4:07 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
->
-> Here is the SPDX pull request for dt for mvebu for v4.17.
->
-> Gregory
->
-> The following changes since commit 29e36c1f63d16c6fe895fa4e33b01e45a11f96de:
->
->   ARM: dts: armada388-clearfog: add SFP module support (2018-03-27 15:07:46 +0200)
->
-> are available in the Git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.17-spdx
->
-> for you to fetch changes up to eb59e09203312de2112b63e0f4c4b4278e4daab9:
->
->   arm: dts: kirkwood*.dts: use SPDX-License-Identifier for board using GPL-2.0+ (2018-03-27 15:43:12 +0200)
->
-> ----------------------------------------------------------------
-> mvebu SPDX dt for 4.17
->
-> convert to the SPDX-License-Identifier for the Kirkwood and the Armada
-> based device tree files.
->
-> Compared to the series submitted most of the patch have been squashed:
-> the result is grouped by SoC, boards, type of licenses and the patches
-> that were explicitly acked on the mailing list.
+From: Peter Chen <peter.chen@freescale.com>
 
-Pulled into next/dt, thanks a lot for respinning the series so fast!
+Add USB clock information, the pll_usb_main_clk is USB_PLL at CCM
+which is the output of USBOTG2 PHY.
 
-      Arnd
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
+Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+---
+ drivers/clk/imx/clk-imx7d.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index 89bfa75..39d110b 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -801,7 +801,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk", "ipg_root_clk", base + 0x4230, 0);
+ 	clks[IMX7D_SNVS_CLK] = imx_clk_gate4("snvs_clk", "ipg_root_clk", base + 0x4250, 0);
+ 	clks[IMX7D_CAAM_CLK] = imx_clk_gate4("caam_clk", "ipg_root_clk", base + 0x4240, 0);
+-	clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
++	clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4690, 0);
+ 	clks[IMX7D_SDMA_CORE_CLK] = imx_clk_gate4("sdma_root_clk", "ahb_root_clk", base + 0x4480, 0);
+ 	clks[IMX7D_PCIE_CTRL_ROOT_CLK] = imx_clk_gate4("pcie_ctrl_root_clk", "pcie_ctrl_post_div", base + 0x4600, 0);
+ 	clks[IMX7D_PCIE_PHY_ROOT_CLK] = imx_clk_gate4("pcie_phy_root_clk", "pcie_phy_post_div", base + 0x4600, 0);
+@@ -867,6 +867,9 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_CSI_MCLK_ROOT_CLK] = imx_clk_gate4("csi_mclk_root_clk", "csi_mclk_post_div", base + 0x4490, 0);
+ 	clks[IMX7D_AUDIO_MCLK_ROOT_CLK] = imx_clk_gate4("audio_mclk_root_clk", "audio_mclk_post_div", base + 0x4790, 0);
+ 	clks[IMX7D_WRCLK_ROOT_CLK] = imx_clk_gate4("wrclk_root_clk", "wrclk_post_div", base + 0x47a0, 0);
++	clks[IMX7D_USB_CTRL_CLK] = imx_clk_gate4("usb_ctrl_clk", "ahb_root_clk", base + 0x4680, 0);
++	clks[IMX7D_USB_PHY1_CLK] = imx_clk_gate4("usb_phy1_clk", "pll_usb1_main_clk", base + 0x46a0, 0);
++	clks[IMX7D_USB_PHY2_CLK] = imx_clk_gate4("usb_phy2_clk", "pll_usb_main_clk", base + 0x46b0, 0);
+ 	clks[IMX7D_ADC_ROOT_CLK] = imx_clk_gate4("adc_root_clk", "ipg_root_clk", base + 0x4200, 0);
+ 
+ 	clks[IMX7D_GPT_3M_CLK] = imx_clk_fixed_factor("gpt_3m", "osc", 1, 8);
+@@ -892,6 +895,10 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	/* set uart module clock's parent clock source that must be great then 80MHz */
+ 	clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
+ 
++	/* Set clock rate for USBPHY, the USB_PLL at CCM is from USBOTG2 */
++	clks[IMX7D_USB1_MAIN_480M_CLK] = imx_clk_fixed_factor("pll_usb1_main_clk", "osc", 20, 1);
++	clks[IMX7D_USB_MAIN_480M_CLK] = imx_clk_fixed_factor("pll_usb_main_clk", "osc", 20, 1);
++
+ 	imx_register_uart_clocks(uart_clks);
+ 
+ }
+-- 
+2.7.4
