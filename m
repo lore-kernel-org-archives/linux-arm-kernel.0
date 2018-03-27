@@ -1,195 +1,179 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 27 Mar 2018 14:15:25 +0100
-Subject: [PATCH v2 15/17] vgic: Add support for 52bit guest physical address
-In-Reply-To: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1522156531-28348-16-git-send-email-suzuki.poulose@arm.com>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Tue, 27 Mar 2018 13:19:48 +0000
+Subject: [PATCH v3 2/4] drivers/staging/fsl-mc: Fix DPIO error path issues
+References: <1522091134-24646-1-git-send-email-roy.pledge@nxp.com>
+ <1522091134-24646-3-git-send-email-roy.pledge@nxp.com>
+ <5e91615b-b2b4-4fe3-4d25-1ae56624976b@arm.com>
+Message-ID: <DB6PR04MB2999389243117938BCBA141686AC0@DB6PR04MB2999.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kristina Martsenko <kristina.martsenko@arm.com>
-
-Add support for handling 52bit guest physical address to the
-VGIC layer. So far we have limited the guest physical address
-to 48bits, by explicitly masking the upper bits. This patch
-removes the restriction. We do not have to check if the host
-supports 52bit as the gpa is always validated during an access.
-(e.g, kvm_{read/write}_guest, kvm_is_visible_gfn()).
-Also, the ITS table save-restore is also not affected with
-the enhancement. The DTE entries already store the bits[51:8]
-of the ITT_addr (with a 256byte alignment).
-
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
-[ Macro clean ups, fix PROPBASER and PENDBASER accesses ]
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- include/linux/irqchip/arm-gic-v3.h |  5 +++++
- virt/kvm/arm/vgic/vgic-its.c       | 37 ++++++++++---------------------------
- virt/kvm/arm/vgic/vgic-mmio-v3.c   |  2 --
- 3 files changed, 15 insertions(+), 29 deletions(-)
-
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index c00c4c33..d9c60eb 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -344,6 +344,8 @@
- #define GITS_CBASER_RaWaWt	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWt)
- #define GITS_CBASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWb)
- 
-+#define GITS_CBASER_ADDRESS(cbaser)	((cbaser) & GENMASK_ULL(52, 12))
-+
- #define GITS_BASER_NR_REGS		8
- 
- #define GITS_BASER_VALID			(1ULL << 63)
-@@ -375,6 +377,9 @@
- #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
- #define GITS_BASER_PHYS_52_to_48(phys)					\
- 	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
-+#define GITS_BASER_ADDR_48_to_52(baser)					\
-+	(((baser) & GENMASK_ULL(47, 16)) | (((baser) >> 12) & 0xf) << 48)
-+
- #define GITS_BASER_SHAREABILITY_SHIFT	(10)
- #define GITS_BASER_InnerShareable					\
- 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4650953..ae6bfaf 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -233,13 +233,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
- 	list_for_each_entry(dev, &(its)->device_list, dev_list) \
- 		list_for_each_entry(ite, &(dev)->itt_head, ite_list)
- 
--/*
-- * We only implement 48 bits of PA at the moment, although the ITS
-- * supports more. Let's be restrictive here.
-- */
--#define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
--#define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
--
- #define GIC_LPI_OFFSET 8192
- 
- #define VITS_TYPER_IDBITS 16
-@@ -745,6 +738,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- {
- 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
- 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
-+	phys_addr_t base = GITS_BASER_ADDR_48_to_52(baser);
- 	int esz = GITS_BASER_ENTRY_SIZE(baser);
- 	int index;
- 	gfn_t gfn;
-@@ -769,7 +763,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- 		if (id >= (l1_tbl_size / esz))
- 			return false;
- 
--		addr = BASER_ADDRESS(baser) + id * esz;
-+		addr = base + id * esz;
- 		gfn = addr >> PAGE_SHIFT;
- 
- 		if (eaddr)
-@@ -783,8 +777,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- 		return false;
- 
- 	/* Each 1st level entry is represented by a 64-bit value. */
--	if (kvm_read_guest(its->dev->kvm,
--			   BASER_ADDRESS(baser) + index * sizeof(indirect_ptr),
-+	if (kvm_read_guest(its->dev->kvm, base + index * sizeof(indirect_ptr),
- 			   &indirect_ptr, sizeof(indirect_ptr)))
- 		return false;
- 
-@@ -794,11 +787,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
- 	if (!(indirect_ptr & BIT_ULL(63)))
- 		return false;
- 
--	/*
--	 * Mask the guest physical address and calculate the frame number.
--	 * Any address beyond our supported 48 bits of PA will be caught
--	 * by the actual check in the final step.
--	 */
-+	/* Mask the guest physical address and calculate the frame number. */
- 	indirect_ptr &= GENMASK_ULL(51, 16);
- 
- 	/* Find the address of the actual entry */
-@@ -1290,9 +1279,6 @@ static u64 vgic_sanitise_its_baser(u64 reg)
- 				  GITS_BASER_OUTER_CACHEABILITY_SHIFT,
- 				  vgic_sanitise_outer_cacheability);
- 
--	/* Bits 15:12 contain bits 51:48 of the PA, which we don't support. */
--	reg &= ~GENMASK_ULL(15, 12);
--
- 	/* We support only one (ITS) page size: 64K */
- 	reg = (reg & ~GITS_BASER_PAGE_SIZE_MASK) | GITS_BASER_PAGE_SIZE_64K;
- 
-@@ -1311,11 +1297,8 @@ static u64 vgic_sanitise_its_cbaser(u64 reg)
- 				  GITS_CBASER_OUTER_CACHEABILITY_SHIFT,
- 				  vgic_sanitise_outer_cacheability);
- 
--	/*
--	 * Sanitise the physical address to be 64k aligned.
--	 * Also limit the physical addresses to 48 bits.
--	 */
--	reg &= ~(GENMASK_ULL(51, 48) | GENMASK_ULL(15, 12));
-+	/* Sanitise the physical address to be 64k aligned. */
-+	reg &= ~GENMASK_ULL(15, 12);
- 
- 	return reg;
- }
-@@ -1361,7 +1344,7 @@ static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
- 	if (!its->enabled)
- 		return;
- 
--	cbaser = CBASER_ADDRESS(its->cbaser);
-+	cbaser = GITS_CBASER_ADDRESS(its->cbaser);
- 
- 	while (its->cwriter != its->creadr) {
- 		int ret = kvm_read_guest(kvm, cbaser + its->creadr,
-@@ -2219,7 +2202,7 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
- 	if (!(baser & GITS_BASER_VALID))
- 		return 0;
- 
--	l1_gpa = BASER_ADDRESS(baser);
-+	l1_gpa = GITS_BASER_ADDR_48_to_52(baser);
- 
- 	if (baser & GITS_BASER_INDIRECT) {
- 		l1_esz = GITS_LVL1_ENTRY_SIZE;
-@@ -2291,7 +2274,7 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
- {
- 	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
- 	u64 baser = its->baser_coll_table;
--	gpa_t gpa = BASER_ADDRESS(baser);
-+	gpa_t gpa = GITS_BASER_ADDR_48_to_52(baser);
- 	struct its_collection *collection;
- 	u64 val;
- 	size_t max_size, filled = 0;
-@@ -2340,7 +2323,7 @@ static int vgic_its_restore_collection_table(struct vgic_its *its)
- 	if (!(baser & GITS_BASER_VALID))
- 		return 0;
- 
--	gpa = BASER_ADDRESS(baser);
-+	gpa = GITS_BASER_ADDR_48_to_52(baser);
- 
- 	max_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
- 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 671fe81..80e0d15 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -333,7 +333,6 @@ static u64 vgic_sanitise_pendbaser(u64 reg)
- 				  vgic_sanitise_outer_cacheability);
- 
- 	reg &= ~PENDBASER_RES0_MASK;
--	reg &= ~GENMASK_ULL(51, 48);
- 
- 	return reg;
- }
-@@ -351,7 +350,6 @@ static u64 vgic_sanitise_propbaser(u64 reg)
- 				  vgic_sanitise_outer_cacheability);
- 
- 	reg &= ~PROPBASER_RES0_MASK;
--	reg &= ~GENMASK_ULL(51, 48);
- 	return reg;
- }
- 
--- 
-2.7.4
+On 3/27/2018 7:05 AM, Robin Murphy wrote:
+> Hi Roy,
+>
+> On 26/03/18 20:05, Roy Pledge wrote:
+>> The error path in the dpaa2_dpio_probe() function was not properly
+>> unmapping the QBMan device memory on the error path. This was also
+>> missing from the dpaa2_dpio_release() function.
+>>
+>> Also addresses a memory leak of the device private data structure.
+>>
+>> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+>> ---
+>>    drivers/staging/fsl-mc/bus/dpio/dpio-driver.c | 49 +++++++++++++++++++--------
+>>    1 file changed, 34 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
+>> index e00f473..e7a0009 100644
+>> --- a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
+>> +++ b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
+>> @@ -28,6 +28,7 @@ MODULE_DESCRIPTION("DPIO Driver");
+>>    
+>>    struct dpio_priv {
+>>    	struct dpaa2_io *io;
+>> +	struct dpaa2_io_desc desc;
+>>    };
+>>    
+>>    static irqreturn_t dpio_irq_handler(int irq_num, void *arg)
+>> @@ -85,7 +86,6 @@ static int register_dpio_irq_handlers(struct fsl_mc_device *dpio_dev, int cpu)
+>>    static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    {
+>>    	struct dpio_attr dpio_attrs;
+>> -	struct dpaa2_io_desc desc;
+>>    	struct dpio_priv *priv;
+>>    	int err = -ENOMEM;
+>>    	struct device *dev = &dpio_dev->dev;
+>> @@ -117,7 +117,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    		dev_err(dev, "dpio_get_attributes() failed %d\n", err);
+>>    		goto err_get_attr;
+>>    	}
+>> -	desc.qman_version = dpio_attrs.qbman_version;
+>> +	priv->desc.qman_version = dpio_attrs.qbman_version;
+>>    
+>>    	err = dpio_enable(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>>    	if (err) {
+>> @@ -126,9 +126,9 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    	}
+>>    
+>>    	/* initialize DPIO descriptor */
+>> -	desc.receives_notifications = dpio_attrs.num_priorities ? 1 : 0;
+>> -	desc.has_8prio = dpio_attrs.num_priorities == 8 ? 1 : 0;
+>> -	desc.dpio_id = dpio_dev->obj_desc.id;
+>> +	priv->desc.receives_notifications = dpio_attrs.num_priorities ? 1 : 0;
+>> +	priv->desc.has_8prio = dpio_attrs.num_priorities == 8 ? 1 : 0;
+>> +	priv->desc.dpio_id = dpio_dev->obj_desc.id;
+>>    
+>>    	/* get the cpu to use for the affinity hint */
+>>    	if (next_cpu == -1)
+>> @@ -139,19 +139,28 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    	if (!cpu_possible(next_cpu)) {
+>>    		dev_err(dev, "probe failed. Number of DPIOs exceeds NR_CPUS.\n");
+>>    		err = -ERANGE;
+>> -		goto err_allocate_irqs;
+>> +		goto err_too_many_cpu;
+>>    	}
+>> -	desc.cpu = next_cpu;
+>> +	priv->desc.cpu = next_cpu;
+>>    
+>>    	/*
+>>    	 * Set the CENA regs to be the cache inhibited area of the portal to
+>>    	 * avoid coherency issues if a user migrates to another core.
+>>    	 */
+>> -	desc.regs_cena = memremap(dpio_dev->regions[1].start,
+>> -				  resource_size(&dpio_dev->regions[1]),
+>> -				  MEMREMAP_WC);
+>> -	desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
+>> -				 resource_size(&dpio_dev->regions[1]));
+>> +	priv->desc.regs_cena = memremap(dpio_dev->regions[1].start,
+>> +					resource_size(&dpio_dev->regions[1]),
+>> +					MEMREMAP_WC);
+> Since you already have some devres-managed resources in this driver,
+> maybe use devm_memremap? (and perhaps convert the existing ioremap too)
+That would make since - will do.
+>
+>> +	if (!priv->desc.regs_cena) {
+>> +		dev_err(dev, "memremap failed\n");
+>> +		goto err_too_many_cpu;
+>> +	}
+>> +
+>> +	priv->desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
+>> +				       resource_size(&dpio_dev->regions[1]));
+>> +	if (!priv->desc.regs_cinh) {
+>> +		dev_err(dev, "ioremap failed\n");
+>> +		goto err_ioremap_failed;
+>> +	}
+>>    
+>>    	err = fsl_mc_allocate_irqs(dpio_dev);
+>>    	if (err) {
+>> @@ -159,11 +168,11 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    		goto err_allocate_irqs;
+>>    	}
+>>    
+>> -	err = register_dpio_irq_handlers(dpio_dev, desc.cpu);
+>> +	err = register_dpio_irq_handlers(dpio_dev, priv->desc.cpu);
+>>    	if (err)
+>>    		goto err_register_dpio_irq;
+>>    
+>> -	priv->io = dpaa2_io_create(&desc);
+>> +	priv->io = dpaa2_io_create(&priv->desc);
+>>    	if (!priv->io) {
+>>    		dev_err(dev, "dpaa2_io_create failed\n");
+>>    		goto err_dpaa2_io_create;
+>> @@ -171,7 +180,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    
+>>    	dev_info(dev, "probed\n");
+>>    	dev_dbg(dev, "   receives_notifications = %d\n",
+>> -		desc.receives_notifications);
+>> +		priv->desc.receives_notifications);
+>>    	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>>    	fsl_mc_portal_free(dpio_dev->mc_io);
+>>    
+>> @@ -182,6 +191,10 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    err_register_dpio_irq:
+>>    	fsl_mc_free_irqs(dpio_dev);
+>>    err_allocate_irqs:
+>> +	iounmap(priv->desc.regs_cinh);
+>> +err_ioremap_failed:
+>> +	memunmap(priv->desc.regs_cena);
+> ...then you wouldn't need to worry about this.
+>
+>> +err_too_many_cpu:
+>>    	dpio_disable(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>>    err_get_attr:
+>>    	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>> @@ -189,6 +202,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>>    	fsl_mc_portal_free(dpio_dev->mc_io);
+>>    err_mcportal:
+>>    	dev_set_drvdata(dev, NULL);
+>> +	devm_kfree(dev, priv);
+> The whole point of devm_* is that you don't need to do this - the devres
+> entries are freed automatically by the driver core upon probe failure or
+> driver detach, i.e. priv was never leaking.
+Right - Not sure what I was thinking yesterday. I think I saw the alloc 
+without free and instinctively
+added it.? I will remove this.
+>
+>>    err_priv_alloc:
+>>    	return err;
+>>    }
+>> @@ -230,8 +244,13 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+>>    
+>>    	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>>    
+>> +	iounmap(priv->desc.regs_cinh);
+>> +	memunmap(priv->desc.regs_cena);
+>> +
+>>    	fsl_mc_portal_free(dpio_dev->mc_io);
+>>    
+>> +	devm_kfree(dev, priv);
+>> +
+>>    	dev_set_drvdata(dev, NULL);
+> Note that clearing drvdata is something else the driver core already
+> does at about the same time as cleaning up devres entries (see
+> __device_release_driver() and the failure path of really_probe(), in
+> drivers/base/dd.c), so this has been similarly superfluous all along.
+Yes I'll clean this up too.? Thanks for the comments, this will make 
+things better for sure.
+>
+> Robin.
+>
