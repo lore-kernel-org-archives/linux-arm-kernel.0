@@ -1,53 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 09:59:43 +0200
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-In-Reply-To: <20180327075520.GA3245@dragon>
-References: <20180327091026.3facbb9d@canb.auug.org.au>
- <20180327075520.GA3245@dragon>
-Message-ID: <CAK8P3a3QBmRBgaJg2n=DcwY7wJaB902Rk7h5kGd_WxqTVSTGog@mail.gmail.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Tue, 27 Mar 2018 10:00:43 +0200
+Subject: [PATCH 02/10] drm/sun4i: Disable YUV channel when using the
+ frontend and set interlace
+In-Reply-To: <20180323095529.5nptn5achjt3esog@flea>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-3-paul.kocialkowski@bootlin.com>
+ <20180323095529.5nptn5achjt3esog@flea>
+Message-ID: <1522137643.1110.4.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 9:55 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Tue, Mar 27, 2018 at 09:10:26AM +1100, Stephen Rothwell wrote:
->> Hi Shawn,
->>
->> Today's linux-next merge of the imx-mxs tree got a conflict in:
->>
->>   arch/arm/configs/mxs_defconfig
->>
->> between commit:
->>
->>   e3e583e7a293 ("ARM: mxs_defconfig: Re-sync defconfig")
->>
->> from the arm-soc tree and commit:
->>
->>   8bc2c29b550c ("ARM: mxs_defconfig: Re-sync defconfig")
->>
->> from the imx-mxs tree.
->>
->> I fixed it up (I just used the latter version) and can carry the fix as
->> necessary. This is now fixed as far as linux-next is concerned, but any
->> non trivial conflicts should be mentioned to your upstream maintainer
->> when your tree is submitted for merging.  You may also want to consider
->> cooperating with the maintainer of the conflicting tree to minimise any
->> particularly complex conflicts.
->
-> Thanks, Stephen.  We will sort this out on arm-soc tree.
->
-> Arnd,
->
-> You pulled "[GIT PULL 6/6] i.MX defconfig updates for 4.17" [1]?
-> I thought you did not pull it, and updated it with v2 to address your
-> comment.  Let me know which one you want to send upstream.  Thanks.
+Hi,
 
-I also thought I had not pulled it, but it seems that I did: I definitely
-pulled it in at first and then sent the email about it, planning to undo
-the merge before pushing the branch to git.kernel.org.
+On Fri, 2018-03-23 at 10:55 +0100, Maxime Ripard wrote:
+> On Wed, Mar 21, 2018 at 04:28:56PM +0100, Paul Kocialkowski wrote:
+> > The YUV channel was only disabled in
+> > sun4i_backend_update_layer_formats,
+> > which is not called when the frontend is selected.
+> > 
+> > Thus, creating a layer with a YUV format handled by the backend and
+> > then
+> > switching to a format that requires the frontend would keep the YUV
+> > channel enabled for the layer.
+> > 
+> > This explicitly disables the YUV channel for the layer when using
+> > the
+> > frontend as well. It also sets the relevant interlace bit, which was
+> > missing in the frontend path as well.
+> 
+> This should be part of a separate patch. Usually, if you write "it
+> also does..." at the end of your commit log, it's a pretty good
+> indication that it should be another patch :)
 
-The merge is currently at the top of the next/soc branch, so I'll undo
-that and pull your new one instead.
+I must say, I figured that this part was missing in the frontend path by
+chance and couldn't really test the feature, so I'm also tempted to drop
+it altogether. What do you think?
 
-Sorry about messing it up.
+Also, is interlacing actually used on any of the video outputs we
+support? Perhaps RGB?
 
-        Arnd
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 17 ++++++++++++++++-
+> >  drivers/gpu/drm/sun4i/sun4i_backend.h |  3 ++-
+> >  drivers/gpu/drm/sun4i/sun4i_layer.c   |  2 +-
+> >  3 files changed, 19 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > index e07a33adc51d..b98dafda52f8 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> > @@ -294,8 +294,10 @@ int sun4i_backend_update_layer_formats(struct
+> > sun4i_backend *backend,
+> >  }
+> >  
+> >  int sun4i_backend_update_layer_frontend(struct sun4i_backend
+> > *backend,
+> > -					int layer, uint32_t fmt)
+> > +					int layer, struct drm_plane
+> > *plane,
+> > +					uint32_t fmt)
+> >  {
+> > +	bool interlaced = false;
+> 
+> There's no need to pass the full drm_plane pointer, you can just pass
+> a boolean to tell if it is interlaced or not.
+
+Yes that'll do just as well.
+
+Thanks,
+
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/82778e66/attachment.sig>
