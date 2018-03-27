@@ -1,66 +1,55 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Mar 2018 12:31:47 -0400
-Subject: [net-next PATCH v2 08/10] net: netcp: ethss: use of_get_phy_mode() to
- support different RGMII modes
-In-Reply-To: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
-References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1522168309-12338-9-git-send-email-m-karicheri2@ti.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 28 Mar 2018 01:31:15 +0900
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for 4.17 (2nd)
+Message-ID: <CAK7LNAQWikF9K41uzkQjixUEO=_s14txEhvd=rmLY69JShezKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy used for K2G allows for internal delays to be added optionally
-to the clock circuitry based on board desing. To add this support,
-enhance the driver to use of_get_phy_mode() to read the phy-mode from
-the phy device and pass the same to phy through of_phy_connect().
+Hi Arnd, Olof,
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/net/ethernet/ti/netcp_ethss.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Sorry for this very late pull request.
+If possible, could you pull a little more for v4.17-rc1 ?
 
-diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
-index 26ccddb..df163ec 100644
---- a/drivers/net/ethernet/ti/netcp_ethss.c
-+++ b/drivers/net/ethernet/ti/netcp_ethss.c
-@@ -21,6 +21,7 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of_mdio.h>
-+#include <linux/of_net.h>
- #include <linux/of_address.h>
- #include <linux/if_vlan.h>
- #include <linux/ptp_classify.h>
-@@ -700,6 +701,7 @@ struct gbe_slave {
- 	u32				link_interface;
- 	u32				mac_control;
- 	u8				phy_port_t;
-+	struct device_node		*node;
- 	struct device_node		*phy_node;
- 	struct ts_ctl                   ts_ctl;
- 	struct list_head		slave_list;
-@@ -2317,6 +2319,15 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
- 		has_phy = true;
- 		phy_mode = PHY_INTERFACE_MODE_SGMII;
- 		slave->phy_port_t = PORT_MII;
-+	} else if (slave->link_interface == RGMII_LINK_MAC_PHY) {
-+		has_phy = true;
-+		phy_mode = of_get_phy_mode(slave->node);
-+		/* if phy-mode is not present, default to
-+		 * PHY_INTERFACE_MODE_RGMII
-+		 */
-+		if (phy_mode < 0)
-+			phy_mode = PHY_INTERFACE_MODE_RGMII;
-+		slave->phy_port_t = PORT_MII;
- 	} else if (slave->link_interface == XGMII_LINK_MAC_PHY) {
- 		has_phy = true;
- 		phy_mode = PHY_INTERFACE_MODE_NA;
-@@ -2942,6 +2953,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
- 		slave->link_interface = SGMII_LINK_MAC_PHY;
- 	}
- 
-+	slave->node = node;
- 	slave->open = false;
- 	if ((slave->link_interface == SGMII_LINK_MAC_PHY) ||
- 	    (slave->link_interface == RGMII_LINK_MAC_PHY) ||
+
+
+The following changes since commit 7f9f76b10dbe3f2585a21699312f74ed2b544b84:
+
+  ARM: dts: uniphier: add sound node for PXs2 (2018-03-15 23:19:05 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-dt-v4.17-2
+
+for you to fetch changes up to aba054a1cd45d87ce473fea6cabbf4b2dc677569:
+
+  arm64: dts: uniphier: add ethernet node for PXs3 (2018-03-28 01:16:18 +0900)
+
+----------------------------------------------------------------
+UniPhier ARM SoC DT updates for v4.17 (2nd)
+
+- add syscon property to sound nodes
+- add more ethernet pin groups
+- add ethernet support for PXs3 SoC
+
+----------------------------------------------------------------
+Katsuhiro Suzuki (2):
+      arm64: dts: uniphier: add syscon property for UniPhier sound system
+      ARM: dts: uniphier: add syscon property for UniPhier sound system
+
+Kunihiko Hayashi (2):
+      ARM: dts: uniphier: add pinctrl groups of ethernet for second instance
+      arm64: dts: uniphier: add ethernet node for PXs3
+
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi            | 10 ++++++
+ arch/arm/boot/dts/uniphier-pxs2.dtsi               |  3 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   |  3 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |  3 +-
+ .../arm64/boot/dts/socionext/uniphier-pxs3-ref.dts | 22 +++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi   | 36 ++++++++++++++++++++++
+ 6 files changed, 74 insertions(+), 3 deletions(-)
+
+
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
