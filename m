@@ -1,72 +1,66 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 27 Mar 2018 14:15:27 +0100
-Subject: [PATCH v2 17/17] kvm: arm64: Allow IPA size supported by the system
+Date: Tue, 27 Mar 2018 14:15:26 +0100
+Subject: [PATCH v2 16/17] kvm: arm64: Add support for handling 52bit IPA
 In-Reply-To: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
 References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1522156531-28348-18-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1522156531-28348-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far we have restricted the IPA size of the VM to the default
-value (40bits). Now that we can manage the IPA size per VM and
-support dynamic stage2 page tables, allow VMs to bigger IPA.
-This is done by setting the IPA limit to the one supported by
-the hardware and kernel. This patch also moves the check for
-the default IPA size support to kvm_get_ipa_limit().
+Add support for handling the 52bit IPA. 52bit IPA
+support needs changes to the following :
+
+ 1) Page-table entries - We use kernel page table helpers for setting
+ up the stage2. Hence we don't explicit changes here
+
+ 2) VTTBR:BADDR - This is already supported with :
+   commit 529c4b05a3cb2f324aa ("arm64: handle 52-bit addresses in TTBR")
+
+ 3) VGIC support for 52bit: Supported with a patch in this series.
+
+That leaves us with the handling for PAR and HPAR. This patch adds
+support for handling the 52bit addresses in PAR and HPFAR,
+which are used while handling the permission faults in stage1.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Kristina Martsenko <kristina.martsenko@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  5 -----
- arch/arm64/include/asm/kvm_mmu.h  | 18 +++++++++++++++++-
- 2 files changed, 17 insertions(+), 6 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h | 7 +++++++
+ arch/arm64/kvm/hyp/switch.c      | 2 +-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 7b0af32..ec61e08 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -402,12 +402,7 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 2b278dc..e48852c 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -302,6 +302,13 @@
  
- static inline void __cpu_init_stage2(void)
- {
--	u32 ps;
--
- 	kvm_call_hyp(__init_stage2_translation);
--	ps = id_aa64mmfr0_parange_to_phys_shift(read_sysreg(id_aa64mmfr0_el1));
--	WARN_ONCE(ps < 40,
--		  "PARange is %d bits, unsupported configuration!", ps);
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~UL(0xf))
++/*
++ * We have
++ *	PAR	[PA_Shift - 1	: 12] = PA	[PA_Shift - 1 : 12]
++ *	HPFAR	[PA_Shift - 9	: 4]  = FIPA	[PA_Shift - 1 : 12]
++ */
++#define PAR_TO_HPFAR(par)		\
++	(((par) & GENMASK_ULL(PHYS_MASK_SHIFT - 1, 12)) >> 8)
+ 
+ #define kvm_arm_exception_type	\
+ 	{0, "IRQ" }, 		\
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 794da55..b785853 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -241,7 +241,7 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
+ 		return false; /* Translation failed, back to guest */
+ 
+ 	/* Convert PAR to HPFAR format */
+-	*hpfar = ((tmp >> 12) & ((1UL << 36) - 1)) << 4;
++	*hpfar = PAR_TO_HPFAR(tmp);
+ 	return true;
  }
  
- /*
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index e86d7f4..6c5f0be 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -414,7 +414,23 @@ static inline u64 kvm_vttbr_baddr_mask(struct kvm *kvm)
- 
- static inline u32 kvm_get_ipa_limit(void)
- {
--	return KVM_PHYS_SHIFT;
-+	unsigned int ipa_max, parange;
-+
-+	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 0x7;
-+	ipa_max = id_aa64mmfr0_parange_to_phys_shift(parange);
-+
-+	/* Raise the limit to the default size for backward compatibility */
-+	if (ipa_max < KVM_PHYS_SHIFT) {
-+		WARN_ONCE(1,
-+			  "PARange is %d bits, unsupported configuration!",
-+			  ipa_max);
-+		ipa_max = KVM_PHYS_SHIFT;
-+	}
-+
-+	/* Clamp it to the size supported by the kernel */
-+	ipa_max = (ipa_max > PHYS_MASK_SHIFT) ? PHYS_MASK_SHIFT : ipa_max;
-+
-+	return ipa_max;
- }
- 
- static inline void kvm_config_stage2(struct kvm *kvm, u8 ipa_shift)
 -- 
 2.7.4
