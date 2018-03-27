@@ -1,24 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 27 Mar 2018 16:01:47 +0800
-Subject: [PATCH v2 1/2] Revert "arm64: dts: fsl: fix ifc simple-bus unit
- address format warnings"
-In-Reply-To: <1522081243-30871-1-git-send-email-festevam@gmail.com>
-References: <1522081243-30871-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180327080145.GF8857@dragon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 Mar 2018 09:05:07 +0100
+Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
+In-Reply-To: <20180323185418.GD255819@dtor-ws>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+ <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
+ <1521685073.28226.10.camel@mtkswgap22>
+ <20180323185418.GD255819@dtor-ws>
+Message-ID: <20180327080507.pgil6pw2mn4y2f4d@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 01:20:42PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Fri, 23 Mar 2018, Dmitry Torokhov wrote:
+> On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
+> > Hi, Dmitry and Lee
+> > 
+> > The series seems not being got merged. Are they good enough to be ready
+> > into the your tree?
+> > 
+> > Recently I've tested the series with focusing on pwrkey event generated
+> > through interrupt when push and release the key on bpi-r2 board and then
+> > finally it's working fine. but for homekey it cannot be found on the
+> > board and thus I cannot have more tests more about it.
+> > 
+> > Tested-by: Sean Wang <sean.wang@mediatek.com>
 > 
-> This reverts commit f81d7af7957539b7808961f929f945381530acb9.
-> 
-> As explained by Rob Herring:
-> 
-> "This "fix" is wrong. Memory controllers with chip selects should have
-> the chip select in the unit-address. The correct fix here is you should
-> drop "simple-bus"."
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> You have my Ack on the input patch; I expect it go through Lee's tree as
+> there are some dependencies on mfd core piece.
 
-Applied both, thanks.
+Are you happy for me to merge the Input dt-bindings without your Ack?
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
