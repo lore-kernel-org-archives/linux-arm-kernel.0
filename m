@@ -1,53 +1,85 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 27 Mar 2018 20:42:02 +0800
-Subject: [PATCH 0/3] clk: meson: drop unnecessary AO clock flags
-In-Reply-To: <1522142509.2632.42.camel@baylibre.com>
-References: <20180326081809.49493-1-yixun.lan@amlogic.com>
- <1522142509.2632.42.camel@baylibre.com>
-Message-ID: <c99b705b-f98a-4b77-7113-78dec326d9b6@amlogic.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 27 Mar 2018 08:42:05 -0400
+Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <862cdbeafb9cfd272a426b010943ffc5@codeaurora.org>
+References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
+ <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
+ <1521849496.15055.16.camel@intel.com>
+ <862cdbeafb9cfd272a426b010943ffc5@codeaurora.org>
+Message-ID: <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Jerome
+Jeff,
 
-On 03/27/2018 05:21 PM, Jerome Brunet wrote:
-> On Mon, 2018-03-26 at 16:18 +0800, Yixun Lan wrote:
->>   This first two patches will drop unnecessary flags for
->> the AO clock driver.
->>   The third DTS patch is a follow-up fix for the second patch,
->> and I've tested them on P200, P212, Q200, S400 boards.
+On 3/23/2018 10:34 PM, okaya at codeaurora.org wrote:
+> On 2018-03-23 19:58, Jeff Kirsher wrote:
+>> On Fri, 2018-03-23 at 14:53 -0700, Alexander Duyck wrote:
+>>> On Fri, Mar 23, 2018 at 11:52 AM, Sinan Kaya <okaya@codeaurora.org>
+>>> wrote:
+>>> > Code includes wmb() followed by writel() in multiple places. writel()
+>>> > already has a barrier on some architectures like arm64.
+>>> >
+>>> > This ends up CPU observing two barriers back to back before executing
+>>> > the
+>>> > register write.
+>>> >
+>>> > Since code already has an explicit barrier call, changing writel() to
+>>> > writel_relaxed().
+>>> >
+>>> > I did a regex search for wmb() followed by writel() in each drivers
+>>> > directory.
+>>> > I scrubbed the ones I care about in this series.
+>>> >
+>>> > I considered "ease of change", "popular usage" and "performance
+>>> > critical
+>>> > path" as the determining criteria for my filtering.
+>>> >
+>>> > We used relaxed API heavily on ARM for a long time but
+>>> > it did not exist on other architectures. For this reason, relaxed
+>>> > architectures have been paying double penalty in order to use the
+>>> > common
+>>> > drivers.
+>>> >
+>>> > Now that relaxed API is present on all architectures, we can go and
+>>> > scrub
+>>> > all drivers to see what needs to change and what can remain.
+>>> >
+>>> > We start with mostly used ones and hope to increase the coverage over
+>>> > time.
+>>> > It will take a while to cover all drivers.
+>>> >
+>>> > Feel free to apply patches individually.
+>>>
+>>> I looked over the set and they seem good.
+>>>
+>>> Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
 >>
->>  Note: this patch series was made on top of patch [0]
->>
->> [0] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
->>
->> Yixun Lan (3):
->>   clk: meson: drop CLK_SET_RATE_PARENT flag
->>   clk: meson: drop CLK_IGNORE_UNUSED flag
->>   ARM64: dts: meson: fix clock source of the pclk for UART_AO
+>> Grrr, patch 1 does not apply cleanly to my next-queue tree (dev-queue
+>> branch).? I will deal with this series in a day or two, after I have dealt
+>> with my driver pull requests.
 > 
-> Please add patch 1 and 2 to the next version of your clkc_ao series
-> 
-I was thinking about patch 1 & 2 as independent patch of the clkc_ao
-series..
+> Sorry, you will have to replace the ones you took from me.
 
-anyway, as your suggestion in another thread,
-I could include the patch 1 into next clkc_ao series
-send patch 3 (DTS part) independently to Kevin, once patch 3 accepted
-into mainline, I will then send patch 2 as a fix
-(this will avoid breaking bisect)
+Double sorry now.
 
-> Patch 3 should sent independently to Kevin, with note warning about the
-> different dependencies (see comment in patch 3)
-> 
->>
->>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi  | 4 ++--
->>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
->>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
->>  drivers/clk/meson/axg-aoclk.c               | 1 -
->>  drivers/clk/meson/gxbb-aoclk.c              | 1 -
->>  5 files changed, 6 insertions(+), 8 deletions(-)
->>
-> 
-> .
-> 
+I don't know if you have been following "RFC on writel and writel_relaxed" thread
+or not but there are some new developments about wmb() requirement. 
+
+Basically, wmb() should never be used before writel() as writel() seem to
+provide coherency and observability guarantee.
+
+wmb()+writel_relaxed() is slower on some architectures than plain writel()
+
+I'll have to rework these patches to have writel() only. 
+
+Are you able to drop the applied ones so that I can post V8 or is it too late?
+
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
