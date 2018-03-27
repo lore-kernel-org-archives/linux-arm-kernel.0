@@ -1,33 +1,46 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 27 Mar 2018 10:02:24 -0400
-Subject: [PATCH v7 0/7] netdev: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <20180327.100051.1676812408119987944.davem@davemloft.net>
-References: <1521988761-30344-1-git-send-email-okaya@codeaurora.org>
- <20180326.124846.2182144342929084561.davem@davemloft.net>
- <044d58fd-b6ea-6341-0cdf-d99c47fc241e@codeaurora.org>
- <20180327.100051.1676812408119987944.davem@davemloft.net>
-Message-ID: <57791274-4190-6bb7-333d-7a126ae609d7@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2018 16:03:10 +0200
+Subject: [PATCH v2 0/4] Introduce PMSAv8 memory protection unit
+In-Reply-To: <2749c3e2-1046-a23f-b91c-f456f304d5c3@arm.com>
+References: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
+ <2415fbb7-a171-2917-35bc-4f2ee128f7c3@arm.com>
+ <2749c3e2-1046-a23f-b91c-f456f304d5c3@arm.com>
+Message-ID: <CAK8P3a0BGZqP2edQcd3xO7Dozg-=7qpP4qfXeGd1PWkvsLMUVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/27/2018 10:00 AM, David Miller wrote:
-> From: Sinan Kaya <okaya@codeaurora.org>
-> Date: Tue, 27 Mar 2018 08:40:41 -0400
-> 
->> Are you able to drop the applied ones so that I can post V7 or is it
->> too late?
-> 
-> I cannot "drop" changes from my tree since my tree is used by thousands
-> of people and therefore immutable.
-> 
-> You must therefore send me relative fixes or reverts.
-> 
+On Tue, Mar 27, 2018 at 11:06 AM, Vladimir Murzin
+<vladimir.murzin@arm.com> wrote:
+> On 08/03/18 13:36, Vladimir Murzin wrote:
+>> On 16/02/18 14:14, Vladimir Murzin wrote:
+>>> Hi,
+>>>
+>>> This series adds support for PMSAv8 MPU defined by ARMv8R/M
+>>> architecture.
+>>>
+>>> Changelog:
+>>>
+>>>      v1 -> v2
+>>>      - Included missed patch.
+>>>      - Folded "ARM: NOMMU: Make _stext and _end meet PMSAv8 alignment
+>>>        restrictions" into "ARM: NOMMU: Support PMSAv8 MPU" since it
+>>>        allows us to refer PMSAv8_MINALIGN in linker scripts.
+>>>      - Improved and tested XIP support
+>>>
+>>>     RFC -> v1
+>>>      - Rebased on v4.16-rc1
+>>>      - Added Tested-by for v7M bits from Andras
+>>>
+>>> Thanks!
+>>
+>> OK for patch tracker?
+>
+> The patches were on the list for a month and half without much attention
+> except v7M folks (thanks them for testing!) and I'm afraid it would be even
+> harder to make progress with them in nearby feature.
+>
+> I'm wondering if ARM SoC team can pick the patches?
 
-Thanks, I'll send fixes. Just wanted to see whether it got merged or if it was
-sitting on a branch.
+This is really core code that should go through Russell's tree.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+      Arnd
