@@ -1,64 +1,28 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Mar 2018 12:34:53 +0100
-Subject: Regression with arm in next with stack protector
-In-Reply-To: <20180327090409.GA10990@n2100.armlinux.org.uk>
-References: <20180323181452.GJ5799@atomide.com>
- <20180327090409.GA10990@n2100.armlinux.org.uk>
-Message-ID: <20180327113453.GC10990@n2100.armlinux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Mar 2018 13:35:42 +0200
+Subject: [PATCH] pinctrl: uniphier: add PXs2 Audio in/out pin-mux settings
+In-Reply-To: <20180314051137.6091-1-suzuki.katsuhiro@socionext.com>
+References: <20180314051137.6091-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <CACRpkdYY5BdXRxjf1dG7-YOVHRuArFFG-fNnidyHuXc_B7j8NA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 10:04:10AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Mar 23, 2018 at 11:14:53AM -0700, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > Looks like commit 5638790dadae ("zboot: fix stack protector in
-> > compressed boot phase") breaks booting on arm.
-> > 
-> > This is all I get from the bootloader on omap3:
-> > 
-> > Starting kernel ...
-> > 
-> > data abort
-> > pc : [<810002d0>]          lr : [<100110a8>]
-> > reloc pc : [<9d6002d0>]    lr : [<2c6110a8>]
-> > sp : 81467c18  ip : 81466bf0     fp : 81466bf0
-> > r10: 80fc2c40  r9 : 81000258     r8 : 86fec000
-> > r7 : ffffffff  r6 : 81466bf8     r5 : 00000000  r4 : 80008000
-> > r3 : 81466c14  r2 : 81466c18     r1 : 000a0dff  r0 : 00466bf8
-> > Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
-> > Resetting CPU ...
-> > 
-> > resetting ...
-> 
-> The reason for this is the following code that was introduced by the
-> referenced patch:
-> 
-> +               ldr     r0, =__stack_chk_guard
-> +               ldr     r1, =0x000a0dff
-> +               str     r1, [r0]
-> 
-> This uses the absolute address of __stack_chk_guard in the decompressor,
-> which is a self-relocatable image.  As with all constructs like the
-> above, this absolute address doesn't get fixed up, and so it ends up
-> pointing at invalid memory (in this case 0x466bf8) vs RAM at 0x80000000,
-> and the decompressor looks to be around 0x81000000.
-> 
-> Such constructs can not be used in the decompressor for exactly this
-> reason - they need to use PC-relative addressing instead just like
-> everything else does in head.S.
+On Wed, Mar 14, 2018 at 6:11 AM, Katsuhiro Suzuki
+<suzuki.katsuhiro@socionext.com> wrote:
 
-Is there any reason we can't do this in misc.c:
+> The UniPhier PXs2 SoC audio core use following 25 pins:
+>   ain1    : 2ch I2S input : AI1ADCCK, AI1BCK, AI1D0, AI1LRCK
+>   ain2    : 8ch I2S input : AI2ADCCK, AI2BCK, AI2D[0-3], AI2LRCK
+>   ainiec1 : S/PDIF input  : XIRQ17 (for AO1IEC)
+>   aout2   : 8ch I2S output: AO2BCK, AO2D0, AO2DACCK, AO2LRCK
+>                             PORT226, 227, 230 (for AO2D[1-3])
+>   aout3   : 2ch I2S output: AO3BCK, AO3DMIX, AO3DACCK, AO3LRCK
+>   aoutiec1: S/PDIF output : PORT132(for AO1IEC)
+>   aoutiec2: S/PDIF output : AO2IEC
+>
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 
-const unsigned int __stack_chk_guard = 0x000a0dff;
+Patch applied with Masahiro's ACK!
 
-?  That would save having runtime code to set that value up, and after
-all, it is constant.  Arguments about it potentially ending up at a
-fixed offset into the image need not be said - that's already the case
-with placing it in the early assembly code, and as has been established,
-it needs to be initialised prior to any C code being called.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Yours,
+Linus Walleij
