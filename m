@@ -1,9 +1,9 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 27 Mar 2018 16:08:11 +0200
+Date: Tue, 27 Mar 2018 16:08:18 +0200
 Subject: [PATCH v3 5/6] PCI: aardvark: fix PCIe max read request size setting
 In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
 References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180327140819.23501-6-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327140819.23501-13-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
