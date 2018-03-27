@@ -1,39 +1,50 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Mar 2018 16:48:56 +0200
-Subject: [PATCH 09/10] drm/sun4i: Add a dedicated ioctl call for
- allocating tiled buffers
-In-Reply-To: <1522140098.1110.40.camel@bootlin.com>
-References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-10-paul.kocialkowski@bootlin.com>
- <20180323104856.qo7w376xr3gcznmm@flea>
- <1522140098.1110.40.camel@bootlin.com>
-Message-ID: <20180327144856.rb757m35zyscefnn@flea>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Tue, 27 Mar 2018 14:51:43 +0000
+Subject: [PATCH  12/12] ARM: multi_v7_defconfig: Enable r8a77470 SoC
+In-Reply-To: <1522161443-54428-13-git-send-email-biju.das@bp.renesas.com>
+References: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
+ <1522161443-54428-13-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <TY1PR01MB1770FC01BEB7430AE352F5D0C0AC0@TY1PR01MB1770.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 10:41:38AM +0200, Paul Kocialkowski wrote:
-> > > +int drm_sun4i_gem_create_tiled(struct drm_device *dev, void *data,
-> > > +			       struct drm_file *file_priv);
-> > 
-> > Do you need it to be non-static, and part of the header as well?
-> 
-> Here as well, I just find that it looks more readable that way, below
-> the drm driver structure definition instead of above it.
+Hello Biju,
 
-But it also creates a global symbol for no particular reason, while
-we're doing the function-first-structure-later pattern pretty much
-everywhere else in the kernel.
+thank you for your patch.
 
-Maxime
+> Subject: [PATCH 12/12] ARM: multi_v7_defconfig: Enable r8a77470 SoC
+>
+> Enable recently added r8a77470 (RZ/G1C) SoC.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index c1e045a..3623900 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -90,6 +90,7 @@ CONFIG_ARCH_R8A73A4=y
+>  CONFIG_ARCH_R8A7740=y
+>  CONFIG_ARCH_R8A7743=y
+>  CONFIG_ARCH_R8A7745=y
+> +CONFIG_ARCH_R8A7747=y
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/c5fa1248/attachment.sig>
+s/CONFIG_ARCH_R8A7747/CONFIG_ARCH_R8A77470/
+
+
+Thanks,
+Fab
+
+>  CONFIG_ARCH_R8A7778=y
+>  CONFIG_ARCH_R8A7779=y
+>  CONFIG_ARCH_R8A7790=y
+> --
+> 2.7.4
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
