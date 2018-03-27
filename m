@@ -1,97 +1,53 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Tue, 27 Mar 2018 14:13:34 -0400
-Subject: [PATCH v4 4/4] drivers/staging: Remove fsl-mc driver from staging
-In-Reply-To: <1522174414-30380-1-git-send-email-roy.pledge@nxp.com>
-References: <1522174414-30380-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1522174414-30380-5-git-send-email-roy.pledge@nxp.com>
+From: rishabhb@codeaurora.org (Rishabh Bhatnagar)
+Date: Tue, 27 Mar 2018 11:52:00 -0700
+Subject: [PATCH v3 0/2] SDM845 System Cache Driver
+Message-ID: <1522176722-12691-1-git-send-email-rishabhb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the staging/drivers/fsl-mc directory from the staging
-area now that all the components have been moved to the main
-kernel areas.
+This series implements system cache or LLCC(Last Level Cache Controller) driver
+for SDM845 SOC. The purpose of the driver is to partition the system cache and
+program the settings such as priortiy, lines to probe while doing a look up
+in the system cache, low power related settings etc. The partitions are called
+cache slices. Each cache slice is associated with size and SCID(System Cache ID)
+The driver also provides API for clients to query the cache slice details,
+activate and deactivate them.
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
----
- drivers/staging/Kconfig             | 2 --
- drivers/staging/Makefile            | 1 -
- drivers/staging/fsl-mc/Kconfig      | 2 --
- drivers/staging/fsl-mc/Makefile     | 3 ---
- drivers/staging/fsl-mc/bus/Kconfig  | 7 -------
- drivers/staging/fsl-mc/bus/Makefile | 7 -------
- 6 files changed, 22 deletions(-)
- delete mode 100644 drivers/staging/fsl-mc/Kconfig
- delete mode 100644 drivers/staging/fsl-mc/Makefile
- delete mode 100644 drivers/staging/fsl-mc/bus/Kconfig
- delete mode 100644 drivers/staging/fsl-mc/bus/Makefile
+The driver can be broadly classified into:
+* SOC specific driver: llcc-sdm845.c: Cache partitioning and cache slice
+properties for usecases on sdm845 that need to use system cache.
 
-diff --git a/drivers/staging/Kconfig b/drivers/staging/Kconfig
-index d5926f0..a0f262a 100644
---- a/drivers/staging/Kconfig
-+++ b/drivers/staging/Kconfig
-@@ -98,8 +98,6 @@ source "drivers/staging/clocking-wizard/Kconfig"
- 
- source "drivers/staging/fbtft/Kconfig"
- 
--source "drivers/staging/fsl-mc/Kconfig"
--
- source "drivers/staging/fsl-dpaa2/Kconfig"
- 
- source "drivers/staging/wilc1000/Kconfig"
-diff --git a/drivers/staging/Makefile b/drivers/staging/Makefile
-index 919753c..326a1e8 100644
---- a/drivers/staging/Makefile
-+++ b/drivers/staging/Makefile
-@@ -40,7 +40,6 @@ obj-$(CONFIG_CRYPTO_SKEIN)	+= skein/
- obj-$(CONFIG_UNISYSSPAR)	+= unisys/
- obj-$(CONFIG_COMMON_CLK_XLNX_CLKWZRD)	+= clocking-wizard/
- obj-$(CONFIG_FB_TFT)		+= fbtft/
--obj-$(CONFIG_FSL_MC_BUS)	+= fsl-mc/
- obj-$(CONFIG_FSL_DPAA2)		+= fsl-dpaa2/
- obj-$(CONFIG_WILC1000)		+= wilc1000/
- obj-$(CONFIG_MOST)		+= most/
-diff --git a/drivers/staging/fsl-mc/Kconfig b/drivers/staging/fsl-mc/Kconfig
-deleted file mode 100644
-index 3002229..0000000
---- a/drivers/staging/fsl-mc/Kconfig
-+++ /dev/null
-@@ -1,2 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--source "drivers/staging/fsl-mc/bus/Kconfig"
-diff --git a/drivers/staging/fsl-mc/Makefile b/drivers/staging/fsl-mc/Makefile
-deleted file mode 100644
-index 1468388..0000000
---- a/drivers/staging/fsl-mc/Makefile
-+++ /dev/null
-@@ -1,3 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--# Freescale Management Complex (MC) bus drivers
--obj-$(CONFIG_FSL_MC_BUS)	+= bus/
-diff --git a/drivers/staging/fsl-mc/bus/Kconfig b/drivers/staging/fsl-mc/bus/Kconfig
-deleted file mode 100644
-index 90f234d..0000000
---- a/drivers/staging/fsl-mc/bus/Kconfig
-+++ /dev/null
-@@ -1,7 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--#
--# DPAA2 fsl-mc bus
--#
--# Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
--#
--
-diff --git a/drivers/staging/fsl-mc/bus/Makefile b/drivers/staging/fsl-mc/bus/Makefile
-deleted file mode 100644
-index 2141e4b..0000000
---- a/drivers/staging/fsl-mc/bus/Makefile
-+++ /dev/null
-@@ -1,7 +0,0 @@
--# SPDX-License-Identifier: GPL-2.0
--#
--# Freescale Management Complex (MC) bus drivers
--#
--# Copyright (C) 2014 Freescale Semiconductor, Inc.
--#
--
--- 
-2.7.4
+* API : llcc-slice.c: Exports APIs to clients to query cache slice details,
+activate and deactivate cache slices.
+
+Changes since v2:
+* Corrected the Makefile to fix compilation.
+
+Changes since v1:
+* Added Makefile and Kconfig.
+
+Changes since v0:
+* Removed the syscon and simple-mfd approach
+* Updated the device tree nodes to mention LLCC as a single HW block
+* Moved llcc bank offsets from device tree and handled the offset
+  in the driver.
+
+ckadabi at codeaurora.org (2):
+  Documentation: Documentation for qcom, llcc
+  drivers: soc: Add LLCC driver
+
+ .../devicetree/bindings/arm/msm/qcom,llcc.txt      |  70 ++++
+ drivers/soc/qcom/Kconfig                           |  16 +
+ drivers/soc/qcom/Makefile                          |   2 +
+ drivers/soc/qcom/llcc-sdm845.c                     | 120 ++++++
+ drivers/soc/qcom/llcc-slice.c                      | 454 +++++++++++++++++++++
+ include/linux/soc/qcom/llcc-qcom.h                 | 178 ++++++++
+ 6 files changed, 840 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+ create mode 100644 drivers/soc/qcom/llcc-sdm845.c
+ create mode 100644 drivers/soc/qcom/llcc-slice.c
+ create mode 100644 include/linux/soc/qcom/llcc-qcom.h
+
+--
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
