@@ -1,25 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 15:15:33 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.17
-In-Reply-To: <CAK8P3a1x9_st4vN7cuMyWk3GrgHYgs8ca5A7ZArM2vEA8ttCgQ@mail.gmail.com>
-References: <cover.1521201256.git.horms+renesas@verge.net.au>
- <CAK8P3a1x9_st4vN7cuMyWk3GrgHYgs8ca5A7ZArM2vEA8ttCgQ@mail.gmail.com>
-Message-ID: <CAK8P3a0UkYS9B3cerVX3o6fT9i-+=ieO5aNLjxtAd=sLed9=VA@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 27 Mar 2018 14:15:11 +0100
+Subject: [PATCH v2 01/17] virtio: mmio-v1: Validate queue PFN
+In-Reply-To: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1522156531-28348-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 3:13 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Mar 16, 2018 at 3:50 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
->> Renesas ARM64 Based SoC Defconfig Updates for v4.17
->>
->> Enable the following to allow them to be more widely exercised:
->> * Newly added R8A77965 and R8A77980 SoCs
->> * PWM and USB as used on R-Car Gen3 SoCs
->>
->
-> Pulled into next/defconfig, thanks!
+virtio-mmio with virtio-v1 uses a 32bit PFN for the queue.
+If the queue pfn is too large to fit in 32bits, which
+we could hit on arm64 systems with 52bit physical addresses
+(even with 64K page size), we simply miss out a proper link
+to the other side of the queue.
 
-This was actually next/soc of course.
+Add a check to validate the PFN, rather than silently breaking
+the devices.
 
-      Arnd
+Cc: "Michael S. Tsirkin" <mst@redhat.com>
+Cc: Jason Wang <jasowang@redhat.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Peter Maydel <peter.maydell@linaro.org>
+Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/virtio/virtio_mmio.c | 18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
+index 67763d3..b2f9b5c 100644
+--- a/drivers/virtio/virtio_mmio.c
++++ b/drivers/virtio/virtio_mmio.c
+@@ -397,9 +397,21 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+ 	/* Activate the queue */
+ 	writel(virtqueue_get_vring_size(vq), vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+ 	if (vm_dev->version == 1) {
++		u64 q_pfn = virtqueue_get_desc_addr(vq) >> PAGE_SHIFT;
++
++		/*
++		 * virtio-mmio v1 uses a 32bit QUEUE PFN. If we have something
++		 * that doesn't fit in 32bit, fail the setup rather than
++		 * pretending to be successful.
++		 */
++		if (q_pfn >> 32) {
++			dev_err(&vdev->dev, "virtio-mmio: queue address too large\n");
++			err = -ENOMEM;
++			goto error_bad_pfn;
++		}
++
+ 		writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
+-		writel(virtqueue_get_desc_addr(vq) >> PAGE_SHIFT,
+-				vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
++		writel(q_pfn, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+ 	} else {
+ 		u64 addr;
+ 
+@@ -430,6 +442,8 @@ static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
+ 
+ 	return vq;
+ 
++error_bad_pfn:
++	vring_del_virtqueue(vq);
+ error_new_virtqueue:
+ 	if (vm_dev->version == 1) {
+ 		writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
+-- 
+2.7.4
