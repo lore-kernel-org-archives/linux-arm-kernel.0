@@ -1,208 +1,195 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 27 Mar 2018 14:15:13 +0100
-Subject: [PATCH v2 03/17] arm64: Make page table helpers reusable
+Date: Tue, 27 Mar 2018 14:15:25 +0100
+Subject: [PATCH v2 15/17] vgic: Add support for 52bit guest physical address
 In-Reply-To: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
 References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1522156531-28348-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1522156531-28348-16-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch rearranges the page table level helpers so that it can
-be reused for a page table with different number of levels
-(e.g, stage2 page table for a VM) than the kernel page tables.
-As such there is no functional change with this patch.
+From: Kristina Martsenko <kristina.martsenko@arm.com>
 
-The page table helpers are defined to do the right thing for the
-fixed page table levels set for the kernel. This patch tries to
-refactor the code such that, we can have helpers for each level,
-which should be used when the caller knows that the level exists
-for the page table dealt with. Since the kernel defines helpers
-p.d_action and __p.d_action, for consistency, we name the raw
-page table action helpers __raw_p.d_action.
+Add support for handling 52bit guest physical address to the
+VGIC layer. So far we have limited the guest physical address
+to 48bits, by explicitly masking the upper bits. This patch
+removes the restriction. We do not have to check if the host
+supports 52bit as the gpa is always validated during an access.
+(e.g, kvm_{read/write}_guest, kvm_is_visible_gfn()).
+Also, the ITS table save-restore is also not affected with
+the enhancement. The DTE entries already store the bits[51:8]
+of the ITT_addr (with a 256byte alignment).
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Steve Capper <steve.capper@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+[ Macro clean ups, fix PROPBASER and PENDBASER accesses ]
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/pgalloc.h | 34 +++++++++++++++++++----
- arch/arm64/include/asm/pgtable.h | 60 +++++++++++++++++++++++++---------------
- 2 files changed, 66 insertions(+), 28 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |  5 +++++
+ virt/kvm/arm/vgic/vgic-its.c       | 37 ++++++++++---------------------------
+ virt/kvm/arm/vgic/vgic-mmio-v3.c   |  2 --
+ 3 files changed, 15 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-index 2e05bcd..ab4662c 100644
---- a/arch/arm64/include/asm/pgalloc.h
-+++ b/arch/arm64/include/asm/pgalloc.h
-@@ -29,6 +29,30 @@
- #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
- #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index c00c4c33..d9c60eb 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -344,6 +344,8 @@
+ #define GITS_CBASER_RaWaWt	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWt)
+ #define GITS_CBASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWb)
  
-+static inline void __raw_pmd_free(pmd_t *pmdp)
-+{
-+	BUG_ON((unsigned long)pmdp & (PAGE_SIZE-1));
-+	free_page((unsigned long)pmdp);
-+}
++#define GITS_CBASER_ADDRESS(cbaser)	((cbaser) & GENMASK_ULL(52, 12))
 +
-+static inline void
-+__raw_pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
-+{
-+	__raw_set_pud(pudp, __pud(__phys_to_pud_val(pmdp) | prot));
-+}
+ #define GITS_BASER_NR_REGS		8
+ 
+ #define GITS_BASER_VALID			(1ULL << 63)
+@@ -375,6 +377,9 @@
+ #define GITS_BASER_ENTRY_SIZE_MASK	GENMASK_ULL(52, 48)
+ #define GITS_BASER_PHYS_52_to_48(phys)					\
+ 	(((phys) & GENMASK_ULL(47, 16)) | (((phys) >> 48) & 0xf) << 12)
++#define GITS_BASER_ADDR_48_to_52(baser)					\
++	(((baser) & GENMASK_ULL(47, 16)) | (((baser) >> 12) & 0xf) << 48)
 +
-+static inline void __raw_pud_free(pud_t *pudp)
-+{
-+	BUG_ON((unsigned long)pudp & (PAGE_SIZE-1));
-+	free_page((unsigned long)pudp);
-+}
-+
-+static inline void
-+__raw_pgd_populate(pgd_t *pgdp, phys_addr_t pudp, pgdval_t prot)
-+{
-+	__raw_set_pgd(pgdp, __pgd(__phys_to_pgd_val(pudp) | prot));
-+}
-+
- #if CONFIG_PGTABLE_LEVELS > 2
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+ #define GITS_BASER_InnerShareable					\
+ 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 4650953..ae6bfaf 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -233,13 +233,6 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
+ 	list_for_each_entry(dev, &(its)->device_list, dev_list) \
+ 		list_for_each_entry(ite, &(dev)->itt_head, ite_list)
  
- static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
-@@ -38,13 +62,12 @@ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
- 
- static inline void pmd_free(struct mm_struct *mm, pmd_t *pmdp)
- {
--	BUG_ON((unsigned long)pmdp & (PAGE_SIZE-1));
--	free_page((unsigned long)pmdp);
-+	__raw_pmd_free(pmdp);
- }
- 
- static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
- {
--	set_pud(pudp, __pud(__phys_to_pud_val(pmdp) | prot));
-+	__raw_pud_populate(pudp, pmdp, prot);
- }
- 
- static inline void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmdp)
-@@ -67,13 +90,12 @@ static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
- 
- static inline void pud_free(struct mm_struct *mm, pud_t *pudp)
- {
--	BUG_ON((unsigned long)pudp & (PAGE_SIZE-1));
--	free_page((unsigned long)pudp);
-+	__raw_pud_free(pudp);
- }
- 
- static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pudp, pgdval_t prot)
- {
--	set_pgd(pgdp, __pgd(__phys_to_pgd_val(pudp) | prot));
-+	__raw_pgd_populate(pgdp, pudp, prot);
- }
- 
- static inline void pgd_populate(struct mm_struct *mm, pgd_t *pgdp, pud_t *pudp)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 7e2c27e..5e22503 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -475,31 +475,39 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
-  */
- #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page),prot)
- 
--#if CONFIG_PGTABLE_LEVELS > 2
-+#define __raw_pud_none(pud)	(!pud_val(pud))
-+#define __raw_pud_bad(pud)	(!(pud_val(pud) & PUD_TABLE_BIT))
-+#define __raw_pud_present(pud)	pte_present(pud_pte(pud))
- 
--#define pmd_ERROR(pmd)		__pmd_error(__FILE__, __LINE__, pmd_val(pmd))
+-/*
+- * We only implement 48 bits of PA at the moment, although the ITS
+- * supports more. Let's be restrictive here.
+- */
+-#define BASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
+-#define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
 -
--#define pud_none(pud)		(!pud_val(pud))
--#define pud_bad(pud)		(!(pud_val(pud) & PUD_TABLE_BIT))
--#define pud_present(pud)	pte_present(pud_pte(pud))
+ #define GIC_LPI_OFFSET 8192
+ 
+ #define VITS_TYPER_IDBITS 16
+@@ -745,6 +738,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ {
+ 	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+ 	u64 indirect_ptr, type = GITS_BASER_TYPE(baser);
++	phys_addr_t base = GITS_BASER_ADDR_48_to_52(baser);
+ 	int esz = GITS_BASER_ENTRY_SIZE(baser);
+ 	int index;
+ 	gfn_t gfn;
+@@ -769,7 +763,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ 		if (id >= (l1_tbl_size / esz))
+ 			return false;
+ 
+-		addr = BASER_ADDRESS(baser) + id * esz;
++		addr = base + id * esz;
+ 		gfn = addr >> PAGE_SHIFT;
+ 
+ 		if (eaddr)
+@@ -783,8 +777,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ 		return false;
+ 
+ 	/* Each 1st level entry is represented by a 64-bit value. */
+-	if (kvm_read_guest(its->dev->kvm,
+-			   BASER_ADDRESS(baser) + index * sizeof(indirect_ptr),
++	if (kvm_read_guest(its->dev->kvm, base + index * sizeof(indirect_ptr),
+ 			   &indirect_ptr, sizeof(indirect_ptr)))
+ 		return false;
+ 
+@@ -794,11 +787,7 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, u32 id,
+ 	if (!(indirect_ptr & BIT_ULL(63)))
+ 		return false;
+ 
+-	/*
+-	 * Mask the guest physical address and calculate the frame number.
+-	 * Any address beyond our supported 48 bits of PA will be caught
+-	 * by the actual check in the final step.
+-	 */
++	/* Mask the guest physical address and calculate the frame number. */
+ 	indirect_ptr &= GENMASK_ULL(51, 16);
+ 
+ 	/* Find the address of the actual entry */
+@@ -1290,9 +1279,6 @@ static u64 vgic_sanitise_its_baser(u64 reg)
+ 				  GITS_BASER_OUTER_CACHEABILITY_SHIFT,
+ 				  vgic_sanitise_outer_cacheability);
+ 
+-	/* Bits 15:12 contain bits 51:48 of the PA, which we don't support. */
+-	reg &= ~GENMASK_ULL(15, 12);
 -
--static inline void set_pud(pud_t *pudp, pud_t pud)
-+static inline void __raw_set_pud(pud_t *pudp, pud_t pud)
- {
- 	WRITE_ONCE(*pudp, pud);
- 	dsb(ishst);
- 	isb();
+ 	/* We support only one (ITS) page size: 64K */
+ 	reg = (reg & ~GITS_BASER_PAGE_SIZE_MASK) | GITS_BASER_PAGE_SIZE_64K;
+ 
+@@ -1311,11 +1297,8 @@ static u64 vgic_sanitise_its_cbaser(u64 reg)
+ 				  GITS_CBASER_OUTER_CACHEABILITY_SHIFT,
+ 				  vgic_sanitise_outer_cacheability);
+ 
+-	/*
+-	 * Sanitise the physical address to be 64k aligned.
+-	 * Also limit the physical addresses to 48 bits.
+-	 */
+-	reg &= ~(GENMASK_ULL(51, 48) | GENMASK_ULL(15, 12));
++	/* Sanitise the physical address to be 64k aligned. */
++	reg &= ~GENMASK_ULL(15, 12);
+ 
+ 	return reg;
  }
+@@ -1361,7 +1344,7 @@ static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
+ 	if (!its->enabled)
+ 		return;
  
--static inline void pud_clear(pud_t *pudp)
-+static inline void __raw_pud_clear(pud_t *pudp)
+-	cbaser = CBASER_ADDRESS(its->cbaser);
++	cbaser = GITS_CBASER_ADDRESS(its->cbaser);
+ 
+ 	while (its->cwriter != its->creadr) {
+ 		int ret = kvm_read_guest(kvm, cbaser + its->creadr,
+@@ -2219,7 +2202,7 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
+ 	if (!(baser & GITS_BASER_VALID))
+ 		return 0;
+ 
+-	l1_gpa = BASER_ADDRESS(baser);
++	l1_gpa = GITS_BASER_ADDR_48_to_52(baser);
+ 
+ 	if (baser & GITS_BASER_INDIRECT) {
+ 		l1_esz = GITS_LVL1_ENTRY_SIZE;
+@@ -2291,7 +2274,7 @@ static int vgic_its_save_collection_table(struct vgic_its *its)
  {
--	set_pud(pudp, __pud(0));
-+	__raw_set_pud(pudp, __pud(0));
+ 	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+ 	u64 baser = its->baser_coll_table;
+-	gpa_t gpa = BASER_ADDRESS(baser);
++	gpa_t gpa = GITS_BASER_ADDR_48_to_52(baser);
+ 	struct its_collection *collection;
+ 	u64 val;
+ 	size_t max_size, filled = 0;
+@@ -2340,7 +2323,7 @@ static int vgic_its_restore_collection_table(struct vgic_its *its)
+ 	if (!(baser & GITS_BASER_VALID))
+ 		return 0;
+ 
+-	gpa = BASER_ADDRESS(baser);
++	gpa = GITS_BASER_ADDR_48_to_52(baser);
+ 
+ 	max_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 671fe81..80e0d15 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -333,7 +333,6 @@ static u64 vgic_sanitise_pendbaser(u64 reg)
+ 				  vgic_sanitise_outer_cacheability);
+ 
+ 	reg &= ~PENDBASER_RES0_MASK;
+-	reg &= ~GENMASK_ULL(51, 48);
+ 
+ 	return reg;
  }
+@@ -351,7 +350,6 @@ static u64 vgic_sanitise_propbaser(u64 reg)
+ 				  vgic_sanitise_outer_cacheability);
  
--static inline phys_addr_t pud_page_paddr(pud_t pud)
-+static inline phys_addr_t __raw_pud_page_paddr(pud_t pud)
- {
- 	return __pud_to_phys(pud);
+ 	reg &= ~PROPBASER_RES0_MASK;
+-	reg &= ~GENMASK_ULL(51, 48);
+ 	return reg;
  }
- 
-+#if CONFIG_PGTABLE_LEVELS > 2
-+
-+#define pmd_ERROR(pmd)		__pmd_error(__FILE__, __LINE__, pmd_val(pmd))
-+
-+#define pud_none(pud)		__raw_pud_none(pud)
-+#define pud_bad(pud)		__raw_pud_bad(pud)
-+#define pud_present(pud)	__raw_pud_present(pud)
-+
-+#define set_pud(pudp, pud)	__raw_set_pud((pudp), (pud))
-+#define pud_clear(pudp)		__raw_pud_clear((pudp))
-+#define pud_page_paddr(pud)	__raw_pud_page_paddr((pud))
-+
- /* Find an entry in the second-level page table. */
- #define pmd_index(addr)		(((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1))
- 
-@@ -528,30 +536,38 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- 
- #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
- 
--#if CONFIG_PGTABLE_LEVELS > 3
-+#define __raw_pgd_none(pgd)	(!pgd_val(pgd))
-+#define __raw_pgd_bad(pgd)	(!(pgd_val(pgd) & 2))
-+#define __raw_pgd_present(pgd)	(pgd_val(pgd))
- 
--#define pud_ERROR(pud)		__pud_error(__FILE__, __LINE__, pud_val(pud))
--
--#define pgd_none(pgd)		(!pgd_val(pgd))
--#define pgd_bad(pgd)		(!(pgd_val(pgd) & 2))
--#define pgd_present(pgd)	(pgd_val(pgd))
--
--static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
-+static inline void __raw_set_pgd(pgd_t *pgdp, pgd_t pgd)
- {
- 	WRITE_ONCE(*pgdp, pgd);
- 	dsb(ishst);
- }
- 
--static inline void pgd_clear(pgd_t *pgdp)
-+static inline void __raw_pgd_clear(pgd_t *pgdp)
- {
--	set_pgd(pgdp, __pgd(0));
-+	__raw_set_pgd(pgdp, __pgd(0));
- }
- 
--static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
-+static inline phys_addr_t __raw_pgd_page_paddr(pgd_t pgd)
- {
- 	return __pgd_to_phys(pgd);
- }
- 
-+#if CONFIG_PGTABLE_LEVELS > 3
-+
-+#define pud_ERROR(pud)		__pud_error(__FILE__, __LINE__, pud_val(pud))
-+
-+#define pgd_none(pgd)		__raw_pgd_none((pgd))
-+#define pgd_bad(pgd)		__raw_pgd_bad((pgd))
-+#define pgd_present(pgd)	__raw_pgd_present((pgd))
-+
-+#define set_pgd(pgdp, pgd)	__raw_set_pgd((pgdp), (pgd))
-+#define pgd_clear(pgdp)		__raw_pgd_clear((pgdp))
-+#define pgd_page_paddr(pgd)	__raw_pgd_page_paddr((pgd))
-+
- /* Find an entry in the frst-level page table. */
- #define pud_index(addr)		(((addr) >> PUD_SHIFT) & (PTRS_PER_PUD - 1))
  
 -- 
 2.7.4
