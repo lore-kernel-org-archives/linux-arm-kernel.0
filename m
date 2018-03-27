@@ -1,69 +1,56 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 27 Mar 2018 16:08:07 +0200
-Subject: [PATCH v3 1/6] PCI: aardvark: introduce an advk_pcie_valid_device()
- helper
+Date: Tue, 27 Mar 2018 16:08:09 +0200
+Subject: [PATCH v3 3/6] PCI: aardvark: set PIO_ADDR_LS correctly in
+ advk_pcie_rd_conf()
 In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
 References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180327140819.23501-2-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327140819.23501-4-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+From: Victor Gu <xigu@marvell.com>
 
-In other to mimic other PCIe host controller drivers, introduce an
-advk_pcie_valid_device() helper, used in the configuration read/write
-functions.
-
-This patch by itself is not a fix, but it is required for a follow-up
-patch that is a fix, hence the Fixes tag and the Cc to stable.
+When setting the PIO_ADDR_LS register during a configuration read, we
+were properly passing the device number, function number and register
+number, but not the bus number, causing issues when reading the
+configuration of PCIe devices.
 
 Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
 Cc: <stable@vger.kernel.org>
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+[Thomas: tweak commit log.]
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
 Changes since v2:
- - New patch
+ - Drop PCIE_BDF() macro, since it's no longer used. Noticed by Bjorn
+   Helgaas.
 ---
- drivers/pci/host/pci-aardvark.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ drivers/pci/host/pci-aardvark.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index b04d37b3c5de..ccd0304a0c21 100644
+index be140dc7109b..4affbf1b826b 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -430,6 +430,15 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
- 	return -ETIMEDOUT;
- }
+@@ -172,8 +172,6 @@
+ #define PCIE_CONFIG_WR_TYPE0			0xa
+ #define PCIE_CONFIG_WR_TYPE1			0xb
  
-+static int advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
-+				  int devfn)
-+{
-+	if (PCI_SLOT(devfn) != 0)
-+		return false;
-+
-+	return true;
-+}
-+
- static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
- 			     int where, int size, u32 *val)
- {
-@@ -437,7 +446,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
- 	u32 reg;
- 	int ret;
+-/* PCI_BDF shifts 8bit, so we need extra 4bit shift */
+-#define PCIE_BDF(dev)				(dev << 4)
+ #define PCIE_CONF_BUS(bus)			(((bus) & 0xff) << 20)
+ #define PCIE_CONF_DEV(dev)			(((dev) & 0x1f) << 15)
+ #define PCIE_CONF_FUNC(fun)			(((fun) & 0x7)	<< 12)
+@@ -465,7 +463,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 	advk_writel(pcie, reg, PIO_CTRL);
  
--	if (PCI_SLOT(devfn) != 0) {
-+	if (!advk_pcie_valid_device(pcie, bus, devfn)) {
- 		*val = 0xffffffff;
- 		return PCIBIOS_DEVICE_NOT_FOUND;
- 	}
-@@ -491,7 +500,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 	int offset;
- 	int ret;
+ 	/* Program the address registers */
+-	reg = PCIE_BDF(devfn) | PCIE_CONF_REG(where);
++	reg = PCIE_CONF_ADDR(bus->number, devfn, where);
+ 	advk_writel(pcie, reg, PIO_ADDR_LS);
+ 	advk_writel(pcie, 0, PIO_ADDR_MS);
  
--	if (PCI_SLOT(devfn) != 0)
-+	if (!advk_pcie_valid_device(pcie, bus, devfn))
- 		return PCIBIOS_DEVICE_NOT_FOUND;
- 
- 	if (where % size)
 -- 
 2.14.3
