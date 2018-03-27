@@ -1,25 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 27 Mar 2018 19:35:09 +0200
-Subject: [net-next PATCH v2 08/10] net: netcp: ethss: use
- of_get_phy_mode() to support different RGMII modes
-In-Reply-To: <1522168309-12338-9-git-send-email-m-karicheri2@ti.com>
-References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
- <1522168309-12338-9-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20180327173509.GQ5862@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Mar 2018 18:36:13 +0100
+Subject: [PATCH V2] arm64: tlbflush: avoid writing RES0 bits
+In-Reply-To: <56b560a5-6e57-8e01-32ca-9d3c95ccd2e5@codeaurora.org>
+References: <1522120877-9136-1-git-send-email-pelcan@codeaurora.org>
+ <985a0edd-e388-dade-8824-30cc58a236f3@arm.com>
+ <56b560a5-6e57-8e01-32ca-9d3c95ccd2e5@codeaurora.org>
+Message-ID: <20180327173613.GI18435@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	} else if (slave->link_interface == RGMII_LINK_MAC_PHY) {
-> +		has_phy = true;
-> +		phy_mode = of_get_phy_mode(slave->node);
-> +		/* if phy-mode is not present, default to
-> +		 * PHY_INTERFACE_MODE_RGMII
-> +		 */
-> +		if (phy_mode < 0)
-> +			phy_mode = PHY_INTERFACE_MODE_RGMII;
+Hi Shanker,
 
-Can only do RGMII? Maybe add a call here to
-phy_interface_mode_is_rgmii() and return -EINVAL if DT contains
-something which is not RGMII?
+On Tue, Mar 27, 2018 at 09:53:16AM -0500, Shanker Donthineni wrote:
+> On 03/27/2018 06:34 AM, Robin Murphy wrote:
+> > On 27/03/18 04:21, Philip Elcan wrote:
+> >> Several of the bits of the TLBI register operand are RES0 per the ARM
+> >> ARM, so TLBI operations should avoid writing non-zero values to these
+> >> bits.
+> >>
+> >> This patch adds a macro __TLBI_VADDR(addr, asid) that creates the
+> >> operand register in the correct format and honors the RES0 bits.
+> >>
+> >> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+> >> ---
+> >> ? arch/arm64/include/asm/tlbflush.h | 23 ++++++++++++++++-------
+> >> ? 1 file changed, 16 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> >> index 9e82dd7..b1205e9 100644
+> >> --- a/arch/arm64/include/asm/tlbflush.h
+> >> +++ b/arch/arm64/include/asm/tlbflush.h
+> >> @@ -60,6 +60,15 @@
+> >> ????????? __tlbi(op, (arg) | USER_ASID_FLAG);??????????????? \
+> >> ? } while (0)
+> >> ? +/* This macro creates a properly formatted VA operand for the TLBI */
+> >> +#define __TLBI_VADDR(addr, asid)??????????????? \
+> >> +??? ({??????????????????????????? \
+> >> +??????? unsigned long __ta = (addr) >> 12;??????? \
+> >> +??????? __ta &= GENMASK_ULL(43, 0);??????????? \
+> >> +??????? __ta |= (unsigned long)(asid) << 48;??????? \
+> >> +??????? __ta;??????????????????????? \
+> >> +??? })
+> > 
+> > I'd be inclined to make this a static inline function rather than a
+> > macro, since it doesn't need to do any wacky type-dodging, but either
+> > way the overall change now looks appropriate;
+> > 
+> > Acked-by: Robin Murphy <robin.murphy@arm.com>
+> > 
+> 
+> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 
-	  Andrew
+[...]
+
+> >> @@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+> >> ????????? return;
+> >> ????? }
+> >> ? -??? start = asid | (start >> 12);
+> >> -??? end = asid | (end >> 12);
+> >> +??? start = __TLBI_VADDR(start, asid);
+> >> +??? end = __TLBI_VADDR(end, asid);
+
+Can you test this bit too, please? ;)
+
+Will
