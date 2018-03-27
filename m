@@ -1,206 +1,66 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 27 Mar 2018 10:41:38 +0200
-Subject: [PATCH 09/10] drm/sun4i: Add a dedicated ioctl call for
- allocating tiled buffers
-In-Reply-To: <20180323104856.qo7w376xr3gcznmm@flea>
+Date: Tue, 27 Mar 2018 10:44:19 +0200
+Subject: [PATCH 02/10] drm/sun4i: Disable YUV channel when using the
+ frontend and set interlace
+In-Reply-To: <20180327081731.he3lhnvqffuimsi5@flea>
 References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
- <20180321152904.22411-10-paul.kocialkowski@bootlin.com>
- <20180323104856.qo7w376xr3gcznmm@flea>
-Message-ID: <1522140098.1110.40.camel@bootlin.com>
+ <20180321152904.22411-3-paul.kocialkowski@bootlin.com>
+ <20180323095529.5nptn5achjt3esog@flea>
+ <1522137643.1110.4.camel@bootlin.com>
+ <20180327081731.he3lhnvqffuimsi5@flea>
+Message-ID: <1522140259.1110.43.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-03-23 at 11:48 +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> On Wed, Mar 21, 2018 at 04:29:03PM +0100, Paul Kocialkowski wrote:
-> > This introduces a dedicated ioctl for allocating tiled buffers in
-> > the
-> > Allwinner MB32 format, that comes with a handful of specific
-> > constraints. In particular, the stride of the buffers is expected to
-> > be
-> > aligned to 32 bytes.
-> 
-> You should have more details here. What are those constraints, what is
-> the expected user? Can you use it only for the scanout, like the dumb
-> buffers, or also for the other devices in the system?
+Hi,
 
-Agreed.
-
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_drv.c | 96
-> > +++++++++++++++++++++++++++++++++++++++
-> >  drivers/gpu/drm/sun4i/sun4i_drv.h |  2 +
-> >  include/uapi/drm/sun4i_drm.h      | 42 +++++++++++++++++
-> >  3 files changed, 140 insertions(+)
-> >  create mode 100644 include/uapi/drm/sun4i_drm.h
+On Tue, 2018-03-27 at 10:17 +0200, Maxime Ripard wrote:
+> On Tue, Mar 27, 2018 at 10:00:43AM +0200, Paul Kocialkowski wrote:
+> > Hi,
 > > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > index d374bb61c565..e9cb03d34b44 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > @@ -21,11 +21,18 @@
-> >  #include <drm/drm_gem_cma_helper.h>
-> >  #include <drm/drm_fb_helper.h>
-> >  #include <drm/drm_of.h>
-> > +#include <drm/sun4i_drm.h>
-> >  
-> >  #include "sun4i_drv.h"
-> >  #include "sun4i_frontend.h"
-> >  #include "sun4i_framebuffer.h"
-> >  #include "sun4i_tcon.h"
-> > +#include "sun4i_format.h"
-> > +
-> > +static const struct drm_ioctl_desc sun4i_drv_ioctls[] = {
-> > +	DRM_IOCTL_DEF_DRV(SUN4I_GEM_CREATE_TILED,
-> > drm_sun4i_gem_create_tiled,
-> > +			  DRM_AUTH | DRM_RENDER_ALLOW),
+> > On Fri, 2018-03-23 at 10:55 +0100, Maxime Ripard wrote:
+> > > On Wed, Mar 21, 2018 at 04:28:56PM +0100, Paul Kocialkowski wrote:
+> > > > The YUV channel was only disabled in
+> > > > sun4i_backend_update_layer_formats,
+> > > > which is not called when the frontend is selected.
+> > > > 
+> > > > Thus, creating a layer with a YUV format handled by the backend
+> > > > and
+> > > > then
+> > > > switching to a format that requires the frontend would keep the
+> > > > YUV
+> > > > channel enabled for the layer.
+> > > > 
+> > > > This explicitly disables the YUV channel for the layer when
+> > > > using
+> > > > the
+> > > > frontend as well. It also sets the relevant interlace bit, which
+> > > > was
+> > > > missing in the frontend path as well.
+> > > 
+> > > This should be part of a separate patch. Usually, if you write "it
+> > > also does..." at the end of your commit log, it's a pretty good
+> > > indication that it should be another patch :)
+> > 
+> > I must say, I figured that this part was missing in the frontend
+> > path by
+> > chance and couldn't really test the feature, so I'm also tempted to
+> > drop
+> > it altogether. What do you think?
 > 
-> Why do you need DRM_RENDER_ALLOW? as far as I know, this is only
-> useful for render-nodes.
+> If you haven't been able to test it, then yeah, don't submit it.
 
-It's probably undeeded indeed.
+Alright, noted.
 
-> > +};
-> >  
-> >  DEFINE_DRM_GEM_CMA_FOPS(sun4i_drv_fops);
-> >  
-> > @@ -34,6 +41,8 @@ static struct drm_driver sun4i_drv_driver = {
-> >  
-> >  	/* Generic Operations */
-> >  	.lastclose		= drm_fb_helper_lastclose,
-> > +	.ioctls			= sun4i_drv_ioctls,
-> > +	.num_ioctls		= ARRAY_SIZE(sun4i_drv_ioctls),
-> >  	.fops			= &sun4i_drv_fops,
-> >  	.name			= "sun4i-drm",
-> >  	.desc			= "Allwinner sun4i Display
-> > Engine",
-> > @@ -69,6 +78,93 @@ int drm_sun4i_gem_dumb_create(struct drm_file
-> > *file_priv,
-> >  	return drm_gem_cma_dumb_create_internal(file_priv, drm,
-> > args);
-> >  }
-> >  
-> > +int drm_sun4i_gem_create_tiled(struct drm_device *drm, void *data,
-> > +			       struct drm_file *file_priv)
-> > +{
-> > +	struct drm_sun4i_gem_create_tiled *args = data;
-> > +	struct drm_gem_cma_object *cma_obj;
-> > +	struct drm_gem_object *gem_obj;
-> > +	uint32_t luma_stride, chroma_stride;
-> > +	uint32_t luma_height, chroma_height;
-> > +	int ret;
-> > +
-> > +	if (!sun4i_format_supports_tiling(args->format))
-> > +		return -EINVAL;
-> > +
-> > +	memset(args->pitches, 0, sizeof(args->pitches));
-> > +	memset(args->offsets, 0, sizeof(args->offsets));
-> > +
-> > +	/* Stride and height are aligned to 32 bytes for MB32 tiled
-> > format. */
-> > +	luma_stride = ALIGN(args->width, 32);
-> > +	luma_height = ALIGN(args->height, 32);
-> > +
-> > +	if (sun4i_format_is_semiplanar(args->format)) {
-> > +		chroma_stride = luma_stride;
-> > +
-> > +		if (sun4i_format_is_yuv420(args->format))
-> > +			chroma_height = ALIGN(DIV_ROUND_UP(args-
-> > >height, 2), 32);
-> > +		else if (sun4i_format_is_yuv422(args->format))
-> > +			chroma_height = luma_height;
-> > +		else
-> > +			return -EINVAL;
-> > +
-> > +		args->pitches[0] = luma_stride;
-> > +		args->pitches[1] = chroma_stride;
-> > +
-> > +		args->offsets[0] = 0;
-> > +		args->offsets[1] = luma_stride * luma_height;
-> > +
-> > +		args->size = luma_stride * luma_height +
-> > +			     chroma_stride * chroma_height;
-> > +	} else if (sun4i_format_is_planar(args->format)) {
-> > +		if (sun4i_format_is_yuv411(args->format)) {
-> > +			chroma_stride = ALIGN(DIV_ROUND_UP(args-
-> > >width, 4), 32);
-> > +			chroma_height = luma_height;
-> > +		} if (sun4i_format_is_yuv420(args->format)) {
-> > +			chroma_stride = ALIGN(DIV_ROUND_UP(args-
-> > >width, 2), 32);
-> > +			chroma_height = ALIGN(DIV_ROUND_UP(args-
-> > >height, 2), 32);
-> > +		} else if (sun4i_format_is_yuv422(args->format)) {
-> > +			chroma_stride = ALIGN(DIV_ROUND_UP(args-
-> > >width, 2), 32);
-> > +			chroma_height = luma_height;
-> > +		} else {
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		args->pitches[0] = luma_stride;
-> > +		args->pitches[1] = chroma_stride;
-> > +		args->pitches[2] = chroma_stride;
-> > +
-> > +		args->offsets[0] = 0;
-> > +		args->offsets[1] = luma_stride * luma_height;
-> > +		args->offsets[2] = luma_stride * luma_height +
-> > +				   chroma_stride * chroma_height;
-> > +
-> > +		args->size = luma_stride * luma_height +
-> > +			     chroma_stride * chroma_height * 2;
-> > +	} else {
-> > +		/* No support for packed formats in tiled mode. */
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	cma_obj = drm_gem_cma_create(drm, args->size);
-> > +	if (IS_ERR(cma_obj))
-> > +		return PTR_ERR(cma_obj);
-> > +
-> > +	gem_obj = &cma_obj->base;
-> > +
-> > +	/*
-> > +	 * allocate a id of idr table where the obj is registered
-> > +	 * and handle has the id what user can see.
-> > +	 */
-> > +	ret = drm_gem_handle_create(file_priv, gem_obj, &args-
-> > >handle);
-> > +	/* drop reference from allocate - handle holds it now. */
-> > +	drm_gem_object_put_unlocked(gem_obj);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	return PTR_ERR_OR_ZERO(cma_obj);
-> > +}
-> > +
-> >  static void sun4i_remove_framebuffers(void)
-> >  {
-> >  	struct apertures_struct *ap;
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h
-> > b/drivers/gpu/drm/sun4i/sun4i_drv.h
-> > index 47969711a889..308ff4bfcdd5 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
-> > @@ -26,5 +26,7 @@ struct sun4i_drv {
-> >  int drm_sun4i_gem_dumb_create(struct drm_file *file_priv,
-> >  			      struct drm_device *drm,
-> >  			      struct drm_mode_create_dumb *args);
-> > +int drm_sun4i_gem_create_tiled(struct drm_device *dev, void *data,
-> > +			       struct drm_file *file_priv);
-> 
-> Do you need it to be non-static, and part of the header as well?
+> > Also, is interlacing actually used on any of the video outputs we
+> > support? Perhaps RGB?
+>
+> Composite would be a better guess :)
 
-Here as well, I just find that it looks more readable that way, below
-the drm driver structure definition instead of above it.
+Oh and I was wondering what CVBS was about. Now I know!
+It seems that we don't support it for now apparently, anyway.
 
-> I'll let the DRM-misc maintainers comment on the validity of the new
-> ioctl.
-
-Cheers,
+Thanks,
 
 -- 
 Paul Kocialkowski, Bootlin (formerly Free Electrons)
@@ -212,4 +72,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/5e5fd6e6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/c43b853c/attachment.sig>
