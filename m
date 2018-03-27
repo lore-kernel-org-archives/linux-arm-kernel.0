@@ -1,39 +1,33 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Tue, 27 Mar 2018 17:19:34 +0300
-Subject: [PATCH] clk: imx7d: Correct ahb clk parent select
-Message-ID: <1522160374-31894-1-git-send-email-abel.vesa@nxp.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Tue, 27 Mar 2018 16:20:16 +0200
+Subject: [PATCH v3 0/6] PCI: aardvark: misc fixes and improvements
+In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
+References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327162016.7df5c684@windsurf.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anson Huang <b20788@freescale.com>
+Hello Bjorn,
 
-Design team change the ahb's clk parent options but
-did NOT update the DOC accordingly in time, so the
-AHB/IPG's clk rate in clk tree is incorrect, AHB is
-67.5MHz and IPG is 33.75MHz, but using scope to
-monitor them, they are actually 135MHz and 67.5MHz,
-update the clk parent option to make clk tree info
-correct.
+On Tue, 27 Mar 2018 16:08:06 +0200, Thomas Petazzoni wrote:
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
-Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
-Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> This patch series brings a number of improvements to the aardvark
+> PCIe. Sorry for being so slow at sending the v3 after the v2 sent in
+> January. Hopefully this time around the series will be fine.
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 89bfa75..4d020dd 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -74,7 +74,7 @@ static const char *nand_usdhc_bus_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
- 
- static const char *ahb_channel_sel[] = { "osc", "pll_sys_pfd2_270m_clk",
- 	"pll_dram_533m_clk", "pll_sys_pfd0_392m_clk",
--	"pll_enet_125m_clk", "pll_usb_main_clk", "pll_audio_post_div",
-+	"pll_enet_250m_clk", "pll_usb_main_clk", "pll_audio_post_div",
- 	"pll_video_post_div", };
- 
- static const char *dram_phym_sel[] = { "pll_dram_main_clk",
+Sorry, I screwed up. I'm not sure how, but I did. The series was sent
+twice, and only the second iteration is correct, the first one lacked
+some Cc: to stable.
+
+I have marked the bogus patches as Superseded in patchwork, so if you
+look at patchwork, you will only see the patches worth considering.
+
+Let me know if you would like to resend anyway.
+
+Sorry again for the mess,
+
+Thomas Petazzoni
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
