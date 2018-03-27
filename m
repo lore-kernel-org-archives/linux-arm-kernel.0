@@ -1,44 +1,52 @@
-From: chenhc@lemote.com (=?utf-8?B?6ZmI5Y2O5omN?=)
-Date: Tue, 27 Mar 2018 16:29:12 +0800
-Subject: Regression with arm in next with stack protector
-In-Reply-To: <20180326153714.GG5700@atomide.com>
-References: <20180323181452.GJ5799@atomide.com>
- <CAOMZO5Bmpk4cwav-qTnNA6L16DwdDPp5LeKC-jY9=QzfVBuKSQ@mail.gmail.com>
- <20180323121530.f28dc29939d9395268911a4e@linux-foundation.org>
- <tencent_79FD53B203715FD7439C6EAB@qq.com>
- <20180326153714.GG5700@atomide.com>
-Message-ID: <tencent_1DDCF65B56759D1B570EF7DD@qq.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 27 Mar 2018 16:29:49 +0800
+Subject: [GIT PULL] Freescale arm64 device tree fixups for 4.17
+Message-ID: <20180327082948.GG8857@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner devices are OK, Exynos devices (except 4210) are OK.
- 
------------------- Original ------------------
-From:  "Tony Lindgren"<tony@atomide.com>;
-Date:  Mon, Mar 26, 2018 11:37 PM
-To:  "???"<chenhc@lemote.com>;
-Cc:  "Andrew Morton"<akpm@linux-foundation.org>; "Fabio Estevam"<festevam@gmail.com>; "Stephen Rothwell"<sfr@canb.auug.org.au>; "Rich Felker"<dalias@libc.org>; "Russell King"<linux@arm.linux.org.uk>; "Yoshinori Sato"<ysato@users.sourceforge.jp>; "linux-kernel"<linux-kernel@vger.kernel.org>; "Ralf Baechle"<ralf@linux-mips.org>; "linux-omap"<linux-omap@vger.kernel.org>; "James Hogan"<james.hogan@mips.com>; "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"<linux-arm-kernel@lists.infradead.org>;
-Subject:  Re: Regression with arm in next with stack protector
- 
-* ??? <chenhc@lemote.com> [180326 06:59]:
-> Hi, Tony and Fabio,
-> 
-> Could you please upload your kernel binary to somewhere for me? I don't understand why some ARM boards is OK while others are broken.
+Hi,
 
-Well the kernel I'm testing is just current Linux next cross
-compiled omap2plus_defconfig kernel. I do have few more config
-options enabled like LOCKDEP and DEBUG_ATOMIC_SLEEP, but I
-doubt they matter here :)
+This is a fix-up for "[GIT PULL 5/6] Freescale arm64 device tree updates
+for 4.17" [1].  After the pull-request gets merged, we're pointed out by
+Rob that the "fix" to IFC memory controller DTC warnings is wrong.
+Let's start over again by reverting the patches first.  Sorry about the
+reverting.
 
-Then I'm using gcc-7.3.0 and binutils-2.30 built with the
-buildall.git scripts:
+Shawn
 
-git://git.infradead.org/users/segher/buildall.git
+[1] https://www.spinics.net/lists/arm-kernel/msg641049.html
 
-If you still need binaries, let me know.
 
-Do you know which arm devices are working with your patch?
+The following changes since commit 4e017f1419397473cf3db6e9fa020013998b1aa4:
 
-Regards,
+  dt-bindings: ifc: Fix the unit address format in the examples (2018-03-12 15:38:49 +0800)
 
-Tony
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.17-2
+
+for you to fetch changes up to ee9c64307b6203151a20ec33e6f51ae1cac1bb6e:
+
+  Revert "dt-bindings: ifc: Fix the unit address format in the examples" (2018-03-27 16:00:07 +0800)
+
+----------------------------------------------------------------
+Freescale arm64 device tree fixups for 4.17:
+ - It reverts a couple of patches that "fix" DTC warnings on IFC memory
+   controller in a wrong way.  We will start over agagin to address the
+   DTC warnings later.
+
+----------------------------------------------------------------
+Fabio Estevam (2):
+      Revert "arm64: dts: fsl: fix ifc simple-bus unit address format warnings"
+      Revert "dt-bindings: ifc: Fix the unit address format in the examples"
+
+ Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt | 6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts                | 6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts                | 6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts                | 6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts                | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-qds.dts                | 6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts                | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls208xa-qds.dtsi               | 6 +++---
+ 8 files changed, 22 insertions(+), 22 deletions(-)
