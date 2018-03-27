@@ -1,50 +1,69 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 27 Mar 2018 16:08:06 +0200
-Subject: [PATCH v3 0/6] PCI: aardvark: misc fixes and improvements
-Message-ID: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
+Date: Tue, 27 Mar 2018 16:08:07 +0200
+Subject: [PATCH v3 1/6] PCI: aardvark: introduce an advk_pcie_valid_device()
+ helper
+In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
+References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327140819.23501-2-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-This patch series brings a number of improvements to the aardvark
-PCIe. Sorry for being so slow at sending the v3 after the v2 sent in
-January. Hopefully this time around the series will be fine.
+In other to mimic other PCIe host controller drivers, introduce an
+advk_pcie_valid_device() helper, used in the configuration read/write
+functions.
 
+This patch by itself is not a fix, but it is required for a follow-up
+patch that is a fix, hence the Fixes tag and the Cc to stable.
+
+Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
 Changes since v2:
+ - New patch
+---
+ drivers/pci/host/pci-aardvark.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
- - Rebased on v4.16-rc7
-
- - Dropped the patches disabling L0S and aligning the MPS between RC
-   and EP, since we are working on a different solution, implementing
-   a proper root port. Therefore, this patch series only has the
-   (hopefully) non-controversial changes.
-
- - Add a patch (PATCH 1) that factorizes the logic to decide if the
-   target of a configuration space access is a valid device or not
-   into a advk_pcie_valid_device() helper, and adjust PATCH 2
-   accordingly.
-
- - Drop unused PCIE_BDF macro in PATCH 3.
-
-Best regards,
-
-Thomas Petazzoni
-
-Evan Wang (2):
-  PCI: aardvark: fix PCIe max read request size setting
-  PCI: aardvark: remove PCIe outbound window configuration
-
-Thomas Petazzoni (1):
-  PCI: aardvark: introduce an advk_pcie_valid_device() helper
-
-Victor Gu (3):
-  PCI: aardvark: fix logic in advk_pcie_valid_device()
-  PCI: aardvark: set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
-  PCI: aardvark: use isr1 instead of isr0 interrupt in legacy irq mode
-
- drivers/pci/host/pci-aardvark.c | 117 ++++++++++++++--------------------------
- 1 file changed, 39 insertions(+), 78 deletions(-)
-
+diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+index b04d37b3c5de..ccd0304a0c21 100644
+--- a/drivers/pci/host/pci-aardvark.c
++++ b/drivers/pci/host/pci-aardvark.c
+@@ -430,6 +430,15 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
+ 	return -ETIMEDOUT;
+ }
+ 
++static int advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
++				  int devfn)
++{
++	if (PCI_SLOT(devfn) != 0)
++		return false;
++
++	return true;
++}
++
+ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 			     int where, int size, u32 *val)
+ {
+@@ -437,7 +446,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 	u32 reg;
+ 	int ret;
+ 
+-	if (PCI_SLOT(devfn) != 0) {
++	if (!advk_pcie_valid_device(pcie, bus, devfn)) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
+@@ -491,7 +500,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	int offset;
+ 	int ret;
+ 
+-	if (PCI_SLOT(devfn) != 0)
++	if (!advk_pcie_valid_device(pcie, bus, devfn))
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+ 	if (where % size)
 -- 
 2.14.3
