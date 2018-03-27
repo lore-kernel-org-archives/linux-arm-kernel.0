@@ -1,105 +1,63 @@
-From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
-Date: Tue, 27 Mar 2018 09:54:17 -0700
-Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
-References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
- <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
- <1521849496.15055.16.camel@intel.com>
- <862cdbeafb9cfd272a426b010943ffc5@codeaurora.org>
- <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
-Message-ID: <1522169657.6503.1.camel@intel.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 27 Mar 2018 09:56:12 -0700
+Subject: [PATCH v5 02/13] ARM: dts: ipq4019: Add a default chosen node
+In-Reply-To: <1521800336-19266-3-git-send-email-sricharan@codeaurora.org>
+References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
+ <1521800336-19266-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20180327165612.GF1403@tuxbook-pro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-03-27 at 08:42 -0400, Sinan Kaya wrote:
-> On 3/23/2018 10:34 PM, okaya at codeaurora.org wrote:
-> > On 2018-03-23 19:58, Jeff Kirsher wrote:
-> > > On Fri, 2018-03-23 at 14:53 -0700, Alexander Duyck wrote:
-> > > > On Fri, Mar 23, 2018 at 11:52 AM, Sinan Kaya <okaya@codeaurora.
-> > > > org>
-> > > > wrote:
-> > > > > Code includes wmb() followed by writel() in multiple places.
-> > > > > writel()
-> > > > > already has a barrier on some architectures like arm64.
-> > > > > 
-> > > > > This ends up CPU observing two barriers back to back before
-> > > > > executing
-> > > > > the
-> > > > > register write.
-> > > > > 
-> > > > > Since code already has an explicit barrier call, changing
-> > > > > writel() to
-> > > > > writel_relaxed().
-> > > > > 
-> > > > > I did a regex search for wmb() followed by writel() in each
-> > > > > drivers
-> > > > > directory.
-> > > > > I scrubbed the ones I care about in this series.
-> > > > > 
-> > > > > I considered "ease of change", "popular usage" and
-> > > > > "performance
-> > > > > critical
-> > > > > path" as the determining criteria for my filtering.
-> > > > > 
-> > > > > We used relaxed API heavily on ARM for a long time but
-> > > > > it did not exist on other architectures. For this reason,
-> > > > > relaxed
-> > > > > architectures have been paying double penalty in order to use
-> > > > > the
-> > > > > common
-> > > > > drivers.
-> > > > > 
-> > > > > Now that relaxed API is present on all architectures, we can
-> > > > > go and
-> > > > > scrub
-> > > > > all drivers to see what needs to change and what can remain.
-> > > > > 
-> > > > > We start with mostly used ones and hope to increase the
-> > > > > coverage over
-> > > > > time.
-> > > > > It will take a while to cover all drivers.
-> > > > > 
-> > > > > Feel free to apply patches individually.
-> > > > 
-> > > > I looked over the set and they seem good.
-> > > > 
-> > > > Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
-> > > 
-> > > Grrr, patch 1 does not apply cleanly to my next-queue tree (dev-
-> > > queue
-> > > branch).  I will deal with this series in a day or two, after I
-> > > have dealt
-> > > with my driver pull requests.
-> > 
-> > Sorry, you will have to replace the ones you took from me.
-> 
-> Double sorry now.
-> 
-> I don't know if you have been following "RFC on writel and
-> writel_relaxed" thread
-> or not but there are some new developments about wmb() requirement. 
-> 
-> Basically, wmb() should never be used before writel() as writel()
-> seem to
-> provide coherency and observability guarantee.
-> 
-> wmb()+writel_relaxed() is slower on some architectures than plain
-> writel()
-> 
-> I'll have to rework these patches to have writel() only. 
-> 
-> Are you able to drop the applied ones so that I can post V8 or is it
-> too late?
+On Fri 23 Mar 03:18 PDT 2018, Sricharan R wrote:
 
-Currently I do not have any of your patches applied to my next-queue
-tree (dev-queue branch).  So feel free to do any revisions you need to
-do and to re-submit to intel-wired-lan at lists.osuosl.org (IWL) mailing
-list.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/a20aa26b/attachment.sig>
+> Add a 'chosen' node to select the serial console.
+> This is needed when bootloaders do not pass the
+> 'console=' bootargs.
+> 
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 8 ++++++++
+>  arch/arm/boot/dts/qcom-ipq4019.dtsi           | 2 +-
+>  2 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+> index e413b21e..ef8d8c8 100644
+> --- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+> @@ -20,6 +20,14 @@
+>  	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
+>  	compatible = "qcom,ipq4019";
+>  
+> +	aliases {
+> +		serial0 = &blsp1_uart1;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+>  	soc {
+>  		rng at 22000 {
+>  			status = "ok";
+> diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> index 10d112a..ea9202a 100644
+> --- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+> @@ -256,7 +256,7 @@
+>                          regulator;
+>                  };
+>  
+> -		serial at 78af000 {
+> +		blsp1_uart1: serial at 78af000 {
+>  			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+>  			reg = <0x78af000 0x200>;
+>  			interrupts = <0 107 0>;
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> 
