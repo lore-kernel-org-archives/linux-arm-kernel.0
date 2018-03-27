@@ -1,64 +1,51 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 27 Mar 2018 18:08:17 +0200
-Subject: [GIT PULL] Reset controller changes for v4.17, part 2
-Message-ID: <1522166897.3345.16.camel@pengutronix.de>
+From: maksims.matjakubovs@gmail.com (Maksims Matjakubovs)
+Date: Tue, 27 Mar 2018 19:11:02 +0300
+Subject: [PATCH] Allwinner SPI sun6i : add dual mode support.
+Message-ID: <1522167062-4079-1-git-send-email-maksims.matjakubovs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+Added Dual mode half duplex Rx and Tx support to Allwinner sun6i/sun8i SPI driver.
+Main changes is related to SUN6I_BURST_CTL_CNT_REG register.
+SPI transmit is in Dual mode if STC (Master Single Mode Transmit Counter) is 0 and DRM (Master Dual Mode RX Enable) is not set.
+SPI receive is in Dual mode if DRM (Master Dual Mode RX Enable) is set.
+Tested on Allwinner V3s (sun8i) CPU.
 
-The following changes since commit 1d7592f84f92c6344978186fdbe547af044274b5:
+Signed-off-by: Maksims Matjakubovs <maksims.matjakubovs@gmail.com>
+---
+ drivers/spi/spi-sun6i.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-  reset: simple: Enable for ASPEED systems (2018-02-20 17:42:29 +0100)
-
-are available in the Git repository at:
-
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.17-2
-
-for you to fetch changes up to 0089313d8595b76422b189b44c55556cb1004190:
-
-  Merge branch 'reset/lookup' into reset/next (2018-03-27 11:03:43 +0200)
-
-----------------------------------------------------------------
-Reset controller changes for v4.17, part 2
-
-This tag contains reset lookup support, similar to pwm lookups, for legacy
-non-DT platforms, a few new reset controls and a Kconfig fix for uniphier
-SoCs, as well as a new driver for the STM32MP1 peripheral reset controller.
-
-The reset lookups are merged from a separate, immutable branch, that may
-also be merged into the davinci tree.
-
-----------------------------------------------------------------
-Bartosz Golaszewski (2):
-      reset: add support for non-DT systems
-      reset: modify the way reset lookup works for board files
-
-Gabriel Fernandez (2):
-      dt-bindings: reset: add STM32MP1 resets
-      reset: stm32mp1: Enable stm32mp1 reset driver
-
-Katsuhiro Suzuki (1):
-      reset: uniphier: add Pro4/Pro5/PXs2 audio systems reset control
-
-Kunihiko Hayashi (1):
-      reset: uniphier: add ethernet reset control support for PXs3
-
-Masahiro Yamada (1):
-      reset: imx7: add 'depends on HAS_IOMEM' to fix unmet dependency
-
-Philipp Zabel (1):
-      Merge branch 'reset/lookup' into reset/next
-
- .../devicetree/bindings/reset/st,stm32mp1-rcc.txt  |   6 ++
- drivers/reset/Kconfig                              |   7 ++
- drivers/reset/Makefile                             |   1 +
- drivers/reset/core.c                               |  96 ++++++++++++++++-
- drivers/reset/reset-stm32mp1.c                     | 115 +++++++++++++++++++++
- drivers/reset/reset-uniphier.c                     |   5 +
- include/dt-bindings/reset/stm32mp1-resets.h        | 108 +++++++++++++++++++
- include/linux/reset-controller.h                   |  30 ++++++
- 8 files changed, 367 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
- create mode 100644 drivers/reset/reset-stm32mp1.c
- create mode 100644 include/dt-bindings/reset/stm32mp1-resets.h
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index 8533f4e..2da52ed 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -84,6 +84,7 @@
+ 
+ #define SUN6I_BURST_CTL_CNT_REG		0x38
+ #define SUN6I_BURST_CTL_CNT_STC(cnt)		((cnt) & SUN6I_MAX_XFER_SIZE)
++#define SUN6I_BURST_CTL_CNT_DRM		BIT(28)
+ 
+ #define SUN6I_TXDATA_REG		0x200
+ #define SUN6I_RXDATA_REG		0x300
+@@ -312,6 +313,8 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	sun6i_spi_write(sspi, SUN6I_BURST_CNT_REG, SUN6I_BURST_CNT(tfr->len));
+ 	sun6i_spi_write(sspi, SUN6I_XMIT_CNT_REG, SUN6I_XMIT_CNT(tx_len));
+ 	sun6i_spi_write(sspi, SUN6I_BURST_CTL_CNT_REG,
++			(tfr->tx_nbits == SPI_NBITS_DUAL) ? 0 :
++			(tfr->rx_nbits == SPI_NBITS_DUAL) ? SUN6I_BURST_CTL_CNT_DRM :
+ 			SUN6I_BURST_CTL_CNT_STC(tx_len));
+ 
+ 	/* Fill the TX FIFO */
+@@ -480,7 +483,8 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 	master->set_cs = sun6i_spi_set_cs;
+ 	master->transfer_one = sun6i_spi_transfer_one;
+ 	master->num_chipselect = 4;
+-	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST;
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST |
++				SPI_RX_DUAL | SPI_TX_DUAL;
+ 	master->bits_per_word_mask = SPI_BPW_MASK(8);
+ 	master->dev.of_node = pdev->dev.of_node;
+ 	master->auto_runtime_pm = true;
+-- 
+2.7.4
