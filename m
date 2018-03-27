@@ -1,33 +1,39 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 27 Mar 2018 10:48:11 -0400
-Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers on
- weakly-ordered archs
-In-Reply-To: <CAKgT0UfeMY0WsJGARrVxNsHzr8OnNSJ2jaYbBTGQNkR_uizJuQ@mail.gmail.com>
-References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
- <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
- <1521849496.15055.16.camel@intel.com>
- <862cdbeafb9cfd272a426b010943ffc5@codeaurora.org>
- <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
- <trinity-6d247cd1-94e3-4a58-a762-77724e895644-1522159460624@3c-app-gmx-bs61>
- <dcbd4406-73f7-4afa-850d-5f5d9f97ab02@codeaurora.org>
- <CAKgT0UfeMY0WsJGARrVxNsHzr8OnNSJ2jaYbBTGQNkR_uizJuQ@mail.gmail.com>
-Message-ID: <6fe4e3a4-219f-68d7-25f1-72ab86aae42e@codeaurora.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Mar 2018 16:48:56 +0200
+Subject: [PATCH 09/10] drm/sun4i: Add a dedicated ioctl call for
+ allocating tiled buffers
+In-Reply-To: <1522140098.1110.40.camel@bootlin.com>
+References: <20180321152904.22411-1-paul.kocialkowski@bootlin.com>
+ <20180321152904.22411-10-paul.kocialkowski@bootlin.com>
+ <20180323104856.qo7w376xr3gcznmm@flea>
+ <1522140098.1110.40.camel@bootlin.com>
+Message-ID: <20180327144856.rb757m35zyscefnn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/27/2018 10:38 AM, Alexander Duyck wrote:
->> We are being told that if you use writel(), then you don't need a wmb() on
->> all architectures.
-> I'm not sure who told you that but that is incorrect, at least for
-> x86. If you attempt to use writel() without the wmb() we will have to
-> NAK the patches. We will accept the wmb() with writel_releaxed() since
-> that solves things for ARM.
+On Tue, Mar 27, 2018 at 10:41:38AM +0200, Paul Kocialkowski wrote:
+> > > +int drm_sun4i_gem_create_tiled(struct drm_device *dev, void *data,
+> > > +			       struct drm_file *file_priv);
+> > 
+> > Do you need it to be non-static, and part of the header as well?
 > 
+> Here as well, I just find that it looks more readable that way, below
+> the drm driver structure definition instead of above it.
 
-I added netdev and you to the RFC on writel and writel_relaxed list. 
-Feel free to raise your concerns.
+But it also creates a global symbol for no particular reason, while
+we're doing the function-first-structure-later pattern pretty much
+everywhere else in the kernel.
+
+Maxime
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/c5fa1248/attachment.sig>
