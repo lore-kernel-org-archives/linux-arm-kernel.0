@@ -1,23 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 13:27:16 +0200
-Subject: [GIT PULL 7/7] arm64: tegra: Device tree changes for v4.17-rc1
-In-Reply-To: <20180316141850.4876-7-thierry.reding@gmail.com>
-References: <20180316141850.4876-1-thierry.reding@gmail.com>
- <20180316141850.4876-7-thierry.reding@gmail.com>
-Message-ID: <CAK8P3a2J-V334ETraU5e4Li_zzHF94EYY4m12vugwmcWK9vmLg@mail.gmail.com>
+Date: Tue, 27 Mar 2018 13:30:17 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.17
+In-Reply-To: <cover.1521206129.git.horms+renesas@verge.net.au>
+References: <cover.1521206129.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a3-MDXWFovrWrJ50Ue68d5-ruHdgbDuWqWjXE3KtLFm1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 3:18 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> ----------------------------------------------------------------
-> arm64: tegra: Device tree changes for v4.17-rc1
+On Fri, Mar 16, 2018 at 3:51 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 >
-> Adds initial support for the P2972-0000 development board based on
-> Tegra194 and enables the AHCI controller on Jetson TX1.
+> Please consider these Renesas ARM64 based SoC DT updates for v4.17.
 >
-> ----------------------------------------------------------------
 
 Pulled into next/dt, thanks!
 
-        Arnd
+       Arnd
