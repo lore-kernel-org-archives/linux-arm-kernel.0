@@ -1,54 +1,34 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 27 Mar 2018 14:15:14 +0100
-Subject: [PATCH v2 04/17] arm64: Refactor pud_huge for reusability
+Date: Tue, 27 Mar 2018 14:15:17 +0100
+Subject: [PATCH v2 07/17] kvm: arm/arm64: Remove spurious WARN_ON
 In-Reply-To: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
 References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1522156531-28348-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1522156531-28348-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make pud_huge reusable for stage2 tables, independent
-of the stage1 levels.
+On a 4-level page table pgd entry can be empty, unlike a 3-level
+page table. Remove the spurious WARN_ON() in stage_get_pud().
 
-Cc: Steve Capper <steve.capper@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <cdall@kernel.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 5 +++++
- arch/arm64/mm/hugetlbpage.c      | 2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ virt/kvm/arm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 5e22503..4a16c11 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -479,6 +479,11 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- #define __raw_pud_bad(pud)	(!(pud_val(pud) & PUD_TABLE_BIT))
- #define __raw_pud_present(pud)	pte_present(pud_pte(pud))
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 16a19fb..9cba334 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -862,7 +862,7 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
+ 	pud_t *pud;
  
-+static inline int __raw_pud_huge(pud_t pud)
-+{
-+	return pud_val(pud) && !(pud_val(pud) & PUD_TABLE_BIT);
-+}
-+
- static inline void __raw_set_pud(pud_t *pudp, pud_t pud)
- {
- 	WRITE_ONCE(*pudp, pud);
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index ecc6818..3f4bb43 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -35,7 +35,7 @@ int pmd_huge(pmd_t pmd)
- int pud_huge(pud_t pud)
- {
- #ifndef __PAGETABLE_PMD_FOLDED
--	return pud_val(pud) && !(pud_val(pud) & PUD_TABLE_BIT);
-+	return __raw_pud_huge(pud);
- #else
- 	return 0;
- #endif
+ 	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+-	if (WARN_ON(stage2_pgd_none(*pgd))) {
++	if (stage2_pgd_none(*pgd)) {
+ 		if (!cache)
+ 			return NULL;
+ 		pud = mmu_memory_cache_alloc(cache);
 -- 
 2.7.4
