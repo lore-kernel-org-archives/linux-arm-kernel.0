@@ -1,69 +1,92 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 27 Mar 2018 10:46:15 +0800
-Subject: [PATCH v2 1/2] arm: dts: sun8i: a23/a33: declare NAND pins
-In-Reply-To: <20180326212820.20637-2-miquel.raynal@bootlin.com>
-References: <20180326212820.20637-1-miquel.raynal@bootlin.com>
- <20180326212820.20637-2-miquel.raynal@bootlin.com>
-Message-ID: <CAGb2v67_9GnJxQT5sP6Rne_mqYr==_yD6=jO1YT8zF3qATja5Q@mail.gmail.com>
+From: pelcan@codeaurora.org (Philip Elcan)
+Date: Mon, 26 Mar 2018 23:21:17 -0400
+Subject: [PATCH V2] arm64: tlbflush: avoid writing RES0 bits
+Message-ID: <1522120877-9136-1-git-send-email-pelcan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 5:28 AM, Miquel Raynal
-<miquel.raynal@bootlin.com> wrote:
-> Declare NAND pins (bus, chip select and ready/busy) for a23/a33 SoCs.
->
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> index 971f9be699a7..0308e8b21ea5 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> @@ -315,6 +315,33 @@
->                                 bias-pull-up;
->                         };
->
-> +                       nand_pins: nand-pins {
-> +                               pins = "PC0", "PC1", "PC2", "PC5",
-> +                                      "PC8", "PC9", "PC10", "PC11",
-> +                                      "PC12", "PC13", "PC14", "PC15";
-> +                               function = "nand0";
-> +                       };
-> +
-> +                       nand_pins_cs0: nand-pins-cs0 {
-> +                               pins = "PC4";
-> +                               function = "nand0";
-> +                       };
-> +
-> +                       nand_pins_cs1: nand-pins-cs1 {
-> +                               pins = "PC3";
-> +                               function = "nand0";
-> +                       };
-> +
-> +                       nand_pins_rb0: nand-pins-rb0 {
-> +                               pins = "PC6";
-> +                               function = "nand0";
-> +                       };
-> +
-> +                       nand_pins_rb1: nand-pins-rb1 {
-> +                               pins = "PC7";
-> +                               function = "nand0";
-> +                       };
-> +
+Several of the bits of the TLBI register operand are RES0 per the ARM
+ARM, so TLBI operations should avoid writing non-zero values to these
+bits.
 
-The CS and RB pins are pulled up by default in the PIO
-hardware reset values. But you should make them explicit,
-especially since you likely don't know if there are external
-pull-ups on these lines. I suppose you could set them to _not_
-pull-up and see if things still work.
+This patch adds a macro __TLBI_VADDR(addr, asid) that creates the
+operand register in the correct format and honors the RES0 bits.
 
-ChenYu
+Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+---
+ arch/arm64/include/asm/tlbflush.h | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
->                         pwm0_pins: pwm0 {
->                                 pins = "PH0";
->                                 function = "pwm0";
-> --
-> 2.14.1
->
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 9e82dd7..b1205e9 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -60,6 +60,15 @@
+ 		__tlbi(op, (arg) | USER_ASID_FLAG);				\
+ } while (0)
+ 
++/* This macro creates a properly formatted VA operand for the TLBI */
++#define __TLBI_VADDR(addr, asid)				\
++	({							\
++		unsigned long __ta = (addr) >> 12;		\
++		__ta &= GENMASK_ULL(43, 0);			\
++		__ta |= (unsigned long)(asid) << 48;		\
++		__ta;						\
++	})
++
+ /*
+  *	TLB Management
+  *	==============
+@@ -117,7 +126,7 @@ static inline void flush_tlb_all(void)
+ 
+ static inline void flush_tlb_mm(struct mm_struct *mm)
+ {
+-	unsigned long asid = ASID(mm) << 48;
++	unsigned long asid = __TLBI_VADDR(0, ASID(mm));
+ 
+ 	dsb(ishst);
+ 	__tlbi(aside1is, asid);
+@@ -128,7 +137,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
+ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 				  unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
++	unsigned long addr = __TLBI_VADDR(uaddr, ASID(vma->vm_mm));
+ 
+ 	dsb(ishst);
+ 	__tlbi(vale1is, addr);
+@@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 		return;
+ 	}
+ 
+-	start = asid | (start >> 12);
+-	end = asid | (end >> 12);
++	start = __TLBI_VADDR(start, asid);
++	end = __TLBI_VADDR(end, asid);
+ 
+ 	dsb(ishst);
+ 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
+@@ -185,8 +194,8 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ 		return;
+ 	}
+ 
+-	start >>= 12;
+-	end >>= 12;
++	start = __TLBI_VADDR(start, 0);
++	end = __TLBI_VADDR(end, 0);
+ 
+ 	dsb(ishst);
+ 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
+@@ -202,7 +211,7 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+ 				       unsigned long uaddr)
+ {
+-	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
++	unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
+ 
+ 	__tlbi(vae1is, addr);
+ 	__tlbi_user(vae1is, addr);
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
