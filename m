@@ -1,53 +1,37 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 28 Mar 2018 01:31:15 +0900
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for 4.17 (2nd)
-Message-ID: <CAK7LNAQWikF9K41uzkQjixUEO=_s14txEhvd=rmLY69JShezKg@mail.gmail.com>
+Date: Wed, 28 Mar 2018 01:32:17 +0900
+Subject: [PATCH 0/2] add ethernet nodes for UniPhier PXs3 SoC
+In-Reply-To: <1522146766-14435-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1522146766-14435-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CAK7LNAStR8jmOUbSUKGcxRi_mZUwJgAwCN__=c6miN8Nfyd2AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+2018-03-27 19:32 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> This series adds ethernet nodes for UniPhier PXs3 SoC and the board,
+> and adds pinctrl groups for second ethernet instances because PXs3 has two
+> ethernet instances.
+>
+> Kunihiko Hayashi (2):
+>   ARM: dts: uniphier: add pinctrl groups of ethernet for second instance
+>   arm64: dts: uniphier: add ethernet node for PXs3
 
-Sorry for this very late pull request.
-If possible, could you pull a little more for v4.17-rc1 ?
+Applied.  Thanks.
 
 
+>  arch/arm/boot/dts/uniphier-pinctrl.dtsi            | 10 ++++++
+>  .../arm64/boot/dts/socionext/uniphier-pxs3-ref.dts | 22 +++++++++++++
+>  arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi   | 36 ++++++++++++++++++++++
+>  3 files changed, 68 insertions(+)
+>
+> --
+> 2.7.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-The following changes since commit 7f9f76b10dbe3f2585a21699312f74ed2b544b84:
-
-  ARM: dts: uniphier: add sound node for PXs2 (2018-03-15 23:19:05 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt-v4.17-2
-
-for you to fetch changes up to aba054a1cd45d87ce473fea6cabbf4b2dc677569:
-
-  arm64: dts: uniphier: add ethernet node for PXs3 (2018-03-28 01:16:18 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC DT updates for v4.17 (2nd)
-
-- add syscon property to sound nodes
-- add more ethernet pin groups
-- add ethernet support for PXs3 SoC
-
-----------------------------------------------------------------
-Katsuhiro Suzuki (2):
-      arm64: dts: uniphier: add syscon property for UniPhier sound system
-      ARM: dts: uniphier: add syscon property for UniPhier sound system
-
-Kunihiko Hayashi (2):
-      ARM: dts: uniphier: add pinctrl groups of ethernet for second instance
-      arm64: dts: uniphier: add ethernet node for PXs3
-
- arch/arm/boot/dts/uniphier-pinctrl.dtsi            | 10 ++++++
- arch/arm/boot/dts/uniphier-pxs2.dtsi               |  3 +-
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   |  3 +-
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |  3 +-
- .../arm64/boot/dts/socionext/uniphier-pxs3-ref.dts | 22 +++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi   | 36 ++++++++++++++++++++++
- 6 files changed, 74 insertions(+), 3 deletions(-)
 
 
 -- 
