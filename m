@@ -1,53 +1,146 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Mar 2018 11:21:17 +0100
-Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
-In-Reply-To: <20180325175004.28162-3-ynorov@caviumnetworks.com>
-References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
- <20180325175004.28162-3-ynorov@caviumnetworks.com>
-Message-ID: <20180327102116.GA2464@arm.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Tue, 27 Mar 2018 12:27:41 +0200
+Subject: [PATCH v2 4/5] drm: bridge: lvds-encoder: allow specifying the
+ input bus format
+In-Reply-To: <20180326212447.7380-5-peda@axentia.se>
+References: <20180326212447.7380-1-peda@axentia.se>
+ <20180326212447.7380-5-peda@axentia.se>
+Message-ID: <20180327102741.GN27746@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 25, 2018 at 08:50:04PM +0300, Yury Norov wrote:
-> kick_all_cpus_sync() forces all CPUs to sync caches by sending broadcast IPI.
-> If CPU is in extended quiescent state (idle task or nohz_full userspace), this
-> work may be done at the exit of this state. Delaying synchronization helps to
-> save power if CPU is in idle state and decrease latency for real-time tasks.
-> 
-> This patch introduces kick_active_cpus_sync() and uses it in mm/slab and arm64
-> code to delay syncronization.
-> 
-> For task isolation (https://lkml.org/lkml/2017/11/3/589), IPI to the CPU running
-> isolated task would be fatal, as it breaks isolation. The approach with delaying
-> of synchronization work helps to maintain isolated state.
-> 
-> I've tested it with test from task isolation series on ThunderX2 for more than
-> 10 hours (10k giga-ticks) without breaking isolation.
-> 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Hi Peter, Laurent,
+   thanks for the patches,
+
+On Mon, Mar 26, 2018 at 11:24:46PM +0200, Peter Rosin wrote:
+> If the bridge changes the bus format, allow this to be described in
+> the bridge, instead of providing false information about the bus
+> format of the connector or panel.
+>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 > ---
->  arch/arm64/kernel/insn.c |  2 +-
->  include/linux/smp.h      |  2 ++
->  kernel/smp.c             | 24 ++++++++++++++++++++++++
->  mm/slab.c                |  2 +-
->  4 files changed, 28 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 2718a77da165..9d7c492e920e 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -291,7 +291,7 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
->  			 * synchronization.
->  			 */
->  			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
-> -			kick_all_cpus_sync();
-> +			kick_active_cpus_sync();
->  			return ret;
->  		}
->  	}
+>  .../bindings/display/bridge/lvds-transmitter.txt   |  6 ++++++
+>  drivers/gpu/drm/bridge/lvds-encoder.c              | 25 ++++++++++++++++++++++
+>  2 files changed, 31 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt b/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt
+> index 50220190c203..8d40a2069252 100644
+> --- a/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt
+> +++ b/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt
+> @@ -30,6 +30,12 @@ Required properties:
+>    device-specific version corresponding to the device first
+>    followed by the generic version.
+>
+> +Optional properties:
+> +
+> +- interface-pix-fmt:
+> +  List of valid input bus formats of the encoder. Recognized bus formats
+> +  are listed in ../bus-format.txt
+> +
 
-I think this means that runtime modifications to the kernel text might not
-be picked up by CPUs coming out of idle. Shouldn't we add an ISB on that
-path to avoid executing stale instructions?
+This comments applies here and to [3/5] as well.
 
-Will
+Are we sure we want the supported bridge input format defined in DT
+bindings?
+
+Again, I may be biased, but as I see this, each bridge driver should
+list its supported formats with MEDIA_BUS_FMT_ fourcc codes and return
+the currently 'active' one when requested by the preceding bridge.
+
+I understand for this driver, being compatible with both a generic lvds
+encoder and a specific chip, the supported input formats are
+different, but I would have used the 'of_device_id.data' field for
+this and leave this out from DT bindings.
+
+This makes the translation routine here implemented not required if
+I'm not wrong...
+
+Thanks
+   j
+
+>  Required nodes:
+>
+>  This device has two video ports. Their connections are modeled using the OF
+> diff --git a/drivers/gpu/drm/bridge/lvds-encoder.c b/drivers/gpu/drm/bridge/lvds-encoder.c
+> index 75b0d3f6e4de..b78619b5560a 100644
+> --- a/drivers/gpu/drm/bridge/lvds-encoder.c
+> +++ b/drivers/gpu/drm/bridge/lvds-encoder.c
+> @@ -9,6 +9,7 @@
+>
+>  #include <drm/drmP.h>
+>  #include <drm/drm_bridge.h>
+> +#include <drm/drm_of.h>
+>  #include <drm/drm_panel.h>
+>
+>  #include <linux/of_graph.h>
+> @@ -16,6 +17,8 @@
+>  struct lvds_encoder {
+>  	struct drm_bridge bridge;
+>  	struct drm_bridge *panel_bridge;
+> +	int num_bus_formats;
+> +	u32 *bus_formats;
+>  };
+>
+>  static int lvds_encoder_attach(struct drm_bridge *bridge)
+> @@ -28,8 +31,22 @@ static int lvds_encoder_attach(struct drm_bridge *bridge)
+>  				 bridge);
+>  }
+>
+> +static int lvds_encoder_input_formats(struct drm_bridge *bridge,
+> +				      const u32 **bus_formats)
+> +{
+> +	struct lvds_encoder *lvds_encoder = container_of(bridge,
+> +							 struct lvds_encoder,
+> +							 bridge);
+> +
+> +	if (lvds_encoder->num_bus_formats)
+> +		*bus_formats = lvds_encoder->bus_formats;
+> +
+> +	return lvds_encoder->num_bus_formats;
+> +}
+> +
+>  static struct drm_bridge_funcs funcs = {
+>  	.attach = lvds_encoder_attach,
+> +	.input_formats = lvds_encoder_input_formats,
+>  };
+>
+>  static int lvds_encoder_probe(struct platform_device *pdev)
+> @@ -39,6 +56,7 @@ static int lvds_encoder_probe(struct platform_device *pdev)
+>  	struct device_node *panel_node;
+>  	struct drm_panel *panel;
+>  	struct lvds_encoder *lvds_encoder;
+> +	int ret;
+>
+>  	lvds_encoder = devm_kzalloc(&pdev->dev, sizeof(*lvds_encoder),
+>  				    GFP_KERNEL);
+> @@ -79,6 +97,12 @@ static int lvds_encoder_probe(struct platform_device *pdev)
+>  	if (IS_ERR(lvds_encoder->panel_bridge))
+>  		return PTR_ERR(lvds_encoder->panel_bridge);
+>
+> +	ret = drm_of_bus_formats(pdev->dev.of_node, "interface-pix-fmt",
+> +				 &lvds_encoder->bus_formats);
+> +	if (ret < 0)
+> +		return ret;
+> +	lvds_encoder->num_bus_formats = ret;
+> +
+>  	/* The panel_bridge bridge is attached to the panel's of_node,
+>  	 * but we need a bridge attached to our of_node for our user
+>  	 * to look up.
+> @@ -96,6 +120,7 @@ static int lvds_encoder_remove(struct platform_device *pdev)
+>  {
+>  	struct lvds_encoder *lvds_encoder = platform_get_drvdata(pdev);
+>
+> +	kfree(lvds_encoder->bus_formats);
+>  	drm_bridge_remove(&lvds_encoder->bridge);
+>
+>  	return 0;
+> --
+> 2.11.0
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/d1047c42/attachment.sig>
