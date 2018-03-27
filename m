@@ -1,47 +1,98 @@
-From: oss@buserror.net (Scott Wood)
-Date: Tue, 27 Mar 2018 11:03:16 -0500
-Subject: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness supports
-In-Reply-To: <VI1PR0402MB385456DB28FE27FCF9ACCAB997AC0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
-References: <20180312081128.8195-1-prabhakar.kushwaha@nxp.com>
- <20180323093408.230a61c1@bbrezillon>
- <VI1PR0402MB385456DB28FE27FCF9ACCAB997AC0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
-Message-ID: <1522166596.5274.6.camel@buserror.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 27 Mar 2018 10:07:04 -0600
+Subject: [PATCH] coresight: use put_device() instead of kfree()
+In-Reply-To: <5AB9ACDA.9090207@gmail.com>
+References: <d5a326b6c284f7389301b265716dc58fda492c98.1521358552.git.arvind.yadav.cs@gmail.com>
+ <CANLsYkymOF2oG7TmKbRTakYKw0ECN_DXfkX5b8WjmS0Lz0sfig@mail.gmail.com>
+ <5AB9ACDA.9090207@gmail.com>
+Message-ID: <CANLsYkw0v-vVpf1M1Ae+y=Hq5cqqp+_Sjq41pDS+=Xv9zesHAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-03-27 at 12:06 +0000, Prabhakar Kushwaha wrote:
-> Hi Boris,
-> 
-> > -----Original Message-----
-> > From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> > Sent: Friday, March 23, 2018 2:04 PM
-> > To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>;
-> > robh at kernel.org
-> > Cc: linux-mtd at lists.infradead.org; devicetree at vger.kernel.org;
-> > mark.rutland at arm.com; shawnguo at kernel.org; boris.brezillon at free-
-> > electrons.com; computersforpeace at gmail.com; oss at buserror.net; Leo Li
-> > <leoyang.li@nxp.com>; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 1/2][v6] dt-bindings: mtd-physmap: Add endianness
-> > supports
-> > 
-> > You still haven't answered the comments I made on your v5. To me, this
-> > does
-> > not represent how the controller and chip pins are connected, but how the
-> > chip was programmed and which endianness should be used by the
-> > controller to correctly read the data back. Maybe I'm wrong, hence my
-> > question.
-> > 
-> 
-> NXP's ARM SoC has IFC module which interface with NOR flash. Here IFC is big
-> endian module connected with NOR flash. 
-> As SoC has ARM processor(Littler Endian),  CONFIG_MTD_CFI_BE_BYTE_SWAP needs
-> to be enabled  to make sure data is read correctly.  
-> This is the reason, I wrote about connection between controller and flash.
-> 
-> In a way, I agree with you.  It is not about connection. 
-> It is about how controller read the data (inherently ARM processor)
+On 26 March 2018 at 20:30, arvindY <arvind.yadav.cs@gmail.com> wrote:
+>
+>
+> On Tuesday 27 March 2018 03:16 AM, Mathieu Poirier wrote:
+>>
+>> drivers/hwtracing/coresight/coresight.c
+>> On 18 March 2018 at 01:38, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
+>>>
+>>> Never directly free @dev after calling device_register(), even
+>>> if it returned an error. Always use put_device() to give up the
+>>> reference initialized.
+>>>
+>>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>>> ---
+>>>   drivers/hwtracing/coresight/coresight.c | 8 ++++----
+>>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/coresight.c
+>>> b/drivers/hwtracing/coresight/coresight.c
+>>> index 389c4ba..132dfbc 100644
+>>> --- a/drivers/hwtracing/coresight/coresight.c
+>>> +++ b/drivers/hwtracing/coresight/coresight.c
+>>> @@ -1026,8 +1026,10 @@ struct coresight_device *coresight_register(struct
+>>> coresight_desc *desc)
+>>>          dev_set_name(&csdev->dev, "%s", desc->pdata->name);
+>>>
+>>>          ret = device_register(&csdev->dev);
+>>> -       if (ret)
+>>> -               goto err_device_register;
+>>> +       if (ret) {
+>>> +               put_device(&csdev->dev);
+>>> +               goto err_kzalloc_csdev;
+>>> +       }
+>>>
+>>>          mutex_lock(&coresight_mutex);
+>>>
+>>> @@ -1038,8 +1040,6 @@ struct coresight_device *coresight_register(struct
+>>> coresight_desc *desc)
+>>>
+>>>          return csdev;
+>>>
+>>> -err_device_register:
+>>> -       kfree(conns);
+>>
+>> Apologies for the late reply, I was travelling.
+>>
+>> I suggest to simply replace kfree() with put_device() in order to
+>> concentrate the error handling code in the same area and make sure
+>> that memory allocated for @conns and @refcnts is freed.
+>>
+>> Thanks,
+>> Mathieu
+>
+>
+> If you will see the comment for device_register(drivers/base/core.c)
+> there is mentioned that 'NOTE: _Never_ directly free @dev
+> after calling this function, even if it returned an error!
+> Always use put_device() to give up the reference initialized
+> in this function instead.
 
-It is not about anything inherent to ARM (which, like PPC, is a bi-endian
-arch).  It's about the programming model of IFC on certain SoCs.
+I have read the notice and in full agreement with the put_device() part.
 
--Scott
+> Here  put_device() will decrement the last reference and then
+> free the memory by calling dev->release.  Internally
+> put_device() -> kobject_put() -> kobject_cleanup() which is
+> responsible to call 'dev -> release' and also free other kobject
+> resources.
+
+Memory would be automatically freed if it would have been allocated
+with the devm_XYZ() helpers but it is not the case here.  As such it
+has to be freed explicitly.  Reading your patch again (and the jetlag
+somewhat fading) I think you've done the right thing except for the
+"goto" that should still point to "err_device_register".
+
+>we should always avoid kfree() if device_register()
+> returned an error. Otherwise it'll not do clean up of other
+> kobject resources.
+>
+> ~arvind
+>>>
+>>>   err_kzalloc_conns:
+>>>          kfree(refcnts);
+>>>   err_kzalloc_refcnts:
+>>> --
+>>> 2.7.4
+>>>
+>
