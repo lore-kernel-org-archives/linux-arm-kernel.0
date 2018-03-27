@@ -1,40 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 14:20:43 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.17 (#2)
-In-Reply-To: <87lgeoxb54.fsf@bootlin.com>
-References: <87lgeoxb54.fsf@bootlin.com>
-Message-ID: <CAK8P3a1CtLN=p0yaw+q2XXGJOFwgsXCYAV9ND8AOYNDw5y=v=w@mail.gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue, 27 Mar 2018 21:21:09 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and
+ CONFIG_SNI_AVE
+Message-ID: <1522153269-21244-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 5:50 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi,
->
-> Here is the second pull request for dt64 for mvebu for v4.17.
->
-> Gregory
->
-> The following changes since commit 597667d889517c6085d57aac92dbf1cc624cd8ae:
->
->   ARM64: dts: marvell: armada-cp110: Add apb_pclk clock for the uart nodes (2018-03-09 17:49:46 +0100)
->
-> are available in the Git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.17-2
->
-> for you to fetch changes up to 003456f564205ca3c3b8b4c9f9c22a0846d81fd7:
->
->   arm64: dts: armada-3720-espressobin: Document URL for schematic (2018-03-19 17:19:24 +0100)
->
-> ----------------------------------------------------------------
-> mvebu dt64 for 4.17 (part 2)
->
-> - Add registers clock for all the peripheral nodes that had been yet
->   converted for CP110 (Armada 7K/8K)
->
-> - Document URL for schematic for the EspressoBin (Armada 3720)
+Enable the thermal monitor driver and the AVE ethernet driver
+implemented on UniPhier SoCs.
 
-Pulled into next/dt, thanks!
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-       Arnd
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index c1e045a..8c923ec 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -262,6 +262,7 @@ CONFIG_KS8851=y
+ CONFIG_R8169=y
+ CONFIG_SH_ETH=y
+ CONFIG_SMSC911X=y
++CONFIG_SNI_AVE=y
+ CONFIG_STMMAC_ETH=y
+ CONFIG_STMMAC_PLATFORM=y
+ CONFIG_DWMAC_DWC_QOS_ETH=y
+@@ -479,6 +480,7 @@ CONFIG_ARMADA_THERMAL=y
+ CONFIG_DAVINCI_WATCHDOG=m
+ CONFIG_EXYNOS_THERMAL=m
+ CONFIG_ST_THERMAL_MEMMAP=y
++CONFIG_UNIPHIER_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_DA9063_WATCHDOG=m
+ CONFIG_XILINX_WATCHDOG=y
+-- 
+2.7.4
