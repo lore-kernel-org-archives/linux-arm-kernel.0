@@ -1,96 +1,25 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Mar 2018 17:07:35 -0400
-Subject: [net-next PATCH v2 05/10] net: netcp: ethss: use rgmii link
- status for 2u cpsw hardware
-In-Reply-To: <20180327172953.GP5862@lunn.ch>
-References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
- <1522168309-12338-6-git-send-email-m-karicheri2@ti.com>
- <20180327172953.GP5862@lunn.ch>
-Message-ID: <33e89328-4f0b-cc9f-96cc-4b45747b9f34@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 27 Mar 2018 23:06:33 +0200 (CEST)
+Subject: [PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
+In-Reply-To: <CAFLxGvxcWLxHyTzgbGssqOEUp2=TU07mLk1-XHavL4HU8N7caQ@mail.gmail.com>
+References: <20180212105642.8662-1-lionel.debieve@st.com>
+ <20180212105642.8662-2-lionel.debieve@st.com>
+ <CAFLxGvxcWLxHyTzgbGssqOEUp2=TU07mLk1-XHavL4HU8N7caQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.21.1803272305350.1618@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2018 01:29 PM, Andrew Lunn wrote:
-> On Tue, Mar 27, 2018 at 12:31:44PM -0400, Murali Karicheri wrote:
->> Introduce rgmii link status to handle link state events for 2u
->> cpsw hardware on K2G.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->>  drivers/net/ethernet/ti/netcp_ethss.c | 27 +++++++++++++++++++++++----
->>  1 file changed, 23 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
->> index ab9d369..078a1b8 100644
->> --- a/drivers/net/ethernet/ti/netcp_ethss.c
->> +++ b/drivers/net/ethernet/ti/netcp_ethss.c
->> @@ -552,6 +552,7 @@ struct gbe_ss_regs {
->>  struct gbe_ss_regs_ofs {
->>  	u16	id_ver;
->>  	u16	control;
->> +	u16	rgmii_status; /* 2U */
->>  };
->>  
->>  struct gbe_switch_regs {
->> @@ -2120,23 +2121,39 @@ static bool gbe_phy_link_status(struct gbe_slave *slave)
->>  	 return !slave->phy || slave->phy->link;
->>  }
->>  
->> +#define RGMII_REG_STATUS_LINK	BIT(0)
->> +
->> +static void netcp_2u_rgmii_get_port_link(struct gbe_priv *gbe_dev, bool *status)
->> +{
->> +	u32 val = 0;
->> +
->> +	val = readl(GBE_REG_ADDR(gbe_dev, ss_regs, rgmii_status));
->> +	*status = false;
->> +	if ((val & RGMII_REG_STATUS_LINK) != 0)
->> +		*status = true;
-> 
->   *status = !!(val & RGMII_REG_STATUS_LINK);
-> 
-> 
->> +}
->> +
->>  static void netcp_ethss_update_link_state(struct gbe_priv *gbe_dev,
->>  					  struct gbe_slave *slave,
->>  					  struct net_device *ndev)
->>  {
->> -	int sp = slave->slave_num;
->> -	int phy_link_state, sgmii_link_state = 1, link_state;
->> +	bool sw_link_state = true, phy_link_state;
->> +	int sp = slave->slave_num, link_state;
->>  
->>  	if (!slave->open)
->>  		return;
->>  
->>  	if (!SLAVE_LINK_IS_XGMII(slave)) {
->> -		sgmii_link_state =
->> +		if (SLAVE_LINK_IS_RGMII(slave))
->> +			netcp_2u_rgmii_get_port_link(gbe_dev,
->> +						     &sw_link_state);
->> +		else
->> +			sw_link_state =
->>  			netcp_sgmii_get_port_link(SGMII_BASE(gbe_dev, sp), sp);
-> 
-> This would be more readable as
-> 
->      if (SLAVE_LINK_IS_RGMII(slave))
-> 		netcp_2u_rgmii_get_port_link(gbe_dev,
-> 					     &sw_link_state);
->      if (SLAVE_LINK_IS_SGMII(slave))
-> 	sw_link_state = netcp_sgmii_get_port_link(
-> 	   SGMII_BASE(gbe_dev, sp), sp);
-> 
-Probably better to use a switch statement in this case for better readability?
-handle only SGMII and RGMII cases in the switch statement.
+On Tue, 27 Mar 2018, Richard Weinberger wrote:
 
-Murali
-
->    Andrew
+> On Mon, Feb 12, 2018 at 11:56 AM, Lionel Debieve <lionel.debieve@st.com> wrote:
+> > Update license template using SPDX. Move the global layout
+> > of UBI headers to dual license helping UBI to be the standard
+> > solution for raw NAND management.
 > 
+> So the goal is re-implementing UBI under a non-GPL license?
+> 
+> If we get a clear ack from all major UBI copyright holders, fine by me.
 
+I already acked that for the u-boot SPL code. So yes:
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
