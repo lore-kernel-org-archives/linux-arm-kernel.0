@@ -1,205 +1,55 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 27 Mar 2018 10:46:21 -0700
-Subject: [PATCH v5 12/13] ARM: dts: ipq8074: Add pcie nodes
-In-Reply-To: <1521800336-19266-13-git-send-email-sricharan@codeaurora.org>
-References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
- <1521800336-19266-13-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20180327174621.GO1403@tuxbook-pro>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 27 Mar 2018 20:47:04 +0300
+Subject: [PATCH] clk: ti: fix flag space conflict with clkctrl clocks
+Message-ID: <1522172824-14094-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 23 Mar 03:18 PDT 2018, Sricharan R wrote:
+The introduction of support for CLK_SET_RATE_PARENT flag for clkctrl
+clocks used a generic clock flag, which causes a conflict with the
+rest of the clkctrl flags, namely the NO_IDLEST flag. This can cause
+boot failures on certain platforms where this flag is introduced, by
+omitting the wait for the clockctrl module to be fully enabled before
+proceeding with rest of the code.
 
-> The driver/phy support for ipq8074 is available now.
-> So enabling the nodes in DT.
-> 
+Fix this by moving all the clkctrl specific flags to their own bit-range.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Fixes: 49159a9dc3da ("clk: ti: add support for CLK_SET_RATE_PARENT flag")
+Reported-by: Christophe Lyon <christophe.lyon@linaro.org>
+---
+ drivers/clk/ti/clock.h | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Regards,
-Bjorn
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 90b86aa..b582780 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -76,6 +76,11 @@ enum {
+ #define CLKF_CORE			(1 << 9)
+ #define CLKF_J_TYPE			(1 << 10)
+ 
++/* CLKCTRL flags */
++#define CLKF_SW_SUP			BIT(5)
++#define CLKF_HW_SUP			BIT(6)
++#define CLKF_NO_IDLEST			BIT(7)
++
+ #define CLK(dev, con, ck)		\
+ 	{				\
+ 		.lk = {			\
+@@ -185,10 +190,6 @@ struct omap_clkctrl_data {
+ extern const struct omap_clkctrl_data dm814_clkctrl_data[];
+ extern const struct omap_clkctrl_data dm816_clkctrl_data[];
+ 
+-#define CLKF_SW_SUP	BIT(0)
+-#define CLKF_HW_SUP	BIT(1)
+-#define CLKF_NO_IDLEST	BIT(2)
+-
+ typedef void (*ti_of_clk_init_cb_t)(void *, struct device_node *);
+ 
+ struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
+-- 
+1.9.1
 
-> Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  arch/arm64/boot/dts/qcom/ipq8074.dtsi | 157 +++++++++++++++++++++++++++++++++-
->  1 file changed, 156 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-> index a8dbbf0..caf3485 100644
-> --- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
-> @@ -24,7 +24,7 @@
->  		ranges = <0 0 0 0xffffffff>;
->  		compatible = "simple-bus";
->  
-> -		pinctrl at 1000000 {
-> +		tlmm: pinctrl at 1000000 {
->  			compatible = "qcom,ipq8074-pinctrl";
->  			reg = <0x1000000 0x300000>;
->  			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
-> @@ -229,6 +229,161 @@
->  			dma-names = "tx", "rx", "cmd";
->  			status = "disabled";
->  		};
-> +
-> +		pcie_phy0: phy at 86000 {
-> +			compatible = "qcom,ipq8074-qmp-pcie-phy";
-> +			reg = <0x86000 0x1000>;
-> +			#phy-cells = <0>;
-> +			clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
-> +			clock-names = "pipe_clk";
-> +			clock-output-names = "pcie20_phy0_pipe_clk";
-> +
-> +			resets = <&gcc GCC_PCIE0_PHY_BCR>,
-> +				<&gcc GCC_PCIE0PHY_PHY_BCR>;
-> +			reset-names = "phy",
-> +				      "common";
-> +			status = "disabled";
-> +		};
-> +
-> +		pcie0: pci at 20000000 {
-> +			compatible = "qcom,pcie-ipq8074";
-> +			reg =  <0x20000000 0xf1d
-> +				0x20000f20 0xa8
-> +				0x80000 0x2000
-> +				0x20100000 0x1000>;
-> +			reg-names = "dbi", "elbi", "parf", "config";
-> +			device_type = "pci";
-> +			linux,pci-domain = <0>;
-> +			bus-range = <0x00 0xff>;
-> +			num-lanes = <1>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +
-> +			phys = <&pcie_phy0>;
-> +			phy-names = "pciephy";
-> +
-> +			ranges = <0x81000000 0 0x20200000 0x20200000
-> +				  0 0x100000   /* downstream I/O */
-> +				  0x82000000 0 0x20300000 0x20300000
-> +				  0 0xd00000>; /* non-prefetchable memory */
-> +
-> +			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "msi";
-> +			#interrupt-cells = <1>;
-> +			interrupt-map-mask = <0 0 0 0x7>;
-> +			interrupt-map = <0 0 0 1 &intc 0 75
-> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-> +					<0 0 0 2 &intc 0 78
-> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-> +					<0 0 0 3 &intc 0 79
-> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-> +					<0 0 0 4 &intc 0 83
-> +					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-> +
-> +			clocks = <&gcc GCC_SYS_NOC_PCIE0_AXI_CLK>,
-> +				 <&gcc GCC_PCIE0_AXI_M_CLK>,
-> +				 <&gcc GCC_PCIE0_AXI_S_CLK>,
-> +				 <&gcc GCC_PCIE0_AHB_CLK>,
-> +				 <&gcc GCC_PCIE0_AUX_CLK>;
-> +
-> +			clock-names = "iface",
-> +				      "axi_m",
-> +				      "axi_s",
-> +				      "ahb",
-> +				      "aux";
-> +			resets = <&gcc GCC_PCIE0_PIPE_ARES>,
-> +				 <&gcc GCC_PCIE0_SLEEP_ARES>,
-> +				 <&gcc GCC_PCIE0_CORE_STICKY_ARES>,
-> +				 <&gcc GCC_PCIE0_AXI_MASTER_ARES>,
-> +				 <&gcc GCC_PCIE0_AXI_SLAVE_ARES>,
-> +				 <&gcc GCC_PCIE0_AHB_ARES>,
-> +				 <&gcc GCC_PCIE0_AXI_MASTER_STICKY_ARES>;
-> +			reset-names = "pipe",
-> +				      "sleep",
-> +				      "sticky",
-> +				      "axi_m",
-> +				      "axi_s",
-> +				      "ahb",
-> +				      "axi_m_sticky";
-> +			status = "disabled";
-> +		};
-> +
-> +		pcie_phy1: phy at 8e000 {
-> +			compatible = "qcom,ipq8074-qmp-pcie-phy";
-> +			reg = <0x8e000 0x1000>;
-> +			#phy-cells = <0>;
-> +			clocks = <&gcc GCC_PCIE1_PIPE_CLK>;
-> +			clock-names = "pipe_clk";
-> +			clock-output-names = "pcie20_phy1_pipe_clk";
-> +
-> +			resets = <&gcc GCC_PCIE1_PHY_BCR>,
-> +				<&gcc GCC_PCIE1PHY_PHY_BCR>;
-> +			reset-names = "phy",
-> +				      "common";
-> +			status = "disabled";
-> +		};
-> +
-> +		pcie1: pci at 10000000 {
-> +			compatible = "qcom,pcie-ipq8074";
-> +			reg =  <0x10000000 0xf1d
-> +				0x10000f20 0xa8
-> +				0x88000 0x2000
-> +				0x10100000 0x1000>;
-> +			reg-names = "dbi", "elbi", "parf", "config";
-> +			device_type = "pci";
-> +			linux,pci-domain = <1>;
-> +			bus-range = <0x00 0xff>;
-> +			num-lanes = <1>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +
-> +			phys = <&pcie_phy1>;
-> +			phy-names = "pciephy";
-> +
-> +			ranges = <0x81000000 0 0x10200000 0x10200000
-> +				  0 0x100000   /* downstream I/O */
-> +				  0x82000000 0 0x10300000 0x10300000
-> +				  0 0xd00000>; /* non-prefetchable memory */
-> +
-> +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "msi";
-> +			#interrupt-cells = <1>;
-> +			interrupt-map-mask = <0 0 0 0x7>;
-> +			interrupt-map = <0 0 0 1 &intc 0 142
-> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
-> +					<0 0 0 2 &intc 0 143
-> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
-> +					<0 0 0 3 &intc 0 144
-> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
-> +					<0 0 0 4 &intc 0 145
-> +					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
-> +
-> +			clocks = <&gcc GCC_SYS_NOC_PCIE1_AXI_CLK>,
-> +				 <&gcc GCC_PCIE1_AXI_M_CLK>,
-> +				 <&gcc GCC_PCIE1_AXI_S_CLK>,
-> +				 <&gcc GCC_PCIE1_AHB_CLK>,
-> +				 <&gcc GCC_PCIE1_AUX_CLK>;
-> +			clock-names = "iface",
-> +				      "axi_m",
-> +				      "axi_s",
-> +				      "ahb",
-> +				      "aux";
-> +			resets = <&gcc GCC_PCIE1_PIPE_ARES>,
-> +				 <&gcc GCC_PCIE1_SLEEP_ARES>,
-> +				 <&gcc GCC_PCIE1_CORE_STICKY_ARES>,
-> +				 <&gcc GCC_PCIE1_AXI_MASTER_ARES>,
-> +				 <&gcc GCC_PCIE1_AXI_SLAVE_ARES>,
-> +				 <&gcc GCC_PCIE1_AHB_ARES>,
-> +				 <&gcc GCC_PCIE1_AXI_MASTER_STICKY_ARES>;
-> +			reset-names = "pipe",
-> +				      "sleep",
-> +				      "sticky",
-> +				      "axi_m",
-> +				      "axi_s",
-> +				      "ahb",
-> +				      "axi_m_sticky";
-> +			status = "disabled";
-> +		};
->  	};
->  
->  	cpus {
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
