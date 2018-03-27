@@ -1,61 +1,36 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 27 Mar 2018 09:56:41 -0700
-Subject: [PATCH v5 01/13] firmware: qcom: scm: Add ipq4019 soc compatible
-In-Reply-To: <1521800336-19266-2-git-send-email-sricharan@codeaurora.org>
-References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
- <1521800336-19266-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20180327165641.GG1403@tuxbook-pro>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 27 Mar 2018 18:57:42 +0200
+Subject: [RFC PATCH v2 6/6] arm64: update
+ Documentation/arm64/tagged-pointers.txt
+In-Reply-To: <cover.1522169685.git.andreyknvl@google.com>
+References: <cover.1522169685.git.andreyknvl@google.com>
+Message-ID: <080040fac18377cb6b9cd418668a10e1113b3c2a.1522169685.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 23 Mar 03:18 PDT 2018, Sricharan R wrote:
+Add a note that work on passing tagged user pointers to the kernel via
+syscalls has started, but might not be complete yet.
 
-> Add the compatible for ipq4019.
-> This does not need clocks to do scm calls.
-> 
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ Documentation/arm64/tagged-pointers.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/firmware/qcom,scm.txt | 3 ++-
->  drivers/firmware/qcom_scm.c                             | 3 +++
->  2 files changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> index 7b40054..fcf6979 100644
-> --- a/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> +++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-> @@ -11,9 +11,10 @@ Required properties:
->   * "qcom,scm-msm8660" for MSM8660 platforms
->   * "qcom,scm-msm8690" for MSM8690 platforms
->   * "qcom,scm-msm8996" for MSM8996 platforms
-> + * "qcom,scm-ipq4019" for IPQ4019 platforms
->   * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
->  - clocks: One to three clocks may be required based on compatible.
-> - * No clock required for "qcom,scm-msm8996"
-> + * No clock required for "qcom,scm-msm8996", "qcom,scm-ipq4019"
->   * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
->   * Core, iface, and bus clocks required for "qcom,scm"
->  - clock-names: Must contain "core" for the core clock, "iface" for the interface
-> diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-> index 5a7d6930..e778af7 100644
-> --- a/drivers/firmware/qcom_scm.c
-> +++ b/drivers/firmware/qcom_scm.c
-> @@ -603,6 +603,9 @@ static void qcom_scm_shutdown(struct platform_device *pdev)
->  	{ .compatible = "qcom,scm-msm8996",
->  	  .data = NULL, /* no clocks */
->  	},
-> +	{ .compatible = "qcom,scm-ipq4019",
-> +	  .data = NULL, /* no clocks */
-> +	},
->  	{ .compatible = "qcom,scm",
->  	  .data = (void *)(SCM_HAS_CORE_CLK
->  			   | SCM_HAS_IFACE_CLK
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
+diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
+index a25a99e82bb1..361481283f00 100644
+--- a/Documentation/arm64/tagged-pointers.txt
++++ b/Documentation/arm64/tagged-pointers.txt
+@@ -35,8 +35,9 @@ Using non-zero address tags in any of these locations may result in an
+ error code being returned, a (fatal) signal being raised, or other modes
+ of failure.
+ 
+-For these reasons, passing non-zero address tags to the kernel via
+-system calls is forbidden, and using a non-zero address tag for sp is
++Some initial work for supporting non-zero address tags passed to the
++kernel via system calls has been done, but the kernel doesn't provide
++any guarantees at this point. Using a non-zero address tag for sp is
+ strongly discouraged.
+ 
+ Programs maintaining a frame pointer and frame records that use non-zero
+-- 
+2.17.0.rc0.231.g781580f067-goog
