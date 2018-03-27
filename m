@@ -1,56 +1,52 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 27 Mar 2018 16:08:16 +0200
-Subject: [PATCH v3 3/6] PCI: aardvark: set PIO_ADDR_LS correctly in
- advk_pcie_rd_conf()
+Date: Tue, 27 Mar 2018 16:08:13 +0200
+Subject: [PATCH v3 0/6] PCI: aardvark: misc fixes and improvements
 In-Reply-To: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
 References: <20180327140819.23501-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180327140819.23501-11-thomas.petazzoni@bootlin.com>
+Message-ID: <20180327140819.23501-8-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+Hello Bjorn,
 
-When setting the PIO_ADDR_LS register during a configuration read, we
-were properly passing the device number, function number and register
-number, but not the bus number, causing issues when reading the
-configuration of PCIe devices.
+This patch series brings a number of improvements to the aardvark
+PCIe. Sorry for being so slow at sending the v3 after the v2 sent in
+January. Hopefully this time around the series will be fine.
 
-Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Wilson Ding <dingwei@marvell.com>
-Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-[Thomas: tweak commit log.]
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
 Changes since v2:
- - Drop PCIE_BDF() macro, since it's no longer used. Noticed by Bjorn
-   Helgaas.
----
- drivers/pci/host/pci-aardvark.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index be140dc7109b..4affbf1b826b 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -172,8 +172,6 @@
- #define PCIE_CONFIG_WR_TYPE0			0xa
- #define PCIE_CONFIG_WR_TYPE1			0xb
- 
--/* PCI_BDF shifts 8bit, so we need extra 4bit shift */
--#define PCIE_BDF(dev)				(dev << 4)
- #define PCIE_CONF_BUS(bus)			(((bus) & 0xff) << 20)
- #define PCIE_CONF_DEV(dev)			(((dev) & 0x1f) << 15)
- #define PCIE_CONF_FUNC(fun)			(((fun) & 0x7)	<< 12)
-@@ -465,7 +463,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
- 	advk_writel(pcie, reg, PIO_CTRL);
- 
- 	/* Program the address registers */
--	reg = PCIE_BDF(devfn) | PCIE_CONF_REG(where);
-+	reg = PCIE_CONF_ADDR(bus->number, devfn, where);
- 	advk_writel(pcie, reg, PIO_ADDR_LS);
- 	advk_writel(pcie, 0, PIO_ADDR_MS);
- 
+ - Rebased on v4.16-rc7
+
+ - Dropped the patches disabling L0S and aligning the MPS between RC
+   and EP, since we are working on a different solution, implementing
+   a proper root port. Therefore, this patch series only has the
+   (hopefully) non-controversial changes.
+
+ - Add a patch (PATCH 1) that factorizes the logic to decide if the
+   target of a configuration space access is a valid device or not
+   into a advk_pcie_valid_device() helper, and adjust PATCH 2
+   accordingly.
+
+ - Drop unused PCIE_BDF macro in PATCH 3.
+
+Best regards,
+
+Thomas Petazzoni
+
+Evan Wang (2):
+  PCI: aardvark: fix PCIe max read request size setting
+  PCI: aardvark: remove PCIe outbound window configuration
+
+Thomas Petazzoni (1):
+  PCI: aardvark: introduce an advk_pcie_valid_device() helper
+
+Victor Gu (3):
+  PCI: aardvark: fix logic in advk_pcie_valid_device()
+  PCI: aardvark: set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
+  PCI: aardvark: use isr1 instead of isr0 interrupt in legacy irq mode
+
+ drivers/pci/host/pci-aardvark.c | 117 ++++++++++++++--------------------------
+ 1 file changed, 39 insertions(+), 78 deletions(-)
+
 -- 
 2.14.3
