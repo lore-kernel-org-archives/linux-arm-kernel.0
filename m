@@ -1,36 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 15:27:06 +0200
-Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.17
-In-Reply-To: <1521512881-1854-1-git-send-email-andy.gross@linaro.org>
-References: <1521512881-1854-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a0bob7wU9W_zR_gfW11gjpsTvXQNcr30FbPavj+OgLjtw@mail.gmail.com>
+Date: Tue, 27 Mar 2018 15:28:04 +0200
+Subject: [GIT PULL 3/3] droid4 defconfig changes for v4.17
+In-Reply-To: <pull-1521736966-849602@atomide.com-3>
+References: <pull-1521736966-849602@atomide.com>
+ <pull-1521736966-849602@atomide.com-3>
+Message-ID: <CAK8P3a30V7Y7qJhGWVQoe=joDg4tUWwq3UNU13jkj0ZVNnLMng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 20, 2018 at 3:27 AM, Andy Gross <andy.gross@linaro.org> wrote:
-> The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
+On Thu, Mar 22, 2018 at 5:43 PM, Tony Lindgren <tony@atomide.com> wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 >
->   Linux 4.16-rc1 (2018-02-11 15:04:29 -0800)
+> The following changes since commit 740c01f76ab3712a45c2f02233c800829626e9ba:
 >
-> are available in the git repository at:
+>   ARM: multi_v7_defconfig: Enable USB gadget configfs as loadable module (2018-03-06 11:25:37 -0800)
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.17
+> are available in the Git repository at:
 >
-> for you to fetch changes up to c1da37a3177366d565d16e03b89cf81d817c4689:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/defconfig-pt2-signed
 >
->   arm64: defconfig: enable more cpufreq governors (2018-03-08 18:45:02 -0600)
+> for you to fetch changes up to 372bed66bfbbc867c085c655b927a4c7fdb4870c:
 >
-> ----------------------------------------------------------------
-> Qualcomm ARM64 Based defconfig Updates for v4.17
->
-> * Enable cpufreq governors, QCOM TSENS, and QCOM APCS driver
+>   ARM: multi_v7_defconfig: Enable CPCAP related options mostly as loadable modules (2018-03-20 07:10:24 -0700)
 >
 > ----------------------------------------------------------------
-> Amit Kucheria (3):
->       arm64: defconfig: Enable the APCS IPC driver on Qualcomm platforms
->       arm64: defconfig: enable thermal sensor on QCOM platforms
->       arm64: defconfig: enable more cpufreq governors
+> Second set of defconfig changes for omap variants for v4.17
+>
+> This series enables more devices working on droid4 to make it easier
+> for people and distros to use out of the box.
 
 Pulled into next/soc, thanks!
 
-       Arnd
+      Arnd
