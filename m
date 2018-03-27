@@ -1,51 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 27 Mar 2018 15:47:36 +0200
-Subject: [net-next PATCH 3/5] net: netcp: ethss enhancements to support
- 2u cpsw h/w on K2G SoC
-In-Reply-To: <be58cf50-2148-cbfa-c7a2-8f4fbe6930e5@ti.com>
-References: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
- <1522095312-23249-4-git-send-email-m-karicheri2@ti.com>
- <20180326202842.GB5862@lunn.ch>
- <be58cf50-2148-cbfa-c7a2-8f4fbe6930e5@ti.com>
-Message-ID: <20180327134736.GJ5862@lunn.ch>
+From: parkch98@gmail.com (Chanho Park)
+Date: Tue, 27 Mar 2018 22:47:40 +0900
+Subject: [PATCH] pinctrl: samsung: add pin_dbg_show callback for debugfs
+In-Reply-To: <CAJKOXPcpb-xFUBCQMXqoTpydwcL2cw+9Omi+3uYxK9fvzxWFhQ@mail.gmail.com>
+References: <20180326152711.7780-1-parkch98@gmail.com>
+ <CAJKOXPcpb-xFUBCQMXqoTpydwcL2cw+9Omi+3uYxK9fvzxWFhQ@mail.gmail.com>
+Message-ID: <7bc686ca-a1e8-07f9-9d70-9909f9930374@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hello Andrew,
-> 
-> Thanks for the comment. But I am not sure how to break this up as this is 
-> an enhancement to the driver to support a newer version of the cspw 
-> hardware. Without all these pieces together, the driver can't
-> function.
+Hi Krzysztof,
 
-Hi Murali
 
-A few things to consider.
+First of all, thanks for your review.
 
-1) You can introduce new features needed by the new hardware one piece
-at a time. The new hardware will then work when all the pieces have
-been added. This is fine, the new hardware never worked before, so you
-are not breaking anything.
 
-2) Your changes could break the old hardware. By having lots of small
-changes, you can do a git bissect and find which of the small changes
-broke it.
+On 03/27/2018 04:07 PM, Krzysztof Kozlowski wrote:
+> On Mon, Mar 26, 2018 at 5:27 PM, Chanho Park <parkch98@gmail.com> wrote:
+>> This patch adds a samsung_pin_dbg_show function to implement the
+>> pin_dbg_show callback function which can be used to show pin
+>> confuration values. Basically, it can show pin setting values by
+>> accessing the "pins" node like below:
+>>
+>> $ cat pins
+>> pin 0 (gpy7-0)  CON(0x0) DAT(0x1) PUD(0x1) DRV(0x0) CON_PDN(0x0) PUD_PDN(0x0)
+>>
+>> Signed-off-by: Chanho Park <parkch98@gmail.com>
+>> ---
+>>   drivers/pinctrl/samsung/pinctrl-samsung.c | 27 +++++++++++++++++++++++++++
+>>   1 file changed, 27 insertions(+)
+>>
+>> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+>> index 336e88d7bdb9..bdec0cbd64f1 100644
+>> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+>> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+>> @@ -279,6 +279,30 @@ static int samsung_dt_node_to_map(struct pinctrl_dev *pctldev,
+>>          return 0;
+>>   }
+>>
+>> +#ifdef CONFIG_DEBUG_FS
+>> +/* Forward declaration which can be used by samsung_pin_dbg_show */
+>> +static int samsung_pinconf_rw(struct pinctrl_dev *pctldev, unsigned int pin,
+>> +                               unsigned long *config, bool set);
+>> +static char *reg_names[] = {"CON", "DAT", "PUD", "DRV", "CON_PDN", "PUD_PDN"};
+> This should be static const char. Please also add an empty line here.
+Okay. I'll fix it and use samsung_pinconf_get forward declaration.
+>
+>> +static void samsung_pin_dbg_show(struct pinctrl_dev *pctldev,
+>> +                               struct seq_file *s, unsigned int pin)
+>> +{
+>> +       enum pincfg_type cfg_type;
+>> +       unsigned long config;
+>> +       int ret;
+>> +
+>> +       for (cfg_type = 0; cfg_type < PINCFG_TYPE_NUM; cfg_type++) {
+>> +               config = PINCFG_PACK(cfg_type, 0);
+>> +               ret = samsung_pinconf_rw(pctldev, pin, &config, false);
+> Use samsung_pinconf_get().
+>
+>> +               if (ret == -EINVAL)
+> if (ret < 0)
+Okay. I'll apply this next patch.
 
-3) It is much easier to review 10 small obviously correct patches than
-one huge complex patch, which is not obvious.
 
-> Probably I can make the below break up based on different functions
-> added. Let me know if this looks good to you. Beware that patch #2 and
-> #3 are small patches and majority of code change will be in patch #1
-> which has to go together. 
-> 
-> Patch #1. Add support new link interface, RGMII_LINK_MAC_PHY, for K2G
->           - Most of the code is for this
-> Patch #2. Add support for configuring phy_mode 
->           - This just add phy_mode handling code 
-> Patch #3. map all vlan priorities to flow id 0
-
-That sounds better.
-
-Thanks
-	Andrew
+Best Regards,
+Chanho Park
