@@ -1,23 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Mar 2018 15:32:34 +0200
-Subject: [PATCH] arm64: defconfig: add CONFIG_UNIPHIER_THERMAL and
- CONFIG_SNI_AVE
-In-Reply-To: <1522153407-21430-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1522153407-21430-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK8P3a3xteNLdGNW=a+jLWmxcEBhBFV8dhL+o0F1AGie=-3hng@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Mar 2018 15:33:02 +0200
+Subject: [PATCH 1/2] pinctrl: qcom: remove static globals to allow
+ multiple TLMMs
+In-Reply-To: <1521848700-22214-1-git-send-email-timur@codeaurora.org>
+References: <1521848700-22214-1-git-send-email-timur@codeaurora.org>
+Message-ID: <CACRpkdZ=z7EncPykPwK+m-_qM3J2PokmkcoKsRqao_X1qx7CSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 2:23 PM, Kunihiko Hayashi
-<hayashi.kunihiko@socionext.com> wrote:
-> Enable the thermal monitor driver and the AVE ethernet driver
-> implemented on UniPhier SoCs.
+On Sat, Mar 24, 2018 at 12:44 AM, Timur Tabi <timur@codeaurora.org> wrote:
+
+> Two data structures are declared as static globals but are intended to
+> be per-TLMM.  Move them into the msm_pinctrl structure and initialize
+> them at runtime.
 >
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
 
-Any reason why this is a built-in driver rather than a loadable module?
+Waiting for a review from Stephen or Bjorn on these two
+patches.
 
-We have a mix of both today for ethernet drivers, but generally I
-would count them as non-essential.
-
-     Arnd
+Yours,
+Linus Walleij
