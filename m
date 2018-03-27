@@ -1,98 +1,64 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 27 Mar 2018 10:07:04 -0600
-Subject: [PATCH] coresight: use put_device() instead of kfree()
-In-Reply-To: <5AB9ACDA.9090207@gmail.com>
-References: <d5a326b6c284f7389301b265716dc58fda492c98.1521358552.git.arvind.yadav.cs@gmail.com>
- <CANLsYkymOF2oG7TmKbRTakYKw0ECN_DXfkX5b8WjmS0Lz0sfig@mail.gmail.com>
- <5AB9ACDA.9090207@gmail.com>
-Message-ID: <CANLsYkw0v-vVpf1M1Ae+y=Hq5cqqp+_Sjq41pDS+=Xv9zesHAw@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 27 Mar 2018 18:08:17 +0200
+Subject: [GIT PULL] Reset controller changes for v4.17, part 2
+Message-ID: <1522166897.3345.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2018 at 20:30, arvindY <arvind.yadav.cs@gmail.com> wrote:
->
->
-> On Tuesday 27 March 2018 03:16 AM, Mathieu Poirier wrote:
->>
->> drivers/hwtracing/coresight/coresight.c
->> On 18 March 2018 at 01:38, Arvind Yadav <arvind.yadav.cs@gmail.com> wrote:
->>>
->>> Never directly free @dev after calling device_register(), even
->>> if it returned an error. Always use put_device() to give up the
->>> reference initialized.
->>>
->>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>> ---
->>>   drivers/hwtracing/coresight/coresight.c | 8 ++++----
->>>   1 file changed, 4 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight.c
->>> b/drivers/hwtracing/coresight/coresight.c
->>> index 389c4ba..132dfbc 100644
->>> --- a/drivers/hwtracing/coresight/coresight.c
->>> +++ b/drivers/hwtracing/coresight/coresight.c
->>> @@ -1026,8 +1026,10 @@ struct coresight_device *coresight_register(struct
->>> coresight_desc *desc)
->>>          dev_set_name(&csdev->dev, "%s", desc->pdata->name);
->>>
->>>          ret = device_register(&csdev->dev);
->>> -       if (ret)
->>> -               goto err_device_register;
->>> +       if (ret) {
->>> +               put_device(&csdev->dev);
->>> +               goto err_kzalloc_csdev;
->>> +       }
->>>
->>>          mutex_lock(&coresight_mutex);
->>>
->>> @@ -1038,8 +1040,6 @@ struct coresight_device *coresight_register(struct
->>> coresight_desc *desc)
->>>
->>>          return csdev;
->>>
->>> -err_device_register:
->>> -       kfree(conns);
->>
->> Apologies for the late reply, I was travelling.
->>
->> I suggest to simply replace kfree() with put_device() in order to
->> concentrate the error handling code in the same area and make sure
->> that memory allocated for @conns and @refcnts is freed.
->>
->> Thanks,
->> Mathieu
->
->
-> If you will see the comment for device_register(drivers/base/core.c)
-> there is mentioned that 'NOTE: _Never_ directly free @dev
-> after calling this function, even if it returned an error!
-> Always use put_device() to give up the reference initialized
-> in this function instead.
+Dear arm-soc maintainers,
 
-I have read the notice and in full agreement with the put_device() part.
+The following changes since commit 1d7592f84f92c6344978186fdbe547af044274b5:
 
-> Here  put_device() will decrement the last reference and then
-> free the memory by calling dev->release.  Internally
-> put_device() -> kobject_put() -> kobject_cleanup() which is
-> responsible to call 'dev -> release' and also free other kobject
-> resources.
+  reset: simple: Enable for ASPEED systems (2018-02-20 17:42:29 +0100)
 
-Memory would be automatically freed if it would have been allocated
-with the devm_XYZ() helpers but it is not the case here.  As such it
-has to be freed explicitly.  Reading your patch again (and the jetlag
-somewhat fading) I think you've done the right thing except for the
-"goto" that should still point to "err_device_register".
+are available in the Git repository at:
 
->we should always avoid kfree() if device_register()
-> returned an error. Otherwise it'll not do clean up of other
-> kobject resources.
->
-> ~arvind
->>>
->>>   err_kzalloc_conns:
->>>          kfree(refcnts);
->>>   err_kzalloc_refcnts:
->>> --
->>> 2.7.4
->>>
->
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.17-2
+
+for you to fetch changes up to 0089313d8595b76422b189b44c55556cb1004190:
+
+  Merge branch 'reset/lookup' into reset/next (2018-03-27 11:03:43 +0200)
+
+----------------------------------------------------------------
+Reset controller changes for v4.17, part 2
+
+This tag contains reset lookup support, similar to pwm lookups, for legacy
+non-DT platforms, a few new reset controls and a Kconfig fix for uniphier
+SoCs, as well as a new driver for the STM32MP1 peripheral reset controller.
+
+The reset lookups are merged from a separate, immutable branch, that may
+also be merged into the davinci tree.
+
+----------------------------------------------------------------
+Bartosz Golaszewski (2):
+      reset: add support for non-DT systems
+      reset: modify the way reset lookup works for board files
+
+Gabriel Fernandez (2):
+      dt-bindings: reset: add STM32MP1 resets
+      reset: stm32mp1: Enable stm32mp1 reset driver
+
+Katsuhiro Suzuki (1):
+      reset: uniphier: add Pro4/Pro5/PXs2 audio systems reset control
+
+Kunihiko Hayashi (1):
+      reset: uniphier: add ethernet reset control support for PXs3
+
+Masahiro Yamada (1):
+      reset: imx7: add 'depends on HAS_IOMEM' to fix unmet dependency
+
+Philipp Zabel (1):
+      Merge branch 'reset/lookup' into reset/next
+
+ .../devicetree/bindings/reset/st,stm32mp1-rcc.txt  |   6 ++
+ drivers/reset/Kconfig                              |   7 ++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/core.c                               |  96 ++++++++++++++++-
+ drivers/reset/reset-stm32mp1.c                     | 115 +++++++++++++++++++++
+ drivers/reset/reset-uniphier.c                     |   5 +
+ include/dt-bindings/reset/stm32mp1-resets.h        | 108 +++++++++++++++++++
+ include/linux/reset-controller.h                   |  30 ++++++
+ 8 files changed, 367 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
+ create mode 100644 drivers/reset/reset-stm32mp1.c
+ create mode 100644 include/dt-bindings/reset/stm32mp1-resets.h
