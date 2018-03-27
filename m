@@ -1,31 +1,105 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 27 Mar 2018 09:52:51 -0700
-Subject: [PATCH script] hwmon: Use octal not symbolic permissions
-In-Reply-To: <9e908abe-2dc8-dbba-97f9-d9614fa4b199@roeck-us.net>
-References: <1522096136.12357.21.camel@perches.com>
- <9b112651-d0cf-5f3b-b643-3328028a95cd@roeck-us.net>
- <1522136107.12357.58.camel@perches.com>
- <5ec8703b-2979-7a1d-fbc3-bd528d7a5e29@roeck-us.net>
- <1522151285.12357.78.camel@perches.com>
- <9e908abe-2dc8-dbba-97f9-d9614fa4b199@roeck-us.net>
-Message-ID: <1522169571.12357.81.camel@perches.com>
+From: jeffrey.t.kirsher@intel.com (Jeff Kirsher)
+Date: Tue, 27 Mar 2018 09:54:17 -0700
+Subject: [PATCH v7 0/7] netdev: intel: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
+References: <1521831180-25014-1-git-send-email-okaya@codeaurora.org>
+ <CAKgT0UcaxM8Mj9Y9fR0B+aafTm1SzTqh+gHT5ozgvyaoHvrzRQ@mail.gmail.com>
+ <1521849496.15055.16.camel@intel.com>
+ <862cdbeafb9cfd272a426b010943ffc5@codeaurora.org>
+ <e3ada376-52a5-573b-33f1-9aa84af75f0d@codeaurora.org>
+Message-ID: <1522169657.6503.1.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-03-27 at 08:44 -0700, Guenter Roeck wrote:
-> On 03/27/2018 04:48 AM, Joe Perches wrote:
-> > On Tue, 2018-03-27 at 03:28 -0700, Guenter Roeck wrote:
-> > > On 03/27/2018 12:35 AM, Joe Perches wrote:
-> > > > On Mon, 2018-03-26 at 23:33 -0700, Guenter Roeck wrote:
-> > > > > Since the hwmon subsystem has been labeled as both "obsolete" and "obscure",
-[]
-> > In what sense do you mean hwmon is obsolete?
-[]
-> _I_ did not say it was obsolete. It was described as obsolete by a maintainer
-> of a different subsystem at a conference a couple of years ago. If I wasn't too
-> lazy, I could try to find the presentation, but I don't see the point.
+On Tue, 2018-03-27 at 08:42 -0400, Sinan Kaya wrote:
+> On 3/23/2018 10:34 PM, okaya at codeaurora.org wrote:
+> > On 2018-03-23 19:58, Jeff Kirsher wrote:
+> > > On Fri, 2018-03-23 at 14:53 -0700, Alexander Duyck wrote:
+> > > > On Fri, Mar 23, 2018 at 11:52 AM, Sinan Kaya <okaya@codeaurora.
+> > > > org>
+> > > > wrote:
+> > > > > Code includes wmb() followed by writel() in multiple places.
+> > > > > writel()
+> > > > > already has a barrier on some architectures like arm64.
+> > > > > 
+> > > > > This ends up CPU observing two barriers back to back before
+> > > > > executing
+> > > > > the
+> > > > > register write.
+> > > > > 
+> > > > > Since code already has an explicit barrier call, changing
+> > > > > writel() to
+> > > > > writel_relaxed().
+> > > > > 
+> > > > > I did a regex search for wmb() followed by writel() in each
+> > > > > drivers
+> > > > > directory.
+> > > > > I scrubbed the ones I care about in this series.
+> > > > > 
+> > > > > I considered "ease of change", "popular usage" and
+> > > > > "performance
+> > > > > critical
+> > > > > path" as the determining criteria for my filtering.
+> > > > > 
+> > > > > We used relaxed API heavily on ARM for a long time but
+> > > > > it did not exist on other architectures. For this reason,
+> > > > > relaxed
+> > > > > architectures have been paying double penalty in order to use
+> > > > > the
+> > > > > common
+> > > > > drivers.
+> > > > > 
+> > > > > Now that relaxed API is present on all architectures, we can
+> > > > > go and
+> > > > > scrub
+> > > > > all drivers to see what needs to change and what can remain.
+> > > > > 
+> > > > > We start with mostly used ones and hope to increase the
+> > > > > coverage over
+> > > > > time.
+> > > > > It will take a while to cover all drivers.
+> > > > > 
+> > > > > Feel free to apply patches individually.
+> > > > 
+> > > > I looked over the set and they seem good.
+> > > > 
+> > > > Reviewed-by: Alexander Duyck <alexander.h.duyck@intel.com>
+> > > 
+> > > Grrr, patch 1 does not apply cleanly to my next-queue tree (dev-
+> > > queue
+> > > branch).  I will deal with this series in a day or two, after I
+> > > have dealt
+> > > with my driver pull requests.
+> > 
+> > Sorry, you will have to replace the ones you took from me.
+> 
+> Double sorry now.
+> 
+> I don't know if you have been following "RFC on writel and
+> writel_relaxed" thread
+> or not but there are some new developments about wmb() requirement. 
+> 
+> Basically, wmb() should never be used before writel() as writel()
+> seem to
+> provide coherency and observability guarantee.
+> 
+> wmb()+writel_relaxed() is slower on some architectures than plain
+> writel()
+> 
+> I'll have to rework these patches to have writel() only. 
+> 
+> Are you able to drop the applied ones so that I can post V8 or is it
+> too late?
 
-Then it seems you were just being obscure on purpose.
-You wrote obsolete without context.
-
-cheers, Joe
+Currently I do not have any of your patches applied to my next-queue
+tree (dev-queue branch).  So feel free to do any revisions you need to
+do and to re-submit to intel-wired-lan at lists.osuosl.org (IWL) mailing
+list.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/a20aa26b/attachment.sig>
