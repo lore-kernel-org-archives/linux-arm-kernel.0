@@ -1,49 +1,54 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Mar 2018 12:31:48 -0400
-Subject: [net-next PATCH v2 09/10] Revert "net: netcp: remove dead code from
- the driver"
+Date: Tue, 27 Mar 2018 12:31:45 -0400
+Subject: [net-next PATCH v2 06/10] net: netcp: ethss: map vlan priorities to
+ zero flow
 In-Reply-To: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
 References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1522168309-12338-10-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1522168309-12338-7-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the probe sequence is not guaranteed contrary to the assumption
-of the commit 2d8e276a9030, same has to be reverted.
-
-commit 2d8e276a9030 ("net: netcp: remove dead code from the driver")
+The driver currently support only vlan priority zero. So map the
+vlan priorities to zero flow in hardware.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/net/ethernet/ti/netcp_core.c | 9 +++++++++
+ drivers/net/ethernet/ti/netcp_ethss.c | 9 +++++++++
  1 file changed, 9 insertions(+)
 
-diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
-index f5a7eb2..9c51b25 100644
---- a/drivers/net/ethernet/ti/netcp_core.c
-+++ b/drivers/net/ethernet/ti/netcp_core.c
-@@ -2155,6 +2155,7 @@ static int netcp_probe(struct platform_device *pdev)
- 	struct device_node *child, *interfaces;
- 	struct netcp_device *netcp_device;
- 	struct device *dev = &pdev->dev;
-+	struct netcp_module *module;
- 	int ret;
- 
- 	if (!node) {
-@@ -2203,6 +2204,14 @@ static int netcp_probe(struct platform_device *pdev)
- 	/* Add the device instance to the list */
- 	list_add_tail(&netcp_device->device_list, &netcp_devices);
- 
-+	/* Probe & attach any modules already registered */
-+	mutex_lock(&netcp_modules_lock);
-+	for_each_netcp_module(module) {
-+		ret = netcp_module_probe(netcp_device, module);
-+		if (ret < 0)
-+			dev_err(dev, "module(%s) probe failed\n", module->name);
-+	}
-+	mutex_unlock(&netcp_modules_lock);
- 	return 0;
- 
- probe_quit_interface:
+diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+index 078a1b8..828243d 100644
+--- a/drivers/net/ethernet/ti/netcp_ethss.c
++++ b/drivers/net/ethernet/ti/netcp_ethss.c
+@@ -595,6 +595,7 @@ struct gbe_port_regs {
+ struct gbe_port_regs_ofs {
+ 	u16	port_vlan;
+ 	u16	tx_pri_map;
++	u16     rx_pri_map;
+ 	u16	sa_lo;
+ 	u16	sa_hi;
+ 	u16	ts_ctl;
+@@ -2299,6 +2300,13 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
+ 	gbe_sgmii_rtreset(priv, slave, false);
+ 	gbe_port_config(priv, slave, priv->rx_packet_max);
+ 	gbe_set_slave_mac(slave, gbe_intf);
++	/* For NU & 2U switch, map the vlan priorities to zero
++	 * as we only configure to use priority 0
++	 */
++	if (IS_SS_ID_MU(priv))
++		writel(HOST_TX_PRI_MAP_DEFAULT,
++		       GBE_REG_ADDR(slave, port_regs, rx_pri_map));
++
+ 	/* enable forwarding */
+ 	cpsw_ale_control_set(priv->ale, slave->port_num,
+ 			     ALE_PORT_STATE, ALE_PORT_STATE_FORWARD);
+@@ -3000,6 +3008,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
+ 		/* Initialize  slave port register offsets */
+ 		GBENU_SET_REG_OFS(slave, port_regs, port_vlan);
+ 		GBENU_SET_REG_OFS(slave, port_regs, tx_pri_map);
++		GBENU_SET_REG_OFS(slave, port_regs, rx_pri_map);
+ 		GBENU_SET_REG_OFS(slave, port_regs, sa_lo);
+ 		GBENU_SET_REG_OFS(slave, port_regs, sa_hi);
+ 		GBENU_SET_REG_OFS(slave, port_regs, ts_ctl);
 -- 
 1.9.1
