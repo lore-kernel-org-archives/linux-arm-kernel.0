@@ -1,89 +1,172 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 27 Mar 2018 11:29:53 +0200
-Subject: [PATCH v4 0/8] ARM: davinci: complete the conversion to using the
- reset framework
-In-Reply-To: <6c55e081-57ba-6c39-8494-cda5022aa927@ti.com>
-References: <20180323130455.11470-1-brgl@bgdev.pl>
- <152182378792.178046.3747112581117251857@swboyd.mtv.corp.google.com>
- <CAMRc=MfEebDk4D=t-ybRgbn+HaY7RUfOFCDAf9H8F3cZRchJmA@mail.gmail.com>
- <152182490783.178046.1191965992600877708@swboyd.mtv.corp.google.com>
- <CAMRc=MdmTAwPAAnL1+n+OXSycnyjuQ1hKmts158mPcgat1NUYQ@mail.gmail.com>
- <6c55e081-57ba-6c39-8494-cda5022aa927@ti.com>
-Message-ID: <CAMRc=MdkfrEvMrFtf_TUDcMVHNC2O9zw8Mn0pQnyFw3iMqVmmg@mail.gmail.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Tue, 27 Mar 2018 11:47:43 +0200
+Subject: [PATCH v2 2/5] drm: bridge: add API to query the expected input
+ formats of bridges
+In-Reply-To: <20180326212447.7380-3-peda@axentia.se>
+References: <20180326212447.7380-1-peda@axentia.se>
+ <20180326212447.7380-3-peda@axentia.se>
+Message-ID: <20180327094743.GL27746@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-27 8:09 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
-> Hi Bart,
->
-> On Friday 23 March 2018 10:46 PM, Bartosz Golaszewski wrote:
->> 2018-03-23 18:08 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
->>> Quoting Bartosz Golaszewski (2018-03-23 09:55:47)
->>>> 2018-03-23 17:49 GMT+01:00 Stephen Boyd <sboyd@kernel.org>:
->>>>> Quoting Bartosz Golaszewski (2018-03-23 06:04:47)
->>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>>>
->>>>>> This series converts the only user of the handcoded, mach-specific reset
->>>>>> routines in the davinci platform to using the reset framework.
->>>>>>
->>>>>> Patch 1 modifies the way lookup entries are registered with the reset
->>>>>> framework.
->>>>>>
->>>>>> Patches 2-4 add necessary lookups/DT-properties.
->>>>>>
->>>>>> Patches 5-7 convert the davinci-rproc driver to the reset framework.
->>>>>>
->>>>>> Patch 8 removes now dead code.
->>>>>>
->>>>>> Philipp: it turned out that it's indeed better to use the reset
->>>>>> controller's device name for the entry lookup.
->>>>>>
->>>>>> Tested both in DT and legacy modes by booting the examples from
->>>>>> ti-ipc-rtos recipe in meta-ti.
->>>>>>
->>>>>> This series applies on top of David Lechner's common-clk-v9 branch[1]
->>>>>> with Philipp Zabel's reset/next branch[2] pulled in.
->>>>>>
->>>>>> It can be found in my github tree as well[3].
->>>>>>
->>>>>
->>>>> What's the merge strategy for the rest of the patches? I should apply
->>>>> the clk ones after the next -rc1?
->>>>
->>>> Or maybe Philipp can provide us with an immutable branch with the reset patches?
->>>>
->>>> The you could apply the driver patches and let Sekhar take all the
->>>> platform code?
->>>>
->>>
->>> Ok that could work too.
->>
->> Ohad, Bjorn can you ack the remoteproc patches? Are you OK with
->> Stephen taking them through the clock tree? Otherwise it would get
->> complicated since they depend on the first clk patch and the last clk
->> patch depends on them.
->
-> I will not be queuing the DTS patches for v4.17. They depend on clock
-> framework DTS patches which itself I plan to queue for v4.18. Given
-> this, I think the best bet is:
->
-> Ohad/Bjorn queue remoteproc patches already acked by Suman and having no
-> dependencies. That is, 5/8 and 6/8.
->
-> If Philipp can provide an immutable branch with reset changes, it will
-> be great and Stephen can queue 4/8. If not, its best to resend that
-> patch to Stephen once v4.17-rc1 is out.
->
-> The remaining patches need to wait till v4.18 (or even v4.19 if
-> dependencies don't pan out well).
->
-> Thanks,
-> Sekhar
+Hi Peter,
+   thanks for the patches
 
-Very good, thanks.
+On Mon, Mar 26, 2018 at 11:24:44PM +0200, Peter Rosin wrote:
+> Bridges may affect the required bus output format of the encoder, in
+> which case it may be wrong to use the output format of the panel or
+> connector as is. Add infrastructure to address this problem.
 
-I've just sent out a v3 with three non-reset remoteproc patches that
-can already be applied by Suman.
+Bridges not only affect the format expected by the connector at the
+end of the display pipeline, they may perform encoding/decoding
+between protocols and their accepted input formats may be unrelated to
+the connector at the end of the pipeline as there may an arbitrary
+number of bridges in between.
 
-Thanks,
-Bartosz
+Eg.
+
+ENCODER                                                CONNECTOR
+  |                                                         |
+|DU LVDS| ->lvds-> |THC63| ->rgb-> |ADV7511| ->hdmi-> |HDMI connector|
+
+The fact that THC63 wants a specific LVDS input format is unrelated to
+the format required by the HDMI connector at the end of the pipeline.
+
+I would just state here that bridges need a way to report their
+accepted media bus formats, and this patch extends the DRM Bridge APIs
+to implement that.
+
+>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> ---
+>  drivers/gpu/drm/drm_bridge.c | 32 ++++++++++++++++++++++++++++++++
+>  include/drm/drm_bridge.h     | 18 ++++++++++++++++++
+>  2 files changed, 50 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/drm_bridge.c b/drivers/gpu/drm/drm_bridge.c
+> index 1638bfe9627c..f85e61b7416e 100644
+> --- a/drivers/gpu/drm/drm_bridge.c
+> +++ b/drivers/gpu/drm/drm_bridge.c
+> @@ -348,6 +348,38 @@ void drm_bridge_enable(struct drm_bridge *bridge)
+>  }
+>  EXPORT_SYMBOL(drm_bridge_enable);
+>
+> +/**
+> + * drm_bridge_input_formats - get the expected bus input format of the bridge
+
+I may be biased by the V4L2 APIs, but this seems to me very much like
+similar to g_fmt/s_fmt callbacks we have there. Bridges have an input and
+an output formats, and that calls for something that takes that into
+account, as well as they may have different input ports with different
+accepted formats but I would for now simplify this to just 'g_fmt()'
+
+> + * @bridge: bridge control structure
+> + * @bus_formats: where to store a pointer to the bus input formats
+> + *
+> + * Calls the &drm_bridge_funcs.input_formats op for the frist bridge in the
+> + * chain that has registered this op.
+
+I'm not sure passing the call down the pipeline is desirable. Each
+component should make sure its output format is accepted as the next
+bridge input format, passing the call to the next bridge is not
+different that getting to the connector at the end of the pipeline and
+return to the initial caller its supported format. Do you agree with this?
+
+> + *
+> + * Note that the bridge passed should normally be the bridge closest to the
+> + * encoder, but possibly the bridge closest to an intermediate bridge in
+> + * convoluted cases.
+> + *
+
+As I see this, any bridge in the arbitrary long pipeline should call
+this operation on next bridge if it supports different output formats.
+Ie. I would not name here the encoder nor refer to the bridge position
+in the pipeline.
+
+> + * RETURNS:
+> + * The number of bus input formats the bridge accepts. Zero means that
+> + * the chain of bridges are not converting the bus format and that the
+> + * format of the drm_connector should be used.
+
+How do we get to the connector format from a bridge that has maybe
+other components in between in the pipeline?
+
+If a bridge do not report any supported format, it won't implement
+this callback and things will work as they work today.
+
+> + */
+> +int drm_bridge_input_formats(struct drm_bridge *bridge,
+> +			     const u32 **bus_formats)
+> +{
+> +	int ret = 0;
+> +
+> +	if (!bridge)
+> +		return 0;
+> +
+> +	if (bridge->funcs->input_formats)
+> +		ret = bridge->funcs->input_formats(bridge, bus_formats);
+> +
+> +	return ret ?: drm_bridge_input_formats(bridge->next, bus_formats);
+
+See my comment on the call propagation down in the pipeline.
+
+> +}
+> +EXPORT_SYMBOL(drm_bridge_input_formats);
+> +
+>  #ifdef CONFIG_OF
+>  /**
+>   * of_drm_find_bridge - find the bridge corresponding to the device node in
+> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+> index 682d01ba920c..ae8d3c4af0b8 100644
+> --- a/include/drm/drm_bridge.h
+> +++ b/include/drm/drm_bridge.h
+> @@ -220,6 +220,22 @@ struct drm_bridge_funcs {
+>  	 * The enable callback is optional.
+>  	 */
+>  	void (*enable)(struct drm_bridge *bridge);
+> +
+> +	/**
+> +	 * @input_formats:
+> +	 *
+> +	 * The callback reports the expected bus input formats of the bridge.
+> +	 *
+> +	 * The @input_formats callback is optional. The bridge is assumed to
+> +	 * not convert the bus format if the callback is not installed.
+> +	 *
+> +	 * RETURNS:
+> +	 *
+> +	 * Zero if the bridge does not convert the bus format, otherwise the
+> +	 * number of bus input formats returned in &bus_formats.
+> +	 */
+> +	int (*input_formats)(struct drm_bridge *bridge,
+> +			     const u32 **bus_formats);
+
+Consider g_fmt() here as well, or a function name that captures that we want
+to know the supported format (and possibly configure it as well one
+day, if ever possible).
+
+Thanks
+   j
+
+>  };
+>
+>  /**
+> @@ -263,6 +279,8 @@ void drm_bridge_mode_set(struct drm_bridge *bridge,
+>  			struct drm_display_mode *adjusted_mode);
+>  void drm_bridge_pre_enable(struct drm_bridge *bridge);
+>  void drm_bridge_enable(struct drm_bridge *bridge);
+> +int drm_bridge_input_formats(struct drm_bridge *bridge,
+> +			     const u32 **bus_formats);
+>
+>  #ifdef CONFIG_DRM_PANEL_BRIDGE
+>  struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel,
+> --
+> 2.11.0
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/0094cb5e/attachment.sig>
