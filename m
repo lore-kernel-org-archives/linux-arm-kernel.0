@@ -1,73 +1,52 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 27 Mar 2018 10:06:30 +0100
-Subject: [PATCH v2 0/4] Introduce PMSAv8 memory protection unit
-In-Reply-To: <2415fbb7-a171-2917-35bc-4f2ee128f7c3@arm.com>
-References: <1518790485-2321-1-git-send-email-vladimir.murzin@arm.com>
- <2415fbb7-a171-2917-35bc-4f2ee128f7c3@arm.com>
-Message-ID: <2749c3e2-1046-a23f-b91c-f456f304d5c3@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Mar 2018 10:04:10 +0100
+Subject: Regression with arm in next with stack protector
+In-Reply-To: <20180323181452.GJ5799@atomide.com>
+References: <20180323181452.GJ5799@atomide.com>
+Message-ID: <20180327090409.GA10990@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/18 13:36, Vladimir Murzin wrote:
-> On 16/02/18 14:14, Vladimir Murzin wrote:
->> Hi,
->>
->> This series adds support for PMSAv8 MPU defined by ARMv8R/M
->> architecture.
->>
->> Changelog:
->>
->>      v1 -> v2
->>      - Included missed patch.
->> 	- Folded "ARM: NOMMU: Make _stext and _end meet PMSAv8 alignment
->> 	  restrictions" into "ARM: NOMMU: Support PMSAv8 MPU" since it
->> 	  allows us to refer PMSAv8_MINALIGN in linker scripts.
->> 	- Improved and tested XIP support
->>
->>     RFC -> v1
->>      - Rebased on v4.16-rc1
->> 	- Added Tested-by for v7M bits from Andras
->>
->> Thanks!
+On Fri, Mar 23, 2018 at 11:14:53AM -0700, Tony Lindgren wrote:
+> Hi,
 > 
-> OK for patch tracker?
+> Looks like commit 5638790dadae ("zboot: fix stack protector in
+> compressed boot phase") breaks booting on arm.
+> 
+> This is all I get from the bootloader on omap3:
+> 
+> Starting kernel ...
+> 
+> data abort
+> pc : [<810002d0>]          lr : [<100110a8>]
+> reloc pc : [<9d6002d0>]    lr : [<2c6110a8>]
+> sp : 81467c18  ip : 81466bf0     fp : 81466bf0
+> r10: 80fc2c40  r9 : 81000258     r8 : 86fec000
+> r7 : ffffffff  r6 : 81466bf8     r5 : 00000000  r4 : 80008000
+> r3 : 81466c14  r2 : 81466c18     r1 : 000a0dff  r0 : 00466bf8
+> Flags: nZCv  IRQs off  FIQs off  Mode SVC_32
+> Resetting CPU ...
+> 
+> resetting ...
 
-The patches were on the list for a month and half without much attention
-except v7M folks (thanks them for testing!) and I'm afraid it would be even
-harder to make progress with them in nearby feature.
+The reason for this is the following code that was introduced by the
+referenced patch:
 
-I'm wondering if ARM SoC team can pick the patches?
++               ldr     r0, =__stack_chk_guard
++               ldr     r1, =0x000a0dff
++               str     r1, [r0]
 
-Thanks
-Vladimir
+This uses the absolute address of __stack_chk_guard in the decompressor,
+which is a self-relocatable image.  As with all constructs like the
+above, this absolute address doesn't get fixed up, and so it ends up
+pointing at invalid memory (in this case 0x466bf8) vs RAM at 0x80000000,
+and the decompressor looks to be around 0x81000000.
 
-> 
-> Vladimir
-> 
->>
->> Vladimir Murzin (4):
->>   ARM: NOMMU: Move PMSAv7 MPU under it's own namespace
->>   ARM: NOMMU: Reorganise __setup_mpu
->>   ARM: NOMMU: Postpone MPU activation till __after_proc_init
->>   ARM: NOMMU: Support PMSAv8 MPU
->>
->>  arch/arm/include/asm/mpu.h        | 112 +++++++++-----
->>  arch/arm/include/asm/v7m.h        |  14 +-
->>  arch/arm/kernel/asm-offsets.c     |   8 +-
->>  arch/arm/kernel/head-nommu.S      | 289 ++++++++++++++++++++++++++++-------
->>  arch/arm/kernel/vmlinux-xip.lds.S |   4 +
->>  arch/arm/kernel/vmlinux.lds.S     |   7 +
->>  arch/arm/mm/Makefile              |   2 +-
->>  arch/arm/mm/nommu.c               |  32 ++++
->>  arch/arm/mm/pmsa-v7.c             |  59 +++-----
->>  arch/arm/mm/pmsa-v8.c             | 307 ++++++++++++++++++++++++++++++++++++++
->>  10 files changed, 701 insertions(+), 133 deletions(-)
->>  create mode 100644 arch/arm/mm/pmsa-v8.c
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Such constructs can not be used in the decompressor for exactly this
+reason - they need to use PC-relative addressing instead just like
+everything else does in head.S.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
