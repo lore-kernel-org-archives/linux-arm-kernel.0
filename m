@@ -1,53 +1,41 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 27 Mar 2018 09:32:56 -0400
-Subject: [net-next PATCH 2/5] soc: ti: K2G: provide APIs to support driver
- probe deferral
-In-Reply-To: <20180326204802.GC5862@lunn.ch>
-References: <1522095312-23249-1-git-send-email-m-karicheri2@ti.com>
- <1522095312-23249-3-git-send-email-m-karicheri2@ti.com>
- <20180326204802.GC5862@lunn.ch>
-Message-ID: <4aeeda56-c68b-cb64-1314-a669f721ff20@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2018 15:31:02 +0200
+Subject: [GIT PULL 2/2] arm64: stratix10: defconfig update for v4.17
+In-Reply-To: <1521834884-23795-2-git-send-email-dinguyen@kernel.org>
+References: <1521834884-23795-1-git-send-email-dinguyen@kernel.org>
+ <1521834884-23795-2-git-send-email-dinguyen@kernel.org>
+Message-ID: <CAK8P3a0TTKEsmMavojQQcFG4-Y3EiDNtavLV2QdyHjNXHTE2Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andrew,
+On Fri, Mar 23, 2018 at 8:54 PM, Dinh Nguyen <dinguyen@kernel.org> wrote:
 
-On 03/26/2018 04:48 PM, Andrew Lunn wrote:
-> On Mon, Mar 26, 2018 at 04:15:09PM -0400, Murali Karicheri wrote:
->> This patch provide APIs to allow client drivers to support
->> probe deferral. On K2G SoC, devices can be probed only
->> after the ti_sci_pm_domains driver is probed and ready.
->> As drivers may get probed at different order, any driver
->> that depends on knav dma and qmss drivers, for example
->> netcp network driver, needs to defer probe until
->> knav devices are probed and ready to service. To do this,
->> add an API to query the device ready status from the knav
->> dma and qmss devices.
-> 
-> Hi Murali 
-> 
-> Shouldn't you really re-write this to be a dma driver?  You would then
-> do something like of_dma_request_slave_channel() in the ethernet
-> driver probe function. That probably correctly returns EPROBE_DEFER.
-> 
->        Andrew
-> 
+> ----------------------------------------------------------------
+> ARM64: stratix10: defconfig updates for 4.17
+> -enables STMMAC_ETH controller that is present on Stratix10
 
-Could you please elaborate? These knav dma and qmss drivers are
-introduced to support packet DMA hardware available in Keystone
-NetCP which couldn't be implemented using the DMA APIs available
-at the time this driver was introduced. Another reason was that
-the performance was really bad. We had an internal implementation
-based on DMA API before which couldn't be upstreamed at that time
-due to the reason that we were mis-using the API for this driver.
-So we introduced these knav_dma driver to support NetCP. We don't
-have any plan to re-write the driver at this time.
+I got a conflict against an earlier patch that enabled CONFIG_STMMAC_ETH=m
+and kept that version, as I see no need to have it built-in, see below for the
+merge conflict resolution.
 
-If your question is about EPROBE_DEFER being returned from an
-existing knav_dma API and using the return code to achieve probe
-defer instead of introducing these APIs, I can take a look into
-that and respond. So please clarify.
+     Arnd
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+diff --cc arch/arm64/configs/defconfig
+index 1d3b40615efb,a3ea32e4312f..5e4ff17a3ad8
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@@ -220,8 -209,12 +220,13 @@@ CONFIG_QCOM_EMAC=
+  CONFIG_RAVB=y
+  CONFIG_SMC91X=y
+  CONFIG_SMSC911X=y
+ -CONFIG_STMMAC_ETH=y
+ +CONFIG_SNI_NETSEC=y
+ +CONFIG_STMMAC_ETH=m
++ CONFIG_DWMAC_IPQ806X=m
++ CONFIG_DWMAC_MESON=m
++ CONFIG_DWMAC_ROCKCHIP=m
++ CONFIG_DWMAC_SUNXI=m
++ CONFIG_DWMAC_SUN8I=m
+  CONFIG_MDIO_BUS_MUX_MMIOREG=y
+  CONFIG_AT803X_PHY=m
+  CONFIG_MARVELL_PHY=m
