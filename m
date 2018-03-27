@@ -1,70 +1,81 @@
 From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Tue, 27 Mar 2018 08:07:33 -0700
-Subject: [PATCH 4/7] net: thunderx: add new messages for handle
- ndo_set_rx_mode callback
+Date: Tue, 27 Mar 2018 08:07:30 -0700
+Subject: [PATCH 1/7] net: thunderx: move filter register related macro into
+ proper place
 In-Reply-To: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180327150736.10718-5-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180327150736.10718-2-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-The kernel calls ndo_set_rx_mode() callback supplying it will all necessary
-info, such as device state flags, multicast mac addresses list and so on.
-Since we have only 128 bits to communicate with PF we need to initiate
-several requests to PF with small/short operation each based on input data.
+The ThunderX NIC has set of registers which allows to configure
+filter policy for ingress packets. There are three possible regimes
+of filtering multicasts, broadcasts and unicasts: accept all, reject all
+and accept filter allowed only.
 
-So this commit implements following PF messages codes along with new
-data structures for them:
-NIC_MBOX_MSG_RESET_XCAST to flush all filters configured for this
-                          particular network interface (VF)
-NIC_MBOX_MSG_ADD_MCAST   to add new MAC address to DMAC filter registers
-                          for this particular network interface (VF)
-NIC_MBOX_MSG_SET_XCAST   to apply filtering configuration to filter control
-                          register
+Current implementation has enum with all of them and two generic macro
+for enabling filtering et all (CAM_ACCEPT) and enabling/disabling
+broadcast packets, which also should be corrected in order to represent
+register bits properly. All these values are private for driver and
+there is no need to ?publish? them via header file.
+
+This commit is to move filtering register manipulation values from
+header file into source with explicit assignment of exact register
+values to them to be used while register configuring.
 
 Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 13 +++++++++++++
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 11 -----------
+ 2 files changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 4cacce5d2b16..069289b4f968 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -403,6 +403,9 @@ struct nicvf {
- #define	NIC_MBOX_MSG_PTP_CFG		0x19	/* HW packet timestamp */
- #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
- #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
-+#define	NIC_MBOX_MSG_RESET_XCAST	0xF2    /* Reset DCAM filtering mode */
-+#define	NIC_MBOX_MSG_ADD_MCAST		0xF3    /* Add MAC to DCAM filters */
-+#define	NIC_MBOX_MSG_SET_XCAST		0xF4    /* Set MCAST/BCAST RX mode */
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 91d34ea40e2c..0dd211605eb1 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -24,6 +24,19 @@
+ #define DRV_NAME	"thunder_bgx"
+ #define DRV_VERSION	"1.0"
  
- struct nic_cfg_msg {
- 	u8    msg;
-@@ -556,6 +559,14 @@ struct set_ptp {
- 	bool  enable;
- };
- 
-+struct xcast {
-+	u8    msg;
-+	union {
-+		u8    mode;
-+		u64   mac;
-+	} data;
++/* RX_DMAC_CTL configuration */
++enum MCAST_MODE {
++		MCAST_MODE_REJECT = 0x0,
++		MCAST_MODE_ACCEPT = 0x1,
++		MCAST_MODE_CAM_FILTER = 0x2,
++		RSVD = 0x3
 +};
 +
- /* 128 bit shared memory between PF and each VF */
- union nic_mbx {
- 	struct { u8 msg; }	msg;
-@@ -576,6 +587,7 @@ union nic_mbx {
- 	struct reset_stat_cfg	reset_stat;
- 	struct pfc		pfc;
- 	struct set_ptp		ptp;
-+	struct xcast            xcast;
- };
++#define BCAST_ACCEPT      BIT(0)
++#define CAM_ACCEPT        BIT(3)
++#define MCAST_MODE_MASK   0x3
++#define BGX_MCAST_MODE(x) (x << 1)
++
+ struct lmac {
+ 	struct bgx		*bgx;
+ 	int			dmac;
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 5a7567d31138..52439da62c97 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -205,17 +205,6 @@
+ #define LMAC_INTR_LINK_UP	BIT(0)
+ #define LMAC_INTR_LINK_DOWN	BIT(1)
  
- #define NIC_NODE_ID_MASK	0x03
+-/*  RX_DMAC_CTL configuration*/
+-enum MCAST_MODE {
+-		MCAST_MODE_REJECT,
+-		MCAST_MODE_ACCEPT,
+-		MCAST_MODE_CAM_FILTER,
+-		RSVD
+-};
+-
+-#define BCAST_ACCEPT	1
+-#define CAM_ACCEPT	1
+-
+ void octeon_mdiobus_force_mod_depencency(void);
+ void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
+ void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
 -- 
 2.14.3
