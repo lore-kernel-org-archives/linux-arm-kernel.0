@@ -1,101 +1,25 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 27 Mar 2018 13:30:22 +0200
-Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <9761072.pX2B0LJlSJ@ada>
-References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
- <9761072.pX2B0LJlSJ@ada>
-Message-ID: <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2018 13:32:14 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.17
+In-Reply-To: <cover.1521206902.git.horms+renesas@verge.net.au>
+References: <cover.1521206902.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a2kkwB1iyubRS5R7Vn6+ydbpo0Qm3VR5nQSkPYh=q_ZcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/2018 12:41, Alexander Dahl wrote:
-> Hello Alexandre,
-> 
-> Am Freitag, 23. Februar 2018, 18:15:52 CEST schrieb Alexandre Belloni:
->>  - using the PIT doesn't work well with preempt-rt because its interrupt is
->>    shared (in particular with the UART and their interrupt flags are
->>    incompatible)
-> 
-> This is actually quite annoying when using the UART as a serial console, 
-> producing garbage when you type too fast. That's why I tested this patch 
-> series (on top of v4.16-rc7). Target is a at91sam9g20 based board, quite close 
-> to, but not actually an at91sam9g20-ek.
-> 
-> First test was with the previous kernel config updated by oldconfig, so 
-> basically still using the PIT:
-> 
->   +CONFIG_ATMEL_CLOCKSOURCE_PIT=y
-> 
-> On the serial console with v4.16 and the patch set without switching to the 
-> new options, I see this on boot (no surprise, this is what it also prints with 
-> v4.9):
-> 
->   clocksource: pit: mask: 0xfffffff max_cycles: 0xfffffff, max_idle_ns: 
-> 14468723050 ns
->   ?
->   clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 
-> 19112604462750000 ns
->   ?
->   clocksource: tcb_clksrc: mask: 0xffffffff max_cycles: 0xffffffff, 
-> max_idle_ns: 115749784805 ns
->   ?
->   clocksource: Switched to clocksource tcb_clksrc
-> 
-> Interrupts here:
-> 
->   $ cat /proc/interrupts 
->              CPU0       
->    16:       4802  atmel-aic   1 Level     at91_tick, rtc0, ttyS0
->    19:      24041  atmel-aic  19 Level     tc_clkevt
->    26:        124  atmel-aic  21 Level     eth0
->    28:          1      GPIO  11 Edge      reset
->   Err:          0
-> 
-> Second test with tcb block added to dts like in 
-> 32ce250b0af3b6971fc746445fce87861a9f5628 and with changed kernel config 
-> according to defconfig changes in patch 5 and 6:
-> 
->   +# CONFIG_ATMEL_CLOCKSOURCE_PIT is not set
->   +CONFIG_ATMEL_CLOCKSOURCE_TCB=y
->   -CONFIG_ATMEL_TCLIB=y
->   -CONFIG_ATMEL_TCB_CLKSRC=y
->   -CONFIG_ATMEL_TCB_CLKSRC_BLOCK=0
->   +# CONFIG_ATMEL_TCLIB is not set
->   -CONFIG_ATMEL_PIT=y
->   +CONFIG_ATMEL_ARM_TCB_CLKSRC=y
->   -CONFIG_PWM_ATMEL_TCB=m
-> 
-> The output on the serial console contains this:
-> 
->   clocksource: timer at fffa0000:0,1: mask: 0xffffffff max_cycles: 0xffffffff, 
-> max_idle_ns: 115749784805 ns
->   ?
->   clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 
-> 19112604462750000 ns
->   ?
->   clocksource: Switched to clocksource timer at fffa0000:0,1
-> 
-> Interrupts here:
-> 
->   $ cat /proc/interrupts 
->              CPU0       
->    17:    5727291  atmel-aic  19 Level     timer at fffa0000:2
->    18:       5523  atmel-aic   1 Level     rtc0, ttyS0
->    26:       5031  atmel-aic  21 Level     eth0
->    28:          1      GPIO  11 Edge      reset
->   Err:          0
-> 
-> So, the board boots and runs like usual. I don't know if that qualifies for a 
-> Tested-by? Hope that helps.
+On Fri, Mar 16, 2018 at 3:52 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Renesas ARM Based SoC DT Bindings Updates for v4.17
+>
+> * Document the bindings for:
+>   - R-Car V3H (r8a77980) SoC
+>   - Condor board with V3H (r8a77980) SoC
+>   - Stout (ADAS Starterkit) board with R-Car H2 (r8a7790) SoC
+>   - R-Car M3-N (r8a77965) SoC
+>   - Salvator-X and Salvator-XS boards with R-Car M3-N (r8a77965) SoC
+> * Document that Armadillo-800 is compatibie with R-Mobile A1 (r8a7740) SoC
+> * Document part numbers of Wheat and V3MSK boards
 
-Can you can give a rough amount for the irq rate on the timer ?
+Pulled into next/dt, thanks!
 
-
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+      Arnd
