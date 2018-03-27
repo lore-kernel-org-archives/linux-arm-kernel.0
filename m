@@ -1,25 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Mar 2018 15:05:18 +0200
-Subject: [PATCH v4 1/9] pinctrl: sunxi: refactor irq related register
- function to have desc
-In-Reply-To: <20180316140215.28663-2-icenowy@aosc.io>
-References: <20180316140215.28663-1-icenowy@aosc.io>
- <20180316140215.28663-2-icenowy@aosc.io>
-Message-ID: <CACRpkdbO0KQEG_OXbswJkmWm=Ceiutx7vux6GJp8XVun+NiRbw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 27 Mar 2018 15:06:25 +0200
+Subject: [GIT PULL] Freescale arm64 device tree fixups for 4.17
+In-Reply-To: <20180327082948.GG8857@dragon>
+References: <20180327082948.GG8857@dragon>
+Message-ID: <CAK8P3a3-Cs8XKcyLWuUSk3kDV8pxbFRvaiwba1dw5V82aG_Kkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 3:02 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-
-> As the new H6 SoC has holes in the IRQ registers, refactor the IRQ
-> related register function for getting the full pinctrl desc structure.
+On Tue, Mar 27, 2018 at 10:29 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Hi,
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v4:
-> - Adjusted parameter sequence.
+> This is a fix-up for "[GIT PULL 5/6] Freescale arm64 device tree updates
+> for 4.17" [1].  After the pull-request gets merged, we're pointed out by
+> Rob that the "fix" to IFC memory controller DTC warnings is wrong.
+> Let's start over again by reverting the patches first.  Sorry about the
+> reverting.
 
-Patch applied with Maxime's ACK.
+No worries, reverting stuff occasionally is absolutely expected.
+Pulled into next/dt now, thanks!
 
-Yours,
-Linus Walleij
+       Arnd
