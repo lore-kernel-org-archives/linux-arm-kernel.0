@@ -1,30 +1,54 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 27 Mar 2018 09:32:25 +0800
-Subject: [PATCH] ASoC: mediatek: remove "simple-mfd" in the example
-Message-ID: <79b79aa29ea14e6f851ad01ed1f5a33543b05040.1522114156.git.ryder.lee@mediatek.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 27 Mar 2018 10:12:25 +0800
+Subject: [PATCH v2 0/2] Add Nintendo NES/SuperNES classic support
+In-Reply-To: <20180326212820.20637-1-miquel.raynal@bootlin.com>
+References: <20180326212820.20637-1-miquel.raynal@bootlin.com>
+Message-ID: <CAGb2v67_9oTTR30jPPmXO35bqZjif-jvR7z0CHPPu_xwrujriw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove compatible string "simple-mfd" in the example as we have
-already added devm_of_platform_populate() in the parent driver.
+On Tue, Mar 27, 2018 at 5:28 AM, Miquel Raynal
+<miquel.raynal@bootlin.com> wrote:
+> This series adds support for the NES/SuperNES classic consoles from
+> Nintendo. Changes are done in A23/A33 DTSI to add NAND support.
+>
+> Thanks,
+> Miqu?l
+>
+> Changes since v1
+> ================
+>
+> arm: dts: sun8i: a23/a33: declare NAND pins
+>  * Patch created by splitting the v1 in two
+>  * Removed the trailing '@0' after the NAND pins declarations
+>  * Changed the name of these declarations
+>  * Declared all CS/RB lines
+>  * Reorganized the pins entry of nand_pins
+>
+> arm: dts: nes: add Nintendo NES/SuperNES Classic Edition support
+>  * Created two DTS: nes-classic and supernes-classic
+>  * Moved the NAND pinctrl declaration into the DTSI
+>  * Removed the USB hackery explanation
+>  * Explained why one UART port is preferred to the other
+>
+>
+> Miquel Raynal (2):
+>   arm: dts: sun8i: a23/a33: declare NAND pins
+>   arm: dts: nes: add Nintendo NES/SuperNES Classic Edition support
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+"ARM" should be uppercase. However, "arm64" should be lowercase.
 
-diff --git a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-index 6df87b9..e2f7f49 100644
---- a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-+++ b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-@@ -53,7 +53,7 @@ See ../arm/mediatek/mediatek,audsys.txt for details about the parent node.
- Example:
- 
- 	audsys: audio-subsystem at 11220000 {
--		compatible = "mediatek,mt2701-audsys", "syscon", "simple-mfd";
-+		compatible = "mediatek,mt2701-audsys", "syscon";
- 		...
- 
- 		afe: audio-controller {
--- 
-1.9.1
+ChenYu
+
+>
+>  arch/arm/boot/dts/Makefile                         |  2 +
+>  arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 29 ++++++++++
+>  .../boot/dts/sun8i-r16-nintendo-nes-classic.dts    | 62 ++++++++++++++++++++++
+>  .../dts/sun8i-r16-nintendo-supernes-classic.dts    | 17 ++++++
+>  4 files changed, 110 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-nes-classic.dts
+>  create mode 100644 arch/arm/boot/dts/sun8i-r16-nintendo-supernes-classic.dts
+>
+> --
+> 2.14.1
+>
