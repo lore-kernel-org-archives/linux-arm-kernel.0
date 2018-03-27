@@ -1,41 +1,175 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 27 Mar 2018 12:47:42 +0200
-Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
-In-Reply-To: <20180327080507.pgil6pw2mn4y2f4d@dell>
-References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
- <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
- <1521685073.28226.10.camel@mtkswgap22> <20180323185418.GD255819@dtor-ws>
- <20180327080507.pgil6pw2mn4y2f4d@dell>
-Message-ID: <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Mar 2018 12:05:15 +0100
+Subject: [PATCH v3 2/4] drivers/staging/fsl-mc: Fix DPIO error path issues
+In-Reply-To: <1522091134-24646-3-git-send-email-roy.pledge@nxp.com>
+References: <1522091134-24646-1-git-send-email-roy.pledge@nxp.com>
+ <1522091134-24646-3-git-send-email-roy.pledge@nxp.com>
+Message-ID: <5e91615b-b2b4-4fe3-4d25-1ae56624976b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Roy,
 
-
-On 03/27/2018 10:05 AM, Lee Jones wrote:
-> On Fri, 23 Mar 2018, Dmitry Torokhov wrote:
->> On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
->>> Hi, Dmitry and Lee
->>>
->>> The series seems not being got merged. Are they good enough to be ready
->>> into the your tree?
->>>
->>> Recently I've tested the series with focusing on pwrkey event generated
->>> through interrupt when push and release the key on bpi-r2 board and then
->>> finally it's working fine. but for homekey it cannot be found on the
->>> board and thus I cannot have more tests more about it.
->>>
->>> Tested-by: Sean Wang <sean.wang@mediatek.com>
->>
->> You have my Ack on the input patch; I expect it go through Lee's tree as
->> there are some dependencies on mfd core piece.
+On 26/03/18 20:05, Roy Pledge wrote:
+> The error path in the dpaa2_dpio_probe() function was not properly
+> unmapping the QBMan device memory on the error path. This was also
+> missing from the dpaa2_dpio_release() function.
 > 
-> Are you happy for me to merge the Input dt-bindings without your Ack?
+> Also addresses a memory leak of the device private data structure.
 > 
+> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+> ---
+>   drivers/staging/fsl-mc/bus/dpio/dpio-driver.c | 49 +++++++++++++++++++--------
+>   1 file changed, 34 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
+> index e00f473..e7a0009 100644
+> --- a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
+> +++ b/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
+> @@ -28,6 +28,7 @@ MODULE_DESCRIPTION("DPIO Driver");
+>   
+>   struct dpio_priv {
+>   	struct dpaa2_io *io;
+> +	struct dpaa2_io_desc desc;
+>   };
+>   
+>   static irqreturn_t dpio_irq_handler(int irq_num, void *arg)
+> @@ -85,7 +86,6 @@ static int register_dpio_irq_handlers(struct fsl_mc_device *dpio_dev, int cpu)
+>   static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   {
+>   	struct dpio_attr dpio_attrs;
+> -	struct dpaa2_io_desc desc;
+>   	struct dpio_priv *priv;
+>   	int err = -ENOMEM;
+>   	struct device *dev = &dpio_dev->dev;
+> @@ -117,7 +117,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   		dev_err(dev, "dpio_get_attributes() failed %d\n", err);
+>   		goto err_get_attr;
+>   	}
+> -	desc.qman_version = dpio_attrs.qbman_version;
+> +	priv->desc.qman_version = dpio_attrs.qbman_version;
+>   
+>   	err = dpio_enable(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>   	if (err) {
+> @@ -126,9 +126,9 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   	}
+>   
+>   	/* initialize DPIO descriptor */
+> -	desc.receives_notifications = dpio_attrs.num_priorities ? 1 : 0;
+> -	desc.has_8prio = dpio_attrs.num_priorities == 8 ? 1 : 0;
+> -	desc.dpio_id = dpio_dev->obj_desc.id;
+> +	priv->desc.receives_notifications = dpio_attrs.num_priorities ? 1 : 0;
+> +	priv->desc.has_8prio = dpio_attrs.num_priorities == 8 ? 1 : 0;
+> +	priv->desc.dpio_id = dpio_dev->obj_desc.id;
+>   
+>   	/* get the cpu to use for the affinity hint */
+>   	if (next_cpu == -1)
+> @@ -139,19 +139,28 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   	if (!cpu_possible(next_cpu)) {
+>   		dev_err(dev, "probe failed. Number of DPIOs exceeds NR_CPUS.\n");
+>   		err = -ERANGE;
+> -		goto err_allocate_irqs;
+> +		goto err_too_many_cpu;
+>   	}
+> -	desc.cpu = next_cpu;
+> +	priv->desc.cpu = next_cpu;
+>   
+>   	/*
+>   	 * Set the CENA regs to be the cache inhibited area of the portal to
+>   	 * avoid coherency issues if a user migrates to another core.
+>   	 */
+> -	desc.regs_cena = memremap(dpio_dev->regions[1].start,
+> -				  resource_size(&dpio_dev->regions[1]),
+> -				  MEMREMAP_WC);
+> -	desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
+> -				 resource_size(&dpio_dev->regions[1]));
+> +	priv->desc.regs_cena = memremap(dpio_dev->regions[1].start,
+> +					resource_size(&dpio_dev->regions[1]),
+> +					MEMREMAP_WC);
 
-They got both Acked in v5, but the commit message was not updated:
-https://patchwork.kernel.org/patch/9973721/
-https://patchwork.kernel.org/patch/9973723/
+Since you already have some devres-managed resources in this driver, 
+maybe use devm_memremap? (and perhaps convert the existing ioremap too)
 
-Regards,
-Matthias
+> +	if (!priv->desc.regs_cena) {
+> +		dev_err(dev, "memremap failed\n");
+> +		goto err_too_many_cpu;
+> +	}
+> +
+> +	priv->desc.regs_cinh = ioremap(dpio_dev->regions[1].start,
+> +				       resource_size(&dpio_dev->regions[1]));
+> +	if (!priv->desc.regs_cinh) {
+> +		dev_err(dev, "ioremap failed\n");
+> +		goto err_ioremap_failed;
+> +	}
+>   
+>   	err = fsl_mc_allocate_irqs(dpio_dev);
+>   	if (err) {
+> @@ -159,11 +168,11 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   		goto err_allocate_irqs;
+>   	}
+>   
+> -	err = register_dpio_irq_handlers(dpio_dev, desc.cpu);
+> +	err = register_dpio_irq_handlers(dpio_dev, priv->desc.cpu);
+>   	if (err)
+>   		goto err_register_dpio_irq;
+>   
+> -	priv->io = dpaa2_io_create(&desc);
+> +	priv->io = dpaa2_io_create(&priv->desc);
+>   	if (!priv->io) {
+>   		dev_err(dev, "dpaa2_io_create failed\n");
+>   		goto err_dpaa2_io_create;
+> @@ -171,7 +180,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   
+>   	dev_info(dev, "probed\n");
+>   	dev_dbg(dev, "   receives_notifications = %d\n",
+> -		desc.receives_notifications);
+> +		priv->desc.receives_notifications);
+>   	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>   	fsl_mc_portal_free(dpio_dev->mc_io);
+>   
+> @@ -182,6 +191,10 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   err_register_dpio_irq:
+>   	fsl_mc_free_irqs(dpio_dev);
+>   err_allocate_irqs:
+> +	iounmap(priv->desc.regs_cinh);
+> +err_ioremap_failed:
+> +	memunmap(priv->desc.regs_cena);
+
+...then you wouldn't need to worry about this.
+
+> +err_too_many_cpu:
+>   	dpio_disable(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>   err_get_attr:
+>   	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+> @@ -189,6 +202,7 @@ static int dpaa2_dpio_probe(struct fsl_mc_device *dpio_dev)
+>   	fsl_mc_portal_free(dpio_dev->mc_io);
+>   err_mcportal:
+>   	dev_set_drvdata(dev, NULL);
+> +	devm_kfree(dev, priv);
+
+The whole point of devm_* is that you don't need to do this - the devres 
+entries are freed automatically by the driver core upon probe failure or 
+driver detach, i.e. priv was never leaking.
+
+>   err_priv_alloc:
+>   	return err;
+>   }
+> @@ -230,8 +244,13 @@ static int dpaa2_dpio_remove(struct fsl_mc_device *dpio_dev)
+>   
+>   	dpio_close(dpio_dev->mc_io, 0, dpio_dev->mc_handle);
+>   
+> +	iounmap(priv->desc.regs_cinh);
+> +	memunmap(priv->desc.regs_cena);
+> +
+>   	fsl_mc_portal_free(dpio_dev->mc_io);
+>   
+> +	devm_kfree(dev, priv);
+> +
+>   	dev_set_drvdata(dev, NULL);
+
+Note that clearing drvdata is something else the driver core already 
+does at about the same time as cleaning up devres entries (see 
+__device_release_driver() and the failure path of really_probe(), in 
+drivers/base/dd.c), so this has been similarly superfluous all along.
+
+Robin.
