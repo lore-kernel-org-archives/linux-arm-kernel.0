@@ -1,96 +1,83 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Mar 2018 10:11:31 +0200
-Subject: [linux-sunxi] Re: [PATCH 2/7] dt-bindings: add binding for the
- Allwinner A64 DE2 bus
-In-Reply-To: <9A6A8961-D45C-4033-962E-83CCE8F01651@aosc.io>
-References: <20180316175354.21437-1-icenowy@aosc.io>
- <20180320184646.dynqv6qubzabroe4@flea>
- <AAC74653-C6EB-4BE3-BB19-210687C1E158@aosc.io>
- <2866474.lRHIcLtROC@jernej-laptop>
- <9520BDDE-BFE3-4220-B48D-01A00CFA94DE@aosc.io>
- <20180326222258.uxpgj4bk4pg56b7o@rob-hp-laptop>
- <9A6A8961-D45C-4033-962E-83CCE8F01651@aosc.io>
-Message-ID: <20180327081131.hd652vkhohez2hcc@flea>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Mar 2018 10:16:52 +0200
+Subject: [PATCH v6] ARM: dts: wheat: Fix ADV7513 address usage
+In-Reply-To: <d2c5d935-da1f-038b-a0e6-ce390273e21a@ideasonboard.com>
+References: <1521754240-10470-1-git-send-email-kieran.bingham+renesas@ideasonboard.com>
+ <20180323085140.g3golwdtpezo7fhi@verge.net.au>
+ <a771042b-f63a-d00f-73a1-91a7e6089fe4@ideasonboard.com>
+ <20180326083143.r6jz6csckd4ljnpu@verge.net.au>
+ <d2c5d935-da1f-038b-a0e6-ce390273e21a@ideasonboard.com>
+Message-ID: <20180327081652.5v6wqwfjyb2kvimc@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 07:31:18AM +0800, Icenowy Zheng wrote:
+On Mon, Mar 26, 2018 at 10:04:24AM +0100, Kieran Bingham wrote:
+> Hi Simon,
 > 
+> On 26/03/18 09:31, Simon Horman wrote:
+> > On Fri, Mar 23, 2018 at 09:16:13PM +0000, Kieran Bingham wrote:
+> >> Hi Simon,
+> >>
+> >> On 23/03/18 08:51, Simon Horman wrote:
+> >>> On Thu, Mar 22, 2018 at 09:30:40PM +0000, Kieran Bingham wrote:
+> >>>> The r8a7792 Wheat board has two ADV7513 devices sharing a single I2C
+> >>>> bus, however in low power mode the ADV7513 will reset it's slave maps to
+> >>>> use the hardware defined default addresses.
+> >>>>
+> >>>> The ADV7511 driver was adapted to allow the two devices to be registered
+> >>>> correctly - but it did not take into account the fault whereby the
+> >>>> devices reset the addresses.
+> >>>>
+> >>>> This results in an address conflict between the device using the default
+> >>>> addresses, and the other device if it is in low-power-mode.
+> >>>>
+> >>>> Repair this issue by moving both devices away from the default address
+> >>>> definitions.
+> >>>
+> >>> Hi Kierean,
+> >>>
+> >>> as this is a fix
+> >>> a) Does it warrant a fixes tag?
+> >>>    Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
+> >>> b) Does it warrant being posted as a fix for v4.16;
+> >>> c) or v4.17?
+> >>
+> >> Tricky one, yes it could but this DTS fix, will only actually 'fix' the issue if
+> >> the corresponding driver updates to allow secondary addresses to be parsed are
+> >> also backported.
+> >>
+> >> It should be safe to back port the dts fix without the driver updates, but the
+> >> addresses specified by this patch will simply be ignored.
+> > 
+> > In that case I think its safe to add the fixes tag and take the DTS patch
+> > via the renesas tree. Perhaps applying it for v4.18 and allowing automatic
+> > backporting to take its course is the cleanest option.
+> > 
+> >> Thus if this is marked with the fixes tag the corresponding patch "drm: adv7511:
+> >> Add support for i2c_new_secondary_device" should also be marked.
+> >>
+> >> It looks like that patch has yet to be picked up by the DRM subsystem, so how
+> >> about I bundle both of these two patches together in a repost along with the
+> >> fixes tag.
+> >>
+> >> In fact, I don't think the ADV7511 dt-bindings update has made any progress
+> >> either. (dt-bindings: adv7511: Extend bindings to allow specifying slave map
+> >> addresses). The media tree variants for the adv7604 have already been picked up
+> >> by Mauro I believe though.
+> >>
+> >> I presume it would be acceptable for this dts patch (or rather all three patches
+> >> mentioned) to get integrated through the DRM tree ?
+> > 
+> > Unless there is a strong reason I would prefer the dts patch to go via
+> > my tree. The reason is to avoid merge conflicts bubbling up to Linus,
+> > which really is something best avoided.
 > 
-> ? 2018?3?27? GMT+08:00 ??6:22:58, Rob Herring <robh@kernel.org> ??:
-> >On Thu, Mar 22, 2018 at 02:08:43PM +0800, Icenowy Zheng wrote:
-> >> 
-> >> 
-> >> ? 2018?3?22? GMT+08:00 ??1:13:42, "Jernej ?krabec"
-> ><jernej.skrabec@siol.net> ??:
-> >> >Hi all,
-> >> >
-> >> >Dne sreda, 21. marec 2018 ob 03:18:13 CET je Icenowy Zheng
-> >napisal(a):
-> >> >> ? 2018?3?21? GMT+08:00 ??2:46:46, Maxime Ripard
-> >> ><maxime.ripard@bootlin.com> 
-> >> >??:
-> >> >> >On Sat, Mar 17, 2018 at 01:53:49AM +0800, Icenowy Zheng wrote:
-> >> >> >> All the sub-blocks of Allwinner A64 DE2 needs the SRAM C on A64
-> >> >SoC
-> >> >> >
-> >> >> >to
-> >> >> >
-> >> >> >> be claimed, otherwise the whole DE2 space is inaccessible.
-> >> >> >> 
-> >> >> >> Add a device tree binding of the DE2 part as a sub-bus.
-> >> >> >
-> >> >> >Where did you get the info that it was a bus?
-> >> >> 
-> >> >> There's no direct evidence, just some guess.
-> >> >> 
-> >> >> The DE2 is a whole part that is just allocated a memory
-> >> >> space at the user manual, and the SRAM controls the
-> >> >> access to all modules in the DE2.
-> >> >> 
-> >> >> So it might be a bus.
-> >> >> 
-> >> >> Implement it as a bus is a clear representation on A64.
-> >> >
-> >> >Since there is already syscon for same mmio region, we migh as well
-> >use
-> >> >it 
-> >> >when loading ccu-sun8i-de2 driver on A64.
-> >> >
-> >> >Other options, like SRAM driver or bus driver, might better
-> >represent
-> >> >HW, but 
-> >> 
-> >> I think the device tree should properly represent the HW,
-> >> it's a basic requirment.
-> >> 
-> >> >then we would have two DT nodes covering same mmio region, which I
-> >> >think is 
-> >> >not really acceptable.
-> >> 
-> >> It's acceptable, and DE2 is not the only user of SRAM controller so
-> >far.
-> >
-> >No, it's not acceptable. Don't create overlapping mmio regions in DT.
+> That's perfectly fine with me.
 > 
-> Then should the SRAM controller driver be configured to take the syscon?
+> Feel free to add:
+> 
+> Fixes: f6eea82a87db ("ARM: dts: wheat: add DU support")
+> 
+> as you suggested when you apply, or alternatively let me know if you need a repost.
 
-We could have a single DT node that would export a syscon yes, just
-like you did for the R40 ethernet case.
-
-I'm not sure the SRAM controller itself needs to take the syscon, it
-just can export its own.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180327/d40921bc/attachment-0001.sig>
+Thanks, applied for v4.18 with the fixes tag.
