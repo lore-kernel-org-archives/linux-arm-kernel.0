@@ -1,72 +1,115 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:51:47 +0100
-Subject: [PATCH 18/85] KVM: arm64: Move HCR_INT_OVERRIDE to default HCR_EL2
- guest flag
+Date: Wed, 28 Mar 2018 13:51:44 +0100
+Subject: [PATCH 15/85] KVM: arm/arm64: Move vcpu_load call after
+ kvm_vcpu_first_run_init
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-19-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shih-Wei Li <shihwei@cs.columbia.edu>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-We always set the IMO and FMO bits in the HCR_EL2 when running the
-guest, regardless if we use the vgic or not.  By moving these flags to
-HCR_GUEST_FLAGS we can avoid one of the extra save/restore operations of
-HCR_EL2 in the world switch code, and we can also soon get rid of the
-other one.
+Moving the call to vcpu_load() in kvm_arch_vcpu_ioctl_run() to after
+we've called kvm_vcpu_first_run_init() simplifies some of the vgic and
+there is also no need to do vcpu_load() for things such as handling the
+immediate_exit flag.
 
-This is safe, because even though the IMO and FMO bits control both
-taking the interrupts to EL2 and remapping ICC_*_EL1 to ICV_*_EL1 when
-executed at EL1, as long as we ensure that these bits are clear when
-running the EL1 host, we're OK, because we reset the HCR_EL2 to only
-have the HCR_RW bit set when returning to EL1 on non-VHE systems.
-
+Reviewed-by: Julien Grall <julien.grall@arm.com>
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h | 4 ++--
- arch/arm64/kvm/hyp/switch.c      | 3 ---
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ virt/kvm/arm/arch_timer.c     |  4 ----
+ virt/kvm/arm/arm.c            | 22 ++++++++--------------
+ virt/kvm/arm/vgic/vgic-init.c | 11 -----------
+ 3 files changed, 8 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 1b438c334463..6dd285e979c9 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -83,9 +83,9 @@
-  */
- #define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWE | HCR_TWI | HCR_VM | \
- 			 HCR_TVM | HCR_BSU_IS | HCR_FB | HCR_TAC | \
--			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | HCR_TLOR)
-+			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | HCR_TLOR | \
-+			 HCR_FMO | HCR_IMO)
- #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
--#define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
- #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 86eca32474cc..7dd8d9677dc5 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -842,11 +842,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 		return ret;
  
- /* TCR_EL2 Registers bits */
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 579d9a263853..4117717548b0 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -174,8 +174,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
- 		__vgic_v3_save_state(vcpu);
- 	else
- 		__vgic_v2_save_state(vcpu);
+ no_vgic:
+-	preempt_disable();
+ 	timer->enabled = 1;
+-	kvm_timer_vcpu_load(vcpu);
+-	preempt_enable();
 -
--	write_sysreg(read_sysreg(hcr_el2) & ~HCR_INT_OVERRIDE, hcr_el2);
+ 	return 0;
  }
  
- static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
-@@ -183,7 +181,6 @@ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
- 	u64 val;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 53572304843b..932e61858c55 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -632,27 +632,22 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
+ 		return -ENOEXEC;
  
- 	val = read_sysreg(hcr_el2);
--	val |= 	HCR_INT_OVERRIDE;
- 	val |= vcpu->arch.irq_lines;
- 	write_sysreg(val, hcr_el2);
+-	vcpu_load(vcpu);
+-
+ 	ret = kvm_vcpu_first_run_init(vcpu);
+ 	if (ret)
+-		goto out;
++		return ret;
  
+ 	if (run->exit_reason == KVM_EXIT_MMIO) {
+ 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
+ 		if (ret)
+-			goto out;
+-		if (kvm_arm_handle_step_debug(vcpu, vcpu->run)) {
+-			ret = 0;
+-			goto out;
+-		}
+-
++			return ret;
++		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
++			return 0;
+ 	}
+ 
+-	if (run->immediate_exit) {
+-		ret = -EINTR;
+-		goto out;
+-	}
++	if (run->immediate_exit)
++		return -EINTR;
++
++	vcpu_load(vcpu);
+ 
+ 	kvm_sigset_activate(vcpu);
+ 
+@@ -811,7 +806,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	kvm_sigset_deactivate(vcpu);
+ 
+-out:
+ 	vcpu_put(vcpu);
+ 	return ret;
+ }
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 743ca5cb05ef..3e8209a07585 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -302,17 +302,6 @@ int vgic_init(struct kvm *kvm)
+ 
+ 	dist->initialized = true;
+ 
+-	/*
+-	 * If we're initializing GICv2 on-demand when first running the VCPU
+-	 * then we need to load the VGIC state onto the CPU.  We can detect
+-	 * this easily by checking if we are in between vcpu_load and vcpu_put
+-	 * when we just initialized the VGIC.
+-	 */
+-	preempt_disable();
+-	vcpu = kvm_arm_get_running_vcpu();
+-	if (vcpu)
+-		kvm_vgic_load(vcpu);
+-	preempt_enable();
+ out:
+ 	return ret;
+ }
 -- 
 2.14.2
