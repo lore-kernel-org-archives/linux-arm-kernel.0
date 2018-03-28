@@ -1,67 +1,113 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 28 Mar 2018 10:30:01 +0200
-Subject: [PATCH 1/2][v7] dt-bindings: mtd-physmap: Add endianness supports
-In-Reply-To: <20180328054443.2829-1-prabhakar.kushwaha@nxp.com>
-References: <20180328054443.2829-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180328103001.6f4b16d9@bbrezillon>
+From: chenhc@lemote.com (Huacai Chen)
+Date: Wed, 28 Mar 2018 16:38:16 +0800
+Subject: [PATCH V4] ZBOOT: fix stack protector in compressed boot phase
+Message-ID: <1522226296-3091-1-git-send-email-chenhc@lemote.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Mar 2018 11:14:43 +0530
-Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
+Call __stack_chk_guard_setup() in decompress_kernel() is too late that
+stack checking always fails for decompress_kernel() itself. So remove
+__stack_chk_guard_setup() and initialize __stack_chk_guard before we
+call decompress_kernel().
 
-> Connection between flash and controller is not necessary to be always
-> of same type. It may varies from platform to platform.
-> 
-> Adding endianness (optional) property to provide connection type
-> information.
+Original code comes from ARM but also used for MIPS and SH, so fix them
+together. If without this fix, compressed booting of these archs will
+fail because stack checking is enabled by default (>=4.16).
 
-You forgot to adjust your commit message.
+V1 -> V2: Fix build on ARM.
+V2 -> V3: Fix build on SuperH.
+V3 -> V4: Initialize __stack_chk_guard in C code as a constant.
 
-If you're okay, I'll replace your message by:
+Cc: stable at vger.kernel.org
+Signed-off-by: Huacai Chen <chenhc@lemote.com>
+---
+ arch/arm/boot/compressed/head.S        | 4 ++++
+ arch/arm/boot/compressed/misc.c        | 7 -------
+ arch/mips/boot/compressed/decompress.c | 7 -------
+ arch/mips/boot/compressed/head.S       | 4 ++++
+ arch/sh/boot/compressed/head_32.S      | 8 ++++++++
+ arch/sh/boot/compressed/head_64.S      | 4 ++++
+ arch/sh/boot/compressed/misc.c         | 7 -------
+ 7 files changed, 20 insertions(+), 21 deletions(-)
 
-"
-Provides a way to specify the endianness to use when accessing a
-memory-mapped flash.
-"
-
-> 
-> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
-> Changes for v2: updated subject
-> Changes for v3: fixed typo for "big-endian"
-> Changes for v4: Moved binding definition in mtd-physmap.txt
-> as discussed at https://patchwork.ozlabs.org/patch/842543/
-> Changes for v5: Sending as it is
-> Changes for v6: Updated binding when endianness property is absent
-> Changes for v7: Updated binding details
-> 
->  Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> index 4a0a48bf4ecb..232fa12e90ef 100644
-> --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> @@ -41,6 +41,13 @@ additional (optional) property is defined:
->  
->   - erase-size : The chip's physical erase block size in bytes.
->  
-> + The device tree may optionally contain endianness property.
-> + little-endian or big-endian : It Represents the endianness that should be used
-> +                               by the controller to  properly read/write data
-> +			       from/to the flash. If this property is missing,
-> +			       the endianness is chosen by the system
-> +			       (potentially based on extra configuration options).
-> +
->  The device tree may optionally contain sub-nodes describing partitions of the
->  address space. See partition.txt for more detail.
->  
-
-
-
--- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 16a8a80..e8fe51f 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -128,12 +128,7 @@ asmlinkage void __div0(void)
+ 	error("Attempting division by 0!");
+ }
+ 
+-unsigned long __stack_chk_guard;
+-
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
++const unsigned long __stack_chk_guard = 0x000a0dff;
+ 
+ void __stack_chk_fail(void)
+ {
+@@ -150,8 +145,6 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
+ {
+ 	int ret;
+ 
+-	__stack_chk_guard_setup();
+-
+ 	output_data		= (unsigned char *)output_start;
+ 	free_mem_ptr		= free_mem_ptr_p;
+ 	free_mem_end_ptr	= free_mem_ptr_end_p;
+diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
+index fdf99e9..81df904 100644
+--- a/arch/mips/boot/compressed/decompress.c
++++ b/arch/mips/boot/compressed/decompress.c
+@@ -76,12 +76,7 @@ void error(char *x)
+ #include "../../../../lib/decompress_unxz.c"
+ #endif
+ 
+-unsigned long __stack_chk_guard;
+-
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
++const unsigned long __stack_chk_guard = 0x000a0dff;
+ 
+ void __stack_chk_fail(void)
+ {
+@@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
+ {
+ 	unsigned long zimage_start, zimage_size;
+ 
+-	__stack_chk_guard_setup();
+-
+ 	zimage_start = (unsigned long)(&__image_begin);
+ 	zimage_size = (unsigned long)(&__image_end) -
+ 	    (unsigned long)(&__image_begin);
+diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
+index 627ce8e..c15cac9 100644
+--- a/arch/sh/boot/compressed/misc.c
++++ b/arch/sh/boot/compressed/misc.c
+@@ -104,12 +104,7 @@ static void error(char *x)
+ 	while(1);	/* Halt */
+ }
+ 
+-unsigned long __stack_chk_guard;
+-
+-void __stack_chk_guard_setup(void)
+-{
+-	__stack_chk_guard = 0x000a0dff;
+-}
++const unsigned long __stack_chk_guard = 0x000a0dff;
+ 
+ void __stack_chk_fail(void)
+ {
+@@ -130,8 +125,6 @@ void decompress_kernel(void)
+ {
+ 	unsigned long output_addr;
+ 
+-	__stack_chk_guard_setup();
+-
+ #ifdef CONFIG_SUPERH64
+ 	output_addr = (CONFIG_MEMORY_START + 0x2000);
+ #else
