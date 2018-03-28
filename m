@@ -1,217 +1,93 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:26 +0100
-Subject: [PATCH 57/85] arm64: KVM: Dynamically patch the kernel/hyp VA mask
+Date: Wed, 28 Mar 2018 13:52:28 +0100
+Subject: [PATCH 59/85] KVM: arm/arm64: Do not use kern_hyp_va() with
+ kvm_vgic_global_state
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-58-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-60-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we're using a complicated sequence of alternatives to
-patch the kernel/hyp VA mask on non-VHE, and NOP out the
-masking altogether when on VHE.
+kvm_vgic_global_state is part of the read-only section, and is
+usually accessed using a PC-relative address generation (adrp + add).
 
-The newly introduced dynamic patching gives us the opportunity
-to simplify that code by patching a single instruction with
-the correct mask (instead of the mind bending cumulative masking
-we have at the moment) or even a single NOP on VHE. This also
-adds some initial code that will allow the patching callback
-to switch to a more complex patching.
+It is thus useless to use kern_hyp_va() on it, and actively problematic
+if kern_hyp_va() becomes non-idempotent. On the other hand, there is
+no way that the compiler is going to guarantee that such access is
+always PC relative.
+
+So let's bite the bullet and provide our own accessor.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 46 ++++++--------------
- arch/arm64/kvm/Makefile          |  2 +-
- arch/arm64/kvm/va_layout.c       | 91 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 105 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm64/kvm/va_layout.c
+ arch/arm/include/asm/kvm_mmu.h           |  7 +++++++
+ arch/arm64/include/asm/kvm_mmu.h         | 20 ++++++++++++++++++++
+ arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c |  2 +-
+ 3 files changed, 28 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index de1b919404e4..93395b7c2322 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -28,6 +28,13 @@
+  */
+ #define kern_hyp_va(kva)	(kva)
+ 
++/* Contrary to arm64, there is no need to generate a PC-relative address */
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr = &(s);					\
++		addr;							\
++	})
++
+ /*
+  * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
+  */
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index cffa34e23718..0656c79d968f 100644
+index 0656c79d968f..021d3a8117a8 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -69,9 +69,6 @@
-  * mappings, and none of this applies in that case.
-  */
+@@ -110,6 +110,26 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
  
--#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
--#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
--
- #ifdef __ASSEMBLY__
+ #define kern_hyp_va(v) 	((typeof(v))(__kern_hyp_va((unsigned long)(v))))
  
- #include <asm/alternative.h>
-@@ -81,28 +78,15 @@
-  * Convert a kernel VA into a HYP VA.
-  * reg: VA to be converted.
-  *
-- * This generates the following sequences:
-- * - High mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		nop
-- * - Low mask:
-- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
-- *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
-- * - VHE:
-- *		nop
-- *		nop
-- *
-- * The "low mask" version works because the mask is a strict subset of
-- * the "high mask", hence performing the first mask for nothing.
-- * Should be completely invisible on any viable CPU.
-+ * The actual code generation takes place in kvm_update_va_mask, and
-+ * the instructions below are only there to reserve the space and
-+ * perform the register allocation (kvm_update_va_mask uses the
-+ * specific registers encoded in the instructions).
-  */
- .macro kern_hyp_va	reg
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
--	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
--alternative_else_nop_endif
--alternative_if ARM64_HYP_OFFSET_LOW
--	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
--alternative_else_nop_endif
-+alternative_cb kvm_update_va_mask
-+	and     \reg, \reg, #1
-+alternative_cb_end
- .endm
- 
- #else
-@@ -113,18 +97,14 @@ alternative_else_nop_endif
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- 
-+void kvm_update_va_mask(struct alt_instr *alt,
-+			__le32 *origptr, __le32 *updptr, int nr_inst);
-+
- static inline unsigned long __kern_hyp_va(unsigned long v)
- {
--	asm volatile(ALTERNATIVE("and %0, %0, %1",
--				 "nop",
--				 ARM64_HAS_VIRT_HOST_EXTN)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
--	asm volatile(ALTERNATIVE("nop",
--				 "and %0, %0, %1",
--				 ARM64_HYP_OFFSET_LOW)
--		     : "+r" (v)
--		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
-+	asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n",
-+				    kvm_update_va_mask)
-+		     : "+r" (v));
- 	return v;
- }
- 
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 87c4f7ae24de..93afff91cb7c 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -16,7 +16,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- 
--kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
-diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
-new file mode 100644
-index 000000000000..0d7bf8319894
---- /dev/null
-+++ b/arch/arm64/kvm/va_layout.c
-@@ -0,0 +1,91 @@
 +/*
-+ * Copyright (C) 2017 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ * Obtain the PC-relative address of a kernel symbol
++ * s: symbol
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * The goal of this macro is to return a symbol's address based on a
++ * PC-relative computation, as opposed to a loading the VA from a
++ * constant pool or something similar. This works well for HYP, as an
++ * absolute VA is guaranteed to be wrong. Only use this if trying to
++ * obtain the address of a symbol (i.e. not something you obtained by
++ * following a pointer).
 + */
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr;					\
++		asm("adrp	%0, %1\n"				\
++		    "add	%0, %0, :lo12:%1\n"			\
++		    : "=r" (addr) : "S" (&s));				\
++		addr;							\
++	})
 +
-+#include <linux/kvm_host.h>
-+#include <asm/alternative.h>
-+#include <asm/debug-monitors.h>
-+#include <asm/insn.h>
-+#include <asm/kvm_mmu.h>
-+
-+#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
-+#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
-+
-+static u64 va_mask;
-+
-+static void compute_layout(void)
-+{
-+	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
-+	unsigned long mask = HYP_PAGE_OFFSET_HIGH_MASK;
-+
-+	/*
-+	 * Activate the lower HYP offset only if the idmap doesn't
-+	 * clash with it,
-+	 */
-+	if (idmap_addr > HYP_PAGE_OFFSET_LOW_MASK)
-+		mask = HYP_PAGE_OFFSET_LOW_MASK;
-+
-+	va_mask = mask;
-+}
-+
-+static u32 compute_instruction(int n, u32 rd, u32 rn)
-+{
-+	u32 insn = AARCH64_BREAK_FAULT;
-+
-+	switch (n) {
-+	case 0:
-+		insn = aarch64_insn_gen_logical_immediate(AARCH64_INSN_LOGIC_AND,
-+							  AARCH64_INSN_VARIANT_64BIT,
-+							  rn, rd, va_mask);
-+		break;
-+	}
-+
-+	return insn;
-+}
-+
-+void __init kvm_update_va_mask(struct alt_instr *alt,
-+			       __le32 *origptr, __le32 *updptr, int nr_inst)
-+{
-+	int i;
-+
-+	/* We only expect a single instruction in the alternative sequence */
-+	BUG_ON(nr_inst != 1);
-+
-+	if (!has_vhe() && !va_mask)
-+		compute_layout();
-+
-+	for (i = 0; i < nr_inst; i++) {
-+		u32 rd, rn, insn, oinsn;
-+
-+		/*
-+		 * VHE doesn't need any address translation, let's NOP
-+		 * everything.
-+		 */
-+		if (has_vhe()) {
-+			updptr[i] = cpu_to_le32(aarch64_insn_gen_nop());
-+			continue;
-+		}
-+
-+		oinsn = le32_to_cpu(origptr[i]);
-+		rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD, oinsn);
-+		rn = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RN, oinsn);
-+
-+		insn = compute_instruction(i, rd, rn);
-+		BUG_ON(insn == AARCH64_BREAK_FAULT);
-+
-+		updptr[i] = cpu_to_le32(insn);
-+	}
-+}
+ /*
+  * We currently only support a 40bit IPA.
+  */
+diff --git a/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+index 97f357ea9c72..10eb2e96b3e6 100644
+--- a/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
++++ b/arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
+@@ -60,7 +60,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		return -1;
+ 
+ 	rd = kvm_vcpu_dabt_get_rd(vcpu);
+-	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
++	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
+ 	addr += fault_ipa - vgic->vgic_cpu_base;
+ 
+ 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
 -- 
 2.14.2
