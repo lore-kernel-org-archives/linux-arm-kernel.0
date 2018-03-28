@@ -1,56 +1,65 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 28 Mar 2018 05:00:03 -0700
-Subject: [PATCH v2 2/2] arm64: uaccess: Fix omissions from usercopy
- whitelist
-In-Reply-To: <1522230649-22008-3-git-send-email-Dave.Martin@arm.com>
-References: <1522230649-22008-1-git-send-email-Dave.Martin@arm.com>
- <1522230649-22008-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAGXu5j+MLqg+GgTuMneYVxScXyvsCJeNczcv_a2t8pen2h0-nA@mail.gmail.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Wed, 28 Mar 2018 17:40:26 +0530
+Subject: [PATCH v6 0/4] Fix issues with huge mapping in ioremap for ARM64
+In-Reply-To: <1522234731-27397-1-git-send-email-cpandya@codeaurora.org>
+References: <1522234731-27397-1-git-send-email-cpandya@codeaurora.org>
+Message-ID: <f0b3057e-dc8c-d0ef-cffb-87b0f01c80aa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 2:50 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> When the hardend usercopy support was added for arm64, it was
-> concluded that all cases of usercopy into and out of thread_struct
-> were statically sized and so didn't require explicit whitelisting
-> of the appropriate fields in thread_struct.
->
-> Testing with usercopy hardening enabled has revealed that this is
-> not the case for certain ptrace regset manipulation calls on arm64.
-> This occurs because the sizes of usercopies associated with the
-> regset API are dynamic by construction, and because arm64 does not
-> always stage such copies via the stack: indeed the regset API is
-> designed to avoid the need for that by adding some bounds checking.
->
-> This is currently believed to affect only the fpsimd and TLS
-> registers.
->
-> Because the whitelisted fields in thread_struct must be contiguous,
-> this patch groups them together in a nested struct.  It is also
-> necessary to be able to determine the location and size of that
-> struct, so rather than making the struct anonymous (which would
-> save on edits elsewhere) or adding an anonymous union containing
-> named and unnamed instances of the same struct (gross), this patch
-> gives the struct a name and makes the necessary edits to code that
-> references it (noisy but simple).
->
-> Care is needed to ensure that the new struct does not contain
-> padding (which the usercopy hardening would fail to protect).
->
-> For this reason, the presence of tp2_value is made unconditional,
-> since a padding field would be needed there in any case.  This pads
-> up to the 16-byte alignment required by struct user_fpsimd_state.
->
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Fixes: 9e8084d3f761 ("arm64: Implement thread_struct whitelist for hardened usercopy")
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+I goofed up in making a patch file so enumeration is wrong.
+I'll upload v7
 
-Acked-by: Kees Cook <keescook@chromium.org>
+On 3/28/2018 4:28 PM, Chintan Pandya wrote:
+> This series of patches are follow up work (and depends on)
+> Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
+> panic in ioremap huge pages".
+> 
+> This series of patches are tested on 4.9 kernel with Cortex-A75
+> based SoC.
+> 
+> These patches can also go into '-stable' branch (if accepted)
+> for 4.6 onwards.
+> 
+>  From V5->V6:
+>   - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
+>     "bool tlb_inv" based variance as it is not need now
+>   - Re-naming for consistency
+> 
+>  From V4->V5:
+>   - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+>     for kernel addresses
+> 
+>  From V3->V4:
+>   - Add header for 'addr' in x86 implementation
+>   - Re-order pmd/pud clear and table free
+>   - Avoid redundant TLB invalidatation in one perticular case
+> 
+>  From V2->V3:
+>   - Use the exisiting page table free interface to do arm64
+>     specific things
+> 
+>  From V1->V2:
+>   - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+>     Add interfaces to free unmapped page table"
+>   - Honored BBM for ARM64
+> 
+> Chintan Pandya (4):
+>    ioremap: Update pgtable free interfaces with addr
+>    arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+>    arm64: Implement page table free interfaces
+>    Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+> 
+>   arch/arm64/include/asm/tlbflush.h |  6 ++++++
+>   arch/arm64/mm/mmu.c               | 37 +++++++++++++++++++++++++------------
+>   arch/x86/mm/pgtable.c             |  6 ++++--
+>   include/asm-generic/pgtable.h     |  8 ++++----
+>   lib/ioremap.c                     |  4 ++--
+>   5 files changed, 41 insertions(+), 20 deletions(-)
+> 
 
-Awesome! :)
-
--Kees
-
+Chintan
 -- 
-Kees Cook
-Pixel Security
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
