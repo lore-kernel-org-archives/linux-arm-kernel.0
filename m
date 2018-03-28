@@ -1,321 +1,199 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:21 +0100
-Subject: [PATCH 52/85] KVM: arm/arm64: Move VGIC APR save/restore to vgic
- put/load
+Date: Wed, 28 Mar 2018 13:52:25 +0100
+Subject: [PATCH 56/85] arm64: insn: Add encoder for bitwise operations using
+ literals
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-53-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-57-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+We lack a way to encode operations such as AND, ORR, EOR that take
+an immediate value. Doing so is quite involved, and is all about
+reverse engineering the decoding algorithm described in the
+pseudocode function DecodeBitMasks().
 
-The APRs can only have bits set when the guest acknowledges an interrupt
-in the LR and can only have a bit cleared when the guest EOIs an
-interrupt in the LR.  Therefore, if we have no LRs with any
-pending/active interrupts, the APR cannot change value and there is no
-need to clear it on every exit from the VM (hint: it will have already
-been cleared when we exited the guest the last time with the LRs all
-EOIed).
+This has been tested by feeding it all the possible literal values
+and comparing the output with that of GAS.
 
-The only case we need to take care of is when we migrate the VCPU away
-from a CPU or migrate a new VCPU onto a CPU, or when we return to
-userspace to capture the state of the VCPU for migration.  To make sure
-this works, factor out the APR save/restore functionality into separate
-functions called from the VCPU (and by extension VGIC) put/load hooks.
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_hyp.h   |   2 +
- arch/arm64/include/asm/kvm_hyp.h |   2 +
- virt/kvm/arm/hyp/vgic-v3-sr.c    | 124 +++++++++++++++++++++------------------
- virt/kvm/arm/vgic/vgic-v2.c      |   7 +--
- virt/kvm/arm/vgic/vgic-v3.c      |   5 ++
- 5 files changed, 78 insertions(+), 62 deletions(-)
+ arch/arm64/include/asm/insn.h |   9 +++
+ arch/arm64/kernel/insn.c      | 136 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 145 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index 1ab8329e9ff7..530a3c1cfe6f 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -110,6 +110,8 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
- 
- void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
-+void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
-+void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
- 
- asmlinkage void __vfp_save_state(struct vfp_hard_struct *vfp);
- asmlinkage void __vfp_restore_state(struct vfp_hard_struct *vfp);
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index febe417b8b4e..6f3929b2fcf7 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -124,6 +124,8 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
- 
- void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
-+void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
-+void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
- int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
- 
- void __timer_enable_traps(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 9abf2f3c12b5..437d7af08683 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -21,6 +21,7 @@
- 
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
-+#include <asm/kvm_mmu.h>
- 
- #define vtr_to_max_lr_idx(v)		((v) & 0xf)
- #define vtr_to_nr_pre_bits(v)		((((u32)(v) >> 26) & 7) + 1)
-@@ -221,14 +222,11 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 
- 	if (used_lrs) {
- 		int i;
--		u32 nr_pre_bits;
- 		u32 elrsr;
- 
- 		elrsr = read_gicreg(ICH_ELSR_EL2);
- 
- 		write_gicreg(0, ICH_HCR_EL2);
--		val = read_gicreg(ICH_VTR_EL2);
--		nr_pre_bits = vtr_to_nr_pre_bits(val);
- 
- 		for (i = 0; i < used_lrs; i++) {
- 			if (elrsr & (1 << i))
-@@ -238,39 +236,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 
- 			__gic_v3_set_lr(0, i);
- 		}
--
--		switch (nr_pre_bits) {
--		case 7:
--			cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
--			cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
--		case 6:
--			cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
--		default:
--			cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
--		}
--
--		switch (nr_pre_bits) {
--		case 7:
--			cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
--			cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
--		case 6:
--			cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
--		default:
--			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
--		}
- 	} else {
- 		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
- 		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(0, ICH_HCR_EL2);
--
--		cpu_if->vgic_ap0r[0] = 0;
--		cpu_if->vgic_ap0r[1] = 0;
--		cpu_if->vgic_ap0r[2] = 0;
--		cpu_if->vgic_ap0r[3] = 0;
--		cpu_if->vgic_ap1r[0] = 0;
--		cpu_if->vgic_ap1r[1] = 0;
--		cpu_if->vgic_ap1r[2] = 0;
--		cpu_if->vgic_ap1r[3] = 0;
- 	}
- 
- 	val = read_gicreg(ICC_SRE_EL2);
-@@ -287,8 +256,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
- 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
--	u64 val;
--	u32 nr_pre_bits;
- 	int i;
- 
- 	/*
-@@ -306,32 +273,9 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
- 	}
- 
--	val = read_gicreg(ICH_VTR_EL2);
--	nr_pre_bits = vtr_to_nr_pre_bits(val);
--
- 	if (used_lrs) {
- 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 
--		switch (nr_pre_bits) {
--		case 7:
--			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
--			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
--		case 6:
--			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
--		default:
--			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
--		}
--
--		switch (nr_pre_bits) {
--		case 7:
--			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
--			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
--		case 6:
--			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
--		default:
--			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
--		}
--
- 		for (i = 0; i < used_lrs; i++)
- 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
- 	} else {
-@@ -364,6 +308,72 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		     ICC_SRE_EL2);
- }
- 
-+void __hyp_text __vgic_v3_save_aprs(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 21fffdd290a3..815b35bc53ed 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -315,6 +315,10 @@ __AARCH64_INSN_FUNCS(eor,	0x7F200000, 0x4A000000)
+ __AARCH64_INSN_FUNCS(eon,	0x7F200000, 0x4A200000)
+ __AARCH64_INSN_FUNCS(ands,	0x7F200000, 0x6A000000)
+ __AARCH64_INSN_FUNCS(bics,	0x7F200000, 0x6A200000)
++__AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
++__AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
++__AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
++__AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
+ __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+ __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+ __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
+@@ -424,6 +428,11 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
+ 					 int shift,
+ 					 enum aarch64_insn_variant variant,
+ 					 enum aarch64_insn_logic_type type);
++u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
++				       enum aarch64_insn_variant variant,
++				       enum aarch64_insn_register Rn,
++				       enum aarch64_insn_register Rd,
++				       u64 imm);
+ u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
+ 			      enum aarch64_insn_prfm_type type,
+ 			      enum aarch64_insn_prfm_target target,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 7e432662d454..e87d6dcd7c82 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -1485,3 +1485,139 @@ pstate_check_t * const aarch32_opcode_cond_checks[16] = {
+ 	__check_hi, __check_ls, __check_ge, __check_lt,
+ 	__check_gt, __check_le, __check_al, __check_al
+ };
++
++static bool range_of_ones(u64 val)
 +{
-+	struct vgic_v3_cpu_if *cpu_if;
-+	u64 val;
-+	u32 nr_pre_bits;
++	/* Doesn't handle full ones or full zeroes */
++	u64 sval = val >> __ffs64(val);
 +
-+	vcpu = kern_hyp_va(vcpu);
-+	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	val = read_gicreg(ICH_VTR_EL2);
-+	nr_pre_bits = vtr_to_nr_pre_bits(val);
-+
-+	switch (nr_pre_bits) {
-+	case 7:
-+		cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
-+		cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
-+	case 6:
-+		cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
-+	default:
-+		cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
-+	}
-+
-+	switch (nr_pre_bits) {
-+	case 7:
-+		cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
-+		cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
-+	case 6:
-+		cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
-+	default:
-+		cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
-+	}
++	/* One of Sean Eron Anderson's bithack tricks */
++	return ((sval + 1) & (sval)) == 0;
 +}
 +
-+void __hyp_text __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu)
++static u32 aarch64_encode_immediate(u64 imm,
++				    enum aarch64_insn_variant variant,
++				    u32 insn)
 +{
-+	struct vgic_v3_cpu_if *cpu_if;
-+	u64 val;
-+	u32 nr_pre_bits;
++	unsigned int immr, imms, n, ones, ror, esz, tmp;
++	u64 mask = ~0UL;
 +
-+	vcpu = kern_hyp_va(vcpu);
-+	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
++	/* Can't encode full zeroes or full ones */
++	if (!imm || !~imm)
++		return AARCH64_BREAK_FAULT;
 +
-+	val = read_gicreg(ICH_VTR_EL2);
-+	nr_pre_bits = vtr_to_nr_pre_bits(val);
-+
-+	switch (nr_pre_bits) {
-+	case 7:
-+		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
-+		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
-+	case 6:
-+		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
++	switch (variant) {
++	case AARCH64_INSN_VARIANT_32BIT:
++		if (upper_32_bits(imm))
++			return AARCH64_BREAK_FAULT;
++		esz = 32;
++		break;
++	case AARCH64_INSN_VARIANT_64BIT:
++		insn |= AARCH64_INSN_SF_BIT;
++		esz = 64;
++		break;
 +	default:
-+		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
++		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
++		return AARCH64_BREAK_FAULT;
 +	}
 +
-+	switch (nr_pre_bits) {
-+	case 7:
-+		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
-+		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
-+	case 6:
-+		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
-+	default:
-+		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
++	/*
++	 * Inverse of Replicate(). Try to spot a repeating pattern
++	 * with a pow2 stride.
++	 */
++	for (tmp = esz / 2; tmp >= 2; tmp /= 2) {
++		u64 emask = BIT(tmp) - 1;
++
++		if ((imm & emask) != ((imm >> tmp) & emask))
++			break;
++
++		esz = tmp;
++		mask = emask;
 +	}
++
++	/* N is only set if we're encoding a 64bit value */
++	n = esz == 64;
++
++	/* Trim imm to the element size */
++	imm &= mask;
++
++	/* That's how many ones we need to encode */
++	ones = hweight64(imm);
++
++	/*
++	 * imms is set to (ones - 1), prefixed with a string of ones
++	 * and a zero if they fit. Cap it to 6 bits.
++	 */
++	imms  = ones - 1;
++	imms |= 0xf << ffs(esz);
++	imms &= BIT(6) - 1;
++
++	/* Compute the rotation */
++	if (range_of_ones(imm)) {
++		/*
++		 * Pattern: 0..01..10..0
++		 *
++		 * Compute how many rotate we need to align it right
++		 */
++		ror = __ffs64(imm);
++	} else {
++		/*
++		 * Pattern: 0..01..10..01..1
++		 *
++		 * Fill the unused top bits with ones, and check if
++		 * the result is a valid immediate (all ones with a
++		 * contiguous ranges of zeroes).
++		 */
++		imm |= ~mask;
++		if (!range_of_ones(~imm))
++			return AARCH64_BREAK_FAULT;
++
++		/*
++		 * Compute the rotation to get a continuous set of
++		 * ones, with the first bit set@position 0
++		 */
++		ror = fls(~imm);
++	}
++
++	/*
++	 * immr is the number of bits we need to rotate back to the
++	 * original set of ones. Note that this is relative to the
++	 * element size...
++	 */
++	immr = (esz - ror) % esz;
++
++	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, n);
++	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_R, insn, immr);
++	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, imms);
 +}
 +
- void __hyp_text __vgic_v3_init_lrs(void)
- {
- 	int max_lr_idx = vtr_to_max_lr_idx(read_gicreg(ICH_VTR_EL2));
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 1e5f3eb6973d..ca7cfee9f353 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -446,7 +446,6 @@ void vgic_v2_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
- 	struct vgic_dist *vgic = &kvm->arch.vgic;
--	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
- 	void __iomem *base = vgic->vctrl_base;
- 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
- 
-@@ -454,11 +453,8 @@ void vgic_v2_save_state(struct kvm_vcpu *vcpu)
- 		return;
- 
- 	if (used_lrs) {
--		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
- 		save_lrs(vcpu, base);
- 		writel_relaxed(0, base + GICH_HCR);
--	} else {
--		cpu_if->vgic_apr = 0;
- 	}
- }
- 
-@@ -476,7 +472,6 @@ void vgic_v2_restore_state(struct kvm_vcpu *vcpu)
- 
- 	if (used_lrs) {
- 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
--		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
- 		for (i = 0; i < used_lrs; i++) {
- 			writel_relaxed(cpu_if->vgic_lr[i],
- 				       base + GICH_LR0 + (i * 4));
-@@ -490,6 +485,7 @@ void vgic_v2_load(struct kvm_vcpu *vcpu)
- 	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
- 
- 	writel_relaxed(cpu_if->vgic_vmcr, vgic->vctrl_base + GICH_VMCR);
-+	writel_relaxed(cpu_if->vgic_apr, vgic->vctrl_base + GICH_APR);
- }
- 
- void vgic_v2_put(struct kvm_vcpu *vcpu)
-@@ -498,4 +494,5 @@ void vgic_v2_put(struct kvm_vcpu *vcpu)
- 	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
- 
- 	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
-+	cpu_if->vgic_apr = readl_relaxed(vgic->vctrl_base + GICH_APR);
- }
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index b76e21f3e6bd..4bafcd1e6bb8 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -16,6 +16,7 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <kvm/arm_vgic.h>
-+#include <asm/kvm_hyp.h>
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_asm.h>
- 
-@@ -587,6 +588,8 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
- 	 */
- 	if (likely(cpu_if->vgic_sre))
- 		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
++u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
++				       enum aarch64_insn_variant variant,
++				       enum aarch64_insn_register Rn,
++				       enum aarch64_insn_register Rd,
++				       u64 imm)
++{
++	u32 insn;
 +
-+	kvm_call_hyp(__vgic_v3_restore_aprs, vcpu);
- }
- 
- void vgic_v3_put(struct kvm_vcpu *vcpu)
-@@ -595,4 +598,6 @@ void vgic_v3_put(struct kvm_vcpu *vcpu)
- 
- 	if (likely(cpu_if->vgic_sre))
- 		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
++	switch (type) {
++	case AARCH64_INSN_LOGIC_AND:
++		insn = aarch64_insn_get_and_imm_value();
++		break;
++	case AARCH64_INSN_LOGIC_ORR:
++		insn = aarch64_insn_get_orr_imm_value();
++		break;
++	case AARCH64_INSN_LOGIC_EOR:
++		insn = aarch64_insn_get_eor_imm_value();
++		break;
++	case AARCH64_INSN_LOGIC_AND_SETFLAGS:
++		insn = aarch64_insn_get_ands_imm_value();
++		break;
++	default:
++		pr_err("%s: unknown logical encoding %d\n", __func__, type);
++		return AARCH64_BREAK_FAULT;
++	}
 +
-+	kvm_call_hyp(__vgic_v3_save_aprs, vcpu);
- }
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
++	return aarch64_encode_immediate(imm, variant, insn);
++}
 -- 
 2.14.2
