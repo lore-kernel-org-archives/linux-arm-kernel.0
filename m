@@ -1,222 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:53 +0100
-Subject: [PATCH 84/85] Revert "arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for
- Falkor BP hardening"
-In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
-References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-85-marc.zyngier@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 28 Mar 2018 15:59:32 +0300
+Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
+In-Reply-To: <20180326145735.57ba306b@gandalf.local.home>
+References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
+ <20180325175004.28162-3-ynorov@caviumnetworks.com>
+ <20180326085313.GA4016@andrea>
+ <20180326145735.57ba306b@gandalf.local.home>
+Message-ID: <20180328125932.dhzwoxhext4h7hgh@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Creates far too many conflicts with arm64/for-next/core, to be
-resent post -rc1.
+On Mon, Mar 26, 2018 at 02:57:35PM -0400, Steven Rostedt wrote:
+> On Mon, 26 Mar 2018 10:53:13 +0200
+> Andrea Parri <andrea.parri@amarulasolutions.com> wrote:
+> 
+> > > --- a/kernel/smp.c
+> > > +++ b/kernel/smp.c
+> > > @@ -724,6 +724,30 @@ void kick_all_cpus_sync(void)
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
+> > >  
+> > > +/**
+> > > + * kick_active_cpus_sync - Force CPUs that are not in extended
+> > > + * quiescent state (idle or nohz_full userspace) sync by sending
+> > > + * IPI. Extended quiescent state CPUs will sync at the exit of
+> > > + * that state.
+> > > + */
+> > > +void kick_active_cpus_sync(void)
+> > > +{
+> > > +	int cpu;
+> > > +	struct cpumask kernel_cpus;
+> > > +
+> > > +	smp_mb();  
+> > 
+> > (A general remark only:)
+> > 
+> > checkpatch.pl should have warned about the fact that this barrier is
+> > missing an accompanying comment (which accesses are being "ordered",
+> > what is the pairing barrier, etc.).
+> 
+> He could have simply copied the comment above the smp_mb() for
+> kick_all_cpus_sync():
+> 
+> 	/* Make sure the change is visible before we kick the cpus */
+> 
+> The kick itself is pretty much a synchronization primitive.
+> 
+> That is, you make some changes and then you need all CPUs to see it,
+> and you call: kick_active_cpus_synch(), which is the barrier to make
+> sure you previous changes are seen on all CPUS before you proceed
+> further. Note, the matching barrier is implicit in the IPI itself.
+>
+>  -- Steve
 
-This reverts commit f9f5dc19509bbef6f5e675346f1a7d7b846bdb12.
+I know that I had to copy the comment from kick_all_cpus_sync(), but I
+don't like copy-pasting in general, and as Steven told, this smp_mb() is
+already inside synchronization routine, so we may hope that users of
+kick_*_cpus_sync() will explain better what for they need it...
+ 
+> 
+> > 
+> > Moreover if, as your reply above suggested, your patch is relying on
+> > "implicit barriers" (something I would not recommend) then even more
+> > so you should comment on these requirements.
+> > 
+> > This could: (a) force you to reason about the memory ordering stuff,
+> > (b) easy the task of reviewing and adopting your patch, (c) easy the
+> > task of preserving those requirements (as implementations changes).
+> > 
+> >   Andrea
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/cpucaps.h |  2 +-
- arch/arm64/include/asm/kvm_asm.h |  2 ++
- arch/arm64/kernel/bpi.S          |  8 ++++++
- arch/arm64/kernel/cpu_errata.c   | 55 ++++++++++++++++++++++++++--------------
- arch/arm64/kvm/hyp/entry.S       | 12 +++++++++
- arch/arm64/kvm/hyp/switch.c      | 10 ++++++++
- 6 files changed, 69 insertions(+), 20 deletions(-)
+I need v2 anyway, and I will add comments to address all questions in this
+thread.
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index c7dfe68fbcc7..d4cc54ed0656 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -43,7 +43,7 @@
- #define ARM64_SVE				22
- #define ARM64_UNMAP_KERNEL_AT_EL0		23
- #define ARM64_HARDEN_BRANCH_PREDICTOR		24
--/* #define ARM64_UNUSED_CAP_TO_BE_REMOVED	25 */
-+#define ARM64_HARDEN_BP_POST_GUEST_EXIT		25
- #define ARM64_HAS_RAS_EXTN			26
- 
- #define ARM64_NCAPS				27
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index f6648a3e4152..d53d40704416 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -71,6 +71,8 @@ extern u32 __kvm_get_mdcr_el2(void);
- 
- extern u32 __init_stage2_translation(void);
- 
-+extern void __qcom_hyp_sanitize_btac_predictors(void);
-+
- #else /* __ASSEMBLY__ */
- 
- .macro get_host_ctxt reg, tmp
-diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index 9404f6aecda7..bb0b67722e86 100644
---- a/arch/arm64/kernel/bpi.S
-+++ b/arch/arm64/kernel/bpi.S
-@@ -74,6 +74,14 @@ ENTRY(__bp_harden_hyp_vecs_end)
- 
- 	.popsection
- 
-+ENTRY(__qcom_hyp_sanitize_link_stack_start)
-+	stp     x29, x30, [sp, #-16]!
-+	.rept	16
-+	bl	. + 4
-+	.endr
-+	ldp	x29, x30, [sp], #16
-+ENTRY(__qcom_hyp_sanitize_link_stack_end)
-+
- .macro smccc_workaround_1 inst
- 	sub	sp, sp, #(8 * 4)
- 	stp	x2, x3, [sp, #(8 * 0)]
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index caa73af7d26e..aacdc118c4c9 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -69,6 +69,8 @@ atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
- DEFINE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
- 
- #ifdef CONFIG_KVM
-+extern char __qcom_hyp_sanitize_link_stack_start[];
-+extern char __qcom_hyp_sanitize_link_stack_end[];
- extern char __smccc_workaround_1_smc_start[];
- extern char __smccc_workaround_1_smc_end[];
- extern char __smccc_workaround_1_hvc_start[];
-@@ -112,6 +114,8 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	spin_unlock(&bp_lock);
- }
- #else
-+#define __qcom_hyp_sanitize_link_stack_start	NULL
-+#define __qcom_hyp_sanitize_link_stack_end	NULL
- #define __smccc_workaround_1_smc_start		NULL
- #define __smccc_workaround_1_smc_end		NULL
- #define __smccc_workaround_1_hvc_start		NULL
-@@ -156,25 +160,12 @@ static void call_hvc_arch_workaround_1(void)
- 	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
- }
- 
--static void qcom_link_stack_sanitization(void)
--{
--	u64 tmp;
--
--	asm volatile("mov	%0, x30		\n"
--		     ".rept	16		\n"
--		     "bl	. + 4		\n"
--		     ".endr			\n"
--		     "mov	x30, %0		\n"
--		     : "=&r" (tmp));
--}
--
- static int enable_smccc_arch_workaround_1(void *data)
- {
- 	const struct arm64_cpu_capabilities *entry = data;
- 	bp_hardening_cb_t cb;
- 	void *smccc_start, *smccc_end;
- 	struct arm_smccc_res res;
--	u32 midr = read_cpuid_id();
- 
- 	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
- 		return 0;
-@@ -207,15 +198,33 @@ static int enable_smccc_arch_workaround_1(void *data)
- 		return 0;
- 	}
- 
--	if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
--	    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1))
--		cb = qcom_link_stack_sanitization;
--
- 	install_bp_hardening_cb(entry, cb, smccc_start, smccc_end);
- 
- 	return 0;
- }
- 
-+static void qcom_link_stack_sanitization(void)
-+{
-+	u64 tmp;
-+
-+	asm volatile("mov	%0, x30		\n"
-+		     ".rept	16		\n"
-+		     "bl	. + 4		\n"
-+		     ".endr			\n"
-+		     "mov	x30, %0		\n"
-+		     : "=&r" (tmp));
-+}
-+
-+static int qcom_enable_link_stack_sanitization(void *data)
-+{
-+	const struct arm64_cpu_capabilities *entry = data;
-+
-+	install_bp_hardening_cb(entry, qcom_link_stack_sanitization,
-+				__qcom_hyp_sanitize_link_stack_start,
-+				__qcom_hyp_sanitize_link_stack_end);
-+
-+	return 0;
-+}
- #endif	/* CONFIG_HARDEN_BRANCH_PREDICTOR */
- 
- #define MIDR_RANGE(model, min, max) \
-@@ -390,12 +399,20 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
--		.enable = enable_smccc_arch_workaround_1,
-+		.enable = qcom_enable_link_stack_sanitization,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
- 		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
--		.enable = enable_smccc_arch_workaround_1,
-+		.enable = qcom_enable_link_stack_sanitization,
-+	},
-+	{
-+		.capability = ARM64_HARDEN_BP_POST_GUEST_EXIT,
-+		MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR),
- 	},
- 	{
- 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index e41a161d313a..1f458f7c3b44 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -209,3 +209,15 @@ alternative_endif
- 
- 	eret
- ENDPROC(__fpsimd_guest_restore)
-+
-+ENTRY(__qcom_hyp_sanitize_btac_predictors)
-+	/**
-+	 * Call SMC64 with Silicon provider serviceID 23<<8 (0xc2001700)
-+	 * 0xC2000000-0xC200FFFF: assigned to SiP Service Calls
-+	 * b15-b0: contains SiP functionID
-+	 */
-+	movz    x0, #0x1700
-+	movk    x0, #0xc200, lsl #16
-+	smc     #0
-+	ret
-+ENDPROC(__qcom_hyp_sanitize_btac_predictors)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index d9645236e474..07b572173265 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -472,6 +472,16 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 		/* And we're baaack! */
- 	} while (fixup_guest_exit(vcpu, &exit_code));
- 
-+	if (cpus_have_const_cap(ARM64_HARDEN_BP_POST_GUEST_EXIT)) {
-+		u32 midr = read_cpuid_id();
-+
-+		/* Apply BTAC predictors mitigation to all Falkor chips */
-+		if (((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR) ||
-+		    ((midr & MIDR_CPU_MODEL_MASK) == MIDR_QCOM_FALKOR_V1)) {
-+			__qcom_hyp_sanitize_btac_predictors();
-+		}
-+	}
-+
- 	fp_enabled = __fpsimd_enabled_nvhe();
- 
- 	__sysreg_save_state_nvhe(guest_ctxt);
--- 
-2.14.2
+I also hope that we'll agree that for powerpc it's also safe to delay
+synchronization, and if so, we will have no users of kick_all_cpus_sync(),
+and can drop it.
+
+(It looks like this, because nohz_full userspace CPU cannot have pending
+IPIs, but I'd like to get confirmation from powerpc people.)
+
+Would it make sense to rename kick_all_cpus_sync() to smp_mb_sync(), which
+would stand for 'synchronous memory barrier on all online CPUs'?
+
+Yury
