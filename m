@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Mar 2018 17:16:38 +0200
-Subject: [GIT PULL RESEND 3/4] Rockchip dts32 changes for 4.17
-In-Reply-To: <11622789.b3QClBAtVJ@diego>
-References: <12470502.BUvxkRrZk8@phil> <11622789.b3QClBAtVJ@diego>
-Message-ID: <CAK8P3a3_jc2Px5iADy4xLmn9RXYu6czBodxogoOHpqGyLHz4Hw@mail.gmail.com>
+Date: Wed, 28 Mar 2018 17:17:24 +0200
+Subject: [GIT PULL RESEND 4/4] Rockchip dts64 changes for 4.17
+In-Reply-To: <3276217.5UkD8yNFGY@diego>
+References: <12470502.BUvxkRrZk8@phil> <3276217.5UkD8yNFGY@diego>
+Message-ID: <CAK8P3a1FDEcJov-O_fdP8r-6Q56pBb3b0T_-=P1HSeQXqF+R9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,23 +15,29 @@ On Wed, Mar 28, 2018 at 5:09 PM, Heiko Stuebner <heiko@sntech.de> wrote:
 > are available in the Git repository at:
 >
 >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/
-> v4.17-rockchip-dts32-1
+> v4.17-rockchip-dts64-1
 >
-> for you to fetch changes up to 8dc9b9720380a3c16969932151ba92b558110b2f:
+> for you to fetch changes up to 3783f1eb8a8db3747e753c4aa972124e1309db4e:
 >
->   ARM: dts: rockchip: enable USB-OTG port on Radxa Rock2 Square (2018-02-19
-> 06:53:35 +0100)
+>   arm64: dts: rockchip: remove keep-power-in-suspend from sdhci of rk3399-
+> sapphire (2018-03-13 13:01:03 +0100)
 >
 > ----------------------------------------------------------------
-> For general soc-specific changes the rk322x socs got their correct grf
-> compatible set. Other than that there are some board-specific changes
-> like the Rock2 getting its otg port, recovery and power keys enabled.
+> The rk3399 gained support its Cadence displayport controller and some
+> minor additions like pins for 2ch i2s0 and the cif test clocks as well
+> as a default rate for ACLK_VIO that should be 400MHz according to the TRM.
 >
-> The vyasa board gained an enabled emmc node and the phyCORE boards
-> got UHS speeds in their sd card and a fixed sd-card power supply.
+> The rk3328 got uart dmas fixed - a non-critical fix, as nobody was using
+> that so far.
 >
-> Finally the veyron boards dropped a nonstandard and unused property.
+> New boards are the rk3328-based roc-rk3328-cc, the rk3368-based Lion-SOM
+> + baseborad from Theobroma Systems and a standalone variant of the Sapphire
+> board, as a lot of people where using that without the Exkavator baseboard.
+>
+> Sapphire also saw a lot of small cleanups of things that are not part
+> of the actual Sapphire board, but the baseboard instead. The rk3399-puma
+> board got i2s and tsadc support and Gru got its DP node enabled.
 
 Pulled into next/dt, thanks!
 
-     Arnd
+        Arnd
