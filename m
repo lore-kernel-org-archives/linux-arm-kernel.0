@@ -1,21 +1,11 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 28 Mar 2018 17:08:35 +0200
-Subject: [GIT PULL RESEND 1/4] Rockchip driver changes for 4.17
-Message-ID: <11988780.dXTO0OjEMk@diego>
+Date: Wed, 28 Mar 2018 17:09:00 +0200
+Subject: [GIT PULL RESEND 3/4] Rockchip dts32 changes for 4.17
+In-Reply-To: <12470502.BUvxkRrZk8@phil>
+References: <12470502.BUvxkRrZk8@phil>
+Message-ID: <11622789.b3QClBAtVJ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Arnd, Kevin, Olof,
-
-please find below the main Rockchip-related changes for 4.17.
-The individual tags should explain things nicely but overall it's a pretty
-standard set of changes without anything special standing out.
-
-So if things look ok, please pull!
-
-Thanks
-Heiko
-
 
 The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 
@@ -24,31 +14,49 @@ The following changes since commit 7928b2cbe55b2a410a0f5c1f154610059c57b1b2:
 are available in the Git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/
-v4.17-rockchip-drivers-1
+v4.17-rockchip-dts32-1
 
-for you to fetch changes up to b1271993aa3855bda5073c6061a095fd6e6febc6:
+for you to fetch changes up to 8dc9b9720380a3c16969932151ba92b558110b2f:
 
-  soc: rockchip: power-domain: Add a sanity check on pd->num_clks (2018-03-05 
-19:42:29 +0100)
-
-----------------------------------------------------------------
-Rockchip soc drivers containing conversion of the power-domain driver
-to use the clk-bulk APIs and two more socs to disable jtag-switching.
-On the plus-side the issue we see with that are _supposed_ to be fixed
-in hardware in upcoming socs, so maybe this can be the last of those.
+  ARM: dts: rockchip: enable USB-OTG port on Radxa Rock2 Square (2018-02-19 
+06:53:35 +0100)
 
 ----------------------------------------------------------------
-Jeffy Chen (2):
-      soc: rockchip: power-domain: use clk_bulk APIs
-      soc: rockchip: power-domain: Add a sanity check on pd->num_clks
+For general soc-specific changes the rk322x socs got their correct grf
+compatible set. Other than that there are some board-specific changes
+like the Rock2 getting its otg port, recovery and power keys enabled.
+
+The vyasa board gained an enabled emmc node and the phyCORE boards
+got UHS speeds in their sd card and a fixed sd-card power supply.
+
+Finally the veyron boards dropped a nonstandard and unused property.
+
+----------------------------------------------------------------
+Brian Norris (1):
+      ARM: dts: rockchip: drop veyron's nonstandard 'backlight-boot-off'
+
+Jagan Teki (1):
+      ARM: dts: rockchip: Add eMMC node for rk3288-vyasa
+
+John Keeping (3):
+      ARM: dts: rockchip: add power key for Rock2 Square
+      ARM: dts: rockchip: add recovery button for Rock2 Square
+      ARM: dts: rockchip: enable USB-OTG port on Radxa Rock2 Square
 
 Shawn Lin (1):
-      soc: rockchip: disable jtag switching for RK3228/RK3229 SoCs
+      ARM: dts: rockchip: add "rockchip,rk3228-grf" compatible for rk322x grf 
+node
 
-Xiao Yao (1):
-      soc: rockchip: disable jtag switching for RK3128 SoCs
+Wadim Egorov (2):
+      ARM: dts: rockchip: Fix supply node for card's power on phycore som
+      ARM: dts: rockchip: Support UHS mode for SD card on phyCORE-RK3288 RDK
 
- drivers/soc/rockchip/grf.c        | 28 ++++++++++++
- drivers/soc/rockchip/pm_domains.c | 95 ++++++++++++++++++
-+--------------------
- 2 files changed, 75 insertions(+), 48 deletions(-)
+ arch/arm/boot/dts/rk322x.dtsi                   |  2 +-
+ arch/arm/boot/dts/rk3288-phycore-rdk.dts        |  6 +++-
+ arch/arm/boot/dts/rk3288-phycore-som.dtsi       |  5 ++-
+ arch/arm/boot/dts/rk3288-rock2-som.dtsi         |  4 +++
+ arch/arm/boot/dts/rk3288-rock2-square.dts       | 41 ++++++++++++++++++++++++
++
+ arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi |  1 -
+ arch/arm/boot/dts/rk3288-vyasa.dts              | 11 +++++++
+ 7 files changed, 64 insertions(+), 6 deletions(-)
