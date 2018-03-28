@@ -1,124 +1,172 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:41 +0100
-Subject: [PATCH 72/85] arm64: KVM: Move stashing of x0/x1 into the vector code
- itself
+Date: Wed, 28 Mar 2018 13:52:45 +0100
+Subject: [PATCH 76/85] arm/arm64: KVM: Introduce EL2-specific executable
+ mappings
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-73-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-77-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All our useful entry points into the hypervisor are starting by
-saving x0 and x1 on the stack. Let's move those into the vectors
-by introducing macros that annotate whether a vector is valid or
-not, thus indicating whether we want to stash registers or not.
+Until now, all EL2 executable mappings were derived from their
+EL1 VA. Since we want to decouple the vectors mapping from
+the rest of the hypervisor, we need to be able to map some
+text somewhere else.
 
-The only drawback is that we now also stash registers for el2_error,
-but this should never happen, and we pop them back right at the
-start of the handling sequence.
+The "idmap" region (for lack of a better name) is ideally suited
+for this, as we have a huge range that hardly has anything in it.
+
+Let's extend the IO allocator to also deal with executable mappings,
+thus providing the required feature.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 56 ++++++++++++++++++++++++------------------
- 1 file changed, 32 insertions(+), 24 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  2 +
+ arch/arm64/include/asm/kvm_mmu.h |  2 +
+ virt/kvm/arm/mmu.c               | 80 +++++++++++++++++++++++++++++-----------
+ 3 files changed, 63 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 82fbc368f738..8359fed89098 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -55,7 +55,6 @@ ENTRY(__vhe_hyp_call)
- ENDPROC(__vhe_hyp_call)
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index b0b0cde77ca6..707a1f06dc5d 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -56,6 +56,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 			   void __iomem **kaddr,
+ 			   void __iomem **haddr);
++int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
++			     void **haddr);
+ void free_hyp_pgds(void);
  
- el1_sync:				// Guest trapped into EL2
--	stp	x0, x1, [sp, #-16]!
+ void stage2_unmap_vm(struct kvm *kvm);
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 65dc225d019c..eb04437d50fa 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -151,6 +151,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 			   void __iomem **kaddr,
+ 			   void __iomem **haddr);
++int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
++			     void **haddr);
+ void free_hyp_pgds(void);
  
- 	mrs	x0, esr_el2
- 	lsr	x0, x0, #ESR_ELx_EC_SHIFT
-@@ -136,18 +135,18 @@ alternative_else_nop_endif
- 	b	__guest_exit
+ void stage2_unmap_vm(struct kvm *kvm);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 394f41a65732..7f6a944db23d 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -734,30 +734,13 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
+ 	return 0;
+ }
  
- el1_irq:
--	stp     x0, x1, [sp, #-16]!
- 	get_vcpu_ptr	x1, x0
- 	mov	x0, #ARM_EXCEPTION_IRQ
- 	b	__guest_exit
+-/**
+- * create_hyp_io_mappings - Map IO into both kernel and HYP
+- * @phys_addr:	The physical start address which gets mapped
+- * @size:	Size of the region being mapped
+- * @kaddr:	Kernel VA for this mapping
+- * @haddr:	HYP VA for this mapping
+- */
+-int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+-			   void __iomem **kaddr,
+-			   void __iomem **haddr)
++static int __create_hyp_private_mapping(phys_addr_t phys_addr, size_t size,
++					unsigned long *haddr, pgprot_t prot)
+ {
+ 	pgd_t *pgd = hyp_pgd;
+ 	unsigned long base;
+ 	int ret = 0;
  
- el1_error:
--	stp     x0, x1, [sp, #-16]!
- 	get_vcpu_ptr	x1, x0
- 	mov	x0, #ARM_EXCEPTION_EL1_SERROR
- 	b	__guest_exit
+-	*kaddr = ioremap(phys_addr, size);
+-	if (!*kaddr)
+-		return -ENOMEM;
+-
+-	if (is_kernel_in_hyp_mode()) {
+-		*haddr = *kaddr;
+-		return 0;
+-	}
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
  
- el2_error:
-+	ldp	x0, x1, [sp], #16
-+
  	/*
- 	 * Only two possibilities:
- 	 * 1) Either we come from the exit path, having just unmasked
-@@ -198,32 +197,41 @@ ENDPROC(\label)
- 	invalid_vector	el2h_sync_invalid
- 	invalid_vector	el2h_irq_invalid
- 	invalid_vector	el2h_fiq_invalid
--	invalid_vector	el1_sync_invalid
--	invalid_vector	el1_irq_invalid
- 	invalid_vector	el1_fiq_invalid
+@@ -791,19 +774,74 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
  
- 	.ltorg
+ 	ret = __create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
+ 				    base, base + size,
+-				    __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
++				    __phys_to_pfn(phys_addr), prot);
+ 	if (ret)
+ 		goto out;
  
- 	.align 11
+-	*haddr = (void __iomem *)base + offset_in_page(phys_addr);
++	*haddr = base + offset_in_page(phys_addr);
  
-+.macro valid_vect target
-+	.align 7
-+	stp	x0, x1, [sp, #-16]!
-+	b	\target
-+.endm
+ out:
++	return ret;
++}
 +
-+.macro invalid_vect target
-+	.align 7
-+	b	\target
-+.endm
++/**
++ * create_hyp_io_mappings - Map IO into both kernel and HYP
++ * @phys_addr:	The physical start address which gets mapped
++ * @size:	Size of the region being mapped
++ * @kaddr:	Kernel VA for this mapping
++ * @haddr:	HYP VA for this mapping
++ */
++int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
++			   void __iomem **kaddr,
++			   void __iomem **haddr)
++{
++	unsigned long addr;
++	int ret;
 +
- ENTRY(__kvm_hyp_vector)
--	ventry	el2t_sync_invalid		// Synchronous EL2t
--	ventry	el2t_irq_invalid		// IRQ EL2t
--	ventry	el2t_fiq_invalid		// FIQ EL2t
--	ventry	el2t_error_invalid		// Error EL2t
--
--	ventry	el2h_sync_invalid		// Synchronous EL2h
--	ventry	el2h_irq_invalid		// IRQ EL2h
--	ventry	el2h_fiq_invalid		// FIQ EL2h
--	ventry	el2_error			// Error EL2h
--
--	ventry	el1_sync			// Synchronous 64-bit EL1
--	ventry	el1_irq				// IRQ 64-bit EL1
--	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
--	ventry	el1_error			// Error 64-bit EL1
--
--	ventry	el1_sync			// Synchronous 32-bit EL1
--	ventry	el1_irq				// IRQ 32-bit EL1
--	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
--	ventry	el1_error			// Error 32-bit EL1
-+	invalid_vect	el2t_sync_invalid	// Synchronous EL2t
-+	invalid_vect	el2t_irq_invalid	// IRQ EL2t
-+	invalid_vect	el2t_fiq_invalid	// FIQ EL2t
-+	invalid_vect	el2t_error_invalid	// Error EL2t
++	*kaddr = ioremap(phys_addr, size);
++	if (!*kaddr)
++		return -ENOMEM;
 +
-+	invalid_vect	el2h_sync_invalid	// Synchronous EL2h
-+	invalid_vect	el2h_irq_invalid	// IRQ EL2h
-+	invalid_vect	el2h_fiq_invalid	// FIQ EL2h
-+	valid_vect	el2_error		// Error EL2h
++	if (is_kernel_in_hyp_mode()) {
++		*haddr = *kaddr;
++		return 0;
++	}
 +
-+	valid_vect	el1_sync		// Synchronous 64-bit EL1
-+	valid_vect	el1_irq			// IRQ 64-bit EL1
-+	invalid_vect	el1_fiq_invalid		// FIQ 64-bit EL1
-+	valid_vect	el1_error		// Error 64-bit EL1
++	ret = __create_hyp_private_mapping(phys_addr, size,
++					   &addr, PAGE_HYP_DEVICE);
+ 	if (ret) {
+ 		iounmap(*kaddr);
+ 		*kaddr = NULL;
++		*haddr = NULL;
++		return ret;
++	}
 +
-+	valid_vect	el1_sync		// Synchronous 32-bit EL1
-+	valid_vect	el1_irq			// IRQ 32-bit EL1
-+	invalid_vect	el1_fiq_invalid		// FIQ 32-bit EL1
-+	valid_vect	el1_error		// Error 32-bit EL1
- ENDPROC(__kvm_hyp_vector)
++	*haddr = (void __iomem *)addr;
++	return 0;
++}
++
++/**
++ * create_hyp_exec_mappings - Map an executable range into HYP
++ * @phys_addr:	The physical start address which gets mapped
++ * @size:	Size of the region being mapped
++ * @haddr:	HYP VA for this mapping
++ */
++int create_hyp_exec_mappings(phys_addr_t phys_addr, size_t size,
++			     void **haddr)
++{
++	unsigned long addr;
++	int ret;
++
++	BUG_ON(is_kernel_in_hyp_mode());
++
++	ret = __create_hyp_private_mapping(phys_addr, size,
++					   &addr, PAGE_HYP_EXEC);
++	if (ret) {
++		*haddr = NULL;
+ 		return ret;
+ 	}
+ 
++	*haddr = (void *)addr;
+ 	return 0;
+ }
+ 
 -- 
 2.14.2
