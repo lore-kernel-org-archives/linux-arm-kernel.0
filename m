@@ -1,132 +1,81 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 28 Mar 2018 12:03:39 +0200
-Subject: [PATCH] drm/atmel-hlcdc: add command line option to specify
- preferred depth
-In-Reply-To: <20180328093454.4149fa3b@bbrezillon>
-References: <20180326073502.19259-1-peda@axentia.se>
- <20180328093454.4149fa3b@bbrezillon>
-Message-ID: <ce723d9f-6858-0bad-bffb-85ab036510ee@axentia.se>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Mar 2018 11:12:41 +0100
+Subject: [PATCH] arm64: avoid race condition issue in dump_backtrace
+In-Reply-To: <1522229612.26617.47.camel@mtksdccf07>
+References: <1521687960-3744-1-git-send-email-ji.zhang@mediatek.com>
+ <20180322055929.z25brvwlmdighz66@salmiak>
+ <1521711329.26617.31.camel@mtksdccf07>
+ <20180326113932.2i6qp3776jtmcqk4@lakrids.cambridge.arm.com>
+ <1522229612.26617.47.camel@mtksdccf07>
+Message-ID: <20180328101240.moo44g5qd3qjuxgn@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-28 09:34, Boris Brezillon wrote:
-> Hi Peter,
+On Wed, Mar 28, 2018 at 05:33:32PM +0800, Ji.Zhang wrote:
+> On Mon, 2018-03-26 at 12:39 +0100, Mark Rutland wrote:
+> > I think that it would be preferable to try to avoid the inifinite loop
+> > case. We could hit that by accident if we're tracing a live task.
+> > 
+> > It's a little tricky to ensure that we don't loop, since we can have
+> > traces that span several stacks, e.g. overflow -> irq -> task, so we
+> > need to know where the last frame was, and we need to defnie a strict
+> > order for stack nesting.
+> Can we consider this through an easier way? According to AArch64 PCS,
+> stack should be full-descending, which means we can add validation on fp
+> by comparing the fp and previous fp, if they are equal means there is an
+> exactly loop, while if current fp is smaller than previous means the
+> uwnind is rollback, which is also unexpected. The only concern is how to
+> handle the unwind from one stack span to another (eg. overflow->irq, or
+> irq->task, etc)
+> Below diff is a proposal that we check if stack spans, and if yes, a
+> tricky is used to bypass the fp check.
 > 
-> On Mon, 26 Mar 2018 09:35:02 +0200
-> Peter Rosin <peda@axentia.se> wrote:
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index eb2d151..760ea59 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -101,6 +101,7 @@ void dump_backtrace(struct pt_regs *regs, struct
+> task_struct *tsk)
+>  {
+>         struct stackframe frame;
+>         int skip;
+> +       unsigned long fp = 0x0;
 > 
->> I have an sama5d31-based system with 64MB of memory and a 1920x1080
->> LVDS display wired for 16-bpp. When I enable legacy fbdev support,
->> the contiguous memory allocator invariably fails with the order-11
->> allocation for a 1920x1080 at 24-bpp buffer (~6MB). But this HW can never
->> make any good use of RGB888, so that is a wasted attempt anyway that
->> would also waste precious memory should it succeed.
->>
->> Sure, I could rewrite user-space to go directly to KMS etc, and that
->> makes the (attempted) order-11 allocation go away, replacing it with
->> one order-10 allocation per application restart for a 1920x1080 at 16-bpp
->> buffer (<4MB). But after a few restarts, order-10 allocations start to
->> fail as well, which is only to be expected AFAIU.
->>
->> So, I'd rather not change user-space (which was originally written
->> to target a smaller display) so that I at the same time get the
->> benefit of an early pre-allocated fbdev frame-buffer that can be
->> reused over and over. But to do that I need to tell the driver that
->> 16-bpp is the preferred depth. Add a module parameter to do just that.
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++++++++++++-
->>  1 file changed, 17 insertions(+), 1 deletion(-)
->>
->> I found some inspiration regarding naming and implementation here:
->> https://patchwork.kernel.org/patch/9848631/
->>
->> I have found no feedback on that patch though, which makes me wonder if
->> I'm perhaps barking up the wronig tree?
+>         pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
 > 
-> Hm, isn't that something you can already overload with the video=
-> parameter?
-> 
-> 	video=<output>:<resolution>[-<bpp>]
+> @@ -127,6 +128,20 @@ void dump_backtrace(struct pt_regs *regs, struct
+> task_struct *tsk)
+>         skip = !!regs;
+>         printk("Call trace:\n");
+>         do {
+> +               unsigned long stack;
+> +               if (fp) {
+> +                       if (in_entry_text(frame.pc)) {
+> +                               stack = frame.fp - offsetof(struct
+> pt_regs, stackframe);
+> +
+> +                               if (on_accessible_stack(tsk, stack))
+> +                                       fp = frame.fp + 0x8; //tricky to
+> bypass the fp check
+> +                       }
+> +                       if (fp <= frame->fp) {
+> +                               pr_notice("fp invalid, stop unwind\n");
+> +                               break;
+> +                       }
+> +               }
+> +               fp = frame.fp;
 
-Heh, you are right...
+I'm very much not keen on this.
 
-> AFAIR, <bpp> encodes the color depth, so what is the benefit of adding
-> this new property to overload the default depth?
+I think that if we're going to do this, the only sane way to do it is to
+have unwind_frame() verify the current fp against the previous one, and
+verify that we have some strict nesting of stacks. Generally, that means
+we can go:
 
-...but hhhmmm, I think I will have to have to encode the display size
-in the bootargs so I will have to use distinct barebox environments
-depending on the panel, but that's no biggie.
+  overflow -> irq -> task
 
-Splendid, please throw away the patch!
+... though I'm not sure what to do about the SDEI stack vs the overflow
+stack.
 
-Cheers,
-Peter
-
-> Maybe I'm wrong and the default depth param is actually useful, but in
-> this case we should probably make it generic since other drivers seems
-> to need it too, and we might want to attach it to a specific display
-> engine instance.
-> 
-> Thanks,
-> 
-> Boris
-> 
->>
->> Cheers,
->> Peter
->>
->> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->> index c1ea5c36b006..f0148627c221 100644
->> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->> @@ -29,6 +29,11 @@
->>  
->>  #define ATMEL_HLCDC_LAYER_IRQS_OFFSET		8
->>  
->> +static int atmel_hlcdc_preferred_depth __read_mostly;
->> +
->> +MODULE_PARM_DESC(preferreddepth, "Set preferred bpp");
->> +module_param_named(preferreddepth, atmel_hlcdc_preferred_depth, int, 0400);
->> +
->>  static const struct atmel_hlcdc_layer_desc atmel_hlcdc_at91sam9n12_layers[] = {
->>  	{
->>  		.name = "base",
->> @@ -590,6 +595,7 @@ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
->>  	dev->mode_config.min_height = dc->desc->min_height;
->>  	dev->mode_config.max_width = dc->desc->max_width;
->>  	dev->mode_config.max_height = dc->desc->max_height;
->> +	dev->mode_config.preferred_depth = 24;
->>  	dev->mode_config.funcs = &mode_config_funcs;
->>  
->>  	return 0;
->> @@ -658,7 +664,7 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
->>  
->>  	platform_set_drvdata(pdev, dev);
->>  
->> -	drm_fb_cma_fbdev_init(dev, 24, 0);
->> +	drm_fb_cma_fbdev_init(dev, atmel_hlcdc_preferred_depth, 0);
->>  
->>  	drm_kms_helper_poll_init(dev);
->>  
->> @@ -756,6 +762,16 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
->>  	struct drm_device *ddev;
->>  	int ret;
->>  
->> +	switch (atmel_hlcdc_preferred_depth) {
->> +	case 0: /* driver default */
->> +	case 8:
->> +	case 16:
->> +	case 24:
->> +		break;
->> +	default:
->> +		return -EINVAL;
->> +	}
->> +
->>  	ddev = drm_dev_alloc(&atmel_hlcdc_dc_driver, &pdev->dev);
->>  	if (IS_ERR(ddev))
->>  		return PTR_ERR(ddev);
-> 
-> 
-> 
+Thanks,
+Mark.
