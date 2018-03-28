@@ -1,24 +1,24 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 28 Mar 2018 14:11:42 +0200
-Subject: [PATCHv2] pinctrl: samsung: add pin_dbg_show callback for debugfs
-In-Reply-To: <20180327135801.9556-1-parkch98@gmail.com>
-References: <20180327135801.9556-1-parkch98@gmail.com>
- <CGME20180328121148epcas2p2a498fce663d34c8c3caf38e15d6e68c3@epcas2p2.samsung.com>
-Message-ID: <61255506-cb75-3628-4ebb-7dec9d48219d@samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 28 Mar 2018 09:14:55 -0300
+Subject: [PATCH] clk: imx7d: Move clks_init_on before any clock operations
+In-Reply-To: <1522160607-7104-1-git-send-email-abel.vesa@nxp.com>
+References: <1522160607-7104-1-git-send-email-abel.vesa@nxp.com>
+Message-ID: <CAOMZO5A=Wg3KtESLchqQcjN6c-CBWF5Ca0nHpwSZfy4Fbd2f1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2018 03:58 PM, Chanho Park wrote:
-> This patch adds a samsung_pin_dbg_show function to implement the
-> pin_dbg_show callback function which can be used to show pin
-> confuration values. Basically, it can show pin setting values by
-> accessing the "pins" node like below:
-> 
-> $ cat pins
-> pin 0 (gpy7-0)  CON(0x0) DAT(0x1) PUD(0x1) DRV(0x0) CON_PDN(0x0) PUD_PDN(0x0)
-> 
-> Signed-off-by: Chanho Park <parkch98@gmail.com>
+Hi Abel,
 
-Thank you for the patch. On exynos5433-tm2
+On Tue, Mar 27, 2018 at 11:23 AM, Abel Vesa <abel.vesa@nxp.com> wrote:
+> From: Dong Aisheng <b29396@freescale.com>
+>
+> For init on clocks we should move it at the first place in imx7d_clocks_init()
+> before any clock operations, else the clock operation may fail in case the clock
+> is still not on.
 
-Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+The patch and the commit log does not match.
+
+You are not moving the code block to the "first place" inside
+imx7d_clocks_init(), so this is confusing.
+
+Also, why does this need to be done only in the imx7d clock driver?
