@@ -1,26 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Mar 2018 17:18:34 +0200
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for 4.17 (2nd)
-In-Reply-To: <CAK7LNAQWikF9K41uzkQjixUEO=_s14txEhvd=rmLY69JShezKg@mail.gmail.com>
-References: <CAK7LNAQWikF9K41uzkQjixUEO=_s14txEhvd=rmLY69JShezKg@mail.gmail.com>
-Message-ID: <CAK8P3a2db8WqWVQQtnFW+FtqLUSiEZqtUB79bNMw23g88iHixQ@mail.gmail.com>
+From: jhogan@kernel.org (James Hogan)
+Date: Wed, 28 Mar 2018 16:21:15 +0100
+Subject: [PATCH V4 Resend] ZBOOT: fix stack protector in compressed boot
+ phase
+In-Reply-To: <1522226933-29317-1-git-send-email-chenhc@lemote.com>
+References: <1522226933-29317-1-git-send-email-chenhc@lemote.com>
+Message-ID: <20180328152115.GB1991@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 6:31 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Hi Arnd, Olof,
->
-> Sorry for this very late pull request.
-> If possible, could you pull a little more for v4.17-rc1 ?
+On Wed, Mar 28, 2018 at 04:48:53PM +0800, Huacai Chen wrote:
+> diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
+> index fdf99e9..81df904 100644
+> --- a/arch/mips/boot/compressed/decompress.c
+> +++ b/arch/mips/boot/compressed/decompress.c
+> @@ -76,12 +76,7 @@ void error(char *x)
+>  #include "../../../../lib/decompress_unxz.c"
+>  #endif
+>  
+> -unsigned long __stack_chk_guard;
+> -
+> -void __stack_chk_guard_setup(void)
+> -{
+> -	__stack_chk_guard = 0x000a0dff;
+> -}
+> +const unsigned long __stack_chk_guard = 0x000a0dff;
+>  
+>  void __stack_chk_fail(void)
+>  {
+> @@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
+>  {
+>  	unsigned long zimage_start, zimage_size;
+>  
+> -	__stack_chk_guard_setup();
+> -
+>  	zimage_start = (unsigned long)(&__image_begin);
+>  	zimage_size = (unsigned long)(&__image_end) -
+>  	    (unsigned long)(&__image_begin);
 
-> ----------------------------------------------------------------
-> UniPhier ARM SoC DT updates for v4.17 (2nd)
->
-> - add syscon property to sound nodes
-> - add more ethernet pin groups
-> - add ethernet support for PXs3 SoC
+This looks good to me, though I've Cc'd Kees as apparently the original
+author from commit 8779657d29c0 ("stackprotector: Introduce
+CONFIG_CC_STACKPROTECTOR_STRONG") in case there was a particular reason
+this wasn't done in the first place.
 
-It all looks harmless, so no problem at all. Pulled into next/dt, thanks!
+Acked-by: James Hogan <jhogan@kernel.org>
 
-       Arnd
+(Happy to apply with acks from Kees and ARM, SH maintainers if nobody
+else does).
+
+Cheers
+James
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180328/f3633257/attachment.sig>
