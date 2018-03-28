@@ -1,250 +1,72 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 28 Mar 2018 12:17:34 -0700
-Subject: [PATCH v3 1/4] dt-bindings: mfd: Add Gateworks System Controller
- bindings
-In-Reply-To: <20180328162416.GB25325@roeck-us.net>
-References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
- <1522250043-8065-2-git-send-email-tharvey@gateworks.com>
- <20180328162416.GB25325@roeck-us.net>
-Message-ID: <CAJ+vNU2aUN4ME3+RA3DNPO75O6vPBcQpuRSfQJ4_Ns_zQAtCCQ@mail.gmail.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Wed, 28 Mar 2018 20:26:13 +0100
+Subject: [PATCH v2 5/8] ARM: shmobile: r8a77470: basic SoC support
+In-Reply-To: <1522265176-33226-1-git-send-email-biju.das@bp.renesas.com>
+References: <1522265176-33226-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1522265176-33226-6-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 9:24 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Wed, Mar 28, 2018 at 08:14:00AM -0700, Tim Harvey wrote:
->> This patch adds documentation of device-tree bindings for the
->> Gateworks System Controller (GSC).
->>
->> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
->> ---
->> v3:
->>  - replaced _ with -
->>  - remove input bindings
->>  - added full description of hwmon
->>  - fix unit address of hwmon child nodes
->>
->> ---
->>  .../devicetree/bindings/mfd/gateworks-gsc.txt      | 135 +++++++++++++++++++++
->>  1 file changed, 135 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
->> new file mode 100644
->> index 0000000..8f530ed
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
->> @@ -0,0 +1,135 @@
->> +Gateworks System Controller multi-function device
->> +
->> +The GSC is a Multifunction I2C slave device with the following submodules:
->> +- WDT
->> +- GPIO
->> +- Pushbutton controller
->> +- HWMON
->> +
->> +Required properties:
->> +- compatible : Must be "gw,gsc"
->> +- reg: I2C address of the device
->> +- interrupts: interrupt triggered by GSC_IRQ# signal
->> +- interrupt-parent: Interrupt controller GSC is connected to
->> +- #interrupt-cells: should be <1>, index of the interrupt within the
->> +  controller, in accordance with the "one cell" variant of
->> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
->> +
->> +Optional nodes:
->> +* watchdog:
->> +The GSC provides a Watchdog monitor which can power cycle the board's
->> +primary power supply on most board models when tripped.
->> +
->> +Required watchdog properties:
->> +- compatible: must be "gw,gsc-watchdog"
->> +
->> +* hwmon:
->> +The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
->> +temperature and/or voltage monitoring.
->> +
->> +Required hwmon properties:
->> +- compatible: must be "gw,gsc-hwmon"
->> +
->
-> "hwmon" is a very Linux specific term. It might make sense to find a more
-> generic term.
+Add minimal support for the RZ/G1C (R8A77470) SoC.
 
-The 'hwmon' driver supports child nodes that fall into the following category:
- - temperature sensor (GSC internal temperature sensor - i2c registers
-returns value in C*10)
- - voltage rails (two types here; cooked: i2c registers return
-pre-scaled value in mV), raw: i2c registers return a raw ADC value
-that must be scaled based on ADC internal ref voltage and resolution
-and adjusted for a voltage divider to convert to mV
- - fan setpoints (I'll explain these below)
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+---
+V1->V2:
+* No change
 
-I called the node 'gw,gsc-hwmon' because the driver fits into the
-'hwmon' API. Isn't that appropriate here for the driver compatible
-string?
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ arch/arm/mach-shmobile/Kconfig                     | 4 ++++
+ arch/arm/mach-shmobile/setup-rcar-gen2.c           | 2 ++
+ 3 files changed, 8 insertions(+)
 
->
->> +Optional hwmon properties:
->> +- gw,reference-voltage: ADC reference voltage (mV) used in scaling raw ADCs
->
-> AFAIK devicetree likes to specify voltages in uV.
-
-There are currently plenty of dt props specified in mV (grep -r mV
-Documentation/devicetree/bindings/).
-
->
->> +- gw,resolution: ADC resolution (ie 4096) used in scaling raw ADCs
->> +
->
-> 4096 what ?
-
-reference-voltage and resolution are used to scale the values from the
-nodes that report a raw ADC value:
-
-V = Vadc * (reference-voltage / resolution)
-
-I can provide that in bits if it makes more sense? I can also hard
-code both the resolution and the vref in the hwmon driver and remove
-it from dt as currently the only GSC that uses raw ADC values is 12bit
-with 2.5V ref.
-
->
->> +Each hwmon child node defines an ADC input on the chip which the GSC may
->> +report cooked values (ie temperature sensor based on thermister), raw values,
->> +(ie voltage rail with a pre-scaling resistor divider), or a fan controller
->> +setpoint.
->> +
->> +Required hwmon child properties:
->> +- type: one of the following ADC types:
->> +  "gw,hwmon-temperature" - reports temperature in C*10
->> +  "gw,hwmon-voltage" - reports a pre-scaled voltage value
->> +  "gw,hwmon-voltage-raw" - reports a raw ADC that is scaled with
->> +       vreference, resolution, and optional resistor divider
->> +  "gw,hwmon-fan" - a fan temperature setpoint in C*10
->
-> What is a "fan temperature setpoint" ?
->
-
-The GSC supports a fan controller which drives a PWM signal to vary
-the speed of a fan based on the GSC internal temperature sensor. The
-FAN controller has 6 setpoints each having a fixed PWM duty-cycle but
-the temperature at which those setpoints kick in can be varies via
-registers at the 0x29 slave address (same slave address as the
-temperature sensor and voltage inputs which is why I have it in the
-hwmon driver):
-
-fan0_point - 50% PWM (default 300)
-fan1_point - 60% PWM (default 330)
-fan2_point - 70% PWM (default 360)
-fan3_point - 80% PWM (default 390)
-fan4_point - 90% PWM (default 420)
-fan5_point - 100% PWM (default 450)
-
-The values are C/10 thus if the internal GSC temp sensor is below 30C
-the fan output will be 0% duty cycle and if it hits 30C it will go to
-50% until it hits 60% at 33C etc.
-
-That is the hardware implementation that I'm trying to abstract and
-define here. You pointed out the fact that the fan*_input ABI is
-read-only fan PWM and I see that now. What do you suggest I use for
-this feature I'm trying to implement driver support for?
-
-I did notice that nouveau_hwmon.c has a single temperature setpoint
-similar to this that they support with SENSOR_DEVICE_ATTR:
-https://elixir.bootlin.com/linux/latest/source/drivers/gpu/drm/nouveau/nouveau_hwmon.c#L63
-
->> +- reg: offset of the ADC register
->> +- label: name of the ADC input or FAN setpoint
->> +
->> +Optional hwmon child properties:
->> +- gw,voltage-divider: An array of two integers containing the resistor
->> +  values R1 and R2 of the optinal resistor divider on a raw ADC
->> +- gw,voltage-offset: a mV voltage offset to apply to a raw ADC (ie to
->> +  compensate for a diode drop)
->> +
->> +Example:
->> +
->> +     gsc: gsc at 20 {
->> +             compatible = "gw,gsc";
->> +             reg = <0x20>;
->> +             interrupt-parent = <&gpio1>;
->> +             interrupts = <4 GPIO_ACTIVE_LOW>;
->> +             interrupt-controller;
->> +             #interrupt-cells = <1>;
->> +
->> +             watchdog {
->> +                     compatible = "gw,gsc-watchdog";
->> +             };
->> +
->> +             hwmon {
->> +                     compatible = "gw,gsc-hwmon";
->> +                     #address-cells = <1>;
->> +                     #size-cells = <0>;
->> +                     gw,reference-voltage = <2500>;
->> +                     gw,resolution = <4096>;
->> +
->> +                     hwmon at 0 { /* A0: Board Temperature */
->> +                             type = "gw,hwmon-temperature";
->> +                             reg = <0x00>;
->> +                             label = "temp";
->> +                     };
->> +
->> +                     hwmon at 2 { /* A1: Input Voltage (raw ADC) */
->> +                             type = "gw,hwmon-voltage-raw";
->> +                             reg = <0x02>;
->> +                             label = "vdd_vin";
->> +                             gw,voltage-divider = <22100 1000>;
->> +                             gw,voltage-offset = <800>;
->> +                     };
->> +
->> +                     hwmon at b { /* A2: Battery voltage */
->> +                             type = "gw,hwmon-voltage";
->> +                             reg = <0x0b>;
->> +                             label = "vdd_bat";
->> +                     };
->> +
->> +                     hwmon at 2c { /* fan temperature setpoint for 50% duty */
->> +                             type = "gw,hwmon-fan";
->> +                             reg = <0x2c>;
->> +                             label = "fan_50p";
->> +                     };
->> +
->> +                     hwmon at 2e { /* fan1 */
->> +                             type = "gw,hwmon-fan";
->> +                             reg = <0x2e>;
->> +                             label = "fan_60p";
->> +                     };
->> +
->> +                     hwmon at 30 { /* fan2 */
->> +                             type = "gw,hwmon-fan";
->> +                             reg = <0x30>;
->> +                             label = "fan_70p";
->> +                     };
->> +
->> +                     hwmon at 32 { /* fan3 */
->> +                             type = "gw,hwmon-fan";
->> +                             reg = <0x32>;
->> +                             label = "fan_80p";
->> +                     };
->> +
->> +                     hwmon at 34 { /* fan4 */
->> +                             type = "gw,hwmon-fan";
->> +                             reg = <0x34>;
->> +                             label = "fan_90p";
->> +                     };
->> +
->> +                     hwmon at 36 { /* fan5 */
->> +                             type = "gw,hwmon-fan";
->> +                             reg = <0x36>;
->> +                             label = "fan_100p";
->> +                     };
->
-> No idea what this is supposed to be doing, but whatever it is,
-> it appears to be wrong. I'll comment more on it in the hwmon driver.
->
-
-ok - I'll respond to that thread.
-
-Thanks for the review!
-
-Tim
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 29093ba..4401369 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -21,6 +21,8 @@ SoCs:
+     compatible = "renesas,r8a7744"
+   - RZ/G1E (R8A77450)
+     compatible = "renesas,r8a7745"
++  - RZ/G1C (R8A77470)
++    compatible = "renesas,r8a77470"
+   - R-Car M1A (R8A77781)
+     compatible = "renesas,r8a7778"
+   - R-Car H1 (R8A77790)
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 280e731..6b91114 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -75,6 +75,10 @@ config ARCH_R8A7745
+ 	bool "RZ/G1E (R8A77450)"
+ 	select ARCH_RCAR_GEN2
+ 
++config ARCH_R8A77470
++	bool "RZ/G1C (R8A77470)"
++	select ARCH_RCAR_GEN2
++
+ config ARCH_R8A7778
+ 	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_RCAR_GEN1
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 5561dbe..80de6be 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -73,6 +73,7 @@ void __init rcar_gen2_timer_init(void)
+ 	shmobile_init_cntvoff();
+ 
+ 	if (of_machine_is_compatible("renesas,r8a7745") ||
++	    of_machine_is_compatible("renesas,r8a77470") ||
+ 	    of_machine_is_compatible("renesas,r8a7792") ||
+ 	    of_machine_is_compatible("renesas,r8a7794")) {
+ 		freq = 260000000 / 8;	/* ZS / 8 */
+@@ -205,6 +206,7 @@ MACHINE_END
+ static const char * const rz_g1_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7743",
+ 	"renesas,r8a7745",
++	"renesas,r8a77470",
+ 	NULL,
+ };
+ 
+-- 
+2.7.4
