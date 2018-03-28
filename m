@@ -1,175 +1,80 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 28 Mar 2018 09:08:26 +0200
-Subject: [PATCH v2 0/5] allow override of bus format in bridges
-In-Reply-To: <20180326212447.7380-1-peda@axentia.se>
-References: <20180326212447.7380-1-peda@axentia.se>
-Message-ID: <20180328070826.GY14155@phenom.ffwll.local>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 28 Mar 2018 08:28:41 +0100
+Subject: [PATCH 2/2] arm64: uaccess: Fix omissions from usercopy whitelist
+In-Reply-To: <CAGXu5jJ6qon=W7=WXtJ47Rb5nxqCSiZnE+m6v2rYx_7htpUG+A@mail.gmail.com>
+References: <1522174123-13987-1-git-send-email-Dave.Martin@arm.com>
+ <1522174123-13987-3-git-send-email-Dave.Martin@arm.com>
+ <CAGXu5jJ6qon=W7=WXtJ47Rb5nxqCSiZnE+m6v2rYx_7htpUG+A@mail.gmail.com>
+Message-ID: <20180328072839.GJ16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 11:24:42PM +0200, Peter Rosin wrote:
-> Hi!
+On Tue, Mar 27, 2018 at 11:56:47AM -0700, Kees Cook wrote:
+> On Tue, Mar 27, 2018 at 11:08 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > When the hardend usercopy support was added for arm64, it was
+> > concluded that all cases of usercopy into and out of thread_struct
+> > were statically sized and so didn't require explicit whitelisting
+> > of the appropriate fields in thread_struct.
+> >
+> > Testing with usercopy hardening enabled has revealed that this is
+> > not the case for certain ptrace regset manipulation calls on arm64.
+> > This occurs because the sizes of usercopies associated with the
+> > regset API are dynamic by construction, and because arm64 does not
+> > always stage such copies via the stack: indeed the regset API is
+> > designed to avoid the need for that by adding some bounds checking.
+> >
+> > This is currently believed to affect only the fpsimd and TLS
+> > registers.
+> >
+> > Because the whitelisted fields in thread_struct must be contiguous,
+> > this patch groups them together in a nested struct.  It is also
+> > necessary to be able to determine the location and size of that
+> > struct, so rather than making the struct anonymous (which would
+> > save on edits elsewhere) or adding an anonymous union containing
+> > named and unnamed instances of the same struct (gross), this patch
+> > gives the struct a name and makes the necessary edits to code that
+> > references it (noisy but simple).
+> >
+> > Care is needed to ensure that the new struct does not contain
+> > padding (which the usercopy hardening would fail to protect).
+> >
+> > For this reason, the presence of tp2_value is made unconditional,
+> > since a padding field would be needed there in any case.  This pads
+> > up to the 16-byte alignment required by struct user_fpsimd_state.
+> >
+> > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > Fixes: 9e8084d3f761 ("arm64: Implement thread_struct whitelist for hardened usercopy")
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > 
-> [I got to v2 sooner than expected]
+> This looks great; thanks for tackling it!
 > 
-> I have an Atmel sama5d31 hooked up to an lvds encoder and then
-> on to an lvds panel. Which seems like something that has been
-> done one or two times before...
+> Acked-by: Kees Cook <keescook@chromium.org>
 > 
-> The problem is that the bus_format of the SoC and the panel do
-> not agree. The SoC driver (atmel-hlcdc) can handle the
-> rgb444, rgb565, rgb666 and rgb888 bus formats. The hardware is
-> wired for the rgb565 case. The lvds encoder supports rgb888 on
-> its input side with the LSB wires for each color simply pulled
-> down internally in the encoder in my case which means that the
-> rgb565 bus_format is the format that works best. And the panel
-> is expecting lvds (vesa-24), which is what the encoder outputs.
+> > +       /*
+> > +        * Whitelisted fields for hardened usercopy:
+> > +        * Maintainers must ensure manually that this contains no
+> > +        * implicit padding.
+> > +        */
+> > +       struct {
+> > +               unsigned long   tp_value;       /* TLS register */
+> > +               unsigned long   tp2_value;
+> > +               struct user_fpsimd_state fpsimd_state;
+> > +       } uw;
 > 
-> The reason I "blame" the bus_format of the drm_connector is that
-> with the below DT snippet, things do not work *exactly* due to
-> that. At least, it starts to work if I hack the panel-lvds driver
-> to report the rgb565 bus_format instead of vesa-24.
-> 
-> 	panel: panel {
-> 		compatible = "panel-lvds";
-> 
-> 		width-mm = <304>;
-> 		height-mm = <228;
-> 
-> 		data-mapping = "vesa-24";
-> 
-> 		panel-timing {
-> 			// 1024x768 @ 60Hz (typical)
-> 			clock-frequency = <52140000 65000000 71100000>;
-> 			hactive = <1024>;
-> 			vactive = <768>;
-> 			hfront-porch = <48 88 88>;
-> 			hback-porch = <96 168 168>;
-> 			hsync-len = <32 64 64>;
-> 			vfront-porch = <8 13 14>;
-> 			vback-porch = <8 13 14>;
-> 			vsync-len = <8 12 14>;
-> 		};
-> 
-> 		port {
-> 			panel_input: endpoint {
-> 				remote-endpoint = <&lvds_encoder_output>;
-> 			};
-> 		};
-> 	};
-> 
-> 	lvds-encoder {
-> 		compatible = "ti,ds90c185", "lvds-encoder";
-> 
-> 		ports {
-> 			#address-cells = <1>;
-> 			#size-cells = <0>;
-> 
-> 			port at 0 {
-> 				reg = <0>;
-> 
-> 				lvds_encoder_input: endpoint {
-> 					remote-endpoint = <&hlcdc_output>;
-> 				};
-> 			};
-> 
-> 			port at 1 {
-> 				reg = <1>;
-> 
-> 				lvds_encoder_output: endpoint {
-> 					remote-endpoint = <&panel_input>;
-> 				};
-> 			};
-> 		};
-> 	};
-> 
-> But, instead of perverting the panel-lvds driver with support
-> for a totally fake non-lvds bus_format, I intruduce an API that allows
-> display controller drivers to query the required bus_format of any
-> intermediate bridges, and match up with that instead of the formats
-> given by the drm_connector. I trigger this with this addition to the
-> lvds-encoder DT node:
-> 
-> 		interface-pix-fmt = "rgb565";
-> 
-> Naming is hard though, so I'm not sure if that's good?
-> 
-> I threw in the first patch, since that is the actual lvds encoder
-> I have in this case.
-> 
-> Suggestions welcome.
+> I assume "uw" means "usercopy whitelist"?
 
-Took a quick look, feels rather un-atomic. And there's beend discussing
-for other bridge related state that we might want to track (like the full
-adjusted_mode that might need to be adjusted at each stage in the chain).
-So here's my suggestions:
-
-- Add an optional per-bridge internal state struct using the support in
-
-https://dri.freedesktop.org/docs/drm/gpu/drm-kms.html#handling-driver-private-state
-
-  Yes it says "driver private", but since bridge is just helper stuff
-  that's all included. "driver private" == "not exposed as uapi" here.
-  Include all the usual convenience wrappers to get at the state for a
-  bridge.
-
-- Then stuff your bus_format into that new drm_bridge_state struct.
-
-- Add a new bridge callback atomic_check, which gets that bridge state as
-  parameter (similar to all the other atomic_check functions).
-
-This way we can even handle the bus_format dynamically, through the atomic
-framework your bridge's atomic_check callback can look at the entire
-atomic state (both up and down the chain if needed), it all neatly fits
-into atomic overall and it's much easier to extend.
-
-Please also cc Laurent Pinchart on this.
-
-Cheers, Daniel
-
+Yes, for want of a better name.  Usually I'd go for something less
+cryptic, but this has to be pasted all over the place.
 
 > 
-> Cheers,
-> Peter
+> To enforce the padding check, maybe add something like:
 > 
-> Changes since v1 https://lkml.org/lkml/2018/3/17/221
-> - Add a proper bridge API to query the bus_format instead of abusing
->   the ->get_modes part of the code. This is cleaner but requires
->   changes to all display controller drivers wishing to participate.
-> - Add patch to adjust the atmel-hlcdc driver according to the above.
-> - Hook the new info into the bridge local to the lvds-encoder instead
->   of messing about with new interfaces for the panel-bridge driver.
-> - Add patch with a DT parsing function of bus_formats in a central place.
-> - Rephrase the addition of ti,ds90c185 to the lvds-transmitter binding.
-> 
-> Peter Rosin (5):
->   dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
->   drm: bridge: add API to query the expected input formats of bridges
->   drm: of: add display bus-format parser
->   drm: bridge: lvds-encoder: allow specifying the input bus format
->   drm/atmel-hlcdc: take bridges into account when selecting output
->     format
-> 
->  .../bindings/display/bridge/lvds-transmitter.txt   | 14 ++++-
->  .../devicetree/bindings/display/bus-format.txt     | 35 +++++++++++++
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 49 ++++++++++++++++--
->  drivers/gpu/drm/bridge/lvds-encoder.c              | 25 +++++++++
->  drivers/gpu/drm/drm_bridge.c                       | 32 ++++++++++++
->  drivers/gpu/drm/drm_of.c                           | 59 ++++++++++++++++++++++
->  include/drm/drm_bridge.h                           | 18 +++++++
->  include/drm/drm_of.h                               |  9 ++++
->  8 files changed, 237 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/bus-format.txt
-> 
-> -- 
-> 2.11.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> BUILD_BUG_ON(sizeof_field(struct thread_struct, uw) !=
+>         sizeof_field(struct thread_struct, uw.tp_value) +
+>         sizeof_field(struct thread_struct, uw.tp2_value) +
+>         sizeof_field(struct thread_struct, uw.fpsimd_state))
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Hmm, good idea.  Yes, I can add that.
+
+Cheers
+---Dave
