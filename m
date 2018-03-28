@@ -1,575 +1,197 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 28 Mar 2018 10:00:18 -0700
-Subject: [PATCH v3 3/4] hwmon: add Gateworks System Controller support
-In-Reply-To: <1522250043-8065-4-git-send-email-tharvey@gateworks.com>
-References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
- <1522250043-8065-4-git-send-email-tharvey@gateworks.com>
-Message-ID: <20180328170018.GC25325@roeck-us.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 28 Mar 2018 18:18:13 +0100
+Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <20180328124129.6459-3-ard.biesheuvel@linaro.org>
+References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+ <20180328124129.6459-3-ard.biesheuvel@linaro.org>
+Message-ID: <20180328171812.GN16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 08:14:02AM -0700, Tim Harvey wrote:
-> The Gateworks System Controller has a hwmon sub-component that exposes
-> up to 16 ADC's, some of which are temperature sensors, others which are
-> voltage inputs. The ADC configuration (register mapping and name) is
-> configured via device-tree and varies board to board.
+On Wed, Mar 28, 2018 at 02:41:29PM +0200, Ard Biesheuvel wrote:
+> Add support macros to conditionally yield the NEON (and thus the CPU)
+> that may be called from the assembler code.
 > 
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> In some cases, yielding the NEON involves saving and restoring a non
+> trivial amount of context (especially in the CRC folding algorithms),
+> and so the macro is split into three, and the code in between is only
+> executed when the yield path is taken, allowing the context to be preserved.
+> The third macro takes an optional label argument that marks the resume
+> path after a yield has been performed.
+
+Minor comments below, mostly just suggestions/observations.
+
+With the missing #include in asm-offsets.c fixed (if you think it's
+appropriate):
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
-> v3:
-> - add voltage_raw input type and supporting fields
-> - add channel validation to is_visible function
-> - remove unnecessary channel validation from read/write functions
+>  arch/arm64/include/asm/assembler.h | 64 ++++++++++++++++++++
+>  arch/arm64/kernel/asm-offsets.c    |  2 +
+>  2 files changed, 66 insertions(+)
 > 
-> v2:
-> - change license comment style
-> - remove DEBUG
-> - simplify regmap_bulk_read err check
-> - remove break after returns in switch statement
-> - fix fan setpoint buffer address
-> - remove unnecessary parens
-> - consistently use struct device *dev pointer
-> - change license/comment block
-> - add validation for hwmon child node props
-> - move parsing of of to own function
-> - use strlcpy to ensure null termination
-> - fix static array sizes and removed unnecessary initializers
-> - dynamically allocate channels
-> - fix fan input label
-> - support platform data
-> - fixed whitespace issues
-> 
->  drivers/hwmon/Kconfig                   |   9 +
->  drivers/hwmon/Makefile                  |   1 +
->  drivers/hwmon/gsc-hwmon.c               | 368 ++++++++++++++++++++++++++++++++
-
-This will require a matching Documentation/hwmon/gsc-hwmon to explain supported
-attributes.
-
->  include/linux/platform_data/gsc_hwmon.h |  43 ++++
->  4 files changed, 421 insertions(+)
->  create mode 100644 drivers/hwmon/gsc-hwmon.c
->  create mode 100644 include/linux/platform_data/gsc_hwmon.h
-> 
-> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> index 7ad0176..85d9aa3 100644
-> --- a/drivers/hwmon/Kconfig
-> +++ b/drivers/hwmon/Kconfig
-> @@ -475,6 +475,15 @@ config SENSORS_F75375S
->  	  This driver can also be built as a module.  If so, the module
->  	  will be called f75375s.
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index d354eb7f2f0c..fb11514273d9 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -623,4 +623,68 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+>  	.endif
+>  	.endm
 >  
-> +config SENSORS_GSC
-> +        tristate "Gateworks System Controller ADC"
-> +        depends on MFD_GATEWORKS_GSC
-> +        help
-> +          Support for the Gateworks System Controller A/D converters.
-> +
-> +	  To compile this driver as a module, choose M here:
-> +	  the module will be called gsc-hwmon.
-> +
->  config SENSORS_MC13783_ADC
->          tristate "Freescale MC13783/MC13892 ADC"
->          depends on MFD_MC13XXX
-> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-> index 0fe489f..835a536 100644
-> --- a/drivers/hwmon/Makefile
-> +++ b/drivers/hwmon/Makefile
-> @@ -69,6 +69,7 @@ obj-$(CONFIG_SENSORS_G760A)	+= g760a.o
->  obj-$(CONFIG_SENSORS_G762)	+= g762.o
->  obj-$(CONFIG_SENSORS_GL518SM)	+= gl518sm.o
->  obj-$(CONFIG_SENSORS_GL520SM)	+= gl520sm.o
-> +obj-$(CONFIG_SENSORS_GSC)	+= gsc-hwmon.o
->  obj-$(CONFIG_SENSORS_GPIO_FAN)	+= gpio-fan.o
->  obj-$(CONFIG_SENSORS_HIH6130)	+= hih6130.o
->  obj-$(CONFIG_SENSORS_ULTRA45)	+= ultra45_env.o
-> diff --git a/drivers/hwmon/gsc-hwmon.c b/drivers/hwmon/gsc-hwmon.c
-> new file mode 100644
-> index 0000000..10da46f
-> --- /dev/null
-> +++ b/drivers/hwmon/gsc-hwmon.c
-> @@ -0,0 +1,368 @@
-> +/* SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Check whether to yield to another runnable task from kernel mode NEON code
+> + * (which runs with preemption disabled).
 > + *
-> + * Copyright (C) 2018 Gateworks Corporation
+> + * if_will_cond_yield_neon
+> + *        // pre-yield patchup code
+> + * do_cond_yield_neon
+> + *        // post-yield patchup code
+> + * endif_yield_neon    <label>
 > + *
-> + * This driver registers Linux HWMON attributes for GSC ADC's
+> + * where <label> is optional, and marks the point where execution will resume
+> + * after a yield has been performed. If omitted, execution resumes right after
+> + * the endif_yield_neon invocation.
+
+Maybe add a comment describing cond_yield_neon, e.g.:
+
+ *
+ * As a convenience, in the case where no patchup code is required
+ * the above sequence may be abbreviated to:
+ *
+ * cond_yield_neon <label>
+
+> + *
+> + * Note that the patchup code does not support assembler directives that change
+> + * the output section, any use of such directives is undefined.
+> + *
+> + * The yield itself consists of the following:
+> + * - Check whether the preempt count is exactly 1, in which case disabling
+> + *   preemption once will make the task preemptible. If this is not the case,
+> + *   yielding is pointless.
+> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
+> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
+> + *   yield fixup code.
+> + *
+> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
+> + * and may clobber x2 .. x18 if the yield path is taken.
 > + */
-> +#include <linux/hwmon.h>
-> +#include <linux/hwmon-sysfs.h>
-> +#include <linux/mfd/gsc.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +
-> +#include <linux/platform_data/gsc_hwmon.h>
-> +
-> +#define GSC_HWMON_MAX_TEMP_CH	16
-> +#define GSC_HWMON_MAX_IN_CH	16
-> +#define GSC_HWMON_MAX_FAN_CH	6
-> +
-> +struct gsc_hwmon_data {
-> +	struct gsc_dev *gsc;
-> +	struct device *dev;
-> +	struct gsc_hwmon_platform_data *pdata;
-> +	const struct gsc_hwmon_channel *temp_ch[GSC_HWMON_MAX_TEMP_CH];
-> +	const struct gsc_hwmon_channel *in_ch[GSC_HWMON_MAX_IN_CH];
-> +	const struct gsc_hwmon_channel *fan_ch[GSC_HWMON_MAX_FAN_CH];
-> +	u32 temp_config[GSC_HWMON_MAX_TEMP_CH + 1];
-> +	u32 in_config[GSC_HWMON_MAX_IN_CH + 1];
-> +	u32 fan_config[GSC_HWMON_MAX_FAN_CH + 1];
-> +	struct hwmon_channel_info temp_info;
-> +	struct hwmon_channel_info in_info;
-> +	struct hwmon_channel_info fan_info;
-> +	const struct hwmon_channel_info *info[4];
-> +	struct hwmon_chip_info chip;
-> +	int vreference;
-> +	int resolution;
-> +};
-> +
-> +static int
-> +gsc_hwmon_read(struct device *dev, enum hwmon_sensor_types type, u32 attr,
-> +	       int channel, long *val)
-> +{
-> +	struct gsc_hwmon_data *hwmon = dev_get_drvdata(dev);
-> +	struct gsc_hwmon_platform_data *pdata = hwmon->pdata;
-> +	const struct gsc_hwmon_channel *ch;
-> +	int sz, ret;
-> +	u8 buf[3];
-> +
-> +	dev_dbg(dev, "%s type=%d attr=%d channel=%d\n", __func__, type, attr,
-> +		channel);
-> +	switch (type) {
-> +	case hwmon_in:
-> +		ch = hwmon->in_ch[channel];
-> +		break;
-> +	case hwmon_temp:
-> +		ch = hwmon->temp_ch[channel];
-> +		break;
-> +	case hwmon_fan:
-> +		ch = hwmon->fan_ch[channel];
-> +		break;
-> +	default:
-> +		return -EOPNOTSUPP;
-> +	}
-> +
-> +	sz = (ch->type == type_voltage) ? 3 : 2;
-> +	ret = regmap_bulk_read(hwmon->gsc->regmap_hwmon, ch->reg, buf, sz);
-> +	if (ret)
-> +		return ret;
-> +
-> +	*val = 0;
-> +	while (sz-- > 0)
-> +		*val |= (buf[sz] << (8*sz));
 
-Please use spaces before and after operators.
+Does this mean that the pre-yield patchup code can safely refer to
+x2..x18, but the post-yield patchup code and the code at <label> (or
+otherwise immediately following endif_yield_neon) can't?
 
 > +
-> +	switch (ch->type) {
-> +	case type_temperature:
-> +		if ((type == hwmon_temp) && *val > 0x8000)
-
-Please no unnecessary ( ).
-
-Is there ever a situation where ch->type == type_temperature and type !=
-hwmon_temp ? Wouldn't that be a bug ?
-
-> +			*val -= 0xffff;
-> +		break;
-> +	case type_voltage_raw:
-> +		/* scale based on ref voltage and resolution */
-> +		if (pdata->vreference && pdata->resolution) {
-> +			*val *= pdata->vreference;
-> +			*val /= pdata->resolution;
-> +		}
-> +		/* scale based on optional voltage divider */
-> +		if (ch->vdiv[0] && ch->vdiv[1]) {
-> +			*val *= (ch->vdiv[0] + ch->vdiv[1]);
-> +			*val /= ch->vdiv[1];
-> +		}
-
-This accepts both types of scaling. Is that intentional ?
-
-I don't see any protection against overflows. What if pdata->vreference is
-larger than 256 on a system with sizeof(long) == 4 and the raw voltage
-as reported by the chip is 0xffffff ?
-
-> +		/* adjust by offset */
-> +		*val += ch->voffset;
-
-Similar to the above, this can result in an overflow on systems with
-sizeof(long) == 4.
-
-> +		break;
-
-There should be a default case as well as 'case type_voltage:'
-with a break; statement and a comment indicating that no adjustment
-is needed.
-
-> +	}
+> +	.macro		cond_yield_neon, lbl
+> +	if_will_cond_yield_neon
+> +	do_cond_yield_neon
+> +	endif_yield_neon	\lbl
+> +	.endm
 > +
-> +	return 0;
-> +}
-> +
-> +static int
-> +gsc_hwmon_read_string(struct device *dev, enum hwmon_sensor_types type,
-> +		      u32 attr, int channel, const char **buf)
-> +{
-> +	struct gsc_hwmon_data *hwmon = dev_get_drvdata(dev);
-> +
-> +	dev_dbg(dev, "%s type=%d attr=%d channel=%d\n", __func__, type, attr,
-> +		channel);
-
-I seriously wonder if all those dev_dbg() statements add value.
-
-> +	switch (type) {
-> +	case hwmon_in:
-> +		*buf = hwmon->in_ch[channel]->name;
-> +		break;
-> +	case hwmon_temp:
-> +		*buf = hwmon->temp_ch[channel]->name;
-> +		break;
-> +	case hwmon_fan:
-> +		*buf = hwmon->fan_ch[channel]->name;
-> +		break;
-> +	default:
-> +		return -ENOTSUPP;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int
-> +gsc_hwmon_write(struct device *dev, enum hwmon_sensor_types type, u32 attr,
-> +		int channel, long val)
-> +{
-> +	struct gsc_hwmon_data *hwmon = dev_get_drvdata(dev);
-> +	u8 buf[2];
-> +
-> +	dev_dbg(dev, "%s type=%d attr=%d channel=%d\n", __func__, type, attr,
-> +		channel);
-> +	switch (type) {
-> +	case hwmon_fan:
-> +		buf[0] = val & 0xff;
-> +		buf[1] = (val >> 8) & 0xff;
-> +		return regmap_bulk_write(hwmon->gsc->regmap_hwmon,
-> +					 hwmon->fan_ch[channel]->reg, buf, 2);
-
-fanX_input reports the fan speed. By its nature, a fan speed is not writeable.
-I have no idea what this is supposed to achieve, but whatever it is, it is wrong.
-
-Please stick with the ABI.
-
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return -EOPNOTSUPP;
-> +}
-> +
-> +static umode_t
-> +gsc_hwmon_is_visible(const void *_data, enum hwmon_sensor_types type, u32 attr,
-> +		     int ch)
-> +{
-> +	const struct gsc_hwmon_data *hwmon = _data;
-> +	struct device *dev = hwmon->gsc->dev;
-> +	umode_t mode = 0;
-> +
-> +	switch (type) {
-> +	case hwmon_fan:
-> +		if (ch >= GSC_HWMON_MAX_FAN_CH)
-> +			return -EOPNOTSUPP;
-
-Can that ever happen ?
-
-> +		mode = S_IRUGO;
-> +		if (attr == hwmon_fan_input)
-> +			mode |= S_IWUSR;
-
-fanX_input is a read-only attribute per ABI.
-
-> +		break;
-> +	case hwmon_temp:
-> +		if (ch >= GSC_HWMON_MAX_TEMP_CH)
-> +			return -EOPNOTSUPP;
-
-Can that ever happen ?
-
-> +		mode = S_IRUGO;
-> +		break;
-> +	case hwmon_in:
-> +		if (ch >= GSC_HWMON_MAX_IN_CH)
-> +			return -EOPNOTSUPP;
-
-Can that ever happen ?
-
-> +		mode = S_IRUGO;
-> +		break;
-> +	default:
-> +		return -EOPNOTSUPP;
-> +	}
-> +	dev_dbg(dev, "%s type=%d attr=%d ch=%d mode=0x%x\n", __func__, type,
-> +		attr, ch, mode);
-> +
-> +	return mode;
-> +}
-> +
-> +static const struct hwmon_ops gsc_hwmon_ops = {
-> +	.is_visible = gsc_hwmon_is_visible,
-> +	.read = gsc_hwmon_read,
-> +	.read_string = gsc_hwmon_read_string,
-> +	.write = gsc_hwmon_write,
-> +};
-> +
-> +static struct gsc_hwmon_platform_data *
-> +gsc_hwmon_get_devtree_pdata(struct device *dev)
-> +{
-> +	struct gsc_hwmon_platform_data *pdata;
-> +	struct gsc_hwmon_channel *ch;
-> +	struct fwnode_handle *child;
-> +	const char *type;
-> +	int nchannels;
-> +
-> +	nchannels = device_get_child_node_count(dev);
-> +	dev_dbg(dev, "channels=%d\n", nchannels);
-> +	if (nchannels == 0)
-> +		return ERR_PTR(-ENODEV);
-> +
-> +	pdata = devm_kzalloc(dev,
-> +			     sizeof(*pdata) + nchannels * sizeof(*ch),
-> +			     GFP_KERNEL);
-> +	if (!pdata)
-> +		return ERR_PTR(-ENOMEM);
-> +	ch = (struct gsc_hwmon_channel *)(pdata + 1);
-> +	pdata->channels = ch;
-> +	pdata->nchannels = nchannels;
-> +
-> +	device_property_read_u32(dev, "gw,reference-voltage",
-> +				 &pdata->vreference);
-> +	device_property_read_u32(dev, "gw,resolution", &pdata->resolution);
-> +
-> +	/* allocate structures for channels and count instances of each type */
-> +	device_for_each_child_node(dev, child) {
-> +		if (fwnode_property_read_string(child, "label", &ch->name)) {
-> +			dev_err(dev, "channel without label\n");
-> +			fwnode_handle_put(child);
-> +			return ERR_PTR(-EINVAL);
-> +		}
-> +		if (fwnode_property_read_u32(child, "reg", &ch->reg)) {
-> +			dev_err(dev, "channel without reg\n");
-> +			fwnode_handle_put(child);
-> +			return ERR_PTR(-EINVAL);
-> +		}
-> +		if (fwnode_property_read_string(child, "type", &type)) {
-> +			dev_err(dev, "channel without type\n");
-> +			fwnode_handle_put(child);
-> +			return ERR_PTR(-EINVAL);
-> +		}
-> +		if (!strcasecmp(type, "gw,hwmon-temperature"))
-> +			ch->type = type_temperature;
-> +		else if (!strcasecmp(type, "gw,hwmon-voltage"))
-> +			ch->type = type_voltage;
-> +		else if (!strcasecmp(type, "gw,hwmon-voltage-raw"))
-> +			ch->type = type_voltage_raw;
-> +		else if (!strcasecmp(type, "gw,hwmon-fan"))
-> +			ch->type = type_fan;
-> +		else {
-> +			dev_err(dev, "channel without type\n");
-> +			fwnode_handle_put(child);
-> +			return ERR_PTR(-EINVAL);
-> +		}
-> +
-> +		fwnode_property_read_u32(child, "gw,voltage-offset",
-> +			&ch->voffset);
-
-Note that while it is technically ok to keep voltages internally in mV,
-devicetree will likely require specificayion in uV. For accuracy, it might be
-better to perform any calculations on that base and convert to mV for display
-purposes.
-
-> +		fwnode_property_read_u32_array(child, "gw,voltage-divider",
-> +			ch->vdiv, ARRAY_SIZE(ch->vdiv));
-> +		dev_dbg(dev, "of: reg=0x%02x type=%d %s\n", ch->reg, ch->type,
-> +			ch->name);
-> +		ch++;
-> +	}
-> +
-> +	return pdata;
-> +}
-> +
-> +static int gsc_hwmon_probe(struct platform_device *pdev)
-> +{
-> +	struct gsc_dev *gsc = dev_get_drvdata(pdev->dev.parent);
-> +	struct device *dev = &pdev->dev;
-> +	struct gsc_hwmon_platform_data *pdata = dev_get_platdata(dev);
-> +	struct gsc_hwmon_data *hwmon;
-> +	int i, i_in, i_temp, i_fan;
-> +
-> +	if (!pdata) {
-> +		pdata = gsc_hwmon_get_devtree_pdata(dev);
-> +		if (IS_ERR(pdata))
-> +			return PTR_ERR(pdata);
-> +	}
-> +
-> +	hwmon = devm_kzalloc(dev, sizeof(*hwmon), GFP_KERNEL);
-> +	if (!hwmon)
-> +		return -ENOMEM;
-> +	hwmon->gsc = gsc;
-> +	hwmon->pdata = pdata;
-> +
-> +	for (i = 0, i_in = 0, i_temp = 0, i_fan = 0;
-> +	     i < hwmon->pdata->nchannels; i++) {
-> +		const struct gsc_hwmon_channel *ch = &pdata->channels[i];
-> +
-> +		if (ch->reg > GSC_HWMON_MAX_REG) {
-> +			dev_err(dev, "invalid reg: 0x%02x\n", ch->reg);
-> +			return -EINVAL;
-> +		}
-> +		switch (ch->type) {
-> +		case type_temperature:
-> +			if (i_temp == GSC_HWMON_MAX_TEMP_CH) {
-> +				dev_err(dev, "too many temp channels\n");
-> +				return -EINVAL;
-> +			}
-> +			hwmon->temp_ch[i_temp] = ch;
-> +			hwmon->temp_config[i_temp] = HWMON_T_INPUT |
-> +						     HWMON_T_LABEL;
-> +			i_temp++;
-> +			break;
-> +		case type_voltage:
-> +		case type_voltage_raw:
-> +			if (i_in == GSC_HWMON_MAX_IN_CH) {
-> +				dev_err(dev, "too many voltage channels\n");
-> +				return -EINVAL;
-> +			}
-> +			hwmon->in_ch[i_in] = ch;
-> +			hwmon->in_config[i_in] =
-> +				HWMON_I_INPUT | HWMON_I_LABEL;
-> +			i_in++;
-> +			break;
-> +		case type_fan:
-> +			if (i_fan == GSC_HWMON_MAX_FAN_CH) {
-> +				dev_err(dev, "too many voltage channels\n");
-> +				return -EINVAL;
-> +			}
-> +			hwmon->fan_ch[i_fan] = ch;
-> +			hwmon->fan_config[i_fan] =
-> +				HWMON_F_INPUT | HWMON_F_LABEL;
-> +			i_fan++;
-> +			break;
-> +		default:
-> +			dev_err(dev, "invalid type: %d\n", ch->type);
-> +			return -EINVAL;
-> +		}
-> +		dev_dbg(dev, "pdata: reg=0x%02x type=%d %s\n", ch->reg,
-> +			ch->type, ch->name);
-> +	}
-> +
-> +	/* terminate channel config lists */
-> +	hwmon->temp_config[i_temp] = 0;
-> +	hwmon->in_config[i_in] = 0;
-> +	hwmon->fan_config[i_fan] = 0;
-
-'hwmon' was alocated with devm_kzalloc(). Initializing any of its members with 0
-is unnecessary.
-
-> +
-> +	/* setup config structures */
-> +	hwmon->chip.ops = &gsc_hwmon_ops;
-> +	hwmon->chip.info = hwmon->info;
-> +	hwmon->info[0] = &hwmon->temp_info;
-> +	hwmon->info[1] = &hwmon->in_info;
-> +	hwmon->info[2] = &hwmon->fan_info;
-> +	hwmon->temp_info.type = hwmon_temp;
-> +	hwmon->temp_info.config = hwmon->temp_config;
-> +	hwmon->in_info.type = hwmon_in;
-> +	hwmon->in_info.config = hwmon->in_config;
-> +	hwmon->fan_info.type = hwmon_fan;
-> +	hwmon->fan_info.config = hwmon->fan_config;
-> +
-> +	hwmon->dev = devm_hwmon_device_register_with_info(dev,
-> +							  KBUILD_MODNAME, hwmon,
-> +							  &hwmon->chip, NULL);
-> +	return PTR_ERR_OR_ZERO(hwmon->dev);
-> +}
-> +
-> +static const struct of_device_id gsc_hwmon_of_match[] = {
-> +	{ .compatible = "gw,gsc-hwmon", },
-> +	{}
-> +};
-> +
-> +static struct platform_driver gsc_hwmon_driver = {
-> +	.driver = {
-> +		.name = KBUILD_MODNAME,
-> +		.of_match_table = gsc_hwmon_of_match,
-> +	},
-> +	.probe = gsc_hwmon_probe,
-> +};
-> +
-> +module_platform_driver(gsc_hwmon_driver);
-> +
-> +MODULE_AUTHOR("Tim Harvey <tharvey@gateworks.com>");
-> +MODULE_DESCRIPTION("GSC hardware monitor driver");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/platform_data/gsc_hwmon.h b/include/linux/platform_data/gsc_hwmon.h
-> new file mode 100644
-> index 0000000..5e59846
-> --- /dev/null
-> +++ b/include/linux/platform_data/gsc_hwmon.h
-> @@ -0,0 +1,43 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +#ifndef _GSC_HWMON_H
-> +#define _GSC_HWMON_H
-> +
-> +enum gsc_hwmon_type {
-> +	type_temperature,
-> +	type_voltage,
-> +	type_voltage_raw,
-> +	type_fan,
-> +};
-> +
-> +/**
-> + * struct gsc_hwmon_channel - configuration parameters
-> + * @reg:  I2C register offset
-> + * @type: channel type
-> + * @name: channel name
-> + * @voffset: voltage offset (mV)
-> + * @vdiv: voltage divider array (2 resistor values in ohms)
-> + */
-> +struct gsc_hwmon_channel {
-> +	unsigned int reg;
-> +	unsigned int type;
-> +	const char *name;
-> +	unsigned int voffset;
-
-It is interesting that only positive offset values are supported.
-Is that intentional ?
-
-> +	unsigned int vdiv[2];
-> +};
-> +
-> +/**
-> + * struct gsc_hwmon_platform_data - platform data for gsc_hwmon driver
-> + * @channels:	pointer to array of gsc_hwmon_channel structures
-> + *		describing channels
-> + * @nchannels:	number of elements in @channels array
-> + * @vreference: voltage reference (mV)
-> + * @resolution: ADC resolution
-
-Resolution in what ?
-
-> + */
-> +struct gsc_hwmon_platform_data {
-> +	const struct gsc_hwmon_channel *channels;
-> +	int nchannels;
-> +	unsigned int resolution;
-> +	unsigned int vreference;
-> +};
-> +
+> +	.macro		if_will_cond_yield_neon
+> +#ifdef CONFIG_PREEMPT
+> +	get_thread_info	x0
+> +	ldr		w1, [x0, #TSK_TI_PREEMPT]
+> +	ldr		x0, [x0, #TSK_TI_FLAGS]
+> +	cmp		w1, #PREEMPT_DISABLE_OFFSET
+> +	csel		x0, x0, xzr, eq
+> +	tbnz		x0, #TIF_NEED_RESCHED, .Lyield_\@	// needs rescheduling?
 > +#endif
-> -- 
-> 2.7.4
-> 
+> +	/* fall through to endif_yield_neon */
+> +	.subsection	1
+
+Can we junk the code in this case rather than including it in the
+kernel, like
+
+	.section .discard.cond_yield_neon
+
+(this seems to conform to some notion of a standard discarded section
+name, see <asm-generic/vmlinux.lds.h>).  This additionally discards
+the do_cond_yield_neon invocation (which I guess is what we'd expect
+for a non-preemptible kernel?)
+
+If doing that discard, a note could be added in the comment block
+to warn people not to assume that the patchup code and any labels
+defined in it will definitely end up in the kernel image.
+
+Since the patchup sequences aren't likely to be many or large, it's
+not the end of the world if we don't do this discarding though.
+
+> +.Lyield_\@ :
+> +	.endm
+> +
+> +	.macro		do_cond_yield_neon
+> +	bl		kernel_neon_end
+> +	bl		kernel_neon_begin
+> +	.endm
+> +
+> +	.macro		endif_yield_neon, lbl
+> +	.ifnb		\lbl
+> +	b		\lbl
+> +	.else
+> +	b		.Lyield_out_\@
+> +	.endif
+
+Should you include
+
+	.purgem do_cond_yield_neon
+	.purgem endif_yield_neon
+
+here?
+
+Otherwise, I think you would get macro redefinition errors if
+if_will_cond_yield_neon is used more than once in a given file.
+
+You could maybe protect against nested and misordered macro uses by the
+following, though it feels a bit like overkill.  Alternatively you
+could use a magic symbol to record the current state, similarly to
+frame_{push,pop}.
+
+	.macro __if_will_cond_yield_neon
+	.purgem if_will_cond_yield_neon
+	//...
+
+	.macro do_cond_yield_neon
+	.purgem do_cond_yield_neon
+	//...
+
+	.macro endif_yield_neon
+	.purgem endif_yield_neon
+	//...
+
+	.macro if_will_cond_yield_neon
+	__if_will_cond_yield_neon
+	.endm // if_will_cond_yield_neon
+	.endm // endif_yield_neon
+	.endm // do_cond_yield_neon
+	.endm // __if_will_cond_yield_neon
+
+	.macro if_will_cond_yield_neon
+	__if_will_cond_yield_neon
+	.endm
+
+> +	.previous
+> +.Lyield_out_\@ :
+> +	.endm
+> +
+>  #endif	/* __ASM_ASSEMBLER_H */
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 1303e04110cd..1e2ea2e51acb 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -93,6 +93,8 @@ int main(void)
+>    DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
+>    DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+>    BLANK();
+
+#include <linux/preempt.h> ?
+
+> +  DEFINE(PREEMPT_DISABLE_OFFSET, PREEMPT_DISABLE_OFFSET);
+> +  BLANK();
+
+[...]
+
+Cheers
+---Dave
