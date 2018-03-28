@@ -1,335 +1,63 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 28 Mar 2018 10:50:48 +0100
-Subject: [PATCH v2 1/2] arm64: fpsimd: Split cpu field out from struct
- fpsimd_state
-In-Reply-To: <1522230649-22008-1-git-send-email-Dave.Martin@arm.com>
-References: <1522230649-22008-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1522230649-22008-2-git-send-email-Dave.Martin@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Mar 2018 11:03:09 +0100
+Subject: [RESEND PATCH v2 0/8] Add support for PWM input capture on STM32
+In-Reply-To: <20180327225101.GJ28163@mithrandir>
+References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+ <20180327225101.GJ28163@mithrandir>
+Message-ID: <20180328100309.yig4d3bmml6jvodz@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for using a common representation of the FPSIMD
-state for tasks and KVM vcpus, this patch separates out the "cpu"
-field that is used to track the cpu on which the state was most
-recently loaded.
+On Wed, 28 Mar 2018, Thierry Reding wrote:
 
-This will allow common code to operate on task and vcpu contexts
-without requiring the cpu field to be stored at the same offset
-from the FPSIMD register data in both cases.  This should avoid the
-need for messing with the definition of those parts of struct
-vcpu_arch that are exposed in the KVM user ABI.
+> On Wed, Feb 14, 2018 at 11:04:31AM +0100, Fabrice Gasnier wrote:
+> > This series adds support for capture to stm32-pwm driver.
+> > Capture is based on DMAs.
+> > - First two patches are precursor patches
+> > - Subsequent two patches add support for requesting DMAs to MFD core
+> > - Next three patches add support for capture to stm32-pwm driver
+> > - This has been tested on stm32429i-eval board.
+> > 
+> > ---
+> > Resend v2:
+> > - Add collected Acks
+> > 
+> > Changes in v2:
+> > - Abstract DMA handling from child driver: move it to MFD core
+> > - Rework pwm capture routines to adopt this change
+> > - Comment on optional dma support, beautify DMAs probe
+> > 
+> > Fabrice Gasnier (8):
+> >   pwm: stm32: fix, remove unused struct device
+> >   pwm: stm32: protect common prescaler for all channels
+> >   dt-bindings: mfd: stm32-timers: add support for dmas
+> >   mfd: stm32-timers: add support for dmas
+> >   pwm: stm32: add capture support
+> >   pwm: stm32: improve capture by tuning counter prescaler
+> >   pwm: stm32: use input prescaler to improve period capture
+> >   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+> > 
+> >  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
+> >  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
+> >  drivers/mfd/stm32-timers.c                         | 215 +++++++++++++++-
+> >  drivers/pwm/pwm-stm32.c                            | 276 ++++++++++++++++++++-
+> >  include/linux/mfd/stm32-timers.h                   |  39 +++
+> >  5 files changed, 547 insertions(+), 6 deletions(-)
+> 
+> I can't apply patches 1-2 and 5-6 since they depend on patches 3-4 for
+> which I'd need an Acked-by: from Lee if I'm to pick them up. Same goes
+> for patch 7.
+> 
+> By the looks of it there are minor conflicts with the MFD tree, but no
+> major ones. Perhaps it'd be better for Lee to pick up 3-4 for v4.17-rc1
+> and ack patch 7, then I can take the rest after v4.17-rc1?
 
-The resulting change is also convenient for grouping and defining
-the set of thread_struct fields that are supposed to be accessible
-to copy_{to,from}_user(), which includes user_fpsimd_state but
-should exclude the cpu field.  This patch does not amend the
-usercopy whitelist to match: that will be addressed in a subsequent
-patch.
+Sounds like a faff.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/fpsimd.h    | 29 ++------------------------
- arch/arm64/include/asm/processor.h |  4 ++--
- arch/arm64/kernel/fpsimd.c         | 42 +++++++++++++++++++++-----------------
- arch/arm64/kernel/ptrace.c         | 10 ++++-----
- arch/arm64/kernel/signal.c         |  3 +--
- arch/arm64/kernel/signal32.c       |  3 +--
- 6 files changed, 34 insertions(+), 57 deletions(-)
+Why don't I just pick them all up (except the ARM patch)?
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 8857a0f..1bfc920 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -24,31 +24,6 @@
- #include <linux/cache.h>
- #include <linux/stddef.h>
- 
--/*
-- * FP/SIMD storage area has:
-- *  - FPSR and FPCR
-- *  - 32 128-bit data registers
-- *
-- * Note that user_fpsimd forms a prefix of this structure, which is
-- * relied upon in the ptrace FP/SIMD accessors.
-- */
--struct fpsimd_state {
--	union {
--		struct user_fpsimd_state user_fpsimd;
--		struct {
--			__uint128_t vregs[32];
--			u32 fpsr;
--			u32 fpcr;
--			/*
--			 * For ptrace compatibility, pad to next 128-bit
--			 * boundary here if extending this struct.
--			 */
--		};
--	};
--	/* the id of the last cpu to have restored this state */
--	unsigned int cpu;
--};
--
- #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
- /* Masks for extracting the FPSR and FPCR from the FPSCR */
- #define VFP_FPSCR_STAT_MASK	0xf800009f
-@@ -62,8 +37,8 @@ struct fpsimd_state {
- 
- struct task_struct;
- 
--extern void fpsimd_save_state(struct fpsimd_state *state);
--extern void fpsimd_load_state(struct fpsimd_state *state);
-+extern void fpsimd_save_state(struct user_fpsimd_state *state);
-+extern void fpsimd_load_state(struct user_fpsimd_state *state);
- 
- extern void fpsimd_thread_switch(struct task_struct *next);
- extern void fpsimd_flush_thread(void);
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index fce604e..4a04535 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -37,7 +37,6 @@
- #include <linux/string.h>
- 
- #include <asm/alternative.h>
--#include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
- #include <asm/pgtable-hwdef.h>
-@@ -107,7 +106,8 @@ struct thread_struct {
- #ifdef CONFIG_COMPAT
- 	unsigned long		tp2_value;
- #endif
--	struct fpsimd_state	fpsimd_state;
-+	struct user_fpsimd_state fpsimd_state;
-+	unsigned int		fpsimd_cpu;
- 	void			*sve_state;	/* SVE registers, if any */
- 	unsigned int		sve_vl;		/* SVE vector length */
- 	unsigned int		sve_vl_onexec;	/* SVE vl after next exec */
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index e7226c4..c4be311 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -64,7 +64,7 @@
-  *     been loaded into its FPSIMD registers most recently, or whether it has
-  *     been used to perform kernel mode NEON in the meantime.
-  *
-- * For (a), we add a 'cpu' field to struct fpsimd_state, which gets updated to
-+ * For (a), we add a fpsimd_cpu field to thread_struct, which gets updated to
-  * the id of the current CPU every time the state is loaded onto a CPU. For (b),
-  * we add the per-cpu variable 'fpsimd_last_state' (below), which contains the
-  * address of the userland FPSIMD state of the task that was loaded onto the CPU
-@@ -73,7 +73,7 @@
-  * With this in place, we no longer have to restore the next FPSIMD state right
-  * when switching between tasks. Instead, we can defer this check to userland
-  * resume, at which time we verify whether the CPU's fpsimd_last_state and the
-- * task's fpsimd_state.cpu are still mutually in sync. If this is the case, we
-+ * task's fpsimd_cpu are still mutually in sync. If this is the case, we
-  * can omit the FPSIMD restore.
-  *
-  * As an optimization, we use the thread_info flag TIF_FOREIGN_FPSTATE to
-@@ -90,14 +90,14 @@
-  * flag with local_bh_disable() unless softirqs are already masked.
-  *
-  * For a certain task, the sequence may look something like this:
-- * - the task gets scheduled in; if both the task's fpsimd_state.cpu field
-+ * - the task gets scheduled in; if both the task's fpsimd_cpu field
-  *   contains the id of the current CPU, and the CPU's fpsimd_last_state per-cpu
-  *   variable points to the task's fpsimd_state, the TIF_FOREIGN_FPSTATE flag is
-  *   cleared, otherwise it is set;
-  *
-  * - the task returns to userland; if TIF_FOREIGN_FPSTATE is set, the task's
-  *   userland FPSIMD state is copied from memory to the registers, the task's
-- *   fpsimd_state.cpu field is set to the id of the current CPU, the current
-+ *   fpsimd_cpu field is set to the id of the current CPU, the current
-  *   CPU's fpsimd_last_state pointer is set to this task's fpsimd_state and the
-  *   TIF_FOREIGN_FPSTATE flag is cleared;
-  *
-@@ -115,7 +115,7 @@
-  *   whatever is in the FPSIMD registers is not saved to memory, but discarded.
-  */
- struct fpsimd_last_state_struct {
--	struct fpsimd_state *st;
-+	struct user_fpsimd_state *st;
- 	bool sve_in_use;
- };
- 
-@@ -417,7 +417,7 @@ static void fpsimd_to_sve(struct task_struct *task)
- {
- 	unsigned int vq;
- 	void *sst = task->thread.sve_state;
--	struct fpsimd_state const *fst = &task->thread.fpsimd_state;
-+	struct user_fpsimd_state const *fst = &task->thread.fpsimd_state;
- 	unsigned int i;
- 
- 	if (!system_supports_sve())
-@@ -443,7 +443,7 @@ static void sve_to_fpsimd(struct task_struct *task)
- {
- 	unsigned int vq;
- 	void const *sst = task->thread.sve_state;
--	struct fpsimd_state *fst = &task->thread.fpsimd_state;
-+	struct user_fpsimd_state *fst = &task->thread.fpsimd_state;
- 	unsigned int i;
- 
- 	if (!system_supports_sve())
-@@ -539,7 +539,7 @@ void sve_sync_from_fpsimd_zeropad(struct task_struct *task)
- {
- 	unsigned int vq;
- 	void *sst = task->thread.sve_state;
--	struct fpsimd_state const *fst = &task->thread.fpsimd_state;
-+	struct user_fpsimd_state const *fst = &task->thread.fpsimd_state;
- 	unsigned int i;
- 
- 	if (!test_tsk_thread_flag(task, TIF_SVE))
-@@ -908,10 +908,9 @@ void fpsimd_thread_switch(struct task_struct *next)
- 		 * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
- 		 * upon the next return to userland.
- 		 */
--		struct fpsimd_state *st = &next->thread.fpsimd_state;
--
--		if (__this_cpu_read(fpsimd_last_state.st) == st
--		    && st->cpu == smp_processor_id())
-+		if (__this_cpu_read(fpsimd_last_state.st) ==
-+			&next->thread.fpsimd_state
-+		    && next->thread.fpsimd_cpu == smp_processor_id())
- 			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 		else
- 			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
-@@ -927,7 +926,8 @@ void fpsimd_flush_thread(void)
- 
- 	local_bh_disable();
- 
--	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
-+	memset(&current->thread.fpsimd_state, 0,
-+	       sizeof current->thread.fpsimd_state);
- 	fpsimd_flush_task_state(current);
- 
- 	if (system_supports_sve()) {
-@@ -1004,11 +1004,10 @@ static void fpsimd_bind_to_cpu(void)
- {
- 	struct fpsimd_last_state_struct *last =
- 		this_cpu_ptr(&fpsimd_last_state);
--	struct fpsimd_state *st = &current->thread.fpsimd_state;
- 
--	last->st = st;
-+	last->st = &current->thread.fpsimd_state;
- 	last->sve_in_use = test_thread_flag(TIF_SVE);
--	st->cpu = smp_processor_id();
-+	current->thread.fpsimd_cpu = smp_processor_id();
- }
- 
- /*
-@@ -1043,7 +1042,7 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
- 
- 	local_bh_disable();
- 
--	current->thread.fpsimd_state.user_fpsimd = *state;
-+	current->thread.fpsimd_state = *state;
- 	if (system_supports_sve() && test_thread_flag(TIF_SVE))
- 		fpsimd_to_sve(current);
- 
-@@ -1055,12 +1054,17 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
- 	local_bh_enable();
- }
- 
-+void fpsimd_flush_state(unsigned int *cpu)
-+{
-+	*cpu = NR_CPUS;
-+}
-+
- /*
-  * Invalidate live CPU copies of task t's FPSIMD state
-  */
- void fpsimd_flush_task_state(struct task_struct *t)
- {
--	t->thread.fpsimd_state.cpu = NR_CPUS;
-+	fpsimd_flush_state(&t->thread.fpsimd_cpu);
- }
- 
- static inline void fpsimd_flush_cpu_state(void)
-@@ -1159,7 +1163,7 @@ EXPORT_SYMBOL(kernel_neon_end);
- 
- #ifdef CONFIG_EFI
- 
--static DEFINE_PER_CPU(struct fpsimd_state, efi_fpsimd_state);
-+static DEFINE_PER_CPU(struct user_fpsimd_state, efi_fpsimd_state);
- static DEFINE_PER_CPU(bool, efi_fpsimd_state_used);
- static DEFINE_PER_CPU(bool, efi_sve_state_used);
- 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 9ae31f7..fdeaba0de 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -629,7 +629,7 @@ static int __fpr_get(struct task_struct *target,
- 
- 	sve_sync_to_fpsimd(target);
- 
--	uregs = &target->thread.fpsimd_state.user_fpsimd;
-+	uregs = &target->thread.fpsimd_state;
- 
- 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, uregs,
- 				   start_pos, start_pos + sizeof(*uregs));
-@@ -660,14 +660,14 @@ static int __fpr_set(struct task_struct *target,
- 	 */
- 	sve_sync_to_fpsimd(target);
- 
--	newstate = target->thread.fpsimd_state.user_fpsimd;
-+	newstate = target->thread.fpsimd_state;
- 
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &newstate,
- 				 start_pos, start_pos + sizeof(newstate));
- 	if (ret)
- 		return ret;
- 
--	target->thread.fpsimd_state.user_fpsimd = newstate;
-+	target->thread.fpsimd_state = newstate;
- 
- 	return ret;
- }
-@@ -1169,7 +1169,7 @@ static int compat_vfp_get(struct task_struct *target,
- 	compat_ulong_t fpscr;
- 	int ret, vregs_end_pos;
- 
--	uregs = &target->thread.fpsimd_state.user_fpsimd;
-+	uregs = &target->thread.fpsimd_state;
- 
- 	if (target == current)
- 		fpsimd_preserve_current_state();
-@@ -1202,7 +1202,7 @@ static int compat_vfp_set(struct task_struct *target,
- 	compat_ulong_t fpscr;
- 	int ret, vregs_end_pos;
- 
--	uregs = &target->thread.fpsimd_state.user_fpsimd;
-+	uregs = &target->thread.fpsimd_state;
- 
- 	vregs_end_pos = VFP_STATE_SIZE - sizeof(compat_ulong_t);
- 	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, uregs, 0,
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index f60c052..d026615 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -178,8 +178,7 @@ static void __user *apply_user_offset(
- 
- static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- {
--	struct user_fpsimd_state const *fpsimd =
--		&current->thread.fpsimd_state.user_fpsimd;
-+	struct user_fpsimd_state const *fpsimd = &current->thread.fpsimd_state;
- 	int err;
- 
- 	/* copy the FP and status/control registers */
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 79feb86..4ea38d3 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -148,8 +148,7 @@ union __fpsimd_vreg {
- 
- static int compat_preserve_vfp_context(struct compat_vfp_sigframe __user *frame)
- {
--	struct user_fpsimd_state const *fpsimd =
--		&current->thread.fpsimd_state.user_fpsimd;
-+	struct user_fpsimd_state const *fpsimd = &current->thread.fpsimd_state;
- 	compat_ulong_t magic = VFP_MAGIC;
- 	compat_ulong_t size = VFP_STORAGE_SIZE;
- 	compat_ulong_t fpscr, fpexc;
 -- 
-2.1.4
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
