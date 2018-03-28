@@ -1,58 +1,76 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 28 Mar 2018 16:16:45 +0200
-Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <6d43177a-bbea-6a01-5fa5-1c7891e18412@linaro.org>
-References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
- <9761072.pX2B0LJlSJ@ada>
- <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
- <4073350.0MmxRoANOi@ada>
- <6d43177a-bbea-6a01-5fa5-1c7891e18412@linaro.org>
-Message-ID: <20180328141645.GF13942@piout.net>
+From: gerg@linux-m68k.org (Greg Ungerer)
+Date: Thu, 29 Mar 2018 00:19:25 +1000
+Subject: [PATCH] ARM: dts: imx6ull: add UART5 input select register
+ definition
+In-Reply-To: <1be3e0b1-6284-04b0-831a-98e79b57c0a7@i2se.com>
+References: <1522189496-27837-1-git-send-email-gerg@linux-m68k.org>
+ <1be3e0b1-6284-04b0-831a-98e79b57c0a7@i2se.com>
+Message-ID: <54de1ee2-93d7-b9b6-da81-7d5f7f976874@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/03/2018 at 15:03:11 +0200, Daniel Lezcano wrote:
-> On 28/03/2018 12:29, Alexander Dahl wrote:
-> > Hello Daniel,
-> > 
-> > Am Dienstag, 27. M?rz 2018, 13:30:22 CEST schrieb Daniel Lezcano:
-> >> Can you can give a rough amount for the irq rate on the timer ?
-> > 
-> > I used itop [1] now to get a rough estimate. First with kernel v4.14.29-rt25 
-> > (fully preempt RT):
-> > 
-> > INT                NAME          RATE             MAX
-> >  19 [ vel     tc_clkevt]   397 Ints/s     (max:   432)
-> >  26 [      vel     eth0]     4 Ints/s     (max:    38)
-> > 
-> > Next test with kernel v4.15.13 gives (slightly slower, but non-RT):
-> > 
-> > INT                NAME          RATE             MAX
-> >  19 [ vel     tc_clkevt]   248 Ints/s     (max:   273)
-> >  26 [      vel     eth0]     4 Ints/s     (max:    11)
-> > 
-> > With kernel v4.16-rc7 plus this patch series and tcb as clocksource:
-> > 
-> > INT                NAME          RATE             MAX
-> >  17 [vel     timer at fffa]  2164 Ints/s     (max:  2183)
-> >  26 [      vel     eth0]     5 Ints/s     (max:    10)
-> > 
-> > Is this the information you wanted? If not, could you point me on how to get 
-> > the requested irq rate?
-> 
-> It is perfect. Thanks!
-> 
-> It confirms what I was worried about: the clocksource wraps up too
-> quickly thus raising an interrupt every 400us. That is why I asked
-> Alexande about a prescalar register.
-> 
+Hi Stefan,
 
-The code should behave exactly the same between the previous and the new
-driver. The interrupt is not coming from the clocksource but from the
-clockevent and it is already on the slowest clock, the 32kHz one.
+On 28/03/18 16:47, Stefan Wahren wrote:
+> Am 28.03.2018 um 00:24 schrieb Greg Ungerer:
+>> The iMX6ULL UART5_RX_DATA_SELECT_INPUT DAISY Register has some different
+>> bit definitions to that same register in the iMX6UL.
+>>
+>> The bits for the iMX6UL:
+>>
+>> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
+>> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
+>> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
+>> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
+>> 100 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT
+>> 101 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT
+>>
+>> But for the iMX6ULL:
+>>
+>> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
+>> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
+>> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
+>> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
+>> 100 UART1_TX_DATA_ALT9 ? Selecting Pad: UART1_TX_DATA for Mode: ALT9
+>> 101 UART1_RX_DATA_ALT9 ? Selecting Pad: UART1_RX_DATA for Mode: ALT9
+>> 110 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT0
+>> 111 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT0
+>>
+>> Specifically for a board I am working on with the serial console on UART5
+>> I need to be able to enable UART5_RX_DATA_ALT0 mode. There is no definition
+>> for the iMX6ULL version of that in imx6ul-pinfunc.h or imx6ull-pinfunc.h.
+>>
+>> Create a new definition specific to the iMX6ULL so that is settable.
+>>
+>> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
+>> ---
+>>   arch/arm/boot/dts/imx6ull-pinfunc.h | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> index 1182023..19100b5 100644
+>> --- a/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> +++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> @@ -14,6 +14,7 @@
+>>    * The pin function ID is a tuple of
+>>    * <mux_reg conf_reg input_reg mux_mode input_val>
+>>    */
+>> +#define MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
+> 
+> since you mentioned the differences above, could you please add them all?
+
+Sure, will do.
+
+Regards
+Greg
 
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> Thanks
+> Stefan
+> 
+>>   #define MX6ULL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
+>>   #define MX6ULL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
+>>   #define MX6ULL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
+> 
+> 
+> 
