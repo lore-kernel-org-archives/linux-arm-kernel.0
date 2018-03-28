@@ -1,99 +1,86 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:33 +0100
-Subject: [PATCH 64/85] KVM: arm64: Fix HYP idmap unmap when using 52bit PA
+Date: Wed, 28 Mar 2018 13:52:35 +0100
+Subject: [PATCH 66/85] arm64; insn: Add encoder for the EXTR instruction
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-65-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-67-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unmapping the idmap range using 52bit PA is quite broken, as we
-don't take into account the right number of PGD entries, and rely
-on PTRS_PER_PGD. The result is that pgd_index() truncates the
-address, and we end-up in the weed.
+Add an encoder for the EXTR instruction, which also implements the ROR
+variant (where Rn == Rm).
 
-Let's introduce a new unmap_hyp_idmap_range() that knows about this,
-together with a kvm_pgd_index() helper, which hides a bit of the
-complexity of the issue.
-
-Fixes: 98732d1b189b ("KVM: arm/arm64: fix HYP ID map extension to 52 bits")
-Reported-by: James Morse <james.morse@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/mmu.c | 26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/insn.h |  6 ++++++
+ arch/arm64/kernel/insn.c      | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index c41d03a8af93..f7fe724c14f4 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -479,7 +479,13 @@ static void unmap_hyp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- 		clear_hyp_pgd_entry(pgd);
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 815b35bc53ed..f62c56b1793f 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -319,6 +319,7 @@ __AARCH64_INSN_FUNCS(and_imm,	0x7F800000, 0x12000000)
+ __AARCH64_INSN_FUNCS(orr_imm,	0x7F800000, 0x32000000)
+ __AARCH64_INSN_FUNCS(eor_imm,	0x7F800000, 0x52000000)
+ __AARCH64_INSN_FUNCS(ands_imm,	0x7F800000, 0x72000000)
++__AARCH64_INSN_FUNCS(extr,	0x7FA00000, 0x13800000)
+ __AARCH64_INSN_FUNCS(b,		0xFC000000, 0x14000000)
+ __AARCH64_INSN_FUNCS(bl,	0xFC000000, 0x94000000)
+ __AARCH64_INSN_FUNCS(cbz,	0x7F000000, 0x34000000)
+@@ -433,6 +434,11 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
+ 				       enum aarch64_insn_register Rn,
+ 				       enum aarch64_insn_register Rd,
+ 				       u64 imm);
++u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
++			  enum aarch64_insn_register Rm,
++			  enum aarch64_insn_register Rn,
++			  enum aarch64_insn_register Rd,
++			  u8 lsb);
+ u32 aarch64_insn_gen_prefetch(enum aarch64_insn_register base,
+ 			      enum aarch64_insn_prfm_type type,
+ 			      enum aarch64_insn_prfm_target target,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index e87d6dcd7c82..2929adaad587 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -1621,3 +1621,35 @@ u32 aarch64_insn_gen_logical_immediate(enum aarch64_insn_logic_type type,
+ 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
+ 	return aarch64_encode_immediate(imm, variant, insn);
  }
- 
--static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
-+static unsigned int kvm_pgd_index(unsigned long addr, unsigned int ptrs_per_pgd)
-+{
-+	return (addr >> PGDIR_SHIFT) & (ptrs_per_pgd - 1);
-+}
 +
-+static void __unmap_hyp_range(pgd_t *pgdp, unsigned long ptrs_per_pgd,
-+			      phys_addr_t start, u64 size)
- {
- 	pgd_t *pgd;
- 	phys_addr_t addr = start, end = start + size;
-@@ -489,7 +495,7 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
- 	 * We don't unmap anything from HYP, except at the hyp tear down.
- 	 * Hence, we don't have to invalidate the TLBs here.
- 	 */
--	pgd = pgdp + pgd_index(addr);
-+	pgd = pgdp + kvm_pgd_index(addr, ptrs_per_pgd);
- 	do {
- 		next = pgd_addr_end(addr, end);
- 		if (!pgd_none(*pgd))
-@@ -497,6 +503,16 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-+static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
++u32 aarch64_insn_gen_extr(enum aarch64_insn_variant variant,
++			  enum aarch64_insn_register Rm,
++			  enum aarch64_insn_register Rn,
++			  enum aarch64_insn_register Rd,
++			  u8 lsb)
 +{
-+	__unmap_hyp_range(pgdp, PTRS_PER_PGD, start, size);
-+}
++	u32 insn;
 +
-+static void unmap_hyp_idmap_range(pgd_t *pgdp, phys_addr_t start, u64 size)
-+{
-+	__unmap_hyp_range(pgdp, __kvm_idmap_ptrs_per_pgd(), start, size);
-+}
++	insn = aarch64_insn_get_extr_value();
 +
- /**
-  * free_hyp_pgds - free Hyp-mode page tables
-  *
-@@ -512,13 +528,13 @@ void free_hyp_pgds(void)
- 	mutex_lock(&kvm_hyp_pgd_mutex);
- 
- 	if (boot_hyp_pgd) {
--		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
-+		unmap_hyp_idmap_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
- 		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
- 		boot_hyp_pgd = NULL;
- 	}
- 
- 	if (hyp_pgd) {
--		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
-+		unmap_hyp_idmap_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
- 		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
- 				(uintptr_t)high_memory - PAGE_OFFSET);
- 		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
-@@ -634,7 +650,7 @@ static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
- 	addr = start & PAGE_MASK;
- 	end = PAGE_ALIGN(end);
- 	do {
--		pgd = pgdp + ((addr >> PGDIR_SHIFT) & (ptrs_per_pgd - 1));
-+		pgd = pgdp + kvm_pgd_index(addr, ptrs_per_pgd);
- 
- 		if (pgd_none(*pgd)) {
- 			pud = pud_alloc_one(NULL, addr);
++	switch (variant) {
++	case AARCH64_INSN_VARIANT_32BIT:
++		if (lsb > 31)
++			return AARCH64_BREAK_FAULT;
++		break;
++	case AARCH64_INSN_VARIANT_64BIT:
++		if (lsb > 63)
++			return AARCH64_BREAK_FAULT;
++		insn |= AARCH64_INSN_SF_BIT;
++		insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_N, insn, 1);
++		break;
++	default:
++		pr_err("%s: unknown variant encoding %d\n", __func__, variant);
++		return AARCH64_BREAK_FAULT;
++	}
++
++	insn = aarch64_insn_encode_immediate(AARCH64_INSN_IMM_S, insn, lsb);
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, Rd);
++	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, Rn);
++	return aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RM, insn, Rm);
++}
 -- 
 2.14.2
