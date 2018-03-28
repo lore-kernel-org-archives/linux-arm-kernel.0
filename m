@@ -1,66 +1,96 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Mar 2018 14:57:49 +0200
-Subject: [PATCH 08/12] ARM: dts: r8a77470: Initial SoC device tree
-In-Reply-To: <1522161443-54428-9-git-send-email-biju.das@bp.renesas.com>
-References: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
- <1522161443-54428-9-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAMuHMdVdRKpRXhd=0W3hVRt9MD0NVwBpoYa7dsZ+DAEn=sHD-A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Mar 2018 13:52:42 +0100
+Subject: [PATCH 73/85] arm64: KVM: Move BP hardening vectors into .hyp.text
+ section
+In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
+References: <20180328125254.31380-1-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-74-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Biju,
+There is no reason why the BP hardening vectors shouldn't be part
+of the HYP text at compile time, rather than being mapped at runtime.
 
-On Tue, Mar 27, 2018 at 4:37 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> The initial R8A77470 SoC device tree including CPU0, GIC, timer, SYSC, RST,
-> CPG, and the required clock descriptions.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Also introduce a new config symbol that controls the compilation
+of bpi.S.
 
-Thanks for your patch!
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_mmu.h | 4 +---
+ arch/arm64/kernel/Makefile       | 4 +---
+ arch/arm64/kernel/bpi.S          | 6 ++++++
+ arch/arm64/kvm/Kconfig           | 3 +++
+ 4 files changed, 11 insertions(+), 6 deletions(-)
 
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/r8a77470.dtsi
-> @@ -0,0 +1,156 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Device Tree Source for the r8a77470 SoC
-> + *
-> + * Copyright (C) 2018 Renesas Electronics Corp.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/clock/r8a7747x-cpg-mssr.h>
-> +#include <dt-bindings/power/r8a7747x-sysc.h>
-
-It is better to use numerical values for the initial submission, as
-the dt-bindings
-headers and the DTS files go upstream through different maintainer paths.
-
-> +/ {
-> +       compatible = "renesas,r8a77470";
-
-> +       soc {
-
-> +               icram2: sram at e6300000 {
-> +                       compatible = "mmio-sram";
-> +                       reg = <0 0xe6300000 0 0x40000>;
-
-Size should be 0x20000 (half of other members in the RZ/G1 family)?
-
-> +               };
-
-With the above fixed:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 8cd37eac6292..65dc225d019c 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -380,9 +380,7 @@ static inline void *kvm_get_hyp_vector(void)
+ 
+ static inline int kvm_map_vectors(void)
+ {
+-	return create_hyp_mappings(kvm_ksym_ref(__bp_harden_hyp_vecs_start),
+-				   kvm_ksym_ref(__bp_harden_hyp_vecs_end),
+-				   PAGE_HYP_EXEC);
++	return 0;
+ }
+ 
+ #else
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index b87541360f43..93bce17109a6 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -54,9 +54,7 @@ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+ 
+-ifeq ($(CONFIG_KVM),y)
+-arm64-obj-$(CONFIG_HARDEN_BRANCH_PREDICTOR)	+= bpi.o
+-endif
++arm64-obj-$(CONFIG_KVM_INDIRECT_VECTORS)+= bpi.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
+index e5de33513b5d..447188e2a664 100644
+--- a/arch/arm64/kernel/bpi.S
++++ b/arch/arm64/kernel/bpi.S
+@@ -48,6 +48,10 @@
+ 	ventry \target + 0x780
+ .endm
+ 
++
++	.text
++	.pushsection	.hyp.text, "ax"
++
+ 	.align	11
+ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.rept 4
+@@ -55,6 +59,8 @@ ENTRY(__bp_harden_hyp_vecs_start)
+ 	.endr
+ ENTRY(__bp_harden_hyp_vecs_end)
+ 
++	.popsection
++
+ ENTRY(__qcom_hyp_sanitize_link_stack_start)
+ 	stp     x29, x30, [sp, #-16]!
+ 	.rept	16
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 2257dfcc44cc..bd8cc03d7522 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -57,6 +57,9 @@ config KVM_ARM_PMU
+ 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
+ 	  virtual machines.
+ 
++config KVM_INDIRECT_VECTORS
++       def_bool KVM && HARDEN_BRANCH_PREDICTOR
++
+ source drivers/vhost/Kconfig
+ 
+ endif # VIRTUALIZATION
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+2.14.2
