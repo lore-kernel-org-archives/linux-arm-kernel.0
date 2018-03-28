@@ -1,45 +1,63 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 28 Mar 2018 11:02:18 +1030
-Subject: [PATCH 1/2 v2] ARM: dts: Add Aspeed SoC USB controllers to
- device-tree
-In-Reply-To: <1516031982.5522.3.camel@aj.id.au>
-References: <1515738064.31850.100.camel@kernel.crashing.org>
- <1516031982.5522.3.camel@aj.id.au>
-Message-ID: <CACPK8XcrcKQSX5Eq3Cq26j1W9kJJezF+AR3pDu6U-MyWS+2yhg@mail.gmail.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Wed, 28 Mar 2018 02:34:25 +0200
+Subject: [PATCH 4/6] pwm: pwm-omap-dmtimer: Fix frequency when using
+ prescaler
+In-Reply-To: <20180327222349.GK5700@atomide.com>
+References: <20180223101254.GA5746@lenoch> <20180223101553.GE5746@lenoch>
+ <20180327215332.GC28163@mithrandir>
+ <20180327221401.GD28163@mithrandir>
+ <20180327222349.GK5700@atomide.com>
+Message-ID: <20180328003425.GA8707@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 January 2018 at 02:29, Andrew Jeffery <andrew@aj.id.au> wrote:
-> On Fri, 2018-01-12 at 17:21 +1100, Benjamin Herrenschmidt wrote:
->> This adds the USB controllers to the DT template of the
->> AST24xx and AST25xx SoCs.
->>
->> This patch doesn't enable them by default on any board specific
->> .dts yet. This will be done when we have the necessary clock/reset
->> and pinmux support. In the meantime though, this will work if
->> u-boot configures things properly.
->>
->> For the AST2400 I only added pinmux definition for port 1
->> which is dual USB1/USB2. There are additional USB1 only ports
->> that might require more work but I don't have HW to test at
->> hand so I'm leaving that to whoever cares.
->>
->> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
->> ---
->>
->> v2: Previous patch was missing actually adding the nodes
->>     (which was an old patch in my tree I had forgotten to
->>     merge).
->>
->>  arch/arm/boot/dts/aspeed-g4.dtsi | 27 +++++++++++++++++++++++++++
->>  arch/arm/boot/dts/aspeed-g5.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 67 insertions(+)
+On Tue, Mar 27, 2018 at 03:23:49PM -0700, Tony Lindgren wrote:
+> * Thierry Reding <thierry.reding@gmail.com> [180327 22:15]:
+> > On Tue, Mar 27, 2018 at 11:53:33PM +0200, Thierry Reding wrote:
+> > > On Fri, Feb 23, 2018 at 11:15:53AM +0100, Ladislav Michl wrote:
+> > > > Prescaler setting is currently not taken into account.
+> > > > Fix that by introducing freq member variable and initialize
+> > > > it at device probe time. This also avoids frequency
+> > > > recomputing at each pwm configure time.
+> > > > 
+> > > > Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+> > > > ---
+> > > >  drivers/pwm/pwm-omap-dmtimer.c | 93 +++++++++++++++++++++++++-----------------
+> > > >  1 file changed, 55 insertions(+), 38 deletions(-)
+> > > 
+> > > Applied, thanks.
+> > 
+> > Actually, that was a little premature. It seems like this conflicts with
+> > a patch series by Keerthy that Tony merged into his tree and that you've
+> > based this on.
+> > 
+> > I think it'd be easiest if Tony merged this through the TI tree, or we
+> > wait until v4.17-rc1 to resolve the dependency. Given how late we are in
+> > the release cycle, I think it'd have to be the latter.
+> 
+> Sorry about the extra hassle caused by the timer move to drivers.
+> 
+> > Tony, if you think you can find a way to still take this in for
+> > v4.17-rc1, feel free to do so:
+> > 
+> > Acked-by: Thierry Reding <thierry.reding@gmail.com>
+> 
+> I pretty much only apply fixes after -rc6. So let's wait for the
+> dependencies to clear at this point. This seems like a "fix for
+> a feature that never worked" so might be hard to justify it as
+> a fix :)
 
-> Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+Well, DT bindings already contain prescaler, so technically it is
+a fix which also optimizes code a bit ;-) But of course, I can keep
+this patch localy and resend for 4.18 merge window.
 
-This one also slipped through the cracks. I have applied it to the
-aspeed tree with Andrew's review.
+> Ladis, can you please resend the pending patches again to
+> Thierry after v4.17-rc? Then Thierry can queue it as a fix or
+> for v4.18.
 
-Cheers,
+In fact, there is the only one patch ready to be applied - this one - and
+The others (event capture) needs to be yet sorted out. Unfortunately I do
+not have time for that at the moment.
 
-Joel
+Best regards,
+	ladis
