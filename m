@@ -1,80 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:52 +0100
-Subject: [PATCH 83/85] KVM: arm/arm64: vgic-its: Fix potential overrun in
- vgic_copy_lpi_list
+Date: Wed, 28 Mar 2018 13:52:49 +0100
+Subject: [PATCH 80/85] KVM: arm: Reserve bit in KVM_REG_ARM encoding for
+ secure/nonsecure
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-84-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-81-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vgic_copy_lpi_list() parses the LPI list and picks LPIs targeting
-a given vcpu. We allocate the array containing the intids before taking
-the lpi_list_lock, which means we can have an array size that is not
-equal to the number of LPIs.
+From: Peter Maydell <peter.maydell@linaro.org>
 
-This is particularly obvious when looking at the path coming from
-vgic_enable_lpis, which is not a command, and thus can run in parallel
-with commands:
+We have a KVM_REG_ARM encoding that we use to expose KVM guest registers
+to userspace. Define that bit 28 in this encoding indicates secure vs
+nonsecure, so we can distinguish the secure and nonsecure banked versions
+of a banked AArch32 register.
 
-vcpu 0:                                        vcpu 1:
-vgic_enable_lpis
-  its_sync_lpi_pending_table
-    vgic_copy_lpi_list
-      intids = kmalloc_array(irq_count)
-                                               MAPI(lpi targeting vcpu 0)
-      list_for_each_entry(lpi_list_head)
-        intids[i++] = irq->intid;
+For KVM currently, all guest registers are nonsecure, but defining
+the bit is useful for userspace. In particular, QEMU uses this
+encoding as part of its on-the-wire migration format, and needs to be
+able to describe secure-bank registers when it is migrating (fully
+emulated) EL3-enabled CPUs.
 
-At that stage, we will happily overrun the intids array. Boo. An easy
-fix is is to break once the array is full. The MAPI command will update
-the config anyway, and we won't miss a thing. We also make sure that
-lpi_list_count is read exactly once, so that further updates of that
-value will not affect the array bound check.
-
-Cc: stable at vger.kernel.org
-Fixes: ccb1d791ab9e ("KVM: arm64: vgic-its: Fix pending table sync")
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ arch/arm/include/uapi/asm/kvm.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 465095355666..a8f07243aa9f 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -316,21 +316,24 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_irq *irq;
- 	u32 *intids;
--	int irq_count = dist->lpi_list_count, i = 0;
-+	int irq_count, i = 0;
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 6edd177bb1c7..2ba95d6fe852 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -135,6 +135,15 @@ struct kvm_arch_memory_slot {
+ #define KVM_REG_ARM_CRM_SHIFT		7
+ #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
+ #define KVM_REG_ARM_32_CRN_SHIFT	11
++/*
++ * For KVM currently all guest registers are nonsecure, but we reserve a bit
++ * in the encoding to distinguish secure from nonsecure for AArch32 system
++ * registers that are banked by security. This is 1 for the secure banked
++ * register, and 0 for the nonsecure banked register or if the register is
++ * not banked by security.
++ */
++#define KVM_REG_ARM_SECURE_MASK	0x0000000010000000
++#define KVM_REG_ARM_SECURE_SHIFT	28
  
- 	/*
--	 * We use the current value of the list length, which may change
--	 * after the kmalloc. We don't care, because the guest shouldn't
--	 * change anything while the command handling is still running,
--	 * and in the worst case we would miss a new IRQ, which one wouldn't
--	 * expect to be covered by this command anyway.
-+	 * There is an obvious race between allocating the array and LPIs
-+	 * being mapped/unmapped. If we ended up here as a result of a
-+	 * command, we're safe (locks are held, preventing another
-+	 * command). If coming from another path (such as enabling LPIs),
-+	 * we must be careful not to overrun the array.
- 	 */
-+	irq_count = READ_ONCE(dist->lpi_list_count);
- 	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
- 	if (!intids)
- 		return -ENOMEM;
- 
- 	spin_lock(&dist->lpi_list_lock);
- 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-+		if (i == irq_count)
-+			break;
- 		/* We don't need to "get" the IRQ, as we hold the list lock. */
- 		if (irq->target_vcpu != vcpu)
- 			continue;
+ #define ARM_CP15_REG_SHIFT_MASK(x,n) \
+ 	(((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
 -- 
 2.14.2
