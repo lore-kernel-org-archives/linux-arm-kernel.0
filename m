@@ -1,174 +1,217 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:11 +0100
-Subject: [PATCH 42/85] KVM: arm64: Prepare to handle deferred save/restore of
- 32-bit registers
+Date: Wed, 28 Mar 2018 13:52:23 +0100
+Subject: [PATCH 54/85] arm64: alternatives: Add dynamic patching feature
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-43-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-55-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+We've so far relied on a patching infrastructure that only gave us
+a single alternative, without any way to provide a range of potential
+replacement instructions. For a single feature, this is an all or
+nothing thing.
 
-32-bit registers are not used by a 64-bit host kernel and can be
-deferred, but we need to rework the accesses to these register to access
-the latest values depending on whether or not guest system registers are
-loaded on the CPU or only reside in memory.
+It would be interesting to have a more flexible grained way of patching
+the kernel though, where we could dynamically tune the code that gets
+injected.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+In order to achive this, let's introduce a new form of dynamic patching,
+assiciating a callback to a patching site. This callback gets source and
+target locations of the patching request, as well as the number of
+instructions to be patched.
+
+Dynamic patching is declared with the new ALTERNATIVE_CB and alternative_cb
+directives:
+
+	asm volatile(ALTERNATIVE_CB("mov %0, #0\n", callback)
+		     : "r" (v));
+or
+	alternative_cb callback
+		mov	x0, #0
+	alternative_cb_end
+
+where callback is the C function computing the alternative.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h | 32 +++++------------
- arch/arm64/kvm/regmap.c              | 67 +++++++++++++++++++++++++++---------
- 2 files changed, 59 insertions(+), 40 deletions(-)
+ arch/arm64/include/asm/alternative.h | 41 ++++++++++++++++++++++++++++++----
+ arch/arm64/kernel/alternative.c      | 43 +++++++++++++++++++++++++++---------
+ 2 files changed, 69 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 6ed18ce0d638..23b33e8ea03a 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -33,7 +33,8 @@
- #include <asm/virt.h>
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index 669028172fd6..a91933b1e2e6 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -5,6 +5,8 @@
+ #include <asm/cpucaps.h>
+ #include <asm/insn.h>
  
- unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
--unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
-+unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu);
-+void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v);
++#define ARM64_CB_PATCH ARM64_NCAPS
++
+ #ifndef __ASSEMBLY__
  
- bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
- void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
-@@ -162,41 +163,26 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
+ #include <linux/init.h>
+@@ -22,12 +24,19 @@ struct alt_instr {
+ 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
+ };
  
- static inline unsigned long vcpu_read_spsr(const struct kvm_vcpu *vcpu)
- {
--	unsigned long *p = (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
--
--	if (vcpu_mode_is_32bit(vcpu)) {
--		unsigned long *p_32bit = vcpu_spsr32(vcpu);
--
--		/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
--		if (p_32bit != p)
--			return *p_32bit;
--	}
-+	if (vcpu_mode_is_32bit(vcpu))
-+		return vcpu_read_spsr32(vcpu);
++typedef void (*alternative_cb_t)(struct alt_instr *alt,
++				 __le32 *origptr, __le32 *updptr, int nr_inst);
++
+ void __init apply_alternatives_all(void);
+ void apply_alternatives(void *start, size_t length);
  
- 	if (vcpu->arch.sysregs_loaded_on_cpu)
- 		return read_sysreg_el1(spsr);
- 	else
--		return *p;
-+		return vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
- }
- 
--static inline void vcpu_write_spsr(const struct kvm_vcpu *vcpu, unsigned long v)
-+static inline void vcpu_write_spsr(struct kvm_vcpu *vcpu, unsigned long v)
- {
--	unsigned long *p = (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
--
--	/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
- 	if (vcpu_mode_is_32bit(vcpu)) {
--		unsigned long *p_32bit = vcpu_spsr32(vcpu);
--
--		/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
--		if (p_32bit != p) {
--			*p_32bit = v;
--			return;
--		}
-+		vcpu_write_spsr32(vcpu, v);
-+		return;
- 	}
- 
- 	if (vcpu->arch.sysregs_loaded_on_cpu)
- 		write_sysreg_el1(v, spsr);
- 	else
--		*p = v;
-+		vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1] = v;
- }
- 
- static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
-index bbc6ae32e4af..eefe403a2e63 100644
---- a/arch/arm64/kvm/regmap.c
-+++ b/arch/arm64/kvm/regmap.c
-@@ -141,28 +141,61 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
- /*
-  * Return the SPSR for the current mode of the virtual CPU.
+-#define ALTINSTR_ENTRY(feature)						      \
++#define ALTINSTR_ENTRY(feature,cb)					      \
+ 	" .word 661b - .\n"				/* label           */ \
++	" .if " __stringify(cb) " == 0\n"				      \
+ 	" .word 663f - .\n"				/* new instruction */ \
++	" .else\n"							      \
++	" .word " __stringify(cb) "- .\n"		/* callback */	      \
++	" .endif\n"							      \
+ 	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
+ 	" .byte 662b-661b\n"				/* source len      */ \
+ 	" .byte 664f-663f\n"				/* replacement len */
+@@ -45,15 +54,18 @@ void apply_alternatives(void *start, size_t length);
+  * but most assemblers die if insn1 or insn2 have a .inst. This should
+  * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
+  * containing commit 4e4d08cf7399b606 or c1baaddf8861).
++ *
++ * Alternatives with callbacks do not generate replacement instructions.
   */
--unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
-+static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
- {
- 	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
- 	switch (mode) {
--	case COMPAT_PSR_MODE_SVC:
--		mode = KVM_SPSR_SVC;
--		break;
--	case COMPAT_PSR_MODE_ABT:
--		mode = KVM_SPSR_ABT;
--		break;
--	case COMPAT_PSR_MODE_UND:
--		mode = KVM_SPSR_UND;
--		break;
--	case COMPAT_PSR_MODE_IRQ:
--		mode = KVM_SPSR_IRQ;
--		break;
--	case COMPAT_PSR_MODE_FIQ:
--		mode = KVM_SPSR_FIQ;
--		break;
-+	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
-+	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
-+	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
-+	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
-+	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
-+	default: BUG();
-+	}
-+}
-+
-+unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu)
-+{
-+	int spsr_idx = vcpu_spsr32_mode(vcpu);
-+
-+	if (!vcpu->arch.sysregs_loaded_on_cpu)
-+		return vcpu_gp_regs(vcpu)->spsr[spsr_idx];
-+
-+	switch (spsr_idx) {
-+	case KVM_SPSR_SVC:
-+		return read_sysreg_el1(spsr);
-+	case KVM_SPSR_ABT:
-+		return read_sysreg(spsr_abt);
-+	case KVM_SPSR_UND:
-+		return read_sysreg(spsr_und);
-+	case KVM_SPSR_IRQ:
-+		return read_sysreg(spsr_irq);
-+	case KVM_SPSR_FIQ:
-+		return read_sysreg(spsr_fiq);
- 	default:
- 		BUG();
- 	}
-+}
-+
-+void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v)
-+{
-+	int spsr_idx = vcpu_spsr32_mode(vcpu);
-+
-+	if (!vcpu->arch.sysregs_loaded_on_cpu) {
-+		vcpu_gp_regs(vcpu)->spsr[spsr_idx] = v;
-+		return;
-+	}
+-#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled)	\
++#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled, cb)	\
+ 	".if "__stringify(cfg_enabled)" == 1\n"				\
+ 	"661:\n\t"							\
+ 	oldinstr "\n"							\
+ 	"662:\n"							\
+ 	".pushsection .altinstructions,\"a\"\n"				\
+-	ALTINSTR_ENTRY(feature)						\
++	ALTINSTR_ENTRY(feature,cb)					\
+ 	".popsection\n"							\
++	" .if " __stringify(cb) " == 0\n"				\
+ 	".pushsection .altinstr_replacement, \"a\"\n"			\
+ 	"663:\n\t"							\
+ 	newinstr "\n"							\
+@@ -61,11 +73,17 @@ void apply_alternatives(void *start, size_t length);
+ 	".popsection\n\t"						\
+ 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
+ 	".org	. - (662b-661b) + (664b-663b)\n"			\
++	".else\n\t"							\
++	"663:\n\t"							\
++	"664:\n\t"							\
++	".endif\n"							\
+ 	".endif\n"
  
--	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
-+	switch (spsr_idx) {
-+	case KVM_SPSR_SVC:
-+		write_sysreg_el1(v, spsr);
-+	case KVM_SPSR_ABT:
-+		write_sysreg(v, spsr_abt);
-+	case KVM_SPSR_UND:
-+		write_sysreg(v, spsr_und);
-+	case KVM_SPSR_IRQ:
-+		write_sysreg(v, spsr_irq);
-+	case KVM_SPSR_FIQ:
-+		write_sysreg(v, spsr_fiq);
-+	}
+ #define _ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg, ...)	\
+-	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg))
++	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg), 0)
+ 
++#define ALTERNATIVE_CB(oldinstr, cb) \
++	__ALTERNATIVE_CFG(oldinstr, "NOT_AN_INSTRUCTION", ARM64_CB_PATCH, 1, cb)
+ #else
+ 
+ #include <asm/assembler.h>
+@@ -132,6 +150,14 @@ void apply_alternatives(void *start, size_t length);
+ 661:
+ .endm
+ 
++.macro alternative_cb cb
++	.set .Lasm_alt_mode, 0
++	.pushsection .altinstructions, "a"
++	altinstruction_entry 661f, \cb, ARM64_CB_PATCH, 662f-661f, 0
++	.popsection
++661:
++.endm
++
+ /*
+  * Provide the other half of the alternative code sequence.
+  */
+@@ -157,6 +183,13 @@ void apply_alternatives(void *start, size_t length);
+ 	.org	. - (662b-661b) + (664b-663b)
+ .endm
+ 
++/*
++ * Callback-based alternative epilogue
++ */
++.macro alternative_cb_end
++662:
++.endm
++
+ /*
+  * Provides a trivial alternative or default sequence consisting solely
+  * of NOPs. The number of NOPs is chosen automatically to match the
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 414288a558c8..5c4bce4ac381 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -107,32 +107,53 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
+ 	return insn;
  }
+ 
++static void patch_alternative(struct alt_instr *alt,
++			      __le32 *origptr, __le32 *updptr, int nr_inst)
++{
++	__le32 *replptr;
++	int i;
++
++	replptr = ALT_REPL_PTR(alt);
++	for (i = 0; i < nr_inst; i++) {
++		u32 insn;
++
++		insn = get_alt_insn(alt, origptr + i, replptr + i);
++		updptr[i] = cpu_to_le32(insn);
++	}
++}
++
+ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+-	__le32 *origptr, *replptr, *updptr;
++	__le32 *origptr, *updptr;
++	alternative_cb_t alt_cb;
+ 
+ 	for (alt = region->begin; alt < region->end; alt++) {
+-		u32 insn;
+-		int i, nr_inst;
++		int nr_inst;
+ 
+-		if (!cpus_have_cap(alt->cpufeature))
++		/* Use ARM64_CB_PATCH as an unconditional patch */
++		if (alt->cpufeature < ARM64_CB_PATCH &&
++		    !cpus_have_cap(alt->cpufeature))
+ 			continue;
+ 
+-		BUG_ON(alt->alt_len != alt->orig_len);
++		if (alt->cpufeature == ARM64_CB_PATCH)
++			BUG_ON(alt->alt_len != 0);
++		else
++			BUG_ON(alt->alt_len != alt->orig_len);
+ 
+ 		pr_info_once("patching kernel code\n");
+ 
+ 		origptr = ALT_ORIG_PTR(alt);
+-		replptr = ALT_REPL_PTR(alt);
+ 		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
+-		nr_inst = alt->alt_len / sizeof(insn);
++		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
+ 
+-		for (i = 0; i < nr_inst; i++) {
+-			insn = get_alt_insn(alt, origptr + i, replptr + i);
+-			updptr[i] = cpu_to_le32(insn);
+-		}
++		if (alt->cpufeature < ARM64_CB_PATCH)
++			alt_cb = patch_alternative;
++		else
++			alt_cb  = ALT_REPL_PTR(alt);
++
++		alt_cb(alt, origptr, updptr, nr_inst);
+ 
+ 		flush_icache_range((uintptr_t)origptr,
+ 				   (uintptr_t)(origptr + nr_inst));
 -- 
 2.14.2
