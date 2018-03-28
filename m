@@ -1,106 +1,96 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 28 Mar 2018 09:46:55 +0200
-Subject: [PATCH] sched: support dynamiQ cluster
-Message-ID: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Wed, 28 Mar 2018 08:00:10 +0000
+Subject: [PATCH v2 0/8] arm: Base support for Renesas RZN1D-DB Board
+In-Reply-To: <1521719091-25157-1-git-send-email-michel.pollet@bp.renesas.com>
+References: <1521719091-25157-1-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <OSBPR01MB2054B502FE0D0777386C636BD2A30@OSBPR01MB2054.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arm DynamiQ system can integrate cores with different micro architecture
-or max OPP under the same DSU so we can have cores with different compute
-capacity at the LLC (which was not the case with legacy big/LITTLE
-architecture). Such configuration is similar in some way to ITMT on intel
-platform which allows some cores to be boosted to higher turbo frequency
-than others and which uses SD_ASYM_PACKING feature to ensures that CPUs with
-highest capacity, will always be used in priortiy in order to provide
-maximum throughput.
+Replying to myself here, more or less to reflect further discussion on IRC related to where the
+bindings goes. Also, to publicly acknowledge and thank Geert for tons of advice and comments
+outside the email chain...
 
-Add arch_asym_cpu_priority() for arm64 as this function is used to
-differentiate CPUs in the scheduler. The CPU's capacity is used to order
-CPUs in the same DSU.
+So, after further discussion on IRC, that's what I've been trying to do
+[hope outlook doesn't mangle this]:
++---------------------------------+     +------------------------------------+     +--------------------------------+
+|          r9a06g0xx.dtsi         |     |         r9a06g032.dtsi             |     |     r9a06g032-rzn1d-db.dts     |
+|                                 |     |                                    |     |                                |
+|   compatible=                   |     |  compatible=                       |     | compatible=                    |
+|         "renesas,rzn1";         |     |        "renesas,r9a06g032",        |     |       "renesas,rzn1d-db",      |
+|                                 +----->        "renesas,rzn1";             +----->       "renesas,r9a06g032",     |
+|   ...                           |     |  ...                               |     |       "renesas,rzn1";          |
+|   compatible=                   |     |  compatible=                       |     |                                |
+|         "renesas,rzn1-reset";   |     |        "renesas,r9a06g032-reset",  |     |                                |
+|                                 |     |        "renesas,rzn1-reset";       |     |                                |
+|                                 |     |                                    |     |                                |
++---------------------------------+     +------------------------------------+     +--------------------------------+
+      Family File, "rzn1" only                  Future, potential SoC                          Board File
+                                                Specific override file
 
-Create sched domain topolgy level for arm64 so we can set SD_ASYM_PACKING
-at MC level.
+The idea is that the 1D and 1S share /everything/ apart from one extra QSPI, no DDR, one less CPU
+and a few other bits and bobs. So the r9a06g0xx.dtsi will contain 98% of both SoC bindings. *Perhaps*
+later I could add a r9a06g03[23].dtsi for SoC specific bindings, but currently that is not necessary, so we
+Won't need that file.
 
-Some tests have been done on a hikey960 platform (quad cortex-A53,
-quad cortex-A73). For the test purpose, the CPUs topology of the hikey960
-has been modified so the 8 heterogeneous cores are described as being part
-of the same cluster and sharing resources (MC level) like with a DynamiQ DSU.
+If everyone happy with this? I've got a v3 simmering on the fire, but I'd really like everyone to be
+happy with the proposed solution...
 
-Results below show the time in seconds to run sysbench --test=cpu with an
-increasing number of threads. The sysbench test run 32 times
+Cheers,
+Michel
 
-             without patch     with patch    diff
-1 threads    11.04(+/- 30%)    8.86(+/- 0%)  -19%
-2 threads     5.59(+/- 14%)    4.43(+/- 0%)  -20%
-3 threads     3.80(+/- 13%)    2.95(+/- 0%)  -22%
-4 threads     3.10(+/- 12%)    2.22(+/- 0%)  -28%
-5 threads     2.47(+/-  5%)    1.95(+/- 0%)  -21%
-6 threads     2.09(+/-  0%)    1.73(+/- 0%)  -17%
-7 threads     1.64(+/-  0%)    1.56(+/- 0%)  - 7%
-8 threads     1.42(+/-  0%)    1.42(+/- 0%)    0%
+On 22 March 2018 11:45, I wrote:
+> This series adds the plain basic support for booting a bare kernel on the
+> RZ/N1D-DB Board. It's been trimmed to the strict minimum as a 'base',
+> further patches that will add the rest of the support, pinctrl, clock
+> architecture and quite a few others.
+>
+> Thanks for the comments on the previous version!
+>
+> v2:
+>  + Fixes for suggestions by Simon Horman  + Fixes for suggestions by Rob
+> Herring  + Fixes for suggestions by Geert Uytterhoeven  + Removed the
+> mach file  + Added a MFD base for the sysctrl block  + Added a regmap based
+> sub driver for the reboot handler  + Renamed the files to match shmobile
+> conventions  + Adapted the compatible= strings to reflect 'family' vs 'part'
+>    distinction.
+>  + Removed the sysctrl.h file entirelly.
+>  + Fixed every warnings from the DTC compiler on W=12 mode.
+>  + Split the device-tree patches from the code.
+>
+> Michel Pollet (8):
+>   DT: mfd: renesas,rzn1-sysctrl: document RZ/N1 sysctrl node
+>   DT: reset: renesas,rzn1-reboot: document RZ/N1 reboot driver
+>   DT: arm: renesas,r9a06g032: add the RZ/N1 bindings
+>   reset: Renesas RZ/N1 reboot driver
+>   arm: rzn1: Add the RZ/N1 arch to the shmobile Kconfig
+>   DT: arm: Add Renesas RZ/N1 SoC base device tree file
+>   DT: arm: Add Renesas RZN1D-DB Board base file
+>   DT: arm: Add the RZN1D-DB Board to Renesas Makefile target
+>
+>  Documentation/devicetree/bindings/arm/shmobile.txt |   5 +-
+>  .../bindings/mfd/renesas,rzn1-sysctrl.txt          |  22 +++++
+>  .../bindings/power/renesas,rzn1-reboot.txt         |  22 +++++
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts        |  26 +++++
+>  arch/arm/boot/dts/r9a06g0xx.dtsi                   |  96 ++++++++++++++++++
+>  arch/arm/mach-shmobile/Kconfig                     |   5 +
+>  drivers/power/reset/Kconfig                        |   7 ++
+>  drivers/power/reset/Makefile                       |   1 +
+>  drivers/power/reset/rzn1-reboot.c                  | 109
+> +++++++++++++++++++++
+>  10 files changed, 293 insertions(+), 1 deletion(-)  create mode 100644
+> Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
+>  create mode 100644
+> Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+>  create mode 100644 arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts
+>  create mode 100644 arch/arm/boot/dts/r9a06g0xx.dtsi  create mode 100644
+> drivers/power/reset/rzn1-reboot.c
+>
+> --
+> 2.7.4
 
-Results show a better and stable results across iteration with the patch
-compared to mainline because we are always using big cores in priority whereas
-with mainline, the scheduler randomly choose a big or a little cores when
-there are more cores than number of threads.
-With 1 thread, the test duration varies in the range [8.85 .. 15.86] for
-mainline whereas it stays in the range [8.85..8.87] with the patch
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
----
 
-The SD_ASYM_PACKING flag is disabled by default and I'm preparing another patch
-to enable this dynamically at boot time by detecting the system topology.
-
- arch/arm64/kernel/topology.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
-
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 2186853..cb6705e5 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -296,6 +296,33 @@ static void __init reset_cpu_topology(void)
- 	}
- }
- 
-+#ifdef CONFIG_SCHED_MC
-+unsigned int __read_mostly arm64_sched_asym_enabled;
-+
-+int arch_asym_cpu_priority(int cpu)
-+{
-+	return topology_get_cpu_scale(NULL, cpu);
-+}
-+
-+static inline int arm64_sched_dynamiq(void)
-+{
-+	return arm64_sched_asym_enabled ? SD_ASYM_PACKING : 0;
-+}
-+
-+static int arm64_core_flags(void)
-+{
-+	return cpu_core_flags() | arm64_sched_dynamiq();
-+}
-+#endif
-+
-+static struct sched_domain_topology_level arm64_topology[] = {
-+#ifdef CONFIG_SCHED_MC
-+	{ cpu_coregroup_mask, arm64_core_flags, SD_INIT_NAME(MC) },
-+#endif
-+	{ cpu_cpu_mask, SD_INIT_NAME(DIE) },
-+	{ NULL, },
-+};
-+
- void __init init_cpu_topology(void)
- {
- 	reset_cpu_topology();
-@@ -306,4 +333,7 @@ void __init init_cpu_topology(void)
- 	 */
- 	if (of_have_populated_dt() && parse_dt_topology())
- 		reset_cpu_topology();
-+
-+	/* Set scheduler topology descriptor */
-+	set_sched_topology(arm64_topology);
- }
--- 
-2.7.4
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
