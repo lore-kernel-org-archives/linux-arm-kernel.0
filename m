@@ -1,52 +1,59 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 28 Mar 2018 10:02:10 -0400
-Subject: [PATCH 2/5] drm/rockchip: fixup comment for
- gem_free_object_unlocked
-In-Reply-To: <20180327082356.24516-2-daniel.vetter@ffwll.ch>
-References: <20180327082356.24516-1-daniel.vetter@ffwll.ch>
- <20180327082356.24516-2-daniel.vetter@ffwll.ch>
-Message-ID: <20180328140210.GB41885@art_vandelay>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 28 Mar 2018 16:02:38 +0200
+Subject: [PATCH] sched: support dynamiQ cluster
+In-Reply-To: <20180328091226.GD28871@arm.com>
+References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
+ <20180328091226.GD28871@arm.com>
+Message-ID: <CAKfTPtCXPM75N27WzDHSc7rkaNEo8cTU4YO9h1X6ckL-=WkL_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 10:23:53AM +0200, Daniel Vetter wrote:
-> Just want to clean out all grep hits. gem_free_object is deprecated.
-> 
-> Signed-off-by: Daniel Vetter <daniel.vetter@intel.com>
+On 28 March 2018 at 11:12, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Mar 28, 2018 at 09:46:55AM +0200, Vincent Guittot wrote:
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+>>
+>> The SD_ASYM_PACKING flag is disabled by default and I'm preparing another patch
+>> to enable this dynamically at boot time by detecting the system topology.
+>>
+>>  arch/arm64/kernel/topology.c | 30 ++++++++++++++++++++++++++++++
+>>  1 file changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> index 2186853..cb6705e5 100644
+>> --- a/arch/arm64/kernel/topology.c
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -296,6 +296,33 @@ static void __init reset_cpu_topology(void)
+>>       }
+>>  }
+>>
+>> +#ifdef CONFIG_SCHED_MC
+>> +unsigned int __read_mostly arm64_sched_asym_enabled;
+>> +
+>> +int arch_asym_cpu_priority(int cpu)
+>> +{
+>> +     return topology_get_cpu_scale(NULL, cpu);
+>> +}
+>> +
+>> +static inline int arm64_sched_dynamiq(void)
+>> +{
+>> +     return arm64_sched_asym_enabled ? SD_ASYM_PACKING : 0;
+>> +}
+>> +
+>> +static int arm64_core_flags(void)
+>> +{
+>> +     return cpu_core_flags() | arm64_sched_dynamiq();
+>> +}
+>> +#endif
+>> +
+>> +static struct sched_domain_topology_level arm64_topology[] = {
+>> +#ifdef CONFIG_SCHED_MC
+>> +     { cpu_coregroup_mask, arm64_core_flags, SD_INIT_NAME(MC) },
+>
+> Maybe stick this in a macro to avoid the double #ifdef?
 
-> Cc: Sandy Huang <hjc@rock-chips.com>
-> Cc: "Heiko St?bner" <heiko@sntech.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> index 074db7a92809..a8db758d523e 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -357,8 +357,8 @@ rockchip_gem_create_object(struct drm_device *drm, unsigned int size,
->  }
->  
->  /*
-> - * rockchip_gem_free_object - (struct drm_driver)->gem_free_object callback
-> - * function
-> + * rockchip_gem_free_object - (struct drm_driver)->gem_free_object_unlocked
-> + * callback function
->   */
->  void rockchip_gem_free_object(struct drm_gem_object *obj)
->  {
-> -- 
-> 2.16.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ok, I will do that in next version
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Vincent
+
+>
+> Will
