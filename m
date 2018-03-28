@@ -1,115 +1,230 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:51:44 +0100
-Subject: [PATCH 15/85] KVM: arm/arm64: Move vcpu_load call after
- kvm_vcpu_first_run_init
+Date: Wed, 28 Mar 2018 13:51:48 +0100
+Subject: [PATCH 19/85] KVM: arm/arm64: Get rid of vcpu->arch.irq_lines
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-16-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Moving the call to vcpu_load() in kvm_arch_vcpu_ioctl_run() to after
-we've called kvm_vcpu_first_run_init() simplifies some of the vgic and
-there is also no need to do vcpu_load() for things such as handling the
-immediate_exit flag.
+We currently have a separate read-modify-write of the HCR_EL2 on entry
+to the guest for the sole purpose of setting the VF and VI bits, if set.
+Since this is most rarely the case (only when using userspace IRQ chip
+and interrupts are in flight), let's get rid of this operation and
+instead modify the bits in the vcpu->arch.hcr[_el2] directly when
+needed.
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arch_timer.c     |  4 ----
- virt/kvm/arm/arm.c            | 22 ++++++++--------------
- virt/kvm/arm/vgic/vgic-init.c | 11 -----------
- 3 files changed, 8 insertions(+), 29 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h   |  9 ++-------
+ arch/arm/include/asm/kvm_host.h      |  3 ---
+ arch/arm/kvm/emulate.c               |  2 +-
+ arch/arm/kvm/hyp/switch.c            |  2 +-
+ arch/arm64/include/asm/kvm_emulate.h |  9 ++-------
+ arch/arm64/include/asm/kvm_host.h    |  3 ---
+ arch/arm64/kvm/hyp/switch.c          |  6 ------
+ arch/arm64/kvm/inject_fault.c        |  2 +-
+ virt/kvm/arm/arm.c                   | 11 ++++++-----
+ virt/kvm/arm/mmu.c                   |  6 +++---
+ 10 files changed, 16 insertions(+), 37 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 86eca32474cc..7dd8d9677dc5 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -842,11 +842,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return ret;
- 
- no_vgic:
--	preempt_disable();
- 	timer->enabled = 1;
--	kvm_timer_vcpu_load(vcpu);
--	preempt_enable();
--
- 	return 0;
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 9003bd19cb70..e27caa4b47a1 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -92,14 +92,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.hcr = HCR_GUEST_MASK;
  }
  
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 53572304843b..932e61858c55 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -632,27 +632,22 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
- 		return -ENOEXEC;
- 
--	vcpu_load(vcpu);
+-static inline unsigned long vcpu_get_hcr(const struct kvm_vcpu *vcpu)
++static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
+ {
+-	return vcpu->arch.hcr;
+-}
 -
- 	ret = kvm_vcpu_first_run_init(vcpu);
- 	if (ret)
--		goto out;
-+		return ret;
+-static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+-{
+-	vcpu->arch.hcr = hcr;
++	return (unsigned long *)&vcpu->arch.hcr;
+ }
  
- 	if (run->exit_reason == KVM_EXIT_MMIO) {
- 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
- 		if (ret)
--			goto out;
--		if (kvm_arm_handle_step_debug(vcpu, vcpu->run)) {
--			ret = 0;
--			goto out;
--		}
+ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 248b930563e5..6137195ab815 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -155,9 +155,6 @@ struct kvm_vcpu_arch {
+ 	/* HYP trapping configuration */
+ 	u32 hcr;
+ 
+-	/* Interrupt related fields */
+-	u32 irq_lines;		/* IRQ and FIQ levels */
 -
-+			return ret;
-+		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
-+			return 0;
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+index cdff963f133a..fa501bf437f3 100644
+--- a/arch/arm/kvm/emulate.c
++++ b/arch/arm/kvm/emulate.c
+@@ -174,5 +174,5 @@ unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
+  */
+ void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+ {
+-	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VA);
++	*vcpu_hcr(vcpu) |= HCR_VA;
+ }
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index ae45ae96aac2..e86679daddff 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -44,7 +44,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu, u32 *fpexc_host)
+ 		isb();
  	}
  
--	if (run->immediate_exit) {
--		ret = -EINTR;
--		goto out;
--	}
-+	if (run->immediate_exit)
-+		return -EINTR;
-+
-+	vcpu_load(vcpu);
- 
- 	kvm_sigset_activate(vcpu);
- 
-@@ -811,7 +806,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 	kvm_sigset_deactivate(vcpu);
- 
--out:
- 	vcpu_put(vcpu);
- 	return ret;
+-	write_sysreg(vcpu->arch.hcr | vcpu->arch.irq_lines, HCR);
++	write_sysreg(vcpu->arch.hcr, HCR);
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(HSTR_T(15), HSTR);
+ 	write_sysreg(HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11), HCPTR);
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 4610bc818097..9ee316b962c8 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -69,14 +69,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+ 		vcpu->arch.hcr_el2 |= HCR_TID3;
  }
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 743ca5cb05ef..3e8209a07585 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -302,17 +302,6 @@ int vgic_init(struct kvm *kvm)
  
- 	dist->initialized = true;
+-static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
++static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+ {
+-	return vcpu->arch.hcr_el2;
+-}
+-
+-static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+-{
+-	vcpu->arch.hcr_el2 = hcr;
++	return (unsigned long *)&vcpu->arch.hcr_el2;
+ }
  
--	/*
--	 * If we're initializing GICv2 on-demand when first running the VCPU
--	 * then we need to load the VGIC state onto the CPU.  We can detect
--	 * this easily by checking if we are in between vcpu_load and vcpu_put
--	 * when we just initialized the VGIC.
--	 */
--	preempt_disable();
--	vcpu = kvm_arm_get_running_vcpu();
--	if (vcpu)
--		kvm_vgic_load(vcpu);
--	preempt_enable();
- out:
- 	return ret;
+ static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 618cfee7206a..b027a7f025d4 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -272,9 +272,6 @@ struct kvm_vcpu_arch {
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+ 
+-	/* Interrupt related fields */
+-	u64 irq_lines;		/* IRQ and FIQ levels */
+-
+ 	/* Cache some mmu pages needed inside spinlock regions */
+ 	struct kvm_mmu_memory_cache mmu_page_cache;
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 4117717548b0..80bf38ccc8a4 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -178,12 +178,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+ 
+ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ {
+-	u64 val;
+-
+-	val = read_sysreg(hcr_el2);
+-	val |= vcpu->arch.irq_lines;
+-	write_sysreg(val, hcr_el2);
+-
+ 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+ 		__vgic_v3_restore_state(vcpu);
+ 	else
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 60666a056944..c1e179d34e6a 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -167,7 +167,7 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ static void pend_guest_serror(struct kvm_vcpu *vcpu, u64 esr)
+ {
+ 	vcpu_set_vsesr(vcpu, esr);
+-	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
++	*vcpu_hcr(vcpu) |= HCR_VSE;
+ }
+ 
+ /**
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 932e61858c55..49d13510e9c2 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -420,7 +420,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+  */
+ int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
+ {
+-	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
++	bool irq_lines = *vcpu_hcr(v) & (HCR_VI | HCR_VF);
++	return ((irq_lines || kvm_vgic_vcpu_pending_irq(v))
+ 		&& !v->arch.power_off && !v->arch.pause);
+ }
+ 
+@@ -814,18 +815,18 @@ static int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number, bool level)
+ {
+ 	int bit_index;
+ 	bool set;
+-	unsigned long *ptr;
++	unsigned long *hcr;
+ 
+ 	if (number == KVM_ARM_IRQ_CPU_IRQ)
+ 		bit_index = __ffs(HCR_VI);
+ 	else /* KVM_ARM_IRQ_CPU_FIQ */
+ 		bit_index = __ffs(HCR_VF);
+ 
+-	ptr = (unsigned long *)&vcpu->arch.irq_lines;
++	hcr = vcpu_hcr(vcpu);
+ 	if (level)
+-		set = test_and_set_bit(bit_index, ptr);
++		set = test_and_set_bit(bit_index, hcr);
+ 	else
+-		set = test_and_clear_bit(bit_index, ptr);
++		set = test_and_clear_bit(bit_index, hcr);
+ 
+ 	/*
+ 	 * If we didn't change anything, no need to wake up or kick other CPUs
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index ec62d1cccab7..9ebff8e530f9 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -2035,7 +2035,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+  */
+ void kvm_set_way_flush(struct kvm_vcpu *vcpu)
+ {
+-	unsigned long hcr = vcpu_get_hcr(vcpu);
++	unsigned long hcr = *vcpu_hcr(vcpu);
+ 
+ 	/*
+ 	 * If this is the first time we do a S/W operation
+@@ -2050,7 +2050,7 @@ void kvm_set_way_flush(struct kvm_vcpu *vcpu)
+ 		trace_kvm_set_way_flush(*vcpu_pc(vcpu),
+ 					vcpu_has_cache_enabled(vcpu));
+ 		stage2_flush_vm(vcpu->kvm);
+-		vcpu_set_hcr(vcpu, hcr | HCR_TVM);
++		*vcpu_hcr(vcpu) = hcr | HCR_TVM;
+ 	}
+ }
+ 
+@@ -2068,7 +2068,7 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled)
+ 
+ 	/* Caches are now on, stop trapping VM ops (until a S/W op) */
+ 	if (now_enabled)
+-		vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) & ~HCR_TVM);
++		*vcpu_hcr(vcpu) &= ~HCR_TVM;
+ 
+ 	trace_kvm_toggle_cache(*vcpu_pc(vcpu), was_enabled, now_enabled);
  }
 -- 
 2.14.2
