@@ -1,57 +1,37 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Wed, 28 Mar 2018 11:15:52 +0530
-Subject: [PATCH 2/2][v7] driver: mtd: update struct map_info's swap as per map
- requirement
-Message-ID: <20180328054552.2884-1-prabhakar.kushwaha@nxp.com>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Wed, 28 Mar 2018 06:32:18 +0000
+Subject: [PATCH] clk: imx7d: Move clks_init_on before any clock operations
+In-Reply-To: <CAOMZO5C23Va4Frrpqgw8LxEJbfj+cE6xeS3362QzyRn=_wi7JQ@mail.gmail.com>
+References: <1522160607-7104-1-git-send-email-abel.vesa@nxp.com>
+ <CAOMZO5C23Va4Frrpqgw8LxEJbfj+cE6xeS3362QzyRn=_wi7JQ@mail.gmail.com>
+Message-ID: <20180328063217.nztxaphgo3uojop5@fsr-ub1664-175>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not necessary for all device's maps to be CFI_HOST_ENDIAN.
-Maps device can be Big endian or little endian.
+Hi Fabio,
 
-Currently it is being taken care using CONFIG_MTD_CFI_LE_BYTE_SWAP or
-CONFIG_MTD_CFI_BE_BYTE_SWAP i.e. compile time.
+On Tue, Mar 27, 2018 at 12:08:39PM -0300, Fabio Estevam wrote:
+> Hi Abel,
+> 
+> On Tue, Mar 27, 2018 at 11:23 AM, Abel Vesa <abel.vesa@nxp.com> wrote:
+> > From: Dong Aisheng <b29396@freescale.com>
+> >
+> > For init on clocks we should move it at the first place in imx7d_clocks_init()
+> > before any clock operations, else the clock operation may fail in case the clock
+> > is still not on.
+> >
+> > Acked-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
+> > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+> 
+> Thanks for your patches.
+> 
+> You sent 4 patches today touching the same file.
+> 
+> Please annotate the sequence of the patches (1/4, 2/4, etc) so that
+> the maintainer can clearly know the order the patches should be
+> applied.
 
-Now update struct map_info's swap field based on device characteristics
-defined in device tree.
-
-Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
-Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
----
-Changes for v2: Incorporated review comments from Boris Brezillon
-http://patchwork.ozlabs.org/patch/758381/
-Changes for v3: None
-Changes for v4: Updated code as per new defined binding of physmap.txt
-Changes for v5: Avoid map.swap set in case of endiannes not defined in dts file
-Changes for v6: Sending as it is
-Changes for v7: Sending as it is
-
- drivers/mtd/maps/physmap_of_core.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/mtd/maps/physmap_of_core.c b/drivers/mtd/maps/physmap_of_core.c
-index b1bd4faecfb2..527b1682381f 100644
---- a/drivers/mtd/maps/physmap_of_core.c
-+++ b/drivers/mtd/maps/physmap_of_core.c
-@@ -20,6 +20,7 @@
- #include <linux/mtd/map.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/concat.h>
-+#include <linux/mtd/cfi_endian.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -233,6 +234,11 @@ static int of_flash_probe(struct platform_device *dev)
- 		info->list[i].map.bankwidth = be32_to_cpup(width);
- 		info->list[i].map.device_node = dp;
- 
-+		if (of_property_read_bool(dp, "big-endian"))
-+			info->list[i].map.swap = CFI_BIG_ENDIAN;
-+		else if (of_property_read_bool(dp, "little-endian"))
-+			info->list[i].map.swap = CFI_LITTLE_ENDIAN;
-+
- 		err = of_flash_probe_gemini(dev, dp, &info->list[i].map);
- 		if (err)
- 			goto err_out;
+Yep, my bad. I'll resend as a patchset now.
 -- 
-2.14.1
