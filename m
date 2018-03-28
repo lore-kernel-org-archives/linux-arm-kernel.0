@@ -1,39 +1,87 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 28 Mar 2018 11:01:29 +0800
-Subject: [PATCH v3 2/3] ARM64: dts: meson-axg: add an 32K alt aoclk
+Date: Wed, 28 Mar 2018 11:01:30 +0800
+Subject: [PATCH v3 3/3] ARM64: dts: meson: fix clock source of the pclk for
+ UART_AO
 In-Reply-To: <20180328030130.240336-1-yixun.lan@amlogic.com>
 References: <20180328030130.240336-1-yixun.lan@amlogic.com>
-Message-ID: <20180328030130.240336-3-yixun.lan@amlogic.com>
+Message-ID: <20180328030130.240336-4-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ao_clk81 in AO domain have two clock source,
-one from a 32K alt crystal we name it as ao_alt_clk,
-another is the clk81 signal from EE domain.
+>From the hardware perspective, the actual pclk of the AO uarts
+is the corresponding clkc_ao uart gate, not the main clock controller clk81.
+This was not problem so far, because the uart_gate had
+the CLK_IGNORE_UNUSED flag, which kept the gate open.
 
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+We plan to remove the CLK_IGNORE_UNUSED flag in another patch,
+but before doing that, we need to fix the clock in the DTS file.
+
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi  | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index b0eff7d7f771..40ca49fb94a6 100644
+index 40ca49fb94a6..dc6ca0895f11 100644
 --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
 +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -108,6 +108,13 @@
- 		#clock-cells = <0>;
- 	};
+@@ -798,7 +798,7 @@
+ 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+ 				reg = <0x0 0x3000 0x0 0x18>;
+ 				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
+-				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
+ 				clock-names = "xtal", "pclk", "baud";
+ 				status = "disabled";
+ 			};
+@@ -807,7 +807,7 @@
+ 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+ 				reg = <0x0 0x4000 0x0 0x18>;
+ 				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
+-				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
+ 				clock-names = "xtal", "pclk", "baud";
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 562c26a0ba33..ea6898f62044 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -749,12 +749,12 @@
+ };
  
-+	ao_alt_xtal: ao_alt_xtal-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <32000000>;
-+		clock-output-names = "ao_alt_xtal";
-+		#clock-cells = <0>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
+ &uart_AO {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_AO_B {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index e1a39cbed8c9..472106ce9a75 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -697,12 +697,12 @@
+ };
+ 
+ &uart_AO {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_AO_B {
+-	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
++	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
+ 	clock-names = "xtal", "pclk", "baud";
+ };
+ 
 -- 
 2.15.1
