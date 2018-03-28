@@ -1,143 +1,87 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 28 Mar 2018 17:30:27 -0500
-Subject: [PATCH v3 7/8] remoteproc/davinci: use the reset framework
-In-Reply-To: <20180327092031.11251-8-brgl@bgdev.pl>
+Date: Wed, 28 Mar 2018 17:41:18 -0500
+Subject: [PATCH v3 0/8] ARM: davinci: complete the conversion to using the
+ reset framework
+In-Reply-To: <20180327092031.11251-1-brgl@bgdev.pl>
 References: <20180327092031.11251-1-brgl@bgdev.pl>
- <20180327092031.11251-8-brgl@bgdev.pl>
-Message-ID: <51e33d41-37b1-9e88-4a13-503bb39e2e40@ti.com>
+Message-ID: <c57f0342-3690-1d07-35c1-6e12beae9462@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bart,
+Hi Bjorn,
 
 On 03/27/2018 04:20 AM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Switch to using the reset framework instead of handcoded reset routines
-> we used so far.
+> This series converts the only user of the handcoded, mach-specific reset
+> routines in the davinci platform to using the reset framework.
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  drivers/remoteproc/da8xx_remoteproc.c | 33 ++++++++++++++++++++++++++++-----
->  1 file changed, 28 insertions(+), 5 deletions(-)
+> Patches 1-3 add necessary lookups/DT-properties.
 > 
-> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-> index b668e32996e2..788f59809c02 100644
-> --- a/drivers/remoteproc/da8xx_remoteproc.c
-> +++ b/drivers/remoteproc/da8xx_remoteproc.c
-> @@ -10,6 +10,7 @@
->  
->  #include <linux/bitops.h>
->  #include <linux/clk.h>
-> +#include <linux/reset.h>
->  #include <linux/err.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> @@ -20,8 +21,6 @@
->  #include <linux/platform_device.h>
->  #include <linux/remoteproc.h>
->  
-> -#include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
-> -
->  #include "remoteproc_internal.h"
->  
->  static char *da8xx_fw_name;
-> @@ -72,6 +71,7 @@ struct da8xx_rproc {
->  	struct da8xx_rproc_mem *mem;
->  	int num_mems;
->  	struct clk *dsp_clk;
-> +	struct reset_control *dsp_reset;
->  	void (*ack_fxn)(struct irq_data *data);
->  	struct irq_data *irq_data;
->  	void __iomem *chipsig;
-> @@ -138,6 +138,7 @@ static int da8xx_rproc_start(struct rproc *rproc)
->  	struct device *dev = rproc->dev.parent;
->  	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
->  	struct clk *dsp_clk = drproc->dsp_clk;
-> +	struct reset_control *dsp_reset = drproc->dsp_reset;
->  	int ret;
->  
->  	/* hw requires the start (boot) address be on 1KB boundary */
-> @@ -155,7 +156,12 @@ static int da8xx_rproc_start(struct rproc *rproc)
->  		return ret;
->  	}
->  
-> -	davinci_clk_reset_deassert(dsp_clk);
-> +	ret = reset_control_deassert(dsp_reset);
-> +	if (ret) {
-> +		dev_err(dev, "reset_control_deassert() failed: %d\n", ret);
-> +		clk_disable_unprepare(dsp_clk);
-> +		return ret;
-> +	}
->  
->  	return 0;
->  }
-> @@ -163,8 +169,15 @@ static int da8xx_rproc_start(struct rproc *rproc)
->  static int da8xx_rproc_stop(struct rproc *rproc)
->  {
->  	struct da8xx_rproc *drproc = rproc->priv;
-> +	struct device *dev = rproc->dev.parent;
-> +	int ret;
-> +
-> +	ret = reset_control_assert(drproc->dsp_reset);
-> +	if (ret) {
-> +		dev_err(dev, "reset_control_assert() failed: %d\n", ret);
-> +		return ret;
-> +	}
->  
-> -	davinci_clk_reset_assert(drproc->dsp_clk);
->  	clk_disable_unprepare(drproc->dsp_clk);
->  
->  	return 0;
-> @@ -232,6 +245,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->  	struct resource *bootreg_res;
->  	struct resource *chipsig_res;
->  	struct clk *dsp_clk;
-> +	struct reset_control *dsp_reset;
->  	void __iomem *chipsig;
->  	void __iomem *bootreg;
->  	int irq;
-> @@ -268,6 +282,15 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->  		return PTR_ERR(dsp_clk);
->  	}
->  
-> +	dsp_reset = devm_reset_control_get_exclusive(dev, NULL);
-> +	if (IS_ERR(dsp_reset)) {
-> +		if (PTR_ERR(dsp_reset) != -EPROBE_DEFER)
-> +			dev_err(dev, "unable to get reset control: %ld\n",
-> +				PTR_ERR(dsp_reset));
-> +
-> +		return PTR_ERR(dsp_reset);
-> +	}
-> +
->  	if (dev->of_node) {
->  		ret = of_reserved_mem_device_init(dev);
->  		if (ret) {
-> @@ -309,7 +332,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->  	 * *not* in reset, but da8xx_rproc_start() needs the DSP to be
->  	 * held in reset at the time it is called.
->  	 */
-> -	ret = davinci_clk_reset_assert(drproc->dsp_clk);
-> +	ret = reset_control_assert(dsp_reset);
->  	if (ret)
->  		goto free_rproc;
->  
+> Patches 4-6 fix issues found in the remoteproc davinci driver.
 
-Tested your previous branch, need one more change in this patch to have
-the remoteproc boot be actually executing some code. The acquired
-dsp_reset is not stored in the drproc, so the start and stop were not
-effective. The issue was masked because reset_control_assert() and
-deassert() return 0 when a NULL pointer is passed in.
-
---- a/drivers/remoteproc/da8xx_remoteproc.c
-+++ b/drivers/remoteproc/da8xx_remoteproc.c
-@@ -311,6 +311,7 @@ static int da8xx_rproc_probe(struct platform_device
-*pdev)
-        drproc = rproc->priv;
-        drproc->rproc = rproc;
-        drproc->dsp_clk = dsp_clk;
-+       drproc->dsp_reset = dsp_reset;
-        rproc->has_iommu = false;
+Can you pick up patches 4 through 6 for 4.17 itself through the
+remoteproc tree? They can be picked up independent of the CCF
+conversion. Anyway, the actual CCF conversion and the reset framework
+adaptation patch would need the dts patches to be picked up first to
+maintain functionality, and I do not think Sekhar is picking up the dts
+changes for 4.17 this late.
 
 regards
 Suman
+
+> 
+> Patch 7 converts the davinci-rproc driver to the reset framework.
+> 
+> Patch 8 removes now dead code.
+> 
+> Philipp: it turned out that it's indeed better to use the reset
+> controller's device name for the entry lookup.
+> 
+> Tested both in DT and legacy modes by booting the examples from
+> ti-ipc-rtos recipe in meta-ti.
+> 
+> This series applies on top of David Lechner's common-clk-v9 branch[1]
+> with Philipp Zabel's reset/next branch[2] pulled in.
+> 
+> It can be found in my github tree as well[3].
+> 
+> [1] git://github.com/dlech/ev3dev-kernel.git common-clk-v9
+> [2] git://git.pengutronix.de/git/pza/linux reset/next
+> [3] git at github.com:brgl/linux.git topic/davinci-reset
+> 
+> v1 -> v2:
+> - fixed the device tree patches the descriptions of which were mixed up
+> - return -EPROBE_DEFER from davinci-rproc's probe() if we can't get the
+>   reset provider, since it's possible that the lookup table was not yet
+>   registered
+> - made the local variable naming consistent in the davinci-rproc driver
+> - fixed a typo in PATCH 5/8
+> 
+> v2 -> v3:
+> - reworded the commit messages (s/remoteproc: da8xx/remoteproc\/davinci/)
+> - call clk_disable_unprepare() if reset_control_deassert() fails in
+>   da8xx_rproc_start()
+> - added a patch fixing the S_IRUGO checkpatch warning, since we're
+>   already modifying this driver anyway
+> - added a temp variable for code brevity in da8xx_rproc_stop()
+> - removed patch 1/8 (already applied to reset/next)
+> 
+> Bartosz Golaszewski (8):
+>   ARM: davinci: dts: make psc0 a reset provider
+>   ARM: davinci: dts: add a reset control to the dsp node
+>   clk: davinci: add a reset lookup table for psc0
+>   remoteproc/davinci: add the missing retval check for clk_enable()
+>   remoteproc/davinci: prepare and unprepare the clock where needed
+>   remoteproc/davinci: use octal permissions for module_param()
+>   remoteproc/davinci: use the reset framework
+>   clk: davinci: kill davinci_clk_reset_assert/deassert()
+> 
+>  arch/arm/boot/dts/da850.dtsi               |  2 ++
+>  arch/arm/mach-davinci/include/mach/clock.h | 21 --------------
+>  drivers/clk/davinci/psc-da850.c            |  7 +++++
+>  drivers/clk/davinci/psc.c                  | 19 +------------
+>  drivers/remoteproc/da8xx_remoteproc.c      | 45 ++++++++++++++++++++++++------
+>  5 files changed, 47 insertions(+), 47 deletions(-)
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+> 
