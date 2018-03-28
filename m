@@ -1,91 +1,85 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 28 Mar 2018 14:41:28 +0200
-Subject: [PATCH resend 1/2] arm64: assembler: add utility macros to push/pop
- stack frames
-In-Reply-To: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
-References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180328124129.6459-2-ard.biesheuvel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Mar 2018 13:51:31 +0100
+Subject: [PATCH 02/85] ARM: kvm: fix building with gcc-8
+In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
+References: <20180328125254.31380-1-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are going to add code to all the NEON crypto routines that will
-turn them into non-leaf functions, so we need to manage the stack
-frames. To make this less tedious and error prone, add some macros
-that take the number of callee saved registers to preserve and the
-extra size to allocate in the stack frame (for locals) and emit
-the ldp/stp sequences.
+From: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+In banked-sr.c, we use a top-level '__asm__(".arch_extension virt")'
+statement to allow compilation of a multi-CPU kernel for ARMv6
+and older ARMv7-A that don't normally support access to the banked
+registers.
+
+This is considered to be a programming error by the gcc developers
+and will no longer work in gcc-8, where we now get a build error:
+
+/tmp/cc4Qy7GR.s:34: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_usr'
+/tmp/cc4Qy7GR.s:41: Error: Banked registers are not available with this architecture. -- `mrs r3,ELR_hyp'
+/tmp/cc4Qy7GR.s:55: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_svc'
+/tmp/cc4Qy7GR.s:62: Error: Banked registers are not available with this architecture. -- `mrs r3,LR_svc'
+/tmp/cc4Qy7GR.s:69: Error: Banked registers are not available with this architecture. -- `mrs r3,SPSR_svc'
+/tmp/cc4Qy7GR.s:76: Error: Banked registers are not available with this architecture. -- `mrs r3,SP_abt'
+
+Passign the '-march-armv7ve' flag to gcc works, and is ok here, because
+we know the functions won't ever be called on pre-ARMv7VE machines.
+Unfortunately, older compiler versions (4.8 and earlier) do not understand
+that flag, so we still need to keep the asm around.
+
+Backporting to stable kernels (4.6+) is needed to allow those to be built
+with future compilers as well.
+
+Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84129
+Fixes: 33280b4cd1dc ("ARM: KVM: Add banked registers save/restore")
+Cc: stable at vger.kernel.org
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/assembler.h | 58 ++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ arch/arm/kvm/hyp/Makefile    | 5 +++++
+ arch/arm/kvm/hyp/banked-sr.c | 4 ++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 053d83e8db6f..d354eb7f2f0c 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -565,4 +565,62 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
- #endif
- 	.endm
+diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
+index 5638ce0c9524..63d6b404d88e 100644
+--- a/arch/arm/kvm/hyp/Makefile
++++ b/arch/arm/kvm/hyp/Makefile
+@@ -7,6 +7,8 @@ ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
  
-+	/*
-+	 * frame_push - Push @regcount callee saved registers to the stack,
-+	 *              starting at x19, as well as x29/x30, and set x29 to
-+	 *              the new value of sp. Add @extra bytes of stack space
-+	 *              for locals.
-+	 */
-+	.macro		frame_push, regcount:req, extra
-+	__frame		st, \regcount, \extra
-+	.endm
+ KVM=../../../../virt/kvm
+ 
++CFLAGS_ARMV7VE		   :=$(call cc-option, -march=armv7ve)
 +
-+	/*
-+	 * frame_pop  - Pop the callee saved registers from the stack that were
-+	 *              pushed in the most recent call to frame_push, as well
-+	 *              as x29/x30 and any extra stack space that may have been
-+	 *              allocated.
-+	 */
-+	.macro		frame_pop
-+	__frame		ld
-+	.endm
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
+@@ -15,7 +17,10 @@ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
+ obj-$(CONFIG_KVM_ARM_HOST) += cp15-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vfp.o
+ obj-$(CONFIG_KVM_ARM_HOST) += banked-sr.o
++CFLAGS_banked-sr.o	   += $(CFLAGS_ARMV7VE)
 +
-+	.macro		__frame_regs, reg1, reg2, op, num
-+	.if		.Lframe_regcount == \num
-+	\op\()r		\reg1, [sp, #(\num + 1) * 8]
-+	.elseif		.Lframe_regcount > \num
-+	\op\()p		\reg1, \reg2, [sp, #(\num + 1) * 8]
-+	.endif
-+	.endm
-+
-+	.macro		__frame, op, regcount, extra=0
-+	.ifc		\op, st
-+	.if		(\regcount) < 0 || (\regcount) > 10
-+	.error		"regcount should be in the range [0 ... 10]"
-+	.endif
-+	.if		((\extra) % 16) != 0
-+	.error		"extra should be a multiple of 16 bytes"
-+	.endif
-+	.set		.Lframe_regcount, \regcount
-+	.set		.Lframe_extra, \extra
-+	.set		.Lframe_local_offset, ((\regcount + 3) / 2) * 16
-+	stp		x29, x30, [sp, #-.Lframe_local_offset - .Lframe_extra]!
-+	mov		x29, sp
-+	.endif
-+
-+	__frame_regs	x19, x20, \op, 1
-+	__frame_regs	x21, x22, \op, 3
-+	__frame_regs	x23, x24, \op, 5
-+	__frame_regs	x25, x26, \op, 7
-+	__frame_regs	x27, x28, \op, 9
-+
-+	.ifc		\op, ld
-+	.if		.Lframe_regcount == -1
-+	.error		"frame_push/frame_pop may not be nested"
-+	.endif
-+	ldp		x29, x30, [sp], #.Lframe_local_offset + .Lframe_extra
-+	.set		.Lframe_regcount, -1
-+	.endif
-+	.endm
-+
- #endif	/* __ASM_ASSEMBLER_H */
+ obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+ obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+ obj-$(CONFIG_KVM_ARM_HOST) += switch.o
++CFLAGS_switch.o		   += $(CFLAGS_ARMV7VE)
+ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
+diff --git a/arch/arm/kvm/hyp/banked-sr.c b/arch/arm/kvm/hyp/banked-sr.c
+index 111bda8cdebd..be4b8b0a40ad 100644
+--- a/arch/arm/kvm/hyp/banked-sr.c
++++ b/arch/arm/kvm/hyp/banked-sr.c
+@@ -20,6 +20,10 @@
+ 
+ #include <asm/kvm_hyp.h>
+ 
++/*
++ * gcc before 4.9 doesn't understand -march=armv7ve, so we have to
++ * trick the assembler.
++ */
+ __asm__(".arch_extension     virt");
+ 
+ void __hyp_text __banked_save_state(struct kvm_cpu_context *ctxt)
 -- 
-2.11.0
+2.14.2
