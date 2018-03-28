@@ -1,114 +1,92 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:51:46 +0100
-Subject: [PATCH 17/85] KVM: arm64: Rework hyp_panic for VHE and non-VHE
+Date: Wed, 28 Mar 2018 13:51:52 +0100
+Subject: [PATCH 23/85] KVM: arm64: Slightly improve debug save/restore
+ functions
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-18-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-VHE actually doesn't rely on clearing the VTTBR when returning to the
-host kernel, and that is the current key mechanism of hyp_panic to
-figure out how to attempt to return to a state good enough to print a
-panic statement.
+The debug save/restore functions can be improved by using the has_vhe()
+static key instead of the instruction alternative.  Using the static key
+uses the same paradigm as we're going to use elsewhere, it makes the
+code more readable, and it generates slightly better code (no
+stack setups and function calls unless necessary).
 
-Therefore, we split the hyp_panic function into two functions, a VHE and
-a non-VHE, keeping the non-VHE version intact, but changing the VHE
-behavior.
+We also use a static key on the restore path, because it will be
+marginally faster than loading a value from memory.
 
-The vttbr_el2 check on VHE doesn't really make that much sense, because
-the only situation where we can get here on VHE is when the hypervisor
-assembly code actually called into hyp_panic, which only happens when
-VBAR_EL2 has been set to the KVM exception vectors.  On VHE, we can
-always safely disable the traps and restore the host registers at this
-point, so we simply do that unconditionally and call into the panic
-function directly.
+Finally, we don't have to conditionally clear the debug dirty flag if
+it's set, we can just clear it.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 42 +++++++++++++++++++++++-------------------
- 1 file changed, 23 insertions(+), 19 deletions(-)
+ arch/arm64/kvm/hyp/debug-sr.c | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 46717da75643..579d9a263853 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -439,10 +439,20 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index d958cd63a547..74f71fb5e36d 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -66,11 +66,6 @@
+ 	default:	write_debug(ptr[0], reg, 0);			\
+ 	}
  
- static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
--					     struct kvm_vcpu *vcpu)
-+					     struct kvm_cpu_context *__host_ctxt)
+-static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
+-{
+-	/* The vcpu can run. but it can't hide. */
+-}
+-
+ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
  {
-+	struct kvm_vcpu *vcpu;
- 	unsigned long str_va;
- 
-+	vcpu = __host_ctxt->__hyp_running_vcpu;
-+
-+	if (read_sysreg(vttbr_el2)) {
-+		__timer_disable_traps(vcpu);
-+		__deactivate_traps(vcpu);
-+		__deactivate_vm(vcpu);
-+		__sysreg_restore_host_state(__host_ctxt);
-+	}
-+
- 	/*
- 	 * Force the panic string to be loaded from the literal pool,
- 	 * making sure it is a kernel address and not a PC-relative
-@@ -456,37 +466,31 @@ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
- 		       read_sysreg(hpfar_el2), par, vcpu);
+ 	u64 reg;
+@@ -103,11 +98,7 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+ 	dsb(nsh);
  }
  
--static void __hyp_text __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
--					    struct kvm_vcpu *vcpu)
-+static void __hyp_call_panic_vhe(u64 spsr, u64 elr, u64 par,
-+				 struct kvm_cpu_context *host_ctxt)
- {
-+	struct kvm_vcpu *vcpu;
-+	vcpu = host_ctxt->__hyp_running_vcpu;
-+
-+	__deactivate_traps(vcpu);
-+	__sysreg_restore_host_state(host_ctxt);
-+
- 	panic(__hyp_panic_string,
- 	      spsr,  elr,
- 	      read_sysreg_el2(esr),   read_sysreg_el2(far),
- 	      read_sysreg(hpfar_el2), par, vcpu);
- }
- 
--static hyp_alternate_select(__hyp_call_panic,
--			    __hyp_call_panic_nvhe, __hyp_call_panic_vhe,
+-static hyp_alternate_select(__debug_save_spe,
+-			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
 -			    ARM64_HAS_VIRT_HOST_EXTN);
 -
- void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *host_ctxt)
+-static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
++static void __hyp_text __debug_restore_spe_nvhe(u64 pmscr_el1)
  {
--	struct kvm_vcpu *vcpu = NULL;
--
- 	u64 spsr = read_sysreg_el2(spsr);
- 	u64 elr = read_sysreg_el2(elr);
- 	u64 par = read_sysreg(par_el1);
- 
--	if (read_sysreg(vttbr_el2)) {
--		vcpu = host_ctxt->__hyp_running_vcpu;
--		__timer_disable_traps(vcpu);
--		__deactivate_traps(vcpu);
--		__deactivate_vm(vcpu);
--		__sysreg_restore_host_state(host_ctxt);
--	}
--
--	/* Call panic for real */
--	__hyp_call_panic()(spsr, elr, par, vcpu);
+ 	if (!pmscr_el1)
+ 		return;
+@@ -168,17 +159,24 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+ {
+ 	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			   kern_hyp_va(vcpu->arch.host_cpu_context));
+-	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
++
++	/*
++	 * Non-VHE: Disable and flush SPE data generation
++	 * VHE: The vcpu can run, but it can't hide.
++	 */
 +	if (!has_vhe())
-+		__hyp_call_panic_nvhe(spsr, elr, par, host_ctxt);
-+	else
-+		__hyp_call_panic_vhe(spsr, elr, par, host_ctxt);
- 
- 	unreachable();
++		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
  }
+ 
+ void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+ {
+-	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
++	if (!has_vhe())
++		__debug_restore_spe_nvhe(vcpu->arch.host_debug_state.pmscr_el1);
++
+ 	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			      kern_hyp_va(vcpu->arch.host_cpu_context));
+ 
+-	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+-		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
++	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
+ }
+ 
+ u32 __hyp_text __kvm_get_mdcr_el2(void)
 -- 
 2.14.2
