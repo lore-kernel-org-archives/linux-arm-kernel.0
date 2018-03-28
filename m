@@ -1,87 +1,36 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 28 Mar 2018 11:01:30 +0800
-Subject: [PATCH v3 3/3] ARM64: dts: meson: fix clock source of the pclk for
- UART_AO
-In-Reply-To: <20180328030130.240336-1-yixun.lan@amlogic.com>
-References: <20180328030130.240336-1-yixun.lan@amlogic.com>
-Message-ID: <20180328030130.240336-4-yixun.lan@amlogic.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 28 Mar 2018 11:09:03 +0800
+Subject: [PATCH] spi: mediatek: remove redundant MODULE_ALIAS entries
+In-Reply-To: <20180328021416.GK29239@sirena.org.uk>
+References: <58fc8553bdc3cbad8d107a905947b7e4d9c12b92.1522054975.git.sean.wang@mediatek.com>
+ <20180328021416.GK29239@sirena.org.uk>
+Message-ID: <1522206543.18424.23.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From the hardware perspective, the actual pclk of the AO uarts
-is the corresponding clkc_ao uart gate, not the main clock controller clk81.
-This was not problem so far, because the uart_gate had
-the CLK_IGNORE_UNUSED flag, which kept the gate open.
+On Wed, 2018-03-28 at 10:14 +0800, Mark Brown wrote:
+> On Mon, Mar 26, 2018 at 06:04:18PM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > MODULE_ALIAS exports information to allow the module to be auto-loaded at
+> > boot for the drivers registered using legacy platform registration.
+> > 
+> > However, currently the driver is always used by DT-only platform,
+> > MODULE_ALIAS is redundant and should be removed properly.
+> 
+> There is no meaningful cost to having the alias there, why remove it?
 
-We plan to remove the CLK_IGNORE_UNUSED flag in another patch,
-but before doing that, we need to fix the clock in the DTS file.
 
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi  | 4 ++--
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+It's no explicitly improved to the driver, it only takes less bytes
+in .secion modinfo from 644 bytes to 620 bytes in the observation with
+objdump.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 40ca49fb94a6..dc6ca0895f11 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -798,7 +798,7 @@
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
- 				reg = <0x0 0x3000 0x0 0x18>;
- 				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
--				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
- 				clock-names = "xtal", "pclk", "baud";
- 				status = "disabled";
- 			};
-@@ -807,7 +807,7 @@
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
- 				reg = <0x0 0x4000 0x0 0x18>;
- 				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
--				clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+				clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
- 				clock-names = "xtal", "pclk", "baud";
- 				status = "disabled";
- 			};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 562c26a0ba33..ea6898f62044 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -749,12 +749,12 @@
- };
- 
- &uart_AO {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
- &uart_AO_B {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index e1a39cbed8c9..472106ce9a75 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -697,12 +697,12 @@
- };
- 
- &uart_AO {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART1>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
- &uart_AO_B {
--	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-+	clocks = <&xtal>, <&clkc_AO CLKID_AO_UART2>, <&xtal>;
- 	clock-names = "xtal", "pclk", "baud";
- };
- 
--- 
-2.15.1
+More importantly, it seems the driver should probably refer to another
+qualified driver at the initial development, but MODULE_ALIAS is
+forgetting to be removed to meet real usage for the module autoload. 
+
+Even I was curious whether people for the driver know the actual purpose
+the macro it's for.
+
+Removing MODULE_ALIAS is just to correct the driver to where it should
+be.
