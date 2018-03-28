@@ -1,217 +1,321 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:23 +0100
-Subject: [PATCH 54/85] arm64: alternatives: Add dynamic patching feature
+Date: Wed, 28 Mar 2018 13:52:21 +0100
+Subject: [PATCH 52/85] KVM: arm/arm64: Move VGIC APR save/restore to vgic
+ put/load
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-55-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-53-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've so far relied on a patching infrastructure that only gave us
-a single alternative, without any way to provide a range of potential
-replacement instructions. For a single feature, this is an all or
-nothing thing.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-It would be interesting to have a more flexible grained way of patching
-the kernel though, where we could dynamically tune the code that gets
-injected.
+The APRs can only have bits set when the guest acknowledges an interrupt
+in the LR and can only have a bit cleared when the guest EOIs an
+interrupt in the LR.  Therefore, if we have no LRs with any
+pending/active interrupts, the APR cannot change value and there is no
+need to clear it on every exit from the VM (hint: it will have already
+been cleared when we exited the guest the last time with the LRs all
+EOIed).
 
-In order to achive this, let's introduce a new form of dynamic patching,
-assiciating a callback to a patching site. This callback gets source and
-target locations of the patching request, as well as the number of
-instructions to be patched.
+The only case we need to take care of is when we migrate the VCPU away
+from a CPU or migrate a new VCPU onto a CPU, or when we return to
+userspace to capture the state of the VCPU for migration.  To make sure
+this works, factor out the APR save/restore functionality into separate
+functions called from the VCPU (and by extension VGIC) put/load hooks.
 
-Dynamic patching is declared with the new ALTERNATIVE_CB and alternative_cb
-directives:
-
-	asm volatile(ALTERNATIVE_CB("mov %0, #0\n", callback)
-		     : "r" (v));
-or
-	alternative_cb callback
-		mov	x0, #0
-	alternative_cb_end
-
-where callback is the C function computing the alternative.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/alternative.h | 41 ++++++++++++++++++++++++++++++----
- arch/arm64/kernel/alternative.c      | 43 +++++++++++++++++++++++++++---------
- 2 files changed, 69 insertions(+), 15 deletions(-)
+ arch/arm/include/asm/kvm_hyp.h   |   2 +
+ arch/arm64/include/asm/kvm_hyp.h |   2 +
+ virt/kvm/arm/hyp/vgic-v3-sr.c    | 124 +++++++++++++++++++++------------------
+ virt/kvm/arm/vgic/vgic-v2.c      |   7 +--
+ virt/kvm/arm/vgic/vgic-v3.c      |   5 ++
+ 5 files changed, 78 insertions(+), 62 deletions(-)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 669028172fd6..a91933b1e2e6 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -5,6 +5,8 @@
- #include <asm/cpucaps.h>
- #include <asm/insn.h>
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index 1ab8329e9ff7..530a3c1cfe6f 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -110,6 +110,8 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
  
-+#define ARM64_CB_PATCH ARM64_NCAPS
-+
- #ifndef __ASSEMBLY__
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
++void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
++void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
  
- #include <linux/init.h>
-@@ -22,12 +24,19 @@ struct alt_instr {
- 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
- };
+ asmlinkage void __vfp_save_state(struct vfp_hard_struct *vfp);
+ asmlinkage void __vfp_restore_state(struct vfp_hard_struct *vfp);
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index febe417b8b4e..6f3929b2fcf7 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -124,6 +124,8 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
  
-+typedef void (*alternative_cb_t)(struct alt_instr *alt,
-+				 __le32 *origptr, __le32 *updptr, int nr_inst);
-+
- void __init apply_alternatives_all(void);
- void apply_alternatives(void *start, size_t length);
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
++void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
++void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
+ int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
  
--#define ALTINSTR_ENTRY(feature)						      \
-+#define ALTINSTR_ENTRY(feature,cb)					      \
- 	" .word 661b - .\n"				/* label           */ \
-+	" .if " __stringify(cb) " == 0\n"				      \
- 	" .word 663f - .\n"				/* new instruction */ \
-+	" .else\n"							      \
-+	" .word " __stringify(cb) "- .\n"		/* callback */	      \
-+	" .endif\n"							      \
- 	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
- 	" .byte 662b-661b\n"				/* source len      */ \
- 	" .byte 664f-663f\n"				/* replacement len */
-@@ -45,15 +54,18 @@ void apply_alternatives(void *start, size_t length);
-  * but most assemblers die if insn1 or insn2 have a .inst. This should
-  * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
-  * containing commit 4e4d08cf7399b606 or c1baaddf8861).
-+ *
-+ * Alternatives with callbacks do not generate replacement instructions.
-  */
--#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled)	\
-+#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled, cb)	\
- 	".if "__stringify(cfg_enabled)" == 1\n"				\
- 	"661:\n\t"							\
- 	oldinstr "\n"							\
- 	"662:\n"							\
- 	".pushsection .altinstructions,\"a\"\n"				\
--	ALTINSTR_ENTRY(feature)						\
-+	ALTINSTR_ENTRY(feature,cb)					\
- 	".popsection\n"							\
-+	" .if " __stringify(cb) " == 0\n"				\
- 	".pushsection .altinstr_replacement, \"a\"\n"			\
- 	"663:\n\t"							\
- 	newinstr "\n"							\
-@@ -61,11 +73,17 @@ void apply_alternatives(void *start, size_t length);
- 	".popsection\n\t"						\
- 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
- 	".org	. - (662b-661b) + (664b-663b)\n"			\
-+	".else\n\t"							\
-+	"663:\n\t"							\
-+	"664:\n\t"							\
-+	".endif\n"							\
- 	".endif\n"
+ void __timer_enable_traps(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 9abf2f3c12b5..437d7af08683 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -21,6 +21,7 @@
  
- #define _ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg, ...)	\
--	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg))
-+	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg), 0)
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
++#include <asm/kvm_mmu.h>
  
-+#define ALTERNATIVE_CB(oldinstr, cb) \
-+	__ALTERNATIVE_CFG(oldinstr, "NOT_AN_INSTRUCTION", ARM64_CB_PATCH, 1, cb)
- #else
+ #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+ #define vtr_to_nr_pre_bits(v)		((((u32)(v) >> 26) & 7) + 1)
+@@ -221,14 +222,11 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
  
- #include <asm/assembler.h>
-@@ -132,6 +150,14 @@ void apply_alternatives(void *start, size_t length);
- 661:
- .endm
+ 	if (used_lrs) {
+ 		int i;
+-		u32 nr_pre_bits;
+ 		u32 elrsr;
  
-+.macro alternative_cb cb
-+	.set .Lasm_alt_mode, 0
-+	.pushsection .altinstructions, "a"
-+	altinstruction_entry 661f, \cb, ARM64_CB_PATCH, 662f-661f, 0
-+	.popsection
-+661:
-+.endm
-+
- /*
-  * Provide the other half of the alternative code sequence.
-  */
-@@ -157,6 +183,13 @@ void apply_alternatives(void *start, size_t length);
- 	.org	. - (662b-661b) + (664b-663b)
- .endm
+ 		elrsr = read_gicreg(ICH_ELSR_EL2);
  
-+/*
-+ * Callback-based alternative epilogue
-+ */
-+.macro alternative_cb_end
-+662:
-+.endm
-+
- /*
-  * Provides a trivial alternative or default sequence consisting solely
-  * of NOPs. The number of NOPs is chosen automatically to match the
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 414288a558c8..5c4bce4ac381 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -107,32 +107,53 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
- 	return insn;
+ 		write_gicreg(0, ICH_HCR_EL2);
+-		val = read_gicreg(ICH_VTR_EL2);
+-		nr_pre_bits = vtr_to_nr_pre_bits(val);
+ 
+ 		for (i = 0; i < used_lrs; i++) {
+ 			if (elrsr & (1 << i))
+@@ -238,39 +236,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 
+ 			__gic_v3_set_lr(0, i);
+ 		}
+-
+-		switch (nr_pre_bits) {
+-		case 7:
+-			cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
+-			cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
+-		case 6:
+-			cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
+-		default:
+-			cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
+-		}
+-
+-		switch (nr_pre_bits) {
+-		case 7:
+-			cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
+-			cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
+-		case 6:
+-			cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
+-		default:
+-			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
+-		}
+ 	} else {
+ 		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+ 		    cpu_if->its_vpe.its_vm)
+ 			write_gicreg(0, ICH_HCR_EL2);
+-
+-		cpu_if->vgic_ap0r[0] = 0;
+-		cpu_if->vgic_ap0r[1] = 0;
+-		cpu_if->vgic_ap0r[2] = 0;
+-		cpu_if->vgic_ap0r[3] = 0;
+-		cpu_if->vgic_ap1r[0] = 0;
+-		cpu_if->vgic_ap1r[1] = 0;
+-		cpu_if->vgic_ap1r[2] = 0;
+-		cpu_if->vgic_ap1r[3] = 0;
+ 	}
+ 
+ 	val = read_gicreg(ICC_SRE_EL2);
+@@ -287,8 +256,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+-	u64 val;
+-	u32 nr_pre_bits;
+ 	int i;
+ 
+ 	/*
+@@ -306,32 +273,9 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+ 	}
+ 
+-	val = read_gicreg(ICH_VTR_EL2);
+-	nr_pre_bits = vtr_to_nr_pre_bits(val);
+-
+ 	if (used_lrs) {
+ 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+ 
+-		switch (nr_pre_bits) {
+-		case 7:
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
+-		case 6:
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
+-		default:
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
+-		}
+-
+-		switch (nr_pre_bits) {
+-		case 7:
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
+-		case 6:
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
+-		default:
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
+-		}
+-
+ 		for (i = 0; i < used_lrs; i++)
+ 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+ 	} else {
+@@ -364,6 +308,72 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		     ICC_SRE_EL2);
  }
  
-+static void patch_alternative(struct alt_instr *alt,
-+			      __le32 *origptr, __le32 *updptr, int nr_inst)
++void __hyp_text __vgic_v3_save_aprs(struct kvm_vcpu *vcpu)
 +{
-+	__le32 *replptr;
-+	int i;
++	struct vgic_v3_cpu_if *cpu_if;
++	u64 val;
++	u32 nr_pre_bits;
 +
-+	replptr = ALT_REPL_PTR(alt);
-+	for (i = 0; i < nr_inst; i++) {
-+		u32 insn;
++	vcpu = kern_hyp_va(vcpu);
++	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
 +
-+		insn = get_alt_insn(alt, origptr + i, replptr + i);
-+		updptr[i] = cpu_to_le32(insn);
++	val = read_gicreg(ICH_VTR_EL2);
++	nr_pre_bits = vtr_to_nr_pre_bits(val);
++
++	switch (nr_pre_bits) {
++	case 7:
++		cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
++		cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
++	case 6:
++		cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
++	default:
++		cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
++	}
++
++	switch (nr_pre_bits) {
++	case 7:
++		cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
++		cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
++	case 6:
++		cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
++	default:
++		cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
 +	}
 +}
 +
- static void __apply_alternatives(void *alt_region, bool use_linear_alias)
- {
- 	struct alt_instr *alt;
- 	struct alt_region *region = alt_region;
--	__le32 *origptr, *replptr, *updptr;
-+	__le32 *origptr, *updptr;
-+	alternative_cb_t alt_cb;
- 
- 	for (alt = region->begin; alt < region->end; alt++) {
--		u32 insn;
--		int i, nr_inst;
-+		int nr_inst;
- 
--		if (!cpus_have_cap(alt->cpufeature))
-+		/* Use ARM64_CB_PATCH as an unconditional patch */
-+		if (alt->cpufeature < ARM64_CB_PATCH &&
-+		    !cpus_have_cap(alt->cpufeature))
- 			continue;
- 
--		BUG_ON(alt->alt_len != alt->orig_len);
-+		if (alt->cpufeature == ARM64_CB_PATCH)
-+			BUG_ON(alt->alt_len != 0);
-+		else
-+			BUG_ON(alt->alt_len != alt->orig_len);
- 
- 		pr_info_once("patching kernel code\n");
- 
- 		origptr = ALT_ORIG_PTR(alt);
--		replptr = ALT_REPL_PTR(alt);
- 		updptr = use_linear_alias ? lm_alias(origptr) : origptr;
--		nr_inst = alt->alt_len / sizeof(insn);
-+		nr_inst = alt->orig_len / AARCH64_INSN_SIZE;
- 
--		for (i = 0; i < nr_inst; i++) {
--			insn = get_alt_insn(alt, origptr + i, replptr + i);
--			updptr[i] = cpu_to_le32(insn);
--		}
-+		if (alt->cpufeature < ARM64_CB_PATCH)
-+			alt_cb = patch_alternative;
-+		else
-+			alt_cb  = ALT_REPL_PTR(alt);
++void __hyp_text __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu)
++{
++	struct vgic_v3_cpu_if *cpu_if;
++	u64 val;
++	u32 nr_pre_bits;
 +
-+		alt_cb(alt, origptr, updptr, nr_inst);
++	vcpu = kern_hyp_va(vcpu);
++	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
++
++	val = read_gicreg(ICH_VTR_EL2);
++	nr_pre_bits = vtr_to_nr_pre_bits(val);
++
++	switch (nr_pre_bits) {
++	case 7:
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
++	case 6:
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
++	default:
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
++	}
++
++	switch (nr_pre_bits) {
++	case 7:
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
++	case 6:
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
++	default:
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
++	}
++}
++
+ void __hyp_text __vgic_v3_init_lrs(void)
+ {
+ 	int max_lr_idx = vtr_to_max_lr_idx(read_gicreg(ICH_VTR_EL2));
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 1e5f3eb6973d..ca7cfee9f353 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -446,7 +446,6 @@ void vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = vcpu->kvm;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+ 	void __iomem *base = vgic->vctrl_base;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
  
- 		flush_icache_range((uintptr_t)origptr,
- 				   (uintptr_t)(origptr + nr_inst));
+@@ -454,11 +453,8 @@ void vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ 		return;
+ 
+ 	if (used_lrs) {
+-		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
+ 		save_lrs(vcpu, base);
+ 		writel_relaxed(0, base + GICH_HCR);
+-	} else {
+-		cpu_if->vgic_apr = 0;
+ 	}
+ }
+ 
+@@ -476,7 +472,6 @@ void vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ 
+ 	if (used_lrs) {
+ 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+-		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+ 		for (i = 0; i < used_lrs; i++) {
+ 			writel_relaxed(cpu_if->vgic_lr[i],
+ 				       base + GICH_LR0 + (i * 4));
+@@ -490,6 +485,7 @@ void vgic_v2_load(struct kvm_vcpu *vcpu)
+ 	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 
+ 	writel_relaxed(cpu_if->vgic_vmcr, vgic->vctrl_base + GICH_VMCR);
++	writel_relaxed(cpu_if->vgic_apr, vgic->vctrl_base + GICH_APR);
+ }
+ 
+ void vgic_v2_put(struct kvm_vcpu *vcpu)
+@@ -498,4 +494,5 @@ void vgic_v2_put(struct kvm_vcpu *vcpu)
+ 	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 
+ 	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
++	cpu_if->vgic_apr = readl_relaxed(vgic->vctrl_base + GICH_APR);
+ }
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index b76e21f3e6bd..4bafcd1e6bb8 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -16,6 +16,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <kvm/arm_vgic.h>
++#include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_asm.h>
+ 
+@@ -587,6 +588,8 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
+ 	 */
+ 	if (likely(cpu_if->vgic_sre))
+ 		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
++
++	kvm_call_hyp(__vgic_v3_restore_aprs, vcpu);
+ }
+ 
+ void vgic_v3_put(struct kvm_vcpu *vcpu)
+@@ -595,4 +598,6 @@ void vgic_v3_put(struct kvm_vcpu *vcpu)
+ 
+ 	if (likely(cpu_if->vgic_sre))
+ 		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
++
++	kvm_call_hyp(__vgic_v3_save_aprs, vcpu);
+ }
 -- 
 2.14.2
