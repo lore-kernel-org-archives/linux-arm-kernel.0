@@ -1,184 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:44 +0100
-Subject: [PATCH 75/85] arm64: KVM: Allow far branches from vector slots to the
- main vectors
+Date: Wed, 28 Mar 2018 13:52:46 +0100
+Subject: [PATCH 77/85] arm64: Make BP hardening slot counter available
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-76-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-78-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, the branch from the vector slots to the main vectors can at
-most be 4GB from the main vectors (the reach of ADRP), and this
-distance is known at compile time. If we were to remap the slots
-to an unrelated VA, things would break badly.
+We're about to need to allocate hardening slots from other parts
+of the kernel (in order to support ARM64_HARDEN_EL2_VECTORS).
 
-A way to achieve VA independence would be to load the absolute
-address of the vectors (__kvm_hyp_vector), either using a constant
-pool or a series of movs, followed by an indirect branch.
-
-This patches implements the latter solution, using another instance
-of a patching callback. Note that since we have to save a register
-pair on the stack, we branch to the *second* instruction in the
-vectors in order to compensate for it. This also results in having
-to adjust this balance in the invalid vector entry point.
+Turn the counter into an atomic_t and make it available to the
+rest of the kernel. Also add BP_HARDEN_EL2_SLOTS as the number of
+slots instead of the hardcoded 4...
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h |  2 +-
- arch/arm64/kernel/bpi.S          | 21 ++++++++++++
- arch/arm64/kvm/hyp/hyp-entry.S   |  2 ++
- arch/arm64/kvm/va_layout.c       | 72 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 96 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/mmu.h   | 3 +++
+ arch/arm64/kernel/bpi.S        | 3 ++-
+ arch/arm64/kernel/cpu_errata.c | 9 ++++-----
+ 3 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 76a43a17449a..d4cc54ed0656 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -32,7 +32,7 @@
- #define ARM64_HAS_VIRT_HOST_EXTN		11
- #define ARM64_WORKAROUND_CAVIUM_27456		12
- #define ARM64_HAS_32BIT_EL0			13
--/* #define ARM64_UNALLOCATED_ENTRY			14 */
-+#define ARM64_HARDEN_EL2_VECTORS		14
- #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
- #define ARM64_HAS_NO_FPSIMD			16
- #define ARM64_WORKAROUND_REPEAT_TLBI		17
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index a050d4f3615d..3baf010fe883 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -21,6 +21,8 @@
+ #define USER_ASID_FLAG	(UL(1) << USER_ASID_BIT)
+ #define TTBR_ASID_MASK	(UL(0xffff) << 48)
+ 
++#define BP_HARDEN_EL2_SLOTS 4
++
+ #ifndef __ASSEMBLY__
+ 
+ typedef struct {
+@@ -51,6 +53,7 @@ struct bp_hardening_data {
+ 
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ extern char __bp_harden_hyp_vecs_start[], __bp_harden_hyp_vecs_end[];
++extern atomic_t arm64_el2_vector_last_slot;
+ 
+ DECLARE_PER_CPU_READ_MOSTLY(struct bp_hardening_data, bp_hardening_data);
+ 
 diff --git a/arch/arm64/kernel/bpi.S b/arch/arm64/kernel/bpi.S
-index ce1cfe3b24e6..dc51ef2ce98a 100644
+index dc51ef2ce98a..bb0b67722e86 100644
 --- a/arch/arm64/kernel/bpi.S
 +++ b/arch/arm64/kernel/bpi.S
-@@ -19,16 +19,37 @@
- #include <linux/linkage.h>
+@@ -20,6 +20,7 @@
  #include <linux/arm-smccc.h>
  
-+#include <asm/alternative.h>
-+
+ #include <asm/alternative.h>
++#include <asm/mmu.h>
+ 
  .macro hyp_ventry
  	.align 7
- 1:	.rept 27
- 	nop
+@@ -66,7 +67,7 @@ alternative_cb_end
+ 
+ 	.align	11
+ ENTRY(__bp_harden_hyp_vecs_start)
+-	.rept 4
++	.rept BP_HARDEN_EL2_SLOTS
+ 	generate_vectors
  	.endr
-+/*
-+ * The default sequence is to directly branch to the KVM vectors,
-+ * using the computed offset. This applies for VHE as well as
-+ * !ARM64_HARDEN_EL2_VECTORS.
-+ *
-+ * For ARM64_HARDEN_EL2_VECTORS configurations, this gets replaced
-+ * with:
-+ *
-+ * stp	x0, x1, [sp, #-16]!
-+ * movz	x0, #(addr & 0xffff)
-+ * movk	x0, #((addr >> 16) & 0xffff), lsl #16
-+ * movk	x0, #((addr >> 32) & 0xffff), lsl #32
-+ * br	x0
-+ *
-+ * Where addr = kern_hyp_va(__kvm_hyp_vector) + vector-offset + 4.
-+ * See kvm_patch_vector_branch for details.
-+ */
-+alternative_cb	kvm_patch_vector_branch
- 	b	__kvm_hyp_vector + (1b - 0b)
- 	nop
- 	nop
- 	nop
- 	nop
-+alternative_cb_end
- .endm
- 
- .macro generate_vectors
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 8359fed89098..87dfecce82b1 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -212,6 +212,8 @@ ENDPROC(\label)
- .macro invalid_vect target
- 	.align 7
- 	b	\target
-+	ldp	x0, x1, [sp], #16
-+	b	\target
- .endm
- 
- ENTRY(__kvm_hyp_vector)
-diff --git a/arch/arm64/kvm/va_layout.c b/arch/arm64/kvm/va_layout.c
-index 3d41a480b6a5..2deb6e9874c9 100644
---- a/arch/arm64/kvm/va_layout.c
-+++ b/arch/arm64/kvm/va_layout.c
-@@ -150,3 +150,75 @@ void __init kvm_update_va_mask(struct alt_instr *alt,
- 		updptr[i] = cpu_to_le32(insn);
- 	}
+ ENTRY(__bp_harden_hyp_vecs_end)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 52f15cd896e1..8cf6b60a085a 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -60,6 +60,8 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+ 	return 0;
  }
+ 
++atomic_t arm64_el2_vector_last_slot = ATOMIC_INIT(-1);
 +
-+void kvm_patch_vector_branch(struct alt_instr *alt,
-+			     __le32 *origptr, __le32 *updptr, int nr_inst)
-+{
-+	u64 addr;
-+	u32 insn;
-+
-+	BUG_ON(nr_inst != 5);
-+
-+	if (has_vhe() || !cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS)) {
-+		WARN_ON_ONCE(cpus_have_const_cap(ARM64_HARDEN_EL2_VECTORS));
-+		return;
-+	}
-+
-+	if (!va_mask)
-+		compute_layout();
-+
-+	/*
-+	 * Compute HYP VA by using the same computation as kern_hyp_va()
-+	 */
-+	addr = (uintptr_t)kvm_ksym_ref(__kvm_hyp_vector);
-+	addr &= va_mask;
-+	addr |= tag_val << tag_lsb;
-+
-+	/* Use PC[10:7] to branch to the same vector in KVM */
-+	addr |= ((u64)origptr & GENMASK_ULL(10, 7));
-+
-+	/*
-+	 * Branch to the second instruction in the vectors in order to
-+	 * avoid the initial store on the stack (which we already
-+	 * perform in the hardening vectors).
-+	 */
-+	addr += AARCH64_INSN_SIZE;
-+
-+	/* stp x0, x1, [sp, #-16]! */
-+	insn = aarch64_insn_gen_load_store_pair(AARCH64_INSN_REG_0,
-+						AARCH64_INSN_REG_1,
-+						AARCH64_INSN_REG_SP,
-+						-16,
-+						AARCH64_INSN_VARIANT_64BIT,
-+						AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX);
-+	*updptr++ = cpu_to_le32(insn);
-+
-+	/* movz x0, #(addr & 0xffff) */
-+	insn = aarch64_insn_gen_movewide(AARCH64_INSN_REG_0,
-+					 (u16)addr,
-+					 0,
-+					 AARCH64_INSN_VARIANT_64BIT,
-+					 AARCH64_INSN_MOVEWIDE_ZERO);
-+	*updptr++ = cpu_to_le32(insn);
-+
-+	/* movk x0, #((addr >> 16) & 0xffff), lsl #16 */
-+	insn = aarch64_insn_gen_movewide(AARCH64_INSN_REG_0,
-+					 (u16)(addr >> 16),
-+					 16,
-+					 AARCH64_INSN_VARIANT_64BIT,
-+					 AARCH64_INSN_MOVEWIDE_KEEP);
-+	*updptr++ = cpu_to_le32(insn);
-+
-+	/* movk x0, #((addr >> 32) & 0xffff), lsl #32 */
-+	insn = aarch64_insn_gen_movewide(AARCH64_INSN_REG_0,
-+					 (u16)(addr >> 32),
-+					 32,
-+					 AARCH64_INSN_VARIANT_64BIT,
-+					 AARCH64_INSN_MOVEWIDE_KEEP);
-+	*updptr++ = cpu_to_le32(insn);
-+
-+	/* br x0 */
-+	insn = aarch64_insn_gen_branch_reg(AARCH64_INSN_REG_0,
-+					   AARCH64_INSN_BRANCH_NOLINK);
-+	*updptr++ = cpu_to_le32(insn);
-+}
+ #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+ #include <asm/mmu_context.h>
+ #include <asm/cacheflush.h>
+@@ -90,7 +92,6 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 				      const char *hyp_vecs_start,
+ 				      const char *hyp_vecs_end)
+ {
+-	static int last_slot = -1;
+ 	static DEFINE_SPINLOCK(bp_lock);
+ 	int cpu, slot = -1;
+ 
+@@ -103,10 +104,8 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 	}
+ 
+ 	if (slot == -1) {
+-		last_slot++;
+-		BUG_ON(((__bp_harden_hyp_vecs_end - __bp_harden_hyp_vecs_start)
+-			/ SZ_2K) <= last_slot);
+-		slot = last_slot;
++		slot = atomic_inc_return(&arm64_el2_vector_last_slot);
++		BUG_ON(slot >= BP_HARDEN_EL2_SLOTS);
+ 		__copy_hyp_vect_bpi(slot, hyp_vecs_start, hyp_vecs_end);
+ 	}
+ 
 -- 
 2.14.2
