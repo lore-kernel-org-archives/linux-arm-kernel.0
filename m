@@ -1,116 +1,94 @@
-From: pelcan@codeaurora.org (Philip Elcan)
-Date: Tue, 27 Mar 2018 21:08:58 -0400
-Subject: [PATCH V2] arm64: tlbflush: avoid writing RES0 bits
-In-Reply-To: <96f894bb-4855-a77f-3fd1-c8a2878faabb@codeaurora.org>
-References: <1522120877-9136-1-git-send-email-pelcan@codeaurora.org>
- <985a0edd-e388-dade-8824-30cc58a236f3@arm.com>
- <56b560a5-6e57-8e01-32ca-9d3c95ccd2e5@codeaurora.org>
- <20180327173613.GI18435@arm.com>
- <96f894bb-4855-a77f-3fd1-c8a2878faabb@codeaurora.org>
-Message-ID: <d141573d-aa93-20a5-3982-abc70db088b6@codeaurora.org>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Wed, 28 Mar 2018 12:03:51 +1100
+Subject: [PATCH] dts: ARM: Add Aspeed virtual hub to SoC templates
+In-Reply-To: <CACPK8XdgoNLr3m_bp_Y+Cu6pNx5f0xJ5BwWL8svZPgM-YNQA8w@mail.gmail.com>
+References: <1515739918.31850.102.camel@kernel.crashing.org>
+ <CACPK8XdgoNLr3m_bp_Y+Cu6pNx5f0xJ5BwWL8svZPgM-YNQA8w@mail.gmail.com>
+Message-ID: <1522199031.7364.82.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/27/2018 9:03 PM, Shanker Donthineni wrote:
-> Hi Will,
+On Wed, 2018-03-28 at 11:00 +1030, Joel Stanley wrote:
+> Hi Ben,
 > 
-> On 03/27/2018 12:36 PM, Will Deacon wrote:
->> Hi Shanker,
->>
->> On Tue, Mar 27, 2018 at 09:53:16AM -0500, Shanker Donthineni wrote:
->>> On 03/27/2018 06:34 AM, Robin Murphy wrote:
->>>> On 27/03/18 04:21, Philip Elcan wrote:
->>>>> Several of the bits of the TLBI register operand are RES0 per the ARM
->>>>> ARM, so TLBI operations should avoid writing non-zero values to these
->>>>> bits.
->>>>>
->>>>> This patch adds a macro __TLBI_VADDR(addr, asid) that creates the
->>>>> operand register in the correct format and honors the RES0 bits.
->>>>>
->>>>> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
->>>>> ---
->>>>> ? arch/arm64/include/asm/tlbflush.h | 23 ++++++++++++++++-------
->>>>> ? 1 file changed, 16 insertions(+), 7 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
->>>>> index 9e82dd7..b1205e9 100644
->>>>> --- a/arch/arm64/include/asm/tlbflush.h
->>>>> +++ b/arch/arm64/include/asm/tlbflush.h
->>>>> @@ -60,6 +60,15 @@
->>>>> ????????? __tlbi(op, (arg) | USER_ASID_FLAG);??????????????? \
->>>>> ? } while (0)
->>>>> ? +/* This macro creates a properly formatted VA operand for the TLBI */
->>>>> +#define __TLBI_VADDR(addr, asid)??????????????? \
->>>>> +??? ({??????????????????????????? \
->>>>> +??????? unsigned long __ta = (addr) >> 12;??????? \
->>>>> +??????? __ta &= GENMASK_ULL(43, 0);??????????? \
->>>>> +??????? __ta |= (unsigned long)(asid) << 48;??????? \
->>>>> +??????? __ta;??????????????????????? \
->>>>> +??? })
->>>>
->>>> I'd be inclined to make this a static inline function rather than a
->>>> macro, since it doesn't need to do any wacky type-dodging, but either
->>>> way the overall change now looks appropriate;
->>>>
->>>> Acked-by: Robin Murphy <robin.murphy@arm.com>
->>>>
->>>
->>> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
->>
->> [...]
->>
->>>>> @@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
->>>>> ????????? return;
->>>>> ????? }
->>>>> ? -??? start = asid | (start >> 12);
->>>>> -??? end = asid | (end >> 12);
->>>>> +??? start = __TLBI_VADDR(start, asid);
->>>>> +??? end = __TLBI_VADDR(end, asid);
->>
->> Can you test this bit too, please? ;)
->>
+> On 12 January 2018 at 17:21, Benjamin Herrenschmidt
+> <benh@kernel.crashing.org> wrote:
+> > We don't yet enable it in any of the boards
+> > 
+> > Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 > 
-> I've verified the basic boot functionality on QDF2400 platform. But I can see now
-> after your comments, it leads to TLB conflicts because of ASID is truncated to zero
-> due to two times 48bit shift.     
-> 
-> Thanks for catching this one.
-> 
-> @@ -146,7 +155,7 @@ static inline void __flush_tlb_range(structvm_area_struct *
->                                      unsigned long start, unsigned long end,
->                                      bool last_level)
-> {
-> -       unsigned long asid = ASID(vma->vm_mm) << 48;
-> +       unsigned long asid = ASID(vma->vm_mm);
->         unsigned long addr;
->  
->         if ((end - start) > MAX_TLB_RANGE) {
-> @@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct
-> vm_area_struct *
->                 return;
->         }
-> 
-> -       start = asid | (start >> 12);
-> -       end = asid | (end >> 12);
-> +       start = __TLBI_VADDR(start, asid);
-> +       end = __TLBI_VADDR(end, asid);
-> 
-> 
->> Will
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
+> This one slipped through the cracks. Is it still the latest version?
 
-Thanks for catching that.  I'll address with a v3 patch.
+I was going to re-submit it after the driver itself is in.
 
-Philip
-
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
+> Cheers,
+> 
+> Joel
+> 
+> > ---
+> >  arch/arm/boot/dts/aspeed-g4.dtsi |  8 ++++++++
+> >  arch/arm/boot/dts/aspeed-g5.dtsi | 13 +++++++++++++
+> >  2 files changed, 21 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+> > index e55f2ad5de59..743b79014d3d 100644
+> > --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+> > +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+> > @@ -120,6 +120,14 @@
+> >                         status = "disabled";
+> >                 };
+> > 
+> > +               vhub: usb-vhub at 1e6a0000 {
+> > +                       compatible = "aspeed,ast2400-usb-vhub";
+> > +                       reg = <0x1e6a0000 0x300>;
+> > +                       interrupts = <5>;
+> > +                       clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
+> > +                       status = "disabled";
+> > +               };
+> > +
+> >                 apb {
+> >                         compatible = "simple-bus";
+> >                         #address-cells = <1>;
+> > diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+> > index 655258edee24..e50d7f3e18a0 100644
+> > --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+> > +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+> > @@ -163,6 +163,14 @@
+> >                         status = "disabled";
+> >                 };
+> > 
+> > +               vhub: usb-vhub at 1e6a0000 {
+> > +                       compatible = "aspeed,ast2500-usb-vhub";
+> > +                       reg = <0x1e6a0000 0x300>;
+> > +                       interrupts = <5>;
+> > +                       clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
+> > +                       status = "disabled";
+> > +               };
+> > +
+> >                 apb {
+> >                         compatible = "simple-bus";
+> >                         #address-cells = <1>;
+> > @@ -1388,6 +1396,11 @@
+> >                 groups = "USB2AH";
+> >         };
+> > 
+> > +       pinctrl_usb2ad_default: usb2ad_default {
+> > +               function = "USB2AD";
+> > +               groups = "USB2AD";
+> > +       };
+> > +
+> >         pinctrl_usb11bhid_default: usb11bhid_default {
+> >                 function = "USB11BHID";
+> >                 groups = "USB11BHID";
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
