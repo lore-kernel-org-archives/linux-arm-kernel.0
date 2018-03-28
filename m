@@ -1,95 +1,125 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 28 Mar 2018 17:30:55 +0100
-Subject: [PATCH 02/11] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
-In-Reply-To: <20180327172510.GB32184@pd.tnic>
-References: <20180215185606.26736-1-james.morse@arm.com>
- <20180215185606.26736-3-james.morse@arm.com> <20180301150144.GA4215@pd.tnic>
- <87sh9jbrgc.fsf@e105922-lin.cambridge.arm.com>
- <20180301223529.GA28811@pd.tnic> <5AA02C26.10803@arm.com>
- <20180308104408.GB21166@pd.tnic> <5AAFC939.3010309@arm.com>
- <20180327172510.GB32184@pd.tnic>
-Message-ID: <d15ba145-479c-ffde-14ad-ab7170d0f06e@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 28 Mar 2018 17:34:53 +0100
+Subject: [PATCH resend 1/2] arm64: assembler: add utility macros to
+ push/pop stack frames
+In-Reply-To: <20180328124129.6459-2-ard.biesheuvel@linaro.org>
+References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+ <20180328124129.6459-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180328163452.GM16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
+On Wed, Mar 28, 2018 at 02:41:28PM +0200, Ard Biesheuvel wrote:
+> We are going to add code to all the NEON crypto routines that will
+> turn them into non-leaf functions, so we need to manage the stack
+> frames. To make this less tedious and error prone, add some macros
+> that take the number of callee saved registers to preserve and the
 
-On 27/03/18 18:25, Borislav Petkov wrote:
-> On Mon, Mar 19, 2018 at 02:29:13PM +0000, James Morse wrote:
->> I don't think the die_lock really helps here, do we really want to wait for a
->> remote CPU to finish printing an OOPs about user-space's bad memory accesses,
->> before we bring the machine down due to this system-wide fatal RAS error? The
->> presence of firmware-first means we know this error, and any other oops are
->> unrelated.
+Apologies for the delay in looking at these patches...
+
+Anyway:
+
+Nit: for all instances of "callee saved" in this patch, do you mean             "caller saved"?
+
+A few stylistic comments below, but I don't consider them essential to
+address unless someone feels like it.
+
+Otherwise,
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+> extra size to allocate in the stack frame (for locals) and emit
+> the ldp/stp sequences.
 > 
-> Hmm, now that you put it this way...
-
->> I'd like to leave this under the x86-ifdef for now. For arm64 it would be an
->> APEI specific arch hook to stop the arch code from printing some messages,
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/assembler.h | 58 ++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
 > 
-> ... I'm thinking we should ignore the whole serializing of oopses and
-> really dump that hw error ASAP. If it really is a fatal error, our main
-> and only goal is to get it out as fast as possible so that it has the
-> highest chance to appear on some screen or logging facility and thus the
-> system can be serviced successfully.
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 053d83e8db6f..d354eb7f2f0c 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -565,4 +565,62 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+>  #endif
+>  	.endm
+>  
+> +	/*
+> +	 * frame_push - Push @regcount callee saved registers to the stack,
+> +	 *              starting at x19, as well as x29/x30, and set x29 to
+> +	 *              the new value of sp. Add @extra bytes of stack space
+> +	 *              for locals.
+> +	 */
+> +	.macro		frame_push, regcount:req, extra
+> +	__frame		st, \regcount, \extra
+> +	.endm
+> +
+> +	/*
+> +	 * frame_pop  - Pop the callee saved registers from the stack that were
+> +	 *              pushed in the most recent call to frame_push, as well
+> +	 *              as x29/x30 and any extra stack space that may have been
+> +	 *              allocated.
+> +	 */
+> +	.macro		frame_pop
+> +	__frame		ld
+> +	.endm
+> +
+> +	.macro		__frame_regs, reg1, reg2, op, num
+> +	.if		.Lframe_regcount == \num
+> +	\op\()r		\reg1, [sp, #(\num + 1) * 8]
+> +	.elseif		.Lframe_regcount > \num
+> +	\op\()p		\reg1, \reg2, [sp, #(\num + 1) * 8]
+> +	.endif
+> +	.endm
+> +
+> +	.macro		__frame, op, regcount, extra=0
+> +	.ifc		\op, st
+> +	.if		(\regcount) < 0 || (\regcount) > 10
+> +	.error		"regcount should be in the range [0 ... 10]"
+> +	.endif
+> +	.if		((\extra) % 16) != 0
+> +	.error		"extra should be a multiple of 16 bytes"
+> +	.endif
+> +	.set		.Lframe_regcount, \regcount
+> +	.set		.Lframe_extra, \extra
+> +	.set		.Lframe_local_offset, ((\regcount + 3) / 2) * 16
+> +	stp		x29, x30, [sp, #-.Lframe_local_offset - .Lframe_extra]!
+> +	mov		x29, sp
+> +	.endif
+> +
+> +	__frame_regs	x19, x20, \op, 1
+> +	__frame_regs	x21, x22, \op, 3
+> +	__frame_regs	x23, x24, \op, 5
+> +	__frame_regs	x25, x26, \op, 7
+> +	__frame_regs	x27, x28, \op, 9
+> +
+> +	.ifc		\op, ld
+> +	.if		.Lframe_regcount == -1
+
+We could also have
+
+	.ifc		\op, st
+	.ifdef		.Lframe_regcount
+	.if		.Lframe_regcount != -1
+	.error [...]
+
+on the push side, which would trip on the first nested frame_push
+rather than waiting until a frame_pop appears.
+
+Your existing code could be retained to guard against a double pop.
+
+> +	.error		"frame_push/frame_pop may not be nested"
+> +	.endif
+> +	ldp		x29, x30, [sp], #.Lframe_local_offset + .Lframe_extra
+> +	.set		.Lframe_regcount, -1
+> +	.endif
+> +	.endm
+> +
+>  #endif	/* __ASM_ASSEMBLER_H */
+> -- 
+> 2.11.0
 > 
-> And the other oopses have lower prio.
-
-> Hmmm?
-
-Yes, I agree. With firmware-first we know that errors the firmware takes first,
-then notifies by NMI causing us to panic() must be a higher priority than
-another oops.
-
-I'll add a patch[0] to v3 making this argument and removing the #ifdef'd
-oops_begin().
-
-
-Thanks,
-
-James
-
-
-[0]
------------------%<-----------------
-    ACPI / APEI: don't wait to serialise with oops messages when panic()ing
-
-    oops_begin() exists to group printk() messages with the oops message
-    printed by die(). To reach this caller we know that platform firmware
-    took this error first, then notified the OS via NMI with a 'panic'
-    severity.
-
-    Don't wait for another CPU to release the die-lock before we can
-    panic(), our only goal is to print this fatal error and panic().
-
-    This code is always called in_nmi(), and since 42a0bb3f7138 ("printk/nmi:
-    generic solution for safe printk in NMI"), it has been safe to call
-    printk() from this context. Messages are batched in a per-cpu buffer
-    and printed via irq-work, or a call back from panic().
-
-    Signed-off-by: James Morse <james.morse@arm.com>
-
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 22f6ea5b9ad5..f348e6540960 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -34,7 +34,6 @@
- #include <linux/interrupt.h>
- #include <linux/timer.h>
- #include <linux/cper.h>
--#include <linux/kdebug.h>
- #include <linux/platform_device.h>
- #include <linux/mutex.h>
- #include <linux/ratelimit.h>
-@@ -736,9 +735,6 @@ static int _in_nmi_notify_one(struct ghes *ghes)
-
-        sev = ghes_severity(ghes->estatus->error_severity);
-        if (sev >= GHES_SEV_PANIC) {
--#ifdef CONFIG_X86
--               oops_begin();
--#endif
-                ghes_print_queued_estatus();
-                __ghes_panic(ghes);
-        }
------------------%<-----------------
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
