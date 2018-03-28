@@ -1,49 +1,115 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:51:42 +0100
-Subject: [PATCH 13/85] kvm: arm/arm64: vgic-v3: Tighten synchronization for
- guests using v2 on v3
+Date: Wed, 28 Mar 2018 13:51:43 +0100
+Subject: [PATCH 14/85] KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls
+ than KVM_RUN
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-14-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On guest exit, and when using GICv2 on GICv3, we use a dsb(st) to
-force synchronization between the memory-mapped guest view and
-the system-register view that the hypervisor uses.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-This is incorrect, as the spec calls out the need for "a DSB whose
-required access type is both loads and stores with any Shareability
-attribute", while we're only synchronizing stores.
+Calling vcpu_load() registers preempt notifiers for this vcpu and calls
+kvm_arch_vcpu_load().  The latter will soon be doing a lot of heavy
+lifting on arm/arm64 and will try to do things such as enabling the
+virtual timer and setting us up to handle interrupts from the timer
+hardware.
 
-We also lack an isb after the dsb to ensure that the latter has
-actually been executed before we start reading stuff from the sysregs.
+Loading state onto hardware registers and enabling hardware to signal
+interrupts can be problematic when we're not actually about to run the
+VCPU, because it makes it difficult to establish the right context when
+handling interrupts from the timer, and it makes the register access
+code difficult to reason about.
 
-The fix is pretty easy: turn dsb(st) into dsb(sy), and slap an isb()
-just after.
+Luckily, now when we call vcpu_load in each ioctl implementation, we can
+simply remove the call from the non-KVM_RUN vcpu ioctls, and our
+kvm_arch_vcpu_load() is only used for loading vcpu content to the
+physical CPU when we're actually going to run the vcpu.
 
-Cc: stable at vger.kernel.org
-Fixes: f68d2b1b73cc ("arm64: KVM: Implement vgic-v3 save/restore")
-Acked-by: Christoffer Dall <cdall@kernel.org>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Julien Grall <julien.grall@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/guest.c | 3 ---
+ virt/kvm/arm/arm.c     | 9 ---------
+ 2 files changed, 12 deletions(-)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index f5c3d6d7019e..b89ce5432214 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -215,7 +215,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	 * are now visible to the system register interface.
- 	 */
- 	if (!cpu_if->vgic_sre) {
--		dsb(st);
-+		dsb(sy);
-+		isb();
- 		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index d7e3299a7734..959e50d2588c 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -363,8 +363,6 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ {
+ 	int ret = 0;
+ 
+-	vcpu_load(vcpu);
+-
+ 	trace_kvm_set_guest_debug(vcpu, dbg->control);
+ 
+ 	if (dbg->control & ~KVM_GUESTDBG_VALID_MASK) {
+@@ -386,7 +384,6 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
  	}
+ 
+ out:
+-	vcpu_put(vcpu);
+ 	return ret;
+ }
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 86941f6181bb..53572304843b 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -384,14 +384,11 @@ static void vcpu_power_off(struct kvm_vcpu *vcpu)
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
+ {
+-	vcpu_load(vcpu);
+-
+ 	if (vcpu->arch.power_off)
+ 		mp_state->mp_state = KVM_MP_STATE_STOPPED;
+ 	else
+ 		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
+ 
+-	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+@@ -400,8 +397,6 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ {
+ 	int ret = 0;
+ 
+-	vcpu_load(vcpu);
+-
+ 	switch (mp_state->mp_state) {
+ 	case KVM_MP_STATE_RUNNABLE:
+ 		vcpu->arch.power_off = false;
+@@ -413,7 +408,6 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 		ret = -EINVAL;
+ 	}
+ 
+-	vcpu_put(vcpu);
+ 	return ret;
+ }
+ 
+@@ -1036,8 +1030,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 	struct kvm_device_attr attr;
+ 	long r;
+ 
+-	vcpu_load(vcpu);
+-
+ 	switch (ioctl) {
+ 	case KVM_ARM_VCPU_INIT: {
+ 		struct kvm_vcpu_init init;
+@@ -1114,7 +1106,6 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 		r = -EINVAL;
+ 	}
+ 
+-	vcpu_put(vcpu);
+ 	return r;
+ }
  
 -- 
 2.14.2
