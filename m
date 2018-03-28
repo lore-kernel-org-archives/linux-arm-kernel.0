@@ -1,52 +1,41 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Mar 2018 11:26:40 +0100
-Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
-In-Reply-To: <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
-References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
- <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
- <1521685073.28226.10.camel@mtkswgap22>
- <20180323185418.GD255819@dtor-ws>
- <20180327080507.pgil6pw2mn4y2f4d@dell>
- <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
-Message-ID: <20180328102640.yx6nv5abfexmouuf@dell>
+From: ada@thorsis.com (Alexander Dahl)
+Date: Wed, 28 Mar 2018 12:29:20 +0200
+Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
+In-Reply-To: <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
+References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
+ <9761072.pX2B0LJlSJ@ada> <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
+Message-ID: <4073350.0MmxRoANOi@ada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Mar 2018, Matthias Brugger wrote:
+Hello Daniel,
 
-> 
-> 
-> On 03/27/2018 10:05 AM, Lee Jones wrote:
-> > On Fri, 23 Mar 2018, Dmitry Torokhov wrote:
-> >> On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
-> >>> Hi, Dmitry and Lee
-> >>>
-> >>> The series seems not being got merged. Are they good enough to be ready
-> >>> into the your tree?
-> >>>
-> >>> Recently I've tested the series with focusing on pwrkey event generated
-> >>> through interrupt when push and release the key on bpi-r2 board and then
-> >>> finally it's working fine. but for homekey it cannot be found on the
-> >>> board and thus I cannot have more tests more about it.
-> >>>
-> >>> Tested-by: Sean Wang <sean.wang@mediatek.com>
-> >>
-> >> You have my Ack on the input patch; I expect it go through Lee's tree as
-> >> there are some dependencies on mfd core piece.
-> > 
-> > Are you happy for me to merge the Input dt-bindings without your Ack?
-> > 
-> 
-> They got both Acked in v5, but the commit message was not updated:
-> https://patchwork.kernel.org/patch/9973721/
-> https://patchwork.kernel.org/patch/9973723/
+Am Dienstag, 27. M?rz 2018, 13:30:22 CEST schrieb Daniel Lezcano:
+> Can you can give a rough amount for the irq rate on the timer ?
 
-Thanks Matthias.
+I used itop [1] now to get a rough estimate. First with kernel v4.14.29-rt25 
+(fully preempt RT):
 
-Chen, can you collect all the Acks and repost as a RESEND please?
+INT                NAME          RATE             MAX
+ 19 [ vel     tc_clkevt]   397 Ints/s     (max:   432)
+ 26 [      vel     eth0]     4 Ints/s     (max:    38)
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Next test with kernel v4.15.13 gives (slightly slower, but non-RT):
+
+INT                NAME          RATE             MAX
+ 19 [ vel     tc_clkevt]   248 Ints/s     (max:   273)
+ 26 [      vel     eth0]     4 Ints/s     (max:    11)
+
+With kernel v4.16-rc7 plus this patch series and tcb as clocksource:
+
+INT                NAME          RATE             MAX
+ 17 [vel     timer at fffa]  2164 Ints/s     (max:  2183)
+ 26 [      vel     eth0]     5 Ints/s     (max:    10)
+
+Is this the information you wanted? If not, could you point me on how to get 
+the requested irq rate?
+
+Greets
+Alex
+
+[1] https://packages.debian.org/stretch/itop
