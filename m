@@ -1,57 +1,41 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 28 Mar 2018 13:58:13 +0300
-Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
-In-Reply-To: <20180327102116.GA2464@arm.com>
-References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
- <20180325175004.28162-3-ynorov@caviumnetworks.com>
- <20180327102116.GA2464@arm.com>
-Message-ID: <20180328105813.arilhcxi6hawd34n@yury-thinkpad>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Wed, 28 Mar 2018 16:28:49 +0530
+Subject: [PATCH v6 2/4] arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+In-Reply-To: <1522234731-27397-1-git-send-email-cpandya@codeaurora.org>
+References: <1522234731-27397-1-git-send-email-cpandya@codeaurora.org>
+Message-ID: <1522234731-27397-3-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 11:21:17AM +0100, Will Deacon wrote:
-> On Sun, Mar 25, 2018 at 08:50:04PM +0300, Yury Norov wrote:
-> > kick_all_cpus_sync() forces all CPUs to sync caches by sending broadcast IPI.
-> > If CPU is in extended quiescent state (idle task or nohz_full userspace), this
-> > work may be done at the exit of this state. Delaying synchronization helps to
-> > save power if CPU is in idle state and decrease latency for real-time tasks.
-> > 
-> > This patch introduces kick_active_cpus_sync() and uses it in mm/slab and arm64
-> > code to delay syncronization.
-> > 
-> > For task isolation (https://lkml.org/lkml/2017/11/3/589), IPI to the CPU running
-> > isolated task would be fatal, as it breaks isolation. The approach with delaying
-> > of synchronization work helps to maintain isolated state.
-> > 
-> > I've tested it with test from task isolation series on ThunderX2 for more than
-> > 10 hours (10k giga-ticks) without breaking isolation.
-> > 
-> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> > ---
-> >  arch/arm64/kernel/insn.c |  2 +-
-> >  include/linux/smp.h      |  2 ++
-> >  kernel/smp.c             | 24 ++++++++++++++++++++++++
-> >  mm/slab.c                |  2 +-
-> >  4 files changed, 28 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> > index 2718a77da165..9d7c492e920e 100644
-> > --- a/arch/arm64/kernel/insn.c
-> > +++ b/arch/arm64/kernel/insn.c
-> > @@ -291,7 +291,7 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
-> >  			 * synchronization.
-> >  			 */
-> >  			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
-> > -			kick_all_cpus_sync();
-> > +			kick_active_cpus_sync();
-> >  			return ret;
-> >  		}
-> >  	}
-> 
-> I think this means that runtime modifications to the kernel text might not
-> be picked up by CPUs coming out of idle. Shouldn't we add an ISB on that
-> path to avoid executing stale instructions?
+Add an interface to invalidate intermediate page tables
+from TLB for kernel.
 
-Thanks, Will, for the hint. I'll do that.
+Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+---
+From: V5->V6:
+ - No change
 
-Yury
+ arch/arm64/include/asm/tlbflush.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 9e82dd7..6a4816d 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -209,6 +209,12 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+ 	dsb(ish);
+ }
+ 
++static inline void __flush_tlb_kernel_pgtable(unsigned long addr)
++{
++	addr >>= 12;
++	__tlbi(vaae1is, addr);
++	dsb(ish);
++}
+ #endif
+ 
+ #endif
+-- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
+Collaborative Project
