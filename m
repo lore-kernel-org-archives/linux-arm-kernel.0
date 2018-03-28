@@ -1,29 +1,169 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Mar 2018 17:10:09 +0200
-Subject: [GIT PULL 1/4] Rockchip driver changes for 4.17
-In-Reply-To: <2730470.Dx7LZZSCZ1@diego>
-References: <12470502.BUvxkRrZk8@phil> <2730470.Dx7LZZSCZ1@diego>
-Message-ID: <CAK8P3a3vj7zyUg8CmT4S4jJtZOjBX4qLQiVTxs0b19XCYg14_w@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 28 Mar 2018 08:14:00 -0700
+Subject: [PATCH v3 1/4] dt-bindings: mfd: Add Gateworks System Controller
+ bindings
+In-Reply-To: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
+References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <1522250043-8065-2-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 7:50 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi Arnd,
->
-> Am Donnerstag, 15. M?rz 2018, 23:20:53 CEST schrieb Heiko Stuebner:
->> Hi Arnd, Kevin, Olof,
->>
->> please find below the main Rockchip-related changes for 4.17.
->> The individual tags should explain things nicely but overall it's a pretty
->> standard set of changes without anything special standing out.
->>
->> So if things look ok, please pull!
->>
->> Thanks
->> Heiko
->
-> As requested a ping on the seemingly missed pull requests. (4 pieces)
+This patch adds documentation of device-tree bindings for the
+Gateworks System Controller (GSC).
 
-Pulled into next/drivers, thanks for noticing my mistake and resending!
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+v3:
+ - replaced _ with -
+ - remove input bindings
+ - added full description of hwmon
+ - fix unit address of hwmon child nodes
 
-     Arnd
+---
+ .../devicetree/bindings/mfd/gateworks-gsc.txt      | 135 +++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+
+diff --git a/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+new file mode 100644
+index 0000000..8f530ed
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+@@ -0,0 +1,135 @@
++Gateworks System Controller multi-function device
++
++The GSC is a Multifunction I2C slave device with the following submodules:
++- WDT
++- GPIO
++- Pushbutton controller
++- HWMON
++
++Required properties:
++- compatible : Must be "gw,gsc"
++- reg: I2C address of the device
++- interrupts: interrupt triggered by GSC_IRQ# signal
++- interrupt-parent: Interrupt controller GSC is connected to
++- #interrupt-cells: should be <1>, index of the interrupt within the
++  controller, in accordance with the "one cell" variant of
++  <devicetree/bindings/interrupt-controller/interrupt.txt>
++
++Optional nodes:
++* watchdog:
++The GSC provides a Watchdog monitor which can power cycle the board's
++primary power supply on most board models when tripped.
++
++Required watchdog properties:
++- compatible: must be "gw,gsc-watchdog"
++
++* hwmon:
++The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
++temperature and/or voltage monitoring.
++
++Required hwmon properties:
++- compatible: must be "gw,gsc-hwmon"
++
++Optional hwmon properties:
++- gw,reference-voltage: ADC reference voltage (mV) used in scaling raw ADCs
++- gw,resolution: ADC resolution (ie 4096) used in scaling raw ADCs
++
++Each hwmon child node defines an ADC input on the chip which the GSC may
++report cooked values (ie temperature sensor based on thermister), raw values,
++(ie voltage rail with a pre-scaling resistor divider), or a fan controller
++setpoint.
++
++Required hwmon child properties:
++- type: one of the following ADC types:
++  "gw,hwmon-temperature" - reports temperature in C*10
++  "gw,hwmon-voltage" - reports a pre-scaled voltage value
++  "gw,hwmon-voltage-raw" - reports a raw ADC that is scaled with
++       vreference, resolution, and optional resistor divider
++  "gw,hwmon-fan" - a fan temperature setpoint in C*10
++- reg: offset of the ADC register
++- label: name of the ADC input or FAN setpoint
++
++Optional hwmon child properties:
++- gw,voltage-divider: An array of two integers containing the resistor
++  values R1 and R2 of the optinal resistor divider on a raw ADC
++- gw,voltage-offset: a mV voltage offset to apply to a raw ADC (ie to
++  compensate for a diode drop)
++
++Example:
++
++	gsc: gsc at 20 {
++		compatible = "gw,gsc";
++		reg = <0x20>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <4 GPIO_ACTIVE_LOW>;
++		interrupt-controller;
++		#interrupt-cells = <1>;
++
++		watchdog {
++			compatible = "gw,gsc-watchdog";
++		};
++
++		hwmon {
++			compatible = "gw,gsc-hwmon";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			gw,reference-voltage = <2500>;
++			gw,resolution = <4096>;
++
++			hwmon at 0 { /* A0: Board Temperature */
++				type = "gw,hwmon-temperature";
++				reg = <0x00>;
++				label = "temp";
++			};
++
++			hwmon at 2 { /* A1: Input Voltage (raw ADC) */
++				type = "gw,hwmon-voltage-raw";
++				reg = <0x02>;
++				label = "vdd_vin";
++				gw,voltage-divider = <22100 1000>;
++				gw,voltage-offset = <800>;
++			};
++
++			hwmon at b { /* A2: Battery voltage */
++				type = "gw,hwmon-voltage";
++				reg = <0x0b>;
++				label = "vdd_bat";
++			};
++
++			hwmon at 2c { /* fan temperature setpoint for 50% duty */
++				type = "gw,hwmon-fan";
++				reg = <0x2c>;
++				label = "fan_50p";
++			};
++
++			hwmon at 2e { /* fan1 */
++				type = "gw,hwmon-fan";
++				reg = <0x2e>;
++				label = "fan_60p";
++			};
++
++			hwmon at 30 { /* fan2 */
++				type = "gw,hwmon-fan";
++				reg = <0x30>;
++				label = "fan_70p";
++			};
++
++			hwmon at 32 { /* fan3 */
++				type = "gw,hwmon-fan";
++				reg = <0x32>;
++				label = "fan_80p";
++			};
++
++			hwmon at 34 { /* fan4 */
++				type = "gw,hwmon-fan";
++				reg = <0x34>;
++				label = "fan_90p";
++			};
++
++			hwmon at 36 { /* fan5 */
++				type = "gw,hwmon-fan";
++				reg = <0x36>;
++				label = "fan_100p";
++			};
++		};
++	};
+-- 
+2.7.4
