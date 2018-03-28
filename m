@@ -1,233 +1,261 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:51:29 +0100
-Subject: [GIT PULL] KVM/ARM updates for v4.17
-Message-ID: <20180328125254.31380-1-marc.zyngier@arm.com>
+Date: Wed, 28 Mar 2018 13:51:30 +0100
+Subject: [PATCH 01/85] KVM: arm/arm64: Fix arch timers with userspace irqchips
+In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
+References: <20180328125254.31380-1-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paolo, Radim,
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-This is the (rather big) set of updates for KVM/ARM for v4.17. The
-main features are the set of VHE optimizations taking advantage of
-CPUs implementing ARMv8.1, together with the EL2 randomization patches
-that are the foundation for mitigating the so-called variant 3a
-security issue (affecting Cortex-A57 and A72).
+When introducing support for irqchip in userspace we needed a way to
+mask the timer signal to prevent the guest continuously exiting due to a
+screaming timer.
 
-The rest is the usual mix of vgic fixes and minor improvements.
+We did this by disabling the corresponding percpu interrupt on the
+host interrupt controller, because we cannot rely on the host system
+having a GIC, and therefore cannot make any assumptions about having an
+active state to hide the timer signal.
 
-Note that the breakup below is slightly misleading, as it includes
-fixes that have already landed in mainline (I've done a direct merge
-of the fixes branch in order to spare everyone some horrible
-conflicts).
+Unfortunately, when introducing this feature, it became entirely
+possible that a VCPU which belongs to a VM that has a userspace irqchip
+can disable the vtimer irq on the host on some physical CPU, and then go
+away without ever enabling the vtimer irq on that physical CPU again.
 
-Also, we've had to revert a pretty important patch for Qualcomm
-servers due to some more conflicts with the arm64 tree). That patch
-will be resent once both trees have been pulled into Linus' (the
-sooner, the better).
+This means that using irqchips in userspace on a system that also
+supports running VMs with an in-kernel GIC can prevent forward progress
+from in-kernel GIC VMs.
 
-Please pull.
+Later on, when we started taking virtual timer interrupts in the arch
+timer code, we would also leave this timer state active for userspace
+irqchip VMs, because we leave it up to a VGIC-enabled guest to
+deactivate the hardware IRQ using the HW bit in the LR.
 
-	M.
+Both issues are solved by only using the enable/disable trick on systems
+that do not have a host GIC which supports the active state, because all
+VMs on such systems must use irqchips in userspace.  Systems that have a
+working GIC with support for an active state use the active state to
+mask the timer signal for both userspace and in-kernel irqchips.
 
-The following changes since commit 4a3928c6f8a53fa1aed28ccba227742486e8ddcb:
+Cc: Alexander Graf <agraf@suse.de>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: <stable@vger.kernel.org> # v4.12+
+Fixes: d9e139778376 ("KVM: arm/arm64: Support arch timers with a userspace gic")
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/arch_timer.c | 116 +++++++++++++++++++++++++---------------------
+ 1 file changed, 64 insertions(+), 52 deletions(-)
 
-  Linux 4.16-rc3 (2018-02-25 18:50:41 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.17
-
-for you to fetch changes up to dc6ed61d2f824a595033744fc1f3bf4cb98768b5:
-
-  arm64: Add temporary ERRATA_MIDR_ALL_VERSIONS compatibility macro (2018-03-28 12:57:23 +0100)
-
-----------------------------------------------------------------
-KVM/ARM updates for v4.17
-
-- VHE optimizations
-- EL2 address space randomization
-- Variant 3a mitigation for Cortex-A57 and A72
-- The usual vgic fixes
-- Various minor tidying-up
-
-----------------------------------------------------------------
-Andre Przywara (1):
-      KVM: arm/arm64: vgic: Add missing irq_lock to vgic_mmio_read_pending
-
-Ard Biesheuvel (1):
-      KVM: arm/arm64: Reduce verbosity of KVM init log
-
-Arnd Bergmann (1):
-      ARM: kvm: fix building with gcc-8
-
-Christoffer Dall (42):
-      KVM: arm/arm64: Fix arch timers with userspace irqchips
-      KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls than KVM_RUN
-      KVM: arm/arm64: Reset mapped IRQs on VM reset
-      KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls than KVM_RUN
-      KVM: arm/arm64: Move vcpu_load call after kvm_vcpu_first_run_init
-      KVM: arm64: Avoid storing the vcpu pointer on the stack
-      KVM: arm64: Rework hyp_panic for VHE and non-VHE
-      KVM: arm/arm64: Get rid of vcpu->arch.irq_lines
-      KVM: arm/arm64: Add kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs
-      KVM: arm/arm64: Introduce vcpu_el1_is_32bit
-      KVM: arm64: Move debug dirty flag calculation out of world switch
-      KVM: arm64: Slightly improve debug save/restore functions
-      KVM: arm64: Improve debug register save/restore flow
-      KVM: arm64: Factor out fault info population and gic workarounds
-      KVM: arm64: Introduce VHE-specific kvm_vcpu_run
-      KVM: arm64: Remove kern_hyp_va() use in VHE switch function
-      KVM: arm64: Don't deactivate VM on VHE systems
-      KVM: arm64: Remove noop calls to timer save/restore from VHE switch
-      KVM: arm64: Move userspace system registers into separate function
-      KVM: arm64: Rewrite sysreg alternatives to static keys
-      KVM: arm64: Introduce separate VHE/non-VHE sysreg save/restore functions
-      KVM: arm/arm64: Remove leftover comment from kvm_vcpu_run_vhe
-      KVM: arm64: Unify non-VHE host/guest sysreg save and restore functions
-      KVM: arm64: Don't save the host ELR_EL2 and SPSR_EL2 on VHE systems
-      KVM: arm64: Change 32-bit handling of VM system registers
-      KVM: arm64: Rewrite system register accessors to read/write functions
-      KVM: arm64: Introduce framework for accessing deferred sysregs
-      KVM: arm/arm64: Prepare to handle deferred save/restore of SPSR_EL1
-      KVM: arm64: Prepare to handle deferred save/restore of ELR_EL1
-      KVM: arm64: Defer saving/restoring 64-bit sysregs to vcpu load/put on VHE
-      KVM: arm64: Prepare to handle deferred save/restore of 32-bit registers
-      KVM: arm64: Defer saving/restoring 32-bit sysregs to vcpu load/put
-      KVM: arm64: Move common VHE/non-VHE trap config in separate functions
-      KVM: arm64: Directly call VHE and non-VHE FPSIMD enabled functions
-      KVM: arm64: Configure c15, PMU, and debug register traps on cpu load/put for VHE
-      KVM: arm64: Cleanup __activate_traps and __deactive_traps for VHE and non-VHE
-      KVM: arm/arm64: Get rid of vgic_elrsr
-      KVM: arm/arm64: Handle VGICv2 save/restore from the main VGIC code
-      KVM: arm/arm64: Move arm64-only vgic-v2-sr.c file to arm64
-      KVM: arm/arm64: Handle VGICv3 save/restore from the main VGIC code on VHE
-      KVM: arm/arm64: Move VGIC APR save/restore to vgic put/load
-      KVM: arm/arm64: Avoid VGICv3 save/restore on VHE with no IRQs
-
-Dave Martin (1):
-      arm64: KVM: Move CPU ID reg trap setup off the world switch path
-
-J?r?my Fangu?de (2):
-      KVM: arm64: Enable the EL1 physical timer for AArch32 guests
-      KVM: arm: Enable emulation of the physical timer
-
-Marc Zyngier (33):
-      KVM: arm/arm64: vgic: Don't populate multiple LRs with the same vintid
-      kvm: arm/arm64: vgic-v3: Tighten synchronization for guests using v2 on v3
-      arm64: alternatives: Add dynamic patching feature
-      arm64: insn: Add N immediate encoding
-      arm64: insn: Add encoder for bitwise operations using literals
-      arm64: KVM: Dynamically patch the kernel/hyp VA mask
-      arm64: cpufeatures: Drop the ARM64_HYP_OFFSET_LOW feature flag
-      KVM: arm/arm64: Do not use kern_hyp_va() with kvm_vgic_global_state
-      KVM: arm/arm64: Demote HYP VA range display to being a debug feature
-      KVM: arm/arm64: Move ioremap calls to create_hyp_io_mappings
-      KVM: arm/arm64: Keep GICv2 HYP VAs in kvm_vgic_global_state
-      KVM: arm/arm64: Fix idmap size and alignment
-      KVM: arm64: Fix HYP idmap unmap when using 52bit PA
-      KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
-      arm64; insn: Add encoder for the EXTR instruction
-      arm64: insn: Allow ADD/SUB (immediate) with LSL #12
-      arm64: KVM: Dynamically compute the HYP VA mask
-      arm64: KVM: Introduce EL2 VA randomisation
-      arm64: Update the KVM memory map documentation
-      arm64: KVM: Move vector offsetting from hyp-init.S to kvm_get_hyp_vector
-      arm64: KVM: Move stashing of x0/x1 into the vector code itself
-      arm64: KVM: Move BP hardening vectors into .hyp.text section
-      arm64: KVM: Reserve 4 additional instructions in the BPI template
-      arm64: KVM: Allow far branches from vector slots to the main vectors
-      arm/arm64: KVM: Introduce EL2-specific executable mappings
-      arm64: Make BP hardening slot counter available
-      arm64: KVM: Allow mapping of vectors outside of the RAM region
-      arm64: Enable ARM64_HARDEN_EL2_VECTORS on Cortex-A57 and A72
-      Merge tag 'kvm-arm-fixes-for-v4.16-2' into HEAD
-      KVM: arm/arm64: vgic: Disallow Active+Pending for level interrupts
-      KVM: arm/arm64: vgic-its: Fix potential overrun in vgic_copy_lpi_list
-      Revert "arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP hardening"
-      arm64: Add temporary ERRATA_MIDR_ALL_VERSIONS compatibility macro
-
-Mark Rutland (1):
-      arm64/kvm: Prohibit guest LOR accesses
-
-Peter Maydell (1):
-      KVM: arm: Reserve bit in KVM_REG_ARM encoding for secure/nonsecure
-
-Shanker Donthineni (2):
-      KVM: arm/arm64: No need to zero CNTVOFF in kvm_timer_vcpu_put() for VHE
-      arm64: KVM: Use SMCCC_ARCH_WORKAROUND_1 for Falkor BP hardening
-
-Shih-Wei Li (1):
-      KVM: arm64: Move HCR_INT_OVERRIDE to default HCR_EL2 guest flag
-
- Documentation/arm64/memory.txt           |   9 +-
- arch/arm/include/asm/kvm_asm.h           |   5 +-
- arch/arm/include/asm/kvm_emulate.h       |  21 +-
- arch/arm/include/asm/kvm_host.h          |   6 +-
- arch/arm/include/asm/kvm_hyp.h           |   4 +
- arch/arm/include/asm/kvm_mmu.h           |  16 +-
- arch/arm/include/uapi/asm/kvm.h          |   9 +
- arch/arm/kvm/coproc.c                    |  61 +++++
- arch/arm/kvm/emulate.c                   |   4 +-
- arch/arm/kvm/hyp/Makefile                |   6 +-
- arch/arm/kvm/hyp/banked-sr.c             |   4 +
- arch/arm/kvm/hyp/switch.c                |  16 +-
- arch/arm64/Kconfig                       |  16 ++
- arch/arm64/include/asm/alternative.h     |  41 +++-
- arch/arm64/include/asm/cpucaps.h         |   2 +-
- arch/arm64/include/asm/insn.h            |  16 ++
- arch/arm64/include/asm/kvm_arm.h         |   6 +-
- arch/arm64/include/asm/kvm_asm.h         |  19 +-
- arch/arm64/include/asm/kvm_emulate.h     |  78 +++++--
- arch/arm64/include/asm/kvm_host.h        |  53 ++++-
- arch/arm64/include/asm/kvm_hyp.h         |  29 +--
- arch/arm64/include/asm/kvm_mmu.h         | 165 +++++++++----
- arch/arm64/include/asm/mmu.h             |   8 +-
- arch/arm64/include/asm/sysreg.h          |   6 +
- arch/arm64/kernel/Makefile               |   4 +-
- arch/arm64/kernel/alternative.c          |  43 +++-
- arch/arm64/kernel/asm-offsets.c          |   1 +
- arch/arm64/kernel/bpi.S                  |  67 ++++--
- arch/arm64/kernel/cpu_errata.c           |  25 +-
- arch/arm64/kernel/cpufeature.c           |  19 --
- arch/arm64/kernel/head.S                 |   7 +
- arch/arm64/kernel/insn.c                 | 190 ++++++++++++++-
- arch/arm64/kvm/Kconfig                   |   3 +
- arch/arm64/kvm/Makefile                  |   2 +-
- arch/arm64/kvm/debug.c                   |  29 ++-
- arch/arm64/kvm/guest.c                   |   3 -
- arch/arm64/kvm/hyp-init.S                |   1 -
- arch/arm64/kvm/hyp/Makefile              |   2 +-
- arch/arm64/kvm/hyp/debug-sr.c            |  88 ++++---
- arch/arm64/kvm/hyp/entry.S               |   6 +-
- arch/arm64/kvm/hyp/hyp-entry.S           |  86 +++----
- arch/arm64/kvm/hyp/switch.c              | 382 ++++++++++++++++++-------------
- arch/arm64/kvm/hyp/sysreg-sr.c           | 172 +++++++++++---
- arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c |  78 +++++++
- arch/arm64/kvm/inject_fault.c            |  24 +-
- arch/arm64/kvm/regmap.c                  |  67 ++++--
- arch/arm64/kvm/sys_regs.c                | 199 +++++++++++++---
- arch/arm64/kvm/sys_regs.h                |   4 +-
- arch/arm64/kvm/sys_regs_generic_v8.c     |   4 +-
- arch/arm64/kvm/va_layout.c               | 227 ++++++++++++++++++
- include/kvm/arm_vgic.h                   |  15 +-
- include/linux/irqchip/arm-gic-v3.h       |   1 +
- include/linux/irqchip/arm-gic.h          |   1 +
- virt/kvm/arm/aarch32.c                   |   2 +-
- virt/kvm/arm/arch_timer.c                | 132 ++++++-----
- virt/kvm/arm/arm.c                       |  57 ++---
- virt/kvm/arm/hyp/timer-sr.c              |  44 ++--
- virt/kvm/arm/hyp/vgic-v2-sr.c            | 159 -------------
- virt/kvm/arm/hyp/vgic-v3-sr.c            | 246 ++++++++++++--------
- virt/kvm/arm/mmu.c                       | 180 ++++++++++++---
- virt/kvm/arm/pmu.c                       |  36 +--
- virt/kvm/arm/vgic/vgic-init.c            |  17 --
- virt/kvm/arm/vgic/vgic-its.c             |  15 +-
- virt/kvm/arm/vgic/vgic-mmio.c            |   3 +
- virt/kvm/arm/vgic/vgic-v2.c              | 163 ++++++++-----
- virt/kvm/arm/vgic/vgic-v3.c              |  75 +++---
- virt/kvm/arm/vgic/vgic.c                 | 120 ++++++++--
- virt/kvm/arm/vgic/vgic.h                 |   6 +
- 68 files changed, 2508 insertions(+), 1097 deletions(-)
- create mode 100644 arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c
- create mode 100644 arch/arm64/kvm/va_layout.c
- delete mode 100644 virt/kvm/arm/hyp/vgic-v2-sr.c
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 70268c0bec79..70f4c30918eb 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -36,6 +36,8 @@ static struct timecounter *timecounter;
+ static unsigned int host_vtimer_irq;
+ static u32 host_vtimer_irq_flags;
+ 
++static DEFINE_STATIC_KEY_FALSE(has_gic_active_state);
++
+ static const struct kvm_irq_level default_ptimer_irq = {
+ 	.irq	= 30,
+ 	.level	= 1,
+@@ -56,6 +58,12 @@ u64 kvm_phys_timer_read(void)
+ 	return timecounter->cc->read(timecounter->cc);
+ }
+ 
++static inline bool userspace_irqchip(struct kvm *kvm)
++{
++	return static_branch_unlikely(&userspace_irqchip_in_use) &&
++		unlikely(!irqchip_in_kernel(kvm));
++}
++
+ static void soft_timer_start(struct hrtimer *hrt, u64 ns)
+ {
+ 	hrtimer_start(hrt, ktime_add_ns(ktime_get(), ns),
+@@ -69,25 +77,6 @@ static void soft_timer_cancel(struct hrtimer *hrt, struct work_struct *work)
+ 		cancel_work_sync(work);
+ }
+ 
+-static void kvm_vtimer_update_mask_user(struct kvm_vcpu *vcpu)
+-{
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-
+-	/*
+-	 * When using a userspace irqchip with the architected timers, we must
+-	 * prevent continuously exiting from the guest, and therefore mask the
+-	 * physical interrupt by disabling it on the host interrupt controller
+-	 * when the virtual level is high, such that the guest can make
+-	 * forward progress.  Once we detect the output level being
+-	 * de-asserted, we unmask the interrupt again so that we exit from the
+-	 * guest when the timer fires.
+-	 */
+-	if (vtimer->irq.level)
+-		disable_percpu_irq(host_vtimer_irq);
+-	else
+-		enable_percpu_irq(host_vtimer_irq, 0);
+-}
+-
+ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+ {
+ 	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
+@@ -106,9 +95,9 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+ 	if (kvm_timer_should_fire(vtimer))
+ 		kvm_timer_update_irq(vcpu, true, vtimer);
+ 
+-	if (static_branch_unlikely(&userspace_irqchip_in_use) &&
+-	    unlikely(!irqchip_in_kernel(vcpu->kvm)))
+-		kvm_vtimer_update_mask_user(vcpu);
++	if (userspace_irqchip(vcpu->kvm) &&
++	    !static_branch_unlikely(&has_gic_active_state))
++		disable_percpu_irq(host_vtimer_irq);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -290,8 +279,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+ 				   timer_ctx->irq.level);
+ 
+-	if (!static_branch_unlikely(&userspace_irqchip_in_use) ||
+-	    likely(irqchip_in_kernel(vcpu->kvm))) {
++	if (!userspace_irqchip(vcpu->kvm)) {
+ 		ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+ 					  timer_ctx->irq.irq,
+ 					  timer_ctx->irq.level,
+@@ -350,12 +338,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	phys_timer_emulate(vcpu);
+ }
+ 
+-static void __timer_snapshot_state(struct arch_timer_context *timer)
+-{
+-	timer->cnt_ctl = read_sysreg_el0(cntv_ctl);
+-	timer->cnt_cval = read_sysreg_el0(cntv_cval);
+-}
+-
+ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+@@ -367,8 +349,10 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ 	if (!vtimer->loaded)
+ 		goto out;
+ 
+-	if (timer->enabled)
+-		__timer_snapshot_state(vtimer);
++	if (timer->enabled) {
++		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
++		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
++	}
+ 
+ 	/* Disable the virtual timer */
+ 	write_sysreg_el0(0, cntv_ctl);
+@@ -460,23 +444,43 @@ static void set_cntvoff(u64 cntvoff)
+ 	kvm_call_hyp(__kvm_timer_set_cntvoff, low, high);
+ }
+ 
+-static void kvm_timer_vcpu_load_vgic(struct kvm_vcpu *vcpu)
++static inline void set_vtimer_irq_phys_active(struct kvm_vcpu *vcpu, bool active)
++{
++	int r;
++	r = irq_set_irqchip_state(host_vtimer_irq, IRQCHIP_STATE_ACTIVE, active);
++	WARN_ON(r);
++}
++
++static void kvm_timer_vcpu_load_gic(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	bool phys_active;
+-	int ret;
+ 
+-	phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
+-
+-	ret = irq_set_irqchip_state(host_vtimer_irq,
+-				    IRQCHIP_STATE_ACTIVE,
+-				    phys_active);
+-	WARN_ON(ret);
++	if (irqchip_in_kernel(vcpu->kvm))
++		phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
++	else
++		phys_active = vtimer->irq.level;
++	set_vtimer_irq_phys_active(vcpu, phys_active);
+ }
+ 
+-static void kvm_timer_vcpu_load_user(struct kvm_vcpu *vcpu)
++static void kvm_timer_vcpu_load_nogic(struct kvm_vcpu *vcpu)
+ {
+-	kvm_vtimer_update_mask_user(vcpu);
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++
++	/*
++	 * When using a userspace irqchip with the architected timers and a
++	 * host interrupt controller that doesn't support an active state, we
++	 * must still prevent continuously exiting from the guest, and
++	 * therefore mask the physical interrupt by disabling it on the host
++	 * interrupt controller when the virtual level is high, such that the
++	 * guest can make forward progress.  Once we detect the output level
++	 * being de-asserted, we unmask the interrupt again so that we exit
++	 * from the guest when the timer fires.
++	 */
++	if (vtimer->irq.level)
++		disable_percpu_irq(host_vtimer_irq);
++	else
++		enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
+ }
+ 
+ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+@@ -487,10 +491,10 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+ 	if (unlikely(!timer->enabled))
+ 		return;
+ 
+-	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
+-		kvm_timer_vcpu_load_user(vcpu);
++	if (static_branch_likely(&has_gic_active_state))
++		kvm_timer_vcpu_load_gic(vcpu);
+ 	else
+-		kvm_timer_vcpu_load_vgic(vcpu);
++		kvm_timer_vcpu_load_nogic(vcpu);
+ 
+ 	set_cntvoff(vtimer->cntvoff);
+ 
+@@ -555,18 +559,24 @@ static void unmask_vtimer_irq_user(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+-	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
+-		__timer_snapshot_state(vtimer);
+-		if (!kvm_timer_should_fire(vtimer)) {
+-			kvm_timer_update_irq(vcpu, false, vtimer);
+-			kvm_vtimer_update_mask_user(vcpu);
+-		}
++	if (!kvm_timer_should_fire(vtimer)) {
++		kvm_timer_update_irq(vcpu, false, vtimer);
++		if (static_branch_likely(&has_gic_active_state))
++			set_vtimer_irq_phys_active(vcpu, false);
++		else
++			enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
+ 	}
+ }
+ 
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
+-	unmask_vtimer_irq_user(vcpu);
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++
++	if (unlikely(!timer->enabled))
++		return;
++
++	if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
++		unmask_vtimer_irq_user(vcpu);
+ }
+ 
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
+@@ -753,6 +763,8 @@ int kvm_timer_hyp_init(bool has_gic)
+ 			kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
+ 			goto out_free_irq;
+ 		}
++
++		static_branch_enable(&has_gic_active_state);
+ 	}
+ 
+ 	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
+-- 
+2.14.2
