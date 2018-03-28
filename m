@@ -1,37 +1,33 @@
 From: abel.vesa@nxp.com (Abel Vesa)
-Date: Wed, 28 Mar 2018 06:32:18 +0000
-Subject: [PATCH] clk: imx7d: Move clks_init_on before any clock operations
-In-Reply-To: <CAOMZO5C23Va4Frrpqgw8LxEJbfj+cE6xeS3362QzyRn=_wi7JQ@mail.gmail.com>
-References: <1522160607-7104-1-git-send-email-abel.vesa@nxp.com>
- <CAOMZO5C23Va4Frrpqgw8LxEJbfj+cE6xeS3362QzyRn=_wi7JQ@mail.gmail.com>
-Message-ID: <20180328063217.nztxaphgo3uojop5@fsr-ub1664-175>
+Date: Wed, 28 Mar 2018 09:46:34 +0300
+Subject: [RESEND 0/4] Update imx7 clocks
+Message-ID: <1522219599-10831-1-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Resent as a patcheset now.
 
-On Tue, Mar 27, 2018 at 12:08:39PM -0300, Fabio Estevam wrote:
-> Hi Abel,
-> 
-> On Tue, Mar 27, 2018 at 11:23 AM, Abel Vesa <abel.vesa@nxp.com> wrote:
-> > From: Dong Aisheng <b29396@freescale.com>
-> >
-> > For init on clocks we should move it at the first place in imx7d_clocks_init()
-> > before any clock operations, else the clock operation may fail in case the clock
-> > is still not on.
-> >
-> > Acked-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
-> > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> 
-> Thanks for your patches.
-> 
-> You sent 4 patches today touching the same file.
-> 
-> Please annotate the sequence of the patches (1/4, 2/4, etc) so that
-> the maintainer can clearly know the order the patches should be
-> applied.
+I sent the initial patches as individual ones,
+without specifying the order they need to be applied in.
 
-Yep, my bad. I'll resend as a patchset now.
+https://lkml.org/lkml/2018/3/27/535
+https://lkml.org/lkml/2018/3/27/536
+https://lkml.org/lkml/2018/3/27/539
+https://lkml.org/lkml/2018/3/27/542
+
+
+Anson Huang (2):
+  clk: imx7d: Correct dram pll type
+  clk: imx7d: Correct ahb clk parent select
+
+Dong Aisheng (1):
+  clk: imx7d: Move clks_init_on before any clock operations
+
+Peter Chen (1):
+  clk: imx7d: Add USB clock information
+
+ drivers/clk/imx/clk-imx7d.c | 29 +++++++++++++++++++----------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
+
 -- 
+2.7.4
