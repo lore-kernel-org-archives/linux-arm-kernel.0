@@ -1,70 +1,121 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Wed, 28 Mar 2018 20:27:54 +0100
-Subject: [PATCH v2 0/8] Add r8a77470/iW-RainboW-G23S single board computer
- support
-Message-ID: <1522265274-35150-1-git-send-email-biju.das@bp.renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 28 Mar 2018 21:35:41 +0200
+Subject: [GIT PULL] ARM: SoC fixes for 4.16
+Message-ID: <CAK8P3a1+PXOUYS_yEiSLMxEJPiGPbiJ7ngvvWEiD9YLaji2jtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, 
+The following changes since commit 661e50bc853209e41a5c14a290ca4decc43cbfd1:
 
-This series adds support for Rensas RZ/G1C (r8a77470) SoC and
-RZ/G1C based iW-RainboW-G23S single board computer.
+  Linux 4.16-rc4 (2018-03-04 14:54:11 -0800)
 
-The series introduces a cpg-mssr clock/power gating module, a power/reset
-controller for the SoC.
+are available in the git repository at:
 
-power areas for RZ/G1C are similar to RZ/G1E.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/armsoc-fixes
 
-Few functionalities have currently been enabled in DTS and tested: serial
-boot console.
+for you to fetch changes up to bbad2093dfa76f4c3dcc8ab6b89249affe72f851:
 
-This patch series tested against renesas-dev branch 
-tag "renesas-dev-20180328-v4.16-rc7
+  Merge tag 'sunxi-fixes-for-4.16' of
+ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into
+fixes (2018-03-27 13:12:10 +0200)
 
-V1-->V2
-	Incorporated geert's review comments.
+----------------------------------------------------------------
+ARM: SoC fixes for 4.16
 
-Biju Das (8):
-  soc: renesas: rcar-sysc: Add r8a77470 support
-  serial: sh-sci: Document r8a77470 bindings
-  clk: renesas: Add r8a77470 CPG Core Clock Definitions
-  clk: renesas: cpg-mssr: Add r8a77470 support
-  ARM: shmobile: r8a77470: basic SoC support
-  ARM: dts: r8a77470: Initial SoC device tree
-  ARM: dts: iwg23s-sbc: Add support for iWave G23S-SBC based on RZ/G1C
-  ARM: multi_v7_defconfig: Enable r8a77470 SoC
+Here are are a couple of last-minute fixes for 4.16, mostly for
+regressions. As usual, the majority are device tree changes:
 
- Documentation/devicetree/bindings/arm/shmobile.txt |   2 +
- .../devicetree/bindings/clock/renesas,cpg-mssr.txt |   9 +-
- .../bindings/power/renesas,rcar-sysc.txt           |   1 +
- .../bindings/serial/renesas,sci-serial.txt         |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts          |  35 ++++
- arch/arm/boot/dts/r8a77470.dtsi                    | 156 ++++++++++++++
- arch/arm/configs/multi_v7_defconfig                |   1 +
- arch/arm/mach-shmobile/Kconfig                     |   4 +
- arch/arm/mach-shmobile/setup-rcar-gen2.c           |   2 +
- drivers/clk/renesas/Kconfig                        |   5 +
- drivers/clk/renesas/Makefile                       |   1 +
- drivers/clk/renesas/r8a77470-cpg-mssr.c            | 229 +++++++++++++++++++++
- drivers/clk/renesas/rcar-gen2-cpg.c                |  12 ++
- drivers/clk/renesas/renesas-cpg-mssr.c             |   6 +
- drivers/clk/renesas/renesas-cpg-mssr.h             |   1 +
- drivers/soc/renesas/Kconfig                        |   5 +
- drivers/soc/renesas/Makefile                       |   1 +
- drivers/soc/renesas/r8a77470-sysc.c                |  29 +++
- drivers/soc/renesas/rcar-sysc.c                    |   3 +
- drivers/soc/renesas/rcar-sysc.h                    |   1 +
- include/dt-bindings/clock/r8a77470-cpg-mssr.h      |  36 ++++
- include/dt-bindings/power/r8a77470-sysc.h          |  22 ++
- 23 files changed, 561 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
- create mode 100644 arch/arm/boot/dts/r8a77470.dtsi
- create mode 100644 drivers/clk/renesas/r8a77470-cpg-mssr.c
- create mode 100644 drivers/soc/renesas/r8a77470-sysc.c
- create mode 100644 include/dt-bindings/clock/r8a77470-cpg-mssr.h
- create mode 100644 include/dt-bindings/power/r8a77470-sysc.h
+- USB 3 support on rk3399 didn't work and is being reverted for now
 
--- 
-2.7.4
+- One fix for an old suspend/resume bug on rk3399
+
+- A few regulator related fixes on Banana Pi M2, and on imx7d-sdb
+
+- A boot regression fix for all Aspeed SoCs failing to find
+  their memory
+
+- One more dtc warning fix
+
+The other changes are:
+
+- A few updates to the MAINTAINERS file
+
+- A revert for an incorrect orion5x cleanup
+
+- Two power management fixes for OMAP
+
+----------------------------------------------------------------
+Arnd Bergmann (8):
+      Merge tag 'imx-fixes-4.16-2' of
+ssh://gitolite.kernel.org/.../shawnguo/linux into fixes
+      Merge tag 'davinci-fixes-for-v4.16' of
+ssh://gitolite.kernel.org/.../nsekhar/linux-davinci into fixes
+      Merge tag 'mvebu-fixes-4.16-2' of
+git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'v4.16-rockchip-dts32fixes-2' of
+ssh://gitolite.kernel.org/.../mmind/linux-rockchip into fixes
+      Merge tag 'v4.16-rockchip-dts64fixes-2' of
+ssh://gitolite.kernel.org/.../mmind/linux-rockchip into fixes
+      Merge tag 'tegra-for-4.17-misc' of
+ssh://gitolite.kernel.org/.../tegra/linux into fixes
+      Merge tag 'omap-for-v4.16/sram-fix-signed' of
+ssh://gitolite.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'sunxi-fixes-for-4.16' of
+ssh://gitolite.kernel.org/.../sunxi/linux into fixes
+
+Bartosz Golaszewski (1):
+      ARM: davinci: fix the GPIO lookup for omapl138-hawk
+
+Douglas Anderson (1):
+      arm64: dts: rockchip: Fix rk3399-gru-* s2r (pinctrl hogs, wifi reset)
+
+Gregory CLEMENT (1):
+      mailmap: Update email address for Gregory CLEMENT
+
+Heiko Stuebner (1):
+      Revert "arm64: dts: rockchip: add usb3-phy otg-port support for rk3399"
+
+Joel Stanley (1):
+      ARM: dts: aspeed: Add default memory node
+
+Jon Hunter (1):
+      MAINTAINERS: Update Tegra IOMMU maintainer
+
+Leonard Crestez (1):
+      ARM: dts: imx7d-sdb: Fix regulator-usb-otg2-vbus node name
+
+Linus Walleij (1):
+      ARM: ux500: Fix PMU IRQ regression
+
+Maxime Ripard (1):
+      MAINTAINERS: update email address for Maxime Ripard
+
+Philipp Rossak (2):
+      ARM: dts: sun6i: a31s: bpi-m2: improve pmic properties
+      ARM: dts: sun6i: a31s: bpi-m2: add missing regulators
+
+Rob Herring (1):
+      ARM: dts: rockchip: Add missing #sound-dai-cells on rk3288
+
+Tony Lindgren (2):
+      ARM: OMAP: Fix dmtimer init for omap1
+      ARM: OMAP: Fix SRAM W+X mapping
+
+ .mailmap                                         |  1 +
+ MAINTAINERS                                      |  7 ++++---
+ arch/arm/boot/dts/aspeed-g4.dtsi                 |  5 +++++
+ arch/arm/boot/dts/aspeed-g5.dtsi                 |  5 +++++
+ arch/arm/boot/dts/imx7d-sdb.dts                  |  2 +-
+ arch/arm/boot/dts/rk3288.dtsi                    |  2 ++
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 63
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---
+ arch/arm/mach-davinci/board-omapl138-hawk.c      |  4 ++--
+ arch/arm/mach-ux500/cpu-db8500.c                 |  3 +++
+ arch/arm/plat-omap/dmtimer.c                     |  7 ++-----
+ arch/arm/plat-omap/include/plat/sram.h           | 11 +----------
+ arch/arm/plat-omap/sram.c                        | 36
++++++++++++++++++++++++++++++++++++-
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi     | 16 +++-------------
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi         |  8 ++++----
+ 14 files changed, 128 insertions(+), 42 deletions(-)
