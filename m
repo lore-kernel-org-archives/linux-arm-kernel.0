@@ -1,129 +1,175 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Wed, 28 Mar 2018 12:29:25 +0530
-Subject: [PATCH v5 3/4] arm64: Implement page table free interfaces
-In-Reply-To: <20180327180048.GJ18435@arm.com>
-References: <1522157100-16879-1-git-send-email-cpandya@codeaurora.org>
- <1522157100-16879-4-git-send-email-cpandya@codeaurora.org>
- <20180327180048.GJ18435@arm.com>
-Message-ID: <3a9610af-c35d-2624-87a6-71f893740fa4@codeaurora.org>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 28 Mar 2018 09:08:26 +0200
+Subject: [PATCH v2 0/5] allow override of bus format in bridges
+In-Reply-To: <20180326212447.7380-1-peda@axentia.se>
+References: <20180326212447.7380-1-peda@axentia.se>
+Message-ID: <20180328070826.GY14155@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 26, 2018 at 11:24:42PM +0200, Peter Rosin wrote:
+> Hi!
+> 
+> [I got to v2 sooner than expected]
+> 
+> I have an Atmel sama5d31 hooked up to an lvds encoder and then
+> on to an lvds panel. Which seems like something that has been
+> done one or two times before...
+> 
+> The problem is that the bus_format of the SoC and the panel do
+> not agree. The SoC driver (atmel-hlcdc) can handle the
+> rgb444, rgb565, rgb666 and rgb888 bus formats. The hardware is
+> wired for the rgb565 case. The lvds encoder supports rgb888 on
+> its input side with the LSB wires for each color simply pulled
+> down internally in the encoder in my case which means that the
+> rgb565 bus_format is the format that works best. And the panel
+> is expecting lvds (vesa-24), which is what the encoder outputs.
+> 
+> The reason I "blame" the bus_format of the drm_connector is that
+> with the below DT snippet, things do not work *exactly* due to
+> that. At least, it starts to work if I hack the panel-lvds driver
+> to report the rgb565 bus_format instead of vesa-24.
+> 
+> 	panel: panel {
+> 		compatible = "panel-lvds";
+> 
+> 		width-mm = <304>;
+> 		height-mm = <228;
+> 
+> 		data-mapping = "vesa-24";
+> 
+> 		panel-timing {
+> 			// 1024x768 @ 60Hz (typical)
+> 			clock-frequency = <52140000 65000000 71100000>;
+> 			hactive = <1024>;
+> 			vactive = <768>;
+> 			hfront-porch = <48 88 88>;
+> 			hback-porch = <96 168 168>;
+> 			hsync-len = <32 64 64>;
+> 			vfront-porch = <8 13 14>;
+> 			vback-porch = <8 13 14>;
+> 			vsync-len = <8 12 14>;
+> 		};
+> 
+> 		port {
+> 			panel_input: endpoint {
+> 				remote-endpoint = <&lvds_encoder_output>;
+> 			};
+> 		};
+> 	};
+> 
+> 	lvds-encoder {
+> 		compatible = "ti,ds90c185", "lvds-encoder";
+> 
+> 		ports {
+> 			#address-cells = <1>;
+> 			#size-cells = <0>;
+> 
+> 			port at 0 {
+> 				reg = <0>;
+> 
+> 				lvds_encoder_input: endpoint {
+> 					remote-endpoint = <&hlcdc_output>;
+> 				};
+> 			};
+> 
+> 			port at 1 {
+> 				reg = <1>;
+> 
+> 				lvds_encoder_output: endpoint {
+> 					remote-endpoint = <&panel_input>;
+> 				};
+> 			};
+> 		};
+> 	};
+> 
+> But, instead of perverting the panel-lvds driver with support
+> for a totally fake non-lvds bus_format, I intruduce an API that allows
+> display controller drivers to query the required bus_format of any
+> intermediate bridges, and match up with that instead of the formats
+> given by the drm_connector. I trigger this with this addition to the
+> lvds-encoder DT node:
+> 
+> 		interface-pix-fmt = "rgb565";
+> 
+> Naming is hard though, so I'm not sure if that's good?
+> 
+> I threw in the first patch, since that is the actual lvds encoder
+> I have in this case.
+> 
+> Suggestions welcome.
 
+Took a quick look, feels rather un-atomic. And there's beend discussing
+for other bridge related state that we might want to track (like the full
+adjusted_mode that might need to be adjusted at each stage in the chain).
+So here's my suggestions:
 
-On 3/27/2018 11:30 PM, Will Deacon wrote:
-> Hi Chintan,
-Hi Will,
+- Add an optional per-bridge internal state struct using the support in
+
+https://dri.freedesktop.org/docs/drm/gpu/drm-kms.html#handling-driver-private-state
+
+  Yes it says "driver private", but since bridge is just helper stuff
+  that's all included. "driver private" == "not exposed as uapi" here.
+  Include all the usual convenience wrappers to get at the state for a
+  bridge.
+
+- Then stuff your bus_format into that new drm_bridge_state struct.
+
+- Add a new bridge callback atomic_check, which gets that bridge state as
+  parameter (similar to all the other atomic_check functions).
+
+This way we can even handle the bus_format dynamically, through the atomic
+framework your bridge's atomic_check callback can look at the entire
+atomic state (both up and down the chain if needed), it all neatly fits
+into atomic overall and it's much easier to extend.
+
+Please also cc Laurent Pinchart on this.
+
+Cheers, Daniel
+
 
 > 
-> On Tue, Mar 27, 2018 at 06:54:59PM +0530, Chintan Pandya wrote:
->> Implement pud_free_pmd_page() and pmd_free_pte_page().
->>
->> Implementation requires,
->>   1) Freeing of the un-used next level page tables
->>   2) Clearing off the current pud/pmd entry
->>   3) Invalidate TLB which could have previously
->>      valid but not stale entry
->>
->> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
->> ---
->> V4->V5:
->>   - Using __flush_tlb_kernel_pgtable instead of
->>     flush_tlb_kernel_range
->>
->>
->>   arch/arm64/mm/mmu.c | 33 +++++++++++++++++++++++++++++++--
->>   1 file changed, 31 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index da98828..3552c7a 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -45,6 +45,7 @@
->>   #include <asm/memblock.h>
->>   #include <asm/mmu_context.h>
->>   #include <asm/ptdump.h>
->> +#include <asm/tlbflush.h>
->>   
->>   #define NO_BLOCK_MAPPINGS	BIT(0)
->>   #define NO_CONT_MAPPINGS	BIT(1)
->> @@ -973,12 +974,40 @@ int pmd_clear_huge(pmd_t *pmdp)
->>   	return 1;
->>   }
->>   
->> +static int __pmd_free_pte_page(pmd_t *pmd, unsigned long addr, bool tlb_inv)
->> +{
->> +	pmd_t *table;
->> +
->> +	if (pmd_val(*pmd)) {
+> Cheers,
+> Peter
 > 
-> Please can you follow what I did in 20a004e7b017 ("arm64: mm: Use
-> READ_ONCE/WRITE_ONCE when accessing page tables") and:
+> Changes since v1 https://lkml.org/lkml/2018/3/17/221
+> - Add a proper bridge API to query the bus_format instead of abusing
+>   the ->get_modes part of the code. This is cleaner but requires
+>   changes to all display controller drivers wishing to participate.
+> - Add patch to adjust the atmel-hlcdc driver according to the above.
+> - Hook the new info into the bridge local to the lvds-encoder instead
+>   of messing about with new interfaces for the panel-bridge driver.
+> - Add patch with a DT parsing function of bus_formats in a central place.
+> - Rephrase the addition of ti,ds90c185 to the lvds-transmitter binding.
 > 
->    1. Use consistent naming, so pmd_t * pmdp.
->    2. Use READ_ONCE to dereference the entry once into a local.
+> Peter Rosin (5):
+>   dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+>   drm: bridge: add API to query the expected input formats of bridges
+>   drm: of: add display bus-format parser
+>   drm: bridge: lvds-encoder: allow specifying the input bus format
+>   drm/atmel-hlcdc: take bridges into account when selecting output
+>     format
 > 
-> Similarly for the pud code below.
-
-Sure. I'll fix this in v6.
-
+>  .../bindings/display/bridge/lvds-transmitter.txt   | 14 ++++-
+>  .../devicetree/bindings/display/bus-format.txt     | 35 +++++++++++++
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 49 ++++++++++++++++--
+>  drivers/gpu/drm/bridge/lvds-encoder.c              | 25 +++++++++
+>  drivers/gpu/drm/drm_bridge.c                       | 32 ++++++++++++
+>  drivers/gpu/drm/drm_of.c                           | 59 ++++++++++++++++++++++
+>  include/drm/drm_bridge.h                           | 18 +++++++
+>  include/drm/drm_of.h                               |  9 ++++
+>  8 files changed, 237 insertions(+), 4 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/display/bus-format.txt
 > 
->> +		table = __va(pmd_val(*pmd));
->> +		pmd_clear(pmd);
->> +		if (tlb_inv)
->> +			__flush_tlb_kernel_pgtable(addr);
->> +
->> +		free_page((unsigned long) table);
+> -- 
+> 2.11.0
 > 
-> Hmm. Surely it's only safe to call free_page if !tlb_inv in situations when
-> the page table is already disconnected at a higher level? That doesn't
-> appear to be the case with the function below, which still has the pud
-> installed. What am I missing?
-> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-Point ! Without the invalidation, free'ing a page is not safe. Better, I
-do __flush_tlb_kernel_pgtable() every time. This might not be as costly
-as flush_tlb_kernel_range().
-
->> +	}
->> +	return 1;
->> +}
->> +
->>   int pud_free_pmd_page(pud_t *pud, unsigned long addr)
->>   {
->> -	return pud_none(*pud);
->> +	pmd_t *table;
->> +	int i;
->> +
->> +	if (pud_val(*pud)) {
->> +		table = __va(pud_val(*pud));
->> +		for (i = 0; i < PTRS_PER_PMD; i++)
->> +			__pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE),
->> +						false);
->> +
->> +		pud_clear(pud);
->> +		flush_tlb_kernel_range(addr, addr + PUD_SIZE);
-> 
-> Why aren't you using __flush_tlb_kernel_pgtable here?
-> 
-
-Now that I will call __flush_tlb_kernel_pgtable() for every  PMD, I can
-use __flush_tlb_kernel_pgtable() here as well.
-
-Previously, the thought was, while invalidating PUD by VA would not work
-always because PUD may have next level of valid mapping still present in
-the table (valid next PMD but invalid next-to-next PTE). In this case
-doing just __flush_tlb_kernel_pgtable() for PUD might not be enough. We
-need to invalidate subsequent tables as well which I was skipping for 
-optimization. So, I used flush_tlb_kernel_range().
-
-I will upload v6.
-
-> Will
-> 
-
-Chintan
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
-Collaborative Project
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
