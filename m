@@ -1,38 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 28 Mar 2018 12:23:47 +0200
-Subject: [PATCHv2] pinctrl: samsung: add pin_dbg_show callback for debugfs
-In-Reply-To: <20180327135801.9556-1-parkch98@gmail.com>
-References: <20180327135801.9556-1-parkch98@gmail.com>
-Message-ID: <CAJKOXPdu7h3WwfpzVUnmiLs3qxAP5FwDHq58BUifpMQ5unJ=WQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Mar 2018 11:26:40 +0100
+Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
+In-Reply-To: <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+ <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
+ <1521685073.28226.10.camel@mtkswgap22>
+ <20180323185418.GD255819@dtor-ws>
+ <20180327080507.pgil6pw2mn4y2f4d@dell>
+ <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
+Message-ID: <20180328102640.yx6nv5abfexmouuf@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 3:58 PM, Chanho Park <parkch98@gmail.com> wrote:
-> This patch adds a samsung_pin_dbg_show function to implement the
-> pin_dbg_show callback function which can be used to show pin
-> confuration values. Basically, it can show pin setting values by
-> accessing the "pins" node like below:
->
-> $ cat pins
-> pin 0 (gpy7-0)  CON(0x0) DAT(0x1) PUD(0x1) DRV(0x0) CON_PDN(0x0) PUD_PDN(0x0)
->
-> Signed-off-by: Chanho Park <parkch98@gmail.com>
-> ---
-> Changes from v1:
-> - use samsung_pinconf_get instead of samsung_pinconf_rw
-> - use "static const char * const" type declaration of reg_names
-> - skip condition change
->
->  drivers/pinctrl/samsung/pinctrl-samsung.c | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
+On Tue, 27 Mar 2018, Matthias Brugger wrote:
 
-Looks fine, thanks:
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
+> 
+> On 03/27/2018 10:05 AM, Lee Jones wrote:
+> > On Fri, 23 Mar 2018, Dmitry Torokhov wrote:
+> >> On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
+> >>> Hi, Dmitry and Lee
+> >>>
+> >>> The series seems not being got merged. Are they good enough to be ready
+> >>> into the your tree?
+> >>>
+> >>> Recently I've tested the series with focusing on pwrkey event generated
+> >>> through interrupt when push and release the key on bpi-r2 board and then
+> >>> finally it's working fine. but for homekey it cannot be found on the
+> >>> board and thus I cannot have more tests more about it.
+> >>>
+> >>> Tested-by: Sean Wang <sean.wang@mediatek.com>
+> >>
+> >> You have my Ack on the input patch; I expect it go through Lee's tree as
+> >> there are some dependencies on mfd core piece.
+> > 
+> > Are you happy for me to merge the Input dt-bindings without your Ack?
+> > 
+> 
+> They got both Acked in v5, but the commit message was not updated:
+> https://patchwork.kernel.org/patch/9973721/
+> https://patchwork.kernel.org/patch/9973723/
 
-Linus,
-I do not have anything in my pinctrl queue for you so maybe you can
-take it directly? Otherwise, I will apply it after upcoming merge
-window.
+Thanks Matthias.
 
-Best regards,
-Krzysztof
+Chen, can you collect all the Acks and repost as a RESEND please?
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
