@@ -1,83 +1,174 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:09 +0100
-Subject: [PATCH 40/85] KVM: arm64: Prepare to handle deferred save/restore of
- ELR_EL1
+Date: Wed, 28 Mar 2018 13:52:11 +0100
+Subject: [PATCH 42/85] KVM: arm64: Prepare to handle deferred save/restore of
+ 32-bit registers
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-41-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-43-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-ELR_EL1 is not used by a VHE host kernel and can be deferred, but we
-need to rework the accesses to this register to access the latest value
-depending on whether or not guest system registers are loaded on the CPU
-or only reside in memory.
+32-bit registers are not used by a 64-bit host kernel and can be
+deferred, but we need to rework the accesses to these register to access
+the latest values depending on whether or not guest system registers are
+loaded on the CPU or only reside in memory.
 
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_emulate.h | 18 +++++++++++++++++-
- arch/arm64/kvm/inject_fault.c        |  4 ++--
- 2 files changed, 19 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/kvm_emulate.h | 32 +++++------------
+ arch/arm64/kvm/regmap.c              | 67 +++++++++++++++++++++++++++---------
+ 2 files changed, 59 insertions(+), 40 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index f32640132e26..6ed18ce0d638 100644
+index 6ed18ce0d638..23b33e8ea03a 100644
 --- a/arch/arm64/include/asm/kvm_emulate.h
 +++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -90,11 +90,27 @@ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
+@@ -33,7 +33,8 @@
+ #include <asm/virt.h>
+ 
+ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
+-unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
++unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu);
++void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v);
+ 
+ bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
+ void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
+@@ -162,41 +163,26 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
+ 
+ static inline unsigned long vcpu_read_spsr(const struct kvm_vcpu *vcpu)
+ {
+-	unsigned long *p = (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
+-
+-	if (vcpu_mode_is_32bit(vcpu)) {
+-		unsigned long *p_32bit = vcpu_spsr32(vcpu);
+-
+-		/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
+-		if (p_32bit != p)
+-			return *p_32bit;
+-	}
++	if (vcpu_mode_is_32bit(vcpu))
++		return vcpu_read_spsr32(vcpu);
+ 
+ 	if (vcpu->arch.sysregs_loaded_on_cpu)
+ 		return read_sysreg_el1(spsr);
+ 	else
+-		return *p;
++		return vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
  }
  
--static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
-+static inline unsigned long *__vcpu_elr_el1(const struct kvm_vcpu *vcpu)
+-static inline void vcpu_write_spsr(const struct kvm_vcpu *vcpu, unsigned long v)
++static inline void vcpu_write_spsr(struct kvm_vcpu *vcpu, unsigned long v)
  {
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
+-	unsigned long *p = (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
+-
+-	/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
+ 	if (vcpu_mode_is_32bit(vcpu)) {
+-		unsigned long *p_32bit = vcpu_spsr32(vcpu);
+-
+-		/* KVM_SPSR_SVC aliases KVM_SPSR_EL1 */
+-		if (p_32bit != p) {
+-			*p_32bit = v;
+-			return;
+-		}
++		vcpu_write_spsr32(vcpu, v);
++		return;
+ 	}
+ 
+ 	if (vcpu->arch.sysregs_loaded_on_cpu)
+ 		write_sysreg_el1(v, spsr);
+ 	else
+-		*p = v;
++		vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1] = v;
  }
  
-+static inline unsigned long vcpu_read_elr_el1(const struct kvm_vcpu *vcpu)
-+{
-+	if (vcpu->arch.sysregs_loaded_on_cpu)
-+		return read_sysreg_el1(elr);
-+	else
-+		return *__vcpu_elr_el1(vcpu);
-+}
-+
-+static inline void vcpu_write_elr_el1(const struct kvm_vcpu *vcpu, unsigned long v)
-+{
-+	if (vcpu->arch.sysregs_loaded_on_cpu)
-+		write_sysreg_el1(v, elr);
-+	else
-+		*__vcpu_elr_el1(vcpu) = v;
-+}
-+
- static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+ static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/regmap.c b/arch/arm64/kvm/regmap.c
+index bbc6ae32e4af..eefe403a2e63 100644
+--- a/arch/arm64/kvm/regmap.c
++++ b/arch/arm64/kvm/regmap.c
+@@ -141,28 +141,61 @@ unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num)
+ /*
+  * Return the SPSR for the current mode of the virtual CPU.
+  */
+-unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu)
++static int vcpu_spsr32_mode(const struct kvm_vcpu *vcpu)
  {
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index 7f8d2a4e420f..d8e71659ba7e 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -67,7 +67,7 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
- 	bool is_aarch32 = vcpu_mode_is_32bit(vcpu);
- 	u32 esr = 0;
+ 	unsigned long mode = *vcpu_cpsr(vcpu) & COMPAT_PSR_MODE_MASK;
+ 	switch (mode) {
+-	case COMPAT_PSR_MODE_SVC:
+-		mode = KVM_SPSR_SVC;
+-		break;
+-	case COMPAT_PSR_MODE_ABT:
+-		mode = KVM_SPSR_ABT;
+-		break;
+-	case COMPAT_PSR_MODE_UND:
+-		mode = KVM_SPSR_UND;
+-		break;
+-	case COMPAT_PSR_MODE_IRQ:
+-		mode = KVM_SPSR_IRQ;
+-		break;
+-	case COMPAT_PSR_MODE_FIQ:
+-		mode = KVM_SPSR_FIQ;
+-		break;
++	case COMPAT_PSR_MODE_SVC: return KVM_SPSR_SVC;
++	case COMPAT_PSR_MODE_ABT: return KVM_SPSR_ABT;
++	case COMPAT_PSR_MODE_UND: return KVM_SPSR_UND;
++	case COMPAT_PSR_MODE_IRQ: return KVM_SPSR_IRQ;
++	case COMPAT_PSR_MODE_FIQ: return KVM_SPSR_FIQ;
++	default: BUG();
++	}
++}
++
++unsigned long vcpu_read_spsr32(const struct kvm_vcpu *vcpu)
++{
++	int spsr_idx = vcpu_spsr32_mode(vcpu);
++
++	if (!vcpu->arch.sysregs_loaded_on_cpu)
++		return vcpu_gp_regs(vcpu)->spsr[spsr_idx];
++
++	switch (spsr_idx) {
++	case KVM_SPSR_SVC:
++		return read_sysreg_el1(spsr);
++	case KVM_SPSR_ABT:
++		return read_sysreg(spsr_abt);
++	case KVM_SPSR_UND:
++		return read_sysreg(spsr_und);
++	case KVM_SPSR_IRQ:
++		return read_sysreg(spsr_irq);
++	case KVM_SPSR_FIQ:
++		return read_sysreg(spsr_fiq);
+ 	default:
+ 		BUG();
+ 	}
++}
++
++void vcpu_write_spsr32(struct kvm_vcpu *vcpu, unsigned long v)
++{
++	int spsr_idx = vcpu_spsr32_mode(vcpu);
++
++	if (!vcpu->arch.sysregs_loaded_on_cpu) {
++		vcpu_gp_regs(vcpu)->spsr[spsr_idx] = v;
++		return;
++	}
  
--	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
-+	vcpu_write_elr_el1(vcpu, *vcpu_pc(vcpu));
- 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
- 
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
-@@ -102,7 +102,7 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
- 	u32 esr = (ESR_ELx_EC_UNKNOWN << ESR_ELx_EC_SHIFT);
- 
--	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
-+	vcpu_write_elr_el1(vcpu, *vcpu_pc(vcpu));
- 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
- 
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
+-	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[mode];
++	switch (spsr_idx) {
++	case KVM_SPSR_SVC:
++		write_sysreg_el1(v, spsr);
++	case KVM_SPSR_ABT:
++		write_sysreg(v, spsr_abt);
++	case KVM_SPSR_UND:
++		write_sysreg(v, spsr_und);
++	case KVM_SPSR_IRQ:
++		write_sysreg(v, spsr_irq);
++	case KVM_SPSR_FIQ:
++		write_sysreg(v, spsr_fiq);
++	}
+ }
 -- 
 2.14.2
