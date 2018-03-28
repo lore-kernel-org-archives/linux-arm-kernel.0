@@ -1,41 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Mar 2018 12:58:04 +0100
-Subject: [PATCH V2] arm64: tlbflush: avoid writing RES0 bits
-In-Reply-To: <96f894bb-4855-a77f-3fd1-c8a2878faabb@codeaurora.org>
-References: <1522120877-9136-1-git-send-email-pelcan@codeaurora.org>
- <985a0edd-e388-dade-8824-30cc58a236f3@arm.com>
- <56b560a5-6e57-8e01-32ca-9d3c95ccd2e5@codeaurora.org>
- <20180327173613.GI18435@arm.com>
- <96f894bb-4855-a77f-3fd1-c8a2878faabb@codeaurora.org>
-Message-ID: <20180328115804.GD30850@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 28 Mar 2018 05:00:03 -0700
+Subject: [PATCH v2 2/2] arm64: uaccess: Fix omissions from usercopy
+ whitelist
+In-Reply-To: <1522230649-22008-3-git-send-email-Dave.Martin@arm.com>
+References: <1522230649-22008-1-git-send-email-Dave.Martin@arm.com>
+ <1522230649-22008-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <CAGXu5j+MLqg+GgTuMneYVxScXyvsCJeNczcv_a2t8pen2h0-nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 08:03:07PM -0500, Shanker Donthineni wrote:
-> On 03/27/2018 12:36 PM, Will Deacon wrote:
-> > On Tue, Mar 27, 2018 at 09:53:16AM -0500, Shanker Donthineni wrote:
-> >>>> @@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
-> >>>> ????????? return;
-> >>>> ????? }
-> >>>> ? -??? start = asid | (start >> 12);
-> >>>> -??? end = asid | (end >> 12);
-> >>>> +??? start = __TLBI_VADDR(start, asid);
-> >>>> +??? end = __TLBI_VADDR(end, asid);
-> > 
-> > Can you test this bit too, please? ;)
-> > 
-> 
-> I've verified the basic boot functionality on QDF2400 platform. But I can see now
-> after your comments, it leads to TLB conflicts because of ASID is truncated to zero
-> due to two times 48bit shift.     
-> 
-> Thanks for catching this one.
+On Wed, Mar 28, 2018 at 2:50 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> When the hardend usercopy support was added for arm64, it was
+> concluded that all cases of usercopy into and out of thread_struct
+> were statically sized and so didn't require explicit whitelisting
+> of the appropriate fields in thread_struct.
+>
+> Testing with usercopy hardening enabled has revealed that this is
+> not the case for certain ptrace regset manipulation calls on arm64.
+> This occurs because the sizes of usercopies associated with the
+> regset API are dynamic by construction, and because arm64 does not
+> always stage such copies via the stack: indeed the regset API is
+> designed to avoid the need for that by adding some bounds checking.
+>
+> This is currently believed to affect only the fpsimd and TLS
+> registers.
+>
+> Because the whitelisted fields in thread_struct must be contiguous,
+> this patch groups them together in a nested struct.  It is also
+> necessary to be able to determine the location and size of that
+> struct, so rather than making the struct anonymous (which would
+> save on edits elsewhere) or adding an anonymous union containing
+> named and unnamed instances of the same struct (gross), this patch
+> gives the struct a name and makes the necessary edits to code that
+> references it (noisy but simple).
+>
+> Care is needed to ensure that the new struct does not contain
+> padding (which the usercopy hardening would fail to protect).
+>
+> For this reason, the presence of tp2_value is made unconditional,
+> since a padding field would be needed there in any case.  This pads
+> up to the 16-byte alignment required by struct user_fpsimd_state.
+>
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Fixes: 9e8084d3f761 ("arm64: Implement thread_struct whitelist for hardened usercopy")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-I just noticed it during review. In general, if you're making changes
-relating to virtual memory stuff I'd *strongly* advise you to do more
-than a basic boot test. It's amazing how much appears to run fine when
-stuff like TLB invalidation is completely broken.
+Acked-by: Kees Cook <keescook@chromium.org>
 
-Anyway, thanks for turning around a new version so quickly.
+Awesome! :)
 
-Will
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
