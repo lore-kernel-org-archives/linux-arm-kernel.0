@@ -1,53 +1,36 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Wed, 28 Mar 2018 16:28:51 +0530
-Subject: [PATCH v6 4/4] Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
-In-Reply-To: <1522234731-27397-1-git-send-email-cpandya@codeaurora.org>
-References: <1522234731-27397-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1522234731-27397-5-git-send-email-cpandya@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Mar 2018 12:16:22 +0100
+Subject: [RESEND PATCH v2 3/8] dt-bindings: mfd: stm32-timers: add
+ support for dmas
+In-Reply-To: <1518602679-3064-4-git-send-email-fabrice.gasnier@st.com>
+References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+ <1518602679-3064-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180328111622.r7f7e7duq7knvzfg@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit 15122ee2c515a ("arm64: Enforce BBM for huge
-IO/VMAP mappings") is a temporary work-around until the
-issues with CONFIG_HAVE_ARCH_HUGE_VMAP gets fixed.
+On Wed, 14 Feb 2018, Fabrice Gasnier wrote:
 
-Revert this change as we have fixes for the issue.
+> Add support for DMAs to STM32 timers. STM32 Timers can support up to 7
+> dma requests: up to 4 channels, update, compare and trigger.
+> DMAs may be used to transfer data from pwm capture for instance.
+> DMA support is made optional, PWM capture support is also an option.
+> This is much more wise system-wide to avoid shortage on DMA request
+> lines as there's significant amount of timer instances that can
+> request up to 7 channels.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> ---
+>  .../devicetree/bindings/mfd/stm32-timers.txt         | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 
-Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
----
-From: V1-> V6:
- - No change
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
- arch/arm64/mm/mmu.c | 8 --------
- 1 file changed, 8 deletions(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f84b747..601f22f 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -935,10 +935,6 @@ int pud_set_huge(pud_t *pudp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PUD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
- 
--	/* ioremap_page_range doesn't honour BBM */
--	if (pud_present(READ_ONCE(*pudp)))
--		return 0;
--
- 	BUG_ON(phys & ~PUD_MASK);
- 	set_pud(pudp, pfn_pud(__phys_to_pfn(phys), sect_prot));
- 	return 1;
-@@ -949,10 +945,6 @@ int pmd_set_huge(pmd_t *pmdp, phys_addr_t phys, pgprot_t prot)
- 	pgprot_t sect_prot = __pgprot(PMD_TYPE_SECT |
- 					pgprot_val(mk_sect_prot(prot)));
- 
--	/* ioremap_page_range doesn't honour BBM */
--	if (pmd_present(READ_ONCE(*pmdp)))
--		return 0;
--
- 	BUG_ON(phys & ~PMD_MASK);
- 	set_pmd(pmdp, pfn_pmd(__phys_to_pfn(phys), sect_prot));
- 	return 1;
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation
-Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
-Collaborative Project
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
