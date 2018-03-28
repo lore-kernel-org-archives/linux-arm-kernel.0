@@ -1,86 +1,53 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 28 Mar 2018 15:59:32 +0300
-Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
-In-Reply-To: <20180326145735.57ba306b@gandalf.local.home>
-References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
- <20180325175004.28162-3-ynorov@caviumnetworks.com>
- <20180326085313.GA4016@andrea>
- <20180326145735.57ba306b@gandalf.local.home>
-Message-ID: <20180328125932.dhzwoxhext4h7hgh@yury-thinkpad>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 28 Mar 2018 15:03:11 +0200
+Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
+In-Reply-To: <4073350.0MmxRoANOi@ada>
+References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
+ <9761072.pX2B0LJlSJ@ada> <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
+ <4073350.0MmxRoANOi@ada>
+Message-ID: <6d43177a-bbea-6a01-5fa5-1c7891e18412@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 02:57:35PM -0400, Steven Rostedt wrote:
-> On Mon, 26 Mar 2018 10:53:13 +0200
-> Andrea Parri <andrea.parri@amarulasolutions.com> wrote:
+On 28/03/2018 12:29, Alexander Dahl wrote:
+> Hello Daniel,
 > 
-> > > --- a/kernel/smp.c
-> > > +++ b/kernel/smp.c
-> > > @@ -724,6 +724,30 @@ void kick_all_cpus_sync(void)
-> > >  }
-> > >  EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
-> > >  
-> > > +/**
-> > > + * kick_active_cpus_sync - Force CPUs that are not in extended
-> > > + * quiescent state (idle or nohz_full userspace) sync by sending
-> > > + * IPI. Extended quiescent state CPUs will sync at the exit of
-> > > + * that state.
-> > > + */
-> > > +void kick_active_cpus_sync(void)
-> > > +{
-> > > +	int cpu;
-> > > +	struct cpumask kernel_cpus;
-> > > +
-> > > +	smp_mb();  
-> > 
-> > (A general remark only:)
-> > 
-> > checkpatch.pl should have warned about the fact that this barrier is
-> > missing an accompanying comment (which accesses are being "ordered",
-> > what is the pairing barrier, etc.).
+> Am Dienstag, 27. M?rz 2018, 13:30:22 CEST schrieb Daniel Lezcano:
+>> Can you can give a rough amount for the irq rate on the timer ?
 > 
-> He could have simply copied the comment above the smp_mb() for
-> kick_all_cpus_sync():
+> I used itop [1] now to get a rough estimate. First with kernel v4.14.29-rt25 
+> (fully preempt RT):
 > 
-> 	/* Make sure the change is visible before we kick the cpus */
+> INT                NAME          RATE             MAX
+>  19 [ vel     tc_clkevt]   397 Ints/s     (max:   432)
+>  26 [      vel     eth0]     4 Ints/s     (max:    38)
 > 
-> The kick itself is pretty much a synchronization primitive.
+> Next test with kernel v4.15.13 gives (slightly slower, but non-RT):
 > 
-> That is, you make some changes and then you need all CPUs to see it,
-> and you call: kick_active_cpus_synch(), which is the barrier to make
-> sure you previous changes are seen on all CPUS before you proceed
-> further. Note, the matching barrier is implicit in the IPI itself.
->
->  -- Steve
-
-I know that I had to copy the comment from kick_all_cpus_sync(), but I
-don't like copy-pasting in general, and as Steven told, this smp_mb() is
-already inside synchronization routine, so we may hope that users of
-kick_*_cpus_sync() will explain better what for they need it...
- 
+> INT                NAME          RATE             MAX
+>  19 [ vel     tc_clkevt]   248 Ints/s     (max:   273)
+>  26 [      vel     eth0]     4 Ints/s     (max:    11)
 > 
-> > 
-> > Moreover if, as your reply above suggested, your patch is relying on
-> > "implicit barriers" (something I would not recommend) then even more
-> > so you should comment on these requirements.
-> > 
-> > This could: (a) force you to reason about the memory ordering stuff,
-> > (b) easy the task of reviewing and adopting your patch, (c) easy the
-> > task of preserving those requirements (as implementations changes).
-> > 
-> >   Andrea
+> With kernel v4.16-rc7 plus this patch series and tcb as clocksource:
+> 
+> INT                NAME          RATE             MAX
+>  17 [vel     timer at fffa]  2164 Ints/s     (max:  2183)
+>  26 [      vel     eth0]     5 Ints/s     (max:    10)
+> 
+> Is this the information you wanted? If not, could you point me on how to get 
+> the requested irq rate?
 
-I need v2 anyway, and I will add comments to address all questions in this
-thread.
+It is perfect. Thanks!
 
-I also hope that we'll agree that for powerpc it's also safe to delay
-synchronization, and if so, we will have no users of kick_all_cpus_sync(),
-and can drop it.
+It confirms what I was worried about: the clocksource wraps up too
+quickly thus raising an interrupt every 400us. That is why I asked
+Alexande about a prescalar register.
 
-(It looks like this, because nohz_full userspace CPU cannot have pending
-IPIs, but I'd like to get confirmation from powerpc people.)
 
-Would it make sense to rename kick_all_cpus_sync() to smp_mb_sync(), which
-would stand for 'synchronous memory barrier on all online CPUs'?
 
-Yury
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
