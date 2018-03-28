@@ -1,59 +1,112 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 28 Mar 2018 16:02:38 +0200
-Subject: [PATCH] sched: support dynamiQ cluster
-In-Reply-To: <20180328091226.GD28871@arm.com>
-References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
- <20180328091226.GD28871@arm.com>
-Message-ID: <CAKfTPtCXPM75N27WzDHSc7rkaNEo8cTU4YO9h1X6ckL-=WkL_w@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 28 Mar 2018 15:16:28 +0100
+Subject: [PATCH v2 2/2] arm64: uaccess: Fix omissions from usercopy
+ whitelist
+In-Reply-To: <20180328123345.GE30850@arm.com>
+References: <1522230649-22008-3-git-send-email-Dave.Martin@arm.com>
+ <20180328123345.GE30850@arm.com>
+Message-ID: <20180328141628.GK16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 March 2018 at 11:12, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Mar 28, 2018 at 09:46:55AM +0200, Vincent Guittot wrote:
+On Wed, Mar 28, 2018 at 01:33:46PM +0100, Will Deacon wrote:
+> On Wed, Mar 28, 2018 at 10:50:49AM +0100, Dave Martin wrote:
+> > When the hardend usercopy support was added for arm64, it was
+> > concluded that all cases of usercopy into and out of thread_struct
+> > were statically sized and so didn't require explicit whitelisting
+> > of the appropriate fields in thread_struct.
+> > 
+> > Testing with usercopy hardening enabled has revealed that this is
+> > not the case for certain ptrace regset manipulation calls on arm64.
+> > This occurs because the sizes of usercopies associated with the
+> > regset API are dynamic by construction, and because arm64 does not
+> > always stage such copies via the stack: indeed the regset API is
+> > designed to avoid the need for that by adding some bounds checking.
+> > 
+> > This is currently believed to affect only the fpsimd and TLS
+> > registers.
+> > 
+> > Because the whitelisted fields in thread_struct must be contiguous,
+> > this patch groups them together in a nested struct.  It is also
+> > necessary to be able to determine the location and size of that
+> > struct, so rather than making the struct anonymous (which would
+> > save on edits elsewhere) or adding an anonymous union containing
+> > named and unnamed instances of the same struct (gross), this patch
+> > gives the struct a name and makes the necessary edits to code that
+> > references it (noisy but simple).
+> > 
+> > Care is needed to ensure that the new struct does not contain
+> > padding (which the usercopy hardening would fail to protect).
+> > 
+> > For this reason, the presence of tp2_value is made unconditional,
+> > since a padding field would be needed there in any case.  This pads
+> > up to the 16-byte alignment required by struct user_fpsimd_state.
+> > 
+> > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > Fixes: 9e8084d3f761 ("arm64: Implement thread_struct whitelist for hardened usercopy")
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > 
+> > ---
+> > 
+> > Changes since v1:
+> > 
+> >  * Add a BUILD_BUG_ON() check for padding in the whitelist struct.
+> >  * Move to using sizeof_field() for assigning *size; get rid of the
+> >    dummy pointer that was used previously.
+> >  * Delete bogus comment about why no whitelist is (was) needed.
+> > ---
+> >  arch/arm64/include/asm/processor.h | 38 +++++++++++++++++++-----------
+> >  arch/arm64/kernel/fpsimd.c         | 47 +++++++++++++++++++-------------------
+> >  arch/arm64/kernel/process.c        |  6 ++---
+> >  arch/arm64/kernel/ptrace.c         | 30 ++++++++++++------------
+> >  arch/arm64/kernel/signal.c         |  3 ++-
+> >  arch/arm64/kernel/signal32.c       |  3 ++-
+> >  arch/arm64/kernel/sys_compat.c     |  2 +-
+> >  7 files changed, 72 insertions(+), 57 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> > index 4a04535..224af48 100644
+> > --- a/arch/arm64/include/asm/processor.h
+> > +++ b/arch/arm64/include/asm/processor.h
+> > @@ -34,6 +34,8 @@
+> >  
+> >  #ifdef __KERNEL__
+> >  
+> > +#include <linux/build_bug.h>
+> > +#include <linux/stddef.h>
+> >  #include <linux/string.h>
+> >  
+> >  #include <asm/alternative.h>
+> > @@ -102,11 +104,18 @@ struct cpu_context {
+> >  
+> >  struct thread_struct {
+> >  	struct cpu_context	cpu_context;	/* cpu context */
+> > -	unsigned long		tp_value;	/* TLS register */
+> > -#ifdef CONFIG_COMPAT
+> > -	unsigned long		tp2_value;
+> > -#endif
+> > -	struct user_fpsimd_state fpsimd_state;
+> > +
+> > +	/*
+> > +	 * Whitelisted fields for hardened usercopy:
+> > +	 * Maintainers must ensure manually that this contains no
+> > +	 * implicit padding.
+> > +	 */
+> > +	struct {
+> > +		unsigned long	tp_value;	/* TLS register */
+> > +		unsigned long	tp2_value;
+> > +		struct user_fpsimd_state fpsimd_state;
+> > +	} uw;
+> 
+> I was trying to figure out a way to avoid the '.uw.' everywhere we want to
+> access these members. I tried using an anonymous union, but then I couldn't
+> figure out a way to enforce the BUILD_BUG_ON you have later on in the patch
+> so I guess it's fine as-is.
 
->>
->> The SD_ASYM_PACKING flag is disabled by default and I'm preparing another patch
->> to enable this dynamically at boot time by detecting the system topology.
->>
->>  arch/arm64/kernel/topology.c | 30 ++++++++++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
->> index 2186853..cb6705e5 100644
->> --- a/arch/arm64/kernel/topology.c
->> +++ b/arch/arm64/kernel/topology.c
->> @@ -296,6 +296,33 @@ static void __init reset_cpu_topology(void)
->>       }
->>  }
->>
->> +#ifdef CONFIG_SCHED_MC
->> +unsigned int __read_mostly arm64_sched_asym_enabled;
->> +
->> +int arch_asym_cpu_priority(int cpu)
->> +{
->> +     return topology_get_cpu_scale(NULL, cpu);
->> +}
->> +
->> +static inline int arm64_sched_dynamiq(void)
->> +{
->> +     return arm64_sched_asym_enabled ? SD_ASYM_PACKING : 0;
->> +}
->> +
->> +static int arm64_core_flags(void)
->> +{
->> +     return cpu_core_flags() | arm64_sched_dynamiq();
->> +}
->> +#endif
->> +
->> +static struct sched_domain_topology_level arm64_topology[] = {
->> +#ifdef CONFIG_SCHED_MC
->> +     { cpu_coregroup_mask, arm64_core_flags, SD_INIT_NAME(MC) },
->
-> Maybe stick this in a macro to avoid the double #ifdef?
+Agreed, I would have preferred to avoid the explcitly named nested
+struct, but I couldn't find a good way to do it.
 
-ok, I will do that in next version
+We can revisit this later if someone comes up with a bright idea.
 
-Vincent
-
->
-> Will
+Cheers
+---Dave
