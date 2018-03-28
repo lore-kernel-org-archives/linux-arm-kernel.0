@@ -1,73 +1,106 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 28 Mar 2018 14:25:12 +0200
-Subject: [PATCH] drm/atmel-hlcdc: add command line option to specify
- preferred depth
-In-Reply-To: <20180328122236.GF14155@phenom.ffwll.local>
-References: <20180326073502.19259-1-peda@axentia.se>
- <20180328093454.4149fa3b@bbrezillon>
- <20180328122236.GF14155@phenom.ffwll.local>
-Message-ID: <20180328142512.14f8c502@bbrezillon>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 28 Mar 2018 20:29:30 +0800
+Subject: [PATCH 3/7] net: thunderx: add multicast filter management support
+In-Reply-To: <20180327150736.10718-4-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180327150736.10718-4-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <201803282043.2ylP72wS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Mar 2018 14:22:36 +0200
-Daniel Vetter <daniel@ffwll.ch> wrote:
+Hi Vadim,
 
-> On Wed, Mar 28, 2018 at 09:34:54AM +0200, Boris Brezillon wrote:
-> > Hi Peter,
-> > 
-> > On Mon, 26 Mar 2018 09:35:02 +0200
-> > Peter Rosin <peda@axentia.se> wrote:
-> >   
-> > > I have an sama5d31-based system with 64MB of memory and a 1920x1080
-> > > LVDS display wired for 16-bpp. When I enable legacy fbdev support,
-> > > the contiguous memory allocator invariably fails with the order-11
-> > > allocation for a 1920x1080 at 24-bpp buffer (~6MB). But this HW can never
-> > > make any good use of RGB888, so that is a wasted attempt anyway that
-> > > would also waste precious memory should it succeed.
-> > > 
-> > > Sure, I could rewrite user-space to go directly to KMS etc, and that
-> > > makes the (attempted) order-11 allocation go away, replacing it with
-> > > one order-10 allocation per application restart for a 1920x1080 at 16-bpp
-> > > buffer (<4MB). But after a few restarts, order-10 allocations start to
-> > > fail as well, which is only to be expected AFAIU.
-> > > 
-> > > So, I'd rather not change user-space (which was originally written
-> > > to target a smaller display) so that I at the same time get the
-> > > benefit of an early pre-allocated fbdev frame-buffer that can be
-> > > reused over and over. But to do that I need to tell the driver that
-> > > 16-bpp is the preferred depth. Add a module parameter to do just that.
-> > > 
-> > > Signed-off-by: Peter Rosin <peda@axentia.se>
-> > > ---
-> > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++++++++++++-
-> > >  1 file changed, 17 insertions(+), 1 deletion(-)
-> > > 
-> > > I found some inspiration regarding naming and implementation here:
-> > > https://patchwork.kernel.org/patch/9848631/
-> > > 
-> > > I have found no feedback on that patch though, which makes me wonder if
-> > > I'm perhaps barking up the wronig tree?  
-> > 
-> > Hm, isn't that something you can already overload with the video=
-> > parameter?
-> > 
-> > 	video=<output>:<resolution>[-<bpp>]
-> > 
-> > AFAIR, <bpp> encodes the color depth, so what is the benefit of adding
-> > this new property to overload the default depth?
-> > 
-> > Maybe I'm wrong and the default depth param is actually useful, but in
-> > this case we should probably make it generic since other drivers seems
-> > to need it too, and we might want to attach it to a specific display
-> > engine instance.  
-> 
-> I think for the drm's fbdev emulation we ignore the bpp ...
+Thank you for the patch! Perhaps something to improve:
 
-Nope, it's already parsed [1].
+[auto build test WARNING on net-next/master]
+[also build test WARNING on v4.16-rc7 next-20180328]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-[1]https://elixir.bootlin.com/linux/v4.16-rc3/source/drivers/gpu/drm/drm_fb_helper.c#L1812
--- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+url:    https://github.com/0day-ci/linux/commits/Vadim-Lomovtsev/net-thunderx-implement-DMAC-filtering-support/20180328-190332
+config: x86_64-randconfig-s1-03281908 (attached as .config)
+compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All warnings (new ones prefixed by >>):
+
+   drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_lmac_save_filter':
+>> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:286:3: warning: 'return' with no value, in function returning non-void [-Wreturn-type]
+      return;
+      ^~~~~~
+   drivers/net/ethernet/cavium/thunder/thunder_bgx.c:281:12: note: declared here
+    static int bgx_lmac_save_filter(struct lmac *lmac, u64 dmac, u8 vf_id)
+               ^~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/net/ethernet/cavium/thunder/nic.h:15:0,
+                    from drivers/net/ethernet/cavium/thunder/thunder_bgx.c:21:
+   drivers/net/ethernet/cavium/thunder/thunder_bgx.c: In function 'bgx_set_dmac_cam_filter_mac':
+>> drivers/net/ethernet/cavium/thunder/thunder_bgx.h:61:38: warning: left shift count >= width of type [-Wshift-count-overflow]
+    #define  RX_DMACX_CAM_LMACID(x)   (x << 49)
+                                         ^
+>> drivers/net/ethernet/cavium/thunder/thunder_bgx.c:324:8: note: in expansion of macro 'RX_DMACX_CAM_LMACID'
+     cfg = RX_DMACX_CAM_LMACID(lmacid & LMAC_ID_MASK) |
+           ^~~~~~~~~~~~~~~~~~~
+
+vim +/return +286 drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+
+   280	
+ > 281	static int bgx_lmac_save_filter(struct lmac *lmac, u64 dmac, u8 vf_id)
+   282	{
+   283		u8 i = 0;
+   284	
+   285		if (!lmac)
+ > 286			return;
+   287	
+   288		/* At the same time we could have several VFs 'attached' to some
+   289		 * particular LMAC, and each VF is represented as network interface
+   290		 * for kernel. So from user perspective it should be possible to
+   291		 * manipulate with its' (VF) receive modes. However from PF
+   292		 * driver perspective we need to keep track of filter configurations
+   293		 * for different VFs to prevent filter values dupes
+   294		 */
+   295		for (i = 0; i < lmac->dmacs_cfg; i++) {
+   296			if (lmac->dmacs[i].dmac == dmac) {
+   297				lmac->dmacs[i].vf_map |= BIT_ULL(vf_id);
+   298				return -1;
+   299			}
+   300		}
+   301	
+   302		if (!(lmac->dmacs_cfg < lmac->dmacs_count))
+   303			return -1;
+   304	
+   305		/* keep it for further tracking */
+   306		lmac->dmacs[lmac->dmacs_cfg].dmac = dmac;
+   307		lmac->dmacs[lmac->dmacs_cfg].vf_map = BIT_ULL(vf_id);
+   308		lmac->dmacs_cfg++;
+   309		return 0;
+   310	}
+   311	
+   312	static int bgx_set_dmac_cam_filter_mac(struct bgx *bgx, int lmacid, u64 cam_dmac, u8 idx)
+   313	{
+   314		struct lmac *lmac = NULL;
+   315		u64 cfg = 0;
+   316	
+   317		/* skip zero addresses as meaningless */
+   318		if (!cam_dmac || !bgx)
+   319			return -1;
+   320	
+   321		lmac = &bgx->lmac[lmacid];
+   322	
+   323		/* configure DCAM filtering for designated LMAC */
+ > 324		cfg = RX_DMACX_CAM_LMACID(lmacid & LMAC_ID_MASK) |
+   325			RX_DMACX_CAM_EN | cam_dmac;
+   326		bgx_reg_write(bgx, 0, BGX_CMR_RX_DMACX_CAM + ((lmacid * lmac->dmacs_count) + idx) * sizeof(u64), cfg);
+   327		return 0;
+   328	}
+   329	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 29217 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180328/78d453af/attachment-0001.gz>
