@@ -1,51 +1,114 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 28 Mar 2018 14:41:27 +0200
-Subject: [PATCH resend 0/2] preparatory arm64 asm patches for yielding the NEON
-Message-ID: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+Date: Wed, 28 Mar 2018 14:41:29 +0200
+Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180328124129.6459-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RT people reported that the arm64 crypto NEON code behaves poorly in RT
-context, because it disables preemption (to avoid having to context switch
-the NEON registers) and usually processes the entire input in one go. When we
-introduced this code, this was not unreasonable given the overhead of eager
-preserve/restore, but today, there isn't that much overhead anymore, and so
-we can consider approaches that have much better worst case scheduling latency.
+Add support macros to conditionally yield the NEON (and thus the CPU)
+that may be called from the assembler code.
 
-Simply refactoring the code to only call into the core NEON transform one
-block at a time results in a non-negligible performance impact, especially
-on low end cores such as Cortex-A53 where memory accesses are relatively
-costly. So instead, let's introduce some infrastructure to allow assembler
-routines to do a conditional yield, i.e., check the TIF_NEED_RESCHED flag
-after processing each block of input, and yield if it is set, in which case
-some context may need to be preserved and restored, and or constant tables
-reloaded.
+In some cases, yielding the NEON involves saving and restoring a non
+trivial amount of context (especially in the CRC folding algorithms),
+and so the macro is split into three, and the code in between is only
+executed when the yield path is taken, allowing the context to be preserved.
+The third macro takes an optional label argument that marks the resume
+path after a yield has been performed.
 
-Patch #1 adds helper macros to create standard AAPCS stack frames. This is
-needed because the assembler code will be modified to call into schedule()
-[essentially], and so a stack frame is needed to preserve state.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/assembler.h | 64 ++++++++++++++++++++
+ arch/arm64/kernel/asm-offsets.c    |  2 +
+ 2 files changed, 66 insertions(+)
 
-Patch #2 adds helper macros to create the yielding code: check whether a
-yield should be done, and preserve/restore the algorithm specific pieces
-that will not be preserved across the yield in the NEON registers.
-
-These patches have been broken out from the arm64/crypto series and resent
-since they require careful review from the arm64 maintainers, rather than
-pulled silently via the crypto tree (which already happened by accident and
-got reverted)
-
-Full tree is here
-https://git.kernel.org/pub/scm/linux/kernel/git/ardb/linux.git/log/?h=arm64-crypto-preempt
-
-
-Ard Biesheuvel (2):
-  arm64: assembler: add utility macros to push/pop stack frames
-  arm64: assembler: add macros to conditionally yield the NEON under
-    PREEMPT
-
- arch/arm64/include/asm/assembler.h | 122 ++++++++++++++++++++
- arch/arm64/kernel/asm-offsets.c    |   2 +
- 2 files changed, 124 insertions(+)
-
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index d354eb7f2f0c..fb11514273d9 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -623,4 +623,68 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+ 	.endif
+ 	.endm
+ 
++/*
++ * Check whether to yield to another runnable task from kernel mode NEON code
++ * (which runs with preemption disabled).
++ *
++ * if_will_cond_yield_neon
++ *        // pre-yield patchup code
++ * do_cond_yield_neon
++ *        // post-yield patchup code
++ * endif_yield_neon    <label>
++ *
++ * where <label> is optional, and marks the point where execution will resume
++ * after a yield has been performed. If omitted, execution resumes right after
++ * the endif_yield_neon invocation.
++ *
++ * Note that the patchup code does not support assembler directives that change
++ * the output section, any use of such directives is undefined.
++ *
++ * The yield itself consists of the following:
++ * - Check whether the preempt count is exactly 1, in which case disabling
++ *   preemption once will make the task preemptible. If this is not the case,
++ *   yielding is pointless.
++ * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
++ *   kernel mode NEON (which will trigger a reschedule), and branch to the
++ *   yield fixup code.
++ *
++ * This macro sequence clobbers x0, x1 and the flags register unconditionally,
++ * and may clobber x2 .. x18 if the yield path is taken.
++ */
++
++	.macro		cond_yield_neon, lbl
++	if_will_cond_yield_neon
++	do_cond_yield_neon
++	endif_yield_neon	\lbl
++	.endm
++
++	.macro		if_will_cond_yield_neon
++#ifdef CONFIG_PREEMPT
++	get_thread_info	x0
++	ldr		w1, [x0, #TSK_TI_PREEMPT]
++	ldr		x0, [x0, #TSK_TI_FLAGS]
++	cmp		w1, #PREEMPT_DISABLE_OFFSET
++	csel		x0, x0, xzr, eq
++	tbnz		x0, #TIF_NEED_RESCHED, .Lyield_\@	// needs rescheduling?
++#endif
++	/* fall through to endif_yield_neon */
++	.subsection	1
++.Lyield_\@ :
++	.endm
++
++	.macro		do_cond_yield_neon
++	bl		kernel_neon_end
++	bl		kernel_neon_begin
++	.endm
++
++	.macro		endif_yield_neon, lbl
++	.ifnb		\lbl
++	b		\lbl
++	.else
++	b		.Lyield_out_\@
++	.endif
++	.previous
++.Lyield_out_\@ :
++	.endm
++
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 1303e04110cd..1e2ea2e51acb 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -93,6 +93,8 @@ int main(void)
+   DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
+   DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+   BLANK();
++  DEFINE(PREEMPT_DISABLE_OFFSET, PREEMPT_DISABLE_OFFSET);
++  BLANK();
+   DEFINE(CLOCK_REALTIME,	CLOCK_REALTIME);
+   DEFINE(CLOCK_MONOTONIC,	CLOCK_MONOTONIC);
+   DEFINE(CLOCK_MONOTONIC_RAW,	CLOCK_MONOTONIC_RAW);
 -- 
 2.11.0
