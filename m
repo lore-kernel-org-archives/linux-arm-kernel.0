@@ -1,75 +1,107 @@
-From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Wed, 28 Mar 2018 18:01:21 +0530
-Subject: [PATCH v7 3/4] arm64: Implement page table free interfaces
-In-Reply-To: <1522240282-12104-1-git-send-email-cpandya@codeaurora.org>
-References: <1522240282-12104-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <1522240282-12104-4-git-send-email-cpandya@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Mar 2018 13:33:46 +0100
+Subject: [PATCH v2 2/2] arm64: uaccess: Fix omissions from usercopy
+ whitelist
+In-Reply-To: <1522230649-22008-3-git-send-email-Dave.Martin@arm.com>
+References: <1522230649-22008-1-git-send-email-Dave.Martin@arm.com>
+ <1522230649-22008-3-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180328123345.GE30850@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement pud_free_pmd_page() and pmd_free_pte_page().
+On Wed, Mar 28, 2018 at 10:50:49AM +0100, Dave Martin wrote:
+> When the hardend usercopy support was added for arm64, it was
+> concluded that all cases of usercopy into and out of thread_struct
+> were statically sized and so didn't require explicit whitelisting
+> of the appropriate fields in thread_struct.
+> 
+> Testing with usercopy hardening enabled has revealed that this is
+> not the case for certain ptrace regset manipulation calls on arm64.
+> This occurs because the sizes of usercopies associated with the
+> regset API are dynamic by construction, and because arm64 does not
+> always stage such copies via the stack: indeed the regset API is
+> designed to avoid the need for that by adding some bounds checking.
+> 
+> This is currently believed to affect only the fpsimd and TLS
+> registers.
+> 
+> Because the whitelisted fields in thread_struct must be contiguous,
+> this patch groups them together in a nested struct.  It is also
+> necessary to be able to determine the location and size of that
+> struct, so rather than making the struct anonymous (which would
+> save on edits elsewhere) or adding an anonymous union containing
+> named and unnamed instances of the same struct (gross), this patch
+> gives the struct a name and makes the necessary edits to code that
+> references it (noisy but simple).
+> 
+> Care is needed to ensure that the new struct does not contain
+> padding (which the usercopy hardening would fail to protect).
+> 
+> For this reason, the presence of tp2_value is made unconditional,
+> since a padding field would be needed there in any case.  This pads
+> up to the 16-byte alignment required by struct user_fpsimd_state.
+> 
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Fixes: 9e8084d3f761 ("arm64: Implement thread_struct whitelist for hardened usercopy")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> ---
+> 
+> Changes since v1:
+> 
+>  * Add a BUILD_BUG_ON() check for padding in the whitelist struct.
+>  * Move to using sizeof_field() for assigning *size; get rid of the
+>    dummy pointer that was used previously.
+>  * Delete bogus comment about why no whitelist is (was) needed.
+> ---
+>  arch/arm64/include/asm/processor.h | 38 +++++++++++++++++++-----------
+>  arch/arm64/kernel/fpsimd.c         | 47 +++++++++++++++++++-------------------
+>  arch/arm64/kernel/process.c        |  6 ++---
+>  arch/arm64/kernel/ptrace.c         | 30 ++++++++++++------------
+>  arch/arm64/kernel/signal.c         |  3 ++-
+>  arch/arm64/kernel/signal32.c       |  3 ++-
+>  arch/arm64/kernel/sys_compat.c     |  2 +-
+>  7 files changed, 72 insertions(+), 57 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 4a04535..224af48 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -34,6 +34,8 @@
+>  
+>  #ifdef __KERNEL__
+>  
+> +#include <linux/build_bug.h>
+> +#include <linux/stddef.h>
+>  #include <linux/string.h>
+>  
+>  #include <asm/alternative.h>
+> @@ -102,11 +104,18 @@ struct cpu_context {
+>  
+>  struct thread_struct {
+>  	struct cpu_context	cpu_context;	/* cpu context */
+> -	unsigned long		tp_value;	/* TLS register */
+> -#ifdef CONFIG_COMPAT
+> -	unsigned long		tp2_value;
+> -#endif
+> -	struct user_fpsimd_state fpsimd_state;
+> +
+> +	/*
+> +	 * Whitelisted fields for hardened usercopy:
+> +	 * Maintainers must ensure manually that this contains no
+> +	 * implicit padding.
+> +	 */
+> +	struct {
+> +		unsigned long	tp_value;	/* TLS register */
+> +		unsigned long	tp2_value;
+> +		struct user_fpsimd_state fpsimd_state;
+> +	} uw;
 
-Implementation requires,
- 1) Clearing off the current pud/pmd entry
- 2) Invalidate TLB which could have previously
-    valid but not stale entry
- 3) Freeing of the un-used next level page tables
+I was trying to figure out a way to avoid the '.uw.' everywhere we want to
+access these members. I tried using an anonymous union, but then I couldn't
+figure out a way to enforce the BUILD_BUG_ON you have later on in the patch
+so I guess it's fine as-is.
 
-Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
----
- arch/arm64/mm/mmu.c | 29 +++++++++++++++++++++++++----
- 1 file changed, 25 insertions(+), 4 deletions(-)
+Thanks!
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index da98828..0f651db 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -45,6 +45,7 @@
- #include <asm/memblock.h>
- #include <asm/mmu_context.h>
- #include <asm/ptdump.h>
-+#include <asm/tlbflush.h>
- 
- #define NO_BLOCK_MAPPINGS	BIT(0)
- #define NO_CONT_MAPPINGS	BIT(1)
-@@ -973,12 +974,32 @@ int pmd_clear_huge(pmd_t *pmdp)
- 	return 1;
- }
- 
--int pud_free_pmd_page(pud_t *pud, unsigned long addr)
-+int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
- {
--	return pud_none(*pud);
-+	pmd_t *table;
-+
-+	if (pmd_present(READ_ONCE(*pmdp))) {
-+		table = __va(pmd_val(*pmdp));
-+		pmd_clear(pmdp);
-+		__flush_tlb_kernel_pgtable(addr);
-+		free_page((unsigned long) table);
-+	}
-+	return 1;
- }
- 
--int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
-+int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
- {
--	return pmd_none(*pmd);
-+	pmd_t *table;
-+	int i;
-+
-+	if (pud_present(READ_ONCE(*pudp))) {
-+		table = __va(pud_val(*pudp));
-+		for (i = 0; i < PTRS_PER_PMD; i++)
-+			pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE));
-+
-+		pud_clear(pudp);
-+		__flush_tlb_kernel_pgtable(addr);
-+		free_page((unsigned long) table);
-+	}
-+	return 1;
- }
--- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation
-Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
-Collaborative Project
+Will
