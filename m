@@ -1,197 +1,112 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 28 Mar 2018 18:18:13 +0100
-Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <20180328124129.6459-3-ard.biesheuvel@linaro.org>
-References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
- <20180328124129.6459-3-ard.biesheuvel@linaro.org>
-Message-ID: <20180328171812.GN16308@e103592.cambridge.arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 28 Mar 2018 23:16:54 +0530
+Subject: [PATCH v6 0/9] Add Actions Semi S900 pinctrl and gpio support
+Message-ID: <20180328174703.19778-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 02:41:29PM +0200, Ard Biesheuvel wrote:
-> Add support macros to conditionally yield the NEON (and thus the CPU)
-> that may be called from the assembler code.
-> 
-> In some cases, yielding the NEON involves saving and restoring a non
-> trivial amount of context (especially in the CRC folding algorithms),
-> and so the macro is split into three, and the code in between is only
-> executed when the yield path is taken, allowing the context to be preserved.
-> The third macro takes an optional label argument that marks the resume
-> path after a yield has been performed.
+This patchset adds pinctrl and gpio support for Actions Semi S900 SoC.
+Pinctrl and gpio subsystems share the common set of register range but
+implemented as individual drivers for making it less complex.
 
-Minor comments below, mostly just suggestions/observations.
+Pinmux functions are only accessible for pin groups while pinconf
+parameters are available for both pin groups and individual pins.
 
-With the missing #include in asm-offsets.c fixed (if you think it's
-appropriate):
+gpio-line-names has been added for the Bubblegum-96 board matching the
+96Boards CE specification v1.0.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Both pinctrl and gpio drivers are verified using the Bubblegum-96 board.
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/assembler.h | 64 ++++++++++++++++++++
->  arch/arm64/kernel/asm-offsets.c    |  2 +
->  2 files changed, 66 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index d354eb7f2f0c..fb11514273d9 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -623,4 +623,68 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
->  	.endif
->  	.endm
->  
-> +/*
-> + * Check whether to yield to another runnable task from kernel mode NEON code
-> + * (which runs with preemption disabled).
-> + *
-> + * if_will_cond_yield_neon
-> + *        // pre-yield patchup code
-> + * do_cond_yield_neon
-> + *        // post-yield patchup code
-> + * endif_yield_neon    <label>
-> + *
-> + * where <label> is optional, and marks the point where execution will resume
-> + * after a yield has been performed. If omitted, execution resumes right after
-> + * the endif_yield_neon invocation.
+This patchset depends on the clock driver which is still under review:
+https://lkml.org/lkml/2018/2/9/831
 
-Maybe add a comment describing cond_yield_neon, e.g.:
+There is also S500 pinctrl and gpio driver developed by Andreas Farber
+independently to this patchset.
+https://github.com/afaerber/linux/commits/bg96-next
 
- *
- * As a convenience, in the case where no patchup code is required
- * the above sequence may be abbreviated to:
- *
- * cond_yield_neon <label>
+If this patchseries seems to be good enough to add base OWL pinctrl and
+gpio support. Then, we may decide on adding S500 support on top of this later
+by reusing the pinctrl definitions from Andreas.
 
-> + *
-> + * Note that the patchup code does not support assembler directives that change
-> + * the output section, any use of such directives is undefined.
-> + *
-> + * The yield itself consists of the following:
-> + * - Check whether the preempt count is exactly 1, in which case disabling
-> + *   preemption once will make the task preemptible. If this is not the case,
-> + *   yielding is pointless.
-> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
-> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
-> + *   yield fixup code.
-> + *
-> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
-> + * and may clobber x2 .. x18 if the yield path is taken.
-> + */
+Thanks,
+Mani
 
-Does this mean that the pre-yield patchup code can safely refer to
-x2..x18, but the post-yield patchup code and the code at <label> (or
-otherwise immediately following endif_yield_neon) can't?
+Changes in v6:
 
-> +
-> +	.macro		cond_yield_neon, lbl
-> +	if_will_cond_yield_neon
-> +	do_cond_yield_neon
-> +	endif_yield_neon	\lbl
-> +	.endm
-> +
-> +	.macro		if_will_cond_yield_neon
-> +#ifdef CONFIG_PREEMPT
-> +	get_thread_info	x0
-> +	ldr		w1, [x0, #TSK_TI_PREEMPT]
-> +	ldr		x0, [x0, #TSK_TI_FLAGS]
-> +	cmp		w1, #PREEMPT_DISABLE_OFFSET
-> +	csel		x0, x0, xzr, eq
-> +	tbnz		x0, #TIF_NEED_RESCHED, .Lyield_\@	// needs rescheduling?
-> +#endif
-> +	/* fall through to endif_yield_neon */
-> +	.subsection	1
+* Changed owl_gpio_set_reg to owl_gpio_update_reg in gpio driver
+* Reused owl_gpio_update_reg in owl_gpio_set in gpio driver
+* Removed ngpio property from DT for nodes with 32 gpios
+* Fixed size values in DT for gpio nodes
+* Added Reviewed-by tags from Linus for adding gpio-line-names in DT
 
-Can we junk the code in this case rather than including it in the
-kernel, like
+Changes in v5:
 
-	.section .discard.cond_yield_neon
+* Removed alias for gpio nodes
+* Removed duplicate address from gpio nodes and modified the driver accordingly
+* Used ngpios property for specifying number of gpios per bank
+* Used generic gpio node name in DT and binding
+* Modified pinctrl driver to save space
+* Dropped pinctrl bindings patch since it got applied
+* Added Reviewed-by tags from Linus for DT and platform Kconfig changes
 
-(this seems to conform to some notion of a standard discarded section
-name, see <asm-generic/vmlinux.lds.h>).  This additionally discards
-the do_cond_yield_neon invocation (which I guess is what we'd expect
-for a non-preemptible kernel?)
+Changes in v4:
 
-If doing that discard, a note could be added in the comment block
-to warn people not to assume that the patchup code and any labels
-defined in it will definitely end up in the kernel image.
+* Incorporated Andy's review for pinctrl driver
+* Used _relaxed functions for pinctrl driver
+* Added Andy's Reviewed-by tag for gpio driver
+* Added (back) Rob's Reviewed-by tag for pinctrl bindings
 
-Since the patchup sequences aren't likely to be many or large, it's
-not the end of the world if we don't do this discarding though.
+Changes in v3:
 
-> +.Lyield_\@ :
-> +	.endm
-> +
-> +	.macro		do_cond_yield_neon
-> +	bl		kernel_neon_end
-> +	bl		kernel_neon_begin
-> +	.endm
-> +
-> +	.macro		endif_yield_neon, lbl
-> +	.ifnb		\lbl
-> +	b		\lbl
-> +	.else
-> +	b		.Lyield_out_\@
-> +	.endif
+* Simplified owl_gpio_set_reg() with _relaxed functions
+* Added interrupt controller properties to gpio node bindings as suggested
+  by Rob
+* Minor code cleanups
 
-Should you include
+Changes in v2:
 
-	.purgem do_cond_yield_neon
-	.purgem endif_yield_neon
+* Implemented each GPIO bank as its own gpio-controller
+* Added gpio-ranges property
+* Modified pin group to follow pad names instead of register names
+* Incorporated review comments from Andy
+* Incorporated review comments from Andreas
+* Fixed the MODULE_LICENSE with respect to SPDX tag
+* Added Reviewed by tag from Rob for pinctrl binding
 
-here?
+Manivannan Sadhasivam (9):
+  arm64: dts: actions: Add pinctrl node for S900
+  arm64: actions: Enable PINCTRL in platforms Kconfig
+  pinctrl: actions: Add Actions S900 pinctrl driver
+  dt-bindings: gpio: Add gpio nodes for Actions S900 SoC
+  arm64: dts: actions: Add S900 gpio nodes
+  arm64: dts: actions: Add gpio line names to Bubblegum-96 board
+  gpio: Add gpio driver for Actions OWL S900 SoC
+  MAINTAINERS: Add reviewer for ACTIONS platforms
+  MAINTAINERS: Add Actions Semi S900 pinctrl and gpio entries
 
-Otherwise, I think you would get macro redefinition errors if
-if_will_cond_yield_neon is used more than once in a given file.
+ .../devicetree/bindings/gpio/actions,owl-gpio.txt  |   87 +
+ MAINTAINERS                                        |    5 +
+ arch/arm64/Kconfig.platforms                       |    1 +
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  |  195 ++
+ arch/arm64/boot/dts/actions/s900.dtsi              |   57 +
+ drivers/gpio/Kconfig                               |    8 +
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-owl.c                            |  168 ++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/actions/Kconfig                    |   12 +
+ drivers/pinctrl/actions/Makefile                   |    2 +
+ drivers/pinctrl/actions/pinctrl-owl.c              |  579 ++++++
+ drivers/pinctrl/actions/pinctrl-owl.h              |  142 ++
+ drivers/pinctrl/actions/pinctrl-s900.c             | 1861 ++++++++++++++++++++
+ 15 files changed, 3120 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+ create mode 100644 drivers/gpio/gpio-owl.c
+ create mode 100644 drivers/pinctrl/actions/Kconfig
+ create mode 100644 drivers/pinctrl/actions/Makefile
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.c
+ create mode 100644 drivers/pinctrl/actions/pinctrl-owl.h
+ create mode 100644 drivers/pinctrl/actions/pinctrl-s900.c
 
-You could maybe protect against nested and misordered macro uses by the
-following, though it feels a bit like overkill.  Alternatively you
-could use a magic symbol to record the current state, similarly to
-frame_{push,pop}.
-
-	.macro __if_will_cond_yield_neon
-	.purgem if_will_cond_yield_neon
-	//...
-
-	.macro do_cond_yield_neon
-	.purgem do_cond_yield_neon
-	//...
-
-	.macro endif_yield_neon
-	.purgem endif_yield_neon
-	//...
-
-	.macro if_will_cond_yield_neon
-	__if_will_cond_yield_neon
-	.endm // if_will_cond_yield_neon
-	.endm // endif_yield_neon
-	.endm // do_cond_yield_neon
-	.endm // __if_will_cond_yield_neon
-
-	.macro if_will_cond_yield_neon
-	__if_will_cond_yield_neon
-	.endm
-
-> +	.previous
-> +.Lyield_out_\@ :
-> +	.endm
-> +
->  #endif	/* __ASM_ASSEMBLER_H */
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 1303e04110cd..1e2ea2e51acb 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -93,6 +93,8 @@ int main(void)
->    DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
->    DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
->    BLANK();
-
-#include <linux/preempt.h> ?
-
-> +  DEFINE(PREEMPT_DISABLE_OFFSET, PREEMPT_DISABLE_OFFSET);
-> +  BLANK();
-
-[...]
-
-Cheers
----Dave
+-- 
+2.14.1
