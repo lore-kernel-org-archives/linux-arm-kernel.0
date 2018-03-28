@@ -1,191 +1,93 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 28 Mar 2018 09:24:16 -0700
-Subject: [PATCH v3 1/4] dt-bindings: mfd: Add Gateworks System Controller
- bindings
-In-Reply-To: <1522250043-8065-2-git-send-email-tharvey@gateworks.com>
-References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
- <1522250043-8065-2-git-send-email-tharvey@gateworks.com>
-Message-ID: <20180328162416.GB25325@roeck-us.net>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 28 Mar 2018 17:30:07 +0100
+Subject: [PATCH v2 05/11] arm64: KVM/mm: Move SEA handling behind a single
+ 'claim' interface
+In-Reply-To: <08744114-27c0-dc8c-0943-df3dcb80f4a6@arm.com>
+References: <20180322181445.23298-1-james.morse@arm.com>
+ <20180322181445.23298-6-james.morse@arm.com>
+ <08744114-27c0-dc8c-0943-df3dcb80f4a6@arm.com>
+Message-ID: <b9f16902-1aed-bcbb-3e13-d852c766baef@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 08:14:00AM -0700, Tim Harvey wrote:
-> This patch adds documentation of device-tree bindings for the
-> Gateworks System Controller (GSC).
+Hi Marc,
+
+On 26/03/18 18:49, Marc Zyngier wrote:
+> On 22/03/18 18:14, James Morse wrote:
+>> To ensure APEI always takes the same locks when processing a notification
+>> we need the nmi-like callers to always call APEI in_nmi(). Add a helper
+>> to do the work and claim the notification.
+>>
+>> When KVM or the arch code takes an exception that might be a RAS
+>> notification, it asks the APEI firmware-first code whether it wants
+>> to claim the exception. We can then go on to see if (a future)
+>> kernel-first mechanism wants to claim the notification, before
+>> falling through to the existing default behaviour.
+>>
+>> The NOTIFY_SEA code was merged before we had multiple, possibly
+>> interacting, NMI-like notifications and the need to consider kernel
+>> first in the future. Make the 'claiming' behaviour explicit.
+>>
+>> As we're restructuring the APEI code to allow multiple NMI-like
+>> notifications, any notification that might interrupt interrupts-masked
+>> code must always be wrapped in nmi_enter()/nmi_exit(). This allows APEI
+>> to use in_nmi() to choose between the raw/regular spinlock routines.
+>>
+>> We mask SError over this window to prevent an asynchronous RAS error
+>> arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
+
+>> diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
+>> index 5f72b07b7912..9d52bc333110 100644
+>> --- a/arch/arm64/include/asm/kvm_ras.h
+>> +++ b/arch/arm64/include/asm/kvm_ras.h
+>> @@ -4,8 +4,26 @@
+>>  #ifndef __ARM64_KVM_RAS_H__
+>>  #define __ARM64_KVM_RAS_H__
+>>  
+>> +#include <linux/acpi.h>
+>> +#include <linux/errno.h>
+>>  #include <linux/types.h>
+>>  
+>> -int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
+>> +#include <asm/acpi.h>
+>> +
+>> +/*
+>> + * Was this synchronous external abort a RAS notification?
+>> + * Returns '0' for errors handled by some RAS subsystem, or -ENOENT.
+>> + *
+>> + * Call with irqs unmaksed.
+
+Self-Nit: unmasked.
+
+>> + */
+>> +static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
+>> +{
+>> +	int ret = -ENOENT;
+>> +
+>> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+>> +		ret = apei_claim_sea(NULL);
 > 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
-> v3:
->  - replaced _ with -
->  - remove input bindings
->  - added full description of hwmon
->  - fix unit address of hwmon child nodes
+> Nit: it is a bit odd to see this "IS_ENABLED(CONFIG_ACPI_APEI_SEA)"
+> check both in this function and in the only other function this calls
+> (apei_claim_sea). Could this somehow be improved by having a dummy
+> apei_claim_sea if CONFIG_ACPI_APEI doesn't exist?
+
+Good point. Your suggestion also avoids more #ifdefs in the C file, which is
+what I was trying to avoid.
+
+
+>> +
+>> +	return ret;
+>> +}
+>>  
+>>  #endif /* __ARM64_KVM_RAS_H__ */
+
+
+> Otherwise:
 > 
-> ---
->  .../devicetree/bindings/mfd/gateworks-gsc.txt      | 135 +++++++++++++++++++++
->  1 file changed, 135 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
-> new file mode 100644
-> index 0000000..8f530ed
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
-> @@ -0,0 +1,135 @@
-> +Gateworks System Controller multi-function device
-> +
-> +The GSC is a Multifunction I2C slave device with the following submodules:
-> +- WDT
-> +- GPIO
-> +- Pushbutton controller
-> +- HWMON
-> +
-> +Required properties:
-> +- compatible : Must be "gw,gsc"
-> +- reg: I2C address of the device
-> +- interrupts: interrupt triggered by GSC_IRQ# signal
-> +- interrupt-parent: Interrupt controller GSC is connected to
-> +- #interrupt-cells: should be <1>, index of the interrupt within the
-> +  controller, in accordance with the "one cell" variant of
-> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
-> +
-> +Optional nodes:
-> +* watchdog:
-> +The GSC provides a Watchdog monitor which can power cycle the board's
-> +primary power supply on most board models when tripped.
-> +
-> +Required watchdog properties:
-> +- compatible: must be "gw,gsc-watchdog"
-> +
-> +* hwmon:
-> +The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
-> +temperature and/or voltage monitoring.
-> +
-> +Required hwmon properties:
-> +- compatible: must be "gw,gsc-hwmon"
-> +
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-"hwmon" is a very Linux specific term. It might make sense to find a more
-generic term.
+Thanks!
 
-> +Optional hwmon properties:
-> +- gw,reference-voltage: ADC reference voltage (mV) used in scaling raw ADCs
 
-AFAIK devicetree likes to specify voltages in uV.
-
-> +- gw,resolution: ADC resolution (ie 4096) used in scaling raw ADCs
-> +
-
-4096 what ?
-
-> +Each hwmon child node defines an ADC input on the chip which the GSC may
-> +report cooked values (ie temperature sensor based on thermister), raw values,
-> +(ie voltage rail with a pre-scaling resistor divider), or a fan controller
-> +setpoint.
-> +
-> +Required hwmon child properties:
-> +- type: one of the following ADC types:
-> +  "gw,hwmon-temperature" - reports temperature in C*10
-> +  "gw,hwmon-voltage" - reports a pre-scaled voltage value
-> +  "gw,hwmon-voltage-raw" - reports a raw ADC that is scaled with
-> +       vreference, resolution, and optional resistor divider
-> +  "gw,hwmon-fan" - a fan temperature setpoint in C*10
-
-What is a "fan temperature setpoint" ?
-
-> +- reg: offset of the ADC register
-> +- label: name of the ADC input or FAN setpoint
-> +
-> +Optional hwmon child properties:
-> +- gw,voltage-divider: An array of two integers containing the resistor
-> +  values R1 and R2 of the optinal resistor divider on a raw ADC
-> +- gw,voltage-offset: a mV voltage offset to apply to a raw ADC (ie to
-> +  compensate for a diode drop)
-> +
-> +Example:
-> +
-> +	gsc: gsc at 20 {
-> +		compatible = "gw,gsc";
-> +		reg = <0x20>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <4 GPIO_ACTIVE_LOW>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +
-> +		watchdog {
-> +			compatible = "gw,gsc-watchdog";
-> +		};
-> +
-> +		hwmon {
-> +			compatible = "gw,gsc-hwmon";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			gw,reference-voltage = <2500>;
-> +			gw,resolution = <4096>;
-> +
-> +			hwmon at 0 { /* A0: Board Temperature */
-> +				type = "gw,hwmon-temperature";
-> +				reg = <0x00>;
-> +				label = "temp";
-> +			};
-> +
-> +			hwmon at 2 { /* A1: Input Voltage (raw ADC) */
-> +				type = "gw,hwmon-voltage-raw";
-> +				reg = <0x02>;
-> +				label = "vdd_vin";
-> +				gw,voltage-divider = <22100 1000>;
-> +				gw,voltage-offset = <800>;
-> +			};
-> +
-> +			hwmon at b { /* A2: Battery voltage */
-> +				type = "gw,hwmon-voltage";
-> +				reg = <0x0b>;
-> +				label = "vdd_bat";
-> +			};
-> +
-> +			hwmon at 2c { /* fan temperature setpoint for 50% duty */
-> +				type = "gw,hwmon-fan";
-> +				reg = <0x2c>;
-> +				label = "fan_50p";
-> +			};
-> +
-> +			hwmon at 2e { /* fan1 */
-> +				type = "gw,hwmon-fan";
-> +				reg = <0x2e>;
-> +				label = "fan_60p";
-> +			};
-> +
-> +			hwmon at 30 { /* fan2 */
-> +				type = "gw,hwmon-fan";
-> +				reg = <0x30>;
-> +				label = "fan_70p";
-> +			};
-> +
-> +			hwmon at 32 { /* fan3 */
-> +				type = "gw,hwmon-fan";
-> +				reg = <0x32>;
-> +				label = "fan_80p";
-> +			};
-> +
-> +			hwmon at 34 { /* fan4 */
-> +				type = "gw,hwmon-fan";
-> +				reg = <0x34>;
-> +				label = "fan_90p";
-> +			};
-> +
-> +			hwmon at 36 { /* fan5 */
-> +				type = "gw,hwmon-fan";
-> +				reg = <0x36>;
-> +				label = "fan_100p";
-> +			};
-
-No idea what this is supposed to be doing, but whatever it is,
-it appears to be wrong. I'll comment more on it in the hwmon driver.
-
-Guenter
-
-> +		};
-> +	};
-> -- 
-> 2.7.4
-> 
+James
