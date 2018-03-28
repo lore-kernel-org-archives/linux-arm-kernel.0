@@ -1,38 +1,111 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 28 Mar 2018 23:17:03 +0530
-Subject: [PATCH v6 9/9] MAINTAINERS: Add Actions Semi S900 pinctrl and gpio
- entries
-In-Reply-To: <20180328174703.19778-1-manivannan.sadhasivam@linaro.org>
-References: <20180328174703.19778-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180328174703.19778-10-manivannan.sadhasivam@linaro.org>
+From: sebastian_ml@gmx.net (Sebastian Kemper)
+Date: Wed, 28 Mar 2018 19:57:14 +0200
+Subject: Fix compile failures due to arm64 includes in stable kernels
+In-Reply-To: <alpine.DEB.2.10.1803271714560.12360@sstabellini-ThinkPad-X260>
+References: <20180325073255.GA2923@hotdamn.lan>
+ <alpine.DEB.2.10.1803271714560.12360@sstabellini-ThinkPad-X260>
+Message-ID: <20180328175713.GA2390@hotdamn.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add S900 pinctrl and gpio entries under ARCH_ACTIONS
+On Tue, Mar 27, 2018 at 05:23:47PM -0700, Stefano Stabellini wrote:
+> On Sun, 25 Mar 2018, Sebastian Kemper wrote:
+> > Hello all,
+> > 
+> > Some older stable kernels provide some arm64 headers like opcodes.h,
+> > that include their non-64bit equivalents. For example:
+> > 
+> > arch/arm64/include/asm/opcodes.h
+> > 
+> > tries to include
+> > 
+> > <../../arm/include/asm/opcodes.h>
+> > 
+> > It's obvious that there is one hierarchy level missing. This causes
+> > build failures:
+> > 
+> >     CC [M]  /build/lede-snapshots/aarch64_cortex-a53/build/sdk/build_dir/target-aarch64_cortex-a53_musl/linux-brcm2708_bcm2710/dahdi-linux-2.11.1-20180111/drivers/dahdi/dahdi-base.o
+> >   In file included from ./arch/arm64/include/asm/sysreg.h:25:0,
+> >                    from ./arch/arm64/include/asm/cputype.h:94,
+> >                    from ./arch/arm64/include/asm/cachetype.h:19,
+> >                    from ./arch/arm64/include/asm/cache.h:19,
+> >                    from ./include/linux/cache.h:5,
+> >                    from ./include/linux/printk.h:8,
+> >                    from ./include/linux/kernel.h:13,
+> >                    from /build/lede-snapshots/aarch64_cortex-a53/build/sdk/build_dir/target-aarch64_cortex-a53_musl/linux-brcm2708_bcm2710/dahdi-linux-2.11.1-20180111/drivers/dahdi/dahdi-base.c:38:
+> >   ./arch/arm64/include/asm/opcodes.h:5:10: fatal error: ../../arm/include/asm/opcodes.h: No such file or directory
+> >    #include <../../arm/include/asm/opcodes.h>
+> >             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> >   compilation terminated.
+> > 
+> > Some example packages that fail to build are dahdi-linux and
+> > cryptodev-linux.
+> > 
+> > linux-3.16.56:
+> >   - does not have opcodes.h, but the xen headers
+> > 
+> >       hypercall.h
+> >       interface.h
+> >       hypervisor.h
+> >       page.h
+> >       
+> >     have the wrong include lines.
+> >     
+> > linux-4.1.50:
+> >   - affected (needs a small change in the patch for opcodes.h due to slightly different layout)
+> >   
+> > linux-4.4.123:
+> >   - affected
+> >   
+> > linux-4.9.89:
+> >   - affected
+> > 
+> > The attached patch fixes the includes.
+> > 
+> > I understand that to get a patch accepted into the stable series one
+> > needs to provide a commit to master. But in this case that doesn't seem
+> > possible as these headers do not exist anymore in newer kernels.
+> > 
+> > What do you think? Does the above make sense to you to backport to the
+> > stable kernels?
+> 
+> It is not actually a bug: the path was correct given the way the
+> Makefiles were written -- if you build a regular arm64 kernel with the
+> default config and CONFIG_XEN enabled, it will work fine.
+> 
+> I am guessing you see these issues with out-of-tree modules, right?
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- MAINTAINERS | 4 ++++
- 1 file changed, 4 insertions(+)
+Hi Stefano,
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 640dabc4c311..d63793ee545e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1125,10 +1125,14 @@ F:	arch/arm/mach-actions/
- F:	arch/arm/boot/dts/owl-*
- F:	arch/arm64/boot/dts/actions/
- F:	drivers/clocksource/owl-*
-+F:	drivers/gpio/gpio-owl.c
-+F:	drivers/pinctrl/actions/*
- F:	drivers/soc/actions/
- F:	include/dt-bindings/power/owl-*
- F:	include/linux/soc/actions/
- F:	Documentation/devicetree/bindings/arm/actions.txt
-+F:	Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
-+F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
- F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
- F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
- 
--- 
-2.14.1
+Correct. They're out-of-tree modules.
+
+As this seems to imply that my suggested patch could result in in-tree
+modules not compiling anymore, I'll just drop it.
+
+Thanks for your feedback!
+
+Kind regards,
+Sebastian
+
+> Fortunately, on newer kernels the whole thing has been reworked, and
+> should solve the problem for you. The commit you are looking for is
+> 2fbadc3002c5f172d20aa2e7e48920c5f14ed11f:
+> 
+> commit 7465c84a9380779235af42146dae6798b89b1d12
+> Author: Marc Zyngier <marc.zyngier@arm.com>
+> Date:   Fri Dec 2 14:19:35 2016 +0000
+> 
+>     arm/arm64: xen: Move shared architecture headers to include/xen/arm
+>     
+>     ARM and arm64 Xen ports share a number of headers, leading to
+>     packaging issues when these headers needs to be exported, as it
+>     breaks the reasonable requirement that an architecture port
+>     has self-contained headers.
+>     
+>     Fix the issue by moving the 5 header files to include/xen/arm,
+>     and keep local placeholders to include the relevant files.
+>     
+>     Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>     Reviewed-by: Stefano Stabellini <sstabellini@kernel.org>
+> 
+> I am CC'ing the original author.
