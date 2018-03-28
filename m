@@ -1,116 +1,37 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Tue, 27 Mar 2018 18:56:31 -0700
-Subject: [PATCH] memory: brcmstb: dpfe: Remove need for dpfe_dev
-In-Reply-To: <20180327234038.32241-1-f.fainelli@gmail.com>
-References: <20180327234038.32241-1-f.fainelli@gmail.com>
-Message-ID: <CAGt4E5skUrFFdiG9KEaupVZkxmepxBw3wgobkALnfdiE6QOcgw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Mar 2018 10:08:45 +0800
+Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <172d1da4-bde0-1f0c-b907-5582c31c8156@codeaurora.org>
+References: <cover.1521246069.git.collinsd@codeaurora.org>
+ <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
+ <CAD=FV=Xz01ra=WS--vtA+dkb1H8wcw3UnFzXPS=zYWAQCPP5eg@mail.gmail.com>
+ <184378e4-caf8-6ce3-e089-3690588fcb28@codeaurora.org>
+ <CAD=FV=WsVDDaV-mMUvQWUomyBFCJZunKiyDt_K81_syoNhGRZQ@mail.gmail.com>
+ <20180327115606.GC29239@sirena.org.uk>
+ <172d1da4-bde0-1f0c-b907-5582c31c8156@codeaurora.org>
+Message-ID: <20180328020845.GB29099@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2018 at 16:40, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> We can hook sysfs objects to the parent platform device that we are
-> created from, no need to have a synthetic dpfe_dev just for that. This
-> incidentally removes the need for having an index, since we are
-> guaranteed to have an unique path in the sysfs hiearchy.
->
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+On Tue, Mar 27, 2018 at 04:38:07PM -0700, David Collins wrote:
+> On 03/27/2018 04:56 AM, Mark Brown wrote:
 
-Looks good. Thanks.
+> > I didn't spot this in the code but something called "device tree mode"
+> > sounds like it's going to be awfully confusing...
 
-Acked-by: Markus Mayer <mmayer@broadcom.com>
+> As I explained in the earlier email, it makes the device tree
+> configurations much simpler and less confusing/error prone.  I'd like to
+> keep this concept around unless their are strong objections.
 
-> ---
->  drivers/memory/brcmstb_dpfe.c | 42 ++++++++++--------------------------------
->  1 file changed, 10 insertions(+), 32 deletions(-)
->
-> diff --git a/drivers/memory/brcmstb_dpfe.c b/drivers/memory/brcmstb_dpfe.c
-> index 0a7bdbed3a6f..5f8d5aff6040 100644
-> --- a/drivers/memory/brcmstb_dpfe.c
-> +++ b/drivers/memory/brcmstb_dpfe.c
-> @@ -168,7 +168,6 @@ struct private_data {
->         void __iomem *dmem;
->         void __iomem *imem;
->         struct device *dev;
-> -       unsigned int index;
->         struct mutex lock;
->  };
->
-> @@ -628,10 +627,8 @@ static int brcmstb_dpfe_probe(struct platform_device *pdev)
->  {
->         struct device *dev = &pdev->dev;
->         struct private_data *priv;
-> -       struct device *dpfe_dev;
->         struct init_data init;
->         struct resource *res;
-> -       u32 index;
->         int ret;
->
->         priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> @@ -641,11 +638,6 @@ static int brcmstb_dpfe_probe(struct platform_device *pdev)
->         mutex_init(&priv->lock);
->         platform_set_drvdata(pdev, priv);
->
-> -       /* Cell index is optional; default to 0 if not present. */
-> -       ret = of_property_read_u32(dev->of_node, "cell-index", &index);
-> -       if (ret)
-> -               index = 0;
-> -
->         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dpfe-cpu");
->         priv->regs = devm_ioremap_resource(dev, res);
->         if (IS_ERR(priv->regs)) {
-> @@ -669,35 +661,20 @@ static int brcmstb_dpfe_probe(struct platform_device *pdev)
->
->         ret = brcmstb_dpfe_download_firmware(pdev, &init);
->         if (ret)
-> -               goto err;
-> -
-> -       dpfe_dev = devm_kzalloc(dev, sizeof(*dpfe_dev), GFP_KERNEL);
-> -       if (!dpfe_dev) {
-> -               ret = -ENOMEM;
-> -               goto err;
-> -       }
-> -
-> -       priv->dev = dpfe_dev;
-> -       priv->index = index;
-> +               return ret;
->
-> -       dpfe_dev->parent = dev;
-> -       dpfe_dev->groups = dpfe_groups;
-> -       dpfe_dev->of_node = dev->of_node;
-> -       dev_set_drvdata(dpfe_dev, priv);
-> -       dev_set_name(dpfe_dev, "dpfe%u", index);
-> +       ret = sysfs_create_groups(&pdev->dev.kobj, dpfe_groups);
-> +       if (!ret)
-> +               dev_info(dev, "registered.\n");
->
-> -       ret = device_register(dpfe_dev);
-> -       if (ret)
-> -               goto err;
-> +       return ret;
-> +}
->
-> -       dev_info(dev, "registered.\n");
-> +static int brcmstb_dpfe_remove(struct platform_device *pdev)
-> +{
-> +       sysfs_remove_groups(&pdev->dev.kobj, dpfe_groups);
->
->         return 0;
-> -
-> -err:
-> -       dev_err(dev, "failed to initialize -- error %d\n", ret);
-> -
-> -       return ret;
->  }
->
->  static const struct of_device_id brcmstb_dpfe_of_match[] = {
-> @@ -712,6 +689,7 @@ static struct platform_driver brcmstb_dpfe_driver = {
->                 .of_match_table = brcmstb_dpfe_of_match,
->         },
->         .probe = brcmstb_dpfe_probe,
-> +       .remove = brcmstb_dpfe_remove,
->         .resume = brcmstb_dpfe_resume,
->  };
->
-> --
-> 2.14.1
->
+Like I say I didn't spot this in the code, I did give it a brief once
+over but as Doug had spotted such extensive problems I was expecting a
+resend.  It *is* setting off big alarm bells though, in general if your
+individual driver is doing something weird to make life easier that's a
+sign that it's doing things at the wrong level.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180328/24beeaf0/attachment.sig>
