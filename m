@@ -1,63 +1,108 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Wed, 28 Mar 2018 02:34:25 +0200
-Subject: [PATCH 4/6] pwm: pwm-omap-dmtimer: Fix frequency when using
- prescaler
-In-Reply-To: <20180327222349.GK5700@atomide.com>
-References: <20180223101254.GA5746@lenoch> <20180223101553.GE5746@lenoch>
- <20180327215332.GC28163@mithrandir>
- <20180327221401.GD28163@mithrandir>
- <20180327222349.GK5700@atomide.com>
-Message-ID: <20180328003425.GA8707@lenoch>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 27 Mar 2018 20:03:07 -0500
+Subject: [PATCH V2] arm64: tlbflush: avoid writing RES0 bits
+In-Reply-To: <20180327173613.GI18435@arm.com>
+References: <1522120877-9136-1-git-send-email-pelcan@codeaurora.org>
+ <985a0edd-e388-dade-8824-30cc58a236f3@arm.com>
+ <56b560a5-6e57-8e01-32ca-9d3c95ccd2e5@codeaurora.org>
+ <20180327173613.GI18435@arm.com>
+Message-ID: <96f894bb-4855-a77f-3fd1-c8a2878faabb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 03:23:49PM -0700, Tony Lindgren wrote:
-> * Thierry Reding <thierry.reding@gmail.com> [180327 22:15]:
-> > On Tue, Mar 27, 2018 at 11:53:33PM +0200, Thierry Reding wrote:
-> > > On Fri, Feb 23, 2018 at 11:15:53AM +0100, Ladislav Michl wrote:
-> > > > Prescaler setting is currently not taken into account.
-> > > > Fix that by introducing freq member variable and initialize
-> > > > it at device probe time. This also avoids frequency
-> > > > recomputing at each pwm configure time.
-> > > > 
-> > > > Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
-> > > > ---
-> > > >  drivers/pwm/pwm-omap-dmtimer.c | 93 +++++++++++++++++++++++++-----------------
-> > > >  1 file changed, 55 insertions(+), 38 deletions(-)
-> > > 
-> > > Applied, thanks.
-> > 
-> > Actually, that was a little premature. It seems like this conflicts with
-> > a patch series by Keerthy that Tony merged into his tree and that you've
-> > based this on.
-> > 
-> > I think it'd be easiest if Tony merged this through the TI tree, or we
-> > wait until v4.17-rc1 to resolve the dependency. Given how late we are in
-> > the release cycle, I think it'd have to be the latter.
+Hi Will,
+
+On 03/27/2018 12:36 PM, Will Deacon wrote:
+> Hi Shanker,
 > 
-> Sorry about the extra hassle caused by the timer move to drivers.
+> On Tue, Mar 27, 2018 at 09:53:16AM -0500, Shanker Donthineni wrote:
+>> On 03/27/2018 06:34 AM, Robin Murphy wrote:
+>>> On 27/03/18 04:21, Philip Elcan wrote:
+>>>> Several of the bits of the TLBI register operand are RES0 per the ARM
+>>>> ARM, so TLBI operations should avoid writing non-zero values to these
+>>>> bits.
+>>>>
+>>>> This patch adds a macro __TLBI_VADDR(addr, asid) that creates the
+>>>> operand register in the correct format and honors the RES0 bits.
+>>>>
+>>>> Signed-off-by: Philip Elcan <pelcan@codeaurora.org>
+>>>> ---
+>>>> ? arch/arm64/include/asm/tlbflush.h | 23 ++++++++++++++++-------
+>>>> ? 1 file changed, 16 insertions(+), 7 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+>>>> index 9e82dd7..b1205e9 100644
+>>>> --- a/arch/arm64/include/asm/tlbflush.h
+>>>> +++ b/arch/arm64/include/asm/tlbflush.h
+>>>> @@ -60,6 +60,15 @@
+>>>> ????????? __tlbi(op, (arg) | USER_ASID_FLAG);??????????????? \
+>>>> ? } while (0)
+>>>> ? +/* This macro creates a properly formatted VA operand for the TLBI */
+>>>> +#define __TLBI_VADDR(addr, asid)??????????????? \
+>>>> +??? ({??????????????????????????? \
+>>>> +??????? unsigned long __ta = (addr) >> 12;??????? \
+>>>> +??????? __ta &= GENMASK_ULL(43, 0);??????????? \
+>>>> +??????? __ta |= (unsigned long)(asid) << 48;??????? \
+>>>> +??????? __ta;??????????????????????? \
+>>>> +??? })
+>>>
+>>> I'd be inclined to make this a static inline function rather than a
+>>> macro, since it doesn't need to do any wacky type-dodging, but either
+>>> way the overall change now looks appropriate;
+>>>
+>>> Acked-by: Robin Murphy <robin.murphy@arm.com>
+>>>
+>>
+>> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 > 
-> > Tony, if you think you can find a way to still take this in for
-> > v4.17-rc1, feel free to do so:
-> > 
-> > Acked-by: Thierry Reding <thierry.reding@gmail.com>
+> [...]
 > 
-> I pretty much only apply fixes after -rc6. So let's wait for the
-> dependencies to clear at this point. This seems like a "fix for
-> a feature that never worked" so might be hard to justify it as
-> a fix :)
+>>>> @@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+>>>> ????????? return;
+>>>> ????? }
+>>>> ? -??? start = asid | (start >> 12);
+>>>> -??? end = asid | (end >> 12);
+>>>> +??? start = __TLBI_VADDR(start, asid);
+>>>> +??? end = __TLBI_VADDR(end, asid);
+> 
+> Can you test this bit too, please? ;)
+> 
 
-Well, DT bindings already contain prescaler, so technically it is
-a fix which also optimizes code a bit ;-) But of course, I can keep
-this patch localy and resend for 4.18 merge window.
+I've verified the basic boot functionality on QDF2400 platform. But I can see now
+after your comments, it leads to TLB conflicts because of ASID is truncated to zero
+due to two times 48bit shift.     
 
-> Ladis, can you please resend the pending patches again to
-> Thierry after v4.17-rc? Then Thierry can queue it as a fix or
-> for v4.18.
+Thanks for catching this one.
 
-In fact, there is the only one patch ready to be applied - this one - and
-The others (event capture) needs to be yet sorted out. Unfortunately I do
-not have time for that at the moment.
+@@ -146,7 +155,7 @@ static inline void __flush_tlb_range(structvm_area_struct *
+                                     unsigned long start, unsigned long end,
+                                     bool last_level)
+{
+-       unsigned long asid = ASID(vma->vm_mm) << 48;
++       unsigned long asid = ASID(vma->vm_mm);
+        unsigned long addr;
+ 
+        if ((end - start) > MAX_TLB_RANGE) {
+@@ -154,8 +163,8 @@ static inline void __flush_tlb_range(struct
+vm_area_struct *
+                return;
+        }
 
-Best regards,
-	ladis
+-       start = asid | (start >> 12);
+-       end = asid | (end >> 12);
++       start = __TLBI_VADDR(start, asid);
++       end = __TLBI_VADDR(end, asid);
+
+
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
