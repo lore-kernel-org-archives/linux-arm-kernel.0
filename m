@@ -1,63 +1,132 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Mar 2018 11:03:09 +0100
-Subject: [RESEND PATCH v2 0/8] Add support for PWM input capture on STM32
-In-Reply-To: <20180327225101.GJ28163@mithrandir>
-References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
- <20180327225101.GJ28163@mithrandir>
-Message-ID: <20180328100309.yig4d3bmml6jvodz@dell>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 28 Mar 2018 12:03:39 +0200
+Subject: [PATCH] drm/atmel-hlcdc: add command line option to specify
+ preferred depth
+In-Reply-To: <20180328093454.4149fa3b@bbrezillon>
+References: <20180326073502.19259-1-peda@axentia.se>
+ <20180328093454.4149fa3b@bbrezillon>
+Message-ID: <ce723d9f-6858-0bad-bffb-85ab036510ee@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Mar 2018, Thierry Reding wrote:
-
-> On Wed, Feb 14, 2018 at 11:04:31AM +0100, Fabrice Gasnier wrote:
-> > This series adds support for capture to stm32-pwm driver.
-> > Capture is based on DMAs.
-> > - First two patches are precursor patches
-> > - Subsequent two patches add support for requesting DMAs to MFD core
-> > - Next three patches add support for capture to stm32-pwm driver
-> > - This has been tested on stm32429i-eval board.
-> > 
-> > ---
-> > Resend v2:
-> > - Add collected Acks
-> > 
-> > Changes in v2:
-> > - Abstract DMA handling from child driver: move it to MFD core
-> > - Rework pwm capture routines to adopt this change
-> > - Comment on optional dma support, beautify DMAs probe
-> > 
-> > Fabrice Gasnier (8):
-> >   pwm: stm32: fix, remove unused struct device
-> >   pwm: stm32: protect common prescaler for all channels
-> >   dt-bindings: mfd: stm32-timers: add support for dmas
-> >   mfd: stm32-timers: add support for dmas
-> >   pwm: stm32: add capture support
-> >   pwm: stm32: improve capture by tuning counter prescaler
-> >   pwm: stm32: use input prescaler to improve period capture
-> >   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
-> > 
-> >  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
-> >  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
-> >  drivers/mfd/stm32-timers.c                         | 215 +++++++++++++++-
-> >  drivers/pwm/pwm-stm32.c                            | 276 ++++++++++++++++++++-
-> >  include/linux/mfd/stm32-timers.h                   |  39 +++
-> >  5 files changed, 547 insertions(+), 6 deletions(-)
+On 2018-03-28 09:34, Boris Brezillon wrote:
+> Hi Peter,
 > 
-> I can't apply patches 1-2 and 5-6 since they depend on patches 3-4 for
-> which I'd need an Acked-by: from Lee if I'm to pick them up. Same goes
-> for patch 7.
+> On Mon, 26 Mar 2018 09:35:02 +0200
+> Peter Rosin <peda@axentia.se> wrote:
 > 
-> By the looks of it there are minor conflicts with the MFD tree, but no
-> major ones. Perhaps it'd be better for Lee to pick up 3-4 for v4.17-rc1
-> and ack patch 7, then I can take the rest after v4.17-rc1?
+>> I have an sama5d31-based system with 64MB of memory and a 1920x1080
+>> LVDS display wired for 16-bpp. When I enable legacy fbdev support,
+>> the contiguous memory allocator invariably fails with the order-11
+>> allocation for a 1920x1080 at 24-bpp buffer (~6MB). But this HW can never
+>> make any good use of RGB888, so that is a wasted attempt anyway that
+>> would also waste precious memory should it succeed.
+>>
+>> Sure, I could rewrite user-space to go directly to KMS etc, and that
+>> makes the (attempted) order-11 allocation go away, replacing it with
+>> one order-10 allocation per application restart for a 1920x1080 at 16-bpp
+>> buffer (<4MB). But after a few restarts, order-10 allocations start to
+>> fail as well, which is only to be expected AFAIU.
+>>
+>> So, I'd rather not change user-space (which was originally written
+>> to target a smaller display) so that I at the same time get the
+>> benefit of an early pre-allocated fbdev frame-buffer that can be
+>> reused over and over. But to do that I need to tell the driver that
+>> 16-bpp is the preferred depth. Add a module parameter to do just that.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++++++++++++-
+>>  1 file changed, 17 insertions(+), 1 deletion(-)
+>>
+>> I found some inspiration regarding naming and implementation here:
+>> https://patchwork.kernel.org/patch/9848631/
+>>
+>> I have found no feedback on that patch though, which makes me wonder if
+>> I'm perhaps barking up the wronig tree?
+> 
+> Hm, isn't that something you can already overload with the video=
+> parameter?
+> 
+> 	video=<output>:<resolution>[-<bpp>]
 
-Sounds like a faff.
+Heh, you are right...
 
-Why don't I just pick them all up (except the ARM patch)?
+> AFAIR, <bpp> encodes the color depth, so what is the benefit of adding
+> this new property to overload the default depth?
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+...but hhhmmm, I think I will have to have to encode the display size
+in the bootargs so I will have to use distinct barebox environments
+depending on the panel, but that's no biggie.
+
+Splendid, please throw away the patch!
+
+Cheers,
+Peter
+
+> Maybe I'm wrong and the default depth param is actually useful, but in
+> this case we should probably make it generic since other drivers seems
+> to need it too, and we might want to attach it to a specific display
+> engine instance.
+> 
+> Thanks,
+> 
+> Boris
+> 
+>>
+>> Cheers,
+>> Peter
+>>
+>> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+>> index c1ea5c36b006..f0148627c221 100644
+>> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+>> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+>> @@ -29,6 +29,11 @@
+>>  
+>>  #define ATMEL_HLCDC_LAYER_IRQS_OFFSET		8
+>>  
+>> +static int atmel_hlcdc_preferred_depth __read_mostly;
+>> +
+>> +MODULE_PARM_DESC(preferreddepth, "Set preferred bpp");
+>> +module_param_named(preferreddepth, atmel_hlcdc_preferred_depth, int, 0400);
+>> +
+>>  static const struct atmel_hlcdc_layer_desc atmel_hlcdc_at91sam9n12_layers[] = {
+>>  	{
+>>  		.name = "base",
+>> @@ -590,6 +595,7 @@ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
+>>  	dev->mode_config.min_height = dc->desc->min_height;
+>>  	dev->mode_config.max_width = dc->desc->max_width;
+>>  	dev->mode_config.max_height = dc->desc->max_height;
+>> +	dev->mode_config.preferred_depth = 24;
+>>  	dev->mode_config.funcs = &mode_config_funcs;
+>>  
+>>  	return 0;
+>> @@ -658,7 +664,7 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
+>>  
+>>  	platform_set_drvdata(pdev, dev);
+>>  
+>> -	drm_fb_cma_fbdev_init(dev, 24, 0);
+>> +	drm_fb_cma_fbdev_init(dev, atmel_hlcdc_preferred_depth, 0);
+>>  
+>>  	drm_kms_helper_poll_init(dev);
+>>  
+>> @@ -756,6 +762,16 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
+>>  	struct drm_device *ddev;
+>>  	int ret;
+>>  
+>> +	switch (atmel_hlcdc_preferred_depth) {
+>> +	case 0: /* driver default */
+>> +	case 8:
+>> +	case 16:
+>> +	case 24:
+>> +		break;
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+>> +
+>>  	ddev = drm_dev_alloc(&atmel_hlcdc_dc_driver, &pdev->dev);
+>>  	if (IS_ERR(ddev))
+>>  		return PTR_ERR(ddev);
+> 
+> 
+> 
