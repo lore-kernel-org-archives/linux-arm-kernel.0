@@ -1,80 +1,37 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Wed, 28 Mar 2018 13:55:12 +0000
-Subject: [PATCH 10/12] ARM: dts: iwg23s-sbc: Add support for iWave
- G23S-SBC based on RZ/G1C
-In-Reply-To: <CAMuHMdXtp0JGuuoJ_m0MoEbwBFP5yC6q-vidjxNY73=0S4sp+w@mail.gmail.com>
-References: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
- <1522161443-54428-11-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdUWB8=hByJsoZhT1=7QncFexKgZQFiNaUPZrkzGgB-=tg@mail.gmail.com>
- <OSBPR01MB210354AFAFCD7D1AF4FB5EF6B8A30@OSBPR01MB2103.jpnprd01.prod.outlook.com>
- <CAMuHMdXtp0JGuuoJ_m0MoEbwBFP5yC6q-vidjxNY73=0S4sp+w@mail.gmail.com>
-Message-ID: <OSBPR01MB21033FDFC31C3F6B66C44B18B8A30@OSBPR01MB2103.jpnprd01.prod.outlook.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 28 Mar 2018 15:56:23 +0200
+Subject: [PATCH] thermal: exynos_tmu: avoid uninitialized variables
+In-Reply-To: <20180328134520.1970967-1-arnd@arndb.de>
+References: <CGME20180328134538epcas2p4bb7a1f273824995e4baeb10d9563ffda@epcas2p4.samsung.com>
+ <20180328134520.1970967-1-arnd@arndb.de>
+Message-ID: <11114909.7eTX8MzZjF@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Wednesday, March 28, 2018 03:44:44 PM Arnd Bergmann wrote:
+> Removing the initialization in the error case introduced
+> a compile-time warning:
+> 
+> drivers/thermal/samsung/exynos_tmu.c: In function 'temp_to_code':
+> drivers/thermal/samsung/exynos_tmu.c:304:9: error: 'temp_code' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>   return temp_code;
+>          ^~~~~~~~~
+> drivers/thermal/samsung/exynos_tmu.c: In function 'exynos_get_temp':
+> drivers/thermal/samsung/exynos_tmu.c:931:37: error: 'temp' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>    *temp = code_to_temp(data, value) * MCELSIUS;
+> 
+> Let's assume the runtime warning is sufficient, and make it
+> return a well-defined number instead of unintialized data.
+> 
+> Fixes: 480b5bfc16e1 ("thermal: exynos: remove parsing of samsung, tmu_default_temp_offset property")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks for the feedback.
+Thanks Arnd!
 
-> Hi Biju,
->
-> On Wed, Mar 28, 2018 at 3:13 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> >> On Tue, Mar 27, 2018 at 4:37 PM, Biju Das <biju.das@bp.renesas.com>
-> wrote:
-> >> > Add support for iWave iW-RainboW-G23S single board computer based
-> >> > on RZ/G1C.
-> >> >
-> >> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> >> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> >>
-> >> Thanks for your patch!
-> >>
-> >> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>
-> >> One question below.
-> >>
-> >> > --- /dev/null
-> >> > +++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-> >> > @@ -0,0 +1,30 @@
-> >> > +// SPDX-License-Identifier: GPL-2.0
-> >> > +/*
-> >> > + * Device Tree Source for the iWave-RZ/G1C single board computer
-> >> > + *
-> >> > + * Copyright (C) 2018 Renesas Electronics Corp.
-> >> > + */
-> >> > +
-> >> > +/dts-v1/;
-> >> > +#include "r8a77470.dtsi"
-> >> > +/ {
-> >> > +       model = "iWave iW-RainboW-G23S single board computer based
-> >> > +on
-> >> RZ/G1C";
-> >> > +       compatible = "iwave,g23s", "renesas,r8a77470";
-> >> > +
-> >> > +       aliases {
-> >> > +               serial1 = &scif1;
-> >> > +       };
-> >>
-> >> No chosen / stdout-path?
-> >
-> > I am planning this later as part of ethernet patch submission.
->
-> But stdout-path is not related to Ethernet?
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Ok. Will add stdout-path in V2.
-
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But when
-> I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
