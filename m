@@ -1,51 +1,54 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:49 +0100
-Subject: [PATCH 80/85] KVM: arm: Reserve bit in KVM_REG_ARM encoding for
- secure/nonsecure
+Date: Wed, 28 Mar 2018 13:52:54 +0100
+Subject: [PATCH 85/85] arm64: Add temporary ERRATA_MIDR_ALL_VERSIONS
+ compatibility macro
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-81-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-86-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Maydell <peter.maydell@linaro.org>
+MIDR_ALL_VERSIONS is changing, and won't have the same meaning
+in 4.17, and the right thing to use will be ERRATA_MIDR_ALL_VERSIONS.
 
-We have a KVM_REG_ARM encoding that we use to expose KVM guest registers
-to userspace. Define that bit 28 in this encoding indicates secure vs
-nonsecure, so we can distinguish the secure and nonsecure banked versions
-of a banked AArch32 register.
+In order to cope with the merge window, let's add a compatibility
+macro that will allow a relatively smooth transition, and that
+can be removed post 4.17-rc1.
 
-For KVM currently, all guest registers are nonsecure, but defining
-the bit is useful for userspace. In particular, QEMU uses this
-encoding as part of its on-the-wire migration format, and needs to be
-able to describe secure-bank registers when it is migrating (fully
-emulated) EL3-enabled CPUs.
-
-Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/uapi/asm/kvm.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/kernel/cpu_errata.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 6edd177bb1c7..2ba95d6fe852 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -135,6 +135,15 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_CRM_SHIFT		7
- #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
- #define KVM_REG_ARM_32_CRN_SHIFT	11
-+/*
-+ * For KVM currently all guest registers are nonsecure, but we reserve a bit
-+ * in the encoding to distinguish secure from nonsecure for AArch32 system
-+ * registers that are banked by security. This is 1 for the secure banked
-+ * register, and 0 for the nonsecure banked register or if the register is
-+ * not banked by security.
-+ */
-+#define KVM_REG_ARM_SECURE_MASK	0x0000000010000000
-+#define KVM_REG_ARM_SECURE_SHIFT	28
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index aacdc118c4c9..7369ad552700 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -241,6 +241,10 @@ static int qcom_enable_link_stack_sanitization(void *data)
+ 	.midr_range_min = 0, \
+ 	.midr_range_max = (MIDR_VARIANT_MASK | MIDR_REVISION_MASK)
  
- #define ARM_CP15_REG_SHIFT_MASK(x,n) \
- 	(((x) << KVM_REG_ARM_ ## n ## _SHIFT) & KVM_REG_ARM_ ## n ## _MASK)
++#ifndef ERRATA_MIDR_ALL_VERSIONS
++#define	ERRATA_MIDR_ALL_VERSIONS(x)	MIDR_ALL_VERSIONS(x)
++#endif
++
+ const struct arm64_cpu_capabilities arm64_errata[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+@@ -429,12 +433,12 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 		.desc = "Cortex-A57 EL2 vector hardening",
+ 		.capability = ARM64_HARDEN_EL2_VECTORS,
+-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A57),
+ 	},
+ 	{
+ 		.desc = "Cortex-A72 EL2 vector hardening",
+ 		.capability = ARM64_HARDEN_EL2_VECTORS,
+-		MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
++		ERRATA_MIDR_ALL_VERSIONS(MIDR_CORTEX_A72),
+ 	},
+ #endif
+ 	{
 -- 
 2.14.2
