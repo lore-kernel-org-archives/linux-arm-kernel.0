@@ -1,106 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:51:35 +0100
-Subject: [PATCH 06/85] KVM: arm: Enable emulation of the physical timer
+Date: Wed, 28 Mar 2018 13:51:36 +0100
+Subject: [PATCH 07/85] KVM: arm/arm64: No need to zero CNTVOFF in
+ kvm_timer_vcpu_put() for VHE
 In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
 References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-7-marc.zyngier@arm.com>
+Message-ID: <20180328125254.31380-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: J?r?my Fangu?de <j.fanguede@virtualopensystems.com>
+From: Shanker Donthineni <shankerd@codeaurora.org>
 
-Set the handlers to emulate read and write operations for CNTP_CTL,
-CNTP_CVAL and CNTP_TVAL registers in such a way that VMs can use the
-physical timer.
+In AArch64/AArch32, the virtual counter uses a fixed virtual offset
+of zero in the following situations as per ARMv8 specifications:
 
-Signed-off-by: J?r?my Fangu?de <j.fanguede@virtualopensystems.com>
+1) HCR_EL2.E2H is 1, and CNTVCT_EL0/CNTVCT are read from EL2.
+2) HCR_EL2.{E2H, TGE} is {1, 1}, and either:
+   ? CNTVCT_EL0 is read from Non-secure EL0 or EL2.
+   ? CNTVCT is read from Non-secure EL0.
+
+So, no need to zero CNTVOFF_EL2/CNTVOFF for VHE case.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/coproc.c | 61 +++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+ virt/kvm/arm/arch_timer.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 6d1d2e26dfe5..3a02e76699a6 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -270,6 +270,60 @@ static bool access_gic_sre(struct kvm_vcpu *vcpu,
- 	return true;
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 70268c0bec79..86eca32474cc 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -541,9 +541,11 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+ 	 * The kernel may decide to run userspace after calling vcpu_put, so
+ 	 * we reset cntvoff to 0 to ensure a consistent read between user
+ 	 * accesses to the virtual counter and kernel access to the physical
+-	 * counter.
++	 * counter of non-VHE case. For VHE, the virtual counter uses a fixed
++	 * virtual offset of zero, so no need to zero CNTVOFF_EL2 register.
+ 	 */
+-	set_cntvoff(0);
++	if (!has_vhe())
++		set_cntvoff(0);
  }
  
-+static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-+			     const struct coproc_params *p,
-+			     const struct coproc_reg *r)
-+{
-+	u64 now = kvm_phys_timer_read();
-+	u64 val;
-+
-+	if (p->is_write) {
-+		val = *vcpu_reg(vcpu, p->Rt1);
-+		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val + now);
-+	} else {
-+		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-+		*vcpu_reg(vcpu, p->Rt1) = val - now;
-+	}
-+
-+	return true;
-+}
-+
-+static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
-+			    const struct coproc_params *p,
-+			    const struct coproc_reg *r)
-+{
-+	u32 val;
-+
-+	if (p->is_write) {
-+		val = *vcpu_reg(vcpu, p->Rt1);
-+		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CTL, val);
-+	} else {
-+		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CTL);
-+		*vcpu_reg(vcpu, p->Rt1) = val;
-+	}
-+
-+	return true;
-+}
-+
-+static bool access_cntp_cval(struct kvm_vcpu *vcpu,
-+			     const struct coproc_params *p,
-+			     const struct coproc_reg *r)
-+{
-+	u64 val;
-+
-+	if (p->is_write) {
-+		val = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
-+		val |= *vcpu_reg(vcpu, p->Rt1);
-+		kvm_arm_timer_set_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL, val);
-+	} else {
-+		val = kvm_arm_timer_get_reg(vcpu, KVM_REG_ARM_PTIMER_CVAL);
-+		*vcpu_reg(vcpu, p->Rt1) = val;
-+		*vcpu_reg(vcpu, p->Rt2) = val >> 32;
-+	}
-+
-+	return true;
-+}
-+
  /*
-  * We could trap ID_DFR0 and tell the guest we don't support performance
-  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
-@@ -423,10 +477,17 @@ static const struct coproc_reg cp15_regs[] = {
- 	{ CRn(13), CRm( 0), Op1( 0), Op2( 4), is32,
- 			NULL, reset_unknown, c13_TID_PRIV },
- 
-+	/* CNTP */
-+	{ CRm64(14), Op1( 2), is64, access_cntp_cval},
-+
- 	/* CNTKCTL: swapped by interrupt.S. */
- 	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
- 			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
- 
-+	/* CNTP */
-+	{ CRn(14), CRm( 2), Op1( 0), Op2( 0), is32, access_cntp_tval },
-+	{ CRn(14), CRm( 2), Op1( 0), Op2( 1), is32, access_cntp_ctl },
-+
- 	/* The Configuration Base Address Register. */
- 	{ CRn(15), CRm( 0), Op1( 4), Op2( 0), is32, access_cbar},
- };
 -- 
 2.14.2
