@@ -1,147 +1,250 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 28 Mar 2018 14:01:40 -0500
-Subject: [net-next, v2, 01/10] soc: ti: K2G: enhancement to support QMSS in
- NSS
-In-Reply-To: <1522168309-12338-2-git-send-email-m-karicheri2@ti.com>
-References: <1522168309-12338-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1ccf03e7-17b4-cf00-176d-0e41038c88f8@ti.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 28 Mar 2018 12:17:34 -0700
+Subject: [PATCH v3 1/4] dt-bindings: mfd: Add Gateworks System Controller
+ bindings
+In-Reply-To: <20180328162416.GB25325@roeck-us.net>
+References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
+ <1522250043-8065-2-git-send-email-tharvey@gateworks.com>
+ <20180328162416.GB25325@roeck-us.net>
+Message-ID: <CAJ+vNU2aUN4ME3+RA3DNPO75O6vPBcQpuRSfQJ4_Ns_zQAtCCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
+On Wed, Mar 28, 2018 at 9:24 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Wed, Mar 28, 2018 at 08:14:00AM -0700, Tim Harvey wrote:
+>> This patch adds documentation of device-tree bindings for the
+>> Gateworks System Controller (GSC).
+>>
+>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>> ---
+>> v3:
+>>  - replaced _ with -
+>>  - remove input bindings
+>>  - added full description of hwmon
+>>  - fix unit address of hwmon child nodes
+>>
+>> ---
+>>  .../devicetree/bindings/mfd/gateworks-gsc.txt      | 135 +++++++++++++++++++++
+>>  1 file changed, 135 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+>> new file mode 100644
+>> index 0000000..8f530ed
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+>> @@ -0,0 +1,135 @@
+>> +Gateworks System Controller multi-function device
+>> +
+>> +The GSC is a Multifunction I2C slave device with the following submodules:
+>> +- WDT
+>> +- GPIO
+>> +- Pushbutton controller
+>> +- HWMON
+>> +
+>> +Required properties:
+>> +- compatible : Must be "gw,gsc"
+>> +- reg: I2C address of the device
+>> +- interrupts: interrupt triggered by GSC_IRQ# signal
+>> +- interrupt-parent: Interrupt controller GSC is connected to
+>> +- #interrupt-cells: should be <1>, index of the interrupt within the
+>> +  controller, in accordance with the "one cell" variant of
+>> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
+>> +
+>> +Optional nodes:
+>> +* watchdog:
+>> +The GSC provides a Watchdog monitor which can power cycle the board's
+>> +primary power supply on most board models when tripped.
+>> +
+>> +Required watchdog properties:
+>> +- compatible: must be "gw,gsc-watchdog"
+>> +
+>> +* hwmon:
+>> +The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
+>> +temperature and/or voltage monitoring.
+>> +
+>> +Required hwmon properties:
+>> +- compatible: must be "gw,gsc-hwmon"
+>> +
+>
+> "hwmon" is a very Linux specific term. It might make sense to find a more
+> generic term.
 
-On 03/27/2018 11:31 AM, Murali Karicheri wrote:
-> Navigator Subsystem (NSS) available on K2G SoC has a cut down
-> version of QMSS with less number of queues, internal linking ram
-> with lesser number of buffers etc.  It doesn't have status and
-> explicit push register space as in QMSS available on other K2 SoCs.
-> So define reg indices specific to QMSS on K2G. This patch introduces
-> "keystone-navigator-qmss-l" compatibility to identify QMSS on
-> K2G NSS (QMSS Lite) and to customize the dts handling code. Per
-> Device manual, descriptors with index less than or equal to
-> regions0_size is in region 0 in the case of QMSS where as for
-> QMSS Lite, descriptors with index less than regions0_size is in
-> region 0. So update the size accordingly in the regions0_size bits
-> of the linking ram size 0 register.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> ---
->   .../bindings/soc/ti/keystone-navigator-qmss.txt    |  7 ++
->   drivers/soc/ti/knav_qmss.h                         |  6 ++
->   drivers/soc/ti/knav_qmss_queue.c                   | 90 ++++++++++++++++------
->   3 files changed, 81 insertions(+), 22 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-> index 77cd42c..1b0878a 100644
-> --- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-> +++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-> @@ -18,6 +18,7 @@ pool management.
->   
->   Required properties:
->   - compatible	: Must be "ti,keystone-navigator-qmss";
-> +		: Must be "ti,keystone-navigator-qmss-l" for NSS Lite
+The 'hwmon' driver supports child nodes that fall into the following category:
+ - temperature sensor (GSC internal temperature sensor - i2c registers
+returns value in C*10)
+ - voltage rails (two types here; cooked: i2c registers return
+pre-scaled value in mV), raw: i2c registers return a raw ADC value
+that must be scaled based on ADC internal ref voltage and resolution
+and adjusted for a voltage divider to convert to mV
+ - fan setpoints (I'll explain these below)
 
+I called the node 'gw,gsc-hwmon' because the driver fits into the
+'hwmon' API. Isn't that appropriate here for the driver compatible
+string?
 
-I think, It will be more accurate to add K2G specific compat string
-like "ti,66ak2g-navss-qm":
+>
+>> +Optional hwmon properties:
+>> +- gw,reference-voltage: ADC reference voltage (mV) used in scaling raw ADCs
+>
+> AFAIK devicetree likes to specify voltages in uV.
 
-compatible = "ti,66ak2g-navss-qm", "ti,keystone-navigator-qmss";
+There are currently plenty of dt props specified in mV (grep -r mV
+Documentation/devicetree/bindings/).
 
-because 66ak2g TRM doesn't mention "Navss light" and this Navss version is used
-only in 66ak2g Soc. As result, 66ak2g Navss QM is subset of of keystone 2 Navss QM 
-which should be defined in DT by adding more specific compat string in addition
-to generic one.  
+>
+>> +- gw,resolution: ADC resolution (ie 4096) used in scaling raw ADCs
+>> +
+>
+> 4096 what ?
 
+reference-voltage and resolution are used to scale the values from the
+nodes that report a raw ADC value:
 
->   - clocks	: phandle to the reference clock for this device.
->   - queue-range	: <start number> total range of queue numbers for the device.
->   - linkram0	: <address size> for internal link ram, where size is the total
-> @@ -39,6 +40,12 @@ Required properties:
->   			  - Descriptor memory setup region.
->   			  - Queue Management/Queue Proxy region for queue Push.
->   			  - Queue Management/Queue Proxy region for queue Pop.
-> +
-> +For NSS lite, following QMSS reg indexes are used in that order
+V = Vadc * (reference-voltage / resolution)
 
-For 66AK2G NAVSS QM..
+I can provide that in bits if it makes more sense? I can also hard
+code both the resolution and the vref in the hwmon driver and remove
+it from dt as currently the only GSC that uses raw ADC values is 12bit
+with 2.5V ref.
 
-> +			  - Queue Peek region.
-> +			  - Queue configuration region.
-> +			  - Queue Management/Queue Proxy region for queue Push/Pop.
-> +
->   - queue-pools	: child node classifying the queue ranges into pools.
->   		  Queue ranges are grouped into 3 type of pools:
->   		  - qpend	    : pool of qpend(interruptible) queues
-> diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
-> index 905b974..5fa1ce6 100644
-> --- a/drivers/soc/ti/knav_qmss.h
-> +++ b/drivers/soc/ti/knav_qmss.h
-> @@ -292,6 +292,11 @@ struct knav_queue {
->   	struct list_head		list;
->   };
->   
-> +enum qmss_version {
-> +	QMSS,
-> +	QMSS_LITE,
+>
+>> +Each hwmon child node defines an ADC input on the chip which the GSC may
+>> +report cooked values (ie temperature sensor based on thermister), raw values,
+>> +(ie voltage rail with a pre-scaling resistor divider), or a fan controller
+>> +setpoint.
+>> +
+>> +Required hwmon child properties:
+>> +- type: one of the following ADC types:
+>> +  "gw,hwmon-temperature" - reports temperature in C*10
+>> +  "gw,hwmon-voltage" - reports a pre-scaled voltage value
+>> +  "gw,hwmon-voltage-raw" - reports a raw ADC that is scaled with
+>> +       vreference, resolution, and optional resistor divider
+>> +  "gw,hwmon-fan" - a fan temperature setpoint in C*10
+>
+> What is a "fan temperature setpoint" ?
+>
 
-QMSS_66AK2G
+The GSC supports a fan controller which drives a PWM signal to vary
+the speed of a fan based on the GSC internal temperature sensor. The
+FAN controller has 6 setpoints each having a fixed PWM duty-cycle but
+the temperature at which those setpoints kick in can be varies via
+registers at the 0x29 slave address (same slave address as the
+temperature sensor and voltage inputs which is why I have it in the
+hwmon driver):
 
-> +};
-> +
->   struct knav_device {
->   	struct device				*dev;
->   	unsigned				base_id;
-> @@ -305,6 +310,7 @@ struct knav_device {
->   	struct list_head			pools;
->   	struct list_head			pdsps;
->   	struct list_head			qmgrs;
-> +	enum qmss_version			version;
->   };
->   
+fan0_point - 50% PWM (default 300)
+fan1_point - 60% PWM (default 330)
+fan2_point - 70% PWM (default 360)
+fan3_point - 80% PWM (default 390)
+fan4_point - 90% PWM (default 420)
+fan5_point - 100% PWM (default 450)
 
-[...]
+The values are C/10 thus if the internal GSC temp sensor is below 30C
+the fan output will be 0% duty cycle and if it hits 30C it will go to
+50% until it hits 60% at 33C etc.
 
->   }
->   
-> +/* Match table for of_platform binding */
-> +static const struct of_device_id keystone_qmss_of_match[] = {
-> +	{
-> +		.compatible = "ti,keystone-navigator-qmss",
+That is the hardware implementation that I'm trying to abstract and
+define here. You pointed out the fact that the fan*_input ABI is
+read-only fan PWM and I see that now. What do you suggest I use for
+this feature I'm trying to implement driver support for?
 
-		.data	= (void *)QMSS,
+I did notice that nouveau_hwmon.c has a single temperature setpoint
+similar to this that they support with SENSOR_DEVICE_ATTR:
+https://elixir.bootlin.com/linux/latest/source/drivers/gpu/drm/nouveau/nouveau_hwmon.c#L63
 
-> +	},
-> +	{
-> +		.compatible = "ti,keystone-navigator-qmss-l",
-> +		.data	= (void *)QMSS_LITE,
-> +	},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, keystone_qmss_of_match);
-> +
->   static int knav_queue_probe(struct platform_device *pdev)
->   {
->   	struct device_node *node = pdev->dev.of_node;
->   	struct device_node *qmgrs, *queue_pools, *regions, *pdsps;
-> +	const struct of_device_id *match;
->   	struct device *dev = &pdev->dev;
->   	u32 temp[2];
->   	int ret;
-> @@ -1700,6 +1749,10 @@ static int knav_queue_probe(struct platform_device *pdev)
->   		return -ENOMEM;
->   	}
->   
-> +	match = of_match_device(of_match_ptr(keystone_qmss_of_match), dev);
-> +	if (match && match->data)
-> +		kdev->version = QMSS_LITE;
+>> +- reg: offset of the ADC register
+>> +- label: name of the ADC input or FAN setpoint
+>> +
+>> +Optional hwmon child properties:
+>> +- gw,voltage-divider: An array of two integers containing the resistor
+>> +  values R1 and R2 of the optinal resistor divider on a raw ADC
+>> +- gw,voltage-offset: a mV voltage offset to apply to a raw ADC (ie to
+>> +  compensate for a diode drop)
+>> +
+>> +Example:
+>> +
+>> +     gsc: gsc at 20 {
+>> +             compatible = "gw,gsc";
+>> +             reg = <0x20>;
+>> +             interrupt-parent = <&gpio1>;
+>> +             interrupts = <4 GPIO_ACTIVE_LOW>;
+>> +             interrupt-controller;
+>> +             #interrupt-cells = <1>;
+>> +
+>> +             watchdog {
+>> +                     compatible = "gw,gsc-watchdog";
+>> +             };
+>> +
+>> +             hwmon {
+>> +                     compatible = "gw,gsc-hwmon";
+>> +                     #address-cells = <1>;
+>> +                     #size-cells = <0>;
+>> +                     gw,reference-voltage = <2500>;
+>> +                     gw,resolution = <4096>;
+>> +
+>> +                     hwmon at 0 { /* A0: Board Temperature */
+>> +                             type = "gw,hwmon-temperature";
+>> +                             reg = <0x00>;
+>> +                             label = "temp";
+>> +                     };
+>> +
+>> +                     hwmon at 2 { /* A1: Input Voltage (raw ADC) */
+>> +                             type = "gw,hwmon-voltage-raw";
+>> +                             reg = <0x02>;
+>> +                             label = "vdd_vin";
+>> +                             gw,voltage-divider = <22100 1000>;
+>> +                             gw,voltage-offset = <800>;
+>> +                     };
+>> +
+>> +                     hwmon at b { /* A2: Battery voltage */
+>> +                             type = "gw,hwmon-voltage";
+>> +                             reg = <0x0b>;
+>> +                             label = "vdd_bat";
+>> +                     };
+>> +
+>> +                     hwmon at 2c { /* fan temperature setpoint for 50% duty */
+>> +                             type = "gw,hwmon-fan";
+>> +                             reg = <0x2c>;
+>> +                             label = "fan_50p";
+>> +                     };
+>> +
+>> +                     hwmon at 2e { /* fan1 */
+>> +                             type = "gw,hwmon-fan";
+>> +                             reg = <0x2e>;
+>> +                             label = "fan_60p";
+>> +                     };
+>> +
+>> +                     hwmon at 30 { /* fan2 */
+>> +                             type = "gw,hwmon-fan";
+>> +                             reg = <0x30>;
+>> +                             label = "fan_70p";
+>> +                     };
+>> +
+>> +                     hwmon at 32 { /* fan3 */
+>> +                             type = "gw,hwmon-fan";
+>> +                             reg = <0x32>;
+>> +                             label = "fan_80p";
+>> +                     };
+>> +
+>> +                     hwmon at 34 { /* fan4 */
+>> +                             type = "gw,hwmon-fan";
+>> +                             reg = <0x34>;
+>> +                             label = "fan_90p";
+>> +                     };
+>> +
+>> +                     hwmon at 36 { /* fan5 */
+>> +                             type = "gw,hwmon-fan";
+>> +                             reg = <0x36>;
+>> +                             label = "fan_100p";
+>> +                     };
+>
+> No idea what this is supposed to be doing, but whatever it is,
+> it appears to be wrong. I'll comment more on it in the hwmon driver.
+>
 
-	if (match)
-		kdev->version = match->data;
-	else
-		error?
-[...]
+ok - I'll respond to that thread.
 
--- 
-regards,
--grygorii
+Thanks for the review!
+
+Tim
