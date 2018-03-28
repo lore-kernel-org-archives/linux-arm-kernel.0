@@ -1,53 +1,67 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 29 Mar 2018 00:43:33 +0800
-Subject: [PATCH 1/2] arm64: dts: Add msm8998 SoC and MTP board support
-In-Reply-To: <20180327160154.1938-1-bjorn.andersson@linaro.org>
-References: <20180327160154.1938-1-bjorn.andersson@linaro.org>
-Message-ID: <201803282323.uCk1EigM%fengguang.wu@intel.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 28 Mar 2018 10:00:05 -0700
+Subject: [PATCH V4 Resend] ZBOOT: fix stack protector in compressed boot
+ phase
+In-Reply-To: <20180328152115.GB1991@saruman>
+References: <1522226933-29317-1-git-send-email-chenhc@lemote.com>
+ <20180328152115.GB1991@saruman>
+Message-ID: <CAGXu5j+p9fy=fVkBtyXUNH6tmCfraWdZTJCqiRHvyO3vxNxzng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joonwoo,
+On Wed, Mar 28, 2018 at 8:21 AM, James Hogan <jhogan@kernel.org> wrote:
+> On Wed, Mar 28, 2018 at 04:48:53PM +0800, Huacai Chen wrote:
+>> diff --git a/arch/mips/boot/compressed/decompress.c b/arch/mips/boot/compressed/decompress.c
+>> index fdf99e9..81df904 100644
+>> --- a/arch/mips/boot/compressed/decompress.c
+>> +++ b/arch/mips/boot/compressed/decompress.c
+>> @@ -76,12 +76,7 @@ void error(char *x)
+>>  #include "../../../../lib/decompress_unxz.c"
+>>  #endif
+>>
+>> -unsigned long __stack_chk_guard;
+>> -
+>> -void __stack_chk_guard_setup(void)
+>> -{
+>> -     __stack_chk_guard = 0x000a0dff;
+>> -}
+>> +const unsigned long __stack_chk_guard = 0x000a0dff;
+>>
+>>  void __stack_chk_fail(void)
+>>  {
+>> @@ -92,8 +87,6 @@ void decompress_kernel(unsigned long boot_heap_start)
+>>  {
+>>       unsigned long zimage_start, zimage_size;
+>>
+>> -     __stack_chk_guard_setup();
+>> -
+>>       zimage_start = (unsigned long)(&__image_begin);
+>>       zimage_size = (unsigned long)(&__image_end) -
+>>           (unsigned long)(&__image_begin);
+>
+> This looks good to me, though I've Cc'd Kees as apparently the original
+> author from commit 8779657d29c0 ("stackprotector: Introduce
 
-Thank you for the patch! Yet something to improve:
+I wonder what changed in the compiler -- I regularly boot
+stack-protected ARM images. Regardless, this is fine. :)
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.16-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> CONFIG_CC_STACKPROTECTOR_STRONG") in case there was a particular reason
+> this wasn't done in the first place.
 
-url:    https://github.com/0day-ci/linux/commits/Bjorn-Andersson/arm64-dts-Add-msm8998-SoC-and-MTP-board-support/20180328-201811
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+I think I was copying from other places? It's been long enough that I
+don't remember, actually. :)
 
-All errors (new ones prefixed by >>):
+> Acked-by: James Hogan <jhogan@kernel.org>
 
-   In file included from arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi:4:0,
-                    from arch/arm64/boot/dts/qcom/msm8998-mtp.dts:6:
->> arch/arm64/boot/dts/qcom/msm8998.dtsi:5:10: fatal error: dt-bindings/clock/qcom,gcc-msm8998.h: No such file or directory
-    #include <dt-bindings/clock/qcom,gcc-msm8998.h>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   compilation terminated.
+Acked-by: Kees Cook <keescook@chromium.org>
 
-vim +5 arch/arm64/boot/dts/qcom/msm8998.dtsi
+> (Happy to apply with acks from Kees and ARM, SH maintainers if nobody
+> else does).
 
-     3	
-     4	#include <dt-bindings/interrupt-controller/arm-gic.h>
-   > 5	#include <dt-bindings/clock/qcom,gcc-msm8998.h>
-     6	
+That'd be fine by me, FWIW. Thanks!
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 37868 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180329/5e955ae1/attachment-0001.gz>
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
