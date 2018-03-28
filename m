@@ -1,53 +1,58 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 28 Mar 2018 15:03:11 +0200
-Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <4073350.0MmxRoANOi@ada>
-References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
- <9761072.pX2B0LJlSJ@ada> <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
- <4073350.0MmxRoANOi@ada>
-Message-ID: <6d43177a-bbea-6a01-5fa5-1c7891e18412@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Mar 2018 15:07:18 +0200
+Subject: [PATCH 10/12] ARM: dts: iwg23s-sbc: Add support for iWave
+ G23S-SBC based on RZ/G1C
+In-Reply-To: <1522161443-54428-11-git-send-email-biju.das@bp.renesas.com>
+References: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
+ <1522161443-54428-11-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdUWB8=hByJsoZhT1=7QncFexKgZQFiNaUPZrkzGgB-=tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/03/2018 12:29, Alexander Dahl wrote:
-> Hello Daniel,
-> 
-> Am Dienstag, 27. M?rz 2018, 13:30:22 CEST schrieb Daniel Lezcano:
->> Can you can give a rough amount for the irq rate on the timer ?
-> 
-> I used itop [1] now to get a rough estimate. First with kernel v4.14.29-rt25 
-> (fully preempt RT):
-> 
-> INT                NAME          RATE             MAX
->  19 [ vel     tc_clkevt]   397 Ints/s     (max:   432)
->  26 [      vel     eth0]     4 Ints/s     (max:    38)
-> 
-> Next test with kernel v4.15.13 gives (slightly slower, but non-RT):
-> 
-> INT                NAME          RATE             MAX
->  19 [ vel     tc_clkevt]   248 Ints/s     (max:   273)
->  26 [      vel     eth0]     4 Ints/s     (max:    11)
-> 
-> With kernel v4.16-rc7 plus this patch series and tcb as clocksource:
-> 
-> INT                NAME          RATE             MAX
->  17 [vel     timer at fffa]  2164 Ints/s     (max:  2183)
->  26 [      vel     eth0]     5 Ints/s     (max:    10)
-> 
-> Is this the information you wanted? If not, could you point me on how to get 
-> the requested irq rate?
+Hi Biju,
 
-It is perfect. Thanks!
+On Tue, Mar 27, 2018 at 4:37 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> Add support for iWave iW-RainboW-G23S single board computer based on
+>  RZ/G1C.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-It confirms what I was worried about: the clocksource wraps up too
-quickly thus raising an interrupt every 400us. That is why I asked
-Alexande about a prescalar register.
+Thanks for your patch!
 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
+One question below.
+
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+> @@ -0,0 +1,30 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Device Tree Source for the iWave-RZ/G1C single board computer
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Corp.
+> + */
+> +
+> +/dts-v1/;
+> +#include "r8a77470.dtsi"
+> +/ {
+> +       model = "iWave iW-RainboW-G23S single board computer based on RZ/G1C";
+> +       compatible = "iwave,g23s", "renesas,r8a77470";
+> +
+> +       aliases {
+> +               serial1 = &scif1;
+> +       };
+
+No chosen / stdout-path?
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
