@@ -1,65 +1,129 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Wed, 28 Mar 2018 06:51:02 +0000
-Subject: [PATCH] clk: imx7d: Move clks_init_on before any clock operations
-In-Reply-To: <1522219599-10831-3-git-send-email-abel.vesa@nxp.com>
-References: <1522219599-10831-1-git-send-email-abel.vesa@nxp.com>
- <1522219599-10831-3-git-send-email-abel.vesa@nxp.com>
-Message-ID: <20180328065100.z5nxntyax7qk7jwb@fsr-ub1664-175>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Wed, 28 Mar 2018 12:29:25 +0530
+Subject: [PATCH v5 3/4] arm64: Implement page table free interfaces
+In-Reply-To: <20180327180048.GJ18435@arm.com>
+References: <1522157100-16879-1-git-send-email-cpandya@codeaurora.org>
+ <1522157100-16879-4-git-send-email-cpandya@codeaurora.org>
+ <20180327180048.GJ18435@arm.com>
+Message-ID: <3a9610af-c35d-2624-87a6-71f893740fa4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 09:46:36AM +0300, Abel Vesa wrote:
-> From: Dong Aisheng <b29396@freescale.com>
+
+
+On 3/27/2018 11:30 PM, Will Deacon wrote:
+> Hi Chintan,
+Hi Will,
+
 > 
-> For init on clocks we should move it at the first place in imx7d_clocks_init()
-> before any clock operations, else the clock operation may fail in case the clock
-> is still not on.
+> On Tue, Mar 27, 2018 at 06:54:59PM +0530, Chintan Pandya wrote:
+>> Implement pud_free_pmd_page() and pmd_free_pte_page().
+>>
+>> Implementation requires,
+>>   1) Freeing of the un-used next level page tables
+>>   2) Clearing off the current pud/pmd entry
+>>   3) Invalidate TLB which could have previously
+>>      valid but not stale entry
+>>
+>> Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+>> ---
+>> V4->V5:
+>>   - Using __flush_tlb_kernel_pgtable instead of
+>>     flush_tlb_kernel_range
+>>
+>>
+>>   arch/arm64/mm/mmu.c | 33 +++++++++++++++++++++++++++++++--
+>>   1 file changed, 31 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index da98828..3552c7a 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -45,6 +45,7 @@
+>>   #include <asm/memblock.h>
+>>   #include <asm/mmu_context.h>
+>>   #include <asm/ptdump.h>
+>> +#include <asm/tlbflush.h>
+>>   
+>>   #define NO_BLOCK_MAPPINGS	BIT(0)
+>>   #define NO_CONT_MAPPINGS	BIT(1)
+>> @@ -973,12 +974,40 @@ int pmd_clear_huge(pmd_t *pmdp)
+>>   	return 1;
+>>   }
+>>   
+>> +static int __pmd_free_pte_page(pmd_t *pmd, unsigned long addr, bool tlb_inv)
+>> +{
+>> +	pmd_t *table;
+>> +
+>> +	if (pmd_val(*pmd)) {
 > 
-> Acked-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
-> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> ---
->  drivers/clk/imx/clk-imx7d.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+> Please can you follow what I did in 20a004e7b017 ("arm64: mm: Use
+> READ_ONCE/WRITE_ONCE when accessing page tables") and:
 > 
-> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-> index 89bfa75..9b17805 100644
-> --- a/drivers/clk/imx/clk-imx7d.c
-> +++ b/drivers/clk/imx/clk-imx7d.c
-> @@ -433,13 +433,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  	clks[IMX7D_PLL_AUDIO_MAIN_BYPASS] = imx_clk_mux_flags("pll_audio_main_bypass", base + 0xf0, 16, 1, pll_audio_bypass_sel, ARRAY_SIZE(pll_audio_bypass_sel), CLK_SET_RATE_PARENT);
->  	clks[IMX7D_PLL_VIDEO_MAIN_BYPASS] = imx_clk_mux_flags("pll_video_main_bypass", base + 0x130, 16, 1, pll_video_bypass_sel, ARRAY_SIZE(pll_video_bypass_sel), CLK_SET_RATE_PARENT);
->  
-> -	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
-> -	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
-> -
->  	clks[IMX7D_PLL_ARM_MAIN_CLK] = imx_clk_gate("pll_arm_main_clk", "pll_arm_main_bypass", base + 0x60, 13);
->  	clks[IMX7D_PLL_DRAM_MAIN_CLK] = imx_clk_gate("pll_dram_main_clk", "pll_dram_main_bypass", base + 0x70, 13);
->  	clks[IMX7D_PLL_SYS_MAIN_CLK] = imx_clk_gate("pll_sys_main_clk", "pll_sys_main_bypass", base + 0xb0, 13);
-> @@ -886,6 +879,13 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
->  		clk_prepare_enable(clks[clks_init_on[i]]);
->  
-> +	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_ENET_MAIN_BYPASS], clks[IMX7D_PLL_ENET_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_AUDIO_MAIN_BYPASS], clks[IMX7D_PLL_AUDIO_MAIN]);
-> +	clk_set_parent(clks[IMX7D_PLL_VIDEO_MAIN_BYPASS], clks[IMX7D_PLL_VIDEO_MAIN]);
-> +
->  	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
->  	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
->  
-> -- 
-> 2.7.4
+>    1. Use consistent naming, so pmd_t * pmdp.
+>    2. Use READ_ONCE to dereference the entry once into a local.
+> 
+> Similarly for the pud code below.
+
+Sure. I'll fix this in v6.
+
+> 
+>> +		table = __va(pmd_val(*pmd));
+>> +		pmd_clear(pmd);
+>> +		if (tlb_inv)
+>> +			__flush_tlb_kernel_pgtable(addr);
+>> +
+>> +		free_page((unsigned long) table);
+> 
+> Hmm. Surely it's only safe to call free_page if !tlb_inv in situations when
+> the page table is already disconnected at a higher level? That doesn't
+> appear to be the case with the function below, which still has the pud
+> installed. What am I missing?
 > 
 
-Ignore this one please, mistakenly sent because of sending all the patches from the current folder.
-The patchset applies on linux-next/master just fine without this one.
+Point ! Without the invalidation, free'ing a page is not safe. Better, I
+do __flush_tlb_kernel_pgtable() every time. This might not be as costly
+as flush_tlb_kernel_range().
 
+>> +	}
+>> +	return 1;
+>> +}
+>> +
+>>   int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+>>   {
+>> -	return pud_none(*pud);
+>> +	pmd_t *table;
+>> +	int i;
+>> +
+>> +	if (pud_val(*pud)) {
+>> +		table = __va(pud_val(*pud));
+>> +		for (i = 0; i < PTRS_PER_PMD; i++)
+>> +			__pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE),
+>> +						false);
+>> +
+>> +		pud_clear(pud);
+>> +		flush_tlb_kernel_range(addr, addr + PUD_SIZE);
+> 
+> Why aren't you using __flush_tlb_kernel_pgtable here?
+> 
+
+Now that I will call __flush_tlb_kernel_pgtable() for every  PMD, I can
+use __flush_tlb_kernel_pgtable() here as well.
+
+Previously, the thought was, while invalidating PUD by VA would not work
+always because PUD may have next level of valid mapping still present in
+the table (valid next PMD but invalid next-to-next PTE). In this case
+doing just __flush_tlb_kernel_pgtable() for PUD might not be enough. We
+need to invalidate subsequent tables as well which I was skipping for 
+optimization. So, I used flush_tlb_kernel_range().
+
+I will upload v6.
+
+> Will
+> 
+
+Chintan
 -- 
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
