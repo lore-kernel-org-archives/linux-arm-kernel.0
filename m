@@ -1,111 +1,69 @@
-From: sebastian_ml@gmx.net (Sebastian Kemper)
-Date: Wed, 28 Mar 2018 19:57:14 +0200
-Subject: Fix compile failures due to arm64 includes in stable kernels
-In-Reply-To: <alpine.DEB.2.10.1803271714560.12360@sstabellini-ThinkPad-X260>
-References: <20180325073255.GA2923@hotdamn.lan>
- <alpine.DEB.2.10.1803271714560.12360@sstabellini-ThinkPad-X260>
-Message-ID: <20180328175713.GA2390@hotdamn.lan>
+From: dalias@libc.org (Rich Felker)
+Date: Wed, 28 Mar 2018 13:59:52 -0400
+Subject: [PATCH V4 Resend] ZBOOT: fix stack protector in compressed boot
+ phase
+In-Reply-To: <1522226933-29317-1-git-send-email-chenhc@lemote.com>
+References: <1522226933-29317-1-git-send-email-chenhc@lemote.com>
+Message-ID: <20180328175952.GO1436@brightrain.aerifal.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 05:23:47PM -0700, Stefano Stabellini wrote:
-> On Sun, 25 Mar 2018, Sebastian Kemper wrote:
-> > Hello all,
-> > 
-> > Some older stable kernels provide some arm64 headers like opcodes.h,
-> > that include their non-64bit equivalents. For example:
-> > 
-> > arch/arm64/include/asm/opcodes.h
-> > 
-> > tries to include
-> > 
-> > <../../arm/include/asm/opcodes.h>
-> > 
-> > It's obvious that there is one hierarchy level missing. This causes
-> > build failures:
-> > 
-> >     CC [M]  /build/lede-snapshots/aarch64_cortex-a53/build/sdk/build_dir/target-aarch64_cortex-a53_musl/linux-brcm2708_bcm2710/dahdi-linux-2.11.1-20180111/drivers/dahdi/dahdi-base.o
-> >   In file included from ./arch/arm64/include/asm/sysreg.h:25:0,
-> >                    from ./arch/arm64/include/asm/cputype.h:94,
-> >                    from ./arch/arm64/include/asm/cachetype.h:19,
-> >                    from ./arch/arm64/include/asm/cache.h:19,
-> >                    from ./include/linux/cache.h:5,
-> >                    from ./include/linux/printk.h:8,
-> >                    from ./include/linux/kernel.h:13,
-> >                    from /build/lede-snapshots/aarch64_cortex-a53/build/sdk/build_dir/target-aarch64_cortex-a53_musl/linux-brcm2708_bcm2710/dahdi-linux-2.11.1-20180111/drivers/dahdi/dahdi-base.c:38:
-> >   ./arch/arm64/include/asm/opcodes.h:5:10: fatal error: ../../arm/include/asm/opcodes.h: No such file or directory
-> >    #include <../../arm/include/asm/opcodes.h>
-> >             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >   compilation terminated.
-> > 
-> > Some example packages that fail to build are dahdi-linux and
-> > cryptodev-linux.
-> > 
-> > linux-3.16.56:
-> >   - does not have opcodes.h, but the xen headers
-> > 
-> >       hypercall.h
-> >       interface.h
-> >       hypervisor.h
-> >       page.h
-> >       
-> >     have the wrong include lines.
-> >     
-> > linux-4.1.50:
-> >   - affected (needs a small change in the patch for opcodes.h due to slightly different layout)
-> >   
-> > linux-4.4.123:
-> >   - affected
-> >   
-> > linux-4.9.89:
-> >   - affected
-> > 
-> > The attached patch fixes the includes.
-> > 
-> > I understand that to get a patch accepted into the stable series one
-> > needs to provide a commit to master. But in this case that doesn't seem
-> > possible as these headers do not exist anymore in newer kernels.
-> > 
-> > What do you think? Does the above make sense to you to backport to the
-> > stable kernels?
+On Wed, Mar 28, 2018 at 04:48:53PM +0800, Huacai Chen wrote:
+> Call __stack_chk_guard_setup() in decompress_kernel() is too late that
+> stack checking always fails for decompress_kernel() itself. So remove
+> __stack_chk_guard_setup() and initialize __stack_chk_guard before we
+> call decompress_kernel().
 > 
-> It is not actually a bug: the path was correct given the way the
-> Makefiles were written -- if you build a regular arm64 kernel with the
-> default config and CONFIG_XEN enabled, it will work fine.
+> Original code comes from ARM but also used for MIPS and SH, so fix them
+> together. If without this fix, compressed booting of these archs will
+> fail because stack checking is enabled by default (>=4.16).
 > 
-> I am guessing you see these issues with out-of-tree modules, right?
-
-Hi Stefano,
-
-Correct. They're out-of-tree modules.
-
-As this seems to imply that my suggested patch could result in in-tree
-modules not compiling anymore, I'll just drop it.
-
-Thanks for your feedback!
-
-Kind regards,
-Sebastian
-
-> Fortunately, on newer kernels the whole thing has been reworked, and
-> should solve the problem for you. The commit you are looking for is
-> 2fbadc3002c5f172d20aa2e7e48920c5f14ed11f:
+> V1 -> V2: Fix build on ARM.
+> V2 -> V3: Fix build on SuperH.
+> V3 -> V4: Initialize __stack_chk_guard in C code as a constant.
 > 
-> commit 7465c84a9380779235af42146dae6798b89b1d12
-> Author: Marc Zyngier <marc.zyngier@arm.com>
-> Date:   Fri Dec 2 14:19:35 2016 +0000
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Huacai Chen <chenhc@lemote.com>
+> ---
+>  arch/arm/boot/compressed/misc.c        | 9 +--------
+>  arch/mips/boot/compressed/decompress.c | 9 +--------
+>  arch/sh/boot/compressed/misc.c         | 9 +--------
+>  3 files changed, 3 insertions(+), 24 deletions(-)
 > 
->     arm/arm64: xen: Move shared architecture headers to include/xen/arm
->     
->     ARM and arm64 Xen ports share a number of headers, leading to
->     packaging issues when these headers needs to be exported, as it
->     breaks the reasonable requirement that an architecture port
->     has self-contained headers.
->     
->     Fix the issue by moving the 5 header files to include/xen/arm,
->     and keep local placeholders to include the relevant files.
->     
->     Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->     Reviewed-by: Stefano Stabellini <sstabellini@kernel.org>
+> [...]
 > 
-> I am CC'ing the original author.
+> diff --git a/arch/sh/boot/compressed/misc.c b/arch/sh/boot/compressed/misc.c
+> index 627ce8e..c15cac9 100644
+> --- a/arch/sh/boot/compressed/misc.c
+> +++ b/arch/sh/boot/compressed/misc.c
+> @@ -104,12 +104,7 @@ static void error(char *x)
+>  	while(1);	/* Halt */
+>  }
+>  
+> -unsigned long __stack_chk_guard;
+> -
+> -void __stack_chk_guard_setup(void)
+> -{
+> -	__stack_chk_guard = 0x000a0dff;
+> -}
+> +const unsigned long __stack_chk_guard = 0x000a0dff;
+>  
+>  void __stack_chk_fail(void)
+>  {
+> @@ -130,8 +125,6 @@ void decompress_kernel(void)
+>  {
+>  	unsigned long output_addr;
+>  
+> -	__stack_chk_guard_setup();
+> -
+>  #ifdef CONFIG_SUPERH64
+>  	output_addr = (CONFIG_MEMORY_START + 0x2000);
+>  #else
+> -- 
+> 2.7.0
+
+LGTM.
+
+Acked-by: Rich Felker <dalias@libc.org>
+
+Rich
