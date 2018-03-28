@@ -1,84 +1,45 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 28 Mar 2018 11:00:45 +1030
-Subject: [PATCH] dts: ARM: Add Aspeed virtual hub to SoC templates
-In-Reply-To: <1515739918.31850.102.camel@kernel.crashing.org>
-References: <1515739918.31850.102.camel@kernel.crashing.org>
-Message-ID: <CACPK8XdgoNLr3m_bp_Y+Cu6pNx5f0xJ5BwWL8svZPgM-YNQA8w@mail.gmail.com>
+Date: Wed, 28 Mar 2018 11:02:18 +1030
+Subject: [PATCH 1/2 v2] ARM: dts: Add Aspeed SoC USB controllers to
+ device-tree
+In-Reply-To: <1516031982.5522.3.camel@aj.id.au>
+References: <1515738064.31850.100.camel@kernel.crashing.org>
+ <1516031982.5522.3.camel@aj.id.au>
+Message-ID: <CACPK8XcrcKQSX5Eq3Cq26j1W9kJJezF+AR3pDu6U-MyWS+2yhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+On 16 January 2018 at 02:29, Andrew Jeffery <andrew@aj.id.au> wrote:
+> On Fri, 2018-01-12 at 17:21 +1100, Benjamin Herrenschmidt wrote:
+>> This adds the USB controllers to the DT template of the
+>> AST24xx and AST25xx SoCs.
+>>
+>> This patch doesn't enable them by default on any board specific
+>> .dts yet. This will be done when we have the necessary clock/reset
+>> and pinmux support. In the meantime though, this will work if
+>> u-boot configures things properly.
+>>
+>> For the AST2400 I only added pinmux definition for port 1
+>> which is dual USB1/USB2. There are additional USB1 only ports
+>> that might require more work but I don't have HW to test at
+>> hand so I'm leaving that to whoever cares.
+>>
+>> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>> ---
+>>
+>> v2: Previous patch was missing actually adding the nodes
+>>     (which was an old patch in my tree I had forgotten to
+>>     merge).
+>>
+>>  arch/arm/boot/dts/aspeed-g4.dtsi | 27 +++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/aspeed-g5.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 67 insertions(+)
 
-On 12 January 2018 at 17:21, Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
-> We don't yet enable it in any of the boards
->
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
-This one slipped through the cracks. Is it still the latest version?
+This one also slipped through the cracks. I have applied it to the
+aspeed tree with Andrew's review.
 
 Cheers,
 
 Joel
-
-> ---
->  arch/arm/boot/dts/aspeed-g4.dtsi |  8 ++++++++
->  arch/arm/boot/dts/aspeed-g5.dtsi | 13 +++++++++++++
->  2 files changed, 21 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index e55f2ad5de59..743b79014d3d 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -120,6 +120,14 @@
->                         status = "disabled";
->                 };
->
-> +               vhub: usb-vhub at 1e6a0000 {
-> +                       compatible = "aspeed,ast2400-usb-vhub";
-> +                       reg = <0x1e6a0000 0x300>;
-> +                       interrupts = <5>;
-> +                       clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-> +                       status = "disabled";
-> +               };
-> +
->                 apb {
->                         compatible = "simple-bus";
->                         #address-cells = <1>;
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index 655258edee24..e50d7f3e18a0 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -163,6 +163,14 @@
->                         status = "disabled";
->                 };
->
-> +               vhub: usb-vhub at 1e6a0000 {
-> +                       compatible = "aspeed,ast2500-usb-vhub";
-> +                       reg = <0x1e6a0000 0x300>;
-> +                       interrupts = <5>;
-> +                       clocks = <&syscon ASPEED_CLK_GATE_USBPORT1CLK>;
-> +                       status = "disabled";
-> +               };
-> +
->                 apb {
->                         compatible = "simple-bus";
->                         #address-cells = <1>;
-> @@ -1388,6 +1396,11 @@
->                 groups = "USB2AH";
->         };
->
-> +       pinctrl_usb2ad_default: usb2ad_default {
-> +               function = "USB2AD";
-> +               groups = "USB2AD";
-> +       };
-> +
->         pinctrl_usb11bhid_default: usb11bhid_default {
->                 function = "USB11BHID";
->                 groups = "USB11BHID";
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
