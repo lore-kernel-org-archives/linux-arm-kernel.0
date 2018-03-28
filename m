@@ -1,41 +1,57 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Wed, 28 Mar 2018 12:29:20 +0200
-Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
-References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
- <9761072.pX2B0LJlSJ@ada> <989df8a3-462a-c645-87f1-9f956e1b22c9@linaro.org>
-Message-ID: <4073350.0MmxRoANOi@ada>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 28 Mar 2018 13:58:13 +0300
+Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
+In-Reply-To: <20180327102116.GA2464@arm.com>
+References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
+ <20180325175004.28162-3-ynorov@caviumnetworks.com>
+ <20180327102116.GA2464@arm.com>
+Message-ID: <20180328105813.arilhcxi6hawd34n@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Daniel,
+On Tue, Mar 27, 2018 at 11:21:17AM +0100, Will Deacon wrote:
+> On Sun, Mar 25, 2018 at 08:50:04PM +0300, Yury Norov wrote:
+> > kick_all_cpus_sync() forces all CPUs to sync caches by sending broadcast IPI.
+> > If CPU is in extended quiescent state (idle task or nohz_full userspace), this
+> > work may be done at the exit of this state. Delaying synchronization helps to
+> > save power if CPU is in idle state and decrease latency for real-time tasks.
+> > 
+> > This patch introduces kick_active_cpus_sync() and uses it in mm/slab and arm64
+> > code to delay syncronization.
+> > 
+> > For task isolation (https://lkml.org/lkml/2017/11/3/589), IPI to the CPU running
+> > isolated task would be fatal, as it breaks isolation. The approach with delaying
+> > of synchronization work helps to maintain isolated state.
+> > 
+> > I've tested it with test from task isolation series on ThunderX2 for more than
+> > 10 hours (10k giga-ticks) without breaking isolation.
+> > 
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> > ---
+> >  arch/arm64/kernel/insn.c |  2 +-
+> >  include/linux/smp.h      |  2 ++
+> >  kernel/smp.c             | 24 ++++++++++++++++++++++++
+> >  mm/slab.c                |  2 +-
+> >  4 files changed, 28 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> > index 2718a77da165..9d7c492e920e 100644
+> > --- a/arch/arm64/kernel/insn.c
+> > +++ b/arch/arm64/kernel/insn.c
+> > @@ -291,7 +291,7 @@ int __kprobes aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt)
+> >  			 * synchronization.
+> >  			 */
+> >  			ret = aarch64_insn_patch_text_nosync(addrs[0], insns[0]);
+> > -			kick_all_cpus_sync();
+> > +			kick_active_cpus_sync();
+> >  			return ret;
+> >  		}
+> >  	}
+> 
+> I think this means that runtime modifications to the kernel text might not
+> be picked up by CPUs coming out of idle. Shouldn't we add an ISB on that
+> path to avoid executing stale instructions?
 
-Am Dienstag, 27. M?rz 2018, 13:30:22 CEST schrieb Daniel Lezcano:
-> Can you can give a rough amount for the irq rate on the timer ?
+Thanks, Will, for the hint. I'll do that.
 
-I used itop [1] now to get a rough estimate. First with kernel v4.14.29-rt25 
-(fully preempt RT):
-
-INT                NAME          RATE             MAX
- 19 [ vel     tc_clkevt]   397 Ints/s     (max:   432)
- 26 [      vel     eth0]     4 Ints/s     (max:    38)
-
-Next test with kernel v4.15.13 gives (slightly slower, but non-RT):
-
-INT                NAME          RATE             MAX
- 19 [ vel     tc_clkevt]   248 Ints/s     (max:   273)
- 26 [      vel     eth0]     4 Ints/s     (max:    11)
-
-With kernel v4.16-rc7 plus this patch series and tcb as clocksource:
-
-INT                NAME          RATE             MAX
- 17 [vel     timer at fffa]  2164 Ints/s     (max:  2183)
- 26 [      vel     eth0]     5 Ints/s     (max:    10)
-
-Is this the information you wanted? If not, could you point me on how to get 
-the requested irq rate?
-
-Greets
-Alex
-
-[1] https://packages.debian.org/stretch/itop
+Yury
