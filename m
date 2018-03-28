@@ -1,68 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 28 Mar 2018 13:52:36 +0100
-Subject: [PATCH 67/85] arm64: insn: Allow ADD/SUB (immediate) with LSL #12
-In-Reply-To: <20180328125254.31380-1-marc.zyngier@arm.com>
-References: <20180328125254.31380-1-marc.zyngier@arm.com>
-Message-ID: <20180328125254.31380-68-marc.zyngier@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Mar 2018 14:57:49 +0200
+Subject: [PATCH 08/12] ARM: dts: r8a77470: Initial SoC device tree
+In-Reply-To: <1522161443-54428-9-git-send-email-biju.das@bp.renesas.com>
+References: <1522161443-54428-1-git-send-email-biju.das@bp.renesas.com>
+ <1522161443-54428-9-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdVdRKpRXhd=0W3hVRt9MD0NVwBpoYa7dsZ+DAEn=sHD-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder for ADD/SUB (immediate) can only cope with 12bit
-immediates, while there is an encoding for a 12bit immediate shifted
-by 12 bits to the left.
+Hi Biju,
 
-Let's fix this small oversight by allowing the LSL_12 bit to be set.
+On Tue, Mar 27, 2018 at 4:37 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> The initial R8A77470 SoC device tree including CPU0, GIC, timer, SYSC, RST,
+> CPG, and the required clock descriptions.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/insn.c | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+Thanks for your patch!
 
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 2929adaad587..816d03c4c913 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -35,6 +35,7 @@
- 
- #define AARCH64_INSN_SF_BIT	BIT(31)
- #define AARCH64_INSN_N_BIT	BIT(22)
-+#define AARCH64_INSN_LSL_12	BIT(22)
- 
- static int aarch64_insn_encoding_class[] = {
- 	AARCH64_INSN_CLS_UNKNOWN,
-@@ -903,9 +904,18 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
- 		return AARCH64_BREAK_FAULT;
- 	}
- 
-+	/* We can't encode more than a 24bit value (12bit + 12bit shift) */
-+	if (imm & ~(BIT(24) - 1))
-+		goto out;
-+
-+	/* If we have something in the top 12 bits... */
- 	if (imm & ~(SZ_4K - 1)) {
--		pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
--		return AARCH64_BREAK_FAULT;
-+		/* ... and in the low 12 bits -> error */
-+		if (imm & (SZ_4K - 1))
-+			goto out;
-+
-+		imm >>= 12;
-+		insn |= AARCH64_INSN_LSL_12;
- 	}
- 
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RD, insn, dst);
-@@ -913,6 +923,10 @@ u32 aarch64_insn_gen_add_sub_imm(enum aarch64_insn_register dst,
- 	insn = aarch64_insn_encode_register(AARCH64_INSN_REGTYPE_RN, insn, src);
- 
- 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_12, insn, imm);
-+
-+out:
-+	pr_err("%s: invalid immediate encoding %d\n", __func__, imm);
-+	return AARCH64_BREAK_FAULT;
- }
- 
- u32 aarch64_insn_gen_bitfield(enum aarch64_insn_register dst,
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r8a77470.dtsi
+> @@ -0,0 +1,156 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Device Tree Source for the r8a77470 SoC
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Corp.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/r8a7747x-cpg-mssr.h>
+> +#include <dt-bindings/power/r8a7747x-sysc.h>
+
+It is better to use numerical values for the initial submission, as
+the dt-bindings
+headers and the DTS files go upstream through different maintainer paths.
+
+> +/ {
+> +       compatible = "renesas,r8a77470";
+
+> +       soc {
+
+> +               icram2: sram at e6300000 {
+> +                       compatible = "mmio-sram";
+> +                       reg = <0 0xe6300000 0 0x40000>;
+
+Size should be 0x20000 (half of other members in the RZ/G1 family)?
+
+> +               };
+
+With the above fixed:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-2.14.2
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
