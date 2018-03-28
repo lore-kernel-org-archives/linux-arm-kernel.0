@@ -1,36 +1,47 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 28 Mar 2018 11:09:03 +0800
-Subject: [PATCH] spi: mediatek: remove redundant MODULE_ALIAS entries
-In-Reply-To: <20180328021416.GK29239@sirena.org.uk>
-References: <58fc8553bdc3cbad8d107a905947b7e4d9c12b92.1522054975.git.sean.wang@mediatek.com>
- <20180328021416.GK29239@sirena.org.uk>
-Message-ID: <1522206543.18424.23.camel@mtkswgap22>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Wed, 28 Mar 2018 11:14:43 +0530
+Subject: [PATCH 1/2][v7] dt-bindings: mtd-physmap: Add endianness supports
+Message-ID: <20180328054443.2829-1-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-03-28 at 10:14 +0800, Mark Brown wrote:
-> On Mon, Mar 26, 2018 at 06:04:18PM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > MODULE_ALIAS exports information to allow the module to be auto-loaded at
-> > boot for the drivers registered using legacy platform registration.
-> > 
-> > However, currently the driver is always used by DT-only platform,
-> > MODULE_ALIAS is redundant and should be removed properly.
-> 
-> There is no meaningful cost to having the alias there, why remove it?
+Connection between flash and controller is not necessary to be always
+of same type. It may varies from platform to platform.
 
+Adding endianness (optional) property to provide connection type
+information.
 
-It's no explicitly improved to the driver, it only takes less bytes
-in .secion modinfo from 644 bytes to 620 bytes in the observation with
-objdump.
+Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+Changes for v2: updated subject
+Changes for v3: fixed typo for "big-endian"
+Changes for v4: Moved binding definition in mtd-physmap.txt
+as discussed at https://patchwork.ozlabs.org/patch/842543/
+Changes for v5: Sending as it is
+Changes for v6: Updated binding when endianness property is absent
+Changes for v7: Updated binding details
 
-More importantly, it seems the driver should probably refer to another
-qualified driver at the initial development, but MODULE_ALIAS is
-forgetting to be removed to meet real usage for the module autoload. 
+ Documentation/devicetree/bindings/mtd/mtd-physmap.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Even I was curious whether people for the driver know the actual purpose
-the macro it's for.
-
-Removing MODULE_ALIAS is just to correct the driver to where it should
-be.
+diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+index 4a0a48bf4ecb..232fa12e90ef 100644
+--- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+@@ -41,6 +41,13 @@ additional (optional) property is defined:
+ 
+  - erase-size : The chip's physical erase block size in bytes.
+ 
++ The device tree may optionally contain endianness property.
++ little-endian or big-endian : It Represents the endianness that should be used
++                               by the controller to  properly read/write data
++			       from/to the flash. If this property is missing,
++			       the endianness is chosen by the system
++			       (potentially based on extra configuration options).
++
+ The device tree may optionally contain sub-nodes describing partitions of the
+ address space. See partition.txt for more detail.
+ 
+-- 
+2.14.1
