@@ -1,48 +1,30 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Tue, 27 Mar 2018 16:48:21 -0700
-Subject: [PATCH 2/2] dt-bindings: regulator: add QCOM RPMh regulator
- bindings
-In-Reply-To: <20180321024311.GW2186@sirena.org.uk>
-References: <cover.1521246069.git.collinsd@codeaurora.org>
- <b718873e5ad53a2e8df6a5103828a4c04881d564.1521246069.git.collinsd@codeaurora.org>
- <20180321024311.GW2186@sirena.org.uk>
-Message-ID: <63851bce-65c2-76a2-8b75-bc268a998457@codeaurora.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 27 Mar 2018 17:11:11 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.17
+In-Reply-To: <CAK8P3a1kJu+XrNfzYvarP6c2VLX4fWwkZV6Sq_u8qqpeprpk9w@mail.gmail.com>
+ (Arnd Bergmann's message of "Tue, 27 Mar 2018 14:23:24 +0200")
+References: <7hd0zzr4jp.fsf@baylibre.com>
+ <CAK8P3a1kJu+XrNfzYvarP6c2VLX4fWwkZV6Sq_u8qqpeprpk9w@mail.gmail.com>
+Message-ID: <7ho9j9oy8w.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 03/20/2018 07:43 PM, Mark Brown wrote:
-> On Fri, Mar 16, 2018 at 06:09:11PM -0700, David Collins wrote:
->> Introduce bindings for RPMh regulator devices found on some
->> Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
-> 
-> Please use subject lines matching the style for the subsystem.  This
-> makes it easier for people to identify relevant patches.
+> On Tue, Mar 20, 2018 at 1:09 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Neil Armstrong (4):
+>>       ARM64: dts: amlogic: Convert to new-style SPDX license identifiers
+>>       ARM64: dts: meson-gxbb-wetek: add a wetek specific dtsi to cleanup hub and play2
+>>       meson-gx-socinfo: Add package id for S905H
+>
+> That last commit seems misplaced in this branch, but I've pulled it anyway,
+> since it's only a oneline change.
+>
+> Any idea what happened? If it was intentional, I would have expected an
+> explanation in the tag description.
 
-Looking through the DT binding patches sent to devicetree at vger.kernel.org,
-it seemed like the preferred style is:
-[PATCH] dt-bindings: subsystem: ...
+It was a mistake, it should've been in the drivers pull.
 
-I can change the subject line for this patch to be:
-"[PATCH 2/2] regulator: dt-bindings: add QCOM RPMh regulator bindings"
-if you prefer.
+Thanks for taking it anyways,
 
-
->> +=========================================
->> +Second Level Nodes - Regulators
->> +=========================================
->> +
->> +- regulator-name
-> 
-> This document appears to be reproducing the standard regulator bindings;
-> there is no need to do that, just reference them.
-
-Sure, I'll remove this.
-
-Thanks,
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Kevin
