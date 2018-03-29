@@ -1,25 +1,24 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Thu, 29 Mar 2018 09:37:39 -0700
-Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
- data
-In-Reply-To: <20180329143715.GA31757@hector.attlocal.net>
-References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
- <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
- <20180320143131.4eenixtbhciq5fwc@localhost>
- <20180329143715.GA31757@hector.attlocal.net>
-Message-ID: <20180329163739.2fg5qxvb5j3fiy6r@localhost>
+From: mkelly@xevo.com (Martin Kelly)
+Date: Thu, 29 Mar 2018 10:28:43 -0700
+Subject: [linux-sunxi] [PATCH v9 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <20180329090256.e9621262cf069c475a706087@magewell.com>
+References: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
+ <9b60dee0-2504-6ae3-fda3-64c4458025c3@xevo.com>
+ <20180329090256.e9621262cf069c475a706087@magewell.com>
+Message-ID: <a6205796-ee42-1ecc-dfaa-74c196bcadd1@xevo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2018 at 09:37:15AM -0500, Andy Gross wrote:
+On 03/28/2018 06:02 PM, Yong wrote:
 > 
-> Feel free to send your own contributions where you are adding the things that
-> are important to you.
+> AFAIK, there is no document about MIPI CSI-2. You can take a look at the
+> source code in BSP:
+> https://github.com/friendlyarm/h3_lichee/tree/master/linux-3.4/drivers/media/video/sunxi-vfe/mipi_csi
+> And try to port it to mainline.
+> 
 
-You can count on it.  I am really happy that ipq4019 at least boots mainline.
+Yep, I see there's lots of magic constants in that code. I might try to 
+forward-port it, but it won't be very maintainable or easy to change 
+without a datasheet. That's too bad.
 
-BTW is there any hope of getting a working mainline DTS for the
-ipq8062, ideally for the ap145_100 board?
-
-Thanks,
-Richard
+Thanks for the information, Yong.
