@@ -1,82 +1,84 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 29 Mar 2018 13:46:36 +0200
-Subject: [PATCH] MAINTAINERS: update entry for entry for ARM/berlin
-In-Reply-To: <20180329164240.20cfddbc@xhacker.debian> (Jisheng Zhang's message
- of "Thu, 29 Mar 2018 16:42:40 +0800")
-References: <20180329164240.20cfddbc@xhacker.debian>
-Message-ID: <87fu4jt883.fsf@bootlin.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 29 Mar 2018 19:53:32 +0800
+Subject: [PATCH v7 1/4] ioremap: Update pgtable free interfaces with addr
+In-Reply-To: <1522240282-12104-2-git-send-email-cpandya@codeaurora.org>
+References: <1522240282-12104-2-git-send-email-cpandya@codeaurora.org>
+Message-ID: <201803291957.TombWSzK%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
- 
- On jeu., mars 29 2018, Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
+Hi Chintan,
 
-> Change the entry name and move it to its alphabetical location.
-> We move to ARM/Synaptics instead of ARM/Marvell.
->
-> This patch also updates my email address from marvell to synaptics.
->
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->  MAINTAINERS | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 6e950b8b4a41..0a0da6a8e607 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1578,15 +1578,6 @@ ARM/MAGICIAN MACHINE SUPPORT
->  M:	Philipp Zabel <philipp.zabel@gmail.com>
->  S:	Maintained
->  
-> -ARM/Marvell Berlin SoC support
-> -M:	Jisheng Zhang <jszhang@marvell.com>
-> -M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -S:	Maintained
-> -F:	arch/arm/mach-berlin/
-> -F:	arch/arm/boot/dts/berlin*
-> -F:	arch/arm64/boot/dts/marvell/berlin*
-> -
->  ARM/Marvell Dove/MV78xx0/Orion SOC support
->  M:	Jason Cooper <jason@lakedaemon.net>
->  M:	Andrew Lunn <andrew@lunn.ch>
-> @@ -2006,6 +1997,15 @@ F:	arch/arm/boot/dts/stm32*
->  F:	arch/arm/mach-stm32/
->  F:	drivers/clocksource/armv7m_systick.c
->  
-> +ARM/Synaptics Berlin SoC support
-> +M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> +M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	arch/arm/mach-berlin/
-> +F:	arch/arm/boot/dts/berlin*
-> +F:	arch/arm64/boot/dts/marvell/berlin*
+Thank you for the patch! Yet something to improve:
 
-I though you had move the dts file from
-arch/arm64/boot/dts/marvell/berlin* to arch/arm64/boot/dts/synatpics,
-according a patch you submitted in September.
+[auto build test ERROR on v4.16-rc7]
+[also build test ERROR on next-20180328]
+[cannot apply to arm64/for-next/core tip/x86/core asm-generic/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-What happened?
+url:    https://github.com/0day-ci/linux/commits/Chintan-Pandya/ioremap-Update-pgtable-free-interfaces-with-addr/20180329-133736
+config: x86_64-rhel (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Gregory
+All errors (new ones prefixed by >>):
 
-> +
->  ARM/TANGO ARCHITECTURE
->  M:	Marc Gonzalez <marc.w.gonzalez@free.fr>
->  M:	Mans Rullgard <mans@mansr.com>
-> -- 
-> 2.16.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+   arch/x86/mm/pgtable.c: In function 'pud_free_pmd_page':
+>> arch/x86/mm/pgtable.c:725:8: error: too few arguments to function 'pmd_free_pte_page'
+      if (!pmd_free_pte_page(&pmd[i]), addr + (i * PMD_SIZE))
+           ^~~~~~~~~~~~~~~~~
+   In file included from arch/x86/include/asm/pgtable.h:1292:0,
+                    from include/linux/memremap.h:8,
+                    from include/linux/mm.h:27,
+                    from arch/x86/mm/pgtable.c:2:
+   include/asm-generic/pgtable.h:987:5: note: declared here
+    int pmd_free_pte_page(pmd_t *pmd, unsigned long addr);
+        ^~~~~~~~~~~~~~~~~
+   arch/x86/mm/pgtable.c:725:34: warning: left-hand operand of comma expression has no effect [-Wunused-value]
+      if (!pmd_free_pte_page(&pmd[i]), addr + (i * PMD_SIZE))
+                                     ^
 
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+vim +/pmd_free_pte_page +725 arch/x86/mm/pgtable.c
+
+   705	
+   706	/**
+   707	 * pud_free_pmd_page - Clear pud entry and free pmd page.
+   708	 * @pud: Pointer to a PUD.
+   709	 * @addr: Virtual address associated with pud.
+   710	 *
+   711	 * Context: The pud range has been unmaped and TLB purged.
+   712	 * Return: 1 if clearing the entry succeeded. 0 otherwise.
+   713	 */
+   714	int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+   715	{
+   716		pmd_t *pmd;
+   717		int i;
+   718	
+   719		if (pud_none(*pud))
+   720			return 1;
+   721	
+   722		pmd = (pmd_t *)pud_page_vaddr(*pud);
+   723	
+   724		for (i = 0; i < PTRS_PER_PMD; i++)
+ > 725			if (!pmd_free_pte_page(&pmd[i]), addr + (i * PMD_SIZE))
+   726				return 0;
+   727	
+   728		pud_clear(pud);
+   729		free_page((unsigned long)pmd);
+   730	
+   731		return 1;
+   732	}
+   733	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 40695 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180329/3dd9824d/attachment-0001.gz>
