@@ -1,141 +1,70 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Mar 2018 09:54:31 +0100
-Subject: [PATCH resend 1/2] arm64: assembler: add utility macros to
- push/pop stack frames
-In-Reply-To: <20180328163452.GM16308@e103592.cambridge.arm.com>
-References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
- <20180328124129.6459-2-ard.biesheuvel@linaro.org>
- <20180328163452.GM16308@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu9+c610HwdBOkhV3Z0nBePZZ+jf4_OTukRfEgCm0FNtFQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 29 Mar 2018 10:58:37 +0200
+Subject: [RESEND PATCH v2 0/8] Add support for PWM input capture on STM32
+In-Reply-To: <20180328100309.yig4d3bmml6jvodz@dell>
+References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+ <20180327225101.GJ28163@mithrandir>
+ <20180328100309.yig4d3bmml6jvodz@dell>
+Message-ID: <20180329085837.GA16952@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 March 2018 at 17:34, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Wed, Mar 28, 2018 at 02:41:28PM +0200, Ard Biesheuvel wrote:
->> We are going to add code to all the NEON crypto routines that will
->> turn them into non-leaf functions, so we need to manage the stack
->> frames. To make this less tedious and error prone, add some macros
->> that take the number of callee saved registers to preserve and the
->
-> Apologies for the delay in looking at these patches...
->
-> Anyway:
->
-> Nit: for all instances of "callee saved" in this patch, do you mean             "caller saved"?
->
+On Wed, Mar 28, 2018 at 11:03:09AM +0100, Lee Jones wrote:
+> On Wed, 28 Mar 2018, Thierry Reding wrote:
+> 
+> > On Wed, Feb 14, 2018 at 11:04:31AM +0100, Fabrice Gasnier wrote:
+> > > This series adds support for capture to stm32-pwm driver.
+> > > Capture is based on DMAs.
+> > > - First two patches are precursor patches
+> > > - Subsequent two patches add support for requesting DMAs to MFD core
+> > > - Next three patches add support for capture to stm32-pwm driver
+> > > - This has been tested on stm32429i-eval board.
+> > > 
+> > > ---
+> > > Resend v2:
+> > > - Add collected Acks
+> > > 
+> > > Changes in v2:
+> > > - Abstract DMA handling from child driver: move it to MFD core
+> > > - Rework pwm capture routines to adopt this change
+> > > - Comment on optional dma support, beautify DMAs probe
+> > > 
+> > > Fabrice Gasnier (8):
+> > >   pwm: stm32: fix, remove unused struct device
+> > >   pwm: stm32: protect common prescaler for all channels
+> > >   dt-bindings: mfd: stm32-timers: add support for dmas
+> > >   mfd: stm32-timers: add support for dmas
+> > >   pwm: stm32: add capture support
+> > >   pwm: stm32: improve capture by tuning counter prescaler
+> > >   pwm: stm32: use input prescaler to improve period capture
+> > >   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
+> > > 
+> > >  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
+> > >  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
+> > >  drivers/mfd/stm32-timers.c                         | 215 +++++++++++++++-
+> > >  drivers/pwm/pwm-stm32.c                            | 276 ++++++++++++++++++++-
+> > >  include/linux/mfd/stm32-timers.h                   |  39 +++
+> > >  5 files changed, 547 insertions(+), 6 deletions(-)
+> > 
+> > I can't apply patches 1-2 and 5-6 since they depend on patches 3-4 for
+> > which I'd need an Acked-by: from Lee if I'm to pick them up. Same goes
+> > for patch 7.
+> > 
+> > By the looks of it there are minor conflicts with the MFD tree, but no
+> > major ones. Perhaps it'd be better for Lee to pick up 3-4 for v4.17-rc1
+> > and ack patch 7, then I can take the rest after v4.17-rc1?
+> 
+> Sounds like a faff.
+> 
+> Why don't I just pick them all up (except the ARM patch)?
 
-'Caller saved' means that the caller needs to stack/unstack a register
-itself if it needs its value to be preserved across a function call.
-'Callee saved' means that the caller can rely on the callee to ensure
-that the register will retain its value.
+Fine with me. For all the PWM patches in this series:
 
-So we are dealing with the latter here, afaict. Or am I missing something?
-
-> A few stylistic comments below, but I don't consider them essential to
-> address unless someone feels like it.
->
-> Otherwise,
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
->
-
-Thanks.
-
->> extra size to allocate in the stack frame (for locals) and emit
->> the ldp/stp sequences.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/assembler.h | 58 ++++++++++++++++++++
->>  1 file changed, 58 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->> index 053d83e8db6f..d354eb7f2f0c 100644
->> --- a/arch/arm64/include/asm/assembler.h
->> +++ b/arch/arm64/include/asm/assembler.h
->> @@ -565,4 +565,62 @@ USER(\label, ic  ivau, \tmp2)                    // invalidate I line PoU
->>  #endif
->>       .endm
->>
->> +     /*
->> +      * frame_push - Push @regcount callee saved registers to the stack,
->> +      *              starting at x19, as well as x29/x30, and set x29 to
->> +      *              the new value of sp. Add @extra bytes of stack space
->> +      *              for locals.
->> +      */
->> +     .macro          frame_push, regcount:req, extra
->> +     __frame         st, \regcount, \extra
->> +     .endm
->> +
->> +     /*
->> +      * frame_pop  - Pop the callee saved registers from the stack that were
->> +      *              pushed in the most recent call to frame_push, as well
->> +      *              as x29/x30 and any extra stack space that may have been
->> +      *              allocated.
->> +      */
->> +     .macro          frame_pop
->> +     __frame         ld
->> +     .endm
->> +
->> +     .macro          __frame_regs, reg1, reg2, op, num
->> +     .if             .Lframe_regcount == \num
->> +     \op\()r         \reg1, [sp, #(\num + 1) * 8]
->> +     .elseif         .Lframe_regcount > \num
->> +     \op\()p         \reg1, \reg2, [sp, #(\num + 1) * 8]
->> +     .endif
->> +     .endm
->> +
->> +     .macro          __frame, op, regcount, extra=0
->> +     .ifc            \op, st
->> +     .if             (\regcount) < 0 || (\regcount) > 10
->> +     .error          "regcount should be in the range [0 ... 10]"
->> +     .endif
->> +     .if             ((\extra) % 16) != 0
->> +     .error          "extra should be a multiple of 16 bytes"
->> +     .endif
->> +     .set            .Lframe_regcount, \regcount
->> +     .set            .Lframe_extra, \extra
->> +     .set            .Lframe_local_offset, ((\regcount + 3) / 2) * 16
->> +     stp             x29, x30, [sp, #-.Lframe_local_offset - .Lframe_extra]!
->> +     mov             x29, sp
->> +     .endif
->> +
->> +     __frame_regs    x19, x20, \op, 1
->> +     __frame_regs    x21, x22, \op, 3
->> +     __frame_regs    x23, x24, \op, 5
->> +     __frame_regs    x25, x26, \op, 7
->> +     __frame_regs    x27, x28, \op, 9
->> +
->> +     .ifc            \op, ld
->> +     .if             .Lframe_regcount == -1
->
-> We could also have
->
->         .ifc            \op, st
->         .ifdef          .Lframe_regcount
->         .if             .Lframe_regcount != -1
->         .error [...]
->
-> on the push side, which would trip on the first nested frame_push
-> rather than waiting until a frame_pop appears.
->
-> Your existing code could be retained to guard against a double pop.
->
-
-Nice. I'll try that.
-
->> +     .error          "frame_push/frame_pop may not be nested"
->> +     .endif
->> +     ldp             x29, x30, [sp], #.Lframe_local_offset + .Lframe_extra
->> +     .set            .Lframe_regcount, -1
->> +     .endif
->> +     .endm
->> +
->>  #endif       /* __ASM_ASSEMBLER_H */
->> --
->> 2.11.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180329/2ce44944/attachment.sig>
