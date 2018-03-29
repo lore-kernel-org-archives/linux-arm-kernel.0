@@ -1,34 +1,174 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 29 Mar 2018 16:37:51 +0200
-Subject: ns16550 earlycon baud broken on BCM5301X since commit
- 31cb9a8575ca0 ("earlycon: initialise baud field of earlycon device structure")
-In-Reply-To: <1522329420.32101.3.camel@synopsys.com>
-References: <CACna6rzki=sjXQS12eF3yPXH7XeFYTCXVOdj--F=P=jkJZX7fg@mail.gmail.com>
- <1522329420.32101.3.camel@synopsys.com>
-Message-ID: <CACna6rwfCVFHLc_uVQRR=F+53uj8OVtMi1jUygJfTSmDK99+zQ@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 29 Mar 2018 10:50:46 -0400
+Subject: [net-next, v2, 01/10] soc: ti: K2G: enhancement to support QMSS in
+ NSS
+In-Reply-To: <1ccf03e7-17b4-cf00-176d-0e41038c88f8@ti.com>
+References: <1522168309-12338-2-git-send-email-m-karicheri2@ti.com>
+ <1ccf03e7-17b4-cf00-176d-0e41038c88f8@ti.com>
+Message-ID: <9ef90d5d-3714-3705-73d9-f3c04069279d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2018 at 15:17, Eugeniy Paltsev <Eugeniy.Paltsev@synopsys.com> wrote:
-> Hm, your 'port->uartclk' value (and therefore 'BASE_BAUD' value) looks strange to me...
-> Looks like you have 'BASE_BAUD' set to 115200.
->
->
-> Here is my example:
-> uart clock is 33333333Hz (fixed 33.33MHz xtal clock)
-> So 'BASE_BAUD' is 33333333/16 = 2083333
-> So 'port->uartclk' is BASE_BAUD*16 = 33333328
-> 'device->baud' is 115200 (which is read from device tree)
-> So when we calculate divisor with this code
-> ------------------->8---------------
-> divisor = DIV_ROUND_CLOSEST(port->uartclk, 16 * device->baud);
-> ------------------->8---------------
-> We got 'divisor' = 181 which is correct value for us.
+Hi Grygorii,
 
-You're right. 115200 is the default BASE_BAUD value coming from:
-./include/asm-generic/serial.h:#define BASE_BAUD (1843200 / 16)
+Thanks for reviewing this!
 
-You must be using arch/machine that has custom serial.h with different value.
+On 03/28/2018 03:01 PM, Grygorii Strashko wrote:
+> Hi Murali,
+> 
+> On 03/27/2018 11:31 AM, Murali Karicheri wrote:
+>> Navigator Subsystem (NSS) available on K2G SoC has a cut down
+>> version of QMSS with less number of queues, internal linking ram
+>> with lesser number of buffers etc.  It doesn't have status and
+>> explicit push register space as in QMSS available on other K2 SoCs.
+>> So define reg indices specific to QMSS on K2G. This patch introduces
+>> "keystone-navigator-qmss-l" compatibility to identify QMSS on
+>> K2G NSS (QMSS Lite) and to customize the dts handling code. Per
+>> Device manual, descriptors with index less than or equal to
+>> regions0_size is in region 0 in the case of QMSS where as for
+>> QMSS Lite, descriptors with index less than regions0_size is in
+>> region 0. So update the size accordingly in the regions0_size bits
+>> of the linking ram size 0 register.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
+>> ---
+>>   .../bindings/soc/ti/keystone-navigator-qmss.txt    |  7 ++
+>>   drivers/soc/ti/knav_qmss.h                         |  6 ++
+>>   drivers/soc/ti/knav_qmss_queue.c                   | 90 ++++++++++++++++------
+>>   3 files changed, 81 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>> index 77cd42c..1b0878a 100644
+>> --- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>> +++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
+>> @@ -18,6 +18,7 @@ pool management.
+>>   
+>>   Required properties:
+>>   - compatible	: Must be "ti,keystone-navigator-qmss";
+>> +		: Must be "ti,keystone-navigator-qmss-l" for NSS Lite
+> 
+> 
+> I think, It will be more accurate to add K2G specific compat string
+> like "ti,66ak2g-navss-qm":
+> 
+> compatible = "ti,66ak2g-navss-qm", "ti,keystone-navigator-qmss";
+> 
+> because 66ak2g TRM doesn't mention "Navss light" and this Navss version is used
+> only in 66ak2g Soc. As result, 66ak2g Navss QM is subset of of keystone 2 Navss QM 
+> which should be defined in DT by adding more specific compat string in addition
+> to generic one.  
+> 
 
-Could there be some wrong logic regarding uartclk / BASE_BAUD / baud
-in the tty subsystem?
+As I have mentioned in the commit description, it is not a subset of the K2
+registers. There are some differences that makes it not compatible with K2 QMSS.
+See my description, 
+
+>>It doesn't have status and explicit push register space as in QMSS available on
+>>other K2 SoCs.
+
+And also
+
+>> Per Device manual, descriptors with index less than or equal to
+>> regions0_size is in region 0 in the case of QMSS where as for
+>> QMSS Lite, descriptors with index less than regions0_size is in
+>> region 0. So update the size accordingly in the regions0_size bits
+>> of the linking ram size 0 register
+
+So will have to use a specific compatible = "ti,66ak2g-navss-qm" for this QM IMO.
+
+Murali
+> 
+>>   - clocks	: phandle to the reference clock for this device.
+>>   - queue-range	: <start number> total range of queue numbers for the device.
+>>   - linkram0	: <address size> for internal link ram, where size is the total
+>> @@ -39,6 +40,12 @@ Required properties:
+>>   			  - Descriptor memory setup region.
+>>   			  - Queue Management/Queue Proxy region for queue Push.
+>>   			  - Queue Management/Queue Proxy region for queue Pop.
+>> +
+>> +For NSS lite, following QMSS reg indexes are used in that order
+> 
+> For 66AK2G NAVSS QM..
+> 
+>> +			  - Queue Peek region.
+>> +			  - Queue configuration region.
+>> +			  - Queue Management/Queue Proxy region for queue Push/Pop.
+>> +
+>>   - queue-pools	: child node classifying the queue ranges into pools.
+>>   		  Queue ranges are grouped into 3 type of pools:
+>>   		  - qpend	    : pool of qpend(interruptible) queues
+>> diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
+>> index 905b974..5fa1ce6 100644
+>> --- a/drivers/soc/ti/knav_qmss.h
+>> +++ b/drivers/soc/ti/knav_qmss.h
+>> @@ -292,6 +292,11 @@ struct knav_queue {
+>>   	struct list_head		list;
+>>   };
+>>   
+>> +enum qmss_version {
+>> +	QMSS,
+>> +	QMSS_LITE,
+> 
+> QMSS_66AK2G
+> 
+>> +};
+>> +
+>>   struct knav_device {
+>>   	struct device				*dev;
+>>   	unsigned				base_id;
+>> @@ -305,6 +310,7 @@ struct knav_device {
+>>   	struct list_head			pools;
+>>   	struct list_head			pdsps;
+>>   	struct list_head			qmgrs;
+>> +	enum qmss_version			version;
+>>   };
+>>   
+> 
+> [...]
+> 
+>>   }
+>>   
+>> +/* Match table for of_platform binding */
+>> +static const struct of_device_id keystone_qmss_of_match[] = {
+>> +	{
+>> +		.compatible = "ti,keystone-navigator-qmss",
+> 
+> 		.data	= (void *)QMSS,
+> 
+>> +	},
+>> +	{
+>> +		.compatible = "ti,keystone-navigator-qmss-l",
+>> +		.data	= (void *)QMSS_LITE,
+>> +	},
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, keystone_qmss_of_match);
+>> +
+>>   static int knav_queue_probe(struct platform_device *pdev)
+>>   {
+>>   	struct device_node *node = pdev->dev.of_node;
+>>   	struct device_node *qmgrs, *queue_pools, *regions, *pdsps;
+>> +	const struct of_device_id *match;
+>>   	struct device *dev = &pdev->dev;
+>>   	u32 temp[2];
+>>   	int ret;
+>> @@ -1700,6 +1749,10 @@ static int knav_queue_probe(struct platform_device *pdev)
+>>   		return -ENOMEM;
+>>   	}
+>>   
+>> +	match = of_match_device(of_match_ptr(keystone_qmss_of_match), dev);
+>> +	if (match && match->data)
+>> +		kdev->version = QMSS_LITE;
+> 
+> 	if (match)
+> 		kdev->version = match->data;
+> 	else
+> 		error?
+> [...]
+> 
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
