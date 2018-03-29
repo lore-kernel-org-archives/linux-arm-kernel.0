@@ -1,70 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 29 Mar 2018 10:58:37 +0200
-Subject: [RESEND PATCH v2 0/8] Add support for PWM input capture on STM32
-In-Reply-To: <20180328100309.yig4d3bmml6jvodz@dell>
-References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
- <20180327225101.GJ28163@mithrandir>
- <20180328100309.yig4d3bmml6jvodz@dell>
-Message-ID: <20180329085837.GA16952@ulmo>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 29 Mar 2018 16:59:51 +0800
+Subject: [PATCH v3 1/3] arm64: dts: meson-axg: add AO clock driver DT info
+In-Reply-To: <20180328030130.240336-2-yixun.lan@amlogic.com>
+References: <20180328030130.240336-2-yixun.lan@amlogic.com>
+Message-ID: <201803291636.a7yizm7C%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 11:03:09AM +0100, Lee Jones wrote:
-> On Wed, 28 Mar 2018, Thierry Reding wrote:
-> 
-> > On Wed, Feb 14, 2018 at 11:04:31AM +0100, Fabrice Gasnier wrote:
-> > > This series adds support for capture to stm32-pwm driver.
-> > > Capture is based on DMAs.
-> > > - First two patches are precursor patches
-> > > - Subsequent two patches add support for requesting DMAs to MFD core
-> > > - Next three patches add support for capture to stm32-pwm driver
-> > > - This has been tested on stm32429i-eval board.
-> > > 
-> > > ---
-> > > Resend v2:
-> > > - Add collected Acks
-> > > 
-> > > Changes in v2:
-> > > - Abstract DMA handling from child driver: move it to MFD core
-> > > - Rework pwm capture routines to adopt this change
-> > > - Comment on optional dma support, beautify DMAs probe
-> > > 
-> > > Fabrice Gasnier (8):
-> > >   pwm: stm32: fix, remove unused struct device
-> > >   pwm: stm32: protect common prescaler for all channels
-> > >   dt-bindings: mfd: stm32-timers: add support for dmas
-> > >   mfd: stm32-timers: add support for dmas
-> > >   pwm: stm32: add capture support
-> > >   pwm: stm32: improve capture by tuning counter prescaler
-> > >   pwm: stm32: use input prescaler to improve period capture
-> > >   ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
-> > > 
-> > >  .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
-> > >  arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
-> > >  drivers/mfd/stm32-timers.c                         | 215 +++++++++++++++-
-> > >  drivers/pwm/pwm-stm32.c                            | 276 ++++++++++++++++++++-
-> > >  include/linux/mfd/stm32-timers.h                   |  39 +++
-> > >  5 files changed, 547 insertions(+), 6 deletions(-)
-> > 
-> > I can't apply patches 1-2 and 5-6 since they depend on patches 3-4 for
-> > which I'd need an Acked-by: from Lee if I'm to pick them up. Same goes
-> > for patch 7.
-> > 
-> > By the looks of it there are minor conflicts with the MFD tree, but no
-> > major ones. Perhaps it'd be better for Lee to pick up 3-4 for v4.17-rc1
-> > and ack patch 7, then I can take the rest after v4.17-rc1?
-> 
-> Sounds like a faff.
-> 
-> Why don't I just pick them all up (except the ARM patch)?
+Hi Qiufang,
 
-Fine with me. For all the PWM patches in this series:
+Thank you for the patch! Yet something to improve:
 
-Acked-by: Thierry Reding <thierry.reding@gmail.com>
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.16-rc7]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Yixun-Lan/ARM64-dts-meson-axg-add-AO-clock-driver/20180329-134803
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+   In file included from arch/arm64/boot/dts/amlogic/meson-axg-s400.dts:9:0:
+>> arch/arm64/boot/dts/amlogic/meson-axg.dtsi:11:10: fatal error: dt-bindings/clock/axg-aoclkc.h: No such file or directory
+    #include <dt-bindings/clock/axg-aoclkc.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
+
+vim +11 arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+
+  > 11	#include <dt-bindings/clock/axg-aoclkc.h>
+    12	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 37934 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180329/2ce44944/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180329/321d2e53/attachment-0001.gz>
