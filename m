@@ -1,127 +1,102 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Thu, 29 Mar 2018 13:31:18 +0200
-Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
-In-Reply-To: <20180329104542.GK13942@piout.net>
-References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
- <3478710.yJBBt3uoRT@ada> <20180329104542.GK13942@piout.net>
-Message-ID: <3103570.fW0XyqvKVi@ada>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 29 Mar 2018 13:36:44 +0200
+Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <20180329111227.GQ16308@e103592.cambridge.arm.com>
+References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+ <20180328124129.6459-3-ard.biesheuvel@linaro.org>
+ <20180328171812.GN16308@e103592.cambridge.arm.com>
+ <CAKv+Gu-FdndoFON3tJi0WP=+HsBtaoLY-uf6=0bd3e6jr1h-DQ@mail.gmail.com>
+ <20180329093605.GP16308@e103592.cambridge.arm.com>
+ <CAKv+Gu8o4R5JBseRt345OV5UVShFmGYiF4Wpxsnw_ZiRuch2AQ@mail.gmail.com>
+ <20180329111227.GQ16308@e103592.cambridge.arm.com>
+Message-ID: <978F38B1-BCAA-4E57-BFD4-3BB5D8AC0F19@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alexandre,
 
-Am Donnerstag, 29. M?rz 2018, 12:45:42 CEST schrieb Alexandre Belloni:
-> > This is the result:
-> > 
-> > INT                NAME          RATE             MAX
-> > 
-> >  17 [vel     timer at fffa]  1837 Ints/s     (max:  1912)
-> >  26 [      vel     eth0]     3 Ints/s     (max:    11)
-> > 
-> > This is not much lower than the ~2150 I reported yesterday?
-> > 
-> > I'm sorry I can just test this on at91sam9g20 currently, I have no
-> > understanding of the subsystem, I can't do a decent review.
+> On 29 Mar 2018, at 13:12, Dave Martin <Dave.Martin@arm.com> wrote:
 > 
-> Hum, are you sure, I went from:
+>> On Thu, Mar 29, 2018 at 10:59:28AM +0100, Ard Biesheuvel wrote:
+>>> On 29 March 2018 at 10:36, Dave Martin <Dave.Martin@arm.com> wrote:
+>>>> On Thu, Mar 29, 2018 at 10:02:18AM +0100, Ard Biesheuvel wrote:
+>>>> On 28 March 2018 at 18:18, Dave Martin <Dave.Martin@arm.com> wrote:
 > 
-> INT                NAME          RATE             MAX
->  16 [evel     timer at fc0]  1027 Ints/s     (max:  1028)
->  21 [ evel     at_xdmac]     3 Ints/s     (max:     3)
->  30 [    evel     ttyS0]     2 Ints/s     (max:     2)
+> [...]
 > 
-> to:
+>>>> I should probably rephrase this to say that x0 .. x18 may be clobbered.
+>>> 
+>>> Sure, that would be simpler.  Or maybe just say that the set of clobbers
+>>> is the same as for a function call -- this would cover NZCV for example.
+>>> 
+>> 
+>> Even better.
 > 
-> INT                NAME          RATE             MAX
->  16 [evel     timer at fc0]     6 Ints/s     (max:     9)
->  21 [ evel     at_xdmac]     2 Ints/s     (max:     2)
->  30 [    evel     ttyS0]     2 Ints/s     (max:     2)
+> [...]
+> 
+>>>>> Since the patchup sequences aren't likely to be many or large, it's
+>>>>> not the end of the world if we don't do this discarding though.
+>>>>> 
+>>>> 
+>>>> I chose not to bother. These are handcrafted assembly files that are
+>>>> usually kept in modules, which means the .text footprint is a 4k
+>>>> multiple anyway, and the code is complex enough as it is, so
+>>>> discarding ~10 instructions that have been moved out of the hot path
+>>>> already doesn't seem that useful to me.
+>>> 
+>>> Agreed.  Do you know who is building CONFIG_PREEMPT=n kernels these
+>>> days?
+>>> 
+>> 
+>> AFAIK most distro kernels use voluntary preemption, so they'd still
+>> benefit from this.
+> 
+> OK, and given the size of the typical distro kernel, I doubt anyone will
+> lose sleep over a couple of hundred extra bytes.
+> 
 
-Pretty sure. I rebuilt the whole BSP and added another line to the kernel 
-source to see if the tree I applied the patches to, was actually built:
-
-
-diff --git a/drivers/clocksource/timer-atmel-tcb.c b/drivers/clocksource/timer-atmel-tcb.c
-index 7fde9cfbf203..f85affc74a86 100644
---- a/drivers/clocksource/timer-atmel-tcb.c
-+++ b/drivers/clocksource/timer-atmel-tcb.c
-@@ -222,7 +222,8 @@ static int __init tc_clkevt_register(struct device_node *node,
-                goto err_slow;
-        clk_disable(tce.clk);
- 
--       clockevents_config_and_register(&tce.clkevt, 32768, 1, bits - 1);
-+       pr_info( "*** bits: 0x%x, BIT(bits): 0x%lx\n", bits, BIT(bits) );
-+       clockevents_config_and_register(&tce.clkevt, 32768, 1, BIT(bits) - 1);
- 
-        ret = request_irq(tce.irq, tc_clkevt2_irq, IRQF_TIMER | IRQF_SHARED,
-                          tce.clkevt.name, &tce);
-
-
-See the more complete serial console output (including the additional 
-message):
+My point was that this is /not/ dead code on typical distro kernels given that this approach should work equally under voluntary preemption.
 
 
-Starting kernel ...
-
-** 15 printk messages dropped **
-Dentry cache hash table entries: 4096 (order: 2, 16384 bytes)
-Inode-cache hash table entries: 2048 (order: 1, 8192 bytes)
-Memory: 28624K/32768K available (2934K kernel code, 113K rwdata, 436K rodata, 144K init, 73K bss, 4144K reserved, 0K cma-reserved)
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-    vmalloc : 0xc2800000 - 0xff800000   ( 976 MB)
-    lowmem  : 0xc0000000 - 0xc2000000   (  32 MB)
-    modules : 0xbf000000 - 0xc0000000   (  16 MB)
-      .text : 0x(ptrval) - 0x(ptrval)   (2936 kB)
-      .init : 0x(ptrval) - 0x(ptrval)   ( 144 kB)
-      .data : 0x(ptrval) - 0x(ptrval)   ( 114 kB)
-       .bss : 0x(ptrval) - 0x(ptrval)   (  74 kB)
-SLUB: HWalign=32, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
-Preemptible hierarchical RCU implementation.
-        Tasks RCU enabled.
-NR_IRQS: 16, nr_irqs: 16, preallocated irqs: 16
-clocksource: timer at fffa0000:0,1: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 115749784805 ns
-sched_clock: 32 bits at 16MHz, resolution 60ns, wraps every 130055938017ns
-*** bits: 0x10, BIT(bits): 0x10000
-Console: colour dummy device 80x30
-Calibrating delay loop... 197.01 BogoMIPS (lpj=985088)
-pid_max: default: 32768 minimum: 301
-Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
-Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
-CPU: Testing write buffer coherency: ok
-Setting up static identity map for 0x20008400 - 0x2000843c
-Hierarchical SRCU implementation.
-devtmpfs: initialized
-clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
-futex hash table entries: 256 (order: -1, 3072 bytes)
-pinctrl core: initialized pinctrl subsystem
-NET: Registered protocol family 16
-DMA: preallocated 256 KiB pool for atomic coherent allocations
-gpio-at91 fffff400.gpio: at address 82332323
-gpio-at91 fffff600.gpio: at address a4bf53d9
-gpio-at91 fffff800.gpio: at address 31e4ab7c
-pinctrl-at91 ahb:apb:pinctrl at fffff400: initialized AT91 pinctrl driver
-AT91: Detected SoC: at91sam9g20, revision 1
-clocksource: Switched to clocksource timer at fffa0000:0,1
-NET: Registered protocol family 2
-tcp_listen_portaddr_hash hash table entries: 512 (order: 0, 4096 bytes)
-TCP established hash table entries: 1024 (order: 0, 4096 bytes)
-TCP bind hash table entries: 1024 (order: 0, 4096 bytes)
-TCP: Hash tables configured (established 1024 bind 1024)
-UDP hash table entries: 256 (order: 0, 4096 bytes)
-UDP-Lite hash table entries: 256 (order: 0, 4096 bytes)
-NET: Registered protocol family 1
-workingset: timestamp_bits=30 max_order=13 bucket_order=0
-io scheduler noop registered (default)
-fffff200.serial: ttyS0 at MMIO 0xfffff200 (irq = 18, base_baud = 8256000) is a ATMEL_SERIAL
-console [ttyS0] enabled
-rtc rtc0: invalid alarm value: 1900-1-29 0:0:0
-rtc-at91sam9 fffffd20.rtc: rtc core: registered fffffd20.rtc as rtc0
-nand: device found, Manufacturer ID: 0x01, Chip ID: 0xda
-nand: AMD/Spansion S34ML02G1
-nand: 256 MiB, SLC, erase size: 128 KiB, page size: 2048, OOB size: 64
-
-
-Greets
-Alex
+> I might try to hack it up later just for fun, just to see whether it
+> works.
+> 
+> [...]
+> 
+>>>>> Should you include
+>>>>> 
+>>>>>        .purgem do_cond_yield_neon
+>>>>>        .purgem endif_yield_neon
+>>>>> 
+>>>>> here?
+>>>>> 
+>>>>> Otherwise, I think you would get macro redefinition errors if
+>>>>> if_will_cond_yield_neon is used more than once in a given file.
+>>>>> 
+>>>> 
+>>>> if_will_cond_yield_neon does not define any macros itself, so this
+>>>> shouldn't be a problem.
+>>> 
+>>> You're right.  I skipped an .endm for some reason while reading and
+>>> decided there were nested macros here.  But there aren't.
+>>> 
+>>> Protecting against misuse would be "nice", but people using them already
+>>> need to know what they're doing, so it's low-priority and something that
+>>> could be added in a later patch.  So I agree that there's no need to add
+>>> that here.
+>>> 
+>> 
+>> OK.
+>> 
+>> I will respin with the minor issues addressed and your R-b added, and
+>> repost before the end of the day.
+> 
+> Sounds good to me.
+> 
+> Cheers
+> ---Dave
+> 
+>> Will, hopefully you're still ok with picking this up for v4.17? I'd
+>> hate to postpone the crypto pieces that depend on it to v4.19
+> 
+> [...]
