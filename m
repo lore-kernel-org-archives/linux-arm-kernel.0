@@ -1,66 +1,189 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Thu, 29 Mar 2018 11:42:26 +0100
-Subject: [PATCH] ARM: debug-ll: Add support for r8a77470
-Message-ID: <1522320146-41110-1-git-send-email-biju.das@bp.renesas.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Thu, 29 Mar 2018 13:04:50 +0200
+Subject: [PATCH v3 6/8] DT: arm: Add Renesas RZ/N1 SoC base device tree
+ file
+In-Reply-To: <1522309629-10152-7-git-send-email-michel.pollet@bp.renesas.com>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-7-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <20180329110450.GA24193@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable low-level debugging support for RZ/G1C (r8a77470). RZ/G1C uses
-SCIF1 for the debug console.
+Hi Michel
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
----
-* This patch has runtime depency on
-https://www.spinics.net/lists/arm-kernel/msg644192.html
+The subject of all your patches for arch/arm should start with:
 
- arch/arm/Kconfig.debug | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ARM: dts:
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 78a6470..5778103 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -941,6 +941,13 @@ choice
- 		  via SCIF0 on Renesas RZ/G1M (R8A7743), R-Car H2 (R8A7790),
- 		  M2-W (R8A7791), V2H (R8A7792), or M2-N (R8A7793).
- 
-+	config DEBUG_RCAR_GEN2_SCIF1
-+		bool "Kernel low-level debugging messages via SCIF1 on R8A77470"
-+		depends on ARCH_R8A77470
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  via SCIF1 on Renesas RZ/G1C (R8A77470).
+A git log on that directory clearly shows that's the preferred one.
+
+I would also say that you are missing a symbol definition in
+arch/arm/mach-shmobile/Kconfig
+(even if you got rid of any board file)
+
+I would expect a symbol to select in menuconfig, with your
+dependencies listed there (ie, the serial interface driver)
+
+Something like this (I left the 'xx' out from the part name on purpose)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 280e731..9a519330 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -114,4 +114,8 @@ config ARCH_SH73A0
+        bool "SH-Mobile AG5 (R8A73A00)"
+        select ARCH_RMOBILE
+        select RENESAS_INTC_IRQPIN
 +
- 	config DEBUG_RCAR_GEN2_SCIF2
- 		bool "Kernel low-level debugging messages via SCIF2 on R8A7794"
- 		depends on ARCH_R8A7794
-@@ -1494,6 +1501,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF0
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF2
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF0
-+	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF1
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF2
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF4
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
-@@ -1616,6 +1624,7 @@ config DEBUG_UART_PHYS
- 	default 0xe6c80000 if DEBUG_RMOBILE_SCIFA4
- 	default 0xe6e58000 if DEBUG_RCAR_GEN2_SCIF2
- 	default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
-+	default 0xe6e68000 if DEBUG_RCAR_GEN2_SCIF1
- 	default 0xe6ee0000 if DEBUG_RCAR_GEN2_SCIF4
- 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
- 	default 0xf0000be0 if ARCH_EBSA110
-@@ -1650,8 +1659,8 @@ config DEBUG_UART_PHYS
- 		DEBUG_NETX_UART || \
- 		DEBUG_QCOM_UARTDM || DEBUG_R7S72100_SCIF2 || \
- 		DEBUG_RCAR_GEN1_SCIF0 || DEBUG_RCAR_GEN1_SCIF2 || \
--		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
--		DEBUG_RCAR_GEN2_SCIF4 || \
-+		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF1 || \
-+		DEBUG_RCAR_GEN2_SCIF2 || DEBUG_RCAR_GEN2_SCIF4 || \
- 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
- 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
- 		DEBUG_S3C64XX_UART || \
--- 
-2.7.4
++config ARCH_R9A06G0
++       bool "RZ/N1 (R9A06G0)"
++       select SERIAL_8250_DW
+ endif
+
+But please wait for others (preferibly Geert or Simon) to confim this.
+
+On Thu, Mar 29, 2018 at 08:47:02AM +0100, Michel Pollet wrote:
+> This adds the Renesas RZ/N1 Family (Part #R9A06G0xx) SoC
+> bare bone support.
+>
+> This currently only handles generic parts (gic, architected timer)
+> and a UART.
+> For simplicity sake, this also relies on the bootloader to set the
+> pinctrl and clocks.
+>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> ---
+>  arch/arm/boot/dts/r9a06g0xx.dtsi | 96 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 96 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/r9a06g0xx.dtsi
+>
+> diff --git a/arch/arm/boot/dts/r9a06g0xx.dtsi b/arch/arm/boot/dts/r9a06g0xx.dtsi
+> new file mode 100644
+> index 0000000..c6eeee3
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r9a06g0xx.dtsi
+> @@ -0,0 +1,96 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Base Device Tree Source for the Renesas RZ/N1 SoC Family of devices
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Europe Limited
+> + *
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "renesas,rzn1";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0>;
+> +		};
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <1>;
+> +		};
+> +	};
+
+I see you don't like empy lines, that's fine, it is not a strict
+requiremen afaik, but I find a few empty lines here and there more
+redable, expecially if the file is going to grow, as it will be.
+
+
+> +	clocks {
+> +		/*
+> +		 * this is fixed clock for now,
+> +		 * until the clock driver is merged
+> +		 */
+> +		clkuarts: clkuarts {
+
+You can remove the node lable if it's the same as the node name afaik
+
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <47619047>;
+> +		};
+> +	};
+
+Grouping clock nodes under a "clocks" one is now deprecated.
+
+Please see, ie.
+"ARM: dts: r7s72100: stop grouping clocks under a "clocks" subnode"
+
+Thanks
+   j
+
+> +	arch-timer {
+> +		compatible = "arm,cortex-a7-timer",
+> +			     "arm,armv7-timer";
+> +		interrupt-parent = <&gic>;
+> +		arm,cpu-registers-not-fw-configured;
+> +		interrupts =
+> +			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+> +				IRQ_TYPE_LEVEL_LOW)>,
+> +			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+> +				IRQ_TYPE_LEVEL_LOW)>,
+> +			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+> +				IRQ_TYPE_LEVEL_LOW)>,
+> +			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+> +				IRQ_TYPE_LEVEL_LOW)>;
+> +	};
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		interrupt-parent = <&gic>;
+> +		ranges;
+> +
+> +		gic: gic at 44101000 {
+> +			compatible = "arm,cortex-a7-gic", "arm,gic-400";
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +			reg = <0x44101000 0x1000>, /* Distributer */
+> +			      <0x44102000 0x2000>, /* CPU interface */
+> +			      <0x44104000 0x2000>, /* Virt interface control */
+> +			      <0x44106000 0x2000>; /* Virt CPU interface */
+> +			interrupts =
+> +				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
+> +					IRQ_TYPE_LEVEL_HIGH)>;
+> +		};
+> +		sysctrl: sysctrl at 4000c000 {
+> +			compatible = "renesas,rzn1-sysctrl", "syscon",
+> +					"simple-mfd";
+> +			reg = <0x4000c000 0x1000>;
+> +
+> +			reboot {
+> +				compatible = "renesas,rzn1-reboot";
+> +			};
+> +		};
+> +		uart0: serial at 40060000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x40060000 0x400>;
+> +			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			clocks = <&clkuarts>;
+> +			clock-names = "baudclk";
+> +			status = "disabled";
+> +		};
+> +	};
+> +};
+> --
+> 2.7.4
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180329/5ee1517a/attachment.sig>
