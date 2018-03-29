@@ -1,68 +1,50 @@
-From: liwei213@huawei.com (liwei (CM))
-Date: Thu, 29 Mar 2018 01:00:01 +0000
-Subject: =?utf-8?B?562U5aSNOiDnrZTlpI06IOetlOWkjTog562U5aSNOiBbUEFUQ0ggdjggMi81?=
- =?utf-8?B?XSBkdC1iaW5kaW5nczogc2NzaTogdWZzOiBhZGQgZG9jdW1lbnQgZm9yIGhp?=
- =?utf-8?Q?si-ufs?=
-In-Reply-To: <CAK8P3a2BRXWbNzEcd9+Fi1zEkSA8aGB5ObxYrbVnaA7MKzU--w@mail.gmail.com>
-References: <20180213101412.5717-1-liwei213@huawei.com>
- <20180213101412.5717-3-liwei213@huawei.com>
- <CAK8P3a2b3rLHyM+vMppCkAR3VYbhw-b0LpuWfLCqjs7z9n+hyw@mail.gmail.com>
- <1699CE87DE933F49876AD744B5DC140FA584ED@DGGEMM506-MBS.china.huawei.com>
- <CAK8P3a3NdHLDf2vOMyZ1qcWNW1Jg5T47qR0qWhWEeDn+90S4ug@mail.gmail.com>
- <1699CE87DE933F49876AD744B5DC140FA58798@DGGEMM506-MBS.china.huawei.com>
- <CAK8P3a29sDaEj=iTkru-3mc9NpjNvZos3Z+h5UsT1cAeULoGHw@mail.gmail.com>
- <1699CE87DE933F49876AD744B5DC140FA588AD@DGGEMM506-MBS.china.huawei.com>
- <CAK8P3a2BRXWbNzEcd9+Fi1zEkSA8aGB5ObxYrbVnaA7MKzU--w@mail.gmail.com>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA58BA1@DGGEMM506-MBS.china.huawei.com>
+From: yong.deng@magewell.com (Yong)
+Date: Thu, 29 Mar 2018 09:02:56 +0800
+Subject: [linux-sunxi] [PATCH v9 0/2] Initial Allwinner V3s CSI Support
+In-Reply-To: <9b60dee0-2504-6ae3-fda3-64c4458025c3@xevo.com>
+References: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
+ <9b60dee0-2504-6ae3-fda3-64c4458025c3@xevo.com>
+Message-ID: <20180329090256.e9621262cf069c475a706087@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
+Hi,
 
-Thanks for your patiences.
+On Wed, 28 Mar 2018 16:29:47 -0700
+Martin Kelly <mkelly@xevo.com> wrote:
 
------????-----
-???: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] ?? Arnd Bergmann
-????: 2018?3?28? 20:50
-???: liwei (CM)
-??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; Vinayak Holikatti; James E.J. Bottomley; Martin K. Petersen; Kevin Hilman; Gregory CLEMENT; Thomas Petazzoni; Masahiro Yamada; Riku Voipio; Thierry Reding; Krzysztof Kozlowski; Eric Anholt; DTML; Linux Kernel Mailing List; Linux ARM; linux-scsi; zangleigang; Gengjianfeng; Guodong Xu; Zhangfei Gao; Fengbaopeng (kevin, Kirin Solution Dept); Yaniv Gardi
-??: Re: ??: ??: ??: [PATCH v8 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+> On 03/05/2018 05:51 PM, Yong Deng wrote:
+> > This patchset add initial support for Allwinner V3s CSI.
+> > 
+> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > interface and CSI1 is used for parallel interface. This is not
+> > documented in datasheet but by test and guess.
+> > 
+> > This patchset implement a v4l2 framework driver and add a binding
+> > documentation for it.
+> > 
+> > Currently, the driver only support the parallel interface. And has been
+> > tested with a BT1120 signal which generating from FPGA. The following
+> > fetures are not support with this patchset:
+> >    - ISP
+> >    - MIPI-CSI2
+> >    - Master clock for camera sensor
+> >    - Power regulator for the front end IC
+> > 
+> 
+> Hi Yong,
+> 
+> Thanks so much, this driver is a great contribution!
+> 
+> Unfortunately the board I'm working with (nanopi neo air) uses the MIPI 
+> CSI-2 CSI0 interface rather than CSI1. Do you have any plans to support 
+> the MIPI CSI-2 interface at some point? If not, do you know the scope of 
+> what would be involved?
 
-On Tue, Mar 27, 2018 at 8:15 AM, liwei (CM) <liwei213@huawei.com> wrote:
-> Hi, Arnd
->
-> At present our ufs module mainly has four clocks from the outside:
-> hclk_ufs:     main clock of ufs controller ,freq is 207.5MHz
-> cfg_phy_clk:  configuration clock of MPHY, freq is 51.875MHz
-> ref_phy_clk:  reference clock of MPHY from PMU, freq is 19.2MHz
-> ref_io_clk:    reference clock for the external interface to the device, freq is 19.2MHz
->
-> We control two clocks "ref_io_clk" and "cfg_phy_clk" in the driver 
-> because the other two are controlled by main clock module and pmu.
+AFAIK, there is no document about MIPI CSI-2. You can take a look at the
+source code in BSP:
+https://github.com/friendlyarm/h3_lichee/tree/master/linux-3.4/drivers/media/video/sunxi-vfe/mipi_csi
+And try to port it to mainline.
 
-I'm not completely sure what you mean with "control" here. Do you mean setting the rate and disabling them during runtime power management? What does it mean for the clock to be controlled by teh "main clock module and pmu"?
-
-In the driver we only disable/enable "ref_io_clk" and "cfg_phy_clk" during runtime power management.
-
-> for this patch, cfg_phy_clk corresponds to "phy_clk", ref_io_clk corresponds to "ref_clk".
-
-I'm not sure I understand the difference between ref_phy_clk and ref_io_clk, but it sounds like we should give both of those names in the ufs-platform binding.
-
-Your hclk_ufs would appear to correspond to what qualcomm calls core_clk, so maybe use that name as well.
-
-cfg_phy_clk seems to be something that qcom would not have, but it's also generic enough to list it in the common binding.
-
-Ok, let's add a describe for phy_clk in the common binding.
-
-> So the clks in the patch you give appear to be unsuitable for describing this .And the following clks of qcom are internal clock?
-> We didn't describe or pay attention to the clock inside the ufs module.
->
-> PHY to controller symbol synchronization clocks:
->         "rx_lane0_sync_clk" - RX Lane 0
->         "rx_lane1_sync_clk" - RX Lane 1
->         "tx_lane0_sync_clk" - TX Lane 0
->         "tx_lane1_sync_clk" - TX Lane 1
-
-Right, let's leave those for the qcom private binding.
-
-      Arnd
+Thanks,
+Yong
