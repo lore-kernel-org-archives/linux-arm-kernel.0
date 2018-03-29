@@ -1,66 +1,137 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 29 Mar 2018 17:24:54 +0200
-Subject: [PATCHv2] ARM: dts: imx6ull: add UART5 input select register
- definitions
-In-Reply-To: <1522246943-2269-1-git-send-email-gerg@linux-m68k.org>
-References: <1522246943-2269-1-git-send-email-gerg@linux-m68k.org>
-Message-ID: <955ecbba-4a74-3a4f-5865-8b9d607b257b@i2se.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Thu, 29 Mar 2018 17:29:45 +0200
+Subject: [RESEND PATCH v2 4/8] mfd: stm32-timers: add support for dmas
+In-Reply-To: <20180329143129.xdvw6gujghkwbjtm@dell>
+References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+ <1518602679-3064-5-git-send-email-fabrice.gasnier@st.com>
+ <20180328152251.xeh72dpeflzohn4k@dell>
+ <106ff518-4973-5d4a-b5bf-dd58cbd8439a@st.com>
+ <20180329125912.jgasmw75qvtlszgx@dell>
+ <12d53b2e-eec4-a498-1e1f-c217161c5086@st.com>
+ <20180329143129.xdvw6gujghkwbjtm@dell>
+Message-ID: <805c6c6c-4984-1436-56a7-a44d23a06429@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/29/2018 04:31 PM, Lee Jones wrote:
+> On Thu, 29 Mar 2018, Fabrice Gasnier wrote:
+> 
+>> On 03/29/2018 02:59 PM, Lee Jones wrote:
+>>> On Wed, 28 Mar 2018, Fabrice Gasnier wrote:
+>>>
+>>>> On 03/28/2018 05:22 PM, Lee Jones wrote:
+>>>>> On Wed, 14 Feb 2018, Fabrice Gasnier wrote:
+>>>>>
+>>>>>> STM32 Timers can support up to 7 DMA requests:
+>>>>>> - 4 channels, update, compare and trigger.
+>>>>>> Optionally request part, or all DMAs from stm32-timers MFD core.
+>>>>>>
+>>>>>> Also add routine to implement burst reads using DMA from timer registers.
+>>>>>> This is exported. So, it can be used by child drivers, PWM capture
+>>>>>> for instance (but not limited to).
+>>>>>>
+>>>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>>>> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>>>>>> ---
+>>>>>> Changes in v2:
+>>>>>> - Abstract DMA handling from child driver: move it to MFD core
+>>>>>> - Add comments on optional dma support
+>>>>>> ---
+>>>>>>  drivers/mfd/stm32-timers.c       | 215 ++++++++++++++++++++++++++++++++++++++-
+>>>>>>  include/linux/mfd/stm32-timers.h |  27 +++++
+>>>>>>  2 files changed, 238 insertions(+), 4 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+>>>>>> index a6675a4..2cdad2c 100644
+>>>>>> --- a/drivers/mfd/stm32-timers.c
+>>>>>> +++ b/drivers/mfd/stm32-timers.c
+>>>
+>>> [...]
+>>>
+>>>>>> +	struct dma_chan *dmas[STM32_TIMERS_MAX_DMAS];
+>>>>>> +	struct stm32_timers ddata;
+>>>>>
+>>>>> This looks odd to me.  Why can't you expand the current ddata
+>>>>> structure?  Wouldn't it be better to create a stm32_timers_dma
+>>>>> structure to place all this information in (except *dev, that should
+>>>>> live in the ddata struct), then place a reference in the existing
+>>>>> stm32_timers struct?
+>>>>
+>>>> Maybe I miss-understand you here, from what we discussed in V1:
+>>>> https://lkml.org/lkml/2018/1/23/574
+>>>>> ... "passing in the physical address of the parent MFD into
+>>>>> a child device doesn't quite sit right with me"
+>>>> I introduced this private struct in MFD parent, and completely hide it
+>>>> from the child.
+>>>>
+>>>> So, do you suggest to add struct definition here ? But make it part of
+>>>> struct stm32_timers *ddata?
+>>>>
+>>>> And only put declaration in include/linux/mfd/stm32-timers.h:
+>>>> + struct stm32_timers_dma;
+>>>>
+>>>> struct stm32_timers {
+>>>> 	struct clk *clk;
+>>>> 	struct regmap *regmap;
+>>>> 	u32 max_arr;
+>>>> +	struct stm32_timers_dma;
+>>>> };
+>>>
+>>> Yes, that's the basic idea.
+>>>
+>>>> I can probably spare the *dev then... use dev->parent in child driver.
+>>>
+>>> What would you use dev->parent for?
+>>
+>> Hi Lee,
+>>
+>> This is to follow your sugestion to use *dev instead of *ddata when
+>> calling stm32_timers_dma_burst_read(), the idea is to use it on child side:
+>> stm32_timers_dma_burst_read(dev->parent,...) from pwm driver.
+>> Then there is no need to keep *dev inside ddata struct.
+> 
+> I'm wondering if it would be neater to us the child's *dev, then do
+> the ->parent deference in the parent MFD (with a comment to say what
+> you're doing of course).
+> 
 
-Am 28.03.2018 um 16:22 schrieb Greg Ungerer:
-> The iMX6ULL UART5_RX_DATA_SELECT_INPUT DAISY Register has some different
-> bit definitions to that same register in the iMX6UL.
->
-> The bits for the iMX6UL:
->
-> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-> 100 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT
-> 101 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT
->
-> But for the iMX6ULL:
->
-> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-> 100 UART1_TX_DATA_ALT9 ? Selecting Pad: UART1_TX_DATA for Mode: ALT9
-> 101 UART1_RX_DATA_ALT9 ? Selecting Pad: UART1_RX_DATA for Mode: ALT9
-> 110 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT0
-> 111 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT0
->
-> Specifically for a board I am working on with the serial console on UART5
-> I need to be able to enable UART5_RX_DATA_ALT0 mode. There is no definition
-> for the iMX6ULL version of that in imx6ul-pinfunc.h or imx6ull-pinfunc.h.
->
-> Add definitions for the missing UART5 input select register bits of the
-> iMX6ULL.
->
-> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
-> ---
->   arch/arm/boot/dts/imx6ull-pinfunc.h | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> v2: add definitions for all missing bits
->
-> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
-> index 1182023..090846b 100644
-> --- a/arch/arm/boot/dts/imx6ull-pinfunc.h
-> +++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
-> @@ -14,6 +14,10 @@
->    * The pin function ID is a tuple of
->    * <mux_reg conf_reg input_reg mux_mode input_val>
->    */
-> +#define MX6ULL_PAD_UART1_TX_DATA__UART5_DTE_RX                    0x0084 0x0310 0x0644 0x9 0x4
-> +#define MX6ULL_PAD_UART1_RX_DATA__UART5_DCE_RX                    0x0088 0x0314 0x0644 0x9 0x5
-> +#define MX6ULL_PAD_UART5_TX_DATA__UART5_DTE_RX                    0x00BC 0x0348 0x0644 0x0 0x6
-> +#define MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
->   #define MX6ULL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
->   #define MX6ULL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
->   #define MX6ULL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
+There's already dev.parent dereference in child drivers, for same
+purpose: dev_get_drvdata(pdev->dev.parent). So, I guess same can be done
+here ?
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Thanks for you review,
+I'll update all this and send a v3.
+
+Best regards,
+Fabrice
+
+>>> [...]
+>>>
+>>>>>> +static int stm32_timers_remove(struct platform_device *pdev)
+>>>>>> +{
+>>>>>> +	struct stm32_timers *ddata = platform_get_drvdata(pdev);
+>>>>>> +	struct stm32_timers_priv *priv = to_stm32_timers_priv(ddata);
+>>>>>> +
+>>>>>> +	of_platform_depopulate(&pdev->dev);
+>>>>>
+>>>>> Why can't you continue using devm_*?
+>>>>
+>>>> I can use devm_of_platform_depopulate() here if you prefer, and keep
+>>>> devm_of_platform_populate() in probe.
+>>>
+>>> The point of devm_* is that you don't have to call depopulate.
+>>>
+>>> It happens automatically once this driver is unbound.
+>>
+>> Ok, so to clarify, keeping devm_ here may be a bit racy:
+>> of_platform_depopulate will happen after dma has been released (there is
+>> no devm_ variant to release dma).
+>> Only way to prevent race condition here, is to enforce
+>> of_platform_depopulate() is called before dma release (e.g. in reverse
+>> order compared to probe).
+>>
+>> Do you wish I add a comment about it ?
+> 
+> Best thing to do then is keep the non-devm variant and provide a
+> comment as to why is it not possible to use devm_*.
+> 
