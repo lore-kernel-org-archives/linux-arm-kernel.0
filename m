@@ -1,97 +1,132 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Mar 2018 15:13:22 +0200
-Subject: [PATCH resend v2 1/2] arm64: assembler: add utility macros to
- push/pop stack frames
+Date: Thu, 29 Mar 2018 15:13:23 +0200
+Subject: [PATCH resend v2 2/2] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
 In-Reply-To: <20180329131323.15881-1-ard.biesheuvel@linaro.org>
 References: <20180329131323.15881-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180329131323.15881-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180329131323.15881-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are going to add code to all the NEON crypto routines that will
-turn them into non-leaf functions, so we need to manage the stack
-frames. To make this less tedious and error prone, add some macros
-that take the number of callee saved registers to preserve and the
-extra size to allocate in the stack frame (for locals) and emit
-the ldp/stp sequences.
+Add support macros to conditionally yield the NEON (and thus the CPU)
+that may be called from the assembler code.
+
+In some cases, yielding the NEON involves saving and restoring a non
+trivial amount of context (especially in the CRC folding algorithms),
+and so the macro is split into three, and the code in between is only
+executed when the yield path is taken, allowing the context to be preserved.
+The third macro takes an optional label argument that marks the resume
+path after a yield has been performed.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 63 ++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm64/include/asm/assembler.h | 73 ++++++++++++++++++++
+ arch/arm64/kernel/asm-offsets.c    |  3 +
+ 2 files changed, 76 insertions(+)
 
 diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 053d83e8db6f..fe2ff3efe1f0 100644
+index fe2ff3efe1f0..0bcc98dbba56 100644
 --- a/arch/arm64/include/asm/assembler.h
 +++ b/arch/arm64/include/asm/assembler.h
-@@ -565,4 +565,67 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
- #endif
+@@ -628,4 +628,77 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+ 	.endif
  	.endm
  
-+	/*
-+	 * frame_push - Push @regcount callee saved registers to the stack,
-+	 *              starting at x19, as well as x29/x30, and set x29 to
-+	 *              the new value of sp. Add @extra bytes of stack space
-+	 *              for locals.
-+	 */
-+	.macro		frame_push, regcount:req, extra
-+	__frame		st, \regcount, \extra
++/*
++ * Check whether to yield to another runnable task from kernel mode NEON code
++ * (which runs with preemption disabled).
++ *
++ * if_will_cond_yield_neon
++ *        // pre-yield patchup code
++ * do_cond_yield_neon
++ *        // post-yield patchup code
++ * endif_yield_neon    <label>
++ *
++ * where <label> is optional, and marks the point where execution will resume
++ * after a yield has been performed. If omitted, execution resumes right after
++ * the endif_yield_neon invocation. Note that the entire sequence, including
++ * the provided patchup code, will be omitted from the image if CONFIG_PREEMPT
++ * is not defined.
++ *
++ * As a convenience, in the case where no patchup code is required, the above
++ * sequence may be abbreviated to
++ *
++ * cond_yield_neon <label>
++ *
++ * Note that the patchup code does not support assembler directives that change
++ * the output section, any use of such directives is undefined.
++ *
++ * The yield itself consists of the following:
++ * - Check whether the preempt count is exactly 1, in which case disabling
++ *   preemption once will make the task preemptible. If this is not the case,
++ *   yielding is pointless.
++ * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
++ *   kernel mode NEON (which will trigger a reschedule), and branch to the
++ *   yield fixup code.
++ *
++ * This macro sequence may clobber all CPU state that is not guaranteed by the
++ * AAPCS to be preserved across an ordinary function call.
++ */
++
++	.macro		cond_yield_neon, lbl
++	if_will_cond_yield_neon
++	do_cond_yield_neon
++	endif_yield_neon	\lbl
 +	.endm
 +
-+	/*
-+	 * frame_pop  - Pop the callee saved registers from the stack that were
-+	 *              pushed in the most recent call to frame_push, as well
-+	 *              as x29/x30 and any extra stack space that may have been
-+	 *              allocated.
-+	 */
-+	.macro		frame_pop
-+	__frame		ld
++	.macro		if_will_cond_yield_neon
++#ifdef CONFIG_PREEMPT
++	get_thread_info	x0
++	ldr		w1, [x0, #TSK_TI_PREEMPT]
++	ldr		x0, [x0, #TSK_TI_FLAGS]
++	cmp		w1, #PREEMPT_DISABLE_OFFSET
++	csel		x0, x0, xzr, eq
++	tbnz		x0, #TIF_NEED_RESCHED, .Lyield_\@	// needs rescheduling?
++	/* fall through to endif_yield_neon */
++	.subsection	1
++.Lyield_\@ :
++#else
++	.section	".discard.cond_yield_neon", "ax"
++#endif
 +	.endm
 +
-+	.macro		__frame_regs, reg1, reg2, op, num
-+	.if		.Lframe_regcount == \num
-+	\op\()r		\reg1, [sp, #(\num + 1) * 8]
-+	.elseif		.Lframe_regcount > \num
-+	\op\()p		\reg1, \reg2, [sp, #(\num + 1) * 8]
-+	.endif
++	.macro		do_cond_yield_neon
++	bl		kernel_neon_end
++	bl		kernel_neon_begin
 +	.endm
 +
-+	.macro		__frame, op, regcount, extra=0
-+	.ifc		\op, st
-+	.if		(\regcount) < 0 || (\regcount) > 10
-+	.error		"regcount should be in the range [0 ... 10]"
++	.macro		endif_yield_neon, lbl
++	.ifnb		\lbl
++	b		\lbl
++	.else
++	b		.Lyield_out_\@
 +	.endif
-+	.if		((\extra) % 16) != 0
-+	.error		"extra should be a multiple of 16 bytes"
-+	.endif
-+	.ifdef		.Lframe_regcount
-+	.if		.Lframe_regcount != -1
-+	.error		"frame_push/frame_pop may not be nested"
-+	.endif
-+	.endif
-+	.set		.Lframe_regcount, \regcount
-+	.set		.Lframe_extra, \extra
-+	.set		.Lframe_local_offset, ((\regcount + 3) / 2) * 16
-+	stp		x29, x30, [sp, #-.Lframe_local_offset - .Lframe_extra]!
-+	mov		x29, sp
-+	.endif
-+
-+	__frame_regs	x19, x20, \op, 1
-+	__frame_regs	x21, x22, \op, 3
-+	__frame_regs	x23, x24, \op, 5
-+	__frame_regs	x25, x26, \op, 7
-+	__frame_regs	x27, x28, \op, 9
-+
-+	.ifc		\op, ld
-+	.if		.Lframe_regcount == -1
-+	.error		"frame_push/frame_pop may not be nested"
-+	.endif
-+	ldp		x29, x30, [sp], #.Lframe_local_offset + .Lframe_extra
-+	.set		.Lframe_regcount, -1
-+	.endif
++	.previous
++.Lyield_out_\@ :
 +	.endm
 +
  #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 1303e04110cd..b7c33642de6e 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -23,6 +23,7 @@
+ #include <linux/mm.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/kvm_host.h>
++#include <linux/preempt.h>
+ #include <linux/suspend.h>
+ #include <asm/cpufeature.h>
+ #include <asm/fixmap.h>
+@@ -93,6 +94,8 @@ int main(void)
+   DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
+   DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+   BLANK();
++  DEFINE(PREEMPT_DISABLE_OFFSET, PREEMPT_DISABLE_OFFSET);
++  BLANK();
+   DEFINE(CLOCK_REALTIME,	CLOCK_REALTIME);
+   DEFINE(CLOCK_MONOTONIC,	CLOCK_MONOTONIC);
+   DEFINE(CLOCK_MONOTONIC_RAW,	CLOCK_MONOTONIC_RAW);
 -- 
 2.11.0
