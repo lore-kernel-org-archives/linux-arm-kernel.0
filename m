@@ -1,57 +1,26 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 29 Mar 2018 12:27:40 -0400
-Subject: [net-next PATCH v2 03/10] net: netcp: ethss: make call to
- gbe_sgmii_config() conditional
-In-Reply-To: <20180327171817.GO5862@lunn.ch>
-References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
- <1522168309-12338-4-git-send-email-m-karicheri2@ti.com>
- <20180327171817.GO5862@lunn.ch>
-Message-ID: <24d6d476-1c04-c9be-e32f-4d024be649f2@ti.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 29 Mar 2018 09:32:27 -0700
+Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
+ data
+In-Reply-To: <20180329143715.GA31757@hector.attlocal.net>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+ <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
+ <20180320143131.4eenixtbhciq5fwc@localhost>
+ <20180329143715.GA31757@hector.attlocal.net>
+Message-ID: <20180329163227.czbz7bang3oyiueh@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2018 01:18 PM, Andrew Lunn wrote:
-> On Tue, Mar 27, 2018 at 12:31:42PM -0400, Murali Karicheri wrote:
->> As a preparatory patch to add support for 2u cpsw hardware found on
->> K2G SoC, make call to gbe_sgmii_config() conditional. This is required
->> since 2u uses RGMII interface instead of SGMII and to allow for driver
->> re-use.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->>  drivers/net/ethernet/ti/netcp_ethss.c | 7 +++++--
->>  1 file changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
->> index 56dbc0b..1dea891 100644
->> --- a/drivers/net/ethernet/ti/netcp_ethss.c
->> +++ b/drivers/net/ethernet/ti/netcp_ethss.c
->> @@ -2271,7 +2271,8 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
->>  
->>  	void (*hndlr)(struct net_device *) = gbe_adjust_link;
->>  
->> -	gbe_sgmii_config(priv, slave);
->> +	if ((priv->ss_version == GBE_SS_VERSION_14) || IS_SS_ID_NU(priv))
->> +		gbe_sgmii_config(priv, slave);
+On Thu, Mar 29, 2018 at 09:37:15AM -0500, Andy Gross wrote:
 > 
-> Or maybe:
-> 
->    if (slave->phy_node == PHY_INTERFACE_MODE_SGMII)
->    	gbe_sgmii_config(priv, slave);
-> 
-> 	Andrew
-> Actually, on specific cpsw hardware, driver supports specific interface. Driver also
-uses link-interface DT property to configure this and link-interface can be without phy
-as well. So essentially the above code looks good IMO.
+> If you aren't actually testing/validating this specific board, how can you make
+> a statement like this?  Unless you have tested these specifically on this board,
+> I'd appreciate not getting false information about what is or is not working.
 
-I need to change this as 
+I tested qualcomm's 4.4 kernel from codeaurora, and *it* doesn't boot
+on the ipq4019.  I apologize for making a misleading statement.  I
+assumed that the ipq4019 DTSs were merged in not booting from the
+beginning.
 
-if (IS_SS_ID_VER_14(priv) || IS_SS_ID_NU(priv))
-    gbe_sgmii_config(priv, slave);
-
-Based on the link-interface, driver selects the phy mode and pass it to of_phy_connect().
-
-I will update the above in v3.
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Sorry,
+Richard
