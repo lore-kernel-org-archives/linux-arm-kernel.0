@@ -1,47 +1,45 @@
 From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Thu, 29 Mar 2018 08:46:57 +0100
-Subject: [PATCH v3 1/8] DT: mfd: renesas,
- rzn1-sysctrl: document RZ/N1 sysctrl node
+Date: Thu, 29 Mar 2018 08:46:59 +0100
+Subject: [PATCH v3 3/8] DT: arm: renesas,
+ rzn1: add the RZ/N1 SoC and RZN1D-DB board
 In-Reply-To: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
 References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1522309629-10152-2-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <1522309629-10152-4-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Renesas RZ/N1 Family (Part #R9A06G0xx) has a multi-function
-system controller. This documents the node used to encapsulate
-it's sub drivers.
+This documents the RZ/N1 bindings for both the RZ/N1 and the RZN1D-DB
+board.
 
 Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 ---
- .../devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt  | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
+ Documentation/devicetree/bindings/arm/shmobile.txt | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt b/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
-new file mode 100644
-index 0000000..1dbfdaf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
-@@ -0,0 +1,19 @@
-+DT bindings for the Renesas RZ/N1 System Controller
-+
-+== System Controller Node ==
-+
-+The system controller node currently only hosts a single sub-node to handle
-+the rebooting of the CPU. Eventually it will host the clock driver, SMP
-+start handler, watchdog etc.
-+
-+See renesas,rzn1-reboot.txt for further details.
-+
-+Bindings:
-++ Required:
-+	compatible = "renesas,rzn1-sysctrl", "syscon", "simple-mfd";
-+
-+Example:
-+	sysctrl: sysctrl at 4000c000 {
-+		compatible = "renesas,rzn1-sysctrl", "syscon", "simple-mfd";
-+		reg = <0x4000c000 0x1000>;
-+	};
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index d3d1df9..52368fc 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -47,7 +47,10 @@ SoCs:
+     compatible = "renesas,r8a77980"
+   - R-Car D3 (R8A77995)
+     compatible = "renesas,r8a77995"
+-
++  - RZ/N1 Family (R9A06G032 & R9A06G033)
++    compatible = "renesas,rzn1"
++  - RZ/N1D (R9A06G032)
++    compatible = "renesas,r9a06g032", "renesas,rzn1"
+ 
+ Boards:
+ 
+@@ -104,6 +107,8 @@ Boards:
+     compatible = "renesas,porter", "renesas,r8a7791"
+   - RSKRZA1 (YR0K77210C000BE)
+     compatible = "renesas,rskrza1", "renesas,r7s72100"
++  - RZN1D-DB (RZ/N1D Demo Board for the RZ/N1D 400 pins package)
++    compatible = "renesas,rzn1d400-db", "renesas,r9a06g032", "renesas,rzn1"
+   - Salvator-X (RTP0RC7795SIPB0010S)
+     compatible = "renesas,salvator-x", "renesas,r8a7795"
+   - Salvator-X (RTP0RC7796SIPB0011S)
 -- 
 2.7.4
