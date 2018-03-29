@@ -1,39 +1,53 @@
-From: cmc@babblebit.net (Chris Coffey)
-Date: Thu, 29 Mar 2018 13:47:45 +0100
-Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
-In-Reply-To: <20180329095637.GA16778@kroah.com>
-References: <20180329095637.GA16778@kroah.com>
-Message-ID: <20180329124745.24694-1-cmc@babblebit.net>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 29 Mar 2018 15:49:12 +0300
+Subject: [PATCH v2] mmc: sdhci-of-arasan: Add quirk to avoid unexpected
+ interrupt msgs
+In-Reply-To: <1520951200-24703-1-git-send-email-phil.edworthy@renesas.com>
+References: <1520951200-24703-1-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <4b50ca51-117e-cab2-7459-d6c9727ca07c@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following sparse warning:
+On 13/03/18 16:26, Phil Edworthy wrote:
+> On SD 2.00 cards we get lots of these messages:
+> "mmc0: Got data interrupt 0x00000002 even though no data operation was in progress"
+> By applying the SDHCI_QUIRK2_STOP_WITH_TC quirk, the messages no longer happen.
+> 
+> A single card claiming to be SD 3.00 compliant also generates the interrupts,
+> but since the card's manfacturing date is 2002 mar, it's unlikely to really be
+> SD 3.00. This card is a 8GB SanDisk 'SU08G' 8.0 (SDHC class 4).
+> 
+> This has been reported on Xilinx devices that also use the Arasan IP.
+> See https://patchwork.kernel.org/patch/8062871/
+> 
+> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1 SoC. The
+> Arasan IP in this device is version 1.39a and uses a max SD clock of 50MHz and
+> does not support DDR modes.
+> 
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 
-drivers/staging/mt7621-eth/ethtool.c:213:6: warning: symbol
-'mtk_set_ethtool_ops' was not declared. Should it be static?
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
 
-Signed-off-by: Chris Coffey <cmc@babblebit.net>
----
-Changes in v2:
- - Per GregKH's feedback (thanks!), don't add unnecessary new .h file
- dependencies. This patch version reverts those changes and fixes the
- problem directly in ethtool.c (which is that it didn't include
- ethtool.h anywhere -- mtk_set_ethtool_ops is not static).
-
- drivers/staging/mt7621-eth/ethtool.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
-index 38ba0c040a..5268c5ca09 100644
---- a/drivers/staging/mt7621-eth/ethtool.c
-+++ b/drivers/staging/mt7621-eth/ethtool.c
-@@ -13,6 +13,7 @@
-  */
- 
- #include "mtk_eth_soc.h"
-+#include "ethtool.h"
- 
- static const char mtk_gdma_str[][ETH_GSTRING_LEN] = {
- #define _FE(x...)	# x,
--- 
-2.11.0
+> ---
+> v2:
+>  - Changed commit msg to detail the cards that fail.
+>  - Provided the IP version and further background info.
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index c33a5f7..ab66e32 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data sdhci_arasan_pdata = {
+>  	.ops = &sdhci_arasan_ops,
+>  	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+>  	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+> -			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+> +			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
+> +			SDHCI_QUIRK2_STOP_WITH_TC,
+>  };
+>  
+>  static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32 intmask)
+> 
