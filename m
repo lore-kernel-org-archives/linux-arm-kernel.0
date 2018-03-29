@@ -1,79 +1,68 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 28 Mar 2018 17:27:23 -0700
-Subject: [PATCH] pinctrl: msm: fix gpio-hog related boot issues
-In-Reply-To: <20180328180705.29147-1-chunkeey@gmail.com>
-References: <20180328180705.29147-1-chunkeey@gmail.com>
-Message-ID: <20180329002723.GD18510@minitux>
+From: liwei213@huawei.com (liwei (CM))
+Date: Thu, 29 Mar 2018 01:00:01 +0000
+Subject: =?utf-8?B?562U5aSNOiDnrZTlpI06IOetlOWkjTog562U5aSNOiBbUEFUQ0ggdjggMi81?=
+ =?utf-8?B?XSBkdC1iaW5kaW5nczogc2NzaTogdWZzOiBhZGQgZG9jdW1lbnQgZm9yIGhp?=
+ =?utf-8?Q?si-ufs?=
+In-Reply-To: <CAK8P3a2BRXWbNzEcd9+Fi1zEkSA8aGB5ObxYrbVnaA7MKzU--w@mail.gmail.com>
+References: <20180213101412.5717-1-liwei213@huawei.com>
+ <20180213101412.5717-3-liwei213@huawei.com>
+ <CAK8P3a2b3rLHyM+vMppCkAR3VYbhw-b0LpuWfLCqjs7z9n+hyw@mail.gmail.com>
+ <1699CE87DE933F49876AD744B5DC140FA584ED@DGGEMM506-MBS.china.huawei.com>
+ <CAK8P3a3NdHLDf2vOMyZ1qcWNW1Jg5T47qR0qWhWEeDn+90S4ug@mail.gmail.com>
+ <1699CE87DE933F49876AD744B5DC140FA58798@DGGEMM506-MBS.china.huawei.com>
+ <CAK8P3a29sDaEj=iTkru-3mc9NpjNvZos3Z+h5UsT1cAeULoGHw@mail.gmail.com>
+ <1699CE87DE933F49876AD744B5DC140FA588AD@DGGEMM506-MBS.china.huawei.com>
+ <CAK8P3a2BRXWbNzEcd9+Fi1zEkSA8aGB5ObxYrbVnaA7MKzU--w@mail.gmail.com>
+Message-ID: <1699CE87DE933F49876AD744B5DC140FA58BA1@DGGEMM506-MBS.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 28 Mar 11:07 PDT 2018, Christian Lamparter wrote:
+Hi, Arnd
 
-> Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
-> Setting up any gpio-hog in the device-tree for his device would
-> "kill the bootup completely":
-> 
-> | [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> | [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
-> | [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
-> | [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
-> | [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
-> | [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
-> | [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
-> 
-> This was also verified on a RT-AC58U (IPQ4018) which would
-> no longer boot, if a gpio-hog was specified. (Tried forcing
-> the USB LED PIN (GPIO0) to high.).
-> 
+Thanks for your patiences.
 
-It's quite clear that this is a generic issue with the msm pinctrl
-driver.
+-----????-----
+???: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] ?? Arnd Bergmann
+????: 2018?3?28? 20:50
+???: liwei (CM)
+??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; Vinayak Holikatti; James E.J. Bottomley; Martin K. Petersen; Kevin Hilman; Gregory CLEMENT; Thomas Petazzoni; Masahiro Yamada; Riku Voipio; Thierry Reding; Krzysztof Kozlowski; Eric Anholt; DTML; Linux Kernel Mailing List; Linux ARM; linux-scsi; zangleigang; Gengjianfeng; Guodong Xu; Zhangfei Gao; Fengbaopeng (kevin, Kirin Solution Dept); Yaniv Gardi
+??: Re: ??: ??: ??: [PATCH v8 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
 
-For the cases where I've been in need of static configuration of
-certain pins I've simply made the pinctrl node itself have a pinctrl-0
-that refer to a state that I want to hold. This has worked well and I
-didn't even know about the gpio-hog property.
+On Tue, Mar 27, 2018 at 8:15 AM, liwei (CM) <liwei213@huawei.com> wrote:
+> Hi, Arnd
+>
+> At present our ufs module mainly has four clocks from the outside:
+> hclk_ufs:     main clock of ufs controller ,freq is 207.5MHz
+> cfg_phy_clk:  configuration clock of MPHY, freq is 51.875MHz
+> ref_phy_clk:  reference clock of MPHY from PMU, freq is 19.2MHz
+> ref_io_clk:    reference clock for the external interface to the device, freq is 19.2MHz
+>
+> We control two clocks "ref_io_clk" and "cfg_phy_clk" in the driver 
+> because the other two are controlled by main clock module and pmu.
 
-[..]
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index 3ca96e361878..17ad9cbd9f8c 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -327,6 +327,7 @@
->  			reg = <0x800000 0x4000>;
->  
->  			gpio-controller;
-> +			gpio-ranges = <&tlmm_pinmux 0 0 90>;
+I'm not completely sure what you mean with "control" here. Do you mean setting the rate and disabling them during runtime power management? What does it mean for the clock to be controlled by teh "main clock module and pmu"?
 
-This seems reasonable.
+In the driver we only disable/enable "ref_io_clk" and "cfg_phy_clk" during runtime power management.
 
->  			#gpio-cells = <2>;
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-[..]
-> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-> index 495432f3341b..f2580bbba741 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-> @@ -831,13 +831,6 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
->  		return ret;
->  	}
->  
-> -	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
-> -	if (ret) {
-> -		dev_err(pctrl->dev, "Failed to add pin range\n");
-> -		gpiochip_remove(&pctrl->chip);
-> -		return ret;
-> -	}
-> -
+> for this patch, cfg_phy_clk corresponds to "phy_clk", ref_io_clk corresponds to "ref_clk".
 
-But, this will break backwards compatibility with existing DTBs and I
-don't see how this would work with the ACPI based platforms using this
-driver.
+I'm not sure I understand the difference between ref_phy_clk and ref_io_clk, but it sounds like we should give both of those names in the ufs-platform binding.
 
+Your hclk_ufs would appear to correspond to what qualcomm calls core_clk, so maybe use that name as well.
 
-Iirc this driver follows the same pattern as several other pinctrl
-drivers providing gpios, how are they handling this?
+cfg_phy_clk seems to be something that qcom would not have, but it's also generic enough to list it in the common binding.
 
-Regards,
-Bjorn
+Ok, let's add a describe for phy_clk in the common binding.
+
+> So the clks in the patch you give appear to be unsuitable for describing this .And the following clks of qcom are internal clock?
+> We didn't describe or pay attention to the clock inside the ufs module.
+>
+> PHY to controller symbol synchronization clocks:
+>         "rx_lane0_sync_clk" - RX Lane 0
+>         "rx_lane1_sync_clk" - RX Lane 1
+>         "tx_lane0_sync_clk" - TX Lane 0
+>         "tx_lane1_sync_clk" - TX Lane 1
+
+Right, let's leave those for the qcom private binding.
+
+      Arnd
