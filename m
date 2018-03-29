@@ -1,89 +1,206 @@
 From: ilialin@codeaurora.org (Ilia Lin)
-Date: Fri, 30 Mar 2018 00:26:33 +0300
-Subject: [PATCH v4 00/14] CPU scaling support for msm8996
-Message-ID: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+Date: Fri, 30 Mar 2018 00:26:34 +0300
+Subject: [PATCH v4 01/14] soc: qcom: Separate kryo l2 accessors from PMU driver
+In-Reply-To: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+Message-ID: <1522358807-10413-2-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[v4]
- * Adressed comments from Stephen
- * Added CPU regulator support
- * Added qcom-cpufreq-kryo driver
+The driver provides kernel level API for other drivers
+to access the MSM8996 L2 cache registers.
+Separating the L2 access code from the PMU driver and
+making it public to allow other drivers use it.
+The accesses must be separated with a single spinlock,
+maintained in this driver.
 
-[v3]
- * Rebased on top of the latest PLL driver changes
- * Addressed comment from Rob Herring for bindings
-
-[v2]
- * Addressed comments from Rob Herring for bindings
- * Addressed comments from Mark Rutland for memory barrier
- * Addressed comments from Julien Thierry for clock reenabling condition
- * Tuned the HW configuration for clock frequencies below 600MHz
-
-Clocks:
-This series adds support for the CPU clocks on msm8996 devices.
-The driver uses the existing PLL drivers and is required to control
-the CPU frequency scaling on the MSM8996.
-
-Regulators:
-Added SAW regulator support to the SPMI regulator driver. The SAW regulators
-will be controlled through special CPU registers instead of direct
-SPMI accesses.
-
-Cpufreq:
-The qcom-cpufreq-kryo driver is aimed to support different SOC versions.
-The driver reads eFuse information and chooses the required OPP subset
-by passing the OPP supported-hw parameter.
-
-A previous post of RFC can be found here:
-https://patchwork.kernel.org/patch/10218991/
-
-
-Ilia Lin (10):
-  soc: qcom: Separate kryo l2 accessors from PMU driver
-  clk: qcom: Add DT bindings for CPU clock driver for msm8996
-  clk: qcom: Add ACD path to CPU clock driver for msm8996
-  dt: qcom: Add opp and thermal to the msm8996
-  regulator: qcom_spmi: Add support for SAW
-  dt-bindings: Add support for SAW documentation
-  dt: qcom: Add SAW regulator for 8x96 CPUs
-  cpufreq: Add Kryo CPU scaling driver
-  dt-bindings: cpufreq: Document operating-points-v2-kryo-cpu
-  dt: qcom: Add qcom-cpufreq-kryo driver configuration
-
-Rajendra Nayak (4):
-  clk: qcom: Make clk_alpha_pll_configure available to modules
-  clk: qcom: Add CPU clock driver for msm8996
-  clk: qcom: cpu-8996: Add support to switch to alternate PLL
-  clk: qcom: cpu-8996: Add support to switch below 600Mhz
-
- .../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
- .../devicetree/bindings/cpufreq/kryo-cpufreq.txt   | 693 +++++++++++++++++++++
- .../bindings/regulator/qcom,spmi-regulator.txt     |  45 ++
- arch/arm64/boot/dts/qcom/apq8096-db820c.dts        |   2 +-
- arch/arm64/boot/dts/qcom/msm8996.dtsi              | 658 ++++++++++++++++++-
- drivers/clk/clk-fixed-factor.c                     |   2 +-
- drivers/clk/qcom/Kconfig                           |   8 +
- drivers/clk/qcom/Makefile                          |   1 +
- drivers/clk/qcom/clk-alpha-pll.c                   |   1 +
- drivers/clk/qcom/clk-alpha-pll.h                   |   6 +
- drivers/clk/qcom/clk-cpu-8996.c                    | 520 ++++++++++++++++
- drivers/cpufreq/Kconfig.arm                        |  11 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/cpufreq-dt-platdev.c               |   3 +
- drivers/cpufreq/qcom-cpufreq-kryo.c                | 147 +++++
- drivers/perf/qcom_l2_pmu.c                         |  44 +-
- drivers/regulator/qcom_spmi-regulator.c            | 133 +++-
- drivers/soc/qcom/Makefile                          |   2 +
- drivers/soc/qcom/kryo-l2-accessors.c               |  66 ++
- include/soc/qcom/kryo-l2-accessors.h               |  20 +
- 20 files changed, 2324 insertions(+), 56 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
- create mode 100644 Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
- create mode 100644 drivers/clk/qcom/clk-cpu-8996.c
- create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
+Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+---
+ drivers/perf/qcom_l2_pmu.c           | 44 +-----------------------
+ drivers/soc/qcom/Makefile            |  2 ++
+ drivers/soc/qcom/kryo-l2-accessors.c | 66 ++++++++++++++++++++++++++++++++++++
+ include/soc/qcom/kryo-l2-accessors.h | 20 +++++++++++
+ 4 files changed, 89 insertions(+), 43 deletions(-)
  create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
  create mode 100644 include/soc/qcom/kryo-l2-accessors.h
 
+diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
+index 842135c..2a8363e 100644
+--- a/drivers/perf/qcom_l2_pmu.c
++++ b/drivers/perf/qcom_l2_pmu.c
+@@ -31,6 +31,7 @@
+ #include <asm/barrier.h>
+ #include <asm/local64.h>
+ #include <asm/sysreg.h>
++#include <soc/qcom/kryo-l2-accessors.h>
+ 
+ #define MAX_L2_CTRS             9
+ 
+@@ -87,8 +88,6 @@
+ #define L2_COUNTER_RELOAD       BIT_ULL(31)
+ #define L2_CYCLE_COUNTER_RELOAD BIT_ULL(63)
+ 
+-#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
+-#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
+ 
+ #define reg_idx(reg, i)         (((i) * IA_L2_REG_OFFSET) + reg##_BASE)
+ 
+@@ -107,48 +106,7 @@
+ #define L2_EVENT_STREX                     0x421
+ #define L2_EVENT_CLREX                     0x422
+ 
+-static DEFINE_RAW_SPINLOCK(l2_access_lock);
+ 
+-/**
+- * set_l2_indirect_reg: write value to an L2 register
+- * @reg: Address of L2 register.
+- * @value: Value to be written to register.
+- *
+- * Use architecturally required barriers for ordering between system register
+- * accesses
+- */
+-static void set_l2_indirect_reg(u64 reg, u64 val)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2_access_lock, flags);
+-	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+-	isb();
+-	write_sysreg_s(val, L2CPUSRDR_EL1);
+-	isb();
+-	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+-}
+-
+-/**
+- * get_l2_indirect_reg: read an L2 register value
+- * @reg: Address of L2 register.
+- *
+- * Use architecturally required barriers for ordering between system register
+- * accesses
+- */
+-static u64 get_l2_indirect_reg(u64 reg)
+-{
+-	u64 val;
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2_access_lock, flags);
+-	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+-	isb();
+-	val = read_sysreg_s(L2CPUSRDR_EL1);
+-	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+-
+-	return val;
+-}
+ 
+ struct cluster_pmu;
+ 
+diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+index dcebf28..7e50fb5 100644
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -12,3 +12,5 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+ obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
+ obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
+ obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
++obj-$(CONFIG_QCOM_APR) += apr.o
++obj-y +=	kryo-l2-accessors.o
+diff --git a/drivers/soc/qcom/kryo-l2-accessors.c b/drivers/soc/qcom/kryo-l2-accessors.c
+new file mode 100644
+index 0000000..b0356c2
+--- /dev/null
++++ b/drivers/soc/qcom/kryo-l2-accessors.c
+@@ -0,0 +1,66 @@
++/*
++ * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#include <linux/spinlock.h>
++#include <asm/sysreg.h>
++#include <soc/qcom/kryo-l2-accessors.h>
++
++#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
++#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
++
++static DEFINE_RAW_SPINLOCK(l2_access_lock);
++
++/**
++ * set_l2_indirect_reg: write value to an L2 register
++ * @reg: Address of L2 register.
++ * @value: Value to be written to register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses, and system registers with respect to device memory
++ */
++void set_l2_indirect_reg(u64 reg, u64 val)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg_s(reg, L2CPUSRSELR_EL1);
++	isb();
++	write_sysreg_s(val, L2CPUSRDR_EL1);
++	isb();
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
++}
++EXPORT_SYMBOL(set_l2_indirect_reg);
++
++/**
++ * get_l2_indirect_reg: read an L2 register value
++ * @reg: Address of L2 register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses, and system registers with respect to device memory
++ */
++u64 get_l2_indirect_reg(u64 reg)
++{
++	u64 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg_s(reg, L2CPUSRSELR_EL1);
++	isb();
++	val = read_sysreg_s(L2CPUSRDR_EL1);
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(get_l2_indirect_reg);
+diff --git a/include/soc/qcom/kryo-l2-accessors.h b/include/soc/qcom/kryo-l2-accessors.h
+new file mode 100644
+index 0000000..3c796cf
+--- /dev/null
++++ b/include/soc/qcom/kryo-l2-accessors.h
+@@ -0,0 +1,20 @@
++/*
++ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __SOC_ARCH_QCOM_KRYO_L2_ACCESSORS_H
++#define __SOC_ARCH_QCOM_KRYO_L2_ACCESSORS_H
++
++void set_l2_indirect_reg(u64 reg_addr, u64 val);
++u64 get_l2_indirect_reg(u64 reg_addr);
++
++#endif
 -- 
 1.9.1
