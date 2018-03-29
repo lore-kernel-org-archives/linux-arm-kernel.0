@@ -1,80 +1,57 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 29 Mar 2018 09:16:02 -0700
-Subject: [PATCH v6 3/6] dt-bindings: input: Add document bindings for
- mtk-pmic-keys
-In-Reply-To: <1508937364-30054-4-git-send-email-chen.zhong@mediatek.com>
-References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
- <1508937364-30054-4-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <20180329161602.GC107392@dtor-ws>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 29 Mar 2018 12:27:40 -0400
+Subject: [net-next PATCH v2 03/10] net: netcp: ethss: make call to
+ gbe_sgmii_config() conditional
+In-Reply-To: <20180327171817.GO5862@lunn.ch>
+References: <1522168309-12338-1-git-send-email-m-karicheri2@ti.com>
+ <1522168309-12338-4-git-send-email-m-karicheri2@ti.com>
+ <20180327171817.GO5862@lunn.ch>
+Message-ID: <24d6d476-1c04-c9be-e32f-4d024be649f2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 09:16:01PM +0800, Chen Zhong wrote:
-> This patch adds the device tree binding documentation for the MediaTek
-> pmic keys found on PMIC MT6397/MT6323.
+On 03/27/2018 01:18 PM, Andrew Lunn wrote:
+> On Tue, Mar 27, 2018 at 12:31:42PM -0400, Murali Karicheri wrote:
+>> As a preparatory patch to add support for 2u cpsw hardware found on
+>> K2G SoC, make call to gbe_sgmii_config() conditional. This is required
+>> since 2u uses RGMII interface instead of SGMII and to allow for driver
+>> re-use.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>  drivers/net/ethernet/ti/netcp_ethss.c | 7 +++++--
+>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+>> index 56dbc0b..1dea891 100644
+>> --- a/drivers/net/ethernet/ti/netcp_ethss.c
+>> +++ b/drivers/net/ethernet/ti/netcp_ethss.c
+>> @@ -2271,7 +2271,8 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
+>>  
+>>  	void (*hndlr)(struct net_device *) = gbe_adjust_link;
+>>  
+>> -	gbe_sgmii_config(priv, slave);
+>> +	if ((priv->ss_version == GBE_SS_VERSION_14) || IS_SS_ID_NU(priv))
+>> +		gbe_sgmii_config(priv, slave);
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
-> ---
->  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   43 ++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> Or maybe:
 > 
-> diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> new file mode 100644
-> index 0000000..2888d07
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
-> @@ -0,0 +1,43 @@
-> +MediaTek MT6397/MT6323 PMIC Keys Device Driver
-> +
-> +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
-> +and homekey. The key functions are defined as the subnode of the function
-> +node provided by MT6397/MT6323 PMIC that is being defined as one kind
-> +of Muti-Function Device (MFD)
-> +
-> +For MT6397/MT6323 MFD bindings see:
-> +Documentation/devicetree/bindings/mfd/mt6397.txt
-> +
-> +Required properties:
-> +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
-> +- linux,keycodes: See Documentation/devicetree/bindings/input/keys.txt
-> +
-> +Optional Properties:
-> +- wakeup-source: See Documentation/devicetree/bindings/power/wakeup-source.txt
-> +- mediatek,long-press-mode: Long press key shutdown setting, 1 for
-> +	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
-> +- power-off-time-sec: See Documentation/devicetree/bindings/input/keys.txt
-> +
-> +Example:
-> +
-> +	pmic: mt6397 {
-> +		compatible = "mediatek,mt6397";
-> +
-> +		...
-> +
-> +		mt6397keys: mt6397keys {
-> +			compatible = "mediatek,mt6397-keys";
-> +			mediatek,long-press-mode = <1>;
-> +			power-off-time-sec = <0>;
-> +
-> +			power {
-> +				linux,keycodes = <116>;
-> +				wakeup-source;
-> +			};
-> +
-> +			home {
-> +				linux,keycodes = <114>;
-> +			};
-> +		};
-> +
-> +	};
-> -- 
-> 1.7.9.5
+>    if (slave->phy_node == PHY_INTERFACE_MODE_SGMII)
+>    	gbe_sgmii_config(priv, slave);
 > 
+> 	Andrew
+> Actually, on specific cpsw hardware, driver supports specific interface. Driver also
+uses link-interface DT property to configure this and link-interface can be without phy
+as well. So essentially the above code looks good IMO.
 
+I need to change this as 
+
+if (IS_SS_ID_VER_14(priv) || IS_SS_ID_NU(priv))
+    gbe_sgmii_config(priv, slave);
+
+Based on the link-interface, driver selects the phy mode and pass it to of_phy_connect().
+
+I will update the above in v3.
 -- 
-Dmitry
+Murali Karicheri
+Linux Kernel, Keystone
