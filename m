@@ -1,75 +1,80 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 29 Mar 2018 17:35:02 +0200
-Subject: [PATCH] ARM: dts: imx6ull: add UART5 input select register
- definition
-In-Reply-To: <CAOMZO5CB=JkNqtkSf+QE_rjwNsOutfsS4=nWW0uVZdV63Op+eA@mail.gmail.com>
-References: <1522189496-27837-1-git-send-email-gerg@linux-m68k.org>
- <CAOMZO5CB=JkNqtkSf+QE_rjwNsOutfsS4=nWW0uVZdV63Op+eA@mail.gmail.com>
-Message-ID: <4f010fbd-9f6a-1f4e-efb5-564fba1b6cf6@i2se.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 29 Mar 2018 09:15:27 -0700
+Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
+In-Reply-To: <20180329130402.6fp7nofyp6iesmbv@dell>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+ <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
+ <1521685073.28226.10.camel@mtkswgap22>
+ <20180323185418.GD255819@dtor-ws>
+ <20180327080507.pgil6pw2mn4y2f4d@dell>
+ <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
+ <20180328102640.yx6nv5abfexmouuf@dell>
+ <1522290675.17084.8.camel@mhfsdcap03>
+ <20180329130402.6fp7nofyp6iesmbv@dell>
+Message-ID: <20180329161527.GA107392@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.03.2018 um 00:45 schrieb Fabio Estevam:
-> On Tue, Mar 27, 2018 at 7:24 PM, Greg Ungerer <gerg@linux-m68k.org> wrote:
->> The iMX6ULL UART5_RX_DATA_SELECT_INPUT DAISY Register has some different
->> bit definitions to that same register in the iMX6UL.
->>
->> The bits for the iMX6UL:
->>
->> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
->> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
->> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
->> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
->> 100 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT
->> 101 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT
->>
->> But for the iMX6ULL:
->>
->> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
->> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
->> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
->> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
->> 100 UART1_TX_DATA_ALT9 ? Selecting Pad: UART1_TX_DATA for Mode: ALT9
->> 101 UART1_RX_DATA_ALT9 ? Selecting Pad: UART1_RX_DATA for Mode: ALT9
->> 110 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT0
->> 111 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT0
->>
->> Specifically for a board I am working on with the serial console on UART5
->> I need to be able to enable UART5_RX_DATA_ALT0 mode. There is no definition
->> for the iMX6ULL version of that in imx6ul-pinfunc.h or imx6ull-pinfunc.h.
->>
->> Create a new definition specific to the iMX6ULL so that is settable.
->>
->> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Thu, Mar 29, 2018 at 02:04:02PM +0100, Lee Jones wrote:
+> On Thu, 29 Mar 2018, Chen Zhong wrote:
+> 
+> > On Wed, 2018-03-28 at 11:26 +0100, Lee Jones wrote:
+> > > On Tue, 27 Mar 2018, Matthias Brugger wrote:
+> > > 
+> > > > 
+> > > > 
+> > > > On 03/27/2018 10:05 AM, Lee Jones wrote:
+> > > > > On Fri, 23 Mar 2018, Dmitry Torokhov wrote:
+> > > > >> On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
+> > > > >>> Hi, Dmitry and Lee
+> > > > >>>
+> > > > >>> The series seems not being got merged. Are they good enough to be ready
+> > > > >>> into the your tree?
+> > > > >>>
+> > > > >>> Recently I've tested the series with focusing on pwrkey event generated
+> > > > >>> through interrupt when push and release the key on bpi-r2 board and then
+> > > > >>> finally it's working fine. but for homekey it cannot be found on the
+> > > > >>> board and thus I cannot have more tests more about it.
+> > > > >>>
+> > > > >>> Tested-by: Sean Wang <sean.wang@mediatek.com>
+> > > > >>
+> > > > >> You have my Ack on the input patch; I expect it go through Lee's tree as
+> > > > >> there are some dependencies on mfd core piece.
+> > > > > 
+> > > > > Are you happy for me to merge the Input dt-bindings without your Ack?
+> > > > > 
+> > > > 
+> > > > They got both Acked in v5, but the commit message was not updated:
+> > > > https://patchwork.kernel.org/patch/9973721/
+> > > > https://patchwork.kernel.org/patch/9973723/
+> > > 
+> > > Thanks Matthias.
+> > > 
+> > > Chen, can you collect all the Acks and repost as a RESEND please?
+> > > 
+> > 
+> > Thanks Matthias, Lee, Dmitry and Sean for your comments.
+> > 
+> > Hi Lee,
+> > 
+> > I have collected the Acks by Rob and sent the v6:
+> > https://patchwork.kernel.org/patch/10026705
+> > https://patchwork.kernel.org/patch/10026707
+> > 
+> > Are they enough to be merged?
+> 
+> Oh, I see.
+> 
+> I was asking about Dmitry's Ack.
 
-I'm okay with the second version of the patch, but i noticed that at 
-least UART5_RTS_B_SELECT_INPUT is also affected.
+Oh, sorry, I did not realize you wanted my Ack for bindings. I usually
+leave it to Rob and simply ack the driver itself when I am happy with
+the code.
 
-The bits for the iMX6UL:
+I'll go and add my ack to the binding post if that will help merging
+the series.
 
-000 CSI_DATA03_ALT8 ? Selecting Pad: CSI_DATA03 for Mode: ALT8
-001 GPIO1_IO08_ALT8 ? Selecting Pad: GPIO1_IO08 for Mode: ALT8
-010 GPIO1_IO09_ALT8 ? Selecting Pad: GPIO1_IO09 for Mode: ALT8
-011 ENET1_RX_EN_ALT1 ? Selecting Pad: ENET1_RX_EN for Mode: ALT1
-100 ENET1_TX_DATA0_ALT1 ? Selecting Pad: ENET1_TX_DATA0 for Mode: ALT1
-101 CSI_DATA02_ALT8 ? Selecting Pad: CSI_DATA02 for Mode: ALT8
+Thanks.
 
-But for the iMX6ULL:
-
-000 CSI_DATA03_ALT8 ? Selecting Pad: CSI_DATA03 for Mode: ALT8
-001 GPIO1_IO08_ALT8 ? Selecting Pad: GPIO1_IO08 for Mode: ALT8
-010 GPIO1_IO09_ALT8 ? Selecting Pad: GPIO1_IO09 for Mode: ALT8
-011 UART1_CTS_B_ALT9 ? Selecting Pad: UART1_CTS_B for Mode: ALT9
-100 UART1_RTS_B_ALT9 ? Selecting Pad: UART1_RTS_B for Mode: ALT9
-101 ENET1_RX_EN_ALT1 ? Selecting Pad: ENET1_RX_EN for Mode: ALT1
-110 ENET1_TX_DATA0_ALT1 ? Selecting Pad: ENET1_TX_DATA0 for Mode: ALT1
-111 CSI_DATA02_ALT8 ? Selecting Pad: CSI_DATA02 for Mode: ALT8
-
-Comparing the datasheets isn't fun ...
-
-Should i provide a patch for this or is there a easier way to figure out 
-all the differences?
-
-Best regards
-Stefan
+-- 
+Dmitry
