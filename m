@@ -1,101 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 29 Mar 2018 13:59:12 +0100
-Subject: [RESEND PATCH v2 4/8] mfd: stm32-timers: add support for dmas
-In-Reply-To: <106ff518-4973-5d4a-b5bf-dd58cbd8439a@st.com>
-References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
- <1518602679-3064-5-git-send-email-fabrice.gasnier@st.com>
- <20180328152251.xeh72dpeflzohn4k@dell>
- <106ff518-4973-5d4a-b5bf-dd58cbd8439a@st.com>
-Message-ID: <20180329125912.jgasmw75qvtlszgx@dell>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 29 Mar 2018 15:02:20 +0200
+Subject: [PATCH v3 0/6] clocksource: rework Atmel TCB timer driver
+In-Reply-To: <e3235587-8362-e1fc-a813-39f790a1c8b4@linaro.org>
+References: <20180223171558.7037-1-alexandre.belloni@bootlin.com>
+ <3478710.yJBBt3uoRT@ada> <20180329104542.GK13942@piout.net>
+ <3103570.fW0XyqvKVi@ada> <20180329114255.GL13942@piout.net>
+ <e3235587-8362-e1fc-a813-39f790a1c8b4@linaro.org>
+Message-ID: <20180329130220.GM13942@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Mar 2018, Fabrice Gasnier wrote:
-
-> On 03/28/2018 05:22 PM, Lee Jones wrote:
-> > On Wed, 14 Feb 2018, Fabrice Gasnier wrote:
-> > 
-> >> STM32 Timers can support up to 7 DMA requests:
-> >> - 4 channels, update, compare and trigger.
-> >> Optionally request part, or all DMAs from stm32-timers MFD core.
+On 29/03/2018 at 14:07:34 +0200, Daniel Lezcano wrote:
+> On 29/03/2018 13:42, Alexandre Belloni wrote:
+> > On 29/03/2018 at 13:31:18 +0200, Alexander Dahl wrote:
+> >> Pretty sure. I rebuilt the whole BSP and added another line to the kernel 
+> >> source to see if the tree I applied the patches to, was actually built:
 > >>
-> >> Also add routine to implement burst reads using DMA from timer registers.
-> >> This is exported. So, it can be used by child drivers, PWM capture
-> >> for instance (but not limited to).
 > >>
-> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> >> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> >> ---
-> >> Changes in v2:
-> >> - Abstract DMA handling from child driver: move it to MFD core
-> >> - Add comments on optional dma support
-> >> ---
-> >>  drivers/mfd/stm32-timers.c       | 215 ++++++++++++++++++++++++++++++++++++++-
-> >>  include/linux/mfd/stm32-timers.h |  27 +++++
-> >>  2 files changed, 238 insertions(+), 4 deletions(-)
+> >> diff --git a/drivers/clocksource/timer-atmel-tcb.c b/drivers/clocksource/timer-atmel-tcb.c
+> >> index 7fde9cfbf203..f85affc74a86 100644
+> >> --- a/drivers/clocksource/timer-atmel-tcb.c
+> >> +++ b/drivers/clocksource/timer-atmel-tcb.c
+> >> @@ -222,7 +222,8 @@ static int __init tc_clkevt_register(struct device_node *node,
+> >>                 goto err_slow;
+> >>         clk_disable(tce.clk);
+> >>  
+> >> -       clockevents_config_and_register(&tce.clkevt, 32768, 1, bits - 1);
+> >> +       pr_info( "*** bits: 0x%x, BIT(bits): 0x%lx\n", bits, BIT(bits) );
+> >> +       clockevents_config_and_register(&tce.clkevt, 32768, 1, BIT(bits) - 1);
+> >>  
+> >>         ret = request_irq(tce.irq, tc_clkevt2_irq, IRQF_TIMER | IRQF_SHARED,
+> >>                           tce.clkevt.name, &tce);
 > >>
-> >> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
-> >> index a6675a4..2cdad2c 100644
-> >> --- a/drivers/mfd/stm32-timers.c
-> >> +++ b/drivers/mfd/stm32-timers.c
-
-[...]
-
-> >> +	struct dma_chan *dmas[STM32_TIMERS_MAX_DMAS];
-> >> +	struct stm32_timers ddata;
+> >>
 > > 
-> > This looks odd to me.  Why can't you expand the current ddata
-> > structure?  Wouldn't it be better to create a stm32_timers_dma
-> > structure to place all this information in (except *dev, that should
-> > live in the ddata struct), then place a reference in the existing
-> > stm32_timers struct?
-> 
-> Maybe I miss-understand you here, from what we discussed in V1:
-> https://lkml.org/lkml/2018/1/23/574
-> >... "passing in the physical address of the parent MFD into
-> > a child device doesn't quite sit right with me"
-> I introduced this private struct in MFD parent, and completely hide it
-> from the child.
-> 
-> So, do you suggest to add struct definition here ? But make it part of
-> struct stm32_timers *ddata?
-> 
-> And only put declaration in include/linux/mfd/stm32-timers.h:
-> + struct stm32_timers_dma;
-> 
-> struct stm32_timers {
-> 	struct clk *clk;
-> 	struct regmap *regmap;
-> 	u32 max_arr;
-> +	struct stm32_timers_dma;
-> };
-
-Yes, that's the basic idea.
-
-> I can probably spare the *dev then... use dev->parent in child driver.
-
-What would you use dev->parent for?
-
-[...]
-
-> >> +static int stm32_timers_remove(struct platform_device *pdev)
-> >> +{
-> >> +	struct stm32_timers *ddata = platform_get_drvdata(pdev);
-> >> +	struct stm32_timers_priv *priv = to_stm32_timers_priv(ddata);
-> >> +
-> >> +	of_platform_depopulate(&pdev->dev);
+> > I've just tested on a g20, old driver:
+> > INT                NAME          RATE             MAX
+> >  16 [vel     at91_tick,]   175 Ints/s     (max:   231)
+> >  19 [ vel     tc_clkevt]   129 Ints/s     (max:   129)
 > > 
-> > Why can't you continue using devm_*?
+> > 
+> > new driver:
+> > INT                NAME          RATE             MAX
+> >  17 [vel     timer at fffa]   129 Ints/s     (max:   129)
+> >  18 [     vel     ttyS0]   175 Ints/s     (max:   231)
 > 
-> I can use devm_of_platform_depopulate() here if you prefer, and keep
-> devm_of_platform_populate() in probe.
+> Can you give in both platforms how fast the clocksource wraps up ?
+> 
 
-The point of devm_* is that you don't have to call depopulate.
+sam9g20, old:
+clocksource: pit: mask: 0xfffffff max_cycles: 0xfffffff, max_idle_ns: 14370379250 ns
+sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 21474836475000000ns
+clocksource: tcb_clksrc: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 114963034405 ns
 
-It happens automatically once this driver is unbound.
+sam9g20, new:
+clocksource: timer at fffa0000:0,1: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 114963034405 ns
+sched_clock: 32 bits at 16MHz, resolution 60ns, wraps every 129171948513ns
+
+sama5d4, old:
+clocksource: pit: mask: 0x7ffffff max_cycles: 0x7ffffff, max_idle_ns: 10859434279 ns
+sched_clock: 32 bits at 100 Hz, resolution 10000000ns, wraps every 21474836475000000ns
+clocksource: tcb_clksrc: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 173750949719 ns
+
+sama5d4, new:
+clocksource: timer at fc024000:0: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 173750949719 ns
+sched_clock: 32 bits at 11MHz, resolution 90ns, wraps every 195225786322ns
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
