@@ -1,94 +1,76 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 29 Mar 2018 10:59:41 -0400
-Subject: [net-next, v2, 01/10] soc: ti: K2G: enhancement to support QMSS in
- NSS
-In-Reply-To: <1ccf03e7-17b4-cf00-176d-0e41038c88f8@ti.com>
-References: <1522168309-12338-2-git-send-email-m-karicheri2@ti.com>
- <1ccf03e7-17b4-cf00-176d-0e41038c88f8@ti.com>
-Message-ID: <feb354cc-2556-c82c-6061-bea6ee819ed5@ti.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 29 Mar 2018 17:06:46 +0200
+Subject: [PATCH] watchdog: Add support for Armada 37xx CPU watchdog
+In-Reply-To: <20180323164422.27959-1-marek.behun@nic.cz> ("Marek
+ =?utf-8?Q?Beh=C3=BAn=22's?=
+ message of "Fri, 23 Mar 2018 17:44:22 +0100")
+References: <20180323164422.27959-1-marek.behun@nic.cz>
+Message-ID: <871sg2udix.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2018 03:01 PM, Grygorii Strashko wrote:
-> Hi Murali,
-> 
+Hi Marek,
+ 
+ On ven., mars 23 2018, Marek Beh?n <marek.behun@nic.cz> wrote:
 
->>   
->> +enum qmss_version {
->> +	QMSS,
->> +	QMSS_LITE,
-> 
-> QMSS_66AK2G
-> 
+> This adds support for the CPU watchdog found on Marvell Armada 37xx
+> SoCs.
+>
+> There are 4 counters which can be set as CPU watchdog counters.
+> This driver uses the second counter (ID 1, counting from 0)
+> (Marvell's Linux also uses second counter by default).
+> In the future it could be adapted to use other counters, with
+> definition in the device tree.
+>
+> Signed-off-by: Marek Behun <marek.behun@nic.cz>
 
-OK.
+You can add my:
 
->> +};
->> +
->>   struct knav_device {
->>   	struct device				*dev;
->>   	unsigned				base_id;
->> @@ -305,6 +310,7 @@ struct knav_device {
->>   	struct list_head			pools;
->>   	struct list_head			pdsps;
->>   	struct list_head			qmgrs;
->> +	enum qmss_version			version;
->>   };
->>   
-> 
-> [...]
-> 
->>   }
->>   
->> +/* Match table for of_platform binding */
->> +static const struct of_device_id keystone_qmss_of_match[] = {
->> +	{
->> +		.compatible = "ti,keystone-navigator-qmss",
-> 
-> 		.data	= (void *)QMSS,
+Tested-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 
-This seems to be unnecessary as QMSS is actually defined as zero. Also 
-this static. So that value is zero already in memory.
-> 
->> +	},
->> +	{
->> +		.compatible = "ti,keystone-navigator-qmss-l",
->> +		.data	= (void *)QMSS_LITE,
->> +	},
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, keystone_qmss_of_match);
->> +
->>   static int knav_queue_probe(struct platform_device *pdev)
->>   {
->>   	struct device_node *node = pdev->dev.of_node;
->>   	struct device_node *qmgrs, *queue_pools, *regions, *pdsps;
->> +	const struct of_device_id *match;
->>   	struct device *dev = &pdev->dev;
->>   	u32 temp[2];
->>   	int ret;
->> @@ -1700,6 +1749,10 @@ static int knav_queue_probe(struct platform_device *pdev)
->>   		return -ENOMEM;
->>   	}
->>   
->> +	match = of_match_device(of_match_ptr(keystone_qmss_of_match), dev);
->> +	if (match && match->data)
->> +		kdev->version = QMSS_LITE;
-> 
-> 	if (match)
-> 		kdev->version = match->data;
-> 	else
-> 		error?
+However, I have one concern about this patch and the device tree
+binding.
 
-Similar to above. This private memory is allocated using kzalloc which initializes
-everything to zero. So the else part is unnecessary.
 
-Murali
+> ---
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi |   7 +
+>  drivers/watchdog/Kconfig                     |  11 +
+>  drivers/watchdog/Makefile                    |   1 +
+>  drivers/watchdog/armada_37xx_wdt.c           | 356 +++++++++++++++++++++++++++
+>  4 files changed, 375 insertions(+)
+>  create mode 100644 drivers/watchdog/armada_37xx_wdt.c
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index 8c0cf7efac65..fcd2186e869c 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -139,6 +139,13 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			wdt: watchdog-timer at 8300 {
+> +				compatible = "marvell,armada-3700-wdt";
+> +				reg = <0xd064 0x4>,
+> +				      <0x8300 0x40>;
 
-> [...]
-> 
+The first reg is actually part of a bigger ranges of register called
+"CPU Miscellaneous Register Summary ". It start at 0xd000 and its size
+is 0xd8. Here there are registers related to ROM, AXI, watchdog,
+timers...
+
+Could you create a syscon for this set of registers and then use a
+phandle from the watchdog node to use it ? In the driver it could be done
+using regamp.
+
+The rest of the patch looks OK, at least for the point of view of the
+SoC. For the watchdog part I let the maintainer review it.
+
+Thanks,
+
+Gregory
 
 
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
