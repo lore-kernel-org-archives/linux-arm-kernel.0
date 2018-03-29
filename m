@@ -1,36 +1,79 @@
-From: mkelly@xevo.com (Martin Kelly)
-Date: Wed, 28 Mar 2018 16:29:47 -0700
-Subject: [linux-sunxi] [PATCH v9 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
-References: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <9b60dee0-2504-6ae3-fda3-64c4458025c3@xevo.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 28 Mar 2018 17:27:23 -0700
+Subject: [PATCH] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <20180328180705.29147-1-chunkeey@gmail.com>
+References: <20180328180705.29147-1-chunkeey@gmail.com>
+Message-ID: <20180329002723.GD18510@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/2018 05:51 PM, Yong Deng wrote:
-> This patchset add initial support for Allwinner V3s CSI.
+On Wed 28 Mar 11:07 PDT 2018, Christian Lamparter wrote:
+
+> Sven Eckelmann reported an issue with the current IPQ4019 pinctrl.
+> Setting up any gpio-hog in the device-tree for his device would
+> "kill the bootup completely":
 > 
-> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> interface and CSI1 is used for parallel interface. This is not
-> documented in datasheet but by test and guess.
+> | [    0.477838] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+> | [    0.499828] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferring probe
+> | [    1.298883] requesting hog GPIO enable USB2 power (chip 1000000.pinctrl, offset 58) failed, -517
+> | [    1.299609] gpiochip_add_data: GPIOs 0..99 (1000000.pinctrl) failed to register
+> | [    1.308589] ipq4019-pinctrl 1000000.pinctrl: Failed register gpiochip
+> | [    1.316586] msm_serial 78af000.serial: could not find pctldev for node /soc/pinctrl at 1000000/serial_pinmux, deferring probe
+> | [    1.322415] spi_qup 78b5000.spi: could not find pctldev for node /soc/pinctrl at 1000000/spi_0_pinmux, deferri
 > 
-> This patchset implement a v4l2 framework driver and add a binding
-> documentation for it.
-> 
-> Currently, the driver only support the parallel interface. And has been
-> tested with a BT1120 signal which generating from FPGA. The following
-> fetures are not support with this patchset:
->    - ISP
->    - MIPI-CSI2
->    - Master clock for camera sensor
->    - Power regulator for the front end IC
+> This was also verified on a RT-AC58U (IPQ4018) which would
+> no longer boot, if a gpio-hog was specified. (Tried forcing
+> the USB LED PIN (GPIO0) to high.).
 > 
 
-Hi Yong,
+It's quite clear that this is a generic issue with the msm pinctrl
+driver.
 
-Thanks so much, this driver is a great contribution!
+For the cases where I've been in need of static configuration of
+certain pins I've simply made the pinctrl node itself have a pinctrl-0
+that refer to a state that I want to hold. This has worked well and I
+didn't even know about the gpio-hog property.
 
-Unfortunately the board I'm working with (nanopi neo air) uses the MIPI 
-CSI-2 CSI0 interface rather than CSI1. Do you have any plans to support 
-the MIPI CSI-2 interface at some point? If not, do you know the scope of 
-what would be involved?
+[..]
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 3ca96e361878..17ad9cbd9f8c 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -327,6 +327,7 @@
+>  			reg = <0x800000 0x4000>;
+>  
+>  			gpio-controller;
+> +			gpio-ranges = <&tlmm_pinmux 0 0 90>;
+
+This seems reasonable.
+
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+[..]
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+> index 495432f3341b..f2580bbba741 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+> @@ -831,13 +831,6 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>  		return ret;
+>  	}
+>  
+> -	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
+> -	if (ret) {
+> -		dev_err(pctrl->dev, "Failed to add pin range\n");
+> -		gpiochip_remove(&pctrl->chip);
+> -		return ret;
+> -	}
+> -
+
+But, this will break backwards compatibility with existing DTBs and I
+don't see how this would work with the ACPI based platforms using this
+driver.
+
+
+Iirc this driver follows the same pattern as several other pinctrl
+drivers providing gpios, how are they handling this?
+
+Regards,
+Bjorn
