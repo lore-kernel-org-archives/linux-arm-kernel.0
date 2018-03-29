@@ -1,33 +1,50 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 29 Mar 2018 10:26:05 +0200
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.17
-In-Reply-To: <20180327163716.GC18435@arm.com>
-References: <20180327163716.GC18435@arm.com>
-Message-ID: <20180329082605.33gqerpbhskcsw5i@8bytes.org>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Thu, 29 Mar 2018 10:39:42 +0200
+Subject: [PATCH v4 2/6] PCI: aardvark: Fix logic in advk_pcie_valid_device()
+In-Reply-To: <20180329083946.25970-1-thomas.petazzoni@bootlin.com>
+References: <20180329083946.25970-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180329083946.25970-3-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 05:37:17PM +0100, Will Deacon wrote:
-> Hi Joerg,
-> 
-> Please pull the following Arm SMMU updates for 4.17. Changes include:
-> 
->   * More graceful handling and reporting of IRQ setup failures
->   * General cleanup of our register field definitions using linux/bitmask.h
->   * Support for 52-bit physical and virtual addressing
-> 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> The following changes since commit 4a3928c6f8a53fa1aed28ccba227742486e8ddcb:
-> 
->   Linux 4.16-rc3 (2018-02-25 18:50:41 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+From: Victor Gu <xigu@marvell.com>
 
-Pulled, thanks Will.
+The PCI configuration space read/write functions were special casing
+the situation where PCI_SLOT(devfn) != 0, and returned
+PCIBIOS_DEVICE_NOT_FOUND in this case.
+
+However, while this is what is intended for the root bus, it is not
+intended for the child busses, as it prevents discovering devices with
+PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
+if we're on the root bus.
+
+Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+[Thomas: tweak commit log.]
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+---
+Changes since v2:
+ - The logic has been factorized into a advk_pcie_valid_device()
+   helper in a previous patch, so this patch was adjusted accordingly.
+---
+ drivers/pci/host/pci-aardvark.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+index 82bff709a4b3..9d7f9f1c6837 100644
+--- a/drivers/pci/host/pci-aardvark.c
++++ b/drivers/pci/host/pci-aardvark.c
+@@ -433,7 +433,7 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
+ static bool advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
+ 				  int devfn)
+ {
+-	if (PCI_SLOT(devfn) != 0)
++	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0)
+ 		return false;
+ 
+ 	return true;
+-- 
+2.14.3
