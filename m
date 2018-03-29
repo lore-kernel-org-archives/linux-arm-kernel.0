@@ -1,71 +1,101 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Thu, 29 Mar 2018 13:53:24 +0100
-Subject: [PATCH] sched: support dynamiQ cluster
-In-Reply-To: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
-References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20180329125324.GR4589@e105550-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 29 Mar 2018 13:59:12 +0100
+Subject: [RESEND PATCH v2 4/8] mfd: stm32-timers: add support for dmas
+In-Reply-To: <106ff518-4973-5d4a-b5bf-dd58cbd8439a@st.com>
+References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
+ <1518602679-3064-5-git-send-email-fabrice.gasnier@st.com>
+ <20180328152251.xeh72dpeflzohn4k@dell>
+ <106ff518-4973-5d4a-b5bf-dd58cbd8439a@st.com>
+Message-ID: <20180329125912.jgasmw75qvtlszgx@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 09:46:55AM +0200, Vincent Guittot wrote:
-> Arm DynamiQ system can integrate cores with different micro architecture
-> or max OPP under the same DSU so we can have cores with different compute
-> capacity at the LLC (which was not the case with legacy big/LITTLE
-> architecture). Such configuration is similar in some way to ITMT on intel
-> platform which allows some cores to be boosted to higher turbo frequency
-> than others and which uses SD_ASYM_PACKING feature to ensures that CPUs with
-> highest capacity, will always be used in priortiy in order to provide
-> maximum throughput.
-> 
-> Add arch_asym_cpu_priority() for arm64 as this function is used to
-> differentiate CPUs in the scheduler. The CPU's capacity is used to order
-> CPUs in the same DSU.
-> 
-> Create sched domain topolgy level for arm64 so we can set SD_ASYM_PACKING
-> at MC level.
-> 
-> Some tests have been done on a hikey960 platform (quad cortex-A53,
-> quad cortex-A73). For the test purpose, the CPUs topology of the hikey960
-> has been modified so the 8 heterogeneous cores are described as being part
-> of the same cluster and sharing resources (MC level) like with a DynamiQ DSU.
-> 
-> Results below show the time in seconds to run sysbench --test=cpu with an
-> increasing number of threads. The sysbench test run 32 times
-> 
->              without patch     with patch    diff
-> 1 threads    11.04(+/- 30%)    8.86(+/- 0%)  -19%
-> 2 threads     5.59(+/- 14%)    4.43(+/- 0%)  -20%
-> 3 threads     3.80(+/- 13%)    2.95(+/- 0%)  -22%
-> 4 threads     3.10(+/- 12%)    2.22(+/- 0%)  -28%
-> 5 threads     2.47(+/-  5%)    1.95(+/- 0%)  -21%
-> 6 threads     2.09(+/-  0%)    1.73(+/- 0%)  -17%
-> 7 threads     1.64(+/-  0%)    1.56(+/- 0%)  - 7%
-> 8 threads     1.42(+/-  0%)    1.42(+/- 0%)    0%
-> 
-> Results show a better and stable results across iteration with the patch
-> compared to mainline because we are always using big cores in priority whereas
-> with mainline, the scheduler randomly choose a big or a little cores when
-> there are more cores than number of threads.
-> With 1 thread, the test duration varies in the range [8.85 .. 15.86] for
-> mainline whereas it stays in the range [8.85..8.87] with the patch
+On Wed, 28 Mar 2018, Fabrice Gasnier wrote:
 
-Using ASYM_PACKING is essentially an easier but somewhat less accurate
-way to achieve the same behaviour for big.LITTLE system as with the
-"misfit task" series that been under review here for the last couple of
-months.
+> On 03/28/2018 05:22 PM, Lee Jones wrote:
+> > On Wed, 14 Feb 2018, Fabrice Gasnier wrote:
+> > 
+> >> STM32 Timers can support up to 7 DMA requests:
+> >> - 4 channels, update, compare and trigger.
+> >> Optionally request part, or all DMAs from stm32-timers MFD core.
+> >>
+> >> Also add routine to implement burst reads using DMA from timer registers.
+> >> This is exported. So, it can be used by child drivers, PWM capture
+> >> for instance (but not limited to).
+> >>
+> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> >> ---
+> >> Changes in v2:
+> >> - Abstract DMA handling from child driver: move it to MFD core
+> >> - Add comments on optional dma support
+> >> ---
+> >>  drivers/mfd/stm32-timers.c       | 215 ++++++++++++++++++++++++++++++++++++++-
+> >>  include/linux/mfd/stm32-timers.h |  27 +++++
+> >>  2 files changed, 238 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+> >> index a6675a4..2cdad2c 100644
+> >> --- a/drivers/mfd/stm32-timers.c
+> >> +++ b/drivers/mfd/stm32-timers.c
 
-As I see it, the main differences is that ASYM_PACKING attempts to pack
-all tasks regardless of task utilization on the higher capacity cpus
-whereas the "misfit task" series carefully picks cpus with tasks they
-can't handle so we don't risk migrating tasks which are perfectly
-suitable to for a little cpu to a big cpu unnecessarily. Also it is
-based directly on utilization and cpu capacity like the capacity
-awareness we already have to deal with big.LITTLE in the wake-up path.
-Furthermore, it should work for all big.LITTLE systems regardless of the
-topology, where I think ASYM_PACKING might not work well for systems
-with separate big and little sched_domains.
+[...]
 
-Have to tried taking the misfit patches for a spin on your setup? I
-expect them give you the same behaviour as you report above.
+> >> +	struct dma_chan *dmas[STM32_TIMERS_MAX_DMAS];
+> >> +	struct stm32_timers ddata;
+> > 
+> > This looks odd to me.  Why can't you expand the current ddata
+> > structure?  Wouldn't it be better to create a stm32_timers_dma
+> > structure to place all this information in (except *dev, that should
+> > live in the ddata struct), then place a reference in the existing
+> > stm32_timers struct?
+> 
+> Maybe I miss-understand you here, from what we discussed in V1:
+> https://lkml.org/lkml/2018/1/23/574
+> >... "passing in the physical address of the parent MFD into
+> > a child device doesn't quite sit right with me"
+> I introduced this private struct in MFD parent, and completely hide it
+> from the child.
+> 
+> So, do you suggest to add struct definition here ? But make it part of
+> struct stm32_timers *ddata?
+> 
+> And only put declaration in include/linux/mfd/stm32-timers.h:
+> + struct stm32_timers_dma;
+> 
+> struct stm32_timers {
+> 	struct clk *clk;
+> 	struct regmap *regmap;
+> 	u32 max_arr;
+> +	struct stm32_timers_dma;
+> };
 
-Morten
+Yes, that's the basic idea.
+
+> I can probably spare the *dev then... use dev->parent in child driver.
+
+What would you use dev->parent for?
+
+[...]
+
+> >> +static int stm32_timers_remove(struct platform_device *pdev)
+> >> +{
+> >> +	struct stm32_timers *ddata = platform_get_drvdata(pdev);
+> >> +	struct stm32_timers_priv *priv = to_stm32_timers_priv(ddata);
+> >> +
+> >> +	of_platform_depopulate(&pdev->dev);
+> > 
+> > Why can't you continue using devm_*?
+> 
+> I can use devm_of_platform_depopulate() here if you prefer, and keep
+> devm_of_platform_populate() in probe.
+
+The point of devm_* is that you don't have to call depopulate.
+
+It happens automatically once this driver is unbound.
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
