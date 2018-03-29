@@ -1,58 +1,89 @@
-From: atull@kernel.org (Alan Tull)
-Date: Thu, 29 Mar 2018 16:12:30 -0500
-Subject: [PATCHv3 4/7] dt-bindings: fpga: add Stratix10 SoC FPGA manager
- binding
-In-Reply-To: <1522182014-7338-5-git-send-email-richard.gong@linux.intel.com>
-References: <1522182014-7338-1-git-send-email-richard.gong@linux.intel.com>
- <1522182014-7338-5-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <CANk1AXTYZTdMHMPkz1+0zZ2f2FJ-rjJVUbtjjKW06ac1J5VAVQ@mail.gmail.com>
+From: ilialin@codeaurora.org (Ilia Lin)
+Date: Fri, 30 Mar 2018 00:26:33 +0300
+Subject: [PATCH v4 00/14] CPU scaling support for msm8996
+Message-ID: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 3:20 PM,  <richard.gong@linux.intel.com> wrote:
-> From: Alan Tull <atull@kernel.org>
->
-> Add a Device Tree binding for the Intel Stratix10 SoC FPGA manager.
->
-> Signed-off-by: Alan Tull <atull@kernel.org>
-> ---
-> v2: this patch is added in patch set version 2
-> v3: change to put fpga_mgr node under firmware/svc node
-> ---
->  .../bindings/fpga/intel-stratix10-soc-fpga-mgr.txt      | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
->
-> diff --git a/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-> new file mode 100644
-> index 0000000..be7cd96
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fpga/intel-stratix10-soc-fpga-mgr.txt
-> @@ -0,0 +1,17 @@
-> +Intel Stratix10 SoC FPGA Manager
-> +
-> +Required properties:
-> +The fpga_mgr node has the following mandatory property, must be located under
-> +firmware/svc node.
-> +
-> +- compatible : should contain "intel,stratix10-soc-fpga-mgr"
-> +
-> +Example:
-> +
-> +       firmware {
-> +               svc {
-> +                       fpga_mgr: fpga-mgr at 0 {
+[v4]
+ * Adressed comments from Stephen
+ * Added CPU regulator support
+ * Added qcom-cpufreq-kryo driver
 
-Shouldn't have the index.  Should be:
+[v3]
+ * Rebased on top of the latest PLL driver changes
+ * Addressed comment from Rob Herring for bindings
 
-                            fpga_mgr: fpga-mgr {
+[v2]
+ * Addressed comments from Rob Herring for bindings
+ * Addressed comments from Mark Rutland for memory barrier
+ * Addressed comments from Julien Thierry for clock reenabling condition
+ * Tuned the HW configuration for clock frequencies below 600MHz
 
-Alan
+Clocks:
+This series adds support for the CPU clocks on msm8996 devices.
+The driver uses the existing PLL drivers and is required to control
+the CPU frequency scaling on the MSM8996.
 
-> +                               compatible = "intel,stratix10-soc-fpga-mgr";
-> +                       };
-> +               };
-> +       };
-> --
-> 2.7.4
->
+Regulators:
+Added SAW regulator support to the SPMI regulator driver. The SAW regulators
+will be controlled through special CPU registers instead of direct
+SPMI accesses.
+
+Cpufreq:
+The qcom-cpufreq-kryo driver is aimed to support different SOC versions.
+The driver reads eFuse information and chooses the required OPP subset
+by passing the OPP supported-hw parameter.
+
+A previous post of RFC can be found here:
+https://patchwork.kernel.org/patch/10218991/
+
+
+Ilia Lin (10):
+  soc: qcom: Separate kryo l2 accessors from PMU driver
+  clk: qcom: Add DT bindings for CPU clock driver for msm8996
+  clk: qcom: Add ACD path to CPU clock driver for msm8996
+  dt: qcom: Add opp and thermal to the msm8996
+  regulator: qcom_spmi: Add support for SAW
+  dt-bindings: Add support for SAW documentation
+  dt: qcom: Add SAW regulator for 8x96 CPUs
+  cpufreq: Add Kryo CPU scaling driver
+  dt-bindings: cpufreq: Document operating-points-v2-kryo-cpu
+  dt: qcom: Add qcom-cpufreq-kryo driver configuration
+
+Rajendra Nayak (4):
+  clk: qcom: Make clk_alpha_pll_configure available to modules
+  clk: qcom: Add CPU clock driver for msm8996
+  clk: qcom: cpu-8996: Add support to switch to alternate PLL
+  clk: qcom: cpu-8996: Add support to switch below 600Mhz
+
+ .../devicetree/bindings/clock/qcom,kryocc.txt      |  17 +
+ .../devicetree/bindings/cpufreq/kryo-cpufreq.txt   | 693 +++++++++++++++++++++
+ .../bindings/regulator/qcom,spmi-regulator.txt     |  45 ++
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dts        |   2 +-
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 658 ++++++++++++++++++-
+ drivers/clk/clk-fixed-factor.c                     |   2 +-
+ drivers/clk/qcom/Kconfig                           |   8 +
+ drivers/clk/qcom/Makefile                          |   1 +
+ drivers/clk/qcom/clk-alpha-pll.c                   |   1 +
+ drivers/clk/qcom/clk-alpha-pll.h                   |   6 +
+ drivers/clk/qcom/clk-cpu-8996.c                    | 520 ++++++++++++++++
+ drivers/cpufreq/Kconfig.arm                        |  11 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/cpufreq-dt-platdev.c               |   3 +
+ drivers/cpufreq/qcom-cpufreq-kryo.c                | 147 +++++
+ drivers/perf/qcom_l2_pmu.c                         |  44 +-
+ drivers/regulator/qcom_spmi-regulator.c            | 133 +++-
+ drivers/soc/qcom/Makefile                          |   2 +
+ drivers/soc/qcom/kryo-l2-accessors.c               |  66 ++
+ include/soc/qcom/kryo-l2-accessors.h               |  20 +
+ 20 files changed, 2324 insertions(+), 56 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,kryocc.txt
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+ create mode 100644 drivers/clk/qcom/clk-cpu-8996.c
+ create mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
+ create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
+ create mode 100644 include/soc/qcom/kryo-l2-accessors.h
+
+-- 
+1.9.1
