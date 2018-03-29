@@ -1,119 +1,56 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 29 Mar 2018 15:41:24 +0200
-Subject: [RESEND PATCH v2 4/8] mfd: stm32-timers: add support for dmas
-In-Reply-To: <20180329125912.jgasmw75qvtlszgx@dell>
-References: <1518602679-3064-1-git-send-email-fabrice.gasnier@st.com>
- <1518602679-3064-5-git-send-email-fabrice.gasnier@st.com>
- <20180328152251.xeh72dpeflzohn4k@dell>
- <106ff518-4973-5d4a-b5bf-dd58cbd8439a@st.com>
- <20180329125912.jgasmw75qvtlszgx@dell>
-Message-ID: <12d53b2e-eec4-a498-1e1f-c217161c5086@st.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 29 Mar 2018 15:44:16 +0200
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329153322.5e2fc1e7@bbrezillon>
+ <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+Message-ID: <20180329154416.5c1a0013@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2018 02:59 PM, Lee Jones wrote:
-> On Wed, 28 Mar 2018, Fabrice Gasnier wrote:
-> 
->> On 03/28/2018 05:22 PM, Lee Jones wrote:
->>> On Wed, 14 Feb 2018, Fabrice Gasnier wrote:
->>>
->>>> STM32 Timers can support up to 7 DMA requests:
->>>> - 4 channels, update, compare and trigger.
->>>> Optionally request part, or all DMAs from stm32-timers MFD core.
->>>>
->>>> Also add routine to implement burst reads using DMA from timer registers.
->>>> This is exported. So, it can be used by child drivers, PWM capture
->>>> for instance (but not limited to).
->>>>
->>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>>> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->>>> ---
->>>> Changes in v2:
->>>> - Abstract DMA handling from child driver: move it to MFD core
->>>> - Add comments on optional dma support
->>>> ---
->>>>  drivers/mfd/stm32-timers.c       | 215 ++++++++++++++++++++++++++++++++++++++-
->>>>  include/linux/mfd/stm32-timers.h |  27 +++++
->>>>  2 files changed, 238 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
->>>> index a6675a4..2cdad2c 100644
->>>> --- a/drivers/mfd/stm32-timers.c
->>>> +++ b/drivers/mfd/stm32-timers.c
-> 
-> [...]
-> 
->>>> +	struct dma_chan *dmas[STM32_TIMERS_MAX_DMAS];
->>>> +	struct stm32_timers ddata;
->>>
->>> This looks odd to me.  Why can't you expand the current ddata
->>> structure?  Wouldn't it be better to create a stm32_timers_dma
->>> structure to place all this information in (except *dev, that should
->>> live in the ddata struct), then place a reference in the existing
->>> stm32_timers struct?
->>
->> Maybe I miss-understand you here, from what we discussed in V1:
->> https://lkml.org/lkml/2018/1/23/574
->>> ... "passing in the physical address of the parent MFD into
->>> a child device doesn't quite sit right with me"
->> I introduced this private struct in MFD parent, and completely hide it
->> from the child.
->>
->> So, do you suggest to add struct definition here ? But make it part of
->> struct stm32_timers *ddata?
->>
->> And only put declaration in include/linux/mfd/stm32-timers.h:
->> + struct stm32_timers_dma;
->>
->> struct stm32_timers {
->> 	struct clk *clk;
->> 	struct regmap *regmap;
->> 	u32 max_arr;
->> +	struct stm32_timers_dma;
->> };
-> 
-> Yes, that's the basic idea.
-> 
->> I can probably spare the *dev then... use dev->parent in child driver.
-> 
-> What would you use dev->parent for?
+On Thu, 29 Mar 2018 15:37:43 +0200
+Peter Rosin <peda@axentia.se> wrote:
 
-Hi Lee,
-
-This is to follow your sugestion to use *dev instead of *ddata when
-calling stm32_timers_dma_burst_read(), the idea is to use it on child side:
-stm32_timers_dma_burst_read(dev->parent,...) from pwm driver.
-Then there is no need to keep *dev inside ddata struct.
-
+> On 2018-03-29 15:33, Boris Brezillon wrote:
+> > On Thu, 29 Mar 2018 15:10:54 +0200
+> > Peter Rosin <peda@axentia.se> wrote:
+> >   
+> >> On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
+> >> flash accesses have a tendency to cause display disturbances. Add a
+> >> module param to disable DMA from the NAND controller, since that fixes
+> >> the display problem for me.
+> >>
+> >> Signed-off-by: Peter Rosin <peda@axentia.se>
+> >> ---
+> >>  drivers/mtd/nand/raw/atmel/nand-controller.c | 7 ++++++-
+> >>  1 file changed, 6 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
+> >> index b2f00b398490..2ff7a77c7b8e 100644
+> >> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
+> >> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
+> >> @@ -129,6 +129,11 @@
+> >>  #define DEFAULT_TIMEOUT_MS			1000
+> >>  #define MIN_DMA_LEN				128
+> >>  
+> >> +static bool atmel_nand_avoid_dma __read_mostly;
+> >> +
+> >> +MODULE_PARM_DESC(avoiddma, "Avoid using DMA");
+> >> +module_param_named(avoiddma, atmel_nand_avoid_dma, bool, 0400);  
+> > 
+> > I'm not a big fan of those driver specific cmdline parameters. Can't we
+> > instead give an higher priority to HLCDC master using the bus matrix?  
 > 
-> [...]
-> 
->>>> +static int stm32_timers_remove(struct platform_device *pdev)
->>>> +{
->>>> +	struct stm32_timers *ddata = platform_get_drvdata(pdev);
->>>> +	struct stm32_timers_priv *priv = to_stm32_timers_priv(ddata);
->>>> +
->>>> +	of_platform_depopulate(&pdev->dev);
->>>
->>> Why can't you continue using devm_*?
->>
->> I can use devm_of_platform_depopulate() here if you prefer, and keep
->> devm_of_platform_populate() in probe.
-> 
-> The point of devm_* is that you don't have to call depopulate.
-> 
-> It happens automatically once this driver is unbound.
+> I don't know if it will be enough, but we sure can try. However, I have
+> no idea how to do that. I will happily test stuff though...
 
-Ok, so to clarify, keeping devm_ here may be a bit racy:
-of_platform_depopulate will happen after dma has been released (there is
-no devm_ variant to release dma).
-Only way to prevent race condition here, is to enforce
-of_platform_depopulate() is called before dma release (e.g. in reverse
-order compared to probe).
+There's no interface to configure that from Linux, but you can try to
+tweak it with devmem and if that does the trick, maybe we can expose a
+way to configure that from Linux. For more details, see the "Bus Matrix
+(MATRIX)" section in Atmel datasheets.
 
-Do you wish I add a comment about it ?
-
-Best Regards,
-Fabrice
-
-> 
+-- 
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
