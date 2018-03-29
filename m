@@ -1,72 +1,94 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 29 Mar 2018 14:10:34 +0300
-Subject: [PATCH v4 8/9] pwm: add documentation for pwm push-pull mode
-In-Reply-To: <1522321835-6460-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1522321835-6460-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1522321835-6460-9-git-send-email-claudiu.beznea@microchip.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 29 Mar 2018 12:12:27 +0100
+Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <CAKv+Gu8o4R5JBseRt345OV5UVShFmGYiF4Wpxsnw_ZiRuch2AQ@mail.gmail.com>
+References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+ <20180328124129.6459-3-ard.biesheuvel@linaro.org>
+ <20180328171812.GN16308@e103592.cambridge.arm.com>
+ <CAKv+Gu-FdndoFON3tJi0WP=+HsBtaoLY-uf6=0bd3e6jr1h-DQ@mail.gmail.com>
+ <20180329093605.GP16308@e103592.cambridge.arm.com>
+ <CAKv+Gu8o4R5JBseRt345OV5UVShFmGYiF4Wpxsnw_ZiRuch2AQ@mail.gmail.com>
+Message-ID: <20180329111227.GQ16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for PWM push-pull mode.
+On Thu, Mar 29, 2018 at 10:59:28AM +0100, Ard Biesheuvel wrote:
+> On 29 March 2018 at 10:36, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Mar 29, 2018 at 10:02:18AM +0100, Ard Biesheuvel wrote:
+> >> On 28 March 2018 at 18:18, Dave Martin <Dave.Martin@arm.com> wrote:
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/pwm/pwm.txt |  2 ++
- Documentation/pwm.txt                         | 16 ++++++++++++++++
- include/dt-bindings/pwm/pwm.h                 |  1 +
- 3 files changed, 19 insertions(+)
+[...]
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm.txt b/Documentation/devicetree/bindings/pwm/pwm.txt
-index 7c8aaac43f92..6a60c0fca112 100644
---- a/Documentation/devicetree/bindings/pwm/pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm.txt
-@@ -49,6 +49,8 @@ Optionally, the pwm-specifier can encode a number of flags (defined in
- - PWM_MODE_COMPLEMENTARY: PWM complementary working mode (for PWM channels
- with two outputs); if not specified, the default for PWM channel will be
- used
-+- PWM_MODE_PUSH_PULL: PWM push-pull working modes (for PWM channels with
-+two outputs); if not specified the default for PWM channel will be used
+> >> I should probably rephrase this to say that x0 .. x18 may be clobbered.
+> >
+> > Sure, that would be simpler.  Or maybe just say that the set of clobbers
+> > is the same as for a function call -- this would cover NZCV for example.
+> >
+> 
+> Even better.
+
+[...]
+
+> >> > Since the patchup sequences aren't likely to be many or large, it's
+> >> > not the end of the world if we don't do this discarding though.
+> >> >
+> >>
+> >> I chose not to bother. These are handcrafted assembly files that are
+> >> usually kept in modules, which means the .text footprint is a 4k
+> >> multiple anyway, and the code is complex enough as it is, so
+> >> discarding ~10 instructions that have been moved out of the hot path
+> >> already doesn't seem that useful to me.
+> >
+> > Agreed.  Do you know who is building CONFIG_PREEMPT=n kernels these
+> > days?
+> >
+> 
+> AFAIK most distro kernels use voluntary preemption, so they'd still
+> benefit from this.
+
+OK, and given the size of the typical distro kernel, I doubt anyone will
+lose sleep over a couple of hundred extra bytes.
+
+I might try to hack it up later just for fun, just to see whether it
+works.
+
+[...]
+
+> >> > Should you include
+> >> >
+> >> >         .purgem do_cond_yield_neon
+> >> >         .purgem endif_yield_neon
+> >> >
+> >> > here?
+> >> >
+> >> > Otherwise, I think you would get macro redefinition errors if
+> >> > if_will_cond_yield_neon is used more than once in a given file.
+> >> >
+> >>
+> >> if_will_cond_yield_neon does not define any macros itself, so this
+> >> shouldn't be a problem.
+> >
+> > You're right.  I skipped an .endm for some reason while reading and
+> > decided there were nested macros here.  But there aren't.
+> >
+> > Protecting against misuse would be "nice", but people using them already
+> > need to know what they're doing, so it's low-priority and something that
+> > could be added in a later patch.  So I agree that there's no need to add
+> > that here.
+> >
+> 
+> OK.
+> 
+> I will respin with the minor issues addressed and your R-b added, and
+> repost before the end of the day.
+
+Sounds good to me.
+
+Cheers
+---Dave
  
- Example with optional PWM specifier for inverse polarity and complementary
- mode:
-diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
-index 912c43da8b48..675f9351fed1 100644
---- a/Documentation/pwm.txt
-+++ b/Documentation/pwm.txt
-@@ -128,6 +128,22 @@ channel that was exported. The following properties will then be available:
-     PWML1   |__|  |__|  |__|  |__|
-             <--T-->
- 
-+    Push-pull mode - for PWM channels with two outputs; output waveforms
-+        for a PWM channel in push-pull mode, with normal polarity looks like
-+        this:
-+            __          __
-+    PWMH __|  |________|  |________
-+                  __          __
-+    PWML ________|  |________|  |__
-+           <--T-->
-+
-+    If polarity is inversed:
-+         __    ________    ________
-+    PWMH   |__|        |__|
-+         ________    ________    __
-+    PWML         |__|        |__|
-+           <--T-->
-+
-     Where T is the signal period.
- 
- Implementing a PWM driver
-diff --git a/include/dt-bindings/pwm/pwm.h b/include/dt-bindings/pwm/pwm.h
-index b82279cc1787..cd4265bce968 100644
---- a/include/dt-bindings/pwm/pwm.h
-+++ b/include/dt-bindings/pwm/pwm.h
-@@ -12,5 +12,6 @@
- 
- #define PWM_POLARITY_INVERTED			(1 << 0)
- #define PWM_MODE_COMPLEMENTARY			(1 << 1)
-+#define PWM_MODE_PUSH_PULL			(1 << 2)
- 
- #endif
--- 
-2.7.4
+> Will, hopefully you're still ok with picking this up for v4.17? I'd
+> hate to postpone the crypto pieces that depend on it to v4.19
+
+[...]
