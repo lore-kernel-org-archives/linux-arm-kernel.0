@@ -1,26 +1,94 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 29 Mar 2018 17:51:28 +0300
-Subject: [PATCH net-next] dt-bindings: net: renesas-ravb: Add support for
- r8a77470 SoC
-In-Reply-To: <1522317775-35671-1-git-send-email-biju.das@bp.renesas.com>
-References: <1522317775-35671-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <312f1f35-74ab-3874-fc14-4b28eaaf4498@cogentembedded.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 29 Mar 2018 10:59:41 -0400
+Subject: [net-next, v2, 01/10] soc: ti: K2G: enhancement to support QMSS in
+ NSS
+In-Reply-To: <1ccf03e7-17b4-cf00-176d-0e41038c88f8@ti.com>
+References: <1522168309-12338-2-git-send-email-m-karicheri2@ti.com>
+ <1ccf03e7-17b4-cf00-176d-0e41038c88f8@ti.com>
+Message-ID: <feb354cc-2556-c82c-6061-bea6ee819ed5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On 03/28/2018 03:01 PM, Grygorii Strashko wrote:
+> Hi Murali,
+> 
 
-On 03/29/2018 01:02 PM, Biju Das wrote:
+>>   
+>> +enum qmss_version {
+>> +	QMSS,
+>> +	QMSS_LITE,
+> 
+> QMSS_66AK2G
+> 
 
-> Add a new compatible string for the RZ/G1C (R8A77470) SoC.
+OK.
 
-   Needed solely to please checkpatch.pl. :-)
+>> +};
+>> +
+>>   struct knav_device {
+>>   	struct device				*dev;
+>>   	unsigned				base_id;
+>> @@ -305,6 +310,7 @@ struct knav_device {
+>>   	struct list_head			pools;
+>>   	struct list_head			pdsps;
+>>   	struct list_head			qmgrs;
+>> +	enum qmss_version			version;
+>>   };
+>>   
+> 
+> [...]
+> 
+>>   }
+>>   
+>> +/* Match table for of_platform binding */
+>> +static const struct of_device_id keystone_qmss_of_match[] = {
+>> +	{
+>> +		.compatible = "ti,keystone-navigator-qmss",
+> 
+> 		.data	= (void *)QMSS,
 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+This seems to be unnecessary as QMSS is actually defined as zero. Also 
+this static. So that value is zero already in memory.
+> 
+>> +	},
+>> +	{
+>> +		.compatible = "ti,keystone-navigator-qmss-l",
+>> +		.data	= (void *)QMSS_LITE,
+>> +	},
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, keystone_qmss_of_match);
+>> +
+>>   static int knav_queue_probe(struct platform_device *pdev)
+>>   {
+>>   	struct device_node *node = pdev->dev.of_node;
+>>   	struct device_node *qmgrs, *queue_pools, *regions, *pdsps;
+>> +	const struct of_device_id *match;
+>>   	struct device *dev = &pdev->dev;
+>>   	u32 temp[2];
+>>   	int ret;
+>> @@ -1700,6 +1749,10 @@ static int knav_queue_probe(struct platform_device *pdev)
+>>   		return -ENOMEM;
+>>   	}
+>>   
+>> +	match = of_match_device(of_match_ptr(keystone_qmss_of_match), dev);
+>> +	if (match && match->data)
+>> +		kdev->version = QMSS_LITE;
+> 
+> 	if (match)
+> 		kdev->version = match->data;
+> 	else
+> 		error?
 
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Similar to above. This private memory is allocated using kzalloc which initializes
+everything to zero. So the else part is unnecessary.
 
-[...]
+Murali
 
-MBR, Sergei
+> [...]
+> 
+
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
