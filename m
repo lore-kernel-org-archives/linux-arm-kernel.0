@@ -1,298 +1,363 @@
 From: ran.wang_1@nxp.com (Ran Wang)
-Date: Thu, 29 Mar 2018 09:31:43 +0800
-Subject: [PATCH 5/5] powerpc:dts:pm: add power management node
+Date: Thu, 29 Mar 2018 09:31:40 +0800
+Subject: [PATCH 2/5] drivers/soc/fsl: add EPU FSM configuration for deep sleep
 In-Reply-To: <20180329013143.22527-1-ran.wang_1@nxp.com>
 References: <20180329013143.22527-1-ran.wang_1@nxp.com>
-Message-ID: <20180329013143.22527-5-ran.wang_1@nxp.com>
+Message-ID: <20180329013143.22527-2-ran.wang_1@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Power Management feature on device tree, including MPC8536,
-MPC8544, MPC8548, MPC8572, P1010, P1020, P1021, P1022, P2020, P2041,
-P3041, T104X, T1024.
+In the last stage of deep sleep, software will trigger a Finite
+State Machine (FSM) to control the hardware procedure, such a
+board isolation, killing PLLs, removing power, and so on.
 
-Signed-off-by: Zhao Chenhui <chenhui.zhao@freescale.com>
+When the system is waked up by an interrupt, the FSM controls
+the hardware to complete the early resume procedure.
+
+This patch configure the EPU FSM preparing for deep sleep.
+
+Signed-off-by: Hongbo Zhang <hongbo.zhang@freescale.com>
+Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
 Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 ---
- arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi |   14 ++++++-
- arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi |    2 +
- arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi |    2 +
- arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi |    2 +
- arch/powerpc/boot/dts/fsl/p1010si-post.dtsi   |    8 ++++
- arch/powerpc/boot/dts/fsl/p1020si-post.dtsi   |    5 +++
- arch/powerpc/boot/dts/fsl/p1021si-post.dtsi   |    5 +++
- arch/powerpc/boot/dts/fsl/p1022si-post.dtsi   |    9 +++--
- arch/powerpc/boot/dts/fsl/p2020si-post.dtsi   |   14 +++++++
- arch/powerpc/boot/dts/fsl/pq3-power.dtsi      |   48 +++++++++++++++++++++++++
- arch/powerpc/boot/dts/fsl/t1024rdb.dts        |    2 +-
- arch/powerpc/boot/dts/fsl/t1040rdb.dts        |    2 +-
- arch/powerpc/boot/dts/fsl/t1042rdb.dts        |    2 +-
- arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts     |    2 +-
- 14 files changed, 108 insertions(+), 9 deletions(-)
- create mode 100644 arch/powerpc/boot/dts/fsl/pq3-power.dtsi
+ drivers/soc/fsl/Kconfig     |    7 +
+ drivers/soc/fsl/Makefile    |    1 +
+ drivers/soc/fsl/sleep_fsm.c |  279 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/soc/fsl/sleep_fsm.h |  130 ++++++++++++++++++++
+ 4 files changed, 417 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/soc/fsl/sleep_fsm.c
+ create mode 100644 drivers/soc/fsl/sleep_fsm.h
 
-diff --git a/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
-index 4193570..fba40a1 100644
---- a/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
-@@ -199,6 +199,10 @@
- 
- /include/ "pq3-dma-0.dtsi"
- /include/ "pq3-etsec1-0.dtsi"
-+	enet0: ethernet at 24000 {
-+		fsl,wake-on-filer;
-+		fsl,pmc-handle = <&etsec1_clk>;
-+	};
- /include/ "pq3-etsec1-timer-0.dtsi"
- 
- 	usb at 22000 {
-@@ -222,9 +226,10 @@
- 	};
- 
- /include/ "pq3-etsec1-2.dtsi"
--
--	ethernet at 26000 {
-+	enet2: ethernet at 26000 {
- 		cell-index = <1>;
-+		fsl,wake-on-filer;
-+		fsl,pmc-handle = <&etsec3_clk>;
- 	};
- 
- 	usb at 2b000 {
-@@ -249,4 +254,9 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
+diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+index 7a9fb9b..4222bd5 100644
+--- a/drivers/soc/fsl/Kconfig
++++ b/drivers/soc/fsl/Kconfig
+@@ -16,3 +16,10 @@ config FSL_GUTS
+ 	  Initially only reading SVR and registering soc device are supported.
+ 	  Other guts accesses, such as reading RCW, should eventually be moved
+ 	  into this driver as well.
 +
-+/include/ "pq3-power.dtsi"
-+	power at e0070 {
-+		compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
-+	};
- };
-diff --git a/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
-index b68eb11..ea7416a 100644
---- a/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
-@@ -188,4 +188,6 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
-+
-+/include/ "pq3-power.dtsi"
- };
-diff --git a/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
-index 579d76c..dddb737 100644
---- a/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
-@@ -156,4 +156,6 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
-+
-+/include/ "pq3-power.dtsi"
- };
-diff --git a/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
-index 49294cf..40a6cff 100644
---- a/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
-@@ -193,4 +193,6 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
-+
-+/include/ "pq3-power.dtsi"
- };
-diff --git a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
-index 1b4aafc..47b62a8 100644
---- a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
-@@ -173,6 +173,8 @@
- 
- /include/ "pq3-etsec2-0.dtsi"
- 	enet0: ethernet at b0000 {
-+		fsl,pmc-handle = <&etsec1_clk>;
-+
- 		queue-group at b0000 {
- 			fsl,rx-bit-map = <0xff>;
- 			fsl,tx-bit-map = <0xff>;
-@@ -181,6 +183,8 @@
- 
- /include/ "pq3-etsec2-1.dtsi"
- 	enet1: ethernet at b1000 {
-+		fsl,pmc-handle = <&etsec2_clk>;
-+
- 		queue-group at b1000 {
- 			fsl,rx-bit-map = <0xff>;
- 			fsl,tx-bit-map = <0xff>;
-@@ -189,6 +193,8 @@
- 
- /include/ "pq3-etsec2-2.dtsi"
- 	enet2: ethernet at b2000 {
-+		fsl,pmc-handle = <&etsec3_clk>;
-+
- 		queue-group at b2000 {
- 			fsl,rx-bit-map = <0xff>;
- 			fsl,tx-bit-map = <0xff>;
-@@ -201,4 +207,6 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
-+
-+/include/ "pq3-power.dtsi"
- };
-diff --git a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
-index 642dc3a..cc4c746 100644
---- a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
-@@ -163,14 +163,17 @@
- 
- /include/ "pq3-etsec2-0.dtsi"
- 	enet0: enet0_grp2: ethernet at b0000 {
-+		fsl,pmc-handle = <&etsec1_clk>;
- 	};
- 
- /include/ "pq3-etsec2-1.dtsi"
- 	enet1: enet1_grp2: ethernet at b1000 {
-+		fsl,pmc-handle = <&etsec2_clk>;
- 	};
- 
- /include/ "pq3-etsec2-2.dtsi"
- 	enet2: enet2_grp2: ethernet at b2000 {
-+		fsl,pmc-handle = <&etsec3_clk>;
- 	};
- 
- 	global-utilities at e0000 {
-@@ -178,6 +181,8 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
-+
-+/include/ "pq3-power.dtsi"
- };
- 
- /include/ "pq3-etsec2-grp2-0.dtsi"
-diff --git a/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
-index 407cb5f..378195d 100644
---- a/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
-@@ -159,14 +159,17 @@
- 
- /include/ "pq3-etsec2-0.dtsi"
- 	enet0: enet0_grp2: ethernet at b0000 {
-+		fsl,pmc-handle = <&etsec1_clk>;
- 	};
- 
- /include/ "pq3-etsec2-1.dtsi"
- 	enet1: enet1_grp2: ethernet at b1000 {
-+		fsl,pmc-handle = <&etsec2_clk>;
- 	};
- 
- /include/ "pq3-etsec2-2.dtsi"
- 	enet2: enet2_grp2: ethernet at b2000 {
-+		fsl,pmc-handle = <&etsec3_clk>;
- 	};
- 
- 	global-utilities at e0000 {
-@@ -174,6 +177,8 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
-+
-+/include/ "pq3-power.dtsi"
- };
- 
- &qe {
-diff --git a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
-index 5f51b7b..6ac21e8 100644
---- a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
-@@ -225,11 +225,13 @@
- /include/ "pq3-etsec2-0.dtsi"
- 	enet0: enet0_grp2: ethernet at b0000 {
- 		fsl,wake-on-filer;
-+		fsl,pmc-handle = <&etsec1_clk>;
- 	};
- 
- /include/ "pq3-etsec2-1.dtsi"
- 	enet1: enet1_grp2: ethernet at b1000 {
- 		fsl,wake-on-filer;
-+		fsl,pmc-handle = <&etsec2_clk>;
- 	};
- 
- 	global-utilities at e0000 {
-@@ -238,9 +240,10 @@
- 		fsl,has-rstcr;
- 	};
- 
--	power at e0070{
--		compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
--		reg = <0xe0070 0x20>;
-+/include/ "pq3-power.dtsi"
-+	power at e0070 {
-+		compatible = "fsl,p1022-pmc", "fsl,mpc8536-pmc",
-+				"fsl,mpc8548-pmc";
- 	};
- 
- };
-diff --git a/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi b/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
-index 884e01b..2c4787c 100644
---- a/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
-@@ -175,6 +175,10 @@
- 		compatible = "fsl-usb2-dr-v1.6", "fsl-usb2-dr";
- 	};
- /include/ "pq3-etsec1-0.dtsi"
-+	enet0: ethernet at 24000 {
-+		fsl,pmc-handle = <&etsec1_clk>;
-+
-+	};
- /include/ "pq3-etsec1-timer-0.dtsi"
- 
- 	ptp_clock at 24e00 {
-@@ -183,7 +187,15 @@
- 
- 
- /include/ "pq3-etsec1-1.dtsi"
-+	enet1: ethernet at 25000 {
-+		fsl,pmc-handle = <&etsec2_clk>;
-+	};
-+
- /include/ "pq3-etsec1-2.dtsi"
-+	enet2: ethernet at 26000 {
-+		fsl,pmc-handle = <&etsec3_clk>;
-+	};
-+
- /include/ "pq3-esdhc-0.dtsi"
- 	sdhc at 2e000 {
- 		compatible = "fsl,p2020-esdhc", "fsl,esdhc";
-@@ -198,4 +210,6 @@
- 		reg = <0xe0000 0x1000>;
- 		fsl,has-rstcr;
- 	};
-+
-+/include/ "pq3-power.dtsi"
- };
-diff --git a/arch/powerpc/boot/dts/fsl/pq3-power.dtsi b/arch/powerpc/boot/dts/fsl/pq3-power.dtsi
++config FSL_SLEEP_FSM
++	bool
++	help
++	  This driver configures a hardware FSM (Finite State Machine) for deep sleep.
++	  The FSM is used to finish clean-ups at the last stage of system entering deep
++	  sleep, and also wakes up system when a wake up event happens.
+diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+index 44b3beb..28c38c3 100644
+--- a/drivers/soc/fsl/Makefile
++++ b/drivers/soc/fsl/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_FSL_DPAA)                 += qbman/
+ obj-$(CONFIG_QUICC_ENGINE)		+= qe/
+ obj-$(CONFIG_CPM)			+= qe/
+ obj-$(CONFIG_FSL_GUTS)			+= guts.o
++obj-$(CONFIG_FSL_SLEEP_FSM)	+= sleep_fsm.o
+diff --git a/drivers/soc/fsl/sleep_fsm.c b/drivers/soc/fsl/sleep_fsm.c
 new file mode 100644
-index 0000000..5a760b3
+index 0000000..378857f
 --- /dev/null
-+++ b/arch/powerpc/boot/dts/fsl/pq3-power.dtsi
-@@ -0,0 +1,48 @@
++++ b/drivers/soc/fsl/sleep_fsm.c
+@@ -0,0 +1,279 @@
 +/*
-+ * PQ3 Power Management device tree stub
++ * deep sleep FSM (finite-state machine) configuration
 + *
-+ * Copyright 2012-2013 Freescale Semiconductor Inc.
++ * Copyright 2018 NXP
++ *
++ * Author: Hongbo Zhang <hongbo.zhang@freescale.com>
++ *         Chenhui Zhao <chenhui.zhao@freescale.com>
 + *
 + * Redistribution and use in source and binary forms, with or without
 + * modification, are permitted provided that the following conditions are met:
 + *     * Redistributions of source code must retain the above copyright
-+ *       notice, this list of conditions and the following disclaimer.
++ *	 notice, this list of conditions and the following disclaimer.
 + *     * Redistributions in binary form must reproduce the above copyright
-+ *       notice, this list of conditions and the following disclaimer in the
-+ *       documentation and/or other materials provided with the distribution.
-+ *     * Neither the name of Freescale Semiconductor nor the
-+ *       names of its contributors may be used to endorse or promote products
-+ *       derived from this software without specific prior written permission.
++ *	 notice, this list of conditions and the following disclaimer in the
++ *	 documentation and/or other materials provided with the distribution.
++ *     * Neither the name of the above-listed copyright holders nor the
++ *	 names of any contributors may be used to endorse or promote products
++ *	 derived from this software without specific prior written permission.
++ *
++ * ALTERNATIVELY, this software may be distributed under the terms of the
++ * GNU General Public License ("GPL") as published by the Free Software
++ * Foundation, either version 2 of that License or (at your option) any
++ * later version.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <linux/kernel.h>
++#include <linux/io.h>
++#include <linux/types.h>
++
++#include "sleep_fsm.h"
++/*
++ * These values are from chip's reference manual. For example,
++ * the values for T1040 can be found in "8.4.3.8 Programming
++ * supporting deep sleep mode" of Chapter 8 "Run Control and
++ * Power Management (RCPM)".
++ * The default value can be applied to T104x, LS1021.
++ */
++struct fsm_reg_vals epu_default_val[] = {
++	/* EPGCR (Event Processor Global Control Register) */
++	{EPGCR, 0},
++	/* EPECR (Event Processor Event Control Registers) */
++	{EPECR0 + EPECR_STRIDE * 0, 0},
++	{EPECR0 + EPECR_STRIDE * 1, 0},
++	{EPECR0 + EPECR_STRIDE * 2, 0xF0004004},
++	{EPECR0 + EPECR_STRIDE * 3, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 4, 0x20000084},
++	{EPECR0 + EPECR_STRIDE * 5, 0x08000004},
++	{EPECR0 + EPECR_STRIDE * 6, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 7, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 8, 0x60000084},
++	{EPECR0 + EPECR_STRIDE * 9, 0x08000084},
++	{EPECR0 + EPECR_STRIDE * 10, 0x42000084},
++	{EPECR0 + EPECR_STRIDE * 11, 0x90000084},
++	{EPECR0 + EPECR_STRIDE * 12, 0x80000084},
++	{EPECR0 + EPECR_STRIDE * 13, 0x08000084},
++	{EPECR0 + EPECR_STRIDE * 14, 0x02000084},
++	{EPECR0 + EPECR_STRIDE * 15, 0x00000004},
++	/*
++	 * EPEVTCR (Event Processor EVT Pin Control Registers)
++	 * SCU8 triger EVT2, and SCU11 triger EVT9
++	 */
++	{EPEVTCR0 + EPEVTCR_STRIDE * 0, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 1, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 2, 0x80000001},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 3, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 4, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 5, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 6, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 7, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 8, 0},
++	{EPEVTCR0 + EPEVTCR_STRIDE * 9, 0xB0000001},
++	/* EPCMPR (Event Processor Counter Compare Registers) */
++	{EPCMPR0 + EPCMPR_STRIDE * 0, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 1, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 2, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 3, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 4, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 5, 0x00000020},
++	{EPCMPR0 + EPCMPR_STRIDE * 6, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 7, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 8, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 9, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 10, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 11, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 12, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 13, 0},
++	{EPCMPR0 + EPCMPR_STRIDE * 14, 0x000000FF},
++	{EPCMPR0 + EPCMPR_STRIDE * 15, 0x000000FF},
++	/* EPCCR (Event Processor Counter Control Registers) */
++	{EPCCR0 + EPCCR_STRIDE * 0, 0},
++	{EPCCR0 + EPCCR_STRIDE * 1, 0},
++	{EPCCR0 + EPCCR_STRIDE * 2, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 3, 0},
++	{EPCCR0 + EPCCR_STRIDE * 4, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 5, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 6, 0},
++	{EPCCR0 + EPCCR_STRIDE * 7, 0},
++	{EPCCR0 + EPCCR_STRIDE * 8, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 9, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 10, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 11, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 12, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 13, 0},
++	{EPCCR0 + EPCCR_STRIDE * 14, 0x92840000},
++	{EPCCR0 + EPCCR_STRIDE * 15, 0x92840000},
++	/* EPSMCR (Event Processor SCU Mux Control Registers) */
++	{EPSMCR0 + EPSMCR_STRIDE * 0, 0},
++	{EPSMCR0 + EPSMCR_STRIDE * 1, 0},
++	{EPSMCR0 + EPSMCR_STRIDE * 2, 0x6C700000},
++	{EPSMCR0 + EPSMCR_STRIDE * 3, 0x2F000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 4, 0x002F0000},
++	{EPSMCR0 + EPSMCR_STRIDE * 5, 0x00002E00},
++	{EPSMCR0 + EPSMCR_STRIDE * 6, 0x7C000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 7, 0x30000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 8, 0x64300000},
++	{EPSMCR0 + EPSMCR_STRIDE * 9, 0x00003000},
++	{EPSMCR0 + EPSMCR_STRIDE * 10, 0x65000030},
++	{EPSMCR0 + EPSMCR_STRIDE * 11, 0x31740000},
++	{EPSMCR0 + EPSMCR_STRIDE * 12, 0x7F000000},
++	{EPSMCR0 + EPSMCR_STRIDE * 13, 0x00003100},
++	{EPSMCR0 + EPSMCR_STRIDE * 14, 0x00000031},
++	{EPSMCR0 + EPSMCR_STRIDE * 15, 0x76000000},
++	/* EPACR (Event Processor Action Control Registers) */
++	{EPACR0 + EPACR_STRIDE * 0, 0},
++	{EPACR0 + EPACR_STRIDE * 1, 0},
++	{EPACR0 + EPACR_STRIDE * 2, 0},
++	{EPACR0 + EPACR_STRIDE * 3, 0x00000080},
++	{EPACR0 + EPACR_STRIDE * 4, 0},
++	{EPACR0 + EPACR_STRIDE * 5, 0x00000040},
++	{EPACR0 + EPACR_STRIDE * 6, 0},
++	{EPACR0 + EPACR_STRIDE * 7, 0},
++	{EPACR0 + EPACR_STRIDE * 8, 0},
++	{EPACR0 + EPACR_STRIDE * 9, 0x0000001C},
++	{EPACR0 + EPACR_STRIDE * 10, 0x00000020},
++	{EPACR0 + EPACR_STRIDE * 11, 0},
++	{EPACR0 + EPACR_STRIDE * 12, 0x00000003},
++	{EPACR0 + EPACR_STRIDE * 13, 0x06000000},
++	{EPACR0 + EPACR_STRIDE * 14, 0x04000000},
++	{EPACR0 + EPACR_STRIDE * 15, 0x02000000},
++	/* EPIMCR (Event Processor Input Mux Control Registers) */
++	{EPIMCR0 + EPIMCR_STRIDE * 0, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 1, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 2, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 3, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 4, 0x44000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 5, 0x40000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 6, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 7, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 8, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 9, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 10, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 11, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 12, 0x44000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 13, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 14, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 15, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 16, 0x6A000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 17, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 18, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 19, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 20, 0x48000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 21, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 22, 0x6C000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 23, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 24, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 25, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 26, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 27, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 28, 0x76000000},
++	{EPIMCR0 + EPIMCR_STRIDE * 29, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 30, 0},
++	{EPIMCR0 + EPIMCR_STRIDE * 31, 0x76000000},
++	/* EPXTRIGCR (Event Processor Crosstrigger Control Register) */
++	{EPXTRIGCR, 0x0000FFDF},
++	/* end */
++	{FSM_END_FLAG, 0},
++};
++
++struct fsm_reg_vals npc_default_val[] = {
++	/* NPC triggered Memory-Mapped Access Registers */
++	{NCR, 0x80000000},
++	{MCCR1, 0},
++	{MCSR1, 0},
++	{MMAR1LO, 0},
++	{MMAR1HI, 0},
++	{MMDR1, 0},
++	{MCSR2, 0},
++	{MMAR2LO, 0},
++	{MMAR2HI, 0},
++	{MMDR2, 0},
++	{MCSR3, 0x80000000},
++	{MMAR3LO, 0x000E2130},
++	{MMAR3HI, 0x00030000},
++	{MMDR3, 0x00020000},
++	/* end */
++	{FSM_END_FLAG, 0},
++};
++
++/**
++ * fsl_fsm_setup - Configure EPU's FSM registers
++ * @base: the base address of registers
++ * @val: Pointer to address-value pairs for FSM registers
++ */
++void fsl_fsm_setup(void __iomem *base, struct fsm_reg_vals *val)
++{
++	struct fsm_reg_vals *data = val;
++
++	BUG_ON(!base || !data);
++	while (data->offset != FSM_END_FLAG) {
++		iowrite32be(data->value, base + data->offset);
++		data++;
++	}
++}
++
++void fsl_epu_setup_default(void __iomem *epu_base)
++{
++	fsl_fsm_setup(epu_base, epu_default_val);
++}
++
++void fsl_npc_setup_default(void __iomem *npc_base)
++{
++	fsl_fsm_setup(npc_base, npc_default_val);
++}
++
++void fsl_epu_clean_default(void __iomem *epu_base)
++{
++	u32 offset;
++
++	/* follow the exact sequence to clear the registers */
++	/* Clear EPACRn */
++	for (offset = EPACR0; offset <= EPACR15; offset += EPACR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPEVTCRn */
++	for (offset = EPEVTCR0; offset <= EPEVTCR9; offset += EPEVTCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPGCR */
++	iowrite32be(0, epu_base + EPGCR);
++
++	/* Clear EPSMCRn */
++	for (offset = EPSMCR0; offset <= EPSMCR15; offset += EPSMCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPCCRn */
++	for (offset = EPCCR0; offset <= EPCCR31; offset += EPCCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPCMPRn */
++	for (offset = EPCMPR0; offset <= EPCMPR31; offset += EPCMPR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPCTRn */
++	for (offset = EPCTR0; offset <= EPCTR31; offset += EPCTR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPIMCRn */
++	for (offset = EPIMCR0; offset <= EPIMCR31; offset += EPIMCR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++
++	/* Clear EPXTRIGCRn */
++	iowrite32be(0, epu_base + EPXTRIGCR);
++
++	/* Clear EPECRn */
++	for (offset = EPECR0; offset <= EPECR15; offset += EPECR_STRIDE)
++		iowrite32be(0, epu_base + offset);
++}
+diff --git a/drivers/soc/fsl/sleep_fsm.h b/drivers/soc/fsl/sleep_fsm.h
+new file mode 100644
+index 0000000..e0013c0
+--- /dev/null
++++ b/drivers/soc/fsl/sleep_fsm.h
+@@ -0,0 +1,130 @@
++/*
++ * deep sleep FSM (finite-state machine) configuration
++ *
++ * Copyright 2018 NXP
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *     * Redistributions of source code must retain the above copyright
++ *	 notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above copyright
++ *	 notice, this list of conditions and the following disclaimer in the
++ *	 documentation and/or other materials provided with the distribution.
++ *     * Neither the name of the above-listed copyright holders nor the
++ *	 names of any contributors may be used to endorse or promote products
++ *	 derived from this software without specific prior written permission.
 + *
 + *
 + * ALTERNATIVELY, this software may be distributed under the terms of the
@@ -300,83 +365,113 @@ index 0000000..5a760b3
 + * Foundation, either version 2 of that License or (at your option) any
 + * later version.
 + *
-+ * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
-+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-+ * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
-+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
 + */
 +
-+power at e0070 {
-+	compatible = "fsl,mpc8548-pmc";
-+	reg = <0xe0070 0x20>;
++#ifndef _FSL_SLEEP_FSM_H
++#define _FSL_SLEEP_FSM_H
 +
-+	etsec1_clk: soc-clk at 24 {
-+		fsl,pmcdr-mask = <0x00000080>;
-+	};
-+	etsec2_clk: soc-clk at 25 {
-+		fsl,pmcdr-mask = <0x00000040>;
-+	};
-+	etsec3_clk: soc-clk at 26 {
-+		fsl,pmcdr-mask = <0x00000020>;
-+	};
++#define FSL_STRIDE_4B	4
++#define FSL_STRIDE_8B	8
++
++/* End flag */
++#define FSM_END_FLAG		0xFFFFFFFFUL
++
++/* Block offsets */
++#define RCPM_BLOCK_OFFSET	0x00022000
++#define EPU_BLOCK_OFFSET	0x00000000
++#define NPC_BLOCK_OFFSET	0x00001000
++
++/* EPGCR (Event Processor Global Control Register) */
++#define EPGCR		0x000
++
++/* EPEVTCR0-9 (Event Processor EVT Pin Control Registers) */
++#define EPEVTCR0	0x050
++#define EPEVTCR9	0x074
++#define EPEVTCR_STRIDE	FSL_STRIDE_4B
++
++/* EPXTRIGCR (Event Processor Crosstrigger Control Register) */
++#define EPXTRIGCR	0x090
++
++/* EPIMCR0-31 (Event Processor Input Mux Control Registers) */
++#define EPIMCR0		0x100
++#define EPIMCR31	0x17C
++#define EPIMCR_STRIDE	FSL_STRIDE_4B
++
++/* EPSMCR0-15 (Event Processor SCU Mux Control Registers) */
++#define EPSMCR0		0x200
++#define EPSMCR15	0x278
++#define EPSMCR_STRIDE	FSL_STRIDE_8B
++
++/* EPECR0-15 (Event Processor Event Control Registers) */
++#define EPECR0		0x300
++#define EPECR15		0x33C
++#define EPECR_STRIDE	FSL_STRIDE_4B
++
++/* EPACR0-15 (Event Processor Action Control Registers) */
++#define EPACR0		0x400
++#define EPACR15		0x43C
++#define EPACR_STRIDE	FSL_STRIDE_4B
++
++/* EPCCRi0-15 (Event Processor Counter Control Registers) */
++#define EPCCR0		0x800
++#define EPCCR15		0x83C
++#define EPCCR31		0x87C
++#define EPCCR_STRIDE	FSL_STRIDE_4B
++
++/* EPCMPR0-15 (Event Processor Counter Compare Registers) */
++#define EPCMPR0		0x900
++#define EPCMPR15	0x93C
++#define EPCMPR31	0x97C
++#define EPCMPR_STRIDE	FSL_STRIDE_4B
++
++/* EPCTR0-31 (Event Processor Counter Register) */
++#define EPCTR0		0xA00
++#define EPCTR31		0xA7C
++#define EPCTR_STRIDE	FSL_STRIDE_4B
++
++/* NPC triggered Memory-Mapped Access Registers */
++#define NCR		0x000
++#define MCCR1		0x0CC
++#define MCSR1		0x0D0
++#define MMAR1LO		0x0D4
++#define MMAR1HI		0x0D8
++#define MMDR1		0x0DC
++#define MCSR2		0x0E0
++#define MMAR2LO		0x0E4
++#define MMAR2HI		0x0E8
++#define MMDR2		0x0EC
++#define MCSR3		0x0F0
++#define MMAR3LO		0x0F4
++#define MMAR3HI		0x0F8
++#define MMDR3		0x0FC
++
++/* RCPM Core State Action Control Register 0 */
++#define CSTTACR0	0xB00
++
++/* RCPM Core Group 1 Configuration Register 0 */
++#define CG1CR0		0x31C
++
++struct fsm_reg_vals {
++	u32 offset;
++	u32 value;
 +};
-diff --git a/arch/powerpc/boot/dts/fsl/t1024rdb.dts b/arch/powerpc/boot/dts/fsl/t1024rdb.dts
-index 73a6453..95fc694 100644
---- a/arch/powerpc/boot/dts/fsl/t1024rdb.dts
-+++ b/arch/powerpc/boot/dts/fsl/t1024rdb.dts
-@@ -91,7 +91,7 @@
- 		board-control at 2,0 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			compatible = "fsl,t1024-cpld";
-+			compatible = "fsl,t1024-cpld", "fsl,deepsleep-cpld";
- 			reg = <3 0 0x300>;
- 			ranges = <0 3 0 0x300>;
- 			bank-width = <1>;
-diff --git a/arch/powerpc/boot/dts/fsl/t1040rdb.dts b/arch/powerpc/boot/dts/fsl/t1040rdb.dts
-index 65ff34c..825665c 100644
---- a/arch/powerpc/boot/dts/fsl/t1040rdb.dts
-+++ b/arch/powerpc/boot/dts/fsl/t1040rdb.dts
-@@ -70,7 +70,7 @@
- 
- 	ifc: localbus at ffe124000 {
- 		cpld at 3,0 {
--			compatible = "fsl,t1040rdb-cpld";
-+			compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
- 		};
- 	};
- };
-diff --git a/arch/powerpc/boot/dts/fsl/t1042rdb.dts b/arch/powerpc/boot/dts/fsl/t1042rdb.dts
-index 3ebb712..0997643 100644
---- a/arch/powerpc/boot/dts/fsl/t1042rdb.dts
-+++ b/arch/powerpc/boot/dts/fsl/t1042rdb.dts
-@@ -68,7 +68,7 @@
- 
- 	ifc: localbus at ffe124000 {
- 		cpld at 3,0 {
--			compatible = "fsl,t1042rdb-cpld";
-+			compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
- 		};
- 	};
- };
-diff --git a/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts b/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
-index 8ec3ff4..b10cab1 100644
---- a/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
-+++ b/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
-@@ -41,7 +41,7 @@
- 
- 	ifc: localbus at ffe124000 {
- 		cpld at 3,0 {
--			compatible = "fsl,t1042rdb_pi-cpld";
-+			compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
- 		};
- 	};
- 
++
++void fsl_fsm_setup(void __iomem *base, struct fsm_reg_vals *val);
++void fsl_epu_setup_default(void __iomem *epu_base);
++void fsl_npc_setup_default(void __iomem *npc_base);
++void fsl_epu_clean_default(void __iomem *epu_base);
++
++#endif /* _FSL_SLEEP_FSM_H */
 -- 
 1.7.1
