@@ -1,44 +1,55 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 29 Mar 2018 15:10:54 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-Message-ID: <20180329131054.22506-1-peda@axentia.se>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 29 Mar 2018 15:13:21 +0200
+Subject: [PATCH resend v2 0/2] preparatory arm64 asm patches for yielding the
+ NEON
+Message-ID: <20180329131323.15881-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
-flash accesses have a tendency to cause display disturbances. Add a
-module param to disable DMA from the NAND controller, since that fixes
-the display problem for me.
+The RT people reported that the arm64 crypto NEON code behaves poorly in RT
+context, because it disables preemption (to avoid having to context switch
+the NEON registers) and usually processes the entire input in one go. When we
+introduced this code, this was not unreasonable given the overhead of eager
+preserve/restore, but today, there isn't that much overhead anymore, and so
+we can consider approaches that have much better worst case scheduling latency.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/mtd/nand/raw/atmel/nand-controller.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Simply refactoring the code to only call into the core NEON transform one
+block at a time results in a non-negligible performance impact, especially
+on low end cores such as Cortex-A53 where memory accesses are relatively
+costly. So instead, let's introduce some infrastructure to allow assembler
+routines to do a conditional yield, i.e., check the TIF_NEED_RESCHED flag
+after processing each block of input, and yield if it is set, in which case
+some context may need to be preserved and restored, and or constant tables
+reloaded.
 
-diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-index b2f00b398490..2ff7a77c7b8e 100644
---- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-+++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-@@ -129,6 +129,11 @@
- #define DEFAULT_TIMEOUT_MS			1000
- #define MIN_DMA_LEN				128
- 
-+static bool atmel_nand_avoid_dma __read_mostly;
-+
-+MODULE_PARM_DESC(avoiddma, "Avoid using DMA");
-+module_param_named(avoiddma, atmel_nand_avoid_dma, bool, 0400);
-+
- enum atmel_nand_rb_type {
- 	ATMEL_NAND_NO_RB,
- 	ATMEL_NAND_NATIVE_RB,
-@@ -1977,7 +1982,7 @@ static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
- 		return ret;
- 	}
- 
--	if (nc->caps->has_dma) {
-+	if (nc->caps->has_dma && !atmel_nand_avoid_dma) {
- 		dma_cap_mask_t mask;
- 
- 		dma_cap_zero(mask);
+Changes since v1:
+- incorporate Dave's review feedback and add his Reviewed-bys
+  . enhance non-nesting check in frame_push/_pop (#1)
+  . describe cond_yield_neon convenience macro (#2)
+  . discard yield sequence if CONFIG_PREEMPT=n (#2)
+  . add missing include of linux/preempt.h (#2)
+
+Patch #1 adds helper macros to create standard AAPCS stack frames. This is
+needed because the assembler code will be modified to call into schedule()
+[essentially], and so a stack frame is needed to preserve state.
+
+Patch #2 adds helper macros to create the yielding code: check whether a
+yield should be done, and preserve/restore the algorithm specific pieces
+that will not be preserved across the yield in the NEON registers.
+
+These patches have been broken out from the arm64/crypto series and resent
+since they require careful review from the arm64 maintainers, rather than
+pulled silently via the crypto tree (which already happened by accident and
+got reverted)
+
+Ard Biesheuvel (2):
+  arm64: assembler: add utility macros to push/pop stack frames
+  arm64: assembler: add macros to conditionally yield the NEON under
+    PREEMPT
+
+ arch/arm64/include/asm/assembler.h | 136 ++++++++++++++++++++
+ arch/arm64/kernel/asm-offsets.c    |   3 +
+ 2 files changed, 139 insertions(+)
+
 -- 
 2.11.0
