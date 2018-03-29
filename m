@@ -1,51 +1,30 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 29 Mar 2018 14:10:33 +0300
-Subject: [PATCH v4 7/9] pwm: add push-pull mode support
+Date: Thu, 29 Mar 2018 14:10:30 +0300
+Subject: [PATCH v4 4/9] pwm: pxa: populate PWM mode in of_xlate function
 In-Reply-To: <1522321835-6460-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1522321835-6460-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1522321835-6460-8-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1522321835-6460-5-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add push-pull mode support. In push-pull mode the channels' outputs have
-same polarities and the edges are complementary delayed for one period.
+Populate PWM mode in of_xlate function to avoid pwm_apply_state() failure.
 
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- drivers/pwm/core.c  | 1 +
- include/linux/pwm.h | 3 +++
- 2 files changed, 4 insertions(+)
+ drivers/pwm/pwm-pxa.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 59a9df9120de..5fde2e685ca7 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -348,6 +348,7 @@ const char *pwm_mode_desc(struct pwm_device *pwm, unsigned long mode)
- 		"invalid",
- 		"normal",
- 		"complementary",
-+		"push-pull",
- 	};
+diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+index 4143a46684d2..4c88cb47d6ba 100644
+--- a/drivers/pwm/pwm-pxa.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -161,6 +161,7 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 		return pwm;
  
- 	if (!pwm_mode_valid(pwm, mode))
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index c4aa997489f3..9a99d5659331 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -29,11 +29,14 @@ enum pwm_polarity {
-  * PWM modes capabilities
-  * @PWMC_MODE_NORMAL_BIT: PWM has one output
-  * @PWMC_MODE_COMPLEMENTARY_BIT: PWM has 2 outputs with opposite polarities
-+ * @PWMC_MODE_PUSH_PULL_BIT: PWM has 2 outputs with same polarities and the
-+ * edges are complementary delayed for one period
-  * @PWMC_MODE_CNT: PWM modes count
-  */
- enum {
- 	PWMC_MODE_NORMAL_BIT,
- 	PWMC_MODE_COMPLEMENTARY_BIT,
-+	PWMC_MODE_PUSH_PULL_BIT,
- 	PWMC_MODE_CNT,
- };
+ 	pwm->args.period = args->args[0];
++	pwm->args.mode = pwm_mode_get_valid(pc, pwm);
  
+ 	return pwm;
+ }
 -- 
 2.7.4
