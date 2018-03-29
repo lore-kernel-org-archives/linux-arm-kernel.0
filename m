@@ -1,53 +1,37 @@
-From: shorne@gmail.com (Stafford Horne)
-Date: Thu, 29 Mar 2018 14:01:44 +0900
-Subject: [PATCH v4 2/8] openrisc: Set CONFIG_MULTI_IRQ_HANDLER
-In-Reply-To: <20180327161911.14086-3-palmer@sifive.com>
-References: <20180327161911.14086-1-palmer@sifive.com>
- <20180327161911.14086-3-palmer@sifive.com>
-Message-ID: <20180329050144.GD2836@lianli.shorne-pla.net>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 29 Mar 2018 14:08:58 +0900
+Subject: [PATCH] arm64: defconfig: add CONFIG_UNIPHIER_THERMAL and
+ CONFIG_SNI_AVE
+In-Reply-To: <CAK8P3a3xteNLdGNW=a+jLWmxcEBhBFV8dhL+o0F1AGie=-3hng@mail.gmail.com>
+References: <1522153407-21430-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <CAK8P3a3xteNLdGNW=a+jLWmxcEBhBFV8dhL+o0F1AGie=-3hng@mail.gmail.com>
+Message-ID: <20180329140857.3234.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 09:19:05AM -0700, Palmer Dabbelt wrote:
-> arm has an optional MULTI_IRQ_HANDLER, which openrisc copied but didn't
-> make optional.  I'm converting this to generic code, but in order to
-> ensure everything stays bisectable I want this defined on openrisc for
-> now.  This will go away by the end of the patch set.
-> 
-> Signed-off-by: Palmer Dabbelt <palmer@sifive.com>
+Hello Arnd,
 
-Hi Palmer,
-Thanks for doing this work, its always nice to see generic code pulled out of
-architecture ports.
+Sorry for late reply and thanks for applying it.
 
-Acked-by: Stafford Horne <shorne@gmail.com>
+On Tue, 27 Mar 2018 15:32:34 +0200 <arnd@arndb.de> wrote:
 
-> ---
->  arch/openrisc/Kconfig | 4 ++++
->  1 file changed, 4 insertions(+)
+> On Tue, Mar 27, 2018 at 2:23 PM, Kunihiko Hayashi
+> <hayashi.kunihiko@socionext.com> wrote:
+> > Enable the thermal monitor driver and the AVE ethernet driver
+> > implemented on UniPhier SoCs.
+> >
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > 
-> diff --git a/arch/openrisc/Kconfig b/arch/openrisc/Kconfig
-> index 339df7324e9c..9ecad05bfc73 100644
-> --- a/arch/openrisc/Kconfig
-> +++ b/arch/openrisc/Kconfig
-> @@ -27,6 +27,7 @@ config OPENRISC
->  	select GENERIC_STRNLEN_USER
->  	select GENERIC_SMP_IDLE_THREAD
->  	select MODULES_USE_ELF_RELA
-> +	select MULTI_IRQ_HANDLER
->  	select HAVE_DEBUG_STACKOVERFLOW
->  	select OR1K_PIC
->  	select CPU_NO_EFFICIENT_FFS if !OPENRISC_HAVE_INST_FF1
-> @@ -68,6 +69,9 @@ config STACKTRACE_SUPPORT
->  config LOCKDEP_SUPPORT
->  	def_bool  y
->  
-> +config MULTI_IRQ_HANDLER
-> +	def_bool y
-> +
->  source "init/Kconfig"
->  
->  source "kernel/Kconfig.freezer"
-> -- 
-> 2.16.1
+> Any reason why this is a built-in driver rather than a loadable module?
 > 
+> We have a mix of both today for ethernet drivers, but generally I
+> would count them as non-essential.
+
+I have no big reason.
+I think it's necessary when mounting fs over the network.
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
