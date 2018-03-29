@@ -1,132 +1,101 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Mar 2018 15:13:23 +0200
-Subject: [PATCH resend v2 2/2] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <20180329131323.15881-1-ard.biesheuvel@linaro.org>
-References: <20180329131323.15881-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180329131323.15881-3-ard.biesheuvel@linaro.org>
+From: Eugeniy.Paltsev@synopsys.com (Eugeniy Paltsev)
+Date: Thu, 29 Mar 2018 13:17:01 +0000
+Subject: ns16550 earlycon baud broken on BCM5301X since commit
+ 31cb9a8575ca0 ("earlycon: initialise baud field of earlycon device
+ structure")
+In-Reply-To: <CACna6rzki=sjXQS12eF3yPXH7XeFYTCXVOdj--F=P=jkJZX7fg@mail.gmail.com>
+References: <CACna6rzki=sjXQS12eF3yPXH7XeFYTCXVOdj--F=P=jkJZX7fg@mail.gmail.com>
+Message-ID: <1522329420.32101.3.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support macros to conditionally yield the NEON (and thus the CPU)
-that may be called from the assembler code.
+Hi Rafa?,
 
-In some cases, yielding the NEON involves saving and restoring a non
-trivial amount of context (especially in the CRC folding algorithms),
-and so the macro is split into three, and the code in between is only
-executed when the yield path is taken, allowing the context to be preserved.
-The third macro takes an optional label argument that marks the resume
-path after a yield has been performed.
+Hm, your 'port->uartclk' value (and therefore 'BASE_BAUD' value) looks strange to me...
+Looks like you have 'BASE_BAUD' set to 115200.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/include/asm/assembler.h | 73 ++++++++++++++++++++
- arch/arm64/kernel/asm-offsets.c    |  3 +
- 2 files changed, 76 insertions(+)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index fe2ff3efe1f0..0bcc98dbba56 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -628,4 +628,77 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
- 	.endif
- 	.endm
- 
-+/*
-+ * Check whether to yield to another runnable task from kernel mode NEON code
-+ * (which runs with preemption disabled).
-+ *
-+ * if_will_cond_yield_neon
-+ *        // pre-yield patchup code
-+ * do_cond_yield_neon
-+ *        // post-yield patchup code
-+ * endif_yield_neon    <label>
-+ *
-+ * where <label> is optional, and marks the point where execution will resume
-+ * after a yield has been performed. If omitted, execution resumes right after
-+ * the endif_yield_neon invocation. Note that the entire sequence, including
-+ * the provided patchup code, will be omitted from the image if CONFIG_PREEMPT
-+ * is not defined.
-+ *
-+ * As a convenience, in the case where no patchup code is required, the above
-+ * sequence may be abbreviated to
-+ *
-+ * cond_yield_neon <label>
-+ *
-+ * Note that the patchup code does not support assembler directives that change
-+ * the output section, any use of such directives is undefined.
-+ *
-+ * The yield itself consists of the following:
-+ * - Check whether the preempt count is exactly 1, in which case disabling
-+ *   preemption once will make the task preemptible. If this is not the case,
-+ *   yielding is pointless.
-+ * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
-+ *   kernel mode NEON (which will trigger a reschedule), and branch to the
-+ *   yield fixup code.
-+ *
-+ * This macro sequence may clobber all CPU state that is not guaranteed by the
-+ * AAPCS to be preserved across an ordinary function call.
-+ */
-+
-+	.macro		cond_yield_neon, lbl
-+	if_will_cond_yield_neon
-+	do_cond_yield_neon
-+	endif_yield_neon	\lbl
-+	.endm
-+
-+	.macro		if_will_cond_yield_neon
-+#ifdef CONFIG_PREEMPT
-+	get_thread_info	x0
-+	ldr		w1, [x0, #TSK_TI_PREEMPT]
-+	ldr		x0, [x0, #TSK_TI_FLAGS]
-+	cmp		w1, #PREEMPT_DISABLE_OFFSET
-+	csel		x0, x0, xzr, eq
-+	tbnz		x0, #TIF_NEED_RESCHED, .Lyield_\@	// needs rescheduling?
-+	/* fall through to endif_yield_neon */
-+	.subsection	1
-+.Lyield_\@ :
-+#else
-+	.section	".discard.cond_yield_neon", "ax"
-+#endif
-+	.endm
-+
-+	.macro		do_cond_yield_neon
-+	bl		kernel_neon_end
-+	bl		kernel_neon_begin
-+	.endm
-+
-+	.macro		endif_yield_neon, lbl
-+	.ifnb		\lbl
-+	b		\lbl
-+	.else
-+	b		.Lyield_out_\@
-+	.endif
-+	.previous
-+.Lyield_out_\@ :
-+	.endm
-+
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 1303e04110cd..b7c33642de6e 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -23,6 +23,7 @@
- #include <linux/mm.h>
- #include <linux/dma-mapping.h>
- #include <linux/kvm_host.h>
-+#include <linux/preempt.h>
- #include <linux/suspend.h>
- #include <asm/cpufeature.h>
- #include <asm/fixmap.h>
-@@ -93,6 +94,8 @@ int main(void)
-   DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
-   DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
-   BLANK();
-+  DEFINE(PREEMPT_DISABLE_OFFSET, PREEMPT_DISABLE_OFFSET);
-+  BLANK();
-   DEFINE(CLOCK_REALTIME,	CLOCK_REALTIME);
-   DEFINE(CLOCK_MONOTONIC,	CLOCK_MONOTONIC);
-   DEFINE(CLOCK_MONOTONIC_RAW,	CLOCK_MONOTONIC_RAW);
+Here is my example:
+uart clock is 33333333Hz (fixed 33.33MHz xtal clock)
+So 'BASE_BAUD' is 33333333/16 = 2083333
+So 'port->uartclk' is BASE_BAUD*16 = 33333328
+'device->baud' is 115200 (which is read from device tree)
+So when we calculate divisor with this code
+------------------->8---------------
+divisor = DIV_ROUND_CLOSEST(port->uartclk, 16 * device->baud);
+------------------->8---------------
+We got 'divisor' = 181 which is correct value for us.
+
+
+On Thu, 2018-03-29 at 14:34 +0200, Rafa? Mi?ecki wrote:
+> Hi,
+> 
+> I upgraded my BCM5301X device based on BCM4708 SoC from 4.13 to 4.14
+> and noticed earlycon output is corrupted (a wrong baud rate is used).
+> 
+> 
+> I bisected this problem down to the:
+> 
+> commit 31cb9a8575ca04f47ea113434d4782b695638b62
+> Author: Eugeniy Paltsev <Eugeniy.Paltsev@synopsys.com>
+> Date:   Mon Aug 21 19:22:13 2017 +0300
+> 
+>     earlycon: initialise baud field of earlycon device structure
+> 
+> 
+> My device uses arch/arm/boot/dts/bcm4708.dtsi:
+> 
+> uart0: serial at 0300 {
+>         compatible = "ns16550";
+>         reg = <0x0300 0x100>;
+>         interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+>         clocks = <&iprocslow>;
+>         status = "okay";
+> };
+> 
+> aliases {
+>         serial0 = &uart0;
+> };
+> 
+> chosen {
+>         stdout-path = "serial0:115200n8";
+> };
+> 
+> 
+> A valid UART divisor for my device is 54. This is what bootloader sets
+> and what works with my serial console running 115200 8n1.
+> 
+> 
+> Before the commit 31cb9a8575ca0 early_serial8250_setup() never tried
+> setting baud because device->baud was 0. It left baud (divisor) to
+> whatever was configured by the bootloader. It has changed with above
+> commit though. So now the setup looks like that:
+> 1) port->uartclk equals 1843200 as set in the of_setup_earlycon():
+> port->uartclk = BASE_BAUD * 16;
+> 2) [NEW] device->baud equals 115200 as set in the of_setup_earlycon():
+> early_console_dev.baud = simple_strtoul(options, NULL, 0);
+> (a value of options is "115200n8")
+> 3) [NEW] divisor is calculated to 1 in the init_port():
+> divisor = DIV_ROUND_CLOSEST(port->uartclk, 16 * device->baud);
+> 4) [NEW] divisor is set using UART_DLL and UART_DLM in the init_port()
+> 
+> Obviously setting divisor 1 instead of 54 results in a wrong baud.
+> 
+> 
+> So right now my serial console output looks like that:
+> ?6;'+{.??s?.???.".??4??.?????.??J|?.?.8??.?..??????g??~.????L>.??,?9z9?{?Z?.."???NC?<?9.?/???.?.?}??~.???"?.?|????;??.??yy?.[
+>    0.043623] console [ttyS0] enabled
+> [    0.043623] console [ttyS0] enabled
+> [    0.050842] bootconsole [ns16550] disabled
+> [    0.050842] bootconsole [ns16550] disabled
+> [    0.062939] libphy: Fixed MDIO Bus: probed
+> (...)
+> 
+> For a complete log (coming from dmesg command) see attachment.
+> 
+> 
+> Can you take a look at this problem, please? Is there something wrong
+> with my DT? Or is a problem in 8250 or earlycon?
+> 
 -- 
-2.11.0
+ Eugeniy Paltsev
