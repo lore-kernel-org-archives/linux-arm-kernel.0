@@ -1,197 +1,165 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 29 Mar 2018 10:36:19 +0100
-Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <CAKv+Gu-FdndoFON3tJi0WP=+HsBtaoLY-uf6=0bd3e6jr1h-DQ@mail.gmail.com>
-References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
- <20180328124129.6459-3-ard.biesheuvel@linaro.org>
- <20180328171812.GN16308@e103592.cambridge.arm.com>
- <CAKv+Gu-FdndoFON3tJi0WP=+HsBtaoLY-uf6=0bd3e6jr1h-DQ@mail.gmail.com>
-Message-ID: <20180329093605.GP16308@e103592.cambridge.arm.com>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Thu, 29 Mar 2018 09:46:41 +0000
+Subject: [RFC PATCH] sdhci: arasan: Add runtime PM support
+In-Reply-To: <83c564e8-6ebf-f21c-676f-05ab75016777@rock-chips.com>
+References: <1522302530-27550-1-git-send-email-naranimanish@gmail.com>
+ <83c564e8-6ebf-f21c-676f-05ab75016777@rock-chips.com>
+Message-ID: <SN1PR0201MB179173E7833404BE8845DFAFC1A20@SN1PR0201MB1791.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2018 at 10:02:18AM +0100, Ard Biesheuvel wrote:
-> On 28 March 2018 at 18:18, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Wed, Mar 28, 2018 at 02:41:29PM +0200, Ard Biesheuvel wrote:
-> >> Add support macros to conditionally yield the NEON (and thus the CPU)
-> >> that may be called from the assembler code.
-> >>
-> >> In some cases, yielding the NEON involves saving and restoring a non
-> >> trivial amount of context (especially in the CRC folding algorithms),
-> >> and so the macro is split into three, and the code in between is only
-> >> executed when the yield path is taken, allowing the context to be preserved.
-> >> The third macro takes an optional label argument that marks the resume
-> >> path after a yield has been performed.
-> >
-> > Minor comments below, mostly just suggestions/observations.
-> >
-> > With the missing #include in asm-offsets.c fixed (if you think it's
-> > appropriate):
-> >
-> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-> >
+Hi Shawn,
+
+> -----Original Message-----
+> From: Shawn Lin [mailto:shawn.lin at rock-chips.com]
+> Sent: Thursday, March 29, 2018 12:57 PM
+> To: naranimanish at gmail.com
+> Cc: adrian.hunter at intel.com; michal.simek at xilinx.com;
+> ulf.hansson at linaro.org; linux-mmc at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; shawn.lin at rock-
+> chips.com; Manish Narani <MNARANI@xilinx.com>
+> Subject: Re: [RFC PATCH] sdhci: arasan: Add runtime PM support
 > 
-> Thanks Dave
+> On 2018/3/29 13:48, naranimanish at gmail.com wrote:
+> > From: Manish Narani <mnarani@xilinx.com>
+> >
+> > This patch adds runtime PM support in Arasan SD driver.
+> >
+> > Signed-off-by: Manish Narani <mnarani@xilinx.com>
+> > ---
+> >   drivers/mmc/host/sdhci-of-arasan.c | 83
+> +++++++++++++++++++++++++++++++++++++-
+> >   1 file changed, 81 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-of-arasan.c
+> > b/drivers/mmc/host/sdhci-of-arasan.c
+> > index c33a5f7..47196b5 100644
+> > --- a/drivers/mmc/host/sdhci-of-arasan.c
+> > +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> > @@ -23,6 +23,7 @@
+> >   #include <linux/mfd/syscon.h>
+> >   #include <linux/module.h>
+> >   #include <linux/of_device.h>
+> > +#include <linux/pm_runtime.h>
+> >   #include <linux/phy/phy.h>
+> >   #include <linux/regmap.h>
+> >   #include <linux/of.h>
+> > @@ -349,6 +350,75 @@ static const struct sdhci_pltfm_data
+> sdhci_arasan_cqe_pdata = {
+> >   			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+> >   };
+> >
+> > +#ifdef CONFIG_PM
+> > +/**
+> > + * sdhci_arasan_runtime_suspend - Suspend method for the driver
+> > + * @dev:	Address of the device structure
+> > + * Returns 0 on success and error value on error
+> > + *
+> > + * Put the device in a low power state.
+> > + */
+> > +static int sdhci_arasan_runtime_suspend(struct device *dev) {
 > 
-> Replies below
+> Would you help take care of cqhci_suspend?
+Yes, sure. Will take care of this in next version of patch.
+
 > 
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/include/asm/assembler.h | 64 ++++++++++++++++++++
-> >>  arch/arm64/kernel/asm-offsets.c    |  2 +
-> >>  2 files changed, 66 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> >> index d354eb7f2f0c..fb11514273d9 100644
-> >> --- a/arch/arm64/include/asm/assembler.h
-> >> +++ b/arch/arm64/include/asm/assembler.h
-> >> @@ -623,4 +623,68 @@ USER(\label, ic  ivau, \tmp2)                    // invalidate I line PoU
-> >>       .endif
-> >>       .endm
-> >>
-> >> +/*
-> >> + * Check whether to yield to another runnable task from kernel mode NEON code
-> >> + * (which runs with preemption disabled).
-> >> + *
-> >> + * if_will_cond_yield_neon
-> >> + *        // pre-yield patchup code
-> >> + * do_cond_yield_neon
-> >> + *        // post-yield patchup code
-> >> + * endif_yield_neon    <label>
-> >> + *
-> >> + * where <label> is optional, and marks the point where execution will resume
-> >> + * after a yield has been performed. If omitted, execution resumes right after
-> >> + * the endif_yield_neon invocation.
-> >
-> > Maybe add a comment describing cond_yield_neon, e.g.:
-> >
-> >  *
-> >  * As a convenience, in the case where no patchup code is required
-> >  * the above sequence may be abbreviated to:
-> >  *
-> >  * cond_yield_neon <label>
-> >
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> > +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > +	struct sdhci_arasan_data *sdhci_arasan =
+> sdhci_pltfm_priv(pltfm_host);
+> > +	int ret;
+> > +
+> > +	ret = sdhci_runtime_suspend_host(host);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> > +		mmc_retune_needed(host->mmc);
+> > +
+> > +	clk_disable(pltfm_host->clk);
+> > +	clk_disable(sdhci_arasan->clk_ahb);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +/**
+> > + * sdhci_arasan_runtime_resume - Resume method for the driver
+> > + * @dev:	Address of the device structure
+> > + * Returns 0 on success and error value on error
+> > + *
+> > + * Resume operation after suspend
+> > + */
+> > +static int sdhci_arasan_runtime_resume(struct device *dev) {
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> > +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > +	struct sdhci_arasan_data *sdhci_arasan =
+> sdhci_pltfm_priv(pltfm_host);
+> > +	int ret;
+> > +
 > 
-> Makes sense. I will add that.
+> Ditto, for cqhci_resume.
+Yes, okay.
+
+Thanks,
+Manish
+
 > 
-> >> + *
-> >> + * Note that the patchup code does not support assembler directives that change
-> >> + * the output section, any use of such directives is undefined.
-> >> + *
-> >> + * The yield itself consists of the following:
-> >> + * - Check whether the preempt count is exactly 1, in which case disabling
-> >> + *   preemption once will make the task preemptible. If this is not the case,
-> >> + *   yielding is pointless.
-> >> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
-> >> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
-> >> + *   yield fixup code.
-> >> + *
-> >> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
-> >> + * and may clobber x2 .. x18 if the yield path is taken.
-> >> + */
+> > +	ret = clk_enable(sdhci_arasan->clk_ahb);
+> > +	if (ret) {
+> > +		dev_err(dev, "Cannot enable AHB clock.\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = clk_enable(pltfm_host->clk);
+> > +	if (ret) {
+> > +		dev_err(dev, "Cannot enable SD clock.\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = sdhci_runtime_resume_host(host);
+> > +	if (ret)
+> > +		goto out;
+> > +
+> > +	return 0;
+> > +out:
+> > +	clk_disable(pltfm_host->clk);
+> > +	clk_disable(sdhci_arasan->clk_ahb);
+> > +
+> > +	return ret;
+> > +}
+> > +#endif /* ! CONFIG_PM */
+> > +
+> >   #ifdef CONFIG_PM_SLEEP
+> >   /**
+> >    * sdhci_arasan_suspend - Suspend method for the driver @@ -443,8
+> > +513,11 @@ static int sdhci_arasan_resume(struct device *dev)
+> >   }
+> >   #endif /* ! CONFIG_PM_SLEEP */
 > >
-> > Does this mean that the pre-yield patchup code can safely refer to
-> > x2..x18, but the post-yield patchup code and the code at <label> (or
-> > otherwise immediately following endif_yield_neon) can't?
+> > -static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops,
+> sdhci_arasan_suspend,
+> > -			 sdhci_arasan_resume);
+> > +static const struct dev_pm_ops sdhci_arasan_dev_pm_ops = {
+> > +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_arasan_suspend,
+> sdhci_arasan_resume)
+> > +	SET_RUNTIME_PM_OPS(sdhci_arasan_runtime_suspend,
+> > +			   sdhci_arasan_runtime_resume, NULL) };
 > >
-> 
-> In theory, yes, but it doesn't really matter in practice. If you go
-> down the yield path, you will always run the pre and post sequences,
-> and the main code will need to keep state in x19 and up anyway if it
-> wants it to be preserved.
-
-True.
-
-> I should probably rephrase this to say that x0 .. x18 may be clobbered.
-
-Sure, that would be simpler.  Or maybe just say that the set of clobbers
-is the same as for a function call -- this would cover NZCV for example.
-
-> >> +
-> >> +     .macro          cond_yield_neon, lbl
-> >> +     if_will_cond_yield_neon
-> >> +     do_cond_yield_neon
-> >> +     endif_yield_neon        \lbl
-> >> +     .endm
-> >> +
-> >> +     .macro          if_will_cond_yield_neon
-> >> +#ifdef CONFIG_PREEMPT
-> >> +     get_thread_info x0
-> >> +     ldr             w1, [x0, #TSK_TI_PREEMPT]
-> >> +     ldr             x0, [x0, #TSK_TI_FLAGS]
-> >> +     cmp             w1, #PREEMPT_DISABLE_OFFSET
-> >> +     csel            x0, x0, xzr, eq
-> >> +     tbnz            x0, #TIF_NEED_RESCHED, .Lyield_\@       // needs rescheduling?
-> >> +#endif
-> >> +     /* fall through to endif_yield_neon */
-> >> +     .subsection     1
+> >   static const struct of_device_id sdhci_arasan_of_match[] = {
+> >   	/* SoC-specific compatible strings w/ soc_ctl_map */ @@ -806,6
+> > +879,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+> >   	if (ret)
+> >   		goto err_add_host;
 > >
-> > Can we junk the code in this case rather than including it in the
-> > kernel, like
+> > +	pm_runtime_set_active(&pdev->dev);
+> > +	pm_runtime_enable(&pdev->dev);
+> > +	pm_runtime_set_autosuspend_delay(&pdev->dev, 2000);
+> > +	pm_runtime_mark_last_busy(&pdev->dev);
+> > +	pm_runtime_use_autosuspend(&pdev->dev);
+> > +
+> >   	return 0;
 > >
-> >         .section .discard.cond_yield_neon
+> >   err_add_host:
 > >
-> > (this seems to conform to some notion of a standard discarded section
-> > name, see <asm-generic/vmlinux.lds.h>).  This additionally discards
-> > the do_cond_yield_neon invocation (which I guess is what we'd expect
-> > for a non-preemptible kernel?)
-> >
-> > If doing that discard, a note could be added in the comment block
-> > to warn people not to assume that the patchup code and any labels
-> > defined in it will definitely end up in the kernel image.
-> >
-> > Since the patchup sequences aren't likely to be many or large, it's
-> > not the end of the world if we don't do this discarding though.
-> >
-> 
-> I chose not to bother. These are handcrafted assembly files that are
-> usually kept in modules, which means the .text footprint is a 4k
-> multiple anyway, and the code is complex enough as it is, so
-> discarding ~10 instructions that have been moved out of the hot path
-> already doesn't seem that useful to me.
-
-Agreed.  Do you know who is building CONFIG_PREEMPT=n kernels these
-days?
-
-> >> +.Lyield_\@ :
-> >> +     .endm
-> >> +
-> >> +     .macro          do_cond_yield_neon
-> >> +     bl              kernel_neon_end
-> >> +     bl              kernel_neon_begin
-> >> +     .endm
-> >> +
-> >> +     .macro          endif_yield_neon, lbl
-> >> +     .ifnb           \lbl
-> >> +     b               \lbl
-> >> +     .else
-> >> +     b               .Lyield_out_\@
-> >> +     .endif
-> >
-> > Should you include
-> >
-> >         .purgem do_cond_yield_neon
-> >         .purgem endif_yield_neon
-> >
-> > here?
-> >
-> > Otherwise, I think you would get macro redefinition errors if
-> > if_will_cond_yield_neon is used more than once in a given file.
-> >
-> 
-> if_will_cond_yield_neon does not define any macros itself, so this
-> shouldn't be a problem.
-
-You're right.  I skipped an .endm for some reason while reading and
-decided there were nested macros here.  But there aren't.
-
-Protecting against misuse would be "nice", but people using them already
-need to know what they're doing, so it's low-priority and something that
-could be added in a later patch.  So I agree that there's no need to add
-that here.
-
-[...]
-
-Cheers
----Dave
