@@ -1,124 +1,56 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Thu, 29 Mar 2018 10:39:46 +0200
-Subject: [PATCH v4 6/6] PCI: aardvark: Remove PCIe outbound window
- configuration
-In-Reply-To: <20180329083946.25970-1-thomas.petazzoni@bootlin.com>
-References: <20180329083946.25970-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180329083946.25970-7-thomas.petazzoni@bootlin.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 29 Mar 2018 16:42:40 +0800
+Subject: [PATCH] MAINTAINERS: update entry for entry for ARM/berlin
+Message-ID: <20180329164240.20cfddbc@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Evan Wang <xswang@marvell.com>
 
-Outbound window is used to translate CPU space addresses to PCIe space
-addresses when the CPU initiates PCIe transactions.
+Change the entry name and move it to its alphabetical location.
+We move to ARM/Synaptics instead of ARM/Marvell.
 
-According to the suggestion of the HW designers, the recommended
-solution is to use the default outbound parameters, even though the
-current outbound window setting does not cause any known functional
-issue.
+This patch also updates my email address from marvell to synaptics.
 
-This patch doesn't address any known functional issue, but aligns to
-HW design guidelines, and removes code that isn't needed.
-
-Signed-off-by: Evan Wang <xswang@marvell.com>
-Reviewed-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-[Thomas: tweak commit log.]
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 ---
- drivers/pci/host/pci-aardvark.c | 55 -----------------------------------------
- 1 file changed, 55 deletions(-)
+ MAINTAINERS | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 69c4fd50947e..702160c4ae09 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -109,24 +109,6 @@
- #define PCIE_MSI_MASK_REG			(CONTROL_BASE_ADDR + 0x5C)
- #define PCIE_MSI_PAYLOAD_REG			(CONTROL_BASE_ADDR + 0x9C)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6e950b8b4a41..0a0da6a8e607 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1578,15 +1578,6 @@ ARM/MAGICIAN MACHINE SUPPORT
+ M:	Philipp Zabel <philipp.zabel@gmail.com>
+ S:	Maintained
  
--/* PCIe window configuration */
--#define OB_WIN_BASE_ADDR			0x4c00
--#define OB_WIN_BLOCK_SIZE			0x20
--#define OB_WIN_REG_ADDR(win, offset)		(OB_WIN_BASE_ADDR + \
--						 OB_WIN_BLOCK_SIZE * (win) + \
--						 (offset))
--#define OB_WIN_MATCH_LS(win)			OB_WIN_REG_ADDR(win, 0x00)
--#define OB_WIN_MATCH_MS(win)			OB_WIN_REG_ADDR(win, 0x04)
--#define OB_WIN_REMAP_LS(win)			OB_WIN_REG_ADDR(win, 0x08)
--#define OB_WIN_REMAP_MS(win)			OB_WIN_REG_ADDR(win, 0x0c)
--#define OB_WIN_MASK_LS(win)			OB_WIN_REG_ADDR(win, 0x10)
--#define OB_WIN_MASK_MS(win)			OB_WIN_REG_ADDR(win, 0x14)
--#define OB_WIN_ACTIONS(win)			OB_WIN_REG_ADDR(win, 0x18)
+-ARM/Marvell Berlin SoC support
+-M:	Jisheng Zhang <jszhang@marvell.com>
+-M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
+-F:	arch/arm/mach-berlin/
+-F:	arch/arm/boot/dts/berlin*
+-F:	arch/arm64/boot/dts/marvell/berlin*
 -
--/* PCIe window types */
--#define OB_PCIE_MEM				0x0
--#define OB_PCIE_IO				0x4
--
- /* LMI registers base address and register offsets */
- #define LMI_BASE_ADDR				0x6000
- #define CFG_REG					(LMI_BASE_ADDR + 0x0)
-@@ -245,34 +227,9 @@ static int advk_pcie_wait_for_link(struct advk_pcie *pcie)
- 	return -ETIMEDOUT;
- }
+ ARM/Marvell Dove/MV78xx0/Orion SOC support
+ M:	Jason Cooper <jason@lakedaemon.net>
+ M:	Andrew Lunn <andrew@lunn.ch>
+@@ -2006,6 +1997,15 @@ F:	arch/arm/boot/dts/stm32*
+ F:	arch/arm/mach-stm32/
+ F:	drivers/clocksource/armv7m_systick.c
  
--/*
-- * Set PCIe address window register which could be used for memory
-- * mapping.
-- */
--static void advk_pcie_set_ob_win(struct advk_pcie *pcie,
--				 u32 win_num, u32 match_ms,
--				 u32 match_ls, u32 mask_ms,
--				 u32 mask_ls, u32 remap_ms,
--				 u32 remap_ls, u32 action)
--{
--	advk_writel(pcie, match_ls, OB_WIN_MATCH_LS(win_num));
--	advk_writel(pcie, match_ms, OB_WIN_MATCH_MS(win_num));
--	advk_writel(pcie, mask_ms, OB_WIN_MASK_MS(win_num));
--	advk_writel(pcie, mask_ls, OB_WIN_MASK_LS(win_num));
--	advk_writel(pcie, remap_ms, OB_WIN_REMAP_MS(win_num));
--	advk_writel(pcie, remap_ls, OB_WIN_REMAP_LS(win_num));
--	advk_writel(pcie, action, OB_WIN_ACTIONS(win_num));
--	advk_writel(pcie, match_ls | BIT(0), OB_WIN_MATCH_LS(win_num));
--}
--
- static void advk_pcie_setup_hw(struct advk_pcie *pcie)
- {
- 	u32 reg;
--	int i;
--
--	/* Point PCIe unit MBUS decode windows to DRAM space */
--	for (i = 0; i < 8; i++)
--		advk_pcie_set_ob_win(pcie, i, 0, 0, 0, 0, 0, 0, 0);
- 
- 	/* Set to Direct mode */
- 	reg = advk_readl(pcie, CTRL_CONFIG_REG);
-@@ -851,12 +808,6 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
- 
- 		switch (resource_type(res)) {
- 		case IORESOURCE_IO:
--			advk_pcie_set_ob_win(pcie, 1,
--					     upper_32_bits(res->start),
--					     lower_32_bits(res->start),
--					     0,	0xF8000000, 0,
--					     lower_32_bits(res->start),
--					     OB_PCIE_IO);
- 			err = pci_remap_iospace(res, iobase);
- 			if (err) {
- 				dev_warn(dev, "error %d: failed to map resource %pR\n",
-@@ -865,12 +816,6 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
- 			}
- 			break;
- 		case IORESOURCE_MEM:
--			advk_pcie_set_ob_win(pcie, 0,
--					     upper_32_bits(res->start),
--					     lower_32_bits(res->start),
--					     0x0, 0xF8000000, 0,
--					     lower_32_bits(res->start),
--					     (2 << 20) | OB_PCIE_MEM);
- 			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
- 			break;
- 		case IORESOURCE_BUS:
++ARM/Synaptics Berlin SoC support
++M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
++M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-berlin/
++F:	arch/arm/boot/dts/berlin*
++F:	arch/arm64/boot/dts/marvell/berlin*
++
+ ARM/TANGO ARCHITECTURE
+ M:	Marc Gonzalez <marc.w.gonzalez@free.fr>
+ M:	Mans Rullgard <mans@mansr.com>
 -- 
-2.14.3
+2.16.3
