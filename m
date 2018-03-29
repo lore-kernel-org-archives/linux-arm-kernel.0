@@ -1,43 +1,210 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 29 Mar 2018 11:56:37 +0200
-Subject: [PATCH] staging: mt7621-eth: Fix sparse warning in ethtool.c
-In-Reply-To: <20180328211848.11085-1-cmc@babblebit.net>
-References: <20180328211848.11085-1-cmc@babblebit.net>
-Message-ID: <20180329095637.GA16778@kroah.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 29 Mar 2018 10:59:28 +0100
+Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <20180329093605.GP16308@e103592.cambridge.arm.com>
+References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
+ <20180328124129.6459-3-ard.biesheuvel@linaro.org>
+ <20180328171812.GN16308@e103592.cambridge.arm.com>
+ <CAKv+Gu-FdndoFON3tJi0WP=+HsBtaoLY-uf6=0bd3e6jr1h-DQ@mail.gmail.com>
+ <20180329093605.GP16308@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu8o4R5JBseRt345OV5UVShFmGYiF4Wpxsnw_ZiRuch2AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 10:18:48PM +0100, Chris Coffey wrote:
-> Include the local ethtool.h header file in mtk_eth_soc.h so
-> implementation files have centralized access to it.
-> 
-> This fixes the following sparse warning:
-> 
-> drivers/staging/mt7621-eth/ethtool.c:213:6: warning: symbol
-> 'mtk_set_ethtool_ops' was not declared. Should it be static?
-> 
-> Signed-off-by: Chris Coffey <cmc@babblebit.net>
-> ---
->  drivers/staging/mt7621-eth/mtk_eth_soc.c | 1 -
->  drivers/staging/mt7621-eth/mtk_eth_soc.h | 1 +
->  2 files changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/mt7621-eth/mtk_eth_soc.c b/drivers/staging/mt7621-eth/mtk_eth_soc.c
-> index cbc7339843..0574e71573 100644
-> --- a/drivers/staging/mt7621-eth/mtk_eth_soc.c
-> +++ b/drivers/staging/mt7621-eth/mtk_eth_soc.c
-> @@ -35,7 +35,6 @@
->  
->  #include "mtk_eth_soc.h"
->  #include "mdio.h"
-> -#include "ethtool.h"
+On 29 March 2018 at 10:36, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Mar 29, 2018 at 10:02:18AM +0100, Ard Biesheuvel wrote:
+>> On 28 March 2018 at 18:18, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > On Wed, Mar 28, 2018 at 02:41:29PM +0200, Ard Biesheuvel wrote:
+>> >> Add support macros to conditionally yield the NEON (and thus the CPU)
+>> >> that may be called from the assembler code.
+>> >>
+>> >> In some cases, yielding the NEON involves saving and restoring a non
+>> >> trivial amount of context (especially in the CRC folding algorithms),
+>> >> and so the macro is split into three, and the code in between is only
+>> >> executed when the yield path is taken, allowing the context to be preserved.
+>> >> The third macro takes an optional label argument that marks the resume
+>> >> path after a yield has been performed.
+>> >
+>> > Minor comments below, mostly just suggestions/observations.
+>> >
+>> > With the missing #include in asm-offsets.c fixed (if you think it's
+>> > appropriate):
+>> >
+>> > Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+>> >
+>>
+>> Thanks Dave
+>>
+>> Replies below
+>>
+>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >> ---
+>> >>  arch/arm64/include/asm/assembler.h | 64 ++++++++++++++++++++
+>> >>  arch/arm64/kernel/asm-offsets.c    |  2 +
+>> >>  2 files changed, 66 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+>> >> index d354eb7f2f0c..fb11514273d9 100644
+>> >> --- a/arch/arm64/include/asm/assembler.h
+>> >> +++ b/arch/arm64/include/asm/assembler.h
+>> >> @@ -623,4 +623,68 @@ USER(\label, ic  ivau, \tmp2)                    // invalidate I line PoU
+>> >>       .endif
+>> >>       .endm
+>> >>
+>> >> +/*
+>> >> + * Check whether to yield to another runnable task from kernel mode NEON code
+>> >> + * (which runs with preemption disabled).
+>> >> + *
+>> >> + * if_will_cond_yield_neon
+>> >> + *        // pre-yield patchup code
+>> >> + * do_cond_yield_neon
+>> >> + *        // post-yield patchup code
+>> >> + * endif_yield_neon    <label>
+>> >> + *
+>> >> + * where <label> is optional, and marks the point where execution will resume
+>> >> + * after a yield has been performed. If omitted, execution resumes right after
+>> >> + * the endif_yield_neon invocation.
+>> >
+>> > Maybe add a comment describing cond_yield_neon, e.g.:
+>> >
+>> >  *
+>> >  * As a convenience, in the case where no patchup code is required
+>> >  * the above sequence may be abbreviated to:
+>> >  *
+>> >  * cond_yield_neon <label>
+>> >
+>>
+>> Makes sense. I will add that.
+>>
+>> >> + *
+>> >> + * Note that the patchup code does not support assembler directives that change
+>> >> + * the output section, any use of such directives is undefined.
+>> >> + *
+>> >> + * The yield itself consists of the following:
+>> >> + * - Check whether the preempt count is exactly 1, in which case disabling
+>> >> + *   preemption once will make the task preemptible. If this is not the case,
+>> >> + *   yielding is pointless.
+>> >> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
+>> >> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
+>> >> + *   yield fixup code.
+>> >> + *
+>> >> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
+>> >> + * and may clobber x2 .. x18 if the yield path is taken.
+>> >> + */
+>> >
+>> > Does this mean that the pre-yield patchup code can safely refer to
+>> > x2..x18, but the post-yield patchup code and the code at <label> (or
+>> > otherwise immediately following endif_yield_neon) can't?
+>> >
+>>
+>> In theory, yes, but it doesn't really matter in practice. If you go
+>> down the yield path, you will always run the pre and post sequences,
+>> and the main code will need to keep state in x19 and up anyway if it
+>> wants it to be preserved.
+>
+> True.
+>
+>> I should probably rephrase this to say that x0 .. x18 may be clobbered.
+>
+> Sure, that would be simpler.  Or maybe just say that the set of clobbers
+> is the same as for a function call -- this would cover NZCV for example.
+>
 
-How about just moving ethtool.h above the mtk_eth_soc.h include?
+Even better.
 
-Putting .h file dependancies in other .h files is generally not a good
-idea if at all possible.  Keeping them "clean" is better, and this
-driver has a bunch of work to go there, so let's not make it worse :)
+>> >> +
+>> >> +     .macro          cond_yield_neon, lbl
+>> >> +     if_will_cond_yield_neon
+>> >> +     do_cond_yield_neon
+>> >> +     endif_yield_neon        \lbl
+>> >> +     .endm
+>> >> +
+>> >> +     .macro          if_will_cond_yield_neon
+>> >> +#ifdef CONFIG_PREEMPT
+>> >> +     get_thread_info x0
+>> >> +     ldr             w1, [x0, #TSK_TI_PREEMPT]
+>> >> +     ldr             x0, [x0, #TSK_TI_FLAGS]
+>> >> +     cmp             w1, #PREEMPT_DISABLE_OFFSET
+>> >> +     csel            x0, x0, xzr, eq
+>> >> +     tbnz            x0, #TIF_NEED_RESCHED, .Lyield_\@       // needs rescheduling?
+>> >> +#endif
+>> >> +     /* fall through to endif_yield_neon */
+>> >> +     .subsection     1
+>> >
+>> > Can we junk the code in this case rather than including it in the
+>> > kernel, like
+>> >
+>> >         .section .discard.cond_yield_neon
+>> >
+>> > (this seems to conform to some notion of a standard discarded section
+>> > name, see <asm-generic/vmlinux.lds.h>).  This additionally discards
+>> > the do_cond_yield_neon invocation (which I guess is what we'd expect
+>> > for a non-preemptible kernel?)
+>> >
+>> > If doing that discard, a note could be added in the comment block
+>> > to warn people not to assume that the patchup code and any labels
+>> > defined in it will definitely end up in the kernel image.
+>> >
+>> > Since the patchup sequences aren't likely to be many or large, it's
+>> > not the end of the world if we don't do this discarding though.
+>> >
+>>
+>> I chose not to bother. These are handcrafted assembly files that are
+>> usually kept in modules, which means the .text footprint is a 4k
+>> multiple anyway, and the code is complex enough as it is, so
+>> discarding ~10 instructions that have been moved out of the hot path
+>> already doesn't seem that useful to me.
+>
+> Agreed.  Do you know who is building CONFIG_PREEMPT=n kernels these
+> days?
+>
 
-thanks,
+AFAIK most distro kernels use voluntary preemption, so they'd still
+benefit from this.
 
-greg k-h
+>> >> +.Lyield_\@ :
+>> >> +     .endm
+>> >> +
+>> >> +     .macro          do_cond_yield_neon
+>> >> +     bl              kernel_neon_end
+>> >> +     bl              kernel_neon_begin
+>> >> +     .endm
+>> >> +
+>> >> +     .macro          endif_yield_neon, lbl
+>> >> +     .ifnb           \lbl
+>> >> +     b               \lbl
+>> >> +     .else
+>> >> +     b               .Lyield_out_\@
+>> >> +     .endif
+>> >
+>> > Should you include
+>> >
+>> >         .purgem do_cond_yield_neon
+>> >         .purgem endif_yield_neon
+>> >
+>> > here?
+>> >
+>> > Otherwise, I think you would get macro redefinition errors if
+>> > if_will_cond_yield_neon is used more than once in a given file.
+>> >
+>>
+>> if_will_cond_yield_neon does not define any macros itself, so this
+>> shouldn't be a problem.
+>
+> You're right.  I skipped an .endm for some reason while reading and
+> decided there were nested macros here.  But there aren't.
+>
+> Protecting against misuse would be "nice", but people using them already
+> need to know what they're doing, so it's low-priority and something that
+> could be added in a later patch.  So I agree that there's no need to add
+> that here.
+>
+
+OK.
+
+I will respin with the minor issues addressed and your R-b added, and
+repost before the end of the day.
+
+Will, hopefully you're still ok with picking this up for v4.17? I'd
+hate to postpone the crypto pieces that depend on it to v4.19
