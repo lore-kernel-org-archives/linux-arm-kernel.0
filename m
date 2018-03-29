@@ -1,34 +1,66 @@
-From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Thu, 29 Mar 2018 09:53:01 +0800
-Subject: [PATCH] MAINTAINERS: Update Layerscape PCIe driver maintainers list
-Message-ID: <1522288381-470803-1-git-send-email-Minghuan.Lian@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 29 Mar 2018 12:31:15 +0800
+Subject: [PATCH 3/3] mfd: axp20x: Correct AXP806 POK interrupt prefix
+In-Reply-To: <20180329043115.7132-1-wens@csie.org>
+References: <20180329043115.7132-1-wens@csie.org>
+Message-ID: <20180329043115.7132-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change Layerscape PCIe driver maintainers' email address
-from freescale to nxp.
+When AXP806 support was added, POK was incorrectly expanded to PWROK.
+However, the datasheet lists them as POK[LSNP], which is the same as
+on the AXP288. Furthermore, the registers associated with POK functions
+are the same as the PEK on the other AXP PMICs. This suggests that
+"POK" means "Power On Key", much like "PEK" means "Power Enable Key",
+instead of "Power OK".
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+This patch changes the "PWROK" prefix to "POK" for these interrupts.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- MAINTAINERS | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/mfd/axp20x.c       | 8 ++++----
+ include/linux/mfd/axp20x.h | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3bdc260..a0a9524 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10558,9 +10558,9 @@ F:	Documentation/devicetree/bindings/pci/cdns,*.txt
- F:	drivers/pci/cadence/pcie-cadence*
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index b3051e1c3ddc..9a2ef3d9b8f8 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -450,11 +450,11 @@ static const struct regmap_irq axp806_regmap_irqs[] = {
+ 	INIT_REGMAP_IRQ(AXP806, DCDCC_V_LOW,		0, 5),
+ 	INIT_REGMAP_IRQ(AXP806, DCDCD_V_LOW,		0, 6),
+ 	INIT_REGMAP_IRQ(AXP806, DCDCE_V_LOW,		0, 7),
+-	INIT_REGMAP_IRQ(AXP806, PWROK_LONG,		1, 0),
+-	INIT_REGMAP_IRQ(AXP806, PWROK_SHORT,		1, 1),
++	INIT_REGMAP_IRQ(AXP806, POK_LONG,		1, 0),
++	INIT_REGMAP_IRQ(AXP806, POK_SHORT,		1, 1),
+ 	INIT_REGMAP_IRQ(AXP806, WAKEUP,			1, 4),
+-	INIT_REGMAP_IRQ(AXP806, PWROK_FALL,		1, 5),
+-	INIT_REGMAP_IRQ(AXP806, PWROK_RISE,		1, 6),
++	INIT_REGMAP_IRQ(AXP806, POK_FALL,		1, 5),
++	INIT_REGMAP_IRQ(AXP806, POK_RISE,		1, 6),
+ };
  
- PCI DRIVER FOR FREESCALE LAYERSCAPE
--M:	Minghuan Lian <minghuan.Lian@freescale.com>
--M:	Mingkai Hu <mingkai.hu@freescale.com>
--M:	Roy Zang <tie-fei.zang@freescale.com>
-+M:	Minghuan Lian <minghuan.Lian@nxp.com>
-+M:	Mingkai Hu <mingkai.hu@nxp.com>
-+M:	Roy Zang <roy.zang@nxp.com>
- L:	linuxppc-dev at lists.ozlabs.org
- L:	linux-pci at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org
+ static const struct regmap_irq axp809_regmap_irqs[] = {
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index a2489363a998..517e60eecbcb 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -592,11 +592,11 @@ enum axp806_irqs {
+ 	AXP806_IRQ_DCDCC_V_LOW,
+ 	AXP806_IRQ_DCDCD_V_LOW,
+ 	AXP806_IRQ_DCDCE_V_LOW,
+-	AXP806_IRQ_PWROK_LONG,
+-	AXP806_IRQ_PWROK_SHORT,
++	AXP806_IRQ_POK_LONG,
++	AXP806_IRQ_POK_SHORT,
+ 	AXP806_IRQ_WAKEUP,
+-	AXP806_IRQ_PWROK_FALL,
+-	AXP806_IRQ_PWROK_RISE,
++	AXP806_IRQ_POK_FALL,
++	AXP806_IRQ_POK_RISE,
+ };
+ 
+ enum axp809_irqs {
 -- 
-2.7.4
+2.16.3
