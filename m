@@ -1,76 +1,41 @@
-From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Thu, 29 Mar 2018 11:12:45 +0000
-Subject: [PATCH v3 4/8] reset: Renesas RZ/N1 reboot driver
-In-Reply-To: <1522309629-10152-5-git-send-email-michel.pollet@bp.renesas.com>
-References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
- <1522309629-10152-5-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <OSBPR01MB205430EB7EE4F338829135EDD2A20@OSBPR01MB2054.jpnprd01.prod.outlook.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 29 Mar 2018 12:24:52 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Avoid warning with 32-bit phys_addr_t
+Message-ID: <7181ab429dc33f407ca53d66ec36d1c4d28f74cd.1522322035.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It's not entirely unreasonable for io-pgtable-arm to be built for
+configurations with 32-bit phys_addr_t, where the compiler rightly
+raises a warning about the 36-bit shift. That particular code path
+should never actually *run* on those systems, but we still want it
+to compile cleanly, which is easily done by using an unambiguous u64
+as the intermediate type instead.
 
-On 29 March 2018 08:47, I messed up:
-[snip]
->
-> The Renesas RZ/N1 Family (Part #R9A06G0xx) needs a small driver to reboot
-> the Cortex-A7 cores. This driver is a sub driver of the sysctrl MFD.
->
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
-> ---
->  drivers/power/reset/Kconfig       |   7 +++
->  drivers/power/reset/Makefile      |   1 +
->  drivers/power/reset/rzn1-reboot.c | 105
-[snip]
-> +
-> +parent = pdev->dev.parent;
-> +if (!parent || !parent->of_node)
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Not sure what went on when I had all the patches loaded in the editor before sending, but I've deleted a brace here. Will be fixed in v4... :/
+Oops, I managed to totally overlook that phys_addr_t would be
+configuration-dependent, sorry :(
 
-Michel
+If this can't sneak in on top of the SMMU pull, I'll resend it 
+as a fix for -rc1. It shouldn't be super-critical.
 
+ drivers/iommu/io-pgtable-arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +dev_err(&pdev->dev, "couldn't find sysctrl node\n");
-> +return -ENODEV;
-> +}
-> +sysctrl = syscon_node_to_regmap(parent->of_node);
-> +if (IS_ERR(sysctrl)) {
-> +dev_err(&pdev->dev, "couldn't find find regmap\n");
-> +return PTR_ERR(sysctrl);
-> +}
-> +err = register_restart_handler(&rzn1_reboot_nb);
-> +if (err) {
-> +dev_err(&pdev->dev, "register restart handler
-> failed(err=%d)\n",
-> +err);
-> +}
-> +
-> +return err;
-> +}
-> +
-> +static const struct of_device_id rzn1_reboot_of_match[] = {
-> +{ .compatible = "renesas,rzn1-reboot" },
-> +{}
-> +};
-> +MODULE_DEVICE_TABLE(of, rzn1_reboot_of_match);
-> +
-> +static struct platform_driver rzn1_reboot_driver = {
-> +.probe = rzn1_reboot_probe,
-> +.driver = {
-> +.name = "rzn1-reboot",
-> +.of_match_table = rzn1_reboot_of_match,
-> +},
-> +};
-> +module_platform_driver(rzn1_reboot_driver);
-> +
-> +MODULE_DESCRIPTION("RZ/N1 reboot driver");
-> MODULE_AUTHOR("Michel Pollet
-> +<michel.pollet@bp.renesas.com>, <buserror@gmail.com>");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.7.4
-
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index a5be4c92c5c8..47b64d3b833f 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -211,7 +211,7 @@ static arm_lpae_iopte paddr_to_iopte(phys_addr_t paddr,
+ static phys_addr_t iopte_to_paddr(arm_lpae_iopte pte,
+ 				  struct arm_lpae_io_pgtable *data)
+ {
+-	phys_addr_t paddr = pte & ARM_LPAE_PTE_ADDR_MASK;
++	u64 paddr = pte & ARM_LPAE_PTE_ADDR_MASK;
+ 
+ 	if (data->pg_shift < 16)
+ 		return paddr;
+-- 
+2.16.1.dirty
