@@ -1,50 +1,60 @@
-From: yong.deng@magewell.com (Yong)
-Date: Thu, 29 Mar 2018 09:02:56 +0800
-Subject: [linux-sunxi] [PATCH v9 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <9b60dee0-2504-6ae3-fda3-64c4458025c3@xevo.com>
-References: <1520301070-48769-1-git-send-email-yong.deng@magewell.com>
- <9b60dee0-2504-6ae3-fda3-64c4458025c3@xevo.com>
-Message-ID: <20180329090256.e9621262cf069c475a706087@magewell.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Thu, 29 Mar 2018 10:31:15 +0800
+Subject: [PATCH v6 0/6] Add MediaTek PMIC keys support
+In-Reply-To: <20180328102640.yx6nv5abfexmouuf@dell>
+References: <1508937364-30054-1-git-send-email-chen.zhong@mediatek.com>
+ <808b2029da224ab687fb0553cbc1c68e@mtkmbs08n1.mediatek.inc>
+ <1521685073.28226.10.camel@mtkswgap22> <20180323185418.GD255819@dtor-ws>
+ <20180327080507.pgil6pw2mn4y2f4d@dell>
+ <3ece050c-7573-ef4e-2c89-61645a243a33@gmail.com>
+ <20180328102640.yx6nv5abfexmouuf@dell>
+Message-ID: <1522290675.17084.8.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 28 Mar 2018 16:29:47 -0700
-Martin Kelly <mkelly@xevo.com> wrote:
-
-> On 03/05/2018 05:51 PM, Yong Deng wrote:
-> > This patchset add initial support for Allwinner V3s CSI.
-> > 
-> > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> > interface and CSI1 is used for parallel interface. This is not
-> > documented in datasheet but by test and guess.
-> > 
-> > This patchset implement a v4l2 framework driver and add a binding
-> > documentation for it.
-> > 
-> > Currently, the driver only support the parallel interface. And has been
-> > tested with a BT1120 signal which generating from FPGA. The following
-> > fetures are not support with this patchset:
-> >    - ISP
-> >    - MIPI-CSI2
-> >    - Master clock for camera sensor
-> >    - Power regulator for the front end IC
-> > 
+On Wed, 2018-03-28 at 11:26 +0100, Lee Jones wrote:
+> On Tue, 27 Mar 2018, Matthias Brugger wrote:
 > 
-> Hi Yong,
+> > 
+> > 
+> > On 03/27/2018 10:05 AM, Lee Jones wrote:
+> > > On Fri, 23 Mar 2018, Dmitry Torokhov wrote:
+> > >> On Thu, Mar 22, 2018 at 10:17:53AM +0800, Sean Wang wrote:
+> > >>> Hi, Dmitry and Lee
+> > >>>
+> > >>> The series seems not being got merged. Are they good enough to be ready
+> > >>> into the your tree?
+> > >>>
+> > >>> Recently I've tested the series with focusing on pwrkey event generated
+> > >>> through interrupt when push and release the key on bpi-r2 board and then
+> > >>> finally it's working fine. but for homekey it cannot be found on the
+> > >>> board and thus I cannot have more tests more about it.
+> > >>>
+> > >>> Tested-by: Sean Wang <sean.wang@mediatek.com>
+> > >>
+> > >> You have my Ack on the input patch; I expect it go through Lee's tree as
+> > >> there are some dependencies on mfd core piece.
+> > > 
+> > > Are you happy for me to merge the Input dt-bindings without your Ack?
+> > > 
+> > 
+> > They got both Acked in v5, but the commit message was not updated:
+> > https://patchwork.kernel.org/patch/9973721/
+> > https://patchwork.kernel.org/patch/9973723/
 > 
-> Thanks so much, this driver is a great contribution!
+> Thanks Matthias.
 > 
-> Unfortunately the board I'm working with (nanopi neo air) uses the MIPI 
-> CSI-2 CSI0 interface rather than CSI1. Do you have any plans to support 
-> the MIPI CSI-2 interface at some point? If not, do you know the scope of 
-> what would be involved?
+> Chen, can you collect all the Acks and repost as a RESEND please?
+> 
 
-AFAIK, there is no document about MIPI CSI-2. You can take a look at the
-source code in BSP:
-https://github.com/friendlyarm/h3_lichee/tree/master/linux-3.4/drivers/media/video/sunxi-vfe/mipi_csi
-And try to port it to mainline.
+Thanks Matthias, Lee, Dmitry and Sean for your comments.
 
-Thanks,
-Yong
+Hi Lee,
+
+I have collected the Acks by Rob and sent the v6:
+https://patchwork.kernel.org/patch/10026705
+https://patchwork.kernel.org/patch/10026707
+
+Are they enough to be merged?
+
+Thank you.
