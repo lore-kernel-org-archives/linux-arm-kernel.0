@@ -1,94 +1,76 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 29 Mar 2018 12:12:27 +0100
-Subject: [PATCH resend 2/2] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <CAKv+Gu8o4R5JBseRt345OV5UVShFmGYiF4Wpxsnw_ZiRuch2AQ@mail.gmail.com>
-References: <20180328124129.6459-1-ard.biesheuvel@linaro.org>
- <20180328124129.6459-3-ard.biesheuvel@linaro.org>
- <20180328171812.GN16308@e103592.cambridge.arm.com>
- <CAKv+Gu-FdndoFON3tJi0WP=+HsBtaoLY-uf6=0bd3e6jr1h-DQ@mail.gmail.com>
- <20180329093605.GP16308@e103592.cambridge.arm.com>
- <CAKv+Gu8o4R5JBseRt345OV5UVShFmGYiF4Wpxsnw_ZiRuch2AQ@mail.gmail.com>
-Message-ID: <20180329111227.GQ16308@e103592.cambridge.arm.com>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Thu, 29 Mar 2018 11:12:45 +0000
+Subject: [PATCH v3 4/8] reset: Renesas RZ/N1 reboot driver
+In-Reply-To: <1522309629-10152-5-git-send-email-michel.pollet@bp.renesas.com>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-5-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <OSBPR01MB205430EB7EE4F338829135EDD2A20@OSBPR01MB2054.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2018 at 10:59:28AM +0100, Ard Biesheuvel wrote:
-> On 29 March 2018 at 10:36, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Mar 29, 2018 at 10:02:18AM +0100, Ard Biesheuvel wrote:
-> >> On 28 March 2018 at 18:18, Dave Martin <Dave.Martin@arm.com> wrote:
 
-[...]
+On 29 March 2018 08:47, I messed up:
+[snip]
+>
+> The Renesas RZ/N1 Family (Part #R9A06G0xx) needs a small driver to reboot
+> the Cortex-A7 cores. This driver is a sub driver of the sysctrl MFD.
+>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> ---
+>  drivers/power/reset/Kconfig       |   7 +++
+>  drivers/power/reset/Makefile      |   1 +
+>  drivers/power/reset/rzn1-reboot.c | 105
+[snip]
+> +
+> +parent = pdev->dev.parent;
+> +if (!parent || !parent->of_node)
 
-> >> I should probably rephrase this to say that x0 .. x18 may be clobbered.
-> >
-> > Sure, that would be simpler.  Or maybe just say that the set of clobbers
-> > is the same as for a function call -- this would cover NZCV for example.
-> >
-> 
-> Even better.
+Not sure what went on when I had all the patches loaded in the editor before sending, but I've deleted a brace here. Will be fixed in v4... :/
 
-[...]
+Michel
 
-> >> > Since the patchup sequences aren't likely to be many or large, it's
-> >> > not the end of the world if we don't do this discarding though.
-> >> >
-> >>
-> >> I chose not to bother. These are handcrafted assembly files that are
-> >> usually kept in modules, which means the .text footprint is a 4k
-> >> multiple anyway, and the code is complex enough as it is, so
-> >> discarding ~10 instructions that have been moved out of the hot path
-> >> already doesn't seem that useful to me.
-> >
-> > Agreed.  Do you know who is building CONFIG_PREEMPT=n kernels these
-> > days?
-> >
-> 
-> AFAIK most distro kernels use voluntary preemption, so they'd still
-> benefit from this.
 
-OK, and given the size of the typical distro kernel, I doubt anyone will
-lose sleep over a couple of hundred extra bytes.
+> +dev_err(&pdev->dev, "couldn't find sysctrl node\n");
+> +return -ENODEV;
+> +}
+> +sysctrl = syscon_node_to_regmap(parent->of_node);
+> +if (IS_ERR(sysctrl)) {
+> +dev_err(&pdev->dev, "couldn't find find regmap\n");
+> +return PTR_ERR(sysctrl);
+> +}
+> +err = register_restart_handler(&rzn1_reboot_nb);
+> +if (err) {
+> +dev_err(&pdev->dev, "register restart handler
+> failed(err=%d)\n",
+> +err);
+> +}
+> +
+> +return err;
+> +}
+> +
+> +static const struct of_device_id rzn1_reboot_of_match[] = {
+> +{ .compatible = "renesas,rzn1-reboot" },
+> +{}
+> +};
+> +MODULE_DEVICE_TABLE(of, rzn1_reboot_of_match);
+> +
+> +static struct platform_driver rzn1_reboot_driver = {
+> +.probe = rzn1_reboot_probe,
+> +.driver = {
+> +.name = "rzn1-reboot",
+> +.of_match_table = rzn1_reboot_of_match,
+> +},
+> +};
+> +module_platform_driver(rzn1_reboot_driver);
+> +
+> +MODULE_DESCRIPTION("RZ/N1 reboot driver");
+> MODULE_AUTHOR("Michel Pollet
+> +<michel.pollet@bp.renesas.com>, <buserror@gmail.com>");
+> +MODULE_LICENSE("GPL v2");
+> --
+> 2.7.4
 
-I might try to hack it up later just for fun, just to see whether it
-works.
 
-[...]
 
-> >> > Should you include
-> >> >
-> >> >         .purgem do_cond_yield_neon
-> >> >         .purgem endif_yield_neon
-> >> >
-> >> > here?
-> >> >
-> >> > Otherwise, I think you would get macro redefinition errors if
-> >> > if_will_cond_yield_neon is used more than once in a given file.
-> >> >
-> >>
-> >> if_will_cond_yield_neon does not define any macros itself, so this
-> >> shouldn't be a problem.
-> >
-> > You're right.  I skipped an .endm for some reason while reading and
-> > decided there were nested macros here.  But there aren't.
-> >
-> > Protecting against misuse would be "nice", but people using them already
-> > need to know what they're doing, so it's low-priority and something that
-> > could be added in a later patch.  So I agree that there's no need to add
-> > that here.
-> >
-> 
-> OK.
-> 
-> I will respin with the minor issues addressed and your R-b added, and
-> repost before the end of the day.
 
-Sounds good to me.
-
-Cheers
----Dave
- 
-> Will, hopefully you're still ok with picking this up for v4.17? I'd
-> hate to postpone the crypto pieces that depend on it to v4.19
-
-[...]
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
