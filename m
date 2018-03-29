@@ -1,114 +1,100 @@
 From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Thu, 29 Mar 2018 21:59:03 +0300
-Subject: [PATCH 2/6] spi: sun4i: restrict transfer length in PIO-mode
+Date: Thu, 29 Mar 2018 21:59:06 +0300
+Subject: [PATCH 5/6] spi: sun4i: introduce register set/unset helpers
 In-Reply-To: <20180329185907.27281-1-ssuloev@orpaltech.com>
 References: <20180329185907.27281-1-ssuloev@orpaltech.com>
-Message-ID: <20180329185907.27281-3-ssuloev@orpaltech.com>
+Message-ID: <20180329185907.27281-6-ssuloev@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to handle 3/4 empty/full interrupts
-as the maximum supported transfer length in PIO mode
-is 64 bytes for sun4i-family SoCs. As long as a
-problem was reported previously with filling FIFO
-on A10s then we stick with 63 bytes depth.
+Two helper functions were added in order to update
+registers easily.
 
 Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
 
 ---
- drivers/spi/spi-sun4i.c | 50 ++++++++++++-------------------------------------
- 1 file changed, 12 insertions(+), 38 deletions(-)
+ drivers/spi/spi-sun4i.c | 40 +++++++++++++++++++---------------------
+ 1 file changed, 19 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index 4141003..2a49c22 100644
+index 4f24e12..fc913d4 100644
 --- a/drivers/spi/spi-sun4i.c
 +++ b/drivers/spi/spi-sun4i.c
-@@ -22,7 +22,12 @@
- 
- #include <linux/spi/spi.h>
- 
--#define SUN4I_FIFO_DEPTH		64
-+/*
-+ * FIFO length is 64 bytes
-+ * But filling the FIFO fully might cause a timeout
-+ * on some devices, for example on spi2 on A10s
-+ */
-+#define SUN4I_FIFO_DEPTH		63
- 
- #define SUN4I_RXDATA_REG		0x00
- 
-@@ -202,7 +207,7 @@ static void sun4i_spi_set_cs(struct spi_device *spi, bool enable)
- 
- static size_t sun4i_spi_max_transfer_size(struct spi_device *spi)
- {
--	return SUN4I_FIFO_DEPTH - 1;
-+	return SUN4I_FIFO_DEPTH;
+@@ -107,29 +107,29 @@ static inline void sun4i_spi_write(struct sun4i_spi *sspi, u32 reg, u32 value)
+ 	writel(value, sspi->base_addr + reg);
  }
  
- static int sun4i_spi_transfer_one(struct spi_master *master,
-@@ -216,11 +221,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
- 	int ret = 0;
- 	u32 reg;
- 
--	/* We don't support transfer larger than the FIFO */
--	if (tfr->len > SUN4I_MAX_XFER_SIZE)
--		return -EMSGSIZE;
+-static inline u32 sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
++static inline void sun4i_spi_set(struct sun4i_spi *sspi, u32 addr, u32 val)
+ {
+-	u32 reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
 -
--	if (tfr->tx_buf && tfr->len >= SUN4I_MAX_XFER_SIZE)
-+	/* We don't support transfers larger than FIFO depth */
-+	if (tfr->len > SUN4I_FIFO_DEPTH)
- 		return -EMSGSIZE;
+-	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
++	u32 reg = sun4i_spi_read(sspi, addr);
  
- 	reinit_completion(&sspi->done);
-@@ -313,17 +315,11 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+-	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
++	reg |= val;
++	sun4i_spi_write(sspi, addr, reg);
+ }
  
+-static inline void sun4i_spi_enable_interrupt(struct sun4i_spi *sspi, u32 mask)
++static inline void sun4i_spi_unset(struct sun4i_spi *sspi, u32 addr, u32 val)
+ {
+-	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	u32 reg = sun4i_spi_read(sspi, addr);
+ 
+-	reg |= mask;
+-	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++	reg &= ~val;
++	sun4i_spi_write(sspi, addr, reg);
+ }
+ 
+-static inline void sun4i_spi_disable_interrupt(struct sun4i_spi *sspi, u32 mask)
++static inline u32 sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
+ {
+-	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	u32 reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
+ 
+-	reg &= ~mask;
+-	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
++
++	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
+ }
+ 
+ static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
+@@ -256,13 +256,12 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	/* Clear pending interrupts */
+ 	sun4i_spi_write(sspi, SUN4I_INT_STA_REG, ~0);
+ 
++	/* Reset FIFOs */
++	sun4i_spi_set(sspi, SUN4I_CTL_REG,
++		      SUN4I_CTL_RF_RST | SUN4I_CTL_TF_RST);
+ 
+ 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+ 
+-	/* Reset FIFOs */
+-	sun4i_spi_write(sspi, SUN4I_CTL_REG,
+-			reg | SUN4I_CTL_RF_RST | SUN4I_CTL_TF_RST);
+-
  	/*
- 	 * Fill the TX FIFO
--	 * Filling the FIFO fully causes timeout for some reason
--	 * at least on spi2 on A10s
+ 	 * Setup the transfer control register: Chip Select,
+ 	 * polarities, etc.
+@@ -341,12 +340,11 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
  	 */
--	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH - 1);
-+	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
+ 	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
  
--	/* Enable the interrupts */
--	sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TC |
--					 SUN4I_INT_CTL_RF_F34);
--	/* Only enable Tx FIFO interrupt if we really need it */
--	if (tx_len > SUN4I_FIFO_DEPTH)
--		sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TF_E34);
-+	/* Enable the transfer complete interrupt */
-+	sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TC);
+-	/* Enable the transfer complete interrupt */
+-	sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TC);
++	/* Enable transfer complete interrupt */
++	sun4i_spi_set(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
  
  	/* Start the transfer */
- 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
-@@ -363,28 +359,6 @@ static irqreturn_t sun4i_spi_handler(int irq, void *dev_id)
- 		return IRQ_HANDLED;
- 	}
+-	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+-	sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
++	sun4i_spi_set(sspi, SUN4I_CTL_REG, SUN4I_CTL_XCH);
  
--	/* Receive FIFO 3/4 full */
--	if (status & SUN4I_INT_CTL_RF_F34) {
--		sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
--		/* Only clear the interrupt _after_ draining the FIFO */
--		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_RF_F34);
--		return IRQ_HANDLED;
--	}
--
--	/* Transmit FIFO 3/4 empty */
--	if (status & SUN4I_INT_CTL_TF_E34) {
--		sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
--
--		if (!sspi->len)
--			/* nothing left to transmit */
--			sun4i_spi_disable_interrupt(sspi, SUN4I_INT_CTL_TF_E34);
--
--		/* Only clear the interrupt _after_ re-seeding the FIFO */
--		sun4i_spi_write(sspi, SUN4I_INT_STA_REG, SUN4I_INT_CTL_TF_E34);
--
--		return IRQ_HANDLED;
--	}
--
- 	return IRQ_NONE;
- }
+ 	ret = sun4i_spi_wait_for_transfer(spi, tfr);
  
 -- 
 2.16.2
