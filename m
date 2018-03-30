@@ -1,58 +1,45 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 30 Mar 2018 13:09:31 +0200
-Subject: [PATCH 3/3] iio: adc: meson-axg: add saradc driver
-In-Reply-To: <20180326084629.100070-4-yixun.lan@amlogic.com>
-References: <20180326084629.100070-1-yixun.lan@amlogic.com>
- <20180326084629.100070-4-yixun.lan@amlogic.com>
-Message-ID: <CAFBinCCK+Y0QAHcGDXvXvSqChS91XK5C6d5XunkmUVBQa4nn+Q@mail.gmail.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Fri, 30 Mar 2018 04:59:46 -0700
+Subject: [PATCH v2 0/7] net: thunderx: implement DMAC filtering support
+In-Reply-To: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 10:46 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
-> From: Xingyu Chen <xingyu.chen@amlogic.com>
->
-> Add the SAR ADC driver for the Amlogic Meson-AXG SoC.
->
-> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-I suggest changing the subject of this patch to:
-iio: adc: meson-saradc: add support for Meson AXG
+From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-(because "iio: adc: meson-axg" does not point to the "meson-saradc"
-driver and no new driver is added with this patch)
+By default CN88XX BGX accepts all incoming multicast and broadcast
+packets and filtering is disabled. The nic driver doesn't provide
+an ability to change such behaviour.
 
-with that:
-Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+This series is to implement DMAC filtering management for CN88XX
+nic driver allowing user to enable/disable filtering and configure
+specific MAC addresses to filter traffic.
 
-> ---
->  drivers/iio/adc/meson_saradc.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-> index 799ed929ab99..a5d481a2b4ef 100644
-> --- a/drivers/iio/adc/meson_saradc.c
-> +++ b/drivers/iio/adc/meson_saradc.c
-> @@ -935,6 +935,11 @@ static const struct meson_sar_adc_data meson_sar_adc_gxm_data = {
->         .name = "meson-gxm-saradc",
->  };
->
-> +static const struct meson_sar_adc_data meson_sar_adc_axg_data = {
-> +       .param = &meson_sar_adc_gxl_param,
-> +       .name = "meson-axg-saradc",
-> +};
-> +
->  static const struct of_device_id meson_sar_adc_of_match[] = {
->         {
->                 .compatible = "amlogic,meson8-saradc",
-> @@ -953,6 +958,9 @@ static const struct of_device_id meson_sar_adc_of_match[] = {
->         }, {
->                 .compatible = "amlogic,meson-gxm-saradc",
->                 .data = &meson_sar_adc_gxm_data,
-> +       }, {
-> +               .compatible = "amlogic,meson-axg-saradc",
-> +               .data = &meson_sar_adc_axg_data,
->         },
->         {},
->  };
-> --
-> 2.15.1
->
+Changes from v1:
+build issues:
+ - update code in order to address compiler warnings;
+checkpatch.pl reported issues:
+ - update code in order to fit 80 symbols length;
+ - update commit descriptions in order to fit 80 symbols length;
+
+Vadim Lomovtsev (7):
+  net: thunderx: move filter register related macro into proper place
+  net: thunderx: add MAC address filter tracking for LMAC
+  net: thunderx: add multicast filter management support
+  net: thunderx: add new messages for handle ndo_set_rx_mode callback
+  net: thunderx: add XCAST messages handlers for PF
+  net: thunderx: add workqueue control structures for handle
+    ndo_set_rx_mode request
+  net: thunderx: add ndo_set_rx_mode callback implementation for VF
+
+ drivers/net/ethernet/cavium/thunder/nic.h         |  29 ++++
+ drivers/net/ethernet/cavium/thunder/nic_main.c    |  45 ++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c  | 110 +++++++++++-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 201 ++++++++++++++++++++--
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  19 +-
+ 5 files changed, 374 insertions(+), 30 deletions(-)
+
+-- 
+2.14.3
