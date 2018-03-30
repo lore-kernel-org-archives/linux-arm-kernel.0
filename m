@@ -1,19 +1,37 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 30 Mar 2018 16:32:08 +0530
-Subject: [PATCH] ARM: dts: da850-evm: Enable usb_phy, usb0 and usb1
-In-Reply-To: <1521476482-23335-1-git-send-email-aford173@gmail.com>
-References: <1521476482-23335-1-git-send-email-aford173@gmail.com>
-Message-ID: <eec8a86a-13a6-34c2-c353-1cf6bf69e4e7@ti.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 30 Mar 2018 13:05:45 +0200
+Subject: [PATCH 2/3] dt-bindings: iio: adc: document the Meson AXG support
+In-Reply-To: <20180326084629.100070-3-yixun.lan@amlogic.com>
+References: <20180326084629.100070-1-yixun.lan@amlogic.com>
+ <20180326084629.100070-3-yixun.lan@amlogic.com>
+Message-ID: <CAFBinCBQS779Cfu-=nmcA5CJLETy25bYbeN1XgACQpRk4Yw6sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 March 2018 09:51 PM, Adam Ford wrote:
-> The EVM kit has two USB ports.  This patch will enable both
-> when booting with device tree.
-> 
-> Signed-off-by: Adam Ford <aford173@gmail.com>
+On Mon, Mar 26, 2018 at 10:46 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+> From: Xingyu Chen <xingyu.chen@amlogic.com>
+>
+> Update the documentation to expicitly support the Meson-AXG SoC.
+>
+> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Applied for v4.18
-
-Thanks,
-Sekhar
+> ---
+>  Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt b/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
+> index 1e6ee3deb4fa..d1acd5ea2737 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
+> @@ -7,6 +7,7 @@ Required properties:
+>                         - "amlogic,meson-gxbb-saradc" for GXBB
+>                         - "amlogic,meson-gxl-saradc" for GXL
+>                         - "amlogic,meson-gxm-saradc" for GXM
+> +                       - "amlogic,meson-axg-saradc" for AXG
+>                 along with the generic "amlogic,meson-saradc"
+>  - reg:         the physical base address and length of the registers
+>  - interrupts:  the interrupt indicating end of sampling
+> --
+> 2.15.1
+>
