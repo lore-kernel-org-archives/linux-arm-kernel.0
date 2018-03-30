@@ -1,31 +1,30 @@
-From: ryan@edited.us (Ryan Grachek)
-Date: Fri, 30 Mar 2018 11:11:18 -0500
-Subject: [PATCH] arm64: dts: hikey: Enable SDIO high-speed mode on WL1835
- module
-Message-ID: <20180330161118.5751-1-ryan@edited.us>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 30 Mar 2018 12:28:11 -0400 (EDT)
+Subject: [PATCH] net: mvneta: remove duplicate *_coal assignment
+In-Reply-To: <20180329172940.4a5f592c@xhacker.debian>
+References: <20180329172940.4a5f592c@xhacker.debian>
+Message-ID: <20180330.122811.462608073364510854.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to hardware documentation, the WL1835MOD WiFi chip
-supports SDIO high-speed mode, which increases the clock to
-50 MHz. This results in a modest increase in throughput.
+From: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+Date: Thu, 29 Mar 2018 17:29:40 +0800
 
-Signed-off-by: Ryan Grachek <ryan@edited.us>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 1 +
- 1 file changed, 1 insertion(+)
+> The style of the rx/tx queue's *_coal member assignment is:
+> 
+> static void foo_coal_set(...)
+> {
+> 	set the coal in hw;
+> 	update queue's foo_coal member; [1]
+> }
+> 
+> In other place, we call foo_coal_set(pp, queue->foo_coal), so the above [1]
+> is duplicated and could be removed.
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 5d5aa4f4a235..a5e0cc4370e1 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -322,6 +322,7 @@
- 
- 		dwmmc_2: dwmmc2 at f723f000 {
- 			bus-width = <0x4>;
-+			cap-sd-highspeed;
- 			non-removable;
- 			vmmc-supply = <&reg_vdd_3v3>;
- 			mmc-pwrseq = <&wl1835_pwrseq>;
--- 
-2.11.0
+Applied.
+
+We could make this convention even more explicit by not passing
+the coalescing parameter into these helpers, but instead using
+the value in rxq->foo and txq->foo.
