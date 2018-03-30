@@ -1,79 +1,32 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 30 Mar 2018 17:28:56 +0200
-Subject: [PATCH v5 8/8] clk: davinci: kill davinci_clk_reset_assert/deassert()
-In-Reply-To: <20180330152856.12297-1-brgl@bgdev.pl>
-References: <20180330152856.12297-1-brgl@bgdev.pl>
-Message-ID: <20180330152856.12297-9-brgl@bgdev.pl>
+From: colin.king@canonical.com (Colin King)
+Date: Fri, 30 Mar 2018 16:44:20 +0100
+Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
+ "Stopping"
+Message-ID: <20180330154420.6903-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+From: Colin Ian King <colin.king@canonical.com>
 
-This code is no longer used. Remove it.
+Trivial fix to spelling mistake in pr_debug message text
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: David Lechner <david@lechnology.com>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- arch/arm/mach-davinci/include/mach/clock.h | 21 ---------------------
- drivers/clk/davinci/psc.c                  | 18 ------------------
- 2 files changed, 39 deletions(-)
- delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+ sound/soc/atmel/atmel_ssc_dai.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/include/mach/clock.h b/arch/arm/mach-davinci/include/mach/clock.h
-deleted file mode 100644
-index 42ed4f2f5ce4..000000000000
---- a/arch/arm/mach-davinci/include/mach/clock.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- * arch/arm/mach-davinci/include/mach/clock.h
-- *
-- * Clock control driver for DaVinci - header file
-- *
-- * Authors: Vladimir Barinov <source@mvista.com>
-- *
-- * 2007 (c) MontaVista Software, Inc. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--#ifndef __ASM_ARCH_DAVINCI_CLOCK_H
--#define __ASM_ARCH_DAVINCI_CLOCK_H
--
--struct clk;
--
--int davinci_clk_reset_assert(struct clk *c);
--int davinci_clk_reset_deassert(struct clk *c);
--
--#endif
-diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
-index 063df62381ea..75c4bc6f23e3 100644
---- a/drivers/clk/davinci/psc.c
-+++ b/drivers/clk/davinci/psc.c
-@@ -295,24 +295,6 @@ static int davinci_lpsc_clk_reset(struct clk *clk, bool reset)
- 	return 0;
- }
- 
--/*
-- * REVISIT: These exported functions can be removed after a non-DT lookup is
-- * added to the reset controller framework and the davinci-rproc driver is
-- * updated to use the generic reset controller framework.
-- */
--
--int davinci_clk_reset_assert(struct clk *clk)
--{
--	return davinci_lpsc_clk_reset(clk, true);
--}
--EXPORT_SYMBOL(davinci_clk_reset_assert);
--
--int davinci_clk_reset_deassert(struct clk *clk)
--{
--	return davinci_lpsc_clk_reset(clk, false);
--}
--EXPORT_SYMBOL(davinci_clk_reset_deassert);
--
- static int davinci_psc_reset_assert(struct reset_controller_dev *rcdev,
- 				    unsigned long id)
- {
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index a1e2c5682dcd..1c7af0ca98ec 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		if (ret < 0) {
+ 			printk(KERN_WARNING
+ 					"atmel_ssc_dai: request_irq failure\n");
+-			pr_debug("Atmel_ssc_dai: Stoping clock\n");
++			pr_debug("Atmel_ssc_dai: Stopping clock\n");
+ 			clk_disable(ssc_p->ssc->clk);
+ 			return ret;
+ 		}
 -- 
-2.16.3
+2.15.1
