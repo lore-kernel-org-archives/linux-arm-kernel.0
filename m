@@ -1,244 +1,61 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 29 Mar 2018 18:07:57 -0700
-Subject: [v3,4/4] watchdog: add Gateworks System Controller support
-In-Reply-To: <1522250043-8065-5-git-send-email-tharvey@gateworks.com>
-References: <1522250043-8065-5-git-send-email-tharvey@gateworks.com>
-Message-ID: <20180330010757.GA12896@roeck-us.net>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 30 Mar 2018 11:02:11 +0800
+Subject: [PATCH v2] MAINTAINERS: update entry for ARM/berlin
+Message-ID: <20180330110211.36455347@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 08:14:03AM -0700, Tim Harvey wrote:
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  drivers/watchdog/Kconfig   |  10 ++++
->  drivers/watchdog/Makefile  |   1 +
->  drivers/watchdog/gsc_wdt.c | 146 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 157 insertions(+)
->  create mode 100644 drivers/watchdog/gsc_wdt.c
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index ca200d1..c9d4b2e 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -150,6 +150,16 @@ config GPIO_WATCHDOG_ARCH_INITCALL
->  	  arch_initcall.
->  	  If in doubt, say N.
->  
-> +config GSC_WATCHDOG
-> +	tristate "Gateworks System Controller (GSC) Watchdog support"
-> +	depends on MFD_GATEWORKS_GSC
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Say Y here to include support for the GSC Watchdog.
-> +
-> +	  This driver can also be built as a module. If so the module
-> +	  will be called gsc_wdt.
-> +
->  config MENF21BMC_WATCHDOG
->  	tristate "MEN 14F021P00 BMC Watchdog"
->  	depends on MFD_MENF21BMC || COMPILE_TEST
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 715a210..499327e 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -215,6 +215,7 @@ obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
->  obj-$(CONFIG_DA9062_WATCHDOG) += da9062_wdt.o
->  obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
->  obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
-> +obj-$(CONFIG_GSC_WATCHDOG)	+= gsc_wdt.o
->  obj-$(CONFIG_TANGOX_WATCHDOG) += tangox_wdt.o
->  obj-$(CONFIG_WDAT_WDT) += wdat_wdt.o
->  obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
-> diff --git a/drivers/watchdog/gsc_wdt.c b/drivers/watchdog/gsc_wdt.c
-> new file mode 100644
-> index 0000000..b43d083
-> --- /dev/null
-> +++ b/drivers/watchdog/gsc_wdt.c
-> @@ -0,0 +1,146 @@
-> +/* SPDX-License-Identifier: GPL-2.0
-> + *
-> + * Copyright (C) 2018 Gateworks Corporation
-> + *
-> + * This driver registers a Linux Watchdog for the GSC
-> + */
-> +#include <linux/mfd/gsc.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/watchdog.h>
-> +
-> +#define WDT_DEFAULT_TIMEOUT	60
-> +
-> +struct gsc_wdt {
-> +	struct watchdog_device wdt_dev;
-> +	struct gsc_dev *gsc;
-> +};
-> +
-> +static int gsc_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct gsc_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	unsigned int reg = (1 << GSC_CTRL_1_WDT_ENABLE);
+Synaptics has acquired the Multimedia Solutions Business of Marvell[1].
+So change the berlin entry name and move it to its alphabetical
+location. We move to ARM/Synaptics instead of ARM/Marvell.
 
-Please use BIT().
+This patch also updates my email address from marvell to synaptics.
 
-> +	int ret;
-> +
-> +	dev_dbg(wdd->parent, "%s timeout=%d\n", __func__, wdd->timeout);
+[1] https://www.synaptics.com/company/news/conexant-marvell
 
-I don't think those debug messages add any value.
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
+Since v1:
+ - add some comments about this change. Thank Andrew.
 
-> +
-> +	/* clear first as regmap_update_bits will not write if no change */
-> +	ret = regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1, reg, 0);
-> +	if (ret)
-> +		return ret;
-> +	return regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1, reg, reg);
-> +}
-> +
-> +static int gsc_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct gsc_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	unsigned int reg = (1 << GSC_CTRL_1_WDT_ENABLE);
-> +
+ MAINTAINERS | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-BIT(). You might as well drop the variable and just use
-BIT(GSC_CTRL_1_WDT_ENABLE) below.
-
-> +	dev_dbg(wdd->parent, "%s\n", __func__);
-> +
-> +	return regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1, reg, 0);
-> +}
-> +
-> +static int gsc_wdt_set_timeout(struct watchdog_device *wdd,
-> +			       unsigned int timeout)
-> +{
-> +	struct gsc_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	unsigned int long_sel = 0;
-> +
-> +	dev_dbg(wdd->parent, "%s: %d\n", __func__, timeout);
-> +
-> +	switch (timeout) {
-> +	case 60:
-> +		long_sel = (1 << GSC_CTRL_1_WDT_TIME);
-> +	case 30:
-> +		regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1,
-> +				   (1 << GSC_CTRL_1_WDT_TIME),
-
-BIT()
-
-> +				   (long_sel << GSC_CTRL_1_WDT_TIME));
-> +		wdd->timeout = timeout;
-> +		return 0;
-> +	}
-
-Please use rounding and accept other values as well. We don't want to let
-user space guessing valid timeouts. 
-
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct watchdog_info gsc_wdt_info = {
-> +	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-
-Please confirm that WDIOF_MAGICCLOSE is not set on purpose.
-
-> +	.identity = "GSC Watchdog"
-> +};
-> +
-> +static const struct watchdog_ops gsc_wdt_ops = {
-> +	.owner		= THIS_MODULE,
-> +	.start		= gsc_wdt_start,
-> +	.stop		= gsc_wdt_stop,
-> +	.set_timeout	= gsc_wdt_set_timeout,
-> +};
-> +
-> +static int gsc_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct gsc_dev *gsc = dev_get_drvdata(pdev->dev.parent);
-> +	struct device *dev = &pdev->dev;
-> +	struct gsc_wdt *wdt;
-> +	int ret;
-> +	unsigned int reg;
-> +
-> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt)
-> +		return -ENOMEM;
-> +
-> +	/* ensure GSC fw supports WD functionality */
-> +	if (gsc->fwver < 44) {
-
-What if gsc is NULL ?
-
-> +		dev_err(dev, "fw v44 or newer required for wdt function\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* ensure WD bit enabled */
-> +	if (regmap_read(gsc->regmap, GSC_CTRL_1, &reg))
-> +		return -EIO;
-> +	if (!(reg & (1 << GSC_CTRL_1_WDT_ENABLE))) {
-
-BIT()
-
-> +		dev_err(dev, "not enabled - must be manually enabled\n");
-
-This doesn't make sense. Bail out if the watchdog is disabled ? Why ?
-
-> +		return -EINVAL;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	wdt->gsc = gsc;
-> +	wdt->wdt_dev.info = &gsc_wdt_info;
-> +	wdt->wdt_dev.ops = &gsc_wdt_ops;
-> +	wdt->wdt_dev.status = 0;
-
-Initializing a data structure which is known to be 0 is not needed
-and discouraged.
-
-> +	wdt->wdt_dev.min_timeout = 30;
-> +	wdt->wdt_dev.max_timeout = 60;
-> +	wdt->wdt_dev.parent = dev;
-> +
-> +	watchdog_set_nowayout(&wdt->wdt_dev, 1);
-
-WATCHDOG_NOWAYOUT ?
-
-> +	watchdog_init_timeout(&wdt->wdt_dev, WDT_DEFAULT_TIMEOUT, dev);
-
-This is quite pointless. If you don't want to support setting the timeout
-through devicetree or through a module parameter, just set the timeout
-directly above.
-
-> +
-> +	watchdog_set_drvdata(&wdt->wdt_dev, wdt);
-> +	ret = devm_watchdog_register_device(dev, &wdt->wdt_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	dev_info(dev, "watchdog driver (timeout=%d sec)\n",
-> +		 wdt->wdt_dev.timeout);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id gsc_wdt_dt_ids[] = {
-> +	{ .compatible = "gw,gsc-watchdog", },
-> +	{}
-> +};
-> +
-> +static struct platform_driver gsc_wdt_driver = {
-> +	.probe		= gsc_wdt_probe,
-> +	.driver		= {
-> +		.name	= "gsc-wdt",
-> +		.of_match_table = gsc_wdt_dt_ids,
-> +	},
-> +};
-> +
-> +module_platform_driver(gsc_wdt_driver);
-> +
-> +MODULE_AUTHOR("Tim Harvey <tharvey@gateworks.com>");
-> +MODULE_DESCRIPTION("Gateworks System Controller Watchdog driver");
-> +MODULE_LICENSE("GPL v2");
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6e950b8b4a41..0a0da6a8e607 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1578,15 +1578,6 @@ ARM/MAGICIAN MACHINE SUPPORT
+ M:	Philipp Zabel <philipp.zabel@gmail.com>
+ S:	Maintained
+ 
+-ARM/Marvell Berlin SoC support
+-M:	Jisheng Zhang <jszhang@marvell.com>
+-M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-S:	Maintained
+-F:	arch/arm/mach-berlin/
+-F:	arch/arm/boot/dts/berlin*
+-F:	arch/arm64/boot/dts/marvell/berlin*
+-
+ ARM/Marvell Dove/MV78xx0/Orion SOC support
+ M:	Jason Cooper <jason@lakedaemon.net>
+ M:	Andrew Lunn <andrew@lunn.ch>
+@@ -2006,6 +1997,15 @@ F:	arch/arm/boot/dts/stm32*
+ F:	arch/arm/mach-stm32/
+ F:	drivers/clocksource/armv7m_systick.c
+ 
++ARM/Synaptics Berlin SoC support
++M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
++M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/mach-berlin/
++F:	arch/arm/boot/dts/berlin*
++F:	arch/arm64/boot/dts/marvell/berlin*
++
+ ARM/TANGO ARCHITECTURE
+ M:	Marc Gonzalez <marc.w.gonzalez@free.fr>
+ M:	Mans Rullgard <mans@mansr.com>
+-- 
+2.16.3
