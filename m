@@ -1,25 +1,149 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 30 Mar 2018 12:14:03 -0500
-Subject: [PATCH v5 5/8] remoteproc/davinci: prepare and unprepare the
- clock where needed
-In-Reply-To: <20180330152856.12297-6-brgl@bgdev.pl>
-References: <20180330152856.12297-1-brgl@bgdev.pl>
- <20180330152856.12297-6-brgl@bgdev.pl>
-Message-ID: <4122b904-ee40-db8b-ecd5-813d75b3cba2@lechnology.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 30 Mar 2018 10:48:38 -0700
+Subject: [v3,4/4] watchdog: add Gateworks System Controller support
+In-Reply-To: <20180330010757.GA12896@roeck-us.net>
+References: <1522250043-8065-5-git-send-email-tharvey@gateworks.com>
+ <20180330010757.GA12896@roeck-us.net>
+Message-ID: <20180330174838.GA141984@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 3/30/18 10:28 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Thu, Mar 29, 2018 at 06:07:57PM -0700, Guenter Roeck wrote:
+> On Wed, Mar 28, 2018 at 08:14:03AM -0700, Tim Harvey wrote:
+> > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> > ---
+> >  drivers/watchdog/Kconfig   |  10 ++++
+> >  drivers/watchdog/Makefile  |   1 +
+> >  drivers/watchdog/gsc_wdt.c | 146 +++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 157 insertions(+)
+> >  create mode 100644 drivers/watchdog/gsc_wdt.c
+> > 
+> > diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> > index ca200d1..c9d4b2e 100644
+> > --- a/drivers/watchdog/Kconfig
+> > +++ b/drivers/watchdog/Kconfig
+> > @@ -150,6 +150,16 @@ config GPIO_WATCHDOG_ARCH_INITCALL
+> >  	  arch_initcall.
+> >  	  If in doubt, say N.
+> >  
+> > +config GSC_WATCHDOG
+> > +	tristate "Gateworks System Controller (GSC) Watchdog support"
+> > +	depends on MFD_GATEWORKS_GSC
+> > +	select WATCHDOG_CORE
+> > +	help
+> > +	  Say Y here to include support for the GSC Watchdog.
+> > +
+> > +	  This driver can also be built as a module. If so the module
+> > +	  will be called gsc_wdt.
+> > +
+> >  config MENF21BMC_WATCHDOG
+> >  	tristate "MEN 14F021P00 BMC Watchdog"
+> >  	depends on MFD_MENF21BMC || COMPILE_TEST
+> > diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> > index 715a210..499327e 100644
+> > --- a/drivers/watchdog/Makefile
+> > +++ b/drivers/watchdog/Makefile
+> > @@ -215,6 +215,7 @@ obj-$(CONFIG_DA9055_WATCHDOG) += da9055_wdt.o
+> >  obj-$(CONFIG_DA9062_WATCHDOG) += da9062_wdt.o
+> >  obj-$(CONFIG_DA9063_WATCHDOG) += da9063_wdt.o
+> >  obj-$(CONFIG_GPIO_WATCHDOG)	+= gpio_wdt.o
+> > +obj-$(CONFIG_GSC_WATCHDOG)	+= gsc_wdt.o
+> >  obj-$(CONFIG_TANGOX_WATCHDOG) += tangox_wdt.o
+> >  obj-$(CONFIG_WDAT_WDT) += wdat_wdt.o
+> >  obj-$(CONFIG_WM831X_WATCHDOG) += wm831x_wdt.o
+> > diff --git a/drivers/watchdog/gsc_wdt.c b/drivers/watchdog/gsc_wdt.c
+> > new file mode 100644
+> > index 0000000..b43d083
+> > --- /dev/null
+> > +++ b/drivers/watchdog/gsc_wdt.c
+> > @@ -0,0 +1,146 @@
+> > +/* SPDX-License-Identifier: GPL-2.0
+> > + *
+> > + * Copyright (C) 2018 Gateworks Corporation
+> > + *
+> > + * This driver registers a Linux Watchdog for the GSC
+> > + */
+> > +#include <linux/mfd/gsc.h>
+> > +#include <linux/module.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/watchdog.h>
+> > +
+> > +#define WDT_DEFAULT_TIMEOUT	60
+> > +
+> > +struct gsc_wdt {
+> > +	struct watchdog_device wdt_dev;
+> > +	struct gsc_dev *gsc;
+> > +};
+> > +
+> > +static int gsc_wdt_start(struct watchdog_device *wdd)
+> > +{
+> > +	struct gsc_wdt *wdt = watchdog_get_drvdata(wdd);
+> > +	unsigned int reg = (1 << GSC_CTRL_1_WDT_ENABLE);
 > 
-> We're currently switching the platform to using the common clock
-> framework. We need to explicitly prepare and unprepare the rproc
-> clock.
+> Please use BIT().
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Acked-by: Suman Anna <s-anna@ti.com>
-> ---
+> > +	int ret;
+> > +
+> > +	dev_dbg(wdd->parent, "%s timeout=%d\n", __func__, wdd->timeout);
+> 
+> I don't think those debug messages add any value.
+> 
+> > +
+> > +	/* clear first as regmap_update_bits will not write if no change */
+> > +	ret = regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1, reg, 0);
+> > +	if (ret)
+> > +		return ret;
+> > +	return regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1, reg, reg);
+> > +}
+> > +
+> > +static int gsc_wdt_stop(struct watchdog_device *wdd)
+> > +{
+> > +	struct gsc_wdt *wdt = watchdog_get_drvdata(wdd);
+> > +	unsigned int reg = (1 << GSC_CTRL_1_WDT_ENABLE);
+> > +
+> 
+> BIT(). You might as well drop the variable and just use
+> BIT(GSC_CTRL_1_WDT_ENABLE) below.
+> 
+> > +	dev_dbg(wdd->parent, "%s\n", __func__);
+> > +
+> > +	return regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1, reg, 0);
+> > +}
+> > +
+> > +static int gsc_wdt_set_timeout(struct watchdog_device *wdd,
+> > +			       unsigned int timeout)
+> > +{
+> > +	struct gsc_wdt *wdt = watchdog_get_drvdata(wdd);
+> > +	unsigned int long_sel = 0;
+> > +
+> > +	dev_dbg(wdd->parent, "%s: %d\n", __func__, timeout);
+> > +
+> > +	switch (timeout) {
+> > +	case 60:
+> > +		long_sel = (1 << GSC_CTRL_1_WDT_TIME);
+> > +	case 30:
+> > +		regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1,
+> > +				   (1 << GSC_CTRL_1_WDT_TIME),
+> 
+> BIT()
+> 
+> > +				   (long_sel << GSC_CTRL_1_WDT_TIME));
 
-Reviewed-by: David Lechner <david@lechnology.com>
+This looks wrong. Are you sure that in case of 60 timeout you want to
+actually write
+
+	((1 << GSC_CTRL_1_WDT_TIME) << GSC_CTRL_1_WDT_TIME)
+
+to the register?
+
+Or you meant to write:
+
+	long_sel = timeout > 30;
+	regmap_update_bits(wdt->gsc->regmap, GSC_CTRL_1,
+			   (long_sel << GSC_CTRL_1_WDT_TIME),
+
+Thanks.
+
+-- 
+Dmitry
