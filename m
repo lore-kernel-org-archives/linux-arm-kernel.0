@@ -1,82 +1,118 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Fri, 30 Mar 2018 04:59:47 -0700
-Subject: [PATCH v2 1/7] net: thunderx: move filter register related macro into
- proper place
-In-Reply-To: <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
-References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
- <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180330115953.17154-2-Vadim.Lomovtsev@caviumnetworks.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Fri, 30 Mar 2018 13:17:07 +0100
+Subject: [PATCH v2 05/10] iio: adc: at91-sama5d2_adc: fix channel
+ configuration for differential channels
+In-Reply-To: <1522153963-1121-6-git-send-email-eugen.hristev@microchip.com>
+References: <1522153963-1121-1-git-send-email-eugen.hristev@microchip.com>
+ <1522153963-1121-6-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20180330131707.21bc3845@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+On Tue, 27 Mar 2018 15:32:38 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-The ThunderX NIC has set of registers which allows to configure
-filter policy for ingress packets. There are three possible regimes
-of filtering multicasts, broadcasts and unicasts: accept all, reject all
-and accept filter allowed only.
+> When iterating through the channels, the index in the array is not the
+> scan index. Added an xlate function to translate to the proper index.
+> This will be used also for devicetree channel xlate
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+So, this is a fix for an existing bug?
 
-Current implementation has enum with all of them and two generic macro
-for enabling filtering et all (CAM_ACCEPT) and enabling/disabling
-broadcast packets, which also should be corrected in order to represent
-register bits properly. All these values are private for driver and
-there is no need to ?publish? them via header file.
+Please move this to the front of your set (to make it easier to backport).
+Describe the result of the bug as well.
 
-This commit is to move filtering register manipulation values from
-header file into source with explicit assignment of exact register
-values to them to be used while register configuring.
+Fixes tag would be good.
 
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 13 +++++++++++++
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 11 -----------
- 2 files changed, 13 insertions(+), 11 deletions(-)
+Thanks,
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 91d34ea40e2c..0dd211605eb1 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -24,6 +24,19 @@
- #define DRV_NAME	"thunder_bgx"
- #define DRV_VERSION	"1.0"
- 
-+/* RX_DMAC_CTL configuration */
-+enum MCAST_MODE {
-+		MCAST_MODE_REJECT = 0x0,
-+		MCAST_MODE_ACCEPT = 0x1,
-+		MCAST_MODE_CAM_FILTER = 0x2,
-+		RSVD = 0x3
-+};
-+
-+#define BCAST_ACCEPT      BIT(0)
-+#define CAM_ACCEPT        BIT(3)
-+#define MCAST_MODE_MASK   0x3
-+#define BGX_MCAST_MODE(x) (x << 1)
-+
- struct lmac {
- 	struct bgx		*bgx;
- 	int			dmac;
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 5a7567d31138..52439da62c97 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -205,17 +205,6 @@
- #define LMAC_INTR_LINK_UP	BIT(0)
- #define LMAC_INTR_LINK_DOWN	BIT(1)
- 
--/*  RX_DMAC_CTL configuration*/
--enum MCAST_MODE {
--		MCAST_MODE_REJECT,
--		MCAST_MODE_ACCEPT,
--		MCAST_MODE_CAM_FILTER,
--		RSVD
--};
--
--#define BCAST_ACCEPT	1
--#define CAM_ACCEPT	1
--
- void octeon_mdiobus_force_mod_depencency(void);
- void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
- void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
--- 
-2.14.3
+Jonathan
+
+
+> ---
+>  drivers/iio/adc/at91-sama5d2_adc.c | 41 ++++++++++++++++++++++++++++++++++----
+>  1 file changed, 37 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+> index 4eff835..8729d65 100644
+> --- a/drivers/iio/adc/at91-sama5d2_adc.c
+> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
+> @@ -333,6 +333,27 @@ static const struct iio_chan_spec at91_adc_channels[] = {
+>  				+ AT91_SAMA5D2_DIFF_CHAN_CNT + 1),
+>  };
+>  
+> +static int at91_adc_chan_xlate(struct iio_dev *indio_dev, int chan)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < indio_dev->num_channels; i++) {
+> +		if (indio_dev->channels[i].scan_index == chan)
+> +			return i;
+> +	}
+> +	return -EINVAL;
+> +}
+> +
+> +static inline struct iio_chan_spec const *
+> +at91_adc_chan_get(struct iio_dev *indio_dev, int chan)
+> +{
+> +	int index = at91_adc_chan_xlate(indio_dev, chan);
+> +
+> +	if (index < 0)
+> +		return NULL;
+> +	return indio_dev->channels + index;
+> +}
+> +
+>  static int at91_adc_configure_trigger(struct iio_trigger *trig, bool state)
+>  {
+>  	struct iio_dev *indio = iio_trigger_get_drvdata(trig);
+> @@ -350,8 +371,10 @@ static int at91_adc_configure_trigger(struct iio_trigger *trig, bool state)
+>  	at91_adc_writel(st, AT91_SAMA5D2_TRGR, status);
+>  
+>  	for_each_set_bit(bit, indio->active_scan_mask, indio->num_channels) {
+> -		struct iio_chan_spec const *chan = indio->channels + bit;
+> +		struct iio_chan_spec const *chan = at91_adc_chan_get(indio, bit);
+>  
+> +		if (!chan)
+> +			continue;
+>  		if (state) {
+>  			at91_adc_writel(st, AT91_SAMA5D2_CHER,
+>  					BIT(chan->channel));
+> @@ -448,7 +471,11 @@ static int at91_adc_dma_start(struct iio_dev *indio_dev)
+>  
+>  	for_each_set_bit(bit, indio_dev->active_scan_mask,
+>  			 indio_dev->num_channels) {
+> -		struct iio_chan_spec const *chan = indio_dev->channels + bit;
+> +		struct iio_chan_spec const *chan =
+> +					 at91_adc_chan_get(indio_dev, bit);
+> +
+> +		if (!chan)
+> +			continue;
+>  
+>  		st->dma_st.rx_buf_sz += chan->scan_type.storagebits / 8;
+>  	}
+> @@ -526,8 +553,11 @@ static int at91_adc_buffer_predisable(struct iio_dev *indio_dev)
+>  	 */
+>  	for_each_set_bit(bit, indio_dev->active_scan_mask,
+>  			 indio_dev->num_channels) {
+> -		struct iio_chan_spec const *chan = indio_dev->channels + bit;
+> +		struct iio_chan_spec const *chan =
+> +					at91_adc_chan_get(indio_dev, bit);
+>  
+> +		if (!chan)
+> +			continue;
+>  		if (st->dma_st.dma_chan)
+>  			at91_adc_readl(st, chan->address);
+>  	}
+> @@ -587,8 +617,11 @@ static void at91_adc_trigger_handler_nodma(struct iio_dev *indio_dev,
+>  
+>  	for_each_set_bit(bit, indio_dev->active_scan_mask,
+>  			 indio_dev->num_channels) {
+> -		struct iio_chan_spec const *chan = indio_dev->channels + bit;
+> +		struct iio_chan_spec const *chan =
+> +					at91_adc_chan_get(indio_dev, bit);
+>  
+> +		if (!chan)
+> +			continue;
+>  		st->buffer[i] = at91_adc_readl(st, chan->address);
+>  		i++;
+>  	}
