@@ -1,193 +1,82 @@
 From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Fri, 30 Mar 2018 04:59:53 -0700
-Subject: [PATCH v2 7/7] net: thunderx: add ndo_set_rx_mode callback
- implementation for VF
+Date: Fri, 30 Mar 2018 04:59:47 -0700
+Subject: [PATCH v2 1/7] net: thunderx: move filter register related macro into
+ proper place
 In-Reply-To: <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
  <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180330115953.17154-8-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180330115953.17154-2-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-The ndo_set_rx_mode() is called from atomic context which causes
-messages response timeouts while VF to PF communication via MSIx.
-To get rid of that we're copy passed mc list, parse flags and queue
-handling of kernel request to ordered workqueue.
+The ThunderX NIC has set of registers which allows to configure
+filter policy for ingress packets. There are three possible regimes
+of filtering multicasts, broadcasts and unicasts: accept all, reject all
+and accept filter allowed only.
+
+Current implementation has enum with all of them and two generic macro
+for enabling filtering et all (CAM_ACCEPT) and enabling/disabling
+broadcast packets, which also should be corrected in order to represent
+register bits properly. All these values are private for driver and
+there is no need to ?publish? them via header file.
+
+This commit is to move filtering register manipulation values from
+header file into source with explicit assignment of exact register
+values to them to be used while register configuring.
 
 Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 110 ++++++++++++++++++++++-
- 1 file changed, 109 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 13 +++++++++++++
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h | 11 -----------
+ 2 files changed, 13 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 7d9c5ffbd041..c8a8faaf17e9 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -21,6 +21,7 @@
- #include <linux/bpf_trace.h>
- #include <linux/filter.h>
- #include <linux/net_tstamp.h>
-+#include <linux/workqueue.h>
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 91d34ea40e2c..0dd211605eb1 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -24,6 +24,19 @@
+ #define DRV_NAME	"thunder_bgx"
+ #define DRV_VERSION	"1.0"
  
- #include "nic_reg.h"
- #include "nic.h"
-@@ -67,6 +68,9 @@ module_param(cpi_alg, int, S_IRUGO);
- MODULE_PARM_DESC(cpi_alg,
- 		 "PFC algorithm (0=none, 1=VLAN, 2=VLAN16, 3=IP Diffserv)");
++/* RX_DMAC_CTL configuration */
++enum MCAST_MODE {
++		MCAST_MODE_REJECT = 0x0,
++		MCAST_MODE_ACCEPT = 0x1,
++		MCAST_MODE_CAM_FILTER = 0x2,
++		RSVD = 0x3
++};
++
++#define BCAST_ACCEPT      BIT(0)
++#define CAM_ACCEPT        BIT(3)
++#define MCAST_MODE_MASK   0x3
++#define BGX_MCAST_MODE(x) (x << 1)
++
+ struct lmac {
+ 	struct bgx		*bgx;
+ 	int			dmac;
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 5a7567d31138..52439da62c97 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -205,17 +205,6 @@
+ #define LMAC_INTR_LINK_UP	BIT(0)
+ #define LMAC_INTR_LINK_DOWN	BIT(1)
  
-+/* workqueue for handling kernel ndo_set_rx_mode() calls */
-+static struct workqueue_struct *nicvf_rx_mode_wq;
-+
- static inline u8 nicvf_netdev_qidx(struct nicvf *nic, u8 qidx)
- {
- 	if (nic->sqs_mode)
-@@ -1919,6 +1923,100 @@ static int nicvf_ioctl(struct net_device *netdev, struct ifreq *req, int cmd)
- 	}
- }
- 
-+static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
-+{
-+	struct nicvf_work *vf_work = container_of(work_arg, struct nicvf_work,
-+						  work.work);
-+	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
-+	union nic_mbx mbx = {};
-+	struct xcast_addr *xaddr, *next;
-+
-+	if (!vf_work)
-+		return;
-+
-+	/* From the inside of VM code flow we have only 128 bits memory
-+	 * available to send message to host's PF, so send all mc addrs
-+	 * one by one, starting from flush command in case if kernel
-+	 * requests to configure specific MAC filtering
-+	 */
-+
-+	/* flush DMAC filters and reset RX mode */
-+	mbx.xcast.msg = NIC_MBOX_MSG_RESET_XCAST;
-+	nicvf_send_msg_to_pf(nic, &mbx);
-+
-+	if (vf_work->mode & BGX_XCAST_MCAST_FILTER) {
-+		/* once enabling filtering, we need to signal to PF to add
-+		 * its' own LMAC to the filter to accept packets for it.
-+		 */
-+		mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
-+		mbx.xcast.data.mac = 0;
-+		nicvf_send_msg_to_pf(nic, &mbx);
-+	}
-+
-+	/* check if we have any specific MACs to be added to PF DMAC filter */
-+	if (vf_work->mc) {
-+		/* now go through kernel list of MACs and add them one by one */
-+		list_for_each_entry_safe(xaddr, next,
-+					 &vf_work->mc->list, list) {
-+			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
-+			mbx.xcast.data.mac = xaddr->addr;
-+			nicvf_send_msg_to_pf(nic, &mbx);
-+
-+			/* after receiving ACK from PF release memory */
-+			list_del(&xaddr->list);
-+			kfree(xaddr);
-+			vf_work->mc->count--;
-+		}
-+		kfree(vf_work->mc);
-+	}
-+
-+	/* and finally set rx mode for PF accordingly */
-+	mbx.xcast.msg = NIC_MBOX_MSG_SET_XCAST;
-+	mbx.xcast.data.mode = vf_work->mode;
-+
-+	nicvf_send_msg_to_pf(nic, &mbx);
-+}
-+
-+static void nicvf_set_rx_mode(struct net_device *netdev)
-+{
-+	struct nicvf *nic = netdev_priv(netdev);
-+	struct netdev_hw_addr *ha;
-+	struct xcast_addr_list *mc_list = NULL;
-+	u8 mode = 0;
-+
-+	if (netdev->flags & IFF_PROMISC) {
-+		mode = BGX_XCAST_BCAST_ACCEPT | BGX_XCAST_MCAST_ACCEPT;
-+	} else {
-+		if (netdev->flags & IFF_BROADCAST)
-+			mode |= BGX_XCAST_BCAST_ACCEPT;
-+
-+		if (netdev->flags & IFF_ALLMULTI) {
-+			mode |= BGX_XCAST_MCAST_ACCEPT;
-+		} else if (netdev->flags & IFF_MULTICAST) {
-+			mode |= BGX_XCAST_MCAST_FILTER;
-+			/* here we need to copy mc addrs */
-+			if (netdev_mc_count(netdev)) {
-+				struct xcast_addr *xaddr;
-+
-+				mc_list = kmalloc(sizeof(*mc_list), GFP_ATOMIC);
-+				INIT_LIST_HEAD(&mc_list->list);
-+				netdev_hw_addr_list_for_each(ha, &netdev->mc) {
-+					xaddr = kmalloc(sizeof(*xaddr),
-+							GFP_ATOMIC);
-+					xaddr->addr =
-+						ether_addr_to_u64(ha->addr);
-+					list_add_tail(&xaddr->list,
-+						      &mc_list->list);
-+					mc_list->count++;
-+				}
-+			}
-+		}
-+	}
-+	nic->rx_mode_work.mc = mc_list;
-+	nic->rx_mode_work.mode = mode;
-+	queue_delayed_work(nicvf_rx_mode_wq, &nic->rx_mode_work.work, 2 * HZ);
-+}
-+
- static const struct net_device_ops nicvf_netdev_ops = {
- 	.ndo_open		= nicvf_open,
- 	.ndo_stop		= nicvf_stop,
-@@ -1931,6 +2029,7 @@ static const struct net_device_ops nicvf_netdev_ops = {
- 	.ndo_set_features       = nicvf_set_features,
- 	.ndo_bpf		= nicvf_xdp,
- 	.ndo_do_ioctl           = nicvf_ioctl,
-+	.ndo_set_rx_mode        = nicvf_set_rx_mode,
- };
- 
- static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
-@@ -2071,6 +2170,8 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 
- 	INIT_WORK(&nic->reset_task, nicvf_reset_task);
- 
-+	INIT_DELAYED_WORK(&nic->rx_mode_work.work, nicvf_set_rx_mode_task);
-+
- 	err = register_netdev(netdev);
- 	if (err) {
- 		dev_err(dev, "Failed to register netdevice\n");
-@@ -2109,6 +2210,8 @@ static void nicvf_remove(struct pci_dev *pdev)
- 	nic = netdev_priv(netdev);
- 	pnetdev = nic->pnicvf->netdev;
- 
-+	cancel_delayed_work_sync(&nic->rx_mode_work.work);
-+
- 	/* Check if this Qset is assigned to different VF.
- 	 * If yes, clean primary and all secondary Qsets.
- 	 */
-@@ -2140,12 +2243,17 @@ static struct pci_driver nicvf_driver = {
- static int __init nicvf_init_module(void)
- {
- 	pr_info("%s, ver %s\n", DRV_NAME, DRV_VERSION);
+-/*  RX_DMAC_CTL configuration*/
+-enum MCAST_MODE {
+-		MCAST_MODE_REJECT,
+-		MCAST_MODE_ACCEPT,
+-		MCAST_MODE_CAM_FILTER,
+-		RSVD
+-};
 -
-+	nicvf_rx_mode_wq = alloc_ordered_workqueue("nicvf_generic",
-+						   WQ_MEM_RECLAIM);
- 	return pci_register_driver(&nicvf_driver);
- }
- 
- static void __exit nicvf_cleanup_module(void)
- {
-+	if (nicvf_rx_mode_wq) {
-+		destroy_workqueue(nicvf_rx_mode_wq);
-+		nicvf_rx_mode_wq = NULL;
-+	}
- 	pci_unregister_driver(&nicvf_driver);
- }
- 
+-#define BCAST_ACCEPT	1
+-#define CAM_ACCEPT	1
+-
+ void octeon_mdiobus_force_mod_depencency(void);
+ void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable);
+ void bgx_add_dmac_addr(u64 dmac, int node, int bgx_idx, int lmac);
 -- 
 2.14.3
