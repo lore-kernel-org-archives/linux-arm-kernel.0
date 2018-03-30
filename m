@@ -1,32 +1,19 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 30 Mar 2018 12:51:19 +0900
-Subject: [PATCH 1/2] dt-bindings: thermal: uniphier: add a compatible string
- for PXs3
-In-Reply-To: <1522381880-18892-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1522381880-18892-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1522381880-18892-2-git-send-email-hayashi.kunihiko@socionext.com>
+Date: Fri, 30 Mar 2018 12:51:18 +0900
+Subject: [PATCH 0/2] add thermal monitor support for UniPhier PXs3 SoC
+Message-ID: <1522381880-18892-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a compatible string for thermal monitor implemented on
-UniPhier PXs3 SoC.
+Add support for thermal monitor implemented on UniPhier PXs3 SoC.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
+Kunihiko Hayashi (2):
+  dt-bindings: thermal: uniphier: add a compatible string for PXs3
+  thermal: uniphier: add UniPhier PXs3 support
+
  Documentation/devicetree/bindings/thermal/uniphier-thermal.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/thermal/uniphier_thermal.c                             | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
-index 686c0b4..ceb92a9 100644
---- a/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
-@@ -8,6 +8,7 @@ Required properties:
- - compatible :
-   - "socionext,uniphier-pxs2-thermal" : For UniPhier PXs2 SoC
-   - "socionext,uniphier-ld20-thermal" : For UniPhier LD20 SoC
-+  - "socionext,uniphier-pxs3-thermal" : For UniPhier PXs3 SoC
- - interrupts : IRQ for the temperature alarm
- - #thermal-sensor-cells : Should be 0. See ./thermal.txt for details.
- 
 -- 
 2.7.4
