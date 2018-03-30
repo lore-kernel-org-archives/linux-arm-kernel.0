@@ -1,32 +1,85 @@
-From: colin.king@canonical.com (Colin King)
-Date: Fri, 30 Mar 2018 16:44:20 +0100
-Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
- "Stopping"
-Message-ID: <20180330154420.6903-1-colin.king@canonical.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 30 Mar 2018 11:58:13 -0400
+Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default readX()
+ implementation
+In-Reply-To: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
+References: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1522425494-2916-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+The default implementation of mapping readX() to __raw_readX() is wrong.
+readX() has stronger ordering semantics. Compiler is allowed to reorder
+__raw_readX().
 
-Trivial fix to spelling mistake in pr_debug message text
+In the abscence of a read barrier or when using a strongly ordered
+architecture, readX() should at least have a compiler barrier in
+it to prevent commpiler from clobbering the execution order.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- sound/soc/atmel/atmel_ssc_dai.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/asm-generic/io.h | 28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index a1e2c5682dcd..1c7af0ca98ec 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 		if (ret < 0) {
- 			printk(KERN_WARNING
- 					"atmel_ssc_dai: request_irq failure\n");
--			pr_debug("Atmel_ssc_dai: Stoping clock\n");
-+			pr_debug("Atmel_ssc_dai: Stopping clock\n");
- 			clk_disable(ssc_p->ssc->clk);
- 			return ret;
- 		}
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index e8c2078..2554f15 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -110,7 +110,12 @@ static inline void __raw_writeq(u64 value, volatile void __iomem *addr)
+ #define readb readb
+ static inline u8 readb(const volatile void __iomem *addr)
+ {
+-	return __raw_readb(addr);
++	u8 val;
++
++	val = __raw_readb(addr);
++	barrier();
++
++	return val;
+ }
+ #endif
+ 
+@@ -118,7 +123,12 @@ static inline u8 readb(const volatile void __iomem *addr)
+ #define readw readw
+ static inline u16 readw(const volatile void __iomem *addr)
+ {
+-	return __le16_to_cpu(__raw_readw(addr));
++	u16 val;
++
++	val = __le16_to_cpu(__raw_readw(addr));
++	barrier();
++
++	return val;
+ }
+ #endif
+ 
+@@ -126,7 +136,12 @@ static inline u16 readw(const volatile void __iomem *addr)
+ #define readl readl
+ static inline u32 readl(const volatile void __iomem *addr)
+ {
+-	return __le32_to_cpu(__raw_readl(addr));
++	u32 val;
++
++	val = __le32_to_cpu(__raw_readl(addr));
++	barrier();
++
++	return val;
+ }
+ #endif
+ 
+@@ -135,7 +150,12 @@ static inline u32 readl(const volatile void __iomem *addr)
+ #define readq readq
+ static inline u64 readq(const volatile void __iomem *addr)
+ {
+-	return __le64_to_cpu(__raw_readq(addr));
++	u64 val;
++
++	val = __le64_to_cpu(__raw_readq(addr));
++	barrier();
++
++	return val;
+ }
+ #endif
+ #endif /* CONFIG_64BIT */
 -- 
-2.15.1
+2.7.4
