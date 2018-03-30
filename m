@@ -1,16 +1,14 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 30 Mar 2018 18:44:14 +0900
-Subject: [PATCH 3/3] clk: uniphier: add additional ethernet clock lines for
- Pro4
+Date: Fri, 30 Mar 2018 18:44:12 +0900
+Subject: [PATCH 1/3] clk: uniphier: add PCIe clock control support
 In-Reply-To: <1522403054-18691-1-git-send-email-hayashi.kunihiko@socionext.com>
 References: <1522403054-18691-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1522403054-18691-4-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1522403054-18691-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pro4 SoC has clock lines for Giga-bit feature and ethernet phy,
-and these are mandatory to activate the ethernet controller. This adds
-support for the clock lines.
+Add clock control for PCIe controller on UniPhier SoCs. This adds
+support for Pro5, LD20 and PXs3.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
@@ -18,25 +16,32 @@ Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
  1 file changed, 3 insertions(+)
 
 diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
-index 7d66dfb..ebc78ab2 100644
+index fa7f2f3..d539c82 100644
 --- a/drivers/clk/uniphier/clk-uniphier-sys.c
 +++ b/drivers/clk/uniphier/clk-uniphier-sys.c
-@@ -102,13 +102,16 @@ const struct uniphier_clk_data uniphier_pro4_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("upll", -1, "ref", 288, 25),	/* 288 MHz */
- 	UNIPHIER_CLK_FACTOR("a2pll", -1, "upll", 256, 125),	/* 589.824 MHz */
- 	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 270, 25),	/* 270 MHz */
-+	UNIPHIER_CLK_FACTOR("gpll", -1, "ref", 10, 1),		/* 250 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "a2pll", 1, 8),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 32),
- 	UNIPHIER_LD4_SYS_CLK_NAND(2),
- 	UNIPHIER_LD4_SYS_CLK_SD,
- 	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
- 	UNIPHIER_PRO4_SYS_CLK_ETHER(6),
-+	UNIPHIER_CLK_GATE("ether-gb", 7, "gpll", 0x2104, 5),
- 	UNIPHIER_LD4_SYS_CLK_STDMAC(8),			/* HSC, MIO, RLE */
-+	UNIPHIER_CLK_GATE("ether-phy", 10, "ref", 0x2260, 0),
- 	UNIPHIER_PRO4_SYS_CLK_GIO(12),			/* Ether, SATA, USB3 */
+@@ -141,6 +141,7 @@ const struct uniphier_clk_data uniphier_pro5_sys_clk_data[] = {
+ 	UNIPHIER_PRO4_SYS_CLK_GIO(12),				/* PCIe, USB3 */
  	UNIPHIER_PRO4_SYS_CLK_USB3(14, 0),
  	UNIPHIER_PRO4_SYS_CLK_USB3(15, 1),
++	UNIPHIER_CLK_GATE("pcie", 24, NULL, 0x2108, 2),
+ 	UNIPHIER_PRO5_SYS_CLK_AIO(40),
+ 	{ /* sentinel */ }
+ };
+@@ -216,6 +217,7 @@ const struct uniphier_clk_data uniphier_ld20_sys_clk_data[] = {
+ 	UNIPHIER_CLK_GATE("usb30", 14, NULL, 0x210c, 14),
+ 	UNIPHIER_CLK_GATE("usb30-phy0", 16, NULL, 0x210c, 12),
+ 	UNIPHIER_CLK_GATE("usb30-phy1", 17, NULL, 0x210c, 13),
++	UNIPHIER_CLK_GATE("pcie", 24, NULL, 0x210c, 4),
+ 	UNIPHIER_LD11_SYS_CLK_AIO(40),
+ 	UNIPHIER_LD11_SYS_CLK_EVEA(41),
+ 	UNIPHIER_LD11_SYS_CLK_EXIV(42),
+@@ -254,6 +256,7 @@ const struct uniphier_clk_data uniphier_pxs3_sys_clk_data[] = {
+ 	UNIPHIER_CLK_GATE("usb30-phy2", 18, NULL, 0x210c, 20),
+ 	UNIPHIER_CLK_GATE("usb31-phy0", 20, NULL, 0x210c, 17),
+ 	UNIPHIER_CLK_GATE("usb31-phy1", 21, NULL, 0x210c, 19),
++	UNIPHIER_CLK_GATE("pcie", 24, NULL, 0x210c, 3),
+ 	/* CPU gears */
+ 	UNIPHIER_CLK_DIV4("cpll", 2, 3, 4, 8),
+ 	UNIPHIER_CLK_DIV4("spll", 2, 3, 4, 8),
 -- 
 2.7.4
