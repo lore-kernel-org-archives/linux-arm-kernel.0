@@ -1,201 +1,206 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Fri, 30 Mar 2018 10:22:38 +0300
-Subject: [PATCH 1/6] spi: sun6i: coding style/readability improvements
-In-Reply-To: <20180330072243.19368-1-ssuloev@orpaltech.com>
-References: <20180330072243.19368-1-ssuloev@orpaltech.com>
-Message-ID: <20180330072243.19368-2-ssuloev@orpaltech.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 30 Mar 2018 09:25:16 +0200
+Subject: [PATCH v3 6/8] DT: arm: Add Renesas RZ/N1 SoC base device tree
+ file
+In-Reply-To: <20180329110450.GA24193@w540>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-7-git-send-email-michel.pollet@bp.renesas.com>
+ <20180329110450.GA24193@w540>
+Message-ID: <20180330072516.bqkygev7qxp4dpig@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor changes to fulfill the coding style and
-improve the readability.
+On Thu, Mar 29, 2018 at 01:04:50PM +0200, jacopo mondi wrote:
+> Hi Michel
+> 
+> The subject of all your patches for arch/arm should start with:
+> 
+> ARM: dts:
+> 
+> A git log on that directory clearly shows that's the preferred one.
+> 
+> I would also say that you are missing a symbol definition in
+> arch/arm/mach-shmobile/Kconfig
+> (even if you got rid of any board file)
+> 
+> I would expect a symbol to select in menuconfig, with your
+> dependencies listed there (ie, the serial interface driver)
+> 
+> Something like this (I left the 'xx' out from the part name on purpose)
+> 
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index 280e731..9a519330 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -114,4 +114,8 @@ config ARCH_SH73A0
+>         bool "SH-Mobile AG5 (R8A73A00)"
+>         select ARCH_RMOBILE
+>         select RENESAS_INTC_IRQPIN
+> +
+> +config ARCH_R9A06G0
+> +       bool "RZ/N1 (R9A06G0)"
+> +       select SERIAL_8250_DW
+>  endif
+> 
+> But please wait for others (preferibly Geert or Simon) to confim this.
 
-Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+I think that is covered by
+"[PATCH v3 5/8] arm: shmobile: Add the RZ/N1 arch to the shmobile Kconfig"
 
----
- drivers/spi/spi-sun6i.c | 115 +++++++++++++++++++++++++++---------------------
- 1 file changed, 65 insertions(+), 50 deletions(-)
+> On Thu, Mar 29, 2018 at 08:47:02AM +0100, Michel Pollet wrote:
+> > This adds the Renesas RZ/N1 Family (Part #R9A06G0xx) SoC
+> > bare bone support.
+> >
+> > This currently only handles generic parts (gic, architected timer)
+> > and a UART.
+> > For simplicity sake, this also relies on the bootloader to set the
+> > pinctrl and clocks.
+> >
+> > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> > ---
+> >  arch/arm/boot/dts/r9a06g0xx.dtsi | 96 ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 96 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/r9a06g0xx.dtsi
+> >
+> > diff --git a/arch/arm/boot/dts/r9a06g0xx.dtsi b/arch/arm/boot/dts/r9a06g0xx.dtsi
+> > new file mode 100644
+> > index 0000000..c6eeee3
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/r9a06g0xx.dtsi
+> > @@ -0,0 +1,96 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Base Device Tree Source for the Renesas RZ/N1 SoC Family of devices
+> > + *
+> > + * Copyright (C) 2018 Renesas Electronics Europe Limited
+> > + *
+> > + */
+> > +
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +
+> > +/ {
+> > +	compatible = "renesas,rzn1";
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	cpus {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu at 0 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <0>;
+> > +		};
+> > +		cpu at 1 {
+> > +			device_type = "cpu";
+> > +			compatible = "arm,cortex-a7";
+> > +			reg = <1>;
+> > +		};
+> > +	};
+> 
+> I see you don't like empy lines, that's fine, it is not a strict
+> requiremen afaik, but I find a few empty lines here and there more
+> redable, expecially if the file is going to grow, as it will be.
 
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index 8533f4e..ff790dc 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -88,8 +88,12 @@
- #define SUN6I_TXDATA_REG		0x200
- #define SUN6I_RXDATA_REG		0x300
- 
-+#define SUN6I_SPI_MODE_BITS		(SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST)
-+
-+#define SUN6I_SPI_MAX_SPEED_HZ		100000000
-+#define SUN6I_SPI_MIN_SPEED_HZ		3000
-+
- struct sun6i_spi {
--	struct spi_master	*master;
- 	void __iomem		*base_addr;
- 	struct clk		*hclk;
- 	struct clk		*mclk;
-@@ -189,6 +193,9 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
- 	else
- 		reg &= ~SUN6I_TFR_CTL_CS_LEVEL;
- 
-+	/* We want to control the chip select manually */
-+	reg |= SUN6I_TFR_CTL_CS_MANUAL;
-+
- 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
- }
- 
-@@ -197,6 +204,48 @@ static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
- 	return SUN6I_MAX_XFER_SIZE - 1;
- }
- 
-+static int sun6i_spi_prepare_message(struct spi_master *master,
-+				     struct spi_message *msg)
-+{
-+	struct spi_device *spi = msg->spi;
-+	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-+	u32 reg;
-+
-+	/*
-+	 * Setup the transfer control register: Chip Select,
-+	 * polarities, etc.
-+	 */
-+	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
-+
-+	if (spi->mode & SPI_CPOL)
-+		reg |= SUN6I_TFR_CTL_CPOL;
-+	else
-+		reg &= ~SUN6I_TFR_CTL_CPOL;
-+
-+	if (spi->mode & SPI_CPHA)
-+		reg |= SUN6I_TFR_CTL_CPHA;
-+	else
-+		reg &= ~SUN6I_TFR_CTL_CPHA;
-+
-+	if (spi->mode & SPI_LSB_FIRST)
-+		reg |= SUN6I_TFR_CTL_FBS;
-+	else
-+		reg &= ~SUN6I_TFR_CTL_FBS;
-+
-+	/*
-+	 * If it's a TX only transfer, we don't want to fill the RX
-+	 * FIFO with bogus data
-+	 */
-+	if (sspi->rx_buf)
-+		reg &= ~SUN6I_TFR_CTL_DHB;
-+	else
-+		reg |= SUN6I_TFR_CTL_DHB;
-+
-+	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
-+
-+	return 0;
-+}
-+
- static int sun6i_spi_transfer_one(struct spi_master *master,
- 				  struct spi_device *spi,
- 				  struct spi_transfer *tfr)
-@@ -235,40 +284,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS) |
- 			(trig_level << SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS));
- 
--	/*
--	 * Setup the transfer control register: Chip Select,
--	 * polarities, etc.
--	 */
--	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
--
--	if (spi->mode & SPI_CPOL)
--		reg |= SUN6I_TFR_CTL_CPOL;
--	else
--		reg &= ~SUN6I_TFR_CTL_CPOL;
--
--	if (spi->mode & SPI_CPHA)
--		reg |= SUN6I_TFR_CTL_CPHA;
--	else
--		reg &= ~SUN6I_TFR_CTL_CPHA;
--
--	if (spi->mode & SPI_LSB_FIRST)
--		reg |= SUN6I_TFR_CTL_FBS;
--	else
--		reg &= ~SUN6I_TFR_CTL_FBS;
--
--	/*
--	 * If it's a TX only transfer, we don't want to fill the RX
--	 * FIFO with bogus data
--	 */
--	if (sspi->rx_buf)
--		reg &= ~SUN6I_TFR_CTL_DHB;
--	else
--		reg |= SUN6I_TFR_CTL_DHB;
--
--	/* We want to control the chip select manually */
--	reg |= SUN6I_TFR_CTL_CS_MANUAL;
--
--	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
- 
- 	/* Ensure that we have a parent clock fast enough */
- 	mclk_rate = clk_get_rate(sspi->mclk);
-@@ -442,12 +457,24 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	int ret = 0, irq;
- 
--	master = spi_alloc_master(&pdev->dev, sizeof(struct sun6i_spi));
-+	master = spi_alloc_master(&pdev->dev, sizeof(*sspi));
- 	if (!master) {
- 		dev_err(&pdev->dev, "Unable to allocate SPI Master\n");
- 		return -ENOMEM;
- 	}
- 
-+	master->max_speed_hz = SUN6I_SPI_MAX_SPEED_HZ;
-+	master->min_speed_hz = SUN6I_SPI_MIN_SPEED_HZ;
-+	master->num_chipselect = 4;
-+	master->mode_bits = SUN6I_SPI_MODE_BITS;
-+	master->bits_per_word_mask = SPI_BPW_MASK(8);
-+	master->set_cs = sun6i_spi_set_cs;
-+	master->prepare_message = sun6i_spi_prepare_message;
-+	master->transfer_one = sun6i_spi_transfer_one;
-+	master->max_transfer_size = sun6i_spi_max_transfer_size;
-+	master->dev.of_node = pdev->dev.of_node;
-+	master->auto_runtime_pm = true;
-+
- 	platform_set_drvdata(pdev, master);
- 	sspi = spi_master_get_devdata(master);
- 
-@@ -466,26 +493,14 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 	}
- 
- 	ret = devm_request_irq(&pdev->dev, irq, sun6i_spi_handler,
--			       0, "sun6i-spi", sspi);
-+			       0, dev_name(&pdev->dev), sspi);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Cannot request IRQ\n");
- 		goto err_free_master;
- 	}
- 
--	sspi->master = master;
- 	sspi->fifo_depth = (unsigned long)of_device_get_match_data(&pdev->dev);
- 
--	master->max_speed_hz = 100 * 1000 * 1000;
--	master->min_speed_hz = 3 * 1000;
--	master->set_cs = sun6i_spi_set_cs;
--	master->transfer_one = sun6i_spi_transfer_one;
--	master->num_chipselect = 4;
--	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST;
--	master->bits_per_word_mask = SPI_BPW_MASK(8);
--	master->dev.of_node = pdev->dev.of_node;
--	master->auto_runtime_pm = true;
--	master->max_transfer_size = sun6i_spi_max_transfer_size;
--
- 	sspi->hclk = devm_clk_get(&pdev->dev, "ahb");
- 	if (IS_ERR(sspi->hclk)) {
- 		dev_err(&pdev->dev, "Unable to acquire AHB clock\n");
-@@ -525,7 +540,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 
- 	ret = devm_spi_register_master(&pdev->dev, master);
- 	if (ret) {
--		dev_err(&pdev->dev, "cannot register SPI master\n");
-+		dev_err(&pdev->dev, "Couldn't register SPI master\n");
- 		goto err_pm_disable;
- 	}
- 
--- 
-2.16.2
+Please place one empty line between each node.
+
+> > +	clocks {
+> > +		/*
+> > +		 * this is fixed clock for now,
+> > +		 * until the clock driver is merged
+> > +		 */
+> > +		clkuarts: clkuarts {
+> 
+> You can remove the node lable if it's the same as the node name afaik
+> 
+> > +			#clock-cells = <0>;
+> > +			compatible = "fixed-clock";
+> > +			clock-frequency = <47619047>;
+> > +		};
+> > +	};
+> 
+> Grouping clock nodes under a "clocks" one is now deprecated.
+> 
+> Please see, ie.
+> "ARM: dts: r7s72100: stop grouping clocks under a "clocks" subnode"
+
+Also, please sort sub-nodes of the root node alphabetically.
+
+> Thanks
+>    j
+> 
+> > +	arch-timer {
+> > +		compatible = "arm,cortex-a7-timer",
+> > +			     "arm,armv7-timer";
+> > +		interrupt-parent = <&gic>;
+> > +		arm,cpu-registers-not-fw-configured;
+> > +		interrupts =
+> > +			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+> > +				IRQ_TYPE_LEVEL_LOW)>,
+> > +			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+> > +				IRQ_TYPE_LEVEL_LOW)>,
+> > +			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+> > +				IRQ_TYPE_LEVEL_LOW)>,
+> > +			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+> > +				IRQ_TYPE_LEVEL_LOW)>;
+
+I think its nicer not to line-wrap the individual interrupts.
+I.e. please make the above like this:
+
+		interrupts =
+			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+
+> > +	};
+> > +	soc {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		interrupt-parent = <&gic>;
+> > +		ranges;
+> > +
+> > +		gic: gic at 44101000 {
+
+Please sort subnodes of the soc node using:
+- Primary key of bus address
+- Secondary key of IP block type (does not apply here)
+
+
+> > +			compatible = "arm,cortex-a7-gic", "arm,gic-400";
+> > +			interrupt-controller;
+> > +			#interrupt-cells = <3>;
+> > +			reg = <0x44101000 0x1000>, /* Distributer */
+> > +			      <0x44102000 0x2000>, /* CPU interface */
+> > +			      <0x44104000 0x2000>, /* Virt interface control */
+> > +			      <0x44106000 0x2000>; /* Virt CPU interface */
+> > +			interrupts =
+> > +				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
+> > +					IRQ_TYPE_LEVEL_HIGH)>;
+> > +		};
+> > +		sysctrl: sysctrl at 4000c000 {
+> > +			compatible = "renesas,rzn1-sysctrl", "syscon",
+> > +					"simple-mfd";
+> > +			reg = <0x4000c000 0x1000>;
+> > +
+> > +			reboot {
+> > +				compatible = "renesas,rzn1-reboot";
+> > +			};
+> > +		};
+> > +		uart0: serial at 40060000 {
+> > +			compatible = "snps,dw-apb-uart";
+> > +			reg = <0x40060000 0x400>;
+> > +			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+> > +			reg-shift = <2>;
+> > +			reg-io-width = <4>;
+> > +			clocks = <&clkuarts>;
+> > +			clock-names = "baudclk";
+> > +			status = "disabled";
+> > +		};
+> > +	};
+> > +};
+> > --
+> > 2.7.4
+> >
