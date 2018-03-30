@@ -1,24 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 30 Mar 2018 16:16:13 +0800
-Subject: [linux-sunxi] [PATCH v2 08/10] ARM: sun8i: h3: Add SY8106A
- regulator to Orange Pi PC
-In-Reply-To: <20180206044905.30508-9-icenowy@aosc.io>
-References: <20180206044905.30508-1-icenowy@aosc.io>
- <20180206044905.30508-9-icenowy@aosc.io>
-Message-ID: <CAGb2v65_w4LY-5RJqZN2+Rd3jwnD2upJovibgnUY2FrPwVPROw@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 30 Mar 2018 17:04:13 +0800
+Subject: [PATCH 1/2] net: mvneta: split rxq/txq init into SW and HW parts
+In-Reply-To: <20180329134259.3fe6165b@windsurf>
+References: <20180329181220.61d63c92@xhacker.debian>
+ <20180329181356.6489ee2e@xhacker.debian>
+ <20180329134259.3fe6165b@windsurf>
+Message-ID: <20180330170413.73320f7f@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 6, 2018 at 12:49 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> From: Ondrej Jirman <megous@megous.com>
->
-> Add SY8106A regulator to r_i2c bus and enable the r_i2c bus on
-> Orange Pi PC, then set the power supply of the ARM cores to this
-> regulator, in order to enable DVFS.
->
-> Signed-off-by: Ondrej Jirman <megous@megous.com>
-> [Icenowy: Enable DVFS in this patch, slight changes and change commit
->  message]
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Hi,
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On Thu, 29 Mar 2018 13:42:59 +0200 Thomas Petazzoni wrote:
+
+> Hello,
+> 
+> On Thu, 29 Mar 2018 18:13:56 +0800, Jisheng Zhang wrote:
+> > This is to prepare the suspend/resume improvement in next patch. The
+> > SW parts can be optimized out during resume.
+> > 
+> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>  
+> 
+> Thanks, I have two very minor nits below, but otherwise:
+> 
+> Acked-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+
+Thanks for reviewing.
+
+> 
+> > +/* Create a specified RX queue */
+> > +static int mvneta_rxq_init(struct mvneta_port *pp,
+> > +			   struct mvneta_rx_queue *rxq)
+> > +
+> > +{
+> > +	int ret;
+> > +
+> > +	ret = mvneta_rxq_sw_init(pp, rxq);
+> > +	if (ret)  
+> 
+> Here you're testing if (ret), while in mvneta_txq_init(), in the same
+> situation, you're doing if (ret < 0). I don't have a preference for one
+> or the other, but having them consistent between the two lpaces would
+> be nice.
+
+updated in v2.
+
+> 
+> > -/* Create and initialize a tx queue */
+> > -static int mvneta_txq_init(struct mvneta_port *pp,
+> > -			   struct mvneta_tx_queue *txq)
+> > +static int mvneta_txq_sw_init(struct mvneta_port *pp,
+> > +			      struct mvneta_tx_queue *txq)
+> >  {
+> >  	int cpu;
+> >  
+> > @@ -2872,7 +2889,6 @@ static int mvneta_txq_init(struct mvneta_port *pp,
+> >  	txq->tx_stop_threshold = txq->size - MVNETA_MAX_SKB_DESCS;
+> >  	txq->tx_wake_threshold = txq->tx_stop_threshold / 2;
+> >  
+> > -  
+> 
+> Spurious change.
+
+There's an extra blank line here, so I removed it ;)
+
+Thanks
