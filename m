@@ -1,78 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 30 Mar 2018 15:49:01 +0800
-Subject: [linux-sunxi] [PATCH v2 06/10] ARM: sun8i: h2+: add SY8113B
- regulator used by Orange Pi Zero board
-In-Reply-To: <20180206044905.30508-7-icenowy@aosc.io>
-References: <20180206044905.30508-1-icenowy@aosc.io>
- <20180206044905.30508-7-icenowy@aosc.io>
-Message-ID: <CAGb2v66_7BmKuF_NFDP9L+wZ5h=nJm0LChCdKaYaoHy9sWUKKw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 30 Mar 2018 09:51:51 +0200
+Subject: [PATCH] dt-bindings: rcar-dmac: Document r8a77470 support
+In-Reply-To: <1522318266-45281-1-git-send-email-biju.das@bp.renesas.com>
+References: <1522318266-45281-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdVCtk4R-n8eXOH_A=xz+5B+P+8+AJ45hpycS40EWQ2niA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 6, 2018 at 12:49 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Orange Pi Zero board has a SY8113B regulator, which is controlled via
-> GPIO and capable of outputing 1.1V when the PL6 GPIO is set to output 0
-> or 1.3V when the PL6 GPIO is set to input or output 1, and the output is
-> the power supply of the ARM cores in H2+ SoC.
+On Thu, Mar 29, 2018 at 12:11 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> Renesas  RZ/G SoC also have the R-Car gen2/3 compatible DMA controllers.
+> Document RZ/G1C (also known as R8A77470) SoC bindings.
 >
-> Add the device tree node of this regulator and set the cpu's cpu-supply
-> property to it.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-However,
+Gr{oetje,eeting}s,
 
-> ---
-> No changes in v2.
->
->  arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> index 6713d0f2b3f4..34fc35737090 100644
-> --- a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> +++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-zero.dts
-> @@ -94,6 +94,27 @@
->                 reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>;
->                 post-power-on-delay-ms = <200>;
->         };
-> +
-> +       reg_sy8113b: gpio-regulator {
+                        Geert
 
-You might want to change the node name to something a bit more specific,
-like vdd-cpux-regulator. This would decrease the chance of name collisions,
-either from other additions or device tree overlays.
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-ChenYu
-
-> +               compatible = "regulator-gpio";
-> +               regulator-name = "vdd-cpux";
-> +               regulator-type = "voltage";
-> +               regulator-boot-on;
-> +               regulator-always-on;
-> +               regulator-min-microvolt = <1100000>;
-> +               regulator-max-microvolt = <1300000>;
-> +               regulator-ramp-delay = <50>; /* 4ms */
-> +
-> +               gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-> +               enable-active-high;
-> +               gpios-states = <0x1>;
-> +               states = <1100000 0x0
-> +                         1300000 0x1>;
-> +       };
-> +};
-> +
-> +&cpu0 {
-> +       cpu-supply = <&reg_sy8113b>;
->  };
->
->  &ehci0 {
-> --
-> 2.15.1
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
