@@ -1,111 +1,67 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 30 Mar 2018 20:00:51 +0530
-Subject: [PATCH] mtd: nand: davinci: don't acquire and enable clock
-Message-ID: <20180330143051.26423-1-nsekhar@ti.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Fri, 30 Mar 2018 13:51:13 +0100
+Subject: [PATCH 3/3] iio: adc: meson-axg: add saradc driver
+In-Reply-To: <CAFBinCCK+Y0QAHcGDXvXvSqChS91XK5C6d5XunkmUVBQa4nn+Q@mail.gmail.com>
+References: <20180326084629.100070-1-yixun.lan@amlogic.com>
+ <20180326084629.100070-4-yixun.lan@amlogic.com>
+ <CAFBinCCK+Y0QAHcGDXvXvSqChS91XK5C6d5XunkmUVBQa4nn+Q@mail.gmail.com>
+Message-ID: <20180330135113.1d64afd1@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAND itself is an asynchronous interface, it does not have any
-clock input. DaVinci NAND driver acquires clock for AEMIF
-(asynchronous external memory interface) which is an on-chip
-IP to which NAND is connected.
+On Fri, 30 Mar 2018 13:09:31 +0200
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
 
-The same clock is also enabled in AEMIF driver (either present
-drivers/memory or from machine code for some older platforms).
-AEMIF timing must be initialized before NAND can be accessed.
-This ensures that AEMIF clock is enabled too.
+> On Mon, Mar 26, 2018 at 10:46 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+> > From: Xingyu Chen <xingyu.chen@amlogic.com>
+> >
+> > Add the SAR ADC driver for the Amlogic Meson-AXG SoC.
+> >
+> > Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>  
+> I suggest changing the subject of this patch to:
+> iio: adc: meson-saradc: add support for Meson AXG
+> 
+Good point - updated.
+> (because "iio: adc: meson-axg" does not point to the "meson-saradc"
+> driver and no new driver is added with this patch)
+> 
+> with that:
+> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Thanks, acks added to all 3 patches.
 
-Remove the superfluous clock acquisition and enable in DaVinci
-NAND driver.
+Jonathan
 
-Tested on K2L, K2HK, K2E, DA850 EVM, DA850 LCDK in device-tree
-boot and DM644x EVM in legacy boot.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
-Hi Boris,
-
-If/when this patch gets accepted, it will nice to put this on
-an immutable branch others can merge. There is potential cleanup
-in drivers/clock and in DaVinci machine code that will depend
-on this.
-
-Thanks,
-Sekhar
-
- drivers/mtd/nand/raw/davinci_nand.c | 25 +------------------------
- 1 file changed, 1 insertion(+), 24 deletions(-)
-
-diff --git a/drivers/mtd/nand/raw/davinci_nand.c b/drivers/mtd/nand/raw/davinci_nand.c
-index 0f09518d980f..7255a0d94374 100644
---- a/drivers/mtd/nand/raw/davinci_nand.c
-+++ b/drivers/mtd/nand/raw/davinci_nand.c
-@@ -27,7 +27,6 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/err.h>
--#include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -55,7 +54,6 @@ struct davinci_nand_info {
- 	struct nand_chip	chip;
- 
- 	struct device		*dev;
--	struct clk		*clk;
- 
- 	bool			is_readmode;
- 
-@@ -703,22 +701,6 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 	/* Use board-specific ECC config */
- 	info->chip.ecc.mode	= pdata->ecc_mode;
- 
--	ret = -EINVAL;
--
--	info->clk = devm_clk_get(&pdev->dev, "aemif");
--	if (IS_ERR(info->clk)) {
--		ret = PTR_ERR(info->clk);
--		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
--		return ret;
--	}
--
--	ret = clk_prepare_enable(info->clk);
--	if (ret < 0) {
--		dev_dbg(&pdev->dev, "unable to enable AEMIF clock, err %d\n",
--			ret);
--		goto err_clk_enable;
--	}
--
- 	spin_lock_irq(&davinci_nand_lock);
- 
- 	/* put CSxNAND into NAND mode */
-@@ -732,7 +714,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 	ret = nand_scan_ident(mtd, pdata->mask_chipsel ? 2 : 1, NULL);
- 	if (ret < 0) {
- 		dev_dbg(&pdev->dev, "no NAND chip(s) found\n");
--		goto err;
-+		return ret;
- 	}
- 
- 	switch (info->chip.ecc.mode) {
-@@ -838,9 +820,6 @@ static int nand_davinci_probe(struct platform_device *pdev)
- 	nand_cleanup(&info->chip);
- 
- err:
--	clk_disable_unprepare(info->clk);
--
--err_clk_enable:
- 	spin_lock_irq(&davinci_nand_lock);
- 	if (info->chip.ecc.mode == NAND_ECC_HW_SYNDROME)
- 		ecc4_busy = false;
-@@ -859,8 +838,6 @@ static int nand_davinci_remove(struct platform_device *pdev)
- 
- 	nand_release(nand_to_mtd(&info->chip));
- 
--	clk_disable_unprepare(info->clk);
--
- 	return 0;
- }
- 
--- 
-2.16.2
+> 
+> > ---
+> >  drivers/iio/adc/meson_saradc.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
+> >
+> > diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+> > index 799ed929ab99..a5d481a2b4ef 100644
+> > --- a/drivers/iio/adc/meson_saradc.c
+> > +++ b/drivers/iio/adc/meson_saradc.c
+> > @@ -935,6 +935,11 @@ static const struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+> >         .name = "meson-gxm-saradc",
+> >  };
+> >
+> > +static const struct meson_sar_adc_data meson_sar_adc_axg_data = {
+> > +       .param = &meson_sar_adc_gxl_param,
+> > +       .name = "meson-axg-saradc",
+> > +};
+> > +
+> >  static const struct of_device_id meson_sar_adc_of_match[] = {
+> >         {
+> >                 .compatible = "amlogic,meson8-saradc",
+> > @@ -953,6 +958,9 @@ static const struct of_device_id meson_sar_adc_of_match[] = {
+> >         }, {
+> >                 .compatible = "amlogic,meson-gxm-saradc",
+> >                 .data = &meson_sar_adc_gxm_data,
+> > +       }, {
+> > +               .compatible = "amlogic,meson-axg-saradc",
+> > +               .data = &meson_sar_adc_axg_data,
+> >         },
+> >         {},
+> >  };
+> > --
+> > 2.15.1
+> >  
