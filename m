@@ -1,32 +1,83 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Mar 2018 16:16:17 +0100
-Subject: [PATCH] io: prevent compiler reordering on the default writeX()
- implementation
-In-Reply-To: <1522420199-23548-1-git-send-email-okaya@codeaurora.org>
-References: <1522420199-23548-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180330151617.GI16141@n2100.armlinux.org.uk>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Fri, 30 Mar 2018 18:24:25 +0300
+Subject: [PATCH V7 00/13] drivers: Boot Constraint core
+In-Reply-To: <20180323150420.GA21152@kroah.com>
+References: <cover.1519380923.git.viresh.kumar@linaro.org>
+ <20180322012606.vuaemu3pvpeojtwr@vireshk-mac-ubuntu>
+ <20180323150420.GA21152@kroah.com>
+Message-ID: <cbcfeb15-d940-f066-739d-25adfe09f019@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2018 at 10:29:58AM -0400, Sinan Kaya wrote:
-> The default implementation of mapping writeX() to __raw_writeX() is wrong.
-> writeX() has stronger ordering semantics. Compiler is allowed to reorder
-> __raw_writeX().
-> 
-> In the abscence of a write barrier or when using a strongly ordered
-> architecture, writeX() should at least have a compiler barrier in
-> it to prevent commpiler from clobbering the execution order.
+Hi Greg and Viresh,
 
-You want the barrier _before_ the call to __raw_writel() - you need to
-ensure that writes to memory are emitted by the compiler _before_ the
-write to the hardware - the write to the hardware may start DMA, and it
-may be reading data that the program thinks it previously wrote.
+On 03/23/2018 05:04 PM, Greg Kroah-Hartman wrote:
+> On Thu, Mar 22, 2018 at 09:26:06AM +0800, Viresh Kumar wrote:
+>> On 23-02-18, 15:53, Viresh Kumar wrote:
+>>> Problem statement:
+>>>
+>>> Some devices are powered ON by the bootloader before the bootloader
+>>> handovers control to Linux. It maybe important for some of those devices
+>>> to keep working until the time a Linux device driver probes the device
+>>> and reconfigure its resources.
+>>>
+>>> A typical example of that can be the LCD controller, which is used by
+>>> the bootloaders to show image(s) while the platform is booting into
+>>> Linux.  The LCD controller can be using some resources, like clk,
+>>> regulators, etc, that are shared between several devices. These shared
+>>> resources should be configured to satisfy need of all the users.  If
+>>> another device's (X) driver gets probed before the LCD controller driver
+>>> in this case, then it may end up disabling or reconfiguring these
+>>> resources to ranges satisfying the current users (only device X) and
+>>> that can make the LCD screen unstable.
+>>>
+>>> Another case can be a debug serial port enabled from the bootloader.
+>>>
+>>> Of course we can have more complex cases where the same resource is
+>>> getting used by two devices while the kernel boots and the order in
+>>> which devices get probed wouldn't matter as the other device will surely
+>>> break then.
+>>
+>> And we have a _real_ use case for this complex scenario as well.
+>>
+>> Georgi (cc'd) is currently working[1] on implementing generic support for the
+>> interconnect bus, which tries to play with the bandwidth of the bus based on how
+>> much are the requirements from different parts of the SoC. The 4th version was
+>> posted recently by him, and things are looking good/positive.
+>>
+>> The bootloader configures the interconnect to provide sufficient bandwidth for
+>> all the devices which are used during boot, few of them are the CPUs, serial and
+>> the LCD controller. As the kernel starts taking control of things, the drivers
+>> being probed start putting their requirements on the interconnect bus.  Because
+>> the interconnect doesn't have any representation from the devices which are not
+>> yet initialized by the kernel, the interconnect core incorrectly reduces the
+>> bandwidth of the bus to a level unacceptable to the devices running currently,
+>> like the CPUs and this makes kernel boot awfully slow. This is not an ordering
+>> problem as no matter which device we probe first, we are going to break
+>> something else.
 
-Similarly, for readl(), you need the barrier after __raw_readl() to
-ensure that other reads in the program aren't scheduled before a
-potential DMA status register read.
+The interconnect core takes requests from consumer drivers for their
+bandwidth needs and configures the hardware to keep the lowest possible
+power profile. I think that the boot constraint patches would be useful
+to make a board run at maximum performance during boot, until all
+consumer drivers are probed and all bandwidth requests are taken into
+account.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+>> Georgi already tried using the boot constraint patches to solve this complex
+>> problem, and its a perfect fit.
+
+These patches solve a common problem for different subsystems, so it
+makes sense to handle it into the driver core, instead of leaving each
+subsystem to do their own hacks.
+
+> I'm delaying this as I still don't see that "perfect fit" yet.  If there
+> are add-on patches that take better advantage of this, great, let's see
+> those, but right now, it feels like you are the only one wanting this.
+> And the increased complexity overall seems not really worth it yet :(
+
+The interconnect code is still under review, but on the next submission
+i will include a patch to make use of the boot constraints, so that we
+hopefully move this forward.
+
+Thanks,
+Georgi
