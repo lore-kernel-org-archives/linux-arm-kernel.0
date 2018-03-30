@@ -1,44 +1,74 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 30 Mar 2018 23:17:29 +0200
-Subject: 4.16-rc5 on Motorola Droid 4
-In-Reply-To: <20180330121959.uxx6kcl7v5w777vq@earth.universe>
-References: <20180318220418.GA22880@amd> <20180320140322.GU5799@atomide.com>
- <20180320170029.rv3u5wlvqxfl7z2v@earth.universe>
- <20180327212156.GA10834@amd>
- <20180330121959.uxx6kcl7v5w777vq@earth.universe>
-Message-ID: <20180330211729.GA3389@amd>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 30 Mar 2018 23:43:27 +0200
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329153322.5e2fc1e7@bbrezillon>
+ <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+ <20180329154416.5c1a0013@bbrezillon>
+ <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+Message-ID: <68b5f229-638f-e589-36e0-921eb9101848@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2018-03-30 14:19:59, Sebastian Reichel wrote:
-> Hi,
+On 2018-03-29 16:27, Peter Rosin wrote:
+> On 2018-03-29 15:44, Boris Brezillon wrote:
+>> On Thu, 29 Mar 2018 15:37:43 +0200
+>> Peter Rosin <peda@axentia.se> wrote:
+>>
+>>> On 2018-03-29 15:33, Boris Brezillon wrote:
+>>>> On Thu, 29 Mar 2018 15:10:54 +0200
+>>>> Peter Rosin <peda@axentia.se> wrote:
+>>>>   
+>>>>> On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
+>>>>> flash accesses have a tendency to cause display disturbances. Add a
+>>>>> module param to disable DMA from the NAND controller, since that fixes
+>>>>> the display problem for me.
+>>>>>
+>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>>>>> ---
+>>>>>  drivers/mtd/nand/raw/atmel/nand-controller.c | 7 ++++++-
+>>>>>  1 file changed, 6 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
+>>>>> index b2f00b398490..2ff7a77c7b8e 100644
+>>>>> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
+>>>>> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
+>>>>> @@ -129,6 +129,11 @@
+>>>>>  #define DEFAULT_TIMEOUT_MS			1000
+>>>>>  #define MIN_DMA_LEN				128
+>>>>>  
+>>>>> +static bool atmel_nand_avoid_dma __read_mostly;
+>>>>> +
+>>>>> +MODULE_PARM_DESC(avoiddma, "Avoid using DMA");
+>>>>> +module_param_named(avoiddma, atmel_nand_avoid_dma, bool, 0400);  
+>>>>
+>>>> I'm not a big fan of those driver specific cmdline parameters. Can't we
+>>>> instead give an higher priority to HLCDC master using the bus matrix?  
+>>>
+>>> I don't know if it will be enough, but we sure can try. However, I have
+>>> no idea how to do that. I will happily test stuff though...
+>>
+>> There's no interface to configure that from Linux, but you can try to
+>> tweak it with devmem and if that does the trick, maybe we can expose a
+>> way to configure that from Linux. For more details, see the "Bus Matrix
+>> (MATRIX)" section in Atmel datasheets.
 > 
-> On Tue, Mar 27, 2018 at 11:21:56PM +0200, Pavel Machek wrote:
-> > Also, if you know how to get information from light sensor, that would
-> > be nice.
+> I don't seem to succeed in changing the registers I think I need to change.
+> I can poke the "Write Protection Mode Register" by writing MAT0 and MAT1 to
+> it. But when I try to write to "Priority Registers B For Slaves" it doesn't
+> take, regardless of write protect mode.
 > 
-> You need CONFIG_SENSORS_ISL29028. Once the driver is probed:
-> 
-> $ cat /sys/bus/iio/devices/iio\:device1/name
-> isl29030
-> $ cat /sys/bus/iio/devices/iio\:device1/in_illuminance_input
-> 19
+> Can the relevant bits only be written when the HLCDC is inactive or
+> something?
 
-Thanks, that works.
+Here is someone else with what seems like very similar problems[1], however
+also with USB disturbing the display. I can't test that (easily) since a
+mux in front of the USB port was unfortunately wired incorrectly in this
+first attempt. And USB disturbing the display is not a showstopper around
+here, since USB will only be used for debugging etc in my case.
 
-I was also able to get accelerometers to work, but they are extremely
-slow to read (6 seconds for all 3 axis). Interesting, but probably not
-too important for now.
+[1] https://www.avrfreaks.net/forum/sama5d31-ahb-bus-matrix-lcd
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180330/c115bccd/attachment.sig>
+Cheers,
+Peter
