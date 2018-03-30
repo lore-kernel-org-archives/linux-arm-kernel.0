@@ -1,102 +1,62 @@
 From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Fri, 30 Mar 2018 04:59:51 -0700
-Subject: [PATCH v2 5/7] net: thunderx: add XCAST messages handlers for PF
+Date: Fri, 30 Mar 2018 04:59:52 -0700
+Subject: [PATCH v2 6/7] net: thunderx: add workqueue control structures for
+ handle ndo_set_rx_mode request
 In-Reply-To: <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
  <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180330115953.17154-6-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180330115953.17154-7-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-This commit is to add message handling for ndo_set_rx_mode()
-callback at PF side.
+The kernel calls ndo_set_rx_mode() callback from atomic context which
+causes messaging timeouts between VF and PF (as they?re implemented via
+MSIx). So in order to handle ndo_set_rx_mode() we need to get rid of it.
+
+This commit implements necessary workqueue related structures to let VF
+queue kernel request processing in non-atomic context later.
 
 Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c | 45 +++++++++++++++++++++++---
- 1 file changed, 41 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 7ff66a8194e2..55af04fa03a7 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -21,6 +21,8 @@
- #define DRV_NAME	"nicpf"
- #define DRV_VERSION	"1.0"
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 069289b4f968..5fc46c5a4f36 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -265,6 +265,22 @@ struct nicvf_drv_stats {
  
-+#define NIC_VF_PER_MBX_REG      64
+ struct cavium_ptp;
+ 
++struct xcast_addr {
++	struct list_head list;
++	u64              addr;
++};
 +
- struct hw_info {
- 	u8		bgx_cnt;
- 	u8		chans_per_lmac;
-@@ -1072,6 +1074,40 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 	case NIC_MBOX_MSG_PTP_CFG:
- 		nic_config_timestamp(nic, vf, &mbx.ptp);
- 		break;
-+	case NIC_MBOX_MSG_RESET_XCAST:
-+		if (vf >= nic->num_vf_en) {
-+			ret = -1; /* NACK */
-+			break;
-+		}
-+		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		bgx_reset_xcast_mode(nic->node, bgx, lmac,
-+				     vf < NIC_VF_PER_MBX_REG ? vf :
-+				     vf - NIC_VF_PER_MBX_REG);
-+		break;
++struct xcast_addr_list {
++	struct list_head list;
++	int              count;
++};
 +
-+	case NIC_MBOX_MSG_ADD_MCAST:
-+		if (vf >= nic->num_vf_en) {
-+			ret = -1; /* NACK */
-+			break;
-+		}
-+		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		bgx_set_dmac_cam_filter(nic->node, bgx, lmac,
-+					mbx.xcast.data.mac,
-+					vf < NIC_VF_PER_MBX_REG ? vf :
-+					vf - NIC_VF_PER_MBX_REG);
-+		break;
++struct nicvf_work {
++	struct delayed_work    work;
++	u8                     mode;
++	struct xcast_addr_list *mc;
++};
 +
-+	case NIC_MBOX_MSG_SET_XCAST:
-+		if (vf >= nic->num_vf_en) {
-+			ret = -1; /* NACK */
-+			break;
-+		}
-+		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
-+		bgx_set_xcast_mode(nic->node, bgx, lmac, mbx.xcast.data.mode);
-+		break;
- 	default:
- 		dev_err(&nic->pdev->dev,
- 			"Invalid msg from VF%d, msg 0x%x\n", vf, mbx.msg.msg);
-@@ -1094,7 +1130,7 @@ static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
- 	struct nicpf *nic = (struct nicpf *)nic_irq;
- 	int mbx;
- 	u64 intr;
--	u8  vf, vf_per_mbx_reg = 64;
-+	u8  vf;
+ struct nicvf {
+ 	struct nicvf		*pnicvf;
+ 	struct net_device	*netdev;
+@@ -313,6 +329,7 @@ struct nicvf {
+ 	struct nicvf_pfc	pfc;
+ 	struct tasklet_struct	qs_err_task;
+ 	struct work_struct	reset_task;
++	struct nicvf_work       rx_mode_work;
  
- 	if (irq == pci_irq_vector(nic->pdev, NIC_PF_INTR_ID_MBOX0))
- 		mbx = 0;
-@@ -1103,12 +1139,13 @@ static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
- 
- 	intr = nic_reg_read(nic, NIC_PF_MAILBOX_INT + (mbx << 3));
- 	dev_dbg(&nic->pdev->dev, "PF interrupt Mbox%d 0x%llx\n", mbx, intr);
--	for (vf = 0; vf < vf_per_mbx_reg; vf++) {
-+	for (vf = 0; vf < NIC_VF_PER_MBX_REG; vf++) {
- 		if (intr & (1ULL << vf)) {
- 			dev_dbg(&nic->pdev->dev, "Intr from VF %d\n",
--				vf + (mbx * vf_per_mbx_reg));
-+				vf + (mbx * NIC_VF_PER_MBX_REG));
- 
--			nic_handle_mbx_intr(nic, vf + (mbx * vf_per_mbx_reg));
-+			nic_handle_mbx_intr(nic, vf +
-+					    (mbx * NIC_VF_PER_MBX_REG));
- 			nic_clear_mbx_intr(nic, vf, mbx);
- 		}
- 	}
+ 	/* PTP timestamp */
+ 	struct cavium_ptp	*ptp_clock;
 -- 
 2.14.3
