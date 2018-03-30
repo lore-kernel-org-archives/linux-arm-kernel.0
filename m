@@ -1,71 +1,102 @@
 From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Fri, 30 Mar 2018 04:59:50 -0700
-Subject: [PATCH v2 4/7] net: thunderx: add new messages for handle
- ndo_set_rx_mode callback
+Date: Fri, 30 Mar 2018 04:59:51 -0700
+Subject: [PATCH v2 5/7] net: thunderx: add XCAST messages handlers for PF
 In-Reply-To: <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
  <20180330115953.17154-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180330115953.17154-5-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180330115953.17154-6-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-The kernel calls ndo_set_rx_mode() callback supplying it will all necessary
-info, such as device state flags, multicast mac addresses list and so on.
-Since we have only 128 bits to communicate with PF we need to initiate
-several requests to PF with small/short operation each based on input data.
-
-So this commit implements following PF messages codes along with new
-data structures for them:
-NIC_MBOX_MSG_RESET_XCAST to flush all filters configured for this
-                          particular network interface (VF)
-NIC_MBOX_MSG_ADD_MCAST   to add new MAC address to DMAC filter registers
-                          for this particular network interface (VF)
-NIC_MBOX_MSG_SET_XCAST   to apply filtering configuration to filter control
-                          register
+This commit is to add message handling for ndo_set_rx_mode()
+callback at PF side.
 
 Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/net/ethernet/cavium/thunder/nic_main.c | 45 +++++++++++++++++++++++---
+ 1 file changed, 41 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 4cacce5d2b16..069289b4f968 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -403,6 +403,9 @@ struct nicvf {
- #define	NIC_MBOX_MSG_PTP_CFG		0x19	/* HW packet timestamp */
- #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
- #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
-+#define	NIC_MBOX_MSG_RESET_XCAST	0xF2    /* Reset DCAM filtering mode */
-+#define	NIC_MBOX_MSG_ADD_MCAST		0xF3    /* Add MAC to DCAM filters */
-+#define	NIC_MBOX_MSG_SET_XCAST		0xF4    /* Set MCAST/BCAST RX mode */
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index 7ff66a8194e2..55af04fa03a7 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -21,6 +21,8 @@
+ #define DRV_NAME	"nicpf"
+ #define DRV_VERSION	"1.0"
  
- struct nic_cfg_msg {
- 	u8    msg;
-@@ -556,6 +559,14 @@ struct set_ptp {
- 	bool  enable;
- };
- 
-+struct xcast {
-+	u8    msg;
-+	union {
-+		u8    mode;
-+		u64   mac;
-+	} data;
-+};
++#define NIC_VF_PER_MBX_REG      64
 +
- /* 128 bit shared memory between PF and each VF */
- union nic_mbx {
- 	struct { u8 msg; }	msg;
-@@ -576,6 +587,7 @@ union nic_mbx {
- 	struct reset_stat_cfg	reset_stat;
- 	struct pfc		pfc;
- 	struct set_ptp		ptp;
-+	struct xcast            xcast;
- };
+ struct hw_info {
+ 	u8		bgx_cnt;
+ 	u8		chans_per_lmac;
+@@ -1072,6 +1074,40 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 	case NIC_MBOX_MSG_PTP_CFG:
+ 		nic_config_timestamp(nic, vf, &mbx.ptp);
+ 		break;
++	case NIC_MBOX_MSG_RESET_XCAST:
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
++			break;
++		}
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		bgx_reset_xcast_mode(nic->node, bgx, lmac,
++				     vf < NIC_VF_PER_MBX_REG ? vf :
++				     vf - NIC_VF_PER_MBX_REG);
++		break;
++
++	case NIC_MBOX_MSG_ADD_MCAST:
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
++			break;
++		}
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		bgx_set_dmac_cam_filter(nic->node, bgx, lmac,
++					mbx.xcast.data.mac,
++					vf < NIC_VF_PER_MBX_REG ? vf :
++					vf - NIC_VF_PER_MBX_REG);
++		break;
++
++	case NIC_MBOX_MSG_SET_XCAST:
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
++			break;
++		}
++		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
++		bgx_set_xcast_mode(nic->node, bgx, lmac, mbx.xcast.data.mode);
++		break;
+ 	default:
+ 		dev_err(&nic->pdev->dev,
+ 			"Invalid msg from VF%d, msg 0x%x\n", vf, mbx.msg.msg);
+@@ -1094,7 +1130,7 @@ static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
+ 	struct nicpf *nic = (struct nicpf *)nic_irq;
+ 	int mbx;
+ 	u64 intr;
+-	u8  vf, vf_per_mbx_reg = 64;
++	u8  vf;
  
- #define NIC_NODE_ID_MASK	0x03
+ 	if (irq == pci_irq_vector(nic->pdev, NIC_PF_INTR_ID_MBOX0))
+ 		mbx = 0;
+@@ -1103,12 +1139,13 @@ static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
+ 
+ 	intr = nic_reg_read(nic, NIC_PF_MAILBOX_INT + (mbx << 3));
+ 	dev_dbg(&nic->pdev->dev, "PF interrupt Mbox%d 0x%llx\n", mbx, intr);
+-	for (vf = 0; vf < vf_per_mbx_reg; vf++) {
++	for (vf = 0; vf < NIC_VF_PER_MBX_REG; vf++) {
+ 		if (intr & (1ULL << vf)) {
+ 			dev_dbg(&nic->pdev->dev, "Intr from VF %d\n",
+-				vf + (mbx * vf_per_mbx_reg));
++				vf + (mbx * NIC_VF_PER_MBX_REG));
+ 
+-			nic_handle_mbx_intr(nic, vf + (mbx * vf_per_mbx_reg));
++			nic_handle_mbx_intr(nic, vf +
++					    (mbx * NIC_VF_PER_MBX_REG));
+ 			nic_clear_mbx_intr(nic, vf, mbx);
+ 		}
+ 	}
 -- 
 2.14.3
