@@ -1,59 +1,31 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 30 Mar 2018 11:58:12 -0400
-Subject: [PATCH v2 1/2] io: prevent compiler reordering on the default
- writeX() implementation
-Message-ID: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
+From: ryan@edited.us (Ryan Grachek)
+Date: Fri, 30 Mar 2018 11:11:18 -0500
+Subject: [PATCH] arm64: dts: hikey: Enable SDIO high-speed mode on WL1835
+ module
+Message-ID: <20180330161118.5751-1-ryan@edited.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default implementation of mapping writeX() to __raw_writeX() is wrong.
-writeX() has stronger ordering semantics. Compiler is allowed to reorder
-__raw_writeX().
+According to hardware documentation, the WL1835MOD WiFi chip
+supports SDIO high-speed mode, which increases the clock to
+50 MHz. This results in a modest increase in throughput.
 
-In the abscence of a write barrier or when using a strongly ordered
-architecture, writeX() should at least have a compiler barrier in
-it to prevent commpiler from clobbering the execution order.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Ryan Grachek <ryan@edited.us>
 ---
- include/asm-generic/io.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index b4531e3..e8c2078 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -144,6 +144,7 @@ static inline u64 readq(const volatile void __iomem *addr)
- #define writeb writeb
- static inline void writeb(u8 value, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writeb(value, addr);
- }
- #endif
-@@ -152,6 +153,7 @@ static inline void writeb(u8 value, volatile void __iomem *addr)
- #define writew writew
- static inline void writew(u16 value, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writew(cpu_to_le16(value), addr);
- }
- #endif
-@@ -160,6 +162,7 @@ static inline void writew(u16 value, volatile void __iomem *addr)
- #define writel writel
- static inline void writel(u32 value, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writel(__cpu_to_le32(value), addr);
- }
- #endif
-@@ -169,6 +172,7 @@ static inline void writel(u32 value, volatile void __iomem *addr)
- #define writeq writeq
- static inline void writeq(u64 value, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writeq(__cpu_to_le64(value), addr);
- }
- #endif
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 5d5aa4f4a235..a5e0cc4370e1 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -322,6 +322,7 @@
+ 
+ 		dwmmc_2: dwmmc2 at f723f000 {
+ 			bus-width = <0x4>;
++			cap-sd-highspeed;
+ 			non-removable;
+ 			vmmc-supply = <&reg_vdd_3v3>;
+ 			mmc-pwrseq = <&wl1835_pwrseq>;
 -- 
-2.7.4
+2.11.0
