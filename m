@@ -1,70 +1,113 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 30 Mar 2018 11:15:22 +0800
-Subject: [PATCH v4 4/6] coresight: tmc: Hook callback for panic kdump
+Date: Fri, 30 Mar 2018 11:15:23 +0800
+Subject: [PATCH v4 5/6] coresight: Set and clear sink device handler for kdump
+ node
 In-Reply-To: <1522379724-30648-1-git-send-email-leo.yan@linaro.org>
 References: <1522379724-30648-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1522379724-30648-5-git-send-email-leo.yan@linaro.org>
+Message-ID: <1522379724-30648-6-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Coresight panic kdump functionality has been ready, this patch is
-to hook panic callback function for ETB/ETF driver.  The driver data
-structure has allocated a buffer when the session started, so simply
-save tracing data into this buffer when panic happens and update buffer
-related info for kdump.
+If Coresight path is enabled for specific CPU, the sink device handler
+need to be set to kdump node; on the other hand we also need to clear
+sink device handler when path is disabled.
+
+This patch sets sink devices handler for kdump node for two separate
+Coresight enabling modes: CS_MODE_SYSFS and CS_MODE_PERF; and clear the
+handler when Coresight is disabled.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 30 +++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm-perf.c |  5 +++++
+ drivers/hwtracing/coresight/coresight.c          | 16 ++++++++++++++--
+ 2 files changed, 19 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index e2513b7..d20d546 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -504,6 +504,35 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
- 	CS_LOCK(drvdata->base);
- }
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 8a0ad77..f8b159c 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -139,6 +139,8 @@ static void free_event_data(struct work_struct *work)
+ 	for_each_cpu(cpu, mask) {
+ 		if (!(IS_ERR_OR_NULL(event_data->path[cpu])))
+ 			coresight_release_path(event_data->path[cpu]);
++
++		coresight_kdump_sink(cpu, NULL);
+ 	}
  
-+static void tmc_panic_cb(void *data)
-+{
-+	struct coresight_device *csdev = (struct coresight_device *)data;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+	unsigned long flags;
+ 	kfree(event_data->path);
+@@ -238,6 +240,9 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+ 		event_data->path[cpu] = coresight_build_path(csdev, sink);
+ 		if (IS_ERR(event_data->path[cpu]))
+ 			goto err;
 +
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
-+			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
-+		return;
-+
-+	if (drvdata->mode == CS_MODE_DISABLED)
-+		return;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	tmc_flush_and_stop(drvdata);
-+	tmc_etb_dump_hw(drvdata);
-+
-+	CS_LOCK(drvdata->base);
-+
-+	/* Update buffer info for panic dump */
-+	csdev->kdump_buf = drvdata->buf;
-+	csdev->kdump_buf_sz = drvdata->len;
-+
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+}
-+
- static const struct coresight_ops_sink tmc_etf_sink_ops = {
- 	.enable		= tmc_enable_etf_sink,
- 	.disable	= tmc_disable_etf_sink,
-@@ -512,6 +541,7 @@ static const struct coresight_ops_sink tmc_etf_sink_ops = {
- 	.set_buffer	= tmc_set_etf_buffer,
- 	.reset_buffer	= tmc_reset_etf_buffer,
- 	.update_buffer	= tmc_update_etf_buffer,
-+	.panic_cb	= tmc_panic_cb,
- };
++		if (coresight_kdump_sink(cpu, sink))
++			goto err;
+ 	}
  
- static const struct coresight_ops_link tmc_etf_link_ops = {
+ 	if (!sink_ops(sink)->alloc_buffer)
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 389c4ba..483a1f7 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -272,6 +272,7 @@ static int coresight_enable_source(struct coresight_device *csdev, u32 mode)
+ static bool coresight_disable_source(struct coresight_device *csdev)
+ {
+ 	if (atomic_dec_return(csdev->refcnt) == 0) {
++
+ 		if (source_ops(csdev)->disable)
+ 			source_ops(csdev)->disable(csdev, NULL);
+ 		csdev->enable = false;
+@@ -612,6 +613,13 @@ int coresight_enable(struct coresight_device *csdev)
+ 	if (ret)
+ 		goto err_source;
+ 
++	cpu = source_ops(csdev)->cpu_id(csdev);
++
++	/* Set sink device handler into kdump node */
++	ret = coresight_kdump_sink(cpu, sink);
++	if (ret)
++		goto err_kdump;
++
+ 	switch (subtype) {
+ 	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
+ 		/*
+@@ -621,7 +629,6 @@ int coresight_enable(struct coresight_device *csdev)
+ 		 * be a single session per tracer (when working from sysFS)
+ 		 * a per-cpu variable will do just fine.
+ 		 */
+-		cpu = source_ops(csdev)->cpu_id(csdev);
+ 		per_cpu(tracer_path, cpu) = path;
+ 		break;
+ 	case CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE:
+@@ -636,6 +643,9 @@ int coresight_enable(struct coresight_device *csdev)
+ 	mutex_unlock(&coresight_mutex);
+ 	return ret;
+ 
++err_kdump:
++	coresight_disable_source(csdev);
++
+ err_source:
+ 	coresight_disable_path(path);
+ 
+@@ -659,9 +669,10 @@ void coresight_disable(struct coresight_device *csdev)
+ 	if (!csdev->enable || !coresight_disable_source(csdev))
+ 		goto out;
+ 
++	cpu = source_ops(csdev)->cpu_id(csdev);
++
+ 	switch (csdev->subtype.source_subtype) {
+ 	case CORESIGHT_DEV_SUBTYPE_SOURCE_PROC:
+-		cpu = source_ops(csdev)->cpu_id(csdev);
+ 		path = per_cpu(tracer_path, cpu);
+ 		per_cpu(tracer_path, cpu) = NULL;
+ 		break;
+@@ -674,6 +685,7 @@ void coresight_disable(struct coresight_device *csdev)
+ 		break;
+ 	}
+ 
++	coresight_kdump_sink(cpu, NULL);
+ 	coresight_disable_path(path);
+ 	coresight_release_path(path);
+ 
 -- 
 2.7.4
