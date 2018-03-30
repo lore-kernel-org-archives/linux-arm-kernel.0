@@ -1,291 +1,112 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 30 Mar 2018 13:58:35 +0100
-Subject: [PATCH v2 07/10] input: touchscreen: touch_adc: add generic
- resistive ADC touchscreen
-In-Reply-To: <1522153963-1121-8-git-send-email-eugen.hristev@microchip.com>
-References: <1522153963-1121-1-git-send-email-eugen.hristev@microchip.com>
- <1522153963-1121-8-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180330135835.6a8f57f1@archlinux>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 30 Mar 2018 14:40:11 +0200
+Subject: [RESEND][PATCH] pwm: Set class for exported channels in sysfs
+In-Reply-To: <20170926115951.GA29367@sukzessiv.net>
+References: <20170926115951.GA29367@sukzessiv.net>
+Message-ID: <c1b6b62e-8fcb-bff0-b532-aa0879d301ed@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Mar 2018 15:32:40 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
-
-> This adds a generic resistive touchscreen (GRTS) driver, which is based
-> on an IIO device (an ADC). It must be connected to the channels of an ADC
-> to receive touch data. Then it will feed the data into the input subsystem
-> where it registers an input device.
-> It uses an IIO callback buffer to register to the IIO device
+On 09/26/2017 01:59 PM, gohai at sukzessiv.net wrote:
+> Notifications for devices without bus or class set get dropped by
+> dev_uevent_filter. Adding the class to the exported child matches
+> what the gpio subsystem is doing.
 > 
-> Some parts of this patch are based on initial original work by
-> Mohamed Jamsheeth Hajanajubudeen and Bandaru Venkateswara Swamy
+> With this change exporting a channel triggers a udev event, which
+> gives userspace a chance to fixup permissions and makes it possible
+> for non-root users to make use of the pwm subsystem.
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-I like this a lot!
-
-A few minor bits and bobs inline.  Over to Dmitry for the input
-side of things.
-
-Jonathan
-
+> Signed-off-by: Gottfried Haider <gottfried.haider@gmail.com>
+> CC: Thierry Reding <thierry.reding@gmail.com>
+> CC: H Hartley Sweeten <hsweeten@visionengravers.com>
+> CC: linux-pwm at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-rpi-kernel at lists.infradead.org
 > ---
-> Changes in v2:
->  - this is now a generic resistive adc touchscreen driver
+>  drivers/pwm/sysfs.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
->  drivers/input/touchscreen/Kconfig     |  13 +++
->  drivers/input/touchscreen/Makefile    |   1 +
->  drivers/input/touchscreen/touch_adc.c | 199 ++++++++++++++++++++++++++++++++++
->  3 files changed, 213 insertions(+)
->  create mode 100644 drivers/input/touchscreen/touch_adc.c
+> diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+> index a813239..83f2b0b 100644
+> --- a/drivers/pwm/sysfs.c
+> +++ b/drivers/pwm/sysfs.c
+> @@ -263,6 +263,7 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+>         export->pwm = pwm;
+>         mutex_init(&export->lock);
 > 
-> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> index 4f15496..afd879f 100644
-> --- a/drivers/input/touchscreen/Kconfig
-> +++ b/drivers/input/touchscreen/Kconfig
-> @@ -92,6 +92,19 @@ config TOUCHSCREEN_AD7879_SPI
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called ad7879-spi.
->  
-> +config TOUCHSCREEN_ADC
-> +	tristate "Generic ADC based resistive touchscreen"
-> +	depends on IIO
-> +	select IIO_BUFFER_CB
-> +	help
-> +	  Say Y here if you want to use the generic ADC
-> +	  resistive touchscreen driver.
-> +
-> +	  If unsure, say N (but it's safe to say "Y").
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called touch_adc.ko.
-> +
->  config TOUCHSCREEN_AR1021_I2C
->  	tristate "Microchip AR1020/1021 i2c touchscreen"
->  	depends on I2C && OF
-> diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
-> index dddae79..cbe6121 100644
-> --- a/drivers/input/touchscreen/Makefile
-> +++ b/drivers/input/touchscreen/Makefile
-> @@ -13,6 +13,7 @@ obj-$(CONFIG_TOUCHSCREEN_AD7877)	+= ad7877.o
->  obj-$(CONFIG_TOUCHSCREEN_AD7879)	+= ad7879.o
->  obj-$(CONFIG_TOUCHSCREEN_AD7879_I2C)	+= ad7879-i2c.o
->  obj-$(CONFIG_TOUCHSCREEN_AD7879_SPI)	+= ad7879-spi.o
-> +obj-$(CONFIG_TOUCHSCREEN_ADC)		+= touch_adc.o
->  obj-$(CONFIG_TOUCHSCREEN_ADS7846)	+= ads7846.o
->  obj-$(CONFIG_TOUCHSCREEN_AR1021_I2C)	+= ar1021_i2c.o
->  obj-$(CONFIG_TOUCHSCREEN_ATMEL_MXT)	+= atmel_mxt_ts.o
-> diff --git a/drivers/input/touchscreen/touch_adc.c b/drivers/input/touchscreen/touch_adc.c
-> new file mode 100644
-> index 0000000..de4b929
-> --- /dev/null
-> +++ b/drivers/input/touchscreen/touch_adc.c
-> @@ -0,0 +1,199 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * ADC generic resistive touchscreen (GRTS)
-> + *
-> + * Copyright (C) 2017,2018 Microchip Technology,
-> + * Author: Eugen Hristev <eugen.hristev@microchip.com>
-> + *
-> + */
-> +#include <linux/input.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/iio/consumer.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/module.h>
-> +
-> +#define DRIVER_NAME					"touch_adc"
-> +#define GRTS_DEFAULT_PRESSURE_THRESHOLD			10000
-> +#define MAX_POS_MASK					GENMASK(11, 0)
-> +
-> +/**
-> + * grts_state - generic resistive touch screen information struct
-> + * @pressure_threshold:	number representing the threshold for the pressure
-> + * @pressure:		are we getting pressure info or not
-> + * @iio_chans:		list of channels acquired
-> + * @iio_cb:		iio_callback buffer for the data
-> + * @input:		the input device structure that we register
-> + */
-> +struct grts_state {
-> +	u32			pressure_threshold;
-> +	bool			pressure;
-> +	struct iio_channel	*iio_chans;
-> +	struct iio_cb_buffer	*iio_cb;
-> +	struct input_dev	*input;
-> +};
-> +
-> +static int grts_cb(const void *data, void *private)
-> +{
-> +	const u16 *touch_info = data;
-> +	struct grts_state *st = private;
-> +
-> +	unsigned int x, y, press = 0xFFFF;
-> +
-> +	/* channel data coming in buffer in the order below */
-> +	x = touch_info[0];
-> +	y = touch_info[1];
-> +	if (st->pressure)
-> +		press = touch_info[2];
-> +
-> +	if ((!x && !y) || (st->pressure && (press > st->pressure_threshold))) {
-Ah, clearly pressure is the other way around to I assumed and gets larger as
-the pressure is reduced.  hmm.
+> +       export->child.class = parent->class;
 
-> +		/* report end of touch */
-> +		input_report_key(st->input, BTN_TOUCH, 0);
-> +		input_sync(st->input);
-> +		return 0;
-> +	}
-> +
-> +	/* report proper touch to subsystem*/
-> +	input_report_abs(st->input, ABS_X, x);
-> +	input_report_abs(st->input, ABS_Y, y);
-> +	if (st->pressure)
-> +		input_report_abs(st->input, ABS_PRESSURE, press);
-> +	input_report_key(st->input, BTN_TOUCH, 1);
-> +	input_sync(st->input);
-blank line preferred here.
+Hi all,
 
-> +	return 0;
-> +}
-> +
-> +static int grts_open(struct input_dev *dev)
-> +{
-> +	int ret;
-> +	struct grts_state *st = input_get_drvdata(dev);
-> +
-> +	ret = iio_channel_start_all_cb(st->iio_cb);
-> +	if (ret) {
-> +		dev_err(dev->dev.parent, "failed to start callback buffer.\n");
-> +		return ret;
-Drop the return ret out of the brackets.
+Sorry to raise this old mail thread. I just figured out this patch is
+causing *regression* on v4.16-rcs.
 
-> +	}
-> +	return 0;
-> +}
-> +
-> +static void grts_close(struct input_dev *dev)
-> +{
-> +	struct grts_state *st = input_get_drvdata(dev);
-> +
-> +	iio_channel_stop_all_cb(st->iio_cb);
-> +}
-> +
-> +static int grts_probe(struct platform_device *pdev)
-> +{
-> +	struct grts_state *st;
-> +	struct input_dev *input;
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *node = dev->of_node;
-> +	struct iio_channel *chan;
-> +	int ret = 0;
-> +
-> +	st = devm_kzalloc(dev, sizeof(struct grts_state), GFP_KERNEL);
-> +	if (!st)
-> +		return -ENOMEM;
-> +
-> +	ret = of_property_read_u32(node,
-> +			"generic-adc-resistive-touchscreen,pressure-threshold",
-> +			&st->pressure_threshold);
-> +	if (ret < 0) {
-> +		dev_dbg(dev, "can't get touchscreen pressure threshold property.\n");
-> +		st->pressure_threshold = GRTS_DEFAULT_PRESSURE_THRESHOLD;
-> +	}
-> +
-> +	/* get the channels from IIO device */
-> +	st->iio_chans = devm_iio_channel_get_all(dev);
-> +
-> +	if (IS_ERR(st->iio_chans)) {
-> +		if (PTR_ERR(st->iio_chans) != -EPROBE_DEFER)
-> +			dev_err(dev, "can't get iio channels.\n");
-> +		return PTR_ERR(st->iio_chans);
-> +	}
-> +
-> +	chan = &st->iio_chans[0];
-> +	st->pressure = false;
-> +	while (chan && chan->indio_dev) {
-> +		if (!strcmp(chan->channel->datasheet_name, "pressure"))
-> +			st->pressure = true;
-> +		chan++;
-> +	}
-> +
-> +	input = devm_input_allocate_device(dev);
-> +	if (!input) {
-> +		dev_err(dev, "failed to allocate input device.\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	input->name = DRIVER_NAME;
-> +	input->id.bustype = BUS_HOST;
-> +	input->dev.parent = dev;
-> +	input->open = grts_open;
-> +	input->close = grts_close;
-> +
-> +	input_set_abs_params(input, ABS_X, 0, MAX_POS_MASK - 1, 0, 0);
-> +	input_set_abs_params(input, ABS_Y, 0, MAX_POS_MASK - 1, 0, 0);
-> +	if (st->pressure)
-> +		input_set_abs_params(input, ABS_PRESSURE, 0, 0xffffff, 0, 0);
-> +
-> +	input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-> +	input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-> +
-> +	st->input = input;
-> +	input_set_drvdata(input, st);
-> +
-> +	ret = input_register_device(input);
-> +	if (ret) {
-> +		dev_err(dev, "failed to register input device.");
-> +		return ret;
-> +	}
-> +
-> +	st->iio_cb = iio_channel_get_all_cb(&pdev->dev, grts_cb, st);
-> +
-> +	if (IS_ERR(st->iio_cb)) {
-> +		dev_err(dev, "failed to allocate callback buffer.\n");
-> +		ret =  PTR_ERR(st->iio_cb);
-> +		return ret;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, st);
-> +
-> +	return ret;
-> +}
-> +
-> +static int grts_remove(struct platform_device *pdev)
-> +{
-> +	struct grts_state *st = platform_get_drvdata(pdev);
-> +
-> +	iio_channel_release_all_cb(st->iio_cb);
-> +	input_unregister_device(st->input);
-blank line preferred before simple returns.
+This patch has side effect at my end, with multiple pwm chip. It creates
+a new entry in '/sys/class/pwm' every time a 'pwmX' is exported:
+- echo X > export
 
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id grts_of_match[] = {
-> +	{
-> +		.compatible = "generic-resistive-adc-touch",
-> +	}, {
-> +		/* sentinel */
-> +	},
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, grts_of_match);
-> +
-> +static struct platform_driver grts_driver = {
-> +	.probe = grts_probe,
-> +	.remove = grts_remove,
-> +	.driver = {
-> +		   .name = DRIVER_NAME,
-> +		   .of_match_table = of_match_ptr(grts_of_match),
-> +	},
-> +};
-> +
-> +module_platform_driver(grts_driver);
-> +
-> +MODULE_AUTHOR("Eugen Hristev <eugen.hristev@microchip.com>");
-> +MODULE_DESCRIPTION("Generic ADC Resistive Touch Driver");
-> +MODULE_LICENSE("GPL v2");
+This breaks pwm on platforms that have multiple pwmchip:
+- 1st time export will create a /sys/class/pwm/pwmX
+- when another export happens on another pwmchip, it can't be created
+(e.g. -EEXIST)
+
+I looked at /Documentation/ABI/testing/sysfs-class-pwm:
+- pmwX should be there: /sys/class/pwm/pwmchipN/pwmX (only ?)
+
+With this patch:
+- pwmX symlink is created in addition, directly under /sys/class/pwm
+
+Example on stm32 (stm32429i-eval) platform:
+---
+$ ls /sys/class/pwm
+pwmchip0 pwmchip4
+
+$ cd /sys/class/pwm/pwmchip0/
+$ echo 0 > export
+
+$ ls /sys/class/pwm
+pwm0 pwmchip0 pwmchip4
+
+$ cd /sys/class/pwm/pwmchip4/
+$ echo 0 > export
+
+sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+CPU: 0 PID: 50 Comm: sh Not tainted 4.16.0-rc7-00020-g3361545 #1682
+Hardware name: STM32 (Device Tree Support)
+[<0000c0f1>] (unwind_backtrace) from [<0000b23b>] (show_stack+0xb/0xc)
+[<0000b23b>] (show_stack) from [<0008d2f1>] (sysfs_warn_dup+0x31/0x48)
+[<0008d2f1>] (sysfs_warn_dup) from [<0008d4a5>]
+(sysfs_do_create_link_sd+0x75/0x88)
+[<0008d4a5>] (sysfs_do_create_link_sd) from [<000e8e91>]
+(device_add+0x111/0x374)
+[<000e8e91>] (device_add) from [<000ca795>] (export_store+0xb5/0x12c)
+[<000ca795>] (export_store) from [<0008c899>] (kernfs_fop_write+0x87/0xda)
+[<0008c899>] (kernfs_fop_write) from [<0005a0a5>] (__vfs_write+0x1d/0xcc)
+[<0005a0a5>] (__vfs_write) from [<0005a1c7>] (vfs_write+0x4f/0x7c)
+[<0005a1c7>] (vfs_write) from [<0005a29b>] (SyS_write+0x33/0x70)
+[<0005a29b>] (SyS_write) from [<00009001>] (ret_fast_syscall+0x1/0x58)
+Exception stack...
+-sh: write error: File exists
+
+Not sure what the best fix would be thought :-(
+
+probably pwmX should be named also according with pwmchipN ?
+- dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
++ dev_set_name(&export->child, "pwmchip%d-pwm%u", chip->base, pwm->hwpwm);
+BUT I think this would break existing ABI...
+
+Also this is quite late in the cycle. Maybe a revert would be wise for now ?
+
+Please advise,
+Best Regards,
+Fabrice
+
+>         export->child.release = pwm_export_release;
+>         export->child.parent = parent;
+>         export->child.devt = MKDEV(0, 0);
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
