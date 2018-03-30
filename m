@@ -1,138 +1,111 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Fri, 30 Mar 2018 15:50:45 +0300
-Subject: [PATCH v2 4/6] spi: sun6i: use completion provided by SPI core
-In-Reply-To: <20180330125047.13936-1-ssuloev@orpaltech.com>
-References: <20180330125047.13936-1-ssuloev@orpaltech.com>
-Message-ID: <20180330125047.13936-5-ssuloev@orpaltech.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 30 Mar 2018 20:00:51 +0530
+Subject: [PATCH] mtd: nand: davinci: don't acquire and enable clock
+Message-ID: <20180330143051.26423-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As long as the completion is already provided by the SPI core
-then there is no need to waste extra-memory on this.
-Also a waiting function was added to avoid code duplication.
+NAND itself is an asynchronous interface, it does not have any
+clock input. DaVinci NAND driver acquires clock for AEMIF
+(asynchronous external memory interface) which is an on-chip
+IP to which NAND is connected.
 
-Changes in v2:
-1) Fixed issue with passing an invalid argument into devm_request_irq()
-function.
+The same clock is also enabled in AEMIF driver (either present
+drivers/memory or from machine code for some older platforms).
+AEMIF timing must be initialized before NAND can be accessed.
+This ensures that AEMIF clock is enabled too.
 
-Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+Remove the superfluous clock acquisition and enable in DaVinci
+NAND driver.
 
+Tested on K2L, K2HK, K2E, DA850 EVM, DA850 LCDK in device-tree
+boot and DM644x EVM in legacy boot.
+
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- drivers/spi/spi-sun6i.c | 52 ++++++++++++++++++++++++++++---------------------
- 1 file changed, 30 insertions(+), 22 deletions(-)
+Hi Boris,
 
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index 4db1f20..210cef9 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -99,8 +99,6 @@ struct sun6i_spi {
- 	struct clk		*mclk;
- 	struct reset_control	*rstc;
+If/when this patch gets accepted, it will nice to put this on
+an immutable branch others can merge. There is potential cleanup
+in drivers/clock and in DaVinci machine code that will depend
+on this.
+
+Thanks,
+Sekhar
+
+ drivers/mtd/nand/raw/davinci_nand.c | 25 +------------------------
+ 1 file changed, 1 insertion(+), 24 deletions(-)
+
+diff --git a/drivers/mtd/nand/raw/davinci_nand.c b/drivers/mtd/nand/raw/davinci_nand.c
+index 0f09518d980f..7255a0d94374 100644
+--- a/drivers/mtd/nand/raw/davinci_nand.c
++++ b/drivers/mtd/nand/raw/davinci_nand.c
+@@ -27,7 +27,6 @@
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+-#include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/mtd/rawnand.h>
+ #include <linux/mtd/partitions.h>
+@@ -55,7 +54,6 @@ struct davinci_nand_info {
+ 	struct nand_chip	chip;
  
--	struct completion	done;
+ 	struct device		*dev;
+-	struct clk		*clk;
+ 
+ 	bool			is_readmode;
+ 
+@@ -703,22 +701,6 @@ static int nand_davinci_probe(struct platform_device *pdev)
+ 	/* Use board-specific ECC config */
+ 	info->chip.ecc.mode	= pdata->ecc_mode;
+ 
+-	ret = -EINVAL;
 -
- 	const u8		*tx_buf;
- 	u8			*rx_buf;
- 	int			len;
-@@ -246,6 +244,30 @@ static int sun6i_spi_prepare_message(struct spi_master *master,
+-	info->clk = devm_clk_get(&pdev->dev, "aemif");
+-	if (IS_ERR(info->clk)) {
+-		ret = PTR_ERR(info->clk);
+-		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
+-		return ret;
+-	}
+-
+-	ret = clk_prepare_enable(info->clk);
+-	if (ret < 0) {
+-		dev_dbg(&pdev->dev, "unable to enable AEMIF clock, err %d\n",
+-			ret);
+-		goto err_clk_enable;
+-	}
+-
+ 	spin_lock_irq(&davinci_nand_lock);
+ 
+ 	/* put CSxNAND into NAND mode */
+@@ -732,7 +714,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
+ 	ret = nand_scan_ident(mtd, pdata->mask_chipsel ? 2 : 1, NULL);
+ 	if (ret < 0) {
+ 		dev_dbg(&pdev->dev, "no NAND chip(s) found\n");
+-		goto err;
++		return ret;
+ 	}
+ 
+ 	switch (info->chip.ecc.mode) {
+@@ -838,9 +820,6 @@ static int nand_davinci_probe(struct platform_device *pdev)
+ 	nand_cleanup(&info->chip);
+ 
+ err:
+-	clk_disable_unprepare(info->clk);
+-
+-err_clk_enable:
+ 	spin_lock_irq(&davinci_nand_lock);
+ 	if (info->chip.ecc.mode == NAND_ECC_HW_SYNDROME)
+ 		ecc4_busy = false;
+@@ -859,8 +838,6 @@ static int nand_davinci_remove(struct platform_device *pdev)
+ 
+ 	nand_release(nand_to_mtd(&info->chip));
+ 
+-	clk_disable_unprepare(info->clk);
+-
  	return 0;
  }
  
-+static int sun6i_spi_wait_for_transfer(struct spi_device *spi,
-+				       struct spi_transfer *tfr)
-+{
-+	struct spi_master *master = spi->master;
-+	unsigned int start, end, tx_time;
-+	unsigned int timeout;
-+
-+	/* smart wait for completion */
-+	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
-+	start = jiffies;
-+	timeout = wait_for_completion_timeout(&master->xfer_completion,
-+					      msecs_to_jiffies(tx_time));
-+	end = jiffies;
-+	if (!timeout) {
-+		dev_warn(&master->dev,
-+			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
-+			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
-+			 jiffies_to_msecs(end - start), tx_time);
-+		return -ETIMEDOUT;
-+	}
-+
-+	return 0;
-+}
-+
- static int sun6i_spi_transfer_one(struct spi_master *master,
- 				  struct spi_device *spi,
- 				  struct spi_transfer *tfr)
-@@ -266,7 +288,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 	if (tfr->len > sspi->fifo_depth)
- 		return -EMSGSIZE;
- 
--	reinit_completion(&sspi->done);
- 	sspi->tx_buf = tfr->tx_buf;
- 	sspi->rx_buf = tfr->rx_buf;
- 	sspi->len = tfr->len;
-@@ -346,21 +367,9 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
- 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
- 
--	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
--	start = jiffies;
--	timeout = wait_for_completion_timeout(&sspi->done,
--					      msecs_to_jiffies(tx_time));
--	end = jiffies;
--	if (!timeout) {
--		dev_warn(&master->dev,
--			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
--			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
--			 jiffies_to_msecs(end - start), tx_time);
--		ret = -ETIMEDOUT;
--		goto out;
--	}
-+	/* Wait for completion */
-+	ret = sun6i_spi_wait_for_transfer(spi, tfr);
- 
--out:
- 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
- 
- 	return ret;
-@@ -368,7 +377,8 @@ out:
- 
- static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
- {
--	struct sun6i_spi *sspi = dev_id;
-+	struct spi_master *master = dev_id;
-+	struct sun6i_spi *sspi = spi_master_get_devdata(master);
- 	u32 status;
- 
- 	status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
-@@ -377,7 +387,7 @@ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
- 	if (status & SUN6I_INT_CTL_TC) {
- 		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_TC);
- 		sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
--		complete(&sspi->done);
-+		spi_finalize_current_transfer(master);
- 		return IRQ_HANDLED;
- 	}
- 
-@@ -476,7 +486,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 	}
- 
- 	ret = devm_request_irq(&pdev->dev, irq, sun6i_spi_handler,
--			       0, dev_name(&pdev->dev), sspi);
-+			       0, dev_name(&pdev->dev), master);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Cannot request IRQ\n");
- 		goto err_free_master;
-@@ -498,8 +508,6 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 		goto err_free_master;
- 	}
- 
--	init_completion(&sspi->done);
--
- 	sspi->rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
- 	if (IS_ERR(sspi->rstc)) {
- 		dev_err(&pdev->dev, "Couldn't get reset controller\n");
 -- 
 2.16.2
