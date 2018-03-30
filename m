@@ -1,124 +1,32 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 30 Mar 2018 11:19:54 -0700
-Subject: [v3,4/4] watchdog: add Gateworks System Controller support
-In-Reply-To: <CAJ+vNU3ARKLK5AcssEP-_P8AmwnAnS8VtAEO1ppwum2jpCqAYQ@mail.gmail.com>
-References: <1522250043-8065-5-git-send-email-tharvey@gateworks.com>
- <20180330010757.GA12896@roeck-us.net>
- <CAJ+vNU3ARKLK5AcssEP-_P8AmwnAnS8VtAEO1ppwum2jpCqAYQ@mail.gmail.com>
-Message-ID: <20180330181954.GA17580@roeck-us.net>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Fri, 30 Mar 2018 22:54:44 +0300
+Subject: [PATCH] spi: stm32: Fix error handling in stm32_spi_probe()
+Message-ID: <1522439684-7510-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2018 at 10:49:38AM -0700, Tim Harvey wrote:
-> On Thu, Mar 29, 2018 at 6:07 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On Wed, Mar 28, 2018 at 08:14:03AM -0700, Tim Harvey wrote:
-> >> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> >> ---
-> >>  drivers/watchdog/Kconfig   |  10 ++++
-> >>  drivers/watchdog/Makefile  |   1 +
-> >>  drivers/watchdog/gsc_wdt.c | 146 +++++++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 157 insertions(+)
-> >>  create mode 100644 drivers/watchdog/gsc_wdt.c
-> >>
-> <snip>
-> >> +
-> >> +static const struct watchdog_info gsc_wdt_info = {
-> >> +     .options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING,
-> >
-> > Please confirm that WDIOF_MAGICCLOSE is not set on purpose.
-> >
-> >> +     .identity = "GSC Watchdog"
-> >> +};
-> >> +
-> <snip>
-> >> +
-> >> +static int gsc_wdt_probe(struct platform_device *pdev)
-> >> +{
-> >> +     struct gsc_dev *gsc = dev_get_drvdata(pdev->dev.parent);
-> >> +     struct device *dev = &pdev->dev;
-> >> +     struct gsc_wdt *wdt;
-> >> +     int ret;
-> >> +     unsigned int reg;
-> >> +
-> <snip>
-> >> +     /* ensure WD bit enabled */
-> >> +     if (regmap_read(gsc->regmap, GSC_CTRL_1, &reg))
-> >> +             return -EIO;
-> >> +     if (!(reg & (1 << GSC_CTRL_1_WDT_ENABLE))) {
-> >
-> > BIT()
-> >
-> >> +             dev_err(dev, "not enabled - must be manually enabled\n");
-> >
-> > This doesn't make sense. Bail out if the watchdog is disabled ? Why ?
-> >
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> <snip>
-> >> +
-> >> +     watchdog_set_nowayout(&wdt->wdt_dev, 1);
-> >
-> > WATCHDOG_NOWAYOUT ?
-> >
-> 
-> Guenter,
-> 
-> Thanks for the review!
-> 
-> The watchdog implementation of the GSC is such that it is enabled and
-> reset via a single non-volatile I2C register bit. If this bit is set
-> the watchdog will start ticking down automatically on board power up.
-> The register definitions don't provide a condition where it can be
-> enabled in a volatile way such that after board power-cycle it is
-> disabled again nor do they provide a separate register for enable vs
-> reset.
-> 
-> In the typical case the user boots the board, driver registers
-> watchdog, userspace watchdog daemon enables watchdog and it starts
-> ticking. User now powers down the board and later powers it back up.
-> The watchdog was enabled previously by userspace and the register is
-> non-volatile so the watchdog starts ticking before the kernel driver
-> and watchdog daemon yet the user breaks out into the bootloader or
-> boots a different OS without a watchdog daemon and the board resets
-> without them expecting it. The feature that the watchdog starts
-> ticking at board power-up before the CPU has even fetched code was
-> part of its design and was put there to work around some SoC errata
-> that can cause the CPU to fail to fetch boot code. This has caused me
-> to implement a watchdog driver that never actually 'enables' or
-> 'disables' the watchdog which is why there is no MAGIC CLOSE and why I
+clk_get_rate() is below clk_prepare_enable(), so
+its error should lead to goto err_clk_disable, not to err_master_put.
 
-Yet the driver does enable and disable the watchdog in its start and stop
-functions. And I have no idea what that has to do with the MAGICCLOSE
-functionality, which is quite orthogonal to the start/stop functionality.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-> always set nowayout. Its possible this is a fairly unique case of a
-> watchdog. The probe failure if the watchdog isn't enabled is because I
-> don't want a non-enabled watchdog to get enabled just because the
-> driver/daemon were there.
-> 
-Huh ? The whole purpose of a watchdog is for it to be enabled when
-the watchdog device is opened.
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+---
+ drivers/spi/spi-stm32.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> I agree it's a very strange behavior and I'm not sure how to best
-> document or support it with the Linux watchdog API. I welcome any
-> recomendations!
-> 
-
-Sorry, I fail to understand your logic.
-
-You do not explain why your code bails out if the watchdog is not already
-running. That does not make sense.
-
-You are saying that you don't want the watchdog driver to enable the watchdog.
-Since its whole purpose is to enable the watchdog if/when the watchdog device
-is opened, that doesn't make sense either.
-
-At the same time, you do not tell the watchdog core that the watchdog is
-already running, meaning the system _will_ reboot unless the watchdog
-device is opened within the watchdog timeout period. Again, that does not
-make sense.
-
-Maybe it all makes sense to you, but not to me, sorry.
-
-Guenter
+diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c
+index ba9743fa2326..ad1e55d3d5d5 100644
+--- a/drivers/spi/spi-stm32.c
++++ b/drivers/spi/spi-stm32.c
+@@ -1129,7 +1129,7 @@ static int stm32_spi_probe(struct platform_device *pdev)
+ 	if (!spi->clk_rate) {
+ 		dev_err(&pdev->dev, "clk rate = 0\n");
+ 		ret = -EINVAL;
+-		goto err_master_put;
++		goto err_clk_disable;
+ 	}
+ 
+ 	spi->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+-- 
+2.7.4
