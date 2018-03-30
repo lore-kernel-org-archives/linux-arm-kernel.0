@@ -1,20 +1,54 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 30 Mar 2018 09:51:51 +0200
-Subject: [PATCH] dt-bindings: rcar-dmac: Document r8a77470 support
-In-Reply-To: <1522318266-45281-1-git-send-email-biju.das@bp.renesas.com>
-References: <1522318266-45281-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAMuHMdVCtk4R-n8eXOH_A=xz+5B+P+8+AJ45hpycS40EWQ2niA@mail.gmail.com>
+Date: Fri, 30 Mar 2018 09:58:31 +0200
+Subject: [PATCH v3 1/8] DT: mfd: renesas,rzn1-sysctrl: document RZ/N1
+ sysctrl node
+In-Reply-To: <1522309629-10152-2-git-send-email-michel.pollet@bp.renesas.com>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-2-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdXeLNBfBaW32-UK9gx_HFrqEA7ChDPp8mtQCHD0PiJ8Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2018 at 12:11 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> Renesas  RZ/G SoC also have the R-Car gen2/3 compatible DMA controllers.
-> Document RZ/G1C (also known as R8A77470) SoC bindings.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Hi Michel,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Mar 29, 2018 at 9:46 AM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> The Renesas RZ/N1 Family (Part #R9A06G0xx) has a multi-function
+> system controller. This documents the node used to encapsulate
+> it's sub drivers.
+>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+
+Thanks for your patch!
+
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
+> @@ -0,0 +1,19 @@
+> +DT bindings for the Renesas RZ/N1 System Controller
+> +
+> +== System Controller Node ==
+> +
+> +The system controller node currently only hosts a single sub-node to handle
+> +the rebooting of the CPU. Eventually it will host the clock driver, SMP
+> +start handler, watchdog etc.
+> +
+> +See renesas,rzn1-reboot.txt for further details.
+> +
+> +Bindings:
+> ++ Required:
+> +       compatible = "renesas,rzn1-sysctrl", "syscon", "simple-mfd";
+
+You should list the supported SoC-specific compatible values here.
+
+> +
+> +Example:
+> +       sysctrl: sysctrl at 4000c000 {
+> +               compatible = "renesas,rzn1-sysctrl", "syscon", "simple-mfd";
+
+Missing SoC-specific compatible value.
+
+> +               reg = <0x4000c000 0x1000>;
+> +       };
 
 Gr{oetje,eeting}s,
 
