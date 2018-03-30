@@ -1,19 +1,43 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 30 Mar 2018 12:32:58 -0400 (EDT)
-Subject: [PATCH net-next] dt-bindings: net: renesas-ravb: Add support
- for r8a77470 SoC
-In-Reply-To: <1522317775-35671-1-git-send-email-biju.das@bp.renesas.com>
-References: <1522317775-35671-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20180330.123258.681696358960701155.davem@davemloft.net>
+From: aford173@gmail.com (Adam Ford)
+Date: Fri, 30 Mar 2018 11:52:34 -0500
+Subject: [PATCH] ARM: dts: da850-evm: add WP and CD to MMC
+Message-ID: <1522428754-28337-1-git-send-email-aford173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
-Date: Thu, 29 Mar 2018 11:02:55 +0100
+The legacy mode uses the write protect and card detect but DT
+has not.  This patch enables the pinmuxing and detection for
+WP and CD.
 
-> Add a new compatible string for the RZ/G1C (R8A77470) SoC.
-> 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Adam Ford <aford173@gmail.com>
 
-Applied.
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index c82368c..1030788 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -42,6 +42,12 @@
+ 					0x04 0x00011000 0x000ff000
+ 				>;
+ 			};
++			mmc0_cd_wp_pins: pinmux_mmc0_cd_wp_pins {
++				pinctrl-single,bits = <
++					/* GP4[0], GP4[1]*/
++					0x28 0x88000000 0xff000000
++					>;
++			};
+ 			nand_pins: nand_pins {
+ 				pinctrl-single,bits = <
+ 					/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[4], EMA_CS[3] */
+@@ -106,7 +112,9 @@
+ 			bus-width = <4>;
+ 			status = "okay";
+ 			pinctrl-names = "default";
+-			pinctrl-0 = <&mmc0_pins>;
++			pinctrl-0 = <&mmc0_pins &mmc0_cd_wp_pins>;
++			cd-gpios = <&gpio 64 GPIO_ACTIVE_LOW>;
++			wp-gpios = <&gpio 65 GPIO_ACTIVE_HIGH>;
+ 		};
+ 		spi1: spi at 30e000 {
+ 			status = "okay";
+-- 
+2.7.4
