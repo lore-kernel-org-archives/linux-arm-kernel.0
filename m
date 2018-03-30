@@ -1,51 +1,138 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 30 Mar 2018 10:29:58 -0400
-Subject: [PATCH] io: prevent compiler reordering on the default writeX()
- implementation
-Message-ID: <1522420199-23548-1-git-send-email-okaya@codeaurora.org>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Fri, 30 Mar 2018 15:50:45 +0300
+Subject: [PATCH v2 4/6] spi: sun6i: use completion provided by SPI core
+In-Reply-To: <20180330125047.13936-1-ssuloev@orpaltech.com>
+References: <20180330125047.13936-1-ssuloev@orpaltech.com>
+Message-ID: <20180330125047.13936-5-ssuloev@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default implementation of mapping writeX() to __raw_writeX() is wrong.
-writeX() has stronger ordering semantics. Compiler is allowed to reorder
-__raw_writeX().
+As long as the completion is already provided by the SPI core
+then there is no need to waste extra-memory on this.
+Also a waiting function was added to avoid code duplication.
 
-In the abscence of a write barrier or when using a strongly ordered
-architecture, writeX() should at least have a compiler barrier in
-it to prevent commpiler from clobbering the execution order.
+Changes in v2:
+1) Fixed issue with passing an invalid argument into devm_request_irq()
+function.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+
 ---
- include/asm-generic/io.h | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/spi/spi-sun6i.c | 52 ++++++++++++++++++++++++++++---------------------
+ 1 file changed, 30 insertions(+), 22 deletions(-)
 
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index b4531e3..fbbf2bb 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -153,6 +153,7 @@ static inline void writeb(u8 value, volatile void __iomem *addr)
- static inline void writew(u16 value, volatile void __iomem *addr)
- {
- 	__raw_writew(cpu_to_le16(value), addr);
-+	barrier();
- }
- #endif
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index 4db1f20..210cef9 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -99,8 +99,6 @@ struct sun6i_spi {
+ 	struct clk		*mclk;
+ 	struct reset_control	*rstc;
  
-@@ -161,6 +162,7 @@ static inline void writew(u16 value, volatile void __iomem *addr)
- static inline void writel(u32 value, volatile void __iomem *addr)
- {
- 	__raw_writel(__cpu_to_le32(value), addr);
-+	barrier();
+-	struct completion	done;
+-
+ 	const u8		*tx_buf;
+ 	u8			*rx_buf;
+ 	int			len;
+@@ -246,6 +244,30 @@ static int sun6i_spi_prepare_message(struct spi_master *master,
+ 	return 0;
  }
- #endif
  
-@@ -170,6 +172,7 @@ static inline void writel(u32 value, volatile void __iomem *addr)
- static inline void writeq(u64 value, volatile void __iomem *addr)
++static int sun6i_spi_wait_for_transfer(struct spi_device *spi,
++				       struct spi_transfer *tfr)
++{
++	struct spi_master *master = spi->master;
++	unsigned int start, end, tx_time;
++	unsigned int timeout;
++
++	/* smart wait for completion */
++	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
++	start = jiffies;
++	timeout = wait_for_completion_timeout(&master->xfer_completion,
++					      msecs_to_jiffies(tx_time));
++	end = jiffies;
++	if (!timeout) {
++		dev_warn(&master->dev,
++			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
++			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
++			 jiffies_to_msecs(end - start), tx_time);
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
+ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 				  struct spi_device *spi,
+ 				  struct spi_transfer *tfr)
+@@ -266,7 +288,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	if (tfr->len > sspi->fifo_depth)
+ 		return -EMSGSIZE;
+ 
+-	reinit_completion(&sspi->done);
+ 	sspi->tx_buf = tfr->tx_buf;
+ 	sspi->rx_buf = tfr->rx_buf;
+ 	sspi->len = tfr->len;
+@@ -346,21 +367,9 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+ 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
+ 
+-	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
+-	start = jiffies;
+-	timeout = wait_for_completion_timeout(&sspi->done,
+-					      msecs_to_jiffies(tx_time));
+-	end = jiffies;
+-	if (!timeout) {
+-		dev_warn(&master->dev,
+-			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
+-			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
+-			 jiffies_to_msecs(end - start), tx_time);
+-		ret = -ETIMEDOUT;
+-		goto out;
+-	}
++	/* Wait for completion */
++	ret = sun6i_spi_wait_for_transfer(spi, tfr);
+ 
+-out:
+ 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
+ 
+ 	return ret;
+@@ -368,7 +377,8 @@ out:
+ 
+ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
  {
- 	__raw_writeq(__cpu_to_le64(value), addr);
-+	barrier();
- }
- #endif
- #endif /* CONFIG_64BIT */
+-	struct sun6i_spi *sspi = dev_id;
++	struct spi_master *master = dev_id;
++	struct sun6i_spi *sspi = spi_master_get_devdata(master);
+ 	u32 status;
+ 
+ 	status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
+@@ -377,7 +387,7 @@ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
+ 	if (status & SUN6I_INT_CTL_TC) {
+ 		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_TC);
+ 		sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
+-		complete(&sspi->done);
++		spi_finalize_current_transfer(master);
+ 		return IRQ_HANDLED;
+ 	}
+ 
+@@ -476,7 +486,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	ret = devm_request_irq(&pdev->dev, irq, sun6i_spi_handler,
+-			       0, dev_name(&pdev->dev), sspi);
++			       0, dev_name(&pdev->dev), master);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Cannot request IRQ\n");
+ 		goto err_free_master;
+@@ -498,8 +508,6 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 		goto err_free_master;
+ 	}
+ 
+-	init_completion(&sspi->done);
+-
+ 	sspi->rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+ 	if (IS_ERR(sspi->rstc)) {
+ 		dev_err(&pdev->dev, "Couldn't get reset controller\n");
 -- 
-2.7.4
+2.16.2
