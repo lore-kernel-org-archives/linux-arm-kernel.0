@@ -1,86 +1,93 @@
 From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 31 Mar 2018 00:04:11 +0300
-Subject: [PATCH v6 7/9] gpio: Add gpio driver for Actions OWL S900 SoC
-In-Reply-To: <20180328174703.19778-8-manivannan.sadhasivam@linaro.org>
+Date: Sat, 31 Mar 2018 00:16:49 +0300
+Subject: [PATCH v6 3/9] pinctrl: actions: Add Actions S900 pinctrl driver
+In-Reply-To: <20180328174703.19778-4-manivannan.sadhasivam@linaro.org>
 References: <20180328174703.19778-1-manivannan.sadhasivam@linaro.org>
- <20180328174703.19778-8-manivannan.sadhasivam@linaro.org>
-Message-ID: <CAHp75VeGv04CA3f1pRDi35DsbRgrdj86TBUBZ3J+27T822cOqw@mail.gmail.com>
+ <20180328174703.19778-4-manivannan.sadhasivam@linaro.org>
+Message-ID: <CAHp75VeRh9hORs=4nPqc=rUOCRzAfp0z2_1_xpJUScAeE07yqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 8:47 PM, Manivannan Sadhasivam
+On Wed, Mar 28, 2018 at 8:46 PM, Manivannan Sadhasivam
 <manivannan.sadhasivam@linaro.org> wrote:
-> Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
-> controlling the gpio shares the same register range with pinctrl block.
+> Add pinctrl driver for Actions Semi S900 SoC. The driver supports
+> pinctrl, pinmux and pinconf functionalities through a range of registers
+> common to both gpio driver and pinctrl driver.
 >
-> GPIO registers are organized as 6 banks and each bank controls the
-> maximum of 32 gpios.
->
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Pinmux functionality is available only for the pin groups while the
+> pinconf functionality is available for both pin groups and individual
+> pins.
 
-> +static void owl_gpio_update_reg(void __iomem *base, unsigned int pin, int flag)
+> +static void owl_update_bits(void __iomem *base, u32 mask, u32 val)
 > +{
-> +       u32 val;
+> +       u32 reg_val;
 > +
-> +       val = readl_relaxed(base);
+> +       reg_val = readl_relaxed(base);
 > +
-> +       if (flag)
-> +               val |= BIT(pin);
-> +       else
-> +               val &= ~BIT(pin);
+> +       reg_val &= ~mask;
+> +       reg_val |= val;
+
+Usual pattern here is
+
+reg_val = (reg_val & ~mask) | (val & mask);
+
+This will allow to avoid possible overflow.
+
 > +
-> +       writel_relaxed(val, base);
+> +       writel_relaxed(reg_val, base);
 > +}
 
-Hmm... Just realized that this driver misses locking.
+> +       tmp = readl_relaxed(pctrl->base + reg);
+> +       mask = (1 << width) - 1;
+> +       arg = (tmp >> bit) & mask;
+
+This looks like a candidate for a helper function. You have at least
+one more same code.
 
 Something like
-owl_gpio_update_reg_locked()
-{
- spin_lock();
- owl_gpio_update_reg();
- spin_unlock();
-}
 
+..._read_field(reg, mask, shift)
+
+
+> +               mask = (1 << width) - 1;
+> +               mask = mask << bit;
 > +
-> +static int owl_gpio_request(struct gpio_chip *chip, unsigned int offset)
-> +{
-> +       struct owl_gpio *gpio = gpiochip_get_data(chip);
+> +               owl_update_bits(pctrl->base + reg, mask, (arg << bit));
+
+Similar here,
+
+..._write_field(regm mask, shift, arg)
+
+> +       tmp = readl_relaxed(pctrl->base + reg);
+> +       mask = (1 << width) - 1;
+> +       arg = (tmp >> bit) & mask;
+
+> +               mask = (1 << width) - 1;
+> +               mask = mask << bit;
 > +
-> +       /*
-> +        * GPIOs have higher priority over other modules, so either setting
-> +        * them as OUT or IN is sufficient
-> +        */
-> +       owl_gpio_update_reg(gpio->base + GPIO_OUTEN, offset, true);
+> +               owl_update_bits(pctrl->base + reg, mask, (arg << bit));
 
-...to use in such cases.
+> +static const struct pinconf_ops owl_pinconf_ops = {
+> +       .is_generic = true,
+> +       .pin_config_get = owl_pin_config_get,
+> +       .pin_config_set = owl_pin_config_set,
+> +       .pin_config_group_get = owl_group_config_get,
+> +       .pin_config_group_set = owl_group_config_set
 
+It's still good idea to leave comma here...
+
+> +};
 > +
-> +       return 0;
-> +}
+> +static struct pinctrl_desc owl_pinctrl_desc = {
+> +       .pctlops = &owl_pinctrl_ops,
+> +       .pmxops = &owl_pinmux_ops,
+> +       .confops = &owl_pinconf_ops,
+> +       .owner = THIS_MODULE
+
+...and here, and in all similar places.
+
+> +};
 > +
-> +static void owl_gpio_free(struct gpio_chip *chip, unsigned int offset)
-> +{
-> +       struct owl_gpio *gpio = gpiochip_get_data(chip);
-> +
-> +       /* disable gpio output */
-> +       owl_gpio_update_reg(gpio->base + GPIO_OUTEN, offset, false);
-> +
-> +       /* disable gpio input */
-> +       owl_gpio_update_reg(gpio->base + GPIO_INEN, offset, false);
-
-...or
-
-spin_lock();
-owl_gpio_update_reg();
-owl_gpio_update_reg();
-spin_unlock();
-
-...in this and similar cases.
-
-> +}
-
 
 -- 
 With Best Regards,
