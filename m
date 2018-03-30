@@ -1,17 +1,19 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 30 Mar 2018 09:02:52 +0200
-Subject: [PATCH] dt-bindings: rcar-dmac: Document r8a77470 support
-In-Reply-To: <1522318266-45281-1-git-send-email-biju.das@bp.renesas.com>
-References: <1522318266-45281-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20180330070252.whmli57ubaakp4r5@verge.net.au>
+Date: Fri, 30 Mar 2018 09:18:13 +0200
+Subject: [PATCH v3 5/8] arm: shmobile: Add the RZ/N1 arch to the shmobile
+ Kconfig
+In-Reply-To: <1522309629-10152-6-git-send-email-michel.pollet@bp.renesas.com>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-6-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <20180330071813.ov5356yaocqptbkx@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2018 at 11:11:06AM +0100, Biju Das wrote:
-> Renesas  RZ/G SoC also have the R-Car gen2/3 compatible DMA controllers.
-> Document RZ/G1C (also known as R8A77470) SoC bindings.
+On Thu, Mar 29, 2018 at 08:47:01AM +0100, Michel Pollet wrote:
+> Add the RZ/N1 Family (Part #R9A06G0xx) ARCH config to the rest of
+> the Renesas SoC collection.
 > 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Thanks, applied.
