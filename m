@@ -1,83 +1,78 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 30 Mar 2018 18:24:25 +0300
-Subject: [PATCH V7 00/13] drivers: Boot Constraint core
-In-Reply-To: <20180323150420.GA21152@kroah.com>
-References: <cover.1519380923.git.viresh.kumar@linaro.org>
- <20180322012606.vuaemu3pvpeojtwr@vireshk-mac-ubuntu>
- <20180323150420.GA21152@kroah.com>
-Message-ID: <cbcfeb15-d940-f066-739d-25adfe09f019@linaro.org>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 30 Mar 2018 17:28:48 +0200
+Subject: [PATCH v5 0/8] ARM: davinci: complete the conversion to using the
+ reset framework
+Message-ID: <20180330152856.12297-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg and Viresh,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On 03/23/2018 05:04 PM, Greg Kroah-Hartman wrote:
-> On Thu, Mar 22, 2018 at 09:26:06AM +0800, Viresh Kumar wrote:
->> On 23-02-18, 15:53, Viresh Kumar wrote:
->>> Problem statement:
->>>
->>> Some devices are powered ON by the bootloader before the bootloader
->>> handovers control to Linux. It maybe important for some of those devices
->>> to keep working until the time a Linux device driver probes the device
->>> and reconfigure its resources.
->>>
->>> A typical example of that can be the LCD controller, which is used by
->>> the bootloaders to show image(s) while the platform is booting into
->>> Linux.  The LCD controller can be using some resources, like clk,
->>> regulators, etc, that are shared between several devices. These shared
->>> resources should be configured to satisfy need of all the users.  If
->>> another device's (X) driver gets probed before the LCD controller driver
->>> in this case, then it may end up disabling or reconfiguring these
->>> resources to ranges satisfying the current users (only device X) and
->>> that can make the LCD screen unstable.
->>>
->>> Another case can be a debug serial port enabled from the bootloader.
->>>
->>> Of course we can have more complex cases where the same resource is
->>> getting used by two devices while the kernel boots and the order in
->>> which devices get probed wouldn't matter as the other device will surely
->>> break then.
->>
->> And we have a _real_ use case for this complex scenario as well.
->>
->> Georgi (cc'd) is currently working[1] on implementing generic support for the
->> interconnect bus, which tries to play with the bandwidth of the bus based on how
->> much are the requirements from different parts of the SoC. The 4th version was
->> posted recently by him, and things are looking good/positive.
->>
->> The bootloader configures the interconnect to provide sufficient bandwidth for
->> all the devices which are used during boot, few of them are the CPUs, serial and
->> the LCD controller. As the kernel starts taking control of things, the drivers
->> being probed start putting their requirements on the interconnect bus.  Because
->> the interconnect doesn't have any representation from the devices which are not
->> yet initialized by the kernel, the interconnect core incorrectly reduces the
->> bandwidth of the bus to a level unacceptable to the devices running currently,
->> like the CPUs and this makes kernel boot awfully slow. This is not an ordering
->> problem as no matter which device we probe first, we are going to break
->> something else.
+This series converts the only user of the handcoded, mach-specific reset
+routines in the davinci platform to using the reset framework.
 
-The interconnect core takes requests from consumer drivers for their
-bandwidth needs and configures the hardware to keep the lowest possible
-power profile. I think that the boot constraint patches would be useful
-to make a board run at maximum performance during boot, until all
-consumer drivers are probed and all bandwidth requests are taken into
-account.
+Patches 1-3 add necessary lookups/DT-properties.
 
->> Georgi already tried using the boot constraint patches to solve this complex
->> problem, and its a perfect fit.
+Patches 4-6 fix issues found in the remoteproc davinci driver.
 
-These patches solve a common problem for different subsystems, so it
-makes sense to handle it into the driver core, instead of leaving each
-subsystem to do their own hacks.
+Patch 7 converts the davinci-rproc driver to the reset framework.
 
-> I'm delaying this as I still don't see that "perfect fit" yet.  If there
-> are add-on patches that take better advantage of this, great, let's see
-> those, but right now, it feels like you are the only one wanting this.
-> And the increased complexity overall seems not really worth it yet :(
+Patch 8 removes now dead code.
 
-The interconnect code is still under review, but on the next submission
-i will include a patch to make use of the boot constraints, so that we
-hopefully move this forward.
+Tested both in DT and legacy modes by booting the examples from
+ti-ipc-rtos recipe in meta-ti.
 
-Thanks,
-Georgi
+This series applies on top of David Lechner's common-clk-v9 branch[1]
+with Philipp Zabel's reset/next branch[2] pulled in.
+
+It can be found in my github tree as well[3].
+
+[1] git://github.com/dlech/ev3dev-kernel.git common-clk-v9
+[2] git://git.pengutronix.de/git/pza/linux reset/next
+[3] git at github.com:brgl/linux.git topic/davinci-reset
+
+v1 -> v2:
+- fixed the device tree patches the descriptions of which were mixed up
+- return -EPROBE_DEFER from davinci-rproc's probe() if we can't get the
+  reset provider, since it's possible that the lookup table was not yet
+  registered
+- made the local variable naming consistent in the davinci-rproc driver
+- fixed a typo in PATCH 5/8
+
+v2 -> v3:
+- modify PATCH 1/8: drop the provider argument from the function adding
+  lookup entries and instead pass the provider name to the RESET_LOOKUP
+  macro, return -EPROBE_DEFER if we locate a correct lookup entry but
+  cannot get the corresponding reset controller
+- modify the reset lookup entry in psc-da850
+- don't manually return -EPROBE_DEFER from davinci-rproc, instead don't
+  emit an error message if devm_reset_control_get_exclusive() returns
+  this error code
+
+v3 -> v4:
+- make index the second parameter in RESET_LOOKUP() (right after the
+  provider name)
+
+v4 -> v5:
+- fix a bug where the dsp_reset object correctly stored in drproc struct
+
+Bartosz Golaszewski (8):
+  ARM: davinci: dts: make psc0 a reset provider
+  ARM: davinci: dts: add a reset control to the dsp node
+  clk: davinci: add a reset lookup table for psc0
+  remoteproc/davinci: add the missing retval check for clk_enable()
+  remoteproc/davinci: prepare and unprepare the clock where needed
+  remoteproc/davinci: use octal permissions for module_param()
+  remoteproc/davinci: use the reset framework
+  clk: davinci: kill davinci_clk_reset_assert/deassert()
+
+ arch/arm/boot/dts/da850.dtsi               |  2 ++
+ arch/arm/mach-davinci/include/mach/clock.h | 21 --------------
+ drivers/clk/davinci/psc-da850.c            |  7 +++++
+ drivers/clk/davinci/psc.c                  | 19 +-----------
+ drivers/remoteproc/da8xx_remoteproc.c      | 46 ++++++++++++++++++++++++------
+ 5 files changed, 48 insertions(+), 47 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+
+-- 
+2.16.3
