@@ -1,19 +1,20 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 30 Mar 2018 17:39:06 +0800
-Subject: [PATCH v3 1/3] regulator: axp20x: add drivevbus support for axp803
-In-Reply-To: <1513011400-4120-1-git-send-email-jagan@amarulasolutions.com>
-References: <1513011400-4120-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <CAGb2v66xYHHXWkLdovXVsQNPfsJSgZReTUYp_UH=LOk9_MXMCw@mail.gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Fri, 30 Mar 2018 18:44:11 +0900
+Subject: [PATCH 0/3] clk: uniphier: add support for PCIe, SATA and ethernet
+Message-ID: <1522403054-18691-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 12, 2017 at 12:56 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> Like axp221, axp223, axp813 the axp803 is also supporting external
-> regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
->
-> Add support for it.
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+Add clock lines for PCI-express and SATA controllers implemented on
+UniPhier SoCs, and additional clock lines for ethernet controller on Pro4.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Kunihiko Hayashi (3):
+  clk: uniphier: add PCIe clock control support
+  clk: uniphier: add SATA clock control support
+  clk: uniphier: add additional ethernet clock lines for Pro4
+
+ drivers/clk/uniphier/clk-uniphier-sys.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+-- 
+2.7.4
