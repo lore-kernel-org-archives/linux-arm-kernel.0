@@ -1,53 +1,87 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 30 Mar 2018 13:37:36 -0700
-Subject: [PATCH v4 1/5] drm/blend: Add a generic alpha property
-In-Reply-To: <402e596049beb3429faf5981682d902c70325274.1520974361.git-series.maxime.ripard@bootlin.com>
-References: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
- <402e596049beb3429faf5981682d902c70325274.1520974361.git-series.maxime.ripard@bootlin.com>
-Message-ID: <87vadd5mgf.fsf@anholt.net>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sat, 31 Mar 2018 00:04:11 +0300
+Subject: [PATCH v6 7/9] gpio: Add gpio driver for Actions OWL S900 SoC
+In-Reply-To: <20180328174703.19778-8-manivannan.sadhasivam@linaro.org>
+References: <20180328174703.19778-1-manivannan.sadhasivam@linaro.org>
+ <20180328174703.19778-8-manivannan.sadhasivam@linaro.org>
+Message-ID: <CAHp75VeGv04CA3f1pRDi35DsbRgrdj86TBUBZ3J+27T822cOqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@bootlin.com> writes:
-
-> Some drivers duplicate the logic to create a property to store a per-plane
-> alpha.
+On Wed, Mar 28, 2018 at 8:47 PM, Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
+> Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
+> controlling the gpio shares the same register range with pinctrl block.
 >
-> This is especially useful if we ever want to support extra protocols for
-> Wayland like:
-> https://lists.freedesktop.org/archives/wayland-devel/2017-August/034741.html
+> GPIO registers are organized as 6 banks and each bank controls the
+> maximum of 32 gpios.
 >
-> Let's create a helper in order to move that to the core.
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-> diff --git a/drivers/gpu/drm/drm_blend.c b/drivers/gpu/drm/drm_blend.c
-> index 5a81e1b4c076..05eda2d57c77 100644
-> --- a/drivers/gpu/drm/drm_blend.c
-> +++ b/drivers/gpu/drm/drm_blend.c
-> @@ -88,6 +88,12 @@
->   * On top of this basic transformation additional properties can be exposed by
->   * the driver:
->   *
-> + * alpha:
-> + * 	Alpha is setup with drm_plane_create_alpha_property(). It controls the
+> +static void owl_gpio_update_reg(void __iomem *base, unsigned int pin, int flag)
+> +{
+> +       u32 val;
+> +
+> +       val = readl_relaxed(base);
+> +
+> +       if (flag)
+> +               val |= BIT(pin);
+> +       else
+> +               val &= ~BIT(pin);
+> +
+> +       writel_relaxed(val, base);
+> +}
 
-s/setup/set up/
+Hmm... Just realized that this driver misses locking.
 
-> + * 	plane-wide opacity, from transparent (0) to opaque (0xffff). It can be
-> + * 	combined with pixel alpha.
-> + * 	The alpha value is represented as premultiplied alpha.
+Something like
+owl_gpio_update_reg_locked()
+{
+ spin_lock();
+ owl_gpio_update_reg();
+ spin_unlock();
+}
 
-I don't think this premultiplied comment makes any sense.  What are you
-saying it's premultiplied with?  Maybe you mean that the output pixels
-will have both their color and alpha channels multiplied by this alpha?
-I'd just drop it.
+> +
+> +static int owl_gpio_request(struct gpio_chip *chip, unsigned int offset)
+> +{
+> +       struct owl_gpio *gpio = gpiochip_get_data(chip);
+> +
+> +       /*
+> +        * GPIOs have higher priority over other modules, so either setting
+> +        * them as OUT or IN is sufficient
+> +        */
+> +       owl_gpio_update_reg(gpio->base + GPIO_OUTEN, offset, true);
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
+...to use in such cases.
 
-We should probably do this property for vc4 at some point, too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180330/249a4627/attachment.sig>
+> +
+> +       return 0;
+> +}
+> +
+> +static void owl_gpio_free(struct gpio_chip *chip, unsigned int offset)
+> +{
+> +       struct owl_gpio *gpio = gpiochip_get_data(chip);
+> +
+> +       /* disable gpio output */
+> +       owl_gpio_update_reg(gpio->base + GPIO_OUTEN, offset, false);
+> +
+> +       /* disable gpio input */
+> +       owl_gpio_update_reg(gpio->base + GPIO_INEN, offset, false);
+
+...or
+
+spin_lock();
+owl_gpio_update_reg();
+owl_gpio_update_reg();
+spin_unlock();
+
+...in this and similar cases.
+
+> +}
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
