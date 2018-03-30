@@ -1,37 +1,58 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 30 Mar 2018 13:07:14 +0200
-Subject: [PATCH v3 0/8] ARM: davinci: complete the conversion to using the
- reset framework
-In-Reply-To: <6166e140-b417-dd22-10cf-843db3958226@lechnology.com>
-References: <20180327092031.11251-1-brgl@bgdev.pl>
- <6166e140-b417-dd22-10cf-843db3958226@lechnology.com>
-Message-ID: <CAMRc=Me-+oDi7R-=sSbKU45EFDv04X2rswksLD2N1rnbYrZo2A@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 30 Mar 2018 13:09:31 +0200
+Subject: [PATCH 3/3] iio: adc: meson-axg: add saradc driver
+In-Reply-To: <20180326084629.100070-4-yixun.lan@amlogic.com>
+References: <20180326084629.100070-1-yixun.lan@amlogic.com>
+ <20180326084629.100070-4-yixun.lan@amlogic.com>
+Message-ID: <CAFBinCCK+Y0QAHcGDXvXvSqChS91XK5C6d5XunkmUVBQa4nn+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-27 18:48 GMT+02:00 David Lechner <david@lechnology.com>:
-> Wasn't there a v4 already? Is this really v5 instead of v3?
+On Mon, Mar 26, 2018 at 10:46 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+> From: Xingyu Chen <xingyu.chen@amlogic.com>
 >
-
-Yes there was and Philipp applied the v4 alright.
-
+> Add the SAR ADC driver for the Amlogic Meson-AXG SoC.
 >
-> On 03/27/2018 04:20 AM, Bartosz Golaszewski wrote:
->>
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> This series converts the only user of the handcoded, mach-specific reset
->> routines in the davinci platform to using the reset framework.
->>
->> Patches 1-3 add necessary lookups/DT-properties.
->
->
-> Should I just squash the DT changes into my common-clock-v9 branch
-> since those patches haven't been picked up yet anyway? That will be
-> 2 fewer patches to keep track of.
+> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+I suggest changing the subject of this patch to:
+iio: adc: meson-saradc: add support for Meson AXG
 
-I would personally prefer to keep the changesets thematically
-separate. The clock series is big anyway already.
+(because "iio: adc: meson-axg" does not point to the "meson-saradc"
+driver and no new driver is added with this patch)
 
-Thanks,
-Bartosz
+with that:
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+
+> ---
+>  drivers/iio/adc/meson_saradc.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+> index 799ed929ab99..a5d481a2b4ef 100644
+> --- a/drivers/iio/adc/meson_saradc.c
+> +++ b/drivers/iio/adc/meson_saradc.c
+> @@ -935,6 +935,11 @@ static const struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+>         .name = "meson-gxm-saradc",
+>  };
+>
+> +static const struct meson_sar_adc_data meson_sar_adc_axg_data = {
+> +       .param = &meson_sar_adc_gxl_param,
+> +       .name = "meson-axg-saradc",
+> +};
+> +
+>  static const struct of_device_id meson_sar_adc_of_match[] = {
+>         {
+>                 .compatible = "amlogic,meson8-saradc",
+> @@ -953,6 +958,9 @@ static const struct of_device_id meson_sar_adc_of_match[] = {
+>         }, {
+>                 .compatible = "amlogic,meson-gxm-saradc",
+>                 .data = &meson_sar_adc_gxm_data,
+> +       }, {
+> +               .compatible = "amlogic,meson-axg-saradc",
+> +               .data = &meson_sar_adc_axg_data,
+>         },
+>         {},
+>  };
+> --
+> 2.15.1
+>
