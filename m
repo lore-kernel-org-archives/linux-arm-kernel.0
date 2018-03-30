@@ -1,48 +1,28 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 30 Mar 2018 12:01:18 +0200
-Subject: [PATCH v3 0/6] Add support for PWM input capture on STM32
-Message-ID: <1522404084-24903-1-git-send-email-fabrice.gasnier@st.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 30 Mar 2018 18:33:32 +0800
+Subject: [PATCH v2 0/2] net: mvneta: improve suspend/resume
+Message-ID: <20180330183332.3e180a1a@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for capture to stm32-pwm driver.
-Capture is based on DMAs.
-- First two patches add support for requesting DMAs to MFD core
-- Next three patches add support for capture to stm32-pwm driver
-- This has been tested on stm32429i-eval board.
+This series tries to optimize the mvneta's suspend/resume
+implementation by only taking necessary actions.
 
----
-Changes in v3:
-- Dropped 2 precusor patches applied by Thierry in pwm tree:
-  "pwm: stm32: fix, remove unused struct device"
-  "pwm: stm32: protect common prescaler for all channels"
-- Note: this series applies on top on pwm tree
-- Implements Lee's comments on MFD part: rework stm32_timers_dma struct,
-  exported routine prototype now use generic device struct, more
-  various comments (see patch 2 changelog).
+Since v1:
+ - unify ret check
+ - try best to keep the suspend/resume behavior
+ - split txq deinit into sw/hw parts as well
+ - adjust mvneta_stop_dev() location
 
-Resend v2:
-- Add collected Acks
+I didn't add Thomas's Ack tag to patch1, because in v2, I added new code
+to split the txq deinit into two parts.
 
-Changes in v2:
-- Abstract DMA handling from child driver: move it to MFD core
-- Rework pwm capture routines to adopt this change
-- Comment on optional dma support, beautify DMAs probe
+Jisheng Zhang (2):
+  net: mvneta: split rxq/txq init and txq deinit into SW and HW parts
+  net: mvneta: improve suspend/resume
 
-Fabrice Gasnier (6):
-  dt-bindings: mfd: stm32-timers: add support for dmas
-  mfd: stm32-timers: add support for dmas
-  pwm: stm32: add capture support
-  pwm: stm32: improve capture by tuning counter prescaler
-  pwm: stm32: use input prescaler to improve period capture
-  ARM: dts: stm32: Enable pwm3 input capture on stm32f429i-eval
-
- .../devicetree/bindings/mfd/stm32-timers.txt       |  20 ++
- arch/arm/boot/dts/stm32429i-eval.dts               |   3 +
- drivers/mfd/stm32-timers.c                         | 219 +++++++++++++++++-
- drivers/pwm/pwm-stm32.c                            | 257 +++++++++++++++++++++
- include/linux/mfd/stm32-timers.h                   |  44 ++++
- 5 files changed, 541 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 156 +++++++++++++++++++++++++++-------
+ 1 file changed, 127 insertions(+), 29 deletions(-)
 
 -- 
-1.9.1
+2.16.3
