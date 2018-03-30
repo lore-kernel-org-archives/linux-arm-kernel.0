@@ -1,132 +1,125 @@
 From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Fri, 30 Mar 2018 10:22:40 +0300
-Subject: [PATCH 3/6] spi: sun6i: restrict transfer length in PIO-mode
+Date: Fri, 30 Mar 2018 10:22:41 +0300
+Subject: [PATCH 4/6] spi: sun6i: use completion provided by SPI core
 In-Reply-To: <20180330072243.19368-1-ssuloev@orpaltech.com>
 References: <20180330072243.19368-1-ssuloev@orpaltech.com>
-Message-ID: <20180330072243.19368-4-ssuloev@orpaltech.com>
+Message-ID: <20180330072243.19368-5-ssuloev@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to handle 3/4 empty/full interrupts as
-the maximum supported transfer length in PIO mode is
-128 bytes for sun6i- and 64 bytes for sun8i-family SoCs.
+As long as the completion is already provided by the SPI core
+then there is no need to waste extra-memory on this.
+Also a waiting function was added to avoid code duplication.
 
 Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
 
 ---
- drivers/spi/spi-sun6i.c | 61 ++++++++++++++-----------------------------------
- 1 file changed, 17 insertions(+), 44 deletions(-)
+ drivers/spi/spi-sun6i.c | 50 ++++++++++++++++++++++++++++---------------------
+ 1 file changed, 29 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index f992a7d..13396bd 100644
+index 13396bd..fc43752 100644
 --- a/drivers/spi/spi-sun6i.c
 +++ b/drivers/spi/spi-sun6i.c
-@@ -207,7 +207,10 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
+@@ -99,8 +99,6 @@ struct sun6i_spi {
+ 	struct clk		*mclk;
+ 	struct reset_control	*rstc;
  
- static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
- {
--	return SUN6I_MAX_XFER_SIZE - 1;
-+	struct spi_master *master = spi->master;
-+	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-+
-+	return sspi->fifo_depth;
+-	struct completion	done;
+-
+ 	const u8		*tx_buf;
+ 	u8			*rx_buf;
+ 	int			len;
+@@ -255,6 +253,30 @@ static int sun6i_spi_prepare_message(struct spi_master *master,
+ 	return 0;
  }
  
- static int sun6i_spi_prepare_message(struct spi_master *master,
-@@ -259,13 +262,18 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 	struct sun6i_spi *sspi = spi_master_get_devdata(master);
- 	unsigned int mclk_rate, div, timeout;
- 	unsigned int start, end, tx_time;
--	unsigned int trig_level;
- 	unsigned int tx_len = 0;
- 	int ret = 0;
- 	u32 reg;
- 
--	if (tfr->len > SUN6I_MAX_XFER_SIZE)
--		return -EINVAL;
-+	/* A zero length transfer never finishes if programmed
-+	   in the hardware */
-+	if (!tfr->len)
-+		return 0;
++static int sun6i_spi_wait_for_transfer(struct spi_device *spi,
++				       struct spi_transfer *tfr)
++{
++	struct spi_master *master = spi->master;
++	unsigned int start, end, tx_time;
++	unsigned int timeout;
 +
-+	/* Don't support transfer larger than the FIFO */
-+	if (tfr->len > sspi->fifo_depth)
-+		return -EMSGSIZE;
++	/* smart wait for completion */
++	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
++	start = jiffies;
++	timeout = wait_for_completion_timeout(&master->xfer_completion,
++					      msecs_to_jiffies(tx_time));
++	end = jiffies;
++	if (!timeout) {
++		dev_warn(&master->dev,
++			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
++			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
++			 jiffies_to_msecs(end - start), tx_time);
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
+ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 				  struct spi_device *spi,
+ 				  struct spi_transfer *tfr)
+@@ -275,7 +297,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	if (tfr->len > sspi->fifo_depth)
+ 		return -EMSGSIZE;
  
- 	reinit_completion(&sspi->done);
+-	reinit_completion(&sspi->done);
  	sspi->tx_buf = tfr->tx_buf;
-@@ -279,17 +287,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
- 			SUN6I_FIFO_CTL_RF_RST | SUN6I_FIFO_CTL_TF_RST);
- 
--	/*
--	 * Setup FIFO interrupt trigger level
--	 * Here we choose 3/4 of the full fifo depth, as it's the hardcoded
--	 * value used in old generation of Allwinner SPI controller.
--	 * (See spi-sun4i.c)
--	 */
--	trig_level = sspi->fifo_depth / 4 * 3;
--	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
--			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS) |
--			(trig_level << SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS));
--
- 
- 	/* Ensure that we have a parent clock fast enough */
- 	mclk_rate = clk_get_rate(sspi->mclk);
-@@ -338,12 +335,8 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 	/* Fill the TX FIFO */
- 	sun6i_spi_fill_fifo(sspi, sspi->fifo_depth);
- 
--	/* Enable the interrupts */
--	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, SUN6I_INT_CTL_TC);
--	sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TC |
--					 SUN6I_INT_CTL_RF_RDY);
--	if (tx_len > sspi->fifo_depth)
--		sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TF_ERQ);
-+	/* Enable transfer complete interrupt */
-+	sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TC);
- 
- 	/* Start the transfer */
+ 	sspi->rx_buf = tfr->rx_buf;
+ 	sspi->len = tfr->len;
+@@ -342,21 +363,9 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
  	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
-@@ -372,7 +365,9 @@ out:
+ 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
+ 
+-	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
+-	start = jiffies;
+-	timeout = wait_for_completion_timeout(&sspi->done,
+-					      msecs_to_jiffies(tx_time));
+-	end = jiffies;
+-	if (!timeout) {
+-		dev_warn(&master->dev,
+-			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
+-			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
+-			 jiffies_to_msecs(end - start), tx_time);
+-		ret = -ETIMEDOUT;
+-		goto out;
+-	}
++	/* Wait for completion */
++	ret = sun6i_spi_wait_for_transfer(spi, tfr);
+ 
+-out:
+ 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
+ 
+ 	return ret;
+@@ -364,7 +373,8 @@ out:
+ 
  static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
  {
- 	struct sun6i_spi *sspi = dev_id;
--	u32 status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
-+	u32 status;
-+
-+	status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
+-	struct sun6i_spi *sspi = dev_id;
++	struct spi_master *master = dev_id;
++	struct sun6i_spi *sspi = spi_master_get_devdata(master);
+ 	u32 status;
  
- 	/* Transfer complete */
+ 	status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
+@@ -373,7 +383,7 @@ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
  	if (status & SUN6I_INT_CTL_TC) {
-@@ -382,28 +377,6 @@ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
+ 		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_TC);
+ 		sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
+-		complete(&sspi->done);
++		spi_finalize_current_transfer(master);
  		return IRQ_HANDLED;
  	}
  
--	/* Receive FIFO 3/4 full */
--	if (status & SUN6I_INT_CTL_RF_RDY) {
--		sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
--		/* Only clear the interrupt _after_ draining the FIFO */
--		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_RF_RDY);
--		return IRQ_HANDLED;
--	}
--
--	/* Transmit FIFO 3/4 empty */
--	if (status & SUN6I_INT_CTL_TF_ERQ) {
--		sun6i_spi_fill_fifo(sspi, SUN6I_FIFO_DEPTH);
--
--		if (!sspi->len)
--			/* nothing left to transmit */
--			sun6i_spi_disable_interrupt(sspi, SUN6I_INT_CTL_TF_ERQ);
--
--		/* Only clear the interrupt _after_ re-seeding the FIFO */
--		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_TF_ERQ);
--
--		return IRQ_HANDLED;
--	}
--
- 	return IRQ_NONE;
- }
+@@ -494,8 +504,6 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 		goto err_free_master;
+ 	}
  
+-	init_completion(&sspi->done);
+-
+ 	sspi->rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+ 	if (IS_ERR(sspi->rstc)) {
+ 		dev_err(&pdev->dev, "Couldn't get reset controller\n");
 -- 
 2.16.2
