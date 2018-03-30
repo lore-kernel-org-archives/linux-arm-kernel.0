@@ -1,55 +1,72 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Fri, 30 Mar 2018 10:50:55 +0100
-Subject: [PATCH 3/3] iio: adc: meson-axg: add saradc driver
-In-Reply-To: <20180326084629.100070-4-yixun.lan@amlogic.com>
-References: <20180326084629.100070-1-yixun.lan@amlogic.com>
- <20180326084629.100070-4-yixun.lan@amlogic.com>
-Message-ID: <20180330105055.3b0259d6@archlinux>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 30 Mar 2018 12:01:22 +0200
+Subject: [PATCH v3 4/6] pwm: stm32: improve capture by tuning counter prescaler
+In-Reply-To: <1522404084-24903-1-git-send-email-fabrice.gasnier@st.com>
+References: <1522404084-24903-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1522404084-24903-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Mar 2018 16:46:29 +0800
-Yixun Lan <yixun.lan@amlogic.com> wrote:
+Currently, capture is based on timeout window to configure prescaler.
+PWM capture framework provides 1s window at the time of writing.
 
-> From: Xingyu Chen <xingyu.chen@amlogic.com>
-> 
-> Add the SAR ADC driver for the Amlogic Meson-AXG SoC.
-> 
-> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-Applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to play with it.
+There's place for improvement, after input signal has been captured once:
+- Finer tune counter clock prescaler, by using 1st capture result (with
+arbitrary margin).
+- Do a 2nd capture, with scaled capture window.
+This increases accuracy, especially at high rates.
 
-Thanks,
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
+---
+Changes in v2:
+- Adopt DMA read from MFD core.
+---
+ drivers/pwm/pwm-stm32.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-Jonathan
-
-> ---
->  drivers/iio/adc/meson_saradc.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-> index 799ed929ab99..a5d481a2b4ef 100644
-> --- a/drivers/iio/adc/meson_saradc.c
-> +++ b/drivers/iio/adc/meson_saradc.c
-> @@ -935,6 +935,11 @@ static const struct meson_sar_adc_data meson_sar_adc_gxm_data = {
->  	.name = "meson-gxm-saradc",
->  };
->  
-> +static const struct meson_sar_adc_data meson_sar_adc_axg_data = {
-> +	.param = &meson_sar_adc_gxl_param,
-> +	.name = "meson-axg-saradc",
-> +};
-> +
->  static const struct of_device_id meson_sar_adc_of_match[] = {
->  	{
->  		.compatible = "amlogic,meson8-saradc",
-> @@ -953,6 +958,9 @@ static const struct of_device_id meson_sar_adc_of_match[] = {
->  	}, {
->  		.compatible = "amlogic,meson-gxm-saradc",
->  		.data = &meson_sar_adc_gxm_data,
-> +	}, {
-> +		.compatible = "amlogic,meson-axg-saradc",
-> +		.data = &meson_sar_adc_axg_data,
->  	},
->  	{},
->  };
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+index 00c6251..c6eb0a8 100644
+--- a/drivers/pwm/pwm-stm32.c
++++ b/drivers/pwm/pwm-stm32.c
+@@ -169,7 +169,7 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+ 	unsigned long long prd, div, dty;
+ 	unsigned long rate;
+-	unsigned int psc = 0;
++	unsigned int psc = 0, scale;
+ 	u32 raw_prd, raw_dty;
+ 	int ret = 0;
+ 
+@@ -220,6 +220,28 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	if (ret)
+ 		goto stop;
+ 
++	/*
++	 * Got a capture. Try to improve accuracy at high rates:
++	 * - decrease counter clock prescaler, scale up to max rate.
++	 */
++	if (raw_prd) {
++		u32 max_arr = priv->max_arr - 0x1000; /* arbitrary margin */
++
++		scale = max_arr / min(max_arr, raw_prd);
++	} else {
++		scale = priv->max_arr; /* bellow resolution, use max scale */
++	}
++
++	if (psc && scale > 1) {
++		/* 2nd measure with new scale */
++		psc /= scale;
++		regmap_write(priv->regmap, TIM_PSC, psc);
++		ret = stm32_pwm_raw_capture(priv, pwm, tmo_ms, &raw_prd,
++					    &raw_dty);
++		if (ret)
++			goto stop;
++	}
++
+ 	prd = (unsigned long long)raw_prd * (psc + 1) * NSEC_PER_SEC;
+ 	result->period = DIV_ROUND_UP_ULL(prd, rate);
+ 	dty = (unsigned long long)raw_dty * (psc + 1) * NSEC_PER_SEC;
+-- 
+1.9.1
