@@ -1,91 +1,47 @@
-From: ji.zhang@mediatek.com (Ji.Zhang)
-Date: Fri, 30 Mar 2018 16:08:12 +0800
-Subject: [PATCH] arm64: avoid race condition issue in dump_backtrace
-In-Reply-To: <20180328101240.moo44g5qd3qjuxgn@lakrids.cambridge.arm.com>
-References: <1521687960-3744-1-git-send-email-ji.zhang@mediatek.com>
- <20180322055929.z25brvwlmdighz66@salmiak>
- <1521711329.26617.31.camel@mtksdccf07>
- <20180326113932.2i6qp3776jtmcqk4@lakrids.cambridge.arm.com>
- <1522229612.26617.47.camel@mtksdccf07>
- <20180328101240.moo44g5qd3qjuxgn@lakrids.cambridge.arm.com>
-Message-ID: <1522397292.26617.63.camel@mtksdccf07>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 30 Mar 2018 10:10:57 +0200
+Subject: [PATCH v3 6/8] DT: arm: Add Renesas RZ/N1 SoC base device tree
+ file
+In-Reply-To: <1522309629-10152-7-git-send-email-michel.pollet@bp.renesas.com>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-7-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdX5cSB5wDJWq4aWuihN5+z_4T+ZUN4AR-Sm0Q+N4RZE0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-03-28 at 11:12 +0100, Mark Rutland wrote:
-> On Wed, Mar 28, 2018 at 05:33:32PM +0800, Ji.Zhang wrote:
-> 
-> I'm very much not keen on this.
-> 
-> I think that if we're going to do this, the only sane way to do it is to
-> have unwind_frame() verify the current fp against the previous one, and
-> verify that we have some strict nesting of stacks. Generally, that means
-> we can go:
-> 
->   overflow -> irq -> task
-> 
-> ... though I'm not sure what to do about the SDEI stack vs the overflow
-> stack.
-Actually I have had the fp check in unwind_frame(), but since I use the
-in_entry_text() to determine if stack spans, and I did not want to
-include traps.h in stacktrace.c, so I move the check out to
-dump_backtrace.
-Anyway, It seems that the key point is how should we verify that there
-are some nesting of stacks. Since in unwind_frame() we already have the
-previous fp and current fp, could we assume that if these two fps are
-NOT belong to the same stack, there should be stack spans (no matter
-task->irq, or irq->overflow, etc), and we can do the tricky to bypass
-the fp check.The sample of the prosal just like:
+Hi Michel,
 
-diff --git a/arch/arm64/include/asm/stacktrace.h
-b/arch/arm64/include/asm/stacktrace.h
-index 902f9ed..fc2bf4d 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -92,4 +92,18 @@ static inline bool on_accessible_stack(struct
-task_struct *tsk, unsigned long sp
-        return false;
- }
+On Thu, Mar 29, 2018 at 9:47 AM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> This adds the Renesas RZ/N1 Family (Part #R9A06G0xx) SoC
+> bare bone support.
+>
+> This currently only handles generic parts (gic, architected timer)
+> and a UART.
+> For simplicity sake, this also relies on the bootloader to set the
+> pinctrl and clocks.
+>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 
-+static inline bool on_same_stack(struct task_struct *tsk, unsigned long
-sp1, unsigned sp2)
-+{
-+       if (on_task_stack(tsk, sp1) && on_task_stack(tsk, sp2))
-+               return true;
-+       if (on_irq_stack(sp1) && on_irq_stack(sp2))
-+               return true;
-+       if (on_overflow_stack(sp1) && on_overflow_stack(sp2))
-+               return true;
-+       if (on_sdei_stack(sp1) && on_sdei_stack(sp2))
-+               return true;
-+
-+       return false;
-+}
-+
- #endif /* __ASM_STACKTRACE_H */
-diff --git a/arch/arm64/kernel/stacktrace.c
-b/arch/arm64/kernel/stacktrace.c
-index d5718a0..4907a67 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -56,6 +56,13 @@ int notrace unwind_frame(struct task_struct *tsk,
-struct stackframe *frame)
-        frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
-        frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+Thanks for your patch!
 
-+       if (!on_same_stack(fp, frame->fp))
-+               fp = frame->fp + 0x8;
-+       if (fp <= frame->fp) {
-+               pr_notice("fp invalid, stop unwind\n");
-+               return -EINVAL;
-+       }
-+
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-        if (tsk->ret_stack &&
-                        (frame->pc == (unsigned long)return_to_handler))
-{
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/r9a06g0xx.dtsi
 
-Could this work?
+As I said on IRC, I'm not so happy with this r9a06g0xx.dtsi file without
+SoC-specific compatible values, as you have to override all of them in
+r9a06g032.dtsi and r9a06g033.dtsi
 
-Best Regards,
-Ji
+Moreover, in this series you dropped r9a06g032.dtsi, so the devices no longer
+have SoC-specific compatible values?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
