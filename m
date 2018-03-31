@@ -1,51 +1,71 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 31 Mar 2018 12:39:25 +0800
-Subject: [PATCH v4 01/14] soc: qcom: Separate kryo l2 accessors from PMU
- driver
-In-Reply-To: <1522358807-10413-2-git-send-email-ilialin@codeaurora.org>
-References: <1522358807-10413-2-git-send-email-ilialin@codeaurora.org>
-Message-ID: <201803311139.Z34ksG0T%fengguang.wu@intel.com>
+From: haiyue.wang@linux.intel.com (Haiyue Wang)
+Date: Sat, 31 Mar 2018 15:46:38 +0800
+Subject: [PATCH dts/arm/aspeed-g5 v1] ARM: dts: aspeed-g5: Add IPMI KCS nodes
+ for SMS and SMM mode
+Message-ID: <1522482398-6248-1-git-send-email-haiyue.wang@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ilia,
+The IPMI KCS device part of the LPC interface and is used for
+communication with the host processor.
 
-Thank you for the patch! Yet something to improve:
+Keyboard Controller Style Interfaces:
+The KCS channel number is assigned by AST_usrGuide_KCS.pdf
+Name          | Use          | Address       | KCS Channel |
+SMS Interface | SMS          | 0CA2h ? 0CA3h | kcs3        |
+SMM Interface | SMI handling | 0CA4h ? 0CA5h | kcs4        |
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.16-rc7 next-20180329]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Ilia-Lin/soc-qcom-Separate-kryo-l2-accessors-from-PMU-driver/20180331-093947
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> drivers/soc/qcom/kryo-l2-accessors.c:17:10: fatal error: asm/sysreg.h: No such file or directory
-    #include <asm/sysreg.h>
-             ^~~~~~~~~~~~~~
-   compilation terminated.
-
-vim +17 drivers/soc/qcom/kryo-l2-accessors.c
-
-  > 17	#include <asm/sysreg.h>
-    18	#include <soc/qcom/kryo-l2-accessors.h>
-    19	
-
+Signed-off-by: Haiyue Wang <haiyue.wang@linux.intel.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 65187 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180331/f9ddd27b/attachment-0001.gz>
+The kcs_bmc_aspeed driver is in linux-next now:
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/char/ipmi/kcs_bmc_aspeed.c?h=next-20180329
+---
+ arch/arm/boot/dts/aspeed-g5.dtsi | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+index 17ee0fa3..8d6c4af 100644
+--- a/arch/arm/boot/dts/aspeed-g5.dtsi
++++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+@@ -268,8 +268,22 @@
+ 				ranges = <0x0 0x1e789000 0x1000>;
+ 
+ 				lpc_bmc: lpc-bmc at 0 {
+-					compatible = "aspeed,ast2500-lpc-bmc";
++					compatible = "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
+ 					reg = <0x0 0x80>;
++					reg-io-width = <4>;
++
++					#address-cells = <1>;
++					#size-cells = <1>;
++					ranges = <0x0 0x0 0x80>;
++
++					kcs3: kcs3 at 0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0x80>;
++						interrupts = <8>;
++						kcs_chan = <3>;
++						kcs_addr = <0xca2>;
++						status = "disabled";
++					};
+ 				};
+ 
+ 				lpc_host: lpc-host at 80 {
+@@ -281,6 +295,15 @@
+ 					#size-cells = <1>;
+ 					ranges = <0x0 0x80 0x1e0>;
+ 
++					kcs4: kcs4 at 0 {
++						compatible = "aspeed,ast2500-kcs-bmc";
++						reg = <0x0 0xa0>;
++						interrupts = <8>;
++						kcs_chan = <4>;
++						kcs_addr = <0xca4>;
++						status = "disabled";
++					};
++
+ 					lpc_ctrl: lpc-ctrl at 0 {
+ 						compatible = "aspeed,ast2500-lpc-ctrl";
+ 						reg = <0x0 0x80>;
+-- 
+2.7.4
