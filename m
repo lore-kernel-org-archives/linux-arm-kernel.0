@@ -1,32 +1,47 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 30 Mar 2018 17:50:24 -0500
-Subject: [PATCH V3] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <CAL85gmAAVoCCXoLH+c0ROSBy4mS3z86tnbX+7Avh5oGT=fHcfA@mail.gmail.com>
-References: <1520274579-30492-1-git-send-email-fkan@apm.com>
- <CAL85gmAAVoCCXoLH+c0ROSBy4mS3z86tnbX+7Avh5oGT=fHcfA@mail.gmail.com>
-Message-ID: <20180330225024.GH9322@bhelgaas-glaptop.roam.corp.google.com>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Sat, 31 Mar 2018 02:40:30 +0200
+Subject: 4.16-rc5 on Motorola Droid 4
+In-Reply-To: <20180330211729.GA3389@amd>
+References: <20180318220418.GA22880@amd> <20180320140322.GU5799@atomide.com>
+ <20180320170029.rv3u5wlvqxfl7z2v@earth.universe>
+ <20180327212156.GA10834@amd>
+ <20180330121959.uxx6kcl7v5w777vq@earth.universe>
+ <20180330211729.GA3389@amd>
+Message-ID: <20180331004030.2kvdhlgynwmeiuib@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 11:41:33AM -0700, Feng Kan wrote:
-> On Mon, Mar 5, 2018 at 10:29 AM, Feng Kan <fkan@apm.com> wrote:
-> > When bridge and its endpoint is enumerated the devices are added to the
-> > dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-> > This causes the bridge to be moved to the end of the dpm list when
-> > deferred probe kicks in. The order of the dpm list for bridge and
-> > endpoint is reversed.
-> >
-> > Add reordering code to move the bridge and its children and consumers to
-> > the end of the pm list so the order for suspend and resume is not altered.
-> > The code also move device and its children and consumers to the tail of
-> > device_kset list if it is registered.
-> >
-> > Signed-off-by: Feng Kan <fkan@apm.com>
-> > Signed-off-by: Toan Le <toanle@apm.com>
-> > ...
-> >
-> Hi, just wanted to check if there is anything else I need to change on
-> this. Thanks.
+Hi,
 
-I'm assuming Rafael will handle this.
+On Fri, Mar 30, 2018 at 11:17:29PM +0200, Pavel Machek wrote:
+> On Fri 2018-03-30 14:19:59, Sebastian Reichel wrote:
+> > Hi,
+> > 
+> > On Tue, Mar 27, 2018 at 11:21:56PM +0200, Pavel Machek wrote:
+> > > Also, if you know how to get information from light sensor, that would
+> > > be nice.
+> > 
+> > You need CONFIG_SENSORS_ISL29028. Once the driver is probed:
+> > 
+> > $ cat /sys/bus/iio/devices/iio\:device1/name
+> > isl29030
+> > $ cat /sys/bus/iio/devices/iio\:device1/in_illuminance_input
+> > 19
+> 
+> Thanks, that works.
+> 
+> I was also able to get accelerometers to work, but they are extremely
+> slow to read (6 seconds for all 3 axis). Interesting, but probably not
+> too important for now.
+
+IIRC this is related to runtime PM. It should not be a problem if
+you use libiio.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180331/ef7bb4d9/attachment.sig>
