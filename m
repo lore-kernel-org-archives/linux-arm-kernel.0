@@ -1,71 +1,43 @@
-From: haiyue.wang@linux.intel.com (Haiyue Wang)
-Date: Sat, 31 Mar 2018 15:46:38 +0800
-Subject: [PATCH dts/arm/aspeed-g5 v1] ARM: dts: aspeed-g5: Add IPMI KCS nodes
- for SMS and SMM mode
-Message-ID: <1522482398-6248-1-git-send-email-haiyue.wang@linux.intel.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Sat, 31 Mar 2018 10:54:20 +0200
+Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
+ "Stopping"
+In-Reply-To: <20180330154420.6903-1-colin.king@canonical.com>
+References: <20180330154420.6903-1-colin.king@canonical.com>
+Message-ID: <20180331085420.GE14180@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IPMI KCS device part of the LPC interface and is used for
-communication with the host processor.
+On 30/03/2018 at 16:44:20 +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> Trivial fix to spelling mistake in pr_debug message text
+> 
+Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
-Keyboard Controller Style Interfaces:
-The KCS channel number is assigned by AST_usrGuide_KCS.pdf
-Name          | Use          | Address       | KCS Channel |
-SMS Interface | SMS          | 0CA2h ? 0CA3h | kcs3        |
-SMM Interface | SMI handling | 0CA4h ? 0CA5h | kcs4        |
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  sound/soc/atmel/atmel_ssc_dai.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+> index a1e2c5682dcd..1c7af0ca98ec 100644
+> --- a/sound/soc/atmel/atmel_ssc_dai.c
+> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> @@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>  		if (ret < 0) {
+>  			printk(KERN_WARNING
+>  					"atmel_ssc_dai: request_irq failure\n");
+> -			pr_debug("Atmel_ssc_dai: Stoping clock\n");
+> +			pr_debug("Atmel_ssc_dai: Stopping clock\n");
+>  			clk_disable(ssc_p->ssc->clk);
+>  			return ret;
+>  		}
+> -- 
+> 2.15.1
+> 
 
-Signed-off-by: Haiyue Wang <haiyue.wang@linux.intel.com>
----
-The kcs_bmc_aspeed driver is in linux-next now:
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/char/ipmi/kcs_bmc_aspeed.c?h=next-20180329
----
- arch/arm/boot/dts/aspeed-g5.dtsi | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 17ee0fa3..8d6c4af 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -268,8 +268,22 @@
- 				ranges = <0x0 0x1e789000 0x1000>;
- 
- 				lpc_bmc: lpc-bmc at 0 {
--					compatible = "aspeed,ast2500-lpc-bmc";
-+					compatible = "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
- 					reg = <0x0 0x80>;
-+					reg-io-width = <4>;
-+
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					ranges = <0x0 0x0 0x80>;
-+
-+					kcs3: kcs3 at 0 {
-+						compatible = "aspeed,ast2500-kcs-bmc";
-+						reg = <0x0 0x80>;
-+						interrupts = <8>;
-+						kcs_chan = <3>;
-+						kcs_addr = <0xca2>;
-+						status = "disabled";
-+					};
- 				};
- 
- 				lpc_host: lpc-host at 80 {
-@@ -281,6 +295,15 @@
- 					#size-cells = <1>;
- 					ranges = <0x0 0x80 0x1e0>;
- 
-+					kcs4: kcs4 at 0 {
-+						compatible = "aspeed,ast2500-kcs-bmc";
-+						reg = <0x0 0xa0>;
-+						interrupts = <8>;
-+						kcs_chan = <4>;
-+						kcs_addr = <0xca4>;
-+						status = "disabled";
-+					};
-+
- 					lpc_ctrl: lpc-ctrl at 0 {
- 						compatible = "aspeed,ast2500-lpc-ctrl";
- 						reg = <0x0 0x80>;
 -- 
-2.7.4
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
