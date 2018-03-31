@@ -1,180 +1,227 @@
-From: thakursatendra2003@yahoo.co.in (Satendra Singh Thakur)
-Date: Sat, 31 Mar 2018 20:17:58 +0530
-Subject: [PATCH] [DRM][KMS][MODE][MEDIATEK] Using the function
- drm_display_mode_to_videomode
-Message-ID: <1522507712-22763-1-git-send-email-thakursatendra2003@yahoo.co.in>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Sat, 31 Mar 2018 18:20:36 +0200
+Subject: [PATCH v3 6/8] DT: arm: Add Renesas RZ/N1 SoC base device tree
+ file
+In-Reply-To: <20180330072516.bqkygev7qxp4dpig@verge.net.au>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-7-git-send-email-michel.pollet@bp.renesas.com>
+ <20180329110450.GA24193@w540>
+ <20180330072516.bqkygev7qxp4dpig@verge.net.au>
+Message-ID: <20180331162036.GA6436@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses existing method drm_display_mode_to_videomode for
-calculating front/back porches, sync lengths for mediatek dsi/dpi drivers; 
-instead of manually calculating them
+Hi Simon, Michel,
 
-Signed-off-by: Satendra Singh Thakur <thakursatendra2003@yahoo.co.in>
----
- drivers/gpu/drm/mediatek/mtk_dpi.c | 60 +++++++++++++++++++-------------------
- drivers/gpu/drm/mediatek/mtk_dsi.c | 14 ++-------
- 2 files changed, 32 insertions(+), 42 deletions(-)
+On Fri, Mar 30, 2018 at 09:25:16AM +0200, Simon Horman wrote:
+> On Thu, Mar 29, 2018 at 01:04:50PM +0200, jacopo mondi wrote:
+> > Hi Michel
+> >
+> > The subject of all your patches for arch/arm should start with:
+> >
+> > ARM: dts:
+> >
+> > A git log on that directory clearly shows that's the preferred one.
+> >
+> > I would also say that you are missing a symbol definition in
+> > arch/arm/mach-shmobile/Kconfig
+> > (even if you got rid of any board file)
+> >
+> > I would expect a symbol to select in menuconfig, with your
+> > dependencies listed there (ie, the serial interface driver)
+> >
+> > Something like this (I left the 'xx' out from the part name on purpose)
+> >
+> > diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> > index 280e731..9a519330 100644
+> > --- a/arch/arm/mach-shmobile/Kconfig
+> > +++ b/arch/arm/mach-shmobile/Kconfig
+> > @@ -114,4 +114,8 @@ config ARCH_SH73A0
+> >         bool "SH-Mobile AG5 (R8A73A00)"
+> >         select ARCH_RMOBILE
+> >         select RENESAS_INTC_IRQPIN
+> > +
+> > +config ARCH_R9A06G0
+> > +       bool "RZ/N1 (R9A06G0)"
+> > +       select SERIAL_8250_DW
+> >  endif
+> >
+> > But please wait for others (preferibly Geert or Simon) to confim this.
+>
+> I think that is covered by
+> "[PATCH v3 5/8] arm: shmobile: Add the RZ/N1 arch to the shmobile Kconfig"
+>
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index e80a603..6c0ea39 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -22,6 +22,7 @@
- #include <linux/interrupt.h>
- #include <linux/types.h>
- #include <linux/clk.h>
-+#include <video/videomode.h>
- 
- #include "mtk_dpi_regs.h"
- #include "mtk_drm_ddp_comp.h"
-@@ -429,34 +430,35 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 	struct mtk_dpi_sync_param vsync_leven = { 0 };
- 	struct mtk_dpi_sync_param vsync_rodd = { 0 };
- 	struct mtk_dpi_sync_param vsync_reven = { 0 };
--	unsigned long pix_rate;
-+	struct videomode vm = { 0 };
- 	unsigned long pll_rate;
- 	unsigned int factor;
- 
- 	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
--	pix_rate = 1000UL * mode->clock;
-+
- 	if (mode->clock <= 27000)
--		factor = 16 * 3;
-+		factor = 3 << 4;
- 	else if (mode->clock <= 84000)
--		factor = 8 * 3;
-+		factor = 3 << 3;
- 	else if (mode->clock <= 167000)
--		factor = 4 * 3;
-+		factor = 3 << 2;
- 	else
--		factor = 2 * 3;
--	pll_rate = pix_rate * factor;
-+		factor = 3 << 1;
-+	drm_display_mode_to_videomode(mode, &vm);
-+	pll_rate = vm.pixelclock * factor;
- 
- 	dev_dbg(dpi->dev, "Want PLL %lu Hz, pixel clock %lu Hz\n",
--		pll_rate, pix_rate);
-+		pll_rate, vm.pixelclock);
- 
- 	clk_set_rate(dpi->tvd_clk, pll_rate);
- 	pll_rate = clk_get_rate(dpi->tvd_clk);
- 
--	pix_rate = pll_rate / factor;
--	clk_set_rate(dpi->pixel_clk, pix_rate);
--	pix_rate = clk_get_rate(dpi->pixel_clk);
-+	vm.pixelclock = pll_rate / factor;
-+	clk_set_rate(dpi->pixel_clk, vm.pixelclock);
-+	vm.pixelclock = clk_get_rate(dpi->pixel_clk);
- 
- 	dev_dbg(dpi->dev, "Got  PLL %lu Hz, pixel clock %lu Hz\n",
--		pll_rate, pix_rate);
-+		pll_rate, vm.pixelclock);
- 
- 	limit.c_bottom = 0x0010;
- 	limit.c_top = 0x0FE0;
-@@ -465,33 +467,31 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 
- 	dpi_pol.ck_pol = MTK_DPI_POLARITY_FALLING;
- 	dpi_pol.de_pol = MTK_DPI_POLARITY_RISING;
--	dpi_pol.hsync_pol = mode->flags & DRM_MODE_FLAG_PHSYNC ?
-+	dpi_pol.hsync_pol = vm.flags & DISPLAY_FLAGS_HSYNC_HIGH ?
- 			    MTK_DPI_POLARITY_FALLING : MTK_DPI_POLARITY_RISING;
--	dpi_pol.vsync_pol = mode->flags & DRM_MODE_FLAG_PVSYNC ?
-+	dpi_pol.vsync_pol = vm.flags & DISPLAY_FLAGS_VSYNC_HIGH ?
- 			    MTK_DPI_POLARITY_FALLING : MTK_DPI_POLARITY_RISING;
--
--	hsync.sync_width = mode->hsync_end - mode->hsync_start;
--	hsync.back_porch = mode->htotal - mode->hsync_end;
--	hsync.front_porch = mode->hsync_start - mode->hdisplay;
-+	hsync.sync_width = vm.hsync_len;
-+	hsync.back_porch = vm.hback_porch;
-+	hsync.front_porch = vm.hfront_porch;
- 	hsync.shift_half_line = false;
--
--	vsync_lodd.sync_width = mode->vsync_end - mode->vsync_start;
--	vsync_lodd.back_porch = mode->vtotal - mode->vsync_end;
--	vsync_lodd.front_porch = mode->vsync_start - mode->vdisplay;
-+	vsync_lodd.sync_width = vm.vsync_len;
-+	vsync_lodd.back_porch = vm.vback_porch;
-+	vsync_lodd.front_porch = vm.vfront_porch;
- 	vsync_lodd.shift_half_line = false;
- 
--	if (mode->flags & DRM_MODE_FLAG_INTERLACE &&
-+	if (vm.flags & DISPLAY_FLAGS_INTERLACED &&
- 	    mode->flags & DRM_MODE_FLAG_3D_MASK) {
- 		vsync_leven = vsync_lodd;
- 		vsync_rodd = vsync_lodd;
- 		vsync_reven = vsync_lodd;
- 		vsync_leven.shift_half_line = true;
- 		vsync_reven.shift_half_line = true;
--	} else if (mode->flags & DRM_MODE_FLAG_INTERLACE &&
-+	} else if (vm.flags & DISPLAY_FLAGS_INTERLACED &&
- 		   !(mode->flags & DRM_MODE_FLAG_3D_MASK)) {
- 		vsync_leven = vsync_lodd;
- 		vsync_leven.shift_half_line = true;
--	} else if (!(mode->flags & DRM_MODE_FLAG_INTERLACE) &&
-+	} else if (!(vm.flags & DISPLAY_FLAGS_INTERLACED) &&
- 		   mode->flags & DRM_MODE_FLAG_3D_MASK) {
- 		vsync_rodd = vsync_lodd;
- 	}
-@@ -505,12 +505,12 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 	mtk_dpi_config_vsync_reven(dpi, &vsync_reven);
- 
- 	mtk_dpi_config_3d(dpi, !!(mode->flags & DRM_MODE_FLAG_3D_MASK));
--	mtk_dpi_config_interface(dpi, !!(mode->flags &
--					 DRM_MODE_FLAG_INTERLACE));
--	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
--		mtk_dpi_config_fb_size(dpi, mode->hdisplay, mode->vdisplay / 2);
-+	mtk_dpi_config_interface(dpi, !!(vm.flags &
-+					 DISPLAY_FLAGS_INTERLACED));
-+	if (vm.flags & DISPLAY_FLAGS_INTERLACED)
-+		mtk_dpi_config_fb_size(dpi, vm.hactive, vm.vactive >> 1);
- 	else
--		mtk_dpi_config_fb_size(dpi, mode->hdisplay, mode->vdisplay);
-+		mtk_dpi_config_fb_size(dpi, vm.hactive, vm.vactive);
- 
- 	mtk_dpi_config_channel_limit(dpi, &limit);
- 	mtk_dpi_config_bit_num(dpi, dpi->bit_num);
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 7e5e24c..aa0943e 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -551,13 +551,12 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
- 	}
- 
- 	/**
--	 * vm.pixelclock is in kHz, pixel_clock unit is Hz, so multiply by 1000
- 	 * htotal_time = htotal * byte_per_pixel / num_lanes
- 	 * overhead_time = lpx + hs_prepare + hs_zero + hs_trail + hs_exit
- 	 * mipi_ratio = (htotal_time + overhead_time) / htotal_time
- 	 * data_rate = pixel_clock * bit_per_pixel * mipi_ratio / num_lanes;
- 	 */
--	pixel_clock = dsi->vm.pixelclock * 1000;
-+	pixel_clock = dsi->vm.pixelclock;
- 	htotal = dsi->vm.hactive + dsi->vm.hback_porch + dsi->vm.hfront_porch +
- 			dsi->vm.hsync_len;
- 	htotal_bits = htotal * bit_per_pixel;
-@@ -725,16 +724,7 @@ static void mtk_dsi_encoder_mode_set(struct drm_encoder *encoder,
- {
- 	struct mtk_dsi *dsi = encoder_to_dsi(encoder);
- 
--	dsi->vm.pixelclock = adjusted->clock;
--	dsi->vm.hactive = adjusted->hdisplay;
--	dsi->vm.hback_porch = adjusted->htotal - adjusted->hsync_end;
--	dsi->vm.hfront_porch = adjusted->hsync_start - adjusted->hdisplay;
--	dsi->vm.hsync_len = adjusted->hsync_end - adjusted->hsync_start;
--
--	dsi->vm.vactive = adjusted->vdisplay;
--	dsi->vm.vback_porch = adjusted->vtotal - adjusted->vsync_end;
--	dsi->vm.vfront_porch = adjusted->vsync_start - adjusted->vdisplay;
--	dsi->vm.vsync_len = adjusted->vsync_end - adjusted->vsync_start;
-+	drm_display_mode_to_videomode(adjusted, &dsi->vm);
- }
- 
- static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
--- 
-2.7.4
+I somehow didn't apply that patch from the series when reviewing.
+
+Sorry for the fuss.
+
+Thanks
+   j
+
+> > On Thu, Mar 29, 2018 at 08:47:02AM +0100, Michel Pollet wrote:
+> > > This adds the Renesas RZ/N1 Family (Part #R9A06G0xx) SoC
+> > > bare bone support.
+> > >
+> > > This currently only handles generic parts (gic, architected timer)
+> > > and a UART.
+> > > For simplicity sake, this also relies on the bootloader to set the
+> > > pinctrl and clocks.
+> > >
+> > > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> > > ---
+> > >  arch/arm/boot/dts/r9a06g0xx.dtsi | 96 ++++++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 96 insertions(+)
+> > >  create mode 100644 arch/arm/boot/dts/r9a06g0xx.dtsi
+> > >
+> > > diff --git a/arch/arm/boot/dts/r9a06g0xx.dtsi b/arch/arm/boot/dts/r9a06g0xx.dtsi
+> > > new file mode 100644
+> > > index 0000000..c6eeee3
+> > > --- /dev/null
+> > > +++ b/arch/arm/boot/dts/r9a06g0xx.dtsi
+> > > @@ -0,0 +1,96 @@
+> > > +// SPDX-License-Identifier: GPL-2.0
+> > > +/*
+> > > + * Base Device Tree Source for the Renesas RZ/N1 SoC Family of devices
+> > > + *
+> > > + * Copyright (C) 2018 Renesas Electronics Europe Limited
+> > > + *
+> > > + */
+> > > +
+> > > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > > +
+> > > +/ {
+> > > +	compatible = "renesas,rzn1";
+> > > +	#address-cells = <1>;
+> > > +	#size-cells = <1>;
+> > > +
+> > > +	cpus {
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <0>;
+> > > +
+> > > +		cpu at 0 {
+> > > +			device_type = "cpu";
+> > > +			compatible = "arm,cortex-a7";
+> > > +			reg = <0>;
+> > > +		};
+> > > +		cpu at 1 {
+> > > +			device_type = "cpu";
+> > > +			compatible = "arm,cortex-a7";
+> > > +			reg = <1>;
+> > > +		};
+> > > +	};
+> >
+> > I see you don't like empy lines, that's fine, it is not a strict
+> > requiremen afaik, but I find a few empty lines here and there more
+> > redable, expecially if the file is going to grow, as it will be.
+>
+> Please place one empty line between each node.
+>
+> > > +	clocks {
+> > > +		/*
+> > > +		 * this is fixed clock for now,
+> > > +		 * until the clock driver is merged
+> > > +		 */
+> > > +		clkuarts: clkuarts {
+> >
+> > You can remove the node lable if it's the same as the node name afaik
+> >
+> > > +			#clock-cells = <0>;
+> > > +			compatible = "fixed-clock";
+> > > +			clock-frequency = <47619047>;
+> > > +		};
+> > > +	};
+> >
+> > Grouping clock nodes under a "clocks" one is now deprecated.
+> >
+> > Please see, ie.
+> > "ARM: dts: r7s72100: stop grouping clocks under a "clocks" subnode"
+>
+> Also, please sort sub-nodes of the root node alphabetically.
+>
+> > Thanks
+> >    j
+> >
+> > > +	arch-timer {
+> > > +		compatible = "arm,cortex-a7-timer",
+> > > +			     "arm,armv7-timer";
+> > > +		interrupt-parent = <&gic>;
+> > > +		arm,cpu-registers-not-fw-configured;
+> > > +		interrupts =
+> > > +			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+> > > +				IRQ_TYPE_LEVEL_LOW)>,
+> > > +			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+> > > +				IRQ_TYPE_LEVEL_LOW)>,
+> > > +			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+> > > +				IRQ_TYPE_LEVEL_LOW)>,
+> > > +			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+> > > +				IRQ_TYPE_LEVEL_LOW)>;
+>
+> I think its nicer not to line-wrap the individual interrupts.
+> I.e. please make the above like this:
+>
+> 		interrupts =
+> 			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> 			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> 			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> 			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+>
+> > > +	};
+> > > +	soc {
+> > > +		compatible = "simple-bus";
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <1>;
+> > > +		interrupt-parent = <&gic>;
+> > > +		ranges;
+> > > +
+> > > +		gic: gic at 44101000 {
+>
+> Please sort subnodes of the soc node using:
+> - Primary key of bus address
+> - Secondary key of IP block type (does not apply here)
+>
+>
+> > > +			compatible = "arm,cortex-a7-gic", "arm,gic-400";
+> > > +			interrupt-controller;
+> > > +			#interrupt-cells = <3>;
+> > > +			reg = <0x44101000 0x1000>, /* Distributer */
+> > > +			      <0x44102000 0x2000>, /* CPU interface */
+> > > +			      <0x44104000 0x2000>, /* Virt interface control */
+> > > +			      <0x44106000 0x2000>; /* Virt CPU interface */
+> > > +			interrupts =
+> > > +				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
+> > > +					IRQ_TYPE_LEVEL_HIGH)>;
+> > > +		};
+> > > +		sysctrl: sysctrl at 4000c000 {
+> > > +			compatible = "renesas,rzn1-sysctrl", "syscon",
+> > > +					"simple-mfd";
+> > > +			reg = <0x4000c000 0x1000>;
+> > > +
+> > > +			reboot {
+> > > +				compatible = "renesas,rzn1-reboot";
+> > > +			};
+> > > +		};
+> > > +		uart0: serial at 40060000 {
+> > > +			compatible = "snps,dw-apb-uart";
+> > > +			reg = <0x40060000 0x400>;
+> > > +			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+> > > +			reg-shift = <2>;
+> > > +			reg-io-width = <4>;
+> > > +			clocks = <&clkuarts>;
+> > > +			clock-names = "baudclk";
+> > > +			status = "disabled";
+> > > +		};
+> > > +	};
+> > > +};
+> > > --
+> > > 2.7.4
+> > >
+>
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180331/80a1ebc5/attachment.sig>
