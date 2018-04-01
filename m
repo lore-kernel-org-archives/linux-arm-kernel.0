@@ -1,106 +1,56 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sun, 1 Apr 2018 15:34:56 -0700
-Subject: [PATCH v4 01/14] soc: qcom: Separate kryo l2 accessors from PMU
- driver
-In-Reply-To: <1522358807-10413-2-git-send-email-ilialin@codeaurora.org>
-References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
- <1522358807-10413-2-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180401223456.GG510@tuxbook-pro>
+From: neil@brown.name (NeilBrown)
+Date: Mon, 02 Apr 2018 09:34:58 +1000
+Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
+In-Reply-To: <20180329124745.24694-1-cmc@babblebit.net>
+References: <20180329095637.GA16778@kroah.com>
+ <20180329124745.24694-1-cmc@babblebit.net>
+Message-ID: <87vada1owt.fsf@notabene.neil.brown.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 29 Mar 14:26 PDT 2018, Ilia Lin wrote:
+On Thu, Mar 29 2018, Chris Coffey wrote:
 
-> diff --git a/drivers/soc/qcom/kryo-l2-accessors.c b/drivers/soc/qcom/kryo-l2-accessors.c
-> new file mode 100644
-> index 0000000..b0356c2
-> --- /dev/null
-> +++ b/drivers/soc/qcom/kryo-l2-accessors.c
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + */
+> This fixes the following sparse warning:
+>
+> drivers/staging/mt7621-eth/ethtool.c:213:6: warning: symbol
+> 'mtk_set_ethtool_ops' was not declared. Should it be static?
+>
+> Signed-off-by: Chris Coffey <cmc@babblebit.net>
 
-The copyright header in the C file should be:
+Reviewed-by: NeilBrown <neil@brown.name>
 
-// SPDX-License-Identifier: GPL-2.0
-/*
- * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
- */
+Thanks,
+NeilBrown
 
-> +
-> +#include <linux/spinlock.h>
-> +#include <asm/sysreg.h>
-> +#include <soc/qcom/kryo-l2-accessors.h>
-> +
-> +#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
-> +#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
-> +
-> +static DEFINE_RAW_SPINLOCK(l2_access_lock);
-> +
-> +/**
-> + * set_l2_indirect_reg: write value to an L2 register
 
-* set_l2_indirect_reg() - write value to an L2 register
-
-> + * @reg: Address of L2 register.
-> + * @value: Value to be written to register.
-> + *
-> + * Use architecturally required barriers for ordering between system register
-> + * accesses, and system registers with respect to device memory
-> + */
-> +void set_l2_indirect_reg(u64 reg, u64 val)
-
-As these are now kernel-global functions I recommend that you give them
-a slightly more specific name; e.g. kryo_l2_set_indirect_reg() and
-kryo_l2_get_indirect_reg().
-
-[..]
-> diff --git a/include/soc/qcom/kryo-l2-accessors.h b/include/soc/qcom/kryo-l2-accessors.h
-> new file mode 100644
-> index 0000000..3c796cf
-> --- /dev/null
-> +++ b/include/soc/qcom/kryo-l2-accessors.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-
-And in the header file it should be:
-
-/* SPDX-License-Identifier: GPL-2.0 */
-/*
- * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
- */
-
-> +
-> +#ifndef __SOC_ARCH_QCOM_KRYO_L2_ACCESSORS_H
-> +#define __SOC_ARCH_QCOM_KRYO_L2_ACCESSORS_H
-> +
-> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
-> +u64 get_l2_indirect_reg(u64 reg_addr);
-
-Rename "reg_addr" to "reg" to match the implementation.
-
-Regards,
-Bjorn
+> ---
+> Changes in v2:
+>  - Per GregKH's feedback (thanks!), don't add unnecessary new .h file
+>  dependencies. This patch version reverts those changes and fixes the
+>  problem directly in ethtool.c (which is that it didn't include
+>  ethtool.h anywhere -- mtk_set_ethtool_ops is not static).
+>
+>  drivers/staging/mt7621-eth/ethtool.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
+> index 38ba0c040a..5268c5ca09 100644
+> --- a/drivers/staging/mt7621-eth/ethtool.c
+> +++ b/drivers/staging/mt7621-eth/ethtool.c
+> @@ -13,6 +13,7 @@
+>   */
+>  
+>  #include "mtk_eth_soc.h"
+> +#include "ethtool.h"
+>  
+>  static const char mtk_gdma_str[][ETH_GSTRING_LEN] = {
+>  #define _FE(x...)	# x,
+> -- 
+> 2.11.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180402/92da8c83/attachment.sig>
