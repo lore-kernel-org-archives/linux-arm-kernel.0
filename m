@@ -1,81 +1,106 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sun, 1 Apr 2018 14:32:10 -0700
-Subject: [PATCH] ARM: dts: qcom-apq8064: disable i2c by default at soc dtsi
-In-Reply-To: <20180315144434.14095-1-srinivas.kandagatla@linaro.org>
-References: <20180315144434.14095-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180401213210.GE510@tuxbook-pro>
+Date: Sun, 1 Apr 2018 15:34:56 -0700
+Subject: [PATCH v4 01/14] soc: qcom: Separate kryo l2 accessors from PMU
+ driver
+In-Reply-To: <1522358807-10413-2-git-send-email-ilialin@codeaurora.org>
+References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+ <1522358807-10413-2-git-send-email-ilialin@codeaurora.org>
+Message-ID: <20180401223456.GG510@tuxbook-pro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 15 Mar 07:44 PDT 2018, Srinivas Kandagatla wrote:
+On Thu 29 Mar 14:26 PDT 2018, Ilia Lin wrote:
 
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> 
-> This patch marks all the gsbi i2c node at soc level dtsi, so that kernel
-> would not assume that its enabled and result in pin conflicts when gsbi
-> is used for UART or SPI.
-> 
-> Without this patch we see below pin conflict.
-> 
-> apq8064-pinctrl 800000.pinctrl: pin GPIO_20 already requested by
->  12450000.serial; cannot claim for 12460000.i2c
-> apq8064-pinctrl 800000.pinctrl: pin-20 (12460000.i2c) status -22
-> apq8064-pinctrl 800000.pinctrl: could not request pin 20 (GPIO_20)
->  from group gpio20  on device 800000.pinctrl
-> i2c_qup 12460000.i2c: Error applying setting, reverse things back
-> i2c_qup: probe of 12460000.i2c failed with error -22
-> 
+> diff --git a/drivers/soc/qcom/kryo-l2-accessors.c b/drivers/soc/qcom/kryo-l2-accessors.c
+> new file mode 100644
+> index 0000000..b0356c2
+> --- /dev/null
+> +++ b/drivers/soc/qcom/kryo-l2-accessors.c
+> @@ -0,0 +1,66 @@
+> +/*
+> + * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+The copyright header in the C file should be:
+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
+ */
+
+> +
+> +#include <linux/spinlock.h>
+> +#include <asm/sysreg.h>
+> +#include <soc/qcom/kryo-l2-accessors.h>
+> +
+> +#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
+> +#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
+> +
+> +static DEFINE_RAW_SPINLOCK(l2_access_lock);
+> +
+> +/**
+> + * set_l2_indirect_reg: write value to an L2 register
+
+* set_l2_indirect_reg() - write value to an L2 register
+
+> + * @reg: Address of L2 register.
+> + * @value: Value to be written to register.
+> + *
+> + * Use architecturally required barriers for ordering between system register
+> + * accesses, and system registers with respect to device memory
+> + */
+> +void set_l2_indirect_reg(u64 reg, u64 val)
+
+As these are now kernel-global functions I recommend that you give them
+a slightly more specific name; e.g. kryo_l2_set_indirect_reg() and
+kryo_l2_get_indirect_reg().
+
+[..]
+> diff --git a/include/soc/qcom/kryo-l2-accessors.h b/include/soc/qcom/kryo-l2-accessors.h
+> new file mode 100644
+> index 0000000..3c796cf
+> --- /dev/null
+> +++ b/include/soc/qcom/kryo-l2-accessors.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+
+And in the header file it should be:
+
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (c) 2014-2015, 2018, The Linux Foundation. All rights reserved.
+ */
+
+> +
+> +#ifndef __SOC_ARCH_QCOM_KRYO_L2_ACCESSORS_H
+> +#define __SOC_ARCH_QCOM_KRYO_L2_ACCESSORS_H
+> +
+> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
+> +u64 get_l2_indirect_reg(u64 reg_addr);
+
+Rename "reg_addr" to "reg" to match the implementation.
 
 Regards,
 Bjorn
-
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8064.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index 3ca96e361878..54cff79f5725 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -444,6 +444,7 @@
->  				clock-names = "core", "iface";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> +				status = "disabled";
->  			};
->  
->  		};
-> @@ -472,6 +473,7 @@
->  				clock-names = "core", "iface";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> +				status = "disabled";
->  			};
->  		};
->  
-> @@ -497,6 +499,7 @@
->  				clock-names = "core", "iface";
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> +				status = "disabled";
->  			};
->  		};
->  
-> @@ -521,6 +524,7 @@
->  				clocks = <&gcc GSBI4_QUP_CLK>,
->  					 <&gcc GSBI4_H_CLK>;
->  				clock-names = "core", "iface";
-> +				status = "disabled";
->  			};
->  		};
->  
-> -- 
-> 2.16.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
