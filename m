@@ -1,140 +1,39 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 2 Apr 2018 10:53:32 +0900
-Subject: [RFC] arm64: extra entries in /proc/iomem for kexec
-In-Reply-To: <da2989ec-7fa5-b044-3237-4e75f2fe6d98@arm.com>
-References: <20180314082941.GM25863@linaro.org>
- <2d2e1be6-b925-1595-9b6e-76dd270d396d@redhat.com>
- <20180327101654.GB14737@linaro.org>
- <da2989ec-7fa5-b044-3237-4e75f2fe6d98@arm.com>
-Message-ID: <20180402015330.GA27603@linaro.org>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Mon, 2 Apr 2018 10:28:31 +0800
+Subject: [PATCH v2] MAINTAINERS: update entry for ARM/berlin
+In-Reply-To: <20180330135932.GB28244@lunn.ch>
+References: <20180330110211.36455347@xhacker.debian>
+ <20180330135932.GB28244@lunn.ch>
+Message-ID: <20180402102819.599ac67f@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+On Fri, 30 Mar 2018 15:59:32 +0200 Andrew Lunn wrote:
 
-My apologies for slow response. I had a long weekend.
-
-On Tue, Mar 27, 2018 at 02:32:49PM +0100, James Morse wrote:
-> Hi Akashi,
-> 
-> On 27/03/18 11:16, AKASHI Takahiro wrote:
-> > On Tue, Mar 20, 2018 at 01:18:34AM +0530, Bhupesh Sharma wrote:
-> >> On 03/14/2018 01:59 PM, AKASHI Takahiro wrote:
-> >>> Currently, there is a inconsistent view between (A) and the mainline's:
-> >>> see (A-1) and (B-1). If this is really a matter, I can fix it.
-> >>> Kexec-tools can be easily modified to accept both formats, though.
-> 
-> Ooer, what needs changing in kexec-tools? What happens if someone doesn't update
-> userspace at the same time?
-
-Basically, changes that I made on /proc/iomem in my new format D were:
-1. to move NOMAP region entries, formerly named "reserved" and now named
-   "reserved (no map)", under System RAM
-2. to add new entries for firmware-reserved regions as "reserved" also
-   under System RAM
-
-On the other hand, current kexec-tools, in particular kexec command,
-only scan top-level "System RAM" entries as well as "reserved" entries.
-
-So if someone doesn't update kexec-tools, secondary kernel may potentially
-crash during boot time either because
-a. new kernel (or initrd/dtb) may have been allocated on a NOMAP region
-   which are not suitable for usable memory, or
-b. new kernel (or initrd/dtb) may have been allocated on a reserved region
-   whose contents can be overwritten.
-
-While we see (b) even today, (a) is a backward compatibility issue.
-
-Note: we have a different story for kdump (alignment error), and I will
-take a different approach to fixing kdump case.
-
-> Is there a format which doesn't require a user-space change, (and shouldn't we
-> pick that one?)
-
-The only solution that I can imagine for now to prevent (a) and (b)
-at the same time without any user-space change is
-2+. to add new entries for firmware-reserved regions as "reserved",
-    in addition to the current NOMAP regions, at top level
-
-(format E)
-40000000-5858ffff : System RAM
-  40080000-40f1ffff : Kernel code
-  41040000-411e9fff : Kernel data
-  54400000-583fffff : Crash kernel
-58590000-585effff : reserved
-484f0000-586fffff : System RAM 
-58700000-5871ffff : reserved
-58720000-58b5ffff : reserved (no map)
-58b60000-58b0ffff : System RAM
-58b61000-58b61fff : reserved
-58620000-59a7b117 : System RAM
-59a7b118-59a7b667 : reserved
-59a7b668-5be3ffff : System RAM
-5be40000-5becffff : reserved (no map)
-5bed0000-5bedffff : System RAM
-5bee0000-5bffffff : reserved (no map)
-5ec00000-5edfffff : reserved
-5ee00000-5fffffff ; System RAM
-8000000000-ffffffffff : PCI Bus 0000:00
-
-This does not only look quite noisy but also ignores the fact that
-reserved regions are part of System RAM (or memblock.memory). 
-
-Or to maximize the compatibility, we may adopt format B:
-
-(format B)
-40000000-5871ffff : System RAM
-  40080000-40f1ffff : Kernel code
-  41040000-411e9fff : Kernel data
-  54400000-583fffff : Crash kernel
-  58590000-585effff : reserved
-  58700000-5871ffff : reserved
-58720000-58b5ffff : reserved (no map)
-58b60000-5be3ffff : System RAM
-  58b61000-58b61fff : reserved
-  59a7b118-59a7b667 : reserved
-5be40000-5becffff : reserved (no map)
-5bed0000-5bedffff : System RAM
-5bee0000-5bffffff : reserved (no map)
-5c000000-5fffffff : System RAM
-  5ec00000-5edfffff : reserved
-8000000000-ffffffffff : PCI Bus 0000:00
-
-but, in this case, we need some change on kexec-tools to fix (b).
-
-> >>> 2. How should we determine which regions be exported in /proc/iomem?
-> >>>
-> >>>  a. Trust all the memblock_reserve'd regions as my previous patch [3] does.
-> >>>
-> >>>     As I said, it's a kind of "overkill." Some of regions, say fdt, are
-> >>>     not required to be preserved across kexec.
-> >>
-> >>
-> >> I think we should preserve all the memblock_reserve'd regions. So +1 on this
-> >> approach from my side. I believe it might help avoid issues we have seen in
-> >> the past with 'kexec-tools' _incorrectly_ determining which regions to pick
-> >> from the '/proc/iomem'.
+> On Fri, Mar 30, 2018 at 11:02:11AM +0800, Jisheng Zhang wrote:
+> > Synaptics has acquired the Multimedia Solutions Business of Marvell[1].
+> > So change the berlin entry name and move it to its alphabetical
+> > location. We move to ARM/Synaptics instead of ARM/Marvell.
 > > 
-> > As I said in my reply to Ard's comment, I now know *overkill* is not a big
-> > issue and I will go for this approach.
+> > This patch also updates my email address from marvell to synaptics.
+> > 
+> > [1] https://www.synaptics.com/company/news/conexant-marvell
+> > 
+> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>  
 > 
-> /sys/kernel/debug/memblock/reserved has all kinds of weird stuff in it,
-> including some smaller-than-a-page reservations that appear to come from the
-> percpu allocator.
+> Thanks for the link
 > 
-> I agree it will make the implementation simpler, and reserving 'too much' isn't
-> an issue.
-
-Are you suggesting that we should use /sys/kernel/debug/memblock/reserved
-without modifying current /proc/iomem?
-(Note that, even in this approach, we need an user-space change.)
-
-Hmm, overall, this approach will be preferable to format B/E.
-
-Thanks,
--Takahiro AKASHI
-
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> Thanks,
+> Do you still plan to move the DT files from the Marvell subdirectory?
+> Are the locations of these files considered fixed?
 > 
-> James
+
+For new SoCs, the DT files will be put into synaptics sub-directory.
+But for existing arm64 berlin DT files which currently sits in
+arch/arm64/boot/dts/marvell, I dunno the proper solution. Could
+you please give some suggestions? How do other vendors handle this
+situation in the past?
+
+Thanks in advance,
+Jisheng
