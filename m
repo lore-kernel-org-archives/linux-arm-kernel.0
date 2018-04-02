@@ -1,33 +1,71 @@
-From: sricharan@codeaurora.org (sricharan at codeaurora.org)
-Date: Mon, 02 Apr 2018 15:28:47 +0530
-Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
- data
-In-Reply-To: <20180329163739.2fg5qxvb5j3fiy6r@localhost>
-References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
- <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
- <20180320143131.4eenixtbhciq5fwc@localhost>
- <20180329143715.GA31757@hector.attlocal.net>
- <20180329163739.2fg5qxvb5j3fiy6r@localhost>
-Message-ID: <4073ec6b457cb369a83c710d0ae453b4@codeaurora.org>
+From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
+Date: Mon, 2 Apr 2018 16:09:05 +0530
+Subject: [RFC 5/6] dmaengine: xilinx_dma: Program interrupt delay timeout
+In-Reply-To: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
+References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
+Message-ID: <1522665546-10035-6-git-send-email-radheys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-03-29 22:07, Richard Cochran wrote:
-> On Thu, Mar 29, 2018 at 09:37:15AM -0500, Andy Gross wrote:
->> 
->> Feel free to send your own contributions where you are adding the 
->> things that
->> are important to you.
-> 
-> You can count on it.  I am really happy that ipq4019 at least boots 
-> mainline.
-> 
-> BTW is there any hope of getting a working mainline DTS for the
-> ipq8062, ideally for the ap145_100 board?
+Program IRQDelay for AXI DMA. The interrupt timeout mechanism causes
+the DMA engine to generate an interrupt after the delay time period
+has expired. It enables dmaengine to respond in real-time even though
+interrupt coalescing is configured.
 
-   Yes, i will post another series for ipq806[2/4] updates and the 
-corresponding
-   boards after this.
+Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
+---
+ drivers/dma/xilinx/xilinx_dma.c |   16 ++++++++++++++--
+ 1 files changed, 14 insertions(+), 2 deletions(-)
 
-Regards,
-  Sricharan
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index 518465e..ab8f1b0 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -161,8 +161,12 @@
+ /* AXI DMA Specific Masks/Bit fields */
+ #define XILINX_DMA_MAX_TRANS_LEN	GENMASK(22, 0)
+ #define XILINX_DMA_CR_COALESCE_MAX	GENMASK(23, 16)
++#define XILINX_DMA_CR_DELAY_MAX		GENMASK(31, 24)
+ #define XILINX_DMA_CR_CYCLIC_BD_EN_MASK	BIT(4)
+ #define XILINX_DMA_CR_COALESCE_SHIFT	16
++#define XILINX_DMA_CR_DELAY_SHIFT	24
++#define XILINX_DMA_CR_WAITBOUND_DFT	254
++
+ #define XILINX_DMA_BD_SOP		BIT(27)
+ #define XILINX_DMA_BD_EOP		BIT(26)
+ #define XILINX_DMA_COALESCE_MAX		255
+@@ -1294,6 +1298,12 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 		reg &= ~XILINX_DMA_CR_COALESCE_MAX;
+ 		reg |= chan->desc_pendingcount <<
+ 				  XILINX_DMA_CR_COALESCE_SHIFT;
++
++		if (chan->xdev->has_axieth_connected) {
++			reg  &= ~XILINX_DMA_CR_DELAY_MAX;
++			reg  |= XILINX_DMA_CR_WAITBOUND_DFT <<
++					XILINX_DMA_CR_DELAY_SHIFT;
++		}
+ 		dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
+ 	}
+ 
+@@ -1508,7 +1518,8 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
+ 		}
+ 	}
+ 
+-	if (status & XILINX_DMA_DMASR_DLY_CNT_IRQ) {
++	if (!chan->xdev->has_axieth_connected && (status &
++			XILINX_DMA_DMASR_DLY_CNT_IRQ)) {
+ 		/*
+ 		 * Device takes too long to do the transfer when user requires
+ 		 * responsiveness.
+@@ -1516,7 +1527,8 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
+ 		dev_dbg(chan->dev, "Inter-packet latency too long\n");
+ 	}
+ 
+-	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
++	if (status & (XILINX_DMA_DMASR_FRM_CNT_IRQ |
++		      XILINX_DMA_DMASR_DLY_CNT_IRQ)) {
+ 		spin_lock(&chan->lock);
+ 		xilinx_dma_complete_descriptor(chan);
+ 		chan->idle = true;
+-- 
+1.7.1
