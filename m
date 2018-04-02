@@ -1,78 +1,33 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 2 Apr 2018 15:00:18 +0530
-Subject: [PATCH v4 13/14] dt-bindings: cpufreq: Document
- operating-points-v2-kryo-cpu
-In-Reply-To: <1522358807-10413-14-git-send-email-ilialin@codeaurora.org>
-References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
- <1522358807-10413-14-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20180402093018.GC3572@vireshk-i7>
+From: sricharan@codeaurora.org (sricharan at codeaurora.org)
+Date: Mon, 02 Apr 2018 15:28:47 +0530
+Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
+ data
+In-Reply-To: <20180329163739.2fg5qxvb5j3fiy6r@localhost>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+ <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
+ <20180320143131.4eenixtbhciq5fwc@localhost>
+ <20180329143715.GA31757@hector.attlocal.net>
+ <20180329163739.2fg5qxvb5j3fiy6r@localhost>
+Message-ID: <4073ec6b457cb369a83c710d0ae453b4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Sricharan,
-
-On 30-03-18, 00:26, Ilia Lin wrote:
-> In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
-> that have KRYO processors, the CPU ferequencies subset and voltage value
-> of each OPP varies based on the silicon variant in use.
-> Qualcomm Technologies, Inc. Process Voltage Scaling Tables
-> defines the voltage and frequency value based on the msm-id in SMEM
-> and speedbin blown in the efuse combination.
-> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-> to provide the OPP framework with required information.
-> This is used to determine the voltage and frequency value for each OPP of
-> operating-points-v2 table when it is parsed by the OPP framework.
+On 2018-03-29 22:07, Richard Cochran wrote:
+> On Thu, Mar 29, 2018 at 09:37:15AM -0500, Andy Gross wrote:
+>> 
+>> Feel free to send your own contributions where you are adding the 
+>> things that
+>> are important to you.
 > 
-> This change adds documentation.
+> You can count on it.  I am really happy that ipq4019 at least boots 
+> mainline.
 > 
-> Change-Id: I1953f652a48249fb516d175f0e965a9510cd4209
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> ---
->  .../devicetree/bindings/cpufreq/kryo-cpufreq.txt   | 693 +++++++++++++++++++++
->  1 file changed, 693 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+> BTW is there any hope of getting a working mainline DTS for the
+> ipq8062, ideally for the ap145_100 board?
 
-This should really go in opp directory.
+   Yes, i will post another series for ipq806[2/4] updates and the 
+corresponding
+   boards after this.
 
-> new file mode 100644
-> index 0000000..20cef9d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
-> @@ -0,0 +1,693 @@
-> +Qualcomm Technologies, Inc. KRYO CPUFreq and OPP bindings
-> +===================================
-> +
-> +In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
-> +that have KRYO processors, the CPU ferequencies subset and voltage value
-> +of each OPP varies based on the silicon variant in use.
-> +Qualcomm Technologies, Inc. Process Voltage Scaling Tables
-> +defines the voltage and frequency value based on the msm-id in SMEM
-> +and speedbin blown in the efuse combination.
-> +The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
-> +to provide the OPP framework with required information (existing HW bitmap).
-> +This is used to determine the voltage and frequency value for each OPP of
-> +operating-points-v2 table when it is parsed by the OPP framework.
-> +
-> +Required properties:
-> +--------------------
-> +In 'cpus' nodes:
-> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
-> +
-> +In 'operating-points-v2' table:
-> +- compatible: Should be
-> +	- 'operating-points-v2-kryo-cpu' for apq8096 and msm8996.
-> +- nvmem-cells: A phandle pointing to a nvmem-cells node representing the
-> +		efuse registers that has information about the
-> +		speedbin that is used to select the right frequency/voltage
-> +		value pair.
-> +		Please refer the for nvmem-cells
-> +		bindings Documentation/devicetree/bindings/nvmem/nvmem.txt
-> +		and also examples below.
-
-Sricharan is also working on adding these, just make sure you guys do the same
-thing..
-
--- 
-viresh
+Regards,
+  Sricharan
