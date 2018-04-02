@@ -1,161 +1,217 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 2 Apr 2018 16:17:58 +0900
-Subject: [Question] MFD driver that handles clocks/resets and populates child
- nodes
-Message-ID: <CAK7LNARFWDMgmWsCjUmVrm4ZeYOcKCbizijxmDXob618ABjNWg@mail.gmail.com>
+From: hejianet@gmail.com (Jia He)
+Date: Mon, 2 Apr 2018 15:49:23 +0800
+Subject: [PATCH v5 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
+ on arm and arm64
+In-Reply-To: <CAKv+Gu96_sC1Q6-w4O-AXFZzNnH1WoGwJfqvSR+Q_k_bZbrUGg@mail.gmail.com>
+References: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
+ <1522636236-12625-2-git-send-email-hejianet@gmail.com>
+ <CAKv+Gu96_sC1Q6-w4O-AXFZzNnH1WoGwJfqvSR+Q_k_bZbrUGg@mail.gmail.com>
+Message-ID: <41445229-043c-976f-3961-13770163444f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
 
 
-Some MFD drivers populate child nodes
-after some basic hardware setups.
+On 4/2/2018 2:55 PM, Ard Biesheuvel Wrote:
+> On 2 April 2018 at 04:30, Jia He <hejianet@gmail.com> wrote:
+>> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+>> where possible") optimized the loop in memmap_init_zone(). But it causes
+>> possible panic bug. So Daniel Vacek reverted it later.
+>>
+>> But as suggested by Daniel Vacek, it is fine to using memblock to skip
+>> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+>>
+>> On arm and arm64, memblock is used by default. But generic version of
+>> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+>> not always return the next valid one but skips more resulting in some
+>> valid frames to be skipped (as if they were invalid). And that's why
+>> kernel was eventually crashing on some !arm machines.
+>>
+>> And as verified by Eugeniu Rosca, arm can benifit from commit
+>> b92df1de5d28. So remain the memblock_next_valid_pfn on arm{,64} and move
+>> the related codes to arm64 arch directory.
+>>
+>> Suggested-by: Daniel Vacek <neelx@redhat.com>
+>> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+> Hello Jia,
+>
+> Apologies for chiming in late.
+no problem, thanks for your comments? ;-)
+>
+> If we are going to rearchitect this, I'd rather we change the loop in
+> memmap_init_zone() so that we skip to the next valid PFN directly
+> rather than skipping to the last invalid PFN so that the pfn++ in the
+hmm... Maybe this macro name makes you confused
 
+pfn = skip_to_last_invalid_pfn(pfn);
 
-My question is, is it acceptable to upstream
-a MFD driver that handles only clocks/resets,
-then calls of_platform_populate.
+how about skip_to_next_valid_pfn?
 
-
-The probe function will look like follows:
-
-
-static int uniphier_usb3_glue_probe(struct platform_device *pdev)
-{
-        [get some clocks];
-
-        [get some resets];
-
-        [enable some clocks];
-
-        [deassert some resets];
-
-        return devm_of_platform_populate(dev);
-}
-
-
-With this driver, the child devices do not need
-to handle clocks/resets.
-But, I am not sure if it is the right thing to do.
-
-
-
-Background of this question
----------------------------
-
-Socionext is trying to upstream
-the glue layer for DWC3 USB IP.
-
-The original patch is this.
-https://patchwork.kernel.org/patch/10180167/
-
-This driver enables clocks, deassert resets,
-and sets up some more registers,
-then populates the DWC3 core node.
-
-The maintainer of DWC3, Felipe Balbi, requested to
-split the glue layer driver into small parts such as
-reset, regulator, phy, etc.
-
-So, the node will look like follows:
-
-   usb-glue {
-           reset {
-                   ...
-           };
-
-           regulator {
-                   ...
-           };
-
-           hs-phy {
-                   ...
-           };
-
-           ss-phy {
-                   ...
-           };
-   }
-
-Here, one question popped up.
-Where should the hardware resources be described?
-The register, clocks, resets are shared among the sub-nodes.
-This is the obvious result since it is a single hardware block
-in the first place, and we are splitting it into small chunks.
-
-
-If the MFD driver approach is acceptable,
-clocks, resets will be handles in the parent node.
-(Such a driver looks stupid, though)
-
-
-   usb-glue {
-           compatible = "socionext,uniphier-ld20-usb3-glue",
-                        "syscon";
-           reg = <0x65b00000 0x1000>;
-           clocks = <sys_clk 14>;
-           resets = <sys_clk 14>;
-
-           reset {
-                   ...
-           };
-
-           regulator {
-                   ...
-           };
-
-           hs-phy {
-                   ...
-           };
-
-           ss-phy {
-                   ...
-           };
-   }
-
-
-Of course, it is possible to use "simple-mfd"
-and each driver can repeat the same clock/reset like follows.
-(this also looks a bit clumsy...)
-
-   usb-glue {
-           compatible = "socionext,uniphier-ld20-usb3-glue",
-                        "simple-mfd", "syscon";
-           reg = <0x65b00000 0x1000>;
-
-           reset {
-                   clocks = <sys_clk 14>;
-                   resets = <sys_clk 14>;
-                   ...
-           };
-
-           regulator {
-                   clocks = <sys_clk 14>;
-                   resets = <sys_clk 14>;
-                   ...
-           };
-
-           hs-phy {
-                   clocks = <sys_clk 14>;
-                   resets = <sys_clk 14>;
-                   ...
-           };
-
-           ss-phy {
-                   clocks = <sys_clk 14>;
-                   resets = <sys_clk 14>;
-                   ...
-           };
-   }
-
-
-Which is better?
-Or any other good idea?
-
-Thanks.
+> for () results in the next value. Can we replace the pfn++ there with
+> a function calls that defaults to 'return pfn + 1', but does the skip
+> for architectures that implement it?
+I am not sure I understand your question here.
+With this patch, on !arm arches, skip_to_last_invalid_pfn is equal to 
+(pfn), and will be increased
+when for{} loop continue. We only *skip* to the start pfn of next valid 
+region when
+CONFIG_HAVE_MEMBLOCK and CONFIG_HAVE_ARCH_PFN_VALID(arm/arm64 supports 
+both).
 
 
 -- 
-Best Regards
-Masahiro Yamada
+Cheers,
+Jia
+
+>
+>
+>> ---
+>>   arch/arm/include/asm/page.h   |  2 ++
+>>   arch/arm/mm/init.c            | 31 ++++++++++++++++++++++++++++++-
+>>   arch/arm64/include/asm/page.h |  2 ++
+>>   arch/arm64/mm/init.c          | 31 ++++++++++++++++++++++++++++++-
+>>   include/linux/mmzone.h        |  1 +
+>>   mm/page_alloc.c               |  4 +++-
+>>   6 files changed, 68 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+>> index 4355f0e..489875c 100644
+>> --- a/arch/arm/include/asm/page.h
+>> +++ b/arch/arm/include/asm/page.h
+>> @@ -158,6 +158,8 @@ typedef struct page *pgtable_t;
+>>
+>>   #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+>>   extern int pfn_valid(unsigned long);
+>> +extern unsigned long memblock_next_valid_pfn(unsigned long pfn);
+>> +#define skip_to_last_invalid_pfn(pfn) (memblock_next_valid_pfn(pfn) - 1)
+>>   #endif
+>>
+>>   #include <asm/memory.h>
+>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> index a1f11a7..0fb85ca 100644
+>> --- a/arch/arm/mm/init.c
+>> +++ b/arch/arm/mm/init.c
+>> @@ -198,7 +198,36 @@ int pfn_valid(unsigned long pfn)
+>>          return memblock_is_map_memory(__pfn_to_phys(pfn));
+>>   }
+>>   EXPORT_SYMBOL(pfn_valid);
+>> -#endif
+>> +
+>> +/* HAVE_MEMBLOCK is always enabled on arm */
+>> +unsigned long __init_memblock memblock_next_valid_pfn(unsigned long pfn)
+>> +{
+>> +       struct memblock_type *type = &memblock.memory;
+>> +       unsigned int right = type->cnt;
+>> +       unsigned int mid, left = 0;
+>> +       phys_addr_t addr = PFN_PHYS(++pfn);
+>> +
+>> +       do {
+>> +               mid = (right + left) / 2;
+>> +
+>> +               if (addr < type->regions[mid].base)
+>> +                       right = mid;
+>> +               else if (addr >= (type->regions[mid].base +
+>> +                                 type->regions[mid].size))
+>> +                       left = mid + 1;
+>> +               else {
+>> +                       /* addr is within the region, so pfn is valid */
+>> +                       return pfn;
+>> +               }
+>> +       } while (left < right);
+>> +
+>> +       if (right == type->cnt)
+>> +               return -1UL;
+>> +       else
+>> +               return PHYS_PFN(type->regions[right].base);
+>> +}
+>> +EXPORT_SYMBOL(memblock_next_valid_pfn);
+>> +#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
+>>
+>>   #ifndef CONFIG_SPARSEMEM
+>>   static void __init arm_memory_present(void)
+>> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+>> index 60d02c8..e57d3f2 100644
+>> --- a/arch/arm64/include/asm/page.h
+>> +++ b/arch/arm64/include/asm/page.h
+>> @@ -39,6 +39,8 @@ typedef struct page *pgtable_t;
+>>
+>>   #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+>>   extern int pfn_valid(unsigned long);
+>> +extern unsigned long memblock_next_valid_pfn(unsigned long pfn);
+>> +#define skip_to_last_invalid_pfn(pfn) (memblock_next_valid_pfn(pfn) - 1)
+>>   #endif
+>>
+>>   #include <asm/memory.h>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index 00e7b90..13e43ff 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -290,7 +290,36 @@ int pfn_valid(unsigned long pfn)
+>>          return memblock_is_map_memory(pfn << PAGE_SHIFT);
+>>   }
+>>   EXPORT_SYMBOL(pfn_valid);
+>> -#endif
+>> +
+>> +/* HAVE_MEMBLOCK is always enabled on arm64 */
+>> +unsigned long __init_memblock memblock_next_valid_pfn(unsigned long pfn)
+>> +{
+>> +       struct memblock_type *type = &memblock.memory;
+>> +       unsigned int right = type->cnt;
+>> +       unsigned int mid, left = 0;
+>> +       phys_addr_t addr = PFN_PHYS(++pfn);
+>> +
+>> +       do {
+>> +               mid = (right + left) / 2;
+>> +
+>> +               if (addr < type->regions[mid].base)
+>> +                       right = mid;
+>> +               else if (addr >= (type->regions[mid].base +
+>> +                                 type->regions[mid].size))
+>> +                       left = mid + 1;
+>> +               else {
+>> +                       /* addr is within the region, so pfn is valid */
+>> +                       return pfn;
+>> +               }
+>> +       } while (left < right);
+>> +
+>> +       if (right == type->cnt)
+>> +               return -1UL;
+>> +       else
+>> +               return PHYS_PFN(type->regions[right].base);
+>> +}
+>> +EXPORT_SYMBOL(memblock_next_valid_pfn);
+>> +#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
+>>
+>>   #ifndef CONFIG_SPARSEMEM
+>>   static void __init arm64_memory_present(void)
+>> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+>> index d797716..f9c0c46 100644
+>> --- a/include/linux/mmzone.h
+>> +++ b/include/linux/mmzone.h
+>> @@ -1245,6 +1245,7 @@ static inline int pfn_valid(unsigned long pfn)
+>>                  return 0;
+>>          return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+>>   }
+>> +#define skip_to_last_invalid_pfn(pfn) (pfn)
+>>   #endif
+>>
+>>   static inline int pfn_present(unsigned long pfn)
+>> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+>> index c19f5ac..30f7d76 100644
+>> --- a/mm/page_alloc.c
+>> +++ b/mm/page_alloc.c
+>> @@ -5483,8 +5483,10 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
+>>                  if (context != MEMMAP_EARLY)
+>>                          goto not_early;
+>>
+>> -               if (!early_pfn_valid(pfn))
+>> +               if (!early_pfn_valid(pfn)) {
+>> +                       pfn = skip_to_last_invalid_pfn(pfn);
+>>                          continue;
+>> +               }
+>>                  if (!early_pfn_in_nid(pfn, nid))
+>>                          continue;
+>>                  if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
+>> --
+>> 2.7.4
+>>
