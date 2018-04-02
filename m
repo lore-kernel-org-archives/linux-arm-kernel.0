@@ -1,129 +1,127 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 3 Apr 2018 00:35:13 +0800
-Subject: [PATCH 12/15] dmaengine: pxa: make the filter function internal
-In-Reply-To: <20180402142656.26815-13-robert.jarzmik@free.fr>
-References: <20180402142656.26815-13-robert.jarzmik@free.fr>
-Message-ID: <201804030025.FmWPyArN%fengguang.wu@intel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 2 Apr 2018 10:40:58 -0600
+Subject: [PATCH v4 0/6] Coresight: Support panic kdump
+In-Reply-To: <1522379724-30648-1-git-send-email-leo.yan@linaro.org>
+References: <1522379724-30648-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20180402164058.GA15452@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi Leo,
 
-I love your patch! Perhaps something to improve:
+Please see below (and in upcoming patches) my comments related to your latest
+work.
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.16]
-[cannot apply to arm-soc/for-next next-20180329]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks,
+Mathieu
 
-url:    https://github.com/0day-ci/linux/commits/Robert-Jarzmik/ARM-pxa-switch-to-DMA-slave-maps/20180402-233029
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+On Fri, Mar 30, 2018 at 11:15:18AM +0800, Leo Yan wrote:
+> This patch set is to explore Coresight tracing data for postmortem
+> debugging.  When kernel panic happens, the Coresight panic kdump can
+> help to save on-chip tracing data and tracer metadata into DRAM, later
+> relies on kdump and crash/perf tools to recovery tracing data for
+> "offline" analysis.
+> 
+> The documentation is important to understand the purpose of Coresight
+> panic kdump, the implementation of framework and usage. Patches 0001
+> and patch 0002 are used for creating new sub directory for placing
+> Coresight docs and add a new doc for Coresight panic kdump.
+> 
+> Patch 0003 introduces the simple panic kdump framework which provides
+> helper functions can be used by Coresight devices, and it registers
+> panic notifier for dump tracing data.
+> 
+> Patches 0004/0005 support panic kdump for ETB; Patch 0006 supports the
+> kdump for ETMv4.
+> 
+> This patch set has been reworked by following suggestions at Linaro
+> HKG18 connect (mainly suggestions from Mathieu, thanks a lot!), and
+> it's rebased on acme git tree [1] with last commit 109d59b900e7 ('perf
+> vendor events s390: Add JSON files for IBM z14').
+> 
+> Due Coresight kdump data structure has been changed significantly, the
+> corresponding crash extension program also has been updated for this
+> reason [2]; furthermore the crash extension program is updated to
+> dynamically generate kernel buildid according to vmlinux elf info [3],
+> this is a fixing for the old code which uses hard-coded buildid value.
+> 
+> This patch set has been verified on 96boards Hikey620 with Coresight
+> enabling by the sysFS interface.  Also the updated crash extension
+> program has been verified to cowork with Coresight panic kdump and it
+> successfully extracts tracing data from the vmcore and finally can be
+> decoded by perf tool.
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git
+> [2] https://git.linaro.org/people/leo.yan/crash.git/tree/extensions/csdump.c
+> [3] https://git.linaro.org/people/leo.yan/crash.git/tree/extensions/csdump_buildid.c
+> 
+> Changes from v3:
+> * Following Mathieu suggestion, reworked the panic kdump framework,
+>   used kdump array to maintain source and sink device handlers;
+> * According to Mathieu suggestion, optimized panic notifier to
+>   firstly dump panic CPU tracing data and then dump other CPUs tracing
+>   data;
+> * Refined doc to reflect these implementation changes;
+> * Changed ETMv4 driver to add source device handler at probe phase;
+> * Refactored crash extension program to reflect kernel changes.
+> 
+> Changes from v2:
+> * Add the two patches for documentation.
+> * Following Mathieu suggestion, reworked the panic kdump framework,
+>   removed the useless flag "PRE_PANIC".
+> * According to comment, changed to add and delete kdump node operations
+>   in sink enable/disable functions;
+> * According to Mathieu suggestion, handle kdump node
+>   addition/deletion/updating separately for sysFS interface and perf
+>   method.
+> 
+> Changes from v1:
+> * Add support to dump ETMv4 meta data.
+> * Wrote 'crash' extension csdump.so so rely on it to generate 'perf'
+>   format compatible file.
+> * Refactored panic dump driver to support pre & post panic dump.
+> 
+> Changes from RFC:
+> * Follow Mathieu's suggestion, use general framework to support dump
+>   functionality.
+> * Changed to use perf to analyse trace data.
+> 
+> Leo Yan (6):
+>   doc: Add Coresight documentation directory
+>   doc: Add documentation for Coresight panic kdump
+>   coresight: Support panic kdump functionality
+>   coresight: tmc: Hook callback for panic kdump
+>   coresight: Set and clear sink device handler for kdump node
+>   coresight: etm4x: Support panic kdump
+> 
+>  Documentation/trace/coresight-cpu-debug.txt        | 187 ----------
+>  Documentation/trace/coresight.txt                  | 383 ---------------------
+>  .../trace/coresight/coresight-cpu-debug.txt        | 187 ++++++++++
+>  .../trace/coresight/coresight-panic-kdump.txt      | 130 +++++++
+>  Documentation/trace/coresight/coresight.txt        | 383 +++++++++++++++++++++
 
+Please use the -M option with git format-patch in order to prevent the metrics
+associated with the renaming of files to be tallied.
 
-sparse warnings: (new ones prefixed by >>)
-
-   drivers/mtd/nand/marvell_nand.c:2621:17: sparse: undefined identifier 'pxad_filter_fn'
->> drivers/mtd/nand/marvell_nand.c:2621:17: sparse: call with no type!
-   In file included from drivers/mtd/nand/marvell_nand.c:21:0:
-   drivers/mtd/nand/marvell_nand.c: In function 'marvell_nfc_init_dma':
-   drivers/mtd/nand/marvell_nand.c:2621:42: error: 'pxad_filter_fn' undeclared (first use in this function); did you mean 'dma_filter_fn'?
-      dma_request_slave_channel_compat(mask, pxad_filter_fn,
-                                             ^
-   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
-     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-                                                 ^
-   drivers/mtd/nand/marvell_nand.c:2621:42: note: each undeclared identifier is reported only once for each function it appears in
-      dma_request_slave_channel_compat(mask, pxad_filter_fn,
-                                             ^
-   include/linux/dmaengine.h:1408:46: note: in definition of macro 'dma_request_slave_channel_compat'
-     __dma_request_slave_channel_compat(&(mask), x, y, dev, name)
-                                                 ^
-
-vim +2621 drivers/mtd/nand/marvell_nand.c
-
-02f26ecf Miquel Raynal 2018-01-09  2588  
-02f26ecf Miquel Raynal 2018-01-09  2589  static int marvell_nfc_init_dma(struct marvell_nfc *nfc)
-02f26ecf Miquel Raynal 2018-01-09  2590  {
-02f26ecf Miquel Raynal 2018-01-09  2591  	struct platform_device *pdev = container_of(nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2592  						    struct platform_device,
-02f26ecf Miquel Raynal 2018-01-09  2593  						    dev);
-02f26ecf Miquel Raynal 2018-01-09  2594  	struct dma_slave_config config = {};
-02f26ecf Miquel Raynal 2018-01-09  2595  	struct resource *r;
-02f26ecf Miquel Raynal 2018-01-09  2596  	dma_cap_mask_t mask;
-02f26ecf Miquel Raynal 2018-01-09  2597  	struct pxad_param param;
-02f26ecf Miquel Raynal 2018-01-09  2598  	int ret;
-02f26ecf Miquel Raynal 2018-01-09  2599  
-02f26ecf Miquel Raynal 2018-01-09  2600  	if (!IS_ENABLED(CONFIG_PXA_DMA)) {
-02f26ecf Miquel Raynal 2018-01-09  2601  		dev_warn(nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2602  			 "DMA not enabled in configuration\n");
-02f26ecf Miquel Raynal 2018-01-09  2603  		return -ENOTSUPP;
-02f26ecf Miquel Raynal 2018-01-09  2604  	}
-02f26ecf Miquel Raynal 2018-01-09  2605  
-02f26ecf Miquel Raynal 2018-01-09  2606  	ret = dma_set_mask_and_coherent(nfc->dev, DMA_BIT_MASK(32));
-02f26ecf Miquel Raynal 2018-01-09  2607  	if (ret)
-02f26ecf Miquel Raynal 2018-01-09  2608  		return ret;
-02f26ecf Miquel Raynal 2018-01-09  2609  
-02f26ecf Miquel Raynal 2018-01-09  2610  	r = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-02f26ecf Miquel Raynal 2018-01-09  2611  	if (!r) {
-02f26ecf Miquel Raynal 2018-01-09  2612  		dev_err(nfc->dev, "No resource defined for data DMA\n");
-02f26ecf Miquel Raynal 2018-01-09  2613  		return -ENXIO;
-02f26ecf Miquel Raynal 2018-01-09  2614  	}
-02f26ecf Miquel Raynal 2018-01-09  2615  
-02f26ecf Miquel Raynal 2018-01-09  2616  	param.drcmr = r->start;
-02f26ecf Miquel Raynal 2018-01-09  2617  	param.prio = PXAD_PRIO_LOWEST;
-02f26ecf Miquel Raynal 2018-01-09  2618  	dma_cap_zero(mask);
-02f26ecf Miquel Raynal 2018-01-09  2619  	dma_cap_set(DMA_SLAVE, mask);
-02f26ecf Miquel Raynal 2018-01-09  2620  	nfc->dma_chan =
-02f26ecf Miquel Raynal 2018-01-09 @2621  		dma_request_slave_channel_compat(mask, pxad_filter_fn,
-02f26ecf Miquel Raynal 2018-01-09  2622  						 &param, nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2623  						 "data");
-02f26ecf Miquel Raynal 2018-01-09  2624  	if (!nfc->dma_chan) {
-02f26ecf Miquel Raynal 2018-01-09  2625  		dev_err(nfc->dev,
-02f26ecf Miquel Raynal 2018-01-09  2626  			"Unable to request data DMA channel\n");
-02f26ecf Miquel Raynal 2018-01-09  2627  		return -ENODEV;
-02f26ecf Miquel Raynal 2018-01-09  2628  	}
-02f26ecf Miquel Raynal 2018-01-09  2629  
-02f26ecf Miquel Raynal 2018-01-09  2630  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-02f26ecf Miquel Raynal 2018-01-09  2631  	if (!r)
-02f26ecf Miquel Raynal 2018-01-09  2632  		return -ENXIO;
-02f26ecf Miquel Raynal 2018-01-09  2633  
-02f26ecf Miquel Raynal 2018-01-09  2634  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-02f26ecf Miquel Raynal 2018-01-09  2635  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-02f26ecf Miquel Raynal 2018-01-09  2636  	config.src_addr = r->start + NDDB;
-02f26ecf Miquel Raynal 2018-01-09  2637  	config.dst_addr = r->start + NDDB;
-02f26ecf Miquel Raynal 2018-01-09  2638  	config.src_maxburst = 32;
-02f26ecf Miquel Raynal 2018-01-09  2639  	config.dst_maxburst = 32;
-02f26ecf Miquel Raynal 2018-01-09  2640  	ret = dmaengine_slave_config(nfc->dma_chan, &config);
-02f26ecf Miquel Raynal 2018-01-09  2641  	if (ret < 0) {
-02f26ecf Miquel Raynal 2018-01-09  2642  		dev_err(nfc->dev, "Failed to configure DMA channel\n");
-02f26ecf Miquel Raynal 2018-01-09  2643  		return ret;
-02f26ecf Miquel Raynal 2018-01-09  2644  	}
-02f26ecf Miquel Raynal 2018-01-09  2645  
-02f26ecf Miquel Raynal 2018-01-09  2646  	/*
-02f26ecf Miquel Raynal 2018-01-09  2647  	 * DMA must act on length multiple of 32 and this length may be
-02f26ecf Miquel Raynal 2018-01-09  2648  	 * bigger than the destination buffer. Use this buffer instead
-02f26ecf Miquel Raynal 2018-01-09  2649  	 * for DMA transfers and then copy the desired amount of data to
-02f26ecf Miquel Raynal 2018-01-09  2650  	 * the provided buffer.
-02f26ecf Miquel Raynal 2018-01-09  2651  	 */
-c495a927 Miquel Raynal 2018-01-19  2652  	nfc->dma_buf = kmalloc(MAX_CHUNK_SIZE, GFP_KERNEL | GFP_DMA);
-02f26ecf Miquel Raynal 2018-01-09  2653  	if (!nfc->dma_buf)
-02f26ecf Miquel Raynal 2018-01-09  2654  		return -ENOMEM;
-02f26ecf Miquel Raynal 2018-01-09  2655  
-02f26ecf Miquel Raynal 2018-01-09  2656  	nfc->use_dma = true;
-02f26ecf Miquel Raynal 2018-01-09  2657  
-02f26ecf Miquel Raynal 2018-01-09  2658  	return 0;
-02f26ecf Miquel Raynal 2018-01-09  2659  }
-02f26ecf Miquel Raynal 2018-01-09  2660  
-
-:::::: The code at line 2621 was first introduced by commit
-:::::: 02f26ecf8c772751d4b24744d487f6b1b20e75d4 mtd: nand: add reworked Marvell NAND controller driver
-
-:::::: TO: Miquel Raynal <miquel.raynal@free-electrons.com>
-:::::: CC: Boris Brezillon <boris.brezillon@free-electrons.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  MAINTAINERS                                        |   5 +-
+>  drivers/hwtracing/coresight/Kconfig                |   9 +
+>  drivers/hwtracing/coresight/Makefile               |   1 +
+>  drivers/hwtracing/coresight/coresight-etm-perf.c   |   5 +
+>  drivers/hwtracing/coresight/coresight-etm4x.c      |  27 ++
+>  drivers/hwtracing/coresight/coresight-etm4x.h      |  15 +
+>  .../hwtracing/coresight/coresight-panic-kdump.c    | 199 +++++++++++
+>  drivers/hwtracing/coresight/coresight-priv.h       |  12 +
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c    |  30 ++
+>  drivers/hwtracing/coresight/coresight.c            |  16 +-
+>  include/linux/coresight.h                          |   4 +
+>  16 files changed, 1019 insertions(+), 574 deletions(-)
+>  delete mode 100644 Documentation/trace/coresight-cpu-debug.txt
+>  delete mode 100644 Documentation/trace/coresight.txt
+>  create mode 100644 Documentation/trace/coresight/coresight-cpu-debug.txt
+>  create mode 100644 Documentation/trace/coresight/coresight-panic-kdump.txt
+>  create mode 100644 Documentation/trace/coresight/coresight.txt
+>  create mode 100644 drivers/hwtracing/coresight/coresight-panic-kdump.c
+> 
+> -- 
+> 2.7.4
+> 
