@@ -1,64 +1,34 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Mon, 2 Apr 2018 16:09:04 +0530
-Subject: [RFC 4/6] dmaengine: xilinx_dma: Freeup active list based on
- descriptor completion bit
+Date: Mon, 2 Apr 2018 16:09:03 +0530
+Subject: [RFC 3/6] dmaengine: xilinx_dma: Increase AXI DMA transaction segment
+ count
 In-Reply-To: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
 References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
-Message-ID: <1522665546-10035-5-git-send-email-radheys@xilinx.com>
+Message-ID: <1522665546-10035-4-git-send-email-radheys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AXIDMA IP sets completion bit to 1 when the transfer is completed. Read
-this bit to move descriptor from active list to the done list. This feature
-is needed when interrupt delay timeout and IRQThreshold is enabled i.e
-Dly_IrqEn is triggered w/o completing Interrupt Threshold.
+Increase AXI DMA transaction segments count to ensure that even in
+high load we always get a free segment in prepare descriptor for a
+DMA_SLAVE transaction.
 
 Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
 ---
- drivers/dma/xilinx/xilinx_dma.c |   18 ++++++++++++++----
- 1 files changed, 14 insertions(+), 4 deletions(-)
+ drivers/dma/xilinx/xilinx_dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 36e1ab9..518465e 100644
+index 16fee30..36e1ab9 100644
 --- a/drivers/dma/xilinx/xilinx_dma.c
 +++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -103,6 +103,7 @@
- #define XILINX_DMA_PARK_PTR_RD_REF_SHIFT	0
- #define XILINX_DMA_PARK_PTR_RD_REF_MASK		GENMASK(4, 0)
- #define XILINX_DMA_REG_VDMA_VERSION		0x002c
-+#define XILINX_DMA_COMP_MASK			BIT(31)
+@@ -165,7 +165,7 @@
+ #define XILINX_DMA_BD_SOP		BIT(27)
+ #define XILINX_DMA_BD_EOP		BIT(26)
+ #define XILINX_DMA_COALESCE_MAX		255
+-#define XILINX_DMA_NUM_DESCS		255
++#define XILINX_DMA_NUM_DESCS		512
+ #define XILINX_DMA_NUM_APP_WORDS	5
  
- /* Register Direct Mode Registers */
- #define XILINX_DMA_REG_VSIZE			0x0000
-@@ -1387,16 +1388,25 @@ static void xilinx_dma_issue_pending(struct dma_chan *dchan)
- static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
- {
- 	struct xilinx_dma_tx_descriptor *desc, *next;
-+	struct xilinx_axidma_tx_segment *seg;
- 
- 	/* This function was invoked with lock held */
- 	if (list_empty(&chan->active_list))
- 		return;
- 
- 	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
--		list_del(&desc->node);
--		if (!desc->cyclic)
--			dma_cookie_complete(&desc->async_tx);
--		list_add_tail(&desc->node, &chan->done_list);
-+
-+		seg = list_last_entry(&desc->segments,
-+				      struct xilinx_axidma_tx_segment, node);
-+		if ((seg->hw.status & XILINX_DMA_COMP_MASK) ||
-+			(!chan->xdev->has_axieth_connected)) {
-+			list_del(&desc->node);
-+			if (!desc->cyclic)
-+				dma_cookie_complete(&desc->async_tx);
-+			list_add_tail(&desc->node, &chan->done_list);
-+		} else {
-+			break;
-+		}
- 	}
- }
- 
+ /* Multi-Channel DMA Descriptor offsets*/
 -- 
 1.7.1
