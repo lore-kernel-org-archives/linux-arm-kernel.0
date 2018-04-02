@@ -1,34 +1,31 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Mon, 2 Apr 2018 16:09:03 +0530
-Subject: [RFC 3/6] dmaengine: xilinx_dma: Increase AXI DMA transaction segment
- count
-In-Reply-To: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
-Message-ID: <1522665546-10035-4-git-send-email-radheys@xilinx.com>
+Date: Mon, 2 Apr 2018 16:09:00 +0530
+Subject: [RFC 0/6] Xilinx DMA enhancements and optimization
+Message-ID: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase AXI DMA transaction segments count to ensure that even in
-high load we always get a free segment in prepare descriptor for a
-DMA_SLAVE transaction.
+Some background about the patch series: Xilinx Axi Ethernet device driver
+(xilinx_axienet_main.c) currently has axi-dma code inside it. The goal
+is to refactor axiethernet driver and use existing AXI DMA driver using 
+DMAEngine API.
 
-Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
----
- drivers/dma/xilinx/xilinx_dma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+This patchset does feature addition and optimization to support
+integration with axiethernet network driver. Once this patchset
+is reviewed I will send separate patchset for axiethernet driver.
 
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 16fee30..36e1ab9 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -165,7 +165,7 @@
- #define XILINX_DMA_BD_SOP		BIT(27)
- #define XILINX_DMA_BD_EOP		BIT(26)
- #define XILINX_DMA_COALESCE_MAX		255
--#define XILINX_DMA_NUM_DESCS		255
-+#define XILINX_DMA_NUM_DESCS		512
- #define XILINX_DMA_NUM_APP_WORDS	5
- 
- /* Multi-Channel DMA Descriptor offsets*/
--- 
-1.7.1
+Radhey Shyam Pandey (6):
+  dt-bindings: dma: xilinx_dma: Add optional property
+    has_axieth_connected
+  dmaengine: xilinx_dma: Pass AXI4-Stream control words to netdev dma
+    client
+  dmaengine: xilinx_dma: Increase AXI DMA transaction segment count
+  dmaengine: xilinx_dma: Freeup active list based on descriptor
+    completion bit
+  dmaengine: xilinx_dma: Program interrupt delay timeout
+  dmaengine: xilinx_dma: Use tasklet_hi_schedule for timing critical
+    usecase
+
+ .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    1 +
+ drivers/dma/xilinx/xilinx_dma.c                    |   73 +++++++++++++++----
+ 2 files changed, 58 insertions(+), 16 deletions(-)
