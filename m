@@ -1,75 +1,89 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 2 Apr 2018 15:50:44 +0800
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 2 Apr 2018 09:53:33 +0200
 Subject: [PATCH v5 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
  on arm and arm64
-In-Reply-To: <1522636236-12625-2-git-send-email-hejianet@gmail.com>
-References: <1522636236-12625-2-git-send-email-hejianet@gmail.com>
-Message-ID: <201804021305.pjbSxb3W%fengguang.wu@intel.com>
+In-Reply-To: <41445229-043c-976f-3961-13770163444f@gmail.com>
+References: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
+ <1522636236-12625-2-git-send-email-hejianet@gmail.com>
+ <CAKv+Gu96_sC1Q6-w4O-AXFZzNnH1WoGwJfqvSR+Q_k_bZbrUGg@mail.gmail.com>
+ <41445229-043c-976f-3961-13770163444f@gmail.com>
+Message-ID: <CAKv+Gu_CwWnW15jyTCY55akAikEjbgK4zRq_9=YuSDot3O3dQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jia,
+On 2 April 2018 at 09:49, Jia He <hejianet@gmail.com> wrote:
+>
+>
+> On 4/2/2018 2:55 PM, Ard Biesheuvel Wrote:
+>>
+>> On 2 April 2018 at 04:30, Jia He <hejianet@gmail.com> wrote:
+>>>
+>>> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+>>> where possible") optimized the loop in memmap_init_zone(). But it causes
+>>> possible panic bug. So Daniel Vacek reverted it later.
+>>>
+>>> But as suggested by Daniel Vacek, it is fine to using memblock to skip
+>>> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+>>>
+>>> On arm and arm64, memblock is used by default. But generic version of
+>>> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+>>> not always return the next valid one but skips more resulting in some
+>>> valid frames to be skipped (as if they were invalid). And that's why
+>>> kernel was eventually crashing on some !arm machines.
+>>>
+>>> And as verified by Eugeniu Rosca, arm can benifit from commit
+>>> b92df1de5d28. So remain the memblock_next_valid_pfn on arm{,64} and move
+>>> the related codes to arm64 arch directory.
+>>>
+>>> Suggested-by: Daniel Vacek <neelx@redhat.com>
+>>> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+>>
+>> Hello Jia,
+>>
+>> Apologies for chiming in late.
+>
+> no problem, thanks for your comments  ;-)
+>>
+>>
+>> If we are going to rearchitect this, I'd rather we change the loop in
+>> memmap_init_zone() so that we skip to the next valid PFN directly
+>> rather than skipping to the last invalid PFN so that the pfn++ in the
+>
+> hmm... Maybe this macro name makes you confused
+>
+> pfn = skip_to_last_invalid_pfn(pfn);
+>
+> how about skip_to_next_valid_pfn?
+>
+>> for () results in the next value. Can we replace the pfn++ there with
+>> a function calls that defaults to 'return pfn + 1', but does the skip
+>> for architectures that implement it?
+>
+> I am not sure I understand your question here.
+> With this patch, on !arm arches, skip_to_last_invalid_pfn is equal to (pfn),
+> and will be increased
+> when for{} loop continue. We only *skip* to the start pfn of next valid
+> region when
+> CONFIG_HAVE_MEMBLOCK and CONFIG_HAVE_ARCH_PFN_VALID(arm/arm64 supports
+> both).
+>
 
-Thank you for the patch! Yet something to improve:
+What I am saying is that the loop in memmap_init_zone
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.16 next-20180329]
-[cannot apply to arm64/for-next/core]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+for (pfn = start_pfn; pfn < end_pfn; pfn++) { ... }
 
-url:    https://github.com/0day-ci/linux/commits/Jia-He/optimize-memblock_next_valid_pfn-and-early_pfn_valid-on-arm-and-arm64/20180402-131223
-config: i386-tinyconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+should be replaced by something like
 
-All errors (new ones prefixed by >>):
+for (pfn = start_pfn; pfn < end_pfn; pfn = next_valid_pfn(pfn))
 
-   mm/page_alloc.c: In function 'memmap_init_zone':
->> mm/page_alloc.c:5360:10: error: implicit declaration of function 'skip_to_last_invalid_pfn' [-Werror=implicit-function-declaration]
-       pfn = skip_to_last_invalid_pfn(pfn);
-             ^~~~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+where next_valid_pfn() is simply defined as
 
-vim +/skip_to_last_invalid_pfn +5360 mm/page_alloc.c
+static ulong next_valid_pfn(ulong pfn)
+{
+  return pfn + 1;
+}
 
-  5340	
-  5341		if (highest_memmap_pfn < end_pfn - 1)
-  5342			highest_memmap_pfn = end_pfn - 1;
-  5343	
-  5344		/*
-  5345		 * Honor reservation requested by the driver for this ZONE_DEVICE
-  5346		 * memory
-  5347		 */
-  5348		if (altmap && start_pfn == altmap->base_pfn)
-  5349			start_pfn += altmap->reserve;
-  5350	
-  5351		for (pfn = start_pfn; pfn < end_pfn; pfn++) {
-  5352			/*
-  5353			 * There can be holes in boot-time mem_map[]s handed to this
-  5354			 * function.  They do not exist on hotplugged memory.
-  5355			 */
-  5356			if (context != MEMMAP_EARLY)
-  5357				goto not_early;
-  5358	
-  5359			if (!early_pfn_valid(pfn)) {
-> 5360				pfn = skip_to_last_invalid_pfn(pfn);
-  5361				continue;
-  5362			}
-  5363			if (!early_pfn_in_nid(pfn, nid))
-  5364				continue;
-  5365			if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
-  5366				break;
-  5367	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6721 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180402/1a272b4d/attachment-0001.gz>
+by default, unless we do something special like you are proposing for
+ARM and arm64, in which case you provide a different implementation.
+That way, we no longer have to reason around the pfn++, and return an
+invalid pfn so that the ++ will produce a valid pfn
