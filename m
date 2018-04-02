@@ -1,126 +1,161 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 2 Apr 2018 09:03:14 +0200
-Subject: [PATCH] mtd: nand: davinci: don't acquire and enable clock
-In-Reply-To: <20180330143051.26423-1-nsekhar@ti.com>
-References: <20180330143051.26423-1-nsekhar@ti.com>
-Message-ID: <20180402090314.70b1ecee@bbrezillon>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 2 Apr 2018 16:17:58 +0900
+Subject: [Question] MFD driver that handles clocks/resets and populates child
+ nodes
+Message-ID: <CAK7LNARFWDMgmWsCjUmVrm4ZeYOcKCbizijxmDXob618ABjNWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oh, one more thing: now that we moved parallel/raw NAND code in the raw
-subdir, the subject prefix should be "mtd: rawnand: <driver>: ". No need
-to send a new version for that, I'll fix it when applying, just wanted
-to let you know.
+Hi.
 
-On Fri, 30 Mar 2018 20:00:51 +0530
-Sekhar Nori <nsekhar@ti.com> wrote:
 
-> NAND itself is an asynchronous interface, it does not have any
-> clock input. DaVinci NAND driver acquires clock for AEMIF
-> (asynchronous external memory interface) which is an on-chip
-> IP to which NAND is connected.
-> 
-> The same clock is also enabled in AEMIF driver (either present
-> drivers/memory or from machine code for some older platforms).
-> AEMIF timing must be initialized before NAND can be accessed.
-> This ensures that AEMIF clock is enabled too.
-> 
-> Remove the superfluous clock acquisition and enable in DaVinci
-> NAND driver.
-> 
-> Tested on K2L, K2HK, K2E, DA850 EVM, DA850 LCDK in device-tree
-> boot and DM644x EVM in legacy boot.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
-> Hi Boris,
-> 
-> If/when this patch gets accepted, it will nice to put this on
-> an immutable branch others can merge. There is potential cleanup
-> in drivers/clock and in DaVinci machine code that will depend
-> on this.
-> 
-> Thanks,
-> Sekhar
-> 
->  drivers/mtd/nand/raw/davinci_nand.c | 25 +------------------------
->  1 file changed, 1 insertion(+), 24 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/davinci_nand.c b/drivers/mtd/nand/raw/davinci_nand.c
-> index 0f09518d980f..7255a0d94374 100644
-> --- a/drivers/mtd/nand/raw/davinci_nand.c
-> +++ b/drivers/mtd/nand/raw/davinci_nand.c
-> @@ -27,7 +27,6 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/err.h>
-> -#include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/mtd/rawnand.h>
->  #include <linux/mtd/partitions.h>
-> @@ -55,7 +54,6 @@ struct davinci_nand_info {
->  	struct nand_chip	chip;
->  
->  	struct device		*dev;
-> -	struct clk		*clk;
->  
->  	bool			is_readmode;
->  
-> @@ -703,22 +701,6 @@ static int nand_davinci_probe(struct platform_device *pdev)
->  	/* Use board-specific ECC config */
->  	info->chip.ecc.mode	= pdata->ecc_mode;
->  
-> -	ret = -EINVAL;
-> -
-> -	info->clk = devm_clk_get(&pdev->dev, "aemif");
-> -	if (IS_ERR(info->clk)) {
-> -		ret = PTR_ERR(info->clk);
-> -		dev_dbg(&pdev->dev, "unable to get AEMIF clock, err %d\n", ret);
-> -		return ret;
-> -	}
-> -
-> -	ret = clk_prepare_enable(info->clk);
-> -	if (ret < 0) {
-> -		dev_dbg(&pdev->dev, "unable to enable AEMIF clock, err %d\n",
-> -			ret);
-> -		goto err_clk_enable;
-> -	}
-> -
->  	spin_lock_irq(&davinci_nand_lock);
->  
->  	/* put CSxNAND into NAND mode */
-> @@ -732,7 +714,7 @@ static int nand_davinci_probe(struct platform_device *pdev)
->  	ret = nand_scan_ident(mtd, pdata->mask_chipsel ? 2 : 1, NULL);
->  	if (ret < 0) {
->  		dev_dbg(&pdev->dev, "no NAND chip(s) found\n");
-> -		goto err;
-> +		return ret;
->  	}
->  
->  	switch (info->chip.ecc.mode) {
-> @@ -838,9 +820,6 @@ static int nand_davinci_probe(struct platform_device *pdev)
->  	nand_cleanup(&info->chip);
->  
->  err:
-> -	clk_disable_unprepare(info->clk);
-> -
-> -err_clk_enable:
->  	spin_lock_irq(&davinci_nand_lock);
->  	if (info->chip.ecc.mode == NAND_ECC_HW_SYNDROME)
->  		ecc4_busy = false;
-> @@ -859,8 +838,6 @@ static int nand_davinci_remove(struct platform_device *pdev)
->  
->  	nand_release(nand_to_mtd(&info->chip));
->  
-> -	clk_disable_unprepare(info->clk);
-> -
->  	return 0;
->  }
->  
+Some MFD drivers populate child nodes
+after some basic hardware setups.
 
+
+My question is, is it acceptable to upstream
+a MFD driver that handles only clocks/resets,
+then calls of_platform_populate.
+
+
+The probe function will look like follows:
+
+
+static int uniphier_usb3_glue_probe(struct platform_device *pdev)
+{
+        [get some clocks];
+
+        [get some resets];
+
+        [enable some clocks];
+
+        [deassert some resets];
+
+        return devm_of_platform_populate(dev);
+}
+
+
+With this driver, the child devices do not need
+to handle clocks/resets.
+But, I am not sure if it is the right thing to do.
+
+
+
+Background of this question
+---------------------------
+
+Socionext is trying to upstream
+the glue layer for DWC3 USB IP.
+
+The original patch is this.
+https://patchwork.kernel.org/patch/10180167/
+
+This driver enables clocks, deassert resets,
+and sets up some more registers,
+then populates the DWC3 core node.
+
+The maintainer of DWC3, Felipe Balbi, requested to
+split the glue layer driver into small parts such as
+reset, regulator, phy, etc.
+
+So, the node will look like follows:
+
+   usb-glue {
+           reset {
+                   ...
+           };
+
+           regulator {
+                   ...
+           };
+
+           hs-phy {
+                   ...
+           };
+
+           ss-phy {
+                   ...
+           };
+   }
+
+Here, one question popped up.
+Where should the hardware resources be described?
+The register, clocks, resets are shared among the sub-nodes.
+This is the obvious result since it is a single hardware block
+in the first place, and we are splitting it into small chunks.
+
+
+If the MFD driver approach is acceptable,
+clocks, resets will be handles in the parent node.
+(Such a driver looks stupid, though)
+
+
+   usb-glue {
+           compatible = "socionext,uniphier-ld20-usb3-glue",
+                        "syscon";
+           reg = <0x65b00000 0x1000>;
+           clocks = <sys_clk 14>;
+           resets = <sys_clk 14>;
+
+           reset {
+                   ...
+           };
+
+           regulator {
+                   ...
+           };
+
+           hs-phy {
+                   ...
+           };
+
+           ss-phy {
+                   ...
+           };
+   }
+
+
+Of course, it is possible to use "simple-mfd"
+and each driver can repeat the same clock/reset like follows.
+(this also looks a bit clumsy...)
+
+   usb-glue {
+           compatible = "socionext,uniphier-ld20-usb3-glue",
+                        "simple-mfd", "syscon";
+           reg = <0x65b00000 0x1000>;
+
+           reset {
+                   clocks = <sys_clk 14>;
+                   resets = <sys_clk 14>;
+                   ...
+           };
+
+           regulator {
+                   clocks = <sys_clk 14>;
+                   resets = <sys_clk 14>;
+                   ...
+           };
+
+           hs-phy {
+                   clocks = <sys_clk 14>;
+                   resets = <sys_clk 14>;
+                   ...
+           };
+
+           ss-phy {
+                   clocks = <sys_clk 14>;
+                   resets = <sys_clk 14>;
+                   ...
+           };
+   }
+
+
+Which is better?
+Or any other good idea?
+
+Thanks.
 
 
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Best Regards
+Masahiro Yamada
