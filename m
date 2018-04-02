@@ -1,39 +1,71 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon,  2 Apr 2018 16:26:52 +0200
-Subject: [PATCH 11/15] dmaengine: pxa: document pxad_param
+Date: Mon,  2 Apr 2018 16:26:53 +0200
+Subject: [PATCH 12/15] dmaengine: pxa: make the filter function internal
 In-Reply-To: <20180402142656.26815-1-robert.jarzmik@free.fr>
 References: <20180402142656.26815-1-robert.jarzmik@free.fr>
-Message-ID: <20180402142656.26815-12-robert.jarzmik@free.fr>
+Message-ID: <20180402142656.26815-13-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some documentation for the pxad_param structure, and describe the
-contract behind the minimal required priority of a DMA channel.
+As the pxa architecture and all its related drivers do not rely anymore
+on the filter function, thanks to the slave map conversion, make
+pxad_filter_fn() static, and remove it from the global namespace.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- include/linux/dma/pxa-dma.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/dma/pxa_dma.c       |  5 ++---
+ include/linux/dma/pxa-dma.h | 11 -----------
+ 2 files changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/include/linux/dma/pxa-dma.h b/include/linux/dma/pxa-dma.h
-index e56ec7af4fd7..9fc594f69eff 100644
---- a/include/linux/dma/pxa-dma.h
-+++ b/include/linux/dma/pxa-dma.h
-@@ -9,6 +9,15 @@ enum pxad_chan_prio {
- 	PXAD_PRIO_LOWEST,
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 9505334f9c6e..a332ad1d7dfb 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -179,7 +179,7 @@ static unsigned int pxad_drcmr(unsigned int line)
+ 	return 0x1000 + line * 4;
+ }
+ 
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
++static bool pxad_filter_fn(struct dma_chan *chan, void *param);
+ 
+ /*
+  * Debug fs
+@@ -1496,7 +1496,7 @@ static struct platform_driver pxad_driver = {
+ 	.remove		= pxad_remove,
  };
  
-+/**
-+ * struct pxad_param - dma channel request parameters
-+ * @drcmr: requestor line number
-+ * @prio: minimal mandatory priority of the channel
-+ *
-+ * If a requested channel is granted, its priority will be at least @prio,
-+ * ie. if PXAD_PRIO_LOW is required, the requested channel will be either
-+ * PXAD_PRIO_LOW, PXAD_PRIO_NORMAL or PXAD_PRIO_HIGHEST.
-+ */
- struct pxad_param {
- 	unsigned int drcmr;
+-bool pxad_filter_fn(struct dma_chan *chan, void *param)
++static bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ {
+ 	struct pxad_chan *c = to_pxad_chan(chan);
+ 	struct pxad_param *p = param;
+@@ -1509,7 +1509,6 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ 
+ 	return true;
+ }
+-EXPORT_SYMBOL_GPL(pxad_filter_fn);
+ 
+ module_platform_driver(pxad_driver);
+ 
+diff --git a/include/linux/dma/pxa-dma.h b/include/linux/dma/pxa-dma.h
+index 9fc594f69eff..fceb5df07097 100644
+--- a/include/linux/dma/pxa-dma.h
++++ b/include/linux/dma/pxa-dma.h
+@@ -23,15 +23,4 @@ struct pxad_param {
  	enum pxad_chan_prio prio;
+ };
+ 
+-struct dma_chan;
+-
+-#ifdef CONFIG_PXA_DMA
+-bool pxad_filter_fn(struct dma_chan *chan, void *param);
+-#else
+-static inline bool pxad_filter_fn(struct dma_chan *chan, void *param)
+-{
+-	return false;
+-}
+-#endif
+-
+ #endif /* _PXA_DMA_H_ */
 -- 
 2.11.0
