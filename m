@@ -1,7 +1,7 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 2 Apr 2018 22:32:32 +0200
+Date: Mon, 2 Apr 2018 22:35:39 +0200
 Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <20180402222020.1d344c14@bbrezillon>
+In-Reply-To: <8e35701f-1bfa-c9c0-62e6-48ed19d7ba37@axentia.se>
 References: <20180329131054.22506-1-peda@axentia.se>
  <20180329153322.5e2fc1e7@bbrezillon>
  <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
@@ -10,42 +10,37 @@ References: <20180329131054.22506-1-peda@axentia.se>
  <20180402142249.7e076a64@bbrezillon>
  <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
  <20180402212843.164d5d21@bbrezillon>
- <20180402222020.1d344c14@bbrezillon>
-Message-ID: <20180402223232.6213f409@bbrezillon>
+ <8e35701f-1bfa-c9c0-62e6-48ed19d7ba37@axentia.se>
+Message-ID: <20180402223539.6dff3f38@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Apr 2018 22:20:20 +0200
-Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+On Mon, 2 Apr 2018 22:23:17 +0200
+Peter Rosin <peda@axentia.se> wrote:
 
-> >   
-> > > And
-> > > which DDR slave is the target? 7, 8, 9 or 10? More than one?    
+
+> > I don't use devmem2. Is 'readback' information accurate or is it
+> > always what's been written? Because when you write 0x33 to 0xFFFFECBC,
+> > 0x33 is read back, but just after that, when you read it again it's 0.  
+> 
+> Looking at the devmem2 source, it seems very likely that the compiler
+> optimizes out the read and thus outputs what has been written.
+
+Yep, had a look too, and it's missing a volatile specifier to prevent
+that sort of optimizations.
+
+> 
+> >> BTW, how do I
+> >> know which master is in use for the LCD controller? 8 or 9? Both?  
 > > 
-> > This, I don't know. I guess all of them can be used.  
+> > It's configurable on a per-layer basis through the SIF bit in
+> > LCDC_<layer>CFG0. The driver tries to dispatch the load on those 2 AHB
+> > masters [1].  
 > 
-> Looks like I was wrong. According to "Table 15-3. SAMA5D3 Master to
-> Slave Access", LCDC port 0 can only access DDR port 2 and LCDC port 1
-> can only access DDR port 3.
-> 
-> Can you try to write 0x3 to 0xFFFFECCC and 0x30 to 0xFFFFECD4?
-> 
+> Ok, I only have one plane (in this case, i.e. no cursor, no overlays etc),
+> would that mean that only one master is used?
 
-Oh, one more thing. Changing the priority won't necessarily solve your
-problem because of that:
-
-"
-If more than one master requests the slave bus, regardless of the
-respective masters priorities, no master will be granted
-the slave bus for two consecutive runs. A master can only get
-back-to-back grants so long as it is the only requesting
-master.
-"
-
-To solve that, you'll have to play with MATRIX_MCFGy.ULBT (make sure
-DMAC0 and DMAC1 have a small enough ULBT that is not 0) or
-MATRIX_SCFGx.SLOT_CYCLE (that one is probably harder to get right
-since it's expressed in AHB clock cycles).
+Yep, it's always using the first one (master 8 on a sama5d3).
 
 -- 
 Boris Brezillon, Bootlin (formerly Free Electrons)
