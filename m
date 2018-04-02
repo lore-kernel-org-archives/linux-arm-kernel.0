@@ -1,93 +1,31 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  2 Apr 2018 13:48:00 -0400
-Subject: [PATCH] alpha: io: reorder barriers to guarantee writeX() and
- iowriteX() ordering
-Message-ID: <1522691281-21593-1-git-send-email-okaya@codeaurora.org>
+From: neil.m.leeder@gmail.com (Neil Leeder)
+Date: Mon, 2 Apr 2018 13:59:47 -0400
+Subject: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <66ef3bf4-9550-94c7-f8ad-ee53d6c75025@huawei.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-3-git-send-email-nleeder@codeaurora.org>
+ <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
+ <e55ab4404143ea0b3cc4795a93e37480@codeaurora.org>
+ <14f90cc6-f2c1-5a63-67c6-a5c8ddb4799e@gmail.com>
+ <c1f9230b-8ff0-5b2e-def9-cbf6b2e2e99c@huawei.com>
+ <66ef3bf4-9550-94c7-f8ad-ee53d6c75025@huawei.com>
+Message-ID: <0094c5ab-89db-409f-d5fb-c961f9d84740@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-memory-barriers.txt has been updated with the following requirement.
+Hi Hanjun,
 
-"When using writel(), a prior wmb() is not needed to guarantee that the
-cache coherent memory writes have completed before writing to the MMIO
-region."
+On 4/2/2018 10:24 AM, Hanjun Guo wrote:
+<SNIP>
+> 
+> I think we need to wait for the new version of IORT spec,
+> which includes the fix for the two base address for SMMUv3
+> PMCG (now just represent one).
+> 
+> Thanks
+> Hanjun
+> 
+It's in rev D which is available now:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049d/DEN0049D_IO_Remapping_Table.pdf
 
-Current writeX() and iowriteX() implementations on alpha are not
-satisfying this requirement as the barrier is after the register write.
-
-Move mb() in writeX() and iowriteX() functions to guarantee that HW
-observes memory changes before performing register operations.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/alpha/include/asm/io.h | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/alpha/include/asm/io.h b/arch/alpha/include/asm/io.h
-index d123ff9..4c533fc 100644
---- a/arch/alpha/include/asm/io.h
-+++ b/arch/alpha/include/asm/io.h
-@@ -341,14 +341,14 @@ extern inline unsigned int ioread16(void __iomem *addr)
- 
- extern inline void iowrite8(u8 b, void __iomem *addr)
- {
--	IO_CONCAT(__IO_PREFIX,iowrite8)(b, addr);
- 	mb();
-+	IO_CONCAT(__IO_PREFIX, iowrite8)(b, addr);
- }
- 
- extern inline void iowrite16(u16 b, void __iomem *addr)
- {
--	IO_CONCAT(__IO_PREFIX,iowrite16)(b, addr);
- 	mb();
-+	IO_CONCAT(__IO_PREFIX, iowrite16)(b, addr);
- }
- 
- extern inline u8 inb(unsigned long port)
-@@ -382,8 +382,8 @@ extern inline unsigned int ioread32(void __iomem *addr)
- 
- extern inline void iowrite32(u32 b, void __iomem *addr)
- {
--	IO_CONCAT(__IO_PREFIX,iowrite32)(b, addr);
- 	mb();
-+	IO_CONCAT(__IO_PREFIX, iowrite32)(b, addr);
- }
- 
- extern inline u32 inl(unsigned long port)
-@@ -434,14 +434,14 @@ extern inline u16 readw(const volatile void __iomem *addr)
- 
- extern inline void writeb(u8 b, volatile void __iomem *addr)
- {
--	__raw_writeb(b, addr);
- 	mb();
-+	__raw_writeb(b, addr);
- }
- 
- extern inline void writew(u16 b, volatile void __iomem *addr)
- {
--	__raw_writew(b, addr);
- 	mb();
-+	__raw_writew(b, addr);
- }
- #endif
- 
-@@ -482,14 +482,14 @@ extern inline u64 readq(const volatile void __iomem *addr)
- 
- extern inline void writel(u32 b, volatile void __iomem *addr)
- {
--	__raw_writel(b, addr);
- 	mb();
-+	__raw_writel(b, addr);
- }
- 
- extern inline void writeq(u64 b, volatile void __iomem *addr)
- {
--	__raw_writeq(b, addr);
- 	mb();
-+	__raw_writeq(b, addr);
- }
- #endif
- 
--- 
-2.7.4
+Neil
