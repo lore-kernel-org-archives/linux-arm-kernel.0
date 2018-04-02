@@ -1,97 +1,67 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  2 Apr 2018 15:06:25 -0400
-Subject: [PATCH v8 2/7] ixgbe: eliminate duplicate barriers on weakly-ordered
- archs
-In-Reply-To: <1522695990-31082-1-git-send-email-okaya@codeaurora.org>
-References: <1522695990-31082-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1522695990-31082-3-git-send-email-okaya@codeaurora.org>
+Date: Mon,  2 Apr 2018 15:06:23 -0400
+Subject: [PATCH v8 0/7] netdev: intel: Eliminate duplicate barriers on
+ weakly-ordered archs
+Message-ID: <1522695990-31082-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-memory-barriers.txt has been updated as follows:
+Code includes wmb() followed by writel() in multiple places. writel()
+already has a barrier on some architectures like arm64.
 
-"When using writel(), a prior wmb() is not needed to guarantee that the
-cache coherent memory writes have completed before writing to the MMIO
-region."
+This ends up CPU observing two barriers back to back before executing the
+register write.
 
-Remove old IA-64 comments in the code along with unneeded wmb() in front
-of writel().
+Since code already has an explicit barrier call, changing writel() to
+writel_relaxed().
 
-There are places in the code where wmb() has been used as a double barrier
-for CPU and IO in place of smp_wmb() and wmb() as an optimization. For
-such places, keep the wmb() but replace the following writel() with
-writel_relaxed() to have a sequence as
+I did a regex search for wmb() followed by writel() in each drivers
+directory. I scrubbed the ones I care about in this series.
 
-wmb()
-writel_relaxed()
-mmio_wb()
+I considered "ease of change", "popular usage" and "performance critical
+path" as the determining criteria for my filtering.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/net/ethernet/intel/ixgbe/ixgbe_main.c | 23 ++---------------------
- 1 file changed, 2 insertions(+), 21 deletions(-)
+We used relaxed API heavily on ARM for a long time but
+it did not exist on other architectures. For this reason, relaxed
+architectures have been paying double penalty in order to use the common
+drivers.
 
-diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-index afadba9..c17924b 100644
---- a/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-+++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
-@@ -1696,12 +1696,6 @@ void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
- 		/* update next to alloc since we have filled the ring */
- 		rx_ring->next_to_alloc = i;
- 
--		/* Force memory writes to complete before letting h/w
--		 * know there are new descriptors to fetch.  (Only
--		 * applicable for weak-ordered memory model archs,
--		 * such as IA-64).
--		 */
--		wmb();
- 		writel(i, rx_ring->tail);
- 	}
- }
-@@ -2467,10 +2461,6 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
- 	if (xdp_xmit) {
- 		struct ixgbe_ring *ring = adapter->xdp_ring[smp_processor_id()];
- 
--		/* Force memory writes to complete before letting h/w
--		 * know there are new descriptors to fetch.
--		 */
--		wmb();
- 		writel(ring->next_to_use, ring->tail);
- 
- 		xdp_do_flush_map();
-@@ -8080,12 +8070,7 @@ static int ixgbe_tx_map(struct ixgbe_ring *tx_ring,
- 	/* set the timestamp */
- 	first->time_stamp = jiffies;
- 
--	/*
--	 * Force memory writes to complete before letting h/w know there
--	 * are new descriptors to fetch.  (Only applicable for weak-ordered
--	 * memory model archs, such as IA-64).
--	 *
--	 * We also need this memory barrier to make certain all of the
-+	/* We need this memory barrier to make certain all of the
- 	 * status bits have been updated before next_to_watch is written.
- 	 */
- 	wmb();
-@@ -8102,7 +8087,7 @@ static int ixgbe_tx_map(struct ixgbe_ring *tx_ring,
- 	ixgbe_maybe_stop_tx(tx_ring, DESC_NEEDED);
- 
- 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
--		writel(i, tx_ring->tail);
-+		writel_relaxed(i, tx_ring->tail);
- 
- 		/* we need this if more than one processor can write to our tail
- 		 * at a time, it synchronizes IO on IA64/Altix systems
-@@ -10034,10 +10019,6 @@ static void ixgbe_xdp_flush(struct net_device *dev)
- 	if (unlikely(!ring))
- 		return;
- 
--	/* Force memory writes to complete before letting h/w know there
--	 * are new descriptors to fetch.
--	 */
--	wmb();
- 	writel(ring->next_to_use, ring->tail);
- 
- 	return;
+Now that relaxed API is present on all architectures, we can go and scrub
+all drivers to see what needs to change and what can remain.
+
+We start with mostly used ones and hope to increase the coverage over time.
+It will take a while to cover all drivers.
+
+Feel free to apply patches individually.
+
+Change since 7:
+
+* API clarification with Linus and several architecture folks regarding
+writel()
+
+https://www.mail-archive.com/netdev at vger.kernel.org/msg225806.html
+
+* removed wmb() in front of writel() at several places.
+* remove old IA64 comments regarding ordering.
+
+Sinan Kaya (7):
+  i40e/i40evf: Eliminate duplicate barriers on weakly-ordered archs
+  ixgbe: eliminate duplicate barriers on weakly-ordered archs
+  igbvf: eliminate duplicate barriers on weakly-ordered archs
+  igb: eliminate duplicate barriers on weakly-ordered archs
+  fm10k: Eliminate duplicate barriers on weakly-ordered archs
+  ixgbevf: keep writel() closer to wmb()
+  ixgbevf: eliminate duplicate barriers on weakly-ordered archs
+
+ drivers/net/ethernet/intel/fm10k/fm10k_main.c     | 15 ++-----------
+ drivers/net/ethernet/intel/i40e/i40e_txrx.c       | 22 ++++++++----------
+ drivers/net/ethernet/intel/i40evf/i40e_txrx.c     |  8 +------
+ drivers/net/ethernet/intel/igb/igb_main.c         | 14 ++----------
+ drivers/net/ethernet/intel/igbvf/netdev.c         | 16 +++++---------
+ drivers/net/ethernet/intel/ixgbe/ixgbe_main.c     | 23 ++-----------------
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      |  5 -----
+ drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 27 ++++++++---------------
+ 8 files changed, 30 insertions(+), 100 deletions(-)
+
 -- 
 2.7.4
