@@ -1,76 +1,33 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Mon, 2 Apr 2018 12:00:45 +0530
-Subject: [PATCH v5 06/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.1-c1
- board file
-In-Reply-To: <1521800336-19266-7-git-send-email-sricharan@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 2 Apr 2018 12:04:29 +0530
+Subject: [PATCH v5 11/13] ARM: dts: ipq8074: Add peripheral nodes
+In-Reply-To: <20180327174501.GN1403@tuxbook-pro>
 References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
- <1521800336-19266-7-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20180402063044.GA15767@codeaurora.org>
+ <1521800336-19266-12-git-send-email-sricharan@codeaurora.org>
+ <20180327174501.GN1403@tuxbook-pro>
+Message-ID: <67c43e89-c986-e548-c7f1-ce9ac095c509@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 23, 2018 at 03:48:49PM +0530, Sricharan R wrote:
-> Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  arch/arm/boot/dts/Makefile                      |  1 +
->  arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts | 20 ++++++++++++++++++++
->  2 files changed, 21 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
+
+
+On 3/27/2018 11:15 PM, Bjorn Andersson wrote:
+> On Fri 23 Mar 03:18 PDT 2018, Sricharan R wrote:
+>> +		serial_blsp0: serial at 78af000 {
 > 
-
-NAND, BAM and SPI work fine.
-
-Tested-by: Varadarajan Narayanan <varada@codeaurora.org>
-
--Varada
-
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index ade7a38..b6c62c6 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -747,6 +747,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->  	qcom-apq8084-ifc6540.dtb \
->  	qcom-apq8084-mtp.dtb \
->  	qcom-ipq4019-ap.dk01.1-c1.dtb \
-> +	qcom-ipq4019-ap.dk04.1-c1.dtb \
->  	qcom-ipq8064-ap148.dtb \
->  	qcom-msm8660-surf.dtb \
->  	qcom-msm8960-cdp.dtb \
-> diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
-> new file mode 100644
-> index 0000000..526b7f8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1-c1.dts
-> @@ -0,0 +1,20 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> +
-> +#include "qcom-ipq4019-ap.dk04.1.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK04.1-C1";
-> +
-> +	soc {
-> +		dma at 7984000 {
-> +			status = "ok";
-> +		};
-> +
-> +		qpic-nand at 79b0000 {
-> +			pinctrl-0 = <&nand_pins>;
-> +			pinctrl-names = "default";
-> +			status = "ok";
-> +		};
-> +	};
-> +};
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> Please try to have a single scheme for how you name your labels; this is
+> serial0 or blsp1_uart1.
 > 
+> [..]
+>> +		i2c_0: i2c at 78b6000 {
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> As in the previous patches, this is the 2nd i2c master in the SoC,
+> please label it accordingly.
+
+ ok, sure. will correct the label names uniformly.
+
+Regards,
+ Sricharan
 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
