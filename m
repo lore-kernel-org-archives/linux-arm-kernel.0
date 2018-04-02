@@ -1,70 +1,32 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 2 Apr 2018 11:04:15 +0800
-Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
-In-Reply-To: <87vada1owt.fsf@notabene.neil.brown.name>
-References: <20180329095637.GA16778@kroah.com>
- <20180329124745.24694-1-cmc@babblebit.net>
- <87vada1owt.fsf@notabene.neil.brown.name>
-Message-ID: <1522638255.18424.44.camel@mtkswgap22>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Mon, 2 Apr 2018 11:22:29 +0800
+Subject: [PATCH v3 0/2] net: mvneta: improve suspend/resume
+Message-ID: <20180402112229.508e1feb@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-04-02 at 09:34 +1000, NeilBrown wrote:
-> On Thu, Mar 29 2018, Chris Coffey wrote:
-> 
-> > This fixes the following sparse warning:
-> >
-> > drivers/staging/mt7621-eth/ethtool.c:213:6: warning: symbol
-> > 'mtk_set_ethtool_ops' was not declared. Should it be static?
-> >
-> > Signed-off-by: Chris Coffey <cmc@babblebit.net>
-> 
-> Reviewed-by: NeilBrown <neil@brown.name>
-> 
-> Thanks,
-> NeilBrown
-> 
-Hi, Neil
+This series tries to optimize the mvneta's suspend/resume
+implementation by only taking necessary actions.
 
-Forgive me I cannot find the cover letter in the original series in my
-mailbox to make a reply, so I rudely made here just letting you know
-something good to the growth of mt7621 support in upstream.
+Since v2:
+ - keep rtnl lock when calling mvneta_start_dev() and mvneta_stop_dev()
+   Thank Russell for pointing this out
 
-do you have maintained an out-of-tree branch to boot the mt7621 machine
-with those staging patches?
+Since v1:
+ - unify ret check
+ - try best to keep the suspend/resume behavior
+ - split txq deinit into sw/hw parts as well
+ - adjust mvneta_stop_dev() location
 
-If so, it would become a bit easier for me that maybe I could give a
-hand for migrating these staging driver for mt7621 to mainline. I
-thought mmc, pci, ethernet, gsw and hsdma all could probably reuse the
-current mainline code.
+I didn't add Thomas's Ack tag to patch1, because in v2, I add new code
+to split the txq deinit into two parts.
 
-	Sean
-> 
-> > ---
-> > Changes in v2:
-> >  - Per GregKH's feedback (thanks!), don't add unnecessary new .h file
-> >  dependencies. This patch version reverts those changes and fixes the
-> >  problem directly in ethtool.c (which is that it didn't include
-> >  ethtool.h anywhere -- mtk_set_ethtool_ops is not static).
-> >
-> >  drivers/staging/mt7621-eth/ethtool.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
-> > index 38ba0c040a..5268c5ca09 100644
-> > --- a/drivers/staging/mt7621-eth/ethtool.c
-> > +++ b/drivers/staging/mt7621-eth/ethtool.c
-> > @@ -13,6 +13,7 @@
-> >   */
-> >  
-> >  #include "mtk_eth_soc.h"
-> > +#include "ethtool.h"
-> >  
-> >  static const char mtk_gdma_str[][ETH_GSTRING_LEN] = {
-> >  #define _FE(x...)	# x,
-> > -- 
-> > 2.11.0
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Jisheng Zhang (2):
+  net: mvneta: split rxq/txq init and txq deinit into SW and HW parts
+  net: mvneta: improve suspend/resume
+
+ drivers/net/ethernet/marvell/mvneta.c | 154 ++++++++++++++++++++++++++++------
+ 1 file changed, 128 insertions(+), 26 deletions(-)
+
+-- 
+2.16.3
