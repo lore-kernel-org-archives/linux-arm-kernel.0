@@ -1,92 +1,26 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 2 Apr 2018 20:37:54 +0530
-Subject: [PATCH v4 13/14] dt-bindings: cpufreq: Document
- operating-points-v2-kryo-cpu
-In-Reply-To: <20180402093018.GC3572@vireshk-i7>
-References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
- <1522358807-10413-14-git-send-email-ilialin@codeaurora.org>
- <20180402093018.GC3572@vireshk-i7>
-Message-ID: <7ca35b7a-6078-620b-4772-091e53ef6790@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 02 Apr 2018 11:14:34 -0400 (EDT)
+Subject: [PATCH v3 0/2] net: mvneta: improve suspend/resume
+In-Reply-To: <20180402112229.508e1feb@xhacker.debian>
+References: <20180402112229.508e1feb@xhacker.debian>
+Message-ID: <20180402.111434.124774623285634501.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+From: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+Date: Mon, 2 Apr 2018 11:22:29 +0800
 
-On 4/2/2018 3:00 PM, Viresh Kumar wrote:
-> +Sricharan,
+> This series tries to optimize the mvneta's suspend/resume
+> implementation by only taking necessary actions.
 > 
-> On 30-03-18, 00:26, Ilia Lin wrote:
->> In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
->> that have KRYO processors, the CPU ferequencies subset and voltage value
->> of each OPP varies based on the silicon variant in use.
->> Qualcomm Technologies, Inc. Process Voltage Scaling Tables
->> defines the voltage and frequency value based on the msm-id in SMEM
->> and speedbin blown in the efuse combination.
->> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
->> to provide the OPP framework with required information.
->> This is used to determine the voltage and frequency value for each OPP of
->> operating-points-v2 table when it is parsed by the OPP framework.
->>
->> This change adds documentation.
->>
->> Change-Id: I1953f652a48249fb516d175f0e965a9510cd4209
->> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
->> ---
->>  .../devicetree/bindings/cpufreq/kryo-cpufreq.txt   | 693 +++++++++++++++++++++
->>  1 file changed, 693 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
->>
->> diff --git a/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+> Since v2:
+>  - keep rtnl lock when calling mvneta_start_dev() and mvneta_stop_dev()
+>    Thank Russell for pointing this out
 > 
-> This should really go in opp directory.
-> 
->> new file mode 100644
->> index 0000000..20cef9d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
->> @@ -0,0 +1,693 @@
->> +Qualcomm Technologies, Inc. KRYO CPUFreq and OPP bindings
->> +===================================
->> +
->> +In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
->> +that have KRYO processors, the CPU ferequencies subset and voltage value
->> +of each OPP varies based on the silicon variant in use.
->> +Qualcomm Technologies, Inc. Process Voltage Scaling Tables
->> +defines the voltage and frequency value based on the msm-id in SMEM
->> +and speedbin blown in the efuse combination.
->> +The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
->> +to provide the OPP framework with required information (existing HW bitmap).
->> +This is used to determine the voltage and frequency value for each OPP of
->> +operating-points-v2 table when it is parsed by the OPP framework.
->> +
->> +Required properties:
->> +--------------------
->> +In 'cpus' nodes:
->> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
->> +
->> +In 'operating-points-v2' table:
->> +- compatible: Should be
->> +	- 'operating-points-v2-kryo-cpu' for apq8096 and msm8996.
->> +- nvmem-cells: A phandle pointing to a nvmem-cells node representing the
->> +		efuse registers that has information about the
->> +		speedbin that is used to select the right frequency/voltage
->> +		value pair.
->> +		Please refer the for nvmem-cells
->> +		bindings Documentation/devicetree/bindings/nvmem/nvmem.txt
->> +		and also examples below.
-> 
-> Sricharan is also working on adding these, just make sure you guys do the same
-> thing..
-> 
+> Since v1:
+>  - unify ret check
+>  - try best to keep the suspend/resume behavior
+>  - split txq deinit into sw/hw parts as well
+>  - adjust mvneta_stop_dev() location
 
- Right, i was adding a similar one for krait cores [1]. There is code common in the
- init sequence across both (little). Do you intent to make them common ?
-
-Regards,
- Sricharan
-
- [1] https://patchwork.kernel.org/patch/10261873/
-
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Series applied, thank you.
