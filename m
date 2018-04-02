@@ -1,23 +1,22 @@
-From: rob.herring@linaro.org (Rob Herring)
-Date: Mon, 2 Apr 2018 07:31:53 -0500
-Subject: [PATCH v3 1/2] Documentation: Documentation for qcom, llcc
-In-Reply-To: <1522176722-12691-2-git-send-email-rishabhb@codeaurora.org>
-References: <1522176722-12691-1-git-send-email-rishabhb@codeaurora.org>
- <1522176722-12691-2-git-send-email-rishabhb@codeaurora.org>
-Message-ID: <CABGGisy5+50re_D-8FaEuVgTRN3E17_iCVMgDjarhW2ay=r1oQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 2 Apr 2018 14:04:14 +0200
+Subject: [Question] MFD driver that handles clocks/resets and populates
+ child nodes
+In-Reply-To: <CAK7LNARFWDMgmWsCjUmVrm4ZeYOcKCbizijxmDXob618ABjNWg@mail.gmail.com>
+References: <CAK7LNARFWDMgmWsCjUmVrm4ZeYOcKCbizijxmDXob618ABjNWg@mail.gmail.com>
+Message-ID: <20180402120414.GA8159@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 1:52 PM, Rishabh Bhatnagar
-<rishabhb@codeaurora.org> wrote:
-> Documentation for last level cache controller device tree bindings,
-> client bindings usage examples.
->
-> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
-> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
-> ---
->  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 70 ++++++++++++++++++++++
+> The maintainer of DWC3, Felipe Balbi, requested to
+> split the glue layer driver into small parts such as
+> reset, regulator, phy, etc.
 
-Bindings need to go to DT list for review.
+What exactly did Felipe ask for? Did he ask that the patch be split
+up, one patch per reset, regulator, phy etc?
 
-Rob
+Are all these resources used just by the DWC3? Or is it a true MFD,
+multiple functions?
+
+	 Andrew
+ 
