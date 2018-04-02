@@ -1,79 +1,51 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 2 Apr 2018 14:22:49 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
-Message-ID: <20180402142249.7e076a64@bbrezillon>
+From: liuwenliang@huawei.com (Abbott Liu)
+Date: Mon, 2 Apr 2018 20:04:40 +0800
+Subject: [PATCH v3 6/6] Enable KASan for arm
+In-Reply-To: <20180402120440.31900-1-liuwenliang@huawei.com>
+References: <20180402120440.31900-1-liuwenliang@huawei.com>
+Message-ID: <20180402120440.31900-7-liuwenliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Mar 2018 16:27:12 +0200
-Peter Rosin <peda@axentia.se> wrote:
+From: Andrey Ryabinin <a.ryabinin@samsung.com>
 
-> On 2018-03-29 15:44, Boris Brezillon wrote:
-> > On Thu, 29 Mar 2018 15:37:43 +0200
-> > Peter Rosin <peda@axentia.se> wrote:
-> >   
-> >> On 2018-03-29 15:33, Boris Brezillon wrote:  
-> >>> On Thu, 29 Mar 2018 15:10:54 +0200
-> >>> Peter Rosin <peda@axentia.se> wrote:
-> >>>     
-> >>>> On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
-> >>>> flash accesses have a tendency to cause display disturbances. Add a
-> >>>> module param to disable DMA from the NAND controller, since that fixes
-> >>>> the display problem for me.
-> >>>>
-> >>>> Signed-off-by: Peter Rosin <peda@axentia.se>
-> >>>> ---
-> >>>>  drivers/mtd/nand/raw/atmel/nand-controller.c | 7 ++++++-
-> >>>>  1 file changed, 6 insertions(+), 1 deletion(-)
-> >>>>
-> >>>> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> >>>> index b2f00b398490..2ff7a77c7b8e 100644
-> >>>> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-> >>>> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> >>>> @@ -129,6 +129,11 @@
-> >>>>  #define DEFAULT_TIMEOUT_MS			1000
-> >>>>  #define MIN_DMA_LEN				128
-> >>>>  
-> >>>> +static bool atmel_nand_avoid_dma __read_mostly;
-> >>>> +
-> >>>> +MODULE_PARM_DESC(avoiddma, "Avoid using DMA");
-> >>>> +module_param_named(avoiddma, atmel_nand_avoid_dma, bool, 0400);    
-> >>>
-> >>> I'm not a big fan of those driver specific cmdline parameters. Can't we
-> >>> instead give an higher priority to HLCDC master using the bus matrix?    
-> >>
-> >> I don't know if it will be enough, but we sure can try. However, I have
-> >> no idea how to do that. I will happily test stuff though...  
-> > 
-> > There's no interface to configure that from Linux, but you can try to
-> > tweak it with devmem and if that does the trick, maybe we can expose a
-> > way to configure that from Linux. For more details, see the "Bus Matrix
-> > (MATRIX)" section in Atmel datasheets.  
-> 
-> I don't seem to succeed in changing the registers I think I need to change.
-> I can poke the "Write Protection Mode Register" by writing MAT0 and MAT1 to
-> it.
+This patch enable kernel address sanitizer for arm.
 
-You mean 0x4D415400, right? ("MAT0" != 0x4D415400).
+Cc: Andrey Ryabinin <a.ryabinin@samsung.com>
+Acked-by: Dmitry Vyukov <dvyukov@google.com>
+Tested-by: Joel Stanley <joel@jms.id.au>
+Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+Tested-by: Abbott Liu <liuwenliang@huawei.com>
+Signed-off-by: Abbott Liu <liuwenliang@huawei.com>
+---
+ Documentation/dev-tools/kasan.rst | 2 +-
+ arch/arm/Kconfig                  | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-> But when I try to write to "Priority Registers B For Slaves" it doesn't
-> take, regardless of write protect mode.
-
-Did you check MATRIX_WPSR after writing to MATRIX_PRXSY?
-
-> 
-> Can the relevant bits only be written when the HLCDC is inactive or
-> something?
-
-I don't know, but maybe Nicolas does.
-
+diff --git a/Documentation/dev-tools/kasan.rst b/Documentation/dev-tools/kasan.rst
+index f7a18f2..d92120d 100644
+--- a/Documentation/dev-tools/kasan.rst
++++ b/Documentation/dev-tools/kasan.rst
+@@ -12,7 +12,7 @@ KASAN uses compile-time instrumentation for checking every memory access,
+ therefore you will need a GCC version 4.9.2 or later. GCC 5.0 or later is
+ required for detection of out-of-bounds accesses to stack or global variables.
+ 
+-Currently KASAN is supported only for the x86_64 and arm64 architectures.
++Currently KASAN is supported only for the x86_64, arm64 and arm architectures.
+ 
+ Usage
+ -----
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7e3d535..ac2287b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -49,6 +49,7 @@ config ARM
+ 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
++	select HAVE_ARCH_KASAN if MMU
+ 	select HAVE_ARCH_MMAP_RND_BITS if MMU
+ 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+ 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.9.0
