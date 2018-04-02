@@ -1,162 +1,251 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 2 Apr 2018 21:28:43 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
-Message-ID: <20180402212843.164d5d21@bbrezillon>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Mon,  2 Apr 2018 13:06:05 -0700
+Subject: [PATCH v5] ARM: imx: Update spi_imx platform data to reflect current
+ state
+Message-ID: <20180402200605.13050-1-tpiepho@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Apr 2018 19:59:39 +0200
-Peter Rosin <peda@axentia.se> wrote:
+The docs for the spi_imx platform data still refer to a -32 offset used to
+specify a native chip select.  This was removed in commit 602c8f4485cd
+("spi: imx: fix use of native chip-selects with devicetree") and no
+longer works as documented.  Update documentation.
 
-> On 2018-04-02 14:22, Boris Brezillon wrote:
-> > On Thu, 29 Mar 2018 16:27:12 +0200
-> > Peter Rosin <peda@axentia.se> wrote:
-> >   
-> >> On 2018-03-29 15:44, Boris Brezillon wrote:  
-> >>> On Thu, 29 Mar 2018 15:37:43 +0200
-> >>> Peter Rosin <peda@axentia.se> wrote:
-> >>>     
-> >>>> On 2018-03-29 15:33, Boris Brezillon wrote:    
-> >>>>> On Thu, 29 Mar 2018 15:10:54 +0200
-> >>>>> Peter Rosin <peda@axentia.se> wrote:
-> >>>>>       
-> >>>>>> On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
-> >>>>>> flash accesses have a tendency to cause display disturbances. Add a
-> >>>>>> module param to disable DMA from the NAND controller, since that fixes
-> >>>>>> the display problem for me.
-> >>>>>>
-> >>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
-> >>>>>> ---
-> >>>>>>  drivers/mtd/nand/raw/atmel/nand-controller.c | 7 ++++++-
-> >>>>>>  1 file changed, 6 insertions(+), 1 deletion(-)
-> >>>>>>
-> >>>>>> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> >>>>>> index b2f00b398490..2ff7a77c7b8e 100644
-> >>>>>> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-> >>>>>> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> >>>>>> @@ -129,6 +129,11 @@
-> >>>>>>  #define DEFAULT_TIMEOUT_MS			1000
-> >>>>>>  #define MIN_DMA_LEN				128
-> >>>>>>  
-> >>>>>> +static bool atmel_nand_avoid_dma __read_mostly;
-> >>>>>> +
-> >>>>>> +MODULE_PARM_DESC(avoiddma, "Avoid using DMA");
-> >>>>>> +module_param_named(avoiddma, atmel_nand_avoid_dma, bool, 0400);      
-> >>>>>
-> >>>>> I'm not a big fan of those driver specific cmdline parameters. Can't we
-> >>>>> instead give an higher priority to HLCDC master using the bus matrix?      
-> >>>>
-> >>>> I don't know if it will be enough, but we sure can try. However, I have
-> >>>> no idea how to do that. I will happily test stuff though...    
-> >>>
-> >>> There's no interface to configure that from Linux, but you can try to
-> >>> tweak it with devmem and if that does the trick, maybe we can expose a
-> >>> way to configure that from Linux. For more details, see the "Bus Matrix
-> >>> (MATRIX)" section in Atmel datasheets.    
-> >>
-> >> I don't seem to succeed in changing the registers I think I need to change.
-> >> I can poke the "Write Protection Mode Register" by writing MAT0 and MAT1 to
-> >> it.  
-> > 
-> > You mean 0x4D415400, right? ("MAT0" != 0x4D415400).  
-> 
-> Bits 1 through 7 do not matter, so even though not equal they are (or
-> should be) equivalent. But I did use 0x4d415400. I simply used the
-> shorter syntax since that was easier to type and conveyed the relevant
-> info.
+The macro MXC_SPI_CS() is no longer is needed.
 
-Ok.
+If a board uses all native chip selects, then it's not necessary to
+specify a chip select array at all, as all native is the default (this is
+how device-tree configured SPI masters work too).  Most of the spi-imx
+platform data users have their chip select arrays removed by this patch.
 
-> 
-> >> But when I try to write to "Priority Registers B For Slaves" it doesn't
-> >> take, regardless of write protect mode.  
-> > 
-> > Did you check MATRIX_WPSR after writing to MATRIX_PRXSY?  
-> 
-> No, but did it again and checked, see transcript below.
+This patch also fixes a bug in mx31moboard introduced in the '602 commit.
+When that board was updated in commit 901f26bce64a ("ARM: imx: set
+correct chip_select in platform setup") to reflect the SPI change, only
+SPI bus 2 was updated and SPI bus 1 was left with non-sequential chip
+selects.  The mc13783 spi device on bus 1 had its chip select updated as
+if it were on bus 2.
 
-I don't use devmem2. Is 'readback' information accurate or is it
-always what's been written? Because when you write 0x33 to 0xFFFFECBC,
-0x33 is read back, but just after that, when you read it again it's 0.
+CC: Shawn Guo <shawnguo@kernel.org>
+CC: Sascha Hauer <kernel@pengutronix.de>
+CC: Fabio Estevam <fabio.estevam@nxp.com>
+Acked-by: Greg Ungerer <gerg@linux-m68k.org>
+Reviewed-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+---
 
-> BTW, how do I
-> know which master is in use for the LCD controller? 8 or 9? Both?
+Changes from v4:
+  Ported to current linux-next with no changes.
+  This patch no longer has any dependencies that are not applied in v4.15
 
-It's configurable on a per-layer basis through the SIF bit in
-LCDC_<layer>CFG0. The driver tries to dispatch the load on those 2 AHB
-masters [1].
 
-> And
-> which DDR slave is the target? 7, 8, 9 or 10? More than one?
+ arch/arm/mach-imx/mach-mx31_3ds.c     | 18 ++----------------
+ arch/arm/mach-imx/mach-mx31lilly.c    | 12 ++----------
+ arch/arm/mach-imx/mach-mx31lite.c     | 16 ++--------------
+ arch/arm/mach-imx/mach-mx31moboard.c  | 17 +++--------------
+ arch/arm/mach-imx/mach-pcm037_eet.c   |  5 +----
+ include/linux/platform_data/spi-imx.h | 29 +++++++++++++++++------------
+ 6 files changed, 27 insertions(+), 70 deletions(-)
 
-This, I don't know. I guess all of them can be used.
-
-> 
-> Cheers,
-> Peter
-> 
-> # devmem2 0xffffede4 w
-> /dev/mem opened.
-> Memory mapped at address 0xb6f50000.
-> Value at address 0xFFFFEDE4 (0xb6f50de4): 0x0
-> # devmem2 0xffffede4 w 0x4d415401
-> /dev/mem opened.
-> Memory mapped at address 0xb6f0d000.
-> Value at address 0xFFFFEDE4 (0xb6f0dde4): 0x0
-> Written 0x4D415401; readback 0x4D415401
-> # devmem2 0xffffede4 w
-> /dev/mem opened.
-> Memory mapped at address 0xb6f55000.
-> Value at address 0xFFFFEDE4 (0xb6f55de4): 0x1
-> # devmem2 0xffffede4 w 0x4d415400
-> /dev/mem opened.
-> Memory mapped at address 0xb6fb5000.
-> Value at address 0xFFFFEDE4 (0xb6fb5de4): 0x1
-> Written 0x4D415400; readback 0x4D415400
-> # devmem2 0xffffede4 w
-> /dev/mem opened.
-> Memory mapped at address 0xb6fef000.
-> Value at address 0xFFFFEDE4 (0xb6fefde4): 0x0
-> 
-> 
-> # devmem2 0xffffede8 w
-> /dev/mem opened.
-> Memory mapped at address 0xb6fe9000.
-> Value at address 0xFFFFEDE8 (0xb6fe9de8): 0x0
-> 
-> 
-> # devmem2 0xffffecbc w
-> /dev/mem opened.
-> Memory mapped at address 0xb6ff0000.
-> Value at address 0xFFFFECBC (0xb6ff0cbc): 0x0
-> # devmem2 0xffffecbc w 0x33
-> /dev/mem opened.
-> Memory mapped at address 0xb6f79000.
-> Value at address 0xFFFFECBC (0xb6f79cbc): 0x0
-> Written 0x33; readback 0x33
-> # devmem2 0xffffecbc w
-> /dev/mem opened.
-> Memory mapped at address 0xb6efe000.
-> Value at address 0xFFFFECBC (0xb6efecbc): 0x0
-> 
-> 
-> # devmem2 0xffffede8 w
-> /dev/mem opened.
-> Memory mapped at address 0xb6f9e000.
-> Value at address 0xFFFFEDE8 (0xb6f9ede8): 0x0
-> 
-
-[1]https://elixir.bootlin.com/linux/latest/source/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c#L498
-
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index 68c3f0799d5b..9d87f1dcf7bb 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -374,26 +374,12 @@ static struct imx_ssi_platform_data mx31_3ds_ssi_pdata = {
+ };
+ 
+ /* SPI */
+-static int spi0_internal_chipselect[] = {
+-	MXC_SPI_CS(0),
+-	MXC_SPI_CS(1),
+-	MXC_SPI_CS(2),
+-};
+-
+ static const struct spi_imx_master spi0_pdata __initconst = {
+-	.chipselect	= spi0_internal_chipselect,
+-	.num_chipselect	= ARRAY_SIZE(spi0_internal_chipselect),
+-};
+-
+-static int spi1_internal_chipselect[] = {
+-	MXC_SPI_CS(0),
+-	MXC_SPI_CS(1),
+-	MXC_SPI_CS(2),
++	.num_chipselect	= 3,
+ };
+ 
+ static const struct spi_imx_master spi1_pdata __initconst = {
+-	.chipselect	= spi1_internal_chipselect,
+-	.num_chipselect	= ARRAY_SIZE(spi1_internal_chipselect),
++	.num_chipselect	= 3,
+ };
+ 
+ static struct spi_board_info mx31_3ds_spi_devs[] __initdata = {
+diff --git a/arch/arm/mach-imx/mach-mx31lilly.c b/arch/arm/mach-imx/mach-mx31lilly.c
+index 6fd463642954..8bf52819d4d9 100644
+--- a/arch/arm/mach-imx/mach-mx31lilly.c
++++ b/arch/arm/mach-imx/mach-mx31lilly.c
+@@ -226,20 +226,12 @@ static void __init lilly1131_usb_init(void)
+ 
+ /* SPI */
+ 
+-static int spi_internal_chipselect[] = {
+-	MXC_SPI_CS(0),
+-	MXC_SPI_CS(1),
+-	MXC_SPI_CS(2),
+-};
+-
+ static const struct spi_imx_master spi0_pdata __initconst = {
+-	.chipselect = spi_internal_chipselect,
+-	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
++	.num_chipselect = 3,
+ };
+ 
+ static const struct spi_imx_master spi1_pdata __initconst = {
+-	.chipselect = spi_internal_chipselect,
+-	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
++	.num_chipselect = 3,
+ };
+ 
+ static struct mc13xxx_platform_data mc13783_pdata __initdata = {
+diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
+index a3250bc7f114..a3cbba6c955b 100644
+--- a/arch/arm/mach-imx/mach-mx31lite.c
++++ b/arch/arm/mach-imx/mach-mx31lite.c
+@@ -83,15 +83,8 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ };
+ 
+ /* SPI */
+-static int spi0_internal_chipselect[] = {
+-	MXC_SPI_CS(0),
+-	MXC_SPI_CS(1),
+-	MXC_SPI_CS(2),
+-};
+-
+ static const struct spi_imx_master spi0_pdata __initconst = {
+-	.chipselect	= spi0_internal_chipselect,
+-	.num_chipselect	= ARRAY_SIZE(spi0_internal_chipselect),
++	.num_chipselect	= 3,
+ };
+ 
+ static const struct mxc_nand_platform_data
+@@ -133,13 +126,8 @@ static struct platform_device smsc911x_device = {
+  * The MC13783 is the only hard-wired SPI device on the module.
+  */
+ 
+-static int spi1_internal_chipselect[] = {
+-	MXC_SPI_CS(0),
+-};
+-
+ static const struct spi_imx_master spi1_pdata __initconst = {
+-	.chipselect	= spi1_internal_chipselect,
+-	.num_chipselect	= ARRAY_SIZE(spi1_internal_chipselect),
++	.num_chipselect	= 1,
+ };
+ 
+ static struct mc13xxx_platform_data mc13783_pdata __initdata = {
+diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+index 7716f83aecdd..643a3d749703 100644
+--- a/arch/arm/mach-imx/mach-mx31moboard.c
++++ b/arch/arm/mach-imx/mach-mx31moboard.c
+@@ -152,14 +152,8 @@ static const struct imxi2c_platform_data moboard_i2c1_data __initconst = {
+ 	.bitrate = 100000,
+ };
+ 
+-static int moboard_spi1_cs[] = {
+-	MXC_SPI_CS(0),
+-	MXC_SPI_CS(2),
+-};
+-
+ static const struct spi_imx_master moboard_spi1_pdata __initconst = {
+-	.chipselect	= moboard_spi1_cs,
+-	.num_chipselect	= ARRAY_SIZE(moboard_spi1_cs),
++	.num_chipselect	= 3,
+ };
+ 
+ static struct regulator_consumer_supply sdhc_consumers[] = {
+@@ -296,19 +290,14 @@ static struct spi_board_info moboard_spi_board_info[] __initdata = {
+ 		/* irq number is run-time assigned */
+ 		.max_speed_hz = 300000,
+ 		.bus_num = 1,
+-		.chip_select = 1,
++		.chip_select = 0,
+ 		.platform_data = &moboard_pmic,
+ 		.mode = SPI_CS_HIGH,
+ 	},
+ };
+ 
+-static int moboard_spi2_cs[] = {
+-	MXC_SPI_CS(0), MXC_SPI_CS(1),
+-};
+-
+ static const struct spi_imx_master moboard_spi2_pdata __initconst = {
+-	.chipselect	= moboard_spi2_cs,
+-	.num_chipselect	= ARRAY_SIZE(moboard_spi2_cs),
++	.num_chipselect	= 2,
+ };
+ 
+ #define SDHC1_CD IOMUX_TO_GPIO(MX31_PIN_ATA_CS0)
+diff --git a/arch/arm/mach-imx/mach-pcm037_eet.c b/arch/arm/mach-imx/mach-pcm037_eet.c
+index 95bd97710494..15bc956d466b 100644
+--- a/arch/arm/mach-imx/mach-pcm037_eet.c
++++ b/arch/arm/mach-imx/mach-pcm037_eet.c
+@@ -56,11 +56,8 @@ static struct spi_board_info pcm037_spi_dev[] = {
+ };
+ 
+ /* Platform Data for MXC CSPI */
+-static int pcm037_spi1_cs[] = { MXC_SPI_CS(0), MXC_SPI_CS(1), };
+-
+ static const struct spi_imx_master pcm037_spi1_pdata __initconst = {
+-	.chipselect = pcm037_spi1_cs,
+-	.num_chipselect = ARRAY_SIZE(pcm037_spi1_cs),
++	.num_chipselect = 2,
+ };
+ 
+ /* GPIO-keys input device */
+diff --git a/include/linux/platform_data/spi-imx.h b/include/linux/platform_data/spi-imx.h
+index 6f012fefa1a2..328f670d10bd 100644
+--- a/include/linux/platform_data/spi-imx.h
++++ b/include/linux/platform_data/spi-imx.h
+@@ -5,24 +5,29 @@
+ 
+ /*
+  * struct spi_imx_master - device.platform_data for SPI controller devices.
+- * @chipselect: Array of chipselects for this master. Numbers >= 0 mean gpio
+- *              pins, numbers < 0 mean internal CSPI chipselects according
+- *              to MXC_SPI_CS(). Normally you want to use gpio based chip
+- *              selects as the CSPI module tries to be intelligent about
+- *              when to assert the chipselect: The CSPI module deasserts the
+- *              chipselect once it runs out of input data. The other problem
+- *              is that it is not possible to mix between high active and low
+- *              active chipselects on one single bus using the internal
+- *              chipselects. Unfortunately Freescale decided to put some
++ * @chipselect: Array of chipselects for this master or NULL.  Numbers >= 0
++ *              mean GPIO pins, -ENOENT means internal CSPI chipselect
++ *              matching the position in the array.  E.g., if chipselect[1] =
++ *              -ENOENT then a SPI slave using chip select 1 will use the
++ *              native SS1 line of the CSPI.  Omitting the array will use
++ *              all native chip selects.
++
++ *              Normally you want to use gpio based chip selects as the CSPI
++ *              module tries to be intelligent about when to assert the
++ *              chipselect:  The CSPI module deasserts the chipselect once it
++ *              runs out of input data.  The other problem is that it is not
++ *              possible to mix between high active and low active chipselects
++ *              on one single bus using the internal chipselects.
++ *              Unfortunately, on some SoCs, Freescale decided to put some
+  *              chipselects on dedicated pins which are not usable as gpios,
+  *              so we have to support the internal chipselects.
+- * @num_chipselect: ARRAY_SIZE(chipselect)
++ *
++ * @num_chipselect: If @chipselect is specified, ARRAY_SIZE(chipselect),
++ *                  otherwise the number of native chip selects.
+  */
+ struct spi_imx_master {
+ 	int	*chipselect;
+ 	int	num_chipselect;
+ };
+ 
+-#define MXC_SPI_CS(no)	((no) - 32)
+-
+ #endif /* __MACH_SPI_H_*/
 -- 
-Boris Brezillon, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.14.3
