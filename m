@@ -1,89 +1,172 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 2 Apr 2018 10:37:55 -0400
-Subject: [net-next PATCH v3 05/11] net: netcp: ethss: add support for handling
- sgmii link interface
-In-Reply-To: <1522679881-25643-1-git-send-email-m-karicheri2@ti.com>
-References: <1522679881-25643-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1522679881-25643-6-git-send-email-m-karicheri2@ti.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 2 Apr 2018 20:26:00 +0530
+Subject: [PATCH v4 12/14] cpufreq: Add Kryo CPU scaling driver
+In-Reply-To: <1522358807-10413-13-git-send-email-ilialin@codeaurora.org>
+References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+ <1522358807-10413-13-git-send-email-ilialin@codeaurora.org>
+Message-ID: <c17f3623-849f-cba8-8118-623e4e8261da@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2u cpsw hardware on K2G uses sgmii link to interface with Phy. So add
-support for this interface in the code so that drover can be re-used
-for 2u hardware.
+Hi Ilia,
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/net/ethernet/ti/netcp.h       |  2 ++
- drivers/net/ethernet/ti/netcp_ethss.c | 15 +++++++++++----
- 2 files changed, 13 insertions(+), 4 deletions(-)
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 7f56fe5..71350e2 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -134,6 +134,17 @@ config ARM_OMAP2PLUS_CPUFREQ
+>  	depends on ARCH_OMAP2PLUS
+>  	default ARCH_OMAP2PLUS
+>  
+> +config ARM_QCOM_CPUFREQ_KRYO
+> +	tristate "Qualcomm Technologies, Inc. Kryo based"
 
-diff --git a/drivers/net/ethernet/ti/netcp.h b/drivers/net/ethernet/ti/netcp.h
-index 8900a6f..416f732 100644
---- a/drivers/net/ethernet/ti/netcp.h
-+++ b/drivers/net/ethernet/ti/netcp.h
-@@ -33,6 +33,8 @@
- #define SGMII_LINK_MAC_MAC_FORCED	2
- #define SGMII_LINK_MAC_FIBER		3
- #define SGMII_LINK_MAC_PHY_NO_MDIO	4
-+#define RGMII_LINK_MAC_PHY		5
-+#define RGMII_LINK_MAC_PHY_NO_MDIO	7
- #define XGMII_LINK_MAC_PHY		10
- #define XGMII_LINK_MAC_MAC_FORCED	11
- 
-diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
-index 1628fbe..06bbb65 100644
---- a/drivers/net/ethernet/ti/netcp_ethss.c
-+++ b/drivers/net/ethernet/ti/netcp_ethss.c
-@@ -2094,8 +2094,9 @@ static void netcp_ethss_link_state_action(struct gbe_priv *gbe_dev,
- 				     ALE_PORT_STATE_FORWARD);
- 
- 		if (ndev && slave->open &&
--		    slave->link_interface != SGMII_LINK_MAC_PHY &&
--		    slave->link_interface != XGMII_LINK_MAC_PHY)
-+		    ((slave->link_interface != SGMII_LINK_MAC_PHY) &&
-+		    (slave->link_interface != RGMII_LINK_MAC_PHY) &&
-+		    (slave->link_interface != XGMII_LINK_MAC_PHY)))
- 			netif_carrier_on(ndev);
- 	} else {
- 		writel(mac_control, GBE_REG_ADDR(slave, emac_regs,
-@@ -2104,8 +2105,9 @@ static void netcp_ethss_link_state_action(struct gbe_priv *gbe_dev,
- 				     ALE_PORT_STATE,
- 				     ALE_PORT_STATE_DISABLE);
- 		if (ndev &&
--		    slave->link_interface != SGMII_LINK_MAC_PHY &&
--		    slave->link_interface != XGMII_LINK_MAC_PHY)
-+		    ((slave->link_interface != SGMII_LINK_MAC_PHY) &&
-+		    (slave->link_interface != RGMII_LINK_MAC_PHY) &&
-+		    (slave->link_interface != XGMII_LINK_MAC_PHY)))
- 			netif_carrier_off(ndev);
- 	}
- 
-@@ -2917,6 +2919,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
- 
- 	slave->open = false;
- 	if ((slave->link_interface == SGMII_LINK_MAC_PHY) ||
-+	    (slave->link_interface == RGMII_LINK_MAC_PHY) ||
- 	    (slave->link_interface == XGMII_LINK_MAC_PHY))
- 		slave->phy_node = of_parse_phandle(node, "phy-handle", 0);
- 	slave->port_num = gbe_get_slave_port(gbe_dev, slave->slave_num);
-@@ -3078,6 +3081,9 @@ static void init_secondary_ports(struct gbe_priv *gbe_dev,
- 	if (slave->link_interface == SGMII_LINK_MAC_PHY) {
- 		phy_mode = PHY_INTERFACE_MODE_SGMII;
- 		slave->phy_port_t = PORT_MII;
-+	} else if (slave->link_interface == RGMII_LINK_MAC_PHY) {
-+		phy_mode = PHY_INTERFACE_MODE_RGMII;
-+		slave->phy_port_t = PORT_MII;
- 	} else {
- 		phy_mode = PHY_INTERFACE_MODE_NA;
- 		slave->phy_port_t = PORT_FIBRE;
-@@ -3085,6 +3091,7 @@ static void init_secondary_ports(struct gbe_priv *gbe_dev,
- 
- 	for_each_sec_slave(slave, gbe_dev) {
- 		if ((slave->link_interface != SGMII_LINK_MAC_PHY) &&
-+		    (slave->link_interface != RGMII_LINK_MAC_PHY) &&
- 		    (slave->link_interface != XGMII_LINK_MAC_PHY))
- 			continue;
- 		slave->phy =
+ Does this need to be 'tristate' ?. 'cpu-freq-dt' driver is already
+ built as module.
+
+<..>
+
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+
+ Is io.h required ?
+
+Regards,
+  Sricharan
+
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/nvmem-consumer.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pm_opp.h>
+> +#include <linux/slab.h>
+> +#include <linux/soc/qcom/smem.h>
+> +
+> +#define MSM_ID_SMEM	137
+> +#define SILVER_LEAD	0
+> +#define GOLD_LEAD	2
+> +
+> +enum _msm_id {
+> +	MSM8996V3 = 0xF6ul,
+> +	APQ8096V3 = 0x123ul,
+> +	MSM8996SG = 0x131ul,
+> +	APQ8096SG = 0x138ul,
+> +};
+> +
+> +enum _msm8996_version {
+> +	MSM8996_V3,
+> +	MSM8996_SG,
+> +	NUM_OF_MSM8996_VERSIONS,
+> +};
+> +
+> +static enum _msm8996_version __init qcom_cpufreq_kryo_get_msm_id(void)
+> +{
+> +	size_t len;
+> +	u32 *msm_id;
+> +	enum _msm8996_version version;
+> +
+> +	msm_id = qcom_smem_get(QCOM_SMEM_HOST_ANY, MSM_ID_SMEM, &len);
+> +	/* The first 4 bytes are format, next to them is the actual msm-id */
+> +	msm_id++;
+> +
+> +	switch ((enum _msm_id)*msm_id) {
+> +	case MSM8996V3:
+> +	case APQ8096V3:
+> +		version = MSM8996_V3;
+> +		break;
+> +	case MSM8996SG:
+> +	case APQ8096SG:
+> +		version = MSM8996_SG;
+> +		break;
+> +	default:
+> +		version = NUM_OF_MSM8996_VERSIONS;
+> +	}
+> +
+> +	return version;
+> +}
+> +
+> +static int __init qcom_cpufreq_kryo_driver_init(void)
+> +{
+> +	struct platform_device *pdev;
+> +	struct device *cpu_dev;
+> +	struct device_node *np;
+> +	struct nvmem_cell *speedbin_nvmem;
+> +	enum _msm8996_version msm8996_version;
+> +	u8 *speedbin;
+> +	size_t len;
+> +	int ret;
+> +	u32 versions;
+> +
+> +	cpu_dev = get_cpu_device(SILVER_LEAD);
+> +	if (IS_ERR_OR_NULL(cpu_dev))
+> +		return PTR_ERR(cpu_dev);
+> +
+> +	msm8996_version = qcom_cpufreq_kryo_get_msm_id();
+> +	if (NUM_OF_MSM8996_VERSIONS == msm8996_version) {
+> +		dev_err(cpu_dev, "Not Snapdragon 820/821!");
+> +		return -ENODEV;
+> +        }
+> +
+> +	np = dev_pm_opp_of_get_opp_desc_node(cpu_dev);
+> +	if (IS_ERR_OR_NULL(np))
+> +		return PTR_ERR(np);
+> +
+> +	if (!of_device_is_compatible(np, "operating-points-v2-kryo-cpu")) {
+> +		ret = -ENOENT;
+> +		goto free_np;
+> +	}
+> +
+> +	speedbin_nvmem = of_nvmem_cell_get(np, NULL);
+> +	if (IS_ERR(speedbin_nvmem)) {
+> +		ret = PTR_ERR(speedbin_nvmem);
+> +		dev_err(cpu_dev, "Could not get nvmem cell: %d\n", ret);
+> +		goto free_np;
+> +	}
+> +
+> +	speedbin = nvmem_cell_read(speedbin_nvmem, &len);
+> +
+> +	switch (msm8996_version) {
+> +	case MSM8996_V3:
+> +		versions = 1 << (unsigned int)(*speedbin);
+> +		break;
+> +	case MSM8996_SG:
+> +		versions = 1 << ((unsigned int)(*speedbin) + 4);
+> +		break;
+> +	default:
+> +		BUG();
+> +		break;
+> +	}
+> +
+> +	ret = PTR_ERR_OR_ZERO(dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> +	if (0 > ret)
+> +		goto free_np;
+> +
+> +	cpu_dev = get_cpu_device(GOLD_LEAD);
+> +	ret = PTR_ERR_OR_ZERO(dev_pm_opp_set_supported_hw(cpu_dev,&versions,1));
+> +
+> +	of_node_put(np);
+> +
+> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> +	if (IS_ERR(pdev)) {
+> +		return PTR_ERR(pdev);
+> +	}
+> +
+> +	return 0;
+> +
+> +free_np:
+> +	of_node_put(np);
+> +
+> +	return ret;
+> +}
+> +late_initcall(qcom_cpufreq_kryo_driver_init);
+> +
+> +MODULE_DESCRIPTION("Qualcomm Technologies, Inc. Kryo CPUfreq driver");
+> +MODULE_LICENSE("GPL v2");
+> 
+
 -- 
-1.9.1
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
