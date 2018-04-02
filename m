@@ -1,33 +1,33 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Mon, 2 Apr 2018 16:09:01 +0530
-Subject: [RFC 1/6] dt-bindings: dma: xilinx_dma: Add optional property
- has_axieth_connected
+Date: Mon, 2 Apr 2018 16:09:06 +0530
+Subject: [RFC 6/6] dmaengine: xilinx_dma: Use tasklet_hi_schedule for timing
+ critical usecase
 In-Reply-To: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
 References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
-Message-ID: <1522665546-10035-2-git-send-email-radheys@xilinx.com>
+Message-ID: <1522665546-10035-7-git-send-email-radheys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an optional AXI DMA property 'has_axieth_connected'. This can be
-specified to indicate that AXI DMA is connected to AXI Ethernet in
-hardware design and dma driver needs to do some additional handling.
+Schedule tasklet with high priority to ensure that callback processing
+is prioritized. It improves throughput for netdev dma clients.
 
 Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
 ---
- .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/dma/xilinx/xilinx_dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-index a2b8bfa..5d592e3 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-@@ -42,6 +42,7 @@ Optional properties:
- 	the hardware.
- Optional properties for AXI DMA:
- - xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
-+- xlnx,axieth-connected: Tells whether AXI DMA is connected to AXI Ethernet.
- Optional properties for VDMA:
- - xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
- 	It takes following values:
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index ab8f1b0..d45224d 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -1536,7 +1536,7 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
+ 		spin_unlock(&chan->lock);
+ 	}
+ 
+-	tasklet_schedule(&chan->tasklet);
++	tasklet_hi_schedule(&chan->tasklet);
+ 	return IRQ_HANDLED;
+ }
+ 
 -- 
 1.7.1
