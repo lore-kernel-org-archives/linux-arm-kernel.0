@@ -1,46 +1,70 @@
-From: hejianet@gmail.com (Jia He)
-Date: Sun,  1 Apr 2018 19:30:36 -0700
-Subject: [PATCH v5 5/5] mm: page_alloc: reduce unnecessary binary search in
- early_pfn_valid()
-In-Reply-To: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
-References: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
-Message-ID: <1522636236-12625-6-git-send-email-hejianet@gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 2 Apr 2018 11:04:15 +0800
+Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
+In-Reply-To: <87vada1owt.fsf@notabene.neil.brown.name>
+References: <20180329095637.GA16778@kroah.com>
+ <20180329124745.24694-1-cmc@babblebit.net>
+ <87vada1owt.fsf@notabene.neil.brown.name>
+Message-ID: <1522638255.18424.44.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-where possible") optimized the loop in memmap_init_zone(). But there is
-still some room for improvement. E.g. in early_pfn_valid(), if pfn and
-pfn+1 are in the same memblock region, we can record the last returned
-memblock region index and check check pfn++ is still in the same region.
+On Mon, 2018-04-02 at 09:34 +1000, NeilBrown wrote:
+> On Thu, Mar 29 2018, Chris Coffey wrote:
+> 
+> > This fixes the following sparse warning:
+> >
+> > drivers/staging/mt7621-eth/ethtool.c:213:6: warning: symbol
+> > 'mtk_set_ethtool_ops' was not declared. Should it be static?
+> >
+> > Signed-off-by: Chris Coffey <cmc@babblebit.net>
+> 
+> Reviewed-by: NeilBrown <neil@brown.name>
+> 
+> Thanks,
+> NeilBrown
+> 
+Hi, Neil
 
-Currently it only improve the performance on arm64 and will have no
-impact on other arches.
+Forgive me I cannot find the cover letter in the original series in my
+mailbox to make a reply, so I rudely made here just letting you know
+something good to the growth of mt7621 support in upstream.
 
-Signed-off-by: Jia He <jia.he@hxt-semitech.com>
----
- include/linux/mmzone.h | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+do you have maintained an out-of-tree branch to boot the mt7621 machine
+with those staging patches?
 
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index f9c0c46..079f468 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -1268,9 +1268,14 @@ static inline int pfn_present(unsigned long pfn)
- })
- #else
- #define pfn_to_nid(pfn)		(0)
--#endif
-+#endif /*CONFIG_NUMA*/
- 
-+#ifdef CONFIG_HAVE_ARCH_PFN_VALID
-+#define early_pfn_valid(pfn) pfn_valid_region(pfn)
-+#else
- #define early_pfn_valid(pfn)	pfn_valid(pfn)
-+#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
-+
- void sparse_init(void);
- #else
- #define sparse_init()	do {} while (0)
--- 
-2.7.4
+If so, it would become a bit easier for me that maybe I could give a
+hand for migrating these staging driver for mt7621 to mainline. I
+thought mmc, pci, ethernet, gsw and hsdma all could probably reuse the
+current mainline code.
+
+	Sean
+> 
+> > ---
+> > Changes in v2:
+> >  - Per GregKH's feedback (thanks!), don't add unnecessary new .h file
+> >  dependencies. This patch version reverts those changes and fixes the
+> >  problem directly in ethtool.c (which is that it didn't include
+> >  ethtool.h anywhere -- mtk_set_ethtool_ops is not static).
+> >
+> >  drivers/staging/mt7621-eth/ethtool.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
+> > index 38ba0c040a..5268c5ca09 100644
+> > --- a/drivers/staging/mt7621-eth/ethtool.c
+> > +++ b/drivers/staging/mt7621-eth/ethtool.c
+> > @@ -13,6 +13,7 @@
+> >   */
+> >  
+> >  #include "mtk_eth_soc.h"
+> > +#include "ethtool.h"
+> >  
+> >  static const char mtk_gdma_str[][ETH_GSTRING_LEN] = {
+> >  #define _FE(x...)	# x,
+> > -- 
+> > 2.11.0
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
