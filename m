@@ -1,60 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 2 Apr 2018 15:32:19 +0200
-Subject: [Question] MFD driver that handles clocks/resets and populates
- child nodes
-In-Reply-To: <CAK7LNAQ6LKk3NtGLB8g07ocyvXidpTHsApeDuctvEHyyLvk2ew@mail.gmail.com>
-References: <CAK7LNARFWDMgmWsCjUmVrm4ZeYOcKCbizijxmDXob618ABjNWg@mail.gmail.com>
- <20180402120414.GA8159@lunn.ch>
- <CAK7LNAQ6LKk3NtGLB8g07ocyvXidpTHsApeDuctvEHyyLvk2ew@mail.gmail.com>
-Message-ID: <20180402133219.GA10520@lunn.ch>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Mon, 2 Apr 2018 22:24:41 +0800
+Subject: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <c1f9230b-8ff0-5b2e-def9-cbf6b2e2e99c@huawei.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-3-git-send-email-nleeder@codeaurora.org>
+ <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
+ <e55ab4404143ea0b3cc4795a93e37480@codeaurora.org>
+ <14f90cc6-f2c1-5a63-67c6-a5c8ddb4799e@gmail.com>
+ <c1f9230b-8ff0-5b2e-def9-cbf6b2e2e99c@huawei.com>
+Message-ID: <66ef3bf4-9550-94c7-f8ad-ee53d6c75025@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2018 at 10:21:01PM +0900, Masahiro Yamada wrote:
-> 2018-04-02 21:04 GMT+09:00 Andrew Lunn <andrew@lunn.ch>:
-> >> The maintainer of DWC3, Felipe Balbi, requested to
-> >> split the glue layer driver into small parts such as
-> >> reset, regulator, phy, etc.
-> >
-> > What exactly did Felipe ask for? Did he ask that the patch be split
-> > up, one patch per reset, regulator, phy etc?
+On 2018/4/2 14:37, Yisheng Xie wrote:
+> Hi Neil,
 > 
+> On 2018/4/1 13:44, Neil Leeder wrote:
+>> Hi Yisheng Xie,
+>>
+>> On 3/29/2018 03:03 AM, Yisheng Xie wrote:
+>>>
+>>> Hi Neil,
+>>>
+>>> On 2017/8/5 3:59, Neil Leeder wrote:
+>>>> +    mem_resource_0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>> +    mem_map_0 = devm_ioremap_resource(&pdev->dev, mem_resource_0);
+>>>> +
+>>> Can we use devm_ioremap instead? for the reg_base of smmu_pmu is
+>>> IMPLEMENTATION DEFINED. If the reg of smmu_pmu is inside smmu,
+>>> devm_ioremap_resource will failed and return -EBUSY, eg.:
+>>>
+>>>   smmu reg ranges:        0x180000000 ~ 0x1801fffff
+>>>   its smmu_pmu reg ranges:    0x180001000 ~ 0x180001fff
+>>>
+>> Just to let you know that I no longer work at Qualcomm and I won't be able to provide updates to this patchset. I expect that others from my former team at Qualcomm will pick up ownership.
 > 
-> Yeah.  That is what we understood from his comments.
+> Thanks for this infomation.
 > 
+> hi Agustin and Timur,
 > 
-> These are the feed-backs from him.
-> 
-> https://lkml.org/lkml/2018/1/23/298
-> https://lkml.org/lkml/2018/1/24/352
+> Is there any new status about this patchset?
 
-> > Are all these resources used just by the DWC3? Or is it a true MFD,
-> > multiple functions?
-> 
-> I do not think this is a real MFD.
-> 
-> This is a DWC3 glue layer, i.e.
-> a collection of misc registers that control
-> the DWC3 IP.
-> 
-> 
-> Just splitting it into small pieces
-> to use PHY, reset, regulator framework in Linux.
-> 
-> Of course, the price of this approach
-> is so cluttered Device Tree,
-> honestly I do not like it much.
+I think we need to wait for the new version of IORT spec,
+which includes the fix for the two base address for SMMUv3
+PMCG (now just represent one).
 
-This however the correct way to do this. You should have a phy driver,
-and a regulator driver, and a reset driver. The DWC3 then uses
-phandles to these drivers.
-
-How is the IO map area 65b00000 split up. Can you cleanly separate it
-into sub areas, which do not overlap, so you have a sub-area for the
-PHY driver, a sub-area for the regulator driver and a sub-area for the
-reset area? If you can cleanly split it up, you don't need an MFD. If
-however the registers are in overlapping areas, you do need an
-MFD. The MFD core provides access to the registers, while its children
-implement PHY, reset, regulator etc.
-
-	  Andrew
+Thanks
+Hanjun
