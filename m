@@ -1,46 +1,123 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 2 Apr 2018 10:37:54 -0400
-Subject: [net-next PATCH v3 04/11] net: netcp: ethss: make call to
- gbe_sgmii_config() conditional
+Date: Mon, 2 Apr 2018 10:37:52 -0400
+Subject: [net-next PATCH v3 02/11] soc: ti: K2G: provide APIs to support
+ driver probe deferral
 In-Reply-To: <1522679881-25643-1-git-send-email-m-karicheri2@ti.com>
 References: <1522679881-25643-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1522679881-25643-5-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1522679881-25643-3-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As a preparatory patch to add support for 2u cpsw hardware found on
-K2G SoC, make call to gbe_sgmii_config() conditional. This is required
-since 2u uses RGMII interface instead of SGMII and to allow for driver
-re-use.
+This patch provide APIs to allow client drivers to support
+probe deferral. On K2G SoC, devices can be probed only
+after the ti_sci_pm_domains driver is probed and ready.
+As drivers may get probed at different order, any driver
+that depends on knav dma and qmss drivers, for example
+netcp network driver, needs to defer probe until
+knav devices are probed and ready to service. To do this,
+add an API to query the device ready status from the knav
+dma and qmss devices.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/net/ethernet/ti/netcp_ethss.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/soc/ti/knav_dma.c        |  8 ++++++++
+ drivers/soc/ti/knav_qmss_queue.c |  8 ++++++++
+ include/linux/soc/ti/knav_dma.h  | 12 ++++++++++++
+ include/linux/soc/ti/knav_qmss.h |  1 +
+ 4 files changed, 29 insertions(+)
 
-diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
-index 1b79fe5..1628fbe 100644
---- a/drivers/net/ethernet/ti/netcp_ethss.c
-+++ b/drivers/net/ethernet/ti/netcp_ethss.c
-@@ -2274,7 +2274,8 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
+diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
+index 026182d..224d7dd 100644
+--- a/drivers/soc/ti/knav_dma.c
++++ b/drivers/soc/ti/knav_dma.c
+@@ -134,6 +134,13 @@ struct knav_dma_chan {
  
- 	void (*hndlr)(struct net_device *) = gbe_adjust_link;
+ static struct knav_dma_pool_device *kdev;
  
--	gbe_sgmii_config(priv, slave);
-+	if (IS_SS_ID_VER_14(priv) || IS_SS_ID_NU(priv))
-+		gbe_sgmii_config(priv, slave);
- 	gbe_port_reset(slave);
- 	gbe_sgmii_rtreset(priv, slave, false);
- 	gbe_port_config(priv, slave, priv->rx_packet_max);
-@@ -3042,7 +3043,8 @@ static void init_secondary_ports(struct gbe_priv *gbe_dev,
- 			continue;
- 		}
++static bool device_ready;
++bool knav_dma_device_ready(void)
++{
++	return device_ready;
++}
++EXPORT_SYMBOL_GPL(knav_dma_device_ready);
++
+ static bool check_config(struct knav_dma_chan *chan, struct knav_dma_cfg *cfg)
+ {
+ 	if (!memcmp(&chan->cfg, cfg, sizeof(*cfg)))
+@@ -773,6 +780,7 @@ static int knav_dma_probe(struct platform_device *pdev)
+ 	debugfs_create_file("knav_dma", S_IFREG | S_IRUGO, NULL, NULL,
+ 			    &knav_dma_debug_ops);
  
--		gbe_sgmii_config(gbe_dev, slave);
-+		if (IS_SS_ID_VER_14(gbe_dev) || IS_SS_ID_NU(gbe_dev))
-+			gbe_sgmii_config(gbe_dev, slave);
- 		gbe_port_reset(slave);
- 		gbe_port_config(gbe_dev, slave, gbe_dev->rx_packet_max);
- 		list_add_tail(&slave->slave_list, &gbe_dev->secondary_slaves);
++	device_ready = true;
+ 	return ret;
+ }
+ 
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 8526c8e..419365a 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -74,6 +74,13 @@
+  */
+ const char *knav_acc_firmwares[] = {"ks2_qmss_pdsp_acc48.bin"};
+ 
++static bool device_ready;
++bool knav_qmss_device_ready(void)
++{
++	return device_ready;
++}
++EXPORT_SYMBOL_GPL(knav_qmss_device_ready);
++
+ /**
+  * knav_queue_notify: qmss queue notfier call
+  *
+@@ -1849,6 +1856,7 @@ static int knav_queue_probe(struct platform_device *pdev)
+ 
+ 	debugfs_create_file("qmss", S_IFREG | S_IRUGO, NULL, NULL,
+ 			    &knav_queue_debug_ops);
++	device_ready = true;
+ 	return 0;
+ 
+ err:
+diff --git a/include/linux/soc/ti/knav_dma.h b/include/linux/soc/ti/knav_dma.h
+index 66693bc..7127ec3 100644
+--- a/include/linux/soc/ti/knav_dma.h
++++ b/include/linux/soc/ti/knav_dma.h
+@@ -167,6 +167,8 @@ struct knav_dma_desc {
+ void *knav_dma_open_channel(struct device *dev, const char *name,
+ 				struct knav_dma_cfg *config);
+ void knav_dma_close_channel(void *channel);
++int knav_dma_get_flow(void *channel);
++bool knav_dma_device_ready(void);
+ #else
+ static inline void *knav_dma_open_channel(struct device *dev, const char *name,
+ 				struct knav_dma_cfg *config)
+@@ -176,6 +178,16 @@ static inline void *knav_dma_open_channel(struct device *dev, const char *name,
+ static inline void knav_dma_close_channel(void *channel)
+ {}
+ 
++static inline int knav_dma_get_flow(void *channel)
++{
++	return -EINVAL;
++}
++
++static inline bool knav_dma_device_ready(void)
++{
++	return false;
++}
++
+ #endif
+ 
+ #endif /* __SOC_TI_KEYSTONE_NAVIGATOR_DMA_H__ */
+diff --git a/include/linux/soc/ti/knav_qmss.h b/include/linux/soc/ti/knav_qmss.h
+index 9f0ebb3b..9745df6 100644
+--- a/include/linux/soc/ti/knav_qmss.h
++++ b/include/linux/soc/ti/knav_qmss.h
+@@ -86,5 +86,6 @@ int knav_pool_desc_map(void *ph, void *desc, unsigned size,
+ void *knav_pool_desc_unmap(void *ph, dma_addr_t dma, unsigned dma_sz);
+ dma_addr_t knav_pool_desc_virt_to_dma(void *ph, void *virt);
+ void *knav_pool_desc_dma_to_virt(void *ph, dma_addr_t dma);
++bool knav_qmss_device_ready(void);
+ 
+ #endif /* __SOC_TI_KNAV_QMSS_H__ */
 -- 
 1.9.1
