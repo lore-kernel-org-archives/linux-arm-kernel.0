@@ -1,43 +1,50 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 2 Apr 2018 16:42:21 +0530
-Subject: [PATCH v8 42/42] ARM: dts: da850: Add clocks
-In-Reply-To: <cf0c4153-b65d-da57-cd0f-0a16cb186377@lechnology.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-43-git-send-email-david@lechnology.com>
- <cf0c4153-b65d-da57-cd0f-0a16cb186377@lechnology.com>
-Message-ID: <510309d2-2df0-a915-a6f6-082b41c6b28b@ti.com>
+From: christian@lkamp.de (Christian =?iso-8859-1?Q?L=FCtke-Stetzkamp?=)
+Date: Mon, 2 Apr 2018 13:41:03 +0200
+Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
+In-Reply-To: <87po3i1dhu.fsf@notabene.neil.brown.name>
+References: <20180329095637.GA16778@kroah.com>
+ <20180329124745.24694-1-cmc@babblebit.net>
+ <87vada1owt.fsf@notabene.neil.brown.name>
+ <1522638255.18424.44.camel@mtkswgap22>
+ <87po3i1dhu.fsf@notabene.neil.brown.name>
+Message-ID: <20180402114103.GA29354@demeter.lkamp.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2018 10:50 PM, David Lechner wrote:
-> On 03/15/2018 09:52 PM, David Lechner wrote:
->> This adds clock provider nodes for da850 and wires them up to all of the
->> devices.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
+On Mon, Apr 02, 2018 at 01:41:33PM +1000, NeilBrown wrote:
+> On Mon, Apr 02 2018, Sean Wang wrote:
+> > Hi, Neil
+> >
+> > Forgive me I cannot find the cover letter in the original series in my
+> > mailbox to make a reply, so I rudely made here just letting you know
+> > something good to the growth of mt7621 support in upstream.
+> >
+> > If so, it would become a bit easier for me that maybe I could give a
+> > hand for migrating these staging driver for mt7621 to mainline. I
+> > thought mmc, pci, ethernet, gsw and hsdma all could probably reuse the
+> > current mainline code.
 > 
-> ...
+> I agree that it is quite likely that several of these drivers could and
+> should reuse current mainline code.  I would love to have some help
+> sorting this out.  I won't have much time myself to dig into it for
+> several weeks, but I'll make time to review and test any code that is
+> contributed.
 > 
-> This is the mcasp0: mcasp at 100000 node...
-> 
->> @@ -560,6 +720,7 @@
->> ????????????? dmas = <&edma0 1 1>,
->> ????????????????? <&edma0 0 1>;
->> ????????????? dma-names = "tx", "rx";
->> +??????????? clocks = <&psc1 7>;
-> 
-> After some testing, it looks like it needs to be:
-> 
-> +??????????? power-domains = <&psc1 7>;
-> 
-> instead of
-> 
-> +??????????? clocks = <&psc1 7>;
+> Thanks,
+> NeilBrown
 
-We should probably have both clocks and power-domains properties for all
-PSC clocks. This way, the driver can change without a corresponding DT
-update dependency.
+Hi,
 
-Thanks,
-Sekhar
+I have started a patch series for the mmc driver that is currently in
+staging, that makes some of the first cleanups (whitespace, indent,..)
+and also starts to clean up the code, to make the similarities and
+differences to the current mainline code clearer. The series is far
+from being complete, but I think I'm going to send it out today, so
+you can look and comment.
+
+I would suggest that we continue cleaning the code that is currently
+in staging to remove the dead parts and make the diff to the mainline
+code obvious. Do you agree with that proposal or do you suggest a
+different plan?
+
+Christian
