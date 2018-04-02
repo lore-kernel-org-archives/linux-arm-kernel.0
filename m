@@ -1,136 +1,96 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon,  2 Apr 2018 16:26:56 +0200
-Subject: [PATCH 15/15] ARM: pxa: change SSP DMA channels allocation
-In-Reply-To: <20180402142656.26815-1-robert.jarzmik@free.fr>
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
-Message-ID: <20180402142656.26815-16-robert.jarzmik@free.fr>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 2 Apr 2018 10:37:56 -0400
+Subject: [net-next PATCH v3 06/11] net: netcp: ethss: use rgmii link status
+ for 2u cpsw hardware
+In-Reply-To: <1522679881-25643-1-git-send-email-m-karicheri2@ti.com>
+References: <1522679881-25643-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1522679881-25643-7-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the dma_slave_map is available for PXA architecture, switch the SSP
-device to it.
+Introduce rgmii link status to handle link state events for 2u
+cpsw hardware on K2G.
 
-This specifically means that :
-- for platform data based machines, the DMA requestor channels are
-  extracted from platform data and passed further to the SSP user,
-  ie. usually the pxa-pcm-audio driver
-
-- for device tree platforms, the dma node should be hooked into the
-  pxa-pcm-audio node.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- arch/arm/plat-pxa/ssp.c    | 50 +++++-----------------------------------------
- include/linux/pxa2xx_ssp.h |  4 ++--
- sound/soc/pxa/pxa-ssp.c    |  5 ++---
- 3 files changed, 9 insertions(+), 50 deletions(-)
+ drivers/net/ethernet/ti/netcp_ethss.c | 34 +++++++++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
-index ba13f793fbce..3457f01e3340 100644
---- a/arch/arm/plat-pxa/ssp.c
-+++ b/arch/arm/plat-pxa/ssp.c
-@@ -16,6 +16,7 @@
-  *  Author: Liam Girdwood <liam.girdwood@wolfsonmicro.com>
-  */
+diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+index 06bbb65..ab6c918 100644
+--- a/drivers/net/ethernet/ti/netcp_ethss.c
++++ b/drivers/net/ethernet/ti/netcp_ethss.c
+@@ -169,6 +169,11 @@
+ #define	GBE_RXHOOK_ORDER			0
+ #define GBE_DEFAULT_ALE_AGEOUT			30
+ #define SLAVE_LINK_IS_XGMII(s) ((s)->link_interface >= XGMII_LINK_MAC_PHY)
++#define SLAVE_LINK_IS_RGMII(s) \
++	(((s)->link_interface >= RGMII_LINK_MAC_PHY) && \
++	 ((s)->link_interface <= RGMII_LINK_MAC_PHY_NO_MDIO))
++#define SLAVE_LINK_IS_SGMII(s) \
++	((s)->link_interface <= SGMII_LINK_MAC_PHY_NO_MDIO)
+ #define NETCP_LINK_STATE_INVALID		-1
  
-+#include <mach/audio.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
-@@ -116,6 +117,7 @@ static int pxa_ssp_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct ssp_device *ssp;
- 	struct device *dev = &pdev->dev;
-+	struct pxa_ssp_info *info = dev_get_platdata(dev);
- 
- 	ssp = devm_kzalloc(dev, sizeof(struct ssp_device), GFP_KERNEL);
- 	if (ssp == NULL)
-@@ -127,51 +129,9 @@ static int pxa_ssp_probe(struct platform_device *pdev)
- 	if (IS_ERR(ssp->clk))
- 		return PTR_ERR(ssp->clk);
- 
--	if (dev->of_node) {
--		struct of_phandle_args dma_spec;
--		struct device_node *np = dev->of_node;
--		int ret;
--
--		/*
--		 * FIXME: we should allocate the DMA channel from this
--		 * context and pass the channel down to the ssp users.
--		 * For now, we lookup the rx and tx indices manually
--		 */
--
--		/* rx */
--		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
--						 0, &dma_spec);
--
--		if (ret) {
--			dev_err(dev, "Can't parse dmas property\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_rx = dma_spec.args[0];
--		of_node_put(dma_spec.np);
--
--		/* tx */
--		ret = of_parse_phandle_with_args(np, "dmas", "#dma-cells",
--						 1, &dma_spec);
--		if (ret) {
--			dev_err(dev, "Can't parse dmas property\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_tx = dma_spec.args[0];
--		of_node_put(dma_spec.np);
--	} else {
--		res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
--		if (res == NULL) {
--			dev_err(dev, "no SSP RX DRCMR defined\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_rx = res->start;
--
--		res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
--		if (res == NULL) {
--			dev_err(dev, "no SSP TX DRCMR defined\n");
--			return -ENODEV;
--		}
--		ssp->drcmr_tx = res->start;
-+	if (!dev->of_node && info) {
-+		ssp->dma_chan_rx = info->dma_chan_rx_name;
-+		ssp->dma_chan_tx = info->dma_chan_tx_name;
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-diff --git a/include/linux/pxa2xx_ssp.h b/include/linux/pxa2xx_ssp.h
-index 8461b18e4608..99c99d397e4d 100644
---- a/include/linux/pxa2xx_ssp.h
-+++ b/include/linux/pxa2xx_ssp.h
-@@ -212,9 +212,9 @@ struct ssp_device {
- 	int		type;
- 	int		use_count;
- 	int		irq;
--	int		drcmr_rx;
--	int		drcmr_tx;
- 
-+	const char	*dma_chan_rx;
-+	const char	*dma_chan_tx;
- 	struct device_node	*of_node;
+ #define GBE_SET_REG_OFS(p, rb, rn) p->rb##_ofs.rn = \
+@@ -552,6 +557,7 @@ struct gbe_ss_regs {
+ struct gbe_ss_regs_ofs {
+ 	u16	id_ver;
+ 	u16	control;
++	u16	rgmii_status; /* 2U */
  };
  
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 0291c7cb64eb..a0189b88f1d2 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -104,9 +104,8 @@ static int pxa_ssp_startup(struct snd_pcm_substream *substream,
- 	dma = kzalloc(sizeof(struct snd_dmaengine_dai_dma_data), GFP_KERNEL);
- 	if (!dma)
- 		return -ENOMEM;
--
--	dma->filter_data = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
--				&ssp->drcmr_tx : &ssp->drcmr_rx;
-+	dma->chan_name = substream->stream == SNDRV_PCM_STREAM_PLAYBACK ?
-+		ssp->dma_chan_tx : ssp->dma_chan_rx;
+ struct gbe_switch_regs {
+@@ -2120,23 +2126,35 @@ static bool gbe_phy_link_status(struct gbe_slave *slave)
+ 	 return !slave->phy || slave->phy->link;
+ }
  
- 	snd_soc_dai_set_dma_data(cpu_dai, substream, dma);
++#define RGMII_REG_STATUS_LINK	BIT(0)
++
++static void netcp_2u_rgmii_get_port_link(struct gbe_priv *gbe_dev, bool *status)
++{
++	u32 val = 0;
++
++	val = readl(GBE_REG_ADDR(gbe_dev, ss_regs, rgmii_status));
++	*status = !!(val & RGMII_REG_STATUS_LINK);
++}
++
+ static void netcp_ethss_update_link_state(struct gbe_priv *gbe_dev,
+ 					  struct gbe_slave *slave,
+ 					  struct net_device *ndev)
+ {
+-	int sp = slave->slave_num;
+-	int phy_link_state, sgmii_link_state = 1, link_state;
++	bool sw_link_state = true, phy_link_state;
++	int sp = slave->slave_num, link_state;
  
+ 	if (!slave->open)
+ 		return;
+ 
+-	if (!SLAVE_LINK_IS_XGMII(slave)) {
+-		sgmii_link_state =
+-			netcp_sgmii_get_port_link(SGMII_BASE(gbe_dev, sp), sp);
+-	}
++	if (SLAVE_LINK_IS_RGMII(slave))
++		netcp_2u_rgmii_get_port_link(gbe_dev,
++					     &sw_link_state);
++	if (SLAVE_LINK_IS_SGMII(slave))
++		sw_link_state =
++		netcp_sgmii_get_port_link(SGMII_BASE(gbe_dev, sp), sp);
+ 
+ 	phy_link_state = gbe_phy_link_status(slave);
+-	link_state = phy_link_state & sgmii_link_state;
++	link_state = phy_link_state & sw_link_state;
+ 
+ 	if (atomic_xchg(&slave->link_state, link_state) != link_state)
+ 		netcp_ethss_link_state_action(gbe_dev, ndev, slave,
+@@ -3431,6 +3449,8 @@ static int set_gbenu_ethss_priv(struct gbe_priv *gbe_dev,
+ 
+ 	/* Subsystem registers */
+ 	GBENU_SET_REG_OFS(gbe_dev, ss_regs, id_ver);
++	/* ok to set for MU, but used by 2U only */
++	GBENU_SET_REG_OFS(gbe_dev, ss_regs, rgmii_status);
+ 
+ 	/* Switch module registers */
+ 	GBENU_SET_REG_OFS(gbe_dev, switch_regs, id_ver);
 -- 
-2.11.0
+1.9.1
