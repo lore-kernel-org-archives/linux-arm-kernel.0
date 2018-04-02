@@ -1,56 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 2 Apr 2018 09:00:37 +0200
-Subject: [PATCH v5 5/5] mm: page_alloc: reduce unnecessary binary search
- in early_pfn_valid()
-In-Reply-To: <1522636236-12625-6-git-send-email-hejianet@gmail.com>
-References: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
- <1522636236-12625-6-git-send-email-hejianet@gmail.com>
-Message-ID: <CAKv+Gu9jSXq7YN68Mk7WV4+aLr=nRtHmuQnHMdM8YhgeA-SYsg@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 2 Apr 2018 09:01:00 +0200
+Subject: [PATCH] mtd: nand: davinci: don't acquire and enable clock
+In-Reply-To: <20180330143051.26423-1-nsekhar@ti.com>
+References: <20180330143051.26423-1-nsekhar@ti.com>
+Message-ID: <20180402090100.28961677@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2018 at 04:30, Jia He <hejianet@gmail.com> wrote:
-> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-> where possible") optimized the loop in memmap_init_zone(). But there is
-> still some room for improvement. E.g. in early_pfn_valid(), if pfn and
-> pfn+1 are in the same memblock region, we can record the last returned
-> memblock region index and check check pfn++ is still in the same region.
->
-> Currently it only improve the performance on arm64 and will have no
-> impact on other arches.
->
+On Fri, 30 Mar 2018 20:00:51 +0530
+Sekhar Nori <nsekhar@ti.com> wrote:
 
-How much does it improve the performance? And in which cases?
-
-I guess it improves boot time on systems with physical address spaces
-that are sparsely populated with DRAM, but you really have to quantify
-this if you want other people to care.
-
-> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+> NAND itself is an asynchronous interface, it does not have any
+> clock input. DaVinci NAND driver acquires clock for AEMIF
+> (asynchronous external memory interface) which is an on-chip
+> IP to which NAND is connected.
+> 
+> The same clock is also enabled in AEMIF driver (either present
+> drivers/memory or from machine code for some older platforms).
+> AEMIF timing must be initialized before NAND can be accessed.
+> This ensures that AEMIF clock is enabled too.
+> 
+> Remove the superfluous clock acquisition and enable in DaVinci
+> NAND driver.
+> 
+> Tested on K2L, K2HK, K2E, DA850 EVM, DA850 LCDK in device-tree
+> boot and DM644x EVM in legacy boot.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 > ---
->  include/linux/mmzone.h | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-> index f9c0c46..079f468 100644
-> --- a/include/linux/mmzone.h
-> +++ b/include/linux/mmzone.h
-> @@ -1268,9 +1268,14 @@ static inline int pfn_present(unsigned long pfn)
->  })
->  #else
->  #define pfn_to_nid(pfn)                (0)
-> -#endif
-> +#endif /*CONFIG_NUMA*/
->
-> +#ifdef CONFIG_HAVE_ARCH_PFN_VALID
-> +#define early_pfn_valid(pfn) pfn_valid_region(pfn)
-> +#else
->  #define early_pfn_valid(pfn)   pfn_valid(pfn)
-> +#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
-> +
->  void sparse_init(void);
->  #else
->  #define sparse_init()  do {} while (0)
-> --
-> 2.7.4
->
+> Hi Boris,
+> 
+> If/when this patch gets accepted,
+
+I'll probably queue it just after v4.17-rc1 is out if nobody complains
+about the change.
+
+> it will nice to put this on
+> an immutable branch others can merge. There is potential cleanup
+> in drivers/clock and in DaVinci machine code that will depend
+> on this.
+
+Sure, I can do that. 
+
+-- 
+Boris Brezillon, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
