@@ -1,10 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  2 Apr 2018 15:06:24 -0400
-Subject: [PATCH v8 1/7] i40e/i40evf: Eliminate duplicate barriers on
- weakly-ordered archs
+Date: Mon,  2 Apr 2018 15:06:27 -0400
+Subject: [PATCH v8 4/7] igb: eliminate duplicate barriers on weakly-ordered
+ archs
 In-Reply-To: <1522695990-31082-1-git-send-email-okaya@codeaurora.org>
 References: <1522695990-31082-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1522695990-31082-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1522695990-31082-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,89 +28,47 @@ mmio_wb()
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/intel/i40e/i40e_txrx.c   | 22 +++++++++-------------
- drivers/net/ethernet/intel/i40evf/i40e_txrx.c |  8 +-------
- 2 files changed, 10 insertions(+), 20 deletions(-)
+ drivers/net/ethernet/intel/igb/igb_main.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/net/ethernet/intel/i40e/i40e_txrx.c b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-index f174c72..1b9fa7a 100644
---- a/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-+++ b/drivers/net/ethernet/intel/i40e/i40e_txrx.c
-@@ -186,7 +186,13 @@ static int i40e_program_fdir_filter(struct i40e_fdir_filter *fdir_data,
- 	/* Mark the data descriptor to be watched */
- 	first->next_to_watch = tx_desc;
+diff --git a/drivers/net/ethernet/intel/igb/igb_main.c b/drivers/net/ethernet/intel/igb/igb_main.c
+index c1c0bc3..c3f7130 100644
+--- a/drivers/net/ethernet/intel/igb/igb_main.c
++++ b/drivers/net/ethernet/intel/igb/igb_main.c
+@@ -5652,11 +5652,7 @@ static int igb_tx_map(struct igb_ring *tx_ring,
+ 	/* set the timestamp */
+ 	first->time_stamp = jiffies;
  
--	writel(tx_ring->next_to_use, tx_ring->tail);
-+	writel_relaxed(tx_ring->next_to_use, tx_ring->tail);
-+
-+	/* We need this if more than one processor can write to our tail
-+	 * at a time, it synchronizes IO on IA64/Altix systems
-+	 */
-+	mmiowb();
-+
- 	return 0;
+-	/* Force memory writes to complete before letting h/w know there
+-	 * are new descriptors to fetch.  (Only applicable for weak-ordered
+-	 * memory model archs, such as IA-64).
+-	 *
+-	 * We also need this memory barrier to make certain all of the
++	/* We need this memory barrier to make certain all of the
+ 	 * status bits have been updated before next_to_watch is written.
+ 	 */
+ 	wmb();
+@@ -5674,7 +5670,7 @@ static int igb_tx_map(struct igb_ring *tx_ring,
+ 	igb_maybe_stop_tx(tx_ring, DESC_NEEDED);
  
- dma_fail:
-@@ -1523,12 +1529,6 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
- 	/* update next to alloc since we have filled the ring */
- 	rx_ring->next_to_alloc = val;
- 
--	/* Force memory writes to complete before letting h/w
--	 * know there are new descriptors to fetch.  (Only
--	 * applicable for weak-ordered memory model archs,
--	 * such as IA-64).
--	 */
--	wmb();
- 	writel(val, rx_ring->tail);
- }
- 
-@@ -2274,11 +2274,7 @@ static void i40e_rx_buffer_flip(struct i40e_ring *rx_ring,
- 
- static inline void i40e_xdp_ring_update_tail(struct i40e_ring *xdp_ring)
- {
--	/* Force memory writes to complete before letting h/w
--	 * know there are new descriptors to fetch.
--	 */
--	wmb();
--	writel_relaxed(xdp_ring->next_to_use, xdp_ring->tail);
-+	writel(xdp_ring->next_to_use, xdp_ring->tail);
- }
- 
- /**
-@@ -3444,7 +3440,7 @@ static inline int i40e_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
- 
- 	/* notify HW of packet */
  	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
 -		writel(i, tx_ring->tail);
 +		writel_relaxed(i, tx_ring->tail);
  
  		/* we need this if more than one processor can write to our tail
  		 * at a time, it synchronizes IO on IA64/Altix systems
-diff --git a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
-index 12bd937..eb5556e 100644
---- a/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
-+++ b/drivers/net/ethernet/intel/i40evf/i40e_txrx.c
-@@ -804,12 +804,6 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
- 	/* update next to alloc since we have filled the ring */
- 	rx_ring->next_to_alloc = val;
+@@ -8073,12 +8069,6 @@ void igb_alloc_rx_buffers(struct igb_ring *rx_ring, u16 cleaned_count)
+ 		/* update next to alloc since we have filled the ring */
+ 		rx_ring->next_to_alloc = i;
  
--	/* Force memory writes to complete before letting h/w
--	 * know there are new descriptors to fetch.  (Only
--	 * applicable for weak-ordered memory model archs,
--	 * such as IA-64).
--	 */
--	wmb();
- 	writel(val, rx_ring->tail);
+-		/* Force memory writes to complete before letting h/w
+-		 * know there are new descriptors to fetch.  (Only
+-		 * applicable for weak-ordered memory model archs,
+-		 * such as IA-64).
+-		 */
+-		wmb();
+ 		writel(i, rx_ring->tail);
+ 	}
  }
- 
-@@ -2379,7 +2373,7 @@ static inline void i40evf_tx_map(struct i40e_ring *tx_ring, struct sk_buff *skb,
- 
- 	/* notify HW of packet */
- 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !skb->xmit_more) {
--		writel(i, tx_ring->tail);
-+		writel_relaxed(i, tx_ring->tail);
- 
- 		/* we need this if more than one processor can write to our tail
- 		 * at a time, it synchronizes IO on IA64/Altix systems
 -- 
 2.7.4
