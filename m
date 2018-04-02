@@ -1,64 +1,70 @@
-From: neil@brown.name (NeilBrown)
-Date: Tue, 03 Apr 2018 08:39:55 +1000
-Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
-In-Reply-To: <20180402114103.GA29354@demeter.lkamp.de>
-References: <20180329095637.GA16778@kroah.com>
- <20180329124745.24694-1-cmc@babblebit.net>
- <87vada1owt.fsf@notabene.neil.brown.name>
- <1522638255.18424.44.camel@mtkswgap22>
- <87po3i1dhu.fsf@notabene.neil.brown.name>
- <20180402114103.GA29354@demeter.lkamp.de>
-Message-ID: <87efjx1bd0.fsf@notabene.neil.brown.name>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 3 Apr 2018 09:48:07 +1000
+Subject: linux-next: manual merge of the tip tree with the arm-soc tree
+In-Reply-To: <20180319140657.223852a1@canb.auug.org.au>
+References: <20180319140657.223852a1@canb.auug.org.au>
+Message-ID: <20180403094807.1466d120@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02 2018, Christian L?tke-Stetzkamp wrote:
+Hi All,
 
-> On Mon, Apr 02, 2018 at 01:41:33PM +1000, NeilBrown wrote:
->> On Mon, Apr 02 2018, Sean Wang wrote:
->> > Hi, Neil
->> >
->> > Forgive me I cannot find the cover letter in the original series in my
->> > mailbox to make a reply, so I rudely made here just letting you know
->> > something good to the growth of mt7621 support in upstream.
->> >
->> > If so, it would become a bit easier for me that maybe I could give a
->> > hand for migrating these staging driver for mt7621 to mainline. I
->> > thought mmc, pci, ethernet, gsw and hsdma all could probably reuse the
->> > current mainline code.
->> 
->> I agree that it is quite likely that several of these drivers could and
->> should reuse current mainline code.  I would love to have some help
->> sorting this out.  I won't have much time myself to dig into it for
->> several weeks, but I'll make time to review and test any code that is
->> contributed.
->> 
->> Thanks,
->> NeilBrown
+On Mon, 19 Mar 2018 14:06:57 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 >
-> Hi,
->
-> I have started a patch series for the mmc driver that is currently in
-> staging, that makes some of the first cleanups (whitespace, indent,..)
-> and also starts to clean up the code, to make the similarities and
-> differences to the current mainline code clearer. The series is far
-> from being complete, but I think I'm going to send it out today, so
-> you can look and comment.
->
-> I would suggest that we continue cleaning the code that is currently
-> in staging to remove the dead parts and make the diff to the mainline
-> code obvious. Do you agree with that proposal or do you suggest a
-> different plan?
+> Today's linux-next merge of the tip tree got a conflict in:
+> 
+>   drivers/bus/arm-cci.c
+> 
+> between commit:
+> 
+>   3de6be7a3dd8 ("drivers/bus: Split Arm CCI driver")
+> 
+> from the arm-soc tree and commit:
+> 
+>   edb39592a587 ("perf: Fix sibling iteration")
+> 
+> from the tip tree.
+> 
+> I fixed it up (I added the following merge fix patch) and can carry the
+> fix as necessary. This is now fixed as far as linux-next is concerned,
+> but any non trivial conflicts should be mentioned to your upstream
+> maintainer when your tree is submitted for merging.  You may also want
+> to consider cooperating with the maintainer of the conflicting tree to
+> minimise any particularly complex conflicts.
+> 
+> From: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date: Mon, 19 Mar 2018 14:04:52 +1100
+> Subject: [PATCH] perf/core: another merge fix for "drivers/bus: Split Arm CCI
+>  driver"
+> 
+> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> ---
+>  drivers/perf/arm-cci.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
+> index 192d23b760a0..383b2d3dcbc6 100644
+> --- a/drivers/perf/arm-cci.c
+> +++ b/drivers/perf/arm-cci.c
+> @@ -1265,7 +1265,7 @@ static int validate_group(struct perf_event *event)
+>  	if (!validate_event(event->pmu, &fake_pmu, leader))
+>  		return -EINVAL;
+>  
+> -	list_for_each_entry(sibling, &leader->sibling_list, sibling_list) {
+> +	for_each_sibling_event(sibling, leader) {
+>  		if (!validate_event(event->pmu, &fake_pmu, sibling))
+>  			return -EINVAL;
+>  	}
+> -- 
 
-I think this is an excellent plan - thanks for doing it.
-I'll hopefully look over your patches today and send any comments.
-
-Thanks,
-NeilBrown
+This conflict is now between the arm-soc tree and Linus' tree.
+-- 
+Cheers,
+Stephen Rothwell
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/4a26d57f/attachment.sig>
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/21e761a4/attachment.sig>
