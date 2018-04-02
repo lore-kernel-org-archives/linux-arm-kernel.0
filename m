@@ -1,71 +1,64 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Mon, 2 Apr 2018 16:09:05 +0530
-Subject: [RFC 5/6] dmaengine: xilinx_dma: Program interrupt delay timeout
+Date: Mon, 2 Apr 2018 16:09:04 +0530
+Subject: [RFC 4/6] dmaengine: xilinx_dma: Freeup active list based on
+ descriptor completion bit
 In-Reply-To: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
 References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
-Message-ID: <1522665546-10035-6-git-send-email-radheys@xilinx.com>
+Message-ID: <1522665546-10035-5-git-send-email-radheys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Program IRQDelay for AXI DMA. The interrupt timeout mechanism causes
-the DMA engine to generate an interrupt after the delay time period
-has expired. It enables dmaengine to respond in real-time even though
-interrupt coalescing is configured.
+AXIDMA IP sets completion bit to 1 when the transfer is completed. Read
+this bit to move descriptor from active list to the done list. This feature
+is needed when interrupt delay timeout and IRQThreshold is enabled i.e
+Dly_IrqEn is triggered w/o completing Interrupt Threshold.
 
 Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
 ---
- drivers/dma/xilinx/xilinx_dma.c |   16 ++++++++++++++--
- 1 files changed, 14 insertions(+), 2 deletions(-)
+ drivers/dma/xilinx/xilinx_dma.c |   18 ++++++++++++++----
+ 1 files changed, 14 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 518465e..ab8f1b0 100644
+index 36e1ab9..518465e 100644
 --- a/drivers/dma/xilinx/xilinx_dma.c
 +++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -161,8 +161,12 @@
- /* AXI DMA Specific Masks/Bit fields */
- #define XILINX_DMA_MAX_TRANS_LEN	GENMASK(22, 0)
- #define XILINX_DMA_CR_COALESCE_MAX	GENMASK(23, 16)
-+#define XILINX_DMA_CR_DELAY_MAX		GENMASK(31, 24)
- #define XILINX_DMA_CR_CYCLIC_BD_EN_MASK	BIT(4)
- #define XILINX_DMA_CR_COALESCE_SHIFT	16
-+#define XILINX_DMA_CR_DELAY_SHIFT	24
-+#define XILINX_DMA_CR_WAITBOUND_DFT	254
+@@ -103,6 +103,7 @@
+ #define XILINX_DMA_PARK_PTR_RD_REF_SHIFT	0
+ #define XILINX_DMA_PARK_PTR_RD_REF_MASK		GENMASK(4, 0)
+ #define XILINX_DMA_REG_VDMA_VERSION		0x002c
++#define XILINX_DMA_COMP_MASK			BIT(31)
+ 
+ /* Register Direct Mode Registers */
+ #define XILINX_DMA_REG_VSIZE			0x0000
+@@ -1387,16 +1388,25 @@ static void xilinx_dma_issue_pending(struct dma_chan *dchan)
+ static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
+ {
+ 	struct xilinx_dma_tx_descriptor *desc, *next;
++	struct xilinx_axidma_tx_segment *seg;
+ 
+ 	/* This function was invoked with lock held */
+ 	if (list_empty(&chan->active_list))
+ 		return;
+ 
+ 	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
+-		list_del(&desc->node);
+-		if (!desc->cyclic)
+-			dma_cookie_complete(&desc->async_tx);
+-		list_add_tail(&desc->node, &chan->done_list);
 +
- #define XILINX_DMA_BD_SOP		BIT(27)
- #define XILINX_DMA_BD_EOP		BIT(26)
- #define XILINX_DMA_COALESCE_MAX		255
-@@ -1294,6 +1298,12 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 		reg &= ~XILINX_DMA_CR_COALESCE_MAX;
- 		reg |= chan->desc_pendingcount <<
- 				  XILINX_DMA_CR_COALESCE_SHIFT;
-+
-+		if (chan->xdev->has_axieth_connected) {
-+			reg  &= ~XILINX_DMA_CR_DELAY_MAX;
-+			reg  |= XILINX_DMA_CR_WAITBOUND_DFT <<
-+					XILINX_DMA_CR_DELAY_SHIFT;
++		seg = list_last_entry(&desc->segments,
++				      struct xilinx_axidma_tx_segment, node);
++		if ((seg->hw.status & XILINX_DMA_COMP_MASK) ||
++			(!chan->xdev->has_axieth_connected)) {
++			list_del(&desc->node);
++			if (!desc->cyclic)
++				dma_cookie_complete(&desc->async_tx);
++			list_add_tail(&desc->node, &chan->done_list);
++		} else {
++			break;
 +		}
- 		dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
  	}
+ }
  
-@@ -1508,7 +1518,8 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
- 		}
- 	}
- 
--	if (status & XILINX_DMA_DMASR_DLY_CNT_IRQ) {
-+	if (!chan->xdev->has_axieth_connected && (status &
-+			XILINX_DMA_DMASR_DLY_CNT_IRQ)) {
- 		/*
- 		 * Device takes too long to do the transfer when user requires
- 		 * responsiveness.
-@@ -1516,7 +1527,8 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
- 		dev_dbg(chan->dev, "Inter-packet latency too long\n");
- 	}
- 
--	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
-+	if (status & (XILINX_DMA_DMASR_FRM_CNT_IRQ |
-+		      XILINX_DMA_DMASR_DLY_CNT_IRQ)) {
- 		spin_lock(&chan->lock);
- 		xilinx_dma_complete_descriptor(chan);
- 		chan->idle = true;
 -- 
 1.7.1
