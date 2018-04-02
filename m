@@ -1,46 +1,92 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 2 Apr 2018 23:07:19 +0800
-Subject: [PATCH v5 2/5] arm: arm64: page_alloc: reduce unnecessary binary
- search in memblock_next_valid_pfn()
-In-Reply-To: <1522636236-12625-3-git-send-email-hejianet@gmail.com>
-References: <1522636236-12625-3-git-send-email-hejianet@gmail.com>
-Message-ID: <201804022139.L0oMwzjy%fengguang.wu@intel.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Mon, 2 Apr 2018 20:37:54 +0530
+Subject: [PATCH v4 13/14] dt-bindings: cpufreq: Document
+ operating-points-v2-kryo-cpu
+In-Reply-To: <20180402093018.GC3572@vireshk-i7>
+References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+ <1522358807-10413-14-git-send-email-ilialin@codeaurora.org>
+ <20180402093018.GC3572@vireshk-i7>
+Message-ID: <7ca35b7a-6078-620b-4772-091e53ef6790@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jia,
+Hi Viresh,
 
-Thank you for the patch! Perhaps something to improve:
+On 4/2/2018 3:00 PM, Viresh Kumar wrote:
+> +Sricharan,
+> 
+> On 30-03-18, 00:26, Ilia Lin wrote:
+>> In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
+>> that have KRYO processors, the CPU ferequencies subset and voltage value
+>> of each OPP varies based on the silicon variant in use.
+>> Qualcomm Technologies, Inc. Process Voltage Scaling Tables
+>> defines the voltage and frequency value based on the msm-id in SMEM
+>> and speedbin blown in the efuse combination.
+>> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
+>> to provide the OPP framework with required information.
+>> This is used to determine the voltage and frequency value for each OPP of
+>> operating-points-v2 table when it is parsed by the OPP framework.
+>>
+>> This change adds documentation.
+>>
+>> Change-Id: I1953f652a48249fb516d175f0e965a9510cd4209
+>> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+>> ---
+>>  .../devicetree/bindings/cpufreq/kryo-cpufreq.txt   | 693 +++++++++++++++++++++
+>>  1 file changed, 693 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+> 
+> This should really go in opp directory.
+> 
+>> new file mode 100644
+>> index 0000000..20cef9d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+>> @@ -0,0 +1,693 @@
+>> +Qualcomm Technologies, Inc. KRYO CPUFreq and OPP bindings
+>> +===================================
+>> +
+>> +In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
+>> +that have KRYO processors, the CPU ferequencies subset and voltage value
+>> +of each OPP varies based on the silicon variant in use.
+>> +Qualcomm Technologies, Inc. Process Voltage Scaling Tables
+>> +defines the voltage and frequency value based on the msm-id in SMEM
+>> +and speedbin blown in the efuse combination.
+>> +The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
+>> +to provide the OPP framework with required information (existing HW bitmap).
+>> +This is used to determine the voltage and frequency value for each OPP of
+>> +operating-points-v2 table when it is parsed by the OPP framework.
+>> +
+>> +Required properties:
+>> +--------------------
+>> +In 'cpus' nodes:
+>> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
+>> +
+>> +In 'operating-points-v2' table:
+>> +- compatible: Should be
+>> +	- 'operating-points-v2-kryo-cpu' for apq8096 and msm8996.
+>> +- nvmem-cells: A phandle pointing to a nvmem-cells node representing the
+>> +		efuse registers that has information about the
+>> +		speedbin that is used to select the right frequency/voltage
+>> +		value pair.
+>> +		Please refer the for nvmem-cells
+>> +		bindings Documentation/devicetree/bindings/nvmem/nvmem.txt
+>> +		and also examples below.
+> 
+> Sricharan is also working on adding these, just make sure you guys do the same
+> thing..
+> 
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.16 next-20180329]
-[cannot apply to arm64/for-next/core]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+ Right, i was adding a similar one for krait cores [1]. There is code common in the
+ init sequence across both (little). Do you intent to make them common ?
 
-url:    https://github.com/0day-ci/linux/commits/Jia-He/optimize-memblock_next_valid_pfn-and-early_pfn_valid-on-arm-and-arm64/20180402-131223
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Regards,
+ Sricharan
 
-All warnings (new ones prefixed by >>):
+ [1] https://patchwork.kernel.org/patch/10261873/
 
->> WARNING: vmlinux.o(.text+0x39a80): Section mismatch in reference from the function memblock_next_valid_pfn() to the variable .meminit.data:$d
-   The function memblock_next_valid_pfn() references
-   the variable __meminitdata $d.
-   This is often because memblock_next_valid_pfn lacks a __meminitdata
-   annotation or the annotation of $d is wrong.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 58864 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180402/c21d664c/attachment-0001.gz>
+-- 
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
