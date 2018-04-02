@@ -1,217 +1,75 @@
-From: hejianet@gmail.com (Jia He)
-Date: Mon, 2 Apr 2018 15:49:23 +0800
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 2 Apr 2018 15:50:44 +0800
 Subject: [PATCH v5 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
  on arm and arm64
-In-Reply-To: <CAKv+Gu96_sC1Q6-w4O-AXFZzNnH1WoGwJfqvSR+Q_k_bZbrUGg@mail.gmail.com>
-References: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
- <1522636236-12625-2-git-send-email-hejianet@gmail.com>
- <CAKv+Gu96_sC1Q6-w4O-AXFZzNnH1WoGwJfqvSR+Q_k_bZbrUGg@mail.gmail.com>
-Message-ID: <41445229-043c-976f-3961-13770163444f@gmail.com>
+In-Reply-To: <1522636236-12625-2-git-send-email-hejianet@gmail.com>
+References: <1522636236-12625-2-git-send-email-hejianet@gmail.com>
+Message-ID: <201804021305.pjbSxb3W%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jia,
 
+Thank you for the patch! Yet something to improve:
 
-On 4/2/2018 2:55 PM, Ard Biesheuvel Wrote:
-> On 2 April 2018 at 04:30, Jia He <hejianet@gmail.com> wrote:
->> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
->> where possible") optimized the loop in memmap_init_zone(). But it causes
->> possible panic bug. So Daniel Vacek reverted it later.
->>
->> But as suggested by Daniel Vacek, it is fine to using memblock to skip
->> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
->>
->> On arm and arm64, memblock is used by default. But generic version of
->> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
->> not always return the next valid one but skips more resulting in some
->> valid frames to be skipped (as if they were invalid). And that's why
->> kernel was eventually crashing on some !arm machines.
->>
->> And as verified by Eugeniu Rosca, arm can benifit from commit
->> b92df1de5d28. So remain the memblock_next_valid_pfn on arm{,64} and move
->> the related codes to arm64 arch directory.
->>
->> Suggested-by: Daniel Vacek <neelx@redhat.com>
->> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
-> Hello Jia,
->
-> Apologies for chiming in late.
-no problem, thanks for your comments? ;-)
->
-> If we are going to rearchitect this, I'd rather we change the loop in
-> memmap_init_zone() so that we skip to the next valid PFN directly
-> rather than skipping to the last invalid PFN so that the pfn++ in the
-hmm... Maybe this macro name makes you confused
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.16 next-20180329]
+[cannot apply to arm64/for-next/core]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-pfn = skip_to_last_invalid_pfn(pfn);
+url:    https://github.com/0day-ci/linux/commits/Jia-He/optimize-memblock_next_valid_pfn-and-early_pfn_valid-on-arm-and-arm64/20180402-131223
+config: i386-tinyconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-how about skip_to_next_valid_pfn?
+All errors (new ones prefixed by >>):
 
-> for () results in the next value. Can we replace the pfn++ there with
-> a function calls that defaults to 'return pfn + 1', but does the skip
-> for architectures that implement it?
-I am not sure I understand your question here.
-With this patch, on !arm arches, skip_to_last_invalid_pfn is equal to 
-(pfn), and will be increased
-when for{} loop continue. We only *skip* to the start pfn of next valid 
-region when
-CONFIG_HAVE_MEMBLOCK and CONFIG_HAVE_ARCH_PFN_VALID(arm/arm64 supports 
-both).
+   mm/page_alloc.c: In function 'memmap_init_zone':
+>> mm/page_alloc.c:5360:10: error: implicit declaration of function 'skip_to_last_invalid_pfn' [-Werror=implicit-function-declaration]
+       pfn = skip_to_last_invalid_pfn(pfn);
+             ^~~~~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
+vim +/skip_to_last_invalid_pfn +5360 mm/page_alloc.c
 
--- 
-Cheers,
-Jia
+  5340	
+  5341		if (highest_memmap_pfn < end_pfn - 1)
+  5342			highest_memmap_pfn = end_pfn - 1;
+  5343	
+  5344		/*
+  5345		 * Honor reservation requested by the driver for this ZONE_DEVICE
+  5346		 * memory
+  5347		 */
+  5348		if (altmap && start_pfn == altmap->base_pfn)
+  5349			start_pfn += altmap->reserve;
+  5350	
+  5351		for (pfn = start_pfn; pfn < end_pfn; pfn++) {
+  5352			/*
+  5353			 * There can be holes in boot-time mem_map[]s handed to this
+  5354			 * function.  They do not exist on hotplugged memory.
+  5355			 */
+  5356			if (context != MEMMAP_EARLY)
+  5357				goto not_early;
+  5358	
+  5359			if (!early_pfn_valid(pfn)) {
+> 5360				pfn = skip_to_last_invalid_pfn(pfn);
+  5361				continue;
+  5362			}
+  5363			if (!early_pfn_in_nid(pfn, nid))
+  5364				continue;
+  5365			if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
+  5366				break;
+  5367	
 
->
->
->> ---
->>   arch/arm/include/asm/page.h   |  2 ++
->>   arch/arm/mm/init.c            | 31 ++++++++++++++++++++++++++++++-
->>   arch/arm64/include/asm/page.h |  2 ++
->>   arch/arm64/mm/init.c          | 31 ++++++++++++++++++++++++++++++-
->>   include/linux/mmzone.h        |  1 +
->>   mm/page_alloc.c               |  4 +++-
->>   6 files changed, 68 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
->> index 4355f0e..489875c 100644
->> --- a/arch/arm/include/asm/page.h
->> +++ b/arch/arm/include/asm/page.h
->> @@ -158,6 +158,8 @@ typedef struct page *pgtable_t;
->>
->>   #ifdef CONFIG_HAVE_ARCH_PFN_VALID
->>   extern int pfn_valid(unsigned long);
->> +extern unsigned long memblock_next_valid_pfn(unsigned long pfn);
->> +#define skip_to_last_invalid_pfn(pfn) (memblock_next_valid_pfn(pfn) - 1)
->>   #endif
->>
->>   #include <asm/memory.h>
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index a1f11a7..0fb85ca 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -198,7 +198,36 @@ int pfn_valid(unsigned long pfn)
->>          return memblock_is_map_memory(__pfn_to_phys(pfn));
->>   }
->>   EXPORT_SYMBOL(pfn_valid);
->> -#endif
->> +
->> +/* HAVE_MEMBLOCK is always enabled on arm */
->> +unsigned long __init_memblock memblock_next_valid_pfn(unsigned long pfn)
->> +{
->> +       struct memblock_type *type = &memblock.memory;
->> +       unsigned int right = type->cnt;
->> +       unsigned int mid, left = 0;
->> +       phys_addr_t addr = PFN_PHYS(++pfn);
->> +
->> +       do {
->> +               mid = (right + left) / 2;
->> +
->> +               if (addr < type->regions[mid].base)
->> +                       right = mid;
->> +               else if (addr >= (type->regions[mid].base +
->> +                                 type->regions[mid].size))
->> +                       left = mid + 1;
->> +               else {
->> +                       /* addr is within the region, so pfn is valid */
->> +                       return pfn;
->> +               }
->> +       } while (left < right);
->> +
->> +       if (right == type->cnt)
->> +               return -1UL;
->> +       else
->> +               return PHYS_PFN(type->regions[right].base);
->> +}
->> +EXPORT_SYMBOL(memblock_next_valid_pfn);
->> +#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
->>
->>   #ifndef CONFIG_SPARSEMEM
->>   static void __init arm_memory_present(void)
->> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
->> index 60d02c8..e57d3f2 100644
->> --- a/arch/arm64/include/asm/page.h
->> +++ b/arch/arm64/include/asm/page.h
->> @@ -39,6 +39,8 @@ typedef struct page *pgtable_t;
->>
->>   #ifdef CONFIG_HAVE_ARCH_PFN_VALID
->>   extern int pfn_valid(unsigned long);
->> +extern unsigned long memblock_next_valid_pfn(unsigned long pfn);
->> +#define skip_to_last_invalid_pfn(pfn) (memblock_next_valid_pfn(pfn) - 1)
->>   #endif
->>
->>   #include <asm/memory.h>
->> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->> index 00e7b90..13e43ff 100644
->> --- a/arch/arm64/mm/init.c
->> +++ b/arch/arm64/mm/init.c
->> @@ -290,7 +290,36 @@ int pfn_valid(unsigned long pfn)
->>          return memblock_is_map_memory(pfn << PAGE_SHIFT);
->>   }
->>   EXPORT_SYMBOL(pfn_valid);
->> -#endif
->> +
->> +/* HAVE_MEMBLOCK is always enabled on arm64 */
->> +unsigned long __init_memblock memblock_next_valid_pfn(unsigned long pfn)
->> +{
->> +       struct memblock_type *type = &memblock.memory;
->> +       unsigned int right = type->cnt;
->> +       unsigned int mid, left = 0;
->> +       phys_addr_t addr = PFN_PHYS(++pfn);
->> +
->> +       do {
->> +               mid = (right + left) / 2;
->> +
->> +               if (addr < type->regions[mid].base)
->> +                       right = mid;
->> +               else if (addr >= (type->regions[mid].base +
->> +                                 type->regions[mid].size))
->> +                       left = mid + 1;
->> +               else {
->> +                       /* addr is within the region, so pfn is valid */
->> +                       return pfn;
->> +               }
->> +       } while (left < right);
->> +
->> +       if (right == type->cnt)
->> +               return -1UL;
->> +       else
->> +               return PHYS_PFN(type->regions[right].base);
->> +}
->> +EXPORT_SYMBOL(memblock_next_valid_pfn);
->> +#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
->>
->>   #ifndef CONFIG_SPARSEMEM
->>   static void __init arm64_memory_present(void)
->> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
->> index d797716..f9c0c46 100644
->> --- a/include/linux/mmzone.h
->> +++ b/include/linux/mmzone.h
->> @@ -1245,6 +1245,7 @@ static inline int pfn_valid(unsigned long pfn)
->>                  return 0;
->>          return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
->>   }
->> +#define skip_to_last_invalid_pfn(pfn) (pfn)
->>   #endif
->>
->>   static inline int pfn_present(unsigned long pfn)
->> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
->> index c19f5ac..30f7d76 100644
->> --- a/mm/page_alloc.c
->> +++ b/mm/page_alloc.c
->> @@ -5483,8 +5483,10 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
->>                  if (context != MEMMAP_EARLY)
->>                          goto not_early;
->>
->> -               if (!early_pfn_valid(pfn))
->> +               if (!early_pfn_valid(pfn)) {
->> +                       pfn = skip_to_last_invalid_pfn(pfn);
->>                          continue;
->> +               }
->>                  if (!early_pfn_in_nid(pfn, nid))
->>                          continue;
->>                  if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
->> --
->> 2.7.4
->>
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6721 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180402/1a272b4d/attachment-0001.gz>
