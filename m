@@ -1,56 +1,39 @@
-From: neil@brown.name (NeilBrown)
-Date: Mon, 02 Apr 2018 09:34:58 +1000
-Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
-In-Reply-To: <20180329124745.24694-1-cmc@babblebit.net>
-References: <20180329095637.GA16778@kroah.com>
- <20180329124745.24694-1-cmc@babblebit.net>
-Message-ID: <87vada1owt.fsf@notabene.neil.brown.name>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon,  2 Apr 2018 09:04:28 +0800
+Subject: [PATCH v5 10/10] arm64: defconfig: update config for Rockchip PCIe
+In-Reply-To: <1522630865-151344-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1522630865-151344-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <1522631068-151816-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29 2018, Chris Coffey wrote:
+Now Rockchip PCIe drivers could support both of host mode
+and endponint mode, so we rename the config name. This patch
+updates defconfig to refect the fact that we want to build
+Rockchip PCIe controller driver into a module as before.
 
-> This fixes the following sparse warning:
->
-> drivers/staging/mt7621-eth/ethtool.c:213:6: warning: symbol
-> 'mtk_set_ethtool_ops' was not declared. Should it be static?
->
-> Signed-off-by: Chris Coffey <cmc@babblebit.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Reviewed-by: NeilBrown <neil@brown.name>
+---
 
-Thanks,
-NeilBrown
+ arch/arm64/configs/defconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
-> ---
-> Changes in v2:
->  - Per GregKH's feedback (thanks!), don't add unnecessary new .h file
->  dependencies. This patch version reverts those changes and fixes the
->  problem directly in ethtool.c (which is that it didn't include
->  ethtool.h anywhere -- mtk_set_ethtool_ops is not static).
->
->  drivers/staging/mt7621-eth/ethtool.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/staging/mt7621-eth/ethtool.c b/drivers/staging/mt7621-eth/ethtool.c
-> index 38ba0c040a..5268c5ca09 100644
-> --- a/drivers/staging/mt7621-eth/ethtool.c
-> +++ b/drivers/staging/mt7621-eth/ethtool.c
-> @@ -13,6 +13,7 @@
->   */
->  
->  #include "mtk_eth_soc.h"
-> +#include "ethtool.h"
->  
->  static const char mtk_gdma_str[][ETH_GSTRING_LEN] = {
->  #define _FE(x...)	# x,
-> -- 
-> 2.11.0
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180402/92da8c83/attachment.sig>
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ecf6137..17ea72b 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -78,7 +78,8 @@ CONFIG_PCIE_ARMADA_8K=y
+ CONFIG_PCI_AARDVARK=y
+ CONFIG_PCI_TEGRA=y
+ CONFIG_PCIE_RCAR=y
+-CONFIG_PCIE_ROCKCHIP=m
++CONFIG_PCIE_ROCKCHIP=y
++CONFIG_PCIE_ROCKCHIP_HOST=m
+ CONFIG_PCI_HOST_GENERIC=y
+ CONFIG_PCI_XGENE=y
+ CONFIG_PCI_HOST_THUNDER_PEM=y
+-- 
+1.9.1
