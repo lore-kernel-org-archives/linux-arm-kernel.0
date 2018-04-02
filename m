@@ -1,226 +1,105 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 2 Apr 2018 12:05:12 +0530
-Subject: [PATCH v5 12/13] ARM: dts: ipq8074: Add pcie nodes
-In-Reply-To: <20180327174621.GO1403@tuxbook-pro>
+Date: Mon, 2 Apr 2018 12:06:48 +0530
+Subject: [PATCH v5 13/13] ARM: dts: ipq8074: Enable few peripherals for
+ hk01 board
+In-Reply-To: <20180327174913.GP1403@tuxbook-pro>
 References: <1521800336-19266-1-git-send-email-sricharan@codeaurora.org>
- <1521800336-19266-13-git-send-email-sricharan@codeaurora.org>
- <20180327174621.GO1403@tuxbook-pro>
-Message-ID: <a3ff1d9e-25b2-b251-4914-0caf70165085@codeaurora.org>
+ <1521800336-19266-14-git-send-email-sricharan@codeaurora.org>
+ <20180327174913.GP1403@tuxbook-pro>
+Message-ID: <c02ed3b7-30e6-29a0-a68d-fcb96ace2841@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bjorn,
 
 
-On 3/27/2018 11:16 PM, Bjorn Andersson wrote:
+On 3/27/2018 11:19 PM, Bjorn Andersson wrote:
 > On Fri 23 Mar 03:18 PDT 2018, Sricharan R wrote:
-> 
->> The driver/phy support for ipq8074 is available now.
->> So enabling the nodes in DT.
->>
-> 
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> 
-
- Thanks.
-
-Regards,
- Sricharan
-
-
-
-> Regards,
-> Bjorn
 > 
 >> Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
 >> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 >> ---
->>  arch/arm64/boot/dts/qcom/ipq8074.dtsi | 157 +++++++++++++++++++++++++++++++++-
->>  1 file changed, 156 insertions(+), 1 deletion(-)
+>>  arch/arm64/boot/dts/qcom/ipq8074-hk01.dts | 103 ++++++++++++++++++++++++++++++
+>>  1 file changed, 103 insertions(+)
 >>
->> diff --git a/arch/arm64/boot/dts/qcom/ipq8074.dtsi b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
->> index a8dbbf0..caf3485 100644
->> --- a/arch/arm64/boot/dts/qcom/ipq8074.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/ipq8074.dtsi
->> @@ -24,7 +24,7 @@
->>  		ranges = <0 0 0 0xffffffff>;
->>  		compatible = "simple-bus";
+>> diff --git a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+>> index 6a838b5..dbca7ec 100644
+>> --- a/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+>> +++ b/arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
+>> @@ -21,6 +21,7 @@
 >>  
->> -		pinctrl at 1000000 {
->> +		tlmm: pinctrl at 1000000 {
->>  			compatible = "qcom,ipq8074-pinctrl";
->>  			reg = <0x1000000 0x300000>;
->>  			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
->> @@ -229,6 +229,161 @@
->>  			dma-names = "tx", "rx", "cmd";
->>  			status = "disabled";
->>  		};
->> +
->> +		pcie_phy0: phy at 86000 {
->> +			compatible = "qcom,ipq8074-qmp-pcie-phy";
->> +			reg = <0x86000 0x1000>;
->> +			#phy-cells = <0>;
->> +			clocks = <&gcc GCC_PCIE0_PIPE_CLK>;
->> +			clock-names = "pipe_clk";
->> +			clock-output-names = "pcie20_phy0_pipe_clk";
->> +
->> +			resets = <&gcc GCC_PCIE0_PHY_BCR>,
->> +				<&gcc GCC_PCIE0PHY_PHY_BCR>;
->> +			reset-names = "phy",
->> +				      "common";
->> +			status = "disabled";
->> +		};
->> +
->> +		pcie0: pci at 20000000 {
->> +			compatible = "qcom,pcie-ipq8074";
->> +			reg =  <0x20000000 0xf1d
->> +				0x20000f20 0xa8
->> +				0x80000 0x2000
->> +				0x20100000 0x1000>;
->> +			reg-names = "dbi", "elbi", "parf", "config";
->> +			device_type = "pci";
->> +			linux,pci-domain = <0>;
->> +			bus-range = <0x00 0xff>;
->> +			num-lanes = <1>;
->> +			#address-cells = <3>;
->> +			#size-cells = <2>;
->> +
->> +			phys = <&pcie_phy0>;
->> +			phy-names = "pciephy";
->> +
->> +			ranges = <0x81000000 0 0x20200000 0x20200000
->> +				  0 0x100000   /* downstream I/O */
->> +				  0x82000000 0 0x20300000 0x20300000
->> +				  0 0xd00000>; /* non-prefetchable memory */
->> +
->> +			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
->> +			interrupt-names = "msi";
->> +			#interrupt-cells = <1>;
->> +			interrupt-map-mask = <0 0 0 0x7>;
->> +			interrupt-map = <0 0 0 1 &intc 0 75
->> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
->> +					<0 0 0 2 &intc 0 78
->> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
->> +					<0 0 0 3 &intc 0 79
->> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
->> +					<0 0 0 4 &intc 0 83
->> +					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
->> +
->> +			clocks = <&gcc GCC_SYS_NOC_PCIE0_AXI_CLK>,
->> +				 <&gcc GCC_PCIE0_AXI_M_CLK>,
->> +				 <&gcc GCC_PCIE0_AXI_S_CLK>,
->> +				 <&gcc GCC_PCIE0_AHB_CLK>,
->> +				 <&gcc GCC_PCIE0_AUX_CLK>;
->> +
->> +			clock-names = "iface",
->> +				      "axi_m",
->> +				      "axi_s",
->> +				      "ahb",
->> +				      "aux";
->> +			resets = <&gcc GCC_PCIE0_PIPE_ARES>,
->> +				 <&gcc GCC_PCIE0_SLEEP_ARES>,
->> +				 <&gcc GCC_PCIE0_CORE_STICKY_ARES>,
->> +				 <&gcc GCC_PCIE0_AXI_MASTER_ARES>,
->> +				 <&gcc GCC_PCIE0_AXI_SLAVE_ARES>,
->> +				 <&gcc GCC_PCIE0_AHB_ARES>,
->> +				 <&gcc GCC_PCIE0_AXI_MASTER_STICKY_ARES>;
->> +			reset-names = "pipe",
->> +				      "sleep",
->> +				      "sticky",
->> +				      "axi_m",
->> +				      "axi_s",
->> +				      "ahb",
->> +				      "axi_m_sticky";
->> +			status = "disabled";
->> +		};
->> +
->> +		pcie_phy1: phy at 8e000 {
->> +			compatible = "qcom,ipq8074-qmp-pcie-phy";
->> +			reg = <0x8e000 0x1000>;
->> +			#phy-cells = <0>;
->> +			clocks = <&gcc GCC_PCIE1_PIPE_CLK>;
->> +			clock-names = "pipe_clk";
->> +			clock-output-names = "pcie20_phy1_pipe_clk";
->> +
->> +			resets = <&gcc GCC_PCIE1_PHY_BCR>,
->> +				<&gcc GCC_PCIE1PHY_PHY_BCR>;
->> +			reset-names = "phy",
->> +				      "common";
->> +			status = "disabled";
->> +		};
->> +
->> +		pcie1: pci at 10000000 {
->> +			compatible = "qcom,pcie-ipq8074";
->> +			reg =  <0x10000000 0xf1d
->> +				0x10000f20 0xa8
->> +				0x88000 0x2000
->> +				0x10100000 0x1000>;
->> +			reg-names = "dbi", "elbi", "parf", "config";
->> +			device_type = "pci";
->> +			linux,pci-domain = <1>;
->> +			bus-range = <0x00 0xff>;
->> +			num-lanes = <1>;
->> +			#address-cells = <3>;
->> +			#size-cells = <2>;
->> +
->> +			phys = <&pcie_phy1>;
->> +			phy-names = "pciephy";
->> +
->> +			ranges = <0x81000000 0 0x10200000 0x10200000
->> +				  0 0x100000   /* downstream I/O */
->> +				  0x82000000 0 0x10300000 0x10300000
->> +				  0 0xd00000>; /* non-prefetchable memory */
->> +
->> +			interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
->> +			interrupt-names = "msi";
->> +			#interrupt-cells = <1>;
->> +			interrupt-map-mask = <0 0 0 0x7>;
->> +			interrupt-map = <0 0 0 1 &intc 0 142
->> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_a */
->> +					<0 0 0 2 &intc 0 143
->> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_b */
->> +					<0 0 0 3 &intc 0 144
->> +					 IRQ_TYPE_LEVEL_HIGH>, /* int_c */
->> +					<0 0 0 4 &intc 0 145
->> +					 IRQ_TYPE_LEVEL_HIGH>; /* int_d */
->> +
->> +			clocks = <&gcc GCC_SYS_NOC_PCIE1_AXI_CLK>,
->> +				 <&gcc GCC_PCIE1_AXI_M_CLK>,
->> +				 <&gcc GCC_PCIE1_AXI_S_CLK>,
->> +				 <&gcc GCC_PCIE1_AHB_CLK>,
->> +				 <&gcc GCC_PCIE1_AUX_CLK>;
->> +			clock-names = "iface",
->> +				      "axi_m",
->> +				      "axi_s",
->> +				      "ahb",
->> +				      "aux";
->> +			resets = <&gcc GCC_PCIE1_PIPE_ARES>,
->> +				 <&gcc GCC_PCIE1_SLEEP_ARES>,
->> +				 <&gcc GCC_PCIE1_CORE_STICKY_ARES>,
->> +				 <&gcc GCC_PCIE1_AXI_MASTER_ARES>,
->> +				 <&gcc GCC_PCIE1_AXI_SLAVE_ARES>,
->> +				 <&gcc GCC_PCIE1_AHB_ARES>,
->> +				 <&gcc GCC_PCIE1_AXI_MASTER_STICKY_ARES>;
->> +			reset-names = "pipe",
->> +				      "sleep",
->> +				      "sticky",
->> +				      "axi_m",
->> +				      "axi_s",
->> +				      "ahb",
->> +				      "axi_m_sticky";
->> +			status = "disabled";
->> +		};
+>>  	aliases {
+>>  		serial0 = &blsp1_uart5;
+>> +		serial1 = &serial_blsp2;
 >>  	};
 >>  
->>  	cpus {
->> -- 
->> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->>
+>>  	chosen {
+>> @@ -41,6 +42,47 @@
+>>  					bias-disable;
+>>  				};
+>>  			};
+>> +
+>> +			 i2c_0_pins: i2c_0_pinmux {
+>> +				  mux {
+>> +					   pins = "gpio42", "gpio43";
+>> +					   function = "blsp1_i2c";
+>> +					   drive-strength = <8>;
+>> +					   bias-disable;
+>> +				  };
+>> +			 };
+>> +
+>> +			 spi_0_pins: spi_0_pins {
+>> +				  mux {
+>> +					   pins = "gpio38", "gpio39", "gpio40", "gpio41";
+>> +					   function = "blsp0_spi";
+>> +					   drive-strength = <8>;
+>> +					   bias-disable;
+>> +				  };
+>> +			 };
+>> +
+>> +			 hsuart_pins: hsuart_pins {
+>> +				  mux {
+>> +					   pins = "gpio46", "gpio47", "gpio48", "gpio49";
+>> +					   function = "blsp2_uart";
+>> +					   drive-strength = <8>;
+>> +					   bias-disable;
+>> +				  };
+>> +			 };
+>> +
+>> +			 qpic_pins: qpic_pins {
+>> +				mux {
+>> +					   pins = "gpio1", "gpio3", "gpio4",
+>> +						  "gpio5", "gpio6", "gpio7",
+>> +						  "gpio8", "gpio10", "gpio11",
+>> +						  "gpio12", "gpio13", "gpio14",
+>> +						  "gpio15", "gpio16", "gpio17";
+>> +					   function = "qpic";
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I would prefer that you move the pinmux part to the same dtsi that
+> defines the nand and add the board specific pinconf (electrical
+> properties) here. That way we limit the repetition between the board
+> files.
 > 
+
+ sure. will do.
+
+>> +					   drive-strength = <8>;
+>> +					   bias-disable;
+>> +				  };
+>> +			};
+>> +
+>>  		};
+>>  
+> 
+> Other than that,
+> 
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> 
+
+ Thanks. Again, thanks for your time and all the reviews.
+
+Regards,
+ Sricharan
 
 -- 
 "QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
