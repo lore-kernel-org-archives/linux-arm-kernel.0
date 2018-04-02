@@ -1,78 +1,64 @@
-From: valentin.schneider@arm.com (Valentin Schneider)
-Date: Mon, 2 Apr 2018 23:27:06 +0100
-Subject: [PATCH] sched: support dynamiQ cluster
-In-Reply-To: <CAKfTPtD4skW_3SAk--vBEC5-m1Ua48bjOQYS0pDqW3nPSpsENg@mail.gmail.com>
-References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
- <20180329125324.GR4589@e105550-lin.cambridge.arm.com>
- <CAKfTPtD4skW_3SAk--vBEC5-m1Ua48bjOQYS0pDqW3nPSpsENg@mail.gmail.com>
-Message-ID: <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
+From: neil@brown.name (NeilBrown)
+Date: Tue, 03 Apr 2018 08:39:55 +1000
+Subject: [PATCH v2] staging: mt7621-eth: Fix sparse warning in ethtool.c
+In-Reply-To: <20180402114103.GA29354@demeter.lkamp.de>
+References: <20180329095637.GA16778@kroah.com>
+ <20180329124745.24694-1-cmc@babblebit.net>
+ <87vada1owt.fsf@notabene.neil.brown.name>
+ <1522638255.18424.44.camel@mtkswgap22>
+ <87po3i1dhu.fsf@notabene.neil.brown.name>
+ <20180402114103.GA29354@demeter.lkamp.de>
+Message-ID: <87efjx1bd0.fsf@notabene.neil.brown.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Apr 02 2018, Christian L?tke-Stetzkamp wrote:
 
-On 30/03/18 13:34, Vincent Guittot wrote:
-> Hi Morten,
-> 
-[..]
->>
->> As I see it, the main differences is that ASYM_PACKING attempts to pack
->> all tasks regardless of task utilization on the higher capacity cpus
->> whereas the "misfit task" series carefully picks cpus with tasks they
->> can't handle so we don't risk migrating tasks which are perfectly
-> 
-> That's one main difference because misfit task will let middle range
-> load task on little CPUs which will not provide maximum performance.
-> I have put an example below
-> 
->> suitable to for a little cpu to a big cpu unnecessarily. Also it is
->> based directly on utilization and cpu capacity like the capacity
->> awareness we already have to deal with big.LITTLE in the wake-up path.
+> On Mon, Apr 02, 2018 at 01:41:33PM +1000, NeilBrown wrote:
+>> On Mon, Apr 02 2018, Sean Wang wrote:
+>> > Hi, Neil
+>> >
+>> > Forgive me I cannot find the cover letter in the original series in my
+>> > mailbox to make a reply, so I rudely made here just letting you know
+>> > something good to the growth of mt7621 support in upstream.
+>> >
+>> > If so, it would become a bit easier for me that maybe I could give a
+>> > hand for migrating these staging driver for mt7621 to mainline. I
+>> > thought mmc, pci, ethernet, gsw and hsdma all could probably reuse the
+>> > current mainline code.
+>> 
+>> I agree that it is quite likely that several of these drivers could and
+>> should reuse current mainline code.  I would love to have some help
+>> sorting this out.  I won't have much time myself to dig into it for
+>> several weeks, but I'll make time to review and test any code that is
+>> contributed.
+>> 
+>> Thanks,
+>> NeilBrown
+>
+> Hi,
+>
+> I have started a patch series for the mmc driver that is currently in
+> staging, that makes some of the first cleanups (whitespace, indent,..)
+> and also starts to clean up the code, to make the similarities and
+> differences to the current mainline code clearer. The series is far
+> from being complete, but I think I'm going to send it out today, so
+> you can look and comment.
+>
+> I would suggest that we continue cleaning the code that is currently
+> in staging to remove the dead parts and make the diff to the mainline
+> code obvious. Do you agree with that proposal or do you suggest a
+> different plan?
 
-I think that bit is quite important. AFAICT, ASYM_PACKING disregards
-task utilization, it only makes sure that (with your patch) tasks will be
-migrated to big CPUS if those ever go idle (pulls at NEWLY_IDLE balance or
-later on during nohz balance). I didn't see anything related to ASYM_PACKING
-in the wake path.
+I think this is an excellent plan - thanks for doing it.
+I'll hopefully look over your patches today and send any comments.
 
->> Have to tried taking the misfit patches for a spin on your setup? I
->> expect them give you the same behaviour as you report above.
-> 
-> So I have tried both your tests and mine on both patchset and they
-> provide same results which is somewhat expected as the benches are run
-> for several seconds.
-> In other to highlight the main difference between misfit task and
-> ASYM_PACKING, I have reused your test and reduced the number of
-> max-request for sysbench so that the test duration was in the range of
-> hundreds ms.
-> 
-> Hikey960 (emulate dynamiq topology)
->        min         avg(stdev)          max
-> misfit 0.097500    0.114911(+- 10%)    0.138500
-> asym   0.092500    0.106072(+-  6%)    0.122900
-> 
-> In this case, we can see that ASYM_PACKING is doing better( 8%)
-> because it migrates sysbench threads on big core as soon as they are
-> available whereas misfit task has to wait for the utilization to
-> increase above the 80% which takes around 70ms when starting with an
-> utilization that is null
-> 
-
-I believe ASYM_PACKING behaves better here because the workload is only
-sysbench threads. As stated above, since task utilization is disregarded, I
-think we could have a scenario where the big CPUs are filled with "small"
-tasks and the LITTLE CPUs hold a few "big" tasks - because what mostly
-matters here is the order in which the tasks spawn, not their utilization -
-which is potentially broken.
-
-There's that bit in *update_sd_pick_busiest()*:
-
-/* No ASYM_PACKING if target CPU is already busy */                                     
-if (env->idle == CPU_NOT_IDLE)                                                          
-	return true;
-
-So I'm not entirely sure how realistic that scenario is, but I suppose it
-could still happen. Food for thought in any case.
-
-Regards,
-Valentin
+Thanks,
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/4a26d57f/attachment.sig>
