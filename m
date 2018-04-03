@@ -1,69 +1,107 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 3 Apr 2018 15:15:55 +0800
-Subject: [PATCH v1 5/7] soc: mediatek: add a fixed wait for SRAM stable
+Date: Tue, 3 Apr 2018 15:15:54 +0800
+Subject: [PATCH v1 4/7] soc: mediatek: reuse regmap_read_poll_timeout helpers
 In-Reply-To: <cover.1522736996.git.sean.wang@mediatek.com>
 References: <cover.1522736996.git.sean.wang@mediatek.com>
-Message-ID: <0fc10b2498c6dbe20141831c722c32cc74330d3d.1522736996.git.sean.wang@mediatek.com>
+Message-ID: <2f84f7695ea3223b8626a8369aa4ae5e0d03fdce.1522736996.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
-stable, which is not like the behavior the other power domains should
-have. Therefore, it's necessary for such a power domain to have a fixed
-and well-predefined duration to wait until its managed SRAM can be allowed
-to access by all functions running on the top.
+Reuse the common helpers regmap_read_poll_timeout provided by Linux core
+instead of an open-coded handling.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 Cc: Matthias Brugger <matthias.bgg@gmail.com>
 Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- drivers/soc/mediatek/mtk-scpsys.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+ drivers/soc/mediatek/mtk-infracfg.c | 45 +++++++++----------------------------
+ 1 file changed, 10 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index f9b7248..19aceb8 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -121,6 +121,7 @@ struct scp_domain_data {
- 	u32 bus_prot_mask;
- 	enum clk_id clk_id[MAX_CLKS];
- 	bool active_wakeup;
-+	u32 us_sram_fwait;
- };
+diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+index 8c310de..b849aa5 100644
+--- a/drivers/soc/mediatek/mtk-infracfg.c
++++ b/drivers/soc/mediatek/mtk-infracfg.c
+@@ -12,6 +12,7 @@
+  */
  
- struct scp;
-@@ -234,11 +235,16 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
- 	val &= ~scpd->data->sram_pdn_bits;
- 	writel(val, ctl_addr);
+ #include <linux/export.h>
++#include <linux/iopoll.h>
+ #include <linux/jiffies.h>
+ #include <linux/regmap.h>
+ #include <linux/soc/mediatek/infracfg.h>
+@@ -37,7 +38,6 @@
+ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
+ 		bool reg_update)
+ {
+-	unsigned long expired;
+ 	u32 val;
+ 	int ret;
  
--	/* wait until SRAM_PDN_ACK all 0 */
--	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
--				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
--	if (ret < 0)
--		goto err_pwr_ack;
-+	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
-+	if (!scpd->data->us_sram_fwait) {
-+		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
-+					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
-+		if (ret < 0)
-+			goto err_pwr_ack;
-+	} else {
-+		usleep_range(scpd->data->us_sram_fwait,
-+			     scpd->data->us_sram_fwait + 100);
-+	};
+@@ -47,22 +47,11 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
+ 	else
+ 		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_SET, mask);
  
- 	if (scpd->data->bus_prot_mask) {
- 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
-@@ -783,6 +789,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
- 		.clk_id = {CLK_NONE},
- 		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
- 		.active_wakeup = true,
-+		.us_sram_fwait = 12000,
- 	},
- };
+-	expired = jiffies + HZ;
++	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
++				       val, (val & mask) == mask, 10,
++				       jiffies_to_usecs(HZ));
  
+-	while (1) {
+-		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
+-		if (ret)
+-			return ret;
+-
+-		if ((val & mask) == mask)
+-			break;
+-
+-		cpu_relax();
+-		if (time_after(jiffies, expired))
+-			return -EIO;
+-	}
+-
+-	return 0;
++	return ret;
+ }
+ 
+ /**
+@@ -80,30 +69,16 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
+ int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
+ 		bool reg_update)
+ {
+-	unsigned long expired;
+ 	int ret;
++	u32 val;
+ 
+ 	if (reg_update)
+ 		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
+ 	else
+ 		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_CLR, mask);
+ 
+-	expired = jiffies + HZ;
+-
+-	while (1) {
+-		u32 val;
+-
+-		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
+-		if (ret)
+-			return ret;
+-
+-		if (!(val & mask))
+-			break;
+-
+-		cpu_relax();
+-		if (time_after(jiffies, expired))
+-			return -EIO;
+-	}
+-
+-	return 0;
++	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
++				       val, !(val & mask), 10,
++				       jiffies_to_usecs(HZ));
++	return ret;
+ }
 -- 
 2.7.4
