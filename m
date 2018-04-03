@@ -1,25 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 3 Apr 2018 14:52:45 +0800
-Subject: [PATCH v5 01/13] ARM: move cputype definitions into another file
-In-Reply-To: <20180403061836.3926-2-mylene.josserand@bootlin.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-2-mylene.josserand@bootlin.com>
-Message-ID: <CAGb2v64GL=1UcYs1tFp-mS07vbHBao82SEhyzUrUHB++2-EKBg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Apr 2018 09:06:46 +0200
+Subject: [PATCH 14/15] ARM: pxa: change SSP devices allocation
+In-Reply-To: <20180402142656.26815-15-robert.jarzmik@free.fr>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-15-robert.jarzmik@free.fr>
+Message-ID: <CAK8P3a2hYWO2eweg3zpR7iJoqtH4uxJLAxJAno7L96G7nA2HxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 3, 2018 at 2:18 PM, Myl?ne Josserand
-<mylene.josserand@bootlin.com> wrote:
-> To add the support for SMP on sun8i-a83t, we will use some
-> definitions in an assembly file so move definitions into
-> another file to separate C functions and macro defintions.
+On Mon, Apr 2, 2018 at 4:26 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-Instead of moving the definitions, you could guard all the C
-stuff in "#ifndef __ASSEMBLY__". AFAIK a few header files do that.
+>
+> +static struct pxa_ssp_info pxa_ssp_infos[] = {
+> +       { .dma_chan_rx_name = "ssp1_rx", .dma_chan_tx_name = "ssp1_tx", },
+> +       { .dma_chan_rx_name = "ssp1_rx", .dma_chan_tx_name = "ssp1_tx", },
+> +       { .dma_chan_rx_name = "ssp2_rx", .dma_chan_tx_name = "ssp2_tx", },
+> +       { .dma_chan_rx_name = "ssp2_rx", .dma_chan_tx_name = "ssp2_tx", },
+> +       { .dma_chan_rx_name = "ssp3_rx", .dma_chan_tx_name = "ssp3_tx", },
+> +       { .dma_chan_rx_name = "ssp3_rx", .dma_chan_tx_name = "ssp3_tx", },
+> +       { .dma_chan_rx_name = "ssp4_rx", .dma_chan_tx_name = "ssp4_tx", },
+> +       { .dma_chan_rx_name = "ssp4_rx", .dma_chan_tx_name = "ssp4_tx", },
+> +};
 
-ChenYu
+This part looks odd to me, you're adding an extra level of indirection to
+do two stages of lookups in some form of platform data.
 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> ---
->  arch/arm/include/asm/cputype.h     | 94 +-----------------------------------
->  arch/arm/include/asm/cputype_def.h | 98 ++++++++++++++++++++++++++++++++++++++
+Why can't you just always use "rx" and "tx" as the names here?
+
+(also, I don't see why each line is duplicated, but I'm sure there's
+an easy answer for that).
+
+       Arnd
