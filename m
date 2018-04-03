@@ -1,82 +1,37 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue,  3 Apr 2018 12:19:39 +0100
-Subject: [PATCH v3 3/3] ARM: dts: iwg23s-sbc: Add support for iWave G23S-SBC
- based on RZ/G1C
-In-Reply-To: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
-References: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1522754379-64116-4-git-send-email-biju.das@bp.renesas.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 3 Apr 2018 12:30:42 +0100
+Subject: [PATCH v3 2/6] Disable instrumentation for some code
+In-Reply-To: <20180402120440.31900-3-liuwenliang@huawei.com>
+References: <20180402120440.31900-1-liuwenliang@huawei.com>
+ <20180402120440.31900-3-liuwenliang@huawei.com>
+Message-ID: <7837103a-bcf0-6b00-14d6-bd6b80649886@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for iWave iW-RainboW-G23S single board computer based on
- RZ/G1C.
+On 02/04/18 13:04, Abbott Liu wrote:
+> From: Andrey Ryabinin <a.ryabinin@samsung.com>
+> 
+> Disable instrumentation for arch/arm/boot/compressed/*
+> ,arch/arm/kvm/hyp/* and arch/arm/vdso/* because those
+> code won't linkd with kernel image.
+> 
+> Disable kasan check in the function unwind_pop_register
+> because it doesn't matter that kasan checks failed when
+> unwind_pop_register read stack memory of task.
+> 
+> Reviewed-by: Russell King - ARM Linux <linux@armlinux.org.uk>
+> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-V1->V2:
-* Incorporated review comments
-V2->V3:
-* No Change
+Just because I replied to this patch doesn't mean you can stick my
+Reviewed-by tag on it. Please drop this tag until I explicitly say that
+you can add it (see Documentation/process/submitting-patches.rst,
+section 11).
 
- arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts | 35 +++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+Same goes for patch 1.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2b6dfee..4291638 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -781,6 +781,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
- 	r8a7745-iwg22d-sodimm.dtb \
- 	r8a7745-iwg22d-sodimm-dbhd-ca.dtb \
- 	r8a7745-sk-rzg1e.dtb \
-+	r8a77470-iwg23s-sbc.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7779-marzen.dtb \
- 	r8a7790-lager.dtb \
-diff --git a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-new file mode 100644
-index 0000000..d21baad
---- /dev/null
-+++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
-@@ -0,0 +1,35 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the iWave-RZ/G1C single board computer
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+
-+/dts-v1/;
-+#include "r8a77470.dtsi"
-+/ {
-+	model = "iWave iW-RainboW-G23S single board computer based on RZ/G1C";
-+	compatible = "iwave,g23s", "renesas,r8a77470";
-+
-+	aliases {
-+		serial1 = &scif1;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial1:115200n8";
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x20000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&scif1 {
-+	status = "okay";
-+};
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
