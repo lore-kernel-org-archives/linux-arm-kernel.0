@@ -1,63 +1,76 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Tue, 3 Apr 2018 16:03:32 +0300
-Subject: [PATCH 6/6] spi: sun4i: add DMA transfers support
-In-Reply-To: <20180403081711.rqsp77mgnuvlnzt5@flea>
-References: <20180329185907.27281-1-ssuloev@orpaltech.com>
- <20180329185907.27281-7-ssuloev@orpaltech.com>
- <20180403081711.rqsp77mgnuvlnzt5@flea>
-Message-ID: <19d5907c-f081-21ce-1b72-7c0a331eb073@orpaltech.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 3 Apr 2018 09:06:23 -0400
+Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
+ readX() implementation
+In-Reply-To: <CAK8P3a0+Q-aBbKsqqypZfCVzHTwcepL9KhBP9qJKE+2FknWHMg@mail.gmail.com>
+References: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
+ <1522425494-2916-2-git-send-email-okaya@codeaurora.org>
+ <20180403104925.fuyajja6tyanlna4@lakrids.cambridge.arm.com>
+ <CAK8P3a3fZx42sQY41Pf+Q3fMNrP2FgXvvntnrLkQXbAezOQjEw@mail.gmail.com>
+ <d5c0c170-07ab-273f-7d4f-301d2bedb992@codeaurora.org>
+ <CAK8P3a0+Q-aBbKsqqypZfCVzHTwcepL9KhBP9qJKE+2FknWHMg@mail.gmail.com>
+Message-ID: <587b59bb-2794-ffc2-3cd3-b77de85d3e7d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2018 11:17 AM, Maxime Ripard wrote:
-> On Thu, Mar 29, 2018 at 09:59:07PM +0300, Sergey Suloev wrote:
->> +static int sun4i_spi_dma_setup(struct device *dev,
->> +			       struct resource *res)
->> +{
->> +	struct spi_master *master = dev_get_drvdata(dev);
->> +	struct dma_slave_config dma_sconf;
->> +	int ret;
->> +
->> +	master->dma_tx = dma_request_slave_channel_reason(dev, "tx");
->> +	if (IS_ERR(master->dma_tx)) {
->> +		dev_err(dev, "Unable to acquire DMA TX channel\n");
->> +		ret = PTR_ERR(master->dma_tx);
->> +		goto out;
->> +	}
->> +
->> +	dma_sconf.direction = DMA_MEM_TO_DEV;
->> +	dma_sconf.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->> +	dma_sconf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> I guess that would depend on the size of the transfer, right?
-no
-"this is the width in bytes of the source (RX)register where DMA data 
-shall be read. If the sourceis memory this may be ignored depending on 
-architecture."
-AFAIK is should be 1 byte for SPI side and seems to be ignored for 
-memory side, but as soon as I don't know what should be correct value 
-for memory side I just put 1 there too.
->
->> +	dma_sconf.dst_addr = res->start + SUN4I_TXDATA_REG;
->> +	dma_sconf.dst_maxburst = 1;
->> +	dma_sconf.src_maxburst = 1;
-> And a burst of 1 seems sub-optimal here.
-I did some tests before with 3/4 FIFO size but it didn't work and I got 
-stuck with 1 byte.
-It seems like 1 byte is the correct value because in SPI protocol we can 
-only send 1 byte in 1 burst.
+On 4/3/2018 8:56 AM, Arnd Bergmann wrote:
+> On Tue, Apr 3, 2018 at 2:44 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> On 4/3/2018 7:13 AM, Arnd Bergmann wrote:
+>>> On Tue, Apr 3, 2018 at 12:49 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On Fri, Mar 30, 2018 at 11:58:13AM -0400, Sinan Kaya wrote:
+>>>>> The default implementation of mapping readX() to __raw_readX() is wrong.
+>>>>> readX() has stronger ordering semantics. Compiler is allowed to reorder
+>>>>> __raw_readX().
+>>>>
+>>>> Could you please specify what the compiler is potentially reordering
+>>>> __raw_readX() against, and why this would be wrong?
+>>>>
+>>>> e.g. do we care about prior normal memory accesses, subsequent normal
+>>>> memory accesses, and/or other IO accesses?
+>>>>
+>>>> I assume that the asm-generic __raw_{read,write}X() implementations are
+>>>> all ordered w.r.t. each other (at least for a specific device).
+>>>
+>>> I think that is correct: the compiler won't reorder those because of the
+>>> 'volatile' pointer dereference, but it can reorder access to a normal
+>>> pointer against a __raw_readl()/__raw_writel(), which breaks the scenario
+>>> of using writel to trigger a DMA, or using a readl to see if a DMA has
+>>> completed.
+>>
+>> Yes, we are worried about memory update vs. IO update ordering here.
+>> That was the reason why barrier() was introduced in this patch. I'll try to
+>> clarify that better in the commit text.
+>>
+>>>
+>>> The question is whether we should use a stronger barrier such
+>>> as rmb() amd wmb() here rather than a simple compiler barrier.
+>>>
+>>> I would assume that on complex architectures with write buffers and
+>>> out-of-order prefetching, those are required, while on architectures
+>>> without those features, the barriers are cheap.
+>>
+>> That's my reasoning too. I'm trying to follow the x86 example here where there
+>> is a compiler barrier in writeX() and readX() family of functions.
+> 
+> I think x86 is the special case here because it implicitly guarantees
+> the strict ordering in the hardware, as long as the compiler gets it
+> right. For the asm-generic version, it may be better to play safe and
+> do the safest version, requiring architectures to override that barrier
+> if they want to be faster.
+> 
+> We could use the same macros that riscv has, using __io_br(),
+> __io_ar(), __io_bw() and __io_aw() for before/after read/write.
 
->
->> +	ret = sun4i_spi_dma_setup(&pdev->dev, res);
->> +	if (ret) {
->> +		if (ret == -EPROBE_DEFER) {
->> +			/* wait for the dma driver to load */
->> +			goto err_free_master;
->> +		}
->> +		dev_warn(&pdev->dev, "DMA transfer not supported\n");
-> Saying why it's not supported would be great.
-I can put more info in this log
-but there is already a message printed from sun4_spi_dma_setup() if any 
-error occurs
->
-> Maxime
->
+Sure, let me take a stab at it. 
+
+> 
+>       Arnd
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
