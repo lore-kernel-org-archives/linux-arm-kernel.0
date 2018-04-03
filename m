@@ -1,36 +1,61 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Tue,  3 Apr 2018 18:44:43 +0300
-Subject: [PATCH v3 0/6] spi: Add support for DMA transfers in sun6i SPI driver
-Message-ID: <20180403154449.2443-1-ssuloev@orpaltech.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 3 Apr 2018 08:48:27 -0700
+Subject: [PATCH v3 2/4] mfd: add Gateworks System Controller core driver
+In-Reply-To: <1522250043-8065-3-git-send-email-tharvey@gateworks.com>
+References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
+ <1522250043-8065-3-git-send-email-tharvey@gateworks.com>
+Message-ID: <CAJ+vNU3-gaTcMAzo5wB6oSfE-JQC3NBVRJS5zFMTE-nVpD4F5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patchset provides corrections for PIO-mode
-and support for DMA transfers in sun6i SPI driver.
+On Wed, Mar 28, 2018 at 8:14 AM, Tim Harvey <tharvey@gateworks.com> wrote:
+> The Gateworks System Controller (GSC) is an I2C slave controller
+> implemented with an MSP430 micro-controller whose firmware embeds the
+> following features:
+>  - I/O expander (16 GPIO's) using PCA955x protocol
+>  - Real Time Clock using DS1672 protocol
+>  - User EEPROM using AT24 protocol
+>  - HWMON using custom protocol
+>  - Interrupt controller with tamper detect, user pushbotton
+>  - Watchdog controller capable of full board power-cycle
+>  - Power Control capable of full board power-cycle
+>
+> see http://trac.gateworks.com/wiki/gsc for more details
+>
+<snip>
+> +
+> +/*
+> + * gsc_powerdown - API to use GSC to power down board for a specific time
+> + *
+> + * secs - number of seconds to remain powered off
+> + */
+> +static int gsc_powerdown(struct gsc_dev *gsc, unsigned long secs)
+> +{
+> +       int ret;
+> +       unsigned char regs[4];
+> +
+> +       dev_info(&gsc->i2c->dev, "GSC powerdown for %ld seconds\n",
+> +                secs);
+> +       regs[0] = secs & 0xff;
+> +       regs[1] = (secs >> 8) & 0xff;
+> +       regs[2] = (secs >> 16) & 0xff;
+> +       regs[3] = (secs >> 24) & 0xff;
+> +       ret = regmap_bulk_write(gsc->regmap, GSC_TIME_ADD, regs, 4);
+> +
+> +       return ret;
+> +}
 
-Changes in v2:
-1) Fixed issue with misplacing a piece of code that requires access
-to the transfer structure into sun6i_spi_prepare_message() function
-where the transfer structure is not available.
+Any feedback on the 'powerdown' sysfs attribute that hooks to this
+function? This allows the GSC to disable the board primary power
+supply for 2^32 seconds and is often used to 'reset' the board
+although it could also be used to put the board in a power down state
+longer. I'm wondering if there is a more appropriate API for this in
+the kernel that I don't know about.
 
-2) Fixed issue with passing an invalid argument into devm_request_irq()
-function.
+I would also like to register a restart handler using this but I
+believe that ARM restart handlers currently can not use I2C - is that
+correct?
 
-Changes in v3:
-1) Restored processing of 3/4 FIFO full interrupt.
+Regards,
 
-2) Debug log enhancements.
-
-Sergey Suloev (6):
-  spi: sun6i: coding style/readability improvements
-  spi: sun6i: handle chip select polarity flag
-  spi: sun6i: restrict transfer length in PIO-mode
-  spi: sun6i: use completion provided by SPI core
-  spi: sun6i: introduce register set/unset helpers
-  spi: sun6i: add DMA transfers support
-
- drivers/spi/spi-sun6i.c | 526 ++++++++++++++++++++++++++++++++++++------------
- 1 file changed, 402 insertions(+), 124 deletions(-)
-
--- 
-2.16.2
+Tim
