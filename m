@@ -1,44 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  3 Apr 2018 11:22:51 +0100
-Subject: [PATCH] arm64: only advance singlestep for user instruction traps
-Message-ID: <20180403102251.42309-1-mark.rutland@arm.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Tue, 3 Apr 2018 13:26:34 +0300
+Subject: [PATCH 2/6] spi: sun4i: restrict transfer length in PIO-mode
+In-Reply-To: <20180403081041.3ully6bcyfwx2cx6@flea>
+References: <20180329185907.27281-1-ssuloev@orpaltech.com>
+ <20180329185907.27281-3-ssuloev@orpaltech.com>
+ <20180403081041.3ully6bcyfwx2cx6@flea>
+Message-ID: <c3b41806-dc12-3af9-8b3a-bd1a611293f8@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our arm64_skip_faulting_instruction() helper advances the userspace
-singlestep state machine, but this is also called by the kernel BRK
-handler, as used for WARN*().
+On 04/03/2018 11:10 AM, Maxime Ripard wrote:
+> On Thu, Mar 29, 2018 at 09:59:03PM +0300, Sergey Suloev wrote:
+>> There is no need to handle 3/4 empty/full interrupts as the maximum
+>> supported transfer length in PIO mode is 64 bytes for sun4i-family
+>> SoCs.
+> That assumes that you'll be able to treat the FIFO full interrupt and
+> drain the FIFO before we have the next byte coming in. This would
+> require a real time system, and we're not in one of them.
+>
+> Maxime
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Thus, if we happen to hit a WARN*() while the user singlestep state
-machine is in the active-no-pending state, we'll advance to the
-active-pending state without having executed a user instruction, and
-will take a step exception earlier than expected when we return to
-userspace.
-
-Let's fix this by only advancing the state machine when skipping a user
-instruction.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Andrey Konovalov <andreyknvl@google.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/traps.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index ba964da31a25..75625a401a4e 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -277,7 +277,8 @@ void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
- 	 * If we were single stepping, we want to get the step exception after
- 	 * we return from the trap.
- 	 */
--	user_fastforward_single_step(current);
-+	if (user_mode(regs))
-+		user_fastforward_single_step(current);
- }
- 
- static LIST_HEAD(undef_hook);
--- 
-2.11.0
+so you think we should still handle 3/4 FIFO full ?
