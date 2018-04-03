@@ -1,56 +1,69 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Tue, 3 Apr 2018 07:24:47 +0000
-Subject: [PATCH] spi: stm32: Fix error handling in stm32_spi_probe()
-In-Reply-To: <1522439684-7510-1-git-send-email-khoroshilov@ispras.ru>
-References: <1522439684-7510-1-git-send-email-khoroshilov@ispras.ru>
-Message-ID: <1c12d20a40384fc78262bcd82c68ba6a@SFHDAG3NODE2.st.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Tue, 3 Apr 2018 15:15:55 +0800
+Subject: [PATCH v1 5/7] soc: mediatek: add a fixed wait for SRAM stable
+In-Reply-To: <cover.1522736996.git.sean.wang@mediatek.com>
+References: <cover.1522736996.git.sean.wang@mediatek.com>
+Message-ID: <0fc10b2498c6dbe20141831c722c32cc74330d3d.1522736996.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Sean Wang <sean.wang@mediatek.com>
 
-> -----Original Message-----
-> From: Alexey Khoroshilov [mailto:khoroshilov at ispras.ru]
-> Sent: vendredi 30 mars 2018 21:55
-> To: Mark Brown <broonie@kernel.org>; Amelie DELAUNAY
-> <amelie.delaunay@st.com>; Maxime Coquelin
-> <mcoquelin.stm32@gmail.com>; Alexandre TORGUE
-> <alexandre.torgue@st.com>
-> Cc: Alexey Khoroshilov <khoroshilov@ispras.ru>; linux-spi at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; ldv-
-> project at linuxtesting.org
-> Subject: [PATCH] spi: stm32: Fix error handling in stm32_spi_probe()
-> 
-> clk_get_rate() is below clk_prepare_enable(), so its error should lead to goto
-> err_clk_disable, not to err_master_put.
-> 
-> Found by Linux Driver Verification project (linuxtesting.org).
-> 
-> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
-> ---
->  drivers/spi/spi-stm32.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c index
-> ba9743fa2326..ad1e55d3d5d5 100644
-> --- a/drivers/spi/spi-stm32.c
-> +++ b/drivers/spi/spi-stm32.c
-> @@ -1129,7 +1129,7 @@ static int stm32_spi_probe(struct platform_device
-> *pdev)
->  	if (!spi->clk_rate) {
->  		dev_err(&pdev->dev, "clk rate = 0\n");
->  		ret = -EINVAL;
-> -		goto err_master_put;
-> +		goto err_clk_disable;
->  	}
-> 
->  	spi->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
-> --
-> 2.7.4
+MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
+stable, which is not like the behavior the other power domains should
+have. Therefore, it's necessary for such a power domain to have a fixed
+and well-predefined duration to wait until its managed SRAM can be allowed
+to access by all functions running on the top.
 
-Thanks for the patch!
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
-Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
-
-Regards,
-Amelie
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index f9b7248..19aceb8 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -121,6 +121,7 @@ struct scp_domain_data {
+ 	u32 bus_prot_mask;
+ 	enum clk_id clk_id[MAX_CLKS];
+ 	bool active_wakeup;
++	u32 us_sram_fwait;
+ };
+ 
+ struct scp;
+@@ -234,11 +235,16 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 	val &= ~scpd->data->sram_pdn_bits;
+ 	writel(val, ctl_addr);
+ 
+-	/* wait until SRAM_PDN_ACK all 0 */
+-	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
+-				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
+-	if (ret < 0)
+-		goto err_pwr_ack;
++	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
++	if (!scpd->data->us_sram_fwait) {
++		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
++					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
++		if (ret < 0)
++			goto err_pwr_ack;
++	} else {
++		usleep_range(scpd->data->us_sram_fwait,
++			     scpd->data->us_sram_fwait + 100);
++	};
+ 
+ 	if (scpd->data->bus_prot_mask) {
+ 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+@@ -783,6 +789,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+ 		.clk_id = {CLK_NONE},
+ 		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
+ 		.active_wakeup = true,
++		.us_sram_fwait = 12000,
+ 	},
+ };
+ 
+-- 
+2.7.4
