@@ -1,145 +1,31 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Tue, 3 Apr 2018 19:30:44 +0200
-Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
- "Stoping" -> "Stopping"
-In-Reply-To: <1522770597.11653.49.camel@perches.com>
-References: <20180330154420.6903-1-colin.king@canonical.com>
- <20180403134540.GA29017@lenoch>
- <1522770597.11653.49.camel@perches.com>
-Message-ID: <20180403173044.GA6031@lenoch>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 3 Apr 2018 13:47:05 -0400
+Subject: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
+ weakly-ordered archs #2
+In-Reply-To: <CY1PR0701MB201215C9F38E8760732B595088A50@CY1PR0701MB2012.namprd07.prod.outlook.com>
+References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
+ <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
+ <ac46b4e4-7e6c-c15f-06eb-01b1e4893d50@codeaurora.org>
+ <CY1PR0701MB201215C9F38E8760732B595088A50@CY1PR0701MB2012.namprd07.prod.outlook.com>
+Message-ID: <3f8de63a-9036-a5ac-2369-2d9af80bb6ef@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 08:49:57AM -0700, Joe Perches wrote:
-> On Tue, 2018-04-03 at 15:45 +0200, Ladislav Michl wrote:
-> > On Fri, Mar 30, 2018 at 04:44:20PM +0100, Colin King wrote:
-> > > From: Colin Ian King <colin.king@canonical.com>
-> > 
-> > Hello Colin,
-> > 
-> > > Trivial fix to spelling mistake in pr_debug message text
-> > 
-> > would you mind making this patch a bit less non-trivial and
-> > change pr_debug to dev_dbg dropping Atmel_ssc_dai prefix?
-> 
-> Presumably, then all the pr_<foo> calls should be changed.
+On 4/3/2018 3:42 AM, Kalderon, Michal wrote:
+> The wmb before writel are used to make sure the
+> HW observes the changes in memory before we trigger the doorbell. 
 
-Yes, that's what non-trivial means here :)
+According to Linus, writel() guarantees observability. No extra
+barrier is necessary.
 
-> Something like:
-> ---
->  sound/soc/atmel/atmel_ssc_dai.c | 38 ++++++++++++++++----------------------
->  1 file changed, 16 insertions(+), 22 deletions(-)
-> 
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index a1e2c5682dcd..594228156b2d 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -291,11 +291,10 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
->  	int dir, dir_mask;
->  	int ret;
->  
-> -	pr_debug("atmel_ssc_startup: SSC_SR=0x%x\n",
-> -		ssc_readl(ssc_p->ssc->regs, SR));
-> +	dev_dbg(dai->dev, "SSC_SR=0x%x\n", ssc_readl(ssc_p->ssc->regs, SR));
->  
->  	/* Enable PMC peripheral clock for this SSC */
-> -	pr_debug("atmel_ssc_dai: Starting clock\n");
-> +	dev_dbg(dai->dev, "Starting clock\n");
->  	clk_enable(ssc_p->ssc->clk);
->  	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk);
->  
-> @@ -385,7 +384,7 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
->  	spin_unlock_irq(&ssc_p->lock);
->  
->  	/* Shutdown the SSC clock. */
-> -	pr_debug("atmel_ssc_dai: Stopping clock\n");
-> +	dev_dbg(dai->dev, "Stopping clock\n");
->  	clk_disable(ssc_p->ssc->clk);
->  }
->  
-> @@ -794,13 +793,12 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  		break;
->  
->  	default:
-> -		printk(KERN_WARNING "atmel_ssc_dai: unsupported DAI format 0x%x\n",
-> -			ssc_p->daifmt);
-> +		dev_warn(dai->dev, "unsupported DAI format 0x%x\n",
-> +			 ssc_p->daifmt);
->  		return -EINVAL;
->  	}
-> -	pr_debug("atmel_ssc_hw_params: "
-> -			"RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
-> -			rcmr, rfmr, tcmr, tfmr);
-> +	dev_dbg(dai->dev, "RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
-> +		rcmr, rfmr, tcmr, tfmr);
->  
->  	if (!ssc_p->initialized) {
->  		if (!ssc_p->ssc->pdata->use_dma) {
-> @@ -818,9 +816,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  		ret = request_irq(ssc_p->ssc->irq, atmel_ssc_interrupt, 0,
->  				ssc_p->name, ssc_p);
->  		if (ret < 0) {
-> -			printk(KERN_WARNING
-> -					"atmel_ssc_dai: request_irq failure\n");
-> -			pr_debug("Atmel_ssc_dai: Stoping clock\n");
-> +			dev_warn(dai->dev, "request_irq failure\n");
-> +			dev_dbg(dai->dev, "Stopping clock\n");
->  			clk_disable(ssc_p->ssc->clk);
->  			return ret;
->  		}
-> @@ -839,7 +836,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  	ssc_writel(ssc_p->ssc->regs, TCMR, tcmr);
->  	ssc_writel(ssc_p->ssc->regs, TFMR, tfmr);
->  
-> -	pr_debug("atmel_ssc_dai,hw_params: SSC initialized\n");
-> +	dev_dbg(dai->dev, "SSC initialized\n");
->  	return 0;
->  }
->  
-> @@ -862,9 +859,9 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
->  	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
->  	ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
->  
-> -	pr_debug("%s enabled SSC_SR=0x%08x\n",
-> -			dir ? "receive" : "transmit",
-> -			ssc_readl(ssc_p->ssc->regs, SR));
-> +	dev_dbg(dai->dev, "%s enabled SSC_SR=0x%08x\n",
-> +		dir ? "receive" : "transmit",
-> +		ssc_readl(ssc_p->ssc->regs, SR));
->  	return 0;
->  }
->  
-> @@ -1050,21 +1047,18 @@ static void asoc_ssc_exit(struct device *dev)
->  int atmel_ssc_set_audio(int ssc_id)
->  {
->  	struct ssc_device *ssc;
-> -	int ret;
->  
->  	/* If we can grab the SSC briefly to parent the DAI device off it */
->  	ssc = ssc_request(ssc_id);
->  	if (IS_ERR(ssc)) {
->  		pr_err("Unable to parent ASoC SSC DAI on SSC: %ld\n",
-> -			PTR_ERR(ssc));
-> +		       PTR_ERR(ssc));
+https://www.mail-archive.com/netdev at vger.kernel.org/msg225806.html
 
-Well, these are usefull, but unrelated changes. But while there, above
-pr_error deserves to be replaced with dev_err as well.
+There shouldn't be any wmb() in drivers unless it is used for a
+very well-known reason. 
 
->  		return PTR_ERR(ssc);
-> -	} else {
-> -		ssc_info[ssc_id].ssc = ssc;
->  	}
->  
-> -	ret = asoc_ssc_init(&ssc->pdev->dev);
-> +	ssc_info[ssc_id].ssc = ssc;
->  
-> -	return ret;
-> +	return asoc_ssc_init(&ssc->pdev->dev);
->  }
->  EXPORT_SYMBOL_GPL(atmel_ssc_set_audio);
->  
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+APIs like readX() and writeX() guarantee observability.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
