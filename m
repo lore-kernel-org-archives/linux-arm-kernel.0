@@ -1,150 +1,91 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 3 Apr 2018 11:10:37 +0200
-Subject: [PATCH] drm/atmel-hlcdc: add command line option to specify
- preferred depth
-In-Reply-To: <ce723d9f-6858-0bad-bffb-85ab036510ee@axentia.se>
-References: <20180326073502.19259-1-peda@axentia.se>
- <20180328093454.4149fa3b@bbrezillon>
- <ce723d9f-6858-0bad-bffb-85ab036510ee@axentia.se>
-Message-ID: <20180403091037.GO3881@phenom.ffwll.local>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 3 Apr 2018 11:12:18 +0200
+Subject: [PATCH v5 08/13] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180403061836.3926-9-mylene.josserand@bootlin.com>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-9-mylene.josserand@bootlin.com>
+Message-ID: <20180403091218.t6xuq6csjp4uyy5u@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 12:03:39PM +0200, Peter Rosin wrote:
-> On 2018-03-28 09:34, Boris Brezillon wrote:
-> > Hi Peter,
-> > 
-> > On Mon, 26 Mar 2018 09:35:02 +0200
-> > Peter Rosin <peda@axentia.se> wrote:
-> > 
-> >> I have an sama5d31-based system with 64MB of memory and a 1920x1080
-> >> LVDS display wired for 16-bpp. When I enable legacy fbdev support,
-> >> the contiguous memory allocator invariably fails with the order-11
-> >> allocation for a 1920x1080 at 24-bpp buffer (~6MB). But this HW can never
-> >> make any good use of RGB888, so that is a wasted attempt anyway that
-> >> would also waste precious memory should it succeed.
-> >>
-> >> Sure, I could rewrite user-space to go directly to KMS etc, and that
-> >> makes the (attempted) order-11 allocation go away, replacing it with
-> >> one order-10 allocation per application restart for a 1920x1080 at 16-bpp
-> >> buffer (<4MB). But after a few restarts, order-10 allocations start to
-> >> fail as well, which is only to be expected AFAIU.
-> >>
-> >> So, I'd rather not change user-space (which was originally written
-> >> to target a smaller display) so that I at the same time get the
-> >> benefit of an early pre-allocated fbdev frame-buffer that can be
-> >> reused over and over. But to do that I need to tell the driver that
-> >> 16-bpp is the preferred depth. Add a module parameter to do just that.
-> >>
-> >> Signed-off-by: Peter Rosin <peda@axentia.se>
-> >> ---
-> >>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++++++++++++-
-> >>  1 file changed, 17 insertions(+), 1 deletion(-)
-> >>
-> >> I found some inspiration regarding naming and implementation here:
-> >> https://patchwork.kernel.org/patch/9848631/
-> >>
-> >> I have found no feedback on that patch though, which makes me wonder if
-> >> I'm perhaps barking up the wronig tree?
-> > 
-> > Hm, isn't that something you can already overload with the video=
-> > parameter?
-> > 
-> > 	video=<output>:<resolution>[-<bpp>]
+On Tue, Apr 03, 2018 at 08:18:31AM +0200, Myl?ne Josserand wrote:
+> Add the initialization of CNTVOFF for sun8i-a83t.
 > 
-> Heh, you are right...
+> For boot CPU, Create a new machine that handles this
+> function's call in an "init_early" callback.
+> For secondary CPUs, add this function into secondary_startup
+> assembly entry.
 > 
-> > AFAIR, <bpp> encodes the color depth, so what is the benefit of adding
-> > this new property to overload the default depth?
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> ---
+>  arch/arm/mach-sunxi/headsmp.S |  1 +
+>  arch/arm/mach-sunxi/sunxi.c   | 18 +++++++++++++++++-
+>  2 files changed, 18 insertions(+), 1 deletion(-)
 > 
-> ...but hhhmmm, I think I will have to have to encode the display size
-> in the bootargs so I will have to use distinct barebox environments
-> depending on the panel, but that's no biggie.
-> 
-> Splendid, please throw away the patch!
+> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> index 79890fbe5613..b586b7cf803a 100644
+> --- a/arch/arm/mach-sunxi/headsmp.S
+> +++ b/arch/arm/mach-sunxi/headsmp.S
+> @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+>  
+>  ENTRY(sunxi_mc_smp_secondary_startup)
+>  	bl	sunxi_mc_smp_cluster_cache_enable
+> +	bl	smp_init_cntvoff
+>  	b	secondary_startup
+>  ENDPROC(sunxi_mc_smp_secondary_startup)
+>  
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 5e9602ce1573..090784108c0a 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/platform_device.h>
+>  
+>  #include <asm/mach/arch.h>
+> +#include <asm/smp_cntvoff.h>
+>  
+>  static const char * const sunxi_board_dt_compat[] = {
+>  	"allwinner,sun4i-a10",
+> @@ -62,7 +63,6 @@ MACHINE_END
+>  static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-a23",
+>  	"allwinner,sun8i-a33",
+> -	"allwinner,sun8i-a83t",
+>  	"allwinner,sun8i-h2-plus",
+>  	"allwinner,sun8i-h3",
+>  	"allwinner,sun8i-r40",
+> @@ -75,6 +75,22 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+>  	.dt_compat	= sun8i_board_dt_compat,
+>  MACHINE_END
+>  
+> +void __init sun8i_cntvoff_init(void)
+> +{
+> +	smp_init_cntvoff();
 
-I think we could fix the parsing to allow -bpp without the resolution ...
-Not sure how to best do that though. Maybe state that 0x0-bpp means to not
-change the resolution from the default?
--Daniel
+Can't this be moved to the SMP setup code?
 
-> 
-> Cheers,
-> Peter
-> 
-> > Maybe I'm wrong and the default depth param is actually useful, but in
-> > this case we should probably make it generic since other drivers seems
-> > to need it too, and we might want to attach it to a specific display
-> > engine instance.
-> > 
-> > Thanks,
-> > 
-> > Boris
-> > 
-> >>
-> >> Cheers,
-> >> Peter
-> >>
-> >> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >> index c1ea5c36b006..f0148627c221 100644
-> >> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> >> @@ -29,6 +29,11 @@
-> >>  
-> >>  #define ATMEL_HLCDC_LAYER_IRQS_OFFSET		8
-> >>  
-> >> +static int atmel_hlcdc_preferred_depth __read_mostly;
-> >> +
-> >> +MODULE_PARM_DESC(preferreddepth, "Set preferred bpp");
-> >> +module_param_named(preferreddepth, atmel_hlcdc_preferred_depth, int, 0400);
-> >> +
-> >>  static const struct atmel_hlcdc_layer_desc atmel_hlcdc_at91sam9n12_layers[] = {
-> >>  	{
-> >>  		.name = "base",
-> >> @@ -590,6 +595,7 @@ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
-> >>  	dev->mode_config.min_height = dc->desc->min_height;
-> >>  	dev->mode_config.max_width = dc->desc->max_width;
-> >>  	dev->mode_config.max_height = dc->desc->max_height;
-> >> +	dev->mode_config.preferred_depth = 24;
-> >>  	dev->mode_config.funcs = &mode_config_funcs;
-> >>  
-> >>  	return 0;
-> >> @@ -658,7 +664,7 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
-> >>  
-> >>  	platform_set_drvdata(pdev, dev);
-> >>  
-> >> -	drm_fb_cma_fbdev_init(dev, 24, 0);
-> >> +	drm_fb_cma_fbdev_init(dev, atmel_hlcdc_preferred_depth, 0);
-> >>  
-> >>  	drm_kms_helper_poll_init(dev);
-> >>  
-> >> @@ -756,6 +762,16 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
-> >>  	struct drm_device *ddev;
-> >>  	int ret;
-> >>  
-> >> +	switch (atmel_hlcdc_preferred_depth) {
-> >> +	case 0: /* driver default */
-> >> +	case 8:
-> >> +	case 16:
-> >> +	case 24:
-> >> +		break;
-> >> +	default:
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >>  	ddev = drm_dev_alloc(&atmel_hlcdc_dc_driver, &pdev->dev);
-> >>  	if (IS_ERR(ddev))
-> >>  		return PTR_ERR(ddev);
-> > 
-> > 
-> > 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> +}
+> +
+> +static const char * const sun8i_cntvoff_board_dt_compat[] = {
+> +	"allwinner,sun8i-a83t",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i boards needing cntvoff")
+
+All of the SoCs need CNTVOFF, so that doesn't really make sense. Why
+not just calling it for what it is: an A83t?
+
+Maxime
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/d03b971d/attachment.sig>
