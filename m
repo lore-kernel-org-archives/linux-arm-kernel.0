@@ -1,29 +1,76 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Tue, 3 Apr 2018 13:27:57 +0300
-Subject: [PATCH 5/6] spi: sun4i: introduce register set/unset helpers
-In-Reply-To: <20180403081458.lyilg3yu3n2e54fd@flea>
-References: <20180329185907.27281-1-ssuloev@orpaltech.com>
- <20180329185907.27281-6-ssuloev@orpaltech.com>
- <20180403081458.lyilg3yu3n2e54fd@flea>
-Message-ID: <8edccc63-9729-ff4c-b272-1916e7794bc7@orpaltech.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Tue, 3 Apr 2018 12:29:31 +0200
+Subject: [PATCH v1 2/7] serdev: add dev_pm_domain_attach|detach()
+In-Reply-To: <f976766cd499c8d7053a1f442aba1494b4d3314f.1522736996.git.sean.wang@mediatek.com>
+References: <cover.1522736996.git.sean.wang@mediatek.com>
+ <f976766cd499c8d7053a1f442aba1494b4d3314f.1522736996.git.sean.wang@mediatek.com>
+Message-ID: <FD85DED4-589C-4113-8A8B-BC5A39494130@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2018 11:14 AM, Maxime Ripard wrote:
-> On Thu, Mar 29, 2018 at 09:59:06PM +0300, Sergey Suloev wrote:
->> Two helper functions were added in order to update
->> registers easily.
->>
->> Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
-> I'm not really sure what's easier about this one.
->
-> Maxime
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hi Sean,
 
-well, just seems more readable vs doing "read, or, write" every time
+> In order to open up the required power gate before any operation can be
+> effectively performed over the serial bus between CPU and serdev, it's
+> clearly essential to add common attach functions for PM domains to serdev
+> at the probe phase.
+> 
+> Similarly, the relevant dettach function for the PM domains should be
+> properly and reversely added at the remove phase.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.com>
+> Cc: linux-serial at vger.kernel.org
+> ---
+> drivers/tty/serdev/core.c | 14 +++++++++++++-
+> 1 file changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serdev/core.c b/drivers/tty/serdev/core.c
+> index df93b72..c93d8ee 100644
+> --- a/drivers/tty/serdev/core.c
+> +++ b/drivers/tty/serdev/core.c
+> @@ -13,6 +13,7 @@
+> #include <linux/module.h>
+> #include <linux/of.h>
+> #include <linux/of_device.h>
+> +#include <linux/pm_domain.h>
+> #include <linux/serdev.h>
+> #include <linux/slab.h>
+> 
+> @@ -330,8 +331,16 @@ EXPORT_SYMBOL_GPL(serdev_device_set_tiocm);
+> static int serdev_drv_probe(struct device *dev)
+> {
+> 	const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
+> +	int ret;
+> +
+> +	ret = dev_pm_domain_attach(dev, true);
+> +	if (ret != -EPROBE_DEFER) {
+> +		ret = sdrv->probe(to_serdev_device(dev));
+> +		if (ret)
+> +			dev_pm_domain_detach(dev, true);
+> +	}
+
+so if this is deferred, when does the serdev device gets probed?
+
+> 
+> -	return sdrv->probe(to_serdev_device(dev));
+> +	return ret;
+> }
+> 
+> static int serdev_drv_remove(struct device *dev)
+> @@ -339,6 +348,9 @@ static int serdev_drv_remove(struct device *dev)
+> 	const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
+> 	if (sdrv->remove)
+> 		sdrv->remove(to_serdev_device(dev));
+> +
+> +	dev_pm_domain_detach(dev, true);
+> +
+> 	return 0;
+> }
+
+Regards
+
+Marcel
