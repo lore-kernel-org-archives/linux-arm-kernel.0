@@ -1,76 +1,106 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Tue, 3 Apr 2018 12:29:31 +0200
-Subject: [PATCH v1 2/7] serdev: add dev_pm_domain_attach|detach()
-In-Reply-To: <f976766cd499c8d7053a1f442aba1494b4d3314f.1522736996.git.sean.wang@mediatek.com>
-References: <cover.1522736996.git.sean.wang@mediatek.com>
- <f976766cd499c8d7053a1f442aba1494b4d3314f.1522736996.git.sean.wang@mediatek.com>
-Message-ID: <FD85DED4-589C-4113-8A8B-BC5A39494130@holtmann.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Apr 2018 11:49:25 +0100
+Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
+ readX() implementation
+In-Reply-To: <1522425494-2916-2-git-send-email-okaya@codeaurora.org>
+References: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
+ <1522425494-2916-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180403104925.fuyajja6tyanlna4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi,
 
-> In order to open up the required power gate before any operation can be
-> effectively performed over the serial bus between CPU and serdev, it's
-> clearly essential to add common attach functions for PM domains to serdev
-> at the probe phase.
+On Fri, Mar 30, 2018 at 11:58:13AM -0400, Sinan Kaya wrote:
+> The default implementation of mapping readX() to __raw_readX() is wrong.
+> readX() has stronger ordering semantics. Compiler is allowed to reorder
+> __raw_readX().
+
+Could you please specify what the compiler is potentially reordering
+__raw_readX() against, and why this would be wrong?
+
+e.g. do we care about prior normal memory accesses, subsequent normal
+memory accesses, and/or other IO accesses?
+
+I assume that the asm-generic __raw_{read,write}X() implementations are
+all ordered w.r.t. each other (at least for a specific device).
+
+Thanks,
+Mark.
+
+> In the abscence of a read barrier or when using a strongly ordered
+> architecture, readX() should at least have a compiler barrier in
+> it to prevent commpiler from clobbering the execution order.
 > 
-> Similarly, the relevant dettach function for the PM domains should be
-> properly and reversely added at the remove phase.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: linux-serial at vger.kernel.org
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
-> drivers/tty/serdev/core.c | 14 +++++++++++++-
-> 1 file changed, 13 insertions(+), 1 deletion(-)
+>  include/asm-generic/io.h | 28 ++++++++++++++++++++++++----
+>  1 file changed, 24 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/tty/serdev/core.c b/drivers/tty/serdev/core.c
-> index df93b72..c93d8ee 100644
-> --- a/drivers/tty/serdev/core.c
-> +++ b/drivers/tty/serdev/core.c
-> @@ -13,6 +13,7 @@
-> #include <linux/module.h>
-> #include <linux/of.h>
-> #include <linux/of_device.h>
-> +#include <linux/pm_domain.h>
-> #include <linux/serdev.h>
-> #include <linux/slab.h>
-> 
-> @@ -330,8 +331,16 @@ EXPORT_SYMBOL_GPL(serdev_device_set_tiocm);
-> static int serdev_drv_probe(struct device *dev)
-> {
-> 	const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
-> +	int ret;
+> diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+> index e8c2078..2554f15 100644
+> --- a/include/asm-generic/io.h
+> +++ b/include/asm-generic/io.h
+> @@ -110,7 +110,12 @@ static inline void __raw_writeq(u64 value, volatile void __iomem *addr)
+>  #define readb readb
+>  static inline u8 readb(const volatile void __iomem *addr)
+>  {
+> -	return __raw_readb(addr);
+> +	u8 val;
 > +
-> +	ret = dev_pm_domain_attach(dev, true);
-> +	if (ret != -EPROBE_DEFER) {
-> +		ret = sdrv->probe(to_serdev_device(dev));
-> +		if (ret)
-> +			dev_pm_domain_detach(dev, true);
-> +	}
-
-so if this is deferred, when does the serdev device gets probed?
-
-> 
-> -	return sdrv->probe(to_serdev_device(dev));
-> +	return ret;
-> }
-> 
-> static int serdev_drv_remove(struct device *dev)
-> @@ -339,6 +348,9 @@ static int serdev_drv_remove(struct device *dev)
-> 	const struct serdev_device_driver *sdrv = to_serdev_device_driver(dev->driver);
-> 	if (sdrv->remove)
-> 		sdrv->remove(to_serdev_device(dev));
+> +	val = __raw_readb(addr);
+> +	barrier();
 > +
-> +	dev_pm_domain_detach(dev, true);
+> +	return val;
+>  }
+>  #endif
+>  
+> @@ -118,7 +123,12 @@ static inline u8 readb(const volatile void __iomem *addr)
+>  #define readw readw
+>  static inline u16 readw(const volatile void __iomem *addr)
+>  {
+> -	return __le16_to_cpu(__raw_readw(addr));
+> +	u16 val;
 > +
-> 	return 0;
-> }
-
-Regards
-
-Marcel
+> +	val = __le16_to_cpu(__raw_readw(addr));
+> +	barrier();
+> +
+> +	return val;
+>  }
+>  #endif
+>  
+> @@ -126,7 +136,12 @@ static inline u16 readw(const volatile void __iomem *addr)
+>  #define readl readl
+>  static inline u32 readl(const volatile void __iomem *addr)
+>  {
+> -	return __le32_to_cpu(__raw_readl(addr));
+> +	u32 val;
+> +
+> +	val = __le32_to_cpu(__raw_readl(addr));
+> +	barrier();
+> +
+> +	return val;
+>  }
+>  #endif
+>  
+> @@ -135,7 +150,12 @@ static inline u32 readl(const volatile void __iomem *addr)
+>  #define readq readq
+>  static inline u64 readq(const volatile void __iomem *addr)
+>  {
+> -	return __le64_to_cpu(__raw_readq(addr));
+> +	u64 val;
+> +
+> +	val = __le64_to_cpu(__raw_readq(addr));
+> +	barrier();
+> +
+> +	return val;
+>  }
+>  #endif
+>  #endif /* CONFIG_64BIT */
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
