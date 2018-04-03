@@ -1,43 +1,188 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 3 Apr 2018 19:13:59 +0800
-Subject: [PATCH v5 08/13] ARM: sunxi: Add initialization of CNTVOFF
-In-Reply-To: <20180403061836.3926-9-mylene.josserand@bootlin.com>
-References: <20180403061836.3926-9-mylene.josserand@bootlin.com>
-Message-ID: <201804031907.1T91Hxm0%fengguang.wu@intel.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue,  3 Apr 2018 12:19:38 +0100
+Subject: [PATCH v3 2/3] ARM: dts: r8a77470: Initial SoC device tree
+In-Reply-To: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
+References: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1522754379-64116-3-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Myl?ne,
+The initial R8A77470 SoC device tree including CPU0, GIC, timer, SYSC, RST,
+CPG, and the required clock descriptions.
 
-Thank you for the patch! Yet something to improve:
-
-[auto build test ERROR on arm-soc/for-next]
-[also build test ERROR on next-20180403]
-[cannot apply to v4.16]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Myl-ne-Josserand/Sunxi-Add-SMP-support-on-A83T/20180403-143751
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
-config: arm-arm67 (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   arch/arm/mach-sunxi/sunxi.o: In function `sun8i_cntvoff_init':
->> sunxi.c:(.init.text+0x3c): undefined reference to `smp_init_cntvoff'
-
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31765 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/6e396f4b/attachment-0001.gz>
+V1->V2:
+* Incorporated geert's review comment
+* Moved prr node inside soc node.
+V2->V3:
+* Incorporated simon and geert's review comment
+
+ arch/arm/boot/dts/r8a77470.dtsi | 154 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 154 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a77470.dtsi
+
+diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
+new file mode 100644
+index 0000000..4578582
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a77470.dtsi
+@@ -0,0 +1,154 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree Source for the r8a77470 SoC
++ *
++ * Copyright (C) 2018 Renesas Electronics Corp.
++ */
++
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/renesas-cpg-mssr.h>
++/ {
++	compatible = "renesas,r8a77470";
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0>;
++			clock-frequency = <1000000000>;
++			clocks = <&cpg CPG_CORE 0>;
++			power-domains = <&sysc 5>;
++			next-level-cache = <&L2_CA7>;
++		};
++
++
++		L2_CA7: cache-controller-0 {
++			compatible = "cache";
++			cache-unified;
++			cache-level = <2>;
++			power-domains = <&sysc 21>;
++		};
++	};
++
++	/* External root clock */
++	extal_clk: extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
++	/* External SCIF clock */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		cpg: clock-controller at e6150000 {
++			compatible = "renesas,r8a77470-cpg-mssr";
++			reg = <0 0xe6150000 0 0x1000>;
++			clocks = <&extal_clk>, <&usb_extal_clk>;
++			clock-names = "extal", "usb_extal";
++			#clock-cells = <2>;
++			#power-domain-cells = <0>;
++			#reset-cells = <1>;
++		};
++
++		rst: reset-controller at e6160000 {
++			compatible = "renesas,r8a77470-rst";
++			reg = <0 0xe6160000 0 0x100>;
++		};
++
++		sysc: system-controller at e6180000 {
++			compatible = "renesas,r8a77470-sysc";
++			reg = <0 0xe6180000 0 0x200>;
++			#power-domain-cells = <1>;
++		};
++
++		icram0:	sram at e63a0000 {
++			compatible = "mmio-sram";
++			reg = <0 0xe63a0000 0 0x12000>;
++		};
++
++		icram1:	sram at e63c0000 {
++			compatible = "mmio-sram";
++			reg = <0 0xe63c0000 0 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0 0xe63c0000 0x1000>;
++
++			smp-sram at 0 {
++				compatible = "renesas,smp-sram";
++				reg = <0 0x100>;
++			};
++		};
++
++		icram2:	sram at e6300000 {
++			compatible = "mmio-sram";
++			reg = <0 0xe6300000 0 0x20000>;
++		};
++
++		scif1: serial at e6e68000 {
++			compatible = "renesas,scif-r8a77470",
++				     "renesas,rcar-gen2-scif", "renesas,scif";
++			reg = <0 0xe6e68000 0 0x40>;
++			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&cpg CPG_MOD 720>,
++				 <&cpg CPG_CORE 6>, <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 720>;
++			status = "disabled";
++		};
++
++		gic: interrupt-controller at f1001000 {
++			compatible = "arm,gic-400";
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++			reg = <0 0xf1001000 0 0x1000>, <0 0xf1002000 0 0x2000>,
++			      <0 0xf1004000 0 0x2000>, <0 0xf1006000 0 0x2000>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++			clocks = <&cpg CPG_MOD 408>;
++			clock-names = "clk";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 408>;
++		};
++
++		prr: chipid at ff000044 {
++			compatible = "renesas,prr";
++			reg = <0 0xff000044 0 4>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	/* External USB clock - can be overridden by the board */
++	usb_extal_clk: usb_extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <48000000>;
++	};
++};
+-- 
+2.7.4
