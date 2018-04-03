@@ -1,28 +1,38 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 3 Apr 2018 14:23:50 +0200
-Subject: [PATCH v9 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <1520302562-1577-1-git-send-email-yong.deng@magewell.com>
-References: <1520302562-1577-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <218b07cd-4490-517e-1dff-ada7d73dfcf1@xs4all.nl>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Tue, 3 Apr 2018 13:34:34 +0100
+Subject: [kvmtool PATCH 20/17] kvmtool: arm64: Switch memory layout
+In-Reply-To: <1522156531-28348-21-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-21-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <f04a9ac7-a555-47e1-0bef-f5ff28b287f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/18 03:16, Yong Deng wrote:
-> Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> interface and CSI1 is used for parallel interface. This is not
-> documented in datasheet but by test and guess.
-> 
-> This patch implement a v4l2 framework driver for it.
-> 
-> Currently, the driver only support the parallel interface. MIPI-CSI2,
-> ISP's support are not included in this patch.
-> 
-> Reviewed-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Tested-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+Hi Suzuki,
 
-Reviewed-by: Hans Verkuil <hans.verkuil@cisco.com>
+On 27/03/18 14:15, Suzuki K Poulose wrote:
+> If the guest wants to use a larger physical address space place
+> the RAM at upper half of the address space. Otherwise, it uses the
+> default layout.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arm/aarch32/include/kvm/kvm-arch.h |  1 +
+>  arm/aarch64/include/kvm/kvm-arch.h | 15 ++++++++++++---
+>  arm/include/arm-common/kvm-arch.h  | 11 ++++++-----
+>  arm/kvm.c                          |  2 +-
+>  4 files changed, 20 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
+> index cd31e72..2d62aab 100644
+> --- a/arm/aarch32/include/kvm/kvm-arch.h
+> +++ b/arm/aarch32/include/kvm/kvm-arch.h
+> @@ -4,6 +4,7 @@
+>  #define ARM_KERN_OFFSET(...)	0x8000
+>  
+>  #define ARM_MAX_MEMORY(...)	ARM_LOMAP_MAX_MEMORY
 
-Thanks!
+I guess this should now be ARM32_MAX_MEMORY?
 
-	Hans
+Thanks,
+Jean
