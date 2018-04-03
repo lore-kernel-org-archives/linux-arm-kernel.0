@@ -1,39 +1,68 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 3 Apr 2018 10:37:44 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <20180403071843.GI14180@piout.net>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon>
- <8e35701f-1bfa-c9c0-62e6-48ed19d7ba37@axentia.se>
- <20180403071843.GI14180@piout.net>
-Message-ID: <6a2b49fb-8e2c-ff76-4743-08f8d6a8d5e9@axentia.se>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 3 Apr 2018 08:43:29 +0000
+Subject: [PATCH v2 6/8] ARM: dts: r8a77470: Initial SoC device tree
+In-Reply-To: <20180330065440.hbhr26aacokdivl7@verge.net.au>
+References: <1522265176-33226-1-git-send-email-biju.das@bp.renesas.com>
+ <1522265176-33226-7-git-send-email-biju.das@bp.renesas.com>
+ <20180330065440.hbhr26aacokdivl7@verge.net.au>
+Message-ID: <OSBPR01MB210392232C1B5393389EC3A2B8A50@OSBPR01MB2103.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-03 09:18, Alexandre Belloni wrote:
-> On 02/04/2018 at 22:23:17 +0200, Peter Rosin wrote:
->>>> No, but did it again and checked, see transcript below.
->>>
->>> I don't use devmem2. Is 'readback' information accurate or is it
->>> always what's been written? Because when you write 0x33 to 0xFFFFECBC,
->>> 0x33 is read back, but just after that, when you read it again it's 0.
->>
->> Looking at the devmem2 source, it seems very likely that the compiler
->> optimizes out the read and thus outputs what has been written.
->>
-> 
-> At least on x86, it is not optimized out.
+Hi Simon & Geert,
 
-Looking at the disassembly, they are gone here (not that I'm fluent).
-I then tried to compile devmem2 with -O0 (instead of -Os) and the read
-is then fine. So, I guess the devmem2 devs could claim that it's a
-buildroot issue, but a volatile would certainly have helped...
+Thanks for feedback.
 
-Cheers,
-Peter
+> On Wed, Mar 28, 2018 at 08:26:14PM +0100, Biju Das wrote:
+> > The initial R8A77470 SoC device tree including CPU0, GIC, timer, SYSC,
+> > RST, CPG, and the required clock descriptions.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> > V1->V2:
+> > * Incorporated geert's review comment
+> > * Moved prr node inside soc node.
+> >
+> >  arch/arm/boot/dts/r8a77470.dtsi | 155
+> > ++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 155 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/r8a77470.dtsi
+> >
+> > diff --git a/arch/arm/boot/dts/r8a77470.dtsi
+> > b/arch/arm/boot/dts/r8a77470.dtsi new file mode 100644 index
+> > 0000000..f096419
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/r8a77470.dtsi
+> > @@ -0,0 +1,155 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Device Tree Source for the r8a77470 SoC
+> > + *
+> > + * Copyright (C) 2018 Renesas Electronics Corp.
+> > + */
+> > +
+> > +#include <dt-bindings/interrupt-controller/irq.h>
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +#include <dt-bindings/clock/r8a77470-cpg-mssr.h>
+> > +#include <dt-bindings/power/r8a77470-sysc.h>
+>
+> As requested by Geert in his review of v1, please use numerical values for the
+> initial submission as the dt-bindings headers and the DTS files go upstream
+> through different maintainer paths.
+>
+> In other words, please do not include r8a77470-cpg-mssr.h or r8a77470-sysc.h
+> in the initial submission of this file as those header files will not be present and
+> there will be a build failure.
+> Rather, please use numeric values for now and, as a follow-up in the v4.19
+> development cycle, provide a patch to use the headers.
+>
+
+I got your point now. Will send V3 for this patch with numerical values.
+
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
