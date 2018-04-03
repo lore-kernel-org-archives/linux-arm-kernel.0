@@ -1,86 +1,62 @@
 From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Tue,  3 Apr 2018 18:44:44 +0300
-Subject: [PATCH v3 1/6] spi: sun6i: coding style/readability improvements
+Date: Tue,  3 Apr 2018 18:44:47 +0300
+Subject: [PATCH v3 4/6] spi: sun6i: use completion provided by SPI core
 In-Reply-To: <20180403154449.2443-1-ssuloev@orpaltech.com>
 References: <20180403154449.2443-1-ssuloev@orpaltech.com>
-Message-ID: <20180403154449.2443-2-ssuloev@orpaltech.com>
+Message-ID: <20180403154449.2443-5-ssuloev@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor changes to fulfill the coding style and improve
-the readability of the code.
+As long as the completion is already provided by the SPI core
+then there is no need to waste extra-memory on this.
+Also a waiting function was added to avoid code duplication.
 
 Changes in v2:
-1) Fixed issue with misplacing a piece of code that requires access
-to the transfer structure into sun6i_spi_prepare_message() function
-where the transfer structure is not available.
+1) Fixed issue with passing an invalid argument into devm_request_irq()
+function.
 
 Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
 ---
- drivers/spi/spi-sun6i.c | 97 +++++++++++++++++++++++++++++--------------------
- 1 file changed, 58 insertions(+), 39 deletions(-)
+ drivers/spi/spi-sun6i.c | 52 ++++++++++++++++++++++++++++---------------------
+ 1 file changed, 30 insertions(+), 22 deletions(-)
 
 diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index 8533f4e..88ad45e 100644
+index c09ad10..0912404 100644
 --- a/drivers/spi/spi-sun6i.c
 +++ b/drivers/spi/spi-sun6i.c
-@@ -88,8 +88,12 @@
- #define SUN6I_TXDATA_REG		0x200
- #define SUN6I_RXDATA_REG		0x300
- 
-+#define SUN6I_SPI_MODE_BITS		(SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST)
-+
-+#define SUN6I_SPI_MAX_SPEED_HZ		100000000
-+#define SUN6I_SPI_MIN_SPEED_HZ		3000
-+
- struct sun6i_spi {
--	struct spi_master	*master;
- 	void __iomem		*base_addr;
- 	struct clk		*hclk;
+@@ -99,8 +99,6 @@ struct sun6i_spi {
  	struct clk		*mclk;
-@@ -189,6 +193,9 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
- 	else
- 		reg &= ~SUN6I_TFR_CTL_CS_LEVEL;
+ 	struct reset_control	*rstc;
  
-+	/* We want to control the chip select manually */
-+	reg |= SUN6I_TFR_CTL_CS_MANUAL;
-+
- 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
+-	struct completion	done;
+-
+ 	const u8		*tx_buf;
+ 	u8			*rx_buf;
+ 	int			len;
+@@ -246,6 +244,30 @@ static int sun6i_spi_prepare_message(struct spi_master *master,
+ 	return 0;
  }
  
-@@ -197,6 +204,39 @@ static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
- 	return SUN6I_MAX_XFER_SIZE - 1;
- }
- 
-+static int sun6i_spi_prepare_message(struct spi_master *master,
-+				     struct spi_message *msg)
++static int sun6i_spi_wait_for_transfer(struct spi_device *spi,
++				       struct spi_transfer *tfr)
 +{
-+	struct spi_device *spi = msg->spi;
-+	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-+	u32 reg;
++	struct spi_master *master = spi->master;
++	unsigned int start, end, tx_time;
++	unsigned int timeout;
 +
-+	/*
-+	 * Setup the transfer control register: Chip Select,
-+	 * polarities, etc.
-+	 */
-+	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
-+
-+	if (spi->mode & SPI_CPOL)
-+		reg |= SUN6I_TFR_CTL_CPOL;
-+	else
-+		reg &= ~SUN6I_TFR_CTL_CPOL;
-+
-+	if (spi->mode & SPI_CPHA)
-+		reg |= SUN6I_TFR_CTL_CPHA;
-+	else
-+		reg &= ~SUN6I_TFR_CTL_CPHA;
-+
-+	if (spi->mode & SPI_LSB_FIRST)
-+		reg |= SUN6I_TFR_CTL_FBS;
-+	else
-+		reg &= ~SUN6I_TFR_CTL_FBS;
-+
-+	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
++	/* smart wait for completion */
++	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
++	start = jiffies;
++	timeout = wait_for_completion_timeout(&master->xfer_completion,
++					      msecs_to_jiffies(tx_time));
++	end = jiffies;
++	if (!timeout) {
++		dev_warn(&master->dev,
++			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
++			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
++			 jiffies_to_msecs(end - start), tx_time);
++		return -ETIMEDOUT;
++	}
 +
 +	return 0;
 +}
@@ -88,110 +64,74 @@ index 8533f4e..88ad45e 100644
  static int sun6i_spi_transfer_one(struct spi_master *master,
  				  struct spi_device *spi,
  				  struct spi_transfer *tfr)
-@@ -235,27 +275,8 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS) |
- 			(trig_level << SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS));
+@@ -267,7 +289,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	if (tfr->len > sspi->fifo_depth)
+ 		return -EMSGSIZE;
  
--	/*
--	 * Setup the transfer control register: Chip Select,
--	 * polarities, etc.
--	 */
--	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
--
--	if (spi->mode & SPI_CPOL)
--		reg |= SUN6I_TFR_CTL_CPOL;
--	else
--		reg &= ~SUN6I_TFR_CTL_CPOL;
--
--	if (spi->mode & SPI_CPHA)
--		reg |= SUN6I_TFR_CTL_CPHA;
--	else
--		reg &= ~SUN6I_TFR_CTL_CPHA;
--
--	if (spi->mode & SPI_LSB_FIRST)
--		reg |= SUN6I_TFR_CTL_FBS;
--	else
--		reg &= ~SUN6I_TFR_CTL_FBS;
+-	reinit_completion(&sspi->done);
+ 	sspi->tx_buf = tfr->tx_buf;
+ 	sspi->rx_buf = tfr->rx_buf;
+ 	sspi->len = tfr->len;
+@@ -358,21 +379,9 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+ 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
  
-+	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
- 	/*
- 	 * If it's a TX only transfer, we don't want to fill the RX
- 	 * FIFO with bogus data
-@@ -265,11 +286,9 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
- 	else
- 		reg |= SUN6I_TFR_CTL_DHB;
+-	tx_time = max(tfr->len * 8 * 2 / (tfr->speed_hz / 1000), 100U);
+-	start = jiffies;
+-	timeout = wait_for_completion_timeout(&sspi->done,
+-					      msecs_to_jiffies(tx_time));
+-	end = jiffies;
+-	if (!timeout) {
+-		dev_warn(&master->dev,
+-			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
+-			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
+-			 jiffies_to_msecs(end - start), tx_time);
+-		ret = -ETIMEDOUT;
+-		goto out;
+-	}
++	/* Wait for completion */
++	ret = sun6i_spi_wait_for_transfer(spi, tfr);
  
--	/* We want to control the chip select manually */
--	reg |= SUN6I_TFR_CTL_CS_MANUAL;
--
- 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
+-out:
+ 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
  
-+
- 	/* Ensure that we have a parent clock fast enough */
- 	mclk_rate = clk_get_rate(sspi->mclk);
- 	if (mclk_rate < (2 * tfr->speed_hz)) {
-@@ -442,12 +461,24 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 	struct resource	*res;
- 	int ret = 0, irq;
+ 	return ret;
+@@ -380,7 +389,8 @@ out:
  
--	master = spi_alloc_master(&pdev->dev, sizeof(struct sun6i_spi));
-+	master = spi_alloc_master(&pdev->dev, sizeof(*sspi));
- 	if (!master) {
- 		dev_err(&pdev->dev, "Unable to allocate SPI Master\n");
- 		return -ENOMEM;
+ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
+ {
+-	struct sun6i_spi *sspi = dev_id;
++	struct spi_master *master = dev_id;
++	struct sun6i_spi *sspi = spi_master_get_devdata(master);
+ 	u32 status;
+ 
+ 	status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
+@@ -389,7 +399,7 @@ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
+ 	if (status & SUN6I_INT_CTL_TC) {
+ 		sun6i_spi_write(sspi, SUN6I_INT_STA_REG, SUN6I_INT_CTL_TC);
+ 		sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
+-		complete(&sspi->done);
++		spi_finalize_current_transfer(master);
+ 		return IRQ_HANDLED;
  	}
  
-+	master->max_speed_hz = SUN6I_SPI_MAX_SPEED_HZ;
-+	master->min_speed_hz = SUN6I_SPI_MIN_SPEED_HZ;
-+	master->num_chipselect = 4;
-+	master->mode_bits = SUN6I_SPI_MODE_BITS;
-+	master->bits_per_word_mask = SPI_BPW_MASK(8);
-+	master->set_cs = sun6i_spi_set_cs;
-+	master->prepare_message = sun6i_spi_prepare_message;
-+	master->transfer_one = sun6i_spi_transfer_one;
-+	master->max_transfer_size = sun6i_spi_max_transfer_size;
-+	master->dev.of_node = pdev->dev.of_node;
-+	master->auto_runtime_pm = true;
-+
- 	platform_set_drvdata(pdev, master);
- 	sspi = spi_master_get_devdata(master);
- 
-@@ -466,26 +497,14 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+@@ -496,7 +506,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
  	}
  
  	ret = devm_request_irq(&pdev->dev, irq, sun6i_spi_handler,
--			       0, "sun6i-spi", sspi);
-+			       0, dev_name(&pdev->dev), sspi);
+-			       0, dev_name(&pdev->dev), sspi);
++			       0, dev_name(&pdev->dev), master);
  	if (ret) {
  		dev_err(&pdev->dev, "Cannot request IRQ\n");
  		goto err_free_master;
+@@ -518,8 +528,6 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 		goto err_free_master;
  	}
  
--	sspi->master = master;
- 	sspi->fifo_depth = (unsigned long)of_device_get_match_data(&pdev->dev);
- 
--	master->max_speed_hz = 100 * 1000 * 1000;
--	master->min_speed_hz = 3 * 1000;
--	master->set_cs = sun6i_spi_set_cs;
--	master->transfer_one = sun6i_spi_transfer_one;
--	master->num_chipselect = 4;
--	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST;
--	master->bits_per_word_mask = SPI_BPW_MASK(8);
--	master->dev.of_node = pdev->dev.of_node;
--	master->auto_runtime_pm = true;
--	master->max_transfer_size = sun6i_spi_max_transfer_size;
+-	init_completion(&sspi->done);
 -
- 	sspi->hclk = devm_clk_get(&pdev->dev, "ahb");
- 	if (IS_ERR(sspi->hclk)) {
- 		dev_err(&pdev->dev, "Unable to acquire AHB clock\n");
-@@ -525,7 +544,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 
- 	ret = devm_spi_register_master(&pdev->dev, master);
- 	if (ret) {
--		dev_err(&pdev->dev, "cannot register SPI master\n");
-+		dev_err(&pdev->dev, "Couldn't register SPI master\n");
- 		goto err_pm_disable;
- 	}
- 
+ 	sspi->rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+ 	if (IS_ERR(sspi->rstc)) {
+ 		dev_err(&pdev->dev, "Couldn't get reset controller\n");
 -- 
 2.16.2
