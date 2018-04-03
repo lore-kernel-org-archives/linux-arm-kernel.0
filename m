@@ -1,159 +1,73 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 3 Apr 2018 08:51:10 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <20180402222020.1d344c14@bbrezillon>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
-Message-ID: <d9da5ae4-68d0-df88-1214-f53f6b18d718@axentia.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Apr 2018 08:51:37 +0200
+Subject: [PATCH 02/15] ARM: pxa: add dma slave map
+In-Reply-To: <20180402142656.26815-3-robert.jarzmik@free.fr>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-3-robert.jarzmik@free.fr>
+Message-ID: <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-02 22:20, Boris Brezillon wrote:
-> On Mon, 2 Apr 2018 21:28:43 +0200
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> 
->> On Mon, 2 Apr 2018 19:59:39 +0200
->> Peter Rosin <peda@axentia.se> wrote:
->>
->>> On 2018-04-02 14:22, Boris Brezillon wrote:  
->>>> On Thu, 29 Mar 2018 16:27:12 +0200
->>>> Peter Rosin <peda@axentia.se> wrote:
->>>>     
->>>>> On 2018-03-29 15:44, Boris Brezillon wrote:    
->>>>>> On Thu, 29 Mar 2018 15:37:43 +0200
->>>>>> Peter Rosin <peda@axentia.se> wrote:
->>>>>>       
->>>>>>> On 2018-03-29 15:33, Boris Brezillon wrote:      
->>>>>>>> On Thu, 29 Mar 2018 15:10:54 +0200
->>>>>>>> Peter Rosin <peda@axentia.se> wrote:
->>>>>>>>         
->>>>>>>>> On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
->>>>>>>>> flash accesses have a tendency to cause display disturbances. Add a
->>>>>>>>> module param to disable DMA from the NAND controller, since that fixes
->>>>>>>>> the display problem for me.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
->>>>>>>>> ---
->>>>>>>>>  drivers/mtd/nand/raw/atmel/nand-controller.c | 7 ++++++-
->>>>>>>>>  1 file changed, 6 insertions(+), 1 deletion(-)
->>>>>>>>>
->>>>>>>>> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
->>>>>>>>> index b2f00b398490..2ff7a77c7b8e 100644
->>>>>>>>> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
->>>>>>>>> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
->>>>>>>>> @@ -129,6 +129,11 @@
->>>>>>>>>  #define DEFAULT_TIMEOUT_MS			1000
->>>>>>>>>  #define MIN_DMA_LEN				128
->>>>>>>>>  
->>>>>>>>> +static bool atmel_nand_avoid_dma __read_mostly;
->>>>>>>>> +
->>>>>>>>> +MODULE_PARM_DESC(avoiddma, "Avoid using DMA");
->>>>>>>>> +module_param_named(avoiddma, atmel_nand_avoid_dma, bool, 0400);        
->>>>>>>>
->>>>>>>> I'm not a big fan of those driver specific cmdline parameters. Can't we
->>>>>>>> instead give an higher priority to HLCDC master using the bus matrix?        
->>>>>>>
->>>>>>> I don't know if it will be enough, but we sure can try. However, I have
->>>>>>> no idea how to do that. I will happily test stuff though...      
->>>>>>
->>>>>> There's no interface to configure that from Linux, but you can try to
->>>>>> tweak it with devmem and if that does the trick, maybe we can expose a
->>>>>> way to configure that from Linux. For more details, see the "Bus Matrix
->>>>>> (MATRIX)" section in Atmel datasheets.      
->>>>>
->>>>> I don't seem to succeed in changing the registers I think I need to change.
->>>>> I can poke the "Write Protection Mode Register" by writing MAT0 and MAT1 to
->>>>> it.    
->>>>
->>>> You mean 0x4D415400, right? ("MAT0" != 0x4D415400).    
->>>
->>> Bits 1 through 7 do not matter, so even though not equal they are (or
->>> should be) equivalent. But I did use 0x4d415400. I simply used the
->>> shorter syntax since that was easier to type and conveyed the relevant
->>> info.  
->>
->> Ok.
->>
->>>   
->>>>> But when I try to write to "Priority Registers B For Slaves" it doesn't
->>>>> take, regardless of write protect mode.    
->>>>
->>>> Did you check MATRIX_WPSR after writing to MATRIX_PRXSY?    
->>>
->>> No, but did it again and checked, see transcript below.  
->>
->> I don't use devmem2. Is 'readback' information accurate or is it
->> always what's been written? Because when you write 0x33 to 0xFFFFECBC,
->> 0x33 is read back, but just after that, when you read it again it's 0.
->>
->>> BTW, how do I
->>> know which master is in use for the LCD controller? 8 or 9? Both?  
->>
->> It's configurable on a per-layer basis through the SIF bit in
->> LCDC_<layer>CFG0. The driver tries to dispatch the load on those 2 AHB
->> masters [1].
->>
->>> And
->>> which DDR slave is the target? 7, 8, 9 or 10? More than one?  
->>
->> This, I don't know. I guess all of them can be used.
-> 
-> Looks like I was wrong. According to "Table 15-3. SAMA5D3 Master to
-> Slave Access", LCDC port 0 can only access DDR port 2 and LCDC port 1
-> can only access DDR port 3.
-> 
-> Can you try to write 0x3 to 0xFFFFECCC and 0x30 to 0xFFFFECD4?
+On Mon, Apr 2, 2018 at 4:26 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> +
+> +static const struct dma_slave_map pxa_slave_map[] = {
+> +       /* PXA25x, PXA27x and PXA3xx common entries */
+> +       { "pxa-pcm-audio", "ac97_mic_mono", PDMA_FILTER_PARAM(LOWEST, 8) },
+> +       { "pxa-pcm-audio", "ac97_aux_mono_in", PDMA_FILTER_PARAM(LOWEST, 9) },
+> +       { "pxa-pcm-audio", "ac97_aux_mono_out", PDMA_FILTER_PARAM(LOWEST, 10) },
+> +       { "pxa-pcm-audio", "ac97_stereo_in", PDMA_FILTER_PARAM(LOWEST, 11) },
+> +       { "pxa-pcm-audio", "ac97_stereo_out", PDMA_FILTER_PARAM(LOWEST, 12) },
+> +       { "pxa-pcm-audio", "ssp1_rx", PDMA_FILTER_PARAM(LOWEST, 13) },
+> +       { "pxa-pcm-audio", "ssp1_tx", PDMA_FILTER_PARAM(LOWEST, 14) },
+> +       { "pxa-pcm-audio", "ssp2_rx", PDMA_FILTER_PARAM(LOWEST, 15) },
+> +       { "pxa-pcm-audio", "ssp2_tx", PDMA_FILTER_PARAM(LOWEST, 16) },
+> +       { "pxa2xx-ir", "rx", PDMA_FILTER_PARAM(LOWEST, 17) },
+> +       { "pxa2xx-ir", "tx", PDMA_FILTER_PARAM(LOWEST, 18) },
+> +       { "pxa2xx-mci.0", "rx", PDMA_FILTER_PARAM(LOWEST, 21) },
+> +       { "pxa2xx-mci.0", "tx", PDMA_FILTER_PARAM(LOWEST, 22) },
 
-Given the matrix dump in the other mail, it is not surprising that I
-can't. But if I change the matrix from the default
 
- 0 33--3--3--3333--
- 1 33--3--3--3333--
- 2 33--------------
- 3 -3--------333---
- 4 33--------------
- 5 3---------------
- 6 33--33-33333333-
- 7 --3-3--3--------
- 8 -3---3--3--3----
- 9 --3-3--3-33-333-
-10 3--3------------
-11 3-----3---------
-12 ----------------
-13 ----------------
-14 ----------------
-15 ----------------
+> +       { "smc911x.0", "rx", PDMA_FILTER_PARAM(LOWEST, -1) },
+> +       { "smc911x.0", "tx", PDMA_FILTER_PARAM(LOWEST, -1) },
+> +       { "smc91x.0", "data", PDMA_FILTER_PARAM(LOWEST, -1) },
 
-to
+This one is interesting, as you are dealing with an off-chip device,
+and the channel number is '-'1. How does this even work? Does it
+mean
 
- 0 33--3--3--3333--
- 1 33--3--3--3333--
- 2 33--------------
- 3 -3--------333---
- 4 33--------------
- 5 3---------------
- 6 33--33-33333333-
- 7 --1-1--3--------
- 8 -1---1--3--3----
- 9 --1-1--3-33-333-
-10 3--3------------
-11 3-----3---------
-12 ----------------
-13 ----------------
-14 ----------------
-15 ----------------
+> +       /* PXA25x specific map */
+> +       { "pxa25x-ssp.0", "rx", PDMA_FILTER_PARAM(LOWEST, 13) },
+> +       { "pxa25x-ssp.0", "tx", PDMA_FILTER_PARAM(LOWEST, 14) },
+> +       { "pxa25x-nssp.1", "rx", PDMA_FILTER_PARAM(LOWEST, 15) },
+> +       { "pxa25x-nssp.1", "tx", PDMA_FILTER_PARAM(LOWEST, 16) },
+> +       { "pxa25x-nssp.2", "rx", PDMA_FILTER_PARAM(LOWEST, 23) },
+> +       { "pxa25x-nssp.2", "tx", PDMA_FILTER_PARAM(LOWEST, 24) },
+> +       { "pxa-pcm-audio", "nssp2_rx", PDMA_FILTER_PARAM(LOWEST, 15) },
+> +       { "pxa-pcm-audio", "nssp2_tx", PDMA_FILTER_PARAM(LOWEST, 16) },
+> +       { "pxa-pcm-audio", "nssp3_rx", PDMA_FILTER_PARAM(LOWEST, 23) },
+> +       { "pxa-pcm-audio", "nssp3_tx", PDMA_FILTER_PARAM(LOWEST, 24) },
+> +
+> +       /* PXA27x specific map */
+> +       { "pxa-pcm-audio", "ssp3_rx", PDMA_FILTER_PARAM(LOWEST, 66) },
+> +       { "pxa-pcm-audio", "ssp3_tx", PDMA_FILTER_PARAM(LOWEST, 67) },
+> +       { "pxa27x-camera.0", "CI_Y", PDMA_FILTER_PARAM(HIGHEST, 68) },
+> +       { "pxa27x-camera.0", "CI_U", PDMA_FILTER_PARAM(HIGHEST, 69) },
+> +       { "pxa27x-camera.0", "CI_V", PDMA_FILTER_PARAM(HIGHEST, 70) },
+> +
+> +       /* PXA3xx specific map */
+> +       { "pxa-pcm-audio", "ssp4_rx", PDMA_FILTER_PARAM(LOWEST, 2) },
+> +       { "pxa-pcm-audio", "ssp4_tx", PDMA_FILTER_PARAM(LOWEST, 3) },
+> +       { "pxa2xx-mci.1", "rx", PDMA_FILTER_PARAM(LOWEST, 93) },
+> +       { "pxa2xx-mci.1", "tx", PDMA_FILTER_PARAM(LOWEST, 94) },
+> +       { "pxa3xx-nand", "data", PDMA_FILTER_PARAM(LOWEST, 97) },
+> +       { "pxa2xx-mci.2", "rx", PDMA_FILTER_PARAM(LOWEST, 100) },
+> +       { "pxa2xx-mci.2", "tx", PDMA_FILTER_PARAM(LOWEST, 101) },
+> +};
 
-which I *think* is reducing the prio of accesses from all DMAC masters
-to all DDR slaves, and then change the ULBT to 1 (SINGLE) for all
-six DMAC masters, I still get the same display disturbances on nand
-accesses. And I can't seem to tweak the LQOSENx bits, at least not for
-the DMAC/DDR case.
+Since more than half the entries in here are chip specific, maybe it would be
+better to split that table into three and have a copy for each one in
+arch/arm/mach-pxa/pxa{25x.27x.3xx}.c? Does that mean it's actually
+a memory-to-memory transfer with a device being on the external
+SRAM interface?
 
-Cheers,
-Peter
+       Arnd
