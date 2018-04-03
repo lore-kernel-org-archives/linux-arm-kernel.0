@@ -1,52 +1,63 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 3 Apr 2018 15:15:50 +0800
-Subject: [PATCH v1 0/7] add support for Bluetooth on MT7622 SoC
-Message-ID: <cover.1522736996.git.sean.wang@mediatek.com>
+Date: Tue, 3 Apr 2018 15:15:51 +0800
+Subject: [PATCH v1 1/7] dt-bindings: net: bluetooth: Add mediatek-bluetooth
+In-Reply-To: <cover.1522736996.git.sean.wang@mediatek.com>
+References: <cover.1522736996.git.sean.wang@mediatek.com>
+Message-ID: <958f8a0ef0b557fdfcc02a1e86536e1f97a16e22.1522736996.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Hi,
+Add binding document for a SoC built-in device using MediaTek protocol.
+Which could be found on MT7622 SoC or other similar MediaTek SoCs.
 
-This patchset introduces built-in Bluetooth support on MT7622 SoC.
-And, it should be simple to make an extension to support other
-MediaTek SoCs with adjusting a few of changes on the initialization
-sequence of the device.
-
-Before the main driver is being introduced, a few of things about
-power-domain management should be re-worked for serdev core and MediaTek
-SCPSYS to allow the Bluetooth to properly power up.
-
-Patch 2: add a generic way attaching power domain to serdev
-Patch 3 and 4: add cleanups with reuse APIs from Linux core
-Patch 5: fix a limitation about power enablement Bluetooth depends on
-Patch 1, 6 and 7: the major part of adding Bluetooth support to MT7622
-	
-	Sean
-
-Sean Wang (7):
-  dt-bindings: net: bluetooth: Add mediatek-bluetooth
-  serdev: add dev_pm_domain_attach|detach()
-  soc: mediatek: reuse read[l,x]_poll_timeout helpers
-  soc: mediatek: reuse regmap_read_poll_timeout helpers
-  soc: mediatek: add a fixed wait for SRAM stable
-  Bluetooth: hci_mediatek: Add protocol support for MediaTek serial
-    devices
-  MAINTAINERS: add an entry for MediaTek Bluetooth driver
-
- .../devicetree/bindings/net/mediatek-bluetooth.txt |  35 ++
- MAINTAINERS                                        |   8 +
- drivers/bluetooth/Kconfig                          |  12 +
- drivers/bluetooth/Makefile                         |   1 +
- drivers/bluetooth/hci_mediatek.c                   | 499 +++++++++++++++++++++
- drivers/bluetooth/hci_uart.h                       |   3 +-
- drivers/soc/mediatek/mtk-infracfg.c                |  45 +-
- drivers/soc/mediatek/mtk-scpsys.c                  |  98 ++--
- drivers/tty/serdev/core.c                          |  14 +-
- 9 files changed, 610 insertions(+), 105 deletions(-)
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
- create mode 100644 drivers/bluetooth/hci_mediatek.c
 
+diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+new file mode 100644
+index 0000000..1335429
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+@@ -0,0 +1,35 @@
++MediaTek SoC built-in Bluetooth Devices
++==================================
++
++This device is a serial attached device to BTIF device and thus it must be a
++child node of the serial node with BTIF. The dt-bindings details for BTIF
++device can be known via Documentation/devicetree/bindings/serial/8250.txt.
++
++Required properties:
++
++- compatible:	Must be one of
++		  "mediatek,mt7622-bluetooth"": for MT7622 SoC
++- clocks:	Should be the clock specifiers corresponding to the entry in
++		clock-names property.
++- clock-names:	Should contain "ref" entries.
++- power-domains: Phandle to the power domain that the device is part of
++
++Example:
++
++	btif: serial at 1100c000 {
++		compatible = "mediatek,mt7622-btif",
++			     "mediatek,mtk-btif";
++		reg = <0 0x1100c000 0 0x1000>;
++		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_BTIF_PD>;
++		clock-names = "main";
++		reg-shift = <2>;
++		reg-io-width = <4>;
++
++		bluetooth {
++			compatible = "mediatek,mt7622-bluetooth";
++			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
++			clocks = <&clk25m>;
++			clock-names = "ref";
++		};
++	};
 -- 
 2.7.4
