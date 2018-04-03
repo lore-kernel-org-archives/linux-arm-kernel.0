@@ -1,132 +1,67 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 03 Apr 2018 08:49:57 -0700
-Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
- "Stoping" -> "Stopping"
-In-Reply-To: <20180403134540.GA29017@lenoch>
-References: <20180330154420.6903-1-colin.king@canonical.com>
- <20180403134540.GA29017@lenoch>
-Message-ID: <1522770597.11653.49.camel@perches.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Apr 2018 17:53:25 +0200
+Subject: [PATCH 14/15] ARM: pxa: change SSP devices allocation
+In-Reply-To: <87lge4485x.fsf@belgarion.home>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-15-robert.jarzmik@free.fr>
+ <CAK8P3a2hYWO2eweg3zpR7iJoqtH4uxJLAxJAno7L96G7nA2HxQ@mail.gmail.com>
+ <87lge4485x.fsf@belgarion.home>
+Message-ID: <CAK8P3a1ko=YEwR2VOahH0OWHfeOyWAzDYah4DSohBcvTNq_MKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-04-03 at 15:45 +0200, Ladislav Michl wrote:
-> On Fri, Mar 30, 2018 at 04:44:20PM +0100, Colin King wrote:
-> > From: Colin Ian King <colin.king@canonical.com>
-> 
-> Hello Colin,
-> 
-> > Trivial fix to spelling mistake in pr_debug message text
-> 
-> would you mind making this patch a bit less non-trivial and
-> change pr_debug to dev_dbg dropping Atmel_ssc_dai prefix?
+On Tue, Apr 3, 2018 at 5:32 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+> chop chop ... removed several mail recipients to leave only the ASoC / PXA
+> subset ...
+>
+>> On Mon, Apr 2, 2018 at 4:26 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>
+>>>
+>>> +static struct pxa_ssp_info pxa_ssp_infos[] = {
+>>> +       { .dma_chan_rx_name = "ssp1_rx", .dma_chan_tx_name = "ssp1_tx", },
+>>> +       { .dma_chan_rx_name = "ssp1_rx", .dma_chan_tx_name = "ssp1_tx", },
+>>> +       { .dma_chan_rx_name = "ssp2_rx", .dma_chan_tx_name = "ssp2_tx", },
+>>> +       { .dma_chan_rx_name = "ssp2_rx", .dma_chan_tx_name = "ssp2_tx", },
+>>> +       { .dma_chan_rx_name = "ssp3_rx", .dma_chan_tx_name = "ssp3_tx", },
+>>> +       { .dma_chan_rx_name = "ssp3_rx", .dma_chan_tx_name = "ssp3_tx", },
+>>> +       { .dma_chan_rx_name = "ssp4_rx", .dma_chan_tx_name = "ssp4_tx", },
+>>> +       { .dma_chan_rx_name = "ssp4_rx", .dma_chan_tx_name = "ssp4_tx", },
+>>> +};
+>>
+>> This part looks odd to me, you're adding an extra level of indirection to
+>> do two stages of lookups in some form of platform data.
+> That's unfortunately right.
+>
+>> Why can't you just always use "rx" and "tx" as the names here?
+> Well I couldn't. I'll explain you why, and maybe you'll find a better solution.
+>
+> That all is related to how ASoC and SSP interact.
+> If I remember correctly, here is how it works :
+>  - the DMA channel is requested in sound/arm/pxa2xx-pcm-lib.c:128
+>         return snd_dmaengine_pcm_open(
+>                 substream, dma_request_slave_channel(rtd->platform->dev,
+>    The trick is that the device here is _not_ the SSP one, it's if memory serves
+>    me well the pxa-pcm-audio one.
+>
+>    As a consequence, the device cannot be used to differenciate which SSP
+>    exactly is providing the sound samples stream. This information is
+>    nevertheless required to choose the correct requestor line, which is a 1-to-1
+>    match to the SSP port.
+>
+>    The indirection in the channel name is used to choose the correct requestor
+>    line for a given SSP port providing the samples.
+>
+>    It also must be underlined that this dma request serves both AC97 and SSP as
+>    sample providers.
 
-Presumably, then all the pr_<foo> calls should be changed.
-Something like:
----
- sound/soc/atmel/atmel_ssc_dai.c | 38 ++++++++++++++++----------------------
- 1 file changed, 16 insertions(+), 22 deletions(-)
+I'm still unable to follow through that code, but I understand now that
+the device you pass to dma_request_slave_channel() is not the one
+we'd like it to be here.
 
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index a1e2c5682dcd..594228156b2d 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -291,11 +291,10 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
- 	int dir, dir_mask;
- 	int ret;
- 
--	pr_debug("atmel_ssc_startup: SSC_SR=0x%x\n",
--		ssc_readl(ssc_p->ssc->regs, SR));
-+	dev_dbg(dai->dev, "SSC_SR=0x%x\n", ssc_readl(ssc_p->ssc->regs, SR));
- 
- 	/* Enable PMC peripheral clock for this SSC */
--	pr_debug("atmel_ssc_dai: Starting clock\n");
-+	dev_dbg(dai->dev, "Starting clock\n");
- 	clk_enable(ssc_p->ssc->clk);
- 	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk);
- 
-@@ -385,7 +384,7 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
- 	spin_unlock_irq(&ssc_p->lock);
- 
- 	/* Shutdown the SSC clock. */
--	pr_debug("atmel_ssc_dai: Stopping clock\n");
-+	dev_dbg(dai->dev, "Stopping clock\n");
- 	clk_disable(ssc_p->ssc->clk);
- }
- 
-@@ -794,13 +793,12 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 		break;
- 
- 	default:
--		printk(KERN_WARNING "atmel_ssc_dai: unsupported DAI format 0x%x\n",
--			ssc_p->daifmt);
-+		dev_warn(dai->dev, "unsupported DAI format 0x%x\n",
-+			 ssc_p->daifmt);
- 		return -EINVAL;
- 	}
--	pr_debug("atmel_ssc_hw_params: "
--			"RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
--			rcmr, rfmr, tcmr, tfmr);
-+	dev_dbg(dai->dev, "RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
-+		rcmr, rfmr, tcmr, tfmr);
- 
- 	if (!ssc_p->initialized) {
- 		if (!ssc_p->ssc->pdata->use_dma) {
-@@ -818,9 +816,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 		ret = request_irq(ssc_p->ssc->irq, atmel_ssc_interrupt, 0,
- 				ssc_p->name, ssc_p);
- 		if (ret < 0) {
--			printk(KERN_WARNING
--					"atmel_ssc_dai: request_irq failure\n");
--			pr_debug("Atmel_ssc_dai: Stoping clock\n");
-+			dev_warn(dai->dev, "request_irq failure\n");
-+			dev_dbg(dai->dev, "Stopping clock\n");
- 			clk_disable(ssc_p->ssc->clk);
- 			return ret;
- 		}
-@@ -839,7 +836,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 	ssc_writel(ssc_p->ssc->regs, TCMR, tcmr);
- 	ssc_writel(ssc_p->ssc->regs, TFMR, tfmr);
- 
--	pr_debug("atmel_ssc_dai,hw_params: SSC initialized\n");
-+	dev_dbg(dai->dev, "SSC initialized\n");
- 	return 0;
- }
- 
-@@ -862,9 +859,9 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
- 	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
- 	ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
- 
--	pr_debug("%s enabled SSC_SR=0x%08x\n",
--			dir ? "receive" : "transmit",
--			ssc_readl(ssc_p->ssc->regs, SR));
-+	dev_dbg(dai->dev, "%s enabled SSC_SR=0x%08x\n",
-+		dir ? "receive" : "transmit",
-+		ssc_readl(ssc_p->ssc->regs, SR));
- 	return 0;
- }
- 
-@@ -1050,21 +1047,18 @@ static void asoc_ssc_exit(struct device *dev)
- int atmel_ssc_set_audio(int ssc_id)
- {
- 	struct ssc_device *ssc;
--	int ret;
- 
- 	/* If we can grab the SSC briefly to parent the DAI device off it */
- 	ssc = ssc_request(ssc_id);
- 	if (IS_ERR(ssc)) {
- 		pr_err("Unable to parent ASoC SSC DAI on SSC: %ld\n",
--			PTR_ERR(ssc));
-+		       PTR_ERR(ssc));
- 		return PTR_ERR(ssc);
--	} else {
--		ssc_info[ssc_id].ssc = ssc;
- 	}
- 
--	ret = asoc_ssc_init(&ssc->pdev->dev);
-+	ssc_info[ssc_id].ssc = ssc;
- 
--	return ret;
-+	return asoc_ssc_init(&ssc->pdev->dev);
- }
- EXPORT_SYMBOL_GPL(atmel_ssc_set_audio);
- 
+Where exactly does that call to dma_request_chan() happen? Is this
+the one in dmaengine_pcm_new()? Could we perhaps put a
+pointer to the SSP device into snd_dmaengine_dai_dma_data?
+
+       Arnd
