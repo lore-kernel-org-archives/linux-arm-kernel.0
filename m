@@ -1,46 +1,29 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 3 Apr 2018 10:50:24 +0200
-Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
- "Stopping"
-In-Reply-To: <20180331085420.GE14180@piout.net>
-References: <20180330154420.6903-1-colin.king@canonical.com>
- <20180331085420.GE14180@piout.net>
-Message-ID: <051e667b-6a62-1c9c-344f-c1aed341fe8d@microchip.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 3 Apr 2018 16:51:25 +0800
+Subject: [PATCH v5 10/13] ARM: sun9i: smp: Move structures
+In-Reply-To: <20180403084745.zuq6o3tlxpvcynev@flea>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-11-mylene.josserand@bootlin.com>
+ <20180403084745.zuq6o3tlxpvcynev@flea>
+Message-ID: <CAGb2v66QTGkMC21SS-zAbToVcmOp3oO4YMbvC5SyWwA2kP8uGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/2018 at 10:54, Alexandre Belloni wrote:
-> On 30/03/2018 at 16:44:20 +0100, Colin King wrote:
->> From: Colin Ian King <colin.king@canonical.com>
+On Tue, Apr 3, 2018 at 4:47 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Tue, Apr 03, 2018 at 08:18:33AM +0200, Myl?ne Josserand wrote:
+>> To prepare the support for sun8i-a83t, move some structures
+>> at the beginning of the file.
 >>
->> Trivial fix to spelling mistake in pr_debug message text
->>
-> Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+>> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+>
+> I'm not quite sure what would be the benefit from that, if it's was
+> working before, then it would probably work in your case as welle, right?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->> Signed-off-by: Colin Ian King <colin.king@canonical.com>
->> ---
->>   sound/soc/atmel/atmel_ssc_dai.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
->> index a1e2c5682dcd..1c7af0ca98ec 100644
->> --- a/sound/soc/atmel/atmel_ssc_dai.c
->> +++ b/sound/soc/atmel/atmel_ssc_dai.c
->> @@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->>   		if (ret < 0) {
->>   			printk(KERN_WARNING
->>   					"atmel_ssc_dai: request_irq failure\n");
->> -			pr_debug("Atmel_ssc_dai: Stoping clock\n");
->> +			pr_debug("Atmel_ssc_dai: Stopping clock\n");
->>   			clk_disable(ssc_p->ssc->clk);
->>   			return ret;
->>   		}
->> -- 
->> 2.15.1
->>
-> 
+You should only need to move struct sunxi_mc_smp_data, since you are reading
+the is_sun9i field. I suppose you could also get away with adding a global
+variable just for that, and not have to store an index or pointer. Then none
+of this code movement would be necessary. It would be slightly harder to
+understand, but it's still contained within this file, and it has a clear
+purpose, so I would call that acceptable.
 
-
--- 
-Nicolas Ferre
+ChenYu
