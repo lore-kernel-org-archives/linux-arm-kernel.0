@@ -1,97 +1,91 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 3 Apr 2018 17:08:42 +0200
-Subject: [PATCH 00/15] ARM: pxa: switch to DMA slave maps
-In-Reply-To: <20180402142656.26815-1-robert.jarzmik@free.fr>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 03 Apr 2018 17:18:49 +0200
+Subject: [PATCH 02/15] ARM: pxa: add dma slave map
+In-Reply-To: <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
+ (Arnd Bergmann's message of "Tue, 3 Apr 2018 08:51:37 +0200")
 References: <20180402142656.26815-1-robert.jarzmik@free.fr>
-Message-ID: <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
+ <20180402142656.26815-3-robert.jarzmik@free.fr>
+ <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
+Message-ID: <87tvss48ti.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2018 at 16:26, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Hi,
->
-> This serie is aimed at removing the dmaengine slave compat use, and transfer
-> knowledge of the DMA requestors into architecture code.
->
-> This was discussed/advised by Arnd a couple of years back, it's almost time.
->
-> The serie is divided in 3 phasees :
->  - phase 1 : patch 1/15 and patch 2/15
->    => this is the preparation work
->  - phase 2 : patches 3/15 .. 10/15
->    => this is the switch of all the drivers
->    => this one will require either an Ack of the maintainers or be taken by them
->       once phase 1 is merged
->  - phase 3 : patches 11/15
->    => this is the last part, cleanup and removal of export of the DMA filter
->       function
->
-> As this looks like a patch bomb, each maintainer expressing for his tree either
-> an Ack or "I want to take through my tree" will be spared in the next iterations
-> of this serie.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Perhaps an option is to send this hole series as PR for 3.17 rc1, that
-would removed some churns and make this faster/easier? Well, if you
-receive the needed acks of course.
+>> +       { "smc911x.0", "rx", PDMA_FILTER_PARAM(LOWEST, -1) },
+>> +       { "smc911x.0", "tx", PDMA_FILTER_PARAM(LOWEST, -1) },
+>> +       { "smc91x.0", "data", PDMA_FILTER_PARAM(LOWEST, -1) },
+>
+> This one is interesting, as you are dealing with an off-chip device,
+> and the channel number is '-'1. How does this even work? Does it
+> mean
 
-For the mmc change:
+This relies on pxa_dma, in which the "-1" for a requestor line means "no
+requestor" or said in another way "always requesting". As a consequence, as soon
+as the DMA descriptors are queued, the transfer begins, and it is supposed
+implicitely that the FIFO output availability is at least as quick as the system
+bus and the DMA size is perfectly fit for the FIFO available bytes.
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-Kind regards
-Uffe
+This is what has been the underlying of DMA transfers of smc91x(x) on the PXA
+platforms, where the smc91x(s) are directly wired on the system bus (the same
+bus having DRAM, SRAM, IO-mapped devices).
 
 >
-> Several of these changes have been tested on actual hardware, including :
->  - pxamci
->  - pxa_camera
->  - smc*
->  - ASoC and SSP
+>> +       /* PXA25x specific map */
+>> +       { "pxa25x-ssp.0", "rx", PDMA_FILTER_PARAM(LOWEST, 13) },
+>> +       { "pxa25x-ssp.0", "tx", PDMA_FILTER_PARAM(LOWEST, 14) },
+>> +       { "pxa25x-nssp.1", "rx", PDMA_FILTER_PARAM(LOWEST, 15) },
+>> +       { "pxa25x-nssp.1", "tx", PDMA_FILTER_PARAM(LOWEST, 16) },
+>> +       { "pxa25x-nssp.2", "rx", PDMA_FILTER_PARAM(LOWEST, 23) },
+>> +       { "pxa25x-nssp.2", "tx", PDMA_FILTER_PARAM(LOWEST, 24) },
+>> +       { "pxa-pcm-audio", "nssp2_rx", PDMA_FILTER_PARAM(LOWEST, 15) },
+>> +       { "pxa-pcm-audio", "nssp2_tx", PDMA_FILTER_PARAM(LOWEST, 16) },
+>> +       { "pxa-pcm-audio", "nssp3_rx", PDMA_FILTER_PARAM(LOWEST, 23) },
+>> +       { "pxa-pcm-audio", "nssp3_tx", PDMA_FILTER_PARAM(LOWEST, 24) },
+>> +
+>> +       /* PXA27x specific map */
+>> +       { "pxa-pcm-audio", "ssp3_rx", PDMA_FILTER_PARAM(LOWEST, 66) },
+>> +       { "pxa-pcm-audio", "ssp3_tx", PDMA_FILTER_PARAM(LOWEST, 67) },
+>> +       { "pxa27x-camera.0", "CI_Y", PDMA_FILTER_PARAM(HIGHEST, 68) },
+>> +       { "pxa27x-camera.0", "CI_U", PDMA_FILTER_PARAM(HIGHEST, 69) },
+>> +       { "pxa27x-camera.0", "CI_V", PDMA_FILTER_PARAM(HIGHEST, 70) },
+>> +
+>> +       /* PXA3xx specific map */
+>> +       { "pxa-pcm-audio", "ssp4_rx", PDMA_FILTER_PARAM(LOWEST, 2) },
+>> +       { "pxa-pcm-audio", "ssp4_tx", PDMA_FILTER_PARAM(LOWEST, 3) },
+>> +       { "pxa2xx-mci.1", "rx", PDMA_FILTER_PARAM(LOWEST, 93) },
+>> +       { "pxa2xx-mci.1", "tx", PDMA_FILTER_PARAM(LOWEST, 94) },
+>> +       { "pxa3xx-nand", "data", PDMA_FILTER_PARAM(LOWEST, 97) },
+>> +       { "pxa2xx-mci.2", "rx", PDMA_FILTER_PARAM(LOWEST, 100) },
+>> +       { "pxa2xx-mci.2", "tx", PDMA_FILTER_PARAM(LOWEST, 101) },
+>> +};
 >
-> Happy review.
->
-> Robert Jarzmik (15):
->   dmaengine: pxa: use a dma slave map
->   ARM: pxa: add dma slave map
->   mmc: pxamci: remove the dmaengine compat need
->   media: pxa_camera: remove the dmaengine compat need
->   mtd: nand: pxa3xx: remove the dmaengine compat need
->   net: smc911x: remove the dmaengine compat need
->   net: smc91x: remove the dmaengine compat need
->   ASoC: pxa: remove the dmaengine compat need
->   net: irda: pxaficp_ir: remove the dmaengine compat need
->   ata: pata_pxa: remove the dmaengine compat need
->   dmaengine: pxa: document pxad_param
->   dmaengine: pxa: make the filter function internal
->   ARM: pxa: remove the DMA IO resources
->   ARM: pxa: change SSP devices allocation
->   ARM: pxa: change SSP DMA channels allocation
->
->  arch/arm/mach-pxa/devices.c               | 269 ++++++++++++++----------------
->  arch/arm/mach-pxa/devices.h               |  14 +-
->  arch/arm/mach-pxa/include/mach/audio.h    |  12 ++
->  arch/arm/mach-pxa/pxa25x.c                |   4 +-
->  arch/arm/mach-pxa/pxa27x.c                |   4 +-
->  arch/arm/mach-pxa/pxa3xx.c                |   5 +-
->  arch/arm/plat-pxa/ssp.c                   |  50 +-----
->  drivers/ata/pata_pxa.c                    |  10 +-
->  drivers/dma/pxa_dma.c                     |  13 +-
->  drivers/media/platform/pxa_camera.c       |  22 +--
->  drivers/mmc/host/pxamci.c                 |  29 +---
->  drivers/mtd/nand/pxa3xx_nand.c            |  10 +-
->  drivers/net/ethernet/smsc/smc911x.c       |  16 +-
->  drivers/net/ethernet/smsc/smc91x.c        |  12 +-
->  drivers/net/ethernet/smsc/smc91x.h        |   1 -
->  drivers/staging/irda/drivers/pxaficp_ir.c |  14 +-
->  include/linux/dma/pxa-dma.h               |  20 +--
->  include/linux/platform_data/mmp_dma.h     |   4 +
->  include/linux/pxa2xx_ssp.h                |   4 +-
->  sound/arm/pxa2xx-ac97.c                   |  14 +-
->  sound/arm/pxa2xx-pcm-lib.c                |   6 +-
->  sound/soc/pxa/pxa-ssp.c                   |   5 +-
->  sound/soc/pxa/pxa2xx-ac97.c               |  32 +---
->  23 files changed, 196 insertions(+), 374 deletions(-)
->
-> --
-> 2.11.0
->
+> Since more than half the entries in here are chip specific, maybe it would be
+> better to split that table into three and have a copy for each one in
+> arch/arm/mach-pxa/pxa{25x.27x.3xx}.c?
+Mmmh, today the split is :
+ - 16 common entries
+ - 10 pxa25x specific entries
+ - 5 pxa27x specific entries
+ - 7 pxa3xx specific entries
+ => total of 38 lines
+
+After the split we'll have :
+ - 26 pxa25x specific entries
+ - 21 pxa27x specific entries
+ - 23 pxa3xx specific entries
+ => total of 70 lines
+
+That doubles the number of lines, not counting the declarations, and amending of
+pxa2xx_set_dmac_info().
+
+If you think it's worth it, what is the driving benefit behind ?
+
+> Does that mean it's actually a memory-to-memory transfer with a device being
+> on the external SRAM interface?
+I'm taking this is the follow up to the "-1" question :0
+
+Cheers.
+
+-- 
+Robert
