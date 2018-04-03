@@ -1,67 +1,94 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 2 Apr 2018 22:29:53 -0400
-Subject: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
- weakly-ordered archs #2
-In-Reply-To: <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
-References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
- <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <ac46b4e4-7e6c-c15f-06eb-01b1e4893d50@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 3 Apr 2018 08:11:50 +0530
+Subject: [PATCH v4 13/14] dt-bindings: cpufreq: Document
+ operating-points-v2-kryo-cpu
+In-Reply-To: <7ca35b7a-6078-620b-4772-091e53ef6790@codeaurora.org>
+References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+ <1522358807-10413-14-git-send-email-ilialin@codeaurora.org>
+ <20180402093018.GC3572@vireshk-i7>
+ <7ca35b7a-6078-620b-4772-091e53ef6790@codeaurora.org>
+Message-ID: <06308b25-14ea-8d8b-6f95-f05c101a617b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/22/2018 12:26 PM, Sinan Kaya wrote:
-> @@ -860,7 +860,7 @@ static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
->  	wmb();
->  	cq->db.data.agg_flags = flags;
->  	cq->db.data.value = cpu_to_le32(cons);
-> -	writeq(cq->db.raw, cq->db_addr);
-> +	writeq_relaxed(cq->db.raw, cq->db_addr);
+Hi Viresh,
 
-Given the direction to get rid of wmb() in front of writeX() functions, I have been
-reviewing this code. Under normal circumstances, I can get rid of all wmb() as follows.
+On 4/2/2018 8:37 PM, Sricharan R wrote:
+> Hi Viresh,
+> 
+> On 4/2/2018 3:00 PM, Viresh Kumar wrote:
+>> +Sricharan,
+>>
+>> On 30-03-18, 00:26, Ilia Lin wrote:
+>>> In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
+>>> that have KRYO processors, the CPU ferequencies subset and voltage value
+>>> of each OPP varies based on the silicon variant in use.
+>>> Qualcomm Technologies, Inc. Process Voltage Scaling Tables
+>>> defines the voltage and frequency value based on the msm-id in SMEM
+>>> and speedbin blown in the efuse combination.
+>>> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
+>>> to provide the OPP framework with required information.
+>>> This is used to determine the voltage and frequency value for each OPP of
+>>> operating-points-v2 table when it is parsed by the OPP framework.
+>>>
+>>> This change adds documentation.
+>>>
+>>> Change-Id: I1953f652a48249fb516d175f0e965a9510cd4209
+>>> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+>>> ---
+>>>  .../devicetree/bindings/cpufreq/kryo-cpufreq.txt   | 693 +++++++++++++++++++++
+>>>  1 file changed, 693 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+>>
+>> This should really go in opp directory.
+>>
+>>> new file mode 100644
+>>> index 0000000..20cef9d
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
+>>> @@ -0,0 +1,693 @@
+>>> +Qualcomm Technologies, Inc. KRYO CPUFreq and OPP bindings
+>>> +===================================
+>>> +
+>>> +In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
+>>> +that have KRYO processors, the CPU ferequencies subset and voltage value
+>>> +of each OPP varies based on the silicon variant in use.
+>>> +Qualcomm Technologies, Inc. Process Voltage Scaling Tables
+>>> +defines the voltage and frequency value based on the msm-id in SMEM
+>>> +and speedbin blown in the efuse combination.
+>>> +The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
+>>> +to provide the OPP framework with required information (existing HW bitmap).
+>>> +This is used to determine the voltage and frequency value for each OPP of
+>>> +operating-points-v2 table when it is parsed by the OPP framework.
+>>> +
+>>> +Required properties:
+>>> +--------------------
+>>> +In 'cpus' nodes:
+>>> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
+>>> +
+>>> +In 'operating-points-v2' table:
+>>> +- compatible: Should be
+>>> +	- 'operating-points-v2-kryo-cpu' for apq8096 and msm8996.
+>>> +- nvmem-cells: A phandle pointing to a nvmem-cells node representing the
+>>> +		efuse registers that has information about the
+>>> +		speedbin that is used to select the right frequency/voltage
+>>> +		value pair.
+>>> +		Please refer the for nvmem-cells
+>>> +		bindings Documentation/devicetree/bindings/nvmem/nvmem.txt
+>>> +		and also examples below.
+>>
+>> Sricharan is also working on adding these, just make sure you guys do the same
+>> thing..
+>>
+ Right, i was adding a similar one for krait cores [1]. There is code common in the
+ init sequence across both (little). Do you suggest to make them common ?
 
-However, I started having my doubts now. Are these wmb() used as a SMP barrier too?
-I can't find any smp_Xmb() in drivers/infiniband/hw/qedr directory.
+Regards,
+ Sricharan
 
-static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
- {
--       /* Flush data before signalling doorbell */
--       wmb();
-        cq->db.data.agg_flags = flags;
-        cq->db.data.value = cpu_to_le32(cons);
-        writeq(cq->db.raw, cq->db_addr);
-@@ -1870,8 +1868,7 @@ static int qedr_update_qp_state(struct qedr_dev *dev,
-                         */
-
-                        if (rdma_protocol_roce(&dev->ibdev, 1)) {
--                               wmb();
--                               writel_relaxed(qp->rq.db_data.raw, qp->rq.db);
-+                               writel(qp->rq.db_data.raw, qp->rq.db);
-                                /* Make sure write takes effect */
-                                mmiowb();
-                        }
-@@ -3275,8 +3272,7 @@ int qedr_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
-         * unchanged). For performance reasons we avoid checking for this
-         * redundant doorbell.
-         */
--       wmb();
--       writel_relaxed(qp->sq.db_data.raw, qp->sq.db);
-+       writel(qp->sq.db_data.raw, qp->sq.db);
-
-        /* Make sure write sticks */
-        mmiowb();
-@@ -3362,9 +3358,6 @@ int qedr_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
-
-                qedr_inc_sw_prod(&qp->rq);
-
--               /* Flush all the writes before signalling doorbell */
--               wmb();
-
-
-
-
+ [1] https://patchwork.kernel.org/patch/10261873/
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
