@@ -1,54 +1,31 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 3 Apr 2018 15:58:41 +0100
-Subject: [PATCH v2 11/17] kvm: arm64: Configure VTCR per VM
-In-Reply-To: <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <be9e8c47-8366-2d8f-8d8d-b8d2f978107b@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 3 Apr 2018 17:01:39 +0200
+Subject: [PATCH v6 0/3] add support for Socionext SynQuacer I2C controller
+In-Reply-To: <20180325110747.8852-1-ard.biesheuvel@linaro.org>
+References: <20180325110747.8852-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180403150139.l7oec4doafmsidfp@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
 
-On 27/03/18 14:15, Suzuki K Poulose wrote:
-> We set VTCR_EL2 very early during the stage2 init and don't
-> touch it ever. This is fine as we had a fixed IPA size. This
-> patch changes the behavior to set the VTCR for a given VM,
-> depending on its stage2 table. The common configuration for
-> VTCR is still performed during the early init as we have to
-> retain the hardware access flag update bits (VTCR_EL2_HA)
-> per CPU (as they are only set for the CPUs which are capabile).
+> - switch to generic recovery using minimal helpers to drive the SDA/SCL lines
+>   directly
 
-(Nit: capable)
+If you had added this incrementally, reviewing would have been easier (=
+faster). The callbacks look okay...
 
+> - don't recover on every error
 
-> The bits defining the number of levels in the page table (SL0)
-> and and the size of the Input address to the translation (T0SZ)
-> are programmed for each VM upon entry to the guest.
+... but you are now never recovering. You don't call i2c_recover_bus().
 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 870f4b1..5ccd3ae 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -164,6 +164,12 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
->  static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
->  {
->  	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
-> +	u64 vtcr = read_sysreg(vtcr_el2);
-> +
-> +	vtcr &= ~VTCR_EL2_PRIVATE_MASK;
-> +	vtcr |= VTCR_EL2_SL0(kvm_stage2_levels(kvm)) |
-> +		VTCR_EL2_T0SZ(kvm_phys_shift(kvm));
-> +	write_sysreg(vtcr, vtcr_el2);
->  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
->  }
+> - add patch to sanity check i2c_transfer() arguments in core code (#3)
 
-Do we need to set this register for tlb maintenance too?
-e.g. tlbi for a 3-level-stage2 vm when a 2-level-stage2 vm's vtcr is loaded...
+See small comment there.
 
-(The ARM-ARM has 'Any of the bits of VTCR_EL2 are permitted to be cached in a TLB'.)
-
-
-Thanks,
-
-James
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/817d23e9/attachment.sig>
