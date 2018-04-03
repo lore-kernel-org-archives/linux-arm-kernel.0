@@ -1,29 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 3 Apr 2018 16:48:41 +0800
-Subject: [PATCH v5 11/13] ARM: sun9i: smp: Add is_sun9i field
-In-Reply-To: <20180403084655.x6u7s4jzqdvq2eey@flea>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-12-mylene.josserand@bootlin.com>
- <20180403084655.x6u7s4jzqdvq2eey@flea>
-Message-ID: <CAGb2v67EzOHd5_Xj9K3ZuAKVZhA4WrwfTM0gE_eR+H4mF1J4eA@mail.gmail.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 3 Apr 2018 10:50:24 +0200
+Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
+ "Stopping"
+In-Reply-To: <20180331085420.GE14180@piout.net>
+References: <20180330154420.6903-1-colin.king@canonical.com>
+ <20180331085420.GE14180@piout.net>
+Message-ID: <051e667b-6a62-1c9c-344f-c1aed341fe8d@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 3, 2018 at 4:46 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> On Tue, Apr 03, 2018 at 08:18:34AM +0200, Myl?ne Josserand wrote:
->> To prepare the support of sun8i-a83t, add a field in the smp_data
->> structure to enable the case of sun9i.
+On 31/03/2018 at 10:54, Alexandre Belloni wrote:
+> On 30/03/2018 at 16:44:20 +0100, Colin King wrote:
+>> From: Colin Ian King <colin.king@canonical.com>
 >>
->> Start to handle the differences between sun9i-a80 and sun8i-a83t
->> by using this variable.
+>> Trivial fix to spelling mistake in pr_debug message text
 >>
->> Add an index to retrieve which structures we are using.
->
-> This should have been in a separate commit, but maybe we can store a
-> pointer to the array cell we're using instead of always using the
-> index?
+> Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
-Using a pointer would also avoid some of the code movement from the
-previous patch.
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+>> ---
+>>   sound/soc/atmel/atmel_ssc_dai.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+>> index a1e2c5682dcd..1c7af0ca98ec 100644
+>> --- a/sound/soc/atmel/atmel_ssc_dai.c
+>> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+>> @@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>>   		if (ret < 0) {
+>>   			printk(KERN_WARNING
+>>   					"atmel_ssc_dai: request_irq failure\n");
+>> -			pr_debug("Atmel_ssc_dai: Stoping clock\n");
+>> +			pr_debug("Atmel_ssc_dai: Stopping clock\n");
+>>   			clk_disable(ssc_p->ssc->clk);
+>>   			return ret;
+>>   		}
+>> -- 
+>> 2.15.1
+>>
+> 
 
-ChenYu
+
+-- 
+Nicolas Ferre
