@@ -1,35 +1,55 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 3 Apr 2018 20:45:59 +0200
-Subject: [PATCH v6 0/3] add support for Socionext SynQuacer I2C controller
-In-Reply-To: <CAKv+Gu_GTmCr8att-_iQ5rD64gvaQC2FJ3cAmYpqRqp_OqPcAg@mail.gmail.com>
-References: <20180325110747.8852-1-ard.biesheuvel@linaro.org>
- <20180403150139.l7oec4doafmsidfp@ninjato>
- <CAKv+Gu9cqQqq_etTSvdBp4Jjk5O_0FePe74phDqt5EO6Cm-_vQ@mail.gmail.com>
- <20180403181216.f22vtkqrnxjgreuo@ninjato>
- <CAKv+Gu8R19T+9O2tODQeS9vtKANmBXgGcavkRdVRU0NmVtHn2w@mail.gmail.com>
- <20180403183219.htbg3w6mejmysoel@ninjato>
- <CAKv+Gu_GTmCr8att-_iQ5rD64gvaQC2FJ3cAmYpqRqp_OqPcAg@mail.gmail.com>
-Message-ID: <20180403184559.z5lixuheqd4ojoti@ninjato>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Tue, 3 Apr 2018 20:54:23 +0200
+Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
+ "Stoping" -> "Stopping"
+In-Reply-To: <1522779423.11653.63.camel@perches.com>
+References: <20180330154420.6903-1-colin.king@canonical.com>
+ <20180403134540.GA29017@lenoch>
+ <1522770597.11653.49.camel@perches.com>
+ <20180403173044.GA6031@lenoch>
+ <1522779423.11653.63.camel@perches.com>
+Message-ID: <20180403185423.GA8683@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 03, 2018 at 11:17:03AM -0700, Joe Perches wrote:
+> On Tue, 2018-04-03 at 19:30 +0200, Ladislav Michl wrote:
+> > On Tue, Apr 03, 2018 at 08:49:57AM -0700, Joe Perches wrote:
+> > > On Tue, 2018-04-03 at 15:45 +0200, Ladislav Michl wrote:
+> > > > On Fri, Mar 30, 2018 at 04:44:20PM +0100, Colin King wrote:
+> > > > > From: Colin Ian King <colin.king@canonical.com>
+> > > > 
+> > > > Hello Colin,
+> > > > 
+> > > > > Trivial fix to spelling mistake in pr_debug message text
+> > > > 
+> > > > would you mind making this patch a bit less non-trivial and
+> > > > change pr_debug to dev_dbg dropping Atmel_ssc_dai prefix?
+> > > 
+> > > Presumably, then all the pr_<foo> calls should be changed.
+> > Yes, that's what non-trivial means here :)
+> 
+> More useful would be less specific originally.
+> 
+> > > diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+> []
+> > > @@ -1050,21 +1047,18 @@ static void asoc_ssc_exit(struct device *dev)
+> > >  int atmel_ssc_set_audio(int ssc_id)
+> > >  {
+> > >  	struct ssc_device *ssc;
+> > > -	int ret;
+> > >  
+> > >  	/* If we can grab the SSC briefly to parent the DAI device off it */
+> > >  	ssc = ssc_request(ssc_id);
+> > >  	if (IS_ERR(ssc)) {
+> > >  		pr_err("Unable to parent ASoC SSC DAI on SSC: %ld\n",
+> > > -			PTR_ERR(ssc));
+> > > +		       PTR_ERR(ssc));
+> > 
+> > Well, these are usefull, but unrelated changes. But while there, above
+> > pr_error deserves to be replaced with dev_err as well.
+> 
+> No  dai device.
 
-> We don't have suspend/resume support yet for this SoC, so I haven't
-> been able to try that. Also, the clocks are fixed in this particular
-> implementation, so the clk_xxx() calls don't actually do anything.
-
-Then please remove that, too! Good that I asked...
-
-Frankly, not nice to make me review untested code without mentioning
-that fact somewhere :(
-
-BTW are you willing to maintain this driver? Then an entry for
-MAINTAINERS would be needed.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/e82bfbf3/attachment.sig>
+As all call sites are already providing error message, so what about just
+removing this one completely?
