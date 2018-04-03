@@ -1,204 +1,59 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 3 Apr 2018 18:26:51 +0800
-Subject: [PATCH] ARM64: dts: meson-axg: enable the eMMC controller
-Message-ID: <20180403102651.60340-1-yixun.lan@amlogic.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 3 Apr 2018 15:56:32 +0530
+Subject: [PATCH v8 25/42] ARM: davinci: dm644x: add new clock init using
+ common clock framework
+In-Reply-To: <1521168778-27236-26-git-send-email-david@lechnology.com>
+References: <1521168778-27236-1-git-send-email-david@lechnology.com>
+ <1521168778-27236-26-git-send-email-david@lechnology.com>
+Message-ID: <333f49c7-bafd-8e2d-65e9-7d1aff4836de@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nan Li <nan.li@amlogic.com>
+On Friday 16 March 2018 08:22 AM, David Lechner wrote:
+> +static struct resource dm644x_pll1_resources[] = {
+> +	{
+> +		.start	= DAVINCI_PLL1_BASE,
+> +		.end	= DAVINCI_PLL1_BASE + SZ_4K - 1,
 
-The IP of eMMC controller in AXG is similiar to Meson-GX series.
-Here we add the initial support of the HS200 mode with
-clock running at 166MHz (to be safe), since we found some eMMC chip
-fail to run at 200MHz due to tunning phase error.
+The .end should be DAVINCI_PLL1_BASE + SZ_1K - 1, otherwise it prevents
+PLL2 from getting registered.
 
-Signed-off-by: Nan Li <nan.li@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +};
+> +
+> +static struct platform_device dm644x_pll1_device = {
+> +	.name		= "dm644x-pll1",
+> +	.id		= -1,
+> +	.resource	= dm644x_pll1_resources,
+> +	.num_resources	= ARRAY_SIZE(dm644x_pll1_resources),
+> +};
+> +
+> +static struct resource dm644x_pll2_resources[] = {
+> +	{
+> +		.start	= DAVINCI_PLL2_BASE,
+> +		.end	= DAVINCI_PLL2_BASE + SZ_4K - 1,
 
----
-Hi Kevin
-  Please note this patch actually depend on the eMMC driver here [0].
-  Still a few problem to solve, to improve the tuning phase driver to make
-the clock running at 200MHz, and to further support the HS400 mode.
-Anyway, this patch itself is quite independent.
+And this too should be fixed, else it prevents the PSC from getting
+registered.
 
-[0] http://lkml.kernel.org/r/20180403100652.41056-1-yixun.lan at amlogic.com
----
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 58 ++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 81 ++++++++++++++++++++++++++
- 2 files changed, 139 insertions(+)
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +};
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index 57eedced5a51..f67d4e47e641 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -15,6 +15,44 @@
- 		serial0 = &uart_AO;
- 		serial1 = &uart_A;
- 	};
-+
-+	vddio_boot: regulator-vddio_boot {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_BOOT";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vddao_3v3: regulator-vddao_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDAO_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vddio_ao18: regulator-vddio_ao18 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_AO18";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vcc_3v3: regulator-vcc_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-+	};
- };
- 
- &ethmac {
-@@ -47,3 +85,23 @@
- 	pinctrl-0 = <&i2c1_z_pins>;
- 	pinctrl-names = "default";
- };
-+
-+/* emmc storage */
-+&sd_emmc_c {
-+	status = "okay";
-+	pinctrl-0 = <&emmc_pins>;
-+	pinctrl-1 = <&emmc_clk_gate_pins>;
-+	pinctrl-names = "default", "clk-gate";
-+
-+	bus-width = <8>;
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
-+	max-frequency = <180000000>;
-+	non-removable;
-+	disable-wp;
-+	mmc-ddr-1_8v;
-+	mmc-hs200-1_8v;
-+
-+	vmmc-supply = <&vcc_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index b58808eb3cc8..52d65643d4b7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -113,6 +113,36 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		apb: apb at ffe00000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xffe00000 0x0 0x200000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xffe00000 0x0 0x200000>;
-+
-+			sd_emmc_b: sd at 5000 {
-+				compatible = "amlogic,meson-axg-mmc";
-+				reg = <0x0 0x5000 0x0 0x2000>;
-+				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
-+				status = "disabled";
-+				clocks = <&clkc CLKID_SD_EMMC_B>,
-+					<&clkc CLKID_SD_EMMC_B_CLK0>,
-+					<&clkc CLKID_FCLK_DIV2>;
-+				clock-names = "core", "clkin0", "clkin1";
-+			};
-+
-+			sd_emmc_c: mmc at 7000 {
-+				compatible = "amlogic,meson-axg-mmc";
-+				reg = <0x0 0x7000 0x0 0x2000>;
-+				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
-+				status = "disabled";
-+				clocks = <&clkc CLKID_SD_EMMC_C>,
-+					<&clkc CLKID_SD_EMMC_C_CLK0>,
-+					<&clkc CLKID_FCLK_DIV2>;
-+				clock-names = "core", "clkin0", "clkin1";
-+			};
-+		};
-+
- 		cbus: bus at ffd00000 {
- 			compatible = "simple-bus";
- 			reg = <0x0 0xffd00000 0x0 0x25000>;
-@@ -309,6 +339,57 @@
- 					gpio-ranges = <&pinctrl_periphs 0 0 86>;
- 				};
- 
-+				emmc_pins: emmc {
-+					mux {
-+						groups = "emmc_nand_d0",
-+							"emmc_nand_d1",
-+							"emmc_nand_d2",
-+							"emmc_nand_d3",
-+							"emmc_nand_d4",
-+							"emmc_nand_d5",
-+							"emmc_nand_d6",
-+							"emmc_nand_d7",
-+							"emmc_clk",
-+							"emmc_cmd",
-+							"emmc_ds";
-+						function = "emmc";
-+					};
-+				};
-+
-+				emmc_clk_gate_pins: emmc_clk_gate {
-+					mux {
-+						groups = "BOOT_8";
-+						function = "gpio_periphs";
-+					};
-+					cfg-pull-down {
-+						pins = "BOOT_8";
-+						bias-pull-down;
-+					};
-+				};
-+
-+				sdio_pins: sdio {
-+					mux {
-+						groups = "sdio_d0",
-+							"sdio_d1",
-+							"sdio_d2",
-+							"sdio_d3",
-+							"sdio_cmd",
-+							"sdio_clk";
-+						function = "sdio";
-+					};
-+				};
-+
-+				sdio_clk_gate_pins: sdio_clk_gate {
-+					mux {
-+						groups = "GPIOX_4";
-+						function = "gpio_periphs";
-+					};
-+					cfg-pull-down {
-+						pins = "GPIOX_4";
-+						bias-pull-down;
-+					};
-+				};
-+
- 				eth_rmii_x_pins: eth-x-rmii {
- 					mux {
- 						groups = "eth_mdio_x",
--- 
-2.16.2
+With these fixed, I still had to enable 'clk_ignore_unused' on DM644x
+EVM to get to NFS boot. I think root of the problem is that pm_runtime()
+APIs are not working in the legacy boot mode.
+
+This can be seen even on the DA850 LCDK in legacy boot. pm_genpd_summary
+in debugfs shows all domains are off and there are no devices registered
+under the "da850-psc1: emac" domain. NFS mounting still works on the
+DA850 LCDK because clk_summary shows enable and prepare count of 4 for
+emac. Not sure how that's happening. But on DM644x EVM, the emac clock
+enable count is 0.
+
+Still looking at whats going wrong here. I am testing your v8 branch
+with clk-davinci branch from clk-next merged to get the fixes Stephen made.
+
+Thanks,
+Sekhar
