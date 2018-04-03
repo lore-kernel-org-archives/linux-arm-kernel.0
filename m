@@ -1,64 +1,90 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 3 Apr 2018 11:13:07 +0530
-Subject: [PATCH v8 42/42] ARM: dts: da850: Add clocks
-In-Reply-To: <5502d0ee-b5dc-e90a-a041-882350c7d339@lechnology.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-43-git-send-email-david@lechnology.com>
- <cf0c4153-b65d-da57-cd0f-0a16cb186377@lechnology.com>
- <510309d2-2df0-a915-a6f6-082b41c6b28b@ti.com>
- <5502d0ee-b5dc-e90a-a041-882350c7d339@lechnology.com>
-Message-ID: <82917652-8be2-75f5-f3fc-814ee7c3f51d@ti.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 3 Apr 2018 07:59:31 +0200
+Subject: [PATCH RESEND v6 0/6] provide power off support for iMX6 with
+ external PMIC
+In-Reply-To: <20180305102524.5905-1-o.rempel@pengutronix.de>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+Message-ID: <54c5cb44-b2d9-3dab-59d5-a6a73a957e8c@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 April 2018 09:45 PM, David Lechner wrote:
-> On 04/02/2018 06:12 AM, Sekhar Nori wrote:
->> On Friday 16 March 2018 10:50 PM, David Lechner wrote:
->>> On 03/15/2018 09:52 PM, David Lechner wrote:
->>>> This adds clock provider nodes for da850 and wires them up to all of
->>>> the
->>>> devices.
->>>>
->>>> Signed-off-by: David Lechner <david@lechnology.com>
->>>> ---
->>>
->>> ...
->>>
->>> This is the mcasp0: mcasp at 100000 node...
->>>
->>>> @@ -560,6 +720,7 @@
->>>> ?????????????? dmas = <&edma0 1 1>,
->>>> ?????????????????? <&edma0 0 1>;
->>>> ?????????????? dma-names = "tx", "rx";
->>>> +??????????? clocks = <&psc1 7>;
->>>
->>> After some testing, it looks like it needs to be:
->>>
->>> +??????????? power-domains = <&psc1 7>;
->>>
->>> instead of
->>>
->>> +??????????? clocks = <&psc1 7>;
->>
->> We should probably have both clocks and power-domains properties for all
->> PSC clocks. This way, the driver can change without a corresponding DT
->> update dependency.
->>
->> Thanks,
->> Sekhar
->>
+ping,
+
+this week is a merge window. Any chance to get it in to 4.17?
+
+On 05.03.2018 11:25, Oleksij Rempel wrote:
+> This patch series is providing power off support for Freescale/NXP iMX6 based
+> boards with external power management integrated circuit (PMIC).
+> As a first step the PMIC is configured to turn off the system if the
+> standby pin is asserted. On second step we assert the standby pin.
+> For this reason we need to use pm_power_off_prepare.
 > 
-> That's fine with me. I just didn't know how people felt about using
-> properties
-> that are not documented.
+> Usage of stnadby pin for power off is described in official iMX6
+> documentation.
+> 
+> 2018.03.05:
+> As this patch set touches multiple subsystems I think it would make
+> sense for Shawn Guo to take the all patch set.
+> The only part which didn't receive an ACK is regulator stuff. So I would
+> hope that Mark Brown can ACK it.
+> 
+> Kind regards,
+> Oleksij Rempel
+> 
+> 2017.12.06:
+> Adding Linus. Probably there is no maintainer for this patch set.
+> No changes are made, tested on v4.15-rc1.
+> 
+> 2017.10.27:
+> Last version of this patch set was send at 20 Jun 2017, this is a rebase against
+> kernel v4.14-rc6. Probably this set got lost. If I forgot to address some comments,
+> please point me.
+> 
+> changes:
+> v6:
+>  - rename imx6_pm_poweroff to imx6_pm_stby_poweroff
+>  - fix "MPIC_STBY_REQ" typo in the comment.
+> 
+> v5:
+>  - remove useless includes from pm-imx6.c patch
+>  - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
+>    patch
+> 
+> v4:
+>  - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
+>    patch
+>  - add Acked-by to "ARM: imx6q: provide documentation for new ..."
+>    patch
+> 
+> v3:
+>  - set pm_power_off_prepare = NULL on .remove.
+>  - documentation and spelling fixes.
+>  - use %pf instead of lookup_symbol_name.
+> 
+> 
+> Oleksij Rempel (6):
+>   ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
+>     property
+>   ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
+>     is set
+>   kernel/reboot.c: export pm_power_off_prepare
+>   regulator: pfuze100: add fsl,pmic-stby-poweroff property
+>   regulator: pfuze100-regulator: provide pm_power_off_prepare handler
+>   ARM: dts: imx6: RIoTboard provide standby on power off option
+> 
+>  .../devicetree/bindings/clock/imx6q-clock.txt      |  8 ++
+>  .../devicetree/bindings/regulator/pfuze100.txt     |  7 ++
+>  arch/arm/boot/dts/imx6dl-riotboard.dts             |  5 ++
+>  arch/arm/mach-imx/pm-imx6.c                        | 25 ++++++
+>  drivers/regulator/pfuze100-regulator.c             | 92 ++++++++++++++++++++++
+>  kernel/reboot.c                                    |  1 +
+>  6 files changed, 138 insertions(+)
+> 
 
-Good point. How to ease documentation for generic properties like these
-was discussed in the past, but there is no guidance in
-Documentation/devicetree/bindings that I can see.
-
-So, in the interest of reduced controversy, its probably better to do
-what you already have and only populate properties already documented in
-the bindings.
-
-Thanks,
-Sekhar
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/66a3ca49/attachment.sig>
