@@ -1,28 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 3 Apr 2018 09:43:23 +0100
-Subject: [PATCH v8 0/4] Fix issues with huge mapping in ioremap for ARM64
-In-Reply-To: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
-References: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
-Message-ID: <a613f834-f356-a826-526f-aef532f62951@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 3 Apr 2018 10:46:55 +0200
+Subject: [PATCH v5 11/13] ARM: sun9i: smp: Add is_sun9i field
+In-Reply-To: <20180403061836.3926-12-mylene.josserand@bootlin.com>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-12-mylene.josserand@bootlin.com>
+Message-ID: <20180403084655.x6u7s4jzqdvq2eey@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chintan,
-
-On 03/04/18 09:00, Chintan Pandya wrote:
-> This series of patches are follow up work (and depends on)
-> Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
-> panic in ioremap huge pages".
+On Tue, Apr 03, 2018 at 08:18:34AM +0200, Myl?ne Josserand wrote:
+> To prepare the support of sun8i-a83t, add a field in the smp_data
+> structure to enable the case of sun9i.
 > 
-> This series of patches are tested on 4.9 kernel with Cortex-A75
-> based SoC.
+> Start to handle the differences between sun9i-a80 and sun8i-a83t
+> by using this variable.
+>
+> Add an index to retrieve which structures we are using.
 
-Given that this is targeting mainline, can you please test with 4.16?
-Basing your patches on something that is over 15 months old is not
-exactly reassuring.
+This should have been in a separate commit, but maybe we can store a
+pointer to the array cell we're using instead of always using the
+index?
 
-Thanks,
+Maxime
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/8a29e4de/attachment.sig>
