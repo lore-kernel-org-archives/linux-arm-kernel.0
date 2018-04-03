@@ -1,95 +1,98 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  3 Apr 2018 08:18:33 +0200
-Subject: [PATCH v5 10/13] ARM: sun9i: smp: Move structures
+Date: Tue,  3 Apr 2018 08:18:30 +0200
+Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
 In-Reply-To: <20180403061836.3926-1-mylene.josserand@bootlin.com>
 References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
-Message-ID: <20180403061836.3926-11-mylene.josserand@bootlin.com>
+Message-ID: <20180403061836.3926-8-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare the support for sun8i-a83t, move some structures
-at the beginning of the file.
+The CNTVOFF register from arch timer is uninitialized.
+It should be done by the bootloader but it is currently not the case,
+even for boot CPU because this SoC is booting in secure mode.
+It leads to an random offset value meaning that each CPU will have a
+different time, which isn't working very well.
+
+Add assembly code used for boot CPU and secondary CPU cores to make
+sure that the CNTVOFF register is initialized. Because this code can
+be used by different platforms, add this assembly file in ARM's common
+folder.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 ---
- arch/arm/mach-sunxi/mc_smp.c | 48 +++++++++++++++++++++++---------------------
- 1 file changed, 25 insertions(+), 23 deletions(-)
+ arch/arm/common/Makefile           |  1 +
+ arch/arm/common/smp_cntvoff.S      | 35 +++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/smp_cntvoff.h |  8 ++++++++
+ 3 files changed, 44 insertions(+)
+ create mode 100644 arch/arm/common/smp_cntvoff.S
+ create mode 100644 arch/arm/include/asm/smp_cntvoff.h
 
-diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-index 03f021d0c73e..0a7252df207f 100644
---- a/arch/arm/mach-sunxi/mc_smp.c
-+++ b/arch/arm/mach-sunxi/mc_smp.c
-@@ -72,9 +72,34 @@ static void __iomem *cpucfg_base;
- static void __iomem *prcm_base;
- static void __iomem *sram_b_smp_base;
- 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 70b4a14ed993..83117deb86c8 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
++obj-$(CONFIG_SMP)		+= smp_cntvoff.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+ obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
+ CFLAGS_REMOVE_mcpm_entry.o	= -pg
+diff --git a/arch/arm/common/smp_cntvoff.S b/arch/arm/common/smp_cntvoff.S
+new file mode 100644
+index 000000000000..65ed199a50fe
+--- /dev/null
++++ b/arch/arm/common/smp_cntvoff.S
+@@ -0,0 +1,35 @@
++// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * This holds any device nodes that we requested resources for,
-+ * so that we may easily release resources in the error path.
++ * Copyright (c) 2018 Chen-Yu Tsai
++ * Copyright (c) 2018 Bootlin
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ * Myl?ne Josserand <mylene.josserand@bootlin.com>
++ *
++ * SMP support for sunxi based systems with Cortex A7/A15
++ *
 + */
-+struct sunxi_mc_smp_nodes {
-+	struct device_node *prcm_node;
-+	struct device_node *cpucfg_node;
-+	struct device_node *sram_node;
-+};
 +
-+/* This structure holds SoC-specific bits tied to an enable-method string. */
-+struct sunxi_mc_smp_data {
-+	const char *enable_method;
-+	int (*get_smp_nodes)(struct sunxi_mc_smp_nodes *nodes);
-+};
++#include <linux/linkage.h>
++#include <asm/assembler.h>
 +
- extern void sunxi_mc_smp_secondary_startup(void);
- extern void sunxi_mc_smp_resume(void);
- 
-+static int __init sun9i_a80_get_smp_nodes(struct sunxi_mc_smp_nodes *nodes);
++ENTRY(smp_init_cntvoff)
++	.arch	armv7-a
++	/*
++	 * CNTVOFF has to be initialized either from non-secure Hypervisor
++	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
++	 * then it should be handled by the secure code
++	 */
++	cps	#MON_MODE
++	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
++	orr	r0, r1, #1
++	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
++	isb
++	mov	r0, #0
++	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
++	isb
++	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
++	isb
++	cps	#SVC_MODE
++	ret	lr
++ENDPROC(smp_init_cntvoff)
+diff --git a/arch/arm/include/asm/smp_cntvoff.h b/arch/arm/include/asm/smp_cntvoff.h
+new file mode 100644
+index 000000000000..59a95f7604ee
+--- /dev/null
++++ b/arch/arm/include/asm/smp_cntvoff.h
+@@ -0,0 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
 +
-+static const struct sunxi_mc_smp_data sunxi_mc_smp_data[] __initconst = {
-+	{
-+		.enable_method	= "allwinner,sun9i-a80-smp",
-+		.get_smp_nodes	= sun9i_a80_get_smp_nodes,
-+	},
-+};
++#ifndef __ASMARM_ARCH_CNTVOFF_H
++#define __ASMARM_ARCH_CNTVOFF_H
 +
- static bool sunxi_core_is_cortex_a15(unsigned int core, unsigned int cluster)
- {
- 	struct device_node *node;
-@@ -610,22 +635,6 @@ static int __init sunxi_mc_smp_loopback(void)
- 	return ret;
- }
- 
--/*
-- * This holds any device nodes that we requested resources for,
-- * so that we may easily release resources in the error path.
-- */
--struct sunxi_mc_smp_nodes {
--	struct device_node *prcm_node;
--	struct device_node *cpucfg_node;
--	struct device_node *sram_node;
--};
--
--/* This structure holds SoC-specific bits tied to an enable-method string. */
--struct sunxi_mc_smp_data {
--	const char *enable_method;
--	int (*get_smp_nodes)(struct sunxi_mc_smp_nodes *nodes);
--};
--
- static void __init sunxi_mc_smp_put_nodes(struct sunxi_mc_smp_nodes *nodes)
- {
- 	of_node_put(nodes->prcm_node);
-@@ -660,13 +669,6 @@ static int __init sun9i_a80_get_smp_nodes(struct sunxi_mc_smp_nodes *nodes)
- 	return 0;
- }
- 
--static const struct sunxi_mc_smp_data sunxi_mc_smp_data[] __initconst = {
--	{
--		.enable_method	= "allwinner,sun9i-a80-smp",
--		.get_smp_nodes	= sun9i_a80_get_smp_nodes,
--	},
--};
--
- static int __init sunxi_mc_smp_init(void)
- {
- 	struct sunxi_mc_smp_nodes nodes = { 0 };
++extern void smp_init_cntvoff(void);
++
++#endif
 -- 
 2.11.0
