@@ -1,179 +1,88 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 3 Apr 2018 21:14:47 +0900
-Subject: [Question] MFD driver that handles clocks/resets and populates
- child nodes
-In-Reply-To: <20180403080335.ksekhxwvbzbxhmln@dell>
-References: <CAK7LNARFWDMgmWsCjUmVrm4ZeYOcKCbizijxmDXob618ABjNWg@mail.gmail.com>
- <20180402120414.GA8159@lunn.ch>
- <CAK7LNAQ6LKk3NtGLB8g07ocyvXidpTHsApeDuctvEHyyLvk2ew@mail.gmail.com>
- <20180402133219.GA10520@lunn.ch> <20180403080335.ksekhxwvbzbxhmln@dell>
-Message-ID: <CAK7LNAQbWUYuhow5VdNDc+SuttY+u3xh9zk92kLEy9id6TNCFg@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 3 Apr 2018 14:17:48 +0200
+Subject: [PATCH] sched: support dynamiQ cluster
+In-Reply-To: <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
+References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
+ <20180329125324.GR4589@e105550-lin.cambridge.arm.com>
+ <CAKfTPtD4skW_3SAk--vBEC5-m1Ua48bjOQYS0pDqW3nPSpsENg@mail.gmail.com>
+ <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
+Message-ID: <CAKfTPtDy2uUj4amA9MARUz9qS=+urwV2edyQn+fW70hkN+CgoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-03 17:03 GMT+09:00 Lee Jones <lee.jones@linaro.org>:
-> On Mon, 02 Apr 2018, Andrew Lunn wrote:
+Hi Valentin,
+
+On 3 April 2018 at 00:27, Valentin Schneider <valentin.schneider@arm.com> wrote:
+> Hi,
 >
->> On Mon, Apr 02, 2018 at 10:21:01PM +0900, Masahiro Yamada wrote:
->> > 2018-04-02 21:04 GMT+09:00 Andrew Lunn <andrew@lunn.ch>:
->> > >> The maintainer of DWC3, Felipe Balbi, requested to
->> > >> split the glue layer driver into small parts such as
->> > >> reset, regulator, phy, etc.
->> > >
->> > > What exactly did Felipe ask for? Did he ask that the patch be split
->> > > up, one patch per reset, regulator, phy etc?
->> >
->> >
->> > Yeah.  That is what we understood from his comments.
->> >
->> >
->> > These are the feed-backs from him.
->> >
->> > https://lkml.org/lkml/2018/1/23/298
->> > https://lkml.org/lkml/2018/1/24/352
+> On 30/03/18 13:34, Vincent Guittot wrote:
+>> Hi Morten,
 >>
->> > > Are all these resources used just by the DWC3? Or is it a true MFD,
->> > > multiple functions?
->> >
->> > I do not think this is a real MFD.
->> >
->> > This is a DWC3 glue layer, i.e.
->> > a collection of misc registers that control
->> > the DWC3 IP.
->> >
->> >
->> > Just splitting it into small pieces
->> > to use PHY, reset, regulator framework in Linux.
->> >
->> > Of course, the price of this approach
->> > is so cluttered Device Tree,
->> > honestly I do not like it much.
+> [..]
+>>>
+>>> As I see it, the main differences is that ASYM_PACKING attempts to pack
+>>> all tasks regardless of task utilization on the higher capacity cpus
+>>> whereas the "misfit task" series carefully picks cpus with tasks they
+>>> can't handle so we don't risk migrating tasks which are perfectly
 >>
->> This however the correct way to do this. You should have a phy driver,
->> and a regulator driver, and a reset driver. The DWC3 then uses
->> phandles to these drivers.
+>> That's one main difference because misfit task will let middle range
+>> load task on little CPUs which will not provide maximum performance.
+>> I have put an example below
 >>
->> How is the IO map area 65b00000 split up. Can you cleanly separate it
->> into sub areas, which do not overlap, so you have a sub-area for the
->> PHY driver, a sub-area for the regulator driver and a sub-area for the
->> reset area? If you can cleanly split it up, you don't need an MFD. If
->> however the registers are in overlapping areas, you do need an
->> MFD. The MFD core provides access to the registers, while its children
->> implement PHY, reset, regulator etc.
+>>> suitable to for a little cpu to a big cpu unnecessarily. Also it is
+>>> based directly on utilization and cpu capacity like the capacity
+>>> awareness we already have to deal with big.LITTLE in the wake-up path.
 >
-> This device certainly sounds like an MFD to me.
+> I think that bit is quite important. AFAICT, ASYM_PACKING disregards
+> task utilization, it only makes sure that (with your patch) tasks will be
+> migrated to big CPUS if those ever go idle (pulls at NEWLY_IDLE balance or
+> later on during nohz balance). I didn't see anything related to ASYM_PACKING
+> in the wake path.
 >
-> Can you share the DT you've written please?
+>>> Have to tried taking the misfit patches for a spin on your setup? I
+>>> expect them give you the same behaviour as you report above.
+>>
+>> So I have tried both your tests and mine on both patchset and they
+>> provide same results which is somewhat expected as the benches are run
+>> for several seconds.
+>> In other to highlight the main difference between misfit task and
+>> ASYM_PACKING, I have reused your test and reduced the number of
+>> max-request for sysbench so that the test duration was in the range of
+>> hundreds ms.
+>>
+>> Hikey960 (emulate dynamiq topology)
+>>        min         avg(stdev)          max
+>> misfit 0.097500    0.114911(+- 10%)    0.138500
+>> asym   0.092500    0.106072(+-  6%)    0.122900
+>>
+>> In this case, we can see that ASYM_PACKING is doing better( 8%)
+>> because it migrates sysbench threads on big core as soon as they are
+>> available whereas misfit task has to wait for the utilization to
+>> increase above the 80% which takes around 70ms when starting with an
+>> utilization that is null
+>>
+>
+> I believe ASYM_PACKING behaves better here because the workload is only
+> sysbench threads. As stated above, since task utilization is disregarded, I
 
+It behaves better because it doesn't wait for the task's utilization
+to reach a level before assuming the task needs high compute capacity.
+The utilization gives an idea of the running time of the task not the
+performance level that is needed
 
-This is still under the internal review in Socionext,
-but I attached it below FWIW.
-
-(I am not the author of this DT.
- Written by Kunihiko Hayashi,
- and clocks/resets parts were slightly modified by me.)
-
-
-Just skimming the driver, I guess it will be possible to flatten
-the node structure by separating the register space into sub-areas.
-If this is success, we do not the MFD driver.
-
-
-usb at 65b00000 {
-        compatible = "socionext,uniphier-ld20-usb3-glue",
-                     "syscon";
-        reg = <0x65b00000 0x1000>;
-        clock-names = "usb";
-        clocks = <&sys_clk 14>;
-        reset-names = "usb";
-        resets = <&sys_rst 14>;
-
-        usb_rst: reset {
-                compatible = "socionext,uniphier-ld20-usb3-reset";
-                #reset-cells = <1>;
-        };
-
-        regulators {
-                compatible = "socionext,uniphier-ld20-usb3-regulator";
-
-                usb_vbus0: vbus-0 { };
-                usb_vbus1: vbus-1 { };
-                usb_vbus2: vbus-2 { };
-                usb_vbus3: vbus-3 { };
-        };
-
-        usb_hsphy: hs-phy {
-                compatible = "socionext,uniphier-ld20-usb3-hsphy";
-                #address-cells = <1>;
-                #size-cells = <0>;
-                #phy-cells = <0>;
-                clock-names = "phy-clk0", "phy-clk1";
-                clocks = <&sys_clk 16>, <&sys_clk 17>;
-                reset-names = "phy-rst0", "phy-rst1";
-                resets = <&sys_rst 16>, <&sys_rst 17>;
-                port0-supply = <&usb_vbus0>;
-                port1-supply = <&usb_vbus1>;
-                port2-supply = <&usb_vbus2>;
-                port3-supply = <&usb_vbus3>;
-
-                port at 0 {
-                        reg = <0>;
-                        nvmem-cell-names = "rterm", "sel_t",
-                                           "hs_i";
-                        nvmem-cells = <&usb_rterm0>,
-                                      <&usb_sel_t0>,
-                                      <&usb_hs_i0>;
-                };
-                port at 1 {
-                        reg = <1>;
-                        nvmem-cell-names = "rterm", "sel_t",
-                                           "hs_i";
-                        nvmem-cells = <&usb_rterm1>,
-                                      <&usb_sel_t1>,
-                                      <&usb_hs_i0>;
-                };
-                port at 2 {
-                        reg = <2>;
-                        nvmem-cell-names = "rterm", "sel_t",
-                                           "hs_i";
-                        nvmem-cells = <&usb_rterm2>,
-                                      <&usb_sel_t2>,
-                                      <&usb_hs_i2>;
-                };
-                port at 3 {
-                        reg = <3>;
-                        nvmem-cell-names = "rterm", "sel_t",
-                                           "hs_i";
-                        nvmem-cells = <&usb_rterm3>,
-                                      <&usb_sel_t3>,
-                                      <&usb_hs_i2>;
-                };
-        };
-
-        usb_ssphy: ss-phy {
-                compatible = "socionext,uniphier-ld20-usb3-ssphy";
-                #address-cells = <1>;
-                #size-cells = <0>;
-                #phy-cells = <0>;
-                reset-names = "phy-rst0", "phy-rst1";
-                resets = <&sys_rst 18>, <&sys_rst 19>;
-                port0-supply = <&usb_vbus0>;
-                port1-supply = <&usb_vbus1>;
-
-                port at 0 {
-                        reg = <0>;
-                };
-                port at 1 {
-                        reg = <1>;
-                };
-        };
-};
-
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> think we could have a scenario where the big CPUs are filled with "small"
+> tasks and the LITTLE CPUs hold a few "big" tasks - because what mostly
+> matters here is the order in which the tasks spawn, not their utilization -
+> which is potentially broken.
+>
+> There's that bit in *update_sd_pick_busiest()*:
+>
+> /* No ASYM_PACKING if target CPU is already busy */
+> if (env->idle == CPU_NOT_IDLE)
+>         return true;
+>
+> So I'm not entirely sure how realistic that scenario is, but I suppose it
+> could still happen. Food for thought in any case.
+>
+> Regards,
+> Valentin
