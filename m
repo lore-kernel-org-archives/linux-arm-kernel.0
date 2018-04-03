@@ -1,38 +1,64 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 3 Apr 2018 13:34:34 +0100
-Subject: [kvmtool PATCH 20/17] kvmtool: arm64: Switch memory layout
-In-Reply-To: <1522156531-28348-21-git-send-email-suzuki.poulose@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-21-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <f04a9ac7-a555-47e1-0bef-f5ff28b287f8@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 3 Apr 2018 08:38:29 -0400
+Subject: [PATCH v2] MIPS: io: add a barrier after register read in readX()
+In-Reply-To: <CAK8P3a0WwhDoTdQNoxnpBVDZu8a7oKdB2tSjVRTRf3rrecEKMA@mail.gmail.com>
+References: <1522692821-27706-1-git-send-email-okaya@codeaurora.org>
+ <CAK8P3a0WwhDoTdQNoxnpBVDZu8a7oKdB2tSjVRTRf3rrecEKMA@mail.gmail.com>
+Message-ID: <58d1d3e5-bec8-1c34-e94a-c3c57321d6eb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-On 27/03/18 14:15, Suzuki K Poulose wrote:
-> If the guest wants to use a larger physical address space place
-> the RAM at upper half of the address space. Otherwise, it uses the
-> default layout.
+On 4/3/2018 3:21 AM, Arnd Bergmann wrote:
+> On Mon, Apr 2, 2018 at 8:13 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> While a barrier is present in writeX() function before the register write,
+>> a similar barrier is missing in the readX() function after the register
+>> read. This could allow memory accesses following readX() to observe
+>> stale data.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> Reported-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>  arch/mips/include/asm/io.h | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/mips/include/asm/io.h b/arch/mips/include/asm/io.h
+>> index 0cbf3af..7f9068d 100644
+>> --- a/arch/mips/include/asm/io.h
+>> +++ b/arch/mips/include/asm/io.h
+>> @@ -377,6 +377,7 @@ static inline type pfx##read##bwlq(const volatile void __iomem *mem)        \
+>>                 BUG();                                                  \
+>>         }                                                               \
+>>                                                                         \
+>> +       war_io_reorder_wmb();                                           \
+>>         return pfx##ioswab##bwlq(__mem, __val);                         \
+>>  }
 > 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arm/aarch32/include/kvm/kvm-arch.h |  1 +
->  arm/aarch64/include/kvm/kvm-arch.h | 15 ++++++++++++---
->  arm/include/arm-common/kvm-arch.h  | 11 ++++++-----
->  arm/kvm.c                          |  2 +-
->  4 files changed, 20 insertions(+), 9 deletions(-)
+> I'm not sure if this is the right barrier: what we want here is a read
+> barrier to
+> prevent any following memory access from being prefetched ahead of the readl(),
+> so I would have expected a kind of rmb() rather than wmb().
 > 
-> diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
-> index cd31e72..2d62aab 100644
-> --- a/arm/aarch32/include/kvm/kvm-arch.h
-> +++ b/arm/aarch32/include/kvm/kvm-arch.h
-> @@ -4,6 +4,7 @@
->  #define ARM_KERN_OFFSET(...)	0x8000
->  
->  #define ARM_MAX_MEMORY(...)	ARM_LOMAP_MAX_MEMORY
 
-I guess this should now be ARM32_MAX_MEMORY?
+That's true. There was too much macro-ism in the code. I was thinking war_io_reorder_wmb()
+to be a mb() under the hood. I'll fix and post an update.
 
-Thanks,
-Jean
+> The barrier you used here is defined as
+> 
+> #if defined(CONFIG_CPU_CAVIUM_OCTEON) || defined(CONFIG_LOONGSON3_ENHANCEMENT)
+> #define war_io_reorder_wmb()            wmb()
+> #else
+> #define war_io_reorder_wmb()            do { } while (0)
+> #endif
+> 
+> which appears to list the particular CPUs that have a reordering
+> write buffer. That may not be the same set of CPUs that have the
+> capability to do out-of-order loads.
+> 
+>        Arnd
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
