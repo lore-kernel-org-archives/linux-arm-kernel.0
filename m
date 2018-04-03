@@ -1,61 +1,132 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 3 Apr 2018 08:48:27 -0700
-Subject: [PATCH v3 2/4] mfd: add Gateworks System Controller core driver
-In-Reply-To: <1522250043-8065-3-git-send-email-tharvey@gateworks.com>
-References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
- <1522250043-8065-3-git-send-email-tharvey@gateworks.com>
-Message-ID: <CAJ+vNU3-gaTcMAzo5wB6oSfE-JQC3NBVRJS5zFMTE-nVpD4F5g@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 03 Apr 2018 08:49:57 -0700
+Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
+ "Stoping" -> "Stopping"
+In-Reply-To: <20180403134540.GA29017@lenoch>
+References: <20180330154420.6903-1-colin.king@canonical.com>
+ <20180403134540.GA29017@lenoch>
+Message-ID: <1522770597.11653.49.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 28, 2018 at 8:14 AM, Tim Harvey <tharvey@gateworks.com> wrote:
-> The Gateworks System Controller (GSC) is an I2C slave controller
-> implemented with an MSP430 micro-controller whose firmware embeds the
-> following features:
->  - I/O expander (16 GPIO's) using PCA955x protocol
->  - Real Time Clock using DS1672 protocol
->  - User EEPROM using AT24 protocol
->  - HWMON using custom protocol
->  - Interrupt controller with tamper detect, user pushbotton
->  - Watchdog controller capable of full board power-cycle
->  - Power Control capable of full board power-cycle
->
-> see http://trac.gateworks.com/wiki/gsc for more details
->
-<snip>
-> +
-> +/*
-> + * gsc_powerdown - API to use GSC to power down board for a specific time
-> + *
-> + * secs - number of seconds to remain powered off
-> + */
-> +static int gsc_powerdown(struct gsc_dev *gsc, unsigned long secs)
-> +{
-> +       int ret;
-> +       unsigned char regs[4];
-> +
-> +       dev_info(&gsc->i2c->dev, "GSC powerdown for %ld seconds\n",
-> +                secs);
-> +       regs[0] = secs & 0xff;
-> +       regs[1] = (secs >> 8) & 0xff;
-> +       regs[2] = (secs >> 16) & 0xff;
-> +       regs[3] = (secs >> 24) & 0xff;
-> +       ret = regmap_bulk_write(gsc->regmap, GSC_TIME_ADD, regs, 4);
-> +
-> +       return ret;
-> +}
+On Tue, 2018-04-03 at 15:45 +0200, Ladislav Michl wrote:
+> On Fri, Mar 30, 2018 at 04:44:20PM +0100, Colin King wrote:
+> > From: Colin Ian King <colin.king@canonical.com>
+> 
+> Hello Colin,
+> 
+> > Trivial fix to spelling mistake in pr_debug message text
+> 
+> would you mind making this patch a bit less non-trivial and
+> change pr_debug to dev_dbg dropping Atmel_ssc_dai prefix?
 
-Any feedback on the 'powerdown' sysfs attribute that hooks to this
-function? This allows the GSC to disable the board primary power
-supply for 2^32 seconds and is often used to 'reset' the board
-although it could also be used to put the board in a power down state
-longer. I'm wondering if there is a more appropriate API for this in
-the kernel that I don't know about.
+Presumably, then all the pr_<foo> calls should be changed.
+Something like:
+---
+ sound/soc/atmel/atmel_ssc_dai.c | 38 ++++++++++++++++----------------------
+ 1 file changed, 16 insertions(+), 22 deletions(-)
 
-I would also like to register a restart handler using this but I
-believe that ARM restart handlers currently can not use I2C - is that
-correct?
-
-Regards,
-
-Tim
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index a1e2c5682dcd..594228156b2d 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -291,11 +291,10 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+ 	int dir, dir_mask;
+ 	int ret;
+ 
+-	pr_debug("atmel_ssc_startup: SSC_SR=0x%x\n",
+-		ssc_readl(ssc_p->ssc->regs, SR));
++	dev_dbg(dai->dev, "SSC_SR=0x%x\n", ssc_readl(ssc_p->ssc->regs, SR));
+ 
+ 	/* Enable PMC peripheral clock for this SSC */
+-	pr_debug("atmel_ssc_dai: Starting clock\n");
++	dev_dbg(dai->dev, "Starting clock\n");
+ 	clk_enable(ssc_p->ssc->clk);
+ 	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk);
+ 
+@@ -385,7 +384,7 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
+ 	spin_unlock_irq(&ssc_p->lock);
+ 
+ 	/* Shutdown the SSC clock. */
+-	pr_debug("atmel_ssc_dai: Stopping clock\n");
++	dev_dbg(dai->dev, "Stopping clock\n");
+ 	clk_disable(ssc_p->ssc->clk);
+ }
+ 
+@@ -794,13 +793,12 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		break;
+ 
+ 	default:
+-		printk(KERN_WARNING "atmel_ssc_dai: unsupported DAI format 0x%x\n",
+-			ssc_p->daifmt);
++		dev_warn(dai->dev, "unsupported DAI format 0x%x\n",
++			 ssc_p->daifmt);
+ 		return -EINVAL;
+ 	}
+-	pr_debug("atmel_ssc_hw_params: "
+-			"RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
+-			rcmr, rfmr, tcmr, tfmr);
++	dev_dbg(dai->dev, "RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
++		rcmr, rfmr, tcmr, tfmr);
+ 
+ 	if (!ssc_p->initialized) {
+ 		if (!ssc_p->ssc->pdata->use_dma) {
+@@ -818,9 +816,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		ret = request_irq(ssc_p->ssc->irq, atmel_ssc_interrupt, 0,
+ 				ssc_p->name, ssc_p);
+ 		if (ret < 0) {
+-			printk(KERN_WARNING
+-					"atmel_ssc_dai: request_irq failure\n");
+-			pr_debug("Atmel_ssc_dai: Stoping clock\n");
++			dev_warn(dai->dev, "request_irq failure\n");
++			dev_dbg(dai->dev, "Stopping clock\n");
+ 			clk_disable(ssc_p->ssc->clk);
+ 			return ret;
+ 		}
+@@ -839,7 +836,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 	ssc_writel(ssc_p->ssc->regs, TCMR, tcmr);
+ 	ssc_writel(ssc_p->ssc->regs, TFMR, tfmr);
+ 
+-	pr_debug("atmel_ssc_dai,hw_params: SSC initialized\n");
++	dev_dbg(dai->dev, "SSC initialized\n");
+ 	return 0;
+ }
+ 
+@@ -862,9 +859,9 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+ 	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
+ 	ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
+ 
+-	pr_debug("%s enabled SSC_SR=0x%08x\n",
+-			dir ? "receive" : "transmit",
+-			ssc_readl(ssc_p->ssc->regs, SR));
++	dev_dbg(dai->dev, "%s enabled SSC_SR=0x%08x\n",
++		dir ? "receive" : "transmit",
++		ssc_readl(ssc_p->ssc->regs, SR));
+ 	return 0;
+ }
+ 
+@@ -1050,21 +1047,18 @@ static void asoc_ssc_exit(struct device *dev)
+ int atmel_ssc_set_audio(int ssc_id)
+ {
+ 	struct ssc_device *ssc;
+-	int ret;
+ 
+ 	/* If we can grab the SSC briefly to parent the DAI device off it */
+ 	ssc = ssc_request(ssc_id);
+ 	if (IS_ERR(ssc)) {
+ 		pr_err("Unable to parent ASoC SSC DAI on SSC: %ld\n",
+-			PTR_ERR(ssc));
++		       PTR_ERR(ssc));
+ 		return PTR_ERR(ssc);
+-	} else {
+-		ssc_info[ssc_id].ssc = ssc;
+ 	}
+ 
+-	ret = asoc_ssc_init(&ssc->pdev->dev);
++	ssc_info[ssc_id].ssc = ssc;
+ 
+-	return ret;
++	return asoc_ssc_init(&ssc->pdev->dev);
+ }
+ EXPORT_SYMBOL_GPL(atmel_ssc_set_audio);
+ 
