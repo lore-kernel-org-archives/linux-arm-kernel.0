@@ -1,231 +1,122 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  3 Apr 2018 08:18:24 +0200
-Subject: [PATCH v5 01/13] ARM: move cputype definitions into another file
-In-Reply-To: <20180403061836.3926-1-mylene.josserand@bootlin.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
-Message-ID: <20180403061836.3926-2-mylene.josserand@bootlin.com>
+Date: Tue,  3 Apr 2018 08:18:23 +0200
+Subject: [PATCH v5 00/13] Sunxi: Add SMP support on A83T
+Message-ID: <20180403061836.3926-1-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To add the support for SMP on sun8i-a83t, we will use some
-definitions in an assembly file so move definitions into
-another file to separate C functions and macro defintions.
+Hello everyone,
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
----
- arch/arm/include/asm/cputype.h     | 94 +-----------------------------------
- arch/arm/include/asm/cputype_def.h | 98 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 99 insertions(+), 93 deletions(-)
+This is a V5 of my series that adds SMP support for Allwinner sun8i-a83t.
+Based on sunxi's tree, sunxi/for-next branch.
+
+For boot CPU, I tried to add the CNTVOFF initialization in mc_smp.c file
+(in sunxi_mc_smp_init function) but it is not working.
+Instead of adding it in timer's function of sunxi.c file, I create
+a new machine to handle this case. Thanks to that, it is specific to
+sun8i-a83t SoC. Let me know what you think.
+
+Changes since v4:
+    - Rebased my series according to new Chen-Yu series:
+       "ARM: sunxi: Clean and improvements for multi-cluster SMP"
+       https://lkml.org/lkml/2018/3/8/886
+    - Updated my series according to Marc Zyngier's reviews to add CNTVOFF
+    initialization's function into ARM's common part. Thanks to that, other
+    platforms such as Renesa can use this function.
+    - For boot CPU, create a new machine to handle the CNTVOFF initialization
+    using "init_early" callback.
+Changes since v3:
+    - Take into account Maxime's reviews:
+	- split the first patch into 4 new patches: add sun9i device tree
+	parsing, rename some variables, add a83t support and finally,
+	add hotplug support.
+	- Move the code of previous patch 07 (to disable CPU0 disabling)
+	into hotplug support patch (see patch 04)
+	- Remove the patch that added PRCM register because it is already
+	available. Because of that, update the device tree parsing to use
+	"sun8i-a83t-r-ccu".
+	- Use a variable to know which SoC we currently have
+    - Take into account Chen-Yu's reviews: create two iounmap functions
+    to release the resources of the device tree parsing.
+    - Take into account Marc's review: Update the code to initialize CNTVOFF
+    register. As there is already assembly code in the driver, I decided
+    to create an assembly file not to mix assembly and C code.
+    For that, I create 3 new patches: move the current assembly code that
+    handles the cluster cache enabling into a file, move the cpu_resume entry
+    in this file and finally, add a new assembly entry to initialize the timer
+    offset for boot CPU and secondary CPUs.
+
+Changes since v2:
+    - Rebased my modifications according to new Chen Yu's patch series
+    that adds SMP support for sun9i-a80 (without MCPM).
+    - Split the device-tree patches into 3 patches for CPUCFG, R_CPUCFG
+    and PRCM registers for more visibility.
+    - The hotplug of CPU0 is currently not working (even after trying what
+    Allwinner's code is doing) so remove the possibility of disabling
+    this CPU. Created a new patch for it.
+
+Changes since v1:
+    - Add Chen Yu's patch in my series (see path 01)
+    - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
+    Create two functions to separate the DT parsing of sun9i-a80 and
+    sun8i-a83t.
+    - Thanks to Maxime's review: order device tree's nodes according
+    to physical addresses, remove unused label and fix registers' sizes.
+    Update the commit log and commit title of my last patch (see
+    patch 05).
+
+Patch 01: To be able to use macro definition (such as ARM_CPU_PART_MASK)
+in an assembly file, we need to separate macro difinitions and C functions
+definitions. This is what this patch is doing.
+Patch 02: Move assembly code into a new assembly file
+Patch 03: Move another assembly code (resuming function) into above file
+Patch 04-06: Add registers nodes (cpucfg, r_cpucfg and cci-400) needed
+for SMP bringup.
+Patch 07: Create a new assembly file to initialize the CNTVOFF register. Can
+be used on other platform so add it in "common" ARM folder.
+Patch 08: Create a new machine to initialize the timer offset for boot CPU.
+Add a new entry to initialize the timer offset for secondary CPUs.
+Patch 09: Prepare to handle sun8i-a83t by renaming some sun9i-a80 functions.
+Patch 10: Again a preparation to support sun8i-a83t by moving some structures.
+Patch 11: Add a new field to know if we are on sun9i-a80 or sun8i-a83t.
+Patch 12: Convert the sunxi SMP driver to add support for A83T.
+This SoC has a bit flip that needs to be handled.
+Patch 13: Enable the smp support on sun8i-a83t by adding enable-method.
+
+If you have any remarks/questions, let me know.
+Thank you in advance,
+Myl?ne
+
+Myl?ne Josserand (13):
+  ARM: move cputype definitions into another file
+  ARM: sunxi: smp: Move assembly code into a file
+  ARM: sunxi: smp: Move cpu_resume assembly entry into file
+  ARM: dts: sun8i: Add CPUCFG device node for A83T dtsi
+  ARM: dts: sun8i: Add R_CPUCFG device node for the A83T dtsi
+  ARM: dts: sun8i: a83t: Add CCI-400 node
+  ARM: smp: Add initialization of CNTVOFF
+  ARM: sunxi: Add initialization of CNTVOFF
+  ARM: sun9i: smp: Rename clusters's power-off
+  ARM: sun9i: smp: Move structures
+  ARM: sun9i: smp: Add is_sun9i field
+  ARM: sun8i: smp: Add support for A83T
+  ARM: dts: sun8i: Add enable-method for SMP support for the A83T SoC
+
+ arch/arm/boot/dts/sun8i-a83t.dtsi  |  59 ++++++++
+ arch/arm/common/Makefile           |   1 +
+ arch/arm/common/smp_cntvoff.S      |  35 +++++
+ arch/arm/include/asm/cputype.h     |  94 +-----------
+ arch/arm/include/asm/cputype_def.h |  98 +++++++++++++
+ arch/arm/include/asm/smp_cntvoff.h |   8 ++
+ arch/arm/mach-sunxi/Makefile       |   4 +-
+ arch/arm/mach-sunxi/headsmp.S      |  81 +++++++++++
+ arch/arm/mach-sunxi/mc_smp.c       | 287 ++++++++++++++++++++++---------------
+ arch/arm/mach-sunxi/sunxi.c        |  18 ++-
+ 10 files changed, 472 insertions(+), 213 deletions(-)
+ create mode 100644 arch/arm/common/smp_cntvoff.S
  create mode 100644 arch/arm/include/asm/cputype_def.h
+ create mode 100644 arch/arm/include/asm/smp_cntvoff.h
+ create mode 100644 arch/arm/mach-sunxi/headsmp.S
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cb546425da8a..4cb26e840a58 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -4,99 +4,7 @@
- 
- #include <linux/stringify.h>
- #include <linux/kernel.h>
--
--#define CPUID_ID	0
--#define CPUID_CACHETYPE	1
--#define CPUID_TCM	2
--#define CPUID_TLBTYPE	3
--#define CPUID_MPUIR	4
--#define CPUID_MPIDR	5
--#define CPUID_REVIDR	6
--
--#ifdef CONFIG_CPU_V7M
--#define CPUID_EXT_PFR0	0x40
--#define CPUID_EXT_PFR1	0x44
--#define CPUID_EXT_DFR0	0x48
--#define CPUID_EXT_AFR0	0x4c
--#define CPUID_EXT_MMFR0	0x50
--#define CPUID_EXT_MMFR1	0x54
--#define CPUID_EXT_MMFR2	0x58
--#define CPUID_EXT_MMFR3	0x5c
--#define CPUID_EXT_ISAR0	0x60
--#define CPUID_EXT_ISAR1	0x64
--#define CPUID_EXT_ISAR2	0x68
--#define CPUID_EXT_ISAR3	0x6c
--#define CPUID_EXT_ISAR4	0x70
--#define CPUID_EXT_ISAR5	0x74
--#else
--#define CPUID_EXT_PFR0	"c1, 0"
--#define CPUID_EXT_PFR1	"c1, 1"
--#define CPUID_EXT_DFR0	"c1, 2"
--#define CPUID_EXT_AFR0	"c1, 3"
--#define CPUID_EXT_MMFR0	"c1, 4"
--#define CPUID_EXT_MMFR1	"c1, 5"
--#define CPUID_EXT_MMFR2	"c1, 6"
--#define CPUID_EXT_MMFR3	"c1, 7"
--#define CPUID_EXT_ISAR0	"c2, 0"
--#define CPUID_EXT_ISAR1	"c2, 1"
--#define CPUID_EXT_ISAR2	"c2, 2"
--#define CPUID_EXT_ISAR3	"c2, 3"
--#define CPUID_EXT_ISAR4	"c2, 4"
--#define CPUID_EXT_ISAR5	"c2, 5"
--#endif
--
--#define MPIDR_SMP_BITMASK (0x3 << 30)
--#define MPIDR_SMP_VALUE (0x2 << 30)
--
--#define MPIDR_MT_BITMASK (0x1 << 24)
--
--#define MPIDR_HWID_BITMASK 0xFFFFFF
--
--#define MPIDR_INVALID (~MPIDR_HWID_BITMASK)
--
--#define MPIDR_LEVEL_BITS 8
--#define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
--#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
--
--#define MPIDR_AFFINITY_LEVEL(mpidr, level) \
--	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
--
--#define ARM_CPU_IMP_ARM			0x41
--#define ARM_CPU_IMP_DEC			0x44
--#define ARM_CPU_IMP_INTEL		0x69
--
--/* ARM implemented processors */
--#define ARM_CPU_PART_ARM1136		0x4100b360
--#define ARM_CPU_PART_ARM1156		0x4100b560
--#define ARM_CPU_PART_ARM1176		0x4100b760
--#define ARM_CPU_PART_ARM11MPCORE	0x4100b020
--#define ARM_CPU_PART_CORTEX_A8		0x4100c080
--#define ARM_CPU_PART_CORTEX_A9		0x4100c090
--#define ARM_CPU_PART_CORTEX_A5		0x4100c050
--#define ARM_CPU_PART_CORTEX_A7		0x4100c070
--#define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
--#define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
--#define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
--#define ARM_CPU_PART_MASK		0xff00fff0
--
--/* DEC implemented cores */
--#define ARM_CPU_PART_SA1100		0x4400a110
--
--/* Intel implemented cores */
--#define ARM_CPU_PART_SA1110		0x6900b110
--#define ARM_CPU_REV_SA1110_A0		0
--#define ARM_CPU_REV_SA1110_B0		4
--#define ARM_CPU_REV_SA1110_B1		5
--#define ARM_CPU_REV_SA1110_B2		6
--#define ARM_CPU_REV_SA1110_B4		8
--
--#define ARM_CPU_XSCALE_ARCH_MASK	0xe000
--#define ARM_CPU_XSCALE_ARCH_V1		0x2000
--#define ARM_CPU_XSCALE_ARCH_V2		0x4000
--#define ARM_CPU_XSCALE_ARCH_V3		0x6000
--
--/* Qualcomm implemented cores */
--#define ARM_CPU_PART_SCORPION		0x510002d0
-+#include <asm/cputype_def.h>
- 
- extern unsigned int processor_id;
- 
-diff --git a/arch/arm/include/asm/cputype_def.h b/arch/arm/include/asm/cputype_def.h
-new file mode 100644
-index 000000000000..3a62ea13dc35
---- /dev/null
-+++ b/arch/arm/include/asm/cputype_def.h
-@@ -0,0 +1,98 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __ASM_ARM_CPUTYPEDEF_H
-+#define __ASM_ARM_CPUTYPEDEF_H
-+
-+#define CPUID_ID	0
-+#define CPUID_CACHETYPE	1
-+#define CPUID_TCM	2
-+#define CPUID_TLBTYPE	3
-+#define CPUID_MPUIR	4
-+#define CPUID_MPIDR	5
-+#define CPUID_REVIDR	6
-+
-+#ifdef CONFIG_CPU_V7M
-+#define CPUID_EXT_PFR0	0x40
-+#define CPUID_EXT_PFR1	0x44
-+#define CPUID_EXT_DFR0	0x48
-+#define CPUID_EXT_AFR0	0x4c
-+#define CPUID_EXT_MMFR0	0x50
-+#define CPUID_EXT_MMFR1	0x54
-+#define CPUID_EXT_MMFR2	0x58
-+#define CPUID_EXT_MMFR3	0x5c
-+#define CPUID_EXT_ISAR0	0x60
-+#define CPUID_EXT_ISAR1	0x64
-+#define CPUID_EXT_ISAR2	0x68
-+#define CPUID_EXT_ISAR3	0x6c
-+#define CPUID_EXT_ISAR4	0x70
-+#define CPUID_EXT_ISAR5	0x74
-+#else
-+#define CPUID_EXT_PFR0	"c1, 0"
-+#define CPUID_EXT_PFR1	"c1, 1"
-+#define CPUID_EXT_DFR0	"c1, 2"
-+#define CPUID_EXT_AFR0	"c1, 3"
-+#define CPUID_EXT_MMFR0	"c1, 4"
-+#define CPUID_EXT_MMFR1	"c1, 5"
-+#define CPUID_EXT_MMFR2	"c1, 6"
-+#define CPUID_EXT_MMFR3	"c1, 7"
-+#define CPUID_EXT_ISAR0	"c2, 0"
-+#define CPUID_EXT_ISAR1	"c2, 1"
-+#define CPUID_EXT_ISAR2	"c2, 2"
-+#define CPUID_EXT_ISAR3	"c2, 3"
-+#define CPUID_EXT_ISAR4	"c2, 4"
-+#define CPUID_EXT_ISAR5	"c2, 5"
-+#endif
-+
-+#define MPIDR_SMP_BITMASK (0x3 << 30)
-+#define MPIDR_SMP_VALUE (0x2 << 30)
-+
-+#define MPIDR_MT_BITMASK (0x1 << 24)
-+
-+#define MPIDR_HWID_BITMASK 0xFFFFFF
-+
-+#define MPIDR_INVALID (~MPIDR_HWID_BITMASK)
-+
-+#define MPIDR_LEVEL_BITS 8
-+#define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
-+#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
-+
-+#define MPIDR_AFFINITY_LEVEL(mpidr, level) \
-+	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
-+
-+#define ARM_CPU_IMP_ARM			0x41
-+#define ARM_CPU_IMP_DEC			0x44
-+#define ARM_CPU_IMP_INTEL		0x69
-+
-+/* ARM implemented processors */
-+#define ARM_CPU_PART_ARM1136		0x4100b360
-+#define ARM_CPU_PART_ARM1156		0x4100b560
-+#define ARM_CPU_PART_ARM1176		0x4100b760
-+#define ARM_CPU_PART_ARM11MPCORE	0x4100b020
-+#define ARM_CPU_PART_CORTEX_A8		0x4100c080
-+#define ARM_CPU_PART_CORTEX_A9		0x4100c090
-+#define ARM_CPU_PART_CORTEX_A5		0x4100c050
-+#define ARM_CPU_PART_CORTEX_A7		0x4100c070
-+#define ARM_CPU_PART_CORTEX_A12		0x4100c0d0
-+#define ARM_CPU_PART_CORTEX_A17		0x4100c0e0
-+#define ARM_CPU_PART_CORTEX_A15		0x4100c0f0
-+#define ARM_CPU_PART_MASK		0xff00fff0
-+
-+/* DEC implemented cores */
-+#define ARM_CPU_PART_SA1100		0x4400a110
-+
-+/* Intel implemented cores */
-+#define ARM_CPU_PART_SA1110		0x6900b110
-+#define ARM_CPU_REV_SA1110_A0		0
-+#define ARM_CPU_REV_SA1110_B0		4
-+#define ARM_CPU_REV_SA1110_B1		5
-+#define ARM_CPU_REV_SA1110_B2		6
-+#define ARM_CPU_REV_SA1110_B4		8
-+
-+#define ARM_CPU_XSCALE_ARCH_MASK	0xe000
-+#define ARM_CPU_XSCALE_ARCH_V1		0x2000
-+#define ARM_CPU_XSCALE_ARCH_V2		0x4000
-+#define ARM_CPU_XSCALE_ARCH_V3		0x6000
-+
-+/* Qualcomm implemented cores */
-+#define ARM_CPU_PART_SCORPION		0x510002d0
-+
-+#endif
 -- 
 2.11.0
