@@ -1,43 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 Apr 2018 13:13:30 +0200
-Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
- readX() implementation
-In-Reply-To: <20180403104925.fuyajja6tyanlna4@lakrids.cambridge.arm.com>
-References: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
- <1522425494-2916-2-git-send-email-okaya@codeaurora.org>
- <20180403104925.fuyajja6tyanlna4@lakrids.cambridge.arm.com>
-Message-ID: <CAK8P3a3fZx42sQY41Pf+Q3fMNrP2FgXvvntnrLkQXbAezOQjEw@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 3 Apr 2018 19:13:59 +0800
+Subject: [PATCH v5 08/13] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180403061836.3926-9-mylene.josserand@bootlin.com>
+References: <20180403061836.3926-9-mylene.josserand@bootlin.com>
+Message-ID: <201804031907.1T91Hxm0%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 3, 2018 at 12:49 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> On Fri, Mar 30, 2018 at 11:58:13AM -0400, Sinan Kaya wrote:
->> The default implementation of mapping readX() to __raw_readX() is wrong.
->> readX() has stronger ordering semantics. Compiler is allowed to reorder
->> __raw_readX().
->
-> Could you please specify what the compiler is potentially reordering
-> __raw_readX() against, and why this would be wrong?
->
-> e.g. do we care about prior normal memory accesses, subsequent normal
-> memory accesses, and/or other IO accesses?
->
-> I assume that the asm-generic __raw_{read,write}X() implementations are
-> all ordered w.r.t. each other (at least for a specific device).
+Hi Myl?ne,
 
-I think that is correct: the compiler won't reorder those because of the
-'volatile' pointer dereference, but it can reorder access to a normal
-pointer against a __raw_readl()/__raw_writel(), which breaks the scenario
-of using writel to trigger a DMA, or using a readl to see if a DMA has
-completed.
+Thank you for the patch! Yet something to improve:
 
-The question is whether we should use a stronger barrier such
-as rmb() amd wmb() here rather than a simple compiler barrier.
+[auto build test ERROR on arm-soc/for-next]
+[also build test ERROR on next-20180403]
+[cannot apply to v4.16]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I would assume that on complex architectures with write buffers and
-out-of-order prefetching, those are required, while on architectures
-without those features, the barriers are cheap.
+url:    https://github.com/0day-ci/linux/commits/Myl-ne-Josserand/Sunxi-Add-SMP-support-on-A83T/20180403-143751
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
+config: arm-arm67 (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-      Arnd
+All errors (new ones prefixed by >>):
+
+   arch/arm/mach-sunxi/sunxi.o: In function `sun8i_cntvoff_init':
+>> sunxi.c:(.init.text+0x3c): undefined reference to `smp_init_cntvoff'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31765 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/6e396f4b/attachment-0001.gz>
