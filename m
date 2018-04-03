@@ -1,32 +1,43 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Tue, 3 Apr 2018 14:08:43 +0300
-Subject: [PATCH 2/6] spi: sun4i: restrict transfer length in PIO-mode
-In-Reply-To: <20180403081041.3ully6bcyfwx2cx6@flea>
-References: <20180329185907.27281-1-ssuloev@orpaltech.com>
- <20180329185907.27281-3-ssuloev@orpaltech.com>
- <20180403081041.3ully6bcyfwx2cx6@flea>
-Message-ID: <4390604e-092b-a89d-3581-b57ee9cbb6a1@orpaltech.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Apr 2018 13:13:30 +0200
+Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
+ readX() implementation
+In-Reply-To: <20180403104925.fuyajja6tyanlna4@lakrids.cambridge.arm.com>
+References: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
+ <1522425494-2916-2-git-send-email-okaya@codeaurora.org>
+ <20180403104925.fuyajja6tyanlna4@lakrids.cambridge.arm.com>
+Message-ID: <CAK8P3a3fZx42sQY41Pf+Q3fMNrP2FgXvvntnrLkQXbAezOQjEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2018 11:10 AM, Maxime Ripard wrote:
-> On Thu, Mar 29, 2018 at 09:59:03PM +0300, Sergey Suloev wrote:
->> There is no need to handle 3/4 empty/full interrupts as the maximum
->> supported transfer length in PIO mode is 64 bytes for sun4i-family
->> SoCs.
-> That assumes that you'll be able to treat the FIFO full interrupt and
-> drain the FIFO before we have the next byte coming in. This would
-> require a real time system, and we're not in one of them.
+On Tue, Apr 3, 2018 at 12:49 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
 >
-> Maxime
+> On Fri, Mar 30, 2018 at 11:58:13AM -0400, Sinan Kaya wrote:
+>> The default implementation of mapping readX() to __raw_readX() is wrong.
+>> readX() has stronger ordering semantics. Compiler is allowed to reorder
+>> __raw_readX().
 >
-AFAIK in SPI protocol we send and receive at the same time. As soon as 
-the transfer length
+> Could you please specify what the compiler is potentially reordering
+> __raw_readX() against, and why this would be wrong?
+>
+> e.g. do we care about prior normal memory accesses, subsequent normal
+> memory accesses, and/or other IO accesses?
+>
+> I assume that the asm-generic __raw_{read,write}X() implementations are
+> all ordered w.r.t. each other (at least for a specific device).
 
-is <= FIFO depth then it means that@the moment we get TC interrupt 
-all data for this transfer
+I think that is correct: the compiler won't reorder those because of the
+'volatile' pointer dereference, but it can reorder access to a normal
+pointer against a __raw_readl()/__raw_writel(), which breaks the scenario
+of using writel to trigger a DMA, or using a readl to see if a DMA has
+completed.
 
-sent/received already.
+The question is whether we should use a stronger barrier such
+as rmb() amd wmb() here rather than a simple compiler barrier.
 
-Is your point here that draining FIFO might be a long operation and we 
-can lose next portion of data ?
+I would assume that on complex architectures with write buffers and
+out-of-order prefetching, those are required, while on architectures
+without those features, the barriers are cheap.
+
+      Arnd
