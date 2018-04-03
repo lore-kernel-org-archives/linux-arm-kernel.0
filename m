@@ -1,94 +1,81 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 3 Apr 2018 08:11:50 +0530
-Subject: [PATCH v4 13/14] dt-bindings: cpufreq: Document
- operating-points-v2-kryo-cpu
-In-Reply-To: <7ca35b7a-6078-620b-4772-091e53ef6790@codeaurora.org>
-References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
- <1522358807-10413-14-git-send-email-ilialin@codeaurora.org>
- <20180402093018.GC3572@vireshk-i7>
- <7ca35b7a-6078-620b-4772-091e53ef6790@codeaurora.org>
-Message-ID: <06308b25-14ea-8d8b-6f95-f05c101a617b@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 2 Apr 2018 22:59:13 -0400
+Subject: [PATCH v8 0/7] netdev: intel: Eliminate duplicate barriers on
+ weakly-ordered archs
+In-Reply-To: <1522695990-31082-1-git-send-email-okaya@codeaurora.org>
+References: <1522695990-31082-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <b8355df0-f3ba-c8c8-ccbb-53b1a294eab6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Alex,
 
-On 4/2/2018 8:37 PM, Sricharan R wrote:
-> Hi Viresh,
+On 4/2/2018 3:06 PM, Sinan Kaya wrote:
+> Code includes wmb() followed by writel() in multiple places. writel()
+> already has a barrier on some architectures like arm64.
 > 
-> On 4/2/2018 3:00 PM, Viresh Kumar wrote:
->> +Sricharan,
->>
->> On 30-03-18, 00:26, Ilia Lin wrote:
->>> In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
->>> that have KRYO processors, the CPU ferequencies subset and voltage value
->>> of each OPP varies based on the silicon variant in use.
->>> Qualcomm Technologies, Inc. Process Voltage Scaling Tables
->>> defines the voltage and frequency value based on the msm-id in SMEM
->>> and speedbin blown in the efuse combination.
->>> The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
->>> to provide the OPP framework with required information.
->>> This is used to determine the voltage and frequency value for each OPP of
->>> operating-points-v2 table when it is parsed by the OPP framework.
->>>
->>> This change adds documentation.
->>>
->>> Change-Id: I1953f652a48249fb516d175f0e965a9510cd4209
->>> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
->>> ---
->>>  .../devicetree/bindings/cpufreq/kryo-cpufreq.txt   | 693 +++++++++++++++++++++
->>>  1 file changed, 693 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
->>
->> This should really go in opp directory.
->>
->>> new file mode 100644
->>> index 0000000..20cef9d
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/cpufreq/kryo-cpufreq.txt
->>> @@ -0,0 +1,693 @@
->>> +Qualcomm Technologies, Inc. KRYO CPUFreq and OPP bindings
->>> +===================================
->>> +
->>> +In Certain Qualcomm Technologies, Inc. SoCs like apq8096 and msm8996
->>> +that have KRYO processors, the CPU ferequencies subset and voltage value
->>> +of each OPP varies based on the silicon variant in use.
->>> +Qualcomm Technologies, Inc. Process Voltage Scaling Tables
->>> +defines the voltage and frequency value based on the msm-id in SMEM
->>> +and speedbin blown in the efuse combination.
->>> +The qcom-cpufreq-kryo driver reads the msm-id and efuse value from the SoC
->>> +to provide the OPP framework with required information (existing HW bitmap).
->>> +This is used to determine the voltage and frequency value for each OPP of
->>> +operating-points-v2 table when it is parsed by the OPP framework.
->>> +
->>> +Required properties:
->>> +--------------------
->>> +In 'cpus' nodes:
->>> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
->>> +
->>> +In 'operating-points-v2' table:
->>> +- compatible: Should be
->>> +	- 'operating-points-v2-kryo-cpu' for apq8096 and msm8996.
->>> +- nvmem-cells: A phandle pointing to a nvmem-cells node representing the
->>> +		efuse registers that has information about the
->>> +		speedbin that is used to select the right frequency/voltage
->>> +		value pair.
->>> +		Please refer the for nvmem-cells
->>> +		bindings Documentation/devicetree/bindings/nvmem/nvmem.txt
->>> +		and also examples below.
->>
->> Sricharan is also working on adding these, just make sure you guys do the same
->> thing..
->>
- Right, i was adding a similar one for krait cores [1]. There is code common in the
- init sequence across both (little). Do you suggest to make them common ?
+> This ends up CPU observing two barriers back to back before executing the
+> register write.
+> 
+> Since code already has an explicit barrier call, changing writel() to
+> writel_relaxed().
+> 
+> I did a regex search for wmb() followed by writel() in each drivers
+> directory. I scrubbed the ones I care about in this series.
+> 
+> I considered "ease of change", "popular usage" and "performance critical
+> path" as the determining criteria for my filtering.
+> 
+> We used relaxed API heavily on ARM for a long time but
+> it did not exist on other architectures. For this reason, relaxed
+> architectures have been paying double penalty in order to use the common
+> drivers.
+> 
+> Now that relaxed API is present on all architectures, we can go and scrub
+> all drivers to see what needs to change and what can remain.
+> 
+> We start with mostly used ones and hope to increase the coverage over time.
+> It will take a while to cover all drivers.
+> 
+> Feel free to apply patches individually.
+> 
+> Change since 7:
+> 
+> * API clarification with Linus and several architecture folks regarding
+> writel()
+> 
+> https://www.mail-archive.com/netdev at vger.kernel.org/msg225806.html
+> 
+> * removed wmb() in front of writel() at several places.
+> * remove old IA64 comments regarding ordering.
+> 
 
-Regards,
- Sricharan
+What do you think about this version? Did I miss any SMP barriers?
 
- [1] https://patchwork.kernel.org/patch/10261873/
+
+> Sinan Kaya (7):
+>   i40e/i40evf: Eliminate duplicate barriers on weakly-ordered archs
+>   ixgbe: eliminate duplicate barriers on weakly-ordered archs
+>   igbvf: eliminate duplicate barriers on weakly-ordered archs
+>   igb: eliminate duplicate barriers on weakly-ordered archs
+>   fm10k: Eliminate duplicate barriers on weakly-ordered archs
+>   ixgbevf: keep writel() closer to wmb()
+>   ixgbevf: eliminate duplicate barriers on weakly-ordered archs
+> 
+>  drivers/net/ethernet/intel/fm10k/fm10k_main.c     | 15 ++-----------
+>  drivers/net/ethernet/intel/i40e/i40e_txrx.c       | 22 ++++++++----------
+>  drivers/net/ethernet/intel/i40evf/i40e_txrx.c     |  8 +------
+>  drivers/net/ethernet/intel/igb/igb_main.c         | 14 ++----------
+>  drivers/net/ethernet/intel/igbvf/netdev.c         | 16 +++++---------
+>  drivers/net/ethernet/intel/ixgbe/ixgbe_main.c     | 23 ++-----------------
+>  drivers/net/ethernet/intel/ixgbevf/ixgbevf.h      |  5 -----
+>  drivers/net/ethernet/intel/ixgbevf/ixgbevf_main.c | 27 ++++++++---------------
+>  8 files changed, 30 insertions(+), 100 deletions(-)
+> 
+
+Sinan
 
 -- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
