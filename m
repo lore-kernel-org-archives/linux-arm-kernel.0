@@ -1,60 +1,67 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 3 Apr 2018 12:00:00 +1000
-Subject: linux-next: manual merge of the pci tree with the arm-soc tree
-Message-ID: <20180403120000.4ff083a0@canb.auug.org.au>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 2 Apr 2018 22:29:53 -0400
+Subject: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
+ weakly-ordered archs #2
+In-Reply-To: <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
+References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
+ <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <ac46b4e4-7e6c-c15f-06eb-01b1e4893d50@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 3/22/2018 12:26 PM, Sinan Kaya wrote:
+> @@ -860,7 +860,7 @@ static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
+>  	wmb();
+>  	cq->db.data.agg_flags = flags;
+>  	cq->db.data.value = cpu_to_le32(cons);
+> -	writeq(cq->db.raw, cq->db_addr);
+> +	writeq_relaxed(cq->db.raw, cq->db_addr);
 
-Today's linux-next merge of the pci tree got a conflict in:
+Given the direction to get rid of wmb() in front of writeX() functions, I have been
+reviewing this code. Under normal circumstances, I can get rid of all wmb() as follows.
 
-  drivers/bus/Makefile
+However, I started having my doubts now. Are these wmb() used as a SMP barrier too?
+I can't find any smp_Xmb() in drivers/infiniband/hw/qedr directory.
 
-between commit:
+static void doorbell_cq(struct qedr_cq *cq, u32 cons, u8 flags)
+ {
+-       /* Flush data before signalling doorbell */
+-       wmb();
+        cq->db.data.agg_flags = flags;
+        cq->db.data.value = cpu_to_le32(cons);
+        writeq(cq->db.raw, cq->db_addr);
+@@ -1870,8 +1868,7 @@ static int qedr_update_qp_state(struct qedr_dev *dev,
+                         */
 
-  1888d3ddc3d6 ("drivers/bus: Move Arm CCN PMU driver")
+                        if (rdma_protocol_roce(&dev->ibdev, 1)) {
+-                               wmb();
+-                               writel_relaxed(qp->rq.db_data.raw, qp->rq.db);
++                               writel(qp->rq.db_data.raw, qp->rq.db);
+                                /* Make sure write takes effect */
+                                mmiowb();
+                        }
+@@ -3275,8 +3272,7 @@ int qedr_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+         * unchanged). For performance reasons we avoid checking for this
+         * redundant doorbell.
+         */
+-       wmb();
+-       writel_relaxed(qp->sq.db_data.raw, qp->sq.db);
++       writel(qp->sq.db_data.raw, qp->sq.db);
 
-from the arm-soc tree and commit:
+        /* Make sure write sticks */
+        mmiowb();
+@@ -3362,9 +3358,6 @@ int qedr_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
 
-  38e3446c5d06 ("HISI LPC: Support the LPC host on Hip06/Hip07 with DT bindings")
+                qedr_inc_sw_prod(&qp->rq);
 
-from the pci tree.
+-               /* Flush all the writes before signalling doorbell */
+-               wmb();
 
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
+
+
+
 
 -- 
-Cheers,
-Stephen Rothwell
-
-diff --cc drivers/bus/Makefile
-index 3d473b8adeac,50bb12a971a0..000000000000
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@@ -5,11 -5,10 +5,13 @@@
-  
-  # Interconnect bus drivers for ARM platforms
-  obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
- -obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
-+ 
-+ obj-$(CONFIG_HISILICON_LPC)	+= hisi_lpc.o
-  obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
- +
- +# DPAA2 fsl-mc bus
- +obj-$(CONFIG_FSL_MC_BUS)	+= fsl-mc/
- +
-  obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
-  obj-$(CONFIG_MIPS_CDMM)		+= mips_cdmm.o
-  obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/1485cf80/attachment.sig>
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
