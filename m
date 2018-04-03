@@ -1,90 +1,75 @@
 From: cpandya@codeaurora.org (Chintan Pandya)
-Date: Tue, 3 Apr 2018 13:31:52 +0530
-Subject: [PATCH v7 1/4] ioremap: Update pgtable free interfaces with addr
-In-Reply-To: <201803291957.TombWSzK%fengguang.wu@intel.com>
-References: <1522240282-12104-2-git-send-email-cpandya@codeaurora.org>
- <201803291957.TombWSzK%fengguang.wu@intel.com>
-Message-ID: <95da57a0-dcf9-c829-1c4b-6492d7681750@codeaurora.org>
+Date: Tue,  3 Apr 2018 13:30:45 +0530
+Subject: [PATCH v8 3/4] arm64: Implement page table free interfaces
+In-Reply-To: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
+References: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
+Message-ID: <1522742446-5084-4-git-send-email-cpandya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Implement pud_free_pmd_page() and pmd_free_pte_page().
 
+Implementation requires,
+ 1) Clearing off the current pud/pmd entry
+ 2) Invalidate TLB which could have previously
+    valid but not stale entry
+ 3) Freeing of the un-used next level page tables
 
-On 3/29/2018 5:23 PM, kbuild test robot wrote:
-> Hi Chintan,
-> 
-> Thank you for the patch! Yet something to improve:
-> 
-> [auto build test ERROR on v4.16-rc7]
-> [also build test ERROR on next-20180328]
-> [cannot apply to arm64/for-next/core tip/x86/core asm-generic/master]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Chintan-Pandya/ioremap-Update-pgtable-free-interfaces-with-addr/20180329-133736
-> config: x86_64-rhel (attached as .config)
-> compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-> reproduce:
->          # save the attached .config to linux build tree
->          make ARCH=x86_64
-> 
-> All errors (new ones prefixed by >>):
-> 
->     arch/x86/mm/pgtable.c: In function 'pud_free_pmd_page':
->>> arch/x86/mm/pgtable.c:725:8: error: too few arguments to function 'pmd_free_pte_page'
->        if (!pmd_free_pte_page(&pmd[i]), addr + (i * PMD_SIZE))
->             ^~~~~~~~~~~~~~~~~
->     In file included from arch/x86/include/asm/pgtable.h:1292:0,
->                      from include/linux/memremap.h:8,
->                      from include/linux/mm.h:27,
->                      from arch/x86/mm/pgtable.c:2:
->     include/asm-generic/pgtable.h:987:5: note: declared here
->      int pmd_free_pte_page(pmd_t *pmd, unsigned long addr);
->          ^~~~~~~~~~~~~~~~~
->     arch/x86/mm/pgtable.c:725:34: warning: left-hand operand of comma expression has no effect [-Wunused-value]
->        if (!pmd_free_pte_page(&pmd[i]), addr + (i * PMD_SIZE))
->                                       ^
-> 
-> vim +/pmd_free_pte_page +725 arch/x86/mm/pgtable.c
-> 
->     705	
->     706	/**
->     707	 * pud_free_pmd_page - Clear pud entry and free pmd page.
->     708	 * @pud: Pointer to a PUD.
->     709	 * @addr: Virtual address associated with pud.
->     710	 *
->     711	 * Context: The pud range has been unmaped and TLB purged.
->     712	 * Return: 1 if clearing the entry succeeded. 0 otherwise.
->     713	 */
->     714	int pud_free_pmd_page(pud_t *pud, unsigned long addr)
->     715	{
->     716		pmd_t *pmd;
->     717		int i;
->     718	
->     719		if (pud_none(*pud))
->     720			return 1;
->     721	
->     722		pmd = (pmd_t *)pud_page_vaddr(*pud);
->     723	
->     724		for (i = 0; i < PTRS_PER_PMD; i++)
->   > 725			if (!pmd_free_pte_page(&pmd[i]), addr + (i * PMD_SIZE))
+Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+---
+ arch/arm64/mm/mmu.c | 29 +++++++++++++++++++++++++----
+ 1 file changed, 25 insertions(+), 4 deletions(-)
 
-Missed it. Will upload v8
->     726				return 0;
->     727	
->     728		pud_clear(pud);
->     729		free_page((unsigned long)pmd);
->     730	
->     731		return 1;
->     732	}
->     733	
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
-
-Chintan
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index da98828..0f651db 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -45,6 +45,7 @@
+ #include <asm/memblock.h>
+ #include <asm/mmu_context.h>
+ #include <asm/ptdump.h>
++#include <asm/tlbflush.h>
+ 
+ #define NO_BLOCK_MAPPINGS	BIT(0)
+ #define NO_CONT_MAPPINGS	BIT(1)
+@@ -973,12 +974,32 @@ int pmd_clear_huge(pmd_t *pmdp)
+ 	return 1;
+ }
+ 
+-int pud_free_pmd_page(pud_t *pud, unsigned long addr)
++int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
+ {
+-	return pud_none(*pud);
++	pmd_t *table;
++
++	if (pmd_present(READ_ONCE(*pmdp))) {
++		table = __va(pmd_val(*pmdp));
++		pmd_clear(pmdp);
++		__flush_tlb_kernel_pgtable(addr);
++		free_page((unsigned long) table);
++	}
++	return 1;
+ }
+ 
+-int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
++int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
+ {
+-	return pmd_none(*pmd);
++	pmd_t *table;
++	int i;
++
++	if (pud_present(READ_ONCE(*pudp))) {
++		table = __va(pud_val(*pudp));
++		for (i = 0; i < PTRS_PER_PMD; i++)
++			pmd_free_pte_page(&table[i], addr + (i * PMD_SIZE));
++
++		pud_clear(pudp);
++		__flush_tlb_kernel_pgtable(addr);
++		free_page((unsigned long) table);
++	}
++	return 1;
+ }
 -- 
-Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
-Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+Center, Inc., is a member of Code Aurora Forum, a Linux Foundation
 Collaborative Project
