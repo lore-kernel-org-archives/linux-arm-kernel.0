@@ -1,61 +1,197 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 3 Apr 2018 16:44:07 +0100
-Subject: [PATCH v2 11/17] kvm: arm64: Configure VTCR per VM
-In-Reply-To: <be9e8c47-8366-2d8f-8d8d-b8d2f978107b@arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
- <be9e8c47-8366-2d8f-8d8d-b8d2f978107b@arm.com>
-Message-ID: <f3ea2a6c-6c98-1768-0eef-b57b74ab91fa@arm.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Tue,  3 Apr 2018 18:44:44 +0300
+Subject: [PATCH v3 1/6] spi: sun6i: coding style/readability improvements
+In-Reply-To: <20180403154449.2443-1-ssuloev@orpaltech.com>
+References: <20180403154449.2443-1-ssuloev@orpaltech.com>
+Message-ID: <20180403154449.2443-2-ssuloev@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/18 15:58, James Morse wrote:
-> Hi Suzuki,
-> 
-> On 27/03/18 14:15, Suzuki K Poulose wrote:
->> We set VTCR_EL2 very early during the stage2 init and don't
->> touch it ever. This is fine as we had a fixed IPA size. This
->> patch changes the behavior to set the VTCR for a given VM,
->> depending on its stage2 table. The common configuration for
->> VTCR is still performed during the early init as we have to
->> retain the hardware access flag update bits (VTCR_EL2_HA)
->> per CPU (as they are only set for the CPUs which are capabile).
-> 
-> (Nit: capable)
-> 
+Minor changes to fulfill the coding style and improve
+the readability of the code.
 
-Thanks for spotting, will fix it.
+Changes in v2:
+1) Fixed issue with misplacing a piece of code that requires access
+to the transfer structure into sun6i_spi_prepare_message() function
+where the transfer structure is not available.
 
-> 
->> The bits defining the number of levels in the page table (SL0)
->> and and the size of the Input address to the translation (T0SZ)
->> are programmed for each VM upon entry to the guest.
-> 
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index 870f4b1..5ccd3ae 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -164,6 +164,12 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
->>   static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
->>   {
->>   	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
->> +	u64 vtcr = read_sysreg(vtcr_el2);
->> +
->> +	vtcr &= ~VTCR_EL2_PRIVATE_MASK;
->> +	vtcr |= VTCR_EL2_SL0(kvm_stage2_levels(kvm)) |
->> +		VTCR_EL2_T0SZ(kvm_phys_shift(kvm));
->> +	write_sysreg(vtcr, vtcr_el2);
->>   	write_sysreg(kvm->arch.vttbr, vttbr_el2);
->>   }
-> 
-> Do we need to set this register for tlb maintenance too?
-> e.g. tlbi for a 3-level-stage2 vm when a 2-level-stage2 vm's vtcr is loaded...
-> 
-> (The ARM-ARM has 'Any of the bits of VTCR_EL2 are permitted to be cached in a TLB'.)
+Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+---
+ drivers/spi/spi-sun6i.c | 97 +++++++++++++++++++++++++++++--------------------
+ 1 file changed, 58 insertions(+), 39 deletions(-)
 
-You're right. We need to set the VTCR for the tlb operations. I think
-we can do this by hooking it to the __tlb_switch_to_guest() routine.
-Will address it in the next version.
-
-Cheers
-Suzuki
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index 8533f4e..88ad45e 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -88,8 +88,12 @@
+ #define SUN6I_TXDATA_REG		0x200
+ #define SUN6I_RXDATA_REG		0x300
+ 
++#define SUN6I_SPI_MODE_BITS		(SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST)
++
++#define SUN6I_SPI_MAX_SPEED_HZ		100000000
++#define SUN6I_SPI_MIN_SPEED_HZ		3000
++
+ struct sun6i_spi {
+-	struct spi_master	*master;
+ 	void __iomem		*base_addr;
+ 	struct clk		*hclk;
+ 	struct clk		*mclk;
+@@ -189,6 +193,9 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
+ 	else
+ 		reg &= ~SUN6I_TFR_CTL_CS_LEVEL;
+ 
++	/* We want to control the chip select manually */
++	reg |= SUN6I_TFR_CTL_CS_MANUAL;
++
+ 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
+ }
+ 
+@@ -197,6 +204,39 @@ static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
+ 	return SUN6I_MAX_XFER_SIZE - 1;
+ }
+ 
++static int sun6i_spi_prepare_message(struct spi_master *master,
++				     struct spi_message *msg)
++{
++	struct spi_device *spi = msg->spi;
++	struct sun6i_spi *sspi = spi_master_get_devdata(master);
++	u32 reg;
++
++	/*
++	 * Setup the transfer control register: Chip Select,
++	 * polarities, etc.
++	 */
++	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
++
++	if (spi->mode & SPI_CPOL)
++		reg |= SUN6I_TFR_CTL_CPOL;
++	else
++		reg &= ~SUN6I_TFR_CTL_CPOL;
++
++	if (spi->mode & SPI_CPHA)
++		reg |= SUN6I_TFR_CTL_CPHA;
++	else
++		reg &= ~SUN6I_TFR_CTL_CPHA;
++
++	if (spi->mode & SPI_LSB_FIRST)
++		reg |= SUN6I_TFR_CTL_FBS;
++	else
++		reg &= ~SUN6I_TFR_CTL_FBS;
++
++	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
++
++	return 0;
++}
++
+ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 				  struct spi_device *spi,
+ 				  struct spi_transfer *tfr)
+@@ -235,27 +275,8 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS) |
+ 			(trig_level << SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS));
+ 
+-	/*
+-	 * Setup the transfer control register: Chip Select,
+-	 * polarities, etc.
+-	 */
+-	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+-
+-	if (spi->mode & SPI_CPOL)
+-		reg |= SUN6I_TFR_CTL_CPOL;
+-	else
+-		reg &= ~SUN6I_TFR_CTL_CPOL;
+-
+-	if (spi->mode & SPI_CPHA)
+-		reg |= SUN6I_TFR_CTL_CPHA;
+-	else
+-		reg &= ~SUN6I_TFR_CTL_CPHA;
+-
+-	if (spi->mode & SPI_LSB_FIRST)
+-		reg |= SUN6I_TFR_CTL_FBS;
+-	else
+-		reg &= ~SUN6I_TFR_CTL_FBS;
+ 
++	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+ 	/*
+ 	 * If it's a TX only transfer, we don't want to fill the RX
+ 	 * FIFO with bogus data
+@@ -265,11 +286,9 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	else
+ 		reg |= SUN6I_TFR_CTL_DHB;
+ 
+-	/* We want to control the chip select manually */
+-	reg |= SUN6I_TFR_CTL_CS_MANUAL;
+-
+ 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
+ 
++
+ 	/* Ensure that we have a parent clock fast enough */
+ 	mclk_rate = clk_get_rate(sspi->mclk);
+ 	if (mclk_rate < (2 * tfr->speed_hz)) {
+@@ -442,12 +461,24 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 	struct resource	*res;
+ 	int ret = 0, irq;
+ 
+-	master = spi_alloc_master(&pdev->dev, sizeof(struct sun6i_spi));
++	master = spi_alloc_master(&pdev->dev, sizeof(*sspi));
+ 	if (!master) {
+ 		dev_err(&pdev->dev, "Unable to allocate SPI Master\n");
+ 		return -ENOMEM;
+ 	}
+ 
++	master->max_speed_hz = SUN6I_SPI_MAX_SPEED_HZ;
++	master->min_speed_hz = SUN6I_SPI_MIN_SPEED_HZ;
++	master->num_chipselect = 4;
++	master->mode_bits = SUN6I_SPI_MODE_BITS;
++	master->bits_per_word_mask = SPI_BPW_MASK(8);
++	master->set_cs = sun6i_spi_set_cs;
++	master->prepare_message = sun6i_spi_prepare_message;
++	master->transfer_one = sun6i_spi_transfer_one;
++	master->max_transfer_size = sun6i_spi_max_transfer_size;
++	master->dev.of_node = pdev->dev.of_node;
++	master->auto_runtime_pm = true;
++
+ 	platform_set_drvdata(pdev, master);
+ 	sspi = spi_master_get_devdata(master);
+ 
+@@ -466,26 +497,14 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	ret = devm_request_irq(&pdev->dev, irq, sun6i_spi_handler,
+-			       0, "sun6i-spi", sspi);
++			       0, dev_name(&pdev->dev), sspi);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Cannot request IRQ\n");
+ 		goto err_free_master;
+ 	}
+ 
+-	sspi->master = master;
+ 	sspi->fifo_depth = (unsigned long)of_device_get_match_data(&pdev->dev);
+ 
+-	master->max_speed_hz = 100 * 1000 * 1000;
+-	master->min_speed_hz = 3 * 1000;
+-	master->set_cs = sun6i_spi_set_cs;
+-	master->transfer_one = sun6i_spi_transfer_one;
+-	master->num_chipselect = 4;
+-	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST;
+-	master->bits_per_word_mask = SPI_BPW_MASK(8);
+-	master->dev.of_node = pdev->dev.of_node;
+-	master->auto_runtime_pm = true;
+-	master->max_transfer_size = sun6i_spi_max_transfer_size;
+-
+ 	sspi->hclk = devm_clk_get(&pdev->dev, "ahb");
+ 	if (IS_ERR(sspi->hclk)) {
+ 		dev_err(&pdev->dev, "Unable to acquire AHB clock\n");
+@@ -525,7 +544,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 
+ 	ret = devm_spi_register_master(&pdev->dev, master);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "cannot register SPI master\n");
++		dev_err(&pdev->dev, "Couldn't register SPI master\n");
+ 		goto err_pm_disable;
+ 	}
+ 
+-- 
+2.16.2
