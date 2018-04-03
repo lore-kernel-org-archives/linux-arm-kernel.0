@@ -1,26 +1,61 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 3 Apr 2018 17:39:25 +0200
-Subject: [PATCH v2 5/6] i2c: i2c-stm32f7: Add DMA support
-In-Reply-To: <1521650940-11651-6-git-send-email-pierre-yves.mordret@st.com>
-References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
- <1521650940-11651-6-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20180403153925.lg37rezuvs6hefks@ninjato>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 3 Apr 2018 16:44:07 +0100
+Subject: [PATCH v2 11/17] kvm: arm64: Configure VTCR per VM
+In-Reply-To: <be9e8c47-8366-2d8f-8d8d-b8d2f978107b@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
+ <be9e8c47-8366-2d8f-8d8d-b8d2f978107b@arm.com>
+Message-ID: <f3ea2a6c-6c98-1768-0eef-b57b74ab91fa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/04/18 15:58, James Morse wrote:
+> Hi Suzuki,
+> 
+> On 27/03/18 14:15, Suzuki K Poulose wrote:
+>> We set VTCR_EL2 very early during the stage2 init and don't
+>> touch it ever. This is fine as we had a fixed IPA size. This
+>> patch changes the behavior to set the VTCR for a given VM,
+>> depending on its stage2 table. The common configuration for
+>> VTCR is still performed during the early init as we have to
+>> retain the hardware access flag update bits (VTCR_EL2_HA)
+>> per CPU (as they are only set for the CPUs which are capabile).
+> 
+> (Nit: capable)
+> 
 
-> +#define STM32F7_I2C_DMA_LEN_MIN			0x1
-...
+Thanks for spotting, will fix it.
 
-> +	if (i2c_dev->dma && f7_msg->count >= STM32F7_I2C_DMA_LEN_MIN) {
+> 
+>> The bits defining the number of levels in the page table (SL0)
+>> and and the size of the Input address to the translation (T0SZ)
+>> are programmed for each VM upon entry to the guest.
+> 
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index 870f4b1..5ccd3ae 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -164,6 +164,12 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>>   static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+>>   {
+>>   	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+>> +	u64 vtcr = read_sysreg(vtcr_el2);
+>> +
+>> +	vtcr &= ~VTCR_EL2_PRIVATE_MASK;
+>> +	vtcr |= VTCR_EL2_SL0(kvm_stage2_levels(kvm)) |
+>> +		VTCR_EL2_T0SZ(kvm_phys_shift(kvm));
+>> +	write_sysreg(vtcr, vtcr_el2);
+>>   	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+>>   }
+> 
+> Do we need to set this register for tlb maintenance too?
+> e.g. tlbi for a 3-level-stage2 vm when a 2-level-stage2 vm's vtcr is loaded...
+> 
+> (The ARM-ARM has 'Any of the bits of VTCR_EL2 are permitted to be cached in a TLB'.)
 
-Are you using DMA for every message with a length >= 1? The setup of
-that might be more expensive than the DMA gain, if so.
+You're right. We need to set the VTCR for the tlb operations. I think
+we can do this by hooking it to the __tlb_switch_to_guest() routine.
+Will address it in the next version.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/ac57ea74/attachment.sig>
+Cheers
+Suzuki
