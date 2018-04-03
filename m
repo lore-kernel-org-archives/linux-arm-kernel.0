@@ -1,80 +1,64 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 3 Apr 2018 14:55:36 +0200
-Subject: [PATCH] drm/atmel-hlcdc: add command line option to specify
- preferred depth
-In-Reply-To: <20180403091037.GO3881@phenom.ffwll.local>
-References: <20180326073502.19259-1-peda@axentia.se>
- <20180328093454.4149fa3b@bbrezillon>
- <ce723d9f-6858-0bad-bffb-85ab036510ee@axentia.se>
- <20180403091037.GO3881@phenom.ffwll.local>
-Message-ID: <6a0a1730-be02-758f-b411-776b9c751a3d@axentia.se>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 Apr 2018 14:56:18 +0200
+Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
+ readX() implementation
+In-Reply-To: <d5c0c170-07ab-273f-7d4f-301d2bedb992@codeaurora.org>
+References: <1522425494-2916-1-git-send-email-okaya@codeaurora.org>
+ <1522425494-2916-2-git-send-email-okaya@codeaurora.org>
+ <20180403104925.fuyajja6tyanlna4@lakrids.cambridge.arm.com>
+ <CAK8P3a3fZx42sQY41Pf+Q3fMNrP2FgXvvntnrLkQXbAezOQjEw@mail.gmail.com>
+ <d5c0c170-07ab-273f-7d4f-301d2bedb992@codeaurora.org>
+Message-ID: <CAK8P3a0+Q-aBbKsqqypZfCVzHTwcepL9KhBP9qJKE+2FknWHMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-03 11:10, Daniel Vetter wrote:
-> On Wed, Mar 28, 2018 at 12:03:39PM +0200, Peter Rosin wrote:
->> On 2018-03-28 09:34, Boris Brezillon wrote:
->>> Hi Peter,
+On Tue, Apr 3, 2018 at 2:44 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 4/3/2018 7:13 AM, Arnd Bergmann wrote:
+>> On Tue, Apr 3, 2018 at 12:49 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> Hi,
 >>>
->>> On Mon, 26 Mar 2018 09:35:02 +0200
->>> Peter Rosin <peda@axentia.se> wrote:
+>>> On Fri, Mar 30, 2018 at 11:58:13AM -0400, Sinan Kaya wrote:
+>>>> The default implementation of mapping readX() to __raw_readX() is wrong.
+>>>> readX() has stronger ordering semantics. Compiler is allowed to reorder
+>>>> __raw_readX().
 >>>
->>>> I have an sama5d31-based system with 64MB of memory and a 1920x1080
->>>> LVDS display wired for 16-bpp. When I enable legacy fbdev support,
->>>> the contiguous memory allocator invariably fails with the order-11
->>>> allocation for a 1920x1080 at 24-bpp buffer (~6MB). But this HW can never
->>>> make any good use of RGB888, so that is a wasted attempt anyway that
->>>> would also waste precious memory should it succeed.
->>>>
->>>> Sure, I could rewrite user-space to go directly to KMS etc, and that
->>>> makes the (attempted) order-11 allocation go away, replacing it with
->>>> one order-10 allocation per application restart for a 1920x1080 at 16-bpp
->>>> buffer (<4MB). But after a few restarts, order-10 allocations start to
->>>> fail as well, which is only to be expected AFAIU.
->>>>
->>>> So, I'd rather not change user-space (which was originally written
->>>> to target a smaller display) so that I at the same time get the
->>>> benefit of an early pre-allocated fbdev frame-buffer that can be
->>>> reused over and over. But to do that I need to tell the driver that
->>>> 16-bpp is the preferred depth. Add a module parameter to do just that.
->>>>
->>>> Signed-off-by: Peter Rosin <peda@axentia.se>
->>>> ---
->>>>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++++++++++++-
->>>>  1 file changed, 17 insertions(+), 1 deletion(-)
->>>>
->>>> I found some inspiration regarding naming and implementation here:
->>>> https://patchwork.kernel.org/patch/9848631/
->>>>
->>>> I have found no feedback on that patch though, which makes me wonder if
->>>> I'm perhaps barking up the wronig tree?
+>>> Could you please specify what the compiler is potentially reordering
+>>> __raw_readX() against, and why this would be wrong?
 >>>
->>> Hm, isn't that something you can already overload with the video=
->>> parameter?
+>>> e.g. do we care about prior normal memory accesses, subsequent normal
+>>> memory accesses, and/or other IO accesses?
 >>>
->>> 	video=<output>:<resolution>[-<bpp>]
+>>> I assume that the asm-generic __raw_{read,write}X() implementations are
+>>> all ordered w.r.t. each other (at least for a specific device).
 >>
->> Heh, you are right...
+>> I think that is correct: the compiler won't reorder those because of the
+>> 'volatile' pointer dereference, but it can reorder access to a normal
+>> pointer against a __raw_readl()/__raw_writel(), which breaks the scenario
+>> of using writel to trigger a DMA, or using a readl to see if a DMA has
+>> completed.
+>
+> Yes, we are worried about memory update vs. IO update ordering here.
+> That was the reason why barrier() was introduced in this patch. I'll try to
+> clarify that better in the commit text.
+>
 >>
->>> AFAIR, <bpp> encodes the color depth, so what is the benefit of adding
->>> this new property to overload the default depth?
+>> The question is whether we should use a stronger barrier such
+>> as rmb() amd wmb() here rather than a simple compiler barrier.
 >>
->> ...but hhhmmm, I think I will have to have to encode the display size
->> in the bootargs so I will have to use distinct barebox environments
->> depending on the panel, but that's no biggie.
->>
->> Splendid, please throw away the patch!
-> 
-> I think we could fix the parsing to allow -bpp without the resolution ...
-> Not sure how to best do that though. Maybe state that 0x0-bpp means to not
-> change the resolution from the default?
+>> I would assume that on complex architectures with write buffers and
+>> out-of-order prefetching, those are required, while on architectures
+>> without those features, the barriers are cheap.
+>
+> That's my reasoning too. I'm trying to follow the x86 example here where there
+> is a compiler barrier in writeX() and readX() family of functions.
 
-That could be done, and I had a quick look but it's not immediately obvious
-to me how that should be accomplished in a fairly localized manner. Since
-this is no big deal, I will leave that as is and simply specify the screen
-resolution along with the bpp in the bootargs.
+I think x86 is the special case here because it implicitly guarantees
+the strict ordering in the hardware, as long as the compiler gets it
+right. For the asm-generic version, it may be better to play safe and
+do the safest version, requiring architectures to override that barrier
+if they want to be faster.
 
-But I do like the idea.
+We could use the same macros that riscv has, using __io_br(),
+__io_ar(), __io_bw() and __io_aw() for before/after read/write.
 
-Cheers,
-Peter
+      Arnd
