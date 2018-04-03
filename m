@@ -1,59 +1,100 @@
-From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Tue, 3 Apr 2018 14:03:48 -0600
-Subject: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
- weakly-ordered archs #2
-In-Reply-To: <CY1PR0701MB201215C9F38E8760732B595088A50@CY1PR0701MB2012.namprd07.prod.outlook.com>
-References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
- <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
- <ac46b4e4-7e6c-c15f-06eb-01b1e4893d50@codeaurora.org>
- <CY1PR0701MB201215C9F38E8760732B595088A50@CY1PR0701MB2012.namprd07.prod.outlook.com>
-Message-ID: <20180403200348.GB21167@ziepe.ca>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Tue, 3 Apr 2018 22:06:28 +0200
+Subject: [PATCH v5 08/13] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180403091218.t6xuq6csjp4uyy5u@flea>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-9-mylene.josserand@bootlin.com>
+ <20180403091218.t6xuq6csjp4uyy5u@flea>
+Message-ID: <20180403220628.19c9acaf@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 07:42:28AM +0000, Kalderon, Michal wrote:
-> > From: Sinan Kaya [mailto:okaya at codeaurora.org]
-> > Sent: Tuesday, April 03, 2018 5:30 AM
-> > To: linux-rdma at vger.kernel.org; timur at codeaurora.org;
-> > sulrich at codeaurora.org
-> > Cc: linux-arm-msm at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > Kalderon, Michal <Michal.Kalderon@cavium.com>; Elior, Ariel
-> > <Ariel.Elior@cavium.com>; Doug Ledford <dledford@redhat.com>; Jason
-> > Gunthorpe <jgg@ziepe.ca>; linux-kernel at vger.kernel.org
-> > Subject: Re: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
-> > weakly-ordered archs #2
+Hello,
+
+Thank you for the review.
+
+On Tue, 3 Apr 2018 11:12:18 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+
+> On Tue, Apr 03, 2018 at 08:18:31AM +0200, Myl?ne Josserand wrote:
+> > Add the initialization of CNTVOFF for sun8i-a83t.
 > > 
-> > On 3/22/2018 12:26 PM, Sinan Kaya wrote:
-> > > @@ -860,7 +860,7 @@ static void doorbell_cq(struct qedr_cq *cq, u32
-> > cons, u8 flags)
-> > >  	wmb();
-> > >  	cq->db.data.agg_flags = flags;
-> > >  	cq->db.data.value = cpu_to_le32(cons);
-> > > -	writeq(cq->db.raw, cq->db_addr);
-> > > +	writeq_relaxed(cq->db.raw, cq->db_addr);
+> > For boot CPU, Create a new machine that handles this
+> > function's call in an "init_early" callback.
+> > For secondary CPUs, add this function into secondary_startup
+> > assembly entry.
 > > 
-> > Given the direction to get rid of wmb() in front of writeX() functions, I have
-> > been reviewing this code. Under normal circumstances, I can get rid of all
-> > wmb() as follows.
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > ---
+> >  arch/arm/mach-sunxi/headsmp.S |  1 +
+> >  arch/arm/mach-sunxi/sunxi.c   | 18 +++++++++++++++++-
+> >  2 files changed, 18 insertions(+), 1 deletion(-)
 > > 
-> > However, I started having my doubts now. Are these wmb() used as a SMP
-> > barrier too?
-> > I can't find any smp_Xmb() in drivers/infiniband/hw/qedr directory.
+> > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> > index 79890fbe5613..b586b7cf803a 100644
+> > --- a/arch/arm/mach-sunxi/headsmp.S
+> > +++ b/arch/arm/mach-sunxi/headsmp.S
+> > @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+> >  
+> >  ENTRY(sunxi_mc_smp_secondary_startup)
+> >  	bl	sunxi_mc_smp_cluster_cache_enable
+> > +	bl	smp_init_cntvoff
+> >  	b	secondary_startup
+> >  ENDPROC(sunxi_mc_smp_secondary_startup)
+> >  
+> > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > index 5e9602ce1573..090784108c0a 100644
+> > --- a/arch/arm/mach-sunxi/sunxi.c
+> > +++ b/arch/arm/mach-sunxi/sunxi.c
+> > @@ -16,6 +16,7 @@
+> >  #include <linux/platform_device.h>
+> >  
+> >  #include <asm/mach/arch.h>
+> > +#include <asm/smp_cntvoff.h>
+> >  
+> >  static const char * const sunxi_board_dt_compat[] = {
+> >  	"allwinner,sun4i-a10",
+> > @@ -62,7 +63,6 @@ MACHINE_END
+> >  static const char * const sun8i_board_dt_compat[] = {
+> >  	"allwinner,sun8i-a23",
+> >  	"allwinner,sun8i-a33",
+> > -	"allwinner,sun8i-a83t",
+> >  	"allwinner,sun8i-h2-plus",
+> >  	"allwinner,sun8i-h3",
+> >  	"allwinner,sun8i-r40",
+> > @@ -75,6 +75,22 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+> >  	.dt_compat	= sun8i_board_dt_compat,
+> >  MACHINE_END
+> >  
+> > +void __init sun8i_cntvoff_init(void)
+> > +{
+> > +	smp_init_cntvoff();  
 > 
-> Your doubts are in place. You initial patch series modified writel to writel_relaxed
-> Simply removing the wmb is dangerous. The wmb before writel are used to make sure the
-> HW observes the changes in memory before we trigger the doorbell. Smp barriers here
-> wouldn't suffice, as on a single processor. we still need to make sure memory is updated
-> and not remained in cache when HW accesses it.
-> Reviewing the qedr barriers, I can find places where this may have not been necessary, 
-> But definitely you can't simply remove this wmb barriers. 
+> Can't this be moved to the SMP setup code?
 
-As Sinan said, the consensus is that wmb();writel(); is redundant if
-the only purpose of the wmb is to order DMA and system memory.
+I tried to put it in the first lines of "sunxi_mc_smp_init" function
+but it did not work. I tried to find some callbacks to have an
+early "init" and I only found the "init_early"'s one. There is probably
+another way to handle that so do not hesitate to tell me any ideas.
 
-So can you review these patches on that basis please? Is the WMB doing
-something else, eg SMP related? If yes, please send a patch adding
-appropriate comments.
+> 
+> > +}
+> > +
+> > +static const char * const sun8i_cntvoff_board_dt_compat[] = {
+> > +	"allwinner,sun8i-a83t",
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i boards needing cntvoff")  
+> 
+> All of the SoCs need CNTVOFF, so that doesn't really make sense. Why
+> not just calling it for what it is: an A83t?
 
-Thanks,
-Jason
+Sure, I will update it.
+
+Best regards,
+
+-- 
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
