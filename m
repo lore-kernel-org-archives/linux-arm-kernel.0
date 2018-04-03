@@ -1,42 +1,60 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 3 Apr 2018 09:15:11 +0800
-Subject: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
-In-Reply-To: <0094c5ab-89db-409f-d5fb-c961f9d84740@gmail.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <1501876754-1064-3-git-send-email-nleeder@codeaurora.org>
- <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
- <e55ab4404143ea0b3cc4795a93e37480@codeaurora.org>
- <14f90cc6-f2c1-5a63-67c6-a5c8ddb4799e@gmail.com>
- <c1f9230b-8ff0-5b2e-def9-cbf6b2e2e99c@huawei.com>
- <66ef3bf4-9550-94c7-f8ad-ee53d6c75025@huawei.com>
- <0094c5ab-89db-409f-d5fb-c961f9d84740@gmail.com>
-Message-ID: <23363f05-0fe0-0af3-5f3d-5f2e14181e95@huawei.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 3 Apr 2018 12:00:00 +1000
+Subject: linux-next: manual merge of the pci tree with the arm-soc tree
+Message-ID: <20180403120000.4ff083a0@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+Cc Lorenzo]
+Hi all,
 
-Hi Neil,
+Today's linux-next merge of the pci tree got a conflict in:
 
-On 2018/4/3 1:59, Neil Leeder wrote:
-> Hi Hanjun,
-> 
-> On 4/2/2018 10:24 AM, Hanjun Guo wrote:
-> <SNIP>
->>
->> I think we need to wait for the new version of IORT spec,
->> which includes the fix for the two base address for SMMUv3
->> PMCG (now just represent one).
->>
->> Thanks
->> Hanjun
->>
-> It's in rev D which is available now:
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0049d/DEN0049D_IO_Remapping_Table.pdf
+  drivers/bus/Makefile
 
-Thanks for let me know, I didn't notice the update :)
+between commit:
 
-Lorenzo, do you have a plan for ACPICA changes?
+  1888d3ddc3d6 ("drivers/bus: Move Arm CCN PMU driver")
 
-Thanks
-Hanjun
+from the arm-soc tree and commit:
+
+  38e3446c5d06 ("HISI LPC: Support the LPC host on Hip06/Hip07 with DT bindings")
+
+from the pci tree.
+
+I fixed it up (see below) and can carry the fix as necessary. This
+is now fixed as far as linux-next is concerned, but any non trivial
+conflicts should be mentioned to your upstream maintainer when your tree
+is submitted for merging.  You may also want to consider cooperating
+with the maintainer of the conflicting tree to minimise any particularly
+complex conflicts.
+
+-- 
+Cheers,
+Stephen Rothwell
+
+diff --cc drivers/bus/Makefile
+index 3d473b8adeac,50bb12a971a0..000000000000
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@@ -5,11 -5,10 +5,13 @@@
+  
+  # Interconnect bus drivers for ARM platforms
+  obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
+ -obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
++ 
++ obj-$(CONFIG_HISILICON_LPC)	+= hisi_lpc.o
+  obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+ +
+ +# DPAA2 fsl-mc bus
+ +obj-$(CONFIG_FSL_MC_BUS)	+= fsl-mc/
+ +
+  obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
+  obj-$(CONFIG_MIPS_CDMM)		+= mips_cdmm.o
+  obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/1485cf80/attachment.sig>
