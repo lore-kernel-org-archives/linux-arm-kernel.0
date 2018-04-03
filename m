@@ -1,56 +1,35 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  3 Apr 2018 21:11:48 +0200
-Subject: [PATCH v7 1/4] dt-bindings: i2c: add binding for Socionext SynQuacer
- I2C
+Date: Tue,  3 Apr 2018 21:11:50 +0200
+Subject: [PATCH v7 3/4] i2c: add param sanity check to i2c_transfer()
 In-Reply-To: <20180403191151.14924-1-ard.biesheuvel@linaro.org>
 References: <20180403191151.14924-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180403191151.14924-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180403191151.14924-4-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a binding for the I2C controller that can be found in the Socionext
-SynQuacer SoC.
+The API docs describe i2c_transfer() as taking a pointer to an array
+of i2c_msg containing at least 1 entry, but leaves it to the individual
+drivers to sanity check the msgs and num parameters. Let's do this in
+core code instead.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/i2c/i2c-synquacer.txt | 29 ++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/i2c/i2c-core-base.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
-new file mode 100644
-index 000000000000..72f4a2f0fedc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
-@@ -0,0 +1,29 @@
-+Socionext SynQuacer I2C
+diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
+index c8bfe008f208..e2ca5c331ecb 100644
+--- a/drivers/i2c/i2c-core-base.c
++++ b/drivers/i2c/i2c-core-base.c
+@@ -1845,6 +1845,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+ 	unsigned long orig_jiffies;
+ 	int ret, try;
+ 
++	if (WARN_ON(!msgs || num <= 0))
++		return -EINVAL;
 +
-+Required properties:
-+- compatible      : Must be "socionext,synquacer-i2c"
-+- reg             : Offset and length of the register set for the device
-+- interrupts      : A single interrupt specifier
-+- #address-cells  : Must be <1>;
-+- #size-cells     : Must be <0>;
-+- clock-names     : Must contain "pclk".
-+- clocks          : Must contain an entry for each name in clock-names.
-+                    (See the common clock bindings.)
-+
-+Optional properties:
-+- clock-frequency : Desired I2C bus clock frequency in Hz. As only Normal and
-+                    Fast modes are supported, possible values are 100000 and
-+                    400000.
-+
-+Example :
-+
-+    i2c at 51210000 {
-+        compatible = "socionext,synquacer-i2c";
-+        reg = <0x51210000 0x1000>;
-+        interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
-+        #address-cells = <1>;
-+        #size-cells = <0>;
-+        clock-names = "pclk";
-+        clocks = <&clk_i2c>;
-+        clock-frequency = <400000>;
-+    };
+ 	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
+ 		return -EOPNOTSUPP;
+ 
 -- 
 2.15.1
