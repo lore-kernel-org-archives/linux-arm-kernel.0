@@ -1,47 +1,56 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Tue, 3 Apr 2018 09:27:24 +0200
-Subject: [PATCH v5 01/13] ARM: move cputype definitions into another file
-In-Reply-To: <CAGb2v64GL=1UcYs1tFp-mS07vbHBao82SEhyzUrUHB++2-EKBg@mail.gmail.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-2-mylene.josserand@bootlin.com>
- <CAGb2v64GL=1UcYs1tFp-mS07vbHBao82SEhyzUrUHB++2-EKBg@mail.gmail.com>
-Message-ID: <20180403092724.607e8e37@dell-desktop.home>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Tue, 3 Apr 2018 07:24:47 +0000
+Subject: [PATCH] spi: stm32: Fix error handling in stm32_spi_probe()
+In-Reply-To: <1522439684-7510-1-git-send-email-khoroshilov@ispras.ru>
+References: <1522439684-7510-1-git-send-email-khoroshilov@ispras.ru>
+Message-ID: <1c12d20a40384fc78262bcd82c68ba6a@SFHDAG3NODE2.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Hi,
 
-Thank you for your review!
-
-On Tue, 3 Apr 2018 14:52:45 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
-
-> On Tue, Apr 3, 2018 at 2:18 PM, Myl?ne Josserand
-> <mylene.josserand@bootlin.com> wrote:
-> > To add the support for SMP on sun8i-a83t, we will use some
-> > definitions in an assembly file so move definitions into
-> > another file to separate C functions and macro defintions.  
+> -----Original Message-----
+> From: Alexey Khoroshilov [mailto:khoroshilov at ispras.ru]
+> Sent: vendredi 30 mars 2018 21:55
+> To: Mark Brown <broonie@kernel.org>; Amelie DELAUNAY
+> <amelie.delaunay@st.com>; Maxime Coquelin
+> <mcoquelin.stm32@gmail.com>; Alexandre TORGUE
+> <alexandre.torgue@st.com>
+> Cc: Alexey Khoroshilov <khoroshilov@ispras.ru>; linux-spi at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; ldv-
+> project at linuxtesting.org
+> Subject: [PATCH] spi: stm32: Fix error handling in stm32_spi_probe()
 > 
-> Instead of moving the definitions, you could guard all the C
-> stuff in "#ifndef __ASSEMBLY__". AFAIK a few header files do that.
-
-Oh, right. It is better with this check so I will use that in the next
-iteration of my series.
-
-Best regards,
-
-Myl?ne
-
--- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
-
-
+> clk_get_rate() is below clk_prepare_enable(), so its error should lead to goto
+> err_clk_disable, not to err_master_put.
 > 
-> ChenYu
+> Found by Linux Driver Verification project (linuxtesting.org).
 > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > ---
-> >  arch/arm/include/asm/cputype.h     | 94 +-----------------------------------
-> >  arch/arm/include/asm/cputype_def.h | 98 ++++++++++++++++++++++++++++++++++++++  
+> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+> ---
+>  drivers/spi/spi-stm32.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/spi-stm32.c b/drivers/spi/spi-stm32.c index
+> ba9743fa2326..ad1e55d3d5d5 100644
+> --- a/drivers/spi/spi-stm32.c
+> +++ b/drivers/spi/spi-stm32.c
+> @@ -1129,7 +1129,7 @@ static int stm32_spi_probe(struct platform_device
+> *pdev)
+>  	if (!spi->clk_rate) {
+>  		dev_err(&pdev->dev, "clk rate = 0\n");
+>  		ret = -EINVAL;
+> -		goto err_master_put;
+> +		goto err_clk_disable;
+>  	}
+> 
+>  	spi->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+> --
+> 2.7.4
+
+Thanks for the patch!
+
+Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
+
+Regards,
+Amelie
