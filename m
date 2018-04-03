@@ -1,22 +1,97 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 3 Apr 2018 17:03:11 +0200
-Subject: [PATCH v6 3/3] i2c: add param sanity check to i2c_transfer()
-In-Reply-To: <20180325110747.8852-4-ard.biesheuvel@linaro.org>
-References: <20180325110747.8852-1-ard.biesheuvel@linaro.org>
- <20180325110747.8852-4-ard.biesheuvel@linaro.org>
-Message-ID: <20180403150311.7gpvcga33eivlyms@ninjato>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 3 Apr 2018 17:08:42 +0200
+Subject: [PATCH 00/15] ARM: pxa: switch to DMA slave maps
+In-Reply-To: <20180402142656.26815-1-robert.jarzmik@free.fr>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+Message-ID: <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	if (!msgs || num < 1)
-> +		return -EINVAL;
+On 2 April 2018 at 16:26, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Hi,
+>
+> This serie is aimed at removing the dmaengine slave compat use, and transfer
+> knowledge of the DMA requestors into architecture code.
+>
+> This was discussed/advised by Arnd a couple of years back, it's almost time.
+>
+> The serie is divided in 3 phasees :
+>  - phase 1 : patch 1/15 and patch 2/15
+>    => this is the preparation work
+>  - phase 2 : patches 3/15 .. 10/15
+>    => this is the switch of all the drivers
+>    => this one will require either an Ack of the maintainers or be taken by them
+>       once phase 1 is merged
+>  - phase 3 : patches 11/15
+>    => this is the last part, cleanup and removal of export of the DMA filter
+>       function
+>
+> As this looks like a patch bomb, each maintainer expressing for his tree either
+> an Ack or "I want to take through my tree" will be spared in the next iterations
+> of this serie.
 
-I think this case justifies WARN (or WARN_ON, I always mix them up).
+Perhaps an option is to send this hole series as PR for 3.17 rc1, that
+would removed some churns and make this faster/easier? Well, if you
+receive the needed acks of course.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/10dd1b75/attachment.sig>
+For the mmc change:
+
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Kind regards
+Uffe
+
+>
+> Several of these changes have been tested on actual hardware, including :
+>  - pxamci
+>  - pxa_camera
+>  - smc*
+>  - ASoC and SSP
+>
+> Happy review.
+>
+> Robert Jarzmik (15):
+>   dmaengine: pxa: use a dma slave map
+>   ARM: pxa: add dma slave map
+>   mmc: pxamci: remove the dmaengine compat need
+>   media: pxa_camera: remove the dmaengine compat need
+>   mtd: nand: pxa3xx: remove the dmaengine compat need
+>   net: smc911x: remove the dmaengine compat need
+>   net: smc91x: remove the dmaengine compat need
+>   ASoC: pxa: remove the dmaengine compat need
+>   net: irda: pxaficp_ir: remove the dmaengine compat need
+>   ata: pata_pxa: remove the dmaengine compat need
+>   dmaengine: pxa: document pxad_param
+>   dmaengine: pxa: make the filter function internal
+>   ARM: pxa: remove the DMA IO resources
+>   ARM: pxa: change SSP devices allocation
+>   ARM: pxa: change SSP DMA channels allocation
+>
+>  arch/arm/mach-pxa/devices.c               | 269 ++++++++++++++----------------
+>  arch/arm/mach-pxa/devices.h               |  14 +-
+>  arch/arm/mach-pxa/include/mach/audio.h    |  12 ++
+>  arch/arm/mach-pxa/pxa25x.c                |   4 +-
+>  arch/arm/mach-pxa/pxa27x.c                |   4 +-
+>  arch/arm/mach-pxa/pxa3xx.c                |   5 +-
+>  arch/arm/plat-pxa/ssp.c                   |  50 +-----
+>  drivers/ata/pata_pxa.c                    |  10 +-
+>  drivers/dma/pxa_dma.c                     |  13 +-
+>  drivers/media/platform/pxa_camera.c       |  22 +--
+>  drivers/mmc/host/pxamci.c                 |  29 +---
+>  drivers/mtd/nand/pxa3xx_nand.c            |  10 +-
+>  drivers/net/ethernet/smsc/smc911x.c       |  16 +-
+>  drivers/net/ethernet/smsc/smc91x.c        |  12 +-
+>  drivers/net/ethernet/smsc/smc91x.h        |   1 -
+>  drivers/staging/irda/drivers/pxaficp_ir.c |  14 +-
+>  include/linux/dma/pxa-dma.h               |  20 +--
+>  include/linux/platform_data/mmp_dma.h     |   4 +
+>  include/linux/pxa2xx_ssp.h                |   4 +-
+>  sound/arm/pxa2xx-ac97.c                   |  14 +-
+>  sound/arm/pxa2xx-pcm-lib.c                |   6 +-
+>  sound/soc/pxa/pxa-ssp.c                   |   5 +-
+>  sound/soc/pxa/pxa2xx-ac97.c               |  32 +---
+>  23 files changed, 196 insertions(+), 374 deletions(-)
+>
+> --
+> 2.11.0
+>
