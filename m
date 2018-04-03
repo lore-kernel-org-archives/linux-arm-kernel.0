@@ -1,47 +1,74 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Tue, 3 Apr 2018 15:45:40 +0200
-Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
- "Stoping" -> "Stopping"
-In-Reply-To: <20180330154420.6903-1-colin.king@canonical.com>
-References: <20180330154420.6903-1-colin.king@canonical.com>
-Message-ID: <20180403134540.GA29017@lenoch>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 3 Apr 2018 14:48:32 +0100
+Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
+In-Reply-To: <20180401111108.mudkiewzn33sifvk@yury-thinkpad>
+References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
+ <20180325175004.28162-3-ynorov@caviumnetworks.com>
+ <20180327102116.GA2464@arm.com>
+ <20180401111108.mudkiewzn33sifvk@yury-thinkpad>
+Message-ID: <20180403134832.2cdae64uwuot6ryz@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2018 at 04:44:20PM +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+Hi Yury,
 
-Hello Colin,
+On Sun, Apr 01, 2018 at 02:11:08PM +0300, Yury Norov wrote:
+> +/*
+> + * Flush I-cache if CPU is in extended quiescent state
+> + */
 
-> Trivial fix to spelling mistake in pr_debug message text
+This comment is misleading. An ISB doesn't touch the I-cache; it forces
+a context synchronization event.
 
-would you mind making this patch a bit less non-trivial and
-change pr_debug to dev_dbg dropping Atmel_ssc_dai prefix?
+> +	.macro	isb_if_eqs
+> +#ifndef CONFIG_TINY_RCU
+> +	bl	rcu_is_watching
+> +	tst	w0, #0xff
+> +	b.ne	1f
 
-Thank you.
+The TST+B.NE can be a CBNZ:
 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  sound/soc/atmel/atmel_ssc_dai.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index a1e2c5682dcd..1c7af0ca98ec 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  		if (ret < 0) {
->  			printk(KERN_WARNING
->  					"atmel_ssc_dai: request_irq failure\n");
-> -			pr_debug("Atmel_ssc_dai: Stoping clock\n");
-> +			pr_debug("Atmel_ssc_dai: Stopping clock\n");
->  			clk_disable(ssc_p->ssc->clk);
->  			return ret;
->  		}
-> -- 
-> 2.15.1
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+	bl	rcu_is_watching
+	cbnz	x0, 1f
+	isb
+1:
+
+> +	/* Pairs with aarch64_insn_patch_text for EQS CPUs. */
+> +	isb
+> +1:
+> +#endif
+> +	.endm
+> +
+>  el0_sync_invalid:
+>  	inv_entry 0, BAD_SYNC
+>  ENDPROC(el0_sync_invalid)
+> @@ -840,8 +861,10 @@ el0_svc:
+>  	mov	wsc_nr, #__NR_syscalls
+>  el0_svc_naked:					// compat entry point
+>  	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+> +	isb_if_eqs
+>  	enable_dbg_and_irq
+> -	ct_user_exit 1
+> +	ct_user_exit
+
+I don't think this is safe. here we issue the ISB *before* exiting a
+quiesecent state, so I think we can race with another CPU that calls
+kick_all_active_cpus_sync, e.g.
+
+	CPU0				CPU1
+
+	ISB
+					patch_some_text()
+					kick_all_active_cpus_sync()
+	ct_user_exit
+
+	// not synchronized!
+	use_of_patched_text()
+
+... and therefore the ISB has no effect, which could be disasterous.
+
+I believe we need the ISB *after* we transition into a non-quiescent
+state, so that we can't possibly miss a context synchronization event.
+
+Thanks,
+Mark.
