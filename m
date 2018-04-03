@@ -1,83 +1,47 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  3 Apr 2018 21:40:24 +0800
-Subject: [PATCH] arm64: allwinner: h6: restore the usage of CCU slice macros
-Message-ID: <20180403134024.43156-1-icenowy@aosc.io>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Tue, 3 Apr 2018 15:45:40 +0200
+Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
+ "Stoping" -> "Stopping"
+In-Reply-To: <20180330154420.6903-1-colin.king@canonical.com>
+References: <20180330154420.6903-1-colin.king@canonical.com>
+Message-ID: <20180403134540.GA29017@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the definition of CCU slice macros are already merged into the source
-tree, restore the usage of the macros now.
+On Fri, Mar 30, 2018 at 04:44:20PM +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 20 +++++++++++---------
- 1 file changed, 11 insertions(+), 9 deletions(-)
+Hello Colin,
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-index 56563150d61a..4debc3962830 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-@@ -4,6 +4,8 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/sun50i-h6-ccu.h>
-+#include <dt-bindings/reset/sun50i-h6-ccu.h>
- 
- / {
- 	interrupt-parent = <&gic>;
-@@ -115,7 +117,7 @@
- 				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu 26>, <&osc24M>, <&osc32k>;
-+			clocks = <&ccu CLK_APB1>, <&osc24M>, <&osc32k>;
- 			clock-names = "apb", "hosc", "losc";
- 			gpio-controller;
- 			#gpio-cells = <3>;
-@@ -134,8 +136,8 @@
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 70>;
--			resets = <&ccu 21>;
-+			clocks = <&ccu CLK_BUS_UART0>;
-+			resets = <&ccu RST_BUS_UART0>;
- 			status = "disabled";
- 		};
- 
-@@ -145,8 +147,8 @@
- 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 71>;
--			resets = <&ccu 22>;
-+			clocks = <&ccu CLK_BUS_UART1>;
-+			resets = <&ccu RST_BUS_UART1>;
- 			status = "disabled";
- 		};
- 
-@@ -156,8 +158,8 @@
- 			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 72>;
--			resets = <&ccu 23>;
-+			clocks = <&ccu CLK_BUS_UART2>;
-+			resets = <&ccu RST_BUS_UART2>;
- 			status = "disabled";
- 		};
- 
-@@ -167,8 +169,8 @@
- 			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 73>;
--			resets = <&ccu 24>;
-+			clocks = <&ccu CLK_BUS_UART3>;
-+			resets = <&ccu RST_BUS_UART3>;
- 			status = "disabled";
- 		};
- 	};
--- 
-2.15.1
+> Trivial fix to spelling mistake in pr_debug message text
+
+would you mind making this patch a bit less non-trivial and
+change pr_debug to dev_dbg dropping Atmel_ssc_dai prefix?
+
+Thank you.
+
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  sound/soc/atmel/atmel_ssc_dai.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+> index a1e2c5682dcd..1c7af0ca98ec 100644
+> --- a/sound/soc/atmel/atmel_ssc_dai.c
+> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> @@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+>  		if (ret < 0) {
+>  			printk(KERN_WARNING
+>  					"atmel_ssc_dai: request_irq failure\n");
+> -			pr_debug("Atmel_ssc_dai: Stoping clock\n");
+> +			pr_debug("Atmel_ssc_dai: Stopping clock\n");
+>  			clk_disable(ssc_p->ssc->clk);
+>  			return ret;
+>  		}
+> -- 
+> 2.15.1
+> 
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
