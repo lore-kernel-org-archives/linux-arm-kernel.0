@@ -1,47 +1,65 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 3 Apr 2018 17:31:22 +0200
-Subject: [PATCH v2 3/6] i2c: i2c-stm32f7: Add initial SMBus protocols
- support
-In-Reply-To: <2fadcd7f-3bfc-997e-a30e-808f6d854f2c@st.com>
-References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
- <1521650940-11651-4-git-send-email-pierre-yves.mordret@st.com>
- <20180324224911.xz3fz2jojcdrovb4@ninjato>
- <2fadcd7f-3bfc-997e-a30e-808f6d854f2c@st.com>
-Message-ID: <20180403153122.ux6hnnmexwmq3soz@ninjato>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 03 Apr 2018 17:32:58 +0200
+Subject: [PATCH 14/15] ARM: pxa: change SSP devices allocation
+In-Reply-To: <CAK8P3a2hYWO2eweg3zpR7iJoqtH4uxJLAxJAno7L96G7nA2HxQ@mail.gmail.com>
+ (Arnd Bergmann's message of "Tue, 3 Apr 2018 09:06:46 +0200")
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-15-robert.jarzmik@free.fr>
+ <CAK8P3a2hYWO2eweg3zpR7iJoqtH4uxJLAxJAno7L96G7nA2HxQ@mail.gmail.com>
+Message-ID: <87lge4485x.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd Bergmann <arnd@arndb.de> writes:
 
-> >> All SMBus protocols are implemented except SMBus-specific protocols.
-> > 
-> > What does that mean?
-> 
-> It miss SMBus Host Notification and SMBBus Alert. They are almost ready but I'm
-> struggling to put them back to operational state after recent changes related to
-> SMBust Host Notification. A more "classic" interrupt base solution has been put
-> in place but I fail to use implement it in my side.
-> Another patch set is going to be delivered for these 2 commands.
+chop chop ... removed several mail recipients to leave only the ASoC / PXA
+subset ...
 
-This is totally fine to implement it incrementally. Please just update the
-commit message with the more detailed explanation above.
+> On Mon, Apr 2, 2018 at 4:26 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+>>
+>> +static struct pxa_ssp_info pxa_ssp_infos[] = {
+>> +       { .dma_chan_rx_name = "ssp1_rx", .dma_chan_tx_name = "ssp1_tx", },
+>> +       { .dma_chan_rx_name = "ssp1_rx", .dma_chan_tx_name = "ssp1_tx", },
+>> +       { .dma_chan_rx_name = "ssp2_rx", .dma_chan_tx_name = "ssp2_tx", },
+>> +       { .dma_chan_rx_name = "ssp2_rx", .dma_chan_tx_name = "ssp2_tx", },
+>> +       { .dma_chan_rx_name = "ssp3_rx", .dma_chan_tx_name = "ssp3_tx", },
+>> +       { .dma_chan_rx_name = "ssp3_rx", .dma_chan_tx_name = "ssp3_tx", },
+>> +       { .dma_chan_rx_name = "ssp4_rx", .dma_chan_tx_name = "ssp4_tx", },
+>> +       { .dma_chan_rx_name = "ssp4_rx", .dma_chan_tx_name = "ssp4_tx", },
+>> +};
+>
+> This part looks odd to me, you're adding an extra level of indirection to
+> do two stages of lookups in some form of platform data.
+That's unfortunately right.
 
-> > That is quite some complexity considering we have I2C_FUNC_SMBUS_EMUL. I
-> > don't mind, but you really want that?
-> > 
-> 
-> All SMBBus commands are implemented as such. I never try to emulation commands.
-> Should we use emulation SMBus commands or real commands... Don't know.
+> Why can't you just always use "rx" and "tx" as the names here?
+Well I couldn't. I'll explain you why, and maybe you'll find a better solution.
 
-You won't see any difference on the wire. I don't know your HW. It might
-be that SMBus mode is more "automatic" and uses less interrupts. Or
-stuff like Alert or HostNotification only works in this mode. If you and
-the driver maintainers think it is worth the added complexity, I am
-fine, too.
+That all is related to how ASoC and SSP interact.
+If I remember correctly, here is how it works :
+ - the DMA channel is requested in sound/arm/pxa2xx-pcm-lib.c:128
+	return snd_dmaengine_pcm_open(
+		substream, dma_request_slave_channel(rtd->platform->dev,
+   The trick is that the device here is _not_ the SSP one, it's if memory serves
+   me well the pxa-pcm-audio one.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/1fed5f2c/attachment.sig>
+   As a consequence, the device cannot be used to differenciate which SSP
+   exactly is providing the sound samples stream. This information is
+   nevertheless required to choose the correct requestor line, which is a 1-to-1
+   match to the SSP port.
+
+   The indirection in the channel name is used to choose the correct requestor
+   line for a given SSP port providing the samples.
+
+   It also must be underlined that this dma request serves both AC97 and SSP as
+   sample providers.
+
+> (also, I don't see why each line is duplicated, but I'm sure there's
+> an easy answer for that).
+Ahh that is an unfortunate rebase most probably :)
+
+Cheers.
+
+-- 
+Robert
