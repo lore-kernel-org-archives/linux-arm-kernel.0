@@ -1,91 +1,40 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 03 Apr 2018 17:18:49 +0200
-Subject: [PATCH 02/15] ARM: pxa: add dma slave map
-In-Reply-To: <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
- (Arnd Bergmann's message of "Tue, 3 Apr 2018 08:51:37 +0200")
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <20180402142656.26815-3-robert.jarzmik@free.fr>
- <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
-Message-ID: <87tvss48ti.fsf@belgarion.home>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 3 Apr 2018 17:26:04 +0200
+Subject: [PATCH v2 2/6] i2c: i2c-stm32f7: Add slave support
+In-Reply-To: <94737125-c0b7-08ca-c2f7-feb4e5d0498c@st.com>
+References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
+ <1521650940-11651-3-git-send-email-pierre-yves.mordret@st.com>
+ <20180325181600.vehqe3xcx55qxtd7@katana>
+ <94737125-c0b7-08ca-c2f7-feb4e5d0498c@st.com>
+Message-ID: <20180403152604.udgh4v2erpsupgo3@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Mon, Mar 26, 2018 at 10:41:51AM +0200, Pierre Yves MORDRET wrote:
+> 
+> 
+> On 03/25/2018 08:16 PM, Wolfram Sang wrote:
+> > On Wed, Mar 21, 2018 at 05:48:56PM +0100, Pierre-Yves MORDRET wrote:
+> >> This patch adds slave support for I2C controller embedded in STM32F7 SoC
+> >>
+> >> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> >> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> > 
+> > Looks OK from a first look. What kind of tests did you do?
+> 
+> As mentioned for 10-bit, I'm using 2 I2C instances from the SoC.
+> Here are the tests I dit:
+>  - Master/slave send in 7 and 10 bits
+>  - master/slave recv in 7 and 10 bits
+>  - E2PROM Read/Write
 
->> +       { "smc911x.0", "rx", PDMA_FILTER_PARAM(LOWEST, -1) },
->> +       { "smc911x.0", "tx", PDMA_FILTER_PARAM(LOWEST, -1) },
->> +       { "smc91x.0", "data", PDMA_FILTER_PARAM(LOWEST, -1) },
->
-> This one is interesting, as you are dealing with an off-chip device,
-> and the channel number is '-'1. How does this even work? Does it
-> mean
+As far as I understand the code now, both instances can be master /
+slave simultanously on the same bus?
 
-This relies on pxa_dma, in which the "-1" for a requestor line means "no
-requestor" or said in another way "always requesting". As a consequence, as soon
-as the DMA descriptors are queued, the transfer begins, and it is supposed
-implicitely that the FIFO output availability is at least as quick as the system
-bus and the DMA size is perfectly fit for the FIFO available bytes.
-
-This is what has been the underlying of DMA transfers of smc91x(x) on the PXA
-platforms, where the smc91x(s) are directly wired on the system bus (the same
-bus having DRAM, SRAM, IO-mapped devices).
-
->
->> +       /* PXA25x specific map */
->> +       { "pxa25x-ssp.0", "rx", PDMA_FILTER_PARAM(LOWEST, 13) },
->> +       { "pxa25x-ssp.0", "tx", PDMA_FILTER_PARAM(LOWEST, 14) },
->> +       { "pxa25x-nssp.1", "rx", PDMA_FILTER_PARAM(LOWEST, 15) },
->> +       { "pxa25x-nssp.1", "tx", PDMA_FILTER_PARAM(LOWEST, 16) },
->> +       { "pxa25x-nssp.2", "rx", PDMA_FILTER_PARAM(LOWEST, 23) },
->> +       { "pxa25x-nssp.2", "tx", PDMA_FILTER_PARAM(LOWEST, 24) },
->> +       { "pxa-pcm-audio", "nssp2_rx", PDMA_FILTER_PARAM(LOWEST, 15) },
->> +       { "pxa-pcm-audio", "nssp2_tx", PDMA_FILTER_PARAM(LOWEST, 16) },
->> +       { "pxa-pcm-audio", "nssp3_rx", PDMA_FILTER_PARAM(LOWEST, 23) },
->> +       { "pxa-pcm-audio", "nssp3_tx", PDMA_FILTER_PARAM(LOWEST, 24) },
->> +
->> +       /* PXA27x specific map */
->> +       { "pxa-pcm-audio", "ssp3_rx", PDMA_FILTER_PARAM(LOWEST, 66) },
->> +       { "pxa-pcm-audio", "ssp3_tx", PDMA_FILTER_PARAM(LOWEST, 67) },
->> +       { "pxa27x-camera.0", "CI_Y", PDMA_FILTER_PARAM(HIGHEST, 68) },
->> +       { "pxa27x-camera.0", "CI_U", PDMA_FILTER_PARAM(HIGHEST, 69) },
->> +       { "pxa27x-camera.0", "CI_V", PDMA_FILTER_PARAM(HIGHEST, 70) },
->> +
->> +       /* PXA3xx specific map */
->> +       { "pxa-pcm-audio", "ssp4_rx", PDMA_FILTER_PARAM(LOWEST, 2) },
->> +       { "pxa-pcm-audio", "ssp4_tx", PDMA_FILTER_PARAM(LOWEST, 3) },
->> +       { "pxa2xx-mci.1", "rx", PDMA_FILTER_PARAM(LOWEST, 93) },
->> +       { "pxa2xx-mci.1", "tx", PDMA_FILTER_PARAM(LOWEST, 94) },
->> +       { "pxa3xx-nand", "data", PDMA_FILTER_PARAM(LOWEST, 97) },
->> +       { "pxa2xx-mci.2", "rx", PDMA_FILTER_PARAM(LOWEST, 100) },
->> +       { "pxa2xx-mci.2", "tx", PDMA_FILTER_PARAM(LOWEST, 101) },
->> +};
->
-> Since more than half the entries in here are chip specific, maybe it would be
-> better to split that table into three and have a copy for each one in
-> arch/arm/mach-pxa/pxa{25x.27x.3xx}.c?
-Mmmh, today the split is :
- - 16 common entries
- - 10 pxa25x specific entries
- - 5 pxa27x specific entries
- - 7 pxa3xx specific entries
- => total of 38 lines
-
-After the split we'll have :
- - 26 pxa25x specific entries
- - 21 pxa27x specific entries
- - 23 pxa3xx specific entries
- => total of 70 lines
-
-That doubles the number of lines, not counting the declarations, and amending of
-pxa2xx_set_dmac_info().
-
-If you think it's worth it, what is the driving benefit behind ?
-
-> Does that mean it's actually a memory-to-memory transfer with a device being
-> on the external SRAM interface?
-I'm taking this is the follow up to the "-1" question :0
-
-Cheers.
-
--- 
-Robert
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/936d9647/attachment-0001.sig>
