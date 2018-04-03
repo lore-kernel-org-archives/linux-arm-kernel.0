@@ -1,80 +1,67 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 3 Apr 2018 11:12:18 +0200
-Subject: [PATCH v5 08/13] ARM: sunxi: Add initialization of CNTVOFF
-In-Reply-To: <20180403061836.3926-9-mylene.josserand@bootlin.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-9-mylene.josserand@bootlin.com>
-Message-ID: <20180403091218.t6xuq6csjp4uyy5u@flea>
+Date: Tue, 3 Apr 2018 11:48:45 +0200
+Subject: [PATCH net-next 02/12] clk: sunxi-ng: r40: export a regmap to
+ access the GMAC register
+In-Reply-To: <CAGb2v67Fp20wkmqWyRowpAmm4EDwENnKFG+mccqWaPa5Jj4zBw@mail.gmail.com>
+References: <20180317092857.4396-1-wens@csie.org>
+ <20180317092857.4396-3-wens@csie.org>
+ <20180318213129.ucwslzvwq6khxrcd@flea>
+ <CAGb2v67Fp20wkmqWyRowpAmm4EDwENnKFG+mccqWaPa5Jj4zBw@mail.gmail.com>
+Message-ID: <20180403094845.le2hfuxktlv66lre@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 08:18:31AM +0200, Myl?ne Josserand wrote:
-> Add the initialization of CNTVOFF for sun8i-a83t.
+On Tue, Mar 20, 2018 at 03:15:02PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Mar 19, 2018 at 5:31 AM, Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > On Sat, Mar 17, 2018 at 05:28:47PM +0800, Chen-Yu Tsai wrote:
+> >> From: Icenowy Zheng <icenowy@aosc.io>
+> >>
+> >> There's a GMAC configuration register, which exists on A64/A83T/H3/H5 in
+> >> the syscon part, in the CCU of R40 SoC.
+> >>
+> >> Export a regmap of the CCU.
+> >>
+> >> Read access is not restricted to all registers, but only the GMAC
+> >> register is allowed to be written.
+> >>
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > Gah, this is crazy. I'm really starting to regret letting that syscon
+> > in in the first place...
 > 
-> For boot CPU, Create a new machine that handles this
-> function's call in an "init_early" callback.
-> For secondary CPUs, add this function into secondary_startup
-> assembly entry.
+> IMHO syscon is really a better fit. It's part of the glue layer and
+> most other dwmac user platforms treat it as such and use a syscon.
+> Plus the controls encompass delays (phase), inverters (polarity),
+> and even signal routing. It's not really just a group of clock controls,
+> like what we poorly modeled for A20/A31. I think that was really a
+> mistake.
 > 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> ---
->  arch/arm/mach-sunxi/headsmp.S |  1 +
->  arch/arm/mach-sunxi/sunxi.c   | 18 +++++++++++++++++-
->  2 files changed, 18 insertions(+), 1 deletion(-)
+> As I mentioned in the cover letter, a slightly saner approach would
+> be to let drivers add custom syscon entries, which would then require
+> less custom plumbing.
+
+A syscon is convenient, sure, but it also bypasses any abstraction
+layer we have everywhere else, which means that we'll have to maintain
+the register layout in each and every driver that uses it.
+
+So far, it's only be the GMAC, but it can also be others (the SRAM
+controller comes to my mind), and then, if there's any difference in
+the design in a future SoC, we'll have to maintain that in the GMAC
+driver as well.
+
+> > And I'm not really looking forward the time where SCPI et al. will be
+> > mature and we'll have the clock controller completely outside of our
+> > control.
 > 
-> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-> index 79890fbe5613..b586b7cf803a 100644
-> --- a/arch/arm/mach-sunxi/headsmp.S
-> +++ b/arch/arm/mach-sunxi/headsmp.S
-> @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
->  
->  ENTRY(sunxi_mc_smp_secondary_startup)
->  	bl	sunxi_mc_smp_cluster_cache_enable
-> +	bl	smp_init_cntvoff
->  	b	secondary_startup
->  ENDPROC(sunxi_mc_smp_secondary_startup)
->  
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 5e9602ce1573..090784108c0a 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -16,6 +16,7 @@
->  #include <linux/platform_device.h>
->  
->  #include <asm/mach/arch.h>
-> +#include <asm/smp_cntvoff.h>
->  
->  static const char * const sunxi_board_dt_compat[] = {
->  	"allwinner,sun4i-a10",
-> @@ -62,7 +63,6 @@ MACHINE_END
->  static const char * const sun8i_board_dt_compat[] = {
->  	"allwinner,sun8i-a23",
->  	"allwinner,sun8i-a33",
-> -	"allwinner,sun8i-a83t",
->  	"allwinner,sun8i-h2-plus",
->  	"allwinner,sun8i-h3",
->  	"allwinner,sun8i-r40",
-> @@ -75,6 +75,22 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
->  	.dt_compat	= sun8i_board_dt_compat,
->  MACHINE_END
->  
-> +void __init sun8i_cntvoff_init(void)
-> +{
-> +	smp_init_cntvoff();
+> I don't think it's going to happen for any of the older SoCs. The R40
+> only stands out because the GMAC controls are in the clock controller
+> address space, presumably to be like the A20.
 
-Can't this be moved to the SMP setup code?
-
-> +}
-> +
-> +static const char * const sun8i_cntvoff_board_dt_compat[] = {
-> +	"allwinner,sun8i-a83t",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i boards needing cntvoff")
-
-All of the SoCs need CNTVOFF, so that doesn't really make sense. Why
-not just calling it for what it is: an A83t?
+SCPI (or equivalent) is a really nice feature to have when it comes to
+virtualization, so even if it's less likely, it doesn't make it less
+relevant on other SoCs.
 
 Maxime
 
@@ -88,4 +75,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/d03b971d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/dec2efee/attachment.sig>
