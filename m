@@ -1,58 +1,39 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 3 Apr 2018 17:35:30 +0900
-Subject: [PATCH 2/2] reset: uniphier: add SATA reset control support and
- change SATA-PHY ID
-In-Reply-To: <1522743506.5089.4.camel@pengutronix.de>
-References: <1522403084-18780-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1522403084-18780-3-git-send-email-hayashi.kunihiko@socionext.com>
- <1522743506.5089.4.camel@pengutronix.de>
-Message-ID: <CAK7LNAR0emjbECwZq7zVygzFvhBs0iLNu--WqUQ2yZVvNUgSOw@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 3 Apr 2018 10:37:44 +0200
+Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
+In-Reply-To: <20180403071843.GI14180@piout.net>
+References: <20180329131054.22506-1-peda@axentia.se>
+ <20180329153322.5e2fc1e7@bbrezillon>
+ <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
+ <20180329154416.5c1a0013@bbrezillon>
+ <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
+ <20180402142249.7e076a64@bbrezillon>
+ <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
+ <20180402212843.164d5d21@bbrezillon>
+ <8e35701f-1bfa-c9c0-62e6-48ed19d7ba37@axentia.se>
+ <20180403071843.GI14180@piout.net>
+Message-ID: <6a2b49fb-8e2c-ff76-4743-08f8d6a8d5e9@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-03 17:18 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> On Fri, 2018-03-30 at 18:44 +0900, Kunihiko Hayashi wrote:
->> Add reset lines for SATA controller on UniPhier SoCs.
->> This adds support for Pro4 and PXs3 in addition to PXs2.
+On 2018-04-03 09:18, Alexandre Belloni wrote:
+> On 02/04/2018 at 22:23:17 +0200, Peter Rosin wrote:
+>>>> No, but did it again and checked, see transcript below.
+>>>
+>>> I don't use devmem2. Is 'readback' information accurate or is it
+>>> always what's been written? Because when you write 0x33 to 0xFFFFECBC,
+>>> 0x33 is read back, but just after that, when you read it again it's 0.
 >>
->> And this changes the ID of the reset line for SATA-PHY on PXs2.
->> Since some SoCs have two controller instances with a common PHY, this moves
->> the ID of SATA-PHY for consistency.
+>> Looking at the devmem2 source, it seems very likely that the compiler
+>> optimizes out the read and thus outputs what has been written.
 >>
->> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
->> ---
->>  drivers/reset/reset-uniphier.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
->> index 55ae0f1..90e6caf 100644
->> --- a/drivers/reset/reset-uniphier.c
->> +++ b/drivers/reset/reset-uniphier.c
->> @@ -63,6 +63,9 @@ static const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
->>       UNIPHIER_RESETX(12, 0x2000, 6),         /* GIO (Ether, SATA, USB3) */
->>       UNIPHIER_RESETX(14, 0x2000, 17),        /* USB30 */
->>       UNIPHIER_RESETX(15, 0x2004, 17),        /* USB31 */
->> +     UNIPHIER_RESETX(28, 0x2000, 18),        /* SATA0 */
->> +     UNIPHIER_RESETX(29, 0x2004, 18),        /* SATA1 */
->> +     UNIPHIER_RESETX(30, 0x2000, 19),        /* SATA-PHY */
->>       UNIPHIER_RESETX(40, 0x2000, 13),        /* AIO */
->>       UNIPHIER_RESET_END,
->>  };
->> @@ -90,7 +93,7 @@ static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
->>       UNIPHIER_RESETX(20, 0x2014, 5),         /* USB31-PHY0 */
->>       UNIPHIER_RESETX(21, 0x2014, 1),         /* USB31-PHY1 */
->>       UNIPHIER_RESETX(28, 0x2014, 12),        /* SATA */
->> -     UNIPHIER_RESET(29, 0x2014, 8),          /* SATA-PHY (active high) */
->> +     UNIPHIER_RESET(30, 0x2014, 8),          /* SATA-PHY (active high) */
->
-> This is a backwards incompatible change.
-> There is no DT in use that relies on this being 29 ?
+> 
+> At least on x86, it is not optimized out.
 
+Looking at the disassembly, they are gone here (not that I'm fluent).
+I then tried to compile devmem2 with -O0 (instead of -Os) and the read
+is then fine. So, I guess the devmem2 devs could claim that it's a
+buildroot issue, but a volatile would certainly have helped...
 
-Right.  No user for this reset line ever.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Cheers,
+Peter
