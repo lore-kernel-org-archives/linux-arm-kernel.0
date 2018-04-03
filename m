@@ -1,40 +1,99 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 3 Apr 2018 17:26:04 +0200
-Subject: [PATCH v2 2/6] i2c: i2c-stm32f7: Add slave support
-In-Reply-To: <94737125-c0b7-08ca-c2f7-feb4e5d0498c@st.com>
-References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
- <1521650940-11651-3-git-send-email-pierre-yves.mordret@st.com>
- <20180325181600.vehqe3xcx55qxtd7@katana>
- <94737125-c0b7-08ca-c2f7-feb4e5d0498c@st.com>
-Message-ID: <20180403152604.udgh4v2erpsupgo3@ninjato>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Tue,  3 Apr 2018 18:29:04 +0300
+Subject: [PATCH v2 5/6] spi: sun4i: introduce register set/unset helpers
+In-Reply-To: <20180403152905.1524-1-ssuloev@orpaltech.com>
+References: <20180403152905.1524-1-ssuloev@orpaltech.com>
+Message-ID: <20180403152905.1524-6-ssuloev@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 10:41:51AM +0200, Pierre Yves MORDRET wrote:
-> 
-> 
-> On 03/25/2018 08:16 PM, Wolfram Sang wrote:
-> > On Wed, Mar 21, 2018 at 05:48:56PM +0100, Pierre-Yves MORDRET wrote:
-> >> This patch adds slave support for I2C controller embedded in STM32F7 SoC
-> >>
-> >> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> >> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> > 
-> > Looks OK from a first look. What kind of tests did you do?
-> 
-> As mentioned for 10-bit, I'm using 2 I2C instances from the SoC.
-> Here are the tests I dit:
->  - Master/slave send in 7 and 10 bits
->  - master/slave recv in 7 and 10 bits
->  - E2PROM Read/Write
+Two helper functions were added in order to set/unset
+specified flags in registers.
 
-As far as I understand the code now, both instances can be master /
-slave simultanously on the same bus?
+Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+---
+ drivers/spi/spi-sun4i.c | 40 +++++++++++++++++++---------------------
+ 1 file changed, 19 insertions(+), 21 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/936d9647/attachment-0001.sig>
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index 9d1bc20..d81d31c 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -107,29 +107,29 @@ static inline void sun4i_spi_write(struct sun4i_spi *sspi, u32 reg, u32 value)
+ 	writel(value, sspi->base_addr + reg);
+ }
+ 
+-static inline u32 sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
++static inline void sun4i_spi_set(struct sun4i_spi *sspi, u32 addr, u32 val)
+ {
+-	u32 reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
+-
+-	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
++	u32 reg = sun4i_spi_read(sspi, addr);
+ 
+-	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
++	reg |= val;
++	sun4i_spi_write(sspi, addr, reg);
+ }
+ 
+-static inline void sun4i_spi_enable_interrupt(struct sun4i_spi *sspi, u32 mask)
++static inline void sun4i_spi_unset(struct sun4i_spi *sspi, u32 addr, u32 val)
+ {
+-	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	u32 reg = sun4i_spi_read(sspi, addr);
+ 
+-	reg |= mask;
+-	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++	reg &= ~val;
++	sun4i_spi_write(sspi, addr, reg);
+ }
+ 
+-static inline void sun4i_spi_disable_interrupt(struct sun4i_spi *sspi, u32 mask)
++static inline u32 sun4i_spi_get_tx_fifo_count(struct sun4i_spi *sspi)
+ {
+-	u32 reg = sun4i_spi_read(sspi, SUN4I_INT_CTL_REG);
++	u32 reg = sun4i_spi_read(sspi, SUN4I_FIFO_STA_REG);
+ 
+-	reg &= ~mask;
+-	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, reg);
++	reg >>= SUN4I_FIFO_STA_TF_CNT_BITS;
++
++	return reg & SUN4I_FIFO_STA_TF_CNT_MASK;
+ }
+ 
+ static inline void sun4i_spi_drain_fifo(struct sun4i_spi *sspi, int len)
+@@ -256,13 +256,12 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	/* Clear pending interrupts */
+ 	sun4i_spi_write(sspi, SUN4I_INT_STA_REG, ~0);
+ 
++	/* Reset FIFOs */
++	sun4i_spi_set(sspi, SUN4I_CTL_REG,
++		      SUN4I_CTL_RF_RST | SUN4I_CTL_TF_RST);
+ 
+ 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+ 
+-	/* Reset FIFOs */
+-	sun4i_spi_write(sspi, SUN4I_CTL_REG,
+-			reg | SUN4I_CTL_RF_RST | SUN4I_CTL_TF_RST);
+-
+ 	/*
+ 	 * Setup the transfer control register: Chip Select,
+ 	 * polarities, etc.
+@@ -342,12 +341,11 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
+ 
+ 	/* Enable the interrupts */
+-	sun4i_spi_enable_interrupt(sspi, SUN4I_INT_CTL_TC |
+-					 SUN4I_INT_CTL_RF_F34);
++	sun4i_spi_set(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC |
++					       SUN4I_INT_CTL_RF_F34);
+ 
+ 	/* Start the transfer */
+-	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+-	sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
++	sun4i_spi_set(sspi, SUN4I_CTL_REG, SUN4I_CTL_XCH);
+ 
+ 	ret = sun4i_spi_wait_for_transfer(spi, tfr);
+ 
+-- 
+2.16.2
