@@ -1,74 +1,64 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue,  3 Apr 2018 15:29:17 +0200
-Subject: [PATCH 4/7] of: address: Add support for the dma-parent property
+Date: Tue,  3 Apr 2018 15:29:15 +0200
+Subject: [PATCH 2/7] dt-bindings: bus: Add binding for the Allwinner MBUS
+ controller
 In-Reply-To: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
 References: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
-Message-ID: <9c1caa06023916ca39d647edd169d37d8ea8d3d7.1522761929.git-series.maxime.ripard@bootlin.com>
+Message-ID: <43cb5a132a36492da2ceef801c97f6cb0aad2a25.1522761929.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs have devices that are using a separate bus from the main bus to
-perform DMA.
-
-These buses might have some restrictions and/or different mapping than from
-the CPU side, so we'd need to express those using the usual dma-ranges, but
-using a different DT node than the node's parent.
-
-Add support for a dma-parent property that links to the DMA bus used by the
-device in such a case.
+The MBUS controller drives the MBUS that other devices in the SoC will
+use to perform DMA. It also has a register interface that allows to
+monitor and control the bandwidth and priorities for masters on that
+bus.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/of/address.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/sunxi-mbus.txt | 35 +++++++++++++++++-
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sunxi-mbus.txt
 
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index e3267728a0cb..cc82f825ee03 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -647,7 +647,17 @@ EXPORT_SYMBOL(of_translate_address);
- 
- u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
- {
--	return __of_translate_address(dev, NULL, in_addr, "dma-ranges");
-+	struct of_phandle_args args;
-+	struct device_node *parent = NULL;
-+	int ret;
+diff --git a/Documentation/devicetree/bindings/sunxi-mbus.txt b/Documentation/devicetree/bindings/sunxi-mbus.txt
+new file mode 100644
+index 000000000000..436df0cac9d0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sunxi-mbus.txt
+@@ -0,0 +1,35 @@
++Allwinner Memory Bus (MBUS) controller
 +
-+	ret = of_parse_phandle_with_args(dev, "dma-parent",
-+					 "#dma-parent-cells",
-+					 0, &args);
-+	if (!ret)
-+		parent = args.np;
++The MBUS controller drives the MBUS that other devices in the SoC will
++use to perform DMA. It also has a register interface that allows to
++monitor and control the bandwidth and priorities for masters on that
++bus.
 +
-+	return __of_translate_address(dev, parent, in_addr, "dma-ranges");
- }
- EXPORT_SYMBOL(of_translate_dma_address);
- 
-@@ -847,11 +857,21 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
- 		return -EINVAL;
- 
- 	while (1) {
-+		struct of_phandle_args args;
++Required properties:
++ - compatible: Must be one of:
++	- allwinner,sun5i-a13-mbus
++ - reg: Offset and length of the register set for the controller
++ - clocks: phandle to the clock driving the controller
++ - dma-ranges: see booting-without-of.txt
++ - #dma-parent-cells: Must be one, with the argument being the MBUS port
++   ID
 +
- 		naddr = of_n_addr_cells(node);
- 		nsize = of_n_size_cells(node);
--		node = of_get_next_parent(node);
--		if (!node)
--			break;
++Each device having to perform their DMA through the MBUS must have the
++dma-parent property set to the MBUS controller, as documented in
++booting-without-of.txt.
 +
-+		ret = of_parse_phandle_with_args(node, "dma-parent",
-+						 "#dma-parent-cells",
-+						 0, &args);
-+		if (!ret) {
-+			node = args.np;
-+		} else {
-+			node = of_get_next_parent(node);
-+			if (!node)
-+				break;
-+		}
- 
- 		ranges = of_get_property(node, "dma-ranges", &len);
- 
++Example:
++
++mbus: dram-controller at 1c01000 {
++	compatible = "allwinner,sun5i-a13-mbus";
++	reg = <0x01c01000 0x1000>;
++	clocks = <&ccu CLK_MBUS>;
++	dma-ranges = <0x00000000 0x40000000 0x20000000>;
++	#dma-parent-cells = <1>;
++};
++
++fe0: display-frontend at 1e00000 {
++	compatible = "allwinner,sun5i-a13-display-frontend";
++	...
++	dma-parent = <&mbus 19>;
++};
 -- 
 git-series 0.9.1
