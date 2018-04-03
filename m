@@ -1,39 +1,56 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 3 Apr 2018 20:56:26 +0200
-Subject: [PATCH v6 0/3] add support for Socionext SynQuacer I2C controller
-In-Reply-To: <20180403184559.z5lixuheqd4ojoti@ninjato>
-References: <20180325110747.8852-1-ard.biesheuvel@linaro.org>
- <20180403150139.l7oec4doafmsidfp@ninjato>
- <CAKv+Gu9cqQqq_etTSvdBp4Jjk5O_0FePe74phDqt5EO6Cm-_vQ@mail.gmail.com>
- <20180403181216.f22vtkqrnxjgreuo@ninjato>
- <CAKv+Gu8R19T+9O2tODQeS9vtKANmBXgGcavkRdVRU0NmVtHn2w@mail.gmail.com>
- <20180403183219.htbg3w6mejmysoel@ninjato>
- <CAKv+Gu_GTmCr8att-_iQ5rD64gvaQC2FJ3cAmYpqRqp_OqPcAg@mail.gmail.com>
- <20180403184559.z5lixuheqd4ojoti@ninjato>
-Message-ID: <CAKv+Gu9pMCAB1L0+8vO4w6yj_1O0fK_uyQboLzFfcbUMGjhsNw@mail.gmail.com>
+Date: Tue,  3 Apr 2018 21:11:48 +0200
+Subject: [PATCH v7 1/4] dt-bindings: i2c: add binding for Socionext SynQuacer
+ I2C
+In-Reply-To: <20180403191151.14924-1-ard.biesheuvel@linaro.org>
+References: <20180403191151.14924-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180403191151.14924-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 April 2018 at 20:45, Wolfram Sang <wsa@the-dreams.de> wrote:
->
->> We don't have suspend/resume support yet for this SoC, so I haven't
->> been able to try that. Also, the clocks are fixed in this particular
->> implementation, so the clk_xxx() calls don't actually do anything.
->
-> Then please remove that, too! Good that I asked...
->
+Add a binding for the I2C controller that can be found in the Socionext
+SynQuacer SoC.
 
-OK
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/i2c/i2c-synquacer.txt | 29 ++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-> Frankly, not nice to make me review untested code without mentioning
-> that fact somewhere :(
->
-
-My apologies. I simply didn't think to remove it - I didn't write the
-code, I am just the one upstreaming it.
-
-> BTW are you willing to maintain this driver? Then an entry for
-> MAINTAINERS would be needed.
->
-
-OK, I will add that as well.
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+new file mode 100644
+index 000000000000..72f4a2f0fedc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+@@ -0,0 +1,29 @@
++Socionext SynQuacer I2C
++
++Required properties:
++- compatible      : Must be "socionext,synquacer-i2c"
++- reg             : Offset and length of the register set for the device
++- interrupts      : A single interrupt specifier
++- #address-cells  : Must be <1>;
++- #size-cells     : Must be <0>;
++- clock-names     : Must contain "pclk".
++- clocks          : Must contain an entry for each name in clock-names.
++                    (See the common clock bindings.)
++
++Optional properties:
++- clock-frequency : Desired I2C bus clock frequency in Hz. As only Normal and
++                    Fast modes are supported, possible values are 100000 and
++                    400000.
++
++Example :
++
++    i2c at 51210000 {
++        compatible = "socionext,synquacer-i2c";
++        reg = <0x51210000 0x1000>;
++        interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++        #address-cells = <1>;
++        #size-cells = <0>;
++        clock-names = "pclk";
++        clocks = <&clk_i2c>;
++        clock-frequency = <400000>;
++    };
+-- 
+2.15.1
