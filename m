@@ -1,85 +1,54 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 3 Apr 2018 16:56:55 +0200
-Subject: [PATCH 5/7] drm/sun4i: Rely on dma-parent for our RAM offset
-In-Reply-To: <856ea14e004a70d7d7cf9ca12485c558a966c948.1522761929.git-series.maxime.ripard@bootlin.com>
-References: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
- <856ea14e004a70d7d7cf9ca12485c558a966c948.1522761929.git-series.maxime.ripard@bootlin.com>
-Message-ID: <20180403145655.GU3881@phenom.ffwll.local>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 3 Apr 2018 15:58:41 +0100
+Subject: [PATCH v2 11/17] kvm: arm64: Configure VTCR per VM
+In-Reply-To: <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <be9e8c47-8366-2d8f-8d8d-b8d2f978107b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 03:29:18PM +0200, Maxime Ripard wrote:
-> Now that we can express our DMA topology, rely on those property instead of
-> hardcoding an offset from the dma_addr_t which wasn't really great.
-> 
-> We still need to add some code to deal with the old DT that would lack that
-> property, but we move the offset to the DRM device dma_pfn_offset to be
-> able to rely on just the dma_addr_t associated to the GEM object.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Hi Suzuki,
 
-Yay for hiding more bus address funies behind dma_map_* support. This
-should also help with cleaner dma-buf import.
+On 27/03/18 14:15, Suzuki K Poulose wrote:
+> We set VTCR_EL2 very early during the stage2 init and don't
+> touch it ever. This is fine as we had a fixed IPA size. This
+> patch changes the behavior to set the VTCR for a given VM,
+> depending on its stage2 table. The common configuration for
+> VTCR is still performed during the early init as we have to
+> retain the hardware access flag update bits (VTCR_EL2_HA)
+> per CPU (as they are only set for the CPUs which are capabile).
 
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 28 +++++++++++++++++++++-------
->  1 file changed, 21 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index 847eecbe4d14..04e85d3ca36e 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -222,13 +222,6 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
->  	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
->  	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
->  
-> -	/*
-> -	 * backend DMA accesses DRAM directly, bypassing the system
-> -	 * bus. As such, the address range is different and the buffer
-> -	 * address needs to be corrected.
-> -	 */
-> -	paddr -= PHYS_OFFSET;
-> -
->  	/* Write the 32 lower bits of the address (in bits) */
->  	lo_paddr = paddr << 3;
->  	DRM_DEBUG_DRIVER("Setting address lower bits to 0x%x\n", lo_paddr);
-> @@ -361,6 +354,27 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
->  		return -ENOMEM;
->  	dev_set_drvdata(dev, backend);
->  
-> +	if (of_find_property(dev->of_node, "dma-parent", NULL)) {
-> +		/*
-> +		 * This assume we have the same DMA constraints for all our the
-> +		 * devices in our pipeline (all the backends, but also the
-> +		 * frontends). This sounds bad, but it has always been the case
-> +		 * for us, and DRM doesn't do per-device allocation either, so
-> +		 * we would need to fix DRM first...
-> +		 */
-> +		ret = of_dma_configure(drm->dev, dev->of_node);
-> +		if (ret)
-> +			return ret;
-> +	} else {
-> +		/*
-> +		 * If we don't have the dma-parent property, most likely
-> +		 * because of an old DT, we need to set the DMA offset by hand
-> +		 * on our device since the RAM mapping is at 0 for the DMA bus,
-> +		 * unlike the CPU.
-> +		 */
-> +		drm->dev->dma_pfn_offset = PHYS_PFN_OFFSET;
-> +	}
+(Nit: capable)
+
+
+> The bits defining the number of levels in the page table (SL0)
+> and and the size of the Input address to the translation (T0SZ)
+> are programmed for each VM upon entry to the guest.
+
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 870f4b1..5ccd3ae 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -164,6 +164,12 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>  static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> +	u64 vtcr = read_sysreg(vtcr_el2);
 > +
->  	backend->engine.node = dev->of_node;
->  	backend->engine.ops = &sun4i_backend_engine_ops;
->  	backend->engine.id = sun4i_backend_of_get_id(dev->of_node);
-> -- 
-> git-series 0.9.1
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> +	vtcr &= ~VTCR_EL2_PRIVATE_MASK;
+> +	vtcr |= VTCR_EL2_SL0(kvm_stage2_levels(kvm)) |
+> +		VTCR_EL2_T0SZ(kvm_phys_shift(kvm));
+> +	write_sysreg(vtcr, vtcr_el2);
+>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+>  }
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Do we need to set this register for tlb maintenance too?
+e.g. tlbi for a 3-level-stage2 vm when a 2-level-stage2 vm's vtcr is loaded...
+
+(The ARM-ARM has 'Any of the bits of VTCR_EL2 are permitted to be cached in a TLB'.)
+
+
+Thanks,
+
+James
