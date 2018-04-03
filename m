@@ -1,84 +1,130 @@
-From: hejianet@gmail.com (Jia He)
-Date: Tue, 3 Apr 2018 11:07:18 +0800
-Subject: [PATCH v5 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
- on arm and arm64
-In-Reply-To: <CAKv+Gu_CwWnW15jyTCY55akAikEjbgK4zRq_9=YuSDot3O3dQg@mail.gmail.com>
-References: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
- <1522636236-12625-2-git-send-email-hejianet@gmail.com>
- <CAKv+Gu96_sC1Q6-w4O-AXFZzNnH1WoGwJfqvSR+Q_k_bZbrUGg@mail.gmail.com>
- <41445229-043c-976f-3961-13770163444f@gmail.com>
- <CAKv+Gu_CwWnW15jyTCY55akAikEjbgK4zRq_9=YuSDot3O3dQg@mail.gmail.com>
-Message-ID: <392a8945-fe83-9864-0968-4a13a5443a02@gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 2 Apr 2018 21:04:23 -0700
+Subject: [PATCH 1/2] pinctrl: qcom: remove static globals to allow
+ multiple TLMMs
+In-Reply-To: <1521848700-22214-1-git-send-email-timur@codeaurora.org>
+References: <1521848700-22214-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20180403040423.GA453@tuxbook-pro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri 23 Mar 16:44 PDT 2018, Timur Tabi wrote:
 
+> Two data structures are declared as static globals but are intended to
+> be per-TLMM.  Move them into the msm_pinctrl structure and initialize
+> them at runtime.
+> 
 
-On 4/2/2018 3:53 PM, Ard Biesheuvel Wrote:
-> On 2 April 2018 at 09:49, Jia He <hejianet@gmail.com> wrote:
->>
->> On 4/2/2018 2:55 PM, Ard Biesheuvel Wrote:
->>> On 2 April 2018 at 04:30, Jia He <hejianet@gmail.com> wrote:
->>>> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
->>>> where possible") optimized the loop in memmap_init_zone(). But it causes
->>>> possible panic bug. So Daniel Vacek reverted it later.
->>>>
->>>> But as suggested by Daniel Vacek, it is fine to using memblock to skip
->>>> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
->>>>
->>>> On arm and arm64, memblock is used by default. But generic version of
->>>> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
->>>> not always return the next valid one but skips more resulting in some
->>>> valid frames to be skipped (as if they were invalid). And that's why
->>>> kernel was eventually crashing on some !arm machines.
->>>>
->>>> And as verified by Eugeniu Rosca, arm can benifit from commit
->>>> b92df1de5d28. So remain the memblock_next_valid_pfn on arm{,64} and move
->>>> the related codes to arm64 arch directory.
->>>>
->>>> Suggested-by: Daniel Vacek <neelx@redhat.com>
->>>> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
->>> Hello Jia,
->>>
->>> Apologies for chiming in late.
->> no problem, thanks for your comments  ;-)
->>>
->>> If we are going to rearchitect this, I'd rather we change the loop in
->>> memmap_init_zone() so that we skip to the next valid PFN directly
->>> rather than skipping to the last invalid PFN so that the pfn++ in the
->> hmm... Maybe this macro name makes you confused
->>
->> pfn = skip_to_last_invalid_pfn(pfn);
->>
->> how about skip_to_next_valid_pfn?
->>
->>> for () results in the next value. Can we replace the pfn++ there with
->>> a function calls that defaults to 'return pfn + 1', but does the skip
->>> for architectures that implement it?
->> I am not sure I understand your question here.
->> With this patch, on !arm arches, skip_to_last_invalid_pfn is equal to (pfn),
->> and will be increased
->> when for{} loop continue. We only *skip* to the start pfn of next valid
->> region when
->> CONFIG_HAVE_MEMBLOCK and CONFIG_HAVE_ARCH_PFN_VALID(arm/arm64 supports
->> both).
->>
-> What I am saying is that the loop in memmap_init_zone
->
-> for (pfn = start_pfn; pfn < end_pfn; pfn++) { ... }
->
-> should be replaced by something like
->
-> for (pfn = start_pfn; pfn < end_pfn; pfn = next_valid_pfn(pfn))
->
-> where next_valid_pfn() is simply defined as
->
-> static ulong next_valid_pfn(ulong pfn)
-> {
->    return pfn + 1;
-> }
-Hi Ard,
-Do you think a macro instead of simply fuction is better here?
---
-Cheer,
-Jia
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> ---
+>  drivers/pinctrl/qcom/pinctrl-msm.c | 44 ++++++++++++++++++--------------------
+>  1 file changed, 21 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+> index ad80a17c9990..fa4e94fedb8c 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-msm.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+> @@ -58,7 +58,10 @@ struct msm_pinctrl {
+>  	struct device *dev;
+>  	struct pinctrl_dev *pctrl;
+>  	struct gpio_chip chip;
+> +	struct pinctrl_desc desc;
+>  	struct notifier_block restart_nb;
+> +
+> +	struct irq_chip irq_chip;
+>  	int irq;
+>  
+>  	raw_spinlock_t lock;
+> @@ -390,13 +393,6 @@ static int msm_config_group_set(struct pinctrl_dev *pctldev,
+>  	.pin_config_group_set	= msm_config_group_set,
+>  };
+>  
+> -static struct pinctrl_desc msm_pinctrl_desc = {
+> -	.pctlops = &msm_pinctrl_ops,
+> -	.pmxops = &msm_pinmux_ops,
+> -	.confops = &msm_pinconf_ops,
+> -	.owner = THIS_MODULE,
+> -};
+> -
+>  static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+>  {
+>  	const struct msm_pingroup *g;
+> @@ -776,15 +772,6 @@ static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
+>  	return 0;
+>  }
+>  
+> -static struct irq_chip msm_gpio_irq_chip = {
+> -	.name           = "msmgpio",
+> -	.irq_mask       = msm_gpio_irq_mask,
+> -	.irq_unmask     = msm_gpio_irq_unmask,
+> -	.irq_ack        = msm_gpio_irq_ack,
+> -	.irq_set_type   = msm_gpio_irq_set_type,
+> -	.irq_set_wake   = msm_gpio_irq_set_wake,
+> -};
+> -
+>  static void msm_gpio_irq_handler(struct irq_desc *desc)
+>  {
+>  	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+> @@ -877,6 +864,13 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>  	chip->of_node = pctrl->dev->of_node;
+>  	chip->need_valid_mask = msm_gpio_needs_valid_mask(pctrl);
+>  
+> +	pctrl->irq_chip.name = "msmgpio";
+> +	pctrl->irq_chip.irq_mask = msm_gpio_irq_mask;
+> +	pctrl->irq_chip.irq_unmask = msm_gpio_irq_unmask;
+> +	pctrl->irq_chip.irq_ack = msm_gpio_irq_ack;
+> +	pctrl->irq_chip.irq_set_type = msm_gpio_irq_set_type;
+> +	pctrl->irq_chip.irq_set_wake = msm_gpio_irq_set_wake;
+> +
+>  	ret = gpiochip_add_data(&pctrl->chip, pctrl);
+>  	if (ret) {
+>  		dev_err(pctrl->dev, "Failed register gpiochip\n");
+> @@ -898,7 +892,7 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>  	}
+>  
+>  	ret = gpiochip_irqchip_add(chip,
+> -				   &msm_gpio_irq_chip,
+> +				   &pctrl->irq_chip,
+>  				   0,
+>  				   handle_edge_irq,
+>  				   IRQ_TYPE_NONE);
+> @@ -908,7 +902,7 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+>  		return -ENOSYS;
+>  	}
+>  
+> -	gpiochip_set_chained_irqchip(chip, &msm_gpio_irq_chip, pctrl->irq,
+> +	gpiochip_set_chained_irqchip(chip, &pctrl->irq_chip, pctrl->irq,
+>  				     msm_gpio_irq_handler);
+>  
+>  	return 0;
+> @@ -979,11 +973,15 @@ int msm_pinctrl_probe(struct platform_device *pdev,
+>  		return pctrl->irq;
+>  	}
+>  
+> -	msm_pinctrl_desc.name = dev_name(&pdev->dev);
+> -	msm_pinctrl_desc.pins = pctrl->soc->pins;
+> -	msm_pinctrl_desc.npins = pctrl->soc->npins;
+> -	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &msm_pinctrl_desc,
+> -					     pctrl);
+> +	pctrl->desc.owner = THIS_MODULE;
+> +	pctrl->desc.pctlops = &msm_pinctrl_ops;
+> +	pctrl->desc.pmxops = &msm_pinmux_ops;
+> +	pctrl->desc.confops = &msm_pinconf_ops;
+> +	pctrl->desc.name = dev_name(&pdev->dev);
+> +	pctrl->desc.pins = pctrl->soc->pins;
+> +	pctrl->desc.npins = pctrl->soc->npins;
+> +
+> +	pctrl->pctrl = devm_pinctrl_register(&pdev->dev, &pctrl->desc, pctrl);
+>  	if (IS_ERR(pctrl->pctrl)) {
+>  		dev_err(&pdev->dev, "Couldn't register pinctrl driver\n");
+>  		return PTR_ERR(pctrl->pctrl);
+> -- 
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
