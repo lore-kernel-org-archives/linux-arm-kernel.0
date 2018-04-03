@@ -1,44 +1,54 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Tue, 3 Apr 2018 22:08:39 +0200
-Subject: [PATCH v5 11/13] ARM: sun9i: smp: Add is_sun9i field
-In-Reply-To: <CAGb2v67EzOHd5_Xj9K3ZuAKVZhA4WrwfTM0gE_eR+H4mF1J4eA@mail.gmail.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-12-mylene.josserand@bootlin.com>
- <20180403084655.x6u7s4jzqdvq2eey@flea>
- <CAGb2v67EzOHd5_Xj9K3ZuAKVZhA4WrwfTM0gE_eR+H4mF1J4eA@mail.gmail.com>
-Message-ID: <20180403220839.0ec8f9b8@dell-desktop.home>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 03 Apr 2018 22:19:33 +0200
+Subject: [PATCH 02/15] ARM: pxa: add dma slave map
+In-Reply-To: <CAK8P3a2FFVnPj4+VoQET3-Jz2DaYbc6UUJnX1fH5s8VumJZ7Og@mail.gmail.com>
+ (Arnd Bergmann's message of "Tue, 3 Apr 2018 17:39:08 +0200")
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-3-robert.jarzmik@free.fr>
+ <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
+ <87tvss48ti.fsf@belgarion.home>
+ <CAK8P3a2FFVnPj4+VoQET3-Jz2DaYbc6UUJnX1fH5s8VumJZ7Og@mail.gmail.com>
+Message-ID: <87h8os3uwa.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+... chop chop removing unneeded recipients ....
 
-On Tue, 3 Apr 2018 16:48:41 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-> On Tue, Apr 3, 2018 at 4:46 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Apr 03, 2018 at 08:18:34AM +0200, Myl?ne Josserand wrote:  
-> >> To prepare the support of sun8i-a83t, add a field in the smp_data
-> >> structure to enable the case of sun9i.
-> >>
-> >> Start to handle the differences between sun9i-a80 and sun8i-a83t
-> >> by using this variable.
-> >>
-> >> Add an index to retrieve which structures we are using.  
-> >
-> > This should have been in a separate commit, but maybe we can store a
-> > pointer to the array cell we're using instead of always using the
-> > index?  
-> 
-> Using a pointer would also avoid some of the code movement from the
-> previous patch.
-> 
-> ChenYu
+> Ok, I looked at the driver in more detail now and found the scary parts.
+> So it's using the async DMA interface to do synchronous DMA in
+> interrupt context in order to transfer the rx data faster than an readsl()
+> would, correct?
+That's correct, at least for the smc91x.
 
-Yep, I will use a pointer instead. Thanks for the correction.
+> It still feels odd to me that there is an entry in the slave map for
+> a device that does not have a request line. However, it also seems
+> that the entire code in those two drivers that deals with DMA is specific
+> to PXA anyway, so maybe it can be done differently: instead of
+> calling dma_request_slave_channel_compat() or dma_request_chan()
+> with a fake request line, how about calling dma_request_channel()
+> with an NULL filter function and data, and have the driver handle
+> the empty data case the same way as the rq=-1 case today?
+Okay, in this case :
+ - the channel priority cannot be passed anymore
+ - and I don't see how this can work :
+   dma_request_channel()
+     __dma_request_channel()
+       find_candidate()
+         private_candidate(mask, device, fn, fn_param);
+           /* Here, fn == NULL and fn_param == NULL as per your proposal */
 
-Best regards,
+   This function will find the first available dma channel, all right, but
+   no function will be called in pxa_dma driver, and therefore the last
+   requestor of the channel will be used, which is bad.
+
+>> If you think it's worth it, what is the driving benefit behind ?
+> It seems a bit cleaner to only register the tables for the dma lines that
+> are actually present on a given chip.
+Okay, let's do this.
+
+Cheers.
 
 -- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Robert
