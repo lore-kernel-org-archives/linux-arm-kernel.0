@@ -1,69 +1,83 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue,  3 Apr 2018 15:29:18 +0200
-Subject: [PATCH 5/7] drm/sun4i: Rely on dma-parent for our RAM offset
-In-Reply-To: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
-References: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
-Message-ID: <856ea14e004a70d7d7cf9ca12485c558a966c948.1522761929.git-series.maxime.ripard@bootlin.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue,  3 Apr 2018 21:40:24 +0800
+Subject: [PATCH] arm64: allwinner: h6: restore the usage of CCU slice macros
+Message-ID: <20180403134024.43156-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can express our DMA topology, rely on those property instead of
-hardcoding an offset from the dma_addr_t which wasn't really great.
+As the definition of CCU slice macros are already merged into the source
+tree, restore the usage of the macros now.
 
-We still need to add some code to deal with the old DT that would lack that
-property, but we move the offset to the DRM device dma_pfn_offset to be
-able to rely on just the dma_addr_t associated to the GEM object.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 28 +++++++++++++++++++++-------
- 1 file changed, 21 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 847eecbe4d14..04e85d3ca36e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -222,13 +222,6 @@ int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
- 	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
- 	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index 56563150d61a..4debc3962830 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -4,6 +4,8 @@
+  */
  
--	/*
--	 * backend DMA accesses DRAM directly, bypassing the system
--	 * bus. As such, the address range is different and the buffer
--	 * address needs to be corrected.
--	 */
--	paddr -= PHYS_OFFSET;
--
- 	/* Write the 32 lower bits of the address (in bits) */
- 	lo_paddr = paddr << 3;
- 	DRM_DEBUG_DRIVER("Setting address lower bits to 0x%x\n", lo_paddr);
-@@ -361,6 +354,27 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 		return -ENOMEM;
- 	dev_set_drvdata(dev, backend);
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/sun50i-h6-ccu.h>
++#include <dt-bindings/reset/sun50i-h6-ccu.h>
  
-+	if (of_find_property(dev->of_node, "dma-parent", NULL)) {
-+		/*
-+		 * This assume we have the same DMA constraints for all our the
-+		 * devices in our pipeline (all the backends, but also the
-+		 * frontends). This sounds bad, but it has always been the case
-+		 * for us, and DRM doesn't do per-device allocation either, so
-+		 * we would need to fix DRM first...
-+		 */
-+		ret = of_dma_configure(drm->dev, dev->of_node);
-+		if (ret)
-+			return ret;
-+	} else {
-+		/*
-+		 * If we don't have the dma-parent property, most likely
-+		 * because of an old DT, we need to set the DMA offset by hand
-+		 * on our device since the RAM mapping is at 0 for the DMA bus,
-+		 * unlike the CPU.
-+		 */
-+		drm->dev->dma_pfn_offset = PHYS_PFN_OFFSET;
-+	}
-+
- 	backend->engine.node = dev->of_node;
- 	backend->engine.ops = &sun4i_backend_engine_ops;
- 	backend->engine.id = sun4i_backend_of_get_id(dev->of_node);
+ / {
+ 	interrupt-parent = <&gic>;
+@@ -115,7 +117,7 @@
+ 				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&ccu 26>, <&osc24M>, <&osc32k>;
++			clocks = <&ccu CLK_APB1>, <&osc24M>, <&osc32k>;
+ 			clock-names = "apb", "hosc", "losc";
+ 			gpio-controller;
+ 			#gpio-cells = <3>;
+@@ -134,8 +136,8 @@
+ 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&ccu 70>;
+-			resets = <&ccu 21>;
++			clocks = <&ccu CLK_BUS_UART0>;
++			resets = <&ccu RST_BUS_UART0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -145,8 +147,8 @@
+ 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&ccu 71>;
+-			resets = <&ccu 22>;
++			clocks = <&ccu CLK_BUS_UART1>;
++			resets = <&ccu RST_BUS_UART1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -156,8 +158,8 @@
+ 			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&ccu 72>;
+-			resets = <&ccu 23>;
++			clocks = <&ccu CLK_BUS_UART2>;
++			resets = <&ccu RST_BUS_UART2>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -167,8 +169,8 @@
+ 			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&ccu 73>;
+-			resets = <&ccu 24>;
++			clocks = <&ccu CLK_BUS_UART3>;
++			resets = <&ccu RST_BUS_UART3>;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
-git-series 0.9.1
+2.15.1
