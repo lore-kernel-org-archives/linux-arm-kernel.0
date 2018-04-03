@@ -1,29 +1,26 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue,  3 Apr 2018 15:37:37 +0530
-Subject: [PATCH V2 0/2] cpufreq: Stop validating cpufreq table in drivers
-Message-ID: <cover.1522749887.git.viresh.kumar@linaro.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 3 Apr 2018 18:06:48 +0800
+Subject: [PATCH 0/3] mmc: meson-axg: initial support for AXG SoC platform
+Message-ID: <20180403100652.41056-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+   The patches series try to enable basic eMMC support in the Meson-AXG platfrom.
 
-Most of the patches from the previous series are already applied but we
-didn't remove the cpufreq_table_validate_and_show() helper yet as the
-scmi driver came from a different tree than PM.
+   Currently HS200 mode is tested with clock running at 166MHz, since
+not all boards are stable to running 200MHz (due to tuning phase error),
+we will further improve the tuning phase driver in the future,
+but in my opiton, this patch series itself is pretty good to go.
 
-These can be applied over 4.17-rc1 (that would come out after a week),
-currently based off linux next.
+Nan Li (3):
+  mmc: dt-bindings: update bindings doc to support Meson-AXG SoC
+  mmc: meson-axg: add support for the Meson-AXG platform
+  mmc: meson: update doc to support Meson-AXG platform
 
-Viresh Kumar (2):
-  cpufreq: scmi: Don't validate the frequency table twice
-  cpufreq: Drop cpufreq_table_validate_and_show()
-
- Documentation/cpu-freq/core.txt        | 12 +++++-------
- Documentation/cpu-freq/cpu-drivers.txt |  6 ++----
- drivers/cpufreq/freq_table.c           | 14 --------------
- drivers/cpufreq/scmi-cpufreq.c         | 10 +---------
- include/linux/cpufreq.h                |  2 --
- 5 files changed, 8 insertions(+), 36 deletions(-)
+ .../devicetree/bindings/mmc/amlogic,meson-gx.txt   |  1 +
+ drivers/mmc/host/Kconfig                           |  4 +-
+ drivers/mmc/host/meson-gx-mmc.c                    | 63 ++++++++++++++++++----
+ 3 files changed, 55 insertions(+), 13 deletions(-)
 
 -- 
-2.15.0.194.g9af6a3dea062
+2.16.2
