@@ -1,89 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Apr 2018 13:59:53 +0100
-Subject: [Question] MFD driver that handles clocks/resets and populates
- child nodes
-In-Reply-To: <CAK7LNAQbWUYuhow5VdNDc+SuttY+u3xh9zk92kLEy9id6TNCFg@mail.gmail.com>
-References: <CAK7LNARFWDMgmWsCjUmVrm4ZeYOcKCbizijxmDXob618ABjNWg@mail.gmail.com>
- <20180402120414.GA8159@lunn.ch>
- <CAK7LNAQ6LKk3NtGLB8g07ocyvXidpTHsApeDuctvEHyyLvk2ew@mail.gmail.com>
- <20180402133219.GA10520@lunn.ch>
- <20180403080335.ksekhxwvbzbxhmln@dell>
- <CAK7LNAQbWUYuhow5VdNDc+SuttY+u3xh9zk92kLEy9id6TNCFg@mail.gmail.com>
-Message-ID: <20180403125953.qzpbnlsyuxm4w7nm@dell>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Tue, 3 Apr 2018 16:03:32 +0300
+Subject: [PATCH 6/6] spi: sun4i: add DMA transfers support
+In-Reply-To: <20180403081711.rqsp77mgnuvlnzt5@flea>
+References: <20180329185907.27281-1-ssuloev@orpaltech.com>
+ <20180329185907.27281-7-ssuloev@orpaltech.com>
+ <20180403081711.rqsp77mgnuvlnzt5@flea>
+Message-ID: <19d5907c-f081-21ce-1b72-7c0a331eb073@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Apr 2018, Masahiro Yamada wrote:
+On 04/03/2018 11:17 AM, Maxime Ripard wrote:
+> On Thu, Mar 29, 2018 at 09:59:07PM +0300, Sergey Suloev wrote:
+>> +static int sun4i_spi_dma_setup(struct device *dev,
+>> +			       struct resource *res)
+>> +{
+>> +	struct spi_master *master = dev_get_drvdata(dev);
+>> +	struct dma_slave_config dma_sconf;
+>> +	int ret;
+>> +
+>> +	master->dma_tx = dma_request_slave_channel_reason(dev, "tx");
+>> +	if (IS_ERR(master->dma_tx)) {
+>> +		dev_err(dev, "Unable to acquire DMA TX channel\n");
+>> +		ret = PTR_ERR(master->dma_tx);
+>> +		goto out;
+>> +	}
+>> +
+>> +	dma_sconf.direction = DMA_MEM_TO_DEV;
+>> +	dma_sconf.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+>> +	dma_sconf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> I guess that would depend on the size of the transfer, right?
+no
+"this is the width in bytes of the source (RX)register where DMA data 
+shall be read. If the sourceis memory this may be ignored depending on 
+architecture."
+AFAIK is should be 1 byte for SPI side and seems to be ignored for 
+memory side, but as soon as I don't know what should be correct value 
+for memory side I just put 1 there too.
+>
+>> +	dma_sconf.dst_addr = res->start + SUN4I_TXDATA_REG;
+>> +	dma_sconf.dst_maxburst = 1;
+>> +	dma_sconf.src_maxburst = 1;
+> And a burst of 1 seems sub-optimal here.
+I did some tests before with 3/4 FIFO size but it didn't work and I got 
+stuck with 1 byte.
+It seems like 1 byte is the correct value because in SPI protocol we can 
+only send 1 byte in 1 burst.
 
-> 2018-04-03 17:03 GMT+09:00 Lee Jones <lee.jones@linaro.org>:
-> > On Mon, 02 Apr 2018, Andrew Lunn wrote:
-> >
-> >> On Mon, Apr 02, 2018 at 10:21:01PM +0900, Masahiro Yamada wrote:
-> >> > 2018-04-02 21:04 GMT+09:00 Andrew Lunn <andrew@lunn.ch>:
-> >> > >> The maintainer of DWC3, Felipe Balbi, requested to
-> >> > >> split the glue layer driver into small parts such as
-> >> > >> reset, regulator, phy, etc.
-> >> > >
-> >> > > What exactly did Felipe ask for? Did he ask that the patch be split
-> >> > > up, one patch per reset, regulator, phy etc?
-> >> >
-> >> >
-> >> > Yeah.  That is what we understood from his comments.
-> >> >
-> >> >
-> >> > These are the feed-backs from him.
-> >> >
-> >> > https://lkml.org/lkml/2018/1/23/298
-> >> > https://lkml.org/lkml/2018/1/24/352
-> >>
-> >> > > Are all these resources used just by the DWC3? Or is it a true MFD,
-> >> > > multiple functions?
-> >> >
-> >> > I do not think this is a real MFD.
-> >> >
-> >> > This is a DWC3 glue layer, i.e.
-> >> > a collection of misc registers that control
-> >> > the DWC3 IP.
-> >> >
-> >> >
-> >> > Just splitting it into small pieces
-> >> > to use PHY, reset, regulator framework in Linux.
-> >> >
-> >> > Of course, the price of this approach
-> >> > is so cluttered Device Tree,
-> >> > honestly I do not like it much.
-> >>
-> >> This however the correct way to do this. You should have a phy driver,
-> >> and a regulator driver, and a reset driver. The DWC3 then uses
-> >> phandles to these drivers.
-> >>
-> >> How is the IO map area 65b00000 split up. Can you cleanly separate it
-> >> into sub areas, which do not overlap, so you have a sub-area for the
-> >> PHY driver, a sub-area for the regulator driver and a sub-area for the
-> >> reset area? If you can cleanly split it up, you don't need an MFD. If
-> >> however the registers are in overlapping areas, you do need an
-> >> MFD. The MFD core provides access to the registers, while its children
-> >> implement PHY, reset, regulator etc.
-> >
-> > This device certainly sounds like an MFD to me.
-> >
-> > Can you share the DT you've written please?
-> 
-> 
-> This is still under the internal review in Socionext,
-> but I attached it below FWIW.
-> 
-> (I am not the author of this DT.
->  Written by Kunihiko Hayashi,
-> 
-> Just skimming the driver, I guess it will be possible to flatten
-> the node structure by separating the register space into sub-areas.
-> If this is success, we do not the MFD driver.
-
-Sounds like a plan.  Pretty sure this isn't really an MFD.
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>
+>> +	ret = sun4i_spi_dma_setup(&pdev->dev, res);
+>> +	if (ret) {
+>> +		if (ret == -EPROBE_DEFER) {
+>> +			/* wait for the dma driver to load */
+>> +			goto err_free_master;
+>> +		}
+>> +		dev_warn(&pdev->dev, "DMA transfer not supported\n");
+> Saying why it's not supported would be great.
+I can put more info in this log
+but there is already a message printed from sun4_spi_dma_setup() if any 
+error occurs
+>
+> Maxime
+>
