@@ -1,90 +1,79 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue,  3 Apr 2018 08:18:36 +0200
-Subject: [PATCH v5 13/13] ARM: dts: sun8i: Add enable-method for SMP support
- for the A83T SoC
+Date: Tue,  3 Apr 2018 08:18:31 +0200
+Subject: [PATCH v5 08/13] ARM: sunxi: Add initialization of CNTVOFF
 In-Reply-To: <20180403061836.3926-1-mylene.josserand@bootlin.com>
 References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
-Message-ID: <20180403061836.3926-14-mylene.josserand@bootlin.com>
+Message-ID: <20180403061836.3926-9-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the use of enable-method property for SMP support which allows
-to handle the SMP support for this specific SoC.
+Add the initialization of CNTVOFF for sun8i-a83t.
 
-This commit adds enable-method properties to all CPU nodes.
+For boot CPU, Create a new machine that handles this
+function's call in an "init_early" callback.
+For secondary CPUs, add this function into secondary_startup
+assembly entry.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-sunxi/headsmp.S |  1 +
+ arch/arm/mach-sunxi/sunxi.c   | 18 +++++++++++++++++-
+ 2 files changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 9ac905884d81..208d2823fdef 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -67,6 +67,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu0_opp_table>;
- 			cci-control-port = <&cci_control0>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <0>;
- 		};
+diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+index 79890fbe5613..b586b7cf803a 100644
+--- a/arch/arm/mach-sunxi/headsmp.S
++++ b/arch/arm/mach-sunxi/headsmp.S
+@@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
  
-@@ -75,6 +76,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu0_opp_table>;
- 			cci-control-port = <&cci_control0>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <1>;
- 		};
+ ENTRY(sunxi_mc_smp_secondary_startup)
+ 	bl	sunxi_mc_smp_cluster_cache_enable
++	bl	smp_init_cntvoff
+ 	b	secondary_startup
+ ENDPROC(sunxi_mc_smp_secondary_startup)
  
-@@ -83,6 +85,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu0_opp_table>;
- 			cci-control-port = <&cci_control0>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <2>;
- 		};
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 5e9602ce1573..090784108c0a 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -16,6 +16,7 @@
+ #include <linux/platform_device.h>
  
-@@ -91,6 +94,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu0_opp_table>;
- 			cci-control-port = <&cci_control0>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <3>;
- 		};
+ #include <asm/mach/arch.h>
++#include <asm/smp_cntvoff.h>
  
-@@ -101,6 +105,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu1_opp_table>;
- 			cci-control-port = <&cci_control1>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <0x100>;
- 		};
+ static const char * const sunxi_board_dt_compat[] = {
+ 	"allwinner,sun4i-a10",
+@@ -62,7 +63,6 @@ MACHINE_END
+ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a23",
+ 	"allwinner,sun8i-a33",
+-	"allwinner,sun8i-a83t",
+ 	"allwinner,sun8i-h2-plus",
+ 	"allwinner,sun8i-h3",
+ 	"allwinner,sun8i-r40",
+@@ -75,6 +75,22 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+ 	.dt_compat	= sun8i_board_dt_compat,
+ MACHINE_END
  
-@@ -109,6 +114,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu1_opp_table>;
- 			cci-control-port = <&cci_control1>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <0x101>;
- 		};
- 
-@@ -117,6 +123,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu1_opp_table>;
- 			cci-control-port = <&cci_control1>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <0x102>;
- 		};
- 
-@@ -125,6 +132,7 @@
- 			device_type = "cpu";
- 			operating-points-v2 = <&cpu1_opp_table>;
- 			cci-control-port = <&cci_control1>;
-+			enable-method = "allwinner,sun8i-a83t-smp";
- 			reg = <0x103>;
- 		};
- 	};
++void __init sun8i_cntvoff_init(void)
++{
++	smp_init_cntvoff();
++}
++
++static const char * const sun8i_cntvoff_board_dt_compat[] = {
++	"allwinner,sun8i-a83t",
++	NULL,
++};
++
++DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i boards needing cntvoff")
++	.init_early	= sun8i_cntvoff_init,
++	.init_time	= sun6i_timer_init,
++	.dt_compat	= sun8i_cntvoff_board_dt_compat,
++MACHINE_END
++
+ static const char * const sun9i_board_dt_compat[] = {
+ 	"allwinner,sun9i-a80",
+ 	NULL,
 -- 
 2.11.0
