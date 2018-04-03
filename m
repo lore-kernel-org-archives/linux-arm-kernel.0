@@ -1,33 +1,34 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue,  3 Apr 2018 08:55:03 -0400
-Subject: [PATCH v3 1/2] MIPS: io: prevent compiler reordering on the default
- writeX() implementation
-Message-ID: <1522760109-16497-1-git-send-email-okaya@codeaurora.org>
+Date: Tue,  3 Apr 2018 08:55:04 -0400
+Subject: [PATCH v3 2/2] MIPS: io: add a barrier after register read in readX()
+In-Reply-To: <1522760109-16497-1-git-send-email-okaya@codeaurora.org>
+References: <1522760109-16497-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1522760109-16497-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-writeX() has a strong ordering semantics with respect to memory updates.
-In the abscence of a write barrier or a compiler barrier, commpiler can
-reorder register and memory update instructions. This breaks the writeX()
-API.
+While a barrier is present in writeX() function before the register write,
+a similar barrier is missing in the readX() function after the register
+read. This could allow memory accesses following readX() to observe
+stale data.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/mips/include/asm/io.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/mips/include/asm/io.h | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/mips/include/asm/io.h b/arch/mips/include/asm/io.h
-index 0cbf3af..fd00ddaf 100644
+index fd00ddaf..6ac502f 100644
 --- a/arch/mips/include/asm/io.h
 +++ b/arch/mips/include/asm/io.h
-@@ -307,7 +307,7 @@ static inline void iounmap(const volatile void __iomem *addr)
- #if defined(CONFIG_CPU_CAVIUM_OCTEON) || defined(CONFIG_LOONGSON3_ENHANCEMENT)
- #define war_io_reorder_wmb()		wmb()
- #else
--#define war_io_reorder_wmb()		do { } while (0)
-+#define war_io_reorder_wmb()		barrier()
- #endif
+@@ -377,6 +377,7 @@ static inline type pfx##read##bwlq(const volatile void __iomem *mem)	\
+ 		BUG();							\
+ 	}								\
+ 									\
++	rmb();								\
+ 	return pfx##ioswab##bwlq(__mem, __val);				\
+ }
  
- #define __BUILD_MEMORY_SINGLE(pfx, bwlq, type, irq)			\
 -- 
 2.7.4
