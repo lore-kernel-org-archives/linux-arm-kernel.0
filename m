@@ -1,37 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  3 Apr 2018 21:11:51 +0200
-Subject: [PATCH v7 4/4] MAINTAINERS: add Ard as Socionext SynQuacer I2C driver
- maintainer
-In-Reply-To: <20180403191151.14924-1-ard.biesheuvel@linaro.org>
-References: <20180403191151.14924-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180403191151.14924-5-ard.biesheuvel@linaro.org>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Tue, 3 Apr 2018 21:52:02 +0200
+Subject: [PATCH v5 05/13] ARM: dts: sun8i: Add R_CPUCFG device node for
+ the A83T dtsi
+In-Reply-To: <CAGb2v66w3349h0b+xRD8seHhqMNoue8AzAFr-UPKvzZAtvoV5g@mail.gmail.com>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-6-mylene.josserand@bootlin.com>
+ <CAGb2v66w3349h0b+xRD8seHhqMNoue8AzAFr-UPKvzZAtvoV5g@mail.gmail.com>
+Message-ID: <20180403215202.2892baae@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as maintainer for the newly added Socionext SynQuacer I2C
-driver.
+Hello,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Tue, 3 Apr 2018 17:07:06 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2d3f847cdc8d..6b3e60a6d282 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -12816,6 +12816,12 @@ F:	include/media/soc*
- F:	drivers/media/i2c/soc_camera/
- F:	drivers/media/platform/soc_camera/
- 
-+SOCIONEXT SYNQUACER I2C DRIVER
-+M:	Ard Biesheuvel <ard.biesheuvel@linaro.org>
-+L:	linux-i2c at vger.kernel.org
-+S:	Maintained
-+F:	drivers/i2c/busses/i2c-synquacer.c
-+
- SOCIONEXT UNIPHIER SOUND DRIVER
- M:	Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+> On Tue, Apr 3, 2018 at 2:18 PM, Myl?ne Josserand
+> <mylene.josserand@bootlin.com> wrote:
+> > The R_CPUCFG is a collection of registers needed for SMP bringup
+> > on clusters and cluster's reset.
+> > For the moment, documentation about this register is found in
+> > Allwinner's code only.
+> >
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > ---
+> >  arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> > index 32992afa0b12..85f14f4ebeed 100644
+> > --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> > @@ -933,6 +933,11 @@
+> >                         #reset-cells = <1>;
+> >                 };
+> >
+> > +               r_cpucfg at 1f01c00 {
+> > +                       compatible = "allwinner,sun8i-a83t-r-cpucfg";
+> > +                       reg = <0x1f01c00 0x100>;  
+> 
+> The memory map says that its size is 0x400.
+> 
+> ChenYu
+
+True, thank you for the correction.
+
+Best regards,
+
 -- 
-2.15.1
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
