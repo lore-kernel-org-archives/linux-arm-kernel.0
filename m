@@ -1,44 +1,54 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Apr 2018 12:38:37 +0100
-Subject: [PATCH v3 2/6] Disable instrumentation for some code
-In-Reply-To: <7837103a-bcf0-6b00-14d6-bd6b80649886@arm.com>
-References: <20180402120440.31900-1-liuwenliang@huawei.com>
- <20180402120440.31900-3-liuwenliang@huawei.com>
- <7837103a-bcf0-6b00-14d6-bd6b80649886@arm.com>
-Message-ID: <20180403113837.GK16141@n2100.armlinux.org.uk>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 3 Apr 2018 13:40:06 +0200
+Subject: [PATCH 2/6] spi: sun4i: restrict transfer length in PIO-mode
+In-Reply-To: <4390604e-092b-a89d-3581-b57ee9cbb6a1@orpaltech.com>
+References: <20180329185907.27281-1-ssuloev@orpaltech.com>
+ <20180329185907.27281-3-ssuloev@orpaltech.com>
+ <20180403081041.3ully6bcyfwx2cx6@flea>
+ <4390604e-092b-a89d-3581-b57ee9cbb6a1@orpaltech.com>
+Message-ID: <20180403114006.u7tz2c7lvofsqwtg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 12:30:42PM +0100, Marc Zyngier wrote:
-> On 02/04/18 13:04, Abbott Liu wrote:
-> > From: Andrey Ryabinin <a.ryabinin@samsung.com>
-> > 
-> > Disable instrumentation for arch/arm/boot/compressed/*
-> > ,arch/arm/kvm/hyp/* and arch/arm/vdso/* because those
-> > code won't linkd with kernel image.
-> > 
-> > Disable kasan check in the function unwind_pop_register
-> > because it doesn't matter that kasan checks failed when
-> > unwind_pop_register read stack memory of task.
-> > 
-> > Reviewed-by: Russell King - ARM Linux <linux@armlinux.org.uk>
-> > Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Just because I replied to this patch doesn't mean you can stick my
-> Reviewed-by tag on it. Please drop this tag until I explicitly say that
-> you can add it (see Documentation/process/submitting-patches.rst,
-> section 11).
-> 
-> Same goes for patch 1.
+On Tue, Apr 03, 2018 at 02:08:43PM +0300, Sergey Suloev wrote:
+> On 04/03/2018 11:10 AM, Maxime Ripard wrote:
+> > On Thu, Mar 29, 2018 at 09:59:03PM +0300, Sergey Suloev wrote:
+> > > There is no need to handle 3/4 empty/full interrupts as the maximum
+> > > supported transfer length in PIO mode is 64 bytes for sun4i-family
+> > > SoCs.
+> > That assumes that you'll be able to treat the FIFO full interrupt and
+> > drain the FIFO before we have the next byte coming in. This would
+> > require a real time system, and we're not in one of them.
+>
+> AFAIK in SPI protocol we send and receive at the same time.
 
-Same goes for that reviewed-by line for me.  From my records, I never
-even looked at patch 2 from the first posting, and I don't appear to
-have the second posting in my mailbox (it's probably been classed as
-spam by dspam.)  So these reviewed-by lines seem to be totally
-misleading.
+It depends. The protocol allows it yes, but most devices I've seen can
+only operate in half duplex. But it's not really the point.
+
+> As soon as the transfer length is <= FIFO depth then it means that
+> at the moment we get TC interrupt all data for this transfer
+> sent/received already.
+> 
+> Is your point here that draining FIFO might be a long operation and we can
+> lose next portion of data ?
+
+My point is that, if you get another interrupt(s) right before the
+FIFO full interrupt, that interrupt is going to be masked for as long
+as it is needed for the previous handler(s) to execute.
+
+If you're having another byte received while the interrupt is masked,
+you're losing data.
+
+Maxime
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180403/389746ed/attachment.sig>
