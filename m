@@ -1,29 +1,50 @@
 From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Tue,  3 Apr 2018 18:28:59 +0300
-Subject: [PATCH v2 0/6] spi: Add support for DMA transfers in sun4i SPI driver
-Message-ID: <20180403152905.1524-1-ssuloev@orpaltech.com>
+Date: Tue,  3 Apr 2018 18:29:00 +0300
+Subject: [PATCH v2 1/6] spi: core: handle timeout error from transfer_one()
+In-Reply-To: <20180403152905.1524-1-ssuloev@orpaltech.com>
+References: <20180403152905.1524-1-ssuloev@orpaltech.com>
+Message-ID: <20180403152905.1524-2-ssuloev@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patchset provides corrections for PIO-mode
-and support for DMA transfers in sun4i SPI driver.
+As long as sun4i/sun6i SPI drivers have overriden the default
+"wait for completion" procedure then we need to properly
+handle -ETIMEDOUT error from transfer_one().
 
-Changes in v2:
-1) Restored processing of 3/4 FIFO full interrupt.
+Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+---
+ drivers/spi/spi.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-2) Debug log enhancements.
-
-Sergey Suloev (6):
-  spi: core: handle timeout error from transfer_one()
-  spi: sun4i: restrict transfer length in PIO-mode
-  spi: sun4i: coding style/readability improvements
-  spi: sun4i: use completion provided by SPI core driver
-  spi: sun4i: introduce register set/unset helpers
-  spi: sun4i: add DMA transfers support
-
- drivers/spi/spi-sun4i.c | 442 +++++++++++++++++++++++++++++++++++++-----------
- drivers/spi/spi.c       |   5 +-
- 2 files changed, 347 insertions(+), 100 deletions(-)
-
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index b33a727..2dcd4f6 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -1028,7 +1028,7 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
+ 			reinit_completion(&ctlr->xfer_completion);
+ 
+ 			ret = ctlr->transfer_one(ctlr, msg->spi, xfer);
+-			if (ret < 0) {
++			if (ret < 0 && ret != -ETIMEDOUT) {
+ 				SPI_STATISTICS_INCREMENT_FIELD(statm,
+ 							       errors);
+ 				SPI_STATISTICS_INCREMENT_FIELD(stats,
+@@ -1051,7 +1051,7 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
+ 								 msecs_to_jiffies(ms));
+ 			}
+ 
+-			if (ms == 0) {
++			if (ms == 0 || ret == -ETIMEDOUT) {
+ 				SPI_STATISTICS_INCREMENT_FIELD(statm,
+ 							       timedout);
+ 				SPI_STATISTICS_INCREMENT_FIELD(stats,
+@@ -1059,6 +1059,7 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
+ 				dev_err(&msg->spi->dev,
+ 					"SPI transfer timed out\n");
+ 				msg->status = -ETIMEDOUT;
++				ret = 0;
+ 			}
+ 		} else {
+ 			if (xfer->len)
 -- 
 2.16.2
