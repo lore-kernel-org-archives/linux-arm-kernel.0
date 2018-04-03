@@ -1,44 +1,82 @@
 From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue,  3 Apr 2018 12:19:36 +0100
-Subject: [PATCH v3 0/3] Add r8a77470/iW-RainboW-G23S single board computer
- support
-Message-ID: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
+Date: Tue,  3 Apr 2018 12:19:39 +0100
+Subject: [PATCH v3 3/3] ARM: dts: iwg23s-sbc: Add support for iWave G23S-SBC
+ based on RZ/G1C
+In-Reply-To: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
+References: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1522754379-64116-4-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, 
+Add support for iWave iW-RainboW-G23S single board computer based on
+ RZ/G1C.
 
-This series adds support for Rensas RZ/G1C (r8a77470) SoC and
-RZ/G1C based iW-RainboW-G23S single board computer.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+V1->V2:
+* Incorporated review comments
+V2->V3:
+* No Change
 
-The series introduces a cpg-mssr clock/power gating module, a power/reset
-controller for the SoC.
-
-power areas for RZ/G1C are similar to RZ/G1E.
-
-Few functionalities have currently been enabled in DTS and tested: serial
-boot console.
-
-This patch series tested against renesas-dev branch 
-tag "renesas-dev-20180328-v4.16-rc7
-
-V1-->V2
-	Incorporated geert's review comments.
-V2-->V3
-        Incorporated simon and geert's review comments.
-
-Biju Das (3):
-  serial: sh-sci: Document r8a77470 bindings
-  ARM: dts: r8a77470: Initial SoC device tree
-  ARM: dts: iwg23s-sbc: Add support for iWave G23S-SBC based on RZ/G1C
-
- .../bindings/serial/renesas,sci-serial.txt         |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts          |  35 +++++
- arch/arm/boot/dts/r8a77470.dtsi                    | 154 +++++++++++++++++++++
- 4 files changed, 192 insertions(+)
+ arch/arm/boot/dts/Makefile                |  1 +
+ arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts | 35 +++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
  create mode 100644 arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
- create mode 100644 arch/arm/boot/dts/r8a77470.dtsi
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2b6dfee..4291638 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -781,6 +781,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
+ 	r8a7745-iwg22d-sodimm.dtb \
+ 	r8a7745-iwg22d-sodimm-dbhd-ca.dtb \
+ 	r8a7745-sk-rzg1e.dtb \
++	r8a77470-iwg23s-sbc.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7790-lager.dtb \
+diff --git a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+new file mode 100644
+index 0000000..d21baad
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+@@ -0,0 +1,35 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree Source for the iWave-RZ/G1C single board computer
++ *
++ * Copyright (C) 2018 Renesas Electronics Corp.
++ */
++
++/dts-v1/;
++#include "r8a77470.dtsi"
++/ {
++	model = "iWave iW-RainboW-G23S single board computer based on RZ/G1C";
++	compatible = "iwave,g23s", "renesas,r8a77470";
++
++	aliases {
++		serial1 = &scif1;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial1:115200n8";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x20000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&scif1 {
++	status = "okay";
++};
 -- 
 2.7.4
