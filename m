@@ -1,62 +1,57 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 4 Apr 2018 20:46:22 +0200
-Subject: ARM compile failure in Re: linux-next: Tree for Apr 4
-In-Reply-To: <20180404175852.GI5700@atomide.com>
-References: <20180404165559.4cd0c12c@canb.auug.org.au>
- <20180404074856.GA9342@amd> <20180404175852.GI5700@atomide.com>
-Message-ID: <20180404184622.GA8608@amd>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Wed, 4 Apr 2018 22:19:59 +0300
+Subject: [PATCH v2 1/6] spi: core: handle timeout error from transfer_one()
+In-Reply-To: <20180404070817.6cens44jvlmdaxtm@flea>
+References: <20180403152905.1524-1-ssuloev@orpaltech.com>
+ <20180403152905.1524-2-ssuloev@orpaltech.com>
+ <20180403155224.GA11578@sirena.org.uk>
+ <c0476d75-821f-7a0d-3c3f-270304e7b032@orpaltech.com>
+ <20180403161824.GB11578@sirena.org.uk>
+ <dad0ea81-2dd6-ccc3-a0c9-cf20ff195b7f@orpaltech.com>
+ <20180404070817.6cens44jvlmdaxtm@flea>
+Message-ID: <a75ac9e8-e95e-d412-a1f9-15de1d99badd@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 04/04/2018 10:08 AM, Maxime Ripard wrote:
+> On Tue, Apr 03, 2018 at 07:24:11PM +0300, Sergey Suloev wrote:
+>> On 04/03/2018 07:18 PM, Mark Brown wrote:
+>>> On Tue, Apr 03, 2018 at 07:00:55PM +0300, Sergey Suloev wrote:
+>>>> On 04/03/2018 06:52 PM, Mark Brown wrote:
+>>>>> On Tue, Apr 03, 2018 at 06:29:00PM +0300, Sergey Suloev wrote:
+>>>>>> As long as sun4i/sun6i SPI drivers have overriden the default
+>>>>>> "wait for completion" procedure then we need to properly
+>>>>>> handle -ETIMEDOUT error from transfer_one().
+>>>>> Why is this connected to those drivers specifically?
+>>>> These 2 drivers have their own "waiting" code and not using the code from
+>>>> SPI core.
+>>> Does this not apply to any other driver - why is this something we only
+>>> have to do when these drivers do it?  That's what's setting off alarm
+>>> bells.
+>> sun4i/sun6i drivers have let's say "smart" waiting while SPI core uses a
+>> fixed interval to wait.
+>>
+>> I can't say for every SPI driver in kernel, that's outside of my area of
+>> expertise.
+> I'm not sure what's specific about the sun4i / sun6i case here. Your
+> patch doesn't have anything to do with the delay before the timeout,
+> but the fact that we return -ETIMEDOUT in the first place.
+>
+> And I'm pretty sure that papering over an error returned by a driver
+> is not the right thing to do.
+>
+> Maxime
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> > When trying to build kernel for N900, I get:
-> > 
-> >   CC      lib/timerqueue.o
-> >     CC      lib/vsprintf.o
-> >     lib/string.c: In function 'strstr':
-> >     lib/string.c:478:8: error: inlining failed in call to
-> >     always_inline 'strlen': function not inlinable
-> >     lib/string.c:903:5: error: called from here
-> >     lib/string.c:478:8: error: inlining failed in call to
-> >     always_inline 'strlen': function not inlinable
-> >     lib/string.c:906:5: error: called from here
-> >     lib/string.c:855:15: error: inlining failed in call to
-> >     always_inline 'memcmp': function not inlinable
-> >     ...
-> > pavel at duo:/data/l/linux-next-n900$ git branch -l
-> > * (detached from next-20180403)
-> > 
-> > I'm using
-> > 
-> > eval ` eldk-switch.sh -r 5.4 armv7a`
-> > 
-> > for cross-compilation.
-> 
-> Hmm I'm not seeing build issues with next-20180404, did this somehow
-> already get sorted out?
+do you mean the changes in spi.c are not required at all ?
 
-It seems it is config-dependend. omap2plus_defconfig compiles ok for
-me.
+My point was to eat ETIMEDOUT error from transfer_one() as it is just a 
+mark and
 
-Can you try with attached .config?
-
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config.ok.gz
-Type: application/gzip
-Size: 25181 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/75d8f9fc/attachment-0001.gz>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/75d8f9fc/attachment-0001.sig>
+shouldn't be handled as a normal error.
