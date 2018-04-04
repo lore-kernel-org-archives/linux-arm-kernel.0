@@ -1,44 +1,72 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 4 Apr 2018 09:08:18 +0200
-Subject: [PATCH v2 1/6] spi: core: handle timeout error from transfer_one()
-In-Reply-To: <dad0ea81-2dd6-ccc3-a0c9-cf20ff195b7f@orpaltech.com>
+Date: Wed, 4 Apr 2018 09:10:39 +0200
+Subject: [PATCH v2 2/6] spi: sun4i: restrict transfer length in PIO-mode
+In-Reply-To: <20180403152905.1524-3-ssuloev@orpaltech.com>
 References: <20180403152905.1524-1-ssuloev@orpaltech.com>
- <20180403152905.1524-2-ssuloev@orpaltech.com>
- <20180403155224.GA11578@sirena.org.uk>
- <c0476d75-821f-7a0d-3c3f-270304e7b032@orpaltech.com>
- <20180403161824.GB11578@sirena.org.uk>
- <dad0ea81-2dd6-ccc3-a0c9-cf20ff195b7f@orpaltech.com>
-Message-ID: <20180404070817.6cens44jvlmdaxtm@flea>
+ <20180403152905.1524-3-ssuloev@orpaltech.com>
+Message-ID: <20180404071039.2kiizzkzzogsk3o4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 07:24:11PM +0300, Sergey Suloev wrote:
-> On 04/03/2018 07:18 PM, Mark Brown wrote:
-> > On Tue, Apr 03, 2018 at 07:00:55PM +0300, Sergey Suloev wrote:
-> > > On 04/03/2018 06:52 PM, Mark Brown wrote:
-> > > > On Tue, Apr 03, 2018 at 06:29:00PM +0300, Sergey Suloev wrote:
-> > > > > As long as sun4i/sun6i SPI drivers have overriden the default
-> > > > > "wait for completion" procedure then we need to properly
-> > > > > handle -ETIMEDOUT error from transfer_one().
-> > > > Why is this connected to those drivers specifically?
-> > > These 2 drivers have their own "waiting" code and not using the code from
-> > > SPI core.
-> > Does this not apply to any other driver - why is this something we only
-> > have to do when these drivers do it?  That's what's setting off alarm
-> > bells.
+On Tue, Apr 03, 2018 at 06:29:01PM +0300, Sergey Suloev wrote:
+> There is no need to handle the 3/4 FIFO empty interrupt
+> as the maximum supported transfer length in PIO mode
+> is 64 bytes.
+> As long as a problem was reported previously with filling FIFO
+> on A10s we want to stick with 63 bytes depth.
 > 
-> sun4i/sun6i drivers have let's say "smart" waiting while SPI core uses a
-> fixed interval to wait.
+> Changes in v2:
+> 1) Restored processing of 3/4 FIFO full interrupt.
 > 
-> I can't say for every SPI driver in kernel, that's outside of my area of
-> expertise.
+> Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+> ---
+>  drivers/spi/spi-sun4i.c | 37 ++++++++++---------------------------
+>  1 file changed, 10 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+> index 4141003..08fd007 100644
+> --- a/drivers/spi/spi-sun4i.c
+> +++ b/drivers/spi/spi-sun4i.c
+> @@ -22,7 +22,12 @@
+>  
+>  #include <linux/spi/spi.h>
+>  
+> -#define SUN4I_FIFO_DEPTH		64
+> +/*
+> + * FIFO length is 64 bytes
+> + * But filling the FIFO fully might cause a timeout
+> + * on some devices, for example on spi2 on A10s
+> + */
+> +#define SUN4I_FIFO_DEPTH		63
 
-I'm not sure what's specific about the sun4i / sun6i case here. Your
-patch doesn't have anything to do with the delay before the timeout,
-but the fact that we return -ETIMEDOUT in the first place.
+The FIFO depth is 64 bytes, so the code should remain the same at
+least from that regard.
 
-And I'm pretty sure that papering over an error returned by a driver
-is not the right thing to do.
+>  #define SUN4I_RXDATA_REG		0x00
+>  
+> @@ -202,7 +207,7 @@ static void sun4i_spi_set_cs(struct spi_device *spi, bool enable)
+>  
+>  static size_t sun4i_spi_max_transfer_size(struct spi_device *spi)
+>  {
+> -	return SUN4I_FIFO_DEPTH - 1;
+> +	return SUN4I_FIFO_DEPTH;
+>  }
+>  
+>  static int sun4i_spi_transfer_one(struct spi_master *master,
+> @@ -216,11 +221,8 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+>  	int ret = 0;
+>  	u32 reg;
+>  
+> -	/* We don't support transfer larger than the FIFO */
+> -	if (tfr->len > SUN4I_MAX_XFER_SIZE)
+> -		return -EMSGSIZE;
+> -
+> -	if (tfr->tx_buf && tfr->len >= SUN4I_MAX_XFER_SIZE)
+> +	/* We don't support transfers larger than FIFO depth */
+> +	if (tfr->len > SUN4I_FIFO_DEPTH)
+>  		return -EMSGSIZE;
+
+This essentially reverts 196737912da5, why?
 
 Maxime
 
@@ -52,4 +80,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/614b2c6d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/7de4c81b/attachment.sig>
