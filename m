@@ -1,68 +1,149 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 4 Apr 2018 15:50:52 +0200
-Subject: [PATCH] kvm: arm: remove BUG(preemptible()) check
-Message-ID: <20180404135052.jsduo4s4pxoelnn6@linutronix.de>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Wed, 4 Apr 2018 15:59:09 +0200
+Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
+In-Reply-To: <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-8-mylene.josserand@bootlin.com>
+ <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
+Message-ID: <20180404155909.148085f7@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-native KVM crashes on -RT:
-|------------[ cut here ]------------
-|kernel BUG virt/kvm/arm/arm.c:82!
-|Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-|Modules linked in:
-|CPU: 3 PID: 1527 Comm: qemu-system-aar Tainted: G        W       4.14.29-rt25+ #48
-|Hardware name: Freescale Layerscape 2088A RDB Board (DT)
-|PC is at kvm_arm_get_running_vcpu+0x48/0x50
-|LR is at vgic_mmio_change_active.isra.1+0x2c/0xe0
-|Process qemu-system-aar (pid: 1527, stack limit = 0xffff0000128c8000)
-|Call trace:
-| kvm_arm_get_running_vcpu+0x48/0x50
-| vgic_mmio_change_active.isra.1+0x2c/0xe0
-| __vgic_mmio_write_cactive+0x7c/0xd0
-| vgic_mmio_uaccess_write_cactive+0xc/0x18
-| vgic_uaccess+0xac/0xd8
-| vgic_v2_dist_uaccess+0x3c/0x48
-| vgic_v2_attr_regs_access.isra.3+0x144/0x158
-| vgic_v2_set_attr+0xbc/0xe0
-| kvm_device_ioctl_attr+0x80/0xb0
-| kvm_device_ioctl+0x60/0xa8
-| do_vfs_ioctl+0xa4/0xa18
-| SyS_ioctl+0x44/0x80
+Hi Marc,
 
-vgic_mmio_change_active() holds &irq->irq_lock spin lock which makes
-context not-preemptible. On -RT the same lock is a sleeping lock and
-thus it remains preemptible but can not be migrated to another CPU.
+Thank you for the review.
 
-I *think* that the BUG() statement in kvm_arm_get_running_vcpu() is to
-ensure that we don't switch CPUs while accessing per-CPU variables.
-__this_cpu_write() + __this_cpu_read() will trigger a warning (with
-CONFIG_DEBUG_PREEMPT enabled) to spot such usage without crashing the
-whole machine. Therefore I suggest to remove this check.
+On Wed, 4 Apr 2018 14:01:48 +0100
+Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
- virt/kvm/arm/arm.c | 2 --
- 1 file changed, 2 deletions(-)
+> Hi Myl?ne,
+> 
+> On 03/04/18 07:18, Myl?ne Josserand wrote:
+> > The CNTVOFF register from arch timer is uninitialized.
+> > It should be done by the bootloader but it is currently not the case,
+> > even for boot CPU because this SoC is booting in secure mode.
+> > It leads to an random offset value meaning that each CPU will have a
+> > different time, which isn't working very well.
+> > 
+> > Add assembly code used for boot CPU and secondary CPU cores to make
+> > sure that the CNTVOFF register is initialized. Because this code can
+> > be used by different platforms, add this assembly file in ARM's common
+> > folder.
+> > 
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > ---
+> >  arch/arm/common/Makefile           |  1 +
+> >  arch/arm/common/smp_cntvoff.S      | 35 +++++++++++++++++++++++++++++++++++
+> >  arch/arm/include/asm/smp_cntvoff.h |  8 ++++++++
+> >  3 files changed, 44 insertions(+)
+> >  create mode 100644 arch/arm/common/smp_cntvoff.S
+> >  create mode 100644 arch/arm/include/asm/smp_cntvoff.h
+> > 
+> > diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> > index 70b4a14ed993..83117deb86c8 100644
+> > --- a/arch/arm/common/Makefile
+> > +++ b/arch/arm/common/Makefile
+> > @@ -10,6 +10,7 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+> >  obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+> >  obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+> >  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+> > +obj-$(CONFIG_SMP)		+= smp_cntvoff.o
+> >  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+> >  obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
+> >  CFLAGS_REMOVE_mcpm_entry.o	= -pg
+> > diff --git a/arch/arm/common/smp_cntvoff.S b/arch/arm/common/smp_cntvoff.S
+> > new file mode 100644
+> > index 000000000000..65ed199a50fe
+> > --- /dev/null
+> > +++ b/arch/arm/common/smp_cntvoff.S
+> > @@ -0,0 +1,35 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (c) 2018 Chen-Yu Tsai
+> > + * Copyright (c) 2018 Bootlin
+> > + *
+> > + * Chen-Yu Tsai <wens@csie.org>
+> > + * Myl?ne Josserand <mylene.josserand@bootlin.com>  
+> 
+> Given that this is literally lifted from shmobile_init_cntvoff, the
+> whole attribution is a bit dubious.
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 3db4af5d0197..60a3f23927d9 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -69,7 +69,6 @@ static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
- 
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
- {
--	BUG_ON(preemptible());
- 	__this_cpu_write(kvm_arm_running_vcpu, vcpu);
- }
- 
-@@ -79,7 +78,6 @@ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
-  */
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
- {
--	BUG_ON(preemptible());
- 	return __this_cpu_read(kvm_arm_running_vcpu);
- }
- 
+Yes, sorry, I will fix that.
+
+> 
+> > + *
+> > + * SMP support for sunxi based systems with Cortex A7/A15  
+> 
+> That's not restricted to sunxi, is it?
+
+Nope, I will update this line too (bad copy-paste from
+sunxi/headsmp.S...)
+
+> 
+> > + *
+> > + */
+> > +
+> > +#include <linux/linkage.h>
+> > +#include <asm/assembler.h>
+> > +
+> > +ENTRY(smp_init_cntvoff)  
+> 
+> The name doesn't quite reflect the usage constraints. This will only
+> work if used from secure, and is UNPREDICTABLE otherwise (see the CPS
+> instruction). Also, the "smp" prefix is quite misleading, as it only
+> affects the current CPU, and not any other.
+> 
+> How about secure_cntvoff_init instead? Same thing for the file name.
+
+Sure, this name is fine for me.
+
+> 
+> > +	.arch	armv7-a
+> > +	/*
+> > +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
+> > +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+> > +	 * then it should be handled by the secure code
+> > +	 */
+> > +	cps	#MON_MODE
+> > +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
+> > +	orr	r0, r1, #1
+> > +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
+> > +	isb
+> > +	mov	r0, #0
+> > +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
+> > +	isb
+> > +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
+> > +	isb
+> > +	cps	#SVC_MODE
+> > +	ret	lr
+> > +ENDPROC(smp_init_cntvoff)
+> > diff --git a/arch/arm/include/asm/smp_cntvoff.h b/arch/arm/include/asm/smp_cntvoff.h
+> > new file mode 100644
+> > index 000000000000..59a95f7604ee
+> > --- /dev/null
+> > +++ b/arch/arm/include/asm/smp_cntvoff.h
+> > @@ -0,0 +1,8 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +
+> > +#ifndef __ASMARM_ARCH_CNTVOFF_H
+> > +#define __ASMARM_ARCH_CNTVOFF_H
+> > +
+> > +extern void smp_init_cntvoff(void);
+> > +
+> > +#endif
+> >   
+> 
+> It'd be good to take this opportunity to refactor the shmobile code.
+
+I can do it in this series but I do not have any shmobile platforms so
+I will not be able to test my modifications (only compilation).
+
+If someone can test it for me (who?), it is okay for me to refactor this
+code :)
+
+Best regards,
+
 -- 
-2.16.3
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
