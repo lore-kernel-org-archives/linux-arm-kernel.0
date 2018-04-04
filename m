@@ -1,9 +1,9 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  4 Apr 2018 15:16:27 +0200
-Subject: [PATCH 4/4] ARM: imx: pcm037: use device properties for at24 eeprom
+Date: Wed,  4 Apr 2018 15:16:26 +0200
+Subject: [PATCH 3/4] ARM: imx: pca100: use device properties for at24 eeprom
 In-Reply-To: <20180404131627.9135-1-brgl@bgdev.pl>
 References: <20180404131627.9135-1-brgl@bgdev.pl>
-Message-ID: <20180404131627.9135-5-brgl@bgdev.pl>
+Message-ID: <20180404131627.9135-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,24 +19,24 @@ implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
 ---
- arch/arm/mach-imx/mach-pcm037.c | 13 ++++++-------
+ arch/arm/mach-imx/mach-pca100.c | 13 ++++++-------
  1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-pcm037.c b/arch/arm/mach-imx/mach-pcm037.c
-index b787ba6897e4..004737c40fda 100644
---- a/arch/arm/mach-imx/mach-pcm037.c
-+++ b/arch/arm/mach-imx/mach-pcm037.c
-@@ -23,7 +23,7 @@
- #include <linux/smsc911x.h>
- #include <linux/interrupt.h>
+diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
+index ed675863655b..5714e2f1b106 100644
+--- a/arch/arm/mach-imx/mach-pca100.c
++++ b/arch/arm/mach-imx/mach-pca100.c
+@@ -20,7 +20,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
  #include <linux/i2c.h>
 -#include <linux/platform_data/at24.h>
 +#include <linux/property.h>
- #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
  #include <linux/spi/spi.h>
- #include <linux/irq.h>
-@@ -263,16 +263,15 @@ static const struct imxi2c_platform_data pcm037_i2c2_data __initconst = {
- 	.bitrate = 20000,
+ #include <linux/spi/eeprom.h>
+@@ -168,16 +168,15 @@ static const struct imxi2c_platform_data pca100_i2c1_data __initconst = {
+ 	.bitrate = 100000,
  };
  
 -static struct at24_platform_data board_eeprom = {
@@ -48,7 +48,7 @@ index b787ba6897e4..004737c40fda 100644
 +	{ }
  };
  
- static struct i2c_board_info pcm037_i2c_devices[] = {
+ static struct i2c_board_info pca100_i2c_devices[] = {
  	{
 -		I2C_BOARD_INFO("at24", 0x52), /* E0=0, E1=1, E2=0 */
 -		.platform_data = &board_eeprom,
@@ -56,6 +56,6 @@ index b787ba6897e4..004737c40fda 100644
 +		.properties = board_eeprom_properties,
  	}, {
  		I2C_BOARD_INFO("pcf8563", 0x51),
- 	}
+ 	}, {
 -- 
 2.16.3
