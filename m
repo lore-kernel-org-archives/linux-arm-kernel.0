@@ -1,157 +1,82 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 4 Apr 2018 11:52:20 -0400
-Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
- readX() implementation
-In-Reply-To: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
-References: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
-Message-ID: <691b903c-e97d-0a25-28c5-690318bb215a@codeaurora.org>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 4 Apr 2018 10:52:46 -0500
+Subject: [PATCH] ARM: davinci: dm644x: remove unnecessary
+ postcore_initcall()
+In-Reply-To: <20180404125759.27061-1-nsekhar@ti.com>
+References: <20180404125759.27061-1-nsekhar@ti.com>
+Message-ID: <87b4ad61-93f4-db74-d373-9e8ac0d1a5b9@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/3/2018 6:29 PM, Palmer Dabbelt wrote:
-> On Tue, 03 Apr 2018 05:56:18 PDT (-0700), Arnd Bergmann wrote:
->> On Tue, Apr 3, 2018 at 2:44 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->>> On 4/3/2018 7:13 AM, Arnd Bergmann wrote:
->>>> On Tue, Apr 3, 2018 at 12:49 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>>>> Hi,
->>>>>
->>>>> On Fri, Mar 30, 2018 at 11:58:13AM -0400, Sinan Kaya wrote:
->>>>>> The default implementation of mapping readX() to __raw_readX() is wrong.
->>>>>> readX() has stronger ordering semantics. Compiler is allowed to reorder
->>>>>> __raw_readX().
->>>>>
->>>>> Could you please specify what the compiler is potentially reordering
->>>>> __raw_readX() against, and why this would be wrong?
->>>>>
->>>>> e.g. do we care about prior normal memory accesses, subsequent normal
->>>>> memory accesses, and/or other IO accesses?
->>>>>
->>>>> I assume that the asm-generic __raw_{read,write}X() implementations are
->>>>> all ordered w.r.t. each other (at least for a specific device).
->>>>
->>>> I think that is correct: the compiler won't reorder those because of the
->>>> 'volatile' pointer dereference, but it can reorder access to a normal
->>>> pointer against a __raw_readl()/__raw_writel(), which breaks the scenario
->>>> of using writel to trigger a DMA, or using a readl to see if a DMA has
->>>> completed.
->>>
->>> Yes, we are worried about memory update vs. IO update ordering here.
->>> That was the reason why barrier() was introduced in this patch. I'll try to
->>> clarify that better in the commit text.
->>>
->>>>
->>>> The question is whether we should use a stronger barrier such
->>>> as rmb() amd wmb() here rather than a simple compiler barrier.
->>>>
->>>> I would assume that on complex architectures with write buffers and
->>>> out-of-order prefetching, those are required, while on architectures
->>>> without those features, the barriers are cheap.
->>>
->>> That's my reasoning too. I'm trying to follow the x86 example here where there
->>> is a compiler barrier in writeX() and readX() family of functions.
->>
->> I think x86 is the special case here because it implicitly guarantees
->> the strict ordering in the hardware, as long as the compiler gets it
->> right. For the asm-generic version, it may be better to play safe and
->> do the safest version, requiring architectures to override that barrier
->> if they want to be faster.
->>
->> We could use the same macros that riscv has, using __io_br(),
->> __io_ar(), __io_bw() and __io_aw() for before/after read/write.
+On 04/04/2018 07:57 AM, Sekhar Nori wrote:
+> dm644x_init_devices() is unnecessarily implemented as a
+> postcore_initcall().
 > 
-> FWIW, when I wrote this I wasn't sure what the RISC-V memory model was going to be so I just picked something generic.? In other words, it's already a generic interface, just one that we're the only users of :).
+> This does not cause any issues now, but creates issues when
+> converting to common clock framework where clocks themselves
+> become platform devices and are initialized later. Because of
+> this, device clock acquisition and runtime PM on that device
+> fails.
 > 
+> Move the call to .init_machine() callback along with rest of
+> platform device's registration.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>   arch/arm/mach-davinci/board-dm644x-evm.c  | 5 +++++
+>   arch/arm/mach-davinci/board-neuros-osd2.c | 5 +++++
+>   arch/arm/mach-davinci/board-sffsdr.c      | 6 ++++++
+>   arch/arm/mach-davinci/davinci.h           | 1 +
+>   arch/arm/mach-davinci/dm644x.c            | 6 +-----
+>   5 files changed, 18 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+> index 95b55aae1366..d1a7239a80d6 100644
+> --- a/arch/arm/mach-davinci/board-dm644x-evm.c
+> +++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+> @@ -768,6 +768,11 @@ static __init void davinci_evm_init(void)
+>   	struct clk *aemif_clk;
+>   	struct davinci_soc_info *soc_info = &davinci_soc_info;
+>   
+> +	ret = dm644x_init_devices();
+> +	if (ret)
+> +		pr_warn("%s: dm644x_init_devices() failed: %d\n",
+> +			__func__, ret);
+> +
+>   	ret = dm644x_gpio_register();
+>   	if (ret)
+>   		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+> diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+> index f2875770fbff..23f4f0b70752 100644
+> --- a/arch/arm/mach-davinci/board-neuros-osd2.c
+> +++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+> @@ -174,6 +174,11 @@ static __init void davinci_ntosd2_init(void)
+>   	struct clk *aemif_clk;
+>   	struct davinci_soc_info *soc_info = &davinci_soc_info;
+>   
+> +	ret = dm644x_init_devices();
+> +	if (ret)
+> +		pr_warn("%s: dm644x_init_devices() failed: %d\n",
+> +			__func__, ret);
+> +
+>   	ret = dm644x_gpio_register();
+>   	if (ret)
+>   		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+> diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+> index 2922da9d1684..d9900d7c26d3 100644
+> --- a/arch/arm/mach-davinci/board-sffsdr.c
+> +++ b/arch/arm/mach-davinci/board-sffsdr.c
+> @@ -133,6 +133,12 @@ static void __init davinci_sffsdr_map_io(void)
+>   static __init void davinci_sffsdr_init(void)
+>   {
+>   	struct davinci_soc_info *soc_info = &davinci_soc_info;
+> +	int ret;
+> +
+> +	ret = dm644x_init_devices();
+> +	if (ret)
+> +		pr_warn("%s: dm644x_init_devices() failed: %d\n",
+> +			__func__, ret);
 
-Are we looking for something like this?
-
-
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index e8c2078..693a82f 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -101,6 +101,16 @@ static inline void __raw_writeq(u64 value, volatile void __iomem *addr)
- #endif
- #endif /* CONFIG_64BIT */
- 
-+#ifndef __io_br()
-+#define __io_br()	do {} while (0)
-+#endif
-+
-+#ifdef rmb
-+#define __io_ar()	rmb();
-+#else
-+#define __io_ar()	barrier();
-+#endif
-+
- /*
-  * {read,write}{b,w,l,q}() access little endian memory and return result in
-  * native endianness.
-@@ -108,35 +118,46 @@ static inline void __raw_writeq(u64 value, volatile void __iomem *addr)
- 
- #ifndef readb
- #define readb readb
--static inline u8 readb(const volatile void __iomem *addr)
--{
--	return __raw_readb(addr);
--}
-+#define readb(c)				\
-+	({ u8  __v;				\
-+	 __io_br();				\
-+	 __v = __raw_readb(c);			\
-+	 __io_ar();				\
-+	 __v; })
- #endif
- 
- #ifndef readw
- #define readw readw
--static inline u16 readw(const volatile void __iomem *addr)
--{
--	return __le16_to_cpu(__raw_readw(addr));
--}
-+#define readw(c)				\
-+    ({ u16 __v;					\
-+						\
-+     __io_br();					\
-+      __v = __le16_to_cpu(__raw_readw(c));	\
-+     __io_ar();					\
-+     __v; })
- #endif
- 
- #ifndef readl
- #define readl readl
--static inline u32 readl(const volatile void __iomem *addr)
--{
--	return __le32_to_cpu(__raw_readl(addr));
--}
-+#define readl(c)				\
-+    ({ u32 __v;					\
-+						\
-+     __io_br();					\
-+      __v = __le32_to_cpu(__raw_readl(c));	\
-+     __io_ar();					\
-+     __v; })
- #endif
- 
- #ifdef CONFIG_64BIT
- #ifndef readq
- #define readq readq
--static inline u64 readq(const volatile void __iomem *addr)
--{
--	return __le64_to_cpu(__raw_readq(addr));
--}
-+#define readq(c)				\
-+    ({ u64 __v;					\
-+						\
-+     __io_br();					\
-+      __v = __le64_to_cpu(__raw_readq(c));	\
-+     __io_ar();					\
-+     __v; })
- #endif
- #endif /* CONFIG_64BIT */
-  
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+dm644x_init_devices() already prints a warning in all failure cases, so
+printing another warning seems a bit redundant. It is probably OK to just
+ignore the return value here and in the similar uses above.
