@@ -1,111 +1,93 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 4 Apr 2018 08:45:01 +0200
-Subject: [PATCH v3 1/6] spi: sun6i: coding style/readability improvements
-In-Reply-To: <20180403154449.2443-2-ssuloev@orpaltech.com>
-References: <20180403154449.2443-1-ssuloev@orpaltech.com>
- <20180403154449.2443-2-ssuloev@orpaltech.com>
-Message-ID: <20180404064501.3sfo67ynkplk4vyx@flea>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 04 Apr 2018 14:45:02 +0800
+Subject: [PATCH net-next 02/12] clk: sunxi-ng: r40: export a regmap to
+ access the GMAC register
+In-Reply-To: <20180403095005.skflxb7m2qzbhjix@flea>
+References: <20180317092857.4396-1-wens@csie.org>
+ <20180317092857.4396-3-wens@csie.org>
+ <20180318213129.ucwslzvwq6khxrcd@flea>
+ <CAGb2v67Fp20wkmqWyRowpAmm4EDwENnKFG+mccqWaPa5Jj4zBw@mail.gmail.com>
+ <20180403094845.le2hfuxktlv66lre@flea>
+ <20180403095005.skflxb7m2qzbhjix@flea>
+Message-ID: <1522824302.2049.7.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 06:44:44PM +0300, Sergey Suloev wrote:
-> Minor changes to fulfill the coding style and improve
-> the readability of the code.
+? 2018-04-03?? 11:50 +0200?Maxime Ripard???
+> On Tue, Apr 03, 2018 at 11:48:45AM +0200, Maxime Ripard wrote:
+> > On Tue, Mar 20, 2018 at 03:15:02PM +0800, Chen-Yu Tsai wrote:
+> > > On Mon, Mar 19, 2018 at 5:31 AM, Maxime Ripard
+> > > <maxime.ripard@bootlin.com> wrote:
+> > > > On Sat, Mar 17, 2018 at 05:28:47PM +0800, Chen-Yu Tsai wrote:
+> > > > > From: Icenowy Zheng <icenowy@aosc.io>
+> > > > > 
+> > > > > There's a GMAC configuration register, which exists on
+> > > > > A64/A83T/H3/H5 in
+> > > > > the syscon part, in the CCU of R40 SoC.
+> > > > > 
+> > > > > Export a regmap of the CCU.
+> > > > > 
+> > > > > Read access is not restricted to all registers, but only the
+> > > > > GMAC
+> > > > > register is allowed to be written.
+> > > > > 
+> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > > 
+> > > > Gah, this is crazy. I'm really starting to regret letting that
+> > > > syscon
+> > > > in in the first place...
+> > > 
+> > > IMHO syscon is really a better fit. It's part of the glue layer
+> > > and
+> > > most other dwmac user platforms treat it as such and use a
+> > > syscon.
+> > > Plus the controls encompass delays (phase), inverters (polarity),
+> > > and even signal routing. It's not really just a group of clock
+> > > controls,
+> > > like what we poorly modeled for A20/A31. I think that was really
+> > > a
+> > > mistake.
+> > > 
+> > > As I mentioned in the cover letter, a slightly saner approach
+> > > would
+> > > be to let drivers add custom syscon entries, which would then
+> > > require
+> > > less custom plumbing.
+> > 
+> > A syscon is convenient, sure, but it also bypasses any abstraction
+> > layer we have everywhere else, which means that we'll have to
+> > maintain
+> > the register layout in each and every driver that uses it.
+> > 
+> > So far, it's only be the GMAC, but it can also be others (the SRAM
+> > controller comes to my mind), and then, if there's any difference
+> > in
+> > the design in a future SoC, we'll have to maintain that in the GMAC
+> > driver as well.
 > 
-> Changes in v2:
-> 1) Fixed issue with misplacing a piece of code that requires access
-> to the transfer structure into sun6i_spi_prepare_message() function
-> where the transfer structure is not available.
+> I guess I forgot to say something, I'm fine with using a syscon we
+> already have.
 
-This shouldn't be in your commit log.
+As we finally need the SRAM controller on these new SoCs (for VE on all
+SoCs targeted by dwmac-sun8i, and for DE on A64), should we deprecate
+the syscon and all switch to device regmap (and let sunxi-dram driver
+to export a regmap)? (As in the A64 DE2 thread discussed, two device
+nodes shouldn't cover the same MMIO region.)
 
-> Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
-> ---
->  drivers/spi/spi-sun6i.c | 97 +++++++++++++++++++++++++++++--------------------
->  1 file changed, 58 insertions(+), 39 deletions(-)
+In addition, there might be multiple registers in the syscon/sram zone
+that are needed (for example, if a version driver is written, it will
+need the "0x24 Version Register"; and GMAC needs "0x30 EMAC Clock
+Register"). How to deal with this if we export the syscon/sram zone as
+a generic device regmap?
+
 > 
-> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-> index 8533f4e..88ad45e 100644
-> --- a/drivers/spi/spi-sun6i.c
-> +++ b/drivers/spi/spi-sun6i.c
-> @@ -88,8 +88,12 @@
->  #define SUN6I_TXDATA_REG		0x200
->  #define SUN6I_RXDATA_REG		0x300
->  
-> +#define SUN6I_SPI_MODE_BITS		(SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST)
-> +
-> +#define SUN6I_SPI_MAX_SPEED_HZ		100000000
-> +#define SUN6I_SPI_MIN_SPEED_HZ		3000
-> +
->  struct sun6i_spi {
-> -	struct spi_master	*master;
->  	void __iomem		*base_addr;
->  	struct clk		*hclk;
->  	struct clk		*mclk;
-> @@ -189,6 +193,9 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
->  	else
->  		reg &= ~SUN6I_TFR_CTL_CS_LEVEL;
->  
-> +	/* We want to control the chip select manually */
-> +	reg |= SUN6I_TFR_CTL_CS_MANUAL;
-> +
->  	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
->  }
->  
-> @@ -197,6 +204,39 @@ static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
->  	return SUN6I_MAX_XFER_SIZE - 1;
->  }
->  
-> +static int sun6i_spi_prepare_message(struct spi_master *master,
-> +				     struct spi_message *msg)
-> +{
-> +	struct spi_device *spi = msg->spi;
-> +	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-> +	u32 reg;
-> +
-> +	/*
-> +	 * Setup the transfer control register: Chip Select,
-> +	 * polarities, etc.
-> +	 */
-> +	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
-> +
-> +	if (spi->mode & SPI_CPOL)
-> +		reg |= SUN6I_TFR_CTL_CPOL;
-> +	else
-> +		reg &= ~SUN6I_TFR_CTL_CPOL;
-> +
-> +	if (spi->mode & SPI_CPHA)
-> +		reg |= SUN6I_TFR_CTL_CPHA;
-> +	else
-> +		reg &= ~SUN6I_TFR_CTL_CPHA;
-> +
-> +	if (spi->mode & SPI_LSB_FIRST)
-> +		reg |= SUN6I_TFR_CTL_FBS;
-> +	else
-> +		reg &= ~SUN6I_TFR_CTL_FBS;
-> +
-> +	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg);
-> +
-> +	return 0;
-> +}
-> +
-
-You're doing way more than just "coding style improvements", please
-split the patches accordingly.
-
-And slow down between versions, you had 0 review on the v1 and the v2,
-and you're at v3 already in just a couple of days.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/9b0cc4db/attachment.sig>
+> I'm just questionning if merging any other driver using one is the
+> right move.
+> 
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
