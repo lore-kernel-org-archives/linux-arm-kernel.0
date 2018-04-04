@@ -1,185 +1,118 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 4 Apr 2018 09:32:53 +0800
-Subject: [PATCH v3 5/6] spi: sun6i: introduce register set/unset helpers
-In-Reply-To: <20180403154449.2443-6-ssuloev@orpaltech.com>
-References: <20180403154449.2443-6-ssuloev@orpaltech.com>
-Message-ID: <201804040917.NjWkgZGY%fengguang.wu@intel.com>
+From: hejianet@gmail.com (Jia He)
+Date: Tue,  3 Apr 2018 19:56:14 -0700
+Subject: [PATCH v6 0/5] optimize memblock_next_valid_pfn and early_pfn_valid
+ on arm and arm64
+Message-ID: <1522810579-7466-1-git-send-email-hejianet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergey,
+Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+where possible") tried to optimize the loop in memmap_init_zone(). But
+there is still some room for improvement.
 
-Thank you for the patch! Yet something to improve:
+Patch 1 remain the memblock_next_valid_pfn on arm and arm64
+Patch 2 optimizes the memblock_next_valid_pfn()
+Patch 3~5 optimizes the early_pfn_valid()
 
-[auto build test ERROR on spi/for-next]
-[also build test ERROR on v4.16 next-20180403]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+As for the performance improvement, after this set, I can see the time
+overhead of memmap_init() is reduced from 41313 us to 24345 us in my
+armv8a server(QDF2400 with 96G memory).
 
-url:    https://github.com/0day-ci/linux/commits/Sergey-Suloev/spi-Add-support-for-DMA-transfers-in-sun6i-SPI-driver/20180404-053231
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git for-next
-config: alpha-allyesconfig (attached as .config)
-compiler: alpha-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=alpha 
+Attached the memblock region information in my server.
+[   86.956758] Zone ranges:
+[   86.959452]   DMA      [mem 0x0000000000200000-0x00000000ffffffff]
+[   86.966041]   Normal   [mem 0x0000000100000000-0x00000017ffffffff]
+[   86.972631] Movable zone start for each node
+[   86.977179] Early memory node ranges
+[   86.980985]   node   0: [mem 0x0000000000200000-0x000000000021ffff]
+[   86.987666]   node   0: [mem 0x0000000000820000-0x000000000307ffff]
+[   86.994348]   node   0: [mem 0x0000000003080000-0x000000000308ffff]
+[   87.001029]   node   0: [mem 0x0000000003090000-0x00000000031fffff]
+[   87.007710]   node   0: [mem 0x0000000003200000-0x00000000033fffff]
+[   87.014392]   node   0: [mem 0x0000000003410000-0x000000000563ffff]
+[   87.021073]   node   0: [mem 0x0000000005640000-0x000000000567ffff]
+[   87.027754]   node   0: [mem 0x0000000005680000-0x00000000056dffff]
+[   87.034435]   node   0: [mem 0x00000000056e0000-0x00000000086fffff]
+[   87.041117]   node   0: [mem 0x0000000008700000-0x000000000871ffff]
+[   87.047798]   node   0: [mem 0x0000000008720000-0x000000000894ffff]
+[   87.054479]   node   0: [mem 0x0000000008950000-0x0000000008baffff]
+[   87.061161]   node   0: [mem 0x0000000008bb0000-0x0000000008bcffff]
+[   87.067842]   node   0: [mem 0x0000000008bd0000-0x0000000008c4ffff]
+[   87.074524]   node   0: [mem 0x0000000008c50000-0x0000000008e2ffff]
+[   87.081205]   node   0: [mem 0x0000000008e30000-0x0000000008e4ffff]
+[   87.087886]   node   0: [mem 0x0000000008e50000-0x0000000008fcffff]
+[   87.094568]   node   0: [mem 0x0000000008fd0000-0x000000000910ffff]
+[   87.101249]   node   0: [mem 0x0000000009110000-0x00000000092effff]
+[   87.107930]   node   0: [mem 0x00000000092f0000-0x000000000930ffff]
+[   87.114612]   node   0: [mem 0x0000000009310000-0x000000000963ffff]
+[   87.121293]   node   0: [mem 0x0000000009640000-0x000000000e61ffff]
+[   87.127975]   node   0: [mem 0x000000000e620000-0x000000000e64ffff]
+[   87.134657]   node   0: [mem 0x000000000e650000-0x000000000fffffff]
+[   87.141338]   node   0: [mem 0x0000000010800000-0x0000000017feffff]
+[   87.148019]   node   0: [mem 0x000000001c000000-0x000000001c00ffff]
+[   87.154701]   node   0: [mem 0x000000001c010000-0x000000001c7fffff]
+[   87.161383]   node   0: [mem 0x000000001c810000-0x000000007efbffff]
+[   87.168064]   node   0: [mem 0x000000007efc0000-0x000000007efdffff]
+[   87.174746]   node   0: [mem 0x000000007efe0000-0x000000007efeffff]
+[   87.181427]   node   0: [mem 0x000000007eff0000-0x000000007effffff]
+[   87.188108]   node   0: [mem 0x000000007f000000-0x00000017ffffffff]
+[   87.194791] Initmem setup node 0 [mem 0x0000000000200000-0x00000017ffffffff]
 
-Note: the linux-review/Sergey-Suloev/spi-Add-support-for-DMA-transfers-in-sun6i-SPI-driver/20180404-053231 HEAD a0c010a285d830f07bb81ea59eaea8773d78b74c builds fine.
-      It only hurts bisectibility.
+Without this patchset:
+[  117.106153] Initmem setup node 0 [mem 0x0000000000200000-0x00000017ffffffff]
+[  117.113677] before memmap_init
+[  117.118195] after  memmap_init
+>>> memmap_init takes 4518 us
+[  117.121446] before memmap_init
+[  117.154992] after  memmap_init
+>>> memmap_init takes 33546 us
+[  117.158241] before memmap_init
+[  117.161490] after  memmap_init
+>>> memmap_init takes 3249 us
+>>> totally takes 41313 us
 
-All errors (new ones prefixed by >>):
+With this patchset:
+[   87.194791] Initmem setup node 0 [mem 0x0000000000200000-0x00000017ffffffff]
+[   87.202314] before memmap_init
+[   87.206164] after  memmap_init
+>>> memmap_init takes 3850 us
+[   87.209416] before memmap_init
+[   87.226662] after  memmap_init
+>>> memmap_init takes 17246 us
+[   87.229911] before memmap_init
+[   87.233160] after  memmap_init
+>>> memmap_init takes 3249 us
+>>> totally takes 24345 us
 
-   drivers//spi/spi-sun6i.c: In function 'sun6i_spi_transfer_one':
->> drivers//spi/spi-sun6i.c:371:2: error: implicit declaration of function 'sun6i_spi_enable_interrupt'; did you mean 'sun6i_spi_transfer_one'? [-Werror=implicit-function-declaration]
-     sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TC |
-     ^~~~~~~~~~~~~~~~~~~~~~~~~~
-     sun6i_spi_transfer_one
-   drivers//spi/spi-sun6i.c:277:27: warning: unused variable 'tx_time' [-Wunused-variable]
-     unsigned int start, end, tx_time;
-                              ^~~~~~~
-   drivers//spi/spi-sun6i.c:277:22: warning: unused variable 'end' [-Wunused-variable]
-     unsigned int start, end, tx_time;
-                         ^~~
-   drivers//spi/spi-sun6i.c:277:15: warning: unused variable 'start' [-Wunused-variable]
-     unsigned int start, end, tx_time;
-                  ^~~~~
-   drivers//spi/spi-sun6i.c:276:31: warning: unused variable 'timeout' [-Wunused-variable]
-     unsigned int mclk_rate, div, timeout;
-                                  ^~~~~~~
-   cc1: some warnings being treated as errors
+Changelog:
+V6: - simplify the codes, move arm/arm64 common codes to one file.
+    - refine patches as suggested by Danial Vacek and Ard Biesheuvel
+V5: - further refining as suggested by Danial Vacek. Make codes
+      arm/arm64 more arch specific
+V4: - refine patches as suggested by Danial Vacek and Wei Yang
+    - optimized on arm besides arm64
+V3: - fix 2 issues reported by kbuild test robot
+V2: - rebase to mmotm latest
+    - remain memblock_next_valid_pfn on arm64
+    - refine memblock_search_pfn_regions and pfn_valid_region
 
-vim +371 drivers//spi/spi-sun6i.c
+Jia He (5):
+  mm: page_alloc: remain memblock_next_valid_pfn() on arm and arm64
+  arm: arm64: page_alloc: reduce unnecessary binary search in
+    memblock_next_valid_pfn()
+  mm/memblock: introduce memblock_search_pfn_regions()
+  arm: arm64: introduce pfn_valid_region()
+  mm: page_alloc: reduce unnecessary binary search in early_pfn_valid()
 
-43836daab Sergey Suloev   2018-04-03  270  
-3558fe900 Maxime Ripard   2014-02-05  271  static int sun6i_spi_transfer_one(struct spi_master *master,
-3558fe900 Maxime Ripard   2014-02-05  272  				  struct spi_device *spi,
-3558fe900 Maxime Ripard   2014-02-05  273  				  struct spi_transfer *tfr)
-3558fe900 Maxime Ripard   2014-02-05  274  {
-3558fe900 Maxime Ripard   2014-02-05  275  	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-3558fe900 Maxime Ripard   2014-02-05  276  	unsigned int mclk_rate, div, timeout;
-719bd6542 Michal Suchanek 2016-06-13  277  	unsigned int start, end, tx_time;
-913f536c6 Icenowy Zheng   2017-03-06  278  	unsigned int trig_level;
-3558fe900 Maxime Ripard   2014-02-05  279  	unsigned int tx_len = 0;
-3558fe900 Maxime Ripard   2014-02-05  280  	int ret = 0;
-3558fe900 Maxime Ripard   2014-02-05  281  	u32 reg;
-3558fe900 Maxime Ripard   2014-02-05  282  
-e31cf0250 Sergey Suloev   2018-04-03  283  	/* A zero length transfer never finishes if programmed
-e31cf0250 Sergey Suloev   2018-04-03  284  	   in the hardware */
-e31cf0250 Sergey Suloev   2018-04-03  285  	if (!tfr->len)
-e31cf0250 Sergey Suloev   2018-04-03  286  		return 0;
-e31cf0250 Sergey Suloev   2018-04-03  287  
-e31cf0250 Sergey Suloev   2018-04-03  288  	/* Don't support transfer larger than the FIFO */
-e31cf0250 Sergey Suloev   2018-04-03  289  	if (tfr->len > sspi->fifo_depth)
-e31cf0250 Sergey Suloev   2018-04-03  290  		return -EMSGSIZE;
-3558fe900 Maxime Ripard   2014-02-05  291  
-3558fe900 Maxime Ripard   2014-02-05  292  	sspi->tx_buf = tfr->tx_buf;
-3558fe900 Maxime Ripard   2014-02-05  293  	sspi->rx_buf = tfr->rx_buf;
-3558fe900 Maxime Ripard   2014-02-05  294  	sspi->len = tfr->len;
-3558fe900 Maxime Ripard   2014-02-05  295  
-3558fe900 Maxime Ripard   2014-02-05  296  	/* Clear pending interrupts */
-3558fe900 Maxime Ripard   2014-02-05  297  	sun6i_spi_write(sspi, SUN6I_INT_STA_REG, ~0);
-3558fe900 Maxime Ripard   2014-02-05  298  
-3558fe900 Maxime Ripard   2014-02-05  299  	/* Reset FIFO */
-3558fe900 Maxime Ripard   2014-02-05  300  	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
-3558fe900 Maxime Ripard   2014-02-05  301  			SUN6I_FIFO_CTL_RF_RST | SUN6I_FIFO_CTL_TF_RST);
-3558fe900 Maxime Ripard   2014-02-05  302  
-3558fe900 Maxime Ripard   2014-02-05  303  	/*
-913f536c6 Icenowy Zheng   2017-03-06  304  	 * Setup FIFO interrupt trigger level
-913f536c6 Icenowy Zheng   2017-03-06  305  	 * Here we choose 3/4 of the full fifo depth, as it's the hardcoded
-913f536c6 Icenowy Zheng   2017-03-06  306  	 * value used in old generation of Allwinner SPI controller.
-913f536c6 Icenowy Zheng   2017-03-06  307  	 * (See spi-sun4i.c)
-913f536c6 Icenowy Zheng   2017-03-06  308  	 */
-913f536c6 Icenowy Zheng   2017-03-06  309  	trig_level = sspi->fifo_depth / 4 * 3;
-913f536c6 Icenowy Zheng   2017-03-06  310  	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
-e31cf0250 Sergey Suloev   2018-04-03  311  			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS));
-913f536c6 Icenowy Zheng   2017-03-06  312  
-3558fe900 Maxime Ripard   2014-02-05  313  	/*
-3558fe900 Maxime Ripard   2014-02-05  314  	 * If it's a TX only transfer, we don't want to fill the RX
-3558fe900 Maxime Ripard   2014-02-05  315  	 * FIFO with bogus data
-3558fe900 Maxime Ripard   2014-02-05  316  	 */
-3558fe900 Maxime Ripard   2014-02-05  317  	if (sspi->rx_buf)
-2c98d976c Sergey Suloev   2018-04-03  318  		sun6i_spi_unset(sspi, SUN6I_TFR_CTL_REG, SUN6I_TFR_CTL_DHB);
-3558fe900 Maxime Ripard   2014-02-05  319  	else
-2c98d976c Sergey Suloev   2018-04-03  320  		sun6i_spi_set(sspi, SUN6I_TFR_CTL_REG, SUN6I_TFR_CTL_DHB);
-3558fe900 Maxime Ripard   2014-02-05  321  
-09d186f3c Sergey Suloev   2018-04-03  322  
-3558fe900 Maxime Ripard   2014-02-05  323  	/* Ensure that we have a parent clock fast enough */
-3558fe900 Maxime Ripard   2014-02-05  324  	mclk_rate = clk_get_rate(sspi->mclk);
-47284e3e0 Marcus Weseloh  2015-11-08  325  	if (mclk_rate < (2 * tfr->speed_hz)) {
-47284e3e0 Marcus Weseloh  2015-11-08  326  		clk_set_rate(sspi->mclk, 2 * tfr->speed_hz);
-3558fe900 Maxime Ripard   2014-02-05  327  		mclk_rate = clk_get_rate(sspi->mclk);
-3558fe900 Maxime Ripard   2014-02-05  328  	}
-3558fe900 Maxime Ripard   2014-02-05  329  
-3558fe900 Maxime Ripard   2014-02-05  330  	/*
-3558fe900 Maxime Ripard   2014-02-05  331  	 * Setup clock divider.
-3558fe900 Maxime Ripard   2014-02-05  332  	 *
-3558fe900 Maxime Ripard   2014-02-05  333  	 * We have two choices there. Either we can use the clock
-3558fe900 Maxime Ripard   2014-02-05  334  	 * divide rate 1, which is calculated thanks to this formula:
-3558fe900 Maxime Ripard   2014-02-05  335  	 * SPI_CLK = MOD_CLK / (2 ^ cdr)
-3558fe900 Maxime Ripard   2014-02-05  336  	 * Or we can use CDR2, which is calculated with the formula:
-3558fe900 Maxime Ripard   2014-02-05  337  	 * SPI_CLK = MOD_CLK / (2 * (cdr + 1))
-3558fe900 Maxime Ripard   2014-02-05  338  	 * Wether we use the former or the latter is set through the
-3558fe900 Maxime Ripard   2014-02-05  339  	 * DRS bit.
-3558fe900 Maxime Ripard   2014-02-05  340  	 *
-3558fe900 Maxime Ripard   2014-02-05  341  	 * First try CDR2, and if we can't reach the expected
-3558fe900 Maxime Ripard   2014-02-05  342  	 * frequency, fall back to CDR1.
-3558fe900 Maxime Ripard   2014-02-05  343  	 */
-47284e3e0 Marcus Weseloh  2015-11-08  344  	div = mclk_rate / (2 * tfr->speed_hz);
-3558fe900 Maxime Ripard   2014-02-05  345  	if (div <= (SUN6I_CLK_CTL_CDR2_MASK + 1)) {
-3558fe900 Maxime Ripard   2014-02-05  346  		if (div > 0)
-3558fe900 Maxime Ripard   2014-02-05  347  			div--;
-3558fe900 Maxime Ripard   2014-02-05  348  
-3558fe900 Maxime Ripard   2014-02-05  349  		reg = SUN6I_CLK_CTL_CDR2(div) | SUN6I_CLK_CTL_DRS;
-3558fe900 Maxime Ripard   2014-02-05  350  	} else {
-47284e3e0 Marcus Weseloh  2015-11-08  351  		div = ilog2(mclk_rate) - ilog2(tfr->speed_hz);
-3558fe900 Maxime Ripard   2014-02-05  352  		reg = SUN6I_CLK_CTL_CDR1(div);
-3558fe900 Maxime Ripard   2014-02-05  353  	}
-3558fe900 Maxime Ripard   2014-02-05  354  
-3558fe900 Maxime Ripard   2014-02-05  355  	sun6i_spi_write(sspi, SUN6I_CLK_CTL_REG, reg);
-3558fe900 Maxime Ripard   2014-02-05  356  
-3558fe900 Maxime Ripard   2014-02-05  357  	/* Setup the transfer now... */
-3558fe900 Maxime Ripard   2014-02-05  358  	if (sspi->tx_buf)
-3558fe900 Maxime Ripard   2014-02-05  359  		tx_len = tfr->len;
-3558fe900 Maxime Ripard   2014-02-05  360  
-3558fe900 Maxime Ripard   2014-02-05  361  	/* Setup the counters */
-3558fe900 Maxime Ripard   2014-02-05  362  	sun6i_spi_write(sspi, SUN6I_BURST_CNT_REG, SUN6I_BURST_CNT(tfr->len));
-3558fe900 Maxime Ripard   2014-02-05  363  	sun6i_spi_write(sspi, SUN6I_XMIT_CNT_REG, SUN6I_XMIT_CNT(tx_len));
-3558fe900 Maxime Ripard   2014-02-05  364  	sun6i_spi_write(sspi, SUN6I_BURST_CTL_CNT_REG,
-3558fe900 Maxime Ripard   2014-02-05  365  			SUN6I_BURST_CTL_CNT_STC(tx_len));
-3558fe900 Maxime Ripard   2014-02-05  366  
-3558fe900 Maxime Ripard   2014-02-05  367  	/* Fill the TX FIFO */
-10565dfd3 Milo Kim        2016-10-28  368  	sun6i_spi_fill_fifo(sspi, sspi->fifo_depth);
-3558fe900 Maxime Ripard   2014-02-05  369  
-3558fe900 Maxime Ripard   2014-02-05  370  	/* Enable the interrupts */
-913f536c6 Icenowy Zheng   2017-03-06 @371  	sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TC |
-913f536c6 Icenowy Zheng   2017-03-06  372  					 SUN6I_INT_CTL_RF_RDY);
-3558fe900 Maxime Ripard   2014-02-05  373  
-3558fe900 Maxime Ripard   2014-02-05  374  	/* Start the transfer */
-2c98d976c Sergey Suloev   2018-04-03  375  	sun6i_spi_set(sspi, SUN6I_TFR_CTL_REG, SUN6I_TFR_CTL_XCH);
-3558fe900 Maxime Ripard   2014-02-05  376  
-43836daab Sergey Suloev   2018-04-03  377  	/* Wait for completion */
-43836daab Sergey Suloev   2018-04-03  378  	ret = sun6i_spi_wait_for_transfer(spi, tfr);
-3558fe900 Maxime Ripard   2014-02-05  379  
-3558fe900 Maxime Ripard   2014-02-05  380  	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
-3558fe900 Maxime Ripard   2014-02-05  381  
-3558fe900 Maxime Ripard   2014-02-05  382  	return ret;
-3558fe900 Maxime Ripard   2014-02-05  383  }
-3558fe900 Maxime Ripard   2014-02-05  384  
+ arch/arm/mm/init.c           |  1 +
+ arch/arm64/mm/init.c         |  1 +
+ include/linux/arm96_common.h | 76 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/memblock.h     |  2 ++
+ include/linux/mmzone.h       | 18 ++++++++++-
+ mm/memblock.c                |  9 ++++++
+ mm/page_alloc.c              |  2 +-
+ 7 files changed, 107 insertions(+), 2 deletions(-)
+ create mode 100644 include/linux/arm96_common.h
 
-:::::: The code at line 371 was first introduced by commit
-:::::: 913f536c6c18a2e19e32f06971101c1d0ae3739c spi: sun6i: Allow transfers larger than FIFO size
-
-:::::: TO: Icenowy Zheng <icenowy@aosc.xyz>
-:::::: CC: Mark Brown <broonie@kernel.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 52801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/c9e4b061/attachment-0001.gz>
+-- 
+2.7.4
