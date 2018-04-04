@@ -1,25 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 4 Apr 2018 23:01:45 +0200
-Subject: [PATCH v7 3/4] i2c: add param sanity check to i2c_transfer()
-In-Reply-To: <20180404183823.ejewg6ran5li2vt5@ninjato>
-References: <20180403191151.14924-1-ard.biesheuvel@linaro.org>
- <20180403191151.14924-4-ard.biesheuvel@linaro.org>
- <20180404183823.ejewg6ran5li2vt5@ninjato>
-Message-ID: <CAKv+Gu95je4RPedd9N0xzNWmgggH1FFhquGkLjxcWT3MoRyasg@mail.gmail.com>
+From: fkan@apm.com (Feng Kan)
+Date: Wed, 4 Apr 2018 14:10:41 -0700
+Subject: [PATCH V3] PM / core: fix deferred probe breaking suspend resume
+ order
+In-Reply-To: <20180330225024.GH9322@bhelgaas-glaptop.roam.corp.google.com>
+References: <1520274579-30492-1-git-send-email-fkan@apm.com>
+ <CAL85gmAAVoCCXoLH+c0ROSBy4mS3z86tnbX+7Avh5oGT=fHcfA@mail.gmail.com>
+ <20180330225024.GH9322@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAL85gmBtFnXje9tPngXEyCCwuvxvH6YHB=HrvjfU7npPDiSTCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2018 at 20:38, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Tue, Apr 03, 2018 at 09:11:50PM +0200, Ard Biesheuvel wrote:
->> The API docs describe i2c_transfer() as taking a pointer to an array
->> of i2c_msg containing at least 1 entry, but leaves it to the individual
->> drivers to sanity check the msgs and num parameters. Let's do this in
->> core code instead.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Fri, Mar 30, 2018 at 3:50 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Thu, Mar 15, 2018 at 11:41:33AM -0700, Feng Kan wrote:
+>> On Mon, Mar 5, 2018 at 10:29 AM, Feng Kan <fkan@apm.com> wrote:
+>> > When bridge and its endpoint is enumerated the devices are added to the
+>> > dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
+>> > This causes the bridge to be moved to the end of the dpm list when
+>> > deferred probe kicks in. The order of the dpm list for bridge and
+>> > endpoint is reversed.
+>> >
+>> > Add reordering code to move the bridge and its children and consumers to
+>> > the end of the pm list so the order for suspend and resume is not altered.
+>> > The code also move device and its children and consumers to the tail of
+>> > device_kset list if it is registered.
+>> >
+>> > Signed-off-by: Feng Kan <fkan@apm.com>
+>> > Signed-off-by: Toan Le <toanle@apm.com>
+>> > ...
+>> >
+>> Hi, just wanted to check if there is anything else I need to change on
+>> this. Thanks.
 >
-> Looks good but I want to test it myself, so I will include it in my
-> second pull request later.
->
-
-Thanks Wolfram
+> I'm assuming Rafael will handle this.
+Rafael, sorry to ping again. Do you have a position on this patch yet?
