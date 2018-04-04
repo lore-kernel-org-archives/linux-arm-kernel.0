@@ -1,79 +1,29 @@
-From: jeffy.chen@rock-chips.com (JeffyChen)
-Date: Wed, 04 Apr 2018 19:04:49 +0800
-Subject: [PATCH] iommu: rockchip: fix building without CONFIG_OF
-In-Reply-To: <20180404102401.3634085-1-arnd@arndb.de>
-References: <20180404102401.3634085-1-arnd@arndb.de>
-Message-ID: <5AC4B151.7060307@rock-chips.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 4 Apr 2018 13:07:56 +0200
+Subject: [PATCH v2 2/6] i2c: i2c-stm32f7: Add slave support
+In-Reply-To: <a6218454-d44c-7888-2688-d24bf5bc97f4@st.com>
+References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
+ <1521650940-11651-3-git-send-email-pierre-yves.mordret@st.com>
+ <20180325181600.vehqe3xcx55qxtd7@katana>
+ <94737125-c0b7-08ca-c2f7-feb4e5d0498c@st.com>
+ <20180403152604.udgh4v2erpsupgo3@ninjato>
+ <a6218454-d44c-7888-2688-d24bf5bc97f4@st.com>
+Message-ID: <20180404110756.pxrmyjaiasp2c35n@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amd,
 
-Thanks for your patch.
+> > As far as I understand the code now, both instances can be master /
+> > slave simultanously on the same bus?
+> 
+> Correct.
 
-On 04/04/2018 06:23 PM, Arnd Bergmann wrote:
-> We get a build error when compiling the iommu driver without CONFIG_OF:
->
-> drivers/iommu/rockchip-iommu.c: In function 'rk_iommu_of_xlate':
-> drivers/iommu/rockchip-iommu.c:1101:2: error: implicit declaration of function 'of_dev_put'; did you mean 'of_node_put'? [-Werror=implicit-function-declaration]
->
-oops, didn't notice that.
+Very nice! :)
 
-and checking other iommu drivers which call of_find_device_by_node() 
-too, seems they didn't put() it? maybe we should fix them too
-
-> This replaces the of_dev_put() with the equivalent platform_device_put(),
-> and adds an error check for of_find_device_by_node() returning NULL,
-> which seems to be appropriate here given that we pass the device into
-> platform_get_drvdata() next, and that of_find_device_by_node() might
-> theoretically return a NULL pointer.
-hmm, i thought the of_iommu_xlate() checked that before calling us:
-
-
-static int of_iommu_xlate(struct device *dev,
-               struct of_phandle_args *iommu_spec)
-{
-...
-     if ((ops && !ops->of_xlate) ||
-         !of_device_is_available(iommu_spec->np) ||
-         (!ops && !of_iommu_driver_present(iommu_spec->np)))
-         return NO_IOMMU;
-...
-     return ops->of_xlate(dev, iommu_spec);
-
-
-but it's better to check it ourself :)
-
-
->
-> Fixes: 5fd577c3eac3 ("iommu/rockchip: Use OF_IOMMU to attach devices automatically")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This warning appears to only have been introduced in linux-next after
-> the merge window opened.
-> ---
->   drivers/iommu/rockchip-iommu.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 5fc8656c60f9..fe9c9cc1a9d4 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -1094,11 +1094,15 @@ static int rk_iommu_of_xlate(struct device *dev,
->   		return -ENOMEM;
->
->   	iommu_dev = of_find_device_by_node(args->np);
-> +	if (!iommu_dev) {
-> +		kfree(data);
-> +		return -ENODEV;
-> +	}
->
->   	data->iommu = platform_get_drvdata(iommu_dev);
->   	dev->archdata.iommu = data;
->
-> -	of_dev_put(iommu_dev);
-> +	platform_device_put(iommu_dev);
->
->   	return 0;
->   }
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/68593dbf/attachment-0001.sig>
