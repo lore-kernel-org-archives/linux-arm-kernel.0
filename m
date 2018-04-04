@@ -1,88 +1,47 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Apr 2018 23:38:44 +0100
-Subject: [PATCH] arm: decompressor: mark error() as __noreturn
-In-Reply-To: <CAGXu5jK1abgzQCJ+9ysTZHvxPo4vG6dfwPFs_CuXdP=0_Qib_g@mail.gmail.com>
-References: <20180404123117.3575773-1-arnd@arndb.de>
- <CAGXu5jK1abgzQCJ+9ysTZHvxPo4vG6dfwPFs_CuXdP=0_Qib_g@mail.gmail.com>
-Message-ID: <20180404223843.GL16141@n2100.armlinux.org.uk>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed,  4 Apr 2018 18:50:09 -0400
+Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
+ Extended Tags
+Message-ID: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2018 at 03:34:06PM -0700, Kees Cook wrote:
-> On Wed, Apr 4, 2018 at 5:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > gcc complains about fortify_panic() possibly returning:
-> >
-> > arch/arm/boot/compressed/misc.c: In function 'fortify_panic':
-> > arch/arm/boot/compressed/misc.c:167:1: error: 'noreturn' function does return [-Werror]
-> >
-> > This annotates the error() function as __noreturn, which lets gcc
-> > see in all configurations that it fortify_panic() cannot return either.
-> >
-> > Fixes: ee333554fed5 ("ARM: 8749/1: Kconfig: Add ARCH_HAS_FORTIFY_SOURCE")
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Acked-by: Kees Cook <keescook@chromium.org>
+Per PCIe r3.1, sec 2.2.6.2 and 7.8.4, a Requester may not use 8-bit Tags
+unless its Extended Tag Field Enable is set, but all Receivers/Completers
+must handle 8-bit Tags correctly regardless of their Extended Tag Field
+Enable.
 
-I'd actually prefer a more robust solution to this - error() is used
-in different files, each with their own separate prototype, which is
-error-prone.  The same goes for a few other variables.  The following
-is IMHO a more complete (and thus larger) patch:
+Some devices do not handle 8-bit Tags as Completers, so add a quirk for
+them.  If we find such a device, we disable Extended Tags for the entire
+hierarchy to make peer-to-peer DMA possible.
 
- arch/arm/boot/compressed/decompress.c |  5 +----
- arch/arm/boot/compressed/misc.c       |  2 +-
- arch/arm/boot/compressed/misc.h       | 10 ++++++++++
- 3 files changed, 12 insertions(+), 5 deletions(-)
+The Broadcom HT1100/HT2000/HT2100 seems to have issues with handling 8-bit
+tags.  Mark it as broken.
 
-diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-index a2ac3fe7dbf8..c16c1829a5e4 100644
---- a/arch/arm/boot/compressed/decompress.c
-+++ b/arch/arm/boot/compressed/decompress.c
-@@ -6,10 +6,7 @@
- #include <linux/stddef.h>	/* for NULL */
- #include <linux/linkage.h>
- #include <asm/string.h>
--
--extern unsigned long free_mem_ptr;
--extern unsigned long free_mem_end_ptr;
--extern void error(char *);
-+#include "misc.h"
+Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
+Link: https://bugzilla.kernel.org/show_bug.cgi?id=196197
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/quirks.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 8b14bd3..f012742 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -4813,9 +4813,13 @@ static void quirk_no_ext_tags(struct pci_dev *pdev)
  
- #define STATIC static
- #define STATIC_RW_DATA	/* non-static please */
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index a3ded2a64b32..e94c84dded6c 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -22,9 +22,9 @@ unsigned int __machine_arch_type;
- #include <linux/compiler.h>	/* for inline */
- #include <linux/types.h>
- #include <linux/linkage.h>
-+#include "misc.h"
+ 	pci_walk_bus(bridge->bus, pci_configure_extended_tags, NULL);
+ }
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0132, quirk_no_ext_tags);
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0140, quirk_no_ext_tags);
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0141, quirk_no_ext_tags);
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0142, quirk_no_ext_tags);
+ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0144, quirk_no_ext_tags);
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0420, quirk_no_ext_tags);
++DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0422, quirk_no_ext_tags);
  
- static void putstr(const char *ptr);
--extern void error(char *x);
- 
- #include CONFIG_UNCOMPRESS_INCLUDE
- 
-diff --git a/arch/arm/boot/compressed/misc.h b/arch/arm/boot/compressed/misc.h
-new file mode 100644
-index 000000000000..c958dccd1d97
---- /dev/null
-+++ b/arch/arm/boot/compressed/misc.h
-@@ -0,0 +1,10 @@
-+#ifndef MISC_H
-+#define MISC_H
-+
-+#include <linux/compiler.h>
-+
-+void error(char *x) __noreturn;
-+extern unsigned long free_mem_ptr;
-+extern unsigned long free_mem_end_ptr;
-+
-+#endif
-
-
+ #ifdef CONFIG_PCI_ATS
+ /*
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
