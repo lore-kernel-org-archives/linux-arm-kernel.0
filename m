@@ -1,58 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Apr 2018 10:08:32 +0100
-Subject: [PATCH 2/2] smp: introduce kick_active_cpus_sync()
-In-Reply-To: <20180404033625.gkn4q7kb2xf6d6mo@yury-thinkpad>
-References: <20180325175004.28162-1-ynorov@caviumnetworks.com>
- <20180325175004.28162-3-ynorov@caviumnetworks.com>
- <20180327102116.GA2464@arm.com>
- <20180401111108.mudkiewzn33sifvk@yury-thinkpad>
- <20180403134832.2cdae64uwuot6ryz@lakrids.cambridge.arm.com>
- <20180404033625.gkn4q7kb2xf6d6mo@yury-thinkpad>
-Message-ID: <20180404090831.62dtaqo4ojrmozj7@lakrids.cambridge.arm.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Wed, 04 Apr 2018 11:15:04 +0200
+Subject: [PATCH v4 1/5] drm/blend: Add a generic alpha property
+In-Reply-To: <87vadd5mgf.fsf@anholt.net>
+References: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
+ <402e596049beb3429faf5981682d902c70325274.1520974361.git-series.maxime.ripard@bootlin.com>
+ <87vadd5mgf.fsf@anholt.net>
+Message-ID: <e0c1e8af3c8e9a8283d78d4cdeb2fe92147c5945.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2018 at 06:36:25AM +0300, Yury Norov wrote:
-> On Tue, Apr 03, 2018 at 02:48:32PM +0100, Mark Rutland wrote:
-> > On Sun, Apr 01, 2018 at 02:11:08PM +0300, Yury Norov wrote:
-> > > @@ -840,8 +861,10 @@ el0_svc:
-> > >  	mov	wsc_nr, #__NR_syscalls
-> > >  el0_svc_naked:					// compat entry point
-> > >  	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
-> > > +	isb_if_eqs
-> > >  	enable_dbg_and_irq
-> > > -	ct_user_exit 1
-> > > +	ct_user_exit
-> > 
-> > I don't think this is safe. here we issue the ISB *before* exiting a
-> > quiesecent state, so I think we can race with another CPU that calls
-> > kick_all_active_cpus_sync, e.g.
-> > 
-> > 	CPU0				CPU1
-> > 
-> > 	ISB
-> > 					patch_some_text()
-> > 					kick_all_active_cpus_sync()
-> > 	ct_user_exit
-> > 
-> > 	// not synchronized!
-> > 	use_of_patched_text()
-> > 
-> > ... and therefore the ISB has no effect, which could be disasterous.
-> > 
-> > I believe we need the ISB *after* we transition into a non-quiescent
-> > state, so that we can't possibly miss a context synchronization event.
->  
-> I decided to put isb() in entry because there's a chance that there will
-> be patched code prior to exiting a quiescent state.
+Hi,
 
-If we do patch entry text, then I think we have no option but to use
-kick_all_active_cpus_sync(), or we risk races similar to the above.
+On Fri, 2018-03-30 at 13:37 -0700, Eric Anholt wrote:
+> Maxime Ripard <maxime.ripard@bootlin.com> writes:
+> 
+> > Some drivers duplicate the logic to create a property to store a
+> > per-plane
+> > alpha.
+> > 
+> > This is especially useful if we ever want to support extra protocols
+> > for
+> > Wayland like:
+> > https://lists.freedesktop.org/archives/wayland-devel/2017-August/034
+> > 741.html
+> > 
+> > Let's create a helper in order to move that to the core.
+> > diff --git a/drivers/gpu/drm/drm_blend.c
+> > b/drivers/gpu/drm/drm_blend.c
+> > index 5a81e1b4c076..05eda2d57c77 100644
+> > --- a/drivers/gpu/drm/drm_blend.c
+> > +++ b/drivers/gpu/drm/drm_blend.c
+> > @@ -88,6 +88,12 @@
+> >   * On top of this basic transformation additional properties can be
+> > exposed by
+> >   * the driver:
+> >   *
+> > + * alpha:
+> > + * 	Alpha is setup with drm_plane_create_alpha_property().
+> > It controls the
+> 
+> s/setup/set up/
+> 
+> > + * 	plane-wide opacity, from transparent (0) to opaque
+> > (0xffff). It can be
+> > + * 	combined with pixel alpha.
+> > + * 	The alpha value is represented as premultiplied alpha.
+> 
+> I don't think this premultiplied comment makes any sense.  What are
+> you saying it's premultiplied with?  Maybe you mean that the output
+> pixels will have both their color and alpha channels multiplied by
+> this alpha?
+> I'd just drop it.
 
-> But after some headscratching, I think it's safe. I'll do like you
-> suggested here.
+I disagree here: since there are multiple ways to blend the pixel alpha
+value and the plane-wide alpha value, I think it's important to clearly
+specify which blending equation DRM expects here. Otherwise, the plane-
+wide alpha value just doesn't have a specified meaning and driver
+implementations can't figure whether the hardware uses the same equation
+or not and whether adaptation to this coefficient is needed.
 
-Sounds good.
+The equations for premultiplied alpha blending are at:
+https://en.wikipedia.org/wiki/Alpha_compositing#Alpha_blending
 
-Thanks,
-Mark.
+What do you think?
+
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+> 
+> We should probably do this property for vc4 at some point, too.
+
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/f1f7aa6e/attachment-0001.sig>
