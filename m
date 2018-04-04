@@ -1,58 +1,68 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed,  4 Apr 2018 19:58:19 -0400
-Subject: [PATCH v3 4/5] io: change outX() to have their own IO barrier
- overrides
+Date: Wed,  4 Apr 2018 19:58:18 -0400
+Subject: [PATCH v3 3/5] io: define stronger ordering for the default writeX()
+ implementation
 In-Reply-To: <1522886301-25955-1-git-send-email-okaya@codeaurora.org>
 References: <1522886301-25955-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1522886301-25955-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1522886301-25955-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Open code writeX() inside outX() so that outX() variants have their own
-overrideable Port IO barrier combinations as __io_pbw() and __io_paw() for
-actions to be taken before port IO and after port IO write.
+The default implementation of mapping writeX() to __raw_writeX() is wrong.
+writeX() has stronger ordering semantics. Compiler is allowed to reorder
+memory writes against __raw_writeX().
+
+Use the previously defined __io_aw() and __io_bw() macros to harden
+code generation according to architecture support.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- include/asm-generic/io.h | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ include/asm-generic/io.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index ca268d9..38a96d1 100644
+index fc554af..ca268d9 100644
 --- a/include/asm-generic/io.h
 +++ b/include/asm-generic/io.h
-@@ -456,7 +456,9 @@ static inline u32 inl(unsigned long addr)
- #define outb outb
- static inline void outb(u8 value, unsigned long addr)
+@@ -207,7 +207,9 @@ static inline u64 readq(const volatile void __iomem *addr)
+ #define writeb writeb
+ static inline void writeb(u8 value, volatile void __iomem *addr)
  {
--	writeb(value, PCI_IOBASE + addr);
-+	__io_pbw();
-+	__raw_writeb(value, PCI_IOBASE + addr);
-+	__io_paw();
++	__io_bw();
+ 	__raw_writeb(value, addr);
++	__io_aw();
  }
  #endif
  
-@@ -464,7 +466,9 @@ static inline void outb(u8 value, unsigned long addr)
- #define outw outw
- static inline void outw(u16 value, unsigned long addr)
+@@ -215,7 +217,9 @@ static inline void writeb(u8 value, volatile void __iomem *addr)
+ #define writew writew
+ static inline void writew(u16 value, volatile void __iomem *addr)
  {
--	writew(value, PCI_IOBASE + addr);
-+	__io_pbw();
-+	__raw_writew(cpu_to_le16(value), PCI_IOBASE + addr);
-+	__io_paw();
++	__io_bw();
+ 	__raw_writew(cpu_to_le16(value), addr);
++	__io_aw();
  }
  #endif
  
-@@ -472,7 +476,9 @@ static inline void outw(u16 value, unsigned long addr)
- #define outl outl
- static inline void outl(u32 value, unsigned long addr)
+@@ -223,7 +227,9 @@ static inline void writew(u16 value, volatile void __iomem *addr)
+ #define writel writel
+ static inline void writel(u32 value, volatile void __iomem *addr)
  {
--	writel(value, PCI_IOBASE + addr);
-+	__io_pbw();
-+	__raw_writel(cpu_to_le32(value), PCI_IOBASE + addr);
-+	__io_paw();
++	__io_bw();
+ 	__raw_writel(__cpu_to_le32(value), addr);
++	__io_aw();
  }
  #endif
  
+@@ -232,7 +238,9 @@ static inline void writel(u32 value, volatile void __iomem *addr)
+ #define writeq writeq
+ static inline void writeq(u64 value, volatile void __iomem *addr)
+ {
++	__io_bw();
+ 	__raw_writeq(__cpu_to_le64(value), addr);
++	__io_aw();
+ }
+ #endif
+ #endif /* CONFIG_64BIT */
 -- 
 2.7.4
