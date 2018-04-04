@@ -1,35 +1,51 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 4 Apr 2018 14:10:41 -0700
-Subject: [PATCH V3] PM / core: fix deferred probe breaking suspend resume
- order
-In-Reply-To: <20180330225024.GH9322@bhelgaas-glaptop.roam.corp.google.com>
-References: <1520274579-30492-1-git-send-email-fkan@apm.com>
- <CAL85gmAAVoCCXoLH+c0ROSBy4mS3z86tnbX+7Avh5oGT=fHcfA@mail.gmail.com>
- <20180330225024.GH9322@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAL85gmBtFnXje9tPngXEyCCwuvxvH6YHB=HrvjfU7npPDiSTCw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 4 Apr 2018 15:34:06 -0700
+Subject: [PATCH] arm: decompressor: mark error() as __noreturn
+In-Reply-To: <20180404123117.3575773-1-arnd@arndb.de>
+References: <20180404123117.3575773-1-arnd@arndb.de>
+Message-ID: <CAGXu5jK1abgzQCJ+9ysTZHvxPo4vG6dfwPFs_CuXdP=0_Qib_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 30, 2018 at 3:50 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Thu, Mar 15, 2018 at 11:41:33AM -0700, Feng Kan wrote:
->> On Mon, Mar 5, 2018 at 10:29 AM, Feng Kan <fkan@apm.com> wrote:
->> > When bridge and its endpoint is enumerated the devices are added to the
->> > dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
->> > This causes the bridge to be moved to the end of the dpm list when
->> > deferred probe kicks in. The order of the dpm list for bridge and
->> > endpoint is reversed.
->> >
->> > Add reordering code to move the bridge and its children and consumers to
->> > the end of the pm list so the order for suspend and resume is not altered.
->> > The code also move device and its children and consumers to the tail of
->> > device_kset list if it is registered.
->> >
->> > Signed-off-by: Feng Kan <fkan@apm.com>
->> > Signed-off-by: Toan Le <toanle@apm.com>
->> > ...
->> >
->> Hi, just wanted to check if there is anything else I need to change on
->> this. Thanks.
+On Wed, Apr 4, 2018 at 5:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> gcc complains about fortify_panic() possibly returning:
 >
-> I'm assuming Rafael will handle this.
-Rafael, sorry to ping again. Do you have a position on this patch yet?
+> arch/arm/boot/compressed/misc.c: In function 'fortify_panic':
+> arch/arm/boot/compressed/misc.c:167:1: error: 'noreturn' function does return [-Werror]
+>
+> This annotates the error() function as __noreturn, which lets gcc
+> see in all configurations that it fortify_panic() cannot return either.
+>
+> Fixes: ee333554fed5 ("ARM: 8749/1: Kconfig: Add ARCH_HAS_FORTIFY_SOURCE")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Acked-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+> ---
+>  arch/arm/boot/compressed/misc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+> index 009db7d275f8..313a587d656b 100644
+> --- a/arch/arm/boot/compressed/misc.c
+> +++ b/arch/arm/boot/compressed/misc.c
+> @@ -24,7 +24,7 @@ unsigned int __machine_arch_type;
+>  #include <linux/linkage.h>
+>
+>  static void putstr(const char *ptr);
+> -extern void error(char *x);
+> +extern void error(char *x) __noreturn;
+>
+>  #include CONFIG_UNCOMPRESS_INCLUDE
+>
+> --
+> 2.9.0
+>
+
+
+
+-- 
+Kees Cook
+Pixel Security
