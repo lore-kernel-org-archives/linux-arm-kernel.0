@@ -1,53 +1,40 @@
-From: hejianet@gmail.com (Jia He)
-Date: Tue,  3 Apr 2018 19:56:19 -0700
-Subject: [PATCH v6 5/5] mm: page_alloc: reduce unnecessary binary search in
- early_pfn_valid()
-In-Reply-To: <1522810579-7466-1-git-send-email-hejianet@gmail.com>
-References: <1522810579-7466-1-git-send-email-hejianet@gmail.com>
-Message-ID: <1522810579-7466-6-git-send-email-hejianet@gmail.com>
+From: wangxidong_97@163.com (Xidong Wang)
+Date: Wed,  4 Apr 2018 11:05:51 +0800
+Subject: [PATCH 1/1] mtd:nand:fix memory leak
+Message-ID: <1522811151-18853-1-git-send-email-wangxidong_97@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-where possible") optimized the loop in memmap_init_zone(). But there is
-still some room for improvement. E.g. in early_pfn_valid(), if pfn and
-pfn+1 are in the same memblock region, we can record the last returned
-memblock region index and check check pfn++ is still in the same region.
+In function tango_nand_probe(), the memory allocated by
+clk_get() is not released on the normal path and
+the error path that IS_ERR(nfc->chan) returns true.
+This will result in a memory leak bug.
 
-Currently it only improve the performance on arm64 and will have no
-impact on other arches.
-
-For the performance improvement, after this set, I can see the time
-overhead of memmap_init() is reduced from 41313 us to 24345 us in my
-armv8a server(QDF2400 with 96G memory).
-
-Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+Signed-off-by: Xidong Wang <wangxidong_97@163.com>
 ---
- include/linux/mmzone.h | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/tango_nand.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index a517d43..516ffb49 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -1271,11 +1271,16 @@ static inline int pfn_present(unsigned long pfn)
- #define pfn_to_nid(pfn)		(0)
- #endif
+diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+index c5bee00b..8083459 100644
+--- a/drivers/mtd/nand/tango_nand.c
++++ b/drivers/mtd/nand/tango_nand.c
+@@ -648,12 +648,15 @@ static int tango_nand_probe(struct platform_device *pdev)
+ 		return PTR_ERR(clk);
  
--#define early_pfn_valid(pfn)	pfn_valid(pfn)
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
- extern ulong memblock_next_valid_pfn(ulong pfn);
- #define next_valid_pfn(pfn)	memblock_next_valid_pfn(pfn)
--#endif
-+
-+extern int pfn_valid_region(ulong pfn);
-+#define early_pfn_valid(pfn)	pfn_valid_region(pfn)
-+#else
-+#define early_pfn_valid(pfn)    pfn_valid(pfn)
-+#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
-+
- void sparse_init(void);
- #else
- #define sparse_init()	do {} while (0)
+ 	nfc->chan = dma_request_chan(&pdev->dev, "rxtx");
+-	if (IS_ERR(nfc->chan))
++	if (IS_ERR(nfc->chan)) {
++		clk_put(clk);
+ 		return PTR_ERR(nfc->chan);
++	}
+ 
+ 	platform_set_drvdata(pdev, nfc);
+ 	nand_hw_control_init(&nfc->hw);
+ 	nfc->freq_kHz = clk_get_rate(clk) / 1000;
++	clk_put(clk);
+ 
+ 	for_each_child_of_node(pdev->dev.of_node, np) {
+ 		err = chip_init(&pdev->dev, np);
 -- 
 2.7.4
