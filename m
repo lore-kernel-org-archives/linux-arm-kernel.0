@@ -1,157 +1,106 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Wed, 04 Apr 2018 10:49:21 +0200
-Subject: [PATCH v4 4/5] drm/sun4i: Add support for plane alpha
-In-Reply-To: <7d9d81363e23bd5d8a312b443f9080b52923f7e1.1520974361.git-series.maxime.ripard@bootlin.com>
-References: <cover.b32b447321f6e04da30ed8099fbef2f00fc27fbc.1520974361.git-series.maxime.ripard@bootlin.com>
- <7d9d81363e23bd5d8a312b443f9080b52923f7e1.1520974361.git-series.maxime.ripard@bootlin.com>
-Message-ID: <b2e22ffcbd4b596e64df3992b0128d9c9a5830c4.camel@bootlin.com>
+From: asarkar@xilinx.com (Arindam Sarkar)
+Date: Wed, 4 Apr 2018 08:58:03 +0000
+Subject: i2c-cadence.c receive buffer overrun bug fix patches
+In-Reply-To: <CA+Y=x3=vwp61x+iEJXe0+LBEaY+3uQ6n6j8+AbRN7=aTTOiziw@mail.gmail.com>
+References: <CA+Y=x3=vwp61x+iEJXe0+LBEaY+3uQ6n6j8+AbRN7=aTTOiziw@mail.gmail.com>
+Message-ID: <BLUPR0201MB185945134ED13AA1229D38A9CEA40@BLUPR0201MB1859.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andrew,
 
-On Tue, 2018-03-13 at 21:54 +0100, Maxime Ripard wrote:
-> Our backend supports a per-plane alpha property. Support it through
-> our new
-> helper.
+We appreciate the patches. We will validate the patches at our end and will get back to you on this.
 
-See one comment below. Otherwise, this is:
-Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Best Regards
+Arindam Sarkar
 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 16 +++++++++++++---
->  drivers/gpu/drm/sun4i/sun4i_backend.h |  3 +++
->  drivers/gpu/drm/sun4i/sun4i_layer.c   |  2 ++
->  3 files changed, 18 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index 092ade4ff6a5..98cd4a8a93ed 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -186,6 +186,15 @@ int sun4i_backend_update_layer_formats(struct
-> sun4i_backend *backend,
->  	DRM_DEBUG_DRIVER("Switching display backend interlaced mode
-> %s\n",
->  			 interlaced ? "on" : "off");
->  
-> +	val = SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA(state->alpha >>
-> 8);
+-----Original Message-----
+From: Andrew Worsley [mailto:amworsley at gmail.com] 
+Sent: Tuesday, April 3, 2018 6:59 PM
+To: Harini Katakam <harinik@xilinx.com>; Ajay Yugalkishore Pandey <APANDEY@xilinx.com>; Arindam Sarkar <asarkar@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>; linux-arm-kernel at lists.infradead.org; linux-i2c at vger.kernel.org
+Subject: i2c-cadence.c receive buffer overrun bug fix patches
 
-Have you checked that the alpha value expected by the hardware does
-match the "premultiplied" alpha blemding equation?
+I just sent 2 patches to fix the buffer overrun bug I reported earlier.
+They should apply against the current xilinx kernel i2c-cadence driver.
 
-> +	if (state->alpha != DRM_BLEND_ALPHA_OPAQUE)
-> +		val |= SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN;
+The first is the original patch which traps the overrun and aborts the transfer with out overruning the receive buffer.
 
-Maybe insert a newline for improved readability here?
+The 2nd patch fixes the actual bug - so the first patch is perhaps just a safety measure and could be left out. But I would feel safer if it does check the transfer rather than trusting the hardware transfer register which was wrapping in the bug.
 
-> +	regmap_update_bits(backend->engine.regs,
-> +			   SUN4I_BACKEND_ATTCTL_REG0(layer),
-> +			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_MAS
-> K |
-> +			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN,
-> +			   val);
-> +
->  	ret = sun4i_backend_drm_format_to_layer(fb->format->format,
-> &val);
->  	if (ret) {
->  		DRM_DEBUG_DRIVER("Invalid format\n");
-> @@ -359,7 +368,7 @@ static int sun4i_backend_atomic_check(struct
-> sunxi_engine *engine,
->  		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
->  				 drm_get_format_name(fb->format-
-> >format,
->  						     &format_name));
-> -		if (fb->format->has_alpha)
-> +		if (fb->format->has_alpha || (plane_state->alpha !=
-> DRM_BLEND_ALPHA_OPAQUE))
->  			num_alpha_planes++;
->  
->  		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
-> @@ -412,7 +421,8 @@ static int sun4i_backend_atomic_check(struct
-> sunxi_engine *engine,
->  	}
->  
->  	/* We can't have an alpha plane at the lowest position */
-> -	if (plane_states[0]->fb->format->has_alpha)
-> +	if (plane_states[0]->fb->format->has_alpha ||
-> +	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
->  		return -EINVAL;
->  
->  	for (i = 1; i < num_planes; i++) {
-> @@ -424,7 +434,7 @@ static int sun4i_backend_atomic_check(struct
-> sunxi_engine *engine,
->  		 * The only alpha position is the lowest plane of the
->  		 * second pipe.
->  		 */
-> -		if (fb->format->has_alpha)
-> +		if (fb->format->has_alpha || (p_state->alpha !=
-> DRM_BLEND_ALPHA_OPAQUE))
->  			current_pipe++;
->  
->  		s_state->pipe = current_pipe;
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h
-> b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> index 52e77591186a..03294d5dd1a2 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-> @@ -68,11 +68,14 @@
->  #define SUN4I_BACKEND_CKMIN_REG			0x884
->  #define SUN4I_BACKEND_CKCFG_REG			0x888
->  #define SUN4I_BACKEND_ATTCTL_REG0(l)		(0x890 + (0x4 *
-> (l)))
-> +#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_MASK	GENMASK(31
-> , 24)
-> +#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA(x)		((x)
-> << 24)
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK	BIT(15)
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(x)		((x)
-> << 15)
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK	GENMASK(11,
-> 10)
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(x)			
-> ((x) << 10)
->  #define SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN		BIT(1)
-> +#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN	BIT(0)
->  
->  #define SUN4I_BACKEND_ATTCTL_REG1(l)		(0x8a0 + (0x4 *
-> (l)))
->  #define SUN4I_BACKEND_ATTCTL_REG1_LAY_HSCAFCT		GENMASK(
-> 15, 14)
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> index 33ad377569ec..cf7857b8ac5c 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> @@ -37,6 +37,7 @@ static void sun4i_backend_layer_reset(struct
-> drm_plane *plane)
->  	if (state) {
->  		plane->state = &state->state;
->  		plane->state->plane = plane;
-> +		plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
->  		plane->state->zpos = layer->id;
->  	}
->  }
-> @@ -163,6 +164,7 @@ static struct sun4i_layer
-> *sun4i_layer_init_one(struct drm_device *drm,
->  			     &sun4i_backend_layer_helper_funcs);
->  	layer->backend = backend;
->  
-> +	drm_plane_create_alpha_property(&layer->plane);
->  	drm_plane_create_zpos_property(&layer->plane, 0, 0,
->  				       SUN4I_BACKEND_NUM_LAYERS - 1);
->  
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/3540741d/attachment.sig>
+I have verified the fix on my hardware with over 60 faultless boot ups where before it would crash about 1 in three boot ups.
+
+Below I show the trace of such a buffer over run prevented by the first patch with extra debug showing the outstanding bytes of the transfer (recv_count), CR (Control Register) and the transfer register size. It shows the transfer register size going down to zero and then wrapping and transfering another 16 bytes (256-16=240 ?) The 0x10 bit in the CR was set when the transfer size register was zero allowing further i2c data to be read in before it was detected and the transfer aborted with the message "buffer overruning..."
+
+[    9.963519] hostname kernel: cdns_i2c_process_msg: transfer from 0x29 len=35
+[    9.963524] hostname kernel: cdns_i2c_mrecv:cdns_i2c_writereg(35,
+CDNS_I2C_XFER_SIZE_OFFSET) #6
+[    9.964924] hostname kernel: cdns_i2c_isr: status 0x2 1352ns
+recv_count=35 xfer_size=21 CR=0x321f
+[    9.966189] hostname kernel: cdns_i2c_isr: status 0x2 2594ns
+recv_count=21 xfer_size=7 CR=0x321f
+[    9.966840] hostname kernel: cdns_i2c_isr: status 0x1 3230ns
+recv_count=7 xfer_size=0 CR=0x320f
+[    9.966898] hostname kernel: cdns_i2c_process_msg: cnt=349 Rd 29
+len=35 completed 3369426ns
+[    9.966904] hostname kernel: cdns_i2c_process_msg: err_status=0x0 - ok
+[    9.966922] hostname kernel: cdns_i2c_process_msg: transfer from 0x29 len=142
+[    9.966931] hostname kernel: cdns_i2c_mrecv:cdns_i2c_writereg(142,
+CDNS_I2C_XFER_SIZE_OFFSET) #6
+[    9.977951] hostname kernel: cdns_i2c_isr: status 0xa 10752ns
+recv_count=142 xfer_size=126 CR=0x321f
+[    9.985414] hostname kernel: cdns_i2c_isr: status 0xa 18043ns
+recv_count=126 xfer_size=110 CR=0x321f
+[    9.992783] hostname kernel: cdns_i2c_isr: status 0xa 25237ns
+recv_count=110 xfer_size=94 CR=0x321f
+[   10.000158] hostname kernel: cdns_i2c_isr: status 0xa 32439ns
+recv_count=94 xfer_size=78 CR=0x321f
+[   10.007547] hostname kernel: cdns_i2c_isr: status 0xa 39657ns
+recv_count=78 xfer_size=62 CR=0x321f
+[   10.015016] hostname kernel: cdns_i2c_isr: status 0xa 46950ns
+recv_count=62 xfer_size=46 CR=0x321f
+[   10.022488] hostname kernel: cdns_i2c_isr: status 0xa 54247ns
+recv_count=46 xfer_size=30 CR=0x321f
+[   10.023779] hostname kernel: cdns_i2c_isr: status 0x2 55507ns
+recv_count=30 xfer_size=16 CR=0x321f
+[   10.034019] hostname kernel: cdns_i2c_isr: status 0xa 65503ns
+recv_count=16 xfer_size=0 CR=0x321f
+[   10.041025] hostname kernel: cdns_i2c_isr: status 0x22 72344ns
+recv_count=0 xfer_size=240 CR=0x320f
+[   10.041039] hostname kernel: cdns_i2c_isr: buffer overrunning !!!-
+transfer-size=240 ctrl=0x320f status=0xa0=>Overflow<= int-status=0x0
+[   10.041042] hostname kernel: cdns_i2c_isr:Aborting transfer...
+[   10.981934] hostname kernel: cdns_i2c_process_msg: cnt=350 Rd 29
+len=142 completed 1014997572ns
+[   10.981947] hostname kernel: cdns-i2c e0004000.i2c: timeout waiting
+on completion
+[   10.981970] hostname kernel: tpm tpm0: i2c_atmel_recv reread(buf=00
+c4 00 00 00 8e 00 00 00 00 00 00 00 80 d6 19 c3 0a 3b ff b5 2e 13 20 7d 51 56 0e 40 c7 7c d6 c7 07 e2 79 2f 5e 0a d9 f5 80 92 35 8b 71 bf 6d 26 7d ac 95 40 25 cc 60 55 5f 94 e2 64 bf c4 d2 count=92) expected_len=142-> ret=-110
+[   10.981978] hostname kernel: **buf:da151d06: 00 c4 00 00 00 8e 00
+00 00 00 00 00 00 80 d6 19  ................
+[   10.981983] hostname kernel: **buf:da151d16: c3 0a 3b ff b5 2e 13
+20 7d 51 56 0e 40 c7 7c d6  ..;.... }QV. at .|.
+[   10.981987] hostname kernel: **buf:da151d26: c7 07 e2 79 2f 5e 0a
+d9 f5 80 92 35 8b 71 bf 6d  ...y/^.....5.q.m
+[   10.981991] hostname kernel: **buf:da151d36: 26 7d ac 95 40 25 cc
+60 55 5f 94 e2 64 bf c4 d2  &}..@%.`U_..d...
+[   10.981996] hostname kernel: **buf:da151d46: 21 5d 20 e8 a4 2b aa
+79 63 ae 3d 88 4d a9 2b 7c  !] ..+.yc.=.M.+|
+[   10.982000] hostname kernel: **buf:da151d56: b2 c9 c7 0e b1 5f f0
+3c 32 b8 85 4f 3f 2a 07 06  ....._.<2..O?*..
+[   10.982004] hostname kernel: **buf:da151d66: 30 ea b0 fc 53 ec 13
+d6 18 73 f1 81 41 f8 5e fb  0...S....s..A.^.
+[   10.982008] hostname kernel: **buf:da151d76: a8 77 c4 9b 7e 28 ee
+27 74 6a d6 ed f6 db 83 a7  .w..~(.'tj......
+[   10.982012] hostname kernel: **buf:da151d86: 2e 9a c1 fa 2a 4d c6
+bc 4a 6b e8 1e 76 9d 38 dd  ....*M..Jk..v.8.
+[   10.982016] hostname kernel: **buf:da151d96: 22 c0 03 00 00 00 02
+00 00 00 00 00 00 00 d0 1e  "...............
+[   10.982020] hostname kernel: **buf:da151da6: 15 da 01 00 00 00 00
+00 00 00 04 05 57 3e        ............W>
+[   10.982030] hostname kernel: CPU: 1 PID: 283 Comm: rngd Tainted: G
+         O    4.9.25-zynq+ #45
+[   10.982033] hostname kernel: Hardware name: Xilinx Zynq hostname
+[   10.982066] hostname kernel: [<c0110374>] (unwind_backtrace) from
+[<c010b80c>] (show_stack+0x10/0x14)
+[   10.982085] hostname kernel: [<c010b80c>] (show_stack) from
+[<c03bd97c>] (dump_stack+0x88/0x9c)
