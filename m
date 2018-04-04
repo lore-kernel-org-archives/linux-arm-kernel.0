@@ -1,45 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Apr 2018 14:03:00 +0200
-Subject: [PATCH v2] MAINTAINERS: update entry for ARM/berlin
-In-Reply-To: <20180402102819.599ac67f@xhacker.debian>
-References: <20180330110211.36455347@xhacker.debian>
- <20180330135932.GB28244@lunn.ch>
- <20180402102819.599ac67f@xhacker.debian>
-Message-ID: <CAK8P3a3seSZOocrFtdJJzjmDC8YAAXzicHW_YuXh7ivgYijgAw@mail.gmail.com>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Wed, 04 Apr 2018 13:08:15 +0100
+Subject: [RESEND PATCH] ARM: pxa: stargate2: use device properties for
+ at24 eeprom
+In-Reply-To: <20180404114706.15856-1-brgl@bgdev.pl>
+References: <20180404114706.15856-1-brgl@bgdev.pl>
+Message-ID: <7799C0F9-ABD5-40D5-83E2-AEC631CBBD1E@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 2, 2018 at 4:28 AM, Jisheng Zhang
-<Jisheng.Zhang@synaptics.com> wrote:
-> On Fri, 30 Mar 2018 15:59:32 +0200 Andrew Lunn wrote:
+
+
+On 4 April 2018 12:47:06 BST, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>We want to work towards phasing out the at24_platform_data structure.
+>There are few users and its contents can be represented using generic
+>device properties. Using device properties only will allow us to
+>significantly simplify the at24 configuration code.
 >
->> On Fri, Mar 30, 2018 at 11:02:11AM +0800, Jisheng Zhang wrote:
->> > Synaptics has acquired the Multimedia Solutions Business of Marvell[1].
->> > So change the berlin entry name and move it to its alphabetical
->> > location. We move to ARM/Synaptics instead of ARM/Marvell.
->> >
->> > This patch also updates my email address from marvell to synaptics.
->> >
->> > [1] https://www.synaptics.com/company/news/conexant-marvell
->> >
->> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
->>
->> Thanks for the link
->>
->> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
->>
->> Do you still plan to move the DT files from the Marvell subdirectory?
->> Are the locations of these files considered fixed?
->>
+>Remove the at24_platform_data structure and replace it with an array
+>of property entries. Drop the byte_len/size property, as the model name
+>already implies the EEPROM's size.
 >
-> For new SoCs, the DT files will be put into synaptics sub-directory.
-> But for existing arm64 berlin DT files which currently sits in
-> arch/arm64/boot/dts/marvell, I dunno the proper solution. Could
-> you please give some suggestions? How do other vendors handle this
-> situation in the past?
+>Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
+Looks sensible to me.
 
-There is no good solution, we sometimes move files, other times we don't.
+Acked-by: Jonathan Cameron <jonathan.cameron@huawei.com>
 
-Here, I would probably move it out, but I'd leave it up to you.
+Will be a while before I can test but this looks safe enough..
+>---
+>NOTE: resending with correct e-mail address for Jonathan Cameron.
+>
+> arch/arm/mach-pxa/stargate2.c | 10 +++++-----
+> 1 file changed, 5 insertions(+), 5 deletions(-)
+>
+>diff --git a/arch/arm/mach-pxa/stargate2.c
+>b/arch/arm/mach-pxa/stargate2.c
+>index df62bb23dbee..bbea5fa9a140 100644
+>--- a/arch/arm/mach-pxa/stargate2.c
+>+++ b/arch/arm/mach-pxa/stargate2.c
+>@@ -27,11 +27,11 @@
+> 
+> #include <linux/platform_data/i2c-pxa.h>
+> #include <linux/platform_data/pcf857x.h>
+>-#include <linux/platform_data/at24.h>
+> #include <linux/smc91x.h>
+> #include <linux/gpio/machine.h>
+> #include <linux/gpio.h>
+> #include <linux/leds.h>
+>+#include <linux/property.h>
+> 
+> #include <asm/types.h>
+> #include <asm/setup.h>
+>@@ -795,9 +795,9 @@ static struct pcf857x_platform_data
+>platform_data_pcf857x = {
+> 	.context = NULL,
+> };
+> 
+>-static struct at24_platform_data pca9500_eeprom_pdata = {
+>-	.byte_len = 256,
+>-	.page_size = 4,
+>+static const struct property_entry pca9500_eeprom_properties[] = {
+>+	PROPERTY_ENTRY_U32("pagesize", 4),
+>+	{ }
+> };
+> 
+> /**
+>@@ -935,7 +935,7 @@ static struct i2c_board_info __initdata
+>stargate2_i2c_board_info[] = {
+> 	}, {
+> 		.type = "24c02",
+> 		.addr = 0x57,
+>-		.platform_data = &pca9500_eeprom_pdata,
+>+		.properties = pca9500_eeprom_properties,
+> 	}, {
+> 		.type = "max1238",
+> 		.addr = 0x35,
 
-      Arnd
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
