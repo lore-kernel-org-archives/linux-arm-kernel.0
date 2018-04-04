@@ -1,41 +1,24 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Wed, 4 Apr 2018 09:57:42 -0700
-Subject: [v3,4/4] watchdog: add Gateworks System Controller support
-In-Reply-To: <20180402163242.GC14165@lunn.ch>
-References: <1522250043-8065-5-git-send-email-tharvey@gateworks.com>
- <20180330010757.GA12896@roeck-us.net>
- <CAJ+vNU3ARKLK5AcssEP-_P8AmwnAnS8VtAEO1ppwum2jpCqAYQ@mail.gmail.com>
- <20180330181954.GA17580@roeck-us.net>
- <CAJ+vNU1f+SH16hs3heMA_A2KcbzbXXmJtPxi0uiL4+4tNWgYoQ@mail.gmail.com>
- <20180402163242.GC14165@lunn.ch>
-Message-ID: <CAJ+vNU2RxHngXa00=zx84ifJ6wWh=vN84shRsT5sWYG1G74zeA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Apr 2018 10:12:22 -0700
+Subject: [PATCH] ARM: omap2: fix am43xx build without L2X0
+In-Reply-To: <20180404102550.3692501-1-arnd@arndb.de>
+References: <20180404102550.3692501-1-arnd@arndb.de>
+Message-ID: <20180404171222.GH5700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 2, 2018 at 9:32 AM, Andrew Lunn <andrew@lunn.ch> wrote:
->> The 'use case' we have been using this in for a couple years is that
->> users who want to use this watchdog will enable it externally (we have
->> a command in the bootloader) and if enabled the kernel driver (that
->> I'm proposing here which we've been using out-of-tree) will register
->> the watchdog device and the userspace watchdog process can open the
->> device and start tickling it. If the watchdog is never enabled (or
->> disabled via the bootloader command) the kernel driver fails to probe
->> and the SoC's watchdog can be used.
->
-> Hi Tim
->
-> Is there any reason not to give the user the choice to use both
-> watchdogs? Normally you write drivers to expose the hardware, and then
-> let the users choice if they want to use it.
->
+* Arnd Bergmann <arnd@arndb.de> [180404 10:27]:
+> When CONFIG_CACHE_L2X0 is disabled, the am43xx specific suspend
+> implemnentation fails to link:
+> 
+> arch/arm/mach-omap2/sleep43xx.o: In function `get_l2cache_base':
+> (.text+0x180): undefined reference to `omap4_get_l2cache_base'
+> 
+> This adds an #ifdef protection around the code, like we do for am44xx.
+> 
+> Fixes: 41d37e61372f ("ARM: OMAP2+: Introduce low-level suspend code for AM43XX")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Andrew,
+Thanks, looks OK to me:
 
-I don't know what value the SoC watchdog has if you have the GSC
-watchdog available that can power cycle the board but I would agree
-normally you would expose all of them. I suppose this may be a
-different case because I'm expecting the user to go and manually
-enable the watchdog instead of using the kernel to do it which means
-if its not enabled its not really available to be used.
-
-Tim
+Acked-by: Tony Lindgren <tony@atomide.com>
