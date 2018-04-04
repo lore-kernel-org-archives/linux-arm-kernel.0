@@ -1,74 +1,119 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed,  4 Apr 2018 11:57:09 +0200
-Subject: [PATCH v4 1/8] drm/sun4i: tcon: Add TRI finish interrupt for vblank
+Date: Wed,  4 Apr 2018 11:57:10 +0200
+Subject: [PATCH v4 2/8] dt-bindings: display: Add Allwinner MIPI-DSI bindings
 In-Reply-To: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
 References: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
-Message-ID: <de6d6ad8959da77ea3a974a31a4c0c8391178748.1522835818.git-series.maxime.ripard@bootlin.com>
+Message-ID: <cdc5402570199f5c08211f29d9182ea5948d3c40.1522835818.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "CPU" (or Intel 8080) interface uses a different interrupt called
-TRI_FINISH (most likely TRI being for trigger) to notify the end of frames,
-and hence the VBLANK period.
+The Allwinner SoCs usually come with a DSI encoder. Add a binding for it.
 
-And that interrupt to the possible VBLANK interrupts source.
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c |  9 ++++++---
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  4 ++++
- 2 files changed, 10 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt | 93 +++++++-
+ 1 file changed, 93 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index c3d92d537240..5f423ed2f01b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -201,7 +201,8 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable)
- 	DRM_DEBUG_DRIVER("%sabling VBLANK interrupt\n", enable ? "En" : "Dis");
- 
- 	mask = SUN4I_TCON_GINT0_VBLANK_ENABLE(0) |
--	       SUN4I_TCON_GINT0_VBLANK_ENABLE(1);
-+		SUN4I_TCON_GINT0_VBLANK_ENABLE(1) |
-+		SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE;
- 
- 	if (enable)
- 		val = mask;
-@@ -582,7 +583,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
- 	regmap_read(tcon->regs, SUN4I_TCON_GINT0_REG, &status);
- 
- 	if (!(status & (SUN4I_TCON_GINT0_VBLANK_INT(0) |
--			SUN4I_TCON_GINT0_VBLANK_INT(1))))
-+			SUN4I_TCON_GINT0_VBLANK_INT(1) |
-+			SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT)))
- 		return IRQ_NONE;
- 
- 	drm_crtc_handle_vblank(&scrtc->crtc);
-@@ -591,7 +593,8 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
- 	/* Acknowledge the interrupt */
- 	regmap_update_bits(tcon->regs, SUN4I_TCON_GINT0_REG,
- 			   SUN4I_TCON_GINT0_VBLANK_INT(0) |
--			   SUN4I_TCON_GINT0_VBLANK_INT(1),
-+			   SUN4I_TCON_GINT0_VBLANK_INT(1) |
-+			   SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT,
- 			   0);
- 
- 	if (engine->ops->vblank_quirk)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 161e09427124..2e0fb9640ed9 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -28,7 +28,11 @@
- 
- #define SUN4I_TCON_GINT0_REG			0x4
- #define SUN4I_TCON_GINT0_VBLANK_ENABLE(pipe)		BIT(31 - (pipe))
-+#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_ENABLE	BIT(27)
-+#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_ENABLE	BIT(26)
- #define SUN4I_TCON_GINT0_VBLANK_INT(pipe)		BIT(15 - (pipe))
-+#define SUN4I_TCON_GINT0_TCON0_TRI_FINISH_INT		BIT(11)
-+#define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_INT		BIT(10)
- 
- #define SUN4I_TCON_GINT1_REG			0x8
- #define SUN4I_TCON_FRM_CTL_REG			0x10
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+new file mode 100644
+index 000000000000..6a6cf5de08b0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/sunxi/sun6i-dsi.txt
+@@ -0,0 +1,93 @@
++Allwinner A31 DSI Encoder
++=========================
++
++The DSI pipeline consists of two separate blocks: the DSI controller
++itself, and its associated D-PHY.
++
++DSI Encoder
++-----------
++
++The DSI Encoder generates the DSI signal from the TCON's.
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun6i-a31-mipi-dsi
++  - reg: base address and size of memory-mapped region
++  - interrupts: interrupt associated to this IP
++  - clocks: phandles to the clocks feeding the DSI encoder
++    * bus: the DSI interface clock
++    * mod: the DSI module clock
++  - clock-names: the clock names mentioned above
++  - phys: phandle to the D-PHY
++  - phy-names: must be "dphy"
++  - resets: phandle to the reset controller driving the encoder
++
++  - ports: A ports node with endpoint definitions as defined in
++    Documentation/devicetree/bindings/media/video-interfaces.txt. The
++    first port should be the input endpoint, usually coming from the
++    associated TCON.
++
++Any MIPI-DSI device attached to this should be described according to
++the bindings defined in ../mipi-dsi-bus.txt
++
++D-PHY
++-----
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun6i-a31-mipi-dphy
++  - reg: base address and size of memory-mapped region
++  - clocks: phandles to the clocks feeding the DSI encoder
++    * bus: the DSI interface clock
++    * mod: the DSI module clock
++  - clock-names: the clock names mentioned above
++  - resets: phandle to the reset controller driving the encoder
++
++Example:
++
++dsi0: dsi at 1ca0000 {
++	compatible = "allwinner,sun6i-a31-mipi-dsi";
++	reg = <0x01ca0000 0x1000>;
++	interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++	clocks = <&ccu CLK_BUS_MIPI_DSI>,
++		 <&ccu CLK_DSI_SCLK>;
++	clock-names = "bus", "mod";
++	resets = <&ccu RST_BUS_MIPI_DSI>;
++	phys = <&dphy0>;
++	phy-names = "dphy";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	panel at 0 {
++		compatible = "bananapi,lhr050h41", "ilitek,ili9881c";
++		reg = <0>;
++		power-gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* PB07 */
++		reset-gpios = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL05 */
++		backlight = <&pwm_bl>;
++	};
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			dsi0_in_tcon0: endpoint {
++				remote-endpoint = <&tcon0_out_dsi0>;
++			};
++		};
++	};
++};
++
++dphy0: d-phy at 1ca1000 {
++	compatible = "allwinner,sun6i-a31-mipi-dphy";
++	reg = <0x01ca1000 0x1000>;
++	clocks = <&ccu CLK_BUS_MIPI_DSI>,
++		 <&ccu CLK_DSI_DPHY>;
++	clock-names = "bus", "mod";
++	resets = <&ccu RST_BUS_MIPI_DSI>;
++	#phy-cells = <0>;
++};
 -- 
 git-series 0.9.1
