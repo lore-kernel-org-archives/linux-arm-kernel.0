@@ -1,82 +1,212 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed,  4 Apr 2018 11:57:15 +0200
-Subject: [PATCH v4 7/8] ARM: dts: sun8i: a33: Add the DSI-related nodes
+Date: Wed,  4 Apr 2018 11:57:12 +0200
+Subject: [PATCH v4 4/8] drm/sun4i: Tie the DSI controller in the TCON
 In-Reply-To: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
 References: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
-Message-ID: <970a2e72c8b41235593673f68df2a8b6ef4b9bd8.1522835818.git-series.maxime.ripard@bootlin.com>
+Message-ID: <129f5928113d2ca865bf5269047c2e4ba6fed5e6.1522835818.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A33 has a MIPI-DSI block, along with its D-PHY. Let's add it in order
-to use it in the relevant boards.
+The DSI controller needs a particular interface (CPU aka 8080) with some
+modifications from the TCON in order to run.
+
+Make sure the TCON is able to provide it when we are using the DSI output.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 44 +++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 77 +++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 42 +++++++++++++++++-
+ 2 files changed, 119 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 50eb84fa246a..10e683997760 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -236,6 +236,11 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon0_out_dsi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&dsi_in_tcon0>;
-+					};
- 				};
- 			};
- 		};
-@@ -280,6 +285,45 @@
- 			#io-channel-cells = <0>;
- 		};
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 5f423ed2f01b..08747fc3ee71 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -35,6 +35,7 @@
+ #include "sun4i_lvds.h"
+ #include "sun4i_rgb.h"
+ #include "sun4i_tcon.h"
++#include "sun6i_mipi_dsi.h"
+ #include "sunxi_engine.h"
  
-+		dsi: dsi at 1ca0000 {
-+			compatible = "allwinner,sun6i-a31-mipi-dsi";
-+			reg = <0x01ca0000 0x1000>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_MIPI_DSI>,
-+				 <&ccu CLK_DSI_SCLK>;
-+			clock-names = "bus", "mod";
-+			resets = <&ccu RST_BUS_MIPI_DSI>;
-+			phys = <&dphy>;
-+			phy-names = "dphy";
-+			status = "disabled";
+ static struct drm_connector *sun4i_tcon_get_connector(const struct drm_encoder *encoder)
+@@ -169,6 +170,7 @@ void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
+ 	case DRM_MODE_ENCODER_LVDS:
+ 		is_lvds = true;
+ 		/* Fallthrough */
++	case DRM_MODE_ENCODER_DSI:
+ 	case DRM_MODE_ENCODER_NONE:
+ 		channel = 0;
+ 		break;
+@@ -274,6 +276,71 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+ }
+ 
++static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
++				     struct mipi_dsi_device *device,
++				     const struct drm_display_mode *mode)
++{
++	u8 bpp = mipi_dsi_pixel_format_to_bpp(device->format);
++	u8 lanes = device->lanes;
++	u32 block_space, start_delay;
++	u32 tcon_div;
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++	tcon->dclk_min_div = 4;
++	tcon->dclk_max_div = 127;
 +
-+				port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
++	sun4i_tcon0_mode_set_common(tcon, mode);
 +
-+					dsi_in_tcon0: endpoint {
-+						remote-endpoint = <&tcon0_out_dsi>;
-+					};
-+				};
-+			};
-+		};
++	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
++			   SUN4I_TCON0_CTL_IF_MASK,
++			   SUN4I_TCON0_CTL_IF_8080);
 +
-+		dphy: d-phy at 1ca1000 {
-+			compatible = "allwinner,sun6i-a31-mipi-dphy";
-+			reg = <0x01ca1000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MIPI_DSI>,
-+				 <&ccu CLK_DSI_DPHY>;
-+			clock-names = "bus", "mod";
-+			resets = <&ccu RST_BUS_MIPI_DSI>;
-+			status = "disabled";
-+			#phy-cells = <0>;
-+		};
++	regmap_write(tcon->regs, SUN4I_TCON_ECC_FIFO_REG,
++		     SUN4I_TCON_ECC_FIFO_EN);
 +
- 		fe0: display-frontend at 1e00000 {
- 			compatible = "allwinner,sun8i-a33-display-frontend";
- 			reg = <0x01e00000 0x20000>;
++	regmap_write(tcon->regs, SUN4I_TCON0_CPU_IF_REG,
++		     SUN4I_TCON0_CPU_IF_MODE_DSI |
++		     SUN4I_TCON0_CPU_IF_TRI_FIFO_FLUSH |
++		     SUN4I_TCON0_CPU_IF_TRI_FIFO_EN |
++		     SUN4I_TCON0_CPU_IF_TRI_EN);
++
++	/*
++	 * This looks suspicious, but it works...
++	 *
++	 * The datasheet says that this should be set higher than 20 *
++	 * pixel cycle, but it's not clear what a pixel cycle is.
++	 */
++	regmap_read(tcon->regs, SUN4I_TCON0_DCLK_REG, &tcon_div);
++	tcon_div &= GENMASK(6, 0);
++	block_space = mode->htotal * bpp / (tcon_div * lanes);
++	block_space -= mode->hdisplay + 40;
++
++	regmap_write(tcon->regs, SUN4I_TCON0_CPU_TRI0_REG,
++		     SUN4I_TCON0_CPU_TRI0_BLOCK_SPACE(block_space) |
++		     SUN4I_TCON0_CPU_TRI0_BLOCK_SIZE(mode->hdisplay));
++
++	regmap_write(tcon->regs, SUN4I_TCON0_CPU_TRI1_REG,
++		     SUN4I_TCON0_CPU_TRI1_BLOCK_NUM(mode->vdisplay));
++
++	start_delay = (mode->crtc_vtotal - mode->crtc_vdisplay - 10 - 1);
++	start_delay = start_delay * mode->crtc_htotal * 149;
++	start_delay = start_delay / (mode->crtc_clock / 1000) / 8;
++	regmap_write(tcon->regs, SUN4I_TCON0_CPU_TRI2_REG,
++		     SUN4I_TCON0_CPU_TRI2_TRANS_START_SET(10) |
++		     SUN4I_TCON0_CPU_TRI2_START_DELAY(start_delay));
++
++	/*
++	 * The Allwinner BSP has a comment that the period should be
++	 * the display clock * 15, but uses an hardcoded 3000...
++	 */
++	regmap_write(tcon->regs, SUN4I_TCON_SAFE_PERIOD_REG,
++		     SUN4I_TCON_SAFE_PERIOD_NUM(3000) |
++		     SUN4I_TCON_SAFE_PERIOD_MODE(3));
++
++	/* Enable the output on the pins */
++	regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG,
++		     0xe0000000);
++}
++
+ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
+ 				      const struct drm_encoder *encoder,
+ 				      const struct drm_display_mode *mode)
+@@ -539,7 +606,17 @@ void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
+ 			 const struct drm_encoder *encoder,
+ 			 const struct drm_display_mode *mode)
+ {
++	struct sun6i_dsi *dsi;
++
+ 	switch (encoder->encoder_type) {
++	case DRM_MODE_ENCODER_DSI:
++		/*
++		 * This is not really elegant, but it's the "cleaner"
++		 * way I could think of...
++		 */
++		dsi = encoder_to_sun6i_dsi(encoder);
++		sun4i_tcon0_mode_set_cpu(tcon, dsi->device, mode);
++		break;
+ 	case DRM_MODE_ENCODER_LVDS:
+ 		sun4i_tcon0_mode_set_lvds(tcon, encoder, mode);
+ 		break;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index 2e0fb9640ed9..f6a071cd5a6f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -35,10 +35,25 @@
+ #define SUN4I_TCON_GINT0_TCON0_TRI_COUNTER_INT		BIT(10)
+ 
+ #define SUN4I_TCON_GINT1_REG			0x8
++
+ #define SUN4I_TCON_FRM_CTL_REG			0x10
++#define SUN4I_TCON_FRM_CTL_EN				BIT(31)
++
++#define SUN4I_TCON_FRM_SEED_PR_REG		0x14
++#define SUN4I_TCON_FRM_SEED_PG_REG		0x18
++#define SUN4I_TCON_FRM_SEED_PB_REG		0x1c
++#define SUN4I_TCON_FRM_SEED_LR_REG		0x20
++#define SUN4I_TCON_FRM_SEED_LG_REG		0x24
++#define SUN4I_TCON_FRM_SEED_LB_REG		0x28
++#define SUN4I_TCON_FRM_TBL0_REG			0x2c
++#define SUN4I_TCON_FRM_TBL1_REG			0x30
++#define SUN4I_TCON_FRM_TBL2_REG			0x34
++#define SUN4I_TCON_FRM_TBL3_REG			0x38
+ 
+ #define SUN4I_TCON0_CTL_REG			0x40
+ #define SUN4I_TCON0_CTL_TCON_ENABLE			BIT(31)
++#define SUN4I_TCON0_CTL_IF_MASK				GENMASK(25, 24)
++#define SUN4I_TCON0_CTL_IF_8080				(1 << 24)
+ #define SUN4I_TCON0_CTL_CLK_DELAY_MASK			GENMASK(8, 4)
+ #define SUN4I_TCON0_CTL_CLK_DELAY(delay)		((delay << 4) & SUN4I_TCON0_CTL_CLK_DELAY_MASK)
+ #define SUN4I_TCON0_CTL_SRC_SEL_MASK			GENMASK(2, 0)
+@@ -65,7 +80,14 @@
+ #define SUN4I_TCON0_BASIC3_V_SYNC(height)		(((height) - 1) & 0x7ff)
+ 
+ #define SUN4I_TCON0_HV_IF_REG			0x58
++
+ #define SUN4I_TCON0_CPU_IF_REG			0x60
++#define SUN4I_TCON0_CPU_IF_MODE_MASK			GENMASK(31, 28)
++#define SUN4I_TCON0_CPU_IF_MODE_DSI			(1 << 28)
++#define SUN4I_TCON0_CPU_IF_TRI_FIFO_FLUSH		BIT(16)
++#define SUN4I_TCON0_CPU_IF_TRI_FIFO_EN			BIT(2)
++#define SUN4I_TCON0_CPU_IF_TRI_EN			BIT(0)
++
+ #define SUN4I_TCON0_CPU_WR_REG			0x64
+ #define SUN4I_TCON0_CPU_RD0_REG			0x68
+ #define SUN4I_TCON0_CPU_RDA_REG			0x6c
+@@ -132,6 +154,10 @@
+ 
+ #define SUN4I_TCON1_IO_POL_REG			0xf0
+ #define SUN4I_TCON1_IO_TRI_REG			0xf4
++
++#define SUN4I_TCON_ECC_FIFO_REG			0xf8
++#define SUN4I_TCON_ECC_FIFO_EN				BIT(3)
++
+ #define SUN4I_TCON_CEU_CTL_REG			0x100
+ #define SUN4I_TCON_CEU_MUL_RR_REG		0x110
+ #define SUN4I_TCON_CEU_MUL_RG_REG		0x114
+@@ -148,6 +174,22 @@
+ #define SUN4I_TCON_CEU_RANGE_R_REG		0x140
+ #define SUN4I_TCON_CEU_RANGE_G_REG		0x144
+ #define SUN4I_TCON_CEU_RANGE_B_REG		0x148
++
++#define SUN4I_TCON0_CPU_TRI0_REG		0x160
++#define SUN4I_TCON0_CPU_TRI0_BLOCK_SPACE(space)		((((space) - 1) & 0xfff) << 16)
++#define SUN4I_TCON0_CPU_TRI0_BLOCK_SIZE(size)		(((size) - 1) & 0xfff)
++
++#define SUN4I_TCON0_CPU_TRI1_REG		0x164
++#define SUN4I_TCON0_CPU_TRI1_BLOCK_NUM(num)		(((num) - 1) & 0xffff)
++
++#define SUN4I_TCON0_CPU_TRI2_REG		0x168
++#define SUN4I_TCON0_CPU_TRI2_START_DELAY(delay)		(((delay) & 0xffff) << 16)
++#define SUN4I_TCON0_CPU_TRI2_TRANS_START_SET(set)	((set) & 0xfff)
++
++#define SUN4I_TCON_SAFE_PERIOD_REG		0x1f0
++#define SUN4I_TCON_SAFE_PERIOD_NUM(num)			(((num) & 0xfff) << 16)
++#define SUN4I_TCON_SAFE_PERIOD_MODE(mode)		((mode) & 0x3)
++
+ #define SUN4I_TCON_MUX_CTRL_REG			0x200
+ 
+ #define SUN4I_TCON0_LVDS_ANA0_REG		0x220
 -- 
 git-series 0.9.1
