@@ -1,30 +1,246 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed,  4 Apr 2018 10:04:23 +0200
-Subject: [PATCH v5 5/5] drm/docs: Remove the rcar alpha from the csv file
+Date: Wed,  4 Apr 2018 10:04:21 +0200
+Subject: [PATCH v5 3/5] drm/rcar-du: Convert to the new generic alpha property
 In-Reply-To: <cover.5437f7a0834f12076bc0a4eba52226f28b2e0dda.1522829034.git-series.maxime.ripard@bootlin.com>
 References: <cover.5437f7a0834f12076bc0a4eba52226f28b2e0dda.1522829034.git-series.maxime.ripard@bootlin.com>
-Message-ID: <e0d2cf7e9b111282b9b50f0531cd61a2ed22c407.1522829034.git-series.maxime.ripard@bootlin.com>
+Message-ID: <7f80a2c92d40ccff83e2f9bde0044e4c414fba24.1522829034.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we moved the rcar-du DRM driver has been switched to the generic
-alpha property, remove the former property documentation from the
-deperecated CSV file.
+Now that we have support for per-plane alpha in the core, let's use it.
 
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- Documentation/gpu/kms-properties.csv | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/gpu/drm/rcar-du/rcar_du_drv.h   |  1 +-
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c   |  5 +---
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c | 15 +++------
+ drivers/gpu/drm/rcar-du/rcar_du_plane.h |  2 +-
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c   | 42 ++------------------------
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.h   |  3 +--
+ 6 files changed, 9 insertions(+), 59 deletions(-)
 
-diff --git a/Documentation/gpu/kms-properties.csv b/Documentation/gpu/kms-properties.csv
-index 6b28b014cb7d..07ed22ea3bd6 100644
---- a/Documentation/gpu/kms-properties.csv
-+++ b/Documentation/gpu/kms-properties.csv
-@@ -98,5 +98,4 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
- ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
- ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
- ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
--rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
- ,,"""colorkey""",RANGE,"Min=0, Max=0x01ffffff",Plane,TBD
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.h b/drivers/gpu/drm/rcar-du/rcar_du_drv.h
+index 5c7ec15818c7..131d8e88b06c 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_drv.h
++++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.h
+@@ -87,7 +87,6 @@ struct rcar_du_device {
+ 	struct rcar_du_vsp vsps[RCAR_DU_MAX_VSPS];
+ 
+ 	struct {
+-		struct drm_property *alpha;
+ 		struct drm_property *colorkey;
+ 	} props;
+ 
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_kms.c b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+index ab59d2061e06..f4ac0f884f00 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_kms.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_kms.c
+@@ -407,11 +407,6 @@ static int rcar_du_encoders_init(struct rcar_du_device *rcdu)
+ 
+ static int rcar_du_properties_init(struct rcar_du_device *rcdu)
+ {
+-	rcdu->props.alpha =
+-		drm_property_create_range(rcdu->ddev, 0, "alpha", 0, 255);
+-	if (rcdu->props.alpha == NULL)
+-		return -ENOMEM;
+-
+ 	/*
+ 	 * The color key is expressed as an RGB888 triplet stored in a 32-bit
+ 	 * integer in XRGB8888 format. Bit 24 is used as a flag to disable (0)
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.c b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+index 68556bd9dad2..c20f7ed48c8d 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_plane.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+@@ -423,7 +423,7 @@ static void rcar_du_plane_setup_mode(struct rcar_du_group *rgrp,
+ 		rcar_du_plane_write(rgrp, index, PnALPHAR, PnALPHAR_ABIT_0);
+ 	else
+ 		rcar_du_plane_write(rgrp, index, PnALPHAR,
+-				    PnALPHAR_ABIT_X | state->alpha);
++				    PnALPHAR_ABIT_X | state->state.alpha >> 8);
+ 
+ 	pnmr = PnMR_BM_MD | state->format->pnmr;
+ 
+@@ -692,11 +692,11 @@ static void rcar_du_plane_reset(struct drm_plane *plane)
+ 
+ 	state->hwindex = -1;
+ 	state->source = RCAR_DU_PLANE_MEMORY;
+-	state->alpha = 255;
+ 	state->colorkey = RCAR_DU_COLORKEY_NONE;
+ 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+ 
+ 	plane->state = &state->state;
++	plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
+ 	plane->state->plane = plane;
+ }
+ 
+@@ -708,9 +708,7 @@ static int rcar_du_plane_atomic_set_property(struct drm_plane *plane,
+ 	struct rcar_du_plane_state *rstate = to_rcar_plane_state(state);
+ 	struct rcar_du_device *rcdu = to_rcar_plane(plane)->group->dev;
+ 
+-	if (property == rcdu->props.alpha)
+-		rstate->alpha = val;
+-	else if (property == rcdu->props.colorkey)
++	if (property == rcdu->props.colorkey)
+ 		rstate->colorkey = val;
+ 	else
+ 		return -EINVAL;
+@@ -726,9 +724,7 @@ static int rcar_du_plane_atomic_get_property(struct drm_plane *plane,
+ 		container_of(state, const struct rcar_du_plane_state, state);
+ 	struct rcar_du_device *rcdu = to_rcar_plane(plane)->group->dev;
+ 
+-	if (property == rcdu->props.alpha)
+-		*val = rstate->alpha;
+-	else if (property == rcdu->props.colorkey)
++	if (property == rcdu->props.colorkey)
+ 		*val = rstate->colorkey;
+ 	else
+ 		return -EINVAL;
+@@ -797,10 +793,9 @@ int rcar_du_planes_init(struct rcar_du_group *rgrp)
+ 			continue;
+ 
+ 		drm_object_attach_property(&plane->plane.base,
+-					   rcdu->props.alpha, 255);
+-		drm_object_attach_property(&plane->plane.base,
+ 					   rcdu->props.colorkey,
+ 					   RCAR_DU_COLORKEY_NONE);
++		drm_plane_create_alpha_property(&plane->plane);
+ 		drm_plane_create_zpos_property(&plane->plane, 1, 1, 7);
+ 	}
+ 
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.h b/drivers/gpu/drm/rcar-du/rcar_du_plane.h
+index 890321b4665d..5c19c69e4691 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_plane.h
++++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.h
+@@ -50,7 +50,6 @@ static inline struct rcar_du_plane *to_rcar_plane(struct drm_plane *plane)
+  * @state: base DRM plane state
+  * @format: information about the pixel format used by the plane
+  * @hwindex: 0-based hardware plane index, -1 means unused
+- * @alpha: value of the plane alpha property
+  * @colorkey: value of the plane colorkey property
+  */
+ struct rcar_du_plane_state {
+@@ -60,7 +59,6 @@ struct rcar_du_plane_state {
+ 	int hwindex;
+ 	enum rcar_du_plane_source source;
+ 
+-	unsigned int alpha;
+ 	unsigned int colorkey;
+ };
+ 
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+index 2c260c33840b..b3bec0125696 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+@@ -54,6 +54,7 @@ void rcar_du_vsp_enable(struct rcar_du_crtc *crtc)
+ 	};
+ 	struct rcar_du_plane_state state = {
+ 		.state = {
++			.alpha = DRM_BLEND_ALPHA_OPAQUE,
+ 			.crtc = &crtc->crtc,
+ 			.dst.x1 = 0,
+ 			.dst.y1 = 0,
+@@ -67,7 +68,6 @@ void rcar_du_vsp_enable(struct rcar_du_crtc *crtc)
+ 		},
+ 		.format = rcar_du_format_info(DRM_FORMAT_ARGB8888),
+ 		.source = RCAR_DU_PLANE_VSPD1,
+-		.alpha = 255,
+ 		.colorkey = 0,
+ 	};
+ 
+@@ -173,7 +173,7 @@ static void rcar_du_vsp_plane_setup(struct rcar_du_vsp_plane *plane)
+ 	struct vsp1_du_atomic_config cfg = {
+ 		.pixelformat = 0,
+ 		.pitch = fb->pitches[0],
+-		.alpha = state->alpha,
++		.alpha = state->state.alpha >> 8,
+ 		.zpos = state->state.zpos,
+ 	};
+ 	unsigned int i;
+@@ -335,44 +335,13 @@ static void rcar_du_vsp_plane_reset(struct drm_plane *plane)
+ 	if (state == NULL)
+ 		return;
+ 
+-	state->alpha = 255;
++	state->state.alpha = DRM_BLEND_ALPHA_OPAQUE;
+ 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+ 
+ 	plane->state = &state->state;
+ 	plane->state->plane = plane;
+ }
+ 
+-static int rcar_du_vsp_plane_atomic_set_property(struct drm_plane *plane,
+-	struct drm_plane_state *state, struct drm_property *property,
+-	uint64_t val)
+-{
+-	struct rcar_du_vsp_plane_state *rstate = to_rcar_vsp_plane_state(state);
+-	struct rcar_du_device *rcdu = to_rcar_vsp_plane(plane)->vsp->dev;
+-
+-	if (property == rcdu->props.alpha)
+-		rstate->alpha = val;
+-	else
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+-static int rcar_du_vsp_plane_atomic_get_property(struct drm_plane *plane,
+-	const struct drm_plane_state *state, struct drm_property *property,
+-	uint64_t *val)
+-{
+-	const struct rcar_du_vsp_plane_state *rstate =
+-		container_of(state, const struct rcar_du_vsp_plane_state, state);
+-	struct rcar_du_device *rcdu = to_rcar_vsp_plane(plane)->vsp->dev;
+-
+-	if (property == rcdu->props.alpha)
+-		*val = rstate->alpha;
+-	else
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+ static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
+ 	.update_plane = drm_atomic_helper_update_plane,
+ 	.disable_plane = drm_atomic_helper_disable_plane,
+@@ -380,8 +349,6 @@ static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
+ 	.destroy = drm_plane_cleanup,
+ 	.atomic_duplicate_state = rcar_du_vsp_plane_atomic_duplicate_state,
+ 	.atomic_destroy_state = rcar_du_vsp_plane_atomic_destroy_state,
+-	.atomic_set_property = rcar_du_vsp_plane_atomic_set_property,
+-	.atomic_get_property = rcar_du_vsp_plane_atomic_get_property,
+ };
+ 
+ int rcar_du_vsp_init(struct rcar_du_vsp *vsp, struct device_node *np,
+@@ -438,8 +405,7 @@ int rcar_du_vsp_init(struct rcar_du_vsp *vsp, struct device_node *np,
+ 		if (type == DRM_PLANE_TYPE_PRIMARY)
+ 			continue;
+ 
+-		drm_object_attach_property(&plane->plane.base,
+-					   rcdu->props.alpha, 255);
++		drm_plane_create_alpha_property(&plane->plane);
+ 		drm_plane_create_zpos_property(&plane->plane, 1, 1,
+ 					       vsp->num_planes - 1);
+ 	}
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.h b/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
+index 4c5d7bbce6aa..8a8a25c8c8e8 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
++++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.h
+@@ -44,15 +44,12 @@ static inline struct rcar_du_vsp_plane *to_rcar_vsp_plane(struct drm_plane *p)
+  * @state: base DRM plane state
+  * @format: information about the pixel format used by the plane
+  * @sg_tables: scatter-gather tables for the frame buffer memory
+- * @alpha: value of the plane alpha property
+  */
+ struct rcar_du_vsp_plane_state {
+ 	struct drm_plane_state state;
+ 
+ 	const struct rcar_du_format_info *format;
+ 	struct sg_table sg_tables[3];
+-
+-	unsigned int alpha;
+ };
+ 
+ static inline struct rcar_du_vsp_plane_state *
 -- 
 git-series 0.9.1
