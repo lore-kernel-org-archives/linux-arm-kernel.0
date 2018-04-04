@@ -1,46 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Apr 2018 15:41:19 +0100
-Subject: [PATCH v3 2/4] mfd: add Gateworks System Controller core driver
-In-Reply-To: <20180404131239.GD20869@lunn.ch>
-References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
- <1522250043-8065-3-git-send-email-tharvey@gateworks.com>
- <CAJ+vNU3-gaTcMAzo5wB6oSfE-JQC3NBVRJS5zFMTE-nVpD4F5g@mail.gmail.com>
- <20180403164715.GA5676@lunn.ch>
- <CAJ+vNU31f+iY5LOG6QmdJetb=pPvY_gpKoS+49FSy70U1Ksd8g@mail.gmail.com>
- <20180404131239.GD20869@lunn.ch>
-Message-ID: <20180404144119.GD7691@sirena.org.uk>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 4 Apr 2018 17:34:12 +0200
+Subject: [RFC PATCH 2/2] i2c: at91: provide bus_freq_hz
+In-Reply-To: <20180326111927.16040-2-tudor.ambarus@microchip.com>
+References: <20180326111927.16040-1-tudor.ambarus@microchip.com>
+ <20180326111927.16040-2-tudor.ambarus@microchip.com>
+Message-ID: <20180404153412.GL2574@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2018 at 03:12:39PM +0200, Andrew Lunn wrote:
-> > What about the 'reset' functionality? Is there something in the power
-> > supply API for hooking in a GPIO based power switch (in my case it
-> > would be i2c) as I would think that would be common for ATX supplies?
-> > I didn't see anything in Documentation/power.
+On Mon, Mar 26, 2018 at 02:19:27PM +0300, Tudor Ambarus wrote:
+> The clock-frequency property is not mandatory for the i2c buses. If it's
+> not present in device tree, the buses usually assume that is 100kHZ.
+> There are i2c clients that need to know the clock frequency in order to
+> compute their wake token. Spare the clients of making (wrong) assumptions
+> and provide the bus frequency in adapter.
+> 
+> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-> > This is what led me to the restart handler idea. Ultimately when
-> > someone issues a 'reboot' I would like it to use the GSC to
-> > power-cycle the board.
-
-> I think you end up with the same problem. By the time you need to turn
-> the power supply off, too much of the kernel is shut down to be able
-> to use I2C. And if you are in the middle of an Oops, you have no idea
-> of the current state. Another I2C transaction could be under way etc.
-> All the current reset drivers are pretty much self contained, atomic
-> and use KISS hardware like a GPIO.
-
-> Maybe you best bet is to see if you can find any other I2C PMICs which
-> the kernel supports.
-
-Most systems have a handshake for final power down via asserting signals
-rather than using register writes, the final power down sequence usually
-runs way after software.  There's a few things that don't which just
-unceremoniously cut the power earlier on without completing the full
-power down sequence which for all practical purposes mostly works.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/57136718/attachment.sig>
+> ---
+>  drivers/i2c/busses/i2c-at91.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> index bfd1fdf..d3cd84e 100644
+> --- a/drivers/i2c/busses/i2c-at91.c
+> +++ b/drivers/i2c/busses/i2c-at91.c
+> @@ -1116,6 +1116,7 @@ static int at91_twi_probe(struct platform_device *pdev)
+>  	dev->adapter.quirks = &at91_twi_quirks;
+>  	dev->adapter.dev.parent = dev->dev;
+>  	dev->adapter.nr = pdev->id;
+> +	dev->adapter.bus_freq_hz = bus_clk_rate;
+>  	dev->adapter.timeout = AT91_I2C_TIMEOUT;
+>  	dev->adapter.dev.of_node = pdev->dev.of_node;
+>  
+> -- 
+> 2.9.4
+> 
