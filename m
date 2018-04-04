@@ -1,20 +1,20 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 4 Apr 2018 09:13:01 +0200
-Subject: [PATCH v2 3/6] spi: sun4i: coding style/readability improvements
-In-Reply-To: <20180403152905.1524-4-ssuloev@orpaltech.com>
+Date: Wed, 4 Apr 2018 09:13:26 +0200
+Subject: [PATCH v2 4/6] spi: sun4i: use completion provided by SPI core
+ driver
+In-Reply-To: <20180403152905.1524-5-ssuloev@orpaltech.com>
 References: <20180403152905.1524-1-ssuloev@orpaltech.com>
- <20180403152905.1524-4-ssuloev@orpaltech.com>
-Message-ID: <20180404071301.hr3t225bt3dstikr@flea>
+ <20180403152905.1524-5-ssuloev@orpaltech.com>
+Message-ID: <20180404071326.6mcaal77mzgfnhuy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 06:29:02PM +0300, Sergey Suloev wrote:
-> Minor changes to fulfill the coding style and
-> improve the readability.
+On Tue, Apr 03, 2018 at 06:29:03PM +0300, Sergey Suloev wrote:
+> As long as the completion already provided by the SPI core
+> then there is no need to waste extra-memory on this.
+> Also a waiting function was added to avoid code duplication.
 
-Again, this is a very subjective statement. Overall, I'm not convinced
-by the idea of moving code around and shuffling variables assignments
-just for the sake of it.
+This should also be split in two parts.
 
 Maxime
 
@@ -28,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/65893e53/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/d615ec4b/attachment.sig>
