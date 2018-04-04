@@ -1,11 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 04 Apr 2018 12:23:16 +0300
-Subject: [PATCH v5 2/5] drm/atmel-hclcdc: Convert to the new generic alpha
- property
-In-Reply-To: <393827d6161e144a9182f07beab53cc1e68be62f.1522829034.git-series.maxime.ripard@bootlin.com>
+Date: Wed, 04 Apr 2018 12:25:32 +0300
+Subject: [PATCH v5 5/5] drm/docs: Remove the rcar alpha from the csv file
+In-Reply-To: <e0d2cf7e9b111282b9b50f0531cd61a2ed22c407.1522829034.git-series.maxime.ripard@bootlin.com>
 References: <cover.5437f7a0834f12076bc0a4eba52226f28b2e0dda.1522829034.git-series.maxime.ripard@bootlin.com>
- <393827d6161e144a9182f07beab53cc1e68be62f.1522829034.git-series.maxime.ripard@bootlin.com>
-Message-ID: <1787745.3vzAnH0I27@avalon>
+ <e0d2cf7e9b111282b9b50f0531cd61a2ed22c407.1522829034.git-series.maxime.ripard@bootlin.com>
+Message-ID: <9178266.Jiyqifsqpg@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,238 +12,30 @@ Hi Maxime,
 
 Thank you for the patch.
 
-On Wednesday, 4 April 2018 11:04:20 EEST Maxime Ripard wrote:
-> Now that we have support for per-plane alpha in the core, let's use it.
+On Wednesday, 4 April 2018 11:04:23 EEST Maxime Ripard wrote:
+> Now that we moved the rcar-du DRM driver has been switched to the generic
+> alpha property, remove the former property documentation from the
+> deperecated CSV file.
 > 
-> Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
 > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
 > ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 13 +---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 89 ++----------------
->  2 files changed, 14 insertions(+), 88 deletions(-)
+>  Documentation/gpu/kms-properties.csv | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h index
-> ab32d5b268d2..60c937f42114 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-> @@ -299,7 +299,6 @@ struct atmel_hlcdc_layer {
->  struct atmel_hlcdc_plane {
->  	struct drm_plane base;
->  	struct atmel_hlcdc_layer layer;
-> -	struct atmel_hlcdc_plane_properties *properties;
->  };
-> 
->  static inline struct atmel_hlcdc_plane *
-> @@ -346,18 +345,6 @@ struct atmel_hlcdc_dc_desc {
->  };
-> 
->  /**
-> - * Atmel HLCDC Plane properties.
-> - *
-> - * This structure stores plane property definitions.
-> - *
-> - * @alpha: alpha blending (or transparency) property
-> - * @rotation: rotation property
-> - */
-> -struct atmel_hlcdc_plane_properties {
-> -	struct drm_property *alpha;
-> -};
-> -
-> -/**
->   * Atmel HLCDC Display Controller.
->   *
->   * @desc: HLCDC Display Controller description
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c index
-> e18800ed7cd1..73c875db45f4 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-> @@ -31,7 +31,6 @@
->   * @src_y: y buffer position
->   * @src_w: buffer width
->   * @src_h: buffer height
-> - * @alpha: alpha blending of the plane
->   * @disc_x: x discard position
->   * @disc_y: y discard position
->   * @disc_w: discard width
-> @@ -54,8 +53,6 @@ struct atmel_hlcdc_plane_state {
->  	uint32_t src_w;
->  	uint32_t src_h;
-> 
-> -	u8 alpha;
-> -
->  	int disc_x;
->  	int disc_y;
->  	int disc_w;
-> @@ -385,7 +382,7 @@ atmel_hlcdc_plane_update_general_settings(struct
-> atmel_hlcdc_plane *plane, cfg |= ATMEL_HLCDC_LAYER_LAEN;
->  		else
->  			cfg |= ATMEL_HLCDC_LAYER_GAEN |
-> -			       ATMEL_HLCDC_LAYER_GA(state->alpha);
-> +			       ATMEL_HLCDC_LAYER_GA(state->base.alpha >> 8);
->  	}
-> 
->  	if (state->disc_h && state->disc_w)
-> @@ -553,7 +550,7 @@ atmel_hlcdc_plane_prepare_disc_area(struct
-> drm_crtc_state *c_state)
-> 
->  		if (!ovl_s->fb ||
->  		    ovl_s->fb->format->has_alpha ||
-> -		    ovl_state->alpha != 255)
-> +		    ovl_s->alpha != DRM_BLEND_ALPHA_OPAQUE)
->  			continue;
-> 
->  		/* TODO: implement a smarter hidden area detection */
-> @@ -829,51 +826,18 @@ static void atmel_hlcdc_plane_destroy(struct drm_plane
-> *p) drm_plane_cleanup(p);
->  }
-> 
-> -static int atmel_hlcdc_plane_atomic_set_property(struct drm_plane *p,
-> -						 struct drm_plane_state *s,
-> -						 struct drm_property *property,
-> -						 uint64_t val)
-> -{
-> -	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
-> -	struct atmel_hlcdc_plane_properties *props = plane->properties;
-> -	struct atmel_hlcdc_plane_state *state =
-> -			drm_plane_state_to_atmel_hlcdc_plane_state(s);
-> -
-> -	if (property == props->alpha)
-> -		state->alpha = val;
-> -	else
-> -		return -EINVAL;
-> -
-> -	return 0;
-> -}
-> -
-> -static int atmel_hlcdc_plane_atomic_get_property(struct drm_plane *p,
-> -					const struct drm_plane_state *s,
-> -					struct drm_property *property,
-> -					uint64_t *val)
-> -{
-> -	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
-> -	struct atmel_hlcdc_plane_properties *props = plane->properties;
-> -	const struct atmel_hlcdc_plane_state *state =
-> -		container_of(s, const struct atmel_hlcdc_plane_state, base);
-> -
-> -	if (property == props->alpha)
-> -		*val = state->alpha;
-> -	else
-> -		return -EINVAL;
-> -
-> -	return 0;
-> -}
-> -
-> -static int atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane
-> *plane, -				struct atmel_hlcdc_plane_properties *props)
-> +static int atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane
-> *plane) {
->  	const struct atmel_hlcdc_layer_desc *desc = plane->layer.desc;
-> 
->  	if (desc->type == ATMEL_HLCDC_OVERLAY_LAYER ||
-> -	    desc->type == ATMEL_HLCDC_CURSOR_LAYER)
-> -		drm_object_attach_property(&plane->base.base,
-> -					   props->alpha, 255);
-> +	    desc->type == ATMEL_HLCDC_CURSOR_LAYER) {
-> +		int ret;
-> +
-> +		ret = drm_plane_create_alpha_property(&plane->base);
-> +		if (ret)
-> +			return ret;
-> +	}
-> 
->  	if (desc->layout.xstride && desc->layout.pstride) {
->  		int ret;
-> @@ -988,8 +952,8 @@ static void atmel_hlcdc_plane_reset(struct drm_plane *p)
-> return;
->  		}
-> 
-> -		state->alpha = 255;
->  		p->state = &state->base;
-> +		p->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
->  		p->state->plane = p;
->  	}
->  }
-> @@ -1042,13 +1006,10 @@ static const struct drm_plane_funcs
-> layer_plane_funcs = { .reset = atmel_hlcdc_plane_reset,
->  	.atomic_duplicate_state = atmel_hlcdc_plane_atomic_duplicate_state,
->  	.atomic_destroy_state = atmel_hlcdc_plane_atomic_destroy_state,
-> -	.atomic_set_property = atmel_hlcdc_plane_atomic_set_property,
-> -	.atomic_get_property = atmel_hlcdc_plane_atomic_get_property,
->  };
-> 
->  static int atmel_hlcdc_plane_create(struct drm_device *dev,
-> -				    const struct atmel_hlcdc_layer_desc *desc,
-> -				    struct atmel_hlcdc_plane_properties *props)
-> +				    const struct atmel_hlcdc_layer_desc *desc)
->  {
->  	struct atmel_hlcdc_dc *dc = dev->dev_private;
->  	struct atmel_hlcdc_plane *plane;
-> @@ -1060,7 +1021,6 @@ static int atmel_hlcdc_plane_create(struct drm_device
-> *dev, return -ENOMEM;
-> 
->  	atmel_hlcdc_layer_init(&plane->layer, desc, dc->hlcdc->regmap);
-> -	plane->properties = props;
-> 
->  	if (desc->type == ATMEL_HLCDC_BASE_LAYER)
->  		type = DRM_PLANE_TYPE_PRIMARY;
-> @@ -1081,7 +1041,7 @@ static int atmel_hlcdc_plane_create(struct drm_device
-> *dev, &atmel_hlcdc_layer_plane_helper_funcs);
-> 
->  	/* Set default property values*/
-> -	ret = atmel_hlcdc_plane_init_properties(plane, props);
-> +	ret = atmel_hlcdc_plane_init_properties(plane);
->  	if (ret)
->  		return ret;
-> 
-> @@ -1090,34 +1050,13 @@ static int atmel_hlcdc_plane_create(struct
-> drm_device *dev, return 0;
->  }
-> 
-> -static struct atmel_hlcdc_plane_properties *
-> -atmel_hlcdc_plane_create_properties(struct drm_device *dev)
-> -{
-> -	struct atmel_hlcdc_plane_properties *props;
-> -
-> -	props = devm_kzalloc(dev->dev, sizeof(*props), GFP_KERNEL);
-> -	if (!props)
-> -		return ERR_PTR(-ENOMEM);
-> -
-> -	props->alpha = drm_property_create_range(dev, 0, "alpha", 0, 255);
-> -	if (!props->alpha)
-> -		return ERR_PTR(-ENOMEM);
-> -
-> -	return props;
-> -}
-> -
->  int atmel_hlcdc_create_planes(struct drm_device *dev)
->  {
->  	struct atmel_hlcdc_dc *dc = dev->dev_private;
-> -	struct atmel_hlcdc_plane_properties *props;
->  	const struct atmel_hlcdc_layer_desc *descs = dc->desc->layers;
->  	int nlayers = dc->desc->nlayers;
->  	int i, ret;
-> 
-> -	props = atmel_hlcdc_plane_create_properties(dev);
-> -	if (IS_ERR(props))
-> -		return PTR_ERR(props);
-> -
->  	dc->dscrpool = dmam_pool_create("atmel-hlcdc-dscr", dev->dev,
->  				sizeof(struct atmel_hlcdc_dma_channel_dscr),
->  				sizeof(u64), 0);
-> @@ -1130,7 +1069,7 @@ int atmel_hlcdc_create_planes(struct drm_device *dev)
->  		    descs[i].type != ATMEL_HLCDC_CURSOR_LAYER)
->  			continue;
-> 
-> -		ret = atmel_hlcdc_plane_create(dev, &descs[i], props);
-> +		ret = atmel_hlcdc_plane_create(dev, &descs[i]);
->  		if (ret)
->  			return ret;
->  	}
+> diff --git a/Documentation/gpu/kms-properties.csv
+> b/Documentation/gpu/kms-properties.csv index 6b28b014cb7d..07ed22ea3bd6
+> 100644
+> --- a/Documentation/gpu/kms-properties.csv
+> +++ b/Documentation/gpu/kms-properties.csv
+> @@ -98,5 +98,4 @@ radeon,DVI-I,?coherent?,RANGE,"Min=0, Max=1",Connector,TBD
+> ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
+>  ,Audio,?audio?,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
+>  ,FMT Dithering,?dither?,ENUM,"{ ""off"", ""on"" }",Connector,TBD
+> -rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
+>  ,,"""colorkey""",RANGE,"Min=0, Max=0x01ffffff",Plane,TBD
 
 
 -- 
