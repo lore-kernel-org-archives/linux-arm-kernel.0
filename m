@@ -1,35 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 4 Apr 2018 15:12:39 +0200
-Subject: [PATCH v3 2/4] mfd: add Gateworks System Controller core driver
-In-Reply-To: <CAJ+vNU31f+iY5LOG6QmdJetb=pPvY_gpKoS+49FSy70U1Ksd8g@mail.gmail.com>
-References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
- <1522250043-8065-3-git-send-email-tharvey@gateworks.com>
- <CAJ+vNU3-gaTcMAzo5wB6oSfE-JQC3NBVRJS5zFMTE-nVpD4F5g@mail.gmail.com>
- <20180403164715.GA5676@lunn.ch>
- <CAJ+vNU31f+iY5LOG6QmdJetb=pPvY_gpKoS+49FSy70U1Ksd8g@mail.gmail.com>
-Message-ID: <20180404131239.GD20869@lunn.ch>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed,  4 Apr 2018 15:14:21 +0200
+Subject: [PATCH 4.18] ARM: dts: BCM5301X: Switch Luxul XWC-1000 to the new
+ fixed partitions syntax
+Message-ID: <20180404131421.28651-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What about the 'reset' functionality? Is there something in the power
-> supply API for hooking in a GPIO based power switch (in my case it
-> would be i2c) as I would think that would be common for ATX supplies?
-> I didn't see anything in Documentation/power.
-> 
-> This is what led me to the restart handler idea. Ultimately when
-> someone issues a 'reboot' I would like it to use the GSC to
-> power-cycle the board.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Hi Tim
+This new syntax is slightly better designed & uses "compatible" string.
+For details see Documentation/devicetree/bindings/mtd/partition.txt .
 
-I think you end up with the same problem. By the time you need to turn
-the power supply off, too much of the kernel is shut down to be able
-to use I2C. And if you are in the middle of an Oops, you have no idea
-of the current state. Another I2C transaction could be under way etc.
-All the current reset drivers are pretty much self contained, atomic
-and use KISS hardware like a GPIO.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-Maybe you best bet is to see if you can find any other I2C PMICs which
-the kernel supports.
-
-    Andrew
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+index 50d65d8fbd9a..5efb6f31164d 100644
+--- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
++++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+@@ -26,9 +26,15 @@
+ 
+ 	nand: nand at 18028000 {
+ 		nandcs at 0 {
+-			partition at 0 {
+-				label = "ubi";
+-				reg = <0x00000000 0x08000000>;
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				partition at 0 {
++					label = "ubi";
++					reg = <0x00000000 0x08000000>;
++				};
+ 			};
+ 		};
+ 	};
+-- 
+2.11.0
