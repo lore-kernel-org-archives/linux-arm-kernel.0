@@ -1,56 +1,73 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  4 Apr 2018 13:51:47 +0200
-Subject: [PATCH] ARM: s3c24xx: mini2440: use device properties for at24 eeprom
-Message-ID: <20180404115147.16448-1-brgl@bgdev.pl>
+From: Michal.Kalderon@cavium.com (Kalderon, Michal)
+Date: Wed, 4 Apr 2018 11:54:22 +0000
+Subject: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
+ weakly-ordered archs #2
+In-Reply-To: <20180403200348.GB21167@ziepe.ca>
+References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
+ <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
+ <ac46b4e4-7e6c-c15f-06eb-01b1e4893d50@codeaurora.org>
+ <CY1PR0701MB201215C9F38E8760732B595088A50@CY1PR0701MB2012.namprd07.prod.outlook.com>
+ <20180403200348.GB21167@ziepe.ca>
+Message-ID: <CY1PR0701MB201281968E401A66825498DB88A40@CY1PR0701MB2012.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
+> From: Jason Gunthorpe [mailto:jgg at ziepe.ca]
+> Sent: Tuesday, April 03, 2018 11:04 PM
+> 
+> On Tue, Apr 03, 2018 at 07:42:28AM +0000, Kalderon, Michal wrote:
+> > > From: Sinan Kaya [mailto:okaya at codeaurora.org]
+> > > Sent: Tuesday, April 03, 2018 5:30 AM
+> > > To: linux-rdma at vger.kernel.org; timur at codeaurora.org;
+> > > sulrich at codeaurora.org
+> > > Cc: linux-arm-msm at vger.kernel.org;
+> > > linux-arm-kernel at lists.infradead.org;
+> > > Kalderon, Michal <Michal.Kalderon@cavium.com>; Elior, Ariel
+> > > <Ariel.Elior@cavium.com>; Doug Ledford <dledford@redhat.com>; Jason
+> > > Gunthorpe <jgg@ziepe.ca>; linux-kernel at vger.kernel.org
+> > > Subject: Re: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers
+> > > on weakly-ordered archs #2
+> > >
+> > > On 3/22/2018 12:26 PM, Sinan Kaya wrote:
+> > > > @@ -860,7 +860,7 @@ static void doorbell_cq(struct qedr_cq *cq,
+> > > > u32
+> > > cons, u8 flags)
+> > > >  	wmb();
+> > > >  	cq->db.data.agg_flags = flags;
+> > > >  	cq->db.data.value = cpu_to_le32(cons);
+> > > > -	writeq(cq->db.raw, cq->db_addr);
+> > > > +	writeq_relaxed(cq->db.raw, cq->db_addr);
+> > >
+> > > Given the direction to get rid of wmb() in front of writeX()
+> > > functions, I have been reviewing this code. Under normal
+> > > circumstances, I can get rid of all
+> > > wmb() as follows.
+> > >
+> > > However, I started having my doubts now. Are these wmb() used as a
+> > > SMP barrier too?
+> > > I can't find any smp_Xmb() in drivers/infiniband/hw/qedr directory.
+> >
+> > Your doubts are in place. You initial patch series modified writel to
+> > writel_relaxed Simply removing the wmb is dangerous. The wmb before
+> > writel are used to make sure the HW observes the changes in memory
+> > before we trigger the doorbell. Smp barriers here wouldn't suffice, as
+> > on a single processor. we still need to make sure memory is updated and
+> not remained in cache when HW accesses it.
+> > Reviewing the qedr barriers, I can find places where this may have not
+> > been necessary, But definitely you can't simply remove this wmb barriers.
+> 
+> As Sinan said, the consensus is that wmb();writel(); is redundant if the only
+> purpose of the wmb is to order DMA and system memory.
+> 
+> So can you review these patches on that basis please? Is the WMB doing
+> something else, eg SMP related? If yes, please send a patch adding
+> appropriate comments.
 
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+Thanks Sinan and Jason for the references and explanations, I've reviewed the wmb
+usages in qedr and am about to send a patch that replaces two of them with smp_wmb
+and completely removes two of them that given your explanation, turned out to be redundant,
+thanks.
 
-Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
----
- arch/arm/mach-s3c24xx/mach-mini2440.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index 95753e0bc073..f9fc1f8d2b28 100644
---- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-+++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -20,7 +20,7 @@
- #include <linux/serial_core.h>
- #include <linux/serial_s3c.h>
- #include <linux/dm9000.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/platform_device.h>
- #include <linux/gpio_keys.h>
- #include <linux/i2c.h>
-@@ -481,15 +481,15 @@ static struct platform_device mini2440_audio = {
- /*
-  * I2C devices
-  */
--static struct at24_platform_data at24c08 = {
--	.byte_len	= SZ_8K / 8,
--	.page_size	= 16,
-+static const struct property_entry mini2440_at24_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 16),
-+	{ }
- };
- 
- static struct i2c_board_info mini2440_i2c_devs[] __initdata = {
- 	{
- 		I2C_BOARD_INFO("24c08", 0x50),
--		.platform_data = &at24c08,
-+		.properties = mini2440_at24_properties,
- 	},
- };
- 
--- 
-2.16.3
+> 
+> Thanks,
+> Jason
