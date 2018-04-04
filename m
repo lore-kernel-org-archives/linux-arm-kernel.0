@@ -1,30 +1,31 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 04 Apr 2018 21:44:53 +0200
-Subject: [RESEND PATCH] ARM: pxa: stargate2: use device properties for
- at24 eeprom
-In-Reply-To: <20180404114706.15856-1-brgl@bgdev.pl> (Bartosz Golaszewski's
- message of "Wed, 4 Apr 2018 13:47:06 +0200")
-References: <20180404114706.15856-1-brgl@bgdev.pl>
-Message-ID: <878ta24uyy.fsf@belgarion.home>
+Date: Wed, 04 Apr 2018 21:49:26 +0200
+Subject: [PATCH 00/15] ARM: pxa: switch to DMA slave maps
+In-Reply-To: <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
+ (Ulf Hansson's message of "Tue, 3 Apr 2018 17:08:42 +0200")
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
+Message-ID: <874lkq4urd.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartosz Golaszewski <brgl@bgdev.pl> writes:
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> We want to work towards phasing out the at24_platform_data structure.
-> There are few users and its contents can be represented using generic
-> device properties. Using device properties only will allow us to
-> significantly simplify the at24 configuration code.
+> On 2 April 2018 at 16:26, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>> Hi,
+>>
+>> This serie is aimed at removing the dmaengine slave compat use, and transfer
+>> knowledge of the DMA requestors into architecture code.
+>> As this looks like a patch bomb, each maintainer expressing for his tree either
+>> an Ack or "I want to take through my tree" will be spared in the next iterations
+>> of this serie.
 >
-> Remove the at24_platform_data structure and replace it with an array
-> of property entries. Drop the byte_len/size property, as the model name
-> already implies the EEPROM's size.
-Hi Bartosz,
-
-I'd like a little explanation for the last sentence. Are you implying that
-ac24.c is using the "type" field, and if so could you point me to the correct
-line, because I was under the impression a property called "size" is used for
-byte_len value ... ?
+> Perhaps an option is to send this hole series as PR for 3.17 rc1, that
+> would removed some churns and make this faster/easier? Well, if you
+> receive the needed acks of course.
+For 3.17-rc1 it looks a bit optimistic with the review time ... If I have all
+acks, I'll queue it into my pxa tree. If at least one maintainer withholds his
+ack, the end of the serie (phase 3) won't be applied until it is sorted out.
 
 Cheers.
 
