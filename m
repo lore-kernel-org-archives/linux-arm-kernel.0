@@ -1,29 +1,48 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 4 Apr 2018 10:48:02 +0100
-Subject: [PATCH V2 1/2] cpufreq: scmi: Don't validate the frequency table
- twice
-In-Reply-To: <442ecfd0a5bddf32c912c449b072d8a0139318fc.1522749887.git.viresh.kumar@linaro.org>
-References: <cover.1522749887.git.viresh.kumar@linaro.org>
- <442ecfd0a5bddf32c912c449b072d8a0139318fc.1522749887.git.viresh.kumar@linaro.org>
-Message-ID: <5ce48bce-4fcf-1e0a-6b78-f588fbf7e4a5@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed,  4 Apr 2018 11:57:13 +0200
+Subject: [PATCH v4 5/8] dt-bindings: panel: Add the Ilitek ILI9881c panel
+ documentation
+In-Reply-To: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
+References: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
+Message-ID: <69e479c147d28ada0adcf435783e839a3506216c.1522835818.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The LHR050H41 from BananaPi is a 1280x700 4-lanes DSI panel based on the
+ILI9881c from Ilitek.
 
-(I have exact patches ready :), was on vacation)
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
 
-On 03/04/18 11:07, Viresh Kumar wrote:
-> The cpufreq core is already validating the CPU frequency table after
-> calling the ->init() callback of the cpufreq drivers and the drivers
-> don't need to do the same anymore. Though they need to set the
-> policy->freq_table field directly from the ->init() callback now.
-> 
-> Stop validating the frequency table from scmi driver.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
+diff --git a/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt b/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
+new file mode 100644
+index 000000000000..df05e8bb4851
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/ilitek,ili9881c.txt
+@@ -0,0 +1,20 @@
++Ilitek ILI9881c based MIPI-DSI panels
++
++Required properties:
++  - compatible: must be "ilitek,ili9881c" and one of:
++    * "bananapi,lhr050h41"
++  - reg: DSI virtual channel used by that screen
++  - power-gpios: a GPIO phandle for the power pin
++  - reset-gpios: a GPIO phandle for the reset pin
++
++Optional properties:
++  - backlight: phandle to the backlight used
++
++Example:
++panel at 0 {
++	compatible = "bananapi,lhr050h41", "ilitek,ili9881c";
++	reg = <0>;
++	power-gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>; /* PB07 */
++	reset-gpios = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL05 */
++	backlight = <&pwm_bl>;
++};
 -- 
-Regards,
-Sudeep
+git-series 0.9.1
