@@ -1,73 +1,57 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 4 Apr 2018 15:43:17 +0200
-Subject: [PATCH] sched: support dynamiQ cluster
-In-Reply-To: <e8e6e7d0-7744-1dab-7b24-b7ff37df60c8@arm.com>
-References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
- <20180329125324.GR4589@e105550-lin.cambridge.arm.com>
- <CAKfTPtD4skW_3SAk--vBEC5-m1Ua48bjOQYS0pDqW3nPSpsENg@mail.gmail.com>
- <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
- <CAKfTPtDy2uUj4amA9MARUz9qS=+urwV2edyQn+fW70hkN+CgoQ@mail.gmail.com>
- <e8e6e7d0-7744-1dab-7b24-b7ff37df60c8@arm.com>
-Message-ID: <CAKfTPtCQayuu5-84931ZxzXV1-roV_CfRd_5wXG1oxOEUZmZgw@mail.gmail.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Wed, 4 Apr 2018 15:49:16 +0200
+Subject: [PATCH v5 01/13] ARM: move cputype definitions into another file
+In-Reply-To: <4ba0f1c4-a52a-b9f5-67ac-bf348a13228a@gmail.com>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-2-mylene.josserand@bootlin.com>
+ <CAGb2v64GL=1UcYs1tFp-mS07vbHBao82SEhyzUrUHB++2-EKBg@mail.gmail.com>
+ <4ba0f1c4-a52a-b9f5-67ac-bf348a13228a@gmail.com>
+Message-ID: <20180404154916.66870e98@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2018 at 12:44, Valentin Schneider <valentin.schneider@arm.com> wrote:
-> Hi,
->
-> On 03/04/18 13:17, Vincent Guittot wrote:
->> Hi Valentin,
->>
-> [...]
->>>
->>> I believe ASYM_PACKING behaves better here because the workload is only
->>> sysbench threads. As stated above, since task utilization is disregarded, I
->>
->> It behaves better because it doesn't wait for the task's utilization
->> to reach a level before assuming the task needs high compute capacity.
->> The utilization gives an idea of the running time of the task not the
->> performance level that is needed
->>
->
-> That's my point actually. ASYM_PACKING disregards utilization and moves those
-> threads to the big cores ASAP, which is good here because it's just sysbench
-> threads.
->
-> What I meant was that if the task composition changes, IOW we mix "small"
-> tasks (e.g. periodic stuff) and "big" tasks (performance-sensitive stuff like
-> sysbench threads), we shouldn't assume all of those require to run on a big
-> CPU. The thing is, ASYM_PACKING can't make the difference between those, so
+Hello Florian,
 
-That's the 1st point where I tend to disagree: why big cores are only
-for long running task and periodic stuff can't need to run on big
-cores to get max compute capacity ?
-You make the assumption that only long running tasks need high compute
-capacity. This patch wants to always provide max compute capacity to
-the system and not only long running task
+On Tue, 3 Apr 2018 12:56:30 -0700
+Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-> it'll all come down to which task spawned first.
->
-> Furthermore, ASYM_PACKING will forcefully move tasks via active balance
-> regardless of the imbalance as long as a big CPU is idle.
->
-> So we could have a scenario where loads of "small" tasks spawn, and they all
-> get moved to a big CPU until they're all full (because they're periodic tasks
-> so the big CPUs will eventually be idle and will pull another task as long as
-> they get some idle time).
->
-> Then, before the load tracking signals of those tasks ramp up high enough
-> that the load balancer would try to move those to LITTLE CPUs, some "big"
-> tasks spawn. They get scheduled on LITTLE CPUs, and now the system will look
-> balanced so nothing will be done.
+> On 04/02/2018 11:52 PM, Chen-Yu Tsai wrote:
+> > On Tue, Apr 3, 2018 at 2:18 PM, Myl?ne Josserand
+> > <mylene.josserand@bootlin.com> wrote:  
+> >> To add the support for SMP on sun8i-a83t, we will use some
+> >> definitions in an assembly file so move definitions into
+> >> another file to separate C functions and macro defintions.  
+> > 
+> > Instead of moving the definitions, you could guard all the C
+> > stuff in "#ifndef __ASSEMBLY__". AFAIK a few header files do that.  
+> 
+> Which is effectively what this patch does (still waiting for an ACK):
+> 
+> https://patchwork.kernel.org/patch/10239855/
 
-As explained above, as long as the big CPUs are always used,I don't
-think it's a problem. What is a problem is if a task stays on a little
-CPU whereas a big CPU is idle because we can provide more throughput
+Thanks for pointing out this existing patch.
+I will use it for my next series and add my Tested-by (once tested, of
+course).
 
->
->
-> I acknowledge this all sounds convoluted but I hope it highlights what I
-> think could go wrong with ASYM_PACKING on asymmetric systems.
->
-> Regards,
-> Valentin
+Best regards,
+
+-- 
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
+
+> 
+> > 
+> > ChenYu
+> >   
+> >> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> >> ---
+> >>  arch/arm/include/asm/cputype.h     | 94 +-----------------------------------
+> >>  arch/arm/include/asm/cputype_def.h | 98 ++++++++++++++++++++++++++++++++++++++  
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >   
+> 
+> 
