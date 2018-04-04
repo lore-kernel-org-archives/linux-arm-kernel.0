@@ -1,43 +1,41 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 4 Apr 2018 11:21:02 -0500
-Subject: [PATCH v8 25/42] ARM: davinci: dm644x: add new clock init using
- common clock framework
-In-Reply-To: <333f49c7-bafd-8e2d-65e9-7d1aff4836de@ti.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-26-git-send-email-david@lechnology.com>
- <333f49c7-bafd-8e2d-65e9-7d1aff4836de@ti.com>
-Message-ID: <b44de0a4-776d-153c-54e3-ce6ddc4f074f@lechnology.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 4 Apr 2018 09:57:42 -0700
+Subject: [v3,4/4] watchdog: add Gateworks System Controller support
+In-Reply-To: <20180402163242.GC14165@lunn.ch>
+References: <1522250043-8065-5-git-send-email-tharvey@gateworks.com>
+ <20180330010757.GA12896@roeck-us.net>
+ <CAJ+vNU3ARKLK5AcssEP-_P8AmwnAnS8VtAEO1ppwum2jpCqAYQ@mail.gmail.com>
+ <20180330181954.GA17580@roeck-us.net>
+ <CAJ+vNU1f+SH16hs3heMA_A2KcbzbXXmJtPxi0uiL4+4tNWgYoQ@mail.gmail.com>
+ <20180402163242.GC14165@lunn.ch>
+Message-ID: <CAJ+vNU2RxHngXa00=zx84ifJ6wWh=vN84shRsT5sWYG1G74zeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2018 05:26 AM, Sekhar Nori wrote:
-> On Friday 16 March 2018 08:22 AM, David Lechner wrote:
->> +static struct resource dm644x_pll1_resources[] = {
->> +	{
->> +		.start	= DAVINCI_PLL1_BASE,
->> +		.end	= DAVINCI_PLL1_BASE + SZ_4K - 1,
-> 
-> The .end should be DAVINCI_PLL1_BASE + SZ_1K - 1, otherwise it prevents
-> PLL2 from getting registered.
-> 
->> +		.flags	= IORESOURCE_MEM,
->> +	},
->> +};
->> +
->> +static struct platform_device dm644x_pll1_device = {
->> +	.name		= "dm644x-pll1",
->> +	.id		= -1,
->> +	.resource	= dm644x_pll1_resources,
->> +	.num_resources	= ARRAY_SIZE(dm644x_pll1_resources),
->> +};
->> +
->> +static struct resource dm644x_pll2_resources[] = {
->> +	{
->> +		.start	= DAVINCI_PLL2_BASE,
->> +		.end	= DAVINCI_PLL2_BASE + SZ_4K - 1,
-> 
-> And this too should be fixed, else it prevents the PSC from getting
-> registered.
+On Mon, Apr 2, 2018 at 9:32 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> The 'use case' we have been using this in for a couple years is that
+>> users who want to use this watchdog will enable it externally (we have
+>> a command in the bootloader) and if enabled the kernel driver (that
+>> I'm proposing here which we've been using out-of-tree) will register
+>> the watchdog device and the userspace watchdog process can open the
+>> device and start tickling it. If the watchdog is never enabled (or
+>> disabled via the bootloader command) the kernel driver fails to probe
+>> and the SoC's watchdog can be used.
+>
+> Hi Tim
+>
+> Is there any reason not to give the user the choice to use both
+> watchdogs? Normally you write drivers to expose the hardware, and then
+> let the users choice if they want to use it.
+>
 
-Thanks. I've checked and this needs to be fixed for dm646x, dm355 and
-dm365 as well.
+Andrew,
+
+I don't know what value the SoC watchdog has if you have the GSC
+watchdog available that can power cycle the board but I would agree
+normally you would expose all of them. I suppose this may be a
+different case because I'm expecting the user to go and manually
+enable the watchdog instead of using the kernel to do it which means
+if its not enabled its not really available to be used.
+
+Tim
