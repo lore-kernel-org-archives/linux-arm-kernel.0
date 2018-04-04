@@ -1,50 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  4 Apr 2018 12:23:53 +0200
-Subject: [PATCH] iommu: rockchip: fix building without CONFIG_OF
-Message-ID: <20180404102401.3634085-1-arnd@arndb.de>
+Date: Wed,  4 Apr 2018 12:25:36 +0200
+Subject: [PATCH] ARM: omap2: fix am43xx build without L2X0
+Message-ID: <20180404102550.3692501-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get a build error when compiling the iommu driver without CONFIG_OF:
+When CONFIG_CACHE_L2X0 is disabled, the am43xx specific suspend
+implemnentation fails to link:
 
-drivers/iommu/rockchip-iommu.c: In function 'rk_iommu_of_xlate':
-drivers/iommu/rockchip-iommu.c:1101:2: error: implicit declaration of function 'of_dev_put'; did you mean 'of_node_put'? [-Werror=implicit-function-declaration]
+arch/arm/mach-omap2/sleep43xx.o: In function `get_l2cache_base':
+(.text+0x180): undefined reference to `omap4_get_l2cache_base'
 
-This replaces the of_dev_put() with the equivalent platform_device_put(),
-and adds an error check for of_find_device_by_node() returning NULL,
-which seems to be appropriate here given that we pass the device into
-platform_get_drvdata() next, and that of_find_device_by_node() might
-theoretically return a NULL pointer.
+This adds an #ifdef protection around the code, like we do for am44xx.
 
-Fixes: 5fd577c3eac3 ("iommu/rockchip: Use OF_IOMMU to attach devices automatically")
+Fixes: 41d37e61372f ("ARM: OMAP2+: Introduce low-level suspend code for AM43XX")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-This warning appears to only have been introduced in linux-next after
-the merge window opened.
----
- drivers/iommu/rockchip-iommu.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/sleep43xx.S | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 5fc8656c60f9..fe9c9cc1a9d4 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -1094,11 +1094,15 @@ static int rk_iommu_of_xlate(struct device *dev,
- 		return -ENOMEM;
+diff --git a/arch/arm/mach-omap2/sleep43xx.S b/arch/arm/mach-omap2/sleep43xx.S
+index 59770a69396b..b24be624e8b9 100644
+--- a/arch/arm/mach-omap2/sleep43xx.S
++++ b/arch/arm/mach-omap2/sleep43xx.S
+@@ -52,10 +52,12 @@
+ ENTRY(am43xx_do_wfi)
+ 	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
  
- 	iommu_dev = of_find_device_by_node(args->np);
-+	if (!iommu_dev) {
-+		kfree(data);
-+		return -ENODEV;
-+	}
++#ifdef CONFIG_CACHE_L2X0
+ 	/* Retrieve l2 cache virt address BEFORE we shut off EMIF */
+ 	ldr	r1, get_l2cache_base
+ 	blx	r1
+ 	mov	r8, r0
++#endif
  
- 	data->iommu = platform_get_drvdata(iommu_dev);
- 	dev->archdata.iommu = data;
+ 	/*
+ 	 * Flush all data from the L1 and L2 data cache before disabling
+@@ -334,8 +336,6 @@ ENDPROC(am43xx_resume_from_deep_sleep)
+ 	.align
+ resume_addr:
+ 	.word	cpu_resume - PAGE_OFFSET + 0x80000000
+-get_l2cache_base:
+-	.word	omap4_get_l2cache_base
+ kernel_flush:
+ 	.word   v7_flush_dcache_all
+ ddr_start:
+@@ -354,7 +354,10 @@ am43xx_phys_emif_clkctrl:
+ 	.word	(AM43XX_CM_BASE + AM43XX_CM_PER_INST + \
+ 		 AM43XX_CM_PER_EMIF_CLKCTRL_OFFSET)
  
--	of_dev_put(iommu_dev);
-+	platform_device_put(iommu_dev);
++#ifdef CONFIG_CACHE_L2X0
+ /* L2 cache related defines for AM437x */
++get_l2cache_base:
++	.word	omap4_get_l2cache_base
+ l2_cache_base:
+ 	.word	OMAP44XX_L2CACHE_BASE
+ l2_smc1:
+@@ -365,6 +368,7 @@ l2_smc3:
+ 	.word	OMAP4_MON_L2X0_CTRL_INDEX
+ l2_val:
+ 	.word	0xffff
++#endif
  
- 	return 0;
- }
+ .align 3
+ /* DDR related defines */
 -- 
 2.9.0
