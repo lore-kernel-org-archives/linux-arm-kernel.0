@@ -1,59 +1,32 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 4 Apr 2018 22:19:33 +0800
-Subject: [PATCH v6 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
- on arm and arm64
-In-Reply-To: <1522810579-7466-2-git-send-email-hejianet@gmail.com>
-References: <1522810579-7466-2-git-send-email-hejianet@gmail.com>
-Message-ID: <201804042156.YTVq2WAJ%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 04 Apr 2018 15:30:14 +0100
+Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180404155909.148085f7@dell-desktop.home>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-8-mylene.josserand@bootlin.com>
+ <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
+ <20180404155909.148085f7@dell-desktop.home>
+Message-ID: <86vad7qc21.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jia,
+On Wed, 04 Apr 2018 14:59:09 +0100,
+Myl?ne Josserand wrote:
 
-Thank you for the patch! Yet something to improve:
+> > It'd be good to take this opportunity to refactor the shmobile code.
+> 
+> I can do it in this series but I do not have any shmobile platforms so
+> I will not be able to test my modifications (only compilation).
+> 
+> If someone can test it for me (who?), it is okay for me to refactor this
+> code :)
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.16 next-20180403]
-[cannot apply to linus/master mmotm/master]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I guess you could Cc the shmobile folks (Geert Uytterhoeven, Simon
+Horman), and get them to review/test the changes.
 
-url:    https://github.com/0day-ci/linux/commits/Jia-He/mm-page_alloc-remain-memblock_next_valid_pfn-on-arm-and-arm64/20180404-200732
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: i386-randconfig-x013-201813 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Thanks,
 
-All error/warnings (new ones prefixed by >>):
+	M.
 
-   In file included from include/linux/gfp.h:6:0,
-                    from include/linux/mm.h:10,
-                    from mm/page_alloc.c:18:
-   mm/page_alloc.c: In function 'memmap_init_zone':
->> include/linux/mmzone.h:1299:28: error: called object is not a function or function pointer
-    #define next_valid_pfn (pfn++)
-                           ~~~~^~~
->> mm/page_alloc.c:5349:39: note: in expansion of macro 'next_valid_pfn'
-     for (pfn = start_pfn; pfn < end_pfn; next_valid_pfn(pfn)) {
-                                          ^~~~~~~~~~~~~~
-
-vim +1299 include/linux/mmzone.h
-
-  1296	
-  1297	/* fallback to default defitions*/
-  1298	#ifndef next_valid_pfn
-> 1299	#define next_valid_pfn	(pfn++)
-  1300	#endif
-  1301	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31450 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/29e2103e/attachment-0001.gz>
+-- 
+Jazz is not dead, it just smell funny.
