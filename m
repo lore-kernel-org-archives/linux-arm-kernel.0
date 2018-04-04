@@ -1,39 +1,157 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 4 Apr 2018 17:34:12 +0200
-Subject: [RFC PATCH 2/2] i2c: at91: provide bus_freq_hz
-In-Reply-To: <20180326111927.16040-2-tudor.ambarus@microchip.com>
-References: <20180326111927.16040-1-tudor.ambarus@microchip.com>
- <20180326111927.16040-2-tudor.ambarus@microchip.com>
-Message-ID: <20180404153412.GL2574@rfolt0960.corp.atmel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 4 Apr 2018 11:52:20 -0400
+Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
+ readX() implementation
+In-Reply-To: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
+References: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
+Message-ID: <691b903c-e97d-0a25-28c5-690318bb215a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 26, 2018 at 02:19:27PM +0300, Tudor Ambarus wrote:
-> The clock-frequency property is not mandatory for the i2c buses. If it's
-> not present in device tree, the buses usually assume that is 100kHZ.
-> There are i2c clients that need to know the clock frequency in order to
-> compute their wake token. Spare the clients of making (wrong) assumptions
-> and provide the bus frequency in adapter.
+On 4/3/2018 6:29 PM, Palmer Dabbelt wrote:
+> On Tue, 03 Apr 2018 05:56:18 PDT (-0700), Arnd Bergmann wrote:
+>> On Tue, Apr 3, 2018 at 2:44 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>> On 4/3/2018 7:13 AM, Arnd Bergmann wrote:
+>>>> On Tue, Apr 3, 2018 at 12:49 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Fri, Mar 30, 2018 at 11:58:13AM -0400, Sinan Kaya wrote:
+>>>>>> The default implementation of mapping readX() to __raw_readX() is wrong.
+>>>>>> readX() has stronger ordering semantics. Compiler is allowed to reorder
+>>>>>> __raw_readX().
+>>>>>
+>>>>> Could you please specify what the compiler is potentially reordering
+>>>>> __raw_readX() against, and why this would be wrong?
+>>>>>
+>>>>> e.g. do we care about prior normal memory accesses, subsequent normal
+>>>>> memory accesses, and/or other IO accesses?
+>>>>>
+>>>>> I assume that the asm-generic __raw_{read,write}X() implementations are
+>>>>> all ordered w.r.t. each other (at least for a specific device).
+>>>>
+>>>> I think that is correct: the compiler won't reorder those because of the
+>>>> 'volatile' pointer dereference, but it can reorder access to a normal
+>>>> pointer against a __raw_readl()/__raw_writel(), which breaks the scenario
+>>>> of using writel to trigger a DMA, or using a readl to see if a DMA has
+>>>> completed.
+>>>
+>>> Yes, we are worried about memory update vs. IO update ordering here.
+>>> That was the reason why barrier() was introduced in this patch. I'll try to
+>>> clarify that better in the commit text.
+>>>
+>>>>
+>>>> The question is whether we should use a stronger barrier such
+>>>> as rmb() amd wmb() here rather than a simple compiler barrier.
+>>>>
+>>>> I would assume that on complex architectures with write buffers and
+>>>> out-of-order prefetching, those are required, while on architectures
+>>>> without those features, the barriers are cheap.
+>>>
+>>> That's my reasoning too. I'm trying to follow the x86 example here where there
+>>> is a compiler barrier in writeX() and readX() family of functions.
+>>
+>> I think x86 is the special case here because it implicitly guarantees
+>> the strict ordering in the hardware, as long as the compiler gets it
+>> right. For the asm-generic version, it may be better to play safe and
+>> do the safest version, requiring architectures to override that barrier
+>> if they want to be faster.
+>>
+>> We could use the same macros that riscv has, using __io_br(),
+>> __io_ar(), __io_bw() and __io_aw() for before/after read/write.
 > 
-> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> FWIW, when I wrote this I wasn't sure what the RISC-V memory model was going to be so I just picked something generic.? In other words, it's already a generic interface, just one that we're the only users of :).
+> 
 
-> ---
->  drivers/i2c/busses/i2c-at91.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index bfd1fdf..d3cd84e 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -1116,6 +1116,7 @@ static int at91_twi_probe(struct platform_device *pdev)
->  	dev->adapter.quirks = &at91_twi_quirks;
->  	dev->adapter.dev.parent = dev->dev;
->  	dev->adapter.nr = pdev->id;
-> +	dev->adapter.bus_freq_hz = bus_clk_rate;
->  	dev->adapter.timeout = AT91_I2C_TIMEOUT;
->  	dev->adapter.dev.of_node = pdev->dev.of_node;
->  
-> -- 
-> 2.9.4
-> 
+Are we looking for something like this?
+
+
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index e8c2078..693a82f 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -101,6 +101,16 @@ static inline void __raw_writeq(u64 value, volatile void __iomem *addr)
+ #endif
+ #endif /* CONFIG_64BIT */
+ 
++#ifndef __io_br()
++#define __io_br()	do {} while (0)
++#endif
++
++#ifdef rmb
++#define __io_ar()	rmb();
++#else
++#define __io_ar()	barrier();
++#endif
++
+ /*
+  * {read,write}{b,w,l,q}() access little endian memory and return result in
+  * native endianness.
+@@ -108,35 +118,46 @@ static inline void __raw_writeq(u64 value, volatile void __iomem *addr)
+ 
+ #ifndef readb
+ #define readb readb
+-static inline u8 readb(const volatile void __iomem *addr)
+-{
+-	return __raw_readb(addr);
+-}
++#define readb(c)				\
++	({ u8  __v;				\
++	 __io_br();				\
++	 __v = __raw_readb(c);			\
++	 __io_ar();				\
++	 __v; })
+ #endif
+ 
+ #ifndef readw
+ #define readw readw
+-static inline u16 readw(const volatile void __iomem *addr)
+-{
+-	return __le16_to_cpu(__raw_readw(addr));
+-}
++#define readw(c)				\
++    ({ u16 __v;					\
++						\
++     __io_br();					\
++      __v = __le16_to_cpu(__raw_readw(c));	\
++     __io_ar();					\
++     __v; })
+ #endif
+ 
+ #ifndef readl
+ #define readl readl
+-static inline u32 readl(const volatile void __iomem *addr)
+-{
+-	return __le32_to_cpu(__raw_readl(addr));
+-}
++#define readl(c)				\
++    ({ u32 __v;					\
++						\
++     __io_br();					\
++      __v = __le32_to_cpu(__raw_readl(c));	\
++     __io_ar();					\
++     __v; })
+ #endif
+ 
+ #ifdef CONFIG_64BIT
+ #ifndef readq
+ #define readq readq
+-static inline u64 readq(const volatile void __iomem *addr)
+-{
+-	return __le64_to_cpu(__raw_readq(addr));
+-}
++#define readq(c)				\
++    ({ u64 __v;					\
++						\
++     __io_br();					\
++      __v = __le64_to_cpu(__raw_readq(c));	\
++     __io_ar();					\
++     __v; })
+ #endif
+ #endif /* CONFIG_64BIT */
+  
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
