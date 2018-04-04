@@ -1,26 +1,54 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 4 Apr 2018 13:48:35 -0400
-Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
- readX() implementation
-In-Reply-To: <CAK8P3a2pGQb7TqQtuw0ZpQ=8CwXiRmRKKc1GwvEgKDgofxJ3nA@mail.gmail.com>
-References: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
- <691b903c-e97d-0a25-28c5-690318bb215a@codeaurora.org>
- <CAK8P3a2pGQb7TqQtuw0ZpQ=8CwXiRmRKKc1GwvEgKDgofxJ3nA@mail.gmail.com>
-Message-ID: <9b0d7db3-0830-9661-6dc8-39523daa8f32@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 Apr 2018 10:58:52 -0700
+Subject: ARM compile failure in Re: linux-next: Tree for Apr 4
+In-Reply-To: <20180404074856.GA9342@amd>
+References: <20180404165559.4cd0c12c@canb.auug.org.au>
+ <20180404074856.GA9342@amd>
+Message-ID: <20180404175852.GI5700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/4/2018 11:55 AM, Arnd Bergmann wrote:
-> Yes, exactly, plus the same for write and in/out of course.
+* Pavel Machek <pavel@ucw.cz> [180404 07:50]:
+> Hi!
+> 
+> > Please do not add any v4.18 destined stuff to your linux-next included
+> > trees until after v4.17-rc1 has been released.
+> > 
+> > Changes since 20180403:
+> > 
+> > The vfs tree still had its build failure for which I reverted a commit.
+> > 
+> > Non-merge commits (relative to Linus' tree): 8505
+> >  8493 files changed, 392779 insertions(+), 275941 deletions(-)
+> > 
+> > ----------------------------------------------------------------------------
+> 
+> When trying to build kernel for N900, I get:
+> 
+>   CC      lib/timerqueue.o
+>     CC      lib/vsprintf.o
+>     lib/string.c: In function 'strstr':
+>     lib/string.c:478:8: error: inlining failed in call to
+>     always_inline 'strlen': function not inlinable
+>     lib/string.c:903:5: error: called from here
+>     lib/string.c:478:8: error: inlining failed in call to
+>     always_inline 'strlen': function not inlinable
+>     lib/string.c:906:5: error: called from here
+>     lib/string.c:855:15: error: inlining failed in call to
+>     always_inline 'memcmp': function not inlinable
+>     ...
+> pavel at duo:/data/l/linux-next-n900$ git branch -l
+> * (detached from next-20180403)
+> 
+> I'm using
+> 
+> eval ` eldk-switch.sh -r 5.4 armv7a`
+> 
+> for cross-compilation.
 
-I was looking at this...
+Hmm I'm not seeing build issues with next-20180404, did this somehow
+already get sorted out?
 
-inb() and outb() seem to be calling writeb(). It gets the wmb/barrier automatically
-when we fix writeb().
+Regards,
 
-Did I miss something?
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Tony
