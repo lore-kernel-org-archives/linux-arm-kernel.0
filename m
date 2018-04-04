@@ -1,187 +1,181 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 4 Apr 2018 21:10:28 +0900
-Subject: [usb-next PATCH v11 3/8] usb: core: add a wrapper for the USB
- PHYs on the HCD
-In-Reply-To: <20180303214309.25643-4-martin.blumenstingl@googlemail.com>
-References: <20180303214309.25643-1-martin.blumenstingl@googlemail.com>
- <20180303214309.25643-4-martin.blumenstingl@googlemail.com>
-Message-ID: <CAK7LNARM=F3Ey0aO9PiNftxkcLVo4z10jdrkSrQE1f74nK1=Ng@mail.gmail.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Wed, 4 Apr 2018 14:30:21 +0200
+Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
+ "Stoping" -> "Stopping"
+In-Reply-To: <9b1399de-3834-cd22-2bca-42a1048e0901@canonical.com>
+References: <20180330154420.6903-1-colin.king@canonical.com>
+ <20180403134540.GA29017@lenoch>
+ <20180404102425.cwj7vzvrvi2obcoi@mwanda>
+ <9b1399de-3834-cd22-2bca-42a1048e0901@canonical.com>
+Message-ID: <20180404123021.GA21058@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-03-04 6:43 GMT+09:00 Martin Blumenstingl
-<martin.blumenstingl@googlemail.com>:
-> Many SoC platforms have separate devices for the USB PHY which are
-> registered through the generic PHY framework. These PHYs have to be
-> enabled to make the USB controller actually work. They also have to be
-> disabled again on shutdown/suspend.
->
-> Currently (at least) the following HCI platform drivers are using custom
-> code to obtain all PHYs via devicetree for the roothub/controller and
-> disable/enable them when required:
-> - ehci-platform.c has ehci_platform_power_{on,off}
-> - xhci-mtk.c has xhci_mtk_phy_{init,exit,power_on,power_off}
-> - ohci-platform.c has ohci_platform_power_{on,off}
->
-> With this new wrapper the USB PHYs can be specified directly in the
-> USB controller's devicetree node (just like on the drivers listed
-> above). This allows SoCs like the Amlogic Meson GXL family to operate
-> correctly once this is wired up correctly. These SoCs use a dwc3
-> controller and require all USB PHYs to be initialized (if one of the USB
-> PHYs it not initialized then none of USB port works at all).
->
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Tested-by: Yixun Lan <yixun.lan@amlogic.com>
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Cc: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/usb/core/Makefile |   2 +-
->  drivers/usb/core/phy.c    | 158 ++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/core/phy.h    |   7 ++
->  3 files changed, 166 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/usb/core/phy.c
->  create mode 100644 drivers/usb/core/phy.h
->
-> diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
-> index 92c9cefb4317..18e874b0441e 100644
-> --- a/drivers/usb/core/Makefile
-> +++ b/drivers/usb/core/Makefile
-> @@ -6,7 +6,7 @@
->  usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
->  usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
->  usbcore-y += devio.o notify.o generic.o quirks.o devices.o
-> -usbcore-y += port.o
-> +usbcore-y += phy.o port.o
->
->  usbcore-$(CONFIG_OF)           += of.o
->  usbcore-$(CONFIG_USB_PCI)              += hcd-pci.o
-> diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
-> new file mode 100644
-> index 000000000000..09b7c43c0ea4
-> --- /dev/null
-> +++ b/drivers/usb/core/phy.c
-> @@ -0,0 +1,158 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * A wrapper for multiple PHYs which passes all phy_* function calls to
-> + * multiple (actual) PHY devices. This is comes handy when initializing
-> + * all PHYs on a HCD and to keep them all in the same state.
-> + *
-> + * Copyright (C) 2018 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/list.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/of.h>
-> +
-> +#include "phy.h"
-> +
-> +struct usb_phy_roothub {
-> +       struct phy              *phy;
-> +       struct list_head        list;
-> +};
-> +
-> +static struct usb_phy_roothub *usb_phy_roothub_alloc(struct device *dev)
-> +{
-> +       struct usb_phy_roothub *roothub_entry;
-> +
-> +       roothub_entry = devm_kzalloc(dev, sizeof(*roothub_entry), GFP_KERNEL);
-> +       if (!roothub_entry)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       INIT_LIST_HEAD(&roothub_entry->list);
-> +
-> +       return roothub_entry;
-> +}
-> +
-> +static int usb_phy_roothub_add_phy(struct device *dev, int index,
-> +                                  struct list_head *list)
-> +{
-> +       struct usb_phy_roothub *roothub_entry;
-> +       struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-> +
-> +       if (IS_ERR_OR_NULL(phy)) {
-> +               if (!phy || PTR_ERR(phy) == -ENODEV)
-> +                       return 0;
-> +               else
-> +                       return PTR_ERR(phy);
-> +       }
-> +
-> +       roothub_entry = usb_phy_roothub_alloc(dev);
-> +       if (IS_ERR(roothub_entry))
-> +               return PTR_ERR(roothub_entry);
-> +
-> +       roothub_entry->phy = phy;
-> +
-> +       list_add_tail(&roothub_entry->list, list);
-> +
-> +       return 0;
-> +}
-> +
-> +struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev)
-> +{
-> +       struct usb_phy_roothub *phy_roothub;
-> +       struct usb_phy_roothub *roothub_entry;
-> +       struct list_head *head;
-> +       int i, num_phys, err;
-> +
-> +       num_phys = of_count_phandle_with_args(dev->of_node, "phys",
-> +                                             "#phy-cells");
-> +       if (num_phys <= 0)
-> +               return NULL;
-> +
-> +       phy_roothub = usb_phy_roothub_alloc(dev);
-> +       if (IS_ERR(phy_roothub))
-> +               return phy_roothub;
-> +
-> +       for (i = 0; i < num_phys; i++) {
-> +               err = usb_phy_roothub_add_phy(dev, i, &phy_roothub->list);
-> +               if (err)
-> +                       goto err_out;
-> +       }
-> +
-> +       head = &phy_roothub->list;
+On Wed, Apr 04, 2018 at 11:41:23AM +0100, Colin Ian King wrote:
+> On 04/04/18 11:24, Dan Carpenter wrote:
+> > On Tue, Apr 03, 2018 at 03:45:40PM +0200, Ladislav Michl wrote:
+> >> On Fri, Mar 30, 2018 at 04:44:20PM +0100, Colin King wrote:
+> >>> From: Colin Ian King <colin.king@canonical.com>
+> >>
+> >> Hello Colin,
+> >>
+> >>> Trivial fix to spelling mistake in pr_debug message text
+> >>
+> >> would you mind making this patch a bit less non-trivial and
+> >> change pr_debug to dev_dbg dropping Atmel_ssc_dai prefix?
+> >>
+> >> Thank you.
+> >>
+> > 
+> > Trivial patches should just be trivial instead of evolving into a thread
+> > that lasts for days.
+> 
+> Yep, this feels like this scenario for sure.
 
+And this scenario happens because I wanted to avoid all that work preparing
+trivial patch. In the other words, this thread could be few mails shorter
+if anyone else took a chance ;-)
 
-I think phy_roothub->phy is always empty,
-and only phy_roothub->list is used.
+[...]
 
+> > space character?  And I think about it for 10 minutes and then delete my
+> > patch because it's too much hassle to deal with for something small.
 
-I just wondered if we can directly put 'struct list_head' into
-'struct usb_hcd'.
+...leading into many small glitches never polished...
 
+> Same here. Hence stuff never gets fixed.
 
+For sure, hassle with sending a patch and crediting everyone who contributed
+properly is order of magnitude more time consuming than preparing patch itself.
 
+So here's my last contribution to this painful thread. If you do not like it,
+it's your turn :)
 
+(and it'll be needed as Mark does not like patches being sended this way,
+oh well, whoever sent original patch should first figure out why driver
+outputs debug message just after warning one - so the simplest fix would
+be just deleting that line)
 
-> diff --git a/drivers/usb/core/phy.h b/drivers/usb/core/phy.h
-> new file mode 100644
-> index 000000000000..6fde59bfbff8
-> --- /dev/null
-> +++ b/drivers/usb/core/phy.h
-> @@ -0,0 +1,7 @@
-> +struct usb_phy_roothub;
+-- >8 -- 
 
-struct device;
+From: Joe Perches <joe@perches.com>
+Subject: [PATCH] ASoC: atmel_ssc_dai: Replace pr_debug with dev_dbg
 
-is also needed for usb_phy_roothub_init().
+Use dev_dbg for debug output, remove registration error message
+as every user of atmel_ssc_set_audio prints its own error.
 
+Signed-off-by: Joe Perches <joe@perches.com>
+Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+[Colin Ian King: fix spelling mistake: "Stoping" -> "Stopping"]
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ sound/soc/atmel/atmel_ssc_dai.c | 42 +++++++++++++--------------------
+ 1 file changed, 17 insertions(+), 25 deletions(-)
 
-
-> +struct usb_phy_roothub *usb_phy_roothub_init(struct device *dev);
-> +int usb_phy_roothub_exit(struct usb_phy_roothub *phy_roothub);
-> +
-> +int usb_phy_roothub_power_on(struct usb_phy_roothub *phy_roothub);
-> +void usb_phy_roothub_power_off(struct usb_phy_roothub *phy_roothub);
-
-
-Better to add an include guard?
-SPDX-License-Identifier for this header too?
-
-
-
-
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index a1e2c5682dcd..45c4730e9939 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -291,11 +291,10 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+ 	int dir, dir_mask;
+ 	int ret;
+ 
+-	pr_debug("atmel_ssc_startup: SSC_SR=0x%x\n",
+-		ssc_readl(ssc_p->ssc->regs, SR));
++	dev_dbg(dai->dev, "SSC_SR=0x%x\n", ssc_readl(ssc_p->ssc->regs, SR));
+ 
+ 	/* Enable PMC peripheral clock for this SSC */
+-	pr_debug("atmel_ssc_dai: Starting clock\n");
++	dev_dbg(dai->dev, "Starting clock\n");
+ 	clk_enable(ssc_p->ssc->clk);
+ 	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk);
+ 
+@@ -385,7 +384,7 @@ static void atmel_ssc_shutdown(struct snd_pcm_substream *substream,
+ 	spin_unlock_irq(&ssc_p->lock);
+ 
+ 	/* Shutdown the SSC clock. */
+-	pr_debug("atmel_ssc_dai: Stopping clock\n");
++	dev_dbg(dai->dev, "Stopping clock\n");
+ 	clk_disable(ssc_p->ssc->clk);
+ }
+ 
+@@ -794,13 +793,12 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		break;
+ 
+ 	default:
+-		printk(KERN_WARNING "atmel_ssc_dai: unsupported DAI format 0x%x\n",
+-			ssc_p->daifmt);
++		dev_warn(dai->dev, "unsupported DAI format 0x%x\n",
++			 ssc_p->daifmt);
+ 		return -EINVAL;
+ 	}
+-	pr_debug("atmel_ssc_hw_params: "
+-			"RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
+-			rcmr, rfmr, tcmr, tfmr);
++	dev_dbg(dai->dev, "RCMR=%08x RFMR=%08x TCMR=%08x TFMR=%08x\n",
++		rcmr, rfmr, tcmr, tfmr);
+ 
+ 	if (!ssc_p->initialized) {
+ 		if (!ssc_p->ssc->pdata->use_dma) {
+@@ -818,9 +816,9 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		ret = request_irq(ssc_p->ssc->irq, atmel_ssc_interrupt, 0,
+ 				ssc_p->name, ssc_p);
+ 		if (ret < 0) {
+-			printk(KERN_WARNING
+-					"atmel_ssc_dai: request_irq failure\n");
+-			pr_debug("Atmel_ssc_dai: Stoping clock\n");
++			dev_warn(dai->dev,
++				 "unable to request irq (%d), stopping clock\n",
++				 ret);
+ 			clk_disable(ssc_p->ssc->clk);
+ 			return ret;
+ 		}
+@@ -839,7 +837,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 	ssc_writel(ssc_p->ssc->regs, TCMR, tcmr);
+ 	ssc_writel(ssc_p->ssc->regs, TFMR, tfmr);
+ 
+-	pr_debug("atmel_ssc_dai,hw_params: SSC initialized\n");
++	dev_dbg(dai->dev, "SSC initialized\n");
+ 	return 0;
+ }
+ 
+@@ -862,9 +860,9 @@ static int atmel_ssc_prepare(struct snd_pcm_substream *substream,
+ 	ssc_writel(ssc_p->ssc->regs, CR, dma_params->mask->ssc_disable);
+ 	ssc_writel(ssc_p->ssc->regs, IDR, dma_params->mask->ssc_error);
+ 
+-	pr_debug("%s enabled SSC_SR=0x%08x\n",
+-			dir ? "receive" : "transmit",
+-			ssc_readl(ssc_p->ssc->regs, SR));
++	dev_dbg(dai->dev, "%s enabled SSC_SR=0x%08x\n",
++		dir ? "receive" : "transmit",
++		ssc_readl(ssc_p->ssc->regs, SR));
+ 	return 0;
+ }
+ 
+@@ -1050,21 +1048,15 @@ static void asoc_ssc_exit(struct device *dev)
+ int atmel_ssc_set_audio(int ssc_id)
+ {
+ 	struct ssc_device *ssc;
+-	int ret;
+ 
+ 	/* If we can grab the SSC briefly to parent the DAI device off it */
+ 	ssc = ssc_request(ssc_id);
+-	if (IS_ERR(ssc)) {
+-		pr_err("Unable to parent ASoC SSC DAI on SSC: %ld\n",
+-			PTR_ERR(ssc));
++	if (IS_ERR(ssc))
+ 		return PTR_ERR(ssc);
+-	} else {
+-		ssc_info[ssc_id].ssc = ssc;
+-	}
+ 
+-	ret = asoc_ssc_init(&ssc->pdev->dev);
++	ssc_info[ssc_id].ssc = ssc;
+ 
+-	return ret;
++	return asoc_ssc_init(&ssc->pdev->dev);
+ }
+ EXPORT_SYMBOL_GPL(atmel_ssc_set_audio);
+ 
 -- 
-Best Regards
-Masahiro Yamada
+2.17.0
