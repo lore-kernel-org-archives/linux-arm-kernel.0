@@ -1,56 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Apr 2018 21:50:29 +0200
-Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
- readX() implementation
-In-Reply-To: <9b0d7db3-0830-9661-6dc8-39523daa8f32@codeaurora.org>
-References: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
- <691b903c-e97d-0a25-28c5-690318bb215a@codeaurora.org>
- <CAK8P3a2pGQb7TqQtuw0ZpQ=8CwXiRmRKKc1GwvEgKDgofxJ3nA@mail.gmail.com>
- <9b0d7db3-0830-9661-6dc8-39523daa8f32@codeaurora.org>
-Message-ID: <CAK8P3a2Cg59cTzUq2_8sopeY9BktM7a6_4nunMJVA5fQFaVLug@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 4 Apr 2018 21:56:23 +0200
+Subject: [PATCH 00/15] ARM: pxa: switch to DMA slave maps
+In-Reply-To: <874lkq4urd.fsf@belgarion.home>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
+ <874lkq4urd.fsf@belgarion.home>
+Message-ID: <20180404215623.2bf07406@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2018 at 7:48 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 4/4/2018 11:55 AM, Arnd Bergmann wrote:
->> Yes, exactly, plus the same for write and in/out of course.
->
-> I was looking at this...
->
-> inb() and outb() seem to be calling writeb(). It gets the wmb/barrier automatically
-> when we fix writeb().
->
-> Did I miss something?
+On Wed, 04 Apr 2018 21:49:26 +0200
+Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-At least outb() needs stricter barriers than writeb() in theory, what
-we want here
-is that outb() has not just made it out to the device but that the
-write has been
-confirmed completed by the device. Some architectures can't do it, but those
-that can should have an easy way to hook into that using a separate set of
-barriers.
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
+> 
+> > On 2 April 2018 at 16:26, Robert Jarzmik <robert.jarzmik@free.fr> wrote:  
+> >> Hi,
+> >>
+> >> This serie is aimed at removing the dmaengine slave compat use, and transfer
+> >> knowledge of the DMA requestors into architecture code.
+> >> As this looks like a patch bomb, each maintainer expressing for his tree either
+> >> an Ack or "I want to take through my tree" will be spared in the next iterations
+> >> of this serie.  
+> >
+> > Perhaps an option is to send this hole series as PR for 3.17 rc1, that
+> > would removed some churns and make this faster/easier? Well, if you
+> > receive the needed acks of course.  
+> For 3.17-rc1 it looks a bit optimistic with the review time ... If I have all
 
-Using the riscv barrier names, we could do this like
+Especially since 3.17-rc1 has been released more than 3 years ago :-),
+but I guess you meant 4.17-rc1.
 
-#ifndef __io_bw()
-#define __io_bw()      wmb()
-#endif
-
-#ifndef __io_aw
-#define __io_aw()      barrier()
-#endif
-
-#ifndef __io_pbw
-#define __io_pbw()     __io_bw()
-#endif
-
-#ifndef __io_paw
-#define __io_paw()     __io_aw()
-#endif
-
-and the same thing for reads. This way, an architecture could override
-any of those, but still get reasonable defaults for the others.
-For __io_bw(), I picked barrier() instead of do {} while (0), no idea
-if that's any better, I just play safe here.
-
-     Arnd
+> acks, I'll queue it into my pxa tree. If at least one maintainer withholds his
+> ack, the end of the serie (phase 3) won't be applied until it is sorted out.
+> 
+> Cheers.
+> 
+> --
+> Robert
