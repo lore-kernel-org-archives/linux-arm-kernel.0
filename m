@@ -1,7 +1,8 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  4 Apr 2018 13:44:58 +0200
-Subject: [PATCH] ARM: pxa: stargate2: use device properties for at24 eeprom
-Message-ID: <20180404114458.15376-1-brgl@bgdev.pl>
+Date: Wed,  4 Apr 2018 13:47:06 +0200
+Subject: [RESEND PATCH] ARM: pxa: stargate2: use device properties for at24
+ eeprom
+Message-ID: <20180404114706.15856-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,6 +17,8 @@ already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
 ---
+NOTE: resending with correct e-mail address for Jonathan Cameron.
+
  arch/arm/mach-pxa/stargate2.c | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
