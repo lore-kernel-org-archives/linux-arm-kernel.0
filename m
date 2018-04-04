@@ -1,73 +1,45 @@
-From: Michal.Kalderon@cavium.com (Kalderon, Michal)
-Date: Wed, 4 Apr 2018 11:54:22 +0000
-Subject: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers on
- weakly-ordered archs #2
-In-Reply-To: <20180403200348.GB21167@ziepe.ca>
-References: <1521736009-23387-1-git-send-email-okaya@codeaurora.org>
- <1521736009-23387-4-git-send-email-okaya@codeaurora.org>
- <ac46b4e4-7e6c-c15f-06eb-01b1e4893d50@codeaurora.org>
- <CY1PR0701MB201215C9F38E8760732B595088A50@CY1PR0701MB2012.namprd07.prod.outlook.com>
- <20180403200348.GB21167@ziepe.ca>
-Message-ID: <CY1PR0701MB201281968E401A66825498DB88A40@CY1PR0701MB2012.namprd07.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Apr 2018 14:03:00 +0200
+Subject: [PATCH v2] MAINTAINERS: update entry for ARM/berlin
+In-Reply-To: <20180402102819.599ac67f@xhacker.debian>
+References: <20180330110211.36455347@xhacker.debian>
+ <20180330135932.GB28244@lunn.ch>
+ <20180402102819.599ac67f@xhacker.debian>
+Message-ID: <CAK8P3a3seSZOocrFtdJJzjmDC8YAAXzicHW_YuXh7ivgYijgAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Jason Gunthorpe [mailto:jgg at ziepe.ca]
-> Sent: Tuesday, April 03, 2018 11:04 PM
-> 
-> On Tue, Apr 03, 2018 at 07:42:28AM +0000, Kalderon, Michal wrote:
-> > > From: Sinan Kaya [mailto:okaya at codeaurora.org]
-> > > Sent: Tuesday, April 03, 2018 5:30 AM
-> > > To: linux-rdma at vger.kernel.org; timur at codeaurora.org;
-> > > sulrich at codeaurora.org
-> > > Cc: linux-arm-msm at vger.kernel.org;
-> > > linux-arm-kernel at lists.infradead.org;
-> > > Kalderon, Michal <Michal.Kalderon@cavium.com>; Elior, Ariel
-> > > <Ariel.Elior@cavium.com>; Doug Ledford <dledford@redhat.com>; Jason
-> > > Gunthorpe <jgg@ziepe.ca>; linux-kernel at vger.kernel.org
-> > > Subject: Re: [PATCH v5 3/3] RDMA/qedr: eliminate duplicate barriers
-> > > on weakly-ordered archs #2
-> > >
-> > > On 3/22/2018 12:26 PM, Sinan Kaya wrote:
-> > > > @@ -860,7 +860,7 @@ static void doorbell_cq(struct qedr_cq *cq,
-> > > > u32
-> > > cons, u8 flags)
-> > > >  	wmb();
-> > > >  	cq->db.data.agg_flags = flags;
-> > > >  	cq->db.data.value = cpu_to_le32(cons);
-> > > > -	writeq(cq->db.raw, cq->db_addr);
-> > > > +	writeq_relaxed(cq->db.raw, cq->db_addr);
-> > >
-> > > Given the direction to get rid of wmb() in front of writeX()
-> > > functions, I have been reviewing this code. Under normal
-> > > circumstances, I can get rid of all
-> > > wmb() as follows.
-> > >
-> > > However, I started having my doubts now. Are these wmb() used as a
-> > > SMP barrier too?
-> > > I can't find any smp_Xmb() in drivers/infiniband/hw/qedr directory.
-> >
-> > Your doubts are in place. You initial patch series modified writel to
-> > writel_relaxed Simply removing the wmb is dangerous. The wmb before
-> > writel are used to make sure the HW observes the changes in memory
-> > before we trigger the doorbell. Smp barriers here wouldn't suffice, as
-> > on a single processor. we still need to make sure memory is updated and
-> not remained in cache when HW accesses it.
-> > Reviewing the qedr barriers, I can find places where this may have not
-> > been necessary, But definitely you can't simply remove this wmb barriers.
-> 
-> As Sinan said, the consensus is that wmb();writel(); is redundant if the only
-> purpose of the wmb is to order DMA and system memory.
-> 
-> So can you review these patches on that basis please? Is the WMB doing
-> something else, eg SMP related? If yes, please send a patch adding
-> appropriate comments.
+On Mon, Apr 2, 2018 at 4:28 AM, Jisheng Zhang
+<Jisheng.Zhang@synaptics.com> wrote:
+> On Fri, 30 Mar 2018 15:59:32 +0200 Andrew Lunn wrote:
+>
+>> On Fri, Mar 30, 2018 at 11:02:11AM +0800, Jisheng Zhang wrote:
+>> > Synaptics has acquired the Multimedia Solutions Business of Marvell[1].
+>> > So change the berlin entry name and move it to its alphabetical
+>> > location. We move to ARM/Synaptics instead of ARM/Marvell.
+>> >
+>> > This patch also updates my email address from marvell to synaptics.
+>> >
+>> > [1] https://www.synaptics.com/company/news/conexant-marvell
+>> >
+>> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+>>
+>> Thanks for the link
+>>
+>> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+>>
+>> Do you still plan to move the DT files from the Marvell subdirectory?
+>> Are the locations of these files considered fixed?
+>>
+>
+> For new SoCs, the DT files will be put into synaptics sub-directory.
+> But for existing arm64 berlin DT files which currently sits in
+> arch/arm64/boot/dts/marvell, I dunno the proper solution. Could
+> you please give some suggestions? How do other vendors handle this
+> situation in the past?
 
-Thanks Sinan and Jason for the references and explanations, I've reviewed the wmb
-usages in qedr and am about to send a patch that replaces two of them with smp_wmb
-and completely removes two of them that given your explanation, turned out to be redundant,
-thanks.
+There is no good solution, we sometimes move files, other times we don't.
 
-> 
-> Thanks,
-> Jason
+Here, I would probably move it out, but I'd leave it up to you.
+
+      Arnd
