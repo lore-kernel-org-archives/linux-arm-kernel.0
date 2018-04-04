@@ -1,8 +1,7 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  4 Apr 2018 13:47:06 +0200
-Subject: [RESEND PATCH] ARM: pxa: stargate2: use device properties for at24
- eeprom
-Message-ID: <20180404114706.15856-1-brgl@bgdev.pl>
+Date: Wed,  4 Apr 2018 13:51:47 +0200
+Subject: [PATCH] ARM: s3c24xx: mini2440: use device properties for at24 eeprom
+Message-ID: <20180404115147.16448-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,49 +16,41 @@ already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
 ---
-NOTE: resending with correct e-mail address for Jonathan Cameron.
-
- arch/arm/mach-pxa/stargate2.c | 10 +++++-----
+ arch/arm/mach-s3c24xx/mach-mini2440.c | 10 +++++-----
  1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-index df62bb23dbee..bbea5fa9a140 100644
---- a/arch/arm/mach-pxa/stargate2.c
-+++ b/arch/arm/mach-pxa/stargate2.c
-@@ -27,11 +27,11 @@
- 
- #include <linux/platform_data/i2c-pxa.h>
- #include <linux/platform_data/pcf857x.h>
+diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+index 95753e0bc073..f9fc1f8d2b28 100644
+--- a/arch/arm/mach-s3c24xx/mach-mini2440.c
++++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+@@ -20,7 +20,7 @@
+ #include <linux/serial_core.h>
+ #include <linux/serial_s3c.h>
+ #include <linux/dm9000.h>
 -#include <linux/platform_data/at24.h>
- #include <linux/smc91x.h>
- #include <linux/gpio/machine.h>
- #include <linux/gpio.h>
- #include <linux/leds.h>
 +#include <linux/property.h>
- 
- #include <asm/types.h>
- #include <asm/setup.h>
-@@ -795,9 +795,9 @@ static struct pcf857x_platform_data platform_data_pcf857x = {
- 	.context = NULL,
- };
- 
--static struct at24_platform_data pca9500_eeprom_pdata = {
--	.byte_len = 256,
--	.page_size = 4,
-+static const struct property_entry pca9500_eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 4),
+ #include <linux/platform_device.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/i2c.h>
+@@ -481,15 +481,15 @@ static struct platform_device mini2440_audio = {
+ /*
+  * I2C devices
+  */
+-static struct at24_platform_data at24c08 = {
+-	.byte_len	= SZ_8K / 8,
+-	.page_size	= 16,
++static const struct property_entry mini2440_at24_properties[] = {
++	PROPERTY_ENTRY_U32("pagesize", 16),
 +	{ }
  };
  
- /**
-@@ -935,7 +935,7 @@ static struct i2c_board_info __initdata stargate2_i2c_board_info[] = {
- 	}, {
- 		.type = "24c02",
- 		.addr = 0x57,
--		.platform_data = &pca9500_eeprom_pdata,
-+		.properties = pca9500_eeprom_properties,
- 	}, {
- 		.type = "max1238",
- 		.addr = 0x35,
+ static struct i2c_board_info mini2440_i2c_devs[] __initdata = {
+ 	{
+ 		I2C_BOARD_INFO("24c08", 0x50),
+-		.platform_data = &at24c08,
++		.properties = mini2440_at24_properties,
+ 	},
+ };
+ 
 -- 
 2.16.3
