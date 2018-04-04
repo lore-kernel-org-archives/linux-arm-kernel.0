@@ -1,52 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 4 Apr 2018 12:18:58 +0200
-Subject: [PATCH 02/15] ARM: pxa: add dma slave map
-In-Reply-To: <87h8os3uwa.fsf@belgarion.home>
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <20180402142656.26815-3-robert.jarzmik@free.fr>
- <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
- <87tvss48ti.fsf@belgarion.home>
- <CAK8P3a2FFVnPj4+VoQET3-Jz2DaYbc6UUJnX1fH5s8VumJZ7Og@mail.gmail.com>
- <87h8os3uwa.fsf@belgarion.home>
-Message-ID: <CAK8P3a21xkp5KkNRpnxJH1bSZjyiyO=f7_9XyyqvGS3EC=GBWg@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed,  4 Apr 2018 12:20:47 +0200
+Subject: [PATCH] serial: xuartps: Fix the early_console junk character issue
+Message-ID: <6698032e594f5f921f25c4a7e235e0cee5521087.1522837245.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 3, 2018 at 10:19 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> ... chop chop removing unneeded recipients ....
->
-> Arnd Bergmann <arnd@arndb.de> writes:
->
->> Ok, I looked at the driver in more detail now and found the scary parts.
->> So it's using the async DMA interface to do synchronous DMA in
->> interrupt context in order to transfer the rx data faster than an readsl()
->> would, correct?
-> That's correct, at least for the smc91x.
->
->> It still feels odd to me that there is an entry in the slave map for
->> a device that does not have a request line. However, it also seems
->> that the entire code in those two drivers that deals with DMA is specific
->> to PXA anyway, so maybe it can be done differently: instead of
->> calling dma_request_slave_channel_compat() or dma_request_chan()
->> with a fake request line, how about calling dma_request_channel()
->> with an NULL filter function and data, and have the driver handle
->> the empty data case the same way as the rq=-1 case today?
-> Okay, in this case :
->  - the channel priority cannot be passed anymore
+From: Nava kishore Manne <nava.manne@xilinx.com>
 
-Right, but it could just always use a static priority, right?
+In the early_console_setup is trying to access the unregister clock value,
+so we are receiving some garbage clk value because of this wrong clk value
+the early_console_setup is fail to set the required console baud rate.
 
->  - and I don't see how this can work :
->    dma_request_channel()
->      __dma_request_channel()
->        find_candidate()
->          private_candidate(mask, device, fn, fn_param);
->            /* Here, fn == NULL and fn_param == NULL as per your proposal */
->
->    This function will find the first available dma channel, all right, but
->    no function will be called in pxa_dma driver, and therefore the last
->    requestor of the channel will be used, which is bad.
+This path fix this issue.
 
-Can't you just reset those in pxad_free_chan_resources()?
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-       Arnd
+ drivers/tty/serial/xilinx_uartps.c | 27 +--------------------------
+ 1 file changed, 1 insertion(+), 26 deletions(-)
+
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 19d370779767..4176c3a0b4e8 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1130,34 +1130,9 @@ static void cdns_early_write(struct console *con, const char *s,
+ static int __init cdns_early_console_setup(struct earlycon_device *device,
+ 					   const char *opt)
+ {
+-	struct uart_port *port = &device->port;
+-
+-	if (!port->membase)
++	if (!device->port.membase)
+ 		return -ENODEV;
+ 
+-	/* initialise control register */
+-	writel(CDNS_UART_CR_TX_EN|CDNS_UART_CR_TXRST|CDNS_UART_CR_RXRST,
+-	       port->membase + CDNS_UART_CR);
+-
+-	/* only set baud if specified on command line - otherwise
+-	 * assume it has been initialized by a boot loader.
+-	 */
+-	if (device->baud) {
+-		u32 cd = 0, bdiv = 0;
+-		u32 mr;
+-		int div8;
+-
+-		cdns_uart_calc_baud_divs(port->uartclk, device->baud,
+-					 &bdiv, &cd, &div8);
+-		mr = CDNS_UART_MR_PARITY_NONE;
+-		if (div8)
+-			mr |= CDNS_UART_MR_CLKSEL;
+-
+-		writel(mr,   port->membase + CDNS_UART_MR);
+-		writel(cd,   port->membase + CDNS_UART_BAUDGEN);
+-		writel(bdiv, port->membase + CDNS_UART_BAUDDIV);
+-	}
+-
+ 	device->con->write = cdns_early_write;
+ 
+ 	return 0;
+-- 
+1.9.1
