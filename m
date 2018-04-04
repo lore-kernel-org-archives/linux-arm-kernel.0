@@ -1,67 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 4 Apr 2018 12:12:33 +0100
-Subject: [PATCH] iommu: rockchip: fix building without CONFIG_OF
-In-Reply-To: <20180404102401.3634085-1-arnd@arndb.de>
-References: <20180404102401.3634085-1-arnd@arndb.de>
-Message-ID: <94d8f18d-28a3-1602-ea92-a821a2b9183c@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 4 Apr 2018 12:28:43 +0100
+Subject: [PATCH v4 1/6] PCI: aardvark: Introduce an
+ advk_pcie_valid_device() helper
+In-Reply-To: <20180329083946.25970-2-thomas.petazzoni@bootlin.com>
+References: <20180329083946.25970-1-thomas.petazzoni@bootlin.com>
+ <20180329083946.25970-2-thomas.petazzoni@bootlin.com>
+Message-ID: <20180404112843.GA24669@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Mar 29, 2018 at 10:39:41AM +0200, Thomas Petazzoni wrote:
+> In other to mimic other PCIe host controller drivers, introduce an
+> advk_pcie_valid_device() helper, used in the configuration read/write
+> functions.
+> 
+> This patch by itself is not a fix, but it is required for a follow-up
+> patch that is a fix, hence the Fixes tag and the Cc to stable.
 
-On 04/04/18 11:23, Arnd Bergmann wrote:
-> We get a build error when compiling the iommu driver without CONFIG_OF:
-> 
-> drivers/iommu/rockchip-iommu.c: In function 'rk_iommu_of_xlate':
-> drivers/iommu/rockchip-iommu.c:1101:2: error: implicit declaration of function 'of_dev_put'; did you mean 'of_node_put'? [-Werror=implicit-function-declaration]
-> 
-> This replaces the of_dev_put() with the equivalent platform_device_put(),
-> and adds an error check for of_find_device_by_node() returning NULL,
-> which seems to be appropriate here given that we pass the device into
-> platform_get_drvdata() next, and that of_find_device_by_node() might
-> theoretically return a NULL pointer.
-> 
-> Fixes: 5fd577c3eac3 ("iommu/rockchip: Use OF_IOMMU to attach devices automatically")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Should not we just reshuffle patch 1 and 2 instead of sending this
+patch to stable ? I appreciate the merge window is open and timing is
+quite tight, it is just to avoid sending churn to stable kernels
+for not much.
+
+Thanks,
+Lorenzo
+
+> Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 > ---
-> This warning appears to only have been introduced in linux-next after
-> the merge window opened.
+> Changes since v3:
+>  - Make the new helper return a bool instead of int
+> Changes since v2:
+>  - New patch
 > ---
->   drivers/iommu/rockchip-iommu.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
+>  drivers/pci/host/pci-aardvark.c | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 5fc8656c60f9..fe9c9cc1a9d4 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -1094,11 +1094,15 @@ static int rk_iommu_of_xlate(struct device *dev,
->   		return -ENOMEM;
->   
->   	iommu_dev = of_find_device_by_node(args->np);
-> +	if (!iommu_dev) {
-
-Actually, though the logic is perhaps a bit subtle, this cannot 
-reasonably happen - .of_xlate is only called via a set of iommu_ops 
-associated with the IOMMU node (args->np here); those ops are only 
-registered for the given node at the end of rk_iommu_probe(), by which 
-point the IOMMU device exists and is otherwise successfully probed, so 
-the platform bus lookup should never be able to fail.
-
-> +		kfree(data);
-> +		return -ENODEV;
-> +	}
->   
->   	data->iommu = platform_get_drvdata(iommu_dev);
->   	dev->archdata.iommu = data;
->   
-> -	of_dev_put(iommu_dev);
-> +	platform_device_put(iommu_dev);
-
-This bit looks reasonable, thanks for the fix.
-
-Robin.
-
->   
->   	return 0;
->   }
+> diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
+> index b04d37b3c5de..82bff709a4b3 100644
+> --- a/drivers/pci/host/pci-aardvark.c
+> +++ b/drivers/pci/host/pci-aardvark.c
+> @@ -430,6 +430,15 @@ static int advk_pcie_wait_pio(struct advk_pcie *pcie)
+>  	return -ETIMEDOUT;
+>  }
+>  
+> +static bool advk_pcie_valid_device(struct advk_pcie *pcie, struct pci_bus *bus,
+> +				  int devfn)
+> +{
+> +	if (PCI_SLOT(devfn) != 0)
+> +		return false;
+> +
+> +	return true;
+> +}
+> +
+>  static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+>  			     int where, int size, u32 *val)
+>  {
+> @@ -437,7 +446,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+>  	u32 reg;
+>  	int ret;
+>  
+> -	if (PCI_SLOT(devfn) != 0) {
+> +	if (!advk_pcie_valid_device(pcie, bus, devfn)) {
+>  		*val = 0xffffffff;
+>  		return PCIBIOS_DEVICE_NOT_FOUND;
+>  	}
+> @@ -491,7 +500,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+>  	int offset;
+>  	int ret;
+>  
+> -	if (PCI_SLOT(devfn) != 0)
+> +	if (!advk_pcie_valid_device(pcie, bus, devfn))
+>  		return PCIBIOS_DEVICE_NOT_FOUND;
+>  
+>  	if (where % size)
+> -- 
+> 2.14.3
 > 
