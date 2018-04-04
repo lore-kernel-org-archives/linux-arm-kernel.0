@@ -1,44 +1,52 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 4 Apr 2018 11:13:01 +0100
-Subject: [PATCH 27/37] iommu/arm-smmu-v3: Register fault workqueue
-In-Reply-To: <c4f0a441-e975-395a-fc38-3686db21227d@huawei.com>
-References: <1519280641-30258-1-git-send-email-xieyisheng1@huawei.com>
- <1519280641-30258-27-git-send-email-xieyisheng1@huawei.com>
- <f2841aac-4c5e-4ac2-fa4d-81d6b2857503@huawei.com>
- <cabd71fd-c54c-c21a-a5b7-227e69fa4286@arm.com>
- <c4f0a441-e975-395a-fc38-3686db21227d@huawei.com>
-Message-ID: <5a610d4f-dc41-15a8-78be-ff5c098c2523@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 Apr 2018 12:18:58 +0200
+Subject: [PATCH 02/15] ARM: pxa: add dma slave map
+In-Reply-To: <87h8os3uwa.fsf@belgarion.home>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-3-robert.jarzmik@free.fr>
+ <CAK8P3a3pSitVqfiF2LK0cMrAKLOeCWXXJBLeVc5f_Tg=vALkUA@mail.gmail.com>
+ <87tvss48ti.fsf@belgarion.home>
+ <CAK8P3a2FFVnPj4+VoQET3-Jz2DaYbc6UUJnX1fH5s8VumJZ7Og@mail.gmail.com>
+ <87h8os3uwa.fsf@belgarion.home>
+Message-ID: <CAK8P3a21xkp5KkNRpnxJH1bSZjyiyO=f7_9XyyqvGS3EC=GBWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/03/18 01:09, Yisheng Xie wrote:
-> Hi Jean,
-> 
-> On 2018/3/21 21:24, Jean-Philippe Brucker wrote:
->> Hi Yisheng,
->>
->> On 19/03/18 11:03, Yisheng Xie wrote:
->>> Hi Jean,
->>>
->>> [...]
->>>> @@ -3168,6 +3260,13 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->>>>  	if (ret)
->>>>  		return ret;
->>>>  
->>>> +	if (smmu->features & (ARM_SMMU_FEAT_STALLS | ARM_SMMU_FEAT_PRI)) {
->>>> +		smmu->faultq_nb.notifier_call = arm_smmu_flush_queues;
->>>> +		ret = iommu_fault_queue_register(&smmu->faultq_nb);
->>>> +		if (ret)
->>>> +			return ret;
->>>
->>> I find a case here: CONFIG_IOMMU_FAULT=n, and smmu support feature STALLS or PRI,
->>> the device probe will failed here, is this what we want?
->>
->> Since CONFIG_ARM_SMMU_V3 selects CONFIG_IOMMU_FAULT, I don't think it
->> can happen. 
-> 
-> But CONFIG_IOMMU_FAULT can be changed after select, maybe can make it as unchangeable. Seems sensible, I don't see a reason to leave IOMMU_FAULT selectable
-manually.
+On Tue, Apr 3, 2018 at 10:19 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> ... chop chop removing unneeded recipients ....
+>
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+>> Ok, I looked at the driver in more detail now and found the scary parts.
+>> So it's using the async DMA interface to do synchronous DMA in
+>> interrupt context in order to transfer the rx data faster than an readsl()
+>> would, correct?
+> That's correct, at least for the smc91x.
+>
+>> It still feels odd to me that there is an entry in the slave map for
+>> a device that does not have a request line. However, it also seems
+>> that the entire code in those two drivers that deals with DMA is specific
+>> to PXA anyway, so maybe it can be done differently: instead of
+>> calling dma_request_slave_channel_compat() or dma_request_chan()
+>> with a fake request line, how about calling dma_request_channel()
+>> with an NULL filter function and data, and have the driver handle
+>> the empty data case the same way as the rq=-1 case today?
+> Okay, in this case :
+>  - the channel priority cannot be passed anymore
 
-Thanks,
-Jean
+Right, but it could just always use a static priority, right?
+
+>  - and I don't see how this can work :
+>    dma_request_channel()
+>      __dma_request_channel()
+>        find_candidate()
+>          private_candidate(mask, device, fn, fn_param);
+>            /* Here, fn == NULL and fn_param == NULL as per your proposal */
+>
+>    This function will find the first available dma channel, all right, but
+>    no function will be called in pxa_dma driver, and therefore the last
+>    requestor of the channel will be used, which is bad.
+
+Can't you just reset those in pxad_free_chan_resources()?
+
+       Arnd
