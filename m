@@ -1,49 +1,28 @@
 From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Wed, 4 Apr 2018 10:16:20 +0200
-Subject: [PATCH v2 3/6] i2c: i2c-stm32f7: Add initial SMBus protocols
- support
-In-Reply-To: <20180403153122.ux6hnnmexwmq3soz@ninjato>
+Date: Wed, 4 Apr 2018 10:20:44 +0200
+Subject: [PATCH v2 5/6] i2c: i2c-stm32f7: Add DMA support
+In-Reply-To: <20180403153925.lg37rezuvs6hefks@ninjato>
 References: <1521650940-11651-1-git-send-email-pierre-yves.mordret@st.com>
- <1521650940-11651-4-git-send-email-pierre-yves.mordret@st.com>
- <20180324224911.xz3fz2jojcdrovb4@ninjato>
- <2fadcd7f-3bfc-997e-a30e-808f6d854f2c@st.com>
- <20180403153122.ux6hnnmexwmq3soz@ninjato>
-Message-ID: <79784d30-0a88-9aab-081f-ee14c214288b@st.com>
+ <1521650940-11651-6-git-send-email-pierre-yves.mordret@st.com>
+ <20180403153925.lg37rezuvs6hefks@ninjato>
+Message-ID: <273ac8d2-6861-c1ad-c2fc-f9c5cc2ac3de@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 04/03/2018 05:31 PM, Wolfram Sang wrote:
+On 04/03/2018 05:39 PM, Wolfram Sang wrote:
 > 
->>>> All SMBus protocols are implemented except SMBus-specific protocols.
->>>
->>> What does that mean?
->>
->> It miss SMBus Host Notification and SMBBus Alert. They are almost ready but I'm
->> struggling to put them back to operational state after recent changes related to
->> SMBust Host Notification. A more "classic" interrupt base solution has been put
->> in place but I fail to use implement it in my side.
->> Another patch set is going to be delivered for these 2 commands.
+>> +#define STM32F7_I2C_DMA_LEN_MIN			0x1
+> ...
 > 
-> This is totally fine to implement it incrementally. Please just update the
-> commit message with the more detailed explanation above.
+>> +	if (i2c_dev->dma && f7_msg->count >= STM32F7_I2C_DMA_LEN_MIN) {
 > 
-
-Ok. I get.
-
->>> That is quite some complexity considering we have I2C_FUNC_SMBUS_EMUL. I
->>> don't mind, but you really want that?
->>>
->>
->> All SMBBus commands are implemented as such. I never try to emulation commands.
->> Should we use emulation SMBus commands or real commands... Don't know.
+> Are you using DMA for every message with a length >= 1? The setup of
+> that might be more expensive than the DMA gain, if so.
 > 
-> You won't see any difference on the wire. I don't know your HW. It might
-> be that SMBus mode is more "automatic" and uses less interrupts. Or
-> stuff like Alert or HostNotification only works in this mode. If you and
-> the driver maintainers think it is worth the added complexity, I am
-> fine, too.
-> 
-Ok. I see.
-I am the maintainer. So yes I keep it as such ... with this complexity ;)
+Well yes. I am in charge of DMA IPs as well. I2C is the only devices that I had
+to test DMA outside standard DMA Engine test. Quite convenient.
+I believe to stress both I2C and DMA, this value was relevant.
+Now I agree this value can be tuned a little bit. I might raise this threshold
+in V3.
