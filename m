@@ -1,55 +1,99 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  4 Apr 2018 14:38:22 +0200
-Subject: [PATCH] ARM: omap1: osk: use device properties for at24 eeprom
-Message-ID: <20180404123822.5664-1-brgl@bgdev.pl>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 4 Apr 2018 18:14:07 +0530
+Subject: [PATCH v8 25/42] ARM: davinci: dm644x: add new clock init using
+ common clock framework
+In-Reply-To: <cda6f3bc-7ca9-68e9-80ca-baf6d4860c95@ti.com>
+References: <1521168778-27236-1-git-send-email-david@lechnology.com>
+ <1521168778-27236-26-git-send-email-david@lechnology.com>
+ <333f49c7-bafd-8e2d-65e9-7d1aff4836de@ti.com>
+ <43c266b8-c023-a1b4-c751-bd46c2fb910d@lechnology.com>
+ <cda6f3bc-7ca9-68e9-80ca-baf6d4860c95@ti.com>
+Message-ID: <030ce534-765b-3059-a6a1-fffaaaba307a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
+On Wednesday 04 April 2018 12:17 PM, Sekhar Nori wrote:
+> On Tuesday 03 April 2018 10:00 PM, David Lechner wrote:
+>> On 04/03/2018 05:26 AM, Sekhar Nori wrote:
+>>> On Friday 16 March 2018 08:22 AM, David Lechner wrote:
+>>>> +static struct resource dm644x_pll1_resources[] = {
+>>>> +??? {
+>>>> +??????? .start??? = DAVINCI_PLL1_BASE,
+>>>> +??????? .end??? = DAVINCI_PLL1_BASE + SZ_4K - 1,
+>>>
+>>> The .end should be DAVINCI_PLL1_BASE + SZ_1K - 1, otherwise it prevents
+>>> PLL2 from getting registered.
+>>>
+>>>> +??????? .flags??? = IORESOURCE_MEM,
+>>>> +??? },
+>>>> +};
+>>>> +
+>>>> +static struct platform_device dm644x_pll1_device = {
+>>>> +??? .name??????? = "dm644x-pll1",
+>>>> +??? .id??????? = -1,
+>>>> +??? .resource??? = dm644x_pll1_resources,
+>>>> +??? .num_resources??? = ARRAY_SIZE(dm644x_pll1_resources),
+>>>> +};
+>>>> +
+>>>> +static struct resource dm644x_pll2_resources[] = {
+>>>> +??? {
+>>>> +??????? .start??? = DAVINCI_PLL2_BASE,
+>>>> +??????? .end??? = DAVINCI_PLL2_BASE + SZ_4K - 1,
+>>>
+>>> And this too should be fixed, else it prevents the PSC from getting
+>>> registered.
+>>>
+>>>> +??????? .flags??? = IORESOURCE_MEM,
+>>>> +??? },
+>>>> +};
+>>>
+>>> With these fixed, I still had to enable 'clk_ignore_unused' on DM644x
+>>> EVM to get to NFS boot. I think root of the problem is that pm_runtime()
+>>> APIs are not working in the legacy boot mode.
+>>>
+>>> This can be seen even on the DA850 LCDK in legacy boot. pm_genpd_summary
+>>> in debugfs shows all domains are off and there are no devices registered
+>>> under the "da850-psc1: emac" domain. NFS mounting still works on the
+>>> DA850 LCDK because clk_summary shows enable and prepare count of 4 for
+>>> emac. Not sure how that's happening. But on DM644x EVM, the emac clock
+>>> enable count is 0.
+>>>
+>>> Still looking at whats going wrong here. I am testing your v8 branch
+>>> with clk-davinci branch from clk-next merged to get the fixes Stephen
+>>> made.
+>>>
+>>
+>> In legacy mode, genpd is not being used. I didn't see any mechanism for
+> 
+> Ah, I got stumped by the genpd related debug entries popping up.
+> Probably something should be done to make sure they don't show up in
+> legacy boot. And some comments to that effect in psc.c will help.
+> 
+>> genpd lookup without device tree. So, we are still relying on the
+>> matching in arch/arm/mach-davinci/pm_domain.c.
+> 
+> This is fine. We just need legacy boot to keep working without regressions.
+> 
+>>
+>> I suspect we need to fix the clock lookups in
+>> drivers/clk/davinci/psc-dm644x.c.
+>>
+>> LPSC_CLKDEV2(emac_clkdev,??????? NULL,??????? "davinci_emac.1",
+>> ??????????????????? "fck",??????? "davinci_mdio.0");
+>>
+>> NULL might need to be changed to "fck" to be picked up by pm matching
+>> and "davinci_emac.1" should be verified that it matches the actual EMAC
+>> device name.
+> 
+> NULL con_id matches what we have for DA850 and also what we had for
+> DM644x prior to CCF conversion. So, I did not really suspect that. The
+> device name does match. I will check what else could be going on based
+> on your input.
 
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+This issue is because emac platform device is getting registered really
+early on dm644x even before the clocks are ready in postcore_initcall().
 
-Signed-off-by: Bartosz Golaszewski <brgl@bgdev.pl>
----
- arch/arm/mach-omap1/board-osk.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I will send a patch fixing that.
 
-diff --git a/arch/arm/mach-omap1/board-osk.c b/arch/arm/mach-omap1/board-osk.c
-index c66372ed29e2..9ffa8d755a59 100644
---- a/arch/arm/mach-omap1/board-osk.c
-+++ b/arch/arm/mach-omap1/board-osk.c
-@@ -303,22 +303,22 @@ static const struct omap_lcd_config osk_lcd_config __initconst = {
- #ifdef	CONFIG_OMAP_OSK_MISTRAL
- 
- #include <linux/input.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
- 
- #include <linux/platform_data/keypad-omap.h>
- 
--static struct at24_platform_data at24c04 = {
--	.byte_len	= SZ_4K / 8,
--	.page_size	= 16,
-+static const struct property_entry mistral_at24_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 16),
-+	{ }
- };
- 
- static struct i2c_board_info __initdata mistral_i2c_board_info[] = {
- 	{
- 		/* NOTE:  powered from LCD supply */
- 		I2C_BOARD_INFO("24c04", 0x50),
--		.platform_data	= &at24c04,
-+		.properties = mistral_at24_properties,
- 	},
- 	/* TODO when driver support is ready:
- 	 *  - optionally ov9640 camera sensor at 0x30
--- 
-2.16.3
+Thanks,
+Sekhar
