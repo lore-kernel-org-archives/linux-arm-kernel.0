@@ -1,116 +1,124 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 4 Apr 2018 18:27:59 +0530
-Subject: [PATCH] ARM: davinci: dm644x: remove unnecessary postcore_initcall()
-Message-ID: <20180404125759.27061-1-nsekhar@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 4 Apr 2018 14:01:48 +0100
+Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180403061836.3926-8-mylene.josserand@bootlin.com>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-8-mylene.josserand@bootlin.com>
+Message-ID: <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dm644x_init_devices() is unnecessarily implemented as a
-postcore_initcall().
+Hi Myl?ne,
 
-This does not cause any issues now, but creates issues when
-converting to common clock framework where clocks themselves
-become platform devices and are initialized later. Because of
-this, device clock acquisition and runtime PM on that device
-fails.
+On 03/04/18 07:18, Myl?ne Josserand wrote:
+> The CNTVOFF register from arch timer is uninitialized.
+> It should be done by the bootloader but it is currently not the case,
+> even for boot CPU because this SoC is booting in secure mode.
+> It leads to an random offset value meaning that each CPU will have a
+> different time, which isn't working very well.
+> 
+> Add assembly code used for boot CPU and secondary CPU cores to make
+> sure that the CNTVOFF register is initialized. Because this code can
+> be used by different platforms, add this assembly file in ARM's common
+> folder.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> ---
+>  arch/arm/common/Makefile           |  1 +
+>  arch/arm/common/smp_cntvoff.S      | 35 +++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/smp_cntvoff.h |  8 ++++++++
+>  3 files changed, 44 insertions(+)
+>  create mode 100644 arch/arm/common/smp_cntvoff.S
+>  create mode 100644 arch/arm/include/asm/smp_cntvoff.h
+> 
+> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> index 70b4a14ed993..83117deb86c8 100644
+> --- a/arch/arm/common/Makefile
+> +++ b/arch/arm/common/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+>  obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+>  obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+>  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+> +obj-$(CONFIG_SMP)		+= smp_cntvoff.o
+>  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>  obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
+>  CFLAGS_REMOVE_mcpm_entry.o	= -pg
+> diff --git a/arch/arm/common/smp_cntvoff.S b/arch/arm/common/smp_cntvoff.S
+> new file mode 100644
+> index 000000000000..65ed199a50fe
+> --- /dev/null
+> +++ b/arch/arm/common/smp_cntvoff.S
+> @@ -0,0 +1,35 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2018 Chen-Yu Tsai
+> + * Copyright (c) 2018 Bootlin
+> + *
+> + * Chen-Yu Tsai <wens@csie.org>
+> + * Myl?ne Josserand <mylene.josserand@bootlin.com>
 
-Move the call to .init_machine() callback along with rest of
-platform device's registration.
+Given that this is literally lifted from shmobile_init_cntvoff, the
+whole attribution is a bit dubious.
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/board-dm644x-evm.c  | 5 +++++
- arch/arm/mach-davinci/board-neuros-osd2.c | 5 +++++
- arch/arm/mach-davinci/board-sffsdr.c      | 6 ++++++
- arch/arm/mach-davinci/davinci.h           | 1 +
- arch/arm/mach-davinci/dm644x.c            | 6 +-----
- 5 files changed, 18 insertions(+), 5 deletions(-)
+> + *
+> + * SMP support for sunxi based systems with Cortex A7/A15
 
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 95b55aae1366..d1a7239a80d6 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -768,6 +768,11 @@ static __init void davinci_evm_init(void)
- 	struct clk *aemif_clk;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
-+	ret = dm644x_init_devices();
-+	if (ret)
-+		pr_warn("%s: dm644x_init_devices() failed: %d\n",
-+			__func__, ret);
-+
- 	ret = dm644x_gpio_register();
- 	if (ret)
- 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
-diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
-index f2875770fbff..23f4f0b70752 100644
---- a/arch/arm/mach-davinci/board-neuros-osd2.c
-+++ b/arch/arm/mach-davinci/board-neuros-osd2.c
-@@ -174,6 +174,11 @@ static __init void davinci_ntosd2_init(void)
- 	struct clk *aemif_clk;
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
- 
-+	ret = dm644x_init_devices();
-+	if (ret)
-+		pr_warn("%s: dm644x_init_devices() failed: %d\n",
-+			__func__, ret);
-+
- 	ret = dm644x_gpio_register();
- 	if (ret)
- 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index 2922da9d1684..d9900d7c26d3 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -133,6 +133,12 @@ static void __init davinci_sffsdr_map_io(void)
- static __init void davinci_sffsdr_init(void)
- {
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
-+	int ret;
-+
-+	ret = dm644x_init_devices();
-+	if (ret)
-+		pr_warn("%s: dm644x_init_devices() failed: %d\n",
-+			__func__, ret);
- 
- 	platform_add_devices(davinci_sffsdr_devices,
- 			     ARRAY_SIZE(davinci_sffsdr_devices));
-diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
-index 270cef85750a..0ba37d68ecb4 100644
---- a/arch/arm/mach-davinci/davinci.h
-+++ b/arch/arm/mach-davinci/davinci.h
-@@ -104,6 +104,7 @@ int dm365_gpio_register(void);
- 
- /* DM644x function declarations */
- void dm644x_init(void);
-+int dm644x_init_devices(void);
- void dm644x_init_time(void);
- void dm644x_init_asp(void);
- int dm644x_init_video(struct vpfe_config *, struct vpbe_config *);
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index b409801649e1..da833290291b 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -961,14 +961,11 @@ int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
- 	return 0;
- }
- 
--static int __init dm644x_init_devices(void)
-+int __init dm644x_init_devices(void)
- {
- 	struct platform_device *edma_pdev;
- 	int ret = 0;
- 
--	if (!cpu_is_davinci_dm644x())
--		return 0;
--
- 	edma_pdev = platform_device_register_full(&dm644x_edma_device);
- 	if (IS_ERR(edma_pdev)) {
- 		pr_warn("%s: Failed to register eDMA\n", __func__);
-@@ -984,4 +981,3 @@ static int __init dm644x_init_devices(void)
- 
- 	return ret;
- }
--postcore_initcall(dm644x_init_devices);
+That's not restricted to sunxi, is it?
+
+> + *
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +
+> +ENTRY(smp_init_cntvoff)
+
+The name doesn't quite reflect the usage constraints. This will only
+work if used from secure, and is UNPREDICTABLE otherwise (see the CPS
+instruction). Also, the "smp" prefix is quite misleading, as it only
+affects the current CPU, and not any other.
+
+How about secure_cntvoff_init instead? Same thing for the file name.
+
+> +	.arch	armv7-a
+> +	/*
+> +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
+> +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+> +	 * then it should be handled by the secure code
+> +	 */
+> +	cps	#MON_MODE
+> +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
+> +	orr	r0, r1, #1
+> +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
+> +	isb
+> +	mov	r0, #0
+> +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
+> +	isb
+> +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
+> +	isb
+> +	cps	#SVC_MODE
+> +	ret	lr
+> +ENDPROC(smp_init_cntvoff)
+> diff --git a/arch/arm/include/asm/smp_cntvoff.h b/arch/arm/include/asm/smp_cntvoff.h
+> new file mode 100644
+> index 000000000000..59a95f7604ee
+> --- /dev/null
+> +++ b/arch/arm/include/asm/smp_cntvoff.h
+> @@ -0,0 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +
+> +#ifndef __ASMARM_ARCH_CNTVOFF_H
+> +#define __ASMARM_ARCH_CNTVOFF_H
+> +
+> +extern void smp_init_cntvoff(void);
+> +
+> +#endif
+> 
+
+It'd be good to take this opportunity to refactor the shmobile code.
+
+Thanks,
+
+	M.
 -- 
-2.16.2
+Jazz is not dead. It just smells funny...
