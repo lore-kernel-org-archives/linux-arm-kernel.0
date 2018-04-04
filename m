@@ -1,58 +1,46 @@
-From: valentin.schneider@arm.com (Valentin Schneider)
-Date: Wed, 4 Apr 2018 11:44:04 +0100
-Subject: [PATCH] sched: support dynamiQ cluster
-In-Reply-To: <CAKfTPtDy2uUj4amA9MARUz9qS=+urwV2edyQn+fW70hkN+CgoQ@mail.gmail.com>
-References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
- <20180329125324.GR4589@e105550-lin.cambridge.arm.com>
- <CAKfTPtD4skW_3SAk--vBEC5-m1Ua48bjOQYS0pDqW3nPSpsENg@mail.gmail.com>
- <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
- <CAKfTPtDy2uUj4amA9MARUz9qS=+urwV2edyQn+fW70hkN+CgoQ@mail.gmail.com>
-Message-ID: <e8e6e7d0-7744-1dab-7b24-b7ff37df60c8@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 4 Apr 2018 11:47:56 +0100
+Subject: RFC: Using regmap in ARM64 for EL3 register access
+In-Reply-To: <0cf26fec-a702-9d57-c7e0-85064690133c@linux.intel.com>
+References: <0cf26fec-a702-9d57-c7e0-85064690133c@linux.intel.com>
+Message-ID: <7034387b-8dd9-77fa-95f0-63c805849ced@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 03/04/18 13:17, Vincent Guittot wrote:
-> Hi Valentin,
-> 
-[...]
->>
->> I believe ASYM_PACKING behaves better here because the workload is only
->> sysbench threads. As stated above, since task utilization is disregarded, I
-> 
-> It behaves better because it doesn't wait for the task's utilization
-> to reach a level before assuming the task needs high compute capacity.
-> The utilization gives an idea of the running time of the task not the
-> performance level that is needed
-> 
-
-That's my point actually. ASYM_PACKING disregards utilization and moves those
-threads to the big cores ASAP, which is good here because it's just sysbench
-threads.
-
-What I meant was that if the task composition changes, IOW we mix "small"
-tasks (e.g. periodic stuff) and "big" tasks (performance-sensitive stuff like
-sysbench threads), we shouldn't assume all of those require to run on a big
-CPU. The thing is, ASYM_PACKING can't make the difference between those, so
-it'll all come down to which task spawned first.
-
-Furthermore, ASYM_PACKING will forcefully move tasks via active balance
-regardless of the imbalance as long as a big CPU is idle.
-
-So we could have a scenario where loads of "small" tasks spawn, and they all
-get moved to a big CPU until they're all full (because they're periodic tasks
-so the big CPUs will eventually be idle and will pull another task as long as
-they get some idle time).
-
-Then, before the load tracking signals of those tasks ramp up high enough 
-that the load balancer would try to move those to LITTLE CPUs, some "big"
-tasks spawn. They get scheduled on LITTLE CPUs, and now the system will look
-balanced so nothing will be done.
 
 
-I acknowledge this all sounds convoluted but I hope it highlights what I
-think could go wrong with ASYM_PACKING on asymmetric systems.
+On 30/03/18 00:00, Thor Thayer wrote:
+> Hi,
+>
+> I'm working on an ARM64 architecture that needs to manipulate some
+> protected registers that are only accessible in EL3. Linux is running at
+> EL1 which doesn't have the proper permissions for these registers.
+>
+If the hardware/IP registers are designed not to provide access to EL1,
+then providing one in software by some means is simply wrong approach to
+solve whatever issue you are trying to address here.
 
+> Since U-Boot is running at the higher EL3, we communicate to the U-Boot
+> functions through a SMC mechanism.
+>
+Please follow SMCCC to add any SMC interface.
+
+> The regmap framework seems like a good match for accessing these
+> registers. We need the same functionality as I2C and SPI regmaps - read,
+> write, and update registers.
+>
+No, providing register access to EL1 using regmap+SMC just defeats the
+hardware security restrictions and may provide ways to exploit.
+Why not abstract to the level of services you need ?
+
+> Any comments or suggestions about using regmap for this purpose? Is
+> there a better method?
+>
+If you are looking for power management features, then PSCI and SCMI are
+couple of specifications to look at. I would really like to know more
+details on your use case to provide any suggestions.
+
+
+-- 
 Regards,
-Valentin
+Sudeep
