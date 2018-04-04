@@ -1,124 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 4 Apr 2018 14:01:48 +0100
-Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
-In-Reply-To: <20180403061836.3926-8-mylene.josserand@bootlin.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-8-mylene.josserand@bootlin.com>
-Message-ID: <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
+From: kiarmak@cisco.com (Kostiantyn Iarmak)
+Date: Wed, 4 Apr 2018 16:04:24 +0300
+Subject: [PATCH v3 0/2] kexec-tools: arm64: Enable D-cache in purgatory
+In-Reply-To: <71f0a333-8bfb-3755-c9fd-e30bf2280339@cisco.com>
+References: <cover.1495514291.git.panand@redhat.com>
+ <59312080.1090906@arm.com> <1963984d-e78e-a5b2-f1a2-fb0a789a505e@redhat.com>
+ <CAB=otbT23ySN4VC6G0sBKF5p4SvsnG8PS-C_beBgn8YJUsbw9Q@mail.gmail.com>
+ <71f0a333-8bfb-3755-c9fd-e30bf2280339@cisco.com>
+Message-ID: <22543001-4250-2841-4bec-0a0a286238c6@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Myl?ne,
+Unfortunately got delivery failure notification for Pratyush Anand's 
+address (Unknown address),
 
-On 03/04/18 07:18, Myl?ne Josserand wrote:
-> The CNTVOFF register from arch timer is uninitialized.
-> It should be done by the bootloader but it is currently not the case,
-> even for boot CPU because this SoC is booting in secure mode.
-> It leads to an random offset value meaning that each CPU will have a
-> different time, which isn't working very well.
-> 
-> Add assembly code used for boot CPU and secondary CPU cores to make
-> sure that the CNTVOFF register is initialized. Because this code can
-> be used by different platforms, add this assembly file in ARM's common
-> folder.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> ---
->  arch/arm/common/Makefile           |  1 +
->  arch/arm/common/smp_cntvoff.S      | 35 +++++++++++++++++++++++++++++++++++
->  arch/arm/include/asm/smp_cntvoff.h |  8 ++++++++
->  3 files changed, 44 insertions(+)
->  create mode 100644 arch/arm/common/smp_cntvoff.S
->  create mode 100644 arch/arm/include/asm/smp_cntvoff.h
-> 
-> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
-> index 70b4a14ed993..83117deb86c8 100644
-> --- a/arch/arm/common/Makefile
-> +++ b/arch/arm/common/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
->  obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
->  obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
->  obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
-> +obj-$(CONFIG_SMP)		+= smp_cntvoff.o
->  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
->  obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
->  CFLAGS_REMOVE_mcpm_entry.o	= -pg
-> diff --git a/arch/arm/common/smp_cntvoff.S b/arch/arm/common/smp_cntvoff.S
-> new file mode 100644
-> index 000000000000..65ed199a50fe
-> --- /dev/null
-> +++ b/arch/arm/common/smp_cntvoff.S
-> @@ -0,0 +1,35 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2018 Chen-Yu Tsai
-> + * Copyright (c) 2018 Bootlin
-> + *
-> + * Chen-Yu Tsai <wens@csie.org>
-> + * Myl?ne Josserand <mylene.josserand@bootlin.com>
+   who can help with merging this patch set?
 
-Given that this is literally lifted from shmobile_init_cntvoff, the
-whole attribution is a bit dubious.
 
-> + *
-> + * SMP support for sunxi based systems with Cortex A7/A15
+On 04.04.18 15:45, Kostiantyn Iarmak wrote:
+> Hi Pratyush,
+>
+> From: Pratyush Anand <panand@redhat.com>
+>> Date: Fri, Jun 2, 2017 at 5:42 PM
+>> Subject: Re: [PATCH v3 0/2] kexec-tools: arm64: Enable D-cache in 
+>> purgatory
+>> To: James Morse <james.morse@arm.com>
+>> Cc: mark.rutland at arm.com, bhe at redhat.com, kexec at lists.infradead.org,
+>> horms at verge.net.au, dyoung at redhat.com,
+>> linux-arm-kernel at lists.infradead.org
+>>
+>>
+>> Hi James,
+>>
+>> On Friday 02 June 2017 01:53 PM, James Morse wrote:
+>>> Hi Pratyush,
+>>>
+>>> On 23/05/17 06:02, Pratyush Anand wrote:
+>>>> It takes more that 2 minutes to verify SHA in purgatory when 
+>>>> vmlinuz image
+>>>> is around 13MB and initramfs is around 30MB. It takes more than 20 
+>>>> second
+>>>> even when we have -O2 optimization enabled. However, if dcache is 
+>>>> enabled
+>>>> during purgatory execution then, it takes just a second in SHA
+>>>> verification.
+>>>>
+>>>> Therefore, these patches adds support for dcache enabling facility 
+>>>> during
+>>>> purgatory execution.
+>>>
+>>> I'm still not convinced we need this. Moving the SHA verification to 
+>>> happen
+>>> before the dcache+mmu are disabled would also solve the delay problem,
+>>
+>> Humm..I am not sure, if we can do that.
+>>
+>> When we leave kernel (and enter into purgatory), icache+dcache+mmu are
+>> already disabled. I think, that would be possible when we will be in a
+>> position to use in-kernel purgatory.
+>>
+>>> and we
+>>> can print an error message or fail the syscall.
+>>>
+>>> For kexec we don't expect memory corruption, what are we testing for?
+>>> I can see the use for kdump, but the kdump-kernel is unmapped so the 
+>>> kernel
+>>> can't accidentally write over it.
+>>>
+>>> (we discussed all this last time, but it fizzled-out. If you and the
+>>>   kexec-tools maintainer think its necessary, fine by me!)
+>>
+>> Yes, there had already been discussion and MAINTAINERs have
+>> discouraged none-purgatory implementation.
+>>
+>>> I have some comments on making this code easier to maintain..
+>>>
+>> Thanks.
+>>
+>> I have implemented your review comments and have archived the code in
+>>
+>> https://github.com/pratyushanand/kexec-tools.git : 
+>> purgatory-enable-dcache
+>>
+>> I will be posting the next version only when someone complains about
+>> ARM64 kdump behavior that it is not as fast as x86.
+> On our ARM64-based platform we have very long main kernel-secondary 
+> kernel switch time.
+>
+> This patch set fixes the issue (we are using 4.4 kernel and 2.0.13 
+> kexec-tools version), we can get ~25x speedup, with this patch 
+> secondary kernel boots in ~3 seconds while on 2.0.13-2.0.16 
+> kexec-tools without this patch switch takes about 75 seconds.
+>
+> When do you plan merge this patch?
+>
+> I can help you with testing on our platform.
+>
+>> Thanks for all your time on this series. That really helped me to
+>> understand the arm64 page table in a better way.
+>>
+>> ~Pratyush
+>>
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-That's not restricted to sunxi, is it?
-
-> + *
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <asm/assembler.h>
-> +
-> +ENTRY(smp_init_cntvoff)
-
-The name doesn't quite reflect the usage constraints. This will only
-work if used from secure, and is UNPREDICTABLE otherwise (see the CPS
-instruction). Also, the "smp" prefix is quite misleading, as it only
-affects the current CPU, and not any other.
-
-How about secure_cntvoff_init instead? Same thing for the file name.
-
-> +	.arch	armv7-a
-> +	/*
-> +	 * CNTVOFF has to be initialized either from non-secure Hypervisor
-> +	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
-> +	 * then it should be handled by the secure code
-> +	 */
-> +	cps	#MON_MODE
-> +	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
-> +	orr	r0, r1, #1
-> +	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
-> +	isb
-> +	mov	r0, #0
-> +	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
-> +	isb
-> +	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
-> +	isb
-> +	cps	#SVC_MODE
-> +	ret	lr
-> +ENDPROC(smp_init_cntvoff)
-> diff --git a/arch/arm/include/asm/smp_cntvoff.h b/arch/arm/include/asm/smp_cntvoff.h
-> new file mode 100644
-> index 000000000000..59a95f7604ee
-> --- /dev/null
-> +++ b/arch/arm/include/asm/smp_cntvoff.h
-> @@ -0,0 +1,8 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +
-> +#ifndef __ASMARM_ARCH_CNTVOFF_H
-> +#define __ASMARM_ARCH_CNTVOFF_H
-> +
-> +extern void smp_init_cntvoff(void);
-> +
-> +#endif
-> 
-
-It'd be good to take this opportunity to refactor the shmobile code.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Best Regards,
+
+   Kostiantyn (Kostia) Iarmak.
