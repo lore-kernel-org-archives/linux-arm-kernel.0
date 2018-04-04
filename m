@@ -1,39 +1,33 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed,  4 Apr 2018 16:44:44 +0200
-Subject: [PATCH] cpufreq: armada-37xx: Fix clock leak
-Message-ID: <20180404144444.4142-1-gregory.clement@bootlin.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Apr 2018 15:46:22 +0100
+Subject: [alsa-devel] [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake:
+ "Stoping" -> "Stopping"
+In-Reply-To: <20180404102425.cwj7vzvrvi2obcoi@mwanda>
+References: <20180330154420.6903-1-colin.king@canonical.com>
+ <20180403134540.GA29017@lenoch>
+ <20180404102425.cwj7vzvrvi2obcoi@mwanda>
+Message-ID: <20180404144622.GE7691@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There was no clk_put() balancing the clk_get(). This commit fixes it.
+On Wed, Apr 04, 2018 at 01:24:26PM +0300, Dan Carpenter wrote:
 
-Fixes: 92ce45fb875d ("cpufreq: Add DVFS support for Armada 37xx")
-Cc: <stable@vger.kernel.org>
-Reported-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- drivers/cpufreq/armada-37xx-cpufreq.c | 2 ++
- 1 file changed, 2 insertions(+)
+> Trivial patches should just be trivial instead of evolving into a thread
+> that lasts for days.
 
-diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
-index c6ebc88a7d8d..72a2975499db 100644
---- a/drivers/cpufreq/armada-37xx-cpufreq.c
-+++ b/drivers/cpufreq/armada-37xx-cpufreq.c
-@@ -202,6 +202,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
- 	cur_frequency = clk_get_rate(clk);
- 	if (!cur_frequency) {
- 		dev_err(cpu_dev, "Failed to get clock rate for CPU\n");
-+		clk_put(clk);
- 		return -EINVAL;
- 	}
- 
-@@ -210,6 +211,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
- 		return -EINVAL;
- 
- 	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
-+	clk_put(clk);
- 
- 	for (load_lvl = ARMADA_37XX_DVFS_LOAD_0; load_lvl < LOAD_LEVEL_NR;
- 	     load_lvl++) {
--- 
-2.16.3
+Indeed, and it's usually easier to just send a further trivial patch
+rather than just talk about it.
+
+> Why is "buff += 8;" indented too far?  And why does every line end in a
+> space character?  And I think about it for 10 minutes and then delete my
+> patch because it's too much hassle to deal with for something small.
+
+The other option is to just send it and not worry too much about it
+getting applied or not.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/f1ebe38e/attachment.sig>
