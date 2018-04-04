@@ -1,57 +1,69 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 4 Apr 2018 09:48:56 +0200
-Subject: ARM compile failure in Re: linux-next: Tree for Apr 4
-In-Reply-To: <20180404165559.4cd0c12c@canb.auug.org.au>
-References: <20180404165559.4cd0c12c@canb.auug.org.au>
-Message-ID: <20180404074856.GA9342@amd>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed,  4 Apr 2018 10:04:18 +0200
+Subject: [PATCH v5 0/5] drm/blend: Support generic plane-wide alpha
+Message-ID: <cover.5437f7a0834f12076bc0a4eba52226f28b2e0dda.1522829034.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-> Please do not add any v4.18 destined stuff to your linux-next included
-> trees until after v4.17-rc1 has been released.
-> 
-> Changes since 20180403:
-> 
-> The vfs tree still had its build failure for which I reverted a commit.
-> 
-> Non-merge commits (relative to Linus' tree): 8505
->  8493 files changed, 392779 insertions(+), 275941 deletions(-)
-> 
-> ----------------------------------------------------------------------------
+This serie aims at enhancing the support for plane-wide alpha in the
+drivers that are implementing it at the moment, by turning it into a
+generic property and converting the drivers (rcar-du and atmel-hclcdc). It
+also introduces support for it in the sun4i driver.
 
-When trying to build kernel for N900, I get:
+Let me know what you think,
+Maxime
 
-  CC      lib/timerqueue.o
-    CC      lib/vsprintf.o
-    lib/string.c: In function 'strstr':
-    lib/string.c:478:8: error: inlining failed in call to
-    always_inline 'strlen': function not inlinable
-    lib/string.c:903:5: error: called from here
-    lib/string.c:478:8: error: inlining failed in call to
-    always_inline 'strlen': function not inlinable
-    lib/string.c:906:5: error: called from here
-    lib/string.c:855:15: error: inlining failed in call to
-    always_inline 'memcmp': function not inlinable
-    ...
-pavel at duo:/data/l/linux-next-n900$ git branch -l
-* (detached from next-20180403)
+Changes from v4:
+  - Removed the premultiplied alpha mention
+  - Added Eric Reviewed-by
 
-I'm using
+Changes from v3:
+  - Rebased on current drm-misc-next
+  - Made the alpha property a 16 bits property, and have the drivers
+    drop the lowest 8 bits
+  - Removed the csv documentation, and documented it in the doc instead
 
-eval ` eldk-switch.sh -r 5.4 armv7a`
+Changes from v2:
+  - Rebased on current drm-misc-next
+  - Removed the patches already applied
+  - Split the patch implementing the automatic pipe assignment in two
 
-for cross-compilation.
+Changes from v1:
+  - Document the behaviour on concurrent usage of the alpha property and an
+    alpha component in the format
+  - Allowed for higher alpha values
+  - Moved the alpha value from a helper to the struct drm_format_info
+  - Collected tags
+  - Rebased on current drm-misc-next
 
-									Pavel
+Maxime Ripard (5):
+  drm/blend: Add a generic alpha property
+  drm/atmel-hclcdc: Convert to the new generic alpha property
+  drm/rcar-du: Convert to the new generic alpha property
+  drm/sun4i: Add support for plane alpha
+  drm/docs: Remove the rcar alpha from the csv file
+
+ Documentation/gpu/kms-properties.csv            |  1 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 13 +---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 89 ++----------------
+ drivers/gpu/drm/drm_atomic.c                    |  4 +-
+ drivers/gpu/drm/drm_atomic_helper.c             |  4 +-
+ drivers/gpu/drm/drm_blend.c                     | 37 +++++++-
+ drivers/gpu/drm/rcar-du/rcar_du_drv.h           |  1 +-
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c           |  5 +-
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c         | 15 +--
+ drivers/gpu/drm/rcar-du/rcar_du_plane.h         |  2 +-
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c           | 42 +--------
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.h           |  3 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c           | 16 ++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h           |  3 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.c             |  2 +-
+ include/drm/drm_blend.h                         |  3 +-
+ include/drm/drm_plane.h                         |  6 +-
+ 17 files changed, 95 insertions(+), 151 deletions(-)
+
+base-commit: d31b5c91a27b768ee221fe677eb0b18b4cfb9df8
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/1f3a5e63/attachment.sig>
+git-series 0.9.1
