@@ -1,481 +1,101 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 4 Apr 2018 09:00:39 +0200
-Subject: [PATCH v3 6/6] spi: sun6i: add DMA transfers support
-In-Reply-To: <20180403154449.2443-7-ssuloev@orpaltech.com>
-References: <20180403154449.2443-1-ssuloev@orpaltech.com>
- <20180403154449.2443-7-ssuloev@orpaltech.com>
-Message-ID: <20180404070039.56vxg22l32px4r3m@flea>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 4 Apr 2018 15:00:48 +0800
+Subject: [PATCH net-next 02/12] clk: sunxi-ng: r40: export a regmap to
+ access the GMAC register
+In-Reply-To: <1522824302.2049.7.camel@aosc.io>
+References: <20180317092857.4396-1-wens@csie.org>
+ <20180317092857.4396-3-wens@csie.org>
+ <20180318213129.ucwslzvwq6khxrcd@flea>
+ <CAGb2v67Fp20wkmqWyRowpAmm4EDwENnKFG+mccqWaPa5Jj4zBw@mail.gmail.com>
+ <20180403094845.le2hfuxktlv66lre@flea> <20180403095005.skflxb7m2qzbhjix@flea>
+ <1522824302.2049.7.camel@aosc.io>
+Message-ID: <CAGb2v64eD7H2BB3u_Gvk0EfUB8NwTJjDi6b4+Z3-k+1ok4vNcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 03, 2018 at 06:44:49PM +0300, Sergey Suloev wrote:
-> DMA transfers are now available for sun6i and sun8i SoCs.
-> The DMA mode is used automatically as soon as requested
-> transfer length is more than FIFO length.
-> 
-> Changes in v3:
-> 1) Debug log enhancements.
-> 
-> Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
-> ---
->  drivers/spi/spi-sun6i.c | 331 ++++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 294 insertions(+), 37 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-> index 2fa9d6e..7f41871 100644
-> --- a/drivers/spi/spi-sun6i.c
-> +++ b/drivers/spi/spi-sun6i.c
-> @@ -14,6 +14,8 @@
->  #include <linux/clk.h>
->  #include <linux/delay.h>
->  #include <linux/device.h>
-> +#include <linux/dmaengine.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
-> @@ -55,17 +57,20 @@
->  
->  #define SUN6I_FIFO_CTL_REG		0x18
->  #define SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_MASK	0xff
-> -#define SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS	0
-> +#define SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_POS	0
+On Wed, Apr 4, 2018 at 2:45 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> ? 2018-04-03?? 11:50 +0200?Maxime Ripard???
+>> On Tue, Apr 03, 2018 at 11:48:45AM +0200, Maxime Ripard wrote:
+>> > On Tue, Mar 20, 2018 at 03:15:02PM +0800, Chen-Yu Tsai wrote:
+>> > > On Mon, Mar 19, 2018 at 5:31 AM, Maxime Ripard
+>> > > <maxime.ripard@bootlin.com> wrote:
+>> > > > On Sat, Mar 17, 2018 at 05:28:47PM +0800, Chen-Yu Tsai wrote:
+>> > > > > From: Icenowy Zheng <icenowy@aosc.io>
+>> > > > >
+>> > > > > There's a GMAC configuration register, which exists on
+>> > > > > A64/A83T/H3/H5 in
+>> > > > > the syscon part, in the CCU of R40 SoC.
+>> > > > >
+>> > > > > Export a regmap of the CCU.
+>> > > > >
+>> > > > > Read access is not restricted to all registers, but only the
+>> > > > > GMAC
+>> > > > > register is allowed to be written.
+>> > > > >
+>> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> > > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> > > >
+>> > > > Gah, this is crazy. I'm really starting to regret letting that
+>> > > > syscon
+>> > > > in in the first place...
+>> > >
+>> > > IMHO syscon is really a better fit. It's part of the glue layer
+>> > > and
+>> > > most other dwmac user platforms treat it as such and use a
+>> > > syscon.
+>> > > Plus the controls encompass delays (phase), inverters (polarity),
+>> > > and even signal routing. It's not really just a group of clock
+>> > > controls,
+>> > > like what we poorly modeled for A20/A31. I think that was really
+>> > > a
+>> > > mistake.
+>> > >
+>> > > As I mentioned in the cover letter, a slightly saner approach
+>> > > would
+>> > > be to let drivers add custom syscon entries, which would then
+>> > > require
+>> > > less custom plumbing.
+>> >
+>> > A syscon is convenient, sure, but it also bypasses any abstraction
+>> > layer we have everywhere else, which means that we'll have to
+>> > maintain
+>> > the register layout in each and every driver that uses it.
+>> >
+>> > So far, it's only be the GMAC, but it can also be others (the SRAM
+>> > controller comes to my mind), and then, if there's any difference
+>> > in
+>> > the design in a future SoC, we'll have to maintain that in the GMAC
+>> > driver as well.
+>>
+>> I guess I forgot to say something, I'm fine with using a syscon we
+>> already have.
+>
+> As we finally need the SRAM controller on these new SoCs (for VE on all
+> SoCs targeted by dwmac-sun8i, and for DE on A64), should we deprecate
+> the syscon and all switch to device regmap (and let sunxi-dram driver
+> to export a regmap)? (As in the A64 DE2 thread discussed, two device
+> nodes shouldn't cover the same MMIO region.)
 
-Why are you changing that name
+Sounds like a plan.
 
-> +#define SUN6I_FIFO_CTL_RF_DRQ_EN		BIT(8)
->  #define SUN6I_FIFO_CTL_RF_RST			BIT(15)
->  #define SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_MASK	0xff
-> -#define SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS	16
-> +#define SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_POS	16
+> In addition, there might be multiple registers in the syscon/sram zone
+> that are needed (for example, if a version driver is written, it will
+> need the "0x24 Version Register"; and GMAC needs "0x30 EMAC Clock
+> Register"). How to deal with this if we export the syscon/sram zone as
+> a generic device regmap?
 
-Ditto.
+You can have multiple regmaps for a device. And the API allows you to
+request them up by name.
 
-> +#define SUN6I_FIFO_CTL_TF_DRQ_EN		BIT(24)
->  #define SUN6I_FIFO_CTL_TF_RST			BIT(31)
-> +#define SUN6I_FIFO_CTL_DMA_DEDICATE		BIT(9)|BIT(25)
->  
->  #define SUN6I_FIFO_STA_REG		0x1c
->  #define SUN6I_FIFO_STA_RF_CNT_MASK		0x7f
-> -#define SUN6I_FIFO_STA_RF_CNT_BITS		0
-> +#define SUN6I_FIFO_STA_RF_CNT_POS		0
+ChenYu
 
-Ditto.
-
->  #define SUN6I_FIFO_STA_TF_CNT_MASK		0x7f
-> -#define SUN6I_FIFO_STA_TF_CNT_BITS		16
-> +#define SUN6I_FIFO_STA_TF_CNT_POS		16
-
-Ditto.
-
->  
->  #define SUN6I_CLK_CTL_REG		0x24
->  #define SUN6I_CLK_CTL_CDR2_MASK			0xff
-> @@ -135,7 +140,7 @@ static inline u32 sun6i_spi_get_tx_fifo_count(struct sun6i_spi *sspi)
->  {
->  	u32 reg = sun6i_spi_read(sspi, SUN6I_FIFO_STA_REG);
->  
-> -	reg >>= SUN6I_FIFO_STA_TF_CNT_BITS;
-> +	reg >>= SUN6I_FIFO_STA_TF_CNT_POS;
->  
->  	return reg & SUN6I_FIFO_STA_TF_CNT_MASK;
->  }
-> @@ -148,7 +153,7 @@ static inline void sun6i_spi_drain_fifo(struct sun6i_spi *sspi, int len)
->  	/* See how much data is available */
->  	reg = sun6i_spi_read(sspi, SUN6I_FIFO_STA_REG);
->  	reg &= SUN6I_FIFO_STA_RF_CNT_MASK;
-> -	cnt = reg >> SUN6I_FIFO_STA_RF_CNT_BITS;
-> +	cnt = reg >> SUN6I_FIFO_STA_RF_CNT_POS;
->  
->  	if (len > cnt)
->  		len = cnt;
-> @@ -177,6 +182,15 @@ static inline void sun6i_spi_fill_fifo(struct sun6i_spi *sspi, int len)
->  	}
->  }
->  
-> +static bool sun6i_spi_can_dma(struct spi_master *master,
-> +			      struct spi_device *spi,
-> +			      struct spi_transfer *tfr)
-> +{
-> +	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-> +
-> +	return tfr->len > sspi->fifo_depth;
-> +}
-> +
->  static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
->  {
->  	struct sun6i_spi *sspi = spi_master_get_devdata(spi->master);
-> @@ -208,6 +222,9 @@ static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
->  	struct spi_master *master = spi->master;
->  	struct sun6i_spi *sspi = spi_master_get_devdata(master);
->  
-> +	if (master->can_dma)
-> +		return SUN6I_MAX_XFER_SIZE;
-> +
->  	return sspi->fifo_depth;
->  }
->  
-> @@ -268,16 +285,187 @@ static int sun6i_spi_wait_for_transfer(struct spi_device *spi,
->  	return 0;
->  }
->  
-> +static void sun6i_spi_dma_callback(void *param)
-> +{
-> +	struct spi_master *master = param;
-> +
-> +	dev_dbg(&master->dev, "DMA transfer complete\n");
-> +	spi_finalize_current_transfer(master);
-> +}
-> +
-> +static int sun6i_spi_dmap_prep_tx(struct spi_master *master,
-> +				  struct spi_transfer *tfr,
-> +				  dma_cookie_t *cookie)
-> +{
-> +	struct dma_async_tx_descriptor *chan_desc = NULL;
-> +
-> +	chan_desc = dmaengine_prep_slave_sg(master->dma_tx,
-> +					    tfr->tx_sg.sgl, tfr->tx_sg.nents,
-> +					    DMA_TO_DEVICE,
-> +					    DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!chan_desc) {
-> +		dev_err(&master->dev,
-> +			"Couldn't prepare TX DMA slave\n");
-> +		return -EIO;
-> +	}
-> +
-> +	chan_desc->callback = sun6i_spi_dma_callback;
-> +	chan_desc->callback_param = master;
-> +
-> +	*cookie = dmaengine_submit(chan_desc);
-> +	dma_async_issue_pending(master->dma_tx);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sun6i_spi_dmap_prep_rx(struct spi_master *master,
-> +				  struct spi_transfer *tfr,
-> +				  dma_cookie_t *cookie)
-> +{
-> +	struct dma_async_tx_descriptor *chan_desc = NULL;
-> +
-> +	chan_desc = dmaengine_prep_slave_sg(master->dma_rx,
-> +					    tfr->rx_sg.sgl, tfr->rx_sg.nents,
-> +					    DMA_FROM_DEVICE,
-> +					    DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!chan_desc) {
-> +		dev_err(&master->dev,
-> +			"Couldn't prepare RX DMA slave\n");
-> +		return -EIO;
-> +	}
-> +
-> +	chan_desc->callback = sun6i_spi_dma_callback;
-> +	chan_desc->callback_param = master;
-> +
-> +	*cookie = dmaengine_submit(chan_desc);
-> +	dma_async_issue_pending(master->dma_rx);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sun6i_spi_transfer_one_dma(struct spi_device *spi,
-> +				      struct spi_transfer *tfr)
-> +{
-> +	struct spi_master *master = spi->master;
-> +	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-> +	dma_cookie_t tx_cookie = 0,rx_cookie = 0;
-> +	enum dma_status status;
-> +	int ret;
-> +	u32 reg, trig_level = 0;
-> +
-> +	dev_dbg(&master->dev, "Using DMA mode for transfer\n");
-> +
-> +	/* Disable interrupts */
-> +	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
-> +
-> +	reg = sun6i_spi_read(sspi, SUN6I_FIFO_CTL_REG);
-> +
-> +	if (sspi->tx_buf) {
-> +		ret = sun6i_spi_dmap_prep_tx(master, tfr, &tx_cookie);
-> +		if (ret)
-> +			goto out;
-> +
-> +		reg |= SUN6I_FIFO_CTL_TF_DRQ_EN;
-> +
-> +		trig_level = sspi->fifo_depth;
-> +		reg &= ~SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_MASK;
-> +		reg |= (trig_level << SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_POS);
-> +	}
-> +
-> +	if (sspi->rx_buf) {
-> +		ret = sun6i_spi_dmap_prep_rx(master, tfr, &rx_cookie);
-> +		if (ret)
-> +			goto out;
-> +
-> +		reg |= SUN6I_FIFO_CTL_RF_DRQ_EN;
-> +
-> +		trig_level = 1;
-> +		reg &= ~SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_MASK;
-> +		reg |= (trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_POS);
-> +	}
-> +
-> +	/* Enable Dedicated DMA requests */
-> +	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
-> +			reg | SUN6I_FIFO_CTL_DMA_DEDICATE);
-> +
-> +	/* Start transfer */
-> +	sun6i_spi_set(sspi, SUN6I_TFR_CTL_REG, SUN6I_TFR_CTL_XCH);
-> +
-> +	ret = sun6i_spi_wait_for_transfer(spi, tfr);
-> +	if (ret)
-> +		goto out;
-> +
-> +	if (sspi->tx_buf && (status = dma_async_is_tx_complete(master->dma_tx,
-> +			tx_cookie, NULL, NULL))) {
-> +		dev_warn(&master->dev,
-> +			"DMA returned completion status of: %s\n",
-> +			status == DMA_ERROR ? "error" : "in progress");
-> +	}
-> +	if (sspi->rx_buf && (status = dma_async_is_tx_complete(master->dma_rx,
-> +			rx_cookie, NULL, NULL))) {
-> +		dev_warn(&master->dev,
-> +			"DMA returned completion status of: %s\n",
-> +			status == DMA_ERROR ? "error" : "in progress");
-> +	}
-
-I'm not sure why that would be needed.
-
-> +out:
-> +	if (ret) {
-> +		dev_dbg(&master->dev, "DMA channel teardown\n");
-> +		if (sspi->tx_buf)
-> +			dmaengine_terminate_sync(master->dma_tx);
-> +		if (sspi->rx_buf)
-> +			dmaengine_terminate_sync(master->dma_rx);
-> +	}
-
-That can be addressed through additional labels.
-
-> +	sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
-
-Why are you doing a PIO access here?
-
-> +	return ret;
-> +}
-> +
-> +static int sun6i_spi_transfer_one_pio(struct spi_device *spi,
-> +				      struct spi_transfer *tfr)
-> +{
-> +	struct spi_master *master = spi->master;
-> +	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-> +	unsigned int trig_level;
-> +	int ret;
-> +
-> +	/* Disable DMA requests */
-> +	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG, 0);
-> +
-> +	/*
-> +	 * Setup FIFO interrupt trigger level
-> +	 * Here we choose 3/4 of the full fifo depth, as it's the hardcoded
-> +	 * value used in old generation of Allwinner SPI controller.
-> +	 * (See spi-sun4i.c)
-> +	 */
-> +	trig_level = sspi->fifo_depth / 4 * 3;
-> +	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
-> +			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_POS));
-> +
-> +	sun6i_spi_fill_fifo(sspi, sspi->fifo_depth);
-> +
-> +	/* Enable the interrupts */
-> +	sun6i_spi_set(sspi, SUN6I_INT_CTL_REG, SUN6I_INT_CTL_TC |
-> +					       SUN6I_INT_CTL_RF_RDY);
-> +
-> +	/* Start transfer */
-> +	sun6i_spi_set(sspi, SUN6I_TFR_CTL_REG, SUN6I_TFR_CTL_XCH);
-> +
-> +	ret = sun6i_spi_wait_for_transfer(spi, tfr);
-> +
-> +	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
-> +
-> +	return ret;
-> +}
-> +
->  static int sun6i_spi_transfer_one(struct spi_master *master,
->  				  struct spi_device *spi,
->  				  struct spi_transfer *tfr)
->  {
->  	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-> -	unsigned int mclk_rate, div, timeout;
-> -	unsigned int start, end, tx_time;
-> -	unsigned int trig_level;
-> +	unsigned int mclk_rate, div;
->  	unsigned int tx_len = 0;
-> -	int ret = 0;
->  	u32 reg;
->  
->  	/* A zero length transfer never finishes if programmed
-> @@ -285,10 +473,15 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->  	if (!tfr->len)
->  		return 0;
->  
-> -	/* Don't support transfer larger than the FIFO */
-> -	if (tfr->len > sspi->fifo_depth)
-> +	if (tfr->len > SUN6I_MAX_XFER_SIZE)
->  		return -EMSGSIZE;
->  
-> +	if (!master->can_dma) {
-> +		/* Don't support transfer larger than the FIFO */
-> +		if (tfr->len > sspi->fifo_depth)
-> +			return -EMSGSIZE;
-> +	}
-> +
->  	sspi->tx_buf = tfr->tx_buf;
->  	sspi->rx_buf = tfr->rx_buf;
->  	sspi->len = tfr->len;
-> @@ -300,16 +493,6 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->  	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
->  			SUN6I_FIFO_CTL_RF_RST | SUN6I_FIFO_CTL_TF_RST);
->  
-> -	/*
-> -	 * Setup FIFO interrupt trigger level
-> -	 * Here we choose 3/4 of the full fifo depth, as it's the hardcoded
-> -	 * value used in old generation of Allwinner SPI controller.
-> -	 * (See spi-sun4i.c)
-> -	 */
-> -	trig_level = sspi->fifo_depth / 4 * 3;
-> -	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
-> -			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS));
-> -
->  	/*
->  	 * If it's a TX only transfer, we don't want to fill the RX
->  	 * FIFO with bogus data
-> @@ -364,22 +547,10 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->  	sun6i_spi_write(sspi, SUN6I_BURST_CTL_CNT_REG,
->  			SUN6I_BURST_CTL_CNT_STC(tx_len));
->  
-> -	/* Fill the TX FIFO */
-> -	sun6i_spi_fill_fifo(sspi, sspi->fifo_depth);
-> -
-> -	/* Enable the interrupts */
-> -	sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TC |
-> -					 SUN6I_INT_CTL_RF_RDY);
-> -
-> -	/* Start the transfer */
-> -	sun6i_spi_set(sspi, SUN6I_TFR_CTL_REG, SUN6I_TFR_CTL_XCH);
-> -
-> -	/* Wait for completion */
-> -	ret = sun6i_spi_wait_for_transfer(spi, tfr);
-> -
-> -	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
-> +	if (sun6i_spi_can_dma(master, spi, tfr))
-> +		return sun6i_spi_transfer_one_dma(spi, tfr);
->  
-> -	return ret;
-> +	return sun6i_spi_transfer_one_pio(spi, tfr);
-
-You should really split the function creation here into a separate patch
-
->  }
->  
->  static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
-> @@ -409,6 +580,77 @@ static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
->  	return IRQ_NONE;
->  }
->  
-> +static int sun6i_spi_dma_setup(struct platform_device *pdev,
-> +			       struct resource *res)
-> +{
-> +	struct spi_master *master = platform_get_drvdata(pdev);
-> +	struct sun6i_spi *sspi = spi_master_get_devdata(master);
-> +	struct dma_slave_config dma_sconf;
-> +	int ret;
-> +
-> +	master->dma_tx = dma_request_slave_channel_reason(&pdev->dev, "tx");
-> +	if (IS_ERR(master->dma_tx)) {
-> +		dev_err(&pdev->dev, "Unable to acquire DMA TX channel\n");
-> +		ret = PTR_ERR(master->dma_tx);
-> +		goto out;
-> +	}
-> +
-> +	dma_sconf.direction = DMA_MEM_TO_DEV;
-> +	dma_sconf.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +	dma_sconf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +	dma_sconf.dst_addr = res->start + SUN6I_TXDATA_REG;
-> +	dma_sconf.dst_maxburst = 1;
-> +	dma_sconf.src_maxburst = 1;
-> +
-> +	ret = dmaengine_slave_config(master->dma_tx, &dma_sconf);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Unable to configure DMA TX slave\n");
-> +		goto err_rel_tx;
-> +	}
-> +
-> +	master->dma_rx = dma_request_slave_channel_reason(&pdev->dev, "rx");
-> +	if (IS_ERR(master->dma_rx)) {
-> +		dev_err(&pdev->dev, "Unable to acquire DMA RX channel\n");
-> +		ret = PTR_ERR(master->dma_rx);
-> +		goto err_rel_tx;
-> +	}
-> +
-> +	dma_sconf.direction = DMA_DEV_TO_MEM;
-> +	dma_sconf.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +	dma_sconf.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +	dma_sconf.src_addr = res->start + SUN6I_RXDATA_REG;
-> +	dma_sconf.src_maxburst = 1;
-> +	dma_sconf.dst_maxburst = 1;
-> +
-> +	ret = dmaengine_slave_config(master->dma_rx, &dma_sconf);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "Unable to configure DMA RX slave\n");
-> +		goto err_rel_rx;
-> +	}
-> +
-> +	/* don't set can_dma unless both channels are valid*/
-> +	master->can_dma = sun6i_spi_can_dma;
-> +
-> +	return 0;
-> +
-> +err_rel_rx:
-> +	dma_release_channel(master->dma_rx);
-> +err_rel_tx:
-> +	dma_release_channel(master->dma_tx);
-> +out:
-> +	master->dma_tx = NULL;
-> +	master->dma_rx = NULL;
-> +	return ret;
-> +}
-> +
-> +static void sun6i_spi_dma_release(struct spi_master *master)
-> +{
-> +	if (master->can_dma) {
-> +		dma_release_channel(master->dma_rx);
-> +		dma_release_channel(master->dma_tx);
-> +	}
-> +}
-> +
->  static int sun6i_spi_runtime_resume(struct device *dev)
->  {
->  	struct spi_master *master = dev_get_drvdata(dev);
-> @@ -530,6 +772,16 @@ static int sun6i_spi_probe(struct platform_device *pdev)
->  		goto err_free_master;
->  	}
->  
-> +	ret = sun6i_spi_dma_setup(pdev, res);
-> +	if (ret) {
-> +		if (ret == -EPROBE_DEFER) {
-> +			/* wait for the dma driver to load */
-
-There's no need for that comment.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180404/476317ce/attachment.sig>
+>>
+>> I'm just questionning if merging any other driver using one is the
+>> right move.
+>>
+>> Maxime
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
