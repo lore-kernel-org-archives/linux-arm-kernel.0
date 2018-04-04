@@ -1,99 +1,58 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 4 Apr 2018 18:14:07 +0530
-Subject: [PATCH v8 25/42] ARM: davinci: dm644x: add new clock init using
- common clock framework
-In-Reply-To: <cda6f3bc-7ca9-68e9-80ca-baf6d4860c95@ti.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-26-git-send-email-david@lechnology.com>
- <333f49c7-bafd-8e2d-65e9-7d1aff4836de@ti.com>
- <43c266b8-c023-a1b4-c751-bd46c2fb910d@lechnology.com>
- <cda6f3bc-7ca9-68e9-80ca-baf6d4860c95@ti.com>
-Message-ID: <030ce534-765b-3059-a6a1-fffaaaba307a@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 4 Apr 2018 14:45:23 +0200
+Subject: [PATCH v2] mmc: sdhci-of-arasan: Add quirk to avoid unexpected
+ interrupt msgs
+In-Reply-To: <1520951200-24703-1-git-send-email-phil.edworthy@renesas.com>
+References: <1520951200-24703-1-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <CAPDyKFqFnPosPTb2x5=aeXjGqAJBDgKBCV9pJRfkREecChyJ9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 April 2018 12:17 PM, Sekhar Nori wrote:
-> On Tuesday 03 April 2018 10:00 PM, David Lechner wrote:
->> On 04/03/2018 05:26 AM, Sekhar Nori wrote:
->>> On Friday 16 March 2018 08:22 AM, David Lechner wrote:
->>>> +static struct resource dm644x_pll1_resources[] = {
->>>> +??? {
->>>> +??????? .start??? = DAVINCI_PLL1_BASE,
->>>> +??????? .end??? = DAVINCI_PLL1_BASE + SZ_4K - 1,
->>>
->>> The .end should be DAVINCI_PLL1_BASE + SZ_1K - 1, otherwise it prevents
->>> PLL2 from getting registered.
->>>
->>>> +??????? .flags??? = IORESOURCE_MEM,
->>>> +??? },
->>>> +};
->>>> +
->>>> +static struct platform_device dm644x_pll1_device = {
->>>> +??? .name??????? = "dm644x-pll1",
->>>> +??? .id??????? = -1,
->>>> +??? .resource??? = dm644x_pll1_resources,
->>>> +??? .num_resources??? = ARRAY_SIZE(dm644x_pll1_resources),
->>>> +};
->>>> +
->>>> +static struct resource dm644x_pll2_resources[] = {
->>>> +??? {
->>>> +??????? .start??? = DAVINCI_PLL2_BASE,
->>>> +??????? .end??? = DAVINCI_PLL2_BASE + SZ_4K - 1,
->>>
->>> And this too should be fixed, else it prevents the PSC from getting
->>> registered.
->>>
->>>> +??????? .flags??? = IORESOURCE_MEM,
->>>> +??? },
->>>> +};
->>>
->>> With these fixed, I still had to enable 'clk_ignore_unused' on DM644x
->>> EVM to get to NFS boot. I think root of the problem is that pm_runtime()
->>> APIs are not working in the legacy boot mode.
->>>
->>> This can be seen even on the DA850 LCDK in legacy boot. pm_genpd_summary
->>> in debugfs shows all domains are off and there are no devices registered
->>> under the "da850-psc1: emac" domain. NFS mounting still works on the
->>> DA850 LCDK because clk_summary shows enable and prepare count of 4 for
->>> emac. Not sure how that's happening. But on DM644x EVM, the emac clock
->>> enable count is 0.
->>>
->>> Still looking at whats going wrong here. I am testing your v8 branch
->>> with clk-davinci branch from clk-next merged to get the fixes Stephen
->>> made.
->>>
->>
->> In legacy mode, genpd is not being used. I didn't see any mechanism for
-> 
-> Ah, I got stumped by the genpd related debug entries popping up.
-> Probably something should be done to make sure they don't show up in
-> legacy boot. And some comments to that effect in psc.c will help.
-> 
->> genpd lookup without device tree. So, we are still relying on the
->> matching in arch/arm/mach-davinci/pm_domain.c.
-> 
-> This is fine. We just need legacy boot to keep working without regressions.
-> 
->>
->> I suspect we need to fix the clock lookups in
->> drivers/clk/davinci/psc-dm644x.c.
->>
->> LPSC_CLKDEV2(emac_clkdev,??????? NULL,??????? "davinci_emac.1",
->> ??????????????????? "fck",??????? "davinci_mdio.0");
->>
->> NULL might need to be changed to "fck" to be picked up by pm matching
->> and "davinci_emac.1" should be verified that it matches the actual EMAC
->> device name.
-> 
-> NULL con_id matches what we have for DA850 and also what we had for
-> DM644x prior to CCF conversion. So, I did not really suspect that. The
-> device name does match. I will check what else could be going on based
-> on your input.
+On 13 March 2018 at 15:26, Phil Edworthy <phil.edworthy@renesas.com> wrote:
+> On SD 2.00 cards we get lots of these messages:
+> "mmc0: Got data interrupt 0x00000002 even though no data operation was in progress"
+> By applying the SDHCI_QUIRK2_STOP_WITH_TC quirk, the messages no longer happen.
+>
+> A single card claiming to be SD 3.00 compliant also generates the interrupts,
+> but since the card's manfacturing date is 2002 mar, it's unlikely to really be
+> SD 3.00. This card is a 8GB SanDisk 'SU08G' 8.0 (SDHC class 4).
+>
+> This has been reported on Xilinx devices that also use the Arasan IP.
+> See https://patchwork.kernel.org/patch/8062871/
+>
+> This has been tested on the Renesas RZ/ND-DB board with the RZ/N1 SoC. The
+> Arasan IP in this device is version 1.39a and uses a max SD clock of 50MHz and
+> does not support DDR modes.
+>
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 
-This issue is because emac platform device is getting registered really
-early on dm644x even before the clocks are ready in postcore_initcall().
+Queued for 3.18, thanks!
 
-I will send a patch fixing that.
+Kind regards
+Uffe
 
-Thanks,
-Sekhar
+> ---
+> v2:
+>  - Changed commit msg to detail the cards that fail.
+>  - Provided the IP version and further background info.
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index c33a5f7..ab66e32 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -290,7 +290,8 @@ static const struct sdhci_pltfm_data sdhci_arasan_pdata = {
+>         .ops = &sdhci_arasan_ops,
+>         .quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+>         .quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
+> -                       SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+> +                       SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
+> +                       SDHCI_QUIRK2_STOP_WITH_TC,
+>  };
+>
+>  static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32 intmask)
+> --
+> 2.7.4
+>
