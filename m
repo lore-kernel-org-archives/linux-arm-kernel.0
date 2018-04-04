@@ -1,40 +1,39 @@
-From: wangxidong_97@163.com (Xidong Wang)
-Date: Wed,  4 Apr 2018 11:05:51 +0800
-Subject: [PATCH 1/1] mtd:nand:fix memory leak
-Message-ID: <1522811151-18853-1-git-send-email-wangxidong_97@163.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed,  4 Apr 2018 11:14:30 +0800
+Subject: [PATCH 0/5] Hi3660: enable power management features
+Message-ID: <1522811675-12741-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In function tango_nand_probe(), the memory allocated by
-clk_get() is not released on the normal path and
-the error path that IS_ERR(nfc->chan) returns true.
-This will result in a memory leak bug.
+Since hi3660 drivers have been merged into Linux kernel (mailbox driver is in
+Linux-next branch and other drivers are existed in Linux mainline kernel), so
+this patch series is to enable power management features on hi3660.
 
-Signed-off-by: Xidong Wang <wangxidong_97@163.com>
----
- drivers/mtd/nand/tango_nand.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+This patch series includes device tree binding for mailbox, stub clock and CPU
+OPPs, and has one patch to consolidate the Kconfigs for driver modules.
 
-diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
-index c5bee00b..8083459 100644
---- a/drivers/mtd/nand/tango_nand.c
-+++ b/drivers/mtd/nand/tango_nand.c
-@@ -648,12 +648,15 @@ static int tango_nand_probe(struct platform_device *pdev)
- 		return PTR_ERR(clk);
- 
- 	nfc->chan = dma_request_chan(&pdev->dev, "rxtx");
--	if (IS_ERR(nfc->chan))
-+	if (IS_ERR(nfc->chan)) {
-+		clk_put(clk);
- 		return PTR_ERR(nfc->chan);
-+	}
- 
- 	platform_set_drvdata(pdev, nfc);
- 	nand_hw_control_init(&nfc->hw);
- 	nfc->freq_kHz = clk_get_rate(clk) / 1000;
-+	clk_put(clk);
- 
- 	for_each_child_of_node(pdev->dev.of_node, np) {
- 		err = chip_init(&pdev->dev, np);
+This patch set have been tested on Hikey960 and also verified the patch 'hisi:
+Consolidate the Kconfigs for the CLOCK_STUB and the MAILBOX' for Hikey620.
+
+
+Daniel Lezcano (1):
+  hisi: Consolidate the Kconfigs for the CLOCK_STUB and the MAILBOX
+
+Kaihua Zhong (2):
+  dts: arm64: hi3660: Add mailbox node
+  dts: arm64: hi3660: Add stub clock node
+
+Leo Yan (1):
+  dts: arm64: hi3660: Add CPU frequency scaling support
+
+Tao Wang (1):
+  dts: arm64: hi3660: Add thermal cooling management
+
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 145 ++++++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig              |   1 -
+ drivers/clk/hisilicon/Kconfig             |  13 +--
+ drivers/mailbox/Kconfig                   |  12 ++-
+ 4 files changed, 161 insertions(+), 10 deletions(-)
+
 -- 
-2.7.4
+1.9.1
