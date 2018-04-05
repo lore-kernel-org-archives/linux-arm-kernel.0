@@ -1,48 +1,38 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Thu,  5 Apr 2018 16:29:34 -0400
-Subject: [PATCH v2 07/19] media: exymos4-is: allow compile test for EXYNOS
- FIMC-LITE
-In-Reply-To: <cover.1522959716.git.mchehab@s-opensource.com>
-References: <cover.1522959716.git.mchehab@s-opensource.com>
-Message-ID: <fb51c9ebb76438c554855cc6543651a8c1cb7aa6.1522959716.git.mchehab@s-opensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Apr 2018 22:42:06 +0200
+Subject: [PATCH v1 2/2] arm: npcm: Enable L2 Cache in NPCM7xx
+In-Reply-To: <CAP6Zq1j9i0Zdt3wPCGLLnPZJPGf8BaG9Nh1pLAsnwczqWHtthQ@mail.gmail.com>
+References: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
+ <1521155412-29229-3-git-send-email-tmaimon77@gmail.com>
+ <CAFd5g44NOFRmQbDJfRLw_SwsHwVB-hxsUYMYSmkqeyRKmXqSqQ@mail.gmail.com>
+ <CAP6Zq1jvCvM+uG8kU_JAYzm9e3BG28AS80ANmn_0a0HmiVBm3A@mail.gmail.com>
+ <CAK8P3a3HBkqgas-QkAr_J767ffBMXJTJeqqVY9fFxw2Yexi27g@mail.gmail.com>
+ <CAP6Zq1j9i0Zdt3wPCGLLnPZJPGf8BaG9Nh1pLAsnwczqWHtthQ@mail.gmail.com>
+Message-ID: <CAK8P3a1zvjc8EyXX+c4r++pVHrVQ84CSUrnMA=+9kf7FZojiGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's nothing that prevents building this driver with
-COMPILE_TEST. So, enable it.
+On Thu, Apr 5, 2018 at 6:56 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
+> On 5 April 2018 at 15:54, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Fri, Mar 16, 2018 at 10:51 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
+>
+> It seems that I have to add l2c_aux_val, l2c_aux_mask parameters to the
+> DT_MACHINE_START
+> to enable the L2 Cache.
+>>
+>>
+>> The last email in that thread mentions
+>> L310_AUX_CTRL_CACHE_REPLACE_RR, is that required after all?
+>
+>
+> No it is not require this is why I added:
+> .l2c_aux_val    = 0x0,
+> .l2c_aux_mask   = ~0x0,
+>
+> Can I resend it on Sunday?
 
-While here, make the Kconfig dependency cleaner by removing
-the unneeded if block.
+Yes, please resend it as soon as you have the time to improve the changelog,
+no need to wait if you can do it right away. We can always merge bugfixes,
+but doing it earlier rather than later is better.
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- drivers/media/platform/exynos4-is/Kconfig | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-index 7b2c49e5a592..c8e5ad8f8294 100644
---- a/drivers/media/platform/exynos4-is/Kconfig
-+++ b/drivers/media/platform/exynos4-is/Kconfig
-@@ -41,11 +41,10 @@ config VIDEO_S5P_MIPI_CSIS
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called s5p-csis.
- 
--if SOC_EXYNOS4412 || SOC_EXYNOS5250
--
- config VIDEO_EXYNOS_FIMC_LITE
- 	tristate "EXYNOS FIMC-LITE camera interface driver"
- 	depends on I2C
-+	depends on SOC_EXYNOS4412 || SOC_EXYNOS5250 || COMPILE_TEST
- 	depends on HAS_DMA
- 	select VIDEOBUF2_DMA_CONTIG
- 	select VIDEO_EXYNOS4_IS_COMMON
-@@ -55,7 +54,6 @@ config VIDEO_EXYNOS_FIMC_LITE
- 
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called exynos-fimc-lite.
--endif
- 
- config VIDEO_EXYNOS4_FIMC_IS
- 	tristate "EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver"
--- 
-2.14.3
+      Arnd
