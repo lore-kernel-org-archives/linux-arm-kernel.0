@@ -1,45 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 5 Apr 2018 10:21:53 +0530
-Subject: [PATCH] cpufreq: armada-37xx: Fix clock leak
-In-Reply-To: <20180404144444.4142-1-gregory.clement@bootlin.com>
-References: <20180404144444.4142-1-gregory.clement@bootlin.com>
-Message-ID: <20180405045153.GL3572@vireshk-i7>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 5 Apr 2018 11:40:17 +0530
+Subject: [PATCH] ARM: davinci: dm644x: remove unnecessary
+ postcore_initcall()
+In-Reply-To: <87b4ad61-93f4-db74-d373-9e8ac0d1a5b9@lechnology.com>
+References: <20180404125759.27061-1-nsekhar@ti.com>
+ <87b4ad61-93f4-db74-d373-9e8ac0d1a5b9@lechnology.com>
+Message-ID: <8da02a5b-7c29-eb5d-374e-00515e1e30f6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04-04-18, 16:44, Gregory CLEMENT wrote:
-> There was no clk_put() balancing the clk_get(). This commit fixes it.
+On Wednesday 04 April 2018 09:22 PM, David Lechner wrote:
+>>
+>> --- a/arch/arm/mach-davinci/board-sffsdr.c
+>> +++ b/arch/arm/mach-davinci/board-sffsdr.c
+>> @@ -133,6 +133,12 @@ static void __init davinci_sffsdr_map_io(void)
+>> ? static __init void davinci_sffsdr_init(void)
+>> ? {
+>> ????? struct davinci_soc_info *soc_info = &davinci_soc_info;
+>> +??? int ret;
+>> +
+>> +??? ret = dm644x_init_devices();
+>> +??? if (ret)
+>> +??????? pr_warn("%s: dm644x_init_devices() failed: %d\n",
+>> +??????????? __func__, ret);
 > 
-> Fixes: 92ce45fb875d ("cpufreq: Add DVFS support for Armada 37xx")
-> Cc: <stable@vger.kernel.org>
-> Reported-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> ---
->  drivers/cpufreq/armada-37xx-cpufreq.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
-> index c6ebc88a7d8d..72a2975499db 100644
-> --- a/drivers/cpufreq/armada-37xx-cpufreq.c
-> +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
-> @@ -202,6 +202,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
->  	cur_frequency = clk_get_rate(clk);
->  	if (!cur_frequency) {
->  		dev_err(cpu_dev, "Failed to get clock rate for CPU\n");
-> +		clk_put(clk);
->  		return -EINVAL;
->  	}
->  
-> @@ -210,6 +211,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
->  		return -EINVAL;
->  
->  	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
-> +	clk_put(clk);
->  
->  	for (load_lvl = ARMADA_37XX_DVFS_LOAD_0; load_lvl < LOAD_LEVEL_NR;
->  	     load_lvl++) {
+> dm644x_init_devices() already prints a warning in all failure cases, so
+> printing another warning seems a bit redundant. It is probably OK to just
+> ignore the return value here and in the similar uses above.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Alright, will fix and send v2.
 
--- 
-viresh
+Regards,
+Sekhar
