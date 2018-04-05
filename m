@@ -1,55 +1,50 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Thu, 05 Apr 2018 18:43:05 +0000
-Subject: [PATCH] arm/arm64: smccc: Use xN for arm64 register constraints
- with clang
-In-Reply-To: <20180322235811.GC78232@google.com>
-References: <20180322212705.141175-1-mka@chromium.org>
- <CAKwvOdk4Tos1Q8dyQvic4PUX3cjy3q1hn3FkK=xiVSChht+gEg@mail.gmail.com>
- <20180322224456.GB78232@google.com>
- <fc921bfb-1f49-08f9-515c-07bd442a1e11@google.com>
- <20180322235811.GC78232@google.com>
-Message-ID: <CAKwvOdkcpxcP5Eb5f1-bJgU0gi4zkbof5WJWz2QbVCNsGBUO3w@mail.gmail.com>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Thu, 5 Apr 2018 21:11:37 +0200
+Subject: [v2] ARM: dts: qcom: Add apq8064 Dragon Board 600c support
+In-Reply-To: <20180316215436.22906-1-srinivas.kandagatla@linaro.org>
+References: <20180316215436.22906-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180405191137.GA17656@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 22, 2018 at 4:58 PM Matthias Kaehlcke <mka@chromium.org> wrote:
+On Fri, Mar 16, 2018 at 09:54:36PM +0000, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> This patch add support to DB600c board, which is another
+> 96boards based on Qualcomm APQ8064 SoC.
+> 
+> Support for USB, HDMI, PCIe, I2C, SPI, eMMC, microSD card, LEDs
+> device tree nodes is added in this patch.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+> Changes since v1:
+> 	- added chosen node with stdout, suggested by Stephen Boyd
+> 	- removed spi flash node and gpio22 pinconf, as its not required in this patch.
+> 	- removed extra comment lines and fix a node name, spotted by Stephen Boyd.
+> 
+>  arch/arm/boot/dts/Makefile                |   1 +
+>  arch/arm/boot/dts/qcom-apq8064-db600c.dts | 530 ++++++++++++++++++++++++++++++
+>  2 files changed, 531 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/qcom-apq8064-db600c.dts
 
-> El Thu, Mar 22, 2018 at 04:19:42PM -0700 Greg Hackmann ha dit:
-> > NAK.  There's a reason I didn't send my change upstream.
-> >
-> > As Marc pointed out (https://lkml.org/lkml/2018/3/16/987), the "r"
-> > prefix tells gcc to pick the appropriate register width.  "x" makes it
-> > unconditionally use the entire 64-bit register width.  Just swapping out
-> > one for the other changes the macro's semantics.
-> >
-> > Unfortunately since this was breaking builds in android-4.14 and we
-> > didn't have an immediate-term fix, I bit the bullet and added the above
-> > commit -- but *only* as a short-term workaround.  For the one caller we
-> > currently have in 4.14.y, gcc was using the entire 64-bit width for all
-> > its inputs anyway, so "r" vs. "x" didn't make a difference.  But that
-> > might not be true if/when someone introduces other SMCCC 1.1 callers.
-> >
-> > Unfortunately I don't see a better way to deal with this than waiting
-> > for clang to support "r"-style constraints on ARM64.
-
-> Thanks for the clarification! From the other thread
-> (https://lkml.org/lkml/2018/3/1/268) I had the impression that ARM
-> folks saw the option of a mergeable fix.
-
-> Given the fact that clang support for kernel builds is still
-> recent/WIP I guess it's not the end of the world if we have to raise
-> the minimum clang version to 7.x for newer kernels.
+Hello Srini (I hope you had a nice vacation!)
 
 
-Manoj fixed this in:
-https://reviews.llvm.org/rL328829
-https://bugs.llvm.org/show_bug.cgi?id=36862
+Running checkpatch on this patch gives a few of these warnings:
 
-Looks set to ride the Clang 6.0 train.  mka@ if you're planning another
-state of the union email, it would be good to note the clang 6.0
-requirement for arm64.
+WARNING: line over 80 characters
 
-Is there anything left to do here?
--- 
-Thanks,
-~Nick Desaulniers
+These can probably be ignored, since they exist for most
+arch/arm/boot/dts/qcom-*.dts files.
+
+
+However, it also gives a few of these errors:
+
+ERROR: trailing whitespace
+
+These should probably be fixed, since the are errors and not warnings.
+
+
+Kind regards,
+Niklas
