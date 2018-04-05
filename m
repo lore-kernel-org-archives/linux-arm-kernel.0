@@ -1,30 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Apr 2018 11:07:09 +0200
-Subject: [PATCH] ARM: omap2: fix am43xx build without L2X0
-In-Reply-To: <20180404171222.GH5700@atomide.com>
-References: <20180404102550.3692501-1-arnd@arndb.de>
- <20180404171222.GH5700@atomide.com>
-Message-ID: <CAK8P3a113KzqRU7_qY96YGTz28+hMuyrMvJJVxOcL7cJogkpKQ@mail.gmail.com>
+Date: Thu, 5 Apr 2018 11:08:32 +0200
+Subject: [PATCH v2] MAINTAINERS: update entry for ARM/berlin
+In-Reply-To: <20180330135932.GB28244@lunn.ch>
+References: <20180330110211.36455347@xhacker.debian>
+ <20180330135932.GB28244@lunn.ch>
+Message-ID: <CAK8P3a1srzXpyAvVZ5jDLPTAf4mpt14KY0AeE-hLvy9_M+_=hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2018 at 7:12 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Arnd Bergmann <arnd@arndb.de> [180404 10:27]:
->> When CONFIG_CACHE_L2X0 is disabled, the am43xx specific suspend
->> implemnentation fails to link:
+On Fri, Mar 30, 2018 at 3:59 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Fri, Mar 30, 2018 at 11:02:11AM +0800, Jisheng Zhang wrote:
+>> Synaptics has acquired the Multimedia Solutions Business of Marvell[1].
+>> So change the berlin entry name and move it to its alphabetical
+>> location. We move to ARM/Synaptics instead of ARM/Marvell.
 >>
->> arch/arm/mach-omap2/sleep43xx.o: In function `get_l2cache_base':
->> (.text+0x180): undefined reference to `omap4_get_l2cache_base'
+>> This patch also updates my email address from marvell to synaptics.
 >>
->> This adds an #ifdef protection around the code, like we do for am44xx.
+>> [1] https://www.synaptics.com/company/news/conexant-marvell
 >>
->> Fixes: 41d37e61372f ("ARM: OMAP2+: Introduce low-level suspend code for AM43XX")
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 >
-> Thanks, looks OK to me:
+> Thanks for the link
 >
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Applied to next/soc.
+I've applied it to next/soc now in preparation of sending out the pull requests.
 
-     Arnd
+    Arnd
