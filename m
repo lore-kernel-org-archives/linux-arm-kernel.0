@@ -1,68 +1,68 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed,  4 Apr 2018 19:58:18 -0400
-Subject: [PATCH v3 3/5] io: define stronger ordering for the default writeX()
- implementation
-In-Reply-To: <1522886301-25955-1-git-send-email-okaya@codeaurora.org>
-References: <1522886301-25955-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1522886301-25955-3-git-send-email-okaya@codeaurora.org>
+Date: Wed, 4 Apr 2018 20:06:42 -0400
+Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
+ readX() implementation
+In-Reply-To: <CAK8P3a2Cg59cTzUq2_8sopeY9BktM7a6_4nunMJVA5fQFaVLug@mail.gmail.com>
+References: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
+ <691b903c-e97d-0a25-28c5-690318bb215a@codeaurora.org>
+ <CAK8P3a2pGQb7TqQtuw0ZpQ=8CwXiRmRKKc1GwvEgKDgofxJ3nA@mail.gmail.com>
+ <9b0d7db3-0830-9661-6dc8-39523daa8f32@codeaurora.org>
+ <CAK8P3a2Cg59cTzUq2_8sopeY9BktM7a6_4nunMJVA5fQFaVLug@mail.gmail.com>
+Message-ID: <d7c63b8f-b315-8593-9683-588598dd1dc1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default implementation of mapping writeX() to __raw_writeX() is wrong.
-writeX() has stronger ordering semantics. Compiler is allowed to reorder
-memory writes against __raw_writeX().
+On 4/4/2018 3:50 PM, Arnd Bergmann wrote:
+> On Wed, Apr 4, 2018 at 7:48 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> On 4/4/2018 11:55 AM, Arnd Bergmann wrote:
+>>> Yes, exactly, plus the same for write and in/out of course.
+>>
+>> I was looking at this...
+>>
+>> inb() and outb() seem to be calling writeb(). It gets the wmb/barrier automatically
+>> when we fix writeb().
+>>
+>> Did I miss something?
+> 
+> At least outb() needs stricter barriers than writeb() in theory, what
+> we want here
+> is that outb() has not just made it out to the device but that the
+> write has been
+> confirmed completed by the device. Some architectures can't do it, but those
+> that can should have an easy way to hook into that using a separate set of
+> barriers.
+> 
+> Using the riscv barrier names, we could do this like
+> 
+> #ifndef __io_bw()
+> #define __io_bw()      wmb()
+> #endif
+> 
+> #ifndef __io_aw
+> #define __io_aw()      barrier()
+> #endif
+> 
+> #ifndef __io_pbw
+> #define __io_pbw()     __io_bw()
+> #endif
+> 
+> #ifndef __io_paw
+> #define __io_paw()     __io_aw()
+> #endif
+> 
+> and the same thing for reads. This way, an architecture could override
+> any of those, but still get reasonable defaults for the others.
+> For __io_bw(), I picked barrier() instead of do {} while (0), no idea
+> if that's any better, I just play safe here.
 
-Use the previously defined __io_aw() and __io_bw() macros to harden
-code generation according to architecture support.
+I posted V3. I hope I captured what you mean above correctly.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- include/asm-generic/io.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> 
+>      Arnd
+> 
 
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index fc554af..ca268d9 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -207,7 +207,9 @@ static inline u64 readq(const volatile void __iomem *addr)
- #define writeb writeb
- static inline void writeb(u8 value, volatile void __iomem *addr)
- {
-+	__io_bw();
- 	__raw_writeb(value, addr);
-+	__io_aw();
- }
- #endif
- 
-@@ -215,7 +217,9 @@ static inline void writeb(u8 value, volatile void __iomem *addr)
- #define writew writew
- static inline void writew(u16 value, volatile void __iomem *addr)
- {
-+	__io_bw();
- 	__raw_writew(cpu_to_le16(value), addr);
-+	__io_aw();
- }
- #endif
- 
-@@ -223,7 +227,9 @@ static inline void writew(u16 value, volatile void __iomem *addr)
- #define writel writel
- static inline void writel(u32 value, volatile void __iomem *addr)
- {
-+	__io_bw();
- 	__raw_writel(__cpu_to_le32(value), addr);
-+	__io_aw();
- }
- #endif
- 
-@@ -232,7 +238,9 @@ static inline void writel(u32 value, volatile void __iomem *addr)
- #define writeq writeq
- static inline void writeq(u64 value, volatile void __iomem *addr)
- {
-+	__io_bw();
- 	__raw_writeq(__cpu_to_le64(value), addr);
-+	__io_aw();
- }
- #endif
- #endif /* CONFIG_64BIT */
+
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
