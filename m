@@ -1,46 +1,44 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu,  5 Apr 2018 18:05:16 +0200
-Subject: [PATCH] ARM: dts: omap3-gta04: Add fixed 26MHz clock as fck for twl
-Message-ID: <c0b35797744a71df9d8088508814675cc5f07710.1522944315.git.hns@goldelico.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Thu, 5 Apr 2018 09:07:49 -0700
+Subject: [PATCH] net: thunderx: rework mac addresses list to u64 array
+In-Reply-To: <20180405150748.GA5716@infradead.org>
+References: <20180405145756.12633-1-Vadim.Lomovtsev@caviumnetworks.com>
+ <20180405150748.GA5716@infradead.org>
+Message-ID: <20180405160749.GB12703@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board uses 26MHz oscillator for the twl4030 HFCLK.
-This way we will not depend on the bootloader to configure the
-CFG_BOOT:HFCLK_FREQ
+Hi Christoph,
 
-Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
----
- arch/arm/boot/dts/omap3-gta04.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thank you for your feedback and time.
 
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index 4170be70460e..ac830b917776 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -30,6 +30,13 @@
- 		display0 = &lcd;
- 	};
- 
-+	/* fixed 26MHz oscillator */
-+	hfclk_26m: oscillator {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-@@ -312,6 +319,9 @@
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
- 		interrupt-parent = <&intc>;
- 
-+		clocks = <&hfclk_26m>;
-+		clock-names = "fck";
-+
- 		twl_audio: audio {
- 			compatible = "ti,twl4030-audio";
- 			ti,enable-vibra = <1>;
--- 
-2.12.2
+On Thu, Apr 05, 2018 at 08:07:48AM -0700, Christoph Hellwig wrote:
+> >  struct xcast_addr_list {
+> > -	struct list_head list;
+> >  	int              count;
+> > +	u64              mc[0];
+> 
+> Please use the standard C99 syntax here:
+> 
+> 	u64              mc[];
+
+Ok, will update.
+
+> 
+> > +				mc_list = kmalloc(sizeof(*mc_list) +
+> > +						  sizeof(u64) * netdev_mc_count(netdev),
+> > +						  GFP_ATOMIC);
+> 
+> kmalloc_array(), please.
+
+In this case it would require two memory allocation calls to kmalloc() for
+xcast_addr_list struct and to kmalloc_array() for 'mc' addresses, becasue of
+different data types and so two null-ptr checks .. this is what I'd like get rid off.
+
+My idea of this was to keep number of array elements and themselves within the
+same memory block/page to reduce number of memory allocation requests, number
+of allocated pages/blocks and avoid possible memory fragmentation (however, I believe
+the latter is already handled at the mm layer).
+
+WBR,
+Vadim
