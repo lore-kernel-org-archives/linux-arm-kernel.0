@@ -1,48 +1,82 @@
 From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Thu,  5 Apr 2018 13:54:07 -0400
-Subject: [PATCH 07/16] media: exymos4-is: allow compile test for EXYNOS
- FIMC-LITE
-In-Reply-To: <cover.1522949748.git.mchehab@s-opensource.com>
-References: <cover.1522949748.git.mchehab@s-opensource.com>
-Message-ID: <3cf43e723f17b55d99d817efa535ded43561b1f6.1522949748.git.mchehab@s-opensource.com>
+Date: Thu,  5 Apr 2018 13:54:00 -0400
+Subject: [PATCH 00/16] Make all drivers under drivers/media to build with
+ COMPILE_TEST
+Message-ID: <cover.1522949748.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's nothing that prevents building this driver with
-COMPILE_TEST. So, enable it.
 
-While here, make the Kconfig dependency cleaner by removing
-the unneeded if block.
+The current media policy has been for a while to only accept new drivers 
+that compile with COMPILE_TEST.
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- drivers/media/platform/exynos4-is/Kconfig | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+However, there are still several drivers under drivers/media that 
+doesn't build with COMPILE_TEST.
 
-diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-index 7b2c49e5a592..c8e5ad8f8294 100644
---- a/drivers/media/platform/exynos4-is/Kconfig
-+++ b/drivers/media/platform/exynos4-is/Kconfig
-@@ -41,11 +41,10 @@ config VIDEO_S5P_MIPI_CSIS
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called s5p-csis.
- 
--if SOC_EXYNOS4412 || SOC_EXYNOS5250
--
- config VIDEO_EXYNOS_FIMC_LITE
- 	tristate "EXYNOS FIMC-LITE camera interface driver"
- 	depends on I2C
-+	depends on SOC_EXYNOS4412 || SOC_EXYNOS5250 || COMPILE_TEST
- 	depends on HAS_DMA
- 	select VIDEOBUF2_DMA_CONTIG
- 	select VIDEO_EXYNOS4_IS_COMMON
-@@ -55,7 +54,6 @@ config VIDEO_EXYNOS_FIMC_LITE
- 
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called exynos-fimc-lite.
--endif
- 
- config VIDEO_EXYNOS4_FIMC_IS
- 	tristate "EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver"
+So, this series makes the existing ones also compatible with it.
+
+Not building with COMPILE_TEST is a bad thing, for several reasons.
+
+The main ones is that:
+
+1) the licence the Kernel community has for Coverity only builds for 
+   x86. So, drivers that don't build on such archtecture were likely 
+   never tested by it.
+
+2) That affects my per-patch handling process, with should be quick 
+   enough to not delay my patch handling process. So, I only build for one 
+   architecture (i386).
+
+3) When appliying a patch, I always run two static code analyzers (W=1, 
+   smatch and sparse). Those drivers weren't checked by me. At the end 
+   of the day, that leads to a lower quality check for the drivers that 
+   don't build on i386.
+
+There are two situations on this patch series that proof the lower 
+quality of those drivers:
+
+- There is a case of a driver that was added broken in 2013. Only two 
+  years later, someone noticed and "fixed" it by markin it as BROKEN!
+
+- 5 patches in this series (about 1/3) are just to fix build issues on 
+  those drivers, most of them due to gcc warnings.
+
+
+Mauro Carvalho Chehab (16):
+  omap: omap-iommu.h: allow building drivers with COMPILE_TEST
+  media: omap3isp: allow it to build with COMPILE_TEST
+  media: omap3isp/isp: remove an unused static var
+  media: fsl-viu: mark static functions as such
+  media: fsl-viu: allow building it with COMPILE_TEST
+  media: cec_gpio: allow building CEC_GPIO with COMPILE_TEST
+  media: exymos4-is: allow compile test for EXYNOS FIMC-LITE
+  media: mmp-camera.h: add missing platform data
+  media: marvel-ccic: re-enable mmp-driver build
+  media: mmp-driver: make two functions static
+  media: davinci: allow building isif code
+  media: davinci: allow build vpbe_display with COMPILE_TEST
+  media: vpbe_venc: don't store return codes if they won't be used
+  media: davinci: get rid of lots of kernel-doc warnings
+  media: omapfb_dss.h: add stubs to build with COMPILE_TEST
+  media: omap: allow building it with COMPILE_TEST
+
+ drivers/media/platform/Kconfig                   | 12 +++---
+ drivers/media/platform/davinci/Kconfig           |  6 ++-
+ drivers/media/platform/davinci/isif.c            |  2 -
+ drivers/media/platform/davinci/vpbe.c            | 38 +++++++++--------
+ drivers/media/platform/davinci/vpbe_display.c    | 21 +++++----
+ drivers/media/platform/davinci/vpbe_osd.c        | 16 ++++---
+ drivers/media/platform/davinci/vpbe_venc.c       |  9 ++--
+ drivers/media/platform/exynos4-is/Kconfig        |  4 +-
+ drivers/media/platform/fsl-viu.c                 | 20 ++++++---
+ drivers/media/platform/marvell-ccic/Kconfig      |  5 ++-
+ drivers/media/platform/marvell-ccic/mmp-driver.c |  4 +-
+ drivers/media/platform/omap/Kconfig              |  6 +--
+ drivers/media/platform/omap3isp/isp.c            | 14 +++---
+ include/linux/omap-iommu.h                       |  5 +++
+ include/linux/platform_data/media/mmp-camera.h   | 19 +++++++++
+ include/video/omapfb_dss.h                       | 54 +++++++++++++++++++++++-
+ 16 files changed, 162 insertions(+), 73 deletions(-)
+
 -- 
 2.14.3
