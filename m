@@ -1,55 +1,101 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  5 Apr 2018 17:59:02 +0100
-Subject: [PATCH 05/10] locking/mcs: Use smp_cond_load_acquire() in mcs spin
- loop
+Date: Thu,  5 Apr 2018 17:59:03 +0100
+Subject: [PATCH 06/10] barriers: Introduce smp_cond_load_relaxed and
+ atomic_cond_read_relaxed
 In-Reply-To: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
 References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1522947547-24081-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1522947547-24081-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Low <jason.low2@hp.com>
+Whilst we currently provide smp_cond_load_acquire and
+atomic_cond_read_acquire, there are cases where the ACQUIRE semantics are
+not required because of a subsequent fence or release operation once the
+conditional loop has exited.
 
-For qspinlocks on ARM64, we would like to use WFE instead
-of purely spinning. Qspinlocks internally have lock
-contenders spin on an MCS lock.
+This patch adds relaxed versions of the conditional spinning primitives
+to avoid unnecessary barrier overhead on architectures such as arm64.
 
-Update arch_mcs_spin_lock_contended() such that it uses
-the new smp_cond_load_acquire() so that ARM64 can also
-override this spin loop with its own implementation using WFE.
-
-On x86, this can also be cheaper than spinning on
-smp_load_acquire().
-
-Signed-off-by: Jason Low <jason.low2@hp.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/locking/mcs_spinlock.h | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ include/asm-generic/barrier.h | 27 +++++++++++++++++++++------
+ include/linux/atomic.h        |  2 ++
+ 2 files changed, 23 insertions(+), 6 deletions(-)
 
-diff --git a/kernel/locking/mcs_spinlock.h b/kernel/locking/mcs_spinlock.h
-index f046b7ce9dd6..5e10153b4d3c 100644
---- a/kernel/locking/mcs_spinlock.h
-+++ b/kernel/locking/mcs_spinlock.h
-@@ -23,13 +23,15 @@ struct mcs_spinlock {
- 
- #ifndef arch_mcs_spin_lock_contended
- /*
-- * Using smp_load_acquire() provides a memory barrier that ensures
-- * subsequent operations happen after the lock is acquired.
-+ * Using smp_cond_load_acquire() provides the acquire semantics
-+ * required so that subsequent operations happen after the
-+ * lock is acquired. Additionally, some architectures such as
-+ * ARM64 would like to do spin-waiting instead of purely
-+ * spinning, and smp_cond_load_acquire() provides that behavior.
-  */
- #define arch_mcs_spin_lock_contended(l)					\
- do {									\
--	while (!(smp_load_acquire(l)))					\
--		cpu_relax();						\
-+	smp_cond_load_acquire(l, VAL);					\
- } while (0)
+diff --git a/include/asm-generic/barrier.h b/include/asm-generic/barrier.h
+index fe297b599b0a..305e03b19a26 100644
+--- a/include/asm-generic/barrier.h
++++ b/include/asm-generic/barrier.h
+@@ -221,18 +221,17 @@ do {									\
  #endif
  
+ /**
+- * smp_cond_load_acquire() - (Spin) wait for cond with ACQUIRE ordering
++ * smp_cond_load_relaxed() - (Spin) wait for cond with no ordering guarantees
+  * @ptr: pointer to the variable to wait on
+  * @cond: boolean expression to wait for
+  *
+- * Equivalent to using smp_load_acquire() on the condition variable but employs
+- * the control dependency of the wait to reduce the barrier on many platforms.
++ * Equivalent to using READ_ONCE() on the condition variable.
+  *
+  * Due to C lacking lambda expressions we load the value of *ptr into a
+  * pre-named variable @VAL to be used in @cond.
+  */
+-#ifndef smp_cond_load_acquire
+-#define smp_cond_load_acquire(ptr, cond_expr) ({		\
++#ifndef smp_cond_load_relaxed
++#define smp_cond_load_relaxed(ptr, cond_expr) ({		\
+ 	typeof(ptr) __PTR = (ptr);				\
+ 	typeof(*ptr) VAL;					\
+ 	for (;;) {						\
+@@ -241,10 +240,26 @@ do {									\
+ 			break;					\
+ 		cpu_relax();					\
+ 	}							\
+-	smp_acquire__after_ctrl_dep();				\
+ 	VAL;							\
+ })
+ #endif
+ 
++/**
++ * smp_cond_load_acquire() - (Spin) wait for cond with ACQUIRE ordering
++ * @ptr: pointer to the variable to wait on
++ * @cond: boolean expression to wait for
++ *
++ * Equivalent to using smp_load_acquire() on the condition variable but employs
++ * the control dependency of the wait to reduce the barrier on many platforms.
++ */
++#ifndef smp_cond_load_acquire
++#define smp_cond_load_acquire(ptr, cond_expr) ({		\
++	typeof(*ptr) _val;					\
++	_val = smp_cond_load_relaxed(ptr, cond_expr);		\
++	smp_acquire__after_ctrl_dep();				\
++	_val;							\
++})
++#endif
++
+ #endif /* !__ASSEMBLY__ */
+ #endif /* __ASM_GENERIC_BARRIER_H */
+diff --git a/include/linux/atomic.h b/include/linux/atomic.h
+index 8b276fd9a127..01ce3997cb42 100644
+--- a/include/linux/atomic.h
++++ b/include/linux/atomic.h
+@@ -654,6 +654,7 @@ static inline int atomic_dec_if_positive(atomic_t *v)
+ }
+ #endif
+ 
++#define atomic_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
+ #define atomic_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
+ 
+ #ifdef CONFIG_GENERIC_ATOMIC64
+@@ -1075,6 +1076,7 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
+ }
+ #endif
+ 
++#define atomic64_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
+ #define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
+ 
+ #include <asm-generic/atomic-long.h>
 -- 
 2.1.4
