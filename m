@@ -1,64 +1,94 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:49:39 +0200
-Subject: [PATCH v6 09/30] drm/bridge: analogix_dp: Fix incorrect usage of
- enhanced mode
+Date: Thu,  5 Apr 2018 11:49:42 +0200
+Subject: [PATCH v6 12/30] drm/bridge: analogix_dp: Reset aux channel if an
+ error occurred
 In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
 References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-10-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-13-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zain wang <wzz@rock-chips.com>
+From: Lin Huang <hl@rock-chips.com>
 
-Enhanced mode is required by the eDP 1.2 specification, and not doing it
-early could result in a period of time where we have a link transmitting
-idle packets without it. Since there is no reason to disable it, we just
-enable it at the beginning of link training and then keep it on all the
-time.
+AUX errors are caused by many different reasons. We may not know what
+happened in aux channel on failure, so let's reset aux channel if some
+errors occurred.
 
-Cc: Tomasz Figa <tfiga@chromium.org>
-Signed-off-by: zain wang <wzz@rock-chips.com>
+Cc: ?? ? <wzz@rock-chips.com>
+Cc: Douglas Anderson <dianders@chromium.org>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 1f4f34149019..1e1743b59c77 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -281,6 +281,8 @@ static int analogix_dp_link_start(struct analogix_dp_device *dp)
- 	retval = drm_dp_dpcd_write(&dp->aux, DP_LINK_BW_SET, buf, 2);
- 	if (retval < 0)
- 		return retval;
-+	/* set enhanced mode if available */
-+	analogix_dp_set_enhanced_mode(dp);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index dee1ba109b5f..7b7fd227e1f9 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -466,6 +466,10 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
+ 	reg = RPLY_RECEIV | AUX_ERR;
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_INT_STA);
  
- 	/* Set TX pre-emphasis to minimum */
- 	for (lane = 0; lane < lane_count; lane++)
-@@ -593,8 +595,6 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
- 		dev_dbg(dp->dev, "fast link training %s\n",
- 			dp->fast_train_enable ? "supported" : "unsupported");
++	analogix_dp_set_analog_power_down(dp, AUX_BLOCK, true);
++	usleep_range(10, 11);
++	analogix_dp_set_analog_power_down(dp, AUX_BLOCK, false);
++
+ 	analogix_dp_reset_aux(dp);
  
--		/* set enhanced mode if available */
--		analogix_dp_set_enhanced_mode(dp);
- 		dp->link_train.lt_state = FINISHED;
- 
- 		return 0;
-@@ -940,8 +940,6 @@ static int analogix_dp_commit(struct analogix_dp_device *dp)
+ 	/* Disable AUX transaction H/W retry */
+@@ -1159,7 +1163,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+ 				 reg, !(reg & AUX_EN), 25, 500 * 1000);
+ 	if (ret) {
+ 		dev_err(dp->dev, "AUX CH enable timeout!\n");
+-		return -ETIMEDOUT;
++		goto aux_error;
  	}
  
- 	analogix_dp_enable_scramble(dp, 1);
--	analogix_dp_enable_rx_to_enhanced_mode(dp, 1);
--	analogix_dp_enable_enhanced_mode(dp, 1);
+ 	/* TODO: Wait for an interrupt instead of looping? */
+@@ -1168,7 +1172,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+ 				 reg, reg & RPLY_RECEIV, 10, 20 * 1000);
+ 	if (ret) {
+ 		dev_err(dp->dev, "AUX CH cmd reply timeout!\n");
+-		return -ETIMEDOUT;
++		goto aux_error;
+ 	}
  
- 	analogix_dp_init_video(dp);
- 	ret = analogix_dp_config_video(dp);
+ 	/* Clear interrupt source for AUX CH command reply */
+@@ -1178,7 +1182,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+ 	reg = readl(dp->reg_base + ANALOGIX_DP_INT_STA);
+ 	if (reg & AUX_ERR) {
+ 		writel(AUX_ERR, dp->reg_base + ANALOGIX_DP_INT_STA);
+-		return -EREMOTEIO;
++		goto aux_error;
+ 	}
+ 
+ 	/* Check AUX CH error access status */
+@@ -1186,7 +1190,7 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+ 	if ((reg & AUX_STATUS_MASK)) {
+ 		dev_err(dp->dev, "AUX CH error happened: %d\n\n",
+ 			reg & AUX_STATUS_MASK);
+-		return -EREMOTEIO;
++		goto aux_error;
+ 	}
+ 
+ 	if (msg->request & DP_AUX_I2C_READ) {
+@@ -1212,4 +1216,10 @@ ssize_t analogix_dp_transfer(struct analogix_dp_device *dp,
+ 		msg->reply = DP_AUX_NATIVE_REPLY_ACK;
+ 
+ 	return num_transferred > 0 ? num_transferred : -EBUSY;
++
++aux_error:
++	/* if aux err happen, reset aux */
++	analogix_dp_init_aux(dp);
++
++	return -EREMOTEIO;
+ }
 -- 
 2.16.3
