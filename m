@@ -1,30 +1,39 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 4 Apr 2018 23:26:04 -0700
-Subject: [PATCH 1/2] coresight: Use %px to print pcsr instead of %p
-In-Reply-To: <1520961871-11196-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
- <1520961871-11196-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 5 Apr 2018 08:29:53 +0200
+Subject: [PATCH 00/15] ARM: pxa: switch to DMA slave maps
+In-Reply-To: <20180404215623.2bf07406@bbrezillon>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
+ <874lkq4urd.fsf@belgarion.home> <20180404215623.2bf07406@bbrezillon>
+Message-ID: <CAPDyKFoFz_HgYPOMGuOTpehrTR3DtWE3uZbcnVwUwVhDy02Mow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 13, 2018 at 10:24 AM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> From: Leo Yan <leo.yan@linaro.org>
+On 4 April 2018 at 21:56, Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> On Wed, 04 Apr 2018 21:49:26 +0200
+> Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 >
-> Commit ad67b74d2469 ("printk: hash addresses printed with %p") lets
-> printk specifier %p to hash all addresses before printing, this was
-> resulting in the high 32 bits of pcsr can only output zeros.  So
-> module cannot completely print pc value and it's pointless for debugging
-> purpose.
+>> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>>
+>> > On 2 April 2018 at 16:26, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>> >> Hi,
+>> >>
+>> >> This serie is aimed at removing the dmaengine slave compat use, and transfer
+>> >> knowledge of the DMA requestors into architecture code.
+>> >> As this looks like a patch bomb, each maintainer expressing for his tree either
+>> >> an Ack or "I want to take through my tree" will be spared in the next iterations
+>> >> of this serie.
+>> >
+>> > Perhaps an option is to send this hole series as PR for 3.17 rc1, that
+>> > would removed some churns and make this faster/easier? Well, if you
+>> > receive the needed acks of course.
+>> For 3.17-rc1 it looks a bit optimistic with the review time ... If I have all
 >
-> This patch fixes this by using %px to print pcsr instead.
+> Especially since 3.17-rc1 has been released more than 3 years ago :-),
+> but I guess you meant 4.17-rc1.
 
-Why is %p (and now %px) needed here at all? %pS is already used, which
-should give useful debugging details, yes?
+Yeah, I realize that I was a bit lost in time yesterday. Even more
+people have been having fun about it (me too). :-)
 
--Kees
-
--- 
-Kees Cook
-Pixel Security
+Kind regards
+Uffe
