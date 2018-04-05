@@ -1,32 +1,46 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 05 Apr 2018 13:24:31 -0700
-Subject: [PATCH] clk: samsung: s3c: Mark expected switch fall-through
-In-Reply-To: <20180404010931.GA30291@embeddedor.com>
-References: <20180404010931.GA30291@embeddedor.com>
-Message-ID: <152295987121.91052.16578276622043986934@swboyd.mtv.corp.google.com>
+From: drivshin@awxrd.com (David Rivshin)
+Date: Thu,  5 Apr 2018 16:09:16 -0400
+Subject: [PATCH] arm: kgdb: fix NUMREGBYTES so that gdb_regs[] is the correct
+ size
+Message-ID: <20180405200916.27964-1-drivshin@awxrd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gustavo A. R. Silva (2018-04-03 18:09:31)
-> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
-> where we are expecting to fall through.
-> 
-> Notice that in this particular case I replaced the comma wiht a dash,
+From: David Rivshin <DRivshin@allworx.com>
 
-s/wiht/with/
+NUMREGBYTES (which is used as the size for gdb_regs[]) is incorrectly based
+on DBG_MAX_REG_NUM instead of GDB_MAX_REGS. DBG_MAX_REG_NUM is the number
+of total registers, while GDB_MAX_REGS is the number of 'unsigned longs'
+it takes to serialize those registers. Since FP registers require 3
+'unsigned longs' each, DBG_MAX_REG_NUM is smaller than GDB_MAX_REGS.
 
-> which is what GCC is expecting to find when there are other comments
-> in the same line in which "fall through" appears.
-> 
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> ---
-> This code was compiled with GCC 7.3.0
+This causes GDB 8.0 give the following error on connect:
+"Truncated register 19 in remote 'g' packet"
 
-What's the GCC warning? Please include in the commit text.
+This also causes the register serialization/deserialization logic to
+overflow gdb_regs[], overwriting whatever follows.
 
-Also what's the implicit-fallthrough level you're using? 3? Can you file
-a bug so GCC can update their regex to accept a comma in addition to
-whitespace characters?
+Fixes: 834b2964b7ab ("kgdb,arm: fix register dump")
+Cc: <stable@vger.kernel.org> # 2.6.37+
+Signed-off-by: David Rivshin <drivshin@allworx.com>
+---
+ arch/arm/include/asm/kgdb.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-And maybe we can change the level to 2 or 1 in the kernel's makefile so
-we don't need to patch comments for this.
+diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
+index 3b73fdcf3627a..8de1100d10674 100644
+--- a/arch/arm/include/asm/kgdb.h
++++ b/arch/arm/include/asm/kgdb.h
+@@ -77,7 +77,7 @@ extern int kgdb_fault_expected;
+ 
+ #define KGDB_MAX_NO_CPUS	1
+ #define BUFMAX			400
+-#define NUMREGBYTES		(DBG_MAX_REG_NUM << 2)
++#define NUMREGBYTES		(GDB_MAX_REGS << 2)
+ #define NUMCRITREGBYTES		(32 << 2)
+ 
+ #define _R0			0
+
+base-commit: 0adb32858b0bddf4ada5f364a84ed60b196dbcda
+-- 
+2.14.3
