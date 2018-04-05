@@ -1,153 +1,34 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu,  5 Apr 2018 20:18:00 +0300
-Subject: [PATCH 5/5] smp: Lazy synchronization for EQS CPUs in
- kick_all_cpus_sync()
-In-Reply-To: <20180405171800.5648-1-ynorov@caviumnetworks.com>
-References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
-Message-ID: <20180405171800.5648-6-ynorov@caviumnetworks.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 5 Apr 2018 19:22:26 +0200
+Subject: [PATCH 06/10] barriers: Introduce smp_cond_load_relaxed and
+ atomic_cond_read_relaxed
+In-Reply-To: <1522947547-24081-7-git-send-email-will.deacon@arm.com>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <1522947547-24081-7-git-send-email-will.deacon@arm.com>
+Message-ID: <20180405172226.GF4082@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kick_all_cpus_sync() forces all CPUs to sync caches by sending broadcast
-IPI.  If CPU is in extended quiescent state (idle task or nohz_full
-userspace), this work may be done at the exit of this state. Delaying
-synchronization helps to save power if CPU is in idle state and decrease
-latency for real-time tasks.
+On Thu, Apr 05, 2018 at 05:59:03PM +0100, Will Deacon wrote:
+> diff --git a/include/linux/atomic.h b/include/linux/atomic.h
+> index 8b276fd9a127..01ce3997cb42 100644
+> --- a/include/linux/atomic.h
+> +++ b/include/linux/atomic.h
+> @@ -654,6 +654,7 @@ static inline int atomic_dec_if_positive(atomic_t *v)
+>  }
+>  #endif
+>  
+> +#define atomic_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
+>  #define atomic_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
+>  
+>  #ifdef CONFIG_GENERIC_ATOMIC64
+> @@ -1075,6 +1076,7 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
+>  }
+>  #endif
+>  
+> +#define atomic64_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
+>  #define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
+>  
+>  #include <asm-generic/atomic-long.h>
 
-This patch introduces rcu_get_eqs_cpus() and uses it in
-kick_all_cpus_sync() to delay synchronization.
-
-For task isolation (https://lkml.org/lkml/2017/11/3/589), IPI to the CPU
-running isolated task is fatal, as it breaks isolation. The approach with
-lazy synchronization helps to maintain isolated state.
-
-I've tested it with test from task isolation series on ThunderX2 for
-more than 10 hours (10k giga-ticks) without breaking isolation.
-
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- include/linux/rcutiny.h |  2 ++
- include/linux/rcutree.h |  1 +
- kernel/rcu/tiny.c       |  9 +++++++++
- kernel/rcu/tree.c       | 23 +++++++++++++++++++++++
- kernel/smp.c            | 21 +++++++++++++--------
- 5 files changed, 48 insertions(+), 8 deletions(-)
-
-diff --git a/include/linux/rcutiny.h b/include/linux/rcutiny.h
-index ce9beec35e34..dc7e2ea731fa 100644
---- a/include/linux/rcutiny.h
-+++ b/include/linux/rcutiny.h
-@@ -36,6 +36,8 @@ static inline int rcu_dynticks_snap(struct rcu_dynticks *rdtp)
- /* Never flag non-existent other CPUs! */
- static inline bool rcu_eqs_special_set(int cpu) { return false; }
- 
-+void rcu_get_eqs_cpus(struct cpumask *cpus, int choose_eqs);
-+
- static inline unsigned long get_state_synchronize_rcu(void)
- {
- 	return 0;
-diff --git a/include/linux/rcutree.h b/include/linux/rcutree.h
-index fd996cdf1833..7a34eb8c0df3 100644
---- a/include/linux/rcutree.h
-+++ b/include/linux/rcutree.h
-@@ -74,6 +74,7 @@ static inline void synchronize_rcu_bh_expedited(void)
- void rcu_barrier(void);
- void rcu_barrier_bh(void);
- void rcu_barrier_sched(void);
-+void rcu_get_eqs_cpus(struct cpumask *cpus, int choose_eqs);
- unsigned long get_state_synchronize_rcu(void);
- void cond_synchronize_rcu(unsigned long oldstate);
- unsigned long get_state_synchronize_sched(void);
-diff --git a/kernel/rcu/tiny.c b/kernel/rcu/tiny.c
-index a64eee0db39e..d4e94e1b0570 100644
---- a/kernel/rcu/tiny.c
-+++ b/kernel/rcu/tiny.c
-@@ -128,6 +128,15 @@ void rcu_check_callbacks(int user)
- 		rcu_note_voluntary_context_switch(current);
- }
- 
-+/*
-+ * For tiny RCU, all CPUs are active (non-EQS).
-+ */
-+void rcu_get_eqs_cpus(struct cpumask *cpus, int choose_eqs)
-+{
-+	if (!choose_eqs)
-+		cpumask_copy(cpus, cpu_online_mask);
-+}
-+
- /*
-  * Invoke the RCU callbacks on the specified rcu_ctrlkblk structure
-  * whose grace period has elapsed.
-diff --git a/kernel/rcu/tree.c b/kernel/rcu/tree.c
-index 363f91776b66..cb0d3afe7ea8 100644
---- a/kernel/rcu/tree.c
-+++ b/kernel/rcu/tree.c
-@@ -419,6 +419,29 @@ bool rcu_eqs_special_set(int cpu)
- 	return true;
- }
- 
-+/*
-+ * Get EQS CPUs. If @choose_eqs is 0, set of active (non-EQS)
-+ * CPUs is returned instead.
-+ *
-+ * Call with disabled preemption. Make sure @cpus is cleared.
-+ */
-+void rcu_get_eqs_cpus(struct cpumask *cpus, int choose_eqs)
-+{
-+	int cpu, in_eqs;
-+	struct rcu_dynticks *rdtp;
-+
-+	for_each_online_cpu(cpu) {
-+		rdtp = &per_cpu(rcu_dynticks, cpu);
-+		in_eqs = rcu_dynticks_in_eqs(atomic_read(&rdtp->dynticks));
-+
-+		if (in_eqs && choose_eqs)
-+			cpumask_set_cpu(cpu, cpus);
-+
-+		if (!in_eqs && !choose_eqs)
-+			cpumask_set_cpu(cpu, cpus);
-+	}
-+}
-+
- /*
-  * Let the RCU core know that this CPU has gone through the scheduler,
-  * which is a quiescent state.  This is called when the need for a
-diff --git a/kernel/smp.c b/kernel/smp.c
-index 084c8b3a2681..5e6cfb57da22 100644
---- a/kernel/smp.c
-+++ b/kernel/smp.c
-@@ -708,19 +708,24 @@ static void do_nothing(void *unused)
- /**
-  * kick_all_cpus_sync - Force all cpus out of idle
-  *
-- * Used to synchronize the update of pm_idle function pointer. It's
-- * called after the pointer is updated and returns after the dummy
-- * callback function has been executed on all cpus. The execution of
-- * the function can only happen on the remote cpus after they have
-- * left the idle function which had been called via pm_idle function
-- * pointer. So it's guaranteed that nothing uses the previous pointer
-- * anymore.
-+ * - on current CPU call smp_mb() explicitly;
-+ * - on CPUs in extended quiescent state (idle or nohz_full userspace), memory
-+ *   is synchronized at the exit of that mode, so do nothing (it's safe to delay
-+ *   synchronization because EQS CPUs don't run kernel code);
-+ * - on other CPUs fire IPI for synchronization, which implies barrier.
-  */
- void kick_all_cpus_sync(void)
- {
-+	struct cpumask active_cpus;
-+
- 	/* Make sure the change is visible before we kick the cpus */
- 	smp_mb();
--	smp_call_function(do_nothing, NULL, 1);
-+
-+	cpumask_clear(&active_cpus);
-+	preempt_disable();
-+	rcu_get_eqs_cpus(&active_cpus, 0);
-+	smp_call_function_many(&active_cpus, do_nothing, NULL, 1);
-+	preempt_enable();
- }
- EXPORT_SYMBOL_GPL(kick_all_cpus_sync);
- 
--- 
-2.14.1
+Did we again forget atomic_long glue ? ;-)
