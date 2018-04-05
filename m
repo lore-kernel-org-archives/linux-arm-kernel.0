@@ -1,73 +1,44 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:49:36 +0200
-Subject: [PATCH v6 06/30] drm/bridge: analogix_dp: Set PD_INC_BG first when
- powering up edp phy
+Date: Thu,  5 Apr 2018 11:49:38 +0200
+Subject: [PATCH v6 08/30] drm/bridge: analogix_dp: Extend hpd check time to
+ 100ms
 In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
 References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-7-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-9-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zain wang <wzz@rock-chips.com>
+From: Lin Huang <hl@rock-chips.com>
 
-Following the correct power up sequence:
-dp_pd=ff => dp_pd=7f => wait 10us => dp_pd=00
+There was a 1ms delay to detect the hpd signal, which is too short to
+detect a short pulse. This patch extends this delay to 100ms.
 
 Cc: St?phane Marchesin <marcheu@chromium.org>
-Signed-off-by: zain wang <wzz@rock-chips.com>
+Cc: ?? ? <wzz@rock-chips.com>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 10 ++++++++--
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h |  3 +++
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index b47c5af43560..bb72f8b0e603 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -321,10 +321,16 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 		break;
- 	case POWER_ALL:
- 		if (enable) {
--			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
--				CH1_PD | CH0_PD;
-+			reg = DP_ALL_PD;
- 			writel(reg, dp->reg_base + phy_pd_addr);
- 		} else {
-+			reg = DP_ALL_PD;
-+			writel(reg, dp->reg_base + phy_pd_addr);
-+			usleep_range(10, 15);
-+			reg &= ~DP_INC_BG;
-+			writel(reg, dp->reg_base + phy_pd_addr);
-+			usleep_range(10, 15);
-+
- 			writel(0x00, dp->reg_base + phy_pd_addr);
- 		}
- 		break;
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-index 40200c652533..9602668669f4 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-@@ -342,12 +342,15 @@
- #define DP_PLL_REF_BIT_1_2500V			(0x7 << 0)
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 5957e2338071..1f4f34149019 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -76,7 +76,7 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+ 			return 0;
  
- /* ANALOGIX_DP_PHY_PD */
-+#define DP_INC_BG				(0x1 << 7)
-+#define DP_EXP_BG				(0x1 << 6)
- #define DP_PHY_PD				(0x1 << 5)
- #define AUX_PD					(0x1 << 4)
- #define CH3_PD					(0x1 << 3)
- #define CH2_PD					(0x1 << 2)
- #define CH1_PD					(0x1 << 1)
- #define CH0_PD					(0x1 << 0)
-+#define DP_ALL_PD				(0xff)
+ 		timeout_loop++;
+-		usleep_range(10, 11);
++		usleep_range(1000, 1100);
+ 	}
  
- /* ANALOGIX_DP_PHY_TEST */
- #define MACRO_RST				(0x1 << 5)
+ 	/*
 -- 
 2.16.3
