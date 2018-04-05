@@ -1,78 +1,69 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:49:48 +0200
-Subject: [PATCH v6 18/30] drm/bridge: analogix_dp: Reorder
- plat_data->power_off to happen sooner
+Date: Thu,  5 Apr 2018 11:49:53 +0200
+Subject: [PATCH v6 23/30] drm/rockchip: analogix_dp: Do not call Analogix code
+ before bind
 In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
 References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-19-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-24-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Anderson <dianders@chromium.org>
+From: Tomasz Figa <tfiga@chromium.org>
 
-The current user of the analogix power_off is "analogix_dp-rockchip".
-That driver does this:
-- deactivate PSR
-- turn off a clock
+Driver callbacks, such as system suspend or resume can be called any
+time, specifically they can be called before the component bind
+callback. Let's use dp->adp pointer as a safeguard and skip calling
+Analogix entry points if it is an ERR_PTR().
 
-Both of these things (especially deactive PSR) should be done before
-we turn the PHY power off and turn off analog power.  Let's move the
-callback up.
-
-Note that without this patch (and with
-https://patchwork.kernel.org/patch/9553349/ [seanpaul: this patch was
-not applied, but it seems like the race can still occur]), I experienced
-an error in reboot testing where one thread was at:
-
-  rockchip_drm_psr_deactivate
-  rockchip_dp_powerdown
-  analogix_dp_bridge_disable
-  drm_bridge_disable
-
-...and the other thread was at:
-
-  analogix_dp_send_psr_spd
-  analogix_dp_enable_psr
-  analogix_dp_psr_set
-  psr_flush_handler
-
-The flush handler thread was finding AUX channel errors and eventually
-reported "Failed to apply PSR", where I had a kgdb breakpoint. Presumably
-the device would have eventually given up and shut down anyway, but it
-seems better to fix the order to be more correct.
-
-Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 69b2c16e5776..a260de4f0bd8 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -1337,12 +1337,13 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
- 	}
- 
- 	disable_irq(dp->irq);
--	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
--	phy_power_off(dp->phy);
- 
- 	if (dp->plat_data->power_off)
- 		dp->plat_data->power_off(dp->plat_data);
- 
-+	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
-+	phy_power_off(dp->phy);
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 23317a2269e1..6d45d62466b3 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -368,6 +368,8 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
+ 	analogix_dp_unbind(dp->adp);
+ 	rockchip_drm_psr_unregister(&dp->encoder);
+ 	dp->encoder.funcs->destroy(&dp->encoder);
 +
- 	clk_disable_unprepare(dp->clock);
++	dp->adp = ERR_PTR(-ENODEV);
+ }
  
- 	pm_runtime_put_sync(dp->dev);
+ static const struct component_ops rockchip_dp_component_ops = {
+@@ -391,6 +393,7 @@ static int rockchip_dp_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	dp->dev = dev;
++	dp->adp = ERR_PTR(-ENODEV);
+ 	dp->plat_data.panel = panel;
+ 
+ 	ret = rockchip_dp_of_probe(dp);
+@@ -414,6 +417,9 @@ static int rockchip_dp_suspend(struct device *dev)
+ {
+ 	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
+ 
++	if (IS_ERR(dp->adp))
++		return 0;
++
+ 	return analogix_dp_suspend(dp->adp);
+ }
+ 
+@@ -421,6 +427,9 @@ static int rockchip_dp_resume(struct device *dev)
+ {
+ 	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
+ 
++	if (IS_ERR(dp->adp))
++		return 0;
++
+ 	return analogix_dp_resume(dp->adp);
+ }
+ #endif
 -- 
 2.16.3
