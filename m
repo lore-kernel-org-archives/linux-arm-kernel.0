@@ -1,92 +1,126 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:50:00 +0200
-Subject: [PATCH v6 30/30] drm/rockchip: psr: Remove flush by CRTC
-In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
-References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-31-enric.balletbo@collabora.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Thu, 5 Apr 2018 12:59:35 +0300
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <20180405091913.ky4dnmszoobn2xry@flea>
+References: <20180403154449.2443-1-ssuloev@orpaltech.com>
+ <20180403154449.2443-4-ssuloev@orpaltech.com>
+ <20180404065048.n76r3ytuznd6fqsl@flea>
+ <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
+ <20180405091913.ky4dnmszoobn2xry@flea>
+Message-ID: <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+On 04/05/2018 12:19 PM, Maxime Ripard wrote:
+> On Wed, Apr 04, 2018 at 02:35:14PM +0300, Sergey Suloev wrote:
+>> On 04/04/2018 09:50 AM, Maxime Ripard wrote:
+>>> On Tue, Apr 03, 2018 at 06:44:46PM +0300, Sergey Suloev wrote:
+>>>> There is no need to handle 3/4 empty interrupt as the maximum
+>>>> supported transfer length in PIO mode is equal to FIFO depth,
+>>>> i.e. 128 bytes for sun6i and 64 bytes for sun8i SoCs.
+>>>>
+>>>> Changes in v3:
+>>>> 1) Restored processing of 3/4 FIFO full interrupt.
+>>>>
+>>>> Signed-off-by: Sergey Suloev <ssuloev@orpaltech.com>
+>>>> ---
+>>>>    drivers/spi/spi-sun6i.c | 41 +++++++++++++++++------------------------
+>>>>    1 file changed, 17 insertions(+), 24 deletions(-)
+>>>>
+>>>> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+>>>> index 78acc1f..c09ad10 100644
+>>>> --- a/drivers/spi/spi-sun6i.c
+>>>> +++ b/drivers/spi/spi-sun6i.c
+>>>> @@ -207,7 +207,10 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
+>>>>    static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
+>>>>    {
+>>>> -	return SUN6I_MAX_XFER_SIZE - 1;
+>>>> +	struct spi_master *master = spi->master;
+>>>> +	struct sun6i_spi *sspi = spi_master_get_devdata(master);
+>>>> +
+>>>> +	return sspi->fifo_depth;
+>>> Doesn't that effectively revert 3288d5cb40c0 ?
+>>>
+>>> Why do you need to do so?
+>> Need what?
+> Why do you need to revert that change.
+>
+>> Change is supposed to restrict max transfer size for PIO mode otherwise it
+>> will fail.
+>> The maximum transfer length = FIFO depth for PIO mode.
+> The point of that patch was precisely to allow to send more data than
+> the FIFO. You're breaking that behaviour without any justification,
+> and this is not ok.
 
-It is not used anymore after last changes and it was not even correct to
-begin with as it assumed a 1:1 relation between a CRTC and encoder,
-while in fact a CRTC can be attached to multiple encoders.
-
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
-
- drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 35 -----------------------------
- drivers/gpu/drm/rockchip/rockchip_drm_psr.h |  1 -
- 2 files changed, 36 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-index 1bf5cba9a64d..b1988ac758d5 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-@@ -40,23 +40,6 @@ struct psr_drv {
- 	int (*set)(struct drm_encoder *encoder, bool enable);
- };
- 
--static struct psr_drv *find_psr_by_crtc(struct drm_crtc *crtc)
--{
--	struct rockchip_drm_private *drm_drv = crtc->dev->dev_private;
--	struct psr_drv *psr;
--
--	mutex_lock(&drm_drv->psr_list_lock);
--	list_for_each_entry(psr, &drm_drv->psr_list, list) {
--		if (psr->encoder->crtc == crtc)
--			goto out;
--	}
--	psr = ERR_PTR(-ENODEV);
--
--out:
--	mutex_unlock(&drm_drv->psr_list_lock);
--	return psr;
--}
--
- static struct psr_drv *find_psr_by_encoder(struct drm_encoder *encoder)
- {
- 	struct rockchip_drm_private *drm_drv = encoder->dev->dev_private;
-@@ -173,24 +156,6 @@ static void rockchip_drm_do_flush(struct psr_drv *psr)
- 	mutex_unlock(&psr->lock);
- }
- 
--/**
-- * rockchip_drm_psr_flush - flush a single pipe
-- * @crtc: CRTC of the pipe to flush
-- *
-- * Returns:
-- * 0 on success, -errno on fail
-- */
--int rockchip_drm_psr_flush(struct drm_crtc *crtc)
--{
--	struct psr_drv *psr = find_psr_by_crtc(crtc);
--	if (IS_ERR(psr))
--		return PTR_ERR(psr);
--
--	rockchip_drm_do_flush(psr);
--	return 0;
--}
--EXPORT_SYMBOL(rockchip_drm_psr_flush);
--
- /**
-  * rockchip_drm_psr_flush_all - force to flush all registered PSR encoders
-  * @dev: drm device
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
-index 40e026c14168..860c62494496 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
-@@ -16,7 +16,6 @@
- #define __ROCKCHIP_DRM_PSR___
- 
- void rockchip_drm_psr_flush_all(struct drm_device *dev);
--int rockchip_drm_psr_flush(struct drm_crtc *crtc);
- 
- int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder);
- int rockchip_drm_psr_inhibit_get(struct drm_encoder *encoder);
--- 
-2.16.3
+I am sorry, but you can't. That's a hardware limitation.
+>>>>    }
+>>>>    static int sun6i_spi_prepare_message(struct spi_master *master,
+>>>> @@ -255,8 +258,14 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+>>>>    	int ret = 0;
+>>>>    	u32 reg;
+>>>> -	if (tfr->len > SUN6I_MAX_XFER_SIZE)
+>>>> -		return -EINVAL;
+>>>> +	/* A zero length transfer never finishes if programmed
+>>>> +	   in the hardware */
+>>> Improper comment style here. Please make sure to run checkpatch before
+>>> sending your patches.
+>> ok
+>>>> +	if (!tfr->len)
+>>>> +		return 0;
+>>> Can that case even happen?
+>> Not sure, just for safety.
+>>>> +	/* Don't support transfer larger than the FIFO */
+>>>> +	if (tfr->len > sspi->fifo_depth)
+>>>> +		return -EMSGSIZE;
+>>> You're changing the return type, why?
+>> As? a more appropriate one
+> The fact that it's more appropriate should be justified.
+>
+>>>>    	reinit_completion(&sspi->done);
+>>>>    	sspi->tx_buf = tfr->tx_buf;
+>>>> @@ -278,8 +287,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+>>>>    	 */
+>>>>    	trig_level = sspi->fifo_depth / 4 * 3;
+>>>>    	sun6i_spi_write(sspi, SUN6I_FIFO_CTL_REG,
+>>>> -			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS) |
+>>>> -			(trig_level << SUN6I_FIFO_CTL_TF_ERQ_TRIG_LEVEL_BITS));
+>>>> +			(trig_level << SUN6I_FIFO_CTL_RF_RDY_TRIG_LEVEL_BITS));
+>>>>    	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+>>>> @@ -343,11 +351,8 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+>>>>    	sun6i_spi_fill_fifo(sspi, sspi->fifo_depth);
+>>>>    	/* Enable the interrupts */
+>>>> -	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, SUN6I_INT_CTL_TC);
+>>>>    	sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TC |
+>>>>    					 SUN6I_INT_CTL_RF_RDY);
+>>>> -	if (tx_len > sspi->fifo_depth)
+>>>> -		sun6i_spi_enable_interrupt(sspi, SUN6I_INT_CTL_TF_ERQ);
+>>> This would also need to be explained in your commit log.
+>> What exactly and in what way ?
+> You should explain, at least:
+> A) What is the current behaviour
+> B) Why that is a problem, or what problem does it cause
+> C) What solution you implement and why you think it's justified
+>
+>>>>    	/* Start the transfer */
+>>>>    	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+>>>> @@ -376,7 +381,9 @@ out:
+>>>>    static irqreturn_t sun6i_spi_handler(int irq, void *dev_id)
+>>>>    {
+>>>>    	struct sun6i_spi *sspi = dev_id;
+>>>> -	u32 status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
+>>>> +	u32 status;
+>>>> +
+>>>> +	status = sun6i_spi_read(sspi, SUN6I_INT_STA_REG);
+>>> Why is this change needed?
+>> A minor one, for readability.
+> That's arguable, and you should have a single logical change per
+> patch. So this doesn't belong in this one.
+>
+> Maxime
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
