@@ -1,23 +1,48 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 5 Apr 2018 19:28:08 +0200
-Subject: [PATCH 10/10] locking/qspinlock: Elide back-to-back RELEASE
- operations with smp_wmb()
-In-Reply-To: <1522947547-24081-11-git-send-email-will.deacon@arm.com>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <1522947547-24081-11-git-send-email-will.deacon@arm.com>
-Message-ID: <20180405172808.GG4082@hirez.programming.kicks-ass.net>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Thu,  5 Apr 2018 13:54:07 -0400
+Subject: [PATCH 07/16] media: exymos4-is: allow compile test for EXYNOS
+ FIMC-LITE
+In-Reply-To: <cover.1522949748.git.mchehab@s-opensource.com>
+References: <cover.1522949748.git.mchehab@s-opensource.com>
+Message-ID: <3cf43e723f17b55d99d817efa535ded43561b1f6.1522949748.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 05:59:07PM +0100, Will Deacon wrote:
-> @@ -340,12 +341,17 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
->  		goto release;
->  
->  	/*
-> +	 * Ensure that the initialisation of @node is complete before we
-> +	 * publish the updated tail and potentially link @node into the
-> +	 * waitqueue.
-> +	 */
-> +	smp_wmb();
+There's nothing that prevents building this driver with
+COMPILE_TEST. So, enable it.
 
-Maybe an explicit note to where the matching barrier lives..
+While here, make the Kconfig dependency cleaner by removing
+the unneeded if block.
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ drivers/media/platform/exynos4-is/Kconfig | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 7b2c49e5a592..c8e5ad8f8294 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -41,11 +41,10 @@ config VIDEO_S5P_MIPI_CSIS
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called s5p-csis.
+ 
+-if SOC_EXYNOS4412 || SOC_EXYNOS5250
+-
+ config VIDEO_EXYNOS_FIMC_LITE
+ 	tristate "EXYNOS FIMC-LITE camera interface driver"
+ 	depends on I2C
++	depends on SOC_EXYNOS4412 || SOC_EXYNOS5250 || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select VIDEO_EXYNOS4_IS_COMMON
+@@ -55,7 +54,6 @@ config VIDEO_EXYNOS_FIMC_LITE
+ 
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called exynos-fimc-lite.
+-endif
+ 
+ config VIDEO_EXYNOS4_FIMC_IS
+ 	tristate "EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver"
+-- 
+2.14.3
