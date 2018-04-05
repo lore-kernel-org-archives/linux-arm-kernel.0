@@ -1,39 +1,29 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 5 Apr 2018 08:29:53 +0200
-Subject: [PATCH 00/15] ARM: pxa: switch to DMA slave maps
-In-Reply-To: <20180404215623.2bf07406@bbrezillon>
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
- <874lkq4urd.fsf@belgarion.home> <20180404215623.2bf07406@bbrezillon>
-Message-ID: <CAPDyKFoFz_HgYPOMGuOTpehrTR3DtWE3uZbcnVwUwVhDy02Mow@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Thu, 5 Apr 2018 12:11:39 +0530
+Subject: [PATCH v5 1/3] regulator: axp20x: add drivevbus support for axp803
+In-Reply-To: <20180327053104.3812-1-jagan@amarulasolutions.com>
+References: <20180327053104.3812-1-jagan@amarulasolutions.com>
+Message-ID: <CAMty3ZD3ohpgqsBjgNztpyHOmmcu_y7vuUOoop8y-+OpWjLYGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2018 at 21:56, Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> On Wed, 04 Apr 2018 21:49:26 +0200
-> Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On Tue, Mar 27, 2018 at 11:01 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+> Like axp221, axp223, axp813 the axp803 is also supporting external
+> regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
 >
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
->>
->> > On 2 April 2018 at 16:26, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->> >> Hi,
->> >>
->> >> This serie is aimed at removing the dmaengine slave compat use, and transfer
->> >> knowledge of the DMA requestors into architecture code.
->> >> As this looks like a patch bomb, each maintainer expressing for his tree either
->> >> an Ack or "I want to take through my tree" will be spared in the next iterations
->> >> of this serie.
->> >
->> > Perhaps an option is to send this hole series as PR for 3.17 rc1, that
->> > would removed some churns and make this faster/easier? Well, if you
->> > receive the needed acks of course.
->> For 3.17-rc1 it looks a bit optimistic with the review time ... If I have all
+> Add support for it.
 >
-> Especially since 3.17-rc1 has been released more than 3 years ago :-),
-> but I guess you meant 4.17-rc1.
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes for v5:
+> - Collect Chen-Yu reviewed-by tag
+> Changes for v4:
+> - rebase on master
+> Changes for v3:
+> - Update drivevbus in table of regulators
 
-Yeah, I realize that I was a bit lost in time yesterday. Even more
-people have been having fun about it (me too). :-)
+Can you pick these, has some dependency with drivevbus on other patches.
 
-Kind regards
-Uffe
+Jagan.
