@@ -1,68 +1,48 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 4 Apr 2018 20:06:42 -0400
-Subject: [PATCH v2 2/2] io: prevent compiler reordering on the default
- readX() implementation
-In-Reply-To: <CAK8P3a2Cg59cTzUq2_8sopeY9BktM7a6_4nunMJVA5fQFaVLug@mail.gmail.com>
-References: <mhng-fe49c525-788d-4ce7-9703-95e2b3eaeca6@palmer-si-x1c4>
- <691b903c-e97d-0a25-28c5-690318bb215a@codeaurora.org>
- <CAK8P3a2pGQb7TqQtuw0ZpQ=8CwXiRmRKKc1GwvEgKDgofxJ3nA@mail.gmail.com>
- <9b0d7db3-0830-9661-6dc8-39523daa8f32@codeaurora.org>
- <CAK8P3a2Cg59cTzUq2_8sopeY9BktM7a6_4nunMJVA5fQFaVLug@mail.gmail.com>
-Message-ID: <d7c63b8f-b315-8593-9683-588598dd1dc1@codeaurora.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 5 Apr 2018 09:25:06 +0800
+Subject: [PATCH] ARM64: dts: meson-axg: enable the eMMC controller
+In-Reply-To: <201804040211.7wh3FnSx%fengguang.wu@intel.com>
+References: <20180403102651.60340-1-yixun.lan@amlogic.com>
+ <201804040211.7wh3FnSx%fengguang.wu@intel.com>
+Message-ID: <05e90560-46a7-7e4f-c4cf-13d8d6e754b3@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/4/2018 3:50 PM, Arnd Bergmann wrote:
-> On Wed, Apr 4, 2018 at 7:48 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> On 4/4/2018 11:55 AM, Arnd Bergmann wrote:
->>> Yes, exactly, plus the same for write and in/out of course.
->>
->> I was looking at this...
->>
->> inb() and outb() seem to be calling writeb(). It gets the wmb/barrier automatically
->> when we fix writeb().
->>
->> Did I miss something?
-> 
-> At least outb() needs stricter barriers than writeb() in theory, what
-> we want here
-> is that outb() has not just made it out to the device but that the
-> write has been
-> confirmed completed by the device. Some architectures can't do it, but those
-> that can should have an easy way to hook into that using a separate set of
-> barriers.
-> 
-> Using the riscv barrier names, we could do this like
-> 
-> #ifndef __io_bw()
-> #define __io_bw()      wmb()
-> #endif
-> 
-> #ifndef __io_aw
-> #define __io_aw()      barrier()
-> #endif
-> 
-> #ifndef __io_pbw
-> #define __io_pbw()     __io_bw()
-> #endif
-> 
-> #ifndef __io_paw
-> #define __io_paw()     __io_aw()
-> #endif
-> 
-> and the same thing for reads. This way, an architecture could override
-> any of those, but still get reasonable defaults for the others.
-> For __io_bw(), I picked barrier() instead of do {} while (0), no idea
-> if that's any better, I just play safe here.
+Hi Kevin
 
-I posted V3. I hope I captured what you mean above correctly.
-
+On 04/04/2018 02:26 AM, kbuild test robot wrote:
+> Hi Nan,
 > 
->      Arnd
+> Thank you for the patch! Yet something to improve:
+> 
+> [auto build test ERROR on next-20180403]
+> [cannot apply to robh/for-next v4.16 v4.16-rc7 v4.16-rc6 v4.16]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Yixun-Lan/ARM64-dts-meson-axg-enable-the-eMMC-controller/20180403-224314
+> config: arm64-allyesconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>>> Error: arch/arm64/boot/dts/amlogic/meson-axg-s400.dts:49.24-25 syntax error
+>    FATAL ERROR: Unable to parse input tree
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 > 
 
+oops, need to add this header (I fail to do a last check when rebase to
+the dt64 branch)
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
++#include <dt-bindings/gpio/meson-axg-gpio.h>
+
+will send a patch v2
+
+Yixun
