@@ -1,20 +1,48 @@
-From: willy@infradead.org (Matthew Wilcox)
-Date: Thu, 5 Apr 2018 04:23:57 -0700
-Subject: [PATCH v7 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
- on arm and arm64
-In-Reply-To: <1522915478-5044-2-git-send-email-hejianet@gmail.com>
-References: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
- <1522915478-5044-2-git-send-email-hejianet@gmail.com>
-Message-ID: <20180405112357.GA2647@bombadil.infradead.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 5 Apr 2018 12:26:23 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Set GBPA to abort all transactions
+In-Reply-To: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
+References: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
+Message-ID: <20180405112622.GE23485@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 01:04:34AM -0700, Jia He wrote:
->  create mode 100644 include/linux/arm96_common.h
+On Wed, Mar 28, 2018 at 09:39:40AM -0500, Timur Tabi wrote:
+> From: Sameer Goel <sgoel@codeaurora.org>
+> 
+> Set SMMU_GBPA to abort all incoming translations during the SMMU reset
+> when SMMUEN==0.
+> 
+> This prevents a race condition where a stray DMA from the crashed primary
+> kernel can try to access an IOVA address as an invalid PA when SMMU is
+> disabled during reset in the crash kernel.
+> 
+> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 3f2f1fc68b52..c04a89310c59 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -2458,6 +2458,18 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+>  	if (reg & CR0_SMMUEN)
+>  		dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
+>  
+> +	/*
+> +	 * Abort all incoming translations. This can happen in a kdump case
+> +	 * where SMMU is initialized when a prior DMA is pending. Just
+> +	 * disabling the SMMU in this case might result in writes to invalid
+> +	 * PAs.
+> +	 */
+> +	ret = arm_smmu_update_gbpa(smmu, 1, GBPA_ABORT);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "GBPA not responding to update\n");
+> +		return ret;
+> +	}
 
-'arm96_common'?!  No.  Just no.
+This needs to be predicated on the disable_bypass option, otherwise I think
+it will cause regressions for systems that rely on passthrough.
 
-The right way to share common code is to create a header file (or use
-an existing one), either in asm-generic or linux, with a #ifdef CONFIG_foo
-block and then 'select foo' in the arm Kconfig files.  That allows this
-common code to be shared, maybe with powerpc or x86 or ... in the future.
+Will
