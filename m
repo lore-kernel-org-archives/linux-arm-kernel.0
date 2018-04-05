@@ -1,83 +1,56 @@
 From: hejianet@gmail.com (Jia He)
-Date: Thu,  5 Apr 2018 01:04:35 -0700
-Subject: [PATCH v7 2/5] arm: arm64: page_alloc: reduce unnecessary binary
- search in memblock_next_valid_pfn()
+Date: Thu,  5 Apr 2018 01:04:36 -0700
+Subject: [PATCH v7 3/5] mm/memblock: introduce memblock_search_pfn_regions()
 In-Reply-To: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
 References: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
-Message-ID: <1522915478-5044-3-git-send-email-hejianet@gmail.com>
+Message-ID: <1522915478-5044-4-git-send-email-hejianet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-where possible") optimized the loop in memmap_init_zone(). But there is
-still some room for improvement. E.g. if pfn and pfn+1 are in the same
-memblock region, we can simply pfn++ instead of doing the binary search
-in memblock_next_valid_pfn.
+This api is to find the memory region index of input pfn. With this
+helper, we can improve the loop in early_pfn_valid by recording last
+region index. If current pfn and last pfn are in the same memory
+region, we needn't do the unnecessary binary searches because the
+result of memblock_is_nomap is the same for whole memory region.
 
 Signed-off-by: Jia He <jia.he@hxt-semitech.com>
 ---
- include/linux/arm96_common.h | 31 +++++++++++++++++++++++--------
- 1 file changed, 23 insertions(+), 8 deletions(-)
+ include/linux/memblock.h | 2 ++
+ mm/memblock.c            | 9 +++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/include/linux/arm96_common.h b/include/linux/arm96_common.h
-index a6f68ea..2f4dea4 100644
---- a/include/linux/arm96_common.h
-+++ b/include/linux/arm96_common.h
-@@ -5,32 +5,47 @@
- #ifndef __ARM96_COMMON_H
- #define __ARM96_COMMON_H
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
-+static int early_region_idx __init_memblock = -1;
- /* HAVE_MEMBLOCK is always enabled on arm and arm64 */
- ulong __init_memblock memblock_next_valid_pfn(ulong pfn)
- {
- 	struct memblock_type *type = &memblock.memory;
--	unsigned int right = type->cnt;
--	unsigned int mid, left = 0;
-+	struct memblock_region *regions = type->regions;
-+	uint right = type->cnt;
-+	uint mid, left = 0;
-+	ulong start_pfn, end_pfn;
- 	phys_addr_t addr = PFN_PHYS(++pfn);
+diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+index 0257aee..a0127b3 100644
+--- a/include/linux/memblock.h
++++ b/include/linux/memblock.h
+@@ -203,6 +203,8 @@ void __next_mem_pfn_range(int *idx, int nid, unsigned long *out_start_pfn,
+ 	     i >= 0; __next_mem_pfn_range(&i, nid, p_start, p_end, p_nid))
+ #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
  
-+	/* fast path, return pfn+1 if next pfn is in the same region */
-+	if (early_region_idx != -1) {
-+		start_pfn = PFN_DOWN(regions[early_region_idx].base);
-+		end_pfn = PFN_DOWN(regions[early_region_idx].base +
-+				regions[early_region_idx].size);
++int memblock_search_pfn_regions(unsigned long pfn);
 +
-+		if (pfn >= start_pfn && pfn < end_pfn)
-+			return pfn;
-+	}
-+
-+	/* slow path, do the binary searching */
- 	do {
- 		mid = (right + left) / 2;
- 
--		if (addr < type->regions[mid].base)
-+		if (addr < regions[mid].base)
- 			right = mid;
--		else if (addr >= (type->regions[mid].base +
--				  type->regions[mid].size))
-+		else if (addr >= (regions[mid].base + regions[mid].size))
- 			left = mid + 1;
- 		else {
--			/* addr is within the region, so pfn is valid */
-+			early_region_idx = mid;
- 			return pfn;
- 		}
- 	} while (left < right);
- 
- 	if (right == type->cnt)
- 		return -1UL;
--	else
--		return PHYS_PFN(type->regions[right].base);
-+
-+	early_region_idx = right;
-+
-+	return PHYS_PFN(regions[early_region_idx].base);
+ /**
+  * for_each_free_mem_range - iterate through free memblock areas
+  * @i: u64 used as loop variable
+diff --git a/mm/memblock.c b/mm/memblock.c
+index ba7c878..0f4004c 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -1617,6 +1617,15 @@ static int __init_memblock memblock_search(struct memblock_type *type, phys_addr
+ 	return -1;
  }
- EXPORT_SYMBOL(memblock_next_valid_pfn);
- #endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
+ 
++/* search memblock with the input pfn, return the region idx */
++int __init_memblock memblock_search_pfn_regions(unsigned long pfn)
++{
++	struct memblock_type *type = &memblock.memory;
++	int mid = memblock_search(type, PFN_PHYS(pfn));
++
++	return mid;
++}
++
+ bool __init memblock_is_reserved(phys_addr_t addr)
+ {
+ 	return memblock_search(&memblock.reserved, addr) != -1;
 -- 
 2.7.4
