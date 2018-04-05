@@ -1,39 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Apr 2018 13:18:48 +0200
-Subject: [PATCH] arm: decompressor: mark error() as __noreturn
-In-Reply-To: <20180404223843.GL16141@n2100.armlinux.org.uk>
-References: <20180404123117.3575773-1-arnd@arndb.de>
- <CAGXu5jK1abgzQCJ+9ysTZHvxPo4vG6dfwPFs_CuXdP=0_Qib_g@mail.gmail.com>
- <20180404223843.GL16141@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a3PcP4rpmw2gAO7GhxwaeHeZPTrtONuqUjFvu1rfKjgpw@mail.gmail.com>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Thu, 5 Apr 2018 04:23:57 -0700
+Subject: [PATCH v7 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
+ on arm and arm64
+In-Reply-To: <1522915478-5044-2-git-send-email-hejianet@gmail.com>
+References: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
+ <1522915478-5044-2-git-send-email-hejianet@gmail.com>
+Message-ID: <20180405112357.GA2647@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2018 at 12:38 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Apr 04, 2018 at 03:34:06PM -0700, Kees Cook wrote:
->> On Wed, Apr 4, 2018 at 5:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > gcc complains about fortify_panic() possibly returning:
->> >
->> > arch/arm/boot/compressed/misc.c: In function 'fortify_panic':
->> > arch/arm/boot/compressed/misc.c:167:1: error: 'noreturn' function does return [-Werror]
->> >
->> > This annotates the error() function as __noreturn, which lets gcc
->> > see in all configurations that it fortify_panic() cannot return either.
->> >
->> > Fixes: ee333554fed5 ("ARM: 8749/1: Kconfig: Add ARCH_HAS_FORTIFY_SOURCE")
->> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Acked-by: Kees Cook <keescook@chromium.org>
->
-> I'd actually prefer a more robust solution to this - error() is used
-> in different files, each with their own separate prototype, which is
-> error-prone.  The same goes for a few other variables.  The following
-> is IMHO a more complete (and thus larger) patch:
+On Thu, Apr 05, 2018 at 01:04:34AM -0700, Jia He wrote:
+>  create mode 100644 include/linux/arm96_common.h
 
-Right, much better.
+'arm96_common'?!  No.  Just no.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-I assume you'll just fold it into the original patch if you can, or apply it
-on top yourself.
+The right way to share common code is to create a header file (or use
+an existing one), either in asm-generic or linux, with a #ifdef CONFIG_foo
+block and then 'select foo' in the arm Kconfig files.  That allows this
+common code to be shared, maybe with powerpc or x86 or ... in the future.
