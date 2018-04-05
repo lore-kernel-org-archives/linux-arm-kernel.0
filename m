@@ -1,39 +1,72 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu,  5 Apr 2018 11:46:59 +0200
-Subject: [PATCH] phy: stm32: Fix printing of wrong uninitialized port number
-Message-ID: <1522921619-5790-1-git-send-email-geert@linux-m68k.org>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Thu,  5 Apr 2018 11:49:31 +0200
+Subject: [PATCH v6 01/30] drm/bridge: analogix_dp: Move enable video into
+ config_video()
+In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/phy/st/phy-stm32-usbphyc.c: In function ?stm32_usbphyc_probe?:
-drivers/phy/st/phy-stm32-usbphyc.c:364: warning: ?i? may be used uninitialized in this function
+From: Lin Huang <hl@rock-chips.com>
 
-Indeed, during the first loop iteration, "i" is uninitialized.
-However, "i" does not represent the intended PHY instance number to
-print.
+We need to enable video before analogix_dp_is_video_stream_on(), so
+we can get the right video stream status.
 
-Fix this by printing the correct variable instead.
+We needed to increase the delay in the timeout loop because there is
+random "Timeout of video streamclk ok" message happen when debug edp
+panel, this time do not define in the spec.
 
-Fixes: 94c358da3a054520 ("phy: stm32: add support for STM32 USB PHY Controller (USBPHYC)")
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: ?? ? <wzz@rock-chips.com>
+Cc: St?phane Marchesin <marcheu@chromium.org>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
+Signed-off-by: Sean Paul <seanpaul@chromium.org>
+Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/phy/st/phy-stm32-usbphyc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-stm32-usbphyc.c
-index bc4e78a19c913dc9..1f682c176fd6239e 100644
---- a/drivers/phy/st/phy-stm32-usbphyc.c
-+++ b/drivers/phy/st/phy-stm32-usbphyc.c
-@@ -367,8 +367,8 @@ static int stm32_usbphyc_probe(struct platform_device *pdev)
- 		if (IS_ERR(phy)) {
- 			ret = PTR_ERR(phy);
- 			if (ret != -EPROBE_DEFER)
--				dev_err(dev,
--					"failed to create phy%d: %d\n", i, ret);
-+				dev_err(dev, "failed to create phy%d: %d\n",
-+					port, ret);
- 			goto put_child;
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 5c52307146c7..05a0ca4af057 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -819,11 +819,10 @@ static int analogix_dp_config_video(struct analogix_dp_device *dp)
+ 		if (analogix_dp_is_slave_video_stream_clock_on(dp) == 0)
+ 			break;
+ 		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
+-			dev_err(dp->dev, "Timeout of video streamclk ok\n");
++			dev_err(dp->dev, "Timeout of slave video streamclk ok\n");
+ 			return -ETIMEDOUT;
  		}
+-
+-		usleep_range(1, 2);
++		usleep_range(1000, 1001);
+ 	}
  
+ 	/* Set to use the register calculated M/N video */
+@@ -838,6 +837,9 @@ static int analogix_dp_config_video(struct analogix_dp_device *dp)
+ 	/* Configure video slave mode */
+ 	analogix_dp_enable_video_master(dp, 0);
+ 
++	/* Enable video */
++	analogix_dp_start_video(dp);
++
+ 	timeout_loop = 0;
+ 
+ 	for (;;) {
+@@ -948,9 +950,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 			DRM_ERROR("failed to enable the panel\n");
+ 	}
+ 
+-	/* Enable video */
+-	analogix_dp_start_video(dp);
+-
+ 	dp->psr_enable = analogix_dp_detect_sink_psr(dp);
+ 	if (dp->psr_enable)
+ 		analogix_dp_enable_sink_psr(dp);
 -- 
-2.7.4
+2.16.3
