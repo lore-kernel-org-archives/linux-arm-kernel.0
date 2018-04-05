@@ -1,66 +1,77 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 5 Apr 2018 18:39:17 +0530
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
- <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
-Message-ID: <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 5 Apr 2018 16:15:08 +0300
+Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add fixed 26MHz clock as fck
+ for twl
+In-Reply-To: <20180405115239.17370-1-peter.ujfalusi@ti.com>
+References: <20180405115239.17370-1-peter.ujfalusi@ti.com>
+Message-ID: <1b05ea2c-fa95-e5c7-2a37-4e0b46f62abc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
 
-On Friday 09 February 2018 10:18 PM, Michael Turquette wrote:
-> On Fri, Feb 9, 2018 at 8:22 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->> 2018-01-08 3:17 GMT+01:00 David Lechner <david@lechnology.com>:
 
->> Hi David,
->>
->> I've been working on moving the genpd code from its own driver to the
->> psc one. I couldn't get the system to boot though and problems
->> happened very early in the boot sequence. I struggled to figure out
->> what's happening, but eventually I noticed that psc uses
->> CLK_OF_DECLARE() to initialize clocks. The functions registered this
->> way are called very early in the boot sequence, way before
->> late_initcall() in which the genpd framework is initialized. This of
-
-late_initcall() is too late for genpd to be initialized. As you may have
-seen with the latest set of patches, we have problems with timer
-initialization. After converting to platform devices, PSC and PLL clocks
-get initialized post time_init(). We are working that around using
-fixed-clocks, which hopefully will work (I still need to test many of
-the affected platforms).
-
-Can you please reply with the exact issue you faced with genpd framework
-initialization so we do have that on record.
-
-Thanks,
-Sekhar
-
->> course makes it impossible to register genpd at the same time we
->> register PSCs.
->>
->> Mike, Stephen - it would be great if you could confirm, but I believe
->> the clock framework now only accepts clock drivers which create real
->> platform drivers, in which case this series would need to be modified.
+On 2018-04-05 14:52, Peter Ujfalusi wrote:
+> The board uses 26MHz oscillator for the twl4030 HFCLK.
+> This way we will not depend on the bootloader to configure the
+> CFG_BOOT:HFCLK_FREQ
 > 
-> You are correct. All new uses of CLK_OF_DECLARE are met with high
-> suspicion, and all new drivers should be platform drivers.
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+> Hi,
 > 
-> There are cases when CLK_OF_DECLARE is necessary (sometimes
-> temporarily while things are reworked), but it seems this is not the
-> case for this driver based on your testing of the platform driver
-> approach. Please use the platform driver approach instead.
+> there might be other boards (all omap3 boards with twl4030?) which uses the same
+> setup, but I only have schematics for beagle-xm.
 > 
-> Thanks,
-> Mike
+> In order for the driver to actually use the clock the 
+> [PATCH] mfd: twl-core: Fix clock initialization
+> need to be applied. W/o the twl-core patch the clock is just ignored.
 > 
->>
->> David: FYI I quickly converted the functions in psc-da850.c to actual
->> probe callbacks and it worked just fine on a da850-lcdk board.
->>
->> Best regards,
->> Bartosz Golaszewski
+> Regards,
+> Peter
+> 
+>  arch/arm/boot/dts/omap3-beagle-xm.dts | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> index 0349fcc9dc26..d80587de0bbf 100644
+> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+> @@ -30,6 +30,13 @@
+>  		ethernet = &ethernet;
+>  	};
+>  
+> +	/* fixed 26MHz oscillator */
+> +	hfclk_26m: oscillator {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <26000000>;
+> +	};
+> +
+>  	leds {
+>  		compatible = "gpio-leds";
+>  
+> @@ -274,6 +281,9 @@
+>  		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+>  		interrupt-parent = <&intc>;
+>  
+> +		clocks = <&hfclk_26m>;
+> +		clock-names = "fck";
+
+I wonder if we should rename this to hfclk...
+The DT documentation does not mention it and afaik it is not specified
+in DT files either.
+
+After all it is the HFCLK clock for the twl4030.
+
+I'm fine keeping it as 'fck' but it looks a bit weird.
+
+> +
+>  		twl_audio: audio {
+>  			compatible = "ti,twl4030-audio";
+>  			codec {
+> 
+
+- P?ter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
