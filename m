@@ -1,84 +1,72 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:49:33 +0200
-Subject: [PATCH v6 03/30] drm/bridge: analogix_dp: Don't use fast link
- training when panel just powered up
+Date: Thu,  5 Apr 2018 11:49:37 +0200
+Subject: [PATCH v6 07/30] drm/bridge: analogix_dp: Ensure edp is disabled when
+ shutting down the panel
 In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
 References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-4-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-8-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zain wang <wzz@rock-chips.com>
+From: Lin Huang <hl@rock-chips.com>
 
-Panel would reset its setting when it powers down. It would forget the last
-succeeded link training setting. So we can't use the last successful link
-training setting to do fast link training. Let's reset fast_train_enable in
-analogix_dp_bridge_disable();
+When panel is shut down, we should make sure edp can be disabled to avoid
+undefined behavior.
 
 Cc: St?phane Marchesin <marcheu@chromium.org>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
 Signed-off-by: zain wang <wzz@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 9 +++++----
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h | 2 +-
- 2 files changed, 6 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 05a0ca4af057..85dbb1ca9886 100644
+index 3269deec739d..5957e2338071 100644
 --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
 +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -579,14 +579,14 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
- 		if (retval != 1) {
- 			dev_err(dp->dev, "failed to read downspread %d\n",
- 				retval);
--			dp->fast_train_support = false;
-+			dp->fast_train_enable = false;
- 		} else {
--			dp->fast_train_support =
-+			dp->fast_train_enable =
- 				(spread & DP_NO_AUX_HANDSHAKE_LINK_TRAINING) ?
- 					true : false;
- 		}
- 		dev_dbg(dp->dev, "fast link training %s\n",
--			dp->fast_train_support ? "supported" : "unsupported");
-+			dp->fast_train_enable ? "supported" : "unsupported");
+@@ -1160,6 +1160,12 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
  
- 		/* set enhanced mode if available */
- 		analogix_dp_set_enhanced_mode(dp);
-@@ -793,7 +793,7 @@ static int analogix_dp_fast_link_train(struct analogix_dp_device *dp)
+ 	pm_runtime_get_sync(dp->dev);
  
- static int analogix_dp_train_link(struct analogix_dp_device *dp)
- {
--	if (dp->fast_train_support)
-+	if (dp->fast_train_enable)
- 		return analogix_dp_fast_link_train(dp);
++	ret = clk_prepare_enable(dp->clock);
++	if (ret < 0) {
++		DRM_ERROR("Failed to prepare_enable the clock clk [%d]\n", ret);
++		goto out_dp_clk_pre;
++	}
++
+ 	if (dp->plat_data->power_on)
+ 		dp->plat_data->power_on(dp->plat_data);
  
- 	return analogix_dp_full_link_train(dp, dp->video_info.max_lane_count,
-@@ -1197,6 +1197,7 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
- 		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
+@@ -1191,6 +1197,8 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
+ 	phy_power_off(dp->phy);
+ 	if (dp->plat_data->power_off)
+ 		dp->plat_data->power_off(dp->plat_data);
++	clk_disable_unprepare(dp->clock);
++out_dp_clk_pre:
+ 	pm_runtime_put_sync(dp->dev);
  
- 	dp->psr_enable = false;
-+	dp->fast_train_enable = false;
- 	dp->dpms_mode = DRM_MODE_DPMS_OFF;
- }
+ 	return ret;
+@@ -1233,11 +1241,14 @@ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+ 	}
  
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index 6a96ef7e6934..403ff853464b 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -173,7 +173,7 @@ struct analogix_dp_device {
- 	int			hpd_gpio;
- 	bool                    force_hpd;
- 	bool			psr_enable;
--	bool			fast_train_support;
-+	bool			fast_train_enable;
+ 	disable_irq(dp->irq);
++	analogix_dp_set_analog_power_down(dp, POWER_ALL, 1);
+ 	phy_power_off(dp->phy);
  
- 	struct mutex		panel_lock;
- 	bool			panel_is_modeset;
+ 	if (dp->plat_data->power_off)
+ 		dp->plat_data->power_off(dp->plat_data);
+ 
++	clk_disable_unprepare(dp->clock);
++
+ 	pm_runtime_put_sync(dp->dev);
+ 
+ 	ret = analogix_dp_prepare_panel(dp, false, true);
 -- 
 2.16.3
