@@ -1,348 +1,266 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Apr 2018 23:23:49 +0200
-Subject: [GIT PULL 3/3] ARM: SoC driver updates for 4.17
-Message-ID: <CAK8P3a1rJc+3MMMwcYSZ0n14=5e_1v_UdnHexysuqy4RfQPxmA@mail.gmail.com>
+Date: Thu, 5 Apr 2018 23:29:46 +0200
+Subject: [GIT PULL 2/3] ARM: SoC platform updates for 4.17
+In-Reply-To: <CAK8P3a3Cr34cOcUbxbznHHvUdz1qd0=YLBF8-cc6NF5cgFmK1g@mail.gmail.com>
+References: <CAK8P3a3Cr34cOcUbxbznHHvUdz1qd0=YLBF8-cc6NF5cgFmK1g@mail.gmail.com>
+Message-ID: <CAK8P3a1XKmHjhPe=Vv2TsV_BtNo98M8DcdJqBEHwXRA=Tze73Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 661e50bc853209e41a5c14a290ca4decc43cbfd1:
+On Thu, Apr 5, 2018 at 11:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The following changes since commit 661e50bc853209e41a5c14a290ca4decc43cbfd1:
+>
+>   Linux 4.16-rc4 (2018-03-04 14:54:11 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-soc
+>
+> for you to fetch changes up to cd903711fd9dce808b5cc07e509135886d962b0c:
+>
+>   arm: npcm: modify configuration for the NPCM7xx BMC. (2018-04-05
+> 14:49:08 +0200)
+>
+> ----------------------------------------------------------------
+> ARM: SoC platform updates for 4.17
+>
+> This release brings up a new platform based on the old ARM9 core: the
+> Nuvoton NPCM is used as a baseboard management controller, competing
+> with the better known ASpeed AST2xx series.
+>
+> Another important change is the addition of ARMv7-A based chips
+> in mach-stm32. The older parts in this platform are ARMv7-M based
+> microcontrollers, now they are expanding to general-purpose workloads.
+>
+> The other changes are the usual defconfig updates to enable additional
+> drivers, lesser bugfixes. The largest updates as often are the ongoing
+> OMAP cleanups, but we also have a number of changes for the older
+> PXA and davinci platforms this time.
+>
+> For the Renesas shmobile/r-car platform, some new infrastructure
+> is needed to make the watchdog work correctly.
+>
+> Supporting Multiprocessing on Allwinner A80 required a significant
+> amount of new code, but is not doing anything unexpected.
 
-  Linux 4.16-rc4 (2018-03-04 14:54:11 -0800)
+One clear sign that the branch is indeed bigger than usual: the
+shortlog+diffstat exceeds the 100KB limit for the linux-arm-kernel
+mailing list.
 
-are available in the git repository at:
+Here is the shorter version:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/armsoc-drivers
+$ git shortlog --no-merges -sne v4.16-rc4..armsoc-dt
 
-for you to fetch changes up to 7df3f0bb5f90e3470de2798452000e221420059c:
+    29 Gregory CLEMENT <gregory.clement@bootlin.com>
+    28 Simon Horman <horms+renesas@verge.net.au>
+    27 Fabio Estevam <fabio.estevam@nxp.com>
+    24 Jacopo Mondi <jacopo+renesas@jmondi.org>
+    22 Patrice Chotard <patrice.chotard@st.com>
+    19 Michal Simek <michal.simek@xilinx.com>
+    18 Sean Wang <sean.wang@mediatek.com>
+    16 Geert Uytterhoeven <geert+renesas@glider.be>
+    16 Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+    15 Marcel Ziswiler <marcel.ziswiler@toradex.com>
+    14 Chen-Yu Tsai <wens@csie.org>
+    14 Maciej Purski <m.purski@samsung.com>
+    10 Bartosz Golaszewski <brgl@bgdev.pl>
+    10 Stefan Agner <stefan@agner.ch>
+    10 Sylwester Nawrocki <s.nawrocki@samsung.com>
+    10 Wolfram Sang <wsa+renesas@sang-engineering.com>
+     9 Amelie Delaunay <amelie.delaunay@st.com>
+     9 Dave Gerlach <d-gerlach@ti.com>
+     9 Joel Stanley <joel@jms.id.au>
+     9 Kishon Vijay Abraham I <kishon@ti.com>
+     9 Quentin Schulz <quentin.schulz@bootlin.com>
+     8 Andrew F. Davis <afd@ti.com>
+     8 Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+     8 Marcus Cooper <codekipper@gmail.com>
+     8 Niklas Cassel <niklas.cassel@axis.com>
+     8 Peter Rosin <peda@axentia.se>
+     7 Baolin Wang <baolin.wang@linaro.org>
+     7 Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+     7 Klaus Goger <klaus.goger@theobroma-systems.com>
+     7 Linus Walleij <linus.walleij@linaro.org>
+     7 Tero Kristo <t-kristo@ti.com>
+     7 Viresh Kumar <viresh.kumar@linaro.org>
+     6 Anson Huang <Anson.Huang@nxp.com>
+     6 Baruch Siach <baruch@tkos.co.il>
+     6 Krzysztof Kozlowski <krzk@kernel.org>
+     6 Ludovic Barre <ludovic.barre@st.com>
+     6 Rob Herring <robh@kernel.org>
+     6 Tomer Maimon <tmaimon77@gmail.com>
+     5 Jernej Skrabec <jernej.skrabec@siol.net>
+     5 Jerome Brunet <jbrunet@baylibre.com>
+     5 Joonas Kylm?l? <joonas.kylmala@iki.fi>
+     5 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+     5 Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+     5 Stefan Wahren <stefan.wahren@i2se.com>
+     5 Yixun Lan <yixun.lan@amlogic.com>
+     4 Benjamin Gaignard <benjamin.gaignard@st.com>
+     4 Biju Das <biju.das@bp.renesas.com>
+     4 Georgi Djakov <georgi.djakov@linaro.org>
+     4 Harald Geyer <harald@ccbib.org>
+     4 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+     4 Mikko Perttunen <mperttunen@nvidia.com>
+     4 Neil Armstrong <narmstrong@baylibre.com>
+     4 Rajendra Nayak <rnayak@codeaurora.org>
+     4 Sebastian Reichel <sre@kernel.org>
+     4 Simon Shields <simon@lineageos.org>
+     4 Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+     3 Adam Ford <aford173@gmail.com>
+     3 Giulio Benetti <giulio.benetti@micronovasrl.com>
+     3 Hauke Mehrtens <hauke@hauke-m.de>
+     3 Icenowy Zheng <icenowy@aosc.io>
+     3 Jian Hu <jian.hu@amlogic.com>
+     3 John Keeping <john@metanate.com>
+     3 Lucas Stach <l.stach@pengutronix.de>
+     3 Magnus Damm <damm+renesas@opensource.se>
+     3 Marco Franchi <marcofrk@gmail.com>
+     3 Marek Szyprowski <m.szyprowski@samsung.com>
+     3 Ryder Lee <ryder.lee@mediatek.com>
+     3 Sekhar Nori <nsekhar@ti.com>
+     3 Tony Lindgren <tony@atomide.com>
+     3 Vicente Bergas <vicencb@gmail.com>
+     3 Yuantian Tang <andy.tang@nxp.com>
+     2 Alexandre Belloni <alexandre.belloni@bootlin.com>
+     2 Alexandre Torgue <alexandre.torgue@st.com>
+     2 Andrey Smirnov <andrew.smirnov@gmail.com>
+     2 Andrzej Hajda <a.hajda@samsung.com>
+     2 Beno?t Th?baudeau <benoit.thebaudeau.dev@gmail.com>
+     2 Chris Zhong <zyw@rock-chips.com>
+     2 Christian Hemp <c.hemp@phytec.de>
+     2 Dien Pham <dien.pham.ry@renesas.com>
+     2 Dien Pham <dien.pham.ry@rvc.renesas.com>
+     2 Dinh Nguyen <dinguyen@kernel.org>
+     2 Dmitry Osipenko <digetx@gmail.com>
+     2 Emiliano Ingrassia <ingrassia@epigenesys.com>
+     2 Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+     2 Heiko Stuebner <heiko@sntech.de>
+     2 Jorge Ramirez-Ortiz <jramirez@baylibre.com>
+     2 J?rg Krause <joerg.krause@embedded.rocks>
+     2 Lei YU <mine260309@gmail.com>
+     2 Lothar Wa?mann <LW@KARO-electronics.de>
+     2 Marco Franchi <marco.franchi@nxp.com>
+     2 Marek Vasut <marek.vasut@gmail.com>
+     2 Masahiro Yamada <yamada.masahiro@socionext.com>
+     2 Miquel Raynal <miquel.raynal@bootlin.com>
+     2 Preetham Ramchandra <pchandru@nvidia.com>
+     2 Robin Murphy <robin.murphy@arm.com>
+     2 Rui Miguel Silva <rui.silva@linaro.org>
+     2 Shawn Guo <shawnguo@kernel.org>
+     2 Shawn Lin <shawn.lin@rock-chips.com>
+     2 Shunqian Zheng <zhengsq@rock-chips.com>
+     2 Stefan Mavrodiev <stefan@olimex.com>
+     2 Stefan Monnier <monnier@iro.umontreal.ca>
+     2 Stefan Riedmueller <s.riedmueller@phytec.de>
+     2 Suman Anna <s-anna@ti.com>
+     2 Tuomas Tynkkynen <tuomas@tuxera.com>
+     2 Wadim Egorov <w.egorov@phytec.de>
+     1 Aapo Vienamo <aapo@tuxera.com>
+     1 Andrea Merello <andrea.merello@gmail.com>
+     1 Andrew Jeffery <andrew@aj.id.au>
+     1 Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+     1 Bai Ping <ping.bai@nxp.com>
+     1 Bartosz Golaszewski <bgolaszewski@baylibre.com>
+     1 Bjorn Andersson <bjorn.andersson@linaro.org>
+     1 Brendan Higgins <brendanhiggins@google.com>
+     1 Brian Norris <briannorris@chromium.org>
+     1 Chunfeng Yun <chunfeng.yun@mediatek.com>
+     1 Craig Tatlor <ctatlor97@gmail.com>
+     1 Daniele Debernardi <drebrez@gmail.com>
+     1 David Lechner <david@lechnology.com>
+     1 Dmitry Shmidt <dimitrysh@google.com>
+     1 Emmanuel Vadot <manu@freebsd.org>
+     1 Enrico Scholz <enrico.scholz@sigma-chemnitz.de>
+     1 Eric Anholt <eric@anholt.net>
+     1 Felix Brack <fb@ltec.ch>
+     1 Florian Fainelli <f.fainelli@gmail.com>
+     1 Fugang Duan <fugang.duan@nxp.com>
+     1 Henry Zhang <henryzhang62@gmail.com>
+     1 Huazhong Tan <tanhuazhong@huawei.com>
+     1 INAGAKI Hiroshi <musashino.open@gmail.com>
+     1 Ian Ray <ian.ray@ge.com>
+     1 Ilia Lin <ilialin@codeaurora.org>
+     1 Jagan Teki <jagannadh.teki@gmail.com>
+     1 Jelle van der Waa <jelle@vdwaa.nl>
+     1 Jon Nettleton <jon@solid-run.com>
+     1 Ken Chen <chen.kenyy@inventec.com>
+     1 Ken Lin <yungching0725@gmail.com>
+     1 Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+     1 Leo Yan <leo.yan@linaro.org>
+     1 Levin Du <djw@t-chip.com.cn>
+     1 Linus L?ssing <linus.luessing@c0d3.blue>
+     1 Martin Kaiser <martin@kaiser.cx>
+     1 Martyn Welch <martyn.welch@collabora.co.uk>
+     1 Mathieu Malaterre <malat@debian.org>
+     1 Maxime Ripard <maxime.ripard@free-electrons.com>
+     1 Michael Lyle <mlyle@lyle.org>
+     1 Murali Karicheri <m-karicheri2@ti.com>
+     1 Nicolas Ferre <nicolas.ferre@microchip.com>
+     1 Nobuhiro Iwamatsu <nobuhiro.iwamatsu@cybertrust.co.jp>
+     1 P L Sai Krishna <lakshmi.sai.krishna.potthuri@xilinx.com>
+     1 Pavel Machek <pavel@ucw.cz>
+     1 Peter Senna Tschudin <peter.senna@collabora.com>
+     1 Peter Ujfalusi <peter.ujfalusi@ti.com>
+     1 Philipp Puschmann <pp@emlix.com>
+     1 Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+     1 Ravikumar Kattekola <rk@ti.com>
+     1 Roger Quadros <rogerq@ti.com>
+     1 Roy Pledge <roy.pledge@nxp.com>
+     1 Russell King <rmk+kernel@arm.linux.org.uk>
+     1 Russell King <rmk+kernel@armlinux.org.uk>
+     1 Ryan Harkin <ryan.harkin@linaro.org>
+     1 Santiago Esteban <Santiago.Esteban@microchip.com>
+     1 Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+     1 Shyam Saini <shyam@amarulasolutions.com>
+     1 Sudeep Holla <sudeep.holla@arm.com>
+     1 Takeshi Kihara <takeshi.kihara.df@renesas.com>
+     1 Thierry Reding <treding@nvidia.com>
+     1 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+     1 Zhang Ying-22455 <ying.zhang22455@nxp.com>
+     1 Zhiyong Tao <zhiyong.tao@mediatek.com>
+     1 oscardagrach <ryan@edited.us>
 
-  Merge tag 'v4.17-rockchip-drivers-1' of
-ssh://gitolite.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip
-into next/drivers (2018-03-28 17:08:34 +0200)
-
-----------------------------------------------------------------
-ARM: SoC driver updates for 4.17
-
-The main addition this time around is the new ARM "SCMI" framework,
-which is the latest in a series of standards coming from ARM to do power
-management in a platform independent way. This has been through many
-review cycles, and it relies on a rather interesting way of using the
-mailbox subsystem, but in the end I agreed that Sudeep's version was
-the best we could do after all.
-
-Other changes include:
-
-- the ARM CCN driver is moved out of drivers/bus into drivers/perf,
-  which makes more sense. Similarly, the performance monitoring
-  portion of the CCI driver are moved the same way and cleaned up
-  a little more.
-
-- a series of updates to the SCPI framework
-
-- support for the Mediatek mt7623a SoC in drivers/soc
-
-- support for additional NVIDIA Tegra hardware in drivers/soc
-
-- a new reset driver for Socionext Uniphier
-
-- lesser bug fixes in drivers/soc, drivers/tee, drivers/memory, and
-  drivers/firmware and drivers/reset across platforms
-
-----------------------------------------------------------------
-Anders Roxell (1):
-      firmware: arm_scmi: prevent accessing rate_discrete uninitialized
-
-Anson Huang (1):
-      soc: imx: gpc: ARM power domain should be always-on
-
-Arnd Bergmann (16):
-      Merge tag 'reset-for-4.17' of
-git://git.pengutronix.de/git/pza/linux into next/drivers
-      Merge tag 'scpi-updates-4.17' of
-ssh://gitolite.kernel.org/.../sudeep.holla/linux into next/drivers
-      Merge tag 'scmi-updates-4.17' of
-ssh://gitolite.kernel.org/.../sudeep.holla/linux into next/drivers
-      Merge tag 'soc_drivers_for_4.17' of
-ssh://gitolite.kernel.org/.../ssantosh/linux-keystone into
-next/drivers
-      Merge tag 'tee-drv-misc-for-v4.17' of
-https://git.linaro.org:/people/jens.wiklander/linux-tee into
-next/drivers
-      Merge tag 'samsung-drivers-4.17' of
-ssh://gitolite.kernel.org/.../krzk/linux into next/drivers
-      cpufreq: scmi: add thermal dependency
-      Merge tag 'imx-drivers-4.17' of
-ssh://gitolite.kernel.org/.../shawnguo/linux into next/drivers
-      Merge tag 'tegra-for-4.17-firmware' of
-ssh://gitolite.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.17-soc-2' of
-ssh://gitolite.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'v4.16-next-soc' of
-ssh://gitolite.kernel.org/.../matthias.bgg/linux into next/drivers
-      Merge tag 'amlogic-drivers' of
-ssh://gitolite.kernel.org/.../khilman/linux-amlogic into next/drivers
-      Merge tag 'qcom-drivers-for-4.17' of
-ssh://gitolite.kernel.org/.../agross/linux into next/drivers
-      Merge tag 'scmi-fixes-4.17' of
-ssh://gitolite.kernel.org/.../sudeep.holla/linux into next/drivers
-      Merge tag 'reset-for-4.17-2' of
-git://git.pengutronix.de/git/pza/linux into next/drivers
-      Merge tag 'v4.17-rockchip-drivers-1' of
-ssh://gitolite.kernel.org/.../mmind/linux-rockchip into next/drivers
-
-Bartosz Golaszewski (2):
-      reset: add support for non-DT systems
-      reset: modify the way reset lookup works for board files
-
-Bjorn Andersson (2):
-      soc: qcom: rmtfs-mem: Add support for assigning memory to remote
-      soc: qcom: wcnss_ctrl: Fix increment in NV upload
-
-Gabriel Fernandez (2):
-      dt-bindings: reset: add STM32MP1 resets
-      reset: stm32mp1: Enable stm32mp1 reset driver
-
-Heiner Kallweit (12):
-      soc: amlogic: meson-gx-pwrc-vpu: don't print error message on
-probe deferral
-      soc: amlogic: meson-gx-pwrc-vpu: fix error on shutdown when
-domain is powered off
-      firmware: arm_scpi: remove two unneeded devm_kfree's in scpi_remove
-      firmware: arm_scpi: make freeing mbox channels device-managed
-      firmware: arm_scpi: make scpi_probe completely device-managed
-      firmware: arm_scpi: improve struct dvfs_info to make code better readable
-      firmware: arm_scpi: improve handling of protocol and firmware
-version subfields
-      firmware: arm_scpi: improve struct sensor_value
-      firmware: arm_scpi: fix incorrect __iomem accesses using correct accessors
-      firmware: arm_scpi: remove struct sensor_capabilities
-      firmware: arm_scpi: use FIELD_GET/_PREP to simplify macro definitions
-      firmware: arm_scpi: improve info message for pre-1.0 firmware
-
-Jeffy Chen (2):
-      soc: rockchip: power-domain: use clk_bulk APIs
-      soc: rockchip: power-domain: Add a sanity check on pd->num_clks
-
-Joel Stanley (2):
-      dt-bindings: aspeed-lpc: Add reset controller
-      reset: simple: Enable for ASPEED systems
-
-Julia Lawall (1):
-      firmware: tegra: adjust tested variable
-
-J?r?me Forissier (2):
-      tee: optee: GET_OS_REVISION: document a2 as a build identifier
-      tee: optee: report OP-TEE revision information
-
-Katsuhiro Suzuki (1):
-      reset: uniphier: add Pro4/Pro5/PXs2 audio systems reset control
-
-Krzysztof Kozlowski (3):
-      memory: samsung: Add SPDX license identifiers
-      soc: samsung: Add SPDX license identifiers to headers
-      soc: samsung: pmu: Populate children syscon nodes
-
-Kunihiko Hayashi (1):
-      reset: uniphier: add ethernet reset control support for PXs3
-
-Martin Blumenstingl (1):
-      reset: meson: enable level reset support on Meson8b
-
-Masahiro Yamada (1):
-      reset: imx7: add 'depends on HAS_IOMEM' to fix unmet dependency
-
-Mikko Perttunen (3):
-      firmware: tegra: Simplify channel management
-      soc/tegra: Add Tegra194 SoC configuration option
-      soc/tegra: pmc: Add Tegra194 compatibility string
-
-Neil Armstrong (1):
-      amlogic: meson-gx-socinfo: Update soc ids
-
-Peng Fan (1):
-      tee: correct max value for id allocation
-
-Peter De Schrijver (1):
-      soc/tegra: pmc: MBIST work around for Tegra210
-
-Philipp Zabel (1):
-      Merge branch 'reset/lookup' into reset/next
-
-Robin Murphy (6):
-      drivers/bus: Move Arm CCN PMU driver
-      drivers/bus: Split Arm CCI driver
-      perf/arm-cci: Simplify CPU hotplug
-      bus/arm-cci: Streamline devicetree handling a bit
-      perf/arm-cci: Clean up model discovery
-      perf/arm-cci: Untangle global cci_ctrl_base
-
-SF Markus Elfring (1):
-      memory-EMIF: Use seq_putc() in emif_regdump_show()
-
-Sean Wang (5):
-      dt-bindings: soc: add SCPSYS binding for MT7623 and MT7623A SoC
-      dt-bindings: soc: add header files required for MT7623A SCPSYS dt-binding
-      soc: mediatek: avoid hardcoded value with bus_prot_mask
-      soc: mediatek: add SCPSYS power domain driver for MediaTek MT7623A SoC
-      soc: mediatek: fix the mistaken pointer accessed when subdomains are added
-
-Shawn Lin (1):
-      soc: rockchip: disable jtag switching for RK3228/RK3229 SoCs
-
-Sudeep Holla (25):
-      firmware: arm_scpi: drop unnecessary type cast to scpi_shared_mem
-      firmware: arm_scpi: remove all single element structures
-      dt-bindings: mailbox: add support for mailbox client shared memory
-      dt-bindings: arm: add support for ARM System Control and
-Management Interface(SCMI) protocol
-      firmware: arm_scmi: add basic driver infrastructure for SCMI
-      firmware: arm_scmi: add common infrastructure and support for
-base protocol
-      firmware: arm_scmi: add scmi protocol bus to enumerate protocol devices
-      firmware: arm_scmi: add initial support for performance protocol
-      firmware: arm_scmi: add initial support for clock protocol
-      firmware: arm_scmi: add initial support for power protocol
-      firmware: arm_scmi: add initial support for sensor protocol
-      firmware: arm_scmi: probe and initialise all the supported protocols
-      firmware: arm_scmi: add support for polling based SCMI transfers
-      firmware: arm_scmi: add option for polling based performance
-domain operations
-      firmware: arm_scmi: refactor in preparation to support
-per-protocol channels
-      firmware: arm_scmi: add per-protocol channels support using idr objects
-      firmware: arm_scmi: add device power domain support using genpd
-      clk: add support for clocks provided by SCMI
-      hwmon: (core) Add hwmon_max to hwmon_sensor_types enumeration
-      hwmon: add support for sensors exported via ARM SCMI
-      cpufreq: add support for CPU DVFS based on SCMI message protocol
-      cpufreq: scmi: add support for fast frequency switching
-      firmware: meson-sm: rework meson_sm_init to use
-module_platform_driver_probe
-      hwmon: (scmi) return -EINVAL when sensor information is unavailable
-      clk: scmi: use devm_of_clk_add_hw_provider() API and drop
-scmi_clocks_remove
-
-Thierry Reding (1):
-      soc/tegra: pmc: Pass PMC to tegra_powergate_power_up()
-
-Vivek Gautam (1):
-      soc/tegra: pmc: Use the new reset APIs to manage reset controllers
-
-Wei Yongjun (1):
-      memory: ti-emif-sram: remove redundant dev_err call in ti_emif_probe()
-
-Xiao Yao (1):
-      soc: rockchip: disable jtag switching for RK3128 SoCs
-
-weiyi.lu at mediatek.com (2):
-      dt-bindings: soc: update MT2712 power dt-bindings
-      soc: mediatek: update power domain data of MT2712
-
-weiyongjun (A) (2):
-      meson-mx-socinfo: Make local function meson_mx_socinfo_init() static
-      meson-gx-socinfo: make local function meson_gx_socinfo_init static
-
- Documentation/devicetree/bindings/arm/arm,scmi.txt |  179 ++
- .../devicetree/bindings/arm/samsung/pmu.txt        |    6 +
- .../devicetree/bindings/mailbox/mailbox.txt        |   28 +
- .../devicetree/bindings/mfd/aspeed-lpc.txt         |   21 +
- .../bindings/{arm/ccn.txt => perf/arm-ccn.txt}     |    0
- .../devicetree/bindings/reset/st,stm32mp1-rcc.txt  |    6 +
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |    5 +-
- Documentation/{arm/CCN.txt => perf/arm-ccn.txt}    |    0
- MAINTAINERS                                        |   11 +-
- drivers/bus/Kconfig                                |   36 -
- drivers/bus/Makefile                               |    2 -
- drivers/bus/arm-cci.c                              | 1763 +-------------------
- drivers/clk/Kconfig                                |   10 +
- drivers/clk/Makefile                               |    1 +
- drivers/clk/clk-scmi.c                             |  194 +++
- drivers/cpufreq/Kconfig.arm                        |   12 +
- drivers/cpufreq/Makefile                           |    1 +
- drivers/cpufreq/scmi-cpufreq.c                     |  264 +++
- drivers/firmware/Kconfig                           |   34 +
- drivers/firmware/Makefile                          |    1 +
- drivers/firmware/arm_scmi/Makefile                 |    5 +
- drivers/firmware/arm_scmi/base.c                   |  253 +++
- drivers/firmware/arm_scmi/bus.c                    |  221 +++
- drivers/firmware/arm_scmi/clock.c                  |  343 ++++
- drivers/firmware/arm_scmi/common.h                 |  105 ++
- drivers/firmware/arm_scmi/driver.c                 |  871 ++++++++++
- drivers/firmware/arm_scmi/perf.c                   |  481 ++++++
- drivers/firmware/arm_scmi/power.c                  |  221 +++
- drivers/firmware/arm_scmi/scmi_pm_domain.c         |  129 ++
- drivers/firmware/arm_scmi/sensors.c                |  291 ++++
- drivers/firmware/arm_scpi.c                        |  211 +--
- drivers/firmware/meson/meson_sm.c                  |   25 +-
- drivers/firmware/tegra/bpmp.c                      |  144 +-
- drivers/hwmon/Kconfig                              |   12 +
- drivers/hwmon/Makefile                             |    1 +
- drivers/hwmon/scmi-hwmon.c                         |  225 +++
- drivers/memory/emif.c                              |    2 +-
- drivers/memory/samsung/Kconfig                     |    1 +
- drivers/memory/samsung/Makefile                    |    1 +
- drivers/memory/samsung/exynos-srom.c               |   18 +-
- drivers/memory/samsung/exynos-srom.h               |    7 +-
- drivers/memory/ti-emif-pm.c                        |    1 -
- drivers/perf/Kconfig                               |   33 +
- drivers/perf/Makefile                              |    2 +
- drivers/perf/arm-cci.c                             | 1722 +++++++++++++++++++
- drivers/{bus => perf}/arm-ccn.c                    |    0
- drivers/reset/Kconfig                              |   17 +-
- drivers/reset/Makefile                             |    1 +
- drivers/reset/core.c                               |   96 +-
- drivers/reset/reset-meson.c                        |   22 +-
- drivers/reset/reset-simple.c                       |    2 +
- drivers/reset/reset-stm32mp1.c                     |  115 ++
- drivers/reset/reset-uniphier.c                     |    5 +
- drivers/soc/amlogic/meson-gx-pwrc-vpu.c            |    9 +-
- drivers/soc/amlogic/meson-gx-socinfo.c             |   12 +-
- drivers/soc/amlogic/meson-mx-socinfo.c             |    2 +-
- drivers/soc/imx/gpc.c                              |    1 +
- drivers/soc/mediatek/mtk-scpsys.c                  |  104 +-
- drivers/soc/qcom/Kconfig                           |    1 +
- drivers/soc/qcom/rmtfs_mem.c                       |   34 +
- drivers/soc/qcom/wcnss_ctrl.c                      |    2 +-
- drivers/soc/rockchip/grf.c                         |   28 +
- drivers/soc/rockchip/pm_domains.c                  |   95 +-
- drivers/soc/samsung/exynos-pmu.c                   |    7 +
- drivers/soc/tegra/Kconfig                          |   10 +
- drivers/soc/tegra/pmc.c                            |   98 +-
- drivers/tee/optee/core.c                           |   23 +
- drivers/tee/optee/optee_smc.h                      |   10 +-
- drivers/tee/tee_core.c                             |   14 +-
- include/dt-bindings/power/mt2712-power.h           |    3 +
- include/dt-bindings/power/mt7623a-power.h          |   10 +
- include/dt-bindings/reset/stm32mp1-resets.h        |  108 ++
- include/linux/hwmon.h                              |    1 +
- include/linux/reset-controller.h                   |   30 +
- include/linux/scmi_protocol.h                      |  277 +++
- include/linux/soc/mediatek/infracfg.h              |    4 +
- include/linux/soc/samsung/exynos-pmu.h             |    5 +-
- include/linux/soc/samsung/exynos-regs-pmu.h        |    6 +-
- include/soc/tegra/bpmp.h                           |    4 +-
- 79 files changed, 6864 insertions(+), 2191 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/arm,scmi.txt
- rename Documentation/devicetree/bindings/{arm/ccn.txt =>
-perf/arm-ccn.txt} (100%)
- create mode 100644 Documentation/devicetree/bindings/reset/st,stm32mp1-rcc.txt
- rename Documentation/{arm/CCN.txt => perf/arm-ccn.txt} (100%)
- create mode 100644 drivers/clk/clk-scmi.c
- create mode 100644 drivers/cpufreq/scmi-cpufreq.c
- create mode 100644 drivers/firmware/arm_scmi/Makefile
- create mode 100644 drivers/firmware/arm_scmi/base.c
- create mode 100644 drivers/firmware/arm_scmi/bus.c
- create mode 100644 drivers/firmware/arm_scmi/clock.c
- create mode 100644 drivers/firmware/arm_scmi/common.h
- create mode 100644 drivers/firmware/arm_scmi/driver.c
- create mode 100644 drivers/firmware/arm_scmi/perf.c
- create mode 100644 drivers/firmware/arm_scmi/power.c
- create mode 100644 drivers/firmware/arm_scmi/scmi_pm_domain.c
- create mode 100644 drivers/firmware/arm_scmi/sensors.c
- create mode 100644 drivers/hwmon/scmi-hwmon.c
- create mode 100644 drivers/perf/arm-cci.c
- rename drivers/{bus => perf}/arm-ccn.c (100%)
- create mode 100644 drivers/reset/reset-stm32mp1.c
- create mode 100644 include/dt-bindings/power/mt7623a-power.h
- create mode 100644 include/dt-bindings/reset/stm32mp1-resets.h
- create mode 100644 include/linux/scmi_protocol.h
+$ git diff --dirstat=0 v4.16-rc4..armsoc-dt
+   0.0% Documentation/devicetree/bindings/arm/cpu-enable-method/
+   0.0% Documentation/devicetree/bindings/arm/mediatek/
+   0.0% Documentation/devicetree/bindings/arm/npcm/
+   0.0% Documentation/devicetree/bindings/arm/omap/
+   0.0% Documentation/devicetree/bindings/arm/samsung/
+   0.0% Documentation/devicetree/bindings/arm/tegra/
+   0.2% Documentation/devicetree/bindings/arm/
+   0.0% Documentation/devicetree/bindings/bus/
+   0.0% Documentation/devicetree/bindings/crypto/
+   0.0% Documentation/devicetree/bindings/dma/
+   0.0% Documentation/devicetree/bindings/gpu/
+   0.0% Documentation/devicetree/bindings/memory-controllers/ti/
+   0.0% Documentation/devicetree/bindings/phy/
+   0.0% Documentation/devicetree/bindings/pinctrl/
+   0.0% Documentation/devicetree/bindings/sound/
+   0.0% Documentation/devicetree/bindings/watchdog/
+  75.5% arch/arm/boot/dts/
+   0.0% arch/arm/configs/
+   1.0% arch/arm64/boot/dts/allwinner/
+   0.0% arch/arm64/boot/dts/altera/
+   4.4% arch/arm64/boot/dts/amlogic/
+   0.0% arch/arm64/boot/dts/arm/
+   0.2% arch/arm64/boot/dts/exynos/
+   0.6% arch/arm64/boot/dts/freescale/
+   0.2% arch/arm64/boot/dts/hisilicon/
+   3.0% arch/arm64/boot/dts/marvell/
+   1.7% arch/arm64/boot/dts/mediatek/
+   1.0% arch/arm64/boot/dts/nvidia/
+   0.1% arch/arm64/boot/dts/qcom/
+   3.7% arch/arm64/boot/dts/renesas/
+   1.3% arch/arm64/boot/dts/rockchip/
+   0.8% arch/arm64/boot/dts/socionext/
+   0.4% arch/arm64/boot/dts/sprd/
+   3.6% arch/arm64/boot/dts/xilinx/
+   0.0% arch/arm64/
+   0.0% drivers/clk/imx/
+   0.0% drivers/soc/amlogic/
+   0.7% include/dt-bindings/clock/
+   0.1% include/dt-bindings/gpio/
+   0.0% include/dt-bindings/mfd/
+   0.0% include/dt-bindings/power/
+   0.3% include/dt-bindings/reset/
