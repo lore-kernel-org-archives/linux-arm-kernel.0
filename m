@@ -1,94 +1,61 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:49:46 +0200
-Subject: [PATCH v6 16/30] drm/bridge: analogix_dp: Fix incorrect operations
- with register ANALOGIX_DP_FUNC_EN_1
+Date: Thu,  5 Apr 2018 11:49:50 +0200
+Subject: [PATCH v6 20/30] drm/bridge: analogix_dp: Properly disable aux chan
+ retries on rockchip
 In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
 References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-17-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-21-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zain wang <wzz@rock-chips.com>
+From: Douglas Anderson <dianders@chromium.org>
 
-Register ANALOGIX_DP_FUNC_EN_1(offset 0x18), Rockchip is different to
-Exynos:
+The comments in analogix_dp_init_aux() claim that we're disabling aux
+channel retries, but then right below it for Rockchip it sets them to
+3.  If we actually need 3 retries for Rockchip then we could adjust
+the comment, but it seems more likely that we want the same retry
+behavior across all platforms.
 
-on Exynos edp phy,
-BIT 7		MASTER_VID_FUNC_EN_N
-BIT 6		reserved
-BIT 5		SLAVE_VID_FUNC_EN_N
-
-on Rockchip edp phy,
-BIT 7		reserved
-BIT 6		RK_VID_CAP_FUNC_EN_N
-BIT 5		RK_VID_FIFO_FUNC_EN_N
-
-So, we should do some private operations to Rockchip.
-
-Cc: Tomasz Figa <tfiga@chromium.org>
-Signed-off-by: zain wang <wzz@rock-chips.com>
+Cc: St?phane Marchesin <marcheu@chromium.org>
+Cc: ?? ? <wzz@rock-chips.com>
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 19 ++++++++++++++-----
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h |  2 ++
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 02ab1aaa9993..4eae206ec31b 100644
+index 58e8a28e99aa..a5f2763d72e4 100644
 --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
 +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -126,9 +126,14 @@ void analogix_dp_reset(struct analogix_dp_device *dp)
- 	analogix_dp_stop_video(dp);
- 	analogix_dp_enable_video_mute(dp, 0);
+@@ -481,15 +481,16 @@ void analogix_dp_init_aux(struct analogix_dp_device *dp)
  
--	reg = MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N |
--		AUD_FIFO_FUNC_EN_N | AUD_FUNC_EN_N |
--		HDCP_FUNC_EN_N | SW_FUNC_EN_N;
-+	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type))
-+		reg = RK_VID_CAP_FUNC_EN_N | RK_VID_FIFO_FUNC_EN_N |
-+			SW_FUNC_EN_N;
-+	else
-+		reg = MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N |
-+			AUD_FIFO_FUNC_EN_N | AUD_FUNC_EN_N |
-+			HDCP_FUNC_EN_N | SW_FUNC_EN_N;
+ 	analogix_dp_reset_aux(dp);
+ 
+-	/* Disable AUX transaction H/W retry */
++	/* AUX_BIT_PERIOD_EXPECTED_DELAY doesn't apply to Rockchip IP */
+ 	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type))
+-		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(0) |
+-		      AUX_HW_RETRY_COUNT_SEL(3) |
+-		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++		reg = 0;
+ 	else
+-		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3) |
+-		      AUX_HW_RETRY_COUNT_SEL(0) |
+-		      AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++		reg = AUX_BIT_PERIOD_EXPECTED_DELAY(3);
 +
- 	writel(reg, dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
++	/* Disable AUX transaction H/W retry */
++	reg |= AUX_HW_RETRY_COUNT_SEL(0) |
++	       AUX_HW_RETRY_INTERVAL_600_MICROSECONDS;
++
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_AUX_HW_RETRY_CTL);
  
- 	reg = SSC_FUNC_EN_N | AUX_FUNC_EN_N |
-@@ -971,8 +976,12 @@ void analogix_dp_config_video_slave_mode(struct analogix_dp_device *dp)
- 	u32 reg;
- 
- 	reg = readl(dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
--	reg &= ~(MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N);
--	reg |= MASTER_VID_FUNC_EN_N;
-+	if (dp->plat_data && is_rockchip(dp->plat_data->dev_type)) {
-+		reg &= ~(RK_VID_CAP_FUNC_EN_N | RK_VID_FIFO_FUNC_EN_N);
-+	} else {
-+		reg &= ~(MASTER_VID_FUNC_EN_N | SLAVE_VID_FUNC_EN_N);
-+		reg |= MASTER_VID_FUNC_EN_N;
-+	}
- 	writel(reg, dp->reg_base + ANALOGIX_DP_FUNC_EN_1);
- 
- 	reg = readl(dp->reg_base + ANALOGIX_DP_VIDEO_CTL_10);
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-index b633a4a5082a..0cf27c731727 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
-@@ -127,7 +127,9 @@
- 
- /* ANALOGIX_DP_FUNC_EN_1 */
- #define MASTER_VID_FUNC_EN_N			(0x1 << 7)
-+#define RK_VID_CAP_FUNC_EN_N			(0x1 << 6)
- #define SLAVE_VID_FUNC_EN_N			(0x1 << 5)
-+#define RK_VID_FIFO_FUNC_EN_N			(0x1 << 5)
- #define AUD_FIFO_FUNC_EN_N			(0x1 << 4)
- #define AUD_FUNC_EN_N				(0x1 << 3)
- #define HDCP_FUNC_EN_N				(0x1 << 2)
+ 	/* Receive AUX Channel DEFER commands equal to DEFFER_COUNT*64 */
 -- 
 2.16.3
