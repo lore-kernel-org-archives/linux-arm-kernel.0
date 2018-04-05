@@ -1,47 +1,42 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 5 Apr 2018 08:46:58 +0200
-Subject: [PATCH v5 1/3] regulator: axp20x: add drivevbus support for axp803
-In-Reply-To: <CAMty3ZD3ohpgqsBjgNztpyHOmmcu_y7vuUOoop8y-+OpWjLYGA@mail.gmail.com>
-References: <20180327053104.3812-1-jagan@amarulasolutions.com>
- <CAMty3ZD3ohpgqsBjgNztpyHOmmcu_y7vuUOoop8y-+OpWjLYGA@mail.gmail.com>
-Message-ID: <20180405064658.rz2grnpm5fq45lhu@flea>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Apr 2018 08:50:03 +0200
+Subject: [PATCH 00/15] ARM: pxa: switch to DMA slave maps
+In-Reply-To: <CAPDyKFoFz_HgYPOMGuOTpehrTR3DtWE3uZbcnVwUwVhDy02Mow@mail.gmail.com>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <CAPDyKFot9dAST2jQL5s8E4U=bCHxkio=uwpqPd6S0N4FWJRB-w@mail.gmail.com>
+ <874lkq4urd.fsf@belgarion.home> <20180404215623.2bf07406@bbrezillon>
+ <CAPDyKFoFz_HgYPOMGuOTpehrTR3DtWE3uZbcnVwUwVhDy02Mow@mail.gmail.com>
+Message-ID: <CAK8P3a1Y0X-2QQm+adXO8xNr7Z6SU6rDjZs8JhRskX-UrseyRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 12:11:39PM +0530, Jagan Teki wrote:
-> On Tue, Mar 27, 2018 at 11:01 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > Like axp221, axp223, axp813 the axp803 is also supporting external
-> > regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
-> >
-> > Add support for it.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> > Changes for v5:
-> > - Collect Chen-Yu reviewed-by tag
-> > Changes for v4:
-> > - rebase on master
-> > Changes for v3:
-> > - Update drivevbus in table of regulators
-> 
-> Can you pick these, has some dependency with drivevbus on other
-> patches.
+On Thu, Apr 5, 2018 at 8:29 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 4 April 2018 at 21:56, Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+>> On Wed, 04 Apr 2018 21:49:26 +0200
+>> Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>
+>>> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>>>
+>>> > On 2 April 2018 at 16:26, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>> >> Hi,
+>>> >>
+>>> >> This serie is aimed at removing the dmaengine slave compat use, and transfer
+>>> >> knowledge of the DMA requestors into architecture code.
+>>> >> As this looks like a patch bomb, each maintainer expressing for his tree either
+>>> >> an Ack or "I want to take through my tree" will be spared in the next iterations
+>>> >> of this serie.
+>>> >
+>>> > Perhaps an option is to send this hole series as PR for 3.17 rc1, that
+>>> > would removed some churns and make this faster/easier? Well, if you
+>>> > receive the needed acks of course.
+>>> For 3.17-rc1 it looks a bit optimistic with the review time ... If I have all
+>>
+>> Especially since 3.17-rc1 has been released more than 3 years ago :-),
+>> but I guess you meant 4.17-rc1.
+>
+> Yeah, I realize that I was a bit lost in time yesterday. Even more
+> people have been having fun about it (me too). :-)
 
-I'm not the regulator maintainer, nor the AXP maintainer for that
-matter. Mark Brown and Chen-Yu are, respectively.
+I occasionally still type 2.6.17 when I mean 4.17.
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180405/c84ca2f0/attachment-0001.sig>
+       Arnd
