@@ -1,58 +1,84 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  5 Apr 2018 09:09:12 -0400
-Subject: [PATCH v4 4/5] io: change outX() to have their own IO barrier
- overrides
+Date: Thu,  5 Apr 2018 09:09:10 -0400
+Subject: [PATCH v4 2/5] io: define stronger ordering for the default readX()
+ implementation
 In-Reply-To: <1522933753-19589-1-git-send-email-okaya@codeaurora.org>
 References: <1522933753-19589-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1522933753-19589-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1522933753-19589-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Open code writeX() inside outX() so that outX() variants have their own
-overrideable Port IO barrier combinations as __io_pbw() and __io_paw() for
-actions to be taken before port IO and after port IO write.
+The default implementation of mapping readX() to __raw_readX() is wrong.
+readX() has stronger ordering semantics. Compiler is allowed to reorder
+__raw_readX() against the memory accesses following register read.
+
+Use the previously defined __io_ar() and __io_br() macros to harden
+code generation according to architecture support.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- include/asm-generic/io.h | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ include/asm-generic/io.h | 28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
 
 diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index 964725e..53226d9 100644
+index 570433b..d27e8af 100644
 --- a/include/asm-generic/io.h
 +++ b/include/asm-generic/io.h
-@@ -457,7 +457,9 @@ static inline u32 inl(unsigned long addr)
- #define outb outb
- static inline void outb(u8 value, unsigned long addr)
+@@ -154,7 +154,12 @@ static inline void __raw_writeq(u64 value, volatile void __iomem *addr)
+ #define readb readb
+ static inline u8 readb(const volatile void __iomem *addr)
  {
--	writeb(value, PCI_IOBASE + addr);
-+	__io_pbw();
-+	__raw_writeb(value, PCI_IOBASE + addr);
-+	__io_paw();
+-	return __raw_readb(addr);
++	u8 val;
++
++	__io_br();
++	val = __raw_readb(addr);
++	__io_ar();
++	return val;
  }
  #endif
  
-@@ -465,7 +467,9 @@ static inline void outb(u8 value, unsigned long addr)
- #define outw outw
- static inline void outw(u16 value, unsigned long addr)
+@@ -162,7 +167,12 @@ static inline u8 readb(const volatile void __iomem *addr)
+ #define readw readw
+ static inline u16 readw(const volatile void __iomem *addr)
  {
--	writew(value, PCI_IOBASE + addr);
-+	__io_pbw();
-+	__raw_writew(cpu_to_le16(value), PCI_IOBASE + addr);
-+	__io_paw();
+-	return __le16_to_cpu(__raw_readw(addr));
++	u16 val;
++
++	__io_br();
++	val = __le16_to_cpu(__raw_readw(addr));
++	__io_ar();
++	return val;
  }
  #endif
  
-@@ -473,7 +477,9 @@ static inline void outw(u16 value, unsigned long addr)
- #define outl outl
- static inline void outl(u32 value, unsigned long addr)
+@@ -170,7 +180,12 @@ static inline u16 readw(const volatile void __iomem *addr)
+ #define readl readl
+ static inline u32 readl(const volatile void __iomem *addr)
  {
--	writel(value, PCI_IOBASE + addr);
-+	__io_pbw();
-+	__raw_writel(cpu_to_le32(value), PCI_IOBASE + addr);
-+	__io_paw();
+-	return __le32_to_cpu(__raw_readl(addr));
++	u32 val;
++
++	__io_br();
++	val = __le32_to_cpu(__raw_readl(addr));
++	__io_ar();
++	return val;
  }
  #endif
  
+@@ -179,7 +194,12 @@ static inline u32 readl(const volatile void __iomem *addr)
+ #define readq readq
+ static inline u64 readq(const volatile void __iomem *addr)
+ {
+-	return __le64_to_cpu(__raw_readq(addr));
++	u64 val;
++
++	__io_br();
++	val = __le64_to_cpu(__raw_readq(addr));
++	__io_ar();
++	return val;
+ }
+ #endif
+ #endif /* CONFIG_64BIT */
 -- 
 2.7.4
