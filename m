@@ -1,71 +1,92 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Thu, 5 Apr 2018 11:51:13 +0200
-Subject: Extending the Marvell ICU support
-In-Reply-To: <c80537ac-e483-be9a-2dee-a222f429a3f0@arm.com>
-References: <20180404160425.49fc620d@windsurf>
- <93739952-190c-0cdd-042e-95125f2d644d@arm.com>
- <20180405110421.662269ab@windsurf>
- <c80537ac-e483-be9a-2dee-a222f429a3f0@arm.com>
-Message-ID: <20180405115113.4dac15df@windsurf>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Thu,  5 Apr 2018 11:49:58 +0200
+Subject: [PATCH v6 28/30] drm/rockchip: Disable PSR from reboot notifier
+In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-29-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Tomasz Figa <tfiga@chromium.org>
 
-On Thu, 5 Apr 2018 10:27:24 +0100, Marc Zyngier wrote:
+It looks like the driver subsystem detaches devices from power domains
+at shutdown without consent of the drivers. This means that we might have
+our power domain turned off behind our back and the only way to avoid
+problems is to stop doing any hardware programming at some point before
+the power is cut. A reboot notifier, despite being a misnomer and
+handling shutdowns as well, is a good place to do it.
 
-> > So you're suggesting that the ICU driver registers multiple irq
-> > domains, one for NSR, one for SEI, each having its own MSI parent,
-> > correct ?  
-> 
-> Yes, that's the idea. The alternative would have been to have a single
-> GICP domain and to route everything there, but the fact that SEIs are
-> multiplexed entirely kills that prospect. Blame the HW folks.
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
 
-A quick question: the ICU in total can handle N wired interrupts, and
-it has N registers to configure how those interrupts are routed to the
-AP. Therefore, we have a global set of N wired interrupts, each can be
-either a NSR, a SEI, a REI, etc.
+ drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Currently, the ICU driver registers a single irq domain of
-ICU_MAX_IRQS. If we move to your solution with sub-nodes, we will have
-to register several irq domains. Is it OK if each of them exposes
-ICU_MAX_IRQS, even if in practice you won't be able to use both the
-interrupt icu_nsr[2] and the interrupt icu_sei[2] ?
-
-So we will expose 2 * ICU_MAX_IRQS, but in practice only a total of
-ICU_MAX_IRQS can be used. We would probably use a bitmap or something
-like that in the driver to know which ICU is already used, and which is
-still available. Indeed, a configuration such as:
-
-	dev1 {
-		interrupt-extended = <&icu_nsr 2 IRQ_TYPE_LEVEL_HIGH>;
-	}
-
-	dev2 {
-		interrupt-extended = <&icu_sei 2 IRQ_TYPE_LEVEL_HIGH>;
-	}
-
-is not valid, because the ICU n?2 can only be either a NSR *or* a SEI.
-
-Does that make sense ?
-
-> > I don't think "a new DT on an older kernel" has ever been a
-> > requirement, has it? The whole idea of DT ABI compatibility is that an
-> > old DT shipped on a board continues to work with newer kernel versions.  
-> 
-> In that case, you can probably achieve "old DT with new kernel" at the
-> cost of checking the size of the interrupt specifier in your translate
-> method.
-
-Yep, I think backward compatibility can be achieved. It's going to
-clutter the ICU driver implementation with dead code that is never
-tested, but that's the whole point of DT backward compatibility.
-
-Best regards,
-
-Thomas
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+index e7e16d92d5a1..1bf5cba9a64d 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+@@ -13,6 +13,7 @@
+  */
+ 
+ #include <linux/input.h>
++#include <linux/reboot.h>
+ 
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -33,6 +34,7 @@ struct psr_drv {
+ 	struct delayed_work	flush_work;
+ 	struct work_struct	disable_work;
+ 
++	struct notifier_block	reboot_nb;
+ 	struct input_handler    input_handler;
+ 
+ 	int (*set)(struct drm_encoder *encoder, bool enable);
+@@ -309,6 +311,24 @@ static const struct input_device_id psr_ids[] = {
+ 	{ },
+ };
+ 
++static int rockchip_drm_psr_reboot_notifier(struct notifier_block *nb,
++					    unsigned long action, void *data)
++{
++	struct psr_drv *psr = container_of(nb, struct psr_drv, reboot_nb);
++
++	/*
++	 * It looks like the driver subsystem detaches devices from power
++	 * domains at shutdown without consent of the drivers. This means
++	 * that we might have our power domain turned off behind our back
++	 * and the only way to avoid problems is to stop doing any hardware
++	 * programming after this point, which is achieved by the unbalanced
++	 * call below.
++	 */
++	rockchip_drm_psr_inhibit_get(psr->encoder);
++
++	return 0;
++}
++
+ /**
+  * rockchip_drm_psr_register - register encoder to psr driver
+  * @encoder: encoder that obtain the PSR function
+@@ -361,6 +381,9 @@ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+ 	if (error)
+ 		goto err1;
+ 
++	psr->reboot_nb.notifier_call = rockchip_drm_psr_reboot_notifier;
++	register_reboot_notifier(&psr->reboot_nb);
++
+ 	mutex_lock(&drm_drv->psr_list_lock);
+ 	list_add_tail(&psr->list, &drm_drv->psr_list);
+ 	mutex_unlock(&drm_drv->psr_list_lock);
+@@ -403,6 +426,7 @@ void rockchip_drm_psr_unregister(struct drm_encoder *encoder)
+ 			WARN_ON(psr->inhibit_count != 1);
+ 
+ 			list_del(&psr->list);
++			unregister_reboot_notifier(&psr->reboot_nb);
+ 			input_unregister_handler(&psr->input_handler);
+ 			kfree(psr->input_handler.name);
+ 			kfree(psr);
 -- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.16.3
