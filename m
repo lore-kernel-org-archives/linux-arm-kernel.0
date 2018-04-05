@@ -1,49 +1,119 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Apr 2018 09:29:30 +0200
-Subject: [PATCH 14/15] ARM: pxa: change SSP devices allocation
-In-Reply-To: <87zi2i2ljy.fsf@belgarion.home>
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <20180402142656.26815-15-robert.jarzmik@free.fr>
- <CAK8P3a2hYWO2eweg3zpR7iJoqtH4uxJLAxJAno7L96G7nA2HxQ@mail.gmail.com>
- <87lge4485x.fsf@belgarion.home>
- <CAK8P3a1ko=YEwR2VOahH0OWHfeOyWAzDYah4DSohBcvTNq_MKQ@mail.gmail.com>
- <87zi2i2ljy.fsf@belgarion.home>
-Message-ID: <CAK8P3a0xJnVfXfUtP+JXGNgc2-LuHUmZCMq-SnEQw3wu3azemA@mail.gmail.com>
+From: hejianet@gmail.com (Jia He)
+Date: Thu,  5 Apr 2018 01:04:33 -0700
+Subject: [PATCH v7 0/5] optimize memblock_next_valid_pfn and early_pfn_valid
+ on arm and arm64
+Message-ID: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2018 at 8:51 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
->
->> I'm still unable to follow through that code, but I understand now that
->> the device you pass to dma_request_slave_channel() is not the one
->> we'd like it to be here.
->>
->> Where exactly does that call to dma_request_chan() happen? Is this
->> the one in dmaengine_pcm_new()? Could we perhaps put a
->> pointer to the SSP device into snd_dmaengine_dai_dma_data?
-> This is a sample stack I captured with an added WARN_ON(1), triggered by a
-> userland "aplay Sultans_Of_Swing.wav" :)
->
-> [  299.216743] [<c0012e80>] (unwind_backtrace) from [<c000f55c>] (show_stack+0x20/0x24)
-> [  299.223986] [<c000f55c>] (show_stack) from [<c0529d68>] (dump_stack+0x20/0x28)
-> [  299.231321] [<c0529d68>] (dump_stack) from [<c001de34>] (__warn+0xf0/0x11c)
-> [  299.238183] [<c001de34>] (__warn) from [<c001df94>] (warn_slowpath_null+0x4c/0x58)
-> [  299.245234] [<c001df94>] (warn_slowpath_null) from [<c02a2d38>] (dma_request_chan+0x40/0x228)
-> [  299.252550] [<c02a2d38>] (dma_request_chan) from [<c02a2f38>] (dma_request_slave_channel+0x18/0x24)
-> [  299.259855] [<c02a2f38>] (dma_request_slave_channel) from [<c03f76f0>] (__pxa2xx_pcm_open+0xf4/0x110)
-> [  299.266789] [<c03f76f0>] (__pxa2xx_pcm_open) from [<c0409ed0>] (soc_pcm_open+0xf8/0x9c8)
-> [  299.273932] [<c0409ed0>] (soc_pcm_open) from [<c03db9d4>] (snd_pcm_open_substream+0x9c/0x134)
+Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+where possible") tried to optimize the loop in memmap_init_zone(). But
+there is still some room for improvement.
 
-Ok, so it seems we currently have a special case here that is only used by
-pxa/mmp and omap, and you can simply open-code that by calling
-dma_request_chan() from the pxa-specific __pxa2xx_pcm_open()
-with any device pointer you like, it doesn't have to be the main audio
-device.
+Patch 1 remain the memblock_next_valid_pfn on arm and arm64
+Patch 2 optimizes the memblock_next_valid_pfn()
+Patch 3~5 optimizes the early_pfn_valid()
 
-I don't know exactly how the probing works, but I'd assume that we have
-the correct device pointers in pxa2xx_ac97_dev_probe() and
-asoc_ssp_probe(), or maybe in pxa2xx_ac97_*_startup() and
-pxa_ssp_startup().
+As for the performance improvement, after this set, I can see the time
+overhead of memmap_init() is reduced from 41313 us to 24345 us in my
+armv8a server(QDF2400 with 96G memory).
 
-      Arnd
+Attached the memblock region information in my server.
+[   86.956758] Zone ranges:
+[   86.959452]   DMA      [mem 0x0000000000200000-0x00000000ffffffff]
+[   86.966041]   Normal   [mem 0x0000000100000000-0x00000017ffffffff]
+[   86.972631] Movable zone start for each node
+[   86.977179] Early memory node ranges
+[   86.980985]   node   0: [mem 0x0000000000200000-0x000000000021ffff]
+[   86.987666]   node   0: [mem 0x0000000000820000-0x000000000307ffff]
+[   86.994348]   node   0: [mem 0x0000000003080000-0x000000000308ffff]
+[   87.001029]   node   0: [mem 0x0000000003090000-0x00000000031fffff]
+[   87.007710]   node   0: [mem 0x0000000003200000-0x00000000033fffff]
+[   87.014392]   node   0: [mem 0x0000000003410000-0x000000000563ffff]
+[   87.021073]   node   0: [mem 0x0000000005640000-0x000000000567ffff]
+[   87.027754]   node   0: [mem 0x0000000005680000-0x00000000056dffff]
+[   87.034435]   node   0: [mem 0x00000000056e0000-0x00000000086fffff]
+[   87.041117]   node   0: [mem 0x0000000008700000-0x000000000871ffff]
+[   87.047798]   node   0: [mem 0x0000000008720000-0x000000000894ffff]
+[   87.054479]   node   0: [mem 0x0000000008950000-0x0000000008baffff]
+[   87.061161]   node   0: [mem 0x0000000008bb0000-0x0000000008bcffff]
+[   87.067842]   node   0: [mem 0x0000000008bd0000-0x0000000008c4ffff]
+[   87.074524]   node   0: [mem 0x0000000008c50000-0x0000000008e2ffff]
+[   87.081205]   node   0: [mem 0x0000000008e30000-0x0000000008e4ffff]
+[   87.087886]   node   0: [mem 0x0000000008e50000-0x0000000008fcffff]
+[   87.094568]   node   0: [mem 0x0000000008fd0000-0x000000000910ffff]
+[   87.101249]   node   0: [mem 0x0000000009110000-0x00000000092effff]
+[   87.107930]   node   0: [mem 0x00000000092f0000-0x000000000930ffff]
+[   87.114612]   node   0: [mem 0x0000000009310000-0x000000000963ffff]
+[   87.121293]   node   0: [mem 0x0000000009640000-0x000000000e61ffff]
+[   87.127975]   node   0: [mem 0x000000000e620000-0x000000000e64ffff]
+[   87.134657]   node   0: [mem 0x000000000e650000-0x000000000fffffff]
+[   87.141338]   node   0: [mem 0x0000000010800000-0x0000000017feffff]
+[   87.148019]   node   0: [mem 0x000000001c000000-0x000000001c00ffff]
+[   87.154701]   node   0: [mem 0x000000001c010000-0x000000001c7fffff]
+[   87.161383]   node   0: [mem 0x000000001c810000-0x000000007efbffff]
+[   87.168064]   node   0: [mem 0x000000007efc0000-0x000000007efdffff]
+[   87.174746]   node   0: [mem 0x000000007efe0000-0x000000007efeffff]
+[   87.181427]   node   0: [mem 0x000000007eff0000-0x000000007effffff]
+[   87.188108]   node   0: [mem 0x000000007f000000-0x00000017ffffffff]
+[   87.194791] Initmem setup node 0 [mem 0x0000000000200000-0x00000017ffffffff]
+
+Without this patchset:
+[  117.106153] Initmem setup node 0 [mem 0x0000000000200000-0x00000017ffffffff]
+[  117.113677] before memmap_init
+[  117.118195] after  memmap_init
+>>> memmap_init takes 4518 us
+[  117.121446] before memmap_init
+[  117.154992] after  memmap_init
+>>> memmap_init takes 33546 us
+[  117.158241] before memmap_init
+[  117.161490] after  memmap_init
+>>> memmap_init takes 3249 us
+>>> totally takes 41313 us
+
+With this patchset:
+[   87.194791] Initmem setup node 0 [mem 0x0000000000200000-0x00000017ffffffff]
+[   87.202314] before memmap_init
+[   87.206164] after  memmap_init
+>>> memmap_init takes 3850 us
+[   87.209416] before memmap_init
+[   87.226662] after  memmap_init
+>>> memmap_init takes 17246 us
+[   87.229911] before memmap_init
+[   87.233160] after  memmap_init
+>>> memmap_init takes 3249 us
+>>> totally takes 24345 us
+
+Changelog:
+V7: - fix i386 compilation error. refine the commit description
+V6: - simplify the codes, move arm/arm64 common codes to one file.
+    - refine patches as suggested by Danial Vacek and Ard Biesheuvel
+V5: - further refining as suggested by Danial Vacek. Make codes
+      arm/arm64 more arch specific
+V4: - refine patches as suggested by Danial Vacek and Wei Yang
+    - optimized on arm besides arm64
+V3: - fix 2 issues reported by kbuild test robot
+V2: - rebase to mmotm latest
+    - remain memblock_next_valid_pfn on arm64
+    - refine memblock_search_pfn_regions and pfn_valid_region
+
+Jia He (5):
+  mm: page_alloc: remain memblock_next_valid_pfn() on arm and arm64
+  arm: arm64: page_alloc: reduce unnecessary binary search in
+    memblock_next_valid_pfn()
+  mm/memblock: introduce memblock_search_pfn_regions()
+  arm: arm64: introduce pfn_valid_region()
+  mm: page_alloc: reduce unnecessary binary search in early_pfn_valid()
+
+ arch/arm/mm/init.c           |  1 +
+ arch/arm64/mm/init.c         |  1 +
+ include/linux/arm96_common.h | 76 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/memblock.h     |  2 ++
+ include/linux/mmzone.h       | 18 ++++++++++-
+ mm/memblock.c                |  9 ++++++
+ mm/page_alloc.c              |  2 +-
+ 7 files changed, 107 insertions(+), 2 deletions(-)
+ create mode 100644 include/linux/arm96_common.h
+
+-- 
+2.7.4
