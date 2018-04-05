@@ -1,70 +1,98 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 5 Apr 2018 10:37:35 -0500
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <69bc0848-0698-b936-96a3-2257a5e27809@ti.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
- <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
- <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
- <CAMRc=Mc228JAxxBXcObmokh2h-toojG8OHrmbunm_ORqbGWUnA@mail.gmail.com>
- <69bc0848-0698-b936-96a3-2257a5e27809@ti.com>
-Message-ID: <366610a6-8983-d744-01e5-a00592bef479@lechnology.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Thu, 5 Apr 2018 16:46:30 +0100
+Subject: [PATCH] sched: support dynamiQ cluster
+In-Reply-To: <CAKfTPtCQayuu5-84931ZxzXV1-roV_CfRd_5wXG1oxOEUZmZgw@mail.gmail.com>
+References: <1522223215-23524-1-git-send-email-vincent.guittot@linaro.org>
+ <20180329125324.GR4589@e105550-lin.cambridge.arm.com>
+ <CAKfTPtD4skW_3SAk--vBEC5-m1Ua48bjOQYS0pDqW3nPSpsENg@mail.gmail.com>
+ <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
+ <CAKfTPtDy2uUj4amA9MARUz9qS=+urwV2edyQn+fW70hkN+CgoQ@mail.gmail.com>
+ <e8e6e7d0-7744-1dab-7b24-b7ff37df60c8@arm.com>
+ <CAKfTPtCQayuu5-84931ZxzXV1-roV_CfRd_5wXG1oxOEUZmZgw@mail.gmail.com>
+Message-ID: <20180405154630.GS4589@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2018 09:36 AM, Sekhar Nori wrote:
-> On Thursday 05 April 2018 07:14 PM, Bartosz Golaszewski wrote:
->> 2018-04-05 15:09 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
->>> Hi Bartosz,
->>>
->>> On Friday 09 February 2018 10:18 PM, Michael Turquette wrote:
->>>> On Fri, Feb 9, 2018 at 8:22 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->>>>> 2018-01-08 3:17 GMT+01:00 David Lechner <david@lechnology.com>:
->>>
->>>>> Hi David,
->>>>>
->>>>> I've been working on moving the genpd code from its own driver to the
->>>>> psc one. I couldn't get the system to boot though and problems
->>>>> happened very early in the boot sequence. I struggled to figure out
->>>>> what's happening, but eventually I noticed that psc uses
->>>>> CLK_OF_DECLARE() to initialize clocks. The functions registered this
->>>>> way are called very early in the boot sequence, way before
->>>>> late_initcall() in which the genpd framework is initialized. This of
->>>
->>> late_initcall() is too late for genpd to be initialized. As you may have
->>> seen with the latest set of patches, we have problems with timer
->>> initialization. After converting to platform devices, PSC and PLL clocks
->>> get initialized post time_init(). We are working that around using
->>> fixed-clocks, which hopefully will work (I still need to test many of
->>> the affected platforms).
->>>
->>> Can you please reply with the exact issue you faced with genpd framework
->>> initialization so we do have that on record.
->>>
->>
->> The exact issue manifested itself in a NULL-pointer dereference panic
->> when I tried moving the genpd code I had initially implemented as a
->> separate platform driver to what I believe was v6 or v7 of David's
->> series (before the psc driver became a platform driver, when it was
->> still using CLK_OF_DECLARE()). When I had tested a simple conversion
->> of that version to a platform_driver, genpd worked fine.
->>
->> I don't have the stack traces from these panics, but I recall some
->> debugfs functions being involved and the genpd late_initcalls are
->> related to debugfs. Looking at it now I don't see how exactly it could
->> fail though.
+On Wed, Apr 04, 2018 at 03:43:17PM +0200, Vincent Guittot wrote:
+> On 4 April 2018 at 12:44, Valentin Schneider <valentin.schneider@arm.com> wrote:
+> > Hi,
+> >
+> > On 03/04/18 13:17, Vincent Guittot wrote:
+> >> Hi Valentin,
+> >>
+> > [...]
+> >>>
+> >>> I believe ASYM_PACKING behaves better here because the workload is only
+> >>> sysbench threads. As stated above, since task utilization is disregarded, I
+> >>
+> >> It behaves better because it doesn't wait for the task's utilization
+> >> to reach a level before assuming the task needs high compute capacity.
+> >> The utilization gives an idea of the running time of the task not the
+> >> performance level that is needed
+> >>
+> >
+> > That's my point actually. ASYM_PACKING disregards utilization and moves those
+> > threads to the big cores ASAP, which is good here because it's just sysbench
+> > threads.
+> >
+> > What I meant was that if the task composition changes, IOW we mix "small"
+> > tasks (e.g. periodic stuff) and "big" tasks (performance-sensitive stuff like
+> > sysbench threads), we shouldn't assume all of those require to run on a big
+> > CPU. The thing is, ASYM_PACKING can't make the difference between those, so
 > 
-> Do you have the code where you faced the problem stashed somewhere? I am
-> not (yet) advocating going back to CLK_OF_DECLARE(). But there is a
-> definite issue with timer being ready when not using CLK_OF_DECLARE().
-> So, I want to make sure there the reason why we are going down the
-> platform device path is a amply clear.
-> 
-> Thanks,
-> Sekhar
-> 
-This is the thread that led to the conversion to platform devices:
+> That's the 1st point where I tend to disagree: why big cores are only
+> for long running task and periodic stuff can't need to run on big
+> cores to get max compute capacity ?
+> You make the assumption that only long running tasks need high compute
+> capacity. This patch wants to always provide max compute capacity to
+> the system and not only long running task
 
-https://lkml.org/lkml/2018/2/9/541
+There is no way we can tell if a periodic or short-running tasks
+requires the compute capacity of a big core or not based on utilization
+alone. The utilization can only tell us if a task could potentially use
+more compute capacity, i.e. the utilization approaches the compute
+capacity of its current cpu.
+
+How we handle low utilization tasks comes down to how we define
+"performance" and if we care about the cost of "performance" (e.g.
+energy consumption).
+
+Placing a low utilization task on a little cpu should always be fine
+from _throughput_ point of view. As long as the cpu has spare cycles it
+means that work isn't piling up faster than it can be processed.
+However, from a _latency_ (completion time) point of view it might be a
+problem, and for latency sensitive tasks I can agree that going for max
+capacity might be better choice.
+
+The misfit patches places tasks based on utilization to ensure that
+tasks get the _throughput_ they need if possible. This is in line with
+the placement policy we have in select_task_rq_fair() already.
+
+We shouldn't forget that what we are discussing here is the default
+behaviour when we don't have sufficient knowledge about the tasks in the
+scheduler. So we are looking a reasonable middle-of-the-road policy that
+doesn't kill your performance or the battery. If user-space has its own
+opinion about performance requirements it is free to use task affinity
+to control which cpu the task end up on and ensure that the task gets
+max capacity always. On top of that we have had interfaces in Android
+for years to specify performance requirements for task (groups) to allow
+small tasks to be placed on big cpus and big task to be placed on little
+cpus depending on their requirements. It is even tied into cpufreq as
+well. A lot of effort has gone into Android to get this balance right.
+Patrick is working hard on upstreaming some of those features.
+
+In the bigger picture always going for max capacity is not desirable for
+well-configured big.LITTLE system. You would never exploit the advantage
+of the little cpus as you always use big first and only use little when
+the bigs are overloaded at which point having little cpus at all makes
+little sense. Vendors build big.LITTLE systems because they want a
+better performance/energy trade-off, if they wanted max capacity always,
+they would just built big-only systems.
+
+If we would be that concerned about latency, DVFS would be a problem too
+and we would use nothing but the performance governor. So seen in the
+bigger picture I have to disagree that blindly going for max capacity is
+the right default policy for big.LITTLE. As soon as we involve a energy
+model in the task placement decisions, it definitely isn't.
+
+Morten
