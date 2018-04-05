@@ -1,46 +1,48 @@
-From: drivshin@awxrd.com (David Rivshin)
-Date: Thu,  5 Apr 2018 16:09:16 -0400
-Subject: [PATCH] arm: kgdb: fix NUMREGBYTES so that gdb_regs[] is the correct
- size
-Message-ID: <20180405200916.27964-1-drivshin@awxrd.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Thu,  5 Apr 2018 16:29:34 -0400
+Subject: [PATCH v2 07/19] media: exymos4-is: allow compile test for EXYNOS
+ FIMC-LITE
+In-Reply-To: <cover.1522959716.git.mchehab@s-opensource.com>
+References: <cover.1522959716.git.mchehab@s-opensource.com>
+Message-ID: <fb51c9ebb76438c554855cc6543651a8c1cb7aa6.1522959716.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <DRivshin@allworx.com>
+There's nothing that prevents building this driver with
+COMPILE_TEST. So, enable it.
 
-NUMREGBYTES (which is used as the size for gdb_regs[]) is incorrectly based
-on DBG_MAX_REG_NUM instead of GDB_MAX_REGS. DBG_MAX_REG_NUM is the number
-of total registers, while GDB_MAX_REGS is the number of 'unsigned longs'
-it takes to serialize those registers. Since FP registers require 3
-'unsigned longs' each, DBG_MAX_REG_NUM is smaller than GDB_MAX_REGS.
+While here, make the Kconfig dependency cleaner by removing
+the unneeded if block.
 
-This causes GDB 8.0 give the following error on connect:
-"Truncated register 19 in remote 'g' packet"
-
-This also causes the register serialization/deserialization logic to
-overflow gdb_regs[], overwriting whatever follows.
-
-Fixes: 834b2964b7ab ("kgdb,arm: fix register dump")
-Cc: <stable@vger.kernel.org> # 2.6.37+
-Signed-off-by: David Rivshin <drivshin@allworx.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 ---
- arch/arm/include/asm/kgdb.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/platform/exynos4-is/Kconfig | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-index 3b73fdcf3627a..8de1100d10674 100644
---- a/arch/arm/include/asm/kgdb.h
-+++ b/arch/arm/include/asm/kgdb.h
-@@ -77,7 +77,7 @@ extern int kgdb_fault_expected;
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 7b2c49e5a592..c8e5ad8f8294 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -41,11 +41,10 @@ config VIDEO_S5P_MIPI_CSIS
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called s5p-csis.
  
- #define KGDB_MAX_NO_CPUS	1
- #define BUFMAX			400
--#define NUMREGBYTES		(DBG_MAX_REG_NUM << 2)
-+#define NUMREGBYTES		(GDB_MAX_REGS << 2)
- #define NUMCRITREGBYTES		(32 << 2)
+-if SOC_EXYNOS4412 || SOC_EXYNOS5250
+-
+ config VIDEO_EXYNOS_FIMC_LITE
+ 	tristate "EXYNOS FIMC-LITE camera interface driver"
+ 	depends on I2C
++	depends on SOC_EXYNOS4412 || SOC_EXYNOS5250 || COMPILE_TEST
+ 	depends on HAS_DMA
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select VIDEO_EXYNOS4_IS_COMMON
+@@ -55,7 +54,6 @@ config VIDEO_EXYNOS_FIMC_LITE
  
- #define _R0			0
-
-base-commit: 0adb32858b0bddf4ada5f364a84ed60b196dbcda
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called exynos-fimc-lite.
+-endif
+ 
+ config VIDEO_EXYNOS4_FIMC_IS
+ 	tristate "EXYNOS4x12 FIMC-IS (Imaging Subsystem) driver"
 -- 
 2.14.3
