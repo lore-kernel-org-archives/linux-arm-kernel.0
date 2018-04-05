@@ -1,38 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Apr 2018 11:07:40 +0100
-Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
-In-Reply-To: <20180405091913.ky4dnmszoobn2xry@flea>
-References: <20180403154449.2443-1-ssuloev@orpaltech.com>
- <20180403154449.2443-4-ssuloev@orpaltech.com>
- <20180404065048.n76r3ytuznd6fqsl@flea>
- <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
- <20180405091913.ky4dnmszoobn2xry@flea>
-Message-ID: <20180405100740.GA12349@sirena.org.uk>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Thu, 5 Apr 2018 10:49:38 +0000
+Subject: [PATCH] phy: stm32: Fix printing of wrong uninitialized port
+ number
+In-Reply-To: <1522921619-5790-1-git-send-email-geert@linux-m68k.org>
+References: <1522921619-5790-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <3d3bad02a48f4d5cb1d6f0db1d108cbf@SFHDAG3NODE2.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 11:19:13AM +0200, Maxime Ripard wrote:
-> On Wed, Apr 04, 2018 at 02:35:14PM +0300, Sergey Suloev wrote:
+Hi Geert,
 
-> > What exactly and in what way ?
+Just to let you know, this warning is already fixed by a pending patch I've sent two weeks ago: https://lkml.org/lkml/2018/3/20/424.
 
-> You should explain, at least:
-> A) What is the current behaviour
-> B) Why that is a problem, or what problem does it cause
-> C) What solution you implement and why you think it's justified
+Thanks,
+Amelie
 
-Right, this is key - the top level problem with most of this patch set
-is that it's hard to understand what the changes are intended to do or
-why.  It's really important that people reading the changes be able to
-understand what's going on, especially if technical problems have been
-found since that tends to make people look more closely.  Part of this
-is about splitting the changes out so that each patch does one thing
-(which makes it easier to understand them) and part of it is about
-explaining those changes clearly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180405/ff9be1e3/attachment.sig>
+> -----Original Message-----
+> From: Geert Uytterhoeven [mailto:geert at linux-m68k.org]
+> Sent: jeudi 5 avril 2018 11:47
+> To: Kishon Vijay Abraham I <kishon@ti.com>; Maxime Coquelin
+> <mcoquelin.stm32@gmail.com>; Alexandre TORGUE
+> <alexandre.torgue@st.com>; Amelie DELAUNAY <amelie.delaunay@st.com>
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> Geert Uytterhoeven <geert@linux-m68k.org>
+> Subject: [PATCH] phy: stm32: Fix printing of wrong uninitialized port number
+> 
+> drivers/phy/st/phy-stm32-usbphyc.c: In function ?stm32_usbphyc_probe?:
+> drivers/phy/st/phy-stm32-usbphyc.c:364: warning: ?i? may be used
+> uninitialized in this function
+> 
+> Indeed, during the first loop iteration, "i" is uninitialized.
+> However, "i" does not represent the intended PHY instance number to print.
+> 
+> Fix this by printing the correct variable instead.
+> 
+> Fixes: 94c358da3a054520 ("phy: stm32: add support for STM32 USB PHY
+> Controller (USBPHYC)")
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> ---
+>  drivers/phy/st/phy-stm32-usbphyc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/phy/st/phy-stm32-usbphyc.c b/drivers/phy/st/phy-
+> stm32-usbphyc.c
+> index bc4e78a19c913dc9..1f682c176fd6239e 100644
+> --- a/drivers/phy/st/phy-stm32-usbphyc.c
+> +++ b/drivers/phy/st/phy-stm32-usbphyc.c
+> @@ -367,8 +367,8 @@ static int stm32_usbphyc_probe(struct
+> platform_device *pdev)
+>  		if (IS_ERR(phy)) {
+>  			ret = PTR_ERR(phy);
+>  			if (ret != -EPROBE_DEFER)
+> -				dev_err(dev,
+> -					"failed to create phy%d: %d\n", i, ret);
+> +				dev_err(dev, "failed to create phy%d: %d\n",
+> +					port, ret);
+>  			goto put_child;
+>  		}
+> 
+> --
+> 2.7.4
