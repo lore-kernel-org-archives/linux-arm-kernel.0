@@ -1,38 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 5 Apr 2018 22:42:06 +0200
-Subject: [PATCH v1 2/2] arm: npcm: Enable L2 Cache in NPCM7xx
-In-Reply-To: <CAP6Zq1j9i0Zdt3wPCGLLnPZJPGf8BaG9Nh1pLAsnwczqWHtthQ@mail.gmail.com>
-References: <1521155412-29229-1-git-send-email-tmaimon77@gmail.com>
- <1521155412-29229-3-git-send-email-tmaimon77@gmail.com>
- <CAFd5g44NOFRmQbDJfRLw_SwsHwVB-hxsUYMYSmkqeyRKmXqSqQ@mail.gmail.com>
- <CAP6Zq1jvCvM+uG8kU_JAYzm9e3BG28AS80ANmn_0a0HmiVBm3A@mail.gmail.com>
- <CAK8P3a3HBkqgas-QkAr_J767ffBMXJTJeqqVY9fFxw2Yexi27g@mail.gmail.com>
- <CAP6Zq1j9i0Zdt3wPCGLLnPZJPGf8BaG9Nh1pLAsnwczqWHtthQ@mail.gmail.com>
-Message-ID: <CAK8P3a1zvjc8EyXX+c4r++pVHrVQ84CSUrnMA=+9kf7FZojiGg@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 5 Apr 2018 22:48:33 +0200
+Subject: [PATCH] arm: kgdb: fix NUMREGBYTES so that gdb_regs[] is the
+ correct size
+In-Reply-To: <20180405200916.27964-1-drivshin@awxrd.com>
+References: <20180405200916.27964-1-drivshin@awxrd.com>
+Message-ID: <20180405204833.hn56zpd474jywrm3@lnxartpec.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2018 at 6:56 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
-> On 5 April 2018 at 15:54, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Fri, Mar 16, 2018 at 10:51 PM, Tomer Maimon <tmaimon77@gmail.com> wrote:
->
-> It seems that I have to add l2c_aux_val, l2c_aux_mask parameters to the
-> DT_MACHINE_START
-> to enable the L2 Cache.
->>
->>
->> The last email in that thread mentions
->> L310_AUX_CTRL_CACHE_REPLACE_RR, is that required after all?
->
->
-> No it is not require this is why I added:
-> .l2c_aux_val    = 0x0,
-> .l2c_aux_mask   = ~0x0,
->
-> Can I resend it on Sunday?
+On Thu, Apr 05, 2018 at 04:09:16PM -0400, David Rivshin wrote:
+> From: David Rivshin <DRivshin@allworx.com>
+> 
+> NUMREGBYTES (which is used as the size for gdb_regs[]) is incorrectly based
+> on DBG_MAX_REG_NUM instead of GDB_MAX_REGS. DBG_MAX_REG_NUM is the number
+> of total registers, while GDB_MAX_REGS is the number of 'unsigned longs'
+> it takes to serialize those registers. Since FP registers require 3
+> 'unsigned longs' each, DBG_MAX_REG_NUM is smaller than GDB_MAX_REGS.
+> 
+> This causes GDB 8.0 give the following error on connect:
+> "Truncated register 19 in remote 'g' packet"
+> 
+> This also causes the register serialization/deserialization logic to
+> overflow gdb_regs[], overwriting whatever follows.
+> 
+> Fixes: 834b2964b7ab ("kgdb,arm: fix register dump")
+> Cc: <stable@vger.kernel.org> # 2.6.37+
+> Signed-off-by: David Rivshin <drivshin@allworx.com>
 
-Yes, please resend it as soon as you have the time to improve the changelog,
-no need to wait if you can do it right away. We can always merge bugfixes,
-but doing it earlier rather than later is better.
-
-      Arnd
+Acked-by: Rabin Vincent <rabin@rab.in>
