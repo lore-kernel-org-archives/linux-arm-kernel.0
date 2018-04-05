@@ -1,67 +1,61 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  5 Apr 2018 17:59:01 +0100
-Subject: [PATCH 04/10] locking/qspinlock: Use atomic_cond_read_acquire
-In-Reply-To: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1522947547-24081-5-git-send-email-will.deacon@arm.com>
+Date: Thu,  5 Apr 2018 17:58:57 +0100
+Subject: [PATCH 00/10] kernel/locking: qspinlock improvements
+Message-ID: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than dig into the counter field of the atomic_t inside the
-qspinlock structure so that we can call smp_cond_load_acquire, use
-atomic_cond_read_acquire instead, which operates on the atomic_t
-directly.
+Hi all,
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- kernel/locking/qspinlock.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+I've been kicking the tyres further on qspinlock and with this set of patches
+I'm happy with the performance and fairness properties. In particular, the
+locking algorithm now guarantees forward progress whereas the implementation
+in mainline can starve threads indefinitely in cmpxchg loops.
 
-diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
-index cdfa7b7328a8..291e1526d27b 100644
---- a/kernel/locking/qspinlock.c
-+++ b/kernel/locking/qspinlock.c
-@@ -331,8 +331,8 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 		 * barriers.
- 		 */
- 		if (val & _Q_LOCKED_MASK)
--			smp_cond_load_acquire(&lock->val.counter,
--					      !(VAL & _Q_LOCKED_MASK));
-+			atomic_cond_read_acquire(&lock->val,
-+						 !(VAL & _Q_LOCKED_MASK));
- 		/*
- 		 * take ownership and clear the pending bit.
- 		 *
-@@ -433,8 +433,8 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 	 *
- 	 * The PV pv_wait_head_or_lock function, if active, will acquire
- 	 * the lock and return a non-zero value. So we have to skip the
--	 * smp_cond_load_acquire() call. As the next PV queue head hasn't been
--	 * designated yet, there is no way for the locked value to become
-+	 * atomic_cond_read_acquire() call. As the next PV queue head hasn't
-+	 * been designated yet, there is no way for the locked value to become
- 	 * _Q_SLOW_VAL. So both the set_locked() and the
- 	 * atomic_cmpxchg_relaxed() calls will be safe.
- 	 *
-@@ -444,7 +444,7 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 	if ((val = pv_wait_head_or_lock(lock, node)))
- 		goto locked;
- 
--	val = smp_cond_load_acquire(&lock->val.counter, !(VAL & _Q_LOCKED_PENDING_MASK));
-+	val = atomic_cond_read_acquire(&lock->val, !(VAL & _Q_LOCKED_PENDING_MASK));
- 
- locked:
- 	/*
-@@ -461,7 +461,7 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 	/* In the PV case we might already have _Q_LOCKED_VAL set */
- 	if ((val & _Q_TAIL_MASK) == tail) {
- 		/*
--		 * The smp_cond_load_acquire() call above has provided the
-+		 * The atomic_cond_read_acquire() call above has provided the
- 		 * necessary acquire semantics required for locking.
- 		 */
- 		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
+Catalin has also implemented a model of this using TLA to prove that the
+lock is fair, although this doesn't take the memory model into account:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/kernel-tla.git/commit/
+
+I'd still like to get more benchmark numbers and wider exposure before
+enabling this for arm64, but my current testing is looking very promising.
+This series, along with the arm64-specific patches, is available at:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/log/?h=qspinlock
+
+Cheers,
+
+Will
+
+--->8
+
+Jason Low (1):
+  locking/mcs: Use smp_cond_load_acquire() in mcs spin loop
+
+Will Deacon (9):
+  locking/qspinlock: Don't spin on pending->locked transition in
+    slowpath
+  locking/qspinlock: Remove unbounded cmpxchg loop from locking slowpath
+  locking/qspinlock: Kill cmpxchg loop when claiming lock from head of
+    queue
+  locking/qspinlock: Use atomic_cond_read_acquire
+  barriers: Introduce smp_cond_load_relaxed and atomic_cond_read_relaxed
+  locking/qspinlock: Use smp_cond_load_relaxed to wait for next node
+  locking/qspinlock: Merge struct __qspinlock into struct qspinlock
+  locking/qspinlock: Make queued_spin_unlock use smp_store_release
+  locking/qspinlock: Elide back-to-back RELEASE operations with
+    smp_wmb()
+
+ arch/x86/include/asm/qspinlock.h          |  19 ++-
+ arch/x86/include/asm/qspinlock_paravirt.h |   3 +-
+ include/asm-generic/barrier.h             |  27 ++++-
+ include/asm-generic/qspinlock.h           |   2 +-
+ include/asm-generic/qspinlock_types.h     |  32 ++++-
+ include/linux/atomic.h                    |   2 +
+ kernel/locking/mcs_spinlock.h             |  10 +-
+ kernel/locking/qspinlock.c                | 191 ++++++++++--------------------
+ kernel/locking/qspinlock_paravirt.h       |  34 ++----
+ 9 files changed, 141 insertions(+), 179 deletions(-)
+
 -- 
 2.1.4
