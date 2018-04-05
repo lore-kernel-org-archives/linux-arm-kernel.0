@@ -1,56 +1,29 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 5 Apr 2018 15:44:06 +0200
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
- <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
- <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
-Message-ID: <CAMRc=Mc228JAxxBXcObmokh2h-toojG8OHrmbunm_ORqbGWUnA@mail.gmail.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Thu, 5 Apr 2018 16:44:16 +0300
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <20180405131735.GB12349@sirena.org.uk>
+References: <20180403154449.2443-1-ssuloev@orpaltech.com>
+ <20180403154449.2443-4-ssuloev@orpaltech.com>
+ <20180404065048.n76r3ytuznd6fqsl@flea>
+ <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
+ <20180405091913.ky4dnmszoobn2xry@flea>
+ <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
+ <20180405131735.GB12349@sirena.org.uk>
+Message-ID: <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-05 15:09 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
-> Hi Bartosz,
->
-> On Friday 09 February 2018 10:18 PM, Michael Turquette wrote:
->> On Fri, Feb 9, 2018 at 8:22 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->>> 2018-01-08 3:17 GMT+01:00 David Lechner <david@lechnology.com>:
->
->>> Hi David,
->>>
->>> I've been working on moving the genpd code from its own driver to the
->>> psc one. I couldn't get the system to boot though and problems
->>> happened very early in the boot sequence. I struggled to figure out
->>> what's happening, but eventually I noticed that psc uses
->>> CLK_OF_DECLARE() to initialize clocks. The functions registered this
->>> way are called very early in the boot sequence, way before
->>> late_initcall() in which the genpd framework is initialized. This of
->
-> late_initcall() is too late for genpd to be initialized. As you may have
-> seen with the latest set of patches, we have problems with timer
-> initialization. After converting to platform devices, PSC and PLL clocks
-> get initialized post time_init(). We are working that around using
-> fixed-clocks, which hopefully will work (I still need to test many of
-> the affected platforms).
->
-> Can you please reply with the exact issue you faced with genpd framework
-> initialization so we do have that on record.
->
+On 04/05/2018 04:17 PM, Mark Brown wrote:
+> On Thu, Apr 05, 2018 at 12:59:35PM +0300, Sergey Suloev wrote:
+>> On 04/05/2018 12:19 PM, Maxime Ripard wrote:
+>>> The point of that patch was precisely to allow to send more data than
+>>> the FIFO. You're breaking that behaviour without any justification,
+>>> and this is not ok.
+>> I am sorry, but you can't. That's a hardware limitation.
+> Are you positive about that?  Normally you can add things to hardware
+> FIFOs while they're being drained so so long as you can keep data
+> flowing in at least as fast as it's being consumed.
 
-The exact issue manifested itself in a NULL-pointer dereference panic
-when I tried moving the genpd code I had initially implemented as a
-separate platform driver to what I believe was v6 or v7 of David's
-series (before the psc driver became a platform driver, when it was
-still using CLK_OF_DECLARE()). When I had tested a simple conversion
-of that version to a platform_driver, genpd worked fine.
-
-I don't have the stack traces from these panics, but I recall some
-debugfs functions being involved and the genpd late_initcalls are
-related to debugfs. Looking at it now I don't see how exactly it could
-fail though.
-
-Best regards,
-Bartosz
+Well, normally yes, but this is not the case with the hardware that I 
+own. My a20 (BPiM1+) and a31 (BPiM2) boards behaves differently. With a 
+transfer larger than FIFO then TC interrupt never happens.
