@@ -1,62 +1,28 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 5 Apr 2018 14:52:39 +0300
-Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add fixed 26MHz clock as fck for
- twl
-Message-ID: <20180405115239.17370-1-peter.ujfalusi@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 Apr 2018 13:58:12 +0200
+Subject: [PATCH v3 1/5] io: define several IO & PIO barrier types for the
+ asm-generic version
+In-Reply-To: <e2290e35d919d46a6d45b0e47abb866e@codeaurora.org>
+References: <1522886301-25955-1-git-send-email-okaya@codeaurora.org>
+ <CAK8P3a0Noun+8AaRUcMdOX09KXxFXZxfcyUgJnezPkS2gVkg6w@mail.gmail.com>
+ <e2290e35d919d46a6d45b0e47abb866e@codeaurora.org>
+Message-ID: <CAK8P3a2ovkToy5Yv=15_tyM8GUoZfSJ2QdhGev=fNSRCAj9bCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board uses 26MHz oscillator for the twl4030 HFCLK.
-This way we will not depend on the bootloader to configure the
-CFG_BOOT:HFCLK_FREQ
+On Thu, Apr 5, 2018 at 1:48 PM,  <okaya@codeaurora.org> wrote:
+> On 2018-04-05 03:00, Arnd Bergmann wrote:
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-Hi,
+>> The other four patches look perfect already.  What's the timing we need
+>> for
+>> these patches? Are they 4.18 material, or do we need them in 4.17 and
+>> stable kernels to work around known bugs?
+>
+>
+> I was hoping to get all arch stuff in for 4.17.
+>
+> Driver developers started removing redundant wmb().
 
-there might be other boards (all omap3 boards with twl4030?) which uses the same
-setup, but I only have schematics for beagle-xm.
+Ok, so 4.17 but no stable backports then.
 
-In order for the driver to actually use the clock the 
-[PATCH] mfd: twl-core: Fix clock initialization
-need to be applied. W/o the twl-core patch the clock is just ignored.
-
-Regards,
-Peter
-
- arch/arm/boot/dts/omap3-beagle-xm.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 0349fcc9dc26..d80587de0bbf 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -30,6 +30,13 @@
- 		ethernet = &ethernet;
- 	};
- 
-+	/* fixed 26MHz oscillator */
-+	hfclk_26m: oscillator {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 
-@@ -274,6 +281,9 @@
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
- 		interrupt-parent = <&intc>;
- 
-+		clocks = <&hfclk_26m>;
-+		clock-names = "fck";
-+
- 		twl_audio: audio {
- 			compatible = "ti,twl4030-audio";
- 			codec {
--- 
-Peter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+     Arnd
