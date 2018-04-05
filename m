@@ -1,82 +1,55 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Thu,  5 Apr 2018 13:54:00 -0400
-Subject: [PATCH 00/16] Make all drivers under drivers/media to build with
- COMPILE_TEST
-Message-ID: <cover.1522949748.git.mchehab@s-opensource.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu, 05 Apr 2018 18:43:05 +0000
+Subject: [PATCH] arm/arm64: smccc: Use xN for arm64 register constraints
+ with clang
+In-Reply-To: <20180322235811.GC78232@google.com>
+References: <20180322212705.141175-1-mka@chromium.org>
+ <CAKwvOdk4Tos1Q8dyQvic4PUX3cjy3q1hn3FkK=xiVSChht+gEg@mail.gmail.com>
+ <20180322224456.GB78232@google.com>
+ <fc921bfb-1f49-08f9-515c-07bd442a1e11@google.com>
+ <20180322235811.GC78232@google.com>
+Message-ID: <CAKwvOdkcpxcP5Eb5f1-bJgU0gi4zkbof5WJWz2QbVCNsGBUO3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 22, 2018 at 4:58 PM Matthias Kaehlcke <mka@chromium.org> wrote:
 
-The current media policy has been for a while to only accept new drivers 
-that compile with COMPILE_TEST.
+> El Thu, Mar 22, 2018 at 04:19:42PM -0700 Greg Hackmann ha dit:
+> > NAK.  There's a reason I didn't send my change upstream.
+> >
+> > As Marc pointed out (https://lkml.org/lkml/2018/3/16/987), the "r"
+> > prefix tells gcc to pick the appropriate register width.  "x" makes it
+> > unconditionally use the entire 64-bit register width.  Just swapping out
+> > one for the other changes the macro's semantics.
+> >
+> > Unfortunately since this was breaking builds in android-4.14 and we
+> > didn't have an immediate-term fix, I bit the bullet and added the above
+> > commit -- but *only* as a short-term workaround.  For the one caller we
+> > currently have in 4.14.y, gcc was using the entire 64-bit width for all
+> > its inputs anyway, so "r" vs. "x" didn't make a difference.  But that
+> > might not be true if/when someone introduces other SMCCC 1.1 callers.
+> >
+> > Unfortunately I don't see a better way to deal with this than waiting
+> > for clang to support "r"-style constraints on ARM64.
 
-However, there are still several drivers under drivers/media that 
-doesn't build with COMPILE_TEST.
+> Thanks for the clarification! From the other thread
+> (https://lkml.org/lkml/2018/3/1/268) I had the impression that ARM
+> folks saw the option of a mergeable fix.
 
-So, this series makes the existing ones also compatible with it.
-
-Not building with COMPILE_TEST is a bad thing, for several reasons.
-
-The main ones is that:
-
-1) the licence the Kernel community has for Coverity only builds for 
-   x86. So, drivers that don't build on such archtecture were likely 
-   never tested by it.
-
-2) That affects my per-patch handling process, with should be quick 
-   enough to not delay my patch handling process. So, I only build for one 
-   architecture (i386).
-
-3) When appliying a patch, I always run two static code analyzers (W=1, 
-   smatch and sparse). Those drivers weren't checked by me. At the end 
-   of the day, that leads to a lower quality check for the drivers that 
-   don't build on i386.
-
-There are two situations on this patch series that proof the lower 
-quality of those drivers:
-
-- There is a case of a driver that was added broken in 2013. Only two 
-  years later, someone noticed and "fixed" it by markin it as BROKEN!
-
-- 5 patches in this series (about 1/3) are just to fix build issues on 
-  those drivers, most of them due to gcc warnings.
+> Given the fact that clang support for kernel builds is still
+> recent/WIP I guess it's not the end of the world if we have to raise
+> the minimum clang version to 7.x for newer kernels.
 
 
-Mauro Carvalho Chehab (16):
-  omap: omap-iommu.h: allow building drivers with COMPILE_TEST
-  media: omap3isp: allow it to build with COMPILE_TEST
-  media: omap3isp/isp: remove an unused static var
-  media: fsl-viu: mark static functions as such
-  media: fsl-viu: allow building it with COMPILE_TEST
-  media: cec_gpio: allow building CEC_GPIO with COMPILE_TEST
-  media: exymos4-is: allow compile test for EXYNOS FIMC-LITE
-  media: mmp-camera.h: add missing platform data
-  media: marvel-ccic: re-enable mmp-driver build
-  media: mmp-driver: make two functions static
-  media: davinci: allow building isif code
-  media: davinci: allow build vpbe_display with COMPILE_TEST
-  media: vpbe_venc: don't store return codes if they won't be used
-  media: davinci: get rid of lots of kernel-doc warnings
-  media: omapfb_dss.h: add stubs to build with COMPILE_TEST
-  media: omap: allow building it with COMPILE_TEST
+Manoj fixed this in:
+https://reviews.llvm.org/rL328829
+https://bugs.llvm.org/show_bug.cgi?id=36862
 
- drivers/media/platform/Kconfig                   | 12 +++---
- drivers/media/platform/davinci/Kconfig           |  6 ++-
- drivers/media/platform/davinci/isif.c            |  2 -
- drivers/media/platform/davinci/vpbe.c            | 38 +++++++++--------
- drivers/media/platform/davinci/vpbe_display.c    | 21 +++++----
- drivers/media/platform/davinci/vpbe_osd.c        | 16 ++++---
- drivers/media/platform/davinci/vpbe_venc.c       |  9 ++--
- drivers/media/platform/exynos4-is/Kconfig        |  4 +-
- drivers/media/platform/fsl-viu.c                 | 20 ++++++---
- drivers/media/platform/marvell-ccic/Kconfig      |  5 ++-
- drivers/media/platform/marvell-ccic/mmp-driver.c |  4 +-
- drivers/media/platform/omap/Kconfig              |  6 +--
- drivers/media/platform/omap3isp/isp.c            | 14 +++---
- include/linux/omap-iommu.h                       |  5 +++
- include/linux/platform_data/media/mmp-camera.h   | 19 +++++++++
- include/video/omapfb_dss.h                       | 54 +++++++++++++++++++++++-
- 16 files changed, 162 insertions(+), 73 deletions(-)
+Looks set to ride the Clang 6.0 train.  mka@ if you're planning another
+state of the union email, it would be good to note the clang 6.0
+requirement for arm64.
 
+Is there anything left to do here?
 -- 
-2.14.3
+Thanks,
+~Nick Desaulniers
