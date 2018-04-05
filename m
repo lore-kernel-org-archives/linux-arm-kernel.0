@@ -1,55 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 5 Apr 2018 17:00:01 +0530
-Subject: [PATCH v8 40/42] ARM: davinci: add device tree support to timer
-In-Reply-To: <1521168778-27236-41-git-send-email-david@lechnology.com>
-References: <1521168778-27236-1-git-send-email-david@lechnology.com>
- <1521168778-27236-41-git-send-email-david@lechnology.com>
-Message-ID: <205cae72-4e91-aca2-e3b2-829a12066dc8@ti.com>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Thu, 5 Apr 2018 04:34:44 -0700
+Subject: [PATCH v7 2/5] arm: arm64: page_alloc: reduce unnecessary binary
+ search in memblock_next_valid_pfn()
+In-Reply-To: <1522915478-5044-3-git-send-email-hejianet@gmail.com>
+References: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
+ <1522915478-5044-3-git-send-email-hejianet@gmail.com>
+Message-ID: <20180405113444.GB2647@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 March 2018 08:22 AM, David Lechner wrote:
-> +static int __init of_davinci_timer_init(struct device_node *np)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = of_clk_get(np, 0);
-> +	if (IS_ERR(clk)) {
-> +		struct of_phandle_args clkspec;
-> +
-> +		/*
-> +		 * Fall back to using ref_clk if the actual clock is not
-> +		 * available. This currently always happens because platform
-> +		 * clocks (i.e PLLs and PSCs) are registered as platform
-> +		 * devices and therefore are not available at this point in
-> +		 * the boot process.
+On Thu, Apr 05, 2018 at 01:04:35AM -0700, Jia He wrote:
+> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+> where possible") optimized the loop in memmap_init_zone(). But there is
+> still some room for improvement. E.g. if pfn and pfn+1 are in the same
+> memblock region, we can simply pfn++ instead of doing the binary search
+> in memblock_next_valid_pfn.
 
-It seems to me that this is not going to be a temporary problem (or at
-least will be around for quite a while). So, I think we can as well just
-look for ref_clk directly.
+Sure, but I bet if we are >end_pfn, we're almost certainly going to the
+start_pfn of the next block, so why not test that as well?
 
-> +		 */
-> +		clkspec.np = of_find_node_by_name(NULL, "ref_clk");
-> +		if (IS_ERR(clkspec.np)) {
-> +			pr_err("%s: No clock available for timer!\n", __func__);
-> +			return PTR_ERR(clkspec.np);
-> +		}
-> +		clk = of_clk_get_from_provider(&clkspec);
-> +		of_node_put(clkspec.np);
+> +	/* fast path, return pfn+1 if next pfn is in the same region */
+> +	if (early_region_idx != -1) {
+> +		start_pfn = PFN_DOWN(regions[early_region_idx].base);
+> +		end_pfn = PFN_DOWN(regions[early_region_idx].base +
+> +				regions[early_region_idx].size);
+> +
+> +		if (pfn >= start_pfn && pfn < end_pfn)
+> +			return pfn;
+
+		early_region_idx++;
+		start_pfn = PFN_DOWN(regions[early_region_idx].base);
+		if (pfn >= end_pfn && pfn <= start_pfn)
+			return start_pfn;
 > +	}
-> +
-> +	davinci_timer_init(clk);
-> +
-> +	return 0;
-> +}
-> +TIMER_OF_DECLARE(davinci_timer, "ti,davinci-timer", of_davinci_timer_init);
-
-Here, I think we should use "ti,da850-timer" so we can change the fixed
-clock we are looking for based on the SoC. At a minimum, we should have
-"ti,da850-timer" in the DT along with "ti,davinci-timer".
-
-BTW, I noticed that "ti,davinci-timer" is not documented. I think we
-need to add a binding documentation too.
-
-Thanks,
-Sekhar
