@@ -1,75 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Apr 2018 11:05:01 +0100
-Subject: [PATCH] arm64: only advance singlestep for user instruction traps
-In-Reply-To: <20180405015144.GC19607@linaro.org>
-References: <20180403102251.42309-1-mark.rutland@arm.com>
- <20180405015144.GC19607@linaro.org>
-Message-ID: <20180405100500.e6cxtamjsvhztqlk@lakrids.cambridge.arm.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Thu, 5 Apr 2018 11:51:13 +0200
+Subject: Extending the Marvell ICU support
+In-Reply-To: <c80537ac-e483-be9a-2dee-a222f429a3f0@arm.com>
+References: <20180404160425.49fc620d@windsurf>
+ <93739952-190c-0cdd-042e-95125f2d644d@arm.com>
+ <20180405110421.662269ab@windsurf>
+ <c80537ac-e483-be9a-2dee-a222f429a3f0@arm.com>
+Message-ID: <20180405115113.4dac15df@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 10:51:45AM +0900, AKASHI Takahiro wrote:
-> On Tue, Apr 03, 2018 at 11:22:51AM +0100, Mark Rutland wrote:
-> > Our arm64_skip_faulting_instruction() helper advances the userspace
-> > singlestep state machine, but this is also called by the kernel BRK
-> > handler, as used for WARN*().
-> > 
-> > Thus, if we happen to hit a WARN*() while the user singlestep state
-> > machine is in the active-no-pending state, we'll advance to the
-> > active-pending state without having executed a user instruction, and
-> > will take a step exception earlier than expected when we return to
-> > userspace.
-> > 
-> > Let's fix this by only advancing the state machine when skipping a user
-> > instruction.
+Hello,
+
+On Thu, 5 Apr 2018 10:27:24 +0100, Marc Zyngier wrote:
+
+> > So you're suggesting that the ICU driver registers multiple irq
+> > domains, one for NSR, one for SEI, each having its own MSI parent,
+> > correct ?  
 > 
-> Is it possible to have TIF_SINGLESTEP set even if !user_mode()?
+> Yes, that's the idea. The alternative would have been to have a single
+> GICP domain and to route everything there, but the fact that SEIs are
+> multiplexed entirely kills that prospect. Blame the HW folks.
 
-I believe this can happen if we're single-stepping a user task, then in
-the process of handling some exception (e.g. an instruction abort) we
-hit a WARN(). That WARN() will have a BRK, triggering an EL1 BRK64
-exception, where !user_mode(regs), but as we're in the context of the
-user task, TIF_SINGLESTEP can be set.
+A quick question: the ICU in total can handle N wired interrupts, and
+it has N registers to configure how those interrupts are routed to the
+AP. Therefore, we have a global set of N wired interrupts, each can be
+either a NSR, a SEI, a REI, etc.
 
-> If WARN*() is only an issue, why not fix bug_handler() directly?
+Currently, the ICU driver registers a single irq domain of
+ICU_MAX_IRQS. If we move to your solution with sub-nodes, we will have
+to register several irq domains. Is it OK if each of them exposes
+ICU_MAX_IRQS, even if in practice you won't be able to use both the
+interrupt icu_nsr[2] and the interrupt icu_sei[2] ?
 
-In bug_handler() we call arm64_skip_faulting_instruction(), so we'd
-either need to open-code the PC modification there, or have a separate
-arm64_skip_faulting_{user,kernel}_instruction() helpers.
+So we will expose 2 * ICU_MAX_IRQS, but in practice only a total of
+ICU_MAX_IRQS can be used. We would probably use a bitmap or something
+like that in the driver to know which ICU is already used, and which is
+still available. Indeed, a configuration such as:
 
-I'd prototyped the latter, but it was very churny, and this seemed the
-simlpest option.
+	dev1 {
+		interrupt-extended = <&icu_nsr 2 IRQ_TYPE_LEVEL_HIGH>;
+	}
 
-Thanks,
-Mark.
+	dev2 {
+		interrupt-extended = <&icu_sei 2 IRQ_TYPE_LEVEL_HIGH>;
+	}
 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Andrey Konovalov <andreyknvl@google.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/traps.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> > index ba964da31a25..75625a401a4e 100644
-> > --- a/arch/arm64/kernel/traps.c
-> > +++ b/arch/arm64/kernel/traps.c
-> > @@ -277,7 +277,8 @@ void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
-> >  	 * If we were single stepping, we want to get the step exception after
-> >  	 * we return from the trap.
-> >  	 */
-> > -	user_fastforward_single_step(current);
-> > +	if (user_mode(regs))
-> > +		user_fastforward_single_step(current);
-> >  }
-> >  
-> >  static LIST_HEAD(undef_hook);
-> > -- 
-> > 2.11.0
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+is not valid, because the ICU n?2 can only be either a NSR *or* a SEI.
+
+Does that make sense ?
+
+> > I don't think "a new DT on an older kernel" has ever been a
+> > requirement, has it? The whole idea of DT ABI compatibility is that an
+> > old DT shipped on a board continues to work with newer kernel versions.  
+> 
+> In that case, you can probably achieve "old DT with new kernel" at the
+> cost of checking the size of the interrupt specifier in your translate
+> method.
+
+Yep, I think backward compatibility can be achieved. It's going to
+clutter the ICU driver implementation with dead code that is never
+tested, but that's the whole point of DT backward compatibility.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
