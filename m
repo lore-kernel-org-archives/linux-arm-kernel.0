@@ -1,44 +1,52 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:49:38 +0200
-Subject: [PATCH v6 08/30] drm/bridge: analogix_dp: Extend hpd check time to
- 100ms
+Date: Thu,  5 Apr 2018 11:49:35 +0200
+Subject: [PATCH v6 05/30] drm/bridge: analogix_dp: Wait for HPD signal before
+ configuring link
 In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
 References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-9-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-6-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lin Huang <hl@rock-chips.com>
+From: zain wang <wzz@rock-chips.com>
 
-There was a 1ms delay to detect the hpd signal, which is too short to
-detect a short pulse. This patch extends this delay to 100ms.
+According to DP spec v1.3 chap 3.5.1.2 Link Training, Link Policy Maker
+must first detect that the HPD signal is asserted high by the Downstream
+Device before establishing a link with it.
 
 Cc: St?phane Marchesin <marcheu@chromium.org>
-Cc: ?? ? <wzz@rock-chips.com>
-Signed-off-by: Lin Huang <hl@rock-chips.com>
+Signed-off-by: zain wang <wzz@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 5957e2338071..1f4f34149019 100644
+index bf805f156272..3269deec739d 100644
 --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
 +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -76,7 +76,7 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- 			return 0;
+@@ -1169,6 +1169,17 @@ static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
+ 	if (ret)
+ 		goto out_dp_init;
  
- 		timeout_loop++;
--		usleep_range(10, 11);
-+		usleep_range(1000, 1100);
- 	}
- 
- 	/*
++	/*
++	 * According to DP spec v1.3 chap 3.5.1.2 Link Training,
++	 * We should first make sure the HPD signal is asserted high by device
++	 * when we want to establish a link with it.
++	 */
++	ret = analogix_dp_detect_hpd(dp);
++	if (ret) {
++		DRM_ERROR("failed to get hpd single ret = %d\n", ret);
++		goto out_dp_init;
++	}
++
+ 	ret = analogix_dp_commit(dp);
+ 	if (ret)
+ 		goto out_dp_init;
 -- 
 2.16.3
