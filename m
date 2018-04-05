@@ -1,72 +1,210 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu,  5 Apr 2018 11:49:31 +0200
-Subject: [PATCH v6 01/30] drm/bridge: analogix_dp: Move enable video into
- config_video()
+Date: Thu,  5 Apr 2018 11:49:34 +0200
+Subject: [PATCH v6 04/30] drm/bridge: analogix_dp: Retry bridge enable when it
+ failed
 In-Reply-To: <20180405095000.9756-1-enric.balletbo@collabora.com>
 References: <20180405095000.9756-1-enric.balletbo@collabora.com>
-Message-ID: <20180405095000.9756-2-enric.balletbo@collabora.com>
+Message-ID: <20180405095000.9756-5-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lin Huang <hl@rock-chips.com>
+From: zain wang <wzz@rock-chips.com>
 
-We need to enable video before analogix_dp_is_video_stream_on(), so
-we can get the right video stream status.
+When we enable bridge failed, we have to retry it, otherwise we would get
+the abnormal display.
 
-We needed to increase the delay in the timeout loop because there is
-random "Timeout of video streamclk ok" message happen when debug edp
-panel, this time do not define in the spec.
-
-Cc: ?? ? <wzz@rock-chips.com>
 Cc: St?phane Marchesin <marcheu@chromium.org>
-Signed-off-by: Lin Huang <hl@rock-chips.com>
+Signed-off-by: zain wang <wzz@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
 Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 65 +++++++++++++++++-----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  3 +-
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  5 +-
+ 3 files changed, 56 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 5c52307146c7..05a0ca4af057 100644
+index 85dbb1ca9886..bf805f156272 100644
 --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
 +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -819,11 +819,10 @@ static int analogix_dp_config_video(struct analogix_dp_device *dp)
- 		if (analogix_dp_is_slave_video_stream_clock_on(dp) == 0)
- 			break;
- 		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
--			dev_err(dp->dev, "Timeout of video streamclk ok\n");
-+			dev_err(dp->dev, "Timeout of slave video streamclk ok\n");
- 			return -ETIMEDOUT;
- 		}
--
--		usleep_range(1, 2);
-+		usleep_range(1000, 1001);
- 	}
+@@ -43,8 +43,10 @@ struct bridge_init {
+ 	struct device_node *node;
+ };
  
- 	/* Set to use the register calculated M/N video */
-@@ -838,6 +837,9 @@ static int analogix_dp_config_video(struct analogix_dp_device *dp)
- 	/* Configure video slave mode */
- 	analogix_dp_enable_video_master(dp, 0);
- 
-+	/* Enable video */
-+	analogix_dp_start_video(dp);
+-static void analogix_dp_init_dp(struct analogix_dp_device *dp)
++static int analogix_dp_init_dp(struct analogix_dp_device *dp)
+ {
++	int ret;
 +
- 	timeout_loop = 0;
+ 	analogix_dp_reset(dp);
  
- 	for (;;) {
-@@ -948,9 +950,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
- 			DRM_ERROR("failed to enable the panel\n");
+ 	analogix_dp_swreset(dp);
+@@ -56,10 +58,13 @@ static void analogix_dp_init_dp(struct analogix_dp_device *dp)
+ 	analogix_dp_enable_sw_function(dp);
+ 
+ 	analogix_dp_config_interrupt(dp);
+-	analogix_dp_init_analog_func(dp);
++	ret = analogix_dp_init_analog_func(dp);
++	if (ret)
++		return ret;
+ 
+ 	analogix_dp_init_hpd(dp);
+ 	analogix_dp_init_aux(dp);
++	return 0;
+ }
+ 
+ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
+@@ -918,7 +923,7 @@ static irqreturn_t analogix_dp_irq_thread(int irq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void analogix_dp_commit(struct analogix_dp_device *dp)
++static int analogix_dp_commit(struct analogix_dp_device *dp)
+ {
+ 	int ret;
+ 
+@@ -928,11 +933,10 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 			DRM_ERROR("failed to disable the panel\n");
  	}
  
--	/* Enable video */
--	analogix_dp_start_video(dp);
--
+-	ret = readx_poll_timeout(analogix_dp_train_link, dp, ret, !ret, 100,
+-				 DP_TIMEOUT_TRAINING_US * 5);
++	ret = analogix_dp_train_link(dp);
+ 	if (ret) {
+ 		dev_err(dp->dev, "unable to do link train, ret=%d\n", ret);
+-		return;
++		return ret;
+ 	}
+ 
+ 	analogix_dp_enable_scramble(dp, 1);
+@@ -953,6 +957,7 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
  	dp->psr_enable = analogix_dp_detect_sink_psr(dp);
  	if (dp->psr_enable)
  		analogix_dp_enable_sink_psr(dp);
++	return 0;
+ }
+ 
+ /*
+@@ -1149,12 +1154,9 @@ static void analogix_dp_bridge_pre_enable(struct drm_bridge *bridge)
+ 		DRM_ERROR("failed to setup the panel ret = %d\n", ret);
+ }
+ 
+-static void analogix_dp_bridge_enable(struct drm_bridge *bridge)
++static int analogix_dp_set_bridge(struct analogix_dp_device *dp)
+ {
+-	struct analogix_dp_device *dp = bridge->driver_private;
+-
+-	if (dp->dpms_mode == DRM_MODE_DPMS_ON)
+-		return;
++	int ret;
+ 
+ 	pm_runtime_get_sync(dp->dev);
+ 
+@@ -1162,11 +1164,46 @@ static void analogix_dp_bridge_enable(struct drm_bridge *bridge)
+ 		dp->plat_data->power_on(dp->plat_data);
+ 
+ 	phy_power_on(dp->phy);
+-	analogix_dp_init_dp(dp);
++
++	ret = analogix_dp_init_dp(dp);
++	if (ret)
++		goto out_dp_init;
++
++	ret = analogix_dp_commit(dp);
++	if (ret)
++		goto out_dp_init;
++
+ 	enable_irq(dp->irq);
+-	analogix_dp_commit(dp);
++	return 0;
+ 
+-	dp->dpms_mode = DRM_MODE_DPMS_ON;
++out_dp_init:
++	phy_power_off(dp->phy);
++	if (dp->plat_data->power_off)
++		dp->plat_data->power_off(dp->plat_data);
++	pm_runtime_put_sync(dp->dev);
++
++	return ret;
++}
++
++static void analogix_dp_bridge_enable(struct drm_bridge *bridge)
++{
++	struct analogix_dp_device *dp = bridge->driver_private;
++	int timeout_loop = 0;
++
++	if (dp->dpms_mode == DRM_MODE_DPMS_ON)
++		return;
++
++	while (timeout_loop < MAX_PLL_LOCK_LOOP) {
++		if (analogix_dp_set_bridge(dp) == 0) {
++			dp->dpms_mode = DRM_MODE_DPMS_ON;
++			return;
++		}
++		dev_err(dp->dev, "failed to set bridge, retry: %d\n",
++			timeout_loop);
++		timeout_loop++;
++		usleep_range(10, 11);
++	}
++	dev_err(dp->dev, "too many times retry set bridge, give it up\n");
+ }
+ 
+ static void analogix_dp_bridge_disable(struct drm_bridge *bridge)
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index 403ff853464b..769255dc6e99 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -19,6 +19,7 @@
+ #define DP_TIMEOUT_LOOP_COUNT 100
+ #define MAX_CR_LOOP 5
+ #define MAX_EQ_LOOP 5
++#define MAX_PLL_LOCK_LOOP 5
+ 
+ /* Training takes 22ms if AUX channel comm fails. Use this as retry interval */
+ #define DP_TIMEOUT_TRAINING_US			22000
+@@ -197,7 +198,7 @@ void analogix_dp_set_pll_power_down(struct analogix_dp_device *dp, bool enable);
+ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 				       enum analog_power_block block,
+ 				       bool enable);
+-void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
++int analogix_dp_init_analog_func(struct analogix_dp_device *dp);
+ void analogix_dp_init_hpd(struct analogix_dp_device *dp);
+ void analogix_dp_force_hpd(struct analogix_dp_device *dp);
+ enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index e78c861b9e06..b47c5af43560 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -333,7 +333,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 	}
+ }
+ 
+-void analogix_dp_init_analog_func(struct analogix_dp_device *dp)
++int analogix_dp_init_analog_func(struct analogix_dp_device *dp)
+ {
+ 	u32 reg;
+ 	int timeout_loop = 0;
+@@ -355,7 +355,7 @@ void analogix_dp_init_analog_func(struct analogix_dp_device *dp)
+ 			timeout_loop++;
+ 			if (DP_TIMEOUT_LOOP_COUNT < timeout_loop) {
+ 				dev_err(dp->dev, "failed to get pll lock status\n");
+-				return;
++				return -ETIMEDOUT;
+ 			}
+ 			usleep_range(10, 20);
+ 		}
+@@ -366,6 +366,7 @@ void analogix_dp_init_analog_func(struct analogix_dp_device *dp)
+ 	reg &= ~(SERDES_FIFO_FUNC_EN_N | LS_CLK_DOMAIN_FUNC_EN_N
+ 		| AUX_FUNC_EN_N);
+ 	writel(reg, dp->reg_base + ANALOGIX_DP_FUNC_EN_2);
++	return 0;
+ }
+ 
+ void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp)
 -- 
 2.16.3
