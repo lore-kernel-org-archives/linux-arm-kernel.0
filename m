@@ -1,15 +1,15 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 14:35:19 -0700
-Subject: [PATCH v7 10/11] clk: actions: Add pll clock support
-In-Reply-To: <20180326173905.22313-11-manivannan.sadhasivam@linaro.org>
+Date: Fri, 06 Apr 2018 14:35:21 -0700
+Subject: [PATCH v7 11/11] clk: actions: Add S900 SoC clock support
+In-Reply-To: <20180326173905.22313-12-manivannan.sadhasivam@linaro.org>
 References: <20180326173905.22313-1-manivannan.sadhasivam@linaro.org>
- <20180326173905.22313-11-manivannan.sadhasivam@linaro.org>
-Message-ID: <152305051934.94378.17176399365775497479@swboyd.mtv.corp.google.com>
+ <20180326173905.22313-12-manivannan.sadhasivam@linaro.org>
+Message-ID: <152305052178.94378.12754514753260262003@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Manivannan Sadhasivam (2018-03-26 10:39:04)
-> Add support for Actions Semi PLL clock.
+Quoting Manivannan Sadhasivam (2018-03-26 10:39:05)
+> Add Actions Semi S900 SoC clock support.
 > 
 > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > ---
