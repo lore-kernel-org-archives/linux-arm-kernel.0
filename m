@@ -1,26 +1,45 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Apr 2018 11:25:19 +0100
-Subject: [BUG] Fix drivers/memory O= build
-Message-ID: <20180406102519.GN16141@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Apr 2018 11:54:17 +0100
+Subject: [PATCH 03/10] locking/qspinlock: Kill cmpxchg loop when claiming
+ lock from head of queue
+In-Reply-To: <20180405171912.GE4082@hirez.programming.kicks-ass.net>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <1522947547-24081-4-git-send-email-will.deacon@arm.com>
+ <20180405171912.GE4082@hirez.programming.kicks-ass.net>
+Message-ID: <20180406105417.GA27619@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a kernel with split object directories, the following
-failure occurs:
+On Thu, Apr 05, 2018 at 07:19:12PM +0200, Peter Zijlstra wrote:
+> On Thu, Apr 05, 2018 at 05:59:00PM +0100, Will Deacon wrote:
+> > +
+> > +	/* In the PV case we might already have _Q_LOCKED_VAL set */
+> > +	if ((val & _Q_TAIL_MASK) == tail) {
+> >  		/*
+> >  		 * The smp_cond_load_acquire() call above has provided the
+> > +		 * necessary acquire semantics required for locking.
+> >  		 */
+> >  		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
+> >  		if (old == val)
+> > +			goto release; /* No contention */
+> >  	}
+> 
+> --- a/kernel/locking/qspinlock.c
+> +++ b/kernel/locking/qspinlock.c
+> @@ -464,8 +464,7 @@ void queued_spin_lock_slowpath(struct qs
+>  		 * The smp_cond_load_acquire() call above has provided the
+>  		 * necessary acquire semantics required for locking.
+>  		 */
+> -		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
+> -		if (old == val)
+> +		if (atomic_try_cmpxchg_release(&lock->val, &val, _Q_LOCKED_VAL))
+>  			goto release; /* No contention */
+>  	}
+> 
+> Does that also work for you? It would generate slightly better code for
+> x86 (not that it would matter much on this path).
 
-.../drivers/memory/emif-asm-offsets.c:1:0: fatal error: can't open drivers/memory/emif-asm-offsets.s for writing: No such file or directory
-compilation terminated.
-drivers/memory/Makefile.asm-offsets:2: recipe for target 'drivers/memory/emif-asm-offsets.s' failed
-make[2]: *** [drivers/memory/emif-asm-offsets.s] Error 1
-.../Makefile:1060: recipe for target 'arch/arm/mach-omap2' failed
-make[1]: *** [arch/arm/mach-omap2] Error 2
+Assuming you meant to use atomic_try_cmpxchg_relaxed, then that works for
+me too.
 
-This prevents any kernel being built that includes decending into
-arch/arm/mach-omap2 with split object directories.
-
-This is a regression.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Will
