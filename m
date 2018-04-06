@@ -1,55 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Apr 2018 18:50:27 +0100
-Subject: [PATCH 1/5] arm64: entry: isb in el1_irq
-In-Reply-To: <20180406172211.r42reit2bnpocab2@lakrids.cambridge.arm.com>
-References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
- <20180405171800.5648-2-ynorov@caviumnetworks.com>
- <5036b99a-9faa-c220-27dd-e0d73f8b3fc7@arm.com>
- <20180406165402.nq3sabeku2mp3hpb@yury-thinkpad>
- <20180406172211.r42reit2bnpocab2@lakrids.cambridge.arm.com>
-Message-ID: <20180406175027.oxaru6r3zptct7vb@lakrids.cambridge.arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri,  6 Apr 2018 14:02:46 -0400
+Subject: [PATCH 2/2] io: change writeX_relaxed() to remove barriers
+In-Reply-To: <1523037766-14518-1-git-send-email-okaya@codeaurora.org>
+References: <1523037766-14518-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1523037766-14518-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2018 at 06:22:11PM +0100, Mark Rutland wrote:
-> Digging a bit, I also thing that our ct_user_exit and ct_user_enter
-> usage is on dodgy ground today.
-> 
-> For example, in el0_dbg we call do_debug_exception() *before* calling
-> ct_user_exit. Which I believe means we'd use RCU while supposedly in an
-> extended quiescent period, which would be bad.
+Now that we hardened writeX() API in asm-generic version, writeX_relaxed()
+API is violating the rules when writeX_relaxed() == writeX() in the default
+implementation.
 
-It seems this is the case. I can trigger the following by having GDB
-place a SW breakpoint:
+The relaxed API shouldn't have any barriers in it and it doesn't provide
+any ordering with respect to the memory transactions. The only requirement
+is for writes to be ordered with respect to each other. This is achieved
+by the volatile in the __raw_writeX() API.
 
-[   51.217947] =============================
-[   51.217953] WARNING: suspicious RCU usage
-[   51.217961] 4.16.0 #4 Not tainted
-[   51.217966] -----------------------------
-[   51.217974] ./include/linux/rcupdate.h:632 rcu_read_lock() used illegally while idle!
-[   51.217980]
-[   51.217980] other info that might help us debug this:
-[   51.217980]
-[   51.217987]
-[   51.217987] RCU used illegally from idle CPU!
-[   51.217987] rcu_scheduler_active = 2, debug_locks = 1
-[   51.217992] RCU used illegally from extended quiescent state!
-[   51.217999] 1 lock held by ls/2412:
-[   51.218004]  #0:  (rcu_read_lock){....}, at: [<0000000092efbdd5>] brk_handler+0x0/0x198
-[   51.218041]
-[   51.218041] stack backtrace:
-[   51.218049] CPU: 2 PID: 2412 Comm: ls Not tainted 4.16.0 #4
-[   51.218055] Hardware name: ARM Juno development board (r1) (DT)
-[   51.218061] Call trace:
-[   51.218070]  dump_backtrace+0x0/0x1c8
-[   51.218078]  show_stack+0x14/0x20
-[   51.218087]  dump_stack+0xac/0xe4
-[   51.218096]  lockdep_rcu_suspicious+0xcc/0x110
-[   51.218103]  brk_handler+0x144/0x198
-[   51.218110]  do_debug_exception+0x9c/0x190
-[   51.218116]  el0_dbg+0x14/0x20
+Open code the relaxed API and remove any barriers in it.
 
-We will need to fix this before we can fiddle with kick_all_cpus_sync().
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ include/asm-generic/io.h | 24 ++++++++++++++++++++----
+ 1 file changed, 20 insertions(+), 4 deletions(-)
 
-Thanks,
-Mark.
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index fa0975d..f4a1494 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -284,19 +284,35 @@ static inline u64 readq_relaxed(const volatile void __iomem *addr)
+ #endif
+ 
+ #ifndef writeb_relaxed
+-#define writeb_relaxed writeb
++#define writeb_relaxed writeb_relaxed
++static inline void writeb_relaxed(u8 value, volatile void __iomem *addr)
++{
++	__raw_writeb(value, addr);
++}
+ #endif
+ 
+ #ifndef writew_relaxed
+-#define writew_relaxed writew
++#define writew_relaxed writew_relaxed
++static inline void writew_relaxed(u16 value, volatile void __iomem *addr)
++{
++	__raw_writew(cpu_to_le16(value), addr);
++}
+ #endif
+ 
+ #ifndef writel_relaxed
+-#define writel_relaxed writel
++#define writel_relaxed writel_relaxed
++static inline void writel_relaxed(u32 value, volatile void __iomem *addr)
++{
++	__raw_writel(__cpu_to_le32(value), addr);
++}
+ #endif
+ 
+ #if defined(writeq) && !defined(writeq_relaxed)
+-#define writeq_relaxed writeq
++#define writeq_relaxed writeq_relaxed
++static inline void writeq_relaxed(u64 value, volatile void __iomem *addr)
++{
++	__raw_writeq(__cpu_to_le64(value), addr);
++}
+ #endif
+ 
+ /*
+-- 
+2.7.4
