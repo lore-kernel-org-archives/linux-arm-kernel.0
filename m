@@ -1,95 +1,45 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 6 Apr 2018 10:00:33 +0300
-Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add fixed 26MHz clock as fck
- for twl
-In-Reply-To: <1b05ea2c-fa95-e5c7-2a37-4e0b46f62abc@ti.com>
-References: <20180405115239.17370-1-peter.ujfalusi@ti.com>
- <1b05ea2c-fa95-e5c7-2a37-4e0b46f62abc@ti.com>
-Message-ID: <065d346a-12a4-3dc6-d8a3-e5351a73a7ab@ti.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 6 Apr 2018 09:34:41 +0200
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
+References: <20180403154449.2443-1-ssuloev@orpaltech.com>
+ <20180403154449.2443-4-ssuloev@orpaltech.com>
+ <20180404065048.n76r3ytuznd6fqsl@flea>
+ <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
+ <20180405091913.ky4dnmszoobn2xry@flea>
+ <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
+ <20180405131735.GB12349@sirena.org.uk>
+ <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
+Message-ID: <20180406073441.xesojvzc3deljhoy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 05, 2018 at 04:44:16PM +0300, Sergey Suloev wrote:
+> On 04/05/2018 04:17 PM, Mark Brown wrote:
+> > On Thu, Apr 05, 2018 at 12:59:35PM +0300, Sergey Suloev wrote:
+> > > On 04/05/2018 12:19 PM, Maxime Ripard wrote:
+> > > > The point of that patch was precisely to allow to send more data than
+> > > > the FIFO. You're breaking that behaviour without any justification,
+> > > > and this is not ok.
+> > > I am sorry, but you can't. That's a hardware limitation.
+> > Are you positive about that?  Normally you can add things to hardware
+> > FIFOs while they're being drained so so long as you can keep data
+> > flowing in at least as fast as it's being consumed.
+> 
+> Well, normally yes, but this is not the case with the hardware that I own.
+> My a20 (BPiM1+) and a31 (BPiM2) boards behaves differently. With a transfer
+> larger than FIFO then TC interrupt never happens.
 
+Because you're not supposed to have a transfer larger than the FIFO,
+but to have to setup at first a transfer the size of the FIFO, and
+then when it's (or starts to be) depleted, fill it up again.
 
-On 2018-04-05 16:15, Peter Ujfalusi wrote:
-> 
-> 
-> On 2018-04-05 14:52, Peter Ujfalusi wrote:
->> The board uses 26MHz oscillator for the twl4030 HFCLK.
->> This way we will not depend on the bootloader to configure the
->> CFG_BOOT:HFCLK_FREQ
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->> Hi,
->>
->> there might be other boards (all omap3 boards with twl4030?) which uses the same
->> setup, but I only have schematics for beagle-xm.
->>
->> In order for the driver to actually use the clock the 
->> [PATCH] mfd: twl-core: Fix clock initialization
->> need to be applied. W/o the twl-core patch the clock is just ignored.
->>
->> Regards,
->> Peter
->>
->>  arch/arm/boot/dts/omap3-beagle-xm.dts | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> index 0349fcc9dc26..d80587de0bbf 100644
->> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
->> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
->> @@ -30,6 +30,13 @@
->>  		ethernet = &ethernet;
->>  	};
->>  
->> +	/* fixed 26MHz oscillator */
->> +	hfclk_26m: oscillator {
->> +		#clock-cells = <0>;
->> +		compatible = "fixed-clock";
->> +		clock-frequency = <26000000>;
->> +	};
->> +
->>  	leds {
->>  		compatible = "gpio-leds";
->>  
->> @@ -274,6 +281,9 @@
->>  		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
->>  		interrupt-parent = <&intc>;
->>  
->> +		clocks = <&hfclk_26m>;
->> +		clock-names = "fck";
-> 
-> I wonder if we should rename this to hfclk...
-> The DT documentation does not mention it and afaik it is not specified
-> in DT files either.
-> 
-> After all it is the HFCLK clock for the twl4030.
+That's the point of the patch you're reverting, and if it doesn't
+work, you should make it work and not simply revert it.
 
-We should not as it would break compatibility with stable kernels where
-the code expects 'fck' and not hfclk.
+Maxime
 
-> 
-> I'm fine keeping it as 'fck' but it looks a bit weird.
-> 
->> +
->>  		twl_audio: audio {
->>  			compatible = "ti,twl4030-audio";
->>  			codec {
->>
-> 
-> - P?ter
-> 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-- P?ter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
