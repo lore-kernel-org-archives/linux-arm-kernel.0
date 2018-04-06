@@ -1,43 +1,116 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Apr 2018 19:55:06 +0100
-Subject: [BUG] Fix drivers/memory O= build
-In-Reply-To: <06568f5b-3e4a-f761-7242-85dcc8aeb6a5@oracle.com>
-References: <20180406102519.GN16141@n2100.armlinux.org.uk>
- <20180406164615.GL5700@atomide.com>
- <06568f5b-3e4a-f761-7242-85dcc8aeb6a5@oracle.com>
-Message-ID: <20180406185505.GD10990@n2100.armlinux.org.uk>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Fri,  6 Apr 2018 12:53:54 -0700
+Subject: [PATCH v4] net: thunderx: rework mac addresses list to u64 array
+In-Reply-To: <20180406140443.15181-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180406140443.15181-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2018 at 11:45:01AM -0700, Santosh Shilimkar wrote:
-> On 4/6/2018 9:46 AM, Tony Lindgren wrote:
-> >* Russell King - ARM Linux <linux@armlinux.org.uk> [180406 03:27]:
-> >>When building a kernel with split object directories, the following
-> >>failure occurs:
-> >>
-> >>.../drivers/memory/emif-asm-offsets.c:1:0: fatal error: can't open drivers/memory/emif-asm-offsets.s for writing: No such file or directory
-> >>compilation terminated.
-> >>drivers/memory/Makefile.asm-offsets:2: recipe for target 'drivers/memory/emif-asm-offsets.s' failed
-> >>make[2]: *** [drivers/memory/emif-asm-offsets.s] Error 1
-> >>.../Makefile:1060: recipe for target 'arch/arm/mach-omap2' failed
-> >>make[1]: *** [arch/arm/mach-omap2] Error 2
-> >>
-> >>This prevents any kernel being built that includes decending into
-> >>arch/arm/mach-omap2 with split object directories.
-> >>
-> >>This is a regression.
-> >
-> >Dave, I presume you're looking into this already?
-> >
-> Fix is already posted by 'Anders Roxell <anders.roxell@linaro.org>'
-> You are copied on the email Tony.
+From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-Arnd also has a fix for it as well, which moves emif-asm-offsets.s
-into include/generated, as that will always exist prior to these
-rules being invoked.  Arnd's passing it through his randconfig
-builder before publishing it.
+It is too expensive to pass u64 values via linked list, instead
+allocate array for them by overall number of mac addresses from netdev.
 
+This eventually removes multiple kmalloc() calls, aviod memory
+fragmentation and allow to put single null check on kmalloc
+return value in order to prevent a potential null pointer dereference.
+
+Addresses-Coverity-ID: 1467429 ("Dereference null return value")
+Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+---
+Changes from v1 to v2:
+ - C99 syntax: update xcast_addr_list struct field mc[0] -> mc[];
+Changes from v2 to v3:
+ - update commit description with 'Reported-by: Dan Carpenter';
+ - update size calculations for mc list to offsetof() call
+   instead of explicit arithmetic;
+Changes from v3 to v4:
+ - change loop control variable type from u8 to int, accordingly
+   to mc_count size;
+---
+ drivers/net/ethernet/cavium/thunder/nic.h        |  7 +-----
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 28 +++++++++---------------
+ 2 files changed, 11 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 5fc46c5..448d1fa 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -265,14 +265,9 @@ struct nicvf_drv_stats {
+ 
+ struct cavium_ptp;
+ 
+-struct xcast_addr {
+-	struct list_head list;
+-	u64              addr;
+-};
+-
+ struct xcast_addr_list {
+-	struct list_head list;
+ 	int              count;
++	u64              mc[];
+ };
+ 
+ struct nicvf_work {
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 1e9a31f..6bd5658 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 						  work.work);
+ 	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
+ 	union nic_mbx mbx = {};
+-	struct xcast_addr *xaddr, *next;
++	int idx = 0;
+ 
+ 	if (!vf_work)
+ 		return;
+@@ -1956,16 +1956,10 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 	/* check if we have any specific MACs to be added to PF DMAC filter */
+ 	if (vf_work->mc) {
+ 		/* now go through kernel list of MACs and add them one by one */
+-		list_for_each_entry_safe(xaddr, next,
+-					 &vf_work->mc->list, list) {
++		for (idx = 0; idx < vf_work->mc->count; idx++) {
+ 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
+-			mbx.xcast.data.mac = xaddr->addr;
++			mbx.xcast.data.mac = vf_work->mc->mc[idx];
+ 			nicvf_send_msg_to_pf(nic, &mbx);
+-
+-			/* after receiving ACK from PF release memory */
+-			list_del(&xaddr->list);
+-			kfree(xaddr);
+-			vf_work->mc->count--;
+ 		}
+ 		kfree(vf_work->mc);
+ 	}
+@@ -1996,17 +1990,15 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
+ 			mode |= BGX_XCAST_MCAST_FILTER;
+ 			/* here we need to copy mc addrs */
+ 			if (netdev_mc_count(netdev)) {
+-				struct xcast_addr *xaddr;
+-
+-				mc_list = kmalloc(sizeof(*mc_list), GFP_ATOMIC);
+-				INIT_LIST_HEAD(&mc_list->list);
++				mc_list = kmalloc(offsetof(typeof(*mc_list),
++							   mc[netdev_mc_count(netdev)]),
++						  GFP_ATOMIC);
++				if (unlikely(!mc_list))
++					return;
++				mc_list->count = 0;
+ 				netdev_hw_addr_list_for_each(ha, &netdev->mc) {
+-					xaddr = kmalloc(sizeof(*xaddr),
+-							GFP_ATOMIC);
+-					xaddr->addr =
++					mc_list->mc[mc_list->count] =
+ 						ether_addr_to_u64(ha->addr);
+-					list_add_tail(&xaddr->list,
+-						      &mc_list->list);
+ 					mc_list->count++;
+ 				}
+ 			}
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+1.8.3.1
