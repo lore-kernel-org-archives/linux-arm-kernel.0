@@ -1,94 +1,277 @@
 From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Fri,  6 Apr 2018 16:39:38 +0200
-Subject: [PATCH v5 2/3] ARM: ftrace/recordmcount: filter relocation types
+Date: Fri,  6 Apr 2018 16:39:39 +0200
+Subject: [PATCH v5 3/3] ARM: ftrace: Add MODULE_PLTS support
 In-Reply-To: <20180406143939.14642-1-alexander.sverdlin@nokia.com>
 References: <20180406143939.14642-1-alexander.sverdlin@nokia.com>
-Message-ID: <20180406143939.14642-3-alexander.sverdlin@nokia.com>
+Message-ID: <20180406143939.14642-4-alexander.sverdlin@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If code in arch/arm/kernel/ftrace.c would operate on mcount() pointer the
-following may be generated:
+Teach ftrace_make_call() and ftrace_make_nop() about PLTs.
+Teach PLT code about FTRACE and all its callbacks.
+Otherwise the following might happen:
 
-00000230 <prealloc_fixed_plts>:
- 230:   b5f8            push    {r3, r4, r5, r6, r7, lr}
- 232:   b500            push    {lr}
- 234:   f7ff fffe       bl      0 <__gnu_mcount_nc>
-                        234: R_ARM_THM_CALL     __gnu_mcount_nc
- 238:   f240 0600       movw    r6, #0
-                        238: R_ARM_THM_MOVW_ABS_NC      __gnu_mcount_nc
- 23c:   f8d0 1180       ldr.w   r1, [r0, #384]  ; 0x180
-
-FTRACE currently is not able to deal with it:
-
-WARNING: CPU: 0 PID: 0 at .../kernel/trace/ftrace.c:1979 ftrace_bug+0x1ad/0x230()
+------------[ cut here ]------------
+WARNING: CPU: 14 PID: 2265 at .../arch/arm/kernel/insn.c:14 __arm_gen_branch+0x83/0x8c()
 ...
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.4.116-... #1
+Hardware name: LSI Axxia AXM55XX
+[<c0314a49>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
+[<c03115e9>] (show_stack) from [<c0519f51>] (dump_stack+0x81/0xa8)
+[<c0519f51>] (dump_stack) from [<c032185d>] (warn_slowpath_common+0x69/0x90)
+[<c032185d>] (warn_slowpath_common) from [<c03218f3>] (warn_slowpath_null+0x17/0x1c)
+[<c03218f3>] (warn_slowpath_null) from [<c03143cf>] (__arm_gen_branch+0x83/0x8c)
+[<c03143cf>] (__arm_gen_branch) from [<c0314337>] (ftrace_make_nop+0xf/0x24)
+[<c0314337>] (ftrace_make_nop) from [<c038ebcb>] (ftrace_process_locs+0x27b/0x3e8)
+[<c038ebcb>] (ftrace_process_locs) from [<c0378d79>] (load_module+0x11e9/0x1a44)
+[<c0378d79>] (load_module) from [<c037974d>] (SyS_finit_module+0x59/0x84)
+[<c037974d>] (SyS_finit_module) from [<c030e981>] (ret_fast_syscall+0x1/0x18)
+---[ end trace e1b64ced7a89adcc ]---
+------------[ cut here ]------------
+WARNING: CPU: 14 PID: 2265 at .../kernel/trace/ftrace.c:1979 ftrace_bug+0x1b1/0x234()
 ...
-[<c0314e3d>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
-[<c03115e9>] (show_stack) from [<c051a7f1>] (dump_stack+0x81/0xa8)
-[<c051a7f1>] (dump_stack) from [<c0321c5d>] (warn_slowpath_common+0x69/0x90)
-[<c0321c5d>] (warn_slowpath_common) from [<c0321cf3>] (warn_slowpath_null+0x17/0x1c)
-[<c0321cf3>] (warn_slowpath_null) from [<c038ee9d>] (ftrace_bug+0x1ad/0x230)
-[<c038ee9d>] (ftrace_bug) from [<c038f1f9>] (ftrace_process_locs+0x27d/0x444)
-[<c038f1f9>] (ftrace_process_locs) from [<c08915bd>] (ftrace_init+0x91/0xe8)
-[<c08915bd>] (ftrace_init) from [<c0885a67>] (start_kernel+0x34b/0x358)
-[<c0885a67>] (start_kernel) from [<00308095>] (0x308095)
----[ end trace cb88537fdc8fa200 ]---
-ftrace failed to modify [<c031266c>] prealloc_fixed_plts+0x8/0x60
- actual: 44:f2:e1:36
+Hardware name: LSI Axxia AXM55XX
+[<c0314a49>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
+[<c03115e9>] (show_stack) from [<c0519f51>] (dump_stack+0x81/0xa8)
+[<c0519f51>] (dump_stack) from [<c032185d>] (warn_slowpath_common+0x69/0x90)
+[<c032185d>] (warn_slowpath_common) from [<c03218f3>] (warn_slowpath_null+0x17/0x1c)
+[<c03218f3>] (warn_slowpath_null) from [<c038e87d>] (ftrace_bug+0x1b1/0x234)
+[<c038e87d>] (ftrace_bug) from [<c038ebd5>] (ftrace_process_locs+0x285/0x3e8)
+[<c038ebd5>] (ftrace_process_locs) from [<c0378d79>] (load_module+0x11e9/0x1a44)
+[<c0378d79>] (load_module) from [<c037974d>] (SyS_finit_module+0x59/0x84)
+[<c037974d>] (SyS_finit_module) from [<c030e981>] (ret_fast_syscall+0x1/0x18)
+---[ end trace e1b64ced7a89adcd ]---
+ftrace failed to modify [<e9ef7006>] 0xe9ef7006
+actual: 02:f0:3b:fa
 ftrace record flags: 0
- (0)   expected tramp: c03143e9
-
-Fix this by allowing only selected reloc types in __mcount_loc.
-The list itself comes from the legacy recordmcount.pl script.
+(0) expected tramp: c0314265
 
 Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
 ---
- scripts/recordmcount.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/include/asm/ftrace.h |  3 +++
+ arch/arm/include/asm/module.h |  1 +
+ arch/arm/kernel/ftrace.c      | 62 ++++++++++++++++++++++++++++++++++++-------
+ arch/arm/kernel/module-plts.c | 48 ++++++++++++++++++++++++++++++---
+ 4 files changed, 101 insertions(+), 13 deletions(-)
 
-diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
-index 16e086d..a4888e9 100644
---- a/scripts/recordmcount.c
-+++ b/scripts/recordmcount.c
-@@ -53,6 +53,10 @@
- #define R_AARCH64_ABS64	257
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index 9e842ff..faeb6b1 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -19,6 +19,9 @@ struct dyn_arch_ftrace {
+ #ifdef CONFIG_OLD_MCOUNT
+ 	bool	old_mcount;
  #endif
++#ifdef CONFIG_ARM_MODULE_PLTS
++	struct module *mod;
++#endif
+ };
  
-+#define R_ARM_PC24		1
-+#define R_ARM_THM_CALL		10
-+#define R_ARM_CALL		28
+ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+index 6996405..e3d7a51 100644
+--- a/arch/arm/include/asm/module.h
++++ b/arch/arm/include/asm/module.h
+@@ -30,6 +30,7 @@ struct plt_entries {
+ 
+ struct mod_plt_sec {
+ 	struct elf32_shdr	*plt;
++	struct plt_entries	*plt_ent;
+ 	int			plt_count;
+ };
+ 
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index 5617932..b55355f 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -98,6 +98,19 @@ int ftrace_arch_code_modify_post_process(void)
+ 
+ static unsigned long ftrace_call_replace(unsigned long pc, unsigned long addr)
+ {
++	s32 offset = addr - pc;
++	s32 blim = 0xfe000008;
++	s32 flim = 0x02000004;
 +
- static int fd_map;	/* File descriptor for file being modified. */
- static int mmap_failed; /* Boolean flag. */
- static char gpfx;	/* prefix for global symbol name (sometimes '_') */
-@@ -428,6 +432,18 @@ is_mcounted_section_name(char const *const txtname)
- #define RECORD_MCOUNT_64
- #include "recordmcount.h"
- 
-+static int arm_is_fake_mcount(Elf32_Rel const *rp)
-+{
-+	switch (ELF32_R_TYPE(w(rp->r_info))) {
-+	case R_ARM_THM_CALL:
-+	case R_ARM_CALL:
-+	case R_ARM_PC24:
-+		return 0;
++	if (IS_ENABLED(CONFIG_THUMB2_KERNEL)) {
++		blim = 0xff000004;
++		flim = 0x01000002;
 +	}
 +
-+	return 1;
++	if (IS_ENABLED(CONFIG_ARM_MODULE_PLTS) &&
++	    (offset < blim || offset > flim))
++		return 0;
++
+ 	return arm_gen_branch_link(pc, addr);
+ }
+ 
+@@ -166,10 +179,22 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ {
+ 	unsigned long new, old;
+ 	unsigned long ip = rec->ip;
++	unsigned long aaddr = adjust_address(rec, addr);
+ 
+ 	old = ftrace_nop_replace(rec);
+ 
+-	new = ftrace_call_replace(ip, adjust_address(rec, addr));
++	new = ftrace_call_replace(ip, aaddr);
++
++#ifdef CONFIG_ARM_MODULE_PLTS
++	if (!new) {
++		struct module *mod = rec->arch.mod;
++
++		if (mod) {
++			aaddr = get_module_plt(mod, ip, aaddr);
++			new = ftrace_call_replace(ip, aaddr);
++		}
++	}
++#endif
+ 
+ 	return ftrace_modify_code(rec->ip, old, new, true);
+ }
+@@ -199,20 +224,39 @@ int ftrace_make_nop(struct module *mod,
+ 	unsigned long new;
+ 	int ret;
+ 
+-	old = ftrace_call_replace(ip, adjust_address(rec, addr));
+-	new = ftrace_nop_replace(rec);
+-	ret = ftrace_modify_code(ip, old, new, true);
++#ifdef CONFIG_ARM_MODULE_PLTS
++	/* mod is only supplied during module loading */
++	if (!mod)
++		mod = rec->arch.mod;
++	else
++		rec->arch.mod = mod;
++#endif
+ 
+-#ifdef CONFIG_OLD_MCOUNT
+-	if (ret == -EINVAL && addr == MCOUNT_ADDR) {
+-		rec->arch.old_mcount = true;
++	for (;;) {
++		unsigned long aaddr = adjust_address(rec, addr);
++
++		old = ftrace_call_replace(ip, aaddr);
++
++#ifdef CONFIG_ARM_MODULE_PLTS
++		if (!old && mod) {
++			aaddr = get_module_plt(mod, ip, aaddr);
++			old = ftrace_call_replace(ip, aaddr);
++		}
++#endif
+ 
+-		old = ftrace_call_replace(ip, adjust_address(rec, addr));
+ 		new = ftrace_nop_replace(rec);
+ 		ret = ftrace_modify_code(ip, old, new, true);
+-	}
++
++#ifdef CONFIG_OLD_MCOUNT
++		if (ret == -EINVAL && !rec->arch.old_mcount) {
++			rec->arch.old_mcount = true;
++			continue;
++		}
+ #endif
+ 
++		break;
++	}
++
+ 	return ret;
+ }
+ 
+diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
+index f272711..da9a8a3 100644
+--- a/arch/arm/kernel/module-plts.c
++++ b/arch/arm/kernel/module-plts.c
+@@ -7,6 +7,7 @@
+  */
+ 
+ #include <linux/elf.h>
++#include <linux/ftrace.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/sort.h>
+@@ -22,19 +23,56 @@
+ 						    (PLT_ENT_STRIDE - 8))
+ #endif
+ 
++static const u32 fixed_plts[] = {
++#ifdef CONFIG_FUNCTION_TRACER
++	FTRACE_ADDR,
++	MCOUNT_ADDR,
++#endif
++#ifdef CONFIG_OLD_MCOUNT
++	(unsigned long)ftrace_caller_old,
++	(unsigned long)mcount,
++#endif
++};
++
+ static bool in_init(const struct module *mod, unsigned long loc)
+ {
+ 	return loc - (u32)mod->init_layout.base < mod->init_layout.size;
+ }
+ 
++static void prealloc_fixed(struct mod_plt_sec *pltsec, struct plt_entries *plt)
++{
++	int i;
++
++	if (!ARRAY_SIZE(fixed_plts) || pltsec->plt_count)
++		return;
++	pltsec->plt_count = ARRAY_SIZE(fixed_plts);
++
++	for (i = 0; i < ARRAY_SIZE(plt->ldr); ++i)
++		plt->ldr[i] = PLT_ENT_LDR;
++
++	BUILD_BUG_ON(sizeof(fixed_plts) > sizeof(plt->lit));
++	memcpy(plt->lit, fixed_plts, sizeof(fixed_plts));
 +}
 +
- /* 64-bit EM_MIPS has weird ELF64_Rela.r_info.
-  * http://techpubs.sgi.com/library/manuals/4000/007-4658-001/pdf/007-4658-001.pdf
-  * We interpret Table 29 Relocation Operation (Elf64_Rel, Elf64_Rela) [p.40]
-@@ -529,6 +545,7 @@ do_file(char const *const fname)
- 			 altmcount = "__gnu_mcount_nc";
- 			 make_nop = make_nop_arm;
- 			 rel_type_nop = R_ARM_NONE;
-+			 is_fake_mcount32 = arm_is_fake_mcount;
- 			 break;
- 	case EM_AARCH64:
- 			reltype = R_AARCH64_ABS64;
+ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+ {
+ 	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+ 							  &mod->arch.init;
++	struct plt_entries *plt;
++	int idx;
++
++	/* cache the address, ELF header is available only during module load */
++	if (!pltsec->plt_ent)
++		pltsec->plt_ent = (struct plt_entries *)pltsec->plt->sh_addr;
++	plt = pltsec->plt_ent;
+ 
+-	struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
+-	int idx = 0;
++	prealloc_fixed(pltsec, plt);
++
++	for (idx = 0; idx < ARRAY_SIZE(fixed_plts); ++idx)
++		if (plt->lit[idx] == val)
++			return (u32)&plt->ldr[idx];
+ 
++	idx = 0;
+ 	/*
+ 	 * Look for an existing entry pointing to 'val'. Given that the
+ 	 * relocations are sorted, this will be the last entry we allocated.
+@@ -182,8 +220,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 			      char *secstrings, struct module *mod)
+ {
+-	unsigned long core_plts = 0;
+-	unsigned long init_plts = 0;
++	unsigned long core_plts = ARRAY_SIZE(fixed_plts);
++	unsigned long init_plts = ARRAY_SIZE(fixed_plts);
+ 	Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
+ 	Elf32_Sym *syms = NULL;
+ 
+@@ -238,6 +276,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	mod->arch.core.plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
+ 					       sizeof(struct plt_entries));
+ 	mod->arch.core.plt_count = 0;
++	mod->arch.core.plt_ent = NULL;
+ 
+ 	mod->arch.init.plt->sh_type = SHT_NOBITS;
+ 	mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+@@ -245,6 +284,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	mod->arch.init.plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
+ 					       sizeof(struct plt_entries));
+ 	mod->arch.init.plt_count = 0;
++	mod->arch.init.plt_ent = NULL;
+ 
+ 	pr_debug("%s: plt=%x, init.plt=%x\n", __func__,
+ 		 mod->arch.core.plt->sh_size, mod->arch.init.plt->sh_size);
 -- 
 2.4.6
