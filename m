@@ -1,72 +1,74 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Fri, 06 Apr 2018 08:50:50 -0400
-Subject: [PATCH v4 1/5] io: define several IO & PIO barrier types for the
- asm-generic version
-In-Reply-To: <CAK8P3a0Ahf9uuXYy0fxdC5_O84gmSqTUsP6xjpGQFE8n1Tw7HA@mail.gmail.com>
-References: <1522933753-19589-1-git-send-email-okaya@codeaurora.org>
- <CAK8P3a0Ahf9uuXYy0fxdC5_O84gmSqTUsP6xjpGQFE8n1Tw7HA@mail.gmail.com>
-Message-ID: <fa0b02f16cb4cb993775518fabccfb2d@codeaurora.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 6 Apr 2018 18:26:24 +0530
+Subject: [PATCH v2 2/2] mailbox: add STMicroelectronics STM32 IPCC driver
+In-Reply-To: <4a2170b7-e5e9-4f5c-8ff7-79e102a658c1@st.com>
+References: <1520852307-26659-1-git-send-email-fabien.dessenne@st.com>
+ <1520852307-26659-3-git-send-email-fabien.dessenne@st.com>
+ <CABb+yY1x7J_oEgU-LR5jPYCoCoUHng84E+CibTxLzdtxhENTBw@mail.gmail.com>
+ <4a2170b7-e5e9-4f5c-8ff7-79e102a658c1@st.com>
+Message-ID: <CABb+yY182+7xMbGCurzqxyoGFCRZn4_xKr3AvTQ2c+KyR1vx_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-06 06:19, Arnd Bergmann wrote:
-> On Thu, Apr 5, 2018 at 3:09 PM, Sinan Kaya <okaya@codeaurora.org> 
-> wrote:
->> Getting ready to harden readX()/writeX() and inX()/outX() semantics 
->> for the
->> generic implementation.
->> 
->> Defining two set of macros as __io_br() and __io_ar() to indicate 
->> actions
->> to be taken before and after MMIO read.
->> 
->> Defining two set of macros as __io_bw() and __io_aw() to indicate 
->> actions
->> to be taken before and after MMIO write.
->> 
->> Defining two set of macros as __io_pbw() and __io_paw() to indicate 
->> actions
->> to be taken before and after Port IO write.
->> 
->> Defining two set of macros as __io_pbr() and __io_par() to indicate 
->> actions
->> to be taken before and after Port IO read.
->> 
->> If rmb() is available for the architecture, prefer rmb() as the 
->> default
->> implementation of __io_ar()/__io_par().
->> 
->> If wmb() is available for the architecture, prefer wmb() as the 
->> default
->> implementation of __io_bw()/__io_pbw().
->> 
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> 
-> I've applied the series to my asm-generic tree now, I will give it a 
-> few days
-> in linux-next to see if any obvious regressions happen, and then send
-> a pull request.
-> 
-> Checking the list of architectures that are affected by this, I see
-> h8300, microblaze, nios2, openrisc, s390, sparc, um, unicore32,
-> and xtensa, all of which use asm-generic/io.h without overriding
-> the default readl/writel.
-> 
-> I would guess that at least s390 doesn't need the barriers
-> (maintainers on Cc now), but there may be others that want to
-> override the new barriers with weaker ones where an MMIO
-> access is guaranteed to serialize against DMA, or where
-> a specialized barrier for this case exists.
-> 
-> Looking over the asm-generic implementation once more now,
-> I wonder if we should change the relaxed accessors to not have
-> any barriers (back to the version before your series) rather than
-> defaulting them to having the same barriers as the regular
-> readl/writel.
-
-I can do a follow up patch. You want to map them to raw api without any 
-barriers as before. Right?
+On Fri, Apr 6, 2018 at 5:59 PM, Fabien DESSENNE <fabien.dessenne@st.com> wrote:
+> Hi
+>
+>
+> On 05/04/18 11:38, Jassi Brar wrote:
+>> On Mon, Mar 12, 2018 at 4:28 PM, Fabien Dessenne <fabien.dessenne@st.com> wrote:
+>> ....
+>>> +
+>>> +       /* irq */
+>>> +       for (i = 0; i < IPCC_IRQ_NUM; i++) {
+>>> +               ipcc->irqs[i] = of_irq_get_byname(dev->of_node, irq_name[i]);
+>>> +               if (ipcc->irqs[i] < 0) {
+>>> +                       dev_err(dev, "no IRQ specified %s\n", irq_name[i]);
+>>> +                       ret = ipcc->irqs[i];
+>>> +                       goto err_clk;
+>>> +               }
+>>> +
+>>> +               ret = devm_request_threaded_irq(dev, ipcc->irqs[i], NULL,
+>>> +                                               irq_thread[i], IRQF_ONESHOT,
+>>> +                                               dev_name(dev), ipcc);
+>>>
+>> In your interrupt handlers you don't do anything that could block.
+>> Threads only adds some delay to your message handling.
+>> So maybe use devm_request_irq() ?
+>
+> The interrupt handlers call mbox_chan_received_data() /
+> mbox_chan_txdone(), which call in turn client's rx_callback() /
+> tx_done() / tx_prepare() which behavior may be unsafe. Hence, using a
+> threaded irq here seems to be a good choice.
+>
+rx_callback() is supposed to be atomic. So was tx_done() but some
+platforms needed preparing for the message to be sent. Your client is
+not going to be used by other platforms or even over other
+controllers, so if your prepare is NULL/atomic, you should assume
+tx_done to be atomic and not lose performace. If time comes to fix it,
+we'll move prepare() out of the atomic path.
 
 
-> 
->      Arnd
+>> .......
+>>> +
+>>> +static struct platform_driver stm32_ipcc_driver = {
+>>> +       .driver = {
+>>> +               .name = "stm32-ipcc",
+>>> +               .owner = THIS_MODULE,
+>>>
+>> No need of owner here these days.
+>
+> OK, I will suppress it.
+>
+>> And also maybe use readl/writel, instead of _relaxed.
+>
+> The IPCC device is exclusively used on ARM. In ARM architecture, the
+> ioremap on devices are strictly ordered and uncached.
+> In that case, using _relaxed avoids an unneeded cache flush, slightly
+> improving performance.
+>
+Its not the portability, but that the impact is negligible in favor of
+_relaxed() version when all you do is just program some registers and
+not heavy duty i/o. But I am ok either way.  You'd gain far more
+performance handling irqs in non-threaded manner :)
+
+Cheers!
