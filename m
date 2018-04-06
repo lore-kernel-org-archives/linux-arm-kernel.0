@@ -1,90 +1,40 @@
-From: andrea.parri@amarulasolutions.com (Andrea Parri)
-Date: Fri, 6 Apr 2018 15:05:12 +0200
-Subject: [PATCH 10/10] locking/qspinlock: Elide back-to-back RELEASE
- operations with smp_wmb()
-In-Reply-To: <20180406113436.GC27619@arm.com>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <1522947547-24081-11-git-send-email-will.deacon@arm.com>
- <20180405172808.GG4082@hirez.programming.kicks-ass.net>
- <20180406113436.GC27619@arm.com>
-Message-ID: <20180406130512.GA6631@andrea>
+From: sricharan@codeaurora.org (sricharan at codeaurora.org)
+Date: Fri, 06 Apr 2018 18:35:49 +0530
+Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
+ data
+In-Reply-To: <20180406045511.hnzxe4nepl5sqmld@localhost>
+References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
+ <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
+ <20180320143131.4eenixtbhciq5fwc@localhost>
+ <20180329143715.GA31757@hector.attlocal.net>
+ <20180329163739.2fg5qxvb5j3fiy6r@localhost>
+ <4073ec6b457cb369a83c710d0ae453b4@codeaurora.org>
+ <20180406045511.hnzxe4nepl5sqmld@localhost>
+Message-ID: <7dc41c73f594918701c21075dde30870@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Fri, Apr 06, 2018 at 12:34:36PM +0100, Will Deacon wrote:
-> On Thu, Apr 05, 2018 at 07:28:08PM +0200, Peter Zijlstra wrote:
-> > On Thu, Apr 05, 2018 at 05:59:07PM +0100, Will Deacon wrote:
-> > > @@ -340,12 +341,17 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
-> > >  		goto release;
-> > >  
-> > >  	/*
-> > > +	 * Ensure that the initialisation of @node is complete before we
-> > > +	 * publish the updated tail and potentially link @node into the
-> > > +	 * waitqueue.
-> > > +	 */
-> > > +	smp_wmb();
-> > 
-> > Maybe an explicit note to where the matching barrier lives..
+On 2018-04-06 10:25, Richard Cochran wrote:
+> On Mon, Apr 02, 2018 at 03:28:47PM +0530, sricharan at codeaurora.org 
+> wrote:
+>>   Yes, i will post another series for ipq806[2/4] updates and the
+>> corresponding
+>>   boards after this.
 > 
-> Oh man, that's not a simple thing to write: there isn't a matching barrier!
+> I tried mainline on the ap148 using qcom_defconfig and the
+> qcom-ipq8064-ap148.dtb, and it doesn't boot FYI.
 > 
-> Instead, we rely on dependency ordering for two cases:
-> 
->   * We access a node by decoding the tail we get back from the xchg
-> 
-> - or -
-> 
->   * We access a node by following our own ->next pointer
-> 
-> I could say something like:
-> 
->   "Pairs with dependency ordering from both xchg_tail and explicit
->    dereferences of node->next"
-> 
-> but it's a bit cryptic :(
 
-Agreed. ;)  It might be helpful to instead include a snippet to highlight
-the interested memory accesses/dependencies; IIUC,
-
-/*
- * Pairs with dependency ordering from both xchg_tail and explicit/?
- * dereferences of node->next:
- *
- *   CPU0
- *
- *   /* get node0, encode node0 in tail */
- *   pv_init_node(node0);
- *     ((struct pv_node *)node0)->cpu   = smp_processor_id();
- *     ((struct pv_node *)node0)->state = vcpu_running;
-
- *   smp_wmb();
- *   old = xchg_tail(lock, tail);
- *
- *   CPU1:
- *
- *   /* get node1, encode tail from node1 */
- *   old = xchg_tail(lock, tail);   // = tail corresponding to node0
- *                                  // head an addr. dependency
- *   /* decode old in prev */
- *   pv_wait_node(node1, prev);
- *     READ ((struct pv_node *)prev)->cpu   // addr. dependent read
- *     READ ((struct pv_node *)prev)->state // addr. dependend read
- *
- * [More details for the case "following our own ->next pointer" you
- *  mentioned dabove.]
- */
-
-CPU1 would also have:
-
-   WRITE_ONCE(prev->next, node1); // addr. dependent write
-
-but I'm not sure how this pairs: does this belong to the the second
-case above? can you elaborate on that?
-
-  Andrea
+  I tried booting mainline built with qcom_defconfig on ap148 and
+  did boot. Not sure if your bootloader's bootarg is this,
+   'console=ttyMSM0,115200n8' ?
 
 
-> 
-> Will
+  root@(none):/# cat /proc/version
+  Linux version 4.16.0 (srichara at srichara-linux) (gcc version 6.3.1 
+20170109 (Linaro GCC 6.3-2017.02)) #1691 SMP PREEMPT Fri Apr 6 15:30:45 
+IST 2018
+  root@(none):/#
+
+Regards,
+  Sricharan
