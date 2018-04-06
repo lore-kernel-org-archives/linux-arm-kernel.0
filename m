@@ -1,50 +1,62 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Fri,  6 Apr 2018 16:55:34 +0200
-Subject: [PATCH v4 4/6] PCI: aardvark: Fix PCIe Max Read Request Size setting
+Date: Fri,  6 Apr 2018 16:55:31 +0200
+Subject: [PATCH v4 1/6] PCI: aardvark: Fix logic in advk_pcie_{rd,wr}_conf()
 In-Reply-To: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
 References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180406145536.19637-5-thomas.petazzoni@bootlin.com>
+Message-ID: <20180406145536.19637-2-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Evan Wang <xswang@marvell.com>
+From: Victor Gu <xigu@marvell.com>
 
-There is an obvious typo issue in the definition of the PCIe maximum
-read request size: a bit shift is directly used as a value, while it
-should be used to shift the correct value.
+The PCI configuration space read/write functions were special casing
+the situation where PCI_SLOT(devfn) != 0, and returned
+PCIBIOS_DEVICE_NOT_FOUND in this case.
+
+However, while this is what is intended for the root bus, it is not
+intended for the child busses, as it prevents discovering devices with
+PCI_SLOT(x) != 0. Therefore, we return PCIBIOS_DEVICE_NOT_FOUND only
+if we're on the root bus.
 
 Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
 Cc: <stable@vger.kernel.org>
-Signed-off-by: Evan Wang <xswang@marvell.com>
-Reviewed-by: Victor Gu <xigu@marvell.com>
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
 Reviewed-by: Nadav Haklai <nadavh@marvell.com>
 [Thomas: tweak commit log.]
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 ---
- drivers/pci/host/pci-aardvark.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Changes since v3:
+ - Change to no longer depend on the introduction of
+   advk_pcie_valid_device(), which we do not want to push to stable.
+Changes since v2:
+ - The logic has been factorized into a advk_pcie_valid_device()
+   helper in a previous patch, so this patch was adjusted accordingly.
+---
+ drivers/pci/host/pci-aardvark.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 7a0ddb709052..9abf549631b4 100644
+index b04d37b3c5de..b72f15c99793 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -29,6 +29,7 @@
- #define     PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT	5
- #define     PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE		(0 << 11)
- #define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT	12
-+#define     PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ		0x2
- #define PCIE_CORE_LINK_CTRL_STAT_REG				0xd0
- #define     PCIE_CORE_LINK_L0S_ENTRY				BIT(0)
- #define     PCIE_CORE_LINK_TRAINING				BIT(5)
-@@ -295,7 +296,8 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
- 	reg = PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE |
- 		(7 << PCIE_CORE_DEV_CTRL_STATS_MAX_PAYLOAD_SZ_SHIFT) |
- 		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE |
--		PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT;
-+		(PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SZ <<
-+		 PCIE_CORE_DEV_CTRL_STATS_MAX_RD_REQ_SIZE_SHIFT);
- 	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
+@@ -437,7 +437,7 @@ static int advk_pcie_rd_conf(struct pci_bus *bus, u32 devfn,
+ 	u32 reg;
+ 	int ret;
  
- 	/* Program PCIe Control 2 to disable strict ordering */
+-	if (PCI_SLOT(devfn) != 0) {
++	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
+@@ -491,7 +491,7 @@ static int advk_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	int offset;
+ 	int ret;
+ 
+-	if (PCI_SLOT(devfn) != 0)
++	if ((bus->number == pcie->root_bus_nr) && PCI_SLOT(devfn) != 0)
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+ 	if (where % size)
 -- 
 2.14.3
