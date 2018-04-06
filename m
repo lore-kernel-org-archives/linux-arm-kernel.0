@@ -1,33 +1,46 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 09:46:20 -0700
-Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
- DA850 PSC
-In-Reply-To: <57f2182e-09b4-2cab-5602-9d0e029495be@ti.com>
-References: <1515377863-20358-1-git-send-email-david@lechnology.com>
- <1515377863-20358-13-git-send-email-david@lechnology.com>
- <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
- <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
- <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
- <CAMRc=Mc228JAxxBXcObmokh2h-toojG8OHrmbunm_ORqbGWUnA@mail.gmail.com>
- <69bc0848-0698-b936-96a3-2257a5e27809@ti.com>
- <CAMRc=MenWp=2dtOs1yafnHVkCxfT7SDS0fS2UxUd+U0s_UDwVw@mail.gmail.com>
- <57f2182e-09b4-2cab-5602-9d0e029495be@ti.com>
-Message-ID: <152303318048.143116.2883441215887455211@swboyd.mtv.corp.google.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 6 Apr 2018 19:54:02 +0300
+Subject: [PATCH 1/5] arm64: entry: isb in el1_irq
+In-Reply-To: <5036b99a-9faa-c220-27dd-e0d73f8b3fc7@arm.com>
+References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
+ <20180405171800.5648-2-ynorov@caviumnetworks.com>
+ <5036b99a-9faa-c220-27dd-e0d73f8b3fc7@arm.com>
+Message-ID: <20180406165402.nq3sabeku2mp3hpb@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sekhar Nori (2018-04-06 02:37:03)
+On Fri, Apr 06, 2018 at 11:02:56AM +0100, James Morse wrote:
+> Hi Yury,
 > 
-> Can you please check that and confirm there is no issue with genpd and 
-> using CLK_OF_DECLARE() to initialize clocks?
+> An ISB at the beginning of the vectors? This is odd, taking an IRQ to get in
+> here would be a context-synchronization-event too, so the ISB is superfluous.
 > 
-> Unless you report an issue back, or Mike and Stephen have ideas about 
-> how to handle the dependency between PSC/PLL derived timer clock 
-> initialization and and timer_probe(), I think we need to move back to 
-> using CLK_OF_DECLARE(). 
+> The ARM-ARM  has a list of 'Context-Synchronization event's (Glossary on page
+> 6480 of DDI0487B.b), paraphrasing:
+> * ISB
+> * Taking an exception
+> * ERET
+> * (...loads of debug stuff...)
 
-In such a case, please use the hybrid approach where the clks required
-for the clockevent and/or clocksource are registered in the early
-CLK_OF_DECLARE path but the rest of the clks get registered with a
-proper platform device and driver. There are examples of this approach
-on other platforms already.
+Hi James, Mark,
+
+I completely forgot that taking an exception is the context synchronization
+event. Sorry for your time on reviewing this crap. It means that patches 1,
+2 and 3 are not needed except chunk that adds ISB in do_idle() path. 
+
+Also it means that for arm64 we are safe to mask IPI delivering to CPUs that
+run any userspace code, not only nohz_full.
+
+In general, kick_all_cpus_sync() is needed to switch contexts. But exit from
+userspace is anyway the switch of context. And while in userspace, we cannot
+do something wrong on kernel side. For me it means that we can safely drop
+IPI for all userspace modes - both normal and nohz_full. 
+
+If it's correct, for v3 I would suggest:
+ - in kick_all_cpus_sync() mask all is_idle_task() and user_mode() CPUs;
+ - add isb() for arm64 in do_idle() path only - this path doesn't imply
+   context switch.
+
+What do you think?
+
+Yury
