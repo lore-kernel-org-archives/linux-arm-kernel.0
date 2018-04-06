@@ -1,56 +1,39 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 6 Apr 2018 14:25:11 +0100
-Subject: [PATCH] arm: kgdb: fix NUMREGBYTES so that gdb_regs[] is the
- correct size
-In-Reply-To: <20180405200916.27964-1-drivshin@awxrd.com>
-References: <20180405200916.27964-1-drivshin@awxrd.com>
-Message-ID: <20180406132511.uzl6viazwaey4bem@holly.lan>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 6 Apr 2018 08:33:56 -0500
+Subject: [PATCH v4 1/6] PCI: aardvark: Introduce an
+ advk_pcie_valid_device() helper
+In-Reply-To: <20180406112128.6b904f39@windsurf>
+References: <20180329083946.25970-1-thomas.petazzoni@bootlin.com>
+ <20180329083946.25970-2-thomas.petazzoni@bootlin.com>
+ <20180404112843.GA24669@red-moon>
+ <20180406112128.6b904f39@windsurf>
+Message-ID: <20180406133356.GA163363@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 04:09:16PM -0400, David Rivshin wrote:
-> From: David Rivshin <DRivshin@allworx.com>
+On Fri, Apr 06, 2018 at 11:21:28AM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> NUMREGBYTES (which is used as the size for gdb_regs[]) is incorrectly based
-> on DBG_MAX_REG_NUM instead of GDB_MAX_REGS. DBG_MAX_REG_NUM is the number
-> of total registers, while GDB_MAX_REGS is the number of 'unsigned longs'
-> it takes to serialize those registers. Since FP registers require 3
-> 'unsigned longs' each, DBG_MAX_REG_NUM is smaller than GDB_MAX_REGS.
+> On Wed, 4 Apr 2018 12:28:43 +0100, Lorenzo Pieralisi wrote:
+> > On Thu, Mar 29, 2018 at 10:39:41AM +0200, Thomas Petazzoni wrote:
+> > > In other to mimic other PCIe host controller drivers, introduce an
+> > > advk_pcie_valid_device() helper, used in the configuration read/write
+> > > functions.
+> > > 
+> > > This patch by itself is not a fix, but it is required for a follow-up
+> > > patch that is a fix, hence the Fixes tag and the Cc to stable.  
+> > 
+> > Should not we just reshuffle patch 1 and 2 instead of sending this
+> > patch to stable ? I appreciate the merge window is open and timing is
+> > quite tight, it is just to avoid sending churn to stable kernels
+> > for not much.
 > 
-> This causes GDB 8.0 give the following error on connect:
-> "Truncated register 19 in remote 'g' packet"
-> 
-> This also causes the register serialization/deserialization logic to
-> overflow gdb_regs[], overwriting whatever follows.
-> 
-> Fixes: 834b2964b7ab ("kgdb,arm: fix register dump")
-> Cc: <stable@vger.kernel.org> # 2.6.37+
-> Signed-off-by: David Rivshin <drivshin@allworx.com>
+> I can certainly do that, but it's actually Bjorn who asked in the first
+> place to introduce the advk_pcie_valid_device() helper.
 
-I pointed some trivial autotests at both gdb-7.12 and gdb-8.0. Results
-look good to me!
+I did suggest [1] adding advk_pcie_valid_device() to match other
+drivers, but I don't care about the order of these patches.  If it
+makes more sense to put the fix first for easier backporting to
+stable, that's fine with me.
 
-Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
-
-> ---
->  arch/arm/include/asm/kgdb.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
-> index 3b73fdcf3627a..8de1100d10674 100644
-> --- a/arch/arm/include/asm/kgdb.h
-> +++ b/arch/arm/include/asm/kgdb.h
-> @@ -77,7 +77,7 @@ extern int kgdb_fault_expected;
->  
->  #define KGDB_MAX_NO_CPUS	1
->  #define BUFMAX			400
-> -#define NUMREGBYTES		(DBG_MAX_REG_NUM << 2)
-> +#define NUMREGBYTES		(GDB_MAX_REGS << 2)
->  #define NUMCRITREGBYTES		(32 << 2)
->  
->  #define _R0			0
-> 
-> base-commit: 0adb32858b0bddf4ada5f364a84ed60b196dbcda
-> -- 
-> 2.14.3
-> 
+[1] https://lkml.kernel.org/r/20180110011136.GB157182 at bhelgaas-glaptop.roam.corp.google.com
