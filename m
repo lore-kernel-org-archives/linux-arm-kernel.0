@@ -1,133 +1,124 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Fri,  6 Apr 2018 16:55:33 +0200
-Subject: [PATCH v4 3/6] PCI: aardvark: Use ISR1 instead of ISR0 interrupt in
- legacy irq mode
+Date: Fri,  6 Apr 2018 16:55:36 +0200
+Subject: [PATCH v4 6/6] PCI: aardvark: Remove PCIe outbound window
+ configuration
 In-Reply-To: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
 References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180406145536.19637-4-thomas.petazzoni@bootlin.com>
+Message-ID: <20180406145536.19637-7-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+From: Evan Wang <xswang@marvell.com>
 
-The Aardvark has two interrupts sets:
+Outbound window is used to translate CPU space addresses to PCIe space
+addresses when the CPU initiates PCIe transactions.
 
- - first set is bit[23:16] of PCIe ISR 0 register(RD0074840h)
+According to the suggestion of the HW designers, the recommended
+solution is to use the default outbound parameters, even though the
+current outbound window setting does not cause any known functional
+issue.
 
- - second set is bit[11:8] of PCIe ISR 1 register(RD0074848h)
+This patch doesn't address any known functional issue, but aligns to
+HW design guidelines, and removes code that isn't needed.
 
-Only one set should be used, while another set should be masked.
-
-The second set, ISR1, is more advanced, the Legacy INT_X status bit is
-asserted once Assert_INTX message is received, and de-asserted after
-Deassert_INTX message is received. Therefore, it matches what the
-driver is currently doing in the ->irq_mask() and ->irq_unmask()
-functions. The ISR0 requires additional work to deassert the
-interrupt, which the driver doesn't do currently.
-
-This commit resolves a number of issues with legacy interrupts.
-
-This is part of fixing bug
-https://bugzilla.kernel.org/show_bug.cgi?id=196339, this commit was
-reported as the user to be important to get a Intel 7260 mini-PCIe
-WiFi card working.
-
-Fixes: 8c39d710363c1 ("PCI: aardvark: Add Aardvark PCI host controller driver")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Reviewed-by: Evan Wang <xswang@marvell.com>
+Signed-off-by: Evan Wang <xswang@marvell.com>
+Reviewed-by: Victor Gu <xigu@marvell.com>
 Reviewed-by: Nadav Haklai <nadavh@marvell.com>
 [Thomas: tweak commit log.]
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 ---
- drivers/pci/host/pci-aardvark.c | 41 ++++++++++++++++++++++++-----------------
- 1 file changed, 24 insertions(+), 17 deletions(-)
+ drivers/pci/host/pci-aardvark.c | 55 -----------------------------------------
+ 1 file changed, 55 deletions(-)
 
 diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 5b8201aaf34d..7a0ddb709052 100644
+index 69c4fd50947e..702160c4ae09 100644
 --- a/drivers/pci/host/pci-aardvark.c
 +++ b/drivers/pci/host/pci-aardvark.c
-@@ -100,7 +100,8 @@
- #define PCIE_ISR1_MASK_REG			(CONTROL_BASE_ADDR + 0x4C)
- #define     PCIE_ISR1_POWER_STATE_CHANGE	BIT(4)
- #define     PCIE_ISR1_FLUSH			BIT(5)
--#define     PCIE_ISR1_ALL_MASK			GENMASK(5, 4)
-+#define     PCIE_ISR1_INTX_ASSERT(val)		BIT(8 + (val))
-+#define     PCIE_ISR1_ALL_MASK			GENMASK(11, 4)
- #define PCIE_MSI_ADDR_LOW_REG			(CONTROL_BASE_ADDR + 0x50)
- #define PCIE_MSI_ADDR_HIGH_REG			(CONTROL_BASE_ADDR + 0x54)
- #define PCIE_MSI_STATUS_REG			(CONTROL_BASE_ADDR + 0x58)
-@@ -607,9 +608,9 @@ static void advk_pcie_irq_mask(struct irq_data *d)
- 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
- 	u32 mask;
+@@ -109,24 +109,6 @@
+ #define PCIE_MSI_MASK_REG			(CONTROL_BASE_ADDR + 0x5C)
+ #define PCIE_MSI_PAYLOAD_REG			(CONTROL_BASE_ADDR + 0x9C)
  
--	mask = advk_readl(pcie, PCIE_ISR0_MASK_REG);
--	mask |= PCIE_ISR0_INTX_ASSERT(hwirq);
--	advk_writel(pcie, mask, PCIE_ISR0_MASK_REG);
-+	mask = advk_readl(pcie, PCIE_ISR1_MASK_REG);
-+	mask |= PCIE_ISR1_INTX_ASSERT(hwirq);
-+	advk_writel(pcie, mask, PCIE_ISR1_MASK_REG);
+-/* PCIe window configuration */
+-#define OB_WIN_BASE_ADDR			0x4c00
+-#define OB_WIN_BLOCK_SIZE			0x20
+-#define OB_WIN_REG_ADDR(win, offset)		(OB_WIN_BASE_ADDR + \
+-						 OB_WIN_BLOCK_SIZE * (win) + \
+-						 (offset))
+-#define OB_WIN_MATCH_LS(win)			OB_WIN_REG_ADDR(win, 0x00)
+-#define OB_WIN_MATCH_MS(win)			OB_WIN_REG_ADDR(win, 0x04)
+-#define OB_WIN_REMAP_LS(win)			OB_WIN_REG_ADDR(win, 0x08)
+-#define OB_WIN_REMAP_MS(win)			OB_WIN_REG_ADDR(win, 0x0c)
+-#define OB_WIN_MASK_LS(win)			OB_WIN_REG_ADDR(win, 0x10)
+-#define OB_WIN_MASK_MS(win)			OB_WIN_REG_ADDR(win, 0x14)
+-#define OB_WIN_ACTIONS(win)			OB_WIN_REG_ADDR(win, 0x18)
+-
+-/* PCIe window types */
+-#define OB_PCIE_MEM				0x0
+-#define OB_PCIE_IO				0x4
+-
+ /* LMI registers base address and register offsets */
+ #define LMI_BASE_ADDR				0x6000
+ #define CFG_REG					(LMI_BASE_ADDR + 0x0)
+@@ -245,34 +227,9 @@ static int advk_pcie_wait_for_link(struct advk_pcie *pcie)
+ 	return -ETIMEDOUT;
  }
  
- static void advk_pcie_irq_unmask(struct irq_data *d)
-@@ -618,9 +619,9 @@ static void advk_pcie_irq_unmask(struct irq_data *d)
- 	irq_hw_number_t hwirq = irqd_to_hwirq(d);
- 	u32 mask;
- 
--	mask = advk_readl(pcie, PCIE_ISR0_MASK_REG);
--	mask &= ~PCIE_ISR0_INTX_ASSERT(hwirq);
--	advk_writel(pcie, mask, PCIE_ISR0_MASK_REG);
-+	mask = advk_readl(pcie, PCIE_ISR1_MASK_REG);
-+	mask &= ~PCIE_ISR1_INTX_ASSERT(hwirq);
-+	advk_writel(pcie, mask, PCIE_ISR1_MASK_REG);
- }
- 
- static int advk_pcie_irq_map(struct irq_domain *h,
-@@ -763,29 +764,35 @@ static void advk_pcie_handle_msi(struct advk_pcie *pcie)
- 
- static void advk_pcie_handle_int(struct advk_pcie *pcie)
+-/*
+- * Set PCIe address window register which could be used for memory
+- * mapping.
+- */
+-static void advk_pcie_set_ob_win(struct advk_pcie *pcie,
+-				 u32 win_num, u32 match_ms,
+-				 u32 match_ls, u32 mask_ms,
+-				 u32 mask_ls, u32 remap_ms,
+-				 u32 remap_ls, u32 action)
+-{
+-	advk_writel(pcie, match_ls, OB_WIN_MATCH_LS(win_num));
+-	advk_writel(pcie, match_ms, OB_WIN_MATCH_MS(win_num));
+-	advk_writel(pcie, mask_ms, OB_WIN_MASK_MS(win_num));
+-	advk_writel(pcie, mask_ls, OB_WIN_MASK_LS(win_num));
+-	advk_writel(pcie, remap_ms, OB_WIN_REMAP_MS(win_num));
+-	advk_writel(pcie, remap_ls, OB_WIN_REMAP_LS(win_num));
+-	advk_writel(pcie, action, OB_WIN_ACTIONS(win_num));
+-	advk_writel(pcie, match_ls | BIT(0), OB_WIN_MATCH_LS(win_num));
+-}
+-
+ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
  {
--	u32 val, mask, status;
-+	u32 isr0_val, isr0_mask, isr0_status;
-+	u32 isr1_val, isr1_mask, isr1_status;
- 	int i, virq;
+ 	u32 reg;
+-	int i;
+-
+-	/* Point PCIe unit MBUS decode windows to DRAM space */
+-	for (i = 0; i < 8; i++)
+-		advk_pcie_set_ob_win(pcie, i, 0, 0, 0, 0, 0, 0, 0);
  
--	val = advk_readl(pcie, PCIE_ISR0_REG);
--	mask = advk_readl(pcie, PCIE_ISR0_MASK_REG);
--	status = val & ((~mask) & PCIE_ISR0_ALL_MASK);
-+	isr0_val = advk_readl(pcie, PCIE_ISR0_REG);
-+	isr0_mask = advk_readl(pcie, PCIE_ISR0_MASK_REG);
-+	isr0_status = isr0_val & ((~isr0_mask) & PCIE_ISR0_ALL_MASK);
+ 	/* Set to Direct mode */
+ 	reg = advk_readl(pcie, CTRL_CONFIG_REG);
+@@ -851,12 +808,6 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
  
--	if (!status) {
--		advk_writel(pcie, val, PCIE_ISR0_REG);
-+	isr1_val = advk_readl(pcie, PCIE_ISR1_REG);
-+	isr1_mask = advk_readl(pcie, PCIE_ISR1_MASK_REG);
-+	isr1_status = isr1_val & ((~isr1_mask) & PCIE_ISR1_ALL_MASK);
-+
-+	if (!isr0_status && !isr1_status) {
-+		advk_writel(pcie, isr0_val, PCIE_ISR0_REG);
-+		advk_writel(pcie, isr1_val, PCIE_ISR1_REG);
- 		return;
- 	}
- 
- 	/* Process MSI interrupts */
--	if (status & PCIE_ISR0_MSI_INT_PENDING)
-+	if (isr0_status & PCIE_ISR0_MSI_INT_PENDING)
- 		advk_pcie_handle_msi(pcie);
- 
- 	/* Process legacy interrupts */
- 	for (i = 0; i < PCI_NUM_INTX; i++) {
--		if (!(status & PCIE_ISR0_INTX_ASSERT(i)))
-+		if (!(isr1_status & PCIE_ISR1_INTX_ASSERT(i)))
- 			continue;
- 
--		advk_writel(pcie, PCIE_ISR0_INTX_ASSERT(i),
--			    PCIE_ISR0_REG);
-+		advk_writel(pcie, PCIE_ISR1_INTX_ASSERT(i),
-+			    PCIE_ISR1_REG);
- 
- 		virq = irq_find_mapping(pcie->irq_domain, i);
- 		generic_handle_irq(virq);
+ 		switch (resource_type(res)) {
+ 		case IORESOURCE_IO:
+-			advk_pcie_set_ob_win(pcie, 1,
+-					     upper_32_bits(res->start),
+-					     lower_32_bits(res->start),
+-					     0,	0xF8000000, 0,
+-					     lower_32_bits(res->start),
+-					     OB_PCIE_IO);
+ 			err = pci_remap_iospace(res, iobase);
+ 			if (err) {
+ 				dev_warn(dev, "error %d: failed to map resource %pR\n",
+@@ -865,12 +816,6 @@ static int advk_pcie_parse_request_of_pci_ranges(struct advk_pcie *pcie)
+ 			}
+ 			break;
+ 		case IORESOURCE_MEM:
+-			advk_pcie_set_ob_win(pcie, 0,
+-					     upper_32_bits(res->start),
+-					     lower_32_bits(res->start),
+-					     0x0, 0xF8000000, 0,
+-					     lower_32_bits(res->start),
+-					     (2 << 20) | OB_PCIE_MEM);
+ 			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
+ 			break;
+ 		case IORESOURCE_BUS:
 -- 
 2.14.3
