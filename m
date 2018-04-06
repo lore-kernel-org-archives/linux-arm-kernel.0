@@ -1,201 +1,46 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 6 Apr 2018 16:51:53 +0100
-Subject: [RFC PATCH v2 2/3] KVM: arm64: Convert lazy FPSIMD context
- switch trap to C
-In-Reply-To: <5da0c912-8adb-db89-08b1-fb557b461678@arm.com>
-References: <1523026864-15413-1-git-send-email-Dave.Martin@arm.com>
- <1523026864-15413-3-git-send-email-Dave.Martin@arm.com>
- <5da0c912-8adb-db89-08b1-fb557b461678@arm.com>
-Message-ID: <20180406155151.GS16308@e103592.cambridge.arm.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Fri, 6 Apr 2018 18:54:21 +0300
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <20180406073441.xesojvzc3deljhoy@flea>
+References: <20180403154449.2443-1-ssuloev@orpaltech.com>
+ <20180403154449.2443-4-ssuloev@orpaltech.com>
+ <20180404065048.n76r3ytuznd6fqsl@flea>
+ <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
+ <20180405091913.ky4dnmszoobn2xry@flea>
+ <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
+ <20180405131735.GB12349@sirena.org.uk>
+ <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
+ <20180406073441.xesojvzc3deljhoy@flea>
+Message-ID: <46df9f95-a93f-57af-b7d9-dfd5db046622@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2018 at 04:25:57PM +0100, Marc Zyngier wrote:
-> Hi Dave,
-> 
-> On 06/04/18 16:01, Dave Martin wrote:
-> > To make the lazy FPSIMD context switch trap code easier to hack on,
-> > this patch converts it to C.
-> > 
-> > This is not amazingly efficient, but the trap should typically only
-> > be taken once per host context switch.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > 
-> > ---
-> > 
-> > Since RFCv1:
-> > 
-> >  * Fix indentation to be consistent with the rest of the file.
-> >  * Add missing ! to write back to sp with attempting to push regs.
-> > ---
-> >  arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
-> >  arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
-> >  2 files changed, 46 insertions(+), 35 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> > index fdd1068..47c6a78 100644
-> > --- a/arch/arm64/kvm/hyp/entry.S
-> > +++ b/arch/arm64/kvm/hyp/entry.S
-> > @@ -176,41 +176,28 @@ ENTRY(__fpsimd_guest_restore)
-> >  	// x1: vcpu
-> >  	// x2-x29,lr: vcpu regs
-> >  	// vcpu x0-x1 on the stack
-> > -	stp	x2, x3, [sp, #-16]!
-> > -	stp	x4, lr, [sp, #-16]!
-> > -
-> > -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-> > -	mrs	x2, cptr_el2
-> > -	bic	x2, x2, #CPTR_EL2_TFP
-> > -	msr	cptr_el2, x2
-> > -alternative_else
-> > -	mrs	x2, cpacr_el1
-> > -	orr	x2, x2, #CPACR_EL1_FPEN
-> > -	msr	cpacr_el1, x2
-> > -alternative_endif
-> > -	isb
-> > -
-> > -	mov	x3, x1
-> > -
-> > -	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
-> > -	kern_hyp_va x0
-> > -	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> > -	bl	__fpsimd_save_state
-> > -
-> > -	add	x2, x3, #VCPU_CONTEXT
-> > -	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> > -	bl	__fpsimd_restore_state
-> > -
-> > -	// Skip restoring fpexc32 for AArch64 guests
-> > -	mrs	x1, hcr_el2
-> > -	tbnz	x1, #HCR_RW_SHIFT, 1f
-> > -	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
-> > -	msr	fpexc32_el2, x4
-> > -1:
-> > -	ldp	x4, lr, [sp], #16
-> > -	ldp	x2, x3, [sp], #16
-> > -	ldp	x0, x1, [sp], #16
-> > -
-> > +	stp	x2, x3, [sp, #-144]!
-> > +	stp	x4, x5, [sp, #16]
-> > +	stp	x6, x7, [sp, #32]
-> > +	stp	x8, x9, [sp, #48]
-> > +	stp	x10, x11, [sp, #64]
-> > +	stp	x12, x13, [sp, #80]
-> > +	stp	x14, x15, [sp, #96]
-> > +	stp	x16, x17, [sp, #112]
-> > +	stp	x18, lr, [sp, #128]
-> > +
-> > +	bl	__hyp_switch_fpsimd
-> > +
-> > +	ldp	x4, x5, [sp, #16]
-> > +	ldp	x6, x7, [sp, #32]
-> > +	ldp	x8, x9, [sp, #48]
-> > +	ldp	x10, x11, [sp, #64]
-> > +	ldp	x12, x13, [sp, #80]
-> > +	ldp	x14, x15, [sp, #96]
-> > +	ldp	x16, x17, [sp, #112]
-> > +	ldp	x18, lr, [sp, #128]
-> > +	ldp	x0, x1, [sp, #144]
-> > +	ldp	x2, x3, [sp], #160
-> 
-> I can't say I'm overly thrilled with adding another save/restore 
-> sequence. How about treating it like a real guest exit instead? Granted, 
-> there is a bit more overhead to it, but as you pointed out above, this 
-> should be pretty rare...
-
-I have no objection to handling this after exiting back to
-__kvm_vcpu_run(), provided the performance is deemed acceptable.
-
-> Something like this?
-> 
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index f6648a3e4152..3c388f5c394f 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -27,6 +27,7 @@
->  #define ARM_EXCEPTION_IRQ	  0
->  #define ARM_EXCEPTION_EL1_SERROR  1
->  #define ARM_EXCEPTION_TRAP	  2
-> +#define ARM_EXCEPTION_FP	  3
->  /* The hyp-stub will return this for any kvm_call_hyp() call */
->  #define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
->  
-> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-> index bffece27b5c1..e32dd00410f8 100644
-> --- a/arch/arm64/kvm/hyp/hyp-entry.S
-> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-> @@ -129,11 +129,12 @@ el1_trap:
->  	 */
->  alternative_if_not ARM64_HAS_NO_FPSIMD
->  	cmp	x0, #ESR_ELx_EC_FP_ASIMD
-> -	b.eq	__fpsimd_guest_restore
-> +	mov	x0, #ARM_EXCEPTION_FP
-> +	b.eq	1f
->  alternative_else_nop_endif
->  
->  	mov	x0, #ARM_EXCEPTION_TRAP
-> -	b	__guest_exit
-> +1:	b	__guest_exit
->  
->  el1_irq:
->  	get_vcpu_ptr	x1, x0
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index d9645236e474..50b98ac39480 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -325,6 +325,10 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->   */
->  static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->  {
-> +	if (ARM_EXCEPTION_CODE(*exit_code) == ARM_EXCEPTION_FP) {
-> +		__hyp_switch_fpsim(read_sysreg_el2(esr), vcpu);
-> +		return true;
-> +	}
-
-The esr is a dummy argument here, so we could simply get rid of it.
-
->  	if (ARM_EXCEPTION_CODE(*exit_code) != ARM_EXCEPTION_IRQ)
->  		vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
->  
-> 
-> >  	eret
-> >  ENDPROC(__fpsimd_guest_restore)
-> >  
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > index 870f4b1..8605e04 100644
-> > --- a/arch/arm64/kvm/hyp/switch.c
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -440,6 +440,30 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> >  	return exit_code;
-> >  }
-> >  
-> > +void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
-> > +				    struct kvm_vcpu *vcpu)
-> > +{
-> > +	kvm_cpu_context_t *host_ctxt;
-> > +
-> > +	if (has_vhe())
-> > +		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
-> > +			     cpacr_el1);
-> > +	else
-> > +		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
-> > +			     cptr_el2);
-> > +
-> > +	isb();
-> > +
-> > +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> > +	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
-> > +	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
-> > +
-> > +	/* Skip restoring fpexc32 for AArch64 guests */
-> > +	if (!(read_sysreg(hcr_el2) & HCR_RW))
-> > +		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
-> > +			     fpexc32_el2);
-> > +}
-> > +
-
-[...]
-
-Cheers
----Dave
+On 04/06/2018 10:34 AM, Maxime Ripard wrote:
+> On Thu, Apr 05, 2018 at 04:44:16PM +0300, Sergey Suloev wrote:
+>> On 04/05/2018 04:17 PM, Mark Brown wrote:
+>>> On Thu, Apr 05, 2018 at 12:59:35PM +0300, Sergey Suloev wrote:
+>>>> On 04/05/2018 12:19 PM, Maxime Ripard wrote:
+>>>>> The point of that patch was precisely to allow to send more data than
+>>>>> the FIFO. You're breaking that behaviour without any justification,
+>>>>> and this is not ok.
+>>>> I am sorry, but you can't. That's a hardware limitation.
+>>> Are you positive about that?  Normally you can add things to hardware
+>>> FIFOs while they're being drained so so long as you can keep data
+>>> flowing in at least as fast as it's being consumed.
+>> Well, normally yes, but this is not the case with the hardware that I own.
+>> My a20 (BPiM1+) and a31 (BPiM2) boards behaves differently. With a transfer
+>> larger than FIFO then TC interrupt never happens.
+> Because you're not supposed to have a transfer larger than the FIFO,
+> but to have to setup at first a transfer the size of the FIFO, and
+> then when it's (or starts to be) depleted, fill it up again.
+According to what you said the driver must implement 
+"transfer_one_message" instead of "transfer_one",
+because the maximum transfer length is 64 bytes (for sun4i) and we 
+shouldn't allow "transfer_one" handle
+more than 64 bytes. Otherwise it breaks the concept.
+>
+> That's the point of the patch you're reverting, and if it doesn't
+> work, you should make it work and not simply revert it.
+>
+> Maxime
+>
