@@ -1,41 +1,20 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 6 Apr 2018 23:19:59 +0300
-Subject: [PATCH 3/3] arm64: dts: renesas: condor: add PCIe support
-In-Reply-To: <f07e6173-75b3-fe10-81d6-915942a5f4fe@cogentembedded.com>
-References: <f07e6173-75b3-fe10-81d6-915942a5f4fe@cogentembedded.com>
-Message-ID: <62d9dbbe-9f11-303c-56dd-3dcdaf48bcc1@cogentembedded.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 06 Apr 2018 13:38:35 -0700
+Subject: [PATCH v5 3/8] clk: davinci: add a reset lookup table for psc0
+In-Reply-To: <20180330152856.12297-4-brgl@bgdev.pl>
+References: <20180330152856.12297-1-brgl@bgdev.pl>
+ <20180330152856.12297-4-brgl@bgdev.pl>
+Message-ID: <152304711592.94378.4448268823064394140@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PCIe PHY and PCIEC and specify the PCIe bus clock for the Condor
-board.
+Quoting Bartosz Golaszewski (2018-03-30 08:28:51)
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> In order to be able to use the reset framework in legacy boot mode as
+> well, add the reset lookup table to the psc driver for da850 variant.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -49,6 +49,18 @@
- 	clock-frequency = <32768>;
- };
- 
-+&pciec {
-+	status = "okay";
-+};
-+
-+&pcie_bus_clk {
-+	clock-frequency = <100000000>;
-+};
-+
-+&pcie_phy {
-+	status = "okay";
-+};
-+
- &scif0 {
- 	status = "okay";
- };
+Applied to clk-next
