@@ -1,90 +1,54 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 06 Apr 2018 11:42:19 +0200
-Subject: [PATCH] arm64: dts: armada-3720-espressobin: wire up spi flash
-In-Reply-To: <20180325195736.19782-1-u.kleine-koenig@pengutronix.de> ("Uwe
- =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Sun, 25 Mar 2018 21:57:36
- +0200")
-References: <20180325195736.19782-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <87d0zcisck.fsf@bootlin.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 6 Apr 2018 11:02:56 +0100
+Subject: [PATCH 1/5] arm64: entry: isb in el1_irq
+In-Reply-To: <20180405171800.5648-2-ynorov@caviumnetworks.com>
+References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
+ <20180405171800.5648-2-ynorov@caviumnetworks.com>
+Message-ID: <5036b99a-9faa-c220-27dd-e0d73f8b3fc7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
- 
- On dim., mars 25 2018, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+Hi Yury,
 
-> From: Ellie Reeves <ellierevves@gmail.com>
->
-> This is the storage the machine boots from by default. The partitioning
-> is taken from the U-Boot that is shipped with the board. There is some
-> more space on the flash that isn't used.
+On 05/04/18 18:17, Yury Norov wrote:
+> Kernel text patching framework relies on IPI to ensure that other
+> SMP cores observe the change. Target core calls isb() in IPI handler
 
-I tested this patch and was able to read the uboot environement from
-Linux.
-
->
-> Signed-off-by: Ellie Reeves <ellierevves@gmail.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+(Odd, if its just to synchronize the CPU, taking the IPI should be enough).
 
 
-Applied on mvebu/dt64-for-4.18
+> path, but not at the beginning of el1_irq entry. There's a chance
+> that modified instruction will appear prior isb(), and so will not be
+> observed.
+> 
+> This patch inserts isb early at el1_irq entry to avoid that chance.
+
+
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index ec2ee720e33e..9c06b4b80060 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -593,6 +593,7 @@ ENDPROC(el1_sync)
+>  
+>  	.align	6
+>  el1_irq:
+> +	isb					// pairs with aarch64_insn_patch_text
+>  	kernel_entry 1
+>  	enable_da_f
+>  #ifdef CONFIG_TRACE_IRQFLAGS
+> 
+
+An ISB at the beginning of the vectors? This is odd, taking an IRQ to get in
+here would be a context-synchronization-event too, so the ISB is superfluous.
+
+The ARM-ARM  has a list of 'Context-Synchronization event's (Glossary on page
+6480 of DDI0487B.b), paraphrasing:
+* ISB
+* Taking an exception
+* ERET
+* (...loads of debug stuff...)
+
 
 Thanks,
 
-Gregory
-
-> ---
->  .../boot/dts/marvell/armada-3720-espressobin.dts   | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> index 882d6e4a04e4..5f98c2fecca4 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> @@ -108,6 +108,33 @@
->  	status = "okay";
->  };
->  
-> +&spi0 {
-> +	status = "okay";
-> +
-> +	flash at 0 {
-> +		reg = <0>;
-> +		compatible = "winbond,w25q32dw", "jedec,spi-flash";
-> +		spi-max-frequency = <104000000>;
-> +		m25p,fast-read;
-> +
-> +		partitions {
-> +			compatible = "fixed-partitions";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			partition at 0 {
-> +				label = "uboot";
-> +				reg = <0 0x180000>;
-> +			};
-> +
-> +			partition at 180000 {
-> +				label = "ubootenv";
-> +				reg = <0x180000 0x10000>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
->  /* Exported on the micro USB connector J5 through an FTDI */
->  &uart0 {
->  	pinctrl-names = "default";
-> -- 
-> 2.16.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+James
