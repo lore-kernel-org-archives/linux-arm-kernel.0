@@ -1,106 +1,109 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Apr 2018 12:07:03 +0100
-Subject: [PATCH 3/5] arm64: early ISB at exit from extended quiescent state
-In-Reply-To: <20180405171800.5648-4-ynorov@caviumnetworks.com>
-References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
- <20180405171800.5648-4-ynorov@caviumnetworks.com>
-Message-ID: <20180406110702.pew7xfd3y5c72he7@lakrids.cambridge.arm.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Fri,  6 Apr 2018 04:14:25 -0700
+Subject: [PATCH v2] net: thunderx: rework mac addresses list to u64 array
+In-Reply-To: <20180405145756.12633-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180405145756.12633-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180406111425.14636-1-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 08:17:58PM +0300, Yury Norov wrote:
-> This series enables delaying of kernel memory synchronization
-> for CPUs running in extended quiescent state (EQS) till the exit
-> of that state.
-> 
-> ARM64 uses IPI mechanism to notify all cores in  SMP system that
-> kernel text is changed; and IPI handler calls isb() to synchronize.
-> 
-> If we don't deliver IPI to EQS CPUs anymore, we should add ISB early
-> in EQS exit path.
-> 
-> There are 2 such paths. One starts in do_idle() loop, and other
-> in el0_svc entry. For do_idle(), isb() is added in
-> arch_cpu_idle_exit() hook. And for SVC handler, isb is called in
-> el0_svc_naked.
-> 
-> Suggested-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> ---
->  arch/arm64/kernel/entry.S   | 16 +++++++++++++++-
->  arch/arm64/kernel/process.c |  7 +++++++
->  2 files changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index c8d9ec363ddd..b1e1c19b4432 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -48,7 +48,7 @@
->  	.endm
->  
->  	.macro el0_svc_restore_syscall_args
-> -#if defined(CONFIG_CONTEXT_TRACKING)
-> +#if !defined(CONFIG_TINY_RCU) || defined(CONFIG_CONTEXT_TRACKING)
->  	restore_syscall_args
->  #endif
->  	.endm
-> @@ -483,6 +483,19 @@ __bad_stack:
->  	ASM_BUG()
->  	.endm
->  
-> +/*
-> + * If CPU is in extended quiescent state we need isb to ensure that
-> + * possible change of kernel text is visible by the core.
-> + */
-> +	.macro	isb_if_eqs
-> +#ifndef CONFIG_TINY_RCU
-> +	bl	rcu_is_watching
-> +	cbnz	x0, 1f
-> +	isb 					// pairs with aarch64_insn_patch_text
-> +1:
-> +#endif
-> +	.endm
-> +
->  el0_sync_invalid:
->  	inv_entry 0, BAD_SYNC
->  ENDPROC(el0_sync_invalid)
-> @@ -949,6 +962,7 @@ alternative_else_nop_endif
->  
->  el0_svc_naked:					// compat entry point
->  	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
-> +	isb_if_eqs
+From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-As I mentioned before, this is too early.
+It is too expensive to pass u64 values via linked list, instead
+allocate array for them by overall number of mac addresses from netdev.
 
-If we only kick active CPUs, then until we exit a quiescent state, we
-can race with concurrent modification, and cannot reliably ensure that
-instructions are up-to-date. Practically speaking, that means that we
-cannot patch any code used on the path to exit a quiescent state.
+This eventually removes multiple kmalloc() calls, aviod memory
+fragmentation and allow to put single null check on kmalloc
+return value in order to prevent a potential null pointer dereference.
 
-Also, if this were needed in the SVC path, it would be necessary for all
-exceptions from EL0. Buggy userspace can always trigger a data abort,
-even if it doesn't intend to.
+Addresses-Coverity-ID: 1467429 ("Dereference null return value")
+Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+---
+Changes from v1 to v2:
+ - C99 syntax: update xcast_addr_list struct field mc[0] -> mc[];
 
->  	enable_daif
->  	ct_user_exit
->  	el0_svc_restore_syscall_args
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index f08a2ed9db0d..74cad496b07b 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -88,6 +88,13 @@ void arch_cpu_idle(void)
->  	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
->  }
->  
-> +void arch_cpu_idle_exit(void)
-> +{
-> +	/* Pairs with aarch64_insn_patch_text() for EQS CPUs. */
-> +	if (!rcu_is_watching())
-> +		isb();
-> +}
+---
+ drivers/net/ethernet/cavium/thunder/nic.h        |  7 +-----
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 28 +++++++++---------------
+ 2 files changed, 11 insertions(+), 24 deletions(-)
 
-Likewise, this is too early as we haven't left the extended quiescent
-state yet.
-
-Thanks,
-Mark.
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 5fc46c5a4f36..448d1fafc827 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -265,14 +265,9 @@ struct nicvf_drv_stats {
+ 
+ struct cavium_ptp;
+ 
+-struct xcast_addr {
+-	struct list_head list;
+-	u64              addr;
+-};
+-
+ struct xcast_addr_list {
+-	struct list_head list;
+ 	int              count;
++	u64              mc[];
+ };
+ 
+ struct nicvf_work {
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 1e9a31fef729..a26d8bc92e01 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 						  work.work);
+ 	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
+ 	union nic_mbx mbx = {};
+-	struct xcast_addr *xaddr, *next;
++	u8 idx = 0;
+ 
+ 	if (!vf_work)
+ 		return;
+@@ -1956,16 +1956,10 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 	/* check if we have any specific MACs to be added to PF DMAC filter */
+ 	if (vf_work->mc) {
+ 		/* now go through kernel list of MACs and add them one by one */
+-		list_for_each_entry_safe(xaddr, next,
+-					 &vf_work->mc->list, list) {
++		for (idx = 0; idx < vf_work->mc->count; idx++) {
+ 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
+-			mbx.xcast.data.mac = xaddr->addr;
++			mbx.xcast.data.mac = vf_work->mc->mc[idx];
+ 			nicvf_send_msg_to_pf(nic, &mbx);
+-
+-			/* after receiving ACK from PF release memory */
+-			list_del(&xaddr->list);
+-			kfree(xaddr);
+-			vf_work->mc->count--;
+ 		}
+ 		kfree(vf_work->mc);
+ 	}
+@@ -1996,17 +1990,15 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
+ 			mode |= BGX_XCAST_MCAST_FILTER;
+ 			/* here we need to copy mc addrs */
+ 			if (netdev_mc_count(netdev)) {
+-				struct xcast_addr *xaddr;
+-
+-				mc_list = kmalloc(sizeof(*mc_list), GFP_ATOMIC);
+-				INIT_LIST_HEAD(&mc_list->list);
++				mc_list = kmalloc(sizeof(*mc_list) +
++						  sizeof(u64) * netdev_mc_count(netdev),
++						  GFP_ATOMIC);
++				if (unlikely(!mc_list))
++					return;
++				mc_list->count = 0;
+ 				netdev_hw_addr_list_for_each(ha, &netdev->mc) {
+-					xaddr = kmalloc(sizeof(*xaddr),
+-							GFP_ATOMIC);
+-					xaddr->addr =
++					mc_list->mc[mc_list->count] =
+ 						ether_addr_to_u64(ha->addr);
+-					list_add_tail(&xaddr->list,
+-						      &mc_list->list);
+ 					mc_list->count++;
+ 				}
+ 			}
+-- 
+2.14.3
