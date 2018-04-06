@@ -1,20 +1,18 @@
 From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Fri, 6 Apr 2018 04:43:30 -0700
+Date: Fri, 6 Apr 2018 05:07:42 -0700
 Subject: [PATCH v2] net: thunderx: rework mac addresses list to u64 array
-In-Reply-To: <18c48972-ef34-5b14-f91b-0ceffc286769@embeddedor.com>
+In-Reply-To: <32d75865-6407-9e9e-a78d-38ba761b2575@arm.com>
 References: <20180405145756.12633-1-Vadim.Lomovtsev@caviumnetworks.com>
  <20180406111425.14636-1-Vadim.Lomovtsev@caviumnetworks.com>
- <18c48972-ef34-5b14-f91b-0ceffc286769@embeddedor.com>
-Message-ID: <20180406114330.GA14704@localhost.localdomain>
+ <32d75865-6407-9e9e-a78d-38ba761b2575@arm.com>
+Message-ID: <20180406120742.GB14761@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gustavo,
+Hi Robin,
 
-On Fri, Apr 06, 2018 at 06:36:28AM -0500, Gustavo A. R. Silva wrote:
-> Hi Vadim,
-> 
-> On 04/06/2018 06:14 AM, Vadim Lomovtsev wrote:
+On Fri, Apr 06, 2018 at 12:48:40PM +0100, Robin Murphy wrote:
+> On 06/04/18 12:14, Vadim Lomovtsev wrote:
 > > From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 > > 
 > > It is too expensive to pass u64 values via linked list, instead
@@ -26,28 +24,6 @@ On Fri, Apr 06, 2018 at 06:36:28AM -0500, Gustavo A. R. Silva wrote:
 > > 
 > > Addresses-Coverity-ID: 1467429 ("Dereference null return value")
 > > Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
-> 
-> It'd be nice if you add:
-> 
-> Reported-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-
-Ok, I could do that.
-
-Just to explain .. I didn't do it yet since I get such report from
-Dan Carpenter intially (https://www.spinics.net/lists/linux-kernel-janitors/msg40720.html)
-and was working on it when found you patches, so then asking you to give
-me some time to prepare and test update to driver.
-
-So would it be acceptable put two tags 'Reported-by:' then ?
-
-WBR,
-Vadim
-
-> 
-> Thanks
-> --
-> Gustavo
-> 
 > > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 > > ---
 > > Changes from v1 to v2:
@@ -116,6 +92,27 @@ Vadim
 > > -				INIT_LIST_HEAD(&mc_list->list);
 > > +				mc_list = kmalloc(sizeof(*mc_list) +
 > > +						  sizeof(u64) * netdev_mc_count(netdev),
+> 
+> FWIW if you really wanted to disambiguate that it's a structure and not just
+> an array being allocated, then it could be expressed without explicit
+> arithmetic:
+> 
+> 	size = offsetof(typeof(*mc_list), mc[netdev_mc_count(netdev)]);
+> 
+> but that's probably just a matter of personal preference at this point.
+> 
+> Robin.
+> 
+
+Thanks for reviewing it and for hint. From style perspective, I believe,
+I should get rid off direct types names also, and use your suggestion here.
+
+I'll update patch to v3, test and re-post.
+Thank you for your time.
+
+WBR,
+Vadim
+
 > > +						  GFP_ATOMIC);
 > > +				if (unlikely(!mc_list))
 > > +					return;
