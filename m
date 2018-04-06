@@ -1,108 +1,54 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 5 Apr 2018 21:35:10 -0400
-Subject: [PATCH] alpha: io: reorder barriers to guarantee writeX() and
- iowriteX() ordering
-In-Reply-To: <1522691281-21593-1-git-send-email-okaya@codeaurora.org>
-References: <1522691281-21593-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <3c28281e-de52-abbe-36bc-06f5527da921@codeaurora.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 6 Apr 2018 11:09:50 +0900
+Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
+In-Reply-To: <CACi5LpNyx5VKO6mYB1yXNPENPKhAfAJ7cUSBeVzVtXfF6+EPwg@mail.gmail.com>
+References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
+ <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
+ <20180313102158.GI25863@linaro.org>
+ <20180313104715.prurmrizho4ddc4l@lakrids.cambridge.arm.com>
+ <20180313110747.GJ25863@linaro.org>
+ <20180313112016.ocx4qqhji3zfwjhs@lakrids.cambridge.arm.com>
+ <CACi5LpN4DTYFVSVqru2j0y=CKr2ztrJ1gCW32sJBU=oUV2fcWw@mail.gmail.com>
+ <20180314021050.GK25863@linaro.org>
+ <20180314182448.bnvjtgyzipsuxcbe@lakrids.cambridge.arm.com>
+ <CACi5LpNyx5VKO6mYB1yXNPENPKhAfAJ7cUSBeVzVtXfF6+EPwg@mail.gmail.com>
+Message-ID: <20180406020948.GE19607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/2/2018 1:48 PM, Sinan Kaya wrote:
-> memory-barriers.txt has been updated with the following requirement.
+Bhupesh,
+
+On Fri, Mar 16, 2018 at 03:05:10PM +0530, Bhupesh Sharma wrote:
+> On Wed, Mar 14, 2018 at 11:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Mar 14, 2018 at 11:10:53AM +0900, AKASHI Takahiro wrote:
+> >> If kaslr-seed has a critical value in terms of security, is kexec-tools
+> >> a right place? It is exposed to user space albeit for a short time of period.
+> >
+> > The kernel zeroes the seed in the DT at boot time, so the current seed
+> > isn't visible to userspace.
+> >
+> > If kexec-tools generates a seed, and inserts it into the DTB that it
+> > loads, this is only visible to kexec tools or other applications which
+> > can inspect its memory, so I don't think this is much of a concern.
+> > Anything with such privilege can presumably kexec() to arbitrary code
+> > anyhow.
+> >
+> > The next kernel will then zero its seed in the DT at boot time, so
+> > similarly this won't be visible to userspace on the new kernel.
+> >
+> > FWIW, having kexec tools generate a seed for the kexec_load() case makes
+> > sense to me.
 > 
-> "When using writel(), a prior wmb() is not needed to guarantee that the
-> cache coherent memory writes have completed before writing to the MMIO
-> region."
-> 
-> Current writeX() and iowriteX() implementations on alpha are not
-> satisfying this requirement as the barrier is after the register write.
-> 
-> Move mb() in writeX() and iowriteX() functions to guarantee that HW
-> observes memory changes before performing register operations.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/alpha/include/asm/io.h | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/alpha/include/asm/io.h b/arch/alpha/include/asm/io.h
-> index d123ff9..4c533fc 100644
-> --- a/arch/alpha/include/asm/io.h
-> +++ b/arch/alpha/include/asm/io.h
-> @@ -341,14 +341,14 @@ extern inline unsigned int ioread16(void __iomem *addr)
->  
->  extern inline void iowrite8(u8 b, void __iomem *addr)
->  {
-> -	IO_CONCAT(__IO_PREFIX,iowrite8)(b, addr);
->  	mb();
-> +	IO_CONCAT(__IO_PREFIX, iowrite8)(b, addr);
->  }
->  
->  extern inline void iowrite16(u16 b, void __iomem *addr)
->  {
-> -	IO_CONCAT(__IO_PREFIX,iowrite16)(b, addr);
->  	mb();
-> +	IO_CONCAT(__IO_PREFIX, iowrite16)(b, addr);
->  }
->  
->  extern inline u8 inb(unsigned long port)
-> @@ -382,8 +382,8 @@ extern inline unsigned int ioread32(void __iomem *addr)
->  
->  extern inline void iowrite32(u32 b, void __iomem *addr)
->  {
-> -	IO_CONCAT(__IO_PREFIX,iowrite32)(b, addr);
->  	mb();
-> +	IO_CONCAT(__IO_PREFIX, iowrite32)(b, addr);
->  }
->  
->  extern inline u32 inl(unsigned long port)
-> @@ -434,14 +434,14 @@ extern inline u16 readw(const volatile void __iomem *addr)
->  
->  extern inline void writeb(u8 b, volatile void __iomem *addr)
->  {
-> -	__raw_writeb(b, addr);
->  	mb();
-> +	__raw_writeb(b, addr);
->  }
->  
->  extern inline void writew(u16 b, volatile void __iomem *addr)
->  {
-> -	__raw_writew(b, addr);
->  	mb();
-> +	__raw_writew(b, addr);
->  }
->  #endif
->  
-> @@ -482,14 +482,14 @@ extern inline u64 readq(const volatile void __iomem *addr)
->  
->  extern inline void writel(u32 b, volatile void __iomem *addr)
->  {
-> -	__raw_writel(b, addr);
->  	mb();
-> +	__raw_writel(b, addr);
->  }
->  
->  extern inline void writeq(u64 b, volatile void __iomem *addr)
->  {
-> -	__raw_writeq(b, addr);
->  	mb();
-> +	__raw_writeq(b, addr);
->  }
->  #endif
->  
-> 
+> Fair enough. I will try to take a stab at the same and come back with
+> my findings on this thread.
+
+How's your progress here?
+I've already added kaslr support (i.e. "virtual randomisation") to
+my kexec_file patch set.
+# just a few lines of code, though
+
+-Takahiro AKASHI
 
 
-Can we get these merged to 4.17? 
-
-There was a consensus to fix the architectures having API violation issues.
-https://www.mail-archive.com/netdev at vger.kernel.org/msg225971.html
-
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Thanks,
+> Bhupesh
