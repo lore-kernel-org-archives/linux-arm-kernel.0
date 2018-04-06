@@ -1,107 +1,36 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 6 Apr 2018 11:06:35 +0100
-Subject: [PATCH 3/5] arm64: early ISB at exit from extended quiescent state
-In-Reply-To: <20180405171800.5648-4-ynorov@caviumnetworks.com>
-References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
- <20180405171800.5648-4-ynorov@caviumnetworks.com>
-Message-ID: <c7e03021-4c55-8e5f-3480-6628d83d8cd9@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 6 Apr 2018 18:17:27 +0800
+Subject: [stericsson:earlydebug 1/1] main.c:undefined reference to `printascii'
+Message-ID: <201804061819.S7m5cVtd%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
+head:   d4c6fbc5c32480ae0ad658cc92307ae10629c05a
+commit: d4c6fbc5c32480ae0ad658cc92307ae10629c05a [1/1] uglyhack printascii
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout d4c6fbc5c32480ae0ad658cc92307ae10629c05a
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-On 05/04/18 18:17, Yury Norov wrote:
-> This series enables delaying of kernel memory synchronization
-> for CPUs running in extended quiescent state (EQS) till the exit
-> of that state.
-> 
-> ARM64 uses IPI mechanism to notify all cores in  SMP system that
-> kernel text is changed; and IPI handler calls isb() to synchronize.
-> 
-> If we don't deliver IPI to EQS CPUs anymore, we should add ISB early
-> in EQS exit path.
-> 
-> There are 2 such paths. One starts in do_idle() loop, and other
-> in el0_svc entry. For do_idle(), isb() is added in
-> arch_cpu_idle_exit() hook. And for SVC handler, isb is called in
-> el0_svc_naked.
+All errors (new ones prefixed by >>):
 
-(I know nothing about this EQS stuff, but) there is a third path that might be
-relevant.
->From include/linux/context_tracking.h:guest_enter_irqoff():
-|	 * KVM does not hold any references to rcu protected data when it
-|	 * switches CPU into a guest mode. In fact switching to a guest mode
-|	 * is very similar to exiting to userspace from rcu point of view. In
-|	 * addition CPU may stay in a guest mode for quite a long time (up to
-|	 * one time slice). Lets treat guest mode as quiescent state, just like
-|	 * we do with user-mode execution.
+   init/main.o: In function `start_kernel':
+>> main.c:(.init.text+0x594): undefined reference to `printascii'
+   kernel/printk/printk.o: In function `vprintk_emit':
+>> printk.c:(.text+0x203c): undefined reference to `printascii'
 
-For non-VHE systems guest_enter_irqoff()() is called just before we jump to EL2.
-Coming back gives us an exception-return, so we have a context-synchronisation
-event there, and I assume we will never patch the hyp-text on these systems.
-
-But with VHE on the upcoming kernel version we still go on to run code at the
-same EL. Do we need an ISB on the path back from the guest once we've told RCU
-we've 'exited user-space'?
-If this code can be patched, do we have a problem here?
-
-
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index c8d9ec363ddd..b1e1c19b4432 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -48,7 +48,7 @@
->  	.endm
->  
->  	.macro el0_svc_restore_syscall_args
-> -#if defined(CONFIG_CONTEXT_TRACKING)
-> +#if !defined(CONFIG_TINY_RCU) || defined(CONFIG_CONTEXT_TRACKING)
->  	restore_syscall_args
->  #endif
->  	.endm
-> @@ -483,6 +483,19 @@ __bad_stack:
->  	ASM_BUG()
->  	.endm
->  
-> +/*
-> + * If CPU is in extended quiescent state we need isb to ensure that
-> + * possible change of kernel text is visible by the core.
-> + */
-> +	.macro	isb_if_eqs
-> +#ifndef CONFIG_TINY_RCU
-> +	bl	rcu_is_watching
-> +	cbnz	x0, 1f
-> +	isb 					// pairs with aarch64_insn_patch_text
-> +1:
-> +#endif
-> +	.endm
-> +
->  el0_sync_invalid:
->  	inv_entry 0, BAD_SYNC
->  ENDPROC(el0_sync_invalid)
-> @@ -949,6 +962,7 @@ alternative_else_nop_endif
->  
->  el0_svc_naked:					// compat entry point
->  	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
-> +	isb_if_eqs
->  	enable_daif
->  	ct_user_exit
->  	el0_svc_restore_syscall_args
-
-Shouldn't this be at the point that RCU knows we've exited user-space? Otherwise
-there is a gap where RCU thinks we're in user-space, we're not, and we're about
-to tell it. Code-patching occurring in this gap would be missed.
-
-This gap only contains 'enable_daif', and any exception that occurs here is
-safe, but its going to give someone a nasty surprise...
-
-Mark points out this ISB needs to be after RCU knows we're not quiescent:
-https://lkml.org/lkml/2018/4/3/378
-
-Can't this go in the rcu exit-quiescence code? Isn't this what your
-rcu_dynticks_eqs_exit_sync() hook does?
-
-
-Thanks,
-
-James
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23719 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180406/be812ca9/attachment-0001.gz>
