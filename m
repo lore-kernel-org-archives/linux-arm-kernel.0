@@ -1,72 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Apr 2018 10:09:20 +0100
-Subject: [PATCH v7 2/5] arm: arm64: page_alloc: reduce unnecessary binary
- search in memblock_next_valid_pfn()
-In-Reply-To: <20180405125054.GC2647@bombadil.infradead.org>
-References: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
- <1522915478-5044-3-git-send-email-hejianet@gmail.com>
- <20180405113444.GB2647@bombadil.infradead.org>
- <1f809296-e88d-1090-0027-890782b91d6e@gmail.com>
- <20180405125054.GC2647@bombadil.infradead.org>
-Message-ID: <20180406090920.GM16141@n2100.armlinux.org.uk>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Fri, 6 Apr 2018 11:21:28 +0200
+Subject: [PATCH v4 1/6] PCI: aardvark: Introduce an
+ advk_pcie_valid_device() helper
+In-Reply-To: <20180404112843.GA24669@red-moon>
+References: <20180329083946.25970-1-thomas.petazzoni@bootlin.com>
+ <20180329083946.25970-2-thomas.petazzoni@bootlin.com>
+ <20180404112843.GA24669@red-moon>
+Message-ID: <20180406112128.6b904f39@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 05:50:54AM -0700, Matthew Wilcox wrote:
-> On Thu, Apr 05, 2018 at 08:44:12PM +0800, Jia He wrote:
+Hello,
+
+On Wed, 4 Apr 2018 12:28:43 +0100, Lorenzo Pieralisi wrote:
+> On Thu, Mar 29, 2018 at 10:39:41AM +0200, Thomas Petazzoni wrote:
+> > In other to mimic other PCIe host controller drivers, introduce an
+> > advk_pcie_valid_device() helper, used in the configuration read/write
+> > functions.
 > > 
-> > 
-> > On 4/5/2018 7:34 PM, Matthew Wilcox Wrote:
-> > > On Thu, Apr 05, 2018 at 01:04:35AM -0700, Jia He wrote:
-> > > > Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-> > > > where possible") optimized the loop in memmap_init_zone(). But there is
-> > > > still some room for improvement. E.g. if pfn and pfn+1 are in the same
-> > > > memblock region, we can simply pfn++ instead of doing the binary search
-> > > > in memblock_next_valid_pfn.
-> > > Sure, but I bet if we are >end_pfn, we're almost certainly going to the
-> > > start_pfn of the next block, so why not test that as well?
-> > > 
-> > > > +	/* fast path, return pfn+1 if next pfn is in the same region */
-> > > > +	if (early_region_idx != -1) {
-> > > > +		start_pfn = PFN_DOWN(regions[early_region_idx].base);
-> > > > +		end_pfn = PFN_DOWN(regions[early_region_idx].base +
-> > > > +				regions[early_region_idx].size);
-> > > > +
-> > > > +		if (pfn >= start_pfn && pfn < end_pfn)
-> > > > +			return pfn;
-> > > 		early_region_idx++;
-> > > 		start_pfn = PFN_DOWN(regions[early_region_idx].base);
-> > > 		if (pfn >= end_pfn && pfn <= start_pfn)
-> > > 			return start_pfn;
-> > Thanks, thus the binary search in next step can be discarded?
+> > This patch by itself is not a fix, but it is required for a follow-up
+> > patch that is a fix, hence the Fixes tag and the Cc to stable.  
 > 
-> I don't know all the circumstances in which this is called.  Maybe a linear
-> search with memo is more appropriate than a binary search.
+> Should not we just reshuffle patch 1 and 2 instead of sending this
+> patch to stable ? I appreciate the merge window is open and timing is
+> quite tight, it is just to avoid sending churn to stable kernels
+> for not much.
 
-That's been brought up before, and the reasoning appears to be
-something along the lines of...
+I can certainly do that, but it's actually Bjorn who asked in the first
+place to introduce the advk_pcie_valid_device() helper.
 
-Academics and published wisdom is that on cached architectures, binary
-searches are bad because it doesn't operate efficiently due to the
-overhead from having to load cache lines.  Consequently, there seems
-to be a knee-jerk reaction that "all binary searches are bad, we must
-eliminate them."
+I'll send a new patch series that has these reshuffled.
 
-What is failed to be grasped here, though, is that it is typical that
-the number of entries in this array tend to be small, so the entire
-array takes up one or two cache lines, maybe a maximum of four lines
-depending on your cache line length and number of entries.
+Thanks,
 
-This means that the binary search expense is reduced, and is lower
-than a linear search for the majority of cases.
-
-What is key here as far as performance is concerned is whether the
-general usage of pfn_valid() by the kernel is optimal.  We should
-not optimise only for the boot case, which means evaluating the
-effect of these changes with _real_ workloads, not just "does my
-machine boot a milliseconds faster".
-
+Thomas
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
