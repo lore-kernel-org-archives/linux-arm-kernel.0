@@ -1,117 +1,55 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 10:12:28 -0700
-Subject: [PATCHv7 3/3] clk: socfpga: stratix10: add clock driver for
- Stratix10 platform
-In-Reply-To: <1521642012-9770-3-git-send-email-dinguyen@kernel.org>
-References: <1521642012-9770-1-git-send-email-dinguyen@kernel.org>
- <1521642012-9770-3-git-send-email-dinguyen@kernel.org>
-Message-ID: <152303474801.143116.12893988829541761898@swboyd.mtv.corp.google.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Apr 2018 18:22:11 +0100
+Subject: [PATCH 1/5] arm64: entry: isb in el1_irq
+In-Reply-To: <20180406165402.nq3sabeku2mp3hpb@yury-thinkpad>
+References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
+ <20180405171800.5648-2-ynorov@caviumnetworks.com>
+ <5036b99a-9faa-c220-27dd-e0d73f8b3fc7@arm.com>
+ <20180406165402.nq3sabeku2mp3hpb@yury-thinkpad>
+Message-ID: <20180406172211.r42reit2bnpocab2@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dinh Nguyen (2018-03-21 07:20:12)
-> Add a clock driver for the Stratix10 SoC. The driver is similar to the
-> Cyclone5/Arria10 platforms, with the exception that this driver only uses
-> one single clock binding.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
-> ---
+On Fri, Apr 06, 2018 at 07:54:02PM +0300, Yury Norov wrote:
+> In general, kick_all_cpus_sync() is needed to switch contexts. But exit from
+> userspace is anyway the switch of context. And while in userspace, we cannot
+> do something wrong on kernel side. For me it means that we can safely drop
+> IPI for all userspace modes - both normal and nohz_full. 
 
-Applied to clk-next but I made some fixes. Also, it would be nice if you
-could follow up with using the platform driver APIs to map memory and
-also make sure to implement a driver remove path or block it with the
-suppress attribute.
+This *may* be true, but only if we never have to patch text in the
+windows:
 
-diff --git a/drivers/clk/socfpga/clk-gate-s10.c b/drivers/clk/socfpga/clk-gate-s10.c
-index 71ca3c045a42..eee2d48ab656 100644
---- a/drivers/clk/socfpga/clk-gate-s10.c
-+++ b/drivers/clk/socfpga/clk-gate-s10.c
-@@ -4,6 +4,7 @@
-  */
- #include <linux/clk-provider.h>
- #include <linux/slab.h>
-+#include "stratix10-clk.h"
- #include "clk.h"
- 
- #define SOCFPGA_CS_PDBG_CLK	"cs_pdbg_clk"
-@@ -63,7 +64,7 @@ static const struct clk_ops dbgclk_ops = {
- 	.get_parent = socfpga_gate_get_parent,
- };
- 
--struct clk *s10_register_gate(char *name, const char *parent_name,
-+struct clk *s10_register_gate(const char *name, const char *parent_name,
- 			      const char * const *parent_names,
- 			      u8 num_parents, unsigned long flags,
- 			      void __iomem *regbase, unsigned long gate_reg,
-diff --git a/drivers/clk/socfpga/clk-periph-s10.c b/drivers/clk/socfpga/clk-periph-s10.c
-index 6021ac1b0667..568f59b58ddf 100644
---- a/drivers/clk/socfpga/clk-periph-s10.c
-+++ b/drivers/clk/socfpga/clk-periph-s10.c
-@@ -5,6 +5,7 @@
- #include <linux/slab.h>
- #include <linux/clk-provider.h>
- 
-+#include "stratix10-clk.h"
- #include "clk.h"
- 
- #define CLK_MGR_FREE_SHIFT		16
-@@ -71,7 +72,7 @@ static const struct clk_ops peri_cnt_clk_ops = {
- 	.get_parent = clk_periclk_get_parent,
- };
- 
--struct clk *s10_register_periph(char *name, const char *parent_name,
-+struct clk *s10_register_periph(const char *name, const char *parent_name,
- 				const char * const *parent_names,
- 				u8 num_parents, unsigned long flags,
- 				void __iomem *reg, unsigned long offset)
-@@ -103,7 +104,7 @@ struct clk *s10_register_periph(char *name, const char *parent_name,
- 	return clk;
- }
- 
--struct clk *s10_register_cnt_periph(char *name, const char *parent_name,
-+struct clk *s10_register_cnt_periph(const char *name, const char *parent_name,
- 				    const char * const *parent_names,
- 				    u8 num_parents, unsigned long flags,
- 				    void __iomem *regbase, unsigned long offset,
-diff --git a/drivers/clk/socfpga/clk-pll-s10.c b/drivers/clk/socfpga/clk-pll-s10.c
-index ef24ca7a0cc4..2d5d8b43727e 100644
---- a/drivers/clk/socfpga/clk-pll-s10.c
-+++ b/drivers/clk/socfpga/clk-pll-s10.c
-@@ -5,6 +5,7 @@
- #include <linux/slab.h>
- #include <linux/clk-provider.h>
- 
-+#include "stratix10-clk.h"
- #include "clk.h"
- 
- /* Clock Manager offsets */
-diff --git a/drivers/clk/socfpga/clk-s10.c b/drivers/clk/socfpga/clk-s10.c
-index 27a08b3b30e6..3a11c382a663 100644
---- a/drivers/clk/socfpga/clk-s10.c
-+++ b/drivers/clk/socfpga/clk-s10.c
-@@ -48,11 +48,11 @@ static const struct stratix10_pll_clock s10_pll_clks[] = {
- };
- 
- static const struct stratix10_perip_c_clock s10_main_perip_c_clks[] = {
--	{ STRATIX10_MAIN_MPU_BASE_CLK, "main_mpu_base_clk", "main_pll", 0, 1, 0, 0x84},
--	{ STRATIX10_MAIN_NOC_BASE_CLK, "main_noc_base_clk", "main_pll", 0, 1, 0, 0x88},
--	{ STRATIX10_PERI_MPU_BASE_CLK, "peri_mpu_base_clk", "periph_pll", 0, 1, 0,
-+	{ STRATIX10_MAIN_MPU_BASE_CLK, "main_mpu_base_clk", "main_pll", NULL, 1, 0, 0x84},
-+	{ STRATIX10_MAIN_NOC_BASE_CLK, "main_noc_base_clk", "main_pll", NULL, 1, 0, 0x88},
-+	{ STRATIX10_PERI_MPU_BASE_CLK, "peri_mpu_base_clk", "periph_pll", NULL, 1, 0,
- 	  0xF4},
--	{ STRATIX10_PERI_NOC_BASE_CLK, "peri_noc_base_clk", "periph_pll", 0, 1, 0,
-+	{ STRATIX10_PERI_NOC_BASE_CLK, "peri_noc_base_clk", "periph_pll", NULL, 1, 0,
- 	  0xF8},
- };
- 
-diff --git a/drivers/clk/socfpga/stratix10-clk.h b/drivers/clk/socfpga/stratix10-clk.h
-index f6c9291ed315..e8e121907952 100644
---- a/drivers/clk/socfpga/stratix10-clk.h
-+++ b/drivers/clk/socfpga/stratix10-clk.h
-@@ -76,5 +76,5 @@ struct clk *s10_register_gate(const char *, const char *,
- 			      unsigned long, void __iomem *,
- 			      unsigned long, unsigned long,
- 			      unsigned long, unsigned long, u8,
--			      unsigned long, unsigned long, u8);
-+			      unsigned long, u8, u8);
+* between exception entry and eqs_exit()
+
+* between eqs_enter() and exception return
+
+* between eqs_enter() and eqs_exit() in the idle loop.
+
+If it's possible that we need to execute patched text in any of those
+paths, we must IPI all CPUs in order to correctly serialize things.
+
+Digging a bit, I also thing that our ct_user_exit and ct_user_enter
+usage is on dodgy ground today.
+
+For example, in el0_dbg we call do_debug_exception() *before* calling
+ct_user_exit. Which I believe means we'd use RCU while supposedly in an
+extended quiescent period, which would be bad.
+
+In other paths, we unmask all DAIF bits before calling ct_user_exit, so
+we could similarly take an EL1 debug exception without having exited the
+extended quiescent period.
+
+I think similar applies to SDEI; we don't negotiate with RCU prior to
+invoking handlers, which might need RCU.
+
+> If it's correct, for v3 I would suggest:
+>  - in kick_all_cpus_sync() mask all is_idle_task() and user_mode() CPUs;
+>  - add isb() for arm64 in do_idle() path only - this path doesn't imply
+>    context switch.
+
+As mentioned in my other reply, I don't think the ISB in do_idle()
+makes sense, unless that occurs *after* we exit the extended quiescent
+state.
+
+Thanks,
+Mark.
