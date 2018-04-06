@@ -1,52 +1,62 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 6 Apr 2018 17:50:20 +0530
-Subject: [GIT PULL] Mailbox changes for v4.17
-Message-ID: <CABb+yY0U36FAc+KdObDvE6MfJpNdLZ7gJxdBAG14ou7ECOduXw@mail.gmail.com>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Fri, 6 Apr 2018 12:29:02 +0000
+Subject: [PATCH v2 2/2] mailbox: add STMicroelectronics STM32 IPCC driver
+In-Reply-To: <CABb+yY1x7J_oEgU-LR5jPYCoCoUHng84E+CibTxLzdtxhENTBw@mail.gmail.com>
+References: <1520852307-26659-1-git-send-email-fabien.dessenne@st.com>
+ <1520852307-26659-3-git-send-email-fabien.dessenne@st.com>
+ <CABb+yY1x7J_oEgU-LR5jPYCoCoUHng84E+CibTxLzdtxhENTBw@mail.gmail.com>
+Message-ID: <4a2170b7-e5e9-4f5c-8ff7-79e102a658c1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi
 
-The following changes since commit 0aa3fdb8b3a6df3c2e3b61dbfe079db9d30e03cd:
 
-  Merge tag 'scsi-fixes' of
-git://git.kernel.org/pub/scm/linux/kernel/git/jejb/scsi (2018-03-14
-17:02:49 -0700)
+On 05/04/18 11:38, Jassi Brar wrote:
+> On Mon, Mar 12, 2018 at 4:28 PM, Fabien Dessenne <fabien.dessenne@st.com> wrote:
+> ....
+>> +
+>> +       /* irq */
+>> +       for (i = 0; i < IPCC_IRQ_NUM; i++) {
+>> +               ipcc->irqs[i] = of_irq_get_byname(dev->of_node, irq_name[i]);
+>> +               if (ipcc->irqs[i] < 0) {
+>> +                       dev_err(dev, "no IRQ specified %s\n", irq_name[i]);
+>> +                       ret = ipcc->irqs[i];
+>> +                       goto err_clk;
+>> +               }
+>> +
+>> +               ret = devm_request_threaded_irq(dev, ipcc->irqs[i], NULL,
+>> +                                               irq_thread[i], IRQF_ONESHOT,
+>> +                                               dev_name(dev), ipcc);
+>>
+> In your interrupt handlers you don't do anything that could block.
+> Threads only adds some delay to your message handling.
+> So maybe use devm_request_irq() ?
 
-are available in the git repository at:
+The interrupt handlers call mbox_chan_received_data() / 
+mbox_chan_txdone(), which call in turn client's rx_callback() / 
+tx_done() / tx_prepare() which behavior may be unsafe. Hence, using a 
+threaded irq here seems to be a good choice.
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-tags/mailbox-v4.17
 
-for you to fetch changes up to 41c0e939d70ddb6860e340e7532df8984783f867:
+>
+> .......
+>> +
+>> +static struct platform_driver stm32_ipcc_driver = {
+>> +       .driver = {
+>> +               .name = "stm32-ipcc",
+>> +               .owner = THIS_MODULE,
+>>
+> No need of owner here these days.
 
-  mailbox: Add support for Hi3660 mailbox (2018-03-20 11:15:54 +0800)
+OK, I will suppress it.
 
-----------------------------------------------------------------
-- New Hi3660 mailbox driver
-- Fix TEGRA Kconfig warning
-- Broadcom: use dma_pool_zalloc instead of dma_pool_alloc+memset
+> And also maybe use readl/writel, instead of _relaxed.
 
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      mailbox: tegra: relax TEGRA_HSP_MBOX Kconfig dependencies
+The IPCC device is exclusively used on ARM. In ARM architecture, the 
+ioremap on devices are strictly ordered and uncached.
+In that case, using _relaxed avoids an unneeded cache flush, slightly 
+improving performance.
 
-Kaihua Zhong (1):
-      mailbox: Add support for Hi3660 mailbox
-
-Leo Yan (1):
-      dt-bindings: mailbox: Introduce Hi3660 controller binding
-
-Souptick Joarder (1):
-      maillbox: bcm-flexrm-mailbox: Use dma_pool_zalloc()
-
- .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  |  51 ++++
- drivers/mailbox/Kconfig                            |  10 +-
- drivers/mailbox/Makefile                           |   2 +
- drivers/mailbox/bcm-flexrm-mailbox.c               |   3 +-
- drivers/mailbox/hi3660-mailbox.c                   | 312 +++++++++++++++++++++
- 5 files changed, 375 insertions(+), 3 deletions(-)
- create mode 100644
-Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
- create mode 100644 drivers/mailbox/hi3660-mailbox.c
-~
+>
+> Cheers!
