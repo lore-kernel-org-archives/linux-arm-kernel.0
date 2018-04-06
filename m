@@ -1,17 +1,18 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 13:44:31 -0700
-Subject: [PATCH 1/6] clk: stm32mp1: add missing static
-In-Reply-To: <1522996773-24129-2-git-send-email-gabriel.fernandez@st.com>
+Date: Fri, 06 Apr 2018 13:44:41 -0700
+Subject: [PATCH 5/6] clk: stm32mp1: set stgen_k clock as critical
+In-Reply-To: <1522996773-24129-6-git-send-email-gabriel.fernandez@st.com>
 References: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
- <1522996773-24129-2-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <152304747115.94378.14106353541958461583@swboyd.mtv.corp.google.com>
+ <1522996773-24129-6-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <152304748126.94378.3341413958898112749@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting gabriel.fernandez at st.com (2018-04-05 23:39:28)
+Quoting gabriel.fernandez at st.com (2018-04-05 23:39:32)
 > From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> Add missing static for const parent names and clock ops.
+> stgen_k should be declared as critical to avoid blocking console
+> when ck_hsi is not used.
 > 
 > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
