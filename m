@@ -1,17 +1,22 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 11:18:37 -0700
-Subject: [PATCH v3 03/10] clk: qcom: Add CPU clock driver for msm8996
-In-Reply-To: <024f01d3c1cb$304eaa60$90ebff20$@codeaurora.org>
-References: <1518616792-29028-1-git-send-email-ilialin@codeaurora.org>
- <1518616792-29028-4-git-send-email-ilialin@codeaurora.org>
- <152148100496.242365.3846617702949655708@swboyd.mtv.corp.google.com>
- <024f01d3c1cb$304eaa60$90ebff20$@codeaurora.org>
-Message-ID: <152303871765.143116.6979602150972963768@swboyd.mtv.corp.google.com>
+Date: Fri, 06 Apr 2018 11:20:08 -0700
+Subject: [RESEND 1/4] clk: imx7d: Add USB clock information
+In-Reply-To: <1522219599-10831-2-git-send-email-abel.vesa@nxp.com>
+References: <1522219599-10831-1-git-send-email-abel.vesa@nxp.com>
+ <1522219599-10831-2-git-send-email-abel.vesa@nxp.com>
+Message-ID: <152303880853.143116.713341287544981271@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting ilialin at codeaurora.org (2018-03-22 03:47:30)
+Quoting Abel Vesa (2018-03-27 23:46:35)
+> From: Peter Chen <peter.chen@freescale.com>
 > 
-> I will have to change the clk_hw_unregister_fixed_rate() as well then, right? This will be an API change.
+> Add USB clock information, the pll_usb_main_clk is USB_PLL at CCM
+> which is the output of USBOTG2 PHY.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Signed-off-by: Irina Tirdea <irina.tirdea@nxp.com>
+> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+> ---
 
-You won't need to unregister anything? devm will take care of it.
+Applied to clk-next
