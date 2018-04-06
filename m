@@ -1,45 +1,41 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 6 Apr 2018 09:34:41 +0200
-Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
-In-Reply-To: <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
-References: <20180403154449.2443-1-ssuloev@orpaltech.com>
- <20180403154449.2443-4-ssuloev@orpaltech.com>
- <20180404065048.n76r3ytuznd6fqsl@flea>
- <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
- <20180405091913.ky4dnmszoobn2xry@flea>
- <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
- <20180405131735.GB12349@sirena.org.uk>
- <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
-Message-ID: <20180406073441.xesojvzc3deljhoy@flea>
+From: quentin.schulz@bootlin.com (Quentin Schulz)
+Date: Fri,  6 Apr 2018 09:50:44 +0200
+Subject: [PATCH 1/2] ARM: SPEAr600: add DT description of the watchdog
+Message-ID: <0635969b6ef0fe528a27a8b6493cc3df770e1f60.1523000725.git-series.quentin.schulz@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 04:44:16PM +0300, Sergey Suloev wrote:
-> On 04/05/2018 04:17 PM, Mark Brown wrote:
-> > On Thu, Apr 05, 2018 at 12:59:35PM +0300, Sergey Suloev wrote:
-> > > On 04/05/2018 12:19 PM, Maxime Ripard wrote:
-> > > > The point of that patch was precisely to allow to send more data than
-> > > > the FIFO. You're breaking that behaviour without any justification,
-> > > > and this is not ok.
-> > > I am sorry, but you can't. That's a hardware limitation.
-> > Are you positive about that?  Normally you can add things to hardware
-> > FIFOs while they're being drained so so long as you can keep data
-> > flowing in at least as fast as it's being consumed.
-> 
-> Well, normally yes, but this is not the case with the hardware that I own.
-> My a20 (BPiM1+) and a31 (BPiM2) boards behaves differently. With a transfer
-> larger than FIFO then TC interrupt never happens.
+The SPEAr600 has a built-in watchdog which already has a DT binding
+described in Documentation/devicetree/bindings/watchdog/sp805-wdt.txt.
 
-Because you're not supposed to have a transfer larger than the FIFO,
-but to have to setup at first a transfer the size of the FIFO, and
-then when it's (or starts to be) depleted, fill it up again.
+Let's add the description of the watchdog device in the SPEAr600 Device
+Tree.
 
-That's the point of the patch you're reverting, and if it doesn't
-work, you should make it work and not simply revert it.
+Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
+---
+ arch/arm/boot/dts/spear600.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Maxime
+diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+index 00166eb..d7c3096 100644
+--- a/arch/arm/boot/dts/spear600.dtsi
++++ b/arch/arm/boot/dts/spear600.dtsi
+@@ -213,6 +213,14 @@
+ 				interrupts = <6>;
+ 				status = "disabled";
+ 			};
++
++			wdt: wdt at fc880000 {
++				compatible = "arm,sp805", "arm,primecell";
++				reg = <0xfc880000 0x1000>;
++				interrupt-parent = <&vic1>;
++				interrupts = <20>;
++				status = "disabled";
++			};
+ 		};
+ 	};
+ };
 
+base-commit: 5e1dacccbb87780856219e29122f1eccec912ebb
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+git-series 0.9.1
