@@ -1,76 +1,95 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 6 Apr 2018 08:39:31 +0200
-Subject: [PATCH 4/6] clk: stm32mp1: add missing tzc2 clock
-In-Reply-To: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
-References: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1522996773-24129-5-git-send-email-gabriel.fernandez@st.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 6 Apr 2018 10:00:33 +0300
+Subject: [PATCH] ARM: dts: omap3-beagle-xm: Add fixed 26MHz clock as fck
+ for twl
+In-Reply-To: <1b05ea2c-fa95-e5c7-2a37-4e0b46f62abc@ti.com>
+References: <20180405115239.17370-1-peter.ujfalusi@ti.com>
+ <1b05ea2c-fa95-e5c7-2a37-4e0b46f62abc@ti.com>
+Message-ID: <065d346a-12a4-3dc6-d8a3-e5351a73a7ab@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch adds tzc2 clock and rename tzc clock into tzc1
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/clk/clk-stm32mp1.c                | 9 ++++++---
- include/dt-bindings/clock/stm32mp1-clks.h | 3 ++-
- 2 files changed, 8 insertions(+), 4 deletions(-)
+On 2018-04-05 16:15, Peter Ujfalusi wrote:
+> 
+> 
+> On 2018-04-05 14:52, Peter Ujfalusi wrote:
+>> The board uses 26MHz oscillator for the twl4030 HFCLK.
+>> This way we will not depend on the bootloader to configure the
+>> CFG_BOOT:HFCLK_FREQ
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>> Hi,
+>>
+>> there might be other boards (all omap3 boards with twl4030?) which uses the same
+>> setup, but I only have schematics for beagle-xm.
+>>
+>> In order for the driver to actually use the clock the 
+>> [PATCH] mfd: twl-core: Fix clock initialization
+>> need to be applied. W/o the twl-core patch the clock is just ignored.
+>>
+>> Regards,
+>> Peter
+>>
+>>  arch/arm/boot/dts/omap3-beagle-xm.dts | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> index 0349fcc9dc26..d80587de0bbf 100644
+>> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+>> @@ -30,6 +30,13 @@
+>>  		ethernet = &ethernet;
+>>  	};
+>>  
+>> +	/* fixed 26MHz oscillator */
+>> +	hfclk_26m: oscillator {
+>> +		#clock-cells = <0>;
+>> +		compatible = "fixed-clock";
+>> +		clock-frequency = <26000000>;
+>> +	};
+>> +
+>>  	leds {
+>>  		compatible = "gpio-leds";
+>>  
+>> @@ -274,6 +281,9 @@
+>>  		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+>>  		interrupt-parent = <&intc>;
+>>  
+>> +		clocks = <&hfclk_26m>;
+>> +		clock-names = "fck";
+> 
+> I wonder if we should rename this to hfclk...
+> The DT documentation does not mention it and afaik it is not specified
+> in DT files either.
+> 
+> After all it is the HFCLK clock for the twl4030.
 
-diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index eefed49..e32fc23 100644
---- a/drivers/clk/clk-stm32mp1.c
-+++ b/drivers/clk/clk-stm32mp1.c
-@@ -1399,7 +1399,8 @@ enum {
- 	G_USBH,
- 	G_ETHSTP,
- 	G_RTCAPB,
--	G_TZC,
-+	G_TZC1,
-+	G_TZC2,
- 	G_TZPC,
- 	G_IWDG1,
- 	G_BSEC,
-@@ -1500,7 +1501,8 @@ enum {
- 	K_GATE(G_BSEC,		RCC_APB5ENSETR, 16, 0),
- 	K_GATE(G_IWDG1,		RCC_APB5ENSETR, 15, 0),
- 	K_GATE(G_TZPC,		RCC_APB5ENSETR, 13, 0),
--	K_GATE(G_TZC,		RCC_APB5ENSETR, 12, 0),
-+	K_GATE(G_TZC2,		RCC_APB5ENSETR, 12, 0),
-+	K_GATE(G_TZC1,		RCC_APB5ENSETR, 11, 0),
- 	K_GATE(G_RTCAPB,	RCC_APB5ENSETR, 8, 0),
- 	K_MGATE(G_USART1,	RCC_APB5ENSETR, 4, 0),
- 	K_MGATE(G_I2C6,		RCC_APB5ENSETR, 3, 0),
-@@ -1854,7 +1856,8 @@ enum {
- 	PCLK(USART1, "usart1", "pclk5", 0, G_USART1),
- 	PCLK(RTCAPB, "rtcapb", "pclk5", CLK_IGNORE_UNUSED |
- 	     CLK_IS_CRITICAL, G_RTCAPB),
--	PCLK(TZC, "tzc", "pclk5", CLK_IGNORE_UNUSED, G_TZC),
-+	PCLK(TZC1, "tzc1", "ck_axi", CLK_IGNORE_UNUSED, G_TZC1),
-+	PCLK(TZC2, "tzc2", "ck_axi", CLK_IGNORE_UNUSED, G_TZC2),
- 	PCLK(TZPC, "tzpc", "pclk5", CLK_IGNORE_UNUSED, G_TZPC),
- 	PCLK(IWDG1, "iwdg1", "pclk5", 0, G_IWDG1),
- 	PCLK(BSEC, "bsec", "pclk5", CLK_IGNORE_UNUSED, G_BSEC),
-diff --git a/include/dt-bindings/clock/stm32mp1-clks.h b/include/dt-bindings/clock/stm32mp1-clks.h
-index 86e3ec6..6c807fd 100644
---- a/include/dt-bindings/clock/stm32mp1-clks.h
-+++ b/include/dt-bindings/clock/stm32mp1-clks.h
-@@ -76,7 +76,7 @@
- #define I2C6		63
- #define USART1		64
- #define RTCAPB		65
--#define TZC		66
-+#define TZC1		66
- #define TZPC		67
- #define IWDG1		68
- #define BSEC		69
-@@ -123,6 +123,7 @@
- #define CRC1		110
- #define USBH		111
- #define ETHSTP		112
-+#define TZC2		113
- 
- /* Kernel clocks */
- #define SDMMC1_K	118
--- 
-1.9.1
+We should not as it would break compatibility with stable kernels where
+the code expects 'fck' and not hfclk.
+
+> 
+> I'm fine keeping it as 'fck' but it looks a bit weird.
+> 
+>> +
+>>  		twl_audio: audio {
+>>  			compatible = "ti,twl4030-audio";
+>>  			codec {
+>>
+> 
+> - P?ter
+> 
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+- P?ter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
