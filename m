@@ -1,39 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 6 Apr 2018 13:27:07 +0530
-Subject: [PATCH 2/2] clk: spear: fix WDT clock definition on SPEAr600
-In-Reply-To: <c7240072ab53d5d34a9756389729343243028eb3.1523000725.git-series.quentin.schulz@bootlin.com>
-References: <0635969b6ef0fe528a27a8b6493cc3df770e1f60.1523000725.git-series.quentin.schulz@bootlin.com>
- <c7240072ab53d5d34a9756389729343243028eb3.1523000725.git-series.quentin.schulz@bootlin.com>
-Message-ID: <20180406075707.GX3572@vireshk-i7>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 6 Apr 2018 17:28:52 +0900
+Subject: [usb-next PATCH v11 3/8] usb: core: add a wrapper for the USB
+ PHYs on the HCD
+In-Reply-To: <CAFBinCDThyLeeHaB4WrtCCf_91jf68MohaUF7UbdgWxBDBq6LQ@mail.gmail.com>
+References: <20180303214309.25643-1-martin.blumenstingl@googlemail.com>
+ <20180303214309.25643-4-martin.blumenstingl@googlemail.com>
+ <CAK7LNARM=F3Ey0aO9PiNftxkcLVo4z10jdrkSrQE1f74nK1=Ng@mail.gmail.com>
+ <CAFBinCCRhJLxOCz6_a23XnVcSo35MpE8huA8keNFBrWmr_mR=A@mail.gmail.com>
+ <CAK7LNASN4mgSVXw425CEuFzJdgmgiv=u9h7T+_zSbqU7dwRRcA@mail.gmail.com>
+ <CAFBinCDThyLeeHaB4WrtCCf_91jf68MohaUF7UbdgWxBDBq6LQ@mail.gmail.com>
+Message-ID: <CAK7LNAQ=ke2MJVx2Fs-bSAO40QT7ceMNfPXJy2AOREfNb_7r_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06-04-18, 09:50, Quentin Schulz wrote:
-> There is no SPEAr600 device named "wdt". Instead, the description of the
-> WDT (watchdog) was recently added to the Device Tree, and the device
-> name is "fc880000.wdt", so we should associate the WDT fixed rate clock
-> to this device name.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@bootlin.com>
-> ---
->  drivers/clk/spear/spear6xx_clock.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
-> index f911d9f..47810be 100644
-> --- a/drivers/clk/spear/spear6xx_clock.c
-> +++ b/drivers/clk/spear/spear6xx_clock.c
-> @@ -147,7 +147,7 @@ void __init spear6xx_clk_init(void __iomem *misc_base)
->  
->  	clk = clk_register_fixed_factor(NULL, "wdt_clk", "osc_30m_clk", 0, 1,
->  			1);
-> -	clk_register_clkdev(clk, NULL, "wdt");
-> +	clk_register_clkdev(clk, NULL, "fc880000.wdt");
->  
->  	/* clock derived from pll1 clk */
->  	clk = clk_register_fixed_factor(NULL, "cpu_clk", "pll1_clk",
+2018-04-06 14:15 GMT+09:00 Martin Blumenstingl
+<martin.blumenstingl@googlemail.com>:
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>
+>> When will this be available in Linus' tree?   In the current MW?
+> this is already available in Linus' tree. the commit for this specific
+> patch (#3) is known as 07dbff0ddbd86c
+
+
+Oh, great!  Thank you.
+
+
+
+>> Sure, I can send a patch after some flaws are ironed-out.
+> great, thank you!
+> could you also let me know once you have tested this on one of your SoCs?
+
+I will.
+
+
+
+
 
 -- 
-viresh
+Best Regards
+Masahiro Yamada
