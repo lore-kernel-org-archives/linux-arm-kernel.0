@@ -1,55 +1,122 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 06 Apr 2018 11:37:56 +0200
-Subject: [PATCH] arm64: dts: marvell: mark CP110 ahci as dma-coherent
-In-Reply-To: <20180331144406.23030-1-kettenis@openbsd.org> (Mark Kettenis's
- message of "Sat, 31 Mar 2018 16:44:06 +0200")
-References: <20180331144406.23030-1-kettenis@openbsd.org>
-Message-ID: <87k1tkisjv.fsf@bootlin.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 6 Apr 2018 15:07:03 +0530
+Subject: [PATCH v5 12/44] clk: davinci: Add platform information for TI
+ DA850 PSC
+In-Reply-To: <CAMRc=MenWp=2dtOs1yafnHVkCxfT7SDS0fS2UxUd+U0s_UDwVw@mail.gmail.com>
+References: <1515377863-20358-1-git-send-email-david@lechnology.com>
+ <1515377863-20358-13-git-send-email-david@lechnology.com>
+ <CAMRc=MfQuqTK+mDT0Gawa6J-3d1z6djLutaHREKfVm+3hATEqQ@mail.gmail.com>
+ <CAEG3pND6Cu0P_t3y_VM9Sm-GCb3yW0Pa8q4cRUOXYxa5=2nWUQ@mail.gmail.com>
+ <a4d84be0-e3d3-4e39-40f9-cae9006cb6ee@ti.com>
+ <CAMRc=Mc228JAxxBXcObmokh2h-toojG8OHrmbunm_ORqbGWUnA@mail.gmail.com>
+ <69bc0848-0698-b936-96a3-2257a5e27809@ti.com>
+ <CAMRc=MenWp=2dtOs1yafnHVkCxfT7SDS0fS2UxUd+U0s_UDwVw@mail.gmail.com>
+Message-ID: <57f2182e-09b4-2cab-5602-9d0e029495be@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
- 
- On sam., mars 31 2018, Mark Kettenis <kettenis@openbsd.org> wrote:
+Hi Bart,
 
-> The hardware is clearly DMA coherent and not marking it as such leads
-> to cache coherency problems, at least with the OpenBSD kernel.
+On Thursday 05 April 2018 09:21 PM, Bartosz Golaszewski wrote:
+> 2018-04-05 16:36 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+>> On Thursday 05 April 2018 07:14 PM, Bartosz Golaszewski wrote:
+>>> 2018-04-05 15:09 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+>>>> Hi Bartosz,
+>>>>
+>>>> On Friday 09 February 2018 10:18 PM, Michael Turquette wrote:
+>>>>> On Fri, Feb 9, 2018 at 8:22 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>>>>>> 2018-01-08 3:17 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>>
+>>>>>> Hi David,
+>>>>>>
+>>>>>> I've been working on moving the genpd code from its own driver to the
+>>>>>> psc one. I couldn't get the system to boot though and problems
+>>>>>> happened very early in the boot sequence. I struggled to figure out
+>>>>>> what's happening, but eventually I noticed that psc uses
+>>>>>> CLK_OF_DECLARE() to initialize clocks. The functions registered this
+>>>>>> way are called very early in the boot sequence, way before
+>>>>>> late_initcall() in which the genpd framework is initialized. This of
+>>>>
+>>>> late_initcall() is too late for genpd to be initialized. As you may have
+>>>> seen with the latest set of patches, we have problems with timer
+>>>> initialization. After converting to platform devices, PSC and PLL clocks
+>>>> get initialized post time_init(). We are working that around using
+>>>> fixed-clocks, which hopefully will work (I still need to test many of
+>>>> the affected platforms).
+>>>>
+>>>> Can you please reply with the exact issue you faced with genpd framework
+>>>> initialization so we do have that on record.
+>>>>
+>>>
+>>> The exact issue manifested itself in a NULL-pointer dereference panic
+>>> when I tried moving the genpd code I had initially implemented as a
+>>> separate platform driver to what I believe was v6 or v7 of David's
+>>> series (before the psc driver became a platform driver, when it was
+>>> still using CLK_OF_DECLARE()). When I had tested a simple conversion
+>>> of that version to a platform_driver, genpd worked fine.
+>>>
+>>> I don't have the stack traces from these panics, but I recall some
+>>> debugfs functions being involved and the genpd late_initcalls are
+>>> related to debugfs. Looking at it now I don't see how exactly it could
+>>> fail though.
+>>
+>> Do you have the code where you faced the problem stashed somewhere? I am
+>> not (yet) advocating going back to CLK_OF_DECLARE(). But there is a
+>> definite issue with timer being ready when not using CLK_OF_DECLARE().
+>> So, I want to make sure there the reason why we are going down the
+>> platform device path is a amply clear.
+>>
+>> Thanks,
+>> Sekhar
+> 
+> Yes, you can still find it on my github[1].
+> 
+> Bart
+> 
+> [1] github.com:brgl/linux.git  topic/davinci-genpd-final-v2
 
-The reason to not having this flag from the beginning was that there was
-some issue around it in the very first revision (A0) of the SoC. But now
-all the SoC publicly released belongs to a newer revision that don't
-have anymore this issue, so your patch make sense.
+The panic issue in your branch is not related to genpd. Its because you 
+are accessing platform bus before it is initialized. The attached[1] 
+patch on top of your branch made it boot again.
 
-Applied on mvebu/dt64-for-4.18
+With your branch booting, I can see genpd related debugfs entries 
+getting created. I don't see devices being attached to the domains you 
+have though. I did not debug that. I suspect some matching issue.
+
+Can you please check that and confirm there is no issue with genpd and 
+using CLK_OF_DECLARE() to initialize clocks?
+
+Unless you report an issue back, or Mike and Stephen have ideas about 
+how to handle the dependency between PSC/PLL derived timer clock 
+initialization and and timer_probe(), I think we need to move back to 
+using CLK_OF_DECLARE(). 
 
 Thanks,
+Sekhar
 
-Gregory
-
-
->
-> Signed-off-by: Mark Kettenis <kettenis@openbsd.org>
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> index a8af4136dbe7..7e9177ef7b7d 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> @@ -231,6 +231,7 @@
->  			compatible = "marvell,armada-8k-ahci",
->  			"generic-ahci";
->  			reg = <0x540000 0x30000>;
-> +			dma-coherent;
->  			interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&CP110_LABEL(clk) 1 15>;
->  			status = "disabled";
-> -- 
-> 2.16.2
->
-
--- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+---8<---
+diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
+index 9d9f94eee544..7e3d114efdac 100644
+--- a/drivers/clk/davinci/psc.c
++++ b/drivers/clk/davinci/psc.c
+@@ -281,12 +281,18 @@ int __davinci_psc_register_clocks(const struct davinci_psc_clk_info *info,
+ 		}
+ 	}
+ 
+-	DO_ONCE(pm_clk_add_notifier,
+-		&platform_bus_type, &platform_bus_notifier);
+-
+ 	return 0;
+ }
+ 
++static int __init davinci_pm_runtime_init(void)
++{
++       pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
++
++       return 0;
++}
++core_initcall(davinci_pm_runtime_init);
++
+ int davinci_psc_register_clocks(const struct davinci_psc_clk_info *info,
+ 				void __iomem *base)
+ {
