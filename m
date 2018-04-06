@@ -1,75 +1,46 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 6 Apr 2018 21:50:44 +0530
-Subject: [PATCH v2 2/2] mailbox: add STMicroelectronics STM32 IPCC driver
-In-Reply-To: <f9a45a6e-5b3c-ddd0-e465-cfcad6ece818@st.com>
-References: <1520852307-26659-1-git-send-email-fabien.dessenne@st.com>
- <1520852307-26659-3-git-send-email-fabien.dessenne@st.com>
- <CABb+yY1x7J_oEgU-LR5jPYCoCoUHng84E+CibTxLzdtxhENTBw@mail.gmail.com>
- <4a2170b7-e5e9-4f5c-8ff7-79e102a658c1@st.com>
- <CABb+yY182+7xMbGCurzqxyoGFCRZn4_xKr3AvTQ2c+KyR1vx_w@mail.gmail.com>
- <f9a45a6e-5b3c-ddd0-e465-cfcad6ece818@st.com>
-Message-ID: <CABb+yY2Dd2Gr_-+4RaJarq3tve8tgzVqcoJw+MGT=+Vy56PwLw@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 6 Apr 2018 09:17:05 -0700
+Subject: [PATCH 1/1] arm64: To remove initrd reserved area entry from
+ memblock
+In-Reply-To: <1522990390-30804-1-git-send-email-chandan.vn@samsung.com>
+References: <CGME20180406045340epcas1p1ae6416dc25823212303c9109d125c018@epcas1p1.samsung.com>
+ <1522990390-30804-1-git-send-email-chandan.vn@samsung.com>
+Message-ID: <ff125919-66f7-6658-e9b1-817188c1bdd9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 6, 2018 at 8:35 PM, Fabien DESSENNE <fabien.dessenne@st.com> wrote:
->
-> On 06/04/18 14:56, Jassi Brar wrote:
->> On Fri, Apr 6, 2018 at 5:59 PM, Fabien DESSENNE <fabien.dessenne@st.com> wrote:
->>> Hi
->>>
->>>
->>> On 05/04/18 11:38, Jassi Brar wrote:
->>>> On Mon, Mar 12, 2018 at 4:28 PM, Fabien Dessenne <fabien.dessenne@st.com> wrote:
->>>> ....
->>>>> +
->>>>> +       /* irq */
->>>>> +       for (i = 0; i < IPCC_IRQ_NUM; i++) {
->>>>> +               ipcc->irqs[i] = of_irq_get_byname(dev->of_node, irq_name[i]);
->>>>> +               if (ipcc->irqs[i] < 0) {
->>>>> +                       dev_err(dev, "no IRQ specified %s\n", irq_name[i]);
->>>>> +                       ret = ipcc->irqs[i];
->>>>> +                       goto err_clk;
->>>>> +               }
->>>>> +
->>>>> +               ret = devm_request_threaded_irq(dev, ipcc->irqs[i], NULL,
->>>>> +                                               irq_thread[i], IRQF_ONESHOT,
->>>>> +                                               dev_name(dev), ipcc);
->>>>>
->>>> In your interrupt handlers you don't do anything that could block.
->>>> Threads only adds some delay to your message handling.
->>>> So maybe use devm_request_irq() ?
->>> The interrupt handlers call mbox_chan_received_data() /
->>> mbox_chan_txdone(), which call in turn client's rx_callback() /
->>> tx_done() / tx_prepare() which behavior may be unsafe. Hence, using a
->>> threaded irq here seems to be a good choice.
->>>
->> rx_callback() is supposed to be atomic.
->
-> I am worried with this atomic part (and honestly I did not note that the
-> callbacks were expected to be)
->
-> In my case, remoteproc->virtio->rpmsg is the mailbox client defining the
-> rx_callback.
-> If I follow your suggestion, I shall make this rx_callback Atomic in
-> remoteproc (or in virtio or rpmsg). And this does not seem to be so
-> simple (add a worker in the middle of somewhere?). Bjorn, feel free to
-> comment this part.
->
-> An alternate implementation consists in using a threaded IRQ for the
-> mailbox interrupt.
-> This option is not only simple, but also ensures to split bottom & half
-> parts at the irq level which is IMHO a general good practice.
->
-> I can see that some mailbox clients implement callbacks that are NOT
-> atomic and I suspect this is the reason why some mailbox drivers use
-> threaded_irq (rockchip mailbox splits the bottom & half parts).
->
-> Would it be acceptable to consider the "atomic client callback" as a
-> non-strict rule ?
->
-Of course you can traverse atomic path from sleepable context (but not
-vice-versa).
-Please send in the final revision.
+On 04/05/2018 09:53 PM, CHANDAN VN wrote:
+> INITRD reserved area entry is not removed from memblock
+> even though initrd reserved area is freed. After freeing
+> the memory it is released from memblock. The same can be
+> checked from /sys/kernel/debug/memblock/reserved.
+> 
+> The patch makes sure that the initrd entry is removed from
+> memblock when keepinitrd is not enabled.
+> 
 
-Thanks.
+Does this have an impact on anything besides accounting
+in memblock?
+
+> Signed-off-by: CHANDAN VN <chandan.vn@samsung.com>
+> ---
+>   arch/arm64/mm/init.c | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 9f3c47a..1b18b47 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -646,8 +646,10 @@ void free_initmem(void)
+>   
+>   void __init free_initrd_mem(unsigned long start, unsigned long end)
+>   {
+> -	if (!keep_initrd)
+> +	if (!keep_initrd) {
+>   		free_reserved_area((void *)start, (void *)end, 0, "initrd");
+> +		memblock_free(__virt_to_phys(start), end - start);
+> +	}
+>   }
+>   
+>   static int __init keepinitrd_setup(char *__unused)
+> 
