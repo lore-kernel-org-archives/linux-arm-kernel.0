@@ -1,61 +1,130 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 5 Apr 2018 18:11:25 -0500
-Subject: [PATCH] clk: samsung: s3c: Mark expected switch fall-through
-In-Reply-To: <152295987121.91052.16578276622043986934@swboyd.mtv.corp.google.com>
-References: <20180404010931.GA30291@embeddedor.com>
- <152295987121.91052.16578276622043986934@swboyd.mtv.corp.google.com>
-Message-ID: <4d52473e-019a-58da-c475-49bcd16c2ed4@embeddedor.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 6 Apr 2018 10:38:57 +1000
+Subject: linux-next: manual merge of the tty tree with the arm-soc tree
+In-Reply-To: <20180315172858.7928ed93@canb.auug.org.au>
+References: <20180315172858.7928ed93@canb.auug.org.au>
+Message-ID: <20180406103857.02c15ff4@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
 
-
-On 04/05/2018 03:24 PM, Stephen Boyd wrote:
-> Quoting Gustavo A. R. Silva (2018-04-03 18:09:31)
->> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
->> where we are expecting to fall through.
->>
->> Notice that in this particular case I replaced the comma wiht a dash,
+On Thu, 15 Mar 2018 17:28:58 +1100 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>
+> Today's linux-next merge of the tty tree got conflicts in:
 > 
-> s/wiht/with/
+>   arch/arm/boot/dts/stih407-b2120.dts
+>   arch/arm/boot/dts/stih410-b2120.dts
+>   arch/arm/boot/dts/stih410-b2260.dts
+>   arch/arm/boot/dts/stih418-b2199.dts
 > 
-
-Thanks for this.
-
->> which is what GCC is expecting to find when there are other comments
->> in the same line in which "fall through" appears.
->>
->> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
->> ---
->> This code was compiled with GCC 7.3.0
+> between commit:
 > 
-> What's the GCC warning? Please include in the commit text.
+>   db5430663017 ("arm: dts: replace 'linux,stdout-path' with 'stdout-path'")
 > 
-
-drivers/clk/samsung/clk-s3c2443.c:430:3: warning: this statement may 
-fall through [-Wimplicit-fallthrough=]
-    samsung_clk_register_alias(ctx, s3c2450_aliases,
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-      ARRAY_SIZE(s3c2450_aliases));
-      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-drivers/clk/samsung/clk-s3c2443.c:433:2: note: here
-   case S3C2416:
-   ^~~~
-
-
-> Also what's the implicit-fallthrough level you're using? 3? Can you file
-> a bug so GCC can update their regex to accept a comma in addition to
-> whitespace characters?
+> from the arm-soc tree and commit:
 > 
-
-Yeah, I can talk to the GCC guys about that.
-
-> And maybe we can change the level to 2 or 1 in the kernel's makefile so
-> we don't need to patch comments for this.
+>   dbb3fb45edff ("ARM: dts: STi: Remove "console=ttyASN" from bootargs for STi boards")
 > 
+> from the tty tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary. This
+> is now fixed as far as linux-next is concerned, but any non trivial
+> conflicts should be mentioned to your upstream maintainer when your tree
+> is submitted for merging.  You may also want to consider cooperating
+> with the maintainer of the conflicting tree to minimise any particularly
+> complex conflicts.
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell
+> 
+> diff --cc arch/arm/boot/dts/stih407-b2120.dts
+> index de3c8bf129b5,a7a0f76e9cbc..000000000000
+> --- a/arch/arm/boot/dts/stih407-b2120.dts
+> +++ b/arch/arm/boot/dts/stih407-b2120.dts
+> @@@ -14,11 -14,11 +14,11 @@@
+>   	compatible = "st,stih407-b2120", "st,stih407";
+>   
+>   	chosen {
+> - 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
+> + 		bootargs = "clk_ignore_unused";
+>  -		linux,stdout-path = &sbc_serial0;
+>  +		stdout-path = &sbc_serial0;
+>   	};
+>   
+>  -	memory {
+>  +	memory at 40000000 {
+>   		device_type = "memory";
+>   		reg = <0x40000000 0x80000000>;
+>   	};
+> diff --cc arch/arm/boot/dts/stih410-b2120.dts
+> index 0a59b7b0f4b2,6c6b4cc37e97..000000000000
+> --- a/arch/arm/boot/dts/stih410-b2120.dts
+> +++ b/arch/arm/boot/dts/stih410-b2120.dts
+> @@@ -14,11 -14,11 +14,11 @@@
+>   	compatible = "st,stih410-b2120", "st,stih410";
+>   
+>   	chosen {
+> - 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
+> + 		bootargs = "clk_ignore_unused";
+>  -		linux,stdout-path = &sbc_serial0;
+>  +		stdout-path = &sbc_serial0;
+>   	};
+>   
+>  -	memory {
+>  +	memory at 40000000 {
+>   		device_type = "memory";
+>   		reg = <0x40000000 0x80000000>;
+>   	};
+> diff --cc arch/arm/boot/dts/stih410-b2260.dts
+> index feb8834478fa,50d36758391c..000000000000
+> --- a/arch/arm/boot/dts/stih410-b2260.dts
+> +++ b/arch/arm/boot/dts/stih410-b2260.dts
+> @@@ -15,11 -15,11 +15,11 @@@
+>   	compatible = "st,stih410-b2260", "st,stih410";
+>   
+>   	chosen {
+> - 		bootargs = "console=ttyAS1,115200 clk_ignore_unused";
+> + 		bootargs = "clk_ignore_unused";
+>  -		linux,stdout-path = &uart1;
+>  +		stdout-path = &uart1;
+>   	};
+>   
+>  -	memory {
+>  +	memory at 40000000 {
+>   		device_type = "memory";
+>   		reg = <0x40000000 0x40000000>;
+>   	};
+> diff --cc arch/arm/boot/dts/stih418-b2199.dts
+> index 39b4db2e3507,7f5f3252bfc7..000000000000
+> --- a/arch/arm/boot/dts/stih418-b2199.dts
+> +++ b/arch/arm/boot/dts/stih418-b2199.dts
+> @@@ -14,11 -14,11 +14,11 @@@
+>   	compatible = "st,stih418-b2199", "st,stih418";
+>   
+>   	chosen {
+> - 		bootargs = "console=ttyAS0,115200 clk_ignore_unused";
+> + 		bootargs = "clk_ignore_unused";
+>  -		linux,stdout-path = &sbc_serial0;
+>  +		stdout-path = &sbc_serial0;
+>   	};
+>   
+>  -	memory {
+>  +	memory at 40000000 {
+>   		device_type = "memory";
+>   		reg = <0x40000000 0xc0000000>;
+>   	};
 
-Yeah, with level 2 I don't get that warning.
+These are now conflicts between the arm-soc tree and Linus' tree.
 
-Thanks
---
-Gustavo
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180406/d997424f/attachment.sig>
