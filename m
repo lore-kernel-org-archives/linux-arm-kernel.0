@@ -1,58 +1,44 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 06 Apr 2018 11:06:03 -0400 (EDT)
-Subject: [PATCH v2] net: thunderx: rework mac addresses list to u64 array
-In-Reply-To: <20180406111425.14636-1-Vadim.Lomovtsev@caviumnetworks.com>
-References: <20180405145756.12633-1-Vadim.Lomovtsev@caviumnetworks.com>
- <20180406111425.14636-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180406.110603.978796669734920248.davem@davemloft.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Apr 2018 16:08:19 +0100
+Subject: [PATCH 02/10] locking/qspinlock: Remove unbounded cmpxchg loop
+ from locking slowpath
+In-Reply-To: <a4649773-9dac-c496-2796-713981ead426@redhat.com>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <1522947547-24081-3-git-send-email-will.deacon@arm.com>
+ <a4649773-9dac-c496-2796-713981ead426@redhat.com>
+Message-ID: <20180406150819.GB10528@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
-Date: Fri,  6 Apr 2018 04:14:25 -0700
+On Thu, Apr 05, 2018 at 05:16:16PM -0400, Waiman Long wrote:
+> On 04/05/2018 12:58 PM, Will Deacon wrote:
+> >  	/*
+> > -	 * we're pending, wait for the owner to go away.
+> > -	 *
+> > -	 * *,1,1 -> *,1,0
+> > -	 *
+> > -	 * this wait loop must be a load-acquire such that we match the
+> > -	 * store-release that clears the locked bit and create lock
+> > -	 * sequentiality; this is because not all clear_pending_set_locked()
+> > -	 * implementations imply full barriers.
+> > -	 */
+> > -	smp_cond_load_acquire(&lock->val.counter, !(VAL & _Q_LOCKED_MASK));
+> > -
+> > -	/*
+> > -	 * take ownership and clear the pending bit.
+> > -	 *
+> > -	 * *,1,0 -> *,0,1
+> > +	 * If pending was clear but there are waiters in the queue, then
+> > +	 * we need to undo our setting of pending before we queue ourselves.
+> >  	 */
+> > -	clear_pending_set_locked(lock);
+> > -	return;
+> > +	if (!(val & _Q_PENDING_MASK))
+> > +		atomic_andnot(_Q_PENDING_VAL, &lock->val);
+> Can we add a clear_pending() helper that will just clear the byte if
+> _Q_PENDING_BITS == 8? That will eliminate one atomic instruction from
+> the failure path.
 
-> diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-> index 5fc46c5a4f36..448d1fafc827 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nic.h
-> +++ b/drivers/net/ethernet/cavium/thunder/nic.h
-> @@ -265,14 +265,9 @@ struct nicvf_drv_stats {
->  
->  struct cavium_ptp;
->  
-> -struct xcast_addr {
-> -	struct list_head list;
-> -	u64              addr;
-> -};
-> -
->  struct xcast_addr_list {
-> -	struct list_head list;
->  	int              count;
-> +	u64              mc[];
->  };
->  
->  struct nicvf_work {
-> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> index 1e9a31fef729..a26d8bc92e01 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-> @@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
->  						  work.work);
->  	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
->  	union nic_mbx mbx = {};
-> -	struct xcast_addr *xaddr, *next;
-> +	u8 idx = 0;
-        ^^^^^^^^^^^
+Good idea!
 
->  
->  	if (!vf_work)
->  		return;
-> @@ -1956,16 +1956,10 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
->  	/* check if we have any specific MACs to be added to PF DMAC filter */
->  	if (vf_work->mc) {
->  		/* now go through kernel list of MACs and add them one by one */
-> -		list_for_each_entry_safe(xaddr, next,
-> -					 &vf_work->mc->list, list) {
-> +		for (idx = 0; idx < vf_work->mc->count; idx++) {
-
-vf_work->mx->count is an 'int' therefore 'idx' should be declared 'int' as well,
-not a 'u8'.
+Will
