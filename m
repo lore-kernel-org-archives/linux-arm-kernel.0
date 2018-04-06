@@ -1,27 +1,39 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 5 Apr 2018 21:34:38 -0700
-Subject: [GIT PULL 3/3] ARM: SoC driver updates for 4.17
-In-Reply-To: <CAK8P3a1rJc+3MMMwcYSZ0n14=5e_1v_UdnHexysuqy4RfQPxmA@mail.gmail.com>
-References: <CAK8P3a1rJc+3MMMwcYSZ0n14=5e_1v_UdnHexysuqy4RfQPxmA@mail.gmail.com>
-Message-ID: <CA+55aFzTKu8um8wu5EtZS83+vepPnGM9KG+fPZ91ZjTESOatYg@mail.gmail.com>
+From: chandan.vn@samsung.com (CHANDAN VN)
+Date: Fri, 06 Apr 2018 10:23:10 +0530
+Subject: [PATCH 1/1] arm64: To remove initrd reserved area entry from memblock
+References: <CGME20180406045340epcas1p1ae6416dc25823212303c9109d125c018@epcas1p1.samsung.com>
+Message-ID: <1522990390-30804-1-git-send-email-chandan.vn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 5, 2018 at 2:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> - the ARM CCN driver is moved out of drivers/bus into drivers/perf,
->   which makes more sense. Similarly, the performance monitoring
->   portion of the CCI driver are moved the same way and cleaned up
->   a little more.
+INITRD reserved area entry is not removed from memblock
+even though initrd reserved area is freed. After freeing
+the memory it is released from memblock. The same can be
+checked from /sys/kernel/debug/memblock/reserved.
 
-This caused a trivial merge with the perf tree.
+The patch makes sure that the initrd entry is removed from
+memblock when keepinitrd is not enabled.
 
-But since I don't *build* the trivial merge resolution due to it being
-an arm-only file, I wanted to point it out.
+Signed-off-by: CHANDAN VN <chandan.vn@samsung.com>
+---
+ arch/arm64/mm/init.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Because "not tested" very possibly means "I screwed something silly up
-and didn't notice".
-
-So as trivial as it seemed, it should still be checked.
-
-                Linus
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 9f3c47a..1b18b47 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -646,8 +646,10 @@ void free_initmem(void)
+ 
+ void __init free_initrd_mem(unsigned long start, unsigned long end)
+ {
+-	if (!keep_initrd)
++	if (!keep_initrd) {
+ 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
++		memblock_free(__virt_to_phys(start), end - start);
++	}
+ }
+ 
+ static int __init keepinitrd_setup(char *__unused)
+-- 
+1.9.1
