@@ -1,112 +1,113 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  6 Apr 2018 16:19:35 +0200
-Subject: [PATCH 2/2 v2] drm/pl111: Enable device-specific assigned memory
-In-Reply-To: <20180406141935.6801-1-linus.walleij@linaro.org>
-References: <20180406141935.6801-1-linus.walleij@linaro.org>
-Message-ID: <20180406141935.6801-2-linus.walleij@linaro.org>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Fri,  6 Apr 2018 07:04:43 -0700
+Subject: [PATCH v3] net: thunderx: rework mac addresses list to u64 array
+In-Reply-To: <20180406111425.14636-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180406111425.14636-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180406140443.15181-1-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Versatile Express has 8 MB of dedicated video RAM (VRAM)
-on the motherboard, which is what we should be using for the
-PL111 if available. On this platform, the memory backplane
-is constructed so that only this memory will work properly
-with the CLCD on the motherboard, using any other memory
-region just gives random snow on the display.
+From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-The CA9 Versatile Express also has a PL111 instance on its
-core tile. This is OK, it has been tested with the motherboard
-VRAM and that works just as fine as regular CMA memory.
+It is too expensive to pass u64 values via linked list, instead
+allocate array for them by overall number of mac addresses from netdev.
 
-The memory is assigned to the device using the memory-region
-device tree property and a "shared-dma-pool" reserved
-memory pool like this:
+This eventually removes multiple kmalloc() calls, aviod memory
+fragmentation and allow to put single null check on kmalloc
+return value in order to prevent a potential null pointer dereference.
 
-reserved-memory {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        ranges;
-
-        vram: vram at 48000000 {
-                compatible = "shared-dma-pool";
-                reg = <0x48000000 0x00800000>;
-                no-map;
-        };
-};
-
-clcd at 1f000 {
-        compatible = "arm,pl111", "arm,primecell";
-	(...)
-        memory-region = <&vram>;
-}?;
-
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Mali DP Maintainers <malidp@foss.arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Addresses-Coverity-ID: 1467429 ("Dereference null return value")
+Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 ---
-ChangeLog v1->v2:
-- Make sure to also call of_reserved_mem_device_release() at
-  remove() and errorpath.
+Changes from v1 to v2:
+ - C99 syntax: update xcast_addr_list struct field mc[0] -> mc[];
+Changes from v2 to v3:
+ - update commit description with 'Reported-by: Dan Carpenter';
+ - update size calculations for mc list to offsetof() call
+   instead of explicit arithmetic;
 ---
- drivers/gpu/drm/pl111/pl111_drv.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/cavium/thunder/nic.h        |  7 +-----
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 28 +++++++++---------------
+ 2 files changed, 11 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-index 4621259d5387..bc57c15d9fe4 100644
---- a/drivers/gpu/drm/pl111/pl111_drv.c
-+++ b/drivers/gpu/drm/pl111/pl111_drv.c
-@@ -60,6 +60,7 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/of_graph.h>
-+#include <linux/of_reserved_mem.h>
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 5fc46c5a4f36..448d1fafc827 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -265,14 +265,9 @@ struct nicvf_drv_stats {
  
- #include <drm/drmP.h>
- #include <drm/drm_atomic_helper.h>
-@@ -257,6 +258,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	drm->dev_private = priv;
- 	priv->variant = variant;
+ struct cavium_ptp;
  
-+	ret = of_reserved_mem_device_init(dev);
-+	if (!ret)
-+		dev_info(dev, "using device-specific reserved memory\n");
-+
- 	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
- 				 &priv->memory_bw)) {
- 		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
-@@ -275,7 +280,8 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 	priv->regs = devm_ioremap_resource(dev, &amba_dev->res);
- 	if (IS_ERR(priv->regs)) {
- 		dev_err(dev, "%s failed mmio\n", __func__);
--		return PTR_ERR(priv->regs);
-+		ret = PTR_ERR(priv->regs);
-+		goto mem_rel;
+-struct xcast_addr {
+-	struct list_head list;
+-	u64              addr;
+-};
+-
+ struct xcast_addr_list {
+-	struct list_head list;
+ 	int              count;
++	u64              mc[];
+ };
+ 
+ struct nicvf_work {
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 1e9a31fef729..7d9e58533a83 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 						  work.work);
+ 	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
+ 	union nic_mbx mbx = {};
+-	struct xcast_addr *xaddr, *next;
++	u8 idx = 0;
+ 
+ 	if (!vf_work)
+ 		return;
+@@ -1956,16 +1956,10 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 	/* check if we have any specific MACs to be added to PF DMAC filter */
+ 	if (vf_work->mc) {
+ 		/* now go through kernel list of MACs and add them one by one */
+-		list_for_each_entry_safe(xaddr, next,
+-					 &vf_work->mc->list, list) {
++		for (idx = 0; idx < vf_work->mc->count; idx++) {
+ 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
+-			mbx.xcast.data.mac = xaddr->addr;
++			mbx.xcast.data.mac = vf_work->mc->mc[idx];
+ 			nicvf_send_msg_to_pf(nic, &mbx);
+-
+-			/* after receiving ACK from PF release memory */
+-			list_del(&xaddr->list);
+-			kfree(xaddr);
+-			vf_work->mc->count--;
+ 		}
+ 		kfree(vf_work->mc);
  	}
- 
- 	/* This may override some variant settings */
-@@ -305,11 +311,15 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
- 
- dev_unref:
- 	drm_dev_unref(drm);
-+mem_rel:
-+	of_reserved_mem_device_release(dev);
-+
- 	return ret;
- }
- 
- static int pl111_amba_remove(struct amba_device *amba_dev)
- {
-+	struct device *dev = &amba_dev->dev;
- 	struct drm_device *drm = amba_get_drvdata(amba_dev);
- 	struct pl111_drm_dev_private *priv = drm->dev_private;
- 
-@@ -319,6 +329,7 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
- 		drm_panel_bridge_remove(priv->bridge);
- 	drm_mode_config_cleanup(drm);
- 	drm_dev_unref(drm);
-+	of_reserved_mem_device_release(dev);
- 
- 	return 0;
- }
+@@ -1996,17 +1990,15 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
+ 			mode |= BGX_XCAST_MCAST_FILTER;
+ 			/* here we need to copy mc addrs */
+ 			if (netdev_mc_count(netdev)) {
+-				struct xcast_addr *xaddr;
+-
+-				mc_list = kmalloc(sizeof(*mc_list), GFP_ATOMIC);
+-				INIT_LIST_HEAD(&mc_list->list);
++				mc_list = kmalloc(offsetof(typeof(*mc_list),
++							   mc[netdev_mc_count(netdev)]),
++						  GFP_ATOMIC);
++				if (unlikely(!mc_list))
++					return;
++				mc_list->count = 0;
+ 				netdev_hw_addr_list_for_each(ha, &netdev->mc) {
+-					xaddr = kmalloc(sizeof(*xaddr),
+-							GFP_ATOMIC);
+-					xaddr->addr =
++					mc_list->mc[mc_list->count] =
+ 						ether_addr_to_u64(ha->addr);
+-					list_add_tail(&xaddr->list,
+-						      &mc_list->list);
+ 					mc_list->count++;
+ 				}
+ 			}
 -- 
 2.14.3
