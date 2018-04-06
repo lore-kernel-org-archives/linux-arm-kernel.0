@@ -1,71 +1,33 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 6 Apr 2018 14:49:22 +0100
-Subject: [PATCH] arm: kgdb: fix NUMREGBYTES so that gdb_regs[] is the
- correct size
-In-Reply-To: <20180406132511.uzl6viazwaey4bem@holly.lan>
-References: <20180405200916.27964-1-drivshin@awxrd.com>
- <20180406132511.uzl6viazwaey4bem@holly.lan>
-Message-ID: <eae3e959-60cb-a8cc-be97-f782d0c96f08@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 6 Apr 2018 15:54:35 +0200
+Subject: [GIT PULL 3/3] ARM: SoC driver updates for 4.17
+In-Reply-To: <CA+55aFzTKu8um8wu5EtZS83+vepPnGM9KG+fPZ91ZjTESOatYg@mail.gmail.com>
+References: <CAK8P3a1rJc+3MMMwcYSZ0n14=5e_1v_UdnHexysuqy4RfQPxmA@mail.gmail.com>
+ <CA+55aFzTKu8um8wu5EtZS83+vepPnGM9KG+fPZ91ZjTESOatYg@mail.gmail.com>
+Message-ID: <CAK8P3a1gT=xzCrHQtPTn+ciqze2mArH07+FWEUtkfQgU_ohSjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/18 14:25, Daniel Thompson wrote:
-> On Thu, Apr 05, 2018 at 04:09:16PM -0400, David Rivshin wrote:
->> From: David Rivshin <DRivshin@allworx.com>
+On Fri, Apr 6, 2018 at 6:34 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Thu, Apr 5, 2018 at 2:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 >>
->> NUMREGBYTES (which is used as the size for gdb_regs[]) is incorrectly based
->> on DBG_MAX_REG_NUM instead of GDB_MAX_REGS. DBG_MAX_REG_NUM is the number
->> of total registers, while GDB_MAX_REGS is the number of 'unsigned longs'
->> it takes to serialize those registers. Since FP registers require 3
->> 'unsigned longs' each, DBG_MAX_REG_NUM is smaller than GDB_MAX_REGS.
->>
->> This causes GDB 8.0 give the following error on connect:
->> "Truncated register 19 in remote 'g' packet"
->>
->> This also causes the register serialization/deserialization logic to
->> overflow gdb_regs[], overwriting whatever follows.
->>
->> Fixes: 834b2964b7ab ("kgdb,arm: fix register dump")
->> Cc: <stable@vger.kernel.org> # 2.6.37+
->> Signed-off-by: David Rivshin <drivshin@allworx.com>
-> 
-> I pointed some trivial autotests at both gdb-7.12 and gdb-8.0. Results
-> look good to me!
-> 
-> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> - the ARM CCN driver is moved out of drivers/bus into drivers/perf,
+>>   which makes more sense. Similarly, the performance monitoring
+>>   portion of the CCI driver are moved the same way and cleaned up
+>>   a little more.
+>
+> This caused a trivial merge with the perf tree.
+>
+> But since I don't *build* the trivial merge resolution due to it being
+> an arm-only file, I wanted to point it out.
+>
+> Because "not tested" very possibly means "I screwed something silly up
+> and didn't notice".
+>
+> So as trivial as it seemed, it should still be checked.
 
-BTW I noticed that myself and Jason in the only "real people" in
-To: . Most arch specific patches end up making their way upstream via 
-the arch maintainer rather than via the kgdb tree so personally I would 
-choose to the arch maintainers in the To: field as well.
+Looks good to me and it survived the randconfig build tests,
+so I assume it's fine.
 
-I certainly think you will have to follow up via Russell King's patch 
-tracker once you think its had enough time on the ML for review.
-
-
-Daniel.
-
-
-> 
->> ---
->>   arch/arm/include/asm/kgdb.h | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/kgdb.h b/arch/arm/include/asm/kgdb.h
->> index 3b73fdcf3627a..8de1100d10674 100644
->> --- a/arch/arm/include/asm/kgdb.h
->> +++ b/arch/arm/include/asm/kgdb.h
->> @@ -77,7 +77,7 @@ extern int kgdb_fault_expected;
->>   
->>   #define KGDB_MAX_NO_CPUS	1
->>   #define BUFMAX			400
->> -#define NUMREGBYTES		(DBG_MAX_REG_NUM << 2)
->> +#define NUMREGBYTES		(GDB_MAX_REGS << 2)
->>   #define NUMCRITREGBYTES		(32 << 2)
->>   
->>   #define _R0			0
->>
->> base-commit: 0adb32858b0bddf4ada5f364a84ed60b196dbcda
->> -- 
->> 2.14.3
->>
+       Arnd
