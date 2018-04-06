@@ -1,157 +1,34 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 11:39:22 -0700
-Subject: [PATCH v3 1/6] clk: meson: aoclk: refactor common code into
- dedicated file
-In-Reply-To: <20180328025050.221585-2-yixun.lan@amlogic.com>
-References: <20180328025050.221585-1-yixun.lan@amlogic.com>
- <20180328025050.221585-2-yixun.lan@amlogic.com>
-Message-ID: <152303996277.94378.9360089743935547432@swboyd.mtv.corp.google.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Fri, 6 Apr 2018 11:45:01 -0700
+Subject: [BUG] Fix drivers/memory O= build
+In-Reply-To: <20180406164615.GL5700@atomide.com>
+References: <20180406102519.GN16141@n2100.armlinux.org.uk>
+ <20180406164615.GL5700@atomide.com>
+Message-ID: <06568f5b-3e4a-f761-7242-85dcc8aeb6a5@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Yixun Lan (2018-03-27 19:50:45)
-> diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
-> index 9ec23ae9a219..5a922639a264 100644
-> --- a/drivers/clk/meson/gxbb-aoclk.c
-> +++ b/drivers/clk/meson/gxbb-aoclk.c
-> @@ -165,38 +135,39 @@ static int gxbb_aoclkc_probe(struct platform_device *pdev)
->                 return -ENODEV;
->         }
->  
-> -       /* Reset Controller */
-> -       rstc->regmap = regmap;
-> -       rstc->data = gxbb_aoclk_reset;
-> -       rstc->reset.ops = &gxbb_aoclk_reset_ops;
-> -       rstc->reset.nr_resets = ARRAY_SIZE(gxbb_aoclk_reset);
-> -       rstc->reset.of_node = dev->of_node;
-> -       ret = devm_reset_controller_register(dev, &rstc->reset);
-> -
-> -       /*
-> -        * Populate regmap and register all clks
-> -        */
-> -       for (clkid = 0; clkid < ARRAY_SIZE(gxbb_aoclk_gate); clkid++) {
-> -               gxbb_aoclk_gate[clkid]->map = regmap;
-> -
-> -               ret = devm_clk_hw_register(dev,
-> -                                          gxbb_aoclk_onecell_data.hws[clkid]);
-> -               if (ret)
-> -                       return ret;
-> -       }
-> -
->         /* Specific clocks */
->         cec_32k_ao.regmap = regmap;
->         ret = devm_clk_hw_register(dev, &cec_32k_ao.hw);
-> -       if (ret)
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "clk cec_32k_ao register failed.\n");
->                 return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static struct meson_aoclk_data gxbb_aoclkc_data = {
+On 4/6/2018 9:46 AM, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [180406 03:27]:
+>> When building a kernel with split object directories, the following
+>> failure occurs:
+>>
+>> .../drivers/memory/emif-asm-offsets.c:1:0: fatal error: can't open drivers/memory/emif-asm-offsets.s for writing: No such file or directory
+>> compilation terminated.
+>> drivers/memory/Makefile.asm-offsets:2: recipe for target 'drivers/memory/emif-asm-offsets.s' failed
+>> make[2]: *** [drivers/memory/emif-asm-offsets.s] Error 1
+>> .../Makefile:1060: recipe for target 'arch/arm/mach-omap2' failed
+>> make[1]: *** [arch/arm/mach-omap2] Error 2
+>>
+>> This prevents any kernel being built that includes decending into
+>> arch/arm/mach-omap2 with split object directories.
+>>
+>> This is a regression.
+> 
+> Dave, I presume you're looking into this already?
+> 
+Fix is already posted by 'Anders Roxell <anders.roxell@linaro.org>'
+You are copied on the email Tony.
 
-Can this be const?
-
-> +       .reset_reg      = AO_RTI_GEN_CNTL_REG0,
-> +       .num_reset      = ARRAY_SIZE(gxbb_aoclk_reset),
-> +       .reset          = gxbb_aoclk_reset,
-> +       .num_clks       = ARRAY_SIZE(gxbb_aoclk_gate),
-> +       .clks           = gxbb_aoclk_gate,
-> +       .hw_data        = &gxbb_aoclk_onecell_data,
-> +};
-> +
-> diff --git a/drivers/clk/meson/meson-aoclk.c b/drivers/clk/meson/meson-aoclk.c
-> new file mode 100644
-> index 000000000000..36067c801f7b
-> --- /dev/null
-> +++ b/drivers/clk/meson/meson-aoclk.c
-> @@ -0,0 +1,79 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Amlogic Meson-AXG Clock Controller Driver
-> + *
-> + * Copyright (c) 2016 BayLibre, SAS.
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
-> + * Author: Yixun Lan <yixun.lan@amlogic.com>
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/init.h>
-> +#include <linux/of_device.h>
-> +#include "clk-regmap.h"
-> +#include "meson-aoclk.h"
-> +
-> +static int meson_aoclk_do_reset(struct reset_controller_dev *rcdev,
-> +                              unsigned long id)
-> +{
-> +       struct meson_aoclk_reset_controller *rstc =
-> +               container_of(rcdev, struct meson_aoclk_reset_controller, reset);
-> +
-> +       return regmap_write(rstc->regmap, rstc->data->reset_reg,
-> +                           BIT(rstc->data->reset[id]));
-> +}
-> +
-> +static const struct reset_control_ops meson_aoclk_reset_ops = {
-> +       .reset = meson_aoclk_do_reset,
-> +};
-> +
-> +int meson_aoclkc_probe(struct platform_device *pdev)
-> +{
-> +       struct meson_aoclk_reset_controller *rstc;
-> +       struct meson_aoclk_data *data;
-> +       struct device *dev = &pdev->dev;
-> +       struct regmap *regmap;
-> +       int ret, clkid;
-> +
-> +       data = (struct meson_aoclk_data *)
-> +               of_device_get_match_data(dev);
-> +       if (!data)
-> +               return -ENODEV;
-> +
-> +       rstc = devm_kzalloc(dev, sizeof(*rstc), GFP_KERNEL);
-> +       if (!rstc)
-> +               return -ENOMEM;
-> +
-> +       regmap = syscon_node_to_regmap(of_get_parent(dev->of_node));
-> +       if (IS_ERR(regmap)) {
-> +               dev_err(dev, "failed to get regmap\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       /* Reset Controller */
-> +       rstc->data = data;
-> +       rstc->regmap = regmap;
-> +       rstc->reset.ops = &meson_aoclk_reset_ops;
-> +       rstc->reset.nr_resets = data->num_reset,
-> +       rstc->reset.of_node = dev->of_node;
-> +       ret = devm_reset_controller_register(dev, &rstc->reset);
-
-Please check the return value here.
-
-> +
-> +       /*
-> +        * Populate regmap and register all clks
-> +        */
-> +       for (clkid = 0; clkid < data->num_clks; clkid++) {
-> +               data->clks[clkid]->map = regmap;
-> +
-> +               ret = devm_clk_hw_register(dev, data->hw_data->hws[clkid]);
-> +               if (ret)
-> +                       return ret;
-> +       }
-> +
-> +       return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-> +               data->hw_data);
-
-Use devm_ variant?
-
-I suppose because code is moving in this patch that it would be better
-to make improvements in another patch so that this patch is a pure code
-movement change instead of a movement + improvement change.
+Regards,
+Santosh
