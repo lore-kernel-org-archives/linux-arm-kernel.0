@@ -1,36 +1,56 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 6 Apr 2018 18:17:27 +0800
-Subject: [stericsson:earlydebug 1/1] main.c:undefined reference to `printascii'
-Message-ID: <201804061819.S7m5cVtd%fengguang.wu@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 6 Apr 2018 12:19:49 +0200
+Subject: [PATCH v4 1/5] io: define several IO & PIO barrier types for the
+ asm-generic version
+In-Reply-To: <1522933753-19589-1-git-send-email-okaya@codeaurora.org>
+References: <1522933753-19589-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAK8P3a0Ahf9uuXYy0fxdC5_O84gmSqTUsP6xjpGQFE8n1Tw7HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
-head:   d4c6fbc5c32480ae0ad658cc92307ae10629c05a
-commit: d4c6fbc5c32480ae0ad658cc92307ae10629c05a [1/1] uglyhack printascii
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout d4c6fbc5c32480ae0ad658cc92307ae10629c05a
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Thu, Apr 5, 2018 at 3:09 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Getting ready to harden readX()/writeX() and inX()/outX() semantics for the
+> generic implementation.
+>
+> Defining two set of macros as __io_br() and __io_ar() to indicate actions
+> to be taken before and after MMIO read.
+>
+> Defining two set of macros as __io_bw() and __io_aw() to indicate actions
+> to be taken before and after MMIO write.
+>
+> Defining two set of macros as __io_pbw() and __io_paw() to indicate actions
+> to be taken before and after Port IO write.
+>
+> Defining two set of macros as __io_pbr() and __io_par() to indicate actions
+> to be taken before and after Port IO read.
+>
+> If rmb() is available for the architecture, prefer rmb() as the default
+> implementation of __io_ar()/__io_par().
+>
+> If wmb() is available for the architecture, prefer wmb() as the default
+> implementation of __io_bw()/__io_pbw().
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-All errors (new ones prefixed by >>):
+I've applied the series to my asm-generic tree now, I will give it a few days
+in linux-next to see if any obvious regressions happen, and then send
+a pull request.
 
-   init/main.o: In function `start_kernel':
->> main.c:(.init.text+0x594): undefined reference to `printascii'
-   kernel/printk/printk.o: In function `vprintk_emit':
->> printk.c:(.text+0x203c): undefined reference to `printascii'
+Checking the list of architectures that are affected by this, I see
+h8300, microblaze, nios2, openrisc, s390, sparc, um, unicore32,
+and xtensa, all of which use asm-generic/io.h without overriding
+the default readl/writel.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23719 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180406/be812ca9/attachment-0001.gz>
+I would guess that at least s390 doesn't need the barriers
+(maintainers on Cc now), but there may be others that want to
+override the new barriers with weaker ones where an MMIO
+access is guaranteed to serialize against DMA, or where
+a specialized barrier for this case exists.
+
+Looking over the asm-generic implementation once more now,
+I wonder if we should change the relaxed accessors to not have
+any barriers (back to the version before your series) rather than
+defaulting them to having the same barriers as the regular
+readl/writel.
+
+     Arnd
