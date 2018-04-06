@@ -1,24 +1,20 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 13:40:17 -0700
-Subject: [PATCH v5 8/8] clk: davinci: kill
- davinci_clk_reset_assert/deassert()
-In-Reply-To: <20180330152856.12297-9-brgl@bgdev.pl>
-References: <20180330152856.12297-1-brgl@bgdev.pl>
- <20180330152856.12297-9-brgl@bgdev.pl>
-Message-ID: <152304721717.94378.15508132666893079542@swboyd.mtv.corp.google.com>
+Date: Fri, 06 Apr 2018 13:44:36 -0700
+Subject: [PATCH 3/6] clk: stm32mp1: fix SAI3 & SAI4 clocks
+In-Reply-To: <1522996773-24129-4-git-send-email-gabriel.fernandez@st.com>
+References: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
+ <1522996773-24129-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <152304747637.94378.7897600827238802645@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bartosz Golaszewski (2018-03-30 08:28:56)
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Quoting gabriel.fernandez at st.com (2018-04-05 23:39:30)
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> This code is no longer used. Remove it.
+> fix bad copy / paste.
+> SAI3 & SAI4 used gate of SAI2 instead SAI3 & SAI4
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Reviewed-by: David Lechner <david@lechnology.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
 
-I'll try to remember, but please send this again if we need to apply it
-to the clk tree for 4.18.
-
-Acked-by: Stephen Boyd <sboyd@kernel.org>
+Applied to clk-next
