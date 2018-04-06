@@ -1,116 +1,46 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Fri,  6 Apr 2018 12:53:54 -0700
-Subject: [PATCH v4] net: thunderx: rework mac addresses list to u64 array
-In-Reply-To: <20180406140443.15181-1-Vadim.Lomovtsev@caviumnetworks.com>
-References: <20180406140443.15181-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 06 Apr 2018 13:07:52 -0700
+Subject: [PATCH v3 4/6] clk: meson-axg: Add AO Clock and Reset controller
+ driver
+In-Reply-To: <20180328025050.221585-5-yixun.lan@amlogic.com>
+References: <20180328025050.221585-1-yixun.lan@amlogic.com>
+ <20180328025050.221585-5-yixun.lan@amlogic.com>
+Message-ID: <152304527293.94378.2019634000949753214@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+Quoting Yixun Lan (2018-03-27 19:50:48)
+> +       [CLKID_AO_SAR_ADC_CLK]  = &axg_saradc_gate,
+> +};
+> +
+> +static struct clk_hw_onecell_data axg_aoclk_onecell_data = {
 
-It is too expensive to pass u64 values via linked list, instead
-allocate array for them by overall number of mac addresses from netdev.
+const?
 
-This eventually removes multiple kmalloc() calls, aviod memory
-fragmentation and allow to put single null check on kmalloc
-return value in order to prevent a potential null pointer dereference.
+> +       .hws = {
+> +               [CLKID_AO_REMOTE]       = &remote_ao.hw,
+> +               [CLKID_AO_I2C_MASTER]   = &i2c_master_ao.hw,
+> +               [CLKID_AO_I2C_SLAVE]    = &i2c_slave_ao.hw,
+> +               [CLKID_AO_UART1]        = &uart1_ao.hw,
+> +               [CLKID_AO_UART2]        = &uart2_ao.hw,
+> +               [CLKID_AO_IR_BLASTER]   = &ir_blaster_ao.hw,
+> +               [CLKID_AO_SAR_ADC]      = &saradc_ao.hw,
+> +               [CLKID_AO_CLK81]        = &ao_clk81.hw,
+> +               [CLKID_AO_SAR_ADC_SEL]  = &axg_saradc_mux.hw,
+> +               [CLKID_AO_SAR_ADC_DIV]  = &axg_saradc_div.hw,
+> +               [CLKID_AO_SAR_ADC_CLK]  = &axg_saradc_gate.hw,
+> +       },
+> +       .num = NR_CLKS,
+> +};
+> +
+> +static struct meson_aoclk_data axg_aoclkc_data = {
 
-Addresses-Coverity-ID: 1467429 ("Dereference null return value")
-Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
----
-Changes from v1 to v2:
- - C99 syntax: update xcast_addr_list struct field mc[0] -> mc[];
-Changes from v2 to v3:
- - update commit description with 'Reported-by: Dan Carpenter';
- - update size calculations for mc list to offsetof() call
-   instead of explicit arithmetic;
-Changes from v3 to v4:
- - change loop control variable type from u8 to int, accordingly
-   to mc_count size;
----
- drivers/net/ethernet/cavium/thunder/nic.h        |  7 +-----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 28 +++++++++---------------
- 2 files changed, 11 insertions(+), 24 deletions(-)
+const?
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 5fc46c5..448d1fa 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -265,14 +265,9 @@ struct nicvf_drv_stats {
- 
- struct cavium_ptp;
- 
--struct xcast_addr {
--	struct list_head list;
--	u64              addr;
--};
--
- struct xcast_addr_list {
--	struct list_head list;
- 	int              count;
-+	u64              mc[];
- };
- 
- struct nicvf_work {
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 1e9a31f..6bd5658 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
- 						  work.work);
- 	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
- 	union nic_mbx mbx = {};
--	struct xcast_addr *xaddr, *next;
-+	int idx = 0;
- 
- 	if (!vf_work)
- 		return;
-@@ -1956,16 +1956,10 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
- 	/* check if we have any specific MACs to be added to PF DMAC filter */
- 	if (vf_work->mc) {
- 		/* now go through kernel list of MACs and add them one by one */
--		list_for_each_entry_safe(xaddr, next,
--					 &vf_work->mc->list, list) {
-+		for (idx = 0; idx < vf_work->mc->count; idx++) {
- 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
--			mbx.xcast.data.mac = xaddr->addr;
-+			mbx.xcast.data.mac = vf_work->mc->mc[idx];
- 			nicvf_send_msg_to_pf(nic, &mbx);
--
--			/* after receiving ACK from PF release memory */
--			list_del(&xaddr->list);
--			kfree(xaddr);
--			vf_work->mc->count--;
- 		}
- 		kfree(vf_work->mc);
- 	}
-@@ -1996,17 +1990,15 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
- 			mode |= BGX_XCAST_MCAST_FILTER;
- 			/* here we need to copy mc addrs */
- 			if (netdev_mc_count(netdev)) {
--				struct xcast_addr *xaddr;
--
--				mc_list = kmalloc(sizeof(*mc_list), GFP_ATOMIC);
--				INIT_LIST_HEAD(&mc_list->list);
-+				mc_list = kmalloc(offsetof(typeof(*mc_list),
-+							   mc[netdev_mc_count(netdev)]),
-+						  GFP_ATOMIC);
-+				if (unlikely(!mc_list))
-+					return;
-+				mc_list->count = 0;
- 				netdev_hw_addr_list_for_each(ha, &netdev->mc) {
--					xaddr = kmalloc(sizeof(*xaddr),
--							GFP_ATOMIC);
--					xaddr->addr =
-+					mc_list->mc[mc_list->count] =
- 						ether_addr_to_u64(ha->addr);
--					list_add_tail(&xaddr->list,
--						      &mc_list->list);
- 					mc_list->count++;
- 				}
- 			}
--- 
-1.8.3.1
+> +       .reset_reg      = AO_RTI_GEN_CNTL_REG0,
+> +       .num_reset      = ARRAY_SIZE(axg_aoclk_reset),
+> +       .reset          = axg_aoclk_reset,
+> +       .num_clks       = ARRAY_SIZE(axg_aoclk_regmap),
+> +       .clks           = axg_aoclk_regmap,
+> +       .hw_data        = &axg_aoclk_onecell_data,
+> +};
