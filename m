@@ -1,71 +1,76 @@
-From: longman@redhat.com (Waiman Long)
-Date: Fri, 6 Apr 2018 16:50:19 -0400
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 6 Apr 2018 14:09:53 -0700
 Subject: [PATCH 02/10] locking/qspinlock: Remove unbounded cmpxchg loop
  from locking slowpath
-In-Reply-To: <1522947547-24081-3-git-send-email-will.deacon@arm.com>
+In-Reply-To: <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
 References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
  <1522947547-24081-3-git-send-email-will.deacon@arm.com>
-Message-ID: <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
+ <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
+Message-ID: <20180406210953.GA24165@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2018 12:58 PM, Will Deacon wrote:
-> The qspinlock locking slowpath utilises a "pending" bit as a simple form
-> of an embedded test-and-set lock that can avoid the overhead of explicit
-> queuing in cases where the lock is held but uncontended. This bit is
-> managed using a cmpxchg loop which tries to transition the uncontended
-> lock word from (0,0,0) -> (0,0,1) or (0,0,1) -> (0,1,1).
->
-> Unfortunately, the cmpxchg loop is unbounded and lockers can be starved
-> indefinitely if the lock word is seen to oscillate between unlocked
-> (0,0,0) and locked (0,0,1). This could happen if concurrent lockers are
-> able to take the lock in the cmpxchg loop without queuing and pass it
-> around amongst themselves.
->
-> This patch fixes the problem by unconditionally setting _Q_PENDING_VAL
-> using atomic_fetch_or, and then inspecting the old value to see whether
-> we need to spin on the current lock owner, or whether we now effectively
-> hold the lock. The tricky scenario is when concurrent lockers end up
-> queuing on the lock and the lock becomes available, causing us to see
-> a lockword of (n,0,0). With pending now set, simply queuing could lead
-> to deadlock as the head of the queue may not have observed the pending
-> flag being cleared. Conversely, if the head of the queue did observe
-> pending being cleared, then it could transition the lock from (n,0,0) ->
-> (0,0,1) meaning that any attempt to "undo" our setting of the pending
-> bit could race with a concurrent locker trying to set it.
->
-> We handle this race by preserving the pending bit when taking the lock
-> after reaching the head of the queue and leaving the tail entry intact
-> if we saw pending set, because we know that the tail is going to be
-> updated shortly.
->
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
+On Fri, Apr 06, 2018 at 04:50:19PM -0400, Waiman Long wrote:
+> On 04/05/2018 12:58 PM, Will Deacon wrote:
+> > The qspinlock locking slowpath utilises a "pending" bit as a simple form
+> > of an embedded test-and-set lock that can avoid the overhead of explicit
+> > queuing in cases where the lock is held but uncontended. This bit is
+> > managed using a cmpxchg loop which tries to transition the uncontended
+> > lock word from (0,0,0) -> (0,0,1) or (0,0,1) -> (0,1,1).
+> >
+> > Unfortunately, the cmpxchg loop is unbounded and lockers can be starved
+> > indefinitely if the lock word is seen to oscillate between unlocked
+> > (0,0,0) and locked (0,0,1). This could happen if concurrent lockers are
+> > able to take the lock in the cmpxchg loop without queuing and pass it
+> > around amongst themselves.
+> >
+> > This patch fixes the problem by unconditionally setting _Q_PENDING_VAL
+> > using atomic_fetch_or, and then inspecting the old value to see whether
+> > we need to spin on the current lock owner, or whether we now effectively
+> > hold the lock. The tricky scenario is when concurrent lockers end up
+> > queuing on the lock and the lock becomes available, causing us to see
+> > a lockword of (n,0,0). With pending now set, simply queuing could lead
+> > to deadlock as the head of the queue may not have observed the pending
+> > flag being cleared. Conversely, if the head of the queue did observe
+> > pending being cleared, then it could transition the lock from (n,0,0) ->
+> > (0,0,1) meaning that any attempt to "undo" our setting of the pending
+> > bit could race with a concurrent locker trying to set it.
+> >
+> > We handle this race by preserving the pending bit when taking the lock
+> > after reaching the head of the queue and leaving the tail entry intact
+> > if we saw pending set, because we know that the tail is going to be
+> > updated shortly.
+> >
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Ingo Molnar <mingo@kernel.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> 
+> The pending bit was added to the qspinlock design to counter performance
+> degradation compared with ticket lock for workloads with light
+> spinlock contention. I run my spinlock stress test on a Intel Skylake
+> server running the vanilla 4.16 kernel vs a patched kernel with this
+> patchset. The locking rates with different number of locking threads
+> were as follows:
+> 
+>   # of threads  4.16 kernel     patched 4.16 kernel
+>   ------------  -----------     -------------------
+>         1       7,417 kop/s         7,408 kop/s
+>         2       5,755 kop/s         4,486 kop/s
+>         3       4,214 kop/s         4,169 kop/s
+>         4       4,396 kop/s         4,383 kop/s
+>        
+> The 2 contending threads case is the one that exercise the pending bit
+> code path the most. So it is obvious that this is the one that is most
+> impacted by this patchset. The differences in the other cases are mostly
+> noise or maybe just a little bit on the 3 contending threads case.
+> 
+> I am not against this patch, but we certainly need to find out a way to
+> bring the performance number up closer to what it is before applying
+> the patch.
 
-The pending bit was added to the qspinlock design to counter performance
-degradation compared with ticket lock for workloads with light
-spinlock contention. I run my spinlock stress test on a Intel Skylake
-server running the vanilla 4.16 kernel vs a patched kernel with this
-patchset. The locking rates with different number of locking threads
-were as follows:
+It would indeed be good to not be in the position of having to trade off
+forward-progress guarantees against performance, but that does appear to
+be where we are at the moment.
 
-  # of threads  4.16 kernel     patched 4.16 kernel
-  ------------  -----------     -------------------
-        1       7,417 kop/s         7,408 kop/s
-        2       5,755 kop/s         4,486 kop/s
-        3       4,214 kop/s         4,169 kop/s
-        4       4,396 kop/s         4,383 kop/s
-       
-The 2 contending threads case is the one that exercise the pending bit
-code path the most. So it is obvious that this is the one that is most
-impacted by this patchset. The differences in the other cases are mostly
-noise or maybe just a little bit on the 3 contending threads case.
-
-I am not against this patch, but we certainly need to find out a way to
-bring the performance number up closer to what it is before applying
-the patch.
-
-Cheers,
-Longman
+							Thanx, Paul
