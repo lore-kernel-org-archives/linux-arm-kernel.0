@@ -1,40 +1,45 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 6 Apr 2018 09:47:31 -0600
-Subject: [PATCH 1/2] coresight: Use %px to print pcsr instead of %p
-In-Reply-To: <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
-References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
- <1520961871-11196-2-git-send-email-mathieu.poirier@linaro.org>
- <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
-Message-ID: <CANLsYkwseQo1+PfTuhkgvx=AyLs3dL+zkSxwbkuu9JhLwTDqHQ@mail.gmail.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Fri, 6 Apr 2018 18:48:23 +0300
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <20180406073441.xesojvzc3deljhoy@flea>
+References: <20180403154449.2443-1-ssuloev@orpaltech.com>
+ <20180403154449.2443-4-ssuloev@orpaltech.com>
+ <20180404065048.n76r3ytuznd6fqsl@flea>
+ <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
+ <20180405091913.ky4dnmszoobn2xry@flea>
+ <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
+ <20180405131735.GB12349@sirena.org.uk>
+ <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
+ <20180406073441.xesojvzc3deljhoy@flea>
+Message-ID: <204e97cb-2f39-00f0-fd4e-3aa9a51f7cac@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 April 2018 at 00:26, Kees Cook <keescook@chromium.org> wrote:
-> On Tue, Mar 13, 2018 at 10:24 AM, Mathieu Poirier
-> <mathieu.poirier@linaro.org> wrote:
->> From: Leo Yan <leo.yan@linaro.org>
->>
->> Commit ad67b74d2469 ("printk: hash addresses printed with %p") lets
->> printk specifier %p to hash all addresses before printing, this was
->> resulting in the high 32 bits of pcsr can only output zeros.  So
->> module cannot completely print pc value and it's pointless for debugging
->> purpose.
->>
->> This patch fixes this by using %px to print pcsr instead.
->
-> Why is %p (and now %px) needed here at all? %pS is already used, which
-> should give useful debugging details, yes?
+On 04/06/2018 10:34 AM, Maxime Ripard wrote:
+> On Thu, Apr 05, 2018 at 04:44:16PM +0300, Sergey Suloev wrote:
+>> On 04/05/2018 04:17 PM, Mark Brown wrote:
+>>> On Thu, Apr 05, 2018 at 12:59:35PM +0300, Sergey Suloev wrote:
+>>>> On 04/05/2018 12:19 PM, Maxime Ripard wrote:
+>>>>> The point of that patch was precisely to allow to send more data than
+>>>>> the FIFO. You're breaking that behaviour without any justification,
+>>>>> and this is not ok.
+>>>> I am sorry, but you can't. That's a hardware limitation.
+>>> Are you positive about that?  Normally you can add things to hardware
+>>> FIFOs while they're being drained so so long as you can keep data
+>>> flowing in at least as fast as it's being consumed.
+>> Well, normally yes, but this is not the case with the hardware that I own.
+>> My a20 (BPiM1+) and a31 (BPiM2) boards behaves differently. With a transfer
+>> larger than FIFO then TC interrupt never happens.
+> Because you're not supposed to have a transfer larger than the FIFO,
+> but to have to setup at first a transfer the size of the FIFO, and
+> then when it's (or starts to be) depleted, fill it up again.
 
-Hey Leo,
-
-I've taken a second look at this and Kees has a point, %pS should be
-sufficient here.  Please test again and see if %px is absolutely
-necessary.  If you think that is the case please provide a snapshot of
-the corner case that makes the change mandatory.
+According to what you said the driver must implement 
+"transfer_one_message" instead of "transfer_one"
 
 >
-> -Kees
+> That's the point of the patch you're reverting, and if it doesn't
+> work, you should make it work and not simply revert it.
 >
-> --
-> Kees Cook
-> Pixel Security
+> Maxime
+>
