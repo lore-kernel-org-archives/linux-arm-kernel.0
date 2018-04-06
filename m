@@ -1,66 +1,35 @@
-From: yamada.masahiro@socionext.com (yamada.masahiro at socionext.com)
-Date: Fri, 6 Apr 2018 05:34:08 +0000
-Subject: [PATCH] ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and
- CONFIG_SNI_AVE
-In-Reply-To: <243c6f13b7264e7881b5b06a9c8dca30@SOC-EX01V.e01.socionext.com>
-References: <1522153269-21244-1-git-send-email-hayashi.kunihiko@socionext.com>
- <243c6f13b7264e7881b5b06a9c8dca30@SOC-EX01V.e01.socionext.com>
-Message-ID: <dfd422d81f6f451da6f05685cbe7d506@SOC-EX01V.e01.socionext.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Fri, 6 Apr 2018 08:39:32 +0200
+Subject: [PATCH 5/6] clk: stm32mp1: set stgen_k clock as critical
+In-Reply-To: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
+References: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1522996773-24129-6-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
+stgen_k should be declared as critical to avoid blocking console
+when ck_hsi is not used.
 
-> -----Original Message-----
-> From: linux-arm-kernel
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
-> yamada.masahiro at socionext.com
-> Sent: Friday, April 06, 2018 2:31 PM
-> To: arnd at arndb.de; arm at kernel.org
-> Cc: olof at lixom.net; jaswinder.singh at linaro.org; Hayashi, Kunihiko/? ?
-> ? <hayashi.kunihiko@socionext.com>; masami.hiramatsu at linaro.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH] ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL
-> and CONFIG_SNI_AVE
-> 
-> Hi Arnd,
-> 
-> > -----Original Message-----
-> > From: Kunihiko Hayashi [mailto:hayashi.kunihiko at socionext.com]
-> > Sent: Tuesday, March 27, 2018 9:21 PM
-> > To: Russell King <linux@armlinux.org.uk>; Yamada, Masahiro/?? ??
-> > <yamada.masahiro@socionext.com>; Olof Johansson <olof@lixom.net>; Arnd
-> > Bergmann <arnd@arndb.de>; linux-arm-kernel at lists.infradead.org
-> > Cc: arm at kernel.org; Masami Hiramatsu <masami.hiramatsu@linaro.org>;
-> Jassi
-> > Brar <jaswinder.singh@linaro.org>; Hayashi, Kunihiko/? ??
-> > <hayashi.kunihiko@socionext.com>
-> > Subject: [PATCH] ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL
-> and
-> > CONFIG_SNI_AVE
-> >
-> > Enable the thermal monitor driver and the AVE ethernet driver
-> > implemented on UniPhier SoCs.
-> >
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> 
-> 
-> What has happened to this patch?
-> 
-> You picked up arch/arm64/config/defconfig one (commit d28db34a),
-> but I am afraid you missed this one (arch/arm/configs/multi_v7_defconfig).
-> 
-> I do not have a strong opinion whether ethernet drivers should be built-in
-> or modular,
-> but I want to see consistency between arch/arm and arch/arm64
-> for Socionext platform.
-> 
-> You accepted commit d28db34a anyway,
-> so I hope you will pick up this one too.
-> 
-> 
-> BTW, I do not see this patch in any ML at all.
-> Probably, the sender of this patch, Kunihiko Hayashi,
-> is not a subscriber of the ARM-linux ML, and he did not CC LKML either.
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ drivers/clk/clk-stm32mp1.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-No.  Now I found this patch in ML.  Sorry.
+diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
+index e32fc23..b7b5361 100644
+--- a/drivers/clk/clk-stm32mp1.c
++++ b/drivers/clk/clk-stm32mp1.c
+@@ -1913,8 +1913,7 @@ enum {
+ 	KCLK(RNG1_K, "rng1_k", rng_src, 0, G_RNG1, M_RNG1),
+ 	KCLK(RNG2_K, "rng2_k", rng_src, 0, G_RNG2, M_RNG2),
+ 	KCLK(USBPHY_K, "usbphy_k", usbphy_src, 0, G_USBPHY, M_USBPHY),
+-	KCLK(STGEN_K, "stgen_k",  stgen_src, CLK_IGNORE_UNUSED,
+-	     G_STGEN, M_STGEN),
++	KCLK(STGEN_K, "stgen_k", stgen_src, CLK_IS_CRITICAL, G_STGEN, M_STGEN),
+ 	KCLK(SPDIF_K, "spdif_k", spdif_src, 0, G_SPDIF, M_SPDIF),
+ 	KCLK(SPI1_K, "spi1_k", spi123_src, 0, G_SPI1, M_SPI1),
+ 	KCLK(SPI2_K, "spi2_k", spi123_src, 0, G_SPI2, M_SPI23),
+-- 
+1.9.1
