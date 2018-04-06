@@ -1,40 +1,37 @@
-From: sricharan@codeaurora.org (sricharan at codeaurora.org)
-Date: Fri, 06 Apr 2018 18:35:49 +0530
-Subject: [PATCH v3 04/13] ARM: dts: ipq4019: Update ipq4019-dk01.1 board
- data
-In-Reply-To: <20180406045511.hnzxe4nepl5sqmld@localhost>
-References: <1521518336-5467-1-git-send-email-sricharan@codeaurora.org>
- <1521518336-5467-5-git-send-email-sricharan@codeaurora.org>
- <20180320143131.4eenixtbhciq5fwc@localhost>
- <20180329143715.GA31757@hector.attlocal.net>
- <20180329163739.2fg5qxvb5j3fiy6r@localhost>
- <4073ec6b457cb369a83c710d0ae453b4@codeaurora.org>
- <20180406045511.hnzxe4nepl5sqmld@localhost>
-Message-ID: <7dc41c73f594918701c21075dde30870@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 6 Apr 2018 15:20:40 +0200
+Subject: [PATCH v4 1/5] io: define several IO & PIO barrier types for the
+ asm-generic version
+In-Reply-To: <fa0b02f16cb4cb993775518fabccfb2d@codeaurora.org>
+References: <1522933753-19589-1-git-send-email-okaya@codeaurora.org>
+ <CAK8P3a0Ahf9uuXYy0fxdC5_O84gmSqTUsP6xjpGQFE8n1Tw7HA@mail.gmail.com>
+ <fa0b02f16cb4cb993775518fabccfb2d@codeaurora.org>
+Message-ID: <CAK8P3a3qpbPZuEhW=pYnadDtg5UGRpiD_k2=XiJanqmmTL5VzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-06 10:25, Richard Cochran wrote:
-> On Mon, Apr 02, 2018 at 03:28:47PM +0530, sricharan at codeaurora.org 
-> wrote:
->>   Yes, i will post another series for ipq806[2/4] updates and the
->> corresponding
->>   boards after this.
-> 
-> I tried mainline on the ap148 using qcom_defconfig and the
-> qcom-ipq8064-ap148.dtb, and it doesn't boot FYI.
-> 
+On Fri, Apr 6, 2018 at 2:50 PM,  <okaya@codeaurora.org> wrote:
+> On 2018-04-06 06:19, Arnd Bergmann wrote:
+>>
+>> On Thu, Apr 5, 2018 at 3:09 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>>
+>>
+>> I would guess that at least s390 doesn't need the barriers
+>> (maintainers on Cc now), but there may be others that want to
+>> override the new barriers with weaker ones where an MMIO
+>> access is guaranteed to serialize against DMA, or where
+>> a specialized barrier for this case exists.
+>>
+>> Looking over the asm-generic implementation once more now,
+>> I wonder if we should change the relaxed accessors to not have
+>> any barriers (back to the version before your series) rather than
+>> defaulting them to having the same barriers as the regular
+>> readl/writel.
+>
+>
+> I can do a follow up patch. You want to map them to raw api without any
+> barriers as before. Right?
 
-  I tried booting mainline built with qcom_defconfig on ap148 and
-  did boot. Not sure if your bootloader's bootarg is this,
-   'console=ttyMSM0,115200n8' ?
+Right, but of course with the byteswap.
 
-
-  root@(none):/# cat /proc/version
-  Linux version 4.16.0 (srichara at srichara-linux) (gcc version 6.3.1 
-20170109 (Linaro GCC 6.3-2017.02)) #1691 SMP PREEMPT Fri Apr 6 15:30:45 
-IST 2018
-  root@(none):/#
-
-Regards,
-  Sricharan
+      Arnd
