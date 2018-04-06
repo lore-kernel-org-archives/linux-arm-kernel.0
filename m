@@ -1,40 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Apr 2018 11:55:34 +0100
-Subject: [PATCH 06/10] barriers: Introduce smp_cond_load_relaxed and
- atomic_cond_read_relaxed
-In-Reply-To: <20180405172226.GF4082@hirez.programming.kicks-ass.net>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <1522947547-24081-7-git-send-email-will.deacon@arm.com>
- <20180405172226.GF4082@hirez.programming.kicks-ass.net>
-Message-ID: <20180406105534.GB27619@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Apr 2018 11:57:09 +0100
+Subject: [PATCH 1/5] arm64: entry: isb in el1_irq
+In-Reply-To: <20180405171800.5648-2-ynorov@caviumnetworks.com>
+References: <20180405171800.5648-1-ynorov@caviumnetworks.com>
+ <20180405171800.5648-2-ynorov@caviumnetworks.com>
+Message-ID: <20180406105709.kd3uumwustwnzcd4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 05, 2018 at 07:22:26PM +0200, Peter Zijlstra wrote:
-> On Thu, Apr 05, 2018 at 05:59:03PM +0100, Will Deacon wrote:
-> > diff --git a/include/linux/atomic.h b/include/linux/atomic.h
-> > index 8b276fd9a127..01ce3997cb42 100644
-> > --- a/include/linux/atomic.h
-> > +++ b/include/linux/atomic.h
-> > @@ -654,6 +654,7 @@ static inline int atomic_dec_if_positive(atomic_t *v)
-> >  }
-> >  #endif
-> >  
-> > +#define atomic_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
-> >  #define atomic_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
-> >  
-> >  #ifdef CONFIG_GENERIC_ATOMIC64
-> > @@ -1075,6 +1076,7 @@ static inline long long atomic64_fetch_andnot_release(long long i, atomic64_t *v
-> >  }
-> >  #endif
-> >  
-> > +#define atomic64_cond_read_relaxed(v, c)	smp_cond_load_relaxed(&(v)->counter, (c))
-> >  #define atomic64_cond_read_acquire(v, c)	smp_cond_load_acquire(&(v)->counter, (c))
-> >  
-> >  #include <asm-generic/atomic-long.h>
+On Thu, Apr 05, 2018 at 08:17:56PM +0300, Yury Norov wrote:
+> Kernel text patching framework relies on IPI to ensure that other
+> SMP cores observe the change. Target core calls isb() in IPI handler
+> path, but not at the beginning of el1_irq entry. There's a chance
+> that modified instruction will appear prior isb(), and so will not be
+> observed.
 > 
-> Did we again forget atomic_long glue ? ;-)
+> This patch inserts isb early at el1_irq entry to avoid that chance.
 
-Bah! I'll add it for v2, thanks.
+As James pointed out, taking an exception is context synchronizing, so
+this looks unnecessary.
 
-Will
+Also, it's important to realise that the exception entry is not tied to a
+specific interrupt. We might take an EL1 IRQ because of a timer interrupt,
+then an IPI could be taken before we get to gic_handle_irq().
+
+This means that we can race:
+
+	CPU0				CPU1
+	<take IRQ>
+	ISB
+					<patch text>
+					<send IPI>
+	<discover IPI pending>
+
+... and thus the ISB is too early.
+
+Only once we're in the interrupt handler can we pair an ISB with the IPI, and
+any code executed before that is not guaranteed to be up-to-date.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ---
+>  arch/arm64/kernel/entry.S | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index ec2ee720e33e..9c06b4b80060 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -593,6 +593,7 @@ ENDPROC(el1_sync)
+>  
+>  	.align	6
+>  el1_irq:
+> +	isb					// pairs with aarch64_insn_patch_text
+>  	kernel_entry 1
+>  	enable_da_f
+>  #ifdef CONFIG_TRACE_IRQFLAGS
+> -- 
+> 2.14.1
+> 
