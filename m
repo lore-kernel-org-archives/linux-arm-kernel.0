@@ -1,124 +1,76 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 6 Apr 2018 08:39:28 +0200
-Subject: [PATCH 1/6] clk: stm32mp1: add missing static
+Date: Fri, 6 Apr 2018 08:39:31 +0200
+Subject: [PATCH 4/6] clk: stm32mp1: add missing tzc2 clock
 In-Reply-To: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
 References: <1522996773-24129-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1522996773-24129-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1522996773-24129-5-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Add missing static for const parent names and clock ops.
+This patch adds tzc2 clock and rename tzc clock into tzc1
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32mp1.c | 30 ++++++++++++++----------------
- 1 file changed, 14 insertions(+), 16 deletions(-)
+ drivers/clk/clk-stm32mp1.c                | 9 ++++++---
+ include/dt-bindings/clock/stm32mp1-clks.h | 3 ++-
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
-index f1d5967..62f172c 100644
+index eefed49..e32fc23 100644
 --- a/drivers/clk/clk-stm32mp1.c
 +++ b/drivers/clk/clk-stm32mp1.c
-@@ -216,7 +216,7 @@
- 	"pclk5", "pll3_q", "ck_hsi", "ck_csi", "pll4_q", "ck_hse"
- };
+@@ -1399,7 +1399,8 @@ enum {
+ 	G_USBH,
+ 	G_ETHSTP,
+ 	G_RTCAPB,
+-	G_TZC,
++	G_TZC1,
++	G_TZC2,
+ 	G_TZPC,
+ 	G_IWDG1,
+ 	G_BSEC,
+@@ -1500,7 +1501,8 @@ enum {
+ 	K_GATE(G_BSEC,		RCC_APB5ENSETR, 16, 0),
+ 	K_GATE(G_IWDG1,		RCC_APB5ENSETR, 15, 0),
+ 	K_GATE(G_TZPC,		RCC_APB5ENSETR, 13, 0),
+-	K_GATE(G_TZC,		RCC_APB5ENSETR, 12, 0),
++	K_GATE(G_TZC2,		RCC_APB5ENSETR, 12, 0),
++	K_GATE(G_TZC1,		RCC_APB5ENSETR, 11, 0),
+ 	K_GATE(G_RTCAPB,	RCC_APB5ENSETR, 8, 0),
+ 	K_MGATE(G_USART1,	RCC_APB5ENSETR, 4, 0),
+ 	K_MGATE(G_I2C6,		RCC_APB5ENSETR, 3, 0),
+@@ -1854,7 +1856,8 @@ enum {
+ 	PCLK(USART1, "usart1", "pclk5", 0, G_USART1),
+ 	PCLK(RTCAPB, "rtcapb", "pclk5", CLK_IGNORE_UNUSED |
+ 	     CLK_IS_CRITICAL, G_RTCAPB),
+-	PCLK(TZC, "tzc", "pclk5", CLK_IGNORE_UNUSED, G_TZC),
++	PCLK(TZC1, "tzc1", "ck_axi", CLK_IGNORE_UNUSED, G_TZC1),
++	PCLK(TZC2, "tzc2", "ck_axi", CLK_IGNORE_UNUSED, G_TZC2),
+ 	PCLK(TZPC, "tzpc", "pclk5", CLK_IGNORE_UNUSED, G_TZPC),
+ 	PCLK(IWDG1, "iwdg1", "pclk5", 0, G_IWDG1),
+ 	PCLK(BSEC, "bsec", "pclk5", CLK_IGNORE_UNUSED, G_BSEC),
+diff --git a/include/dt-bindings/clock/stm32mp1-clks.h b/include/dt-bindings/clock/stm32mp1-clks.h
+index 86e3ec6..6c807fd 100644
+--- a/include/dt-bindings/clock/stm32mp1-clks.h
++++ b/include/dt-bindings/clock/stm32mp1-clks.h
+@@ -76,7 +76,7 @@
+ #define I2C6		63
+ #define USART1		64
+ #define RTCAPB		65
+-#define TZC		66
++#define TZC1		66
+ #define TZPC		67
+ #define IWDG1		68
+ #define BSEC		69
+@@ -123,6 +123,7 @@
+ #define CRC1		110
+ #define USBH		111
+ #define ETHSTP		112
++#define TZC2		113
  
--const char * const usart234578_src[] = {
-+static const char * const usart234578_src[] = {
- 	"pclk1", "pll4_q", "ck_hsi", "ck_csi", "ck_hse"
- };
- 
-@@ -316,10 +316,8 @@ struct stm32_clk_mgate {
- struct clock_config {
- 	u32 id;
- 	const char *name;
--	union {
--		const char *parent_name;
--		const char * const *parent_names;
--	};
-+	const char *parent_name;
-+	const char * const *parent_names;
- 	int num_parents;
- 	unsigned long flags;
- 	void *cfg;
-@@ -469,7 +467,7 @@ static void mp1_gate_clk_disable(struct clk_hw *hw)
- 	}
- }
- 
--const struct clk_ops mp1_gate_clk_ops = {
-+static const struct clk_ops mp1_gate_clk_ops = {
- 	.enable		= mp1_gate_clk_enable,
- 	.disable	= mp1_gate_clk_disable,
- 	.is_enabled	= clk_gate_is_enabled,
-@@ -698,7 +696,7 @@ static void mp1_mgate_clk_disable(struct clk_hw *hw)
- 		mp1_gate_clk_disable(hw);
- }
- 
--const struct clk_ops mp1_mgate_clk_ops = {
-+static const struct clk_ops mp1_mgate_clk_ops = {
- 	.enable		= mp1_mgate_clk_enable,
- 	.disable	= mp1_mgate_clk_disable,
- 	.is_enabled	= clk_gate_is_enabled,
-@@ -732,7 +730,7 @@ static int clk_mmux_set_parent(struct clk_hw *hw, u8 index)
- 	return 0;
- }
- 
--const struct clk_ops clk_mmux_ops = {
-+static const struct clk_ops clk_mmux_ops = {
- 	.get_parent	= clk_mmux_get_parent,
- 	.set_parent	= clk_mmux_set_parent,
- 	.determine_rate	= __clk_mux_determine_rate,
-@@ -1048,10 +1046,10 @@ struct stm32_pll_cfg {
- 	u32 offset;
- };
- 
--struct clk_hw *_clk_register_pll(struct device *dev,
--				 struct clk_hw_onecell_data *clk_data,
--				 void __iomem *base, spinlock_t *lock,
--				 const struct clock_config *cfg)
-+static struct clk_hw *_clk_register_pll(struct device *dev,
-+					struct clk_hw_onecell_data *clk_data,
-+					void __iomem *base, spinlock_t *lock,
-+					const struct clock_config *cfg)
- {
- 	struct stm32_pll_cfg *stm_pll_cfg = cfg->cfg;
- 
-@@ -1417,7 +1415,7 @@ enum {
- 	G_LAST
- };
- 
--struct stm32_mgate mp1_mgate[G_LAST];
-+static struct stm32_mgate mp1_mgate[G_LAST];
- 
- #define _K_GATE(_id, _gate_offset, _gate_bit_idx, _gate_flags,\
- 	       _mgate, _ops)\
-@@ -1440,7 +1438,7 @@ enum {
- 	       &mp1_mgate[_id], &mp1_mgate_clk_ops)
- 
- /* Peripheral gates */
--struct stm32_gate_cfg per_gate_cfg[G_LAST] = {
-+static struct stm32_gate_cfg per_gate_cfg[G_LAST] = {
- 	/* Multi gates */
- 	K_GATE(G_MDIO,		RCC_APB1ENSETR, 31, 0),
- 	K_MGATE(G_DAC12,	RCC_APB1ENSETR, 29, 0),
-@@ -1600,7 +1598,7 @@ enum {
- 	M_LAST
- };
- 
--struct stm32_mmux ker_mux[M_LAST];
-+static struct stm32_mmux ker_mux[M_LAST];
- 
- #define _K_MUX(_id, _offset, _shift, _width, _mux_flags, _mmux, _ops)\
- 	[_id] = {\
-@@ -1623,7 +1621,7 @@ enum {
- 	_K_MUX(_id, _offset, _shift, _width, _mux_flags,\
- 			&ker_mux[_id], &clk_mmux_ops)
- 
--const struct stm32_mux_cfg ker_mux_cfg[M_LAST] = {
-+static const struct stm32_mux_cfg ker_mux_cfg[M_LAST] = {
- 	/* Kernel multi mux */
- 	K_MMUX(M_SDMMC12, RCC_SDMMC12CKSELR, 0, 3, 0),
- 	K_MMUX(M_SPI23, RCC_SPI2S23CKSELR, 0, 3, 0),
+ /* Kernel clocks */
+ #define SDMMC1_K	118
 -- 
 1.9.1
