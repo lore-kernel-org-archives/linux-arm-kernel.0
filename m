@@ -1,23 +1,18 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 06 Apr 2018 11:22:23 -0700
-Subject: [PATCH] clk: imx: Set CLK_SET_RATE_GATE for gate and divider
- clocks
-In-Reply-To: <1521812006-6173-1-git-send-email-abel.vesa@nxp.com>
-References: <1521812006-6173-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <152303894318.143116.719157250286888372@swboyd.mtv.corp.google.com>
+Date: Fri, 06 Apr 2018 11:33:17 -0700
+Subject: [PATCH v6 4/4] clk: imx: add clock driver for imx6sll
+In-Reply-To: <1521512644-25265-4-git-send-email-ping.bai@nxp.com>
+References: <1521512644-25265-1-git-send-email-ping.bai@nxp.com>
+ <1521512644-25265-4-git-send-email-ping.bai@nxp.com>
+Message-ID: <152303959738.94378.12246273197414049832@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Abel Vesa (2018-03-23 06:33:26)
-> Add flag CLK_SET_RATE_GATE for i.MX gate and divider clocks on which the
-> client drivers usually make clk_set_rate() call, so that the call will fail
-> when clock is still on instead of standing the risk of running into glitch
-> issue. Rate cannot be changed when the clock is enabled due to the glitchy
-> multiplexers.
+Quoting Bai Ping (2018-03-19 19:24:04)
+> Add clk driver support for imx6sll.
 > 
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> [initial patch from imx internal repo]
-> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> [carried over from 3.14 and also applied the flag to newer functions]
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
+> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
 
-Is Shawn the author of this patch?
+Applied to clk-next
