@@ -1,82 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Apr 2018 16:27:45 +0100
-Subject: [PATCH 10/10] locking/qspinlock: Elide back-to-back RELEASE
- operations with smp_wmb()
-In-Reply-To: <20180406130512.GA6631@andrea>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <1522947547-24081-11-git-send-email-will.deacon@arm.com>
- <20180405172808.GG4082@hirez.programming.kicks-ass.net>
- <20180406113436.GC27619@arm.com> <20180406130512.GA6631@andrea>
-Message-ID: <20180406152744.GE10528@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 6 Apr 2018 09:47:31 -0600
+Subject: [PATCH 1/2] coresight: Use %px to print pcsr instead of %p
+In-Reply-To: <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
+References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
+ <1520961871-11196-2-git-send-email-mathieu.poirier@linaro.org>
+ <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
+Message-ID: <CANLsYkwseQo1+PfTuhkgvx=AyLs3dL+zkSxwbkuu9JhLwTDqHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrea,
+On 5 April 2018 at 00:26, Kees Cook <keescook@chromium.org> wrote:
+> On Tue, Mar 13, 2018 at 10:24 AM, Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
+>> From: Leo Yan <leo.yan@linaro.org>
+>>
+>> Commit ad67b74d2469 ("printk: hash addresses printed with %p") lets
+>> printk specifier %p to hash all addresses before printing, this was
+>> resulting in the high 32 bits of pcsr can only output zeros.  So
+>> module cannot completely print pc value and it's pointless for debugging
+>> purpose.
+>>
+>> This patch fixes this by using %px to print pcsr instead.
+>
+> Why is %p (and now %px) needed here at all? %pS is already used, which
+> should give useful debugging details, yes?
 
-On Fri, Apr 06, 2018 at 03:05:12PM +0200, Andrea Parri wrote:
-> On Fri, Apr 06, 2018 at 12:34:36PM +0100, Will Deacon wrote:
-> > I could say something like:
-> > 
-> >   "Pairs with dependency ordering from both xchg_tail and explicit
-> >    dereferences of node->next"
-> > 
-> > but it's a bit cryptic :(
-> 
-> Agreed. ;)  It might be helpful to instead include a snippet to highlight
-> the interested memory accesses/dependencies; IIUC,
-> 
-> /*
->  * Pairs with dependency ordering from both xchg_tail and explicit/?
->  * dereferences of node->next:
->  *
->  *   CPU0
->  *
->  *   /* get node0, encode node0 in tail */
->  *   pv_init_node(node0);
->  *     ((struct pv_node *)node0)->cpu   = smp_processor_id();
->  *     ((struct pv_node *)node0)->state = vcpu_running;
+Hey Leo,
 
-I'd probably ignore the PV case here and just focus on the native init
-of count/locked/next.
+I've taken a second look at this and Kees has a point, %pS should be
+sufficient here.  Please test again and see if %px is absolutely
+necessary.  If you think that is the case please provide a snapshot of
+the corner case that makes the change mandatory.
 
->  *   smp_wmb();
->  *   old = xchg_tail(lock, tail);
->  *
->  *   CPU1:
->  *
->  *   /* get node1, encode tail from node1 */
->  *   old = xchg_tail(lock, tail);   // = tail corresponding to node0
->  *                                  // head an addr. dependency
->  *   /* decode old in prev */
->  *   pv_wait_node(node1, prev);
-
-Similarly here -- the dependency is through decode_tail.
-
->  *     READ ((struct pv_node *)prev)->cpu   // addr. dependent read
->  *     READ ((struct pv_node *)prev)->state // addr. dependend read
->  *
->  * [More details for the case "following our own ->next pointer" you
->  *  mentioned dabove.]
->  */
-> 
-> CPU1 would also have:
-> 
->    WRITE_ONCE(prev->next, node1); // addr. dependent write
-> 
-> but I'm not sure how this pairs: does this belong to the the second
-> case above? can you elaborate on that?
-
-This is dependent on the result of decode_tail, so it's still the first
-case. The second case is when we queued into an empty tail but somebody
-later queued behind us, so we don't find them until we're claiming the
-lock:
-
-  if (!next)
-  	next = smp_cond_load_relaxed(&node->next, (VAL));
-
-  arch_mcs_spin_unlock_contended(&next->locked);
-
-here, this is all straightforward address dependencies rather than the
-arithmetic in decode_tail.
-
-Will
+>
+> -Kees
+>
+> --
+> Kees Cook
+> Pixel Security
