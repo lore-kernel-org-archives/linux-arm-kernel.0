@@ -1,34 +1,35 @@
-From: swboyd@chromium.org (Stephen Boyd)
-Date: Sat, 07 Apr 2018 05:33:00 -0700
-Subject: [PATCH 2/2] pinctrl: qcom: qdf2xxx: add support for new ACPI HID
- QCOM8002
-In-Reply-To: <1521848700-22214-2-git-send-email-timur@codeaurora.org>
-References: <1521848700-22214-1-git-send-email-timur@codeaurora.org>
- <1521848700-22214-2-git-send-email-timur@codeaurora.org>
-Message-ID: <152310438008.180276.15989327938738839272@swboyd.mtv.corp.google.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Sat, 07 Apr 2018 05:56:54 -0700
+Subject: [PATCH 5/5] hisi: Consolidate the Kconfigs for the CLOCK_STUB and
+ the MAILBOX
+In-Reply-To: <1522811675-12741-6-git-send-email-leo.yan@linaro.org>
+References: <1522811675-12741-1-git-send-email-leo.yan@linaro.org>
+ <1522811675-12741-6-git-send-email-leo.yan@linaro.org>
+Message-ID: <152310581432.180276.1794734900981310994@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Timur Tabi (2018-03-23 16:45:00)
-> Newer versions of the firmware for the Qualcomm Datacenter Technologies
-> QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-> prevent older kernels from accidentally accessing the restricted GPIOs,
-> we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-> and introduce a new property "gpios".  This property is an array of
-> specific GPIOs that are accessible.  When an older kernel boots on
-> newer (restricted) firmware, it will fail to probe.
+Quoting Leo Yan (2018-04-03 20:14:35)
+> From: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
-> To implement the sparse GPIO map, we register all of the GPIOs, but
-> fill in the data only for available GPIOs.  This ensures that the driver
-> cannot accidentally access an unavailable GPIO.
+> The current defconfig is inconsistent as it selects the mailbox and
+> the clock for the hi6220 and the hi3660 without having their Kconfigs
+> making sure the dependencies are correct. It ends up when selecting
+> different versions for the kernel (for example when git bisecting)
+> those options disappear and they don't get back, leading to unexpected
+> behaviors. In our case, the cpufreq driver does no longer work because
+> the clock fails to initialize due to the clock stub and the mailbox
+> missing.
 > 
-> The pinctrl-msm driver also scans the "gpios" property to determine
-> which pins are available, and ensure that only those can be registered.
+> In order to have the dependencies correctly set when defaulting, let's
+> do the same as commit 3a49afb84ca074e ("clk: enable hi655x common clk
+> automatically") where we select automatically the driver when the
+> parent driver is selected. With sensible defaults in place, we can leave
+> other choices for EXPERT.
 > 
-> Support for QCOM8001 is removed as there is no longer any firmware that
-> implements it.
-> 
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > ---
 
-Reviewed-by: Stephen Boyd <swboyd@chromium.org>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
+
+Although I wonder why it can't be split up?
