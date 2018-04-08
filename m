@@ -1,259 +1,81 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Sat, 07 Apr 2018 18:16:29 -0700
-Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
-In-Reply-To: <20180406141935.6801-1-linus.walleij@linaro.org>
-References: <20180406141935.6801-1-linus.walleij@linaro.org>
-Message-ID: <87d0zao5ua.fsf@anholt.net>
+From: hejianet@gmail.com (Jia He)
+Date: Sun, 8 Apr 2018 10:05:08 +0800
+Subject: [PATCH v7 2/5] arm: arm64: page_alloc: reduce unnecessary binary
+ search in memblock_next_valid_pfn()
+In-Reply-To: <20180406090920.GM16141@n2100.armlinux.org.uk>
+References: <1522915478-5044-1-git-send-email-hejianet@gmail.com>
+ <1522915478-5044-3-git-send-email-hejianet@gmail.com>
+ <20180405113444.GB2647@bombadil.infradead.org>
+ <1f809296-e88d-1090-0027-890782b91d6e@gmail.com>
+ <20180405125054.GC2647@bombadil.infradead.org>
+ <20180406090920.GM16141@n2100.armlinux.org.uk>
+Message-ID: <3308d7f2-e793-8f8e-7811-448b808bf736@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Thanks for your comments, Russell
 
-> The Versatile Express uses a special configuration controller
-> deeply embedded in the system motherboard FPGA to multiplex the
-> two to three (!) CLCD instances out to the single SiI9022
-> bridge.
->
-> Set up an extra file with the logic to probe to the FPGA mux
-> register on the system controller bus, then parse the memory
-> range argument to figure out what path the CLCD signal is
-> actually taking, and set up the mux accordingly.
->
-> If there is a CLCD instance on the core tile (the daughterboard
-> with the CPUs fitted) then that CLCD instance will take
-> precedence since it can address all memory.
->
-> Scale down the Versatile Express to 16BPP so we can support a
-> 1024x768 display despite the bus bandwidth restrictions on this
-> platform.
->
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - No changes just reposting rebased on mainline changes.
-> ---
->  drivers/gpu/drm/pl111/Makefile          |   1 +
->  drivers/gpu/drm/pl111/pl111_drm.h       |   3 +-
->  drivers/gpu/drm/pl111/pl111_versatile.c |  48 ++++++++++++++-
->  drivers/gpu/drm/pl111/pl111_vexpress.c  | 106 ++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++++
->  5 files changed, 178 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
->  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
->
-> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
-> index 9c5e8dba8ac6..19a8189dc54f 100644
-> --- a/drivers/gpu/drm/pl111/Makefile
-> +++ b/drivers/gpu/drm/pl111/Makefile
-> @@ -3,6 +3,7 @@ pl111_drm-y +=	pl111_display.o \
->  		pl111_versatile.o \
->  		pl111_drv.o
->  
-> +pl111_drm-$(CONFIG_ARCH_VEXPRESS) += pl111_vexpress.o
->  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
->  
->  obj-$(CONFIG_DRM_PL111) += pl111_drm.o
-> diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
-> index 8639b2d4ddf7..916154ac733a 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drm.h
-> +++ b/drivers/gpu/drm/pl111/pl111_drm.h
-> @@ -64,7 +64,8 @@ struct pl111_drm_dev_private {
->  	struct drm_bridge *bridge;
->  	struct drm_simple_display_pipe pipe;
->  
-> -	void *regs;
-> +	void __iomem *clcd_memory;
 
-This doesn't seem to be used anywhere.
+On 4/6/2018 5:09 PM, Russell King - ARM Linux Wrote:
+> On Thu, Apr 05, 2018 at 05:50:54AM -0700, Matthew Wilcox wrote:
+>> On Thu, Apr 05, 2018 at 08:44:12PM +0800, Jia He wrote:
+>>>
+>>> On 4/5/2018 7:34 PM, Matthew Wilcox Wrote:
+>>>> On Thu, Apr 05, 2018 at 01:04:35AM -0700, Jia He wrote:
+>>>>> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+>>>>> where possible") optimized the loop in memmap_init_zone(). But there is
+>>>>> still some room for improvement. E.g. if pfn and pfn+1 are in the same
+>>>>> memblock region, we can simply pfn++ instead of doing the binary search
+>>>>> in memblock_next_valid_pfn.
+>>>> Sure, but I bet if we are >end_pfn, we're almost certainly going to the
+>>>> start_pfn of the next block, so why not test that as well?
+>>>>
+>>>>> +	/* fast path, return pfn+1 if next pfn is in the same region */
+>>>>> +	if (early_region_idx != -1) {
+>>>>> +		start_pfn = PFN_DOWN(regions[early_region_idx].base);
+>>>>> +		end_pfn = PFN_DOWN(regions[early_region_idx].base +
+>>>>> +				regions[early_region_idx].size);
+>>>>> +
+>>>>> +		if (pfn >= start_pfn && pfn < end_pfn)
+>>>>> +			return pfn;
+>>>> 		early_region_idx++;
+>>>> 		start_pfn = PFN_DOWN(regions[early_region_idx].base);
+>>>> 		if (pfn >= end_pfn && pfn <= start_pfn)
+>>>> 			return start_pfn;
+>>> Thanks, thus the binary search in next step can be discarded?
+>> I don't know all the circumstances in which this is called.  Maybe a linear
+>> search with memo is more appropriate than a binary search.
+> That's been brought up before, and the reasoning appears to be
+> something along the lines of...
+>
+> Academics and published wisdom is that on cached architectures, binary
+> searches are bad because it doesn't operate efficiently due to the
+> overhead from having to load cache lines.  Consequently, there seems
+> to be a knee-jerk reaction that "all binary searches are bad, we must
+> eliminate them."
+IIUC, are you opposed to entirely removing the binary search instead of my
+previous patch set?
+>
+> What is failed to be grasped here, though, is that it is typical that
+> the number of entries in this array tend to be small, so the entire
+> array takes up one or two cache lines, maybe a maximum of four lines
+> depending on your cache line length and number of entries.
+>
+> This means that the binary search expense is reduced, and is lower
+> than a linear search for the majority of cases.
+>
+> What is key here as far as performance is concerned is whether the
+> general usage of pfn_valid() by the kernel is optimal.  We should
+> not optimise only for the boot case, which means evaluating the
+> effect of these changes with _real_ workloads, not just "does my
+> machine boot a milliseconds faster".
+hmm.. But pfn is linearly increased during the booting time. This assumption
+is not correct in real workload for pfn_valid out of booting time. So in my
+patchset, I defined another pfn_valid_region for booting time only.
 
-> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
-> index 9302f516045e..569edf02a36a 100644
-> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
-> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
-> @@ -1,12 +1,14 @@
->  #include <linux/amba/clcd-regs.h>
->  #include <linux/device.h>
->  #include <linux/of.h>
-> +#include <linux/of_platform.h>
->  #include <linux/regmap.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/bitops.h>
->  #include <linux/module.h>
->  #include <drm/drmP.h>
->  #include "pl111_versatile.h"
-> +#include "pl111_vexpress.h"
->  #include "pl111_drm.h"
->  
->  static struct regmap *versatile_syscon_map;
-> @@ -22,6 +24,7 @@ enum versatile_clcd {
->  	REALVIEW_CLCD_PB11MP,
->  	REALVIEW_CLCD_PBA8,
->  	REALVIEW_CLCD_PBX,
-> +	VEXPRESS_CLCD_V2M,
->  };
->  
->  static const struct of_device_id versatile_clcd_of_match[] = {
-> @@ -53,6 +56,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
->  		.compatible = "arm,realview-pbx-syscon",
->  		.data = (void *)REALVIEW_CLCD_PBX,
->  	},
-> +	{
-> +		.compatible = "arm,vexpress-muxfpga",
-> +		.data = (void *)VEXPRESS_CLCD_V2M,
-> +	},
->  	{},
->  };
->  
-> @@ -286,12 +293,26 @@ static const struct pl111_variant_data pl111_realview = {
->  	.fb_bpp = 16,
->  };
->  
-> +/*
-> + * Versatile Express PL111 variant, again we just push the maximum
-> + * BPP to 16 to be able to get 1024x768 without saturating the memory
-> + * bus. The clockdivider also seems broken on the Versatile Express.
-> + */
-> +static const struct pl111_variant_data pl111_vexpress = {
-> +	.name = "PL111 Versatile Express",
-> +	.formats = pl111_realview_pixel_formats,
-> +	.nformats = ARRAY_SIZE(pl111_realview_pixel_formats),
-> +	.fb_bpp = 16,
-> +	.broken_clockdivider = true,
-> +};
-> +
->  int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  {
->  	const struct of_device_id *clcd_id;
->  	enum versatile_clcd versatile_clcd_type;
->  	struct device_node *np;
->  	struct regmap *map;
-> +	int ret;
->  
->  	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
->  					     &clcd_id);
-> @@ -301,7 +322,25 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  	}
->  	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
->  
-> -	map = syscon_node_to_regmap(np);
-> +	/* Versatile Express special handling */
-> +	if (versatile_clcd_type == VEXPRESS_CLCD_V2M) {
-> +		struct platform_device *pdev;
-> +
-> +		/* Call into deep Vexpress configuration API */
-> +		pdev = of_find_device_by_node(np);
-> +		if (!pdev) {
-> +			dev_err(dev, "can't find the sysreg device, deferring\n");
-> +			return -EPROBE_DEFER;
-> +		}
-> +		map = dev_get_drvdata(&pdev->dev);
-> +		if (!map) {
-> +			dev_err(dev, "sysreg has not yet probed\n");
-> +			return -EPROBE_DEFER;
-> +		}
-> +	} else {
-> +		map = syscon_node_to_regmap(np);
-> +	}
-> +
->  	if (IS_ERR(map)) {
->  		dev_err(dev, "no Versatile syscon regmap\n");
->  		return PTR_ERR(map);
-> @@ -340,6 +379,13 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
->  		priv->variant_display_disable = pl111_realview_clcd_disable;
->  		dev_info(dev, "set up callbacks for RealView PL111\n");
->  		break;
-> +	case VEXPRESS_CLCD_V2M:
-> +		priv->variant = &pl111_vexpress;
-> +		dev_info(dev, "initializing Versatile Express PL111\n");
-> +		ret = pl111_vexpress_clcd_init(dev, priv, map);
-> +		if (ret)
-> +			return ret;
-> +		break;
->  	default:
->  		dev_info(dev, "unknown Versatile system controller\n");
->  		break;
-> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.c b/drivers/gpu/drm/pl111/pl111_vexpress.c
-> new file mode 100644
-> index 000000000000..720244f497fe
-> --- /dev/null
-> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.c
-> @@ -0,0 +1,106 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Versatile Express PL111 handling
-> + * Copyright (C) 2018 Linus Walleij
-> + *
-> + * This module binds to the "arm,vexpress-muxfpga" device on the
-> + * Versatile Express configuration bus and sets up which CLCD instance
-> + * gets muxed out on the DVI bridge.
-> + */
-> +#include <linux/device.h>
-> +#include <linux/module.h>
-> +#include <linux/regmap.h>
-> +#include <linux/vexpress.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +#include "pl111_drm.h"
-> +#include "pl111_vexpress.h"
-> +
-> +#define VEXPRESS_FPGAMUX_MOTHERBOARD		0x00
-> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_1	0x01
-> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_2	0x02
-> +
-> +static bool daughterboard_muxed = false;
-> +static bool motherboard_muxed = false;
-> +
-> +int pl111_vexpress_clcd_init(struct device *dev,
-> +			     struct pl111_drm_dev_private *priv,
-> +			     struct regmap *map)
-> +{
-> +	struct device_node *memory;
-> +	u32 val;
-> +	int ret;
-> +
-> +	/*
-> +	 * The CLCD on the motherboard has a special memory region and
-> +	 * does not make use of CMA. We differentiate between the different
-> +	 * CLCD controllers using this memory region phandle.
-> +	 */
-> +	memory = of_parse_phandle(dev->of_node, "memory-region", 0);
-> +	if (!memory) {
-> +		if (motherboard_muxed) {
-> +			dev_info(dev, "motherboard CLCD muxed in\n");
-> +			dev_info(dev, "daughterboard takes precedence\n");
-> +			dev_info(dev, "motherboard CLCD will not be muxed out\n");
-> +		}
-> +		dev_info(dev,
-> +			 "DVI muxed to daughterboard 1 (core tile) CLCD\n");
-> +		val = VEXPRESS_FPGAMUX_DAUGHTERBOARD_1;
-> +		daughterboard_muxed = true;
-> +	} else {
-> +		priv->clcd_memory = of_iomap(memory, 0);
-> +		if (!priv->clcd_memory)
-> +			dev_err(dev, "could not remap CLCD memory\n");
-> +		/* Fall through and try to use CMA */
-> +		if (daughterboard_muxed) {
-> +			dev_info(dev, "daughterboard takes precedence\n");
-> +			dev_info(dev, "motherboard CLCD will not be muxed out\n");
-> +			return -ENODEV;
-> +		}
-> +		dev_info(dev, "DVI muxed to motherboard CLCD\n");
-> +		val = VEXPRESS_FPGAMUX_MOTHERBOARD;
-> +		motherboard_muxed = true;
-> +	}
+I didn't have many arm/arm64 boxes to verifed. What I can do is guaranteeing
+the improvemnet in my armv8a (qualcom centriq 2400). Sorry about it.
 
-I'm confused by global bools here.  It seems like we're trying to
-coordinate between the instantiation of multiple CLCDs here, to set up
-the mux appropriately.  Does it make sense to do things that way, if
-probe order is unreliable?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180407/c021d538/attachment-0001.sig>
+  --
+Cheers,
+Jia
