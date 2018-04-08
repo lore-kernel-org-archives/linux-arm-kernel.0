@@ -1,33 +1,33 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sun, 8 Apr 2018 11:19:33 +0800
-Subject: [PATCH v4 2/7] clk: meson: migrate to devm_of_clk_add_hw_provider API
+Date: Sun, 8 Apr 2018 11:19:34 +0800
+Subject: [PATCH v4 3/7] dt-bindings: clock: axg-aoclkc: New binding for
+ Meson-AXG SoC
 In-Reply-To: <20180408031938.153474-1-yixun.lan@amlogic.com>
 References: <20180408031938.153474-1-yixun.lan@amlogic.com>
-Message-ID: <20180408031938.153474-3-yixun.lan@amlogic.com>
+Message-ID: <20180408031938.153474-4-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a protential memory leak, as of_clk_del_provider is
-never called if of_clk_add_hw_provider has been executed.
-Fix this by using devm variant API.
+Update the dt-binding documentation to support new compatible string
+for the Amlogic's Meson-AXG SoC.
 
-Suggested-by: Stephen Boyd <sboyd@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- drivers/clk/meson/meson-aoclk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/meson/meson-aoclk.c b/drivers/clk/meson/meson-aoclk.c
-index 14862c22e20d..14a1e46a4de6 100644
---- a/drivers/clk/meson/meson-aoclk.c
-+++ b/drivers/clk/meson/meson-aoclk.c
-@@ -78,6 +78,6 @@ int meson_aoclkc_probe(struct platform_device *pdev)
- 			return ret;
- 	}
+diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+index 786dc39ca904..3a880528030e 100644
+--- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
++++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+@@ -9,6 +9,7 @@ Required Properties:
+ 	- GXBB (S905) : "amlogic,meson-gxbb-aoclkc"
+ 	- GXL (S905X, S905D) : "amlogic,meson-gxl-aoclkc"
+ 	- GXM (S912) : "amlogic,meson-gxm-aoclkc"
++	- AXG (A113D, A113X) : "amlogic,meson-axg-aoclkc"
+ 	followed by the common "amlogic,meson-gx-aoclkc"
  
--	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-+	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
- 		(void *) data->hw_data);
- }
+ - #clock-cells: should be 1.
 -- 
 2.15.1
