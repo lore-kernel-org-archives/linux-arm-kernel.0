@@ -1,66 +1,26 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sun, 8 Apr 2018 10:43:21 -0400 (EDT)
-Subject: [PATCH 1/2] clk: at91: Added more information logging.
-In-Reply-To: <20180408094330.GA51669@hak8or>
-Message-ID: <Pine.LNX.4.44L0.1804081038420.20429-100000@netrider.rowland.org>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 08 Apr 2018 12:42:00 -0400 (EDT)
+Subject: [PATCH v4] net: thunderx: rework mac addresses list to u64 array
+In-Reply-To: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180406140443.15181-1-Vadim.Lomovtsev@caviumnetworks.com>
+ <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180408.124200.2204489876311923873.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 8 Apr 2018, Marcin wrote:
+From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+Date: Fri,  6 Apr 2018 12:53:54 -0700
 
-> I noticed that when debugging some USB clocking issue that there weren't
-> many ways to tell what the state of the USB clocking system was. This
-> adds a few logging statements to see what the relevant code is trying to
-> do.
-> 
-> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
+> @@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+>  						  work.work);
+>  	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
+>  	union nic_mbx mbx = {};
+> -	struct xcast_addr *xaddr, *next;
+> +	int idx = 0;
 
-It seems like you have added more debugging lines than necessary.
+No need to initialize idx.
 
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -70,11 +70,12 @@ static const struct ohci_driver_overrides ohci_at91_drv_overrides __initconst =
->  
->  /*-------------------------------------------------------------------------*/
->  
-> -static void at91_start_clock(struct ohci_at91_priv *ohci_at91)
-> +static void at91_start_clock(struct ohci_at91_priv *ohci_at91, struct device *dev)
->  {
->  	if (ohci_at91->clocked)
->  		return;
->  
-> +	dev_dbg(dev, "Enabling hclk, iclk, and setting fclk to 48 Mhz\n");
+> +		for (idx = 0; idx < vf_work->mc->count; idx++) {
 
-Here you list all the clocks and give one frequency.
-
->  	clk_set_rate(ohci_at91->fclk, 48000000);
->  	clk_prepare_enable(ohci_at91->hclk);
->  	clk_prepare_enable(ohci_at91->iclk);
-
-> @@ -104,12 +106,19 @@ static void at91_start_hc(struct platform_device *pdev)
->  	/*
->  	 * Start the USB clocks.
->  	 */
-> -	at91_start_clock(ohci_at91);
-> +	at91_start_clock(ohci_at91, &pdev->dev);
->  
->  	/*
->  	 * The USB host controller must remain in reset.
->  	 */
->  	writel(0, &regs->control);
-> +
-> +	/*
-> +	 * Say what the clocks are set to.
-> +	 */
-> +	dev_dbg(&pdev->dev, "hclk set to: %lu hz\n", clk_get_rate(ohci_at91->hclk));
-> +	dev_dbg(&pdev->dev, "iclk set to: %lu hz\n", clk_get_rate(ohci_at91->iclk));
-> +	dev_dbg(&pdev->dev, "fclk set to: %lu hz\n", clk_get_rate(ohci_at91->fclk));
-
-Here you list all the clocks a second time and give all the 
-frequencies.
-
->  }
->  
->  static void at91_stop_hc(struct platform_device *pdev)
-
-Alan Stern
+As it is always explicitly initialized at, and only used inside of,
+this loop.
