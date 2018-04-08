@@ -1,43 +1,66 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 08 Apr 2018 14:16:17 +0200
-Subject: [PATCH 14/15] ARM: pxa: change SSP devices allocation
-In-Reply-To: <CAK8P3a0xJnVfXfUtP+JXGNgc2-LuHUmZCMq-SnEQw3wu3azemA@mail.gmail.com>
- (Arnd Bergmann's message of "Thu, 5 Apr 2018 09:29:30 +0200")
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <20180402142656.26815-15-robert.jarzmik@free.fr>
- <CAK8P3a2hYWO2eweg3zpR7iJoqtH4uxJLAxJAno7L96G7nA2HxQ@mail.gmail.com>
- <87lge4485x.fsf@belgarion.home>
- <CAK8P3a1ko=YEwR2VOahH0OWHfeOyWAzDYah4DSohBcvTNq_MKQ@mail.gmail.com>
- <87zi2i2ljy.fsf@belgarion.home>
- <CAK8P3a0xJnVfXfUtP+JXGNgc2-LuHUmZCMq-SnEQw3wu3azemA@mail.gmail.com>
-Message-ID: <87o9it3nce.fsf@belgarion.home>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sun, 8 Apr 2018 10:43:21 -0400 (EDT)
+Subject: [PATCH 1/2] clk: at91: Added more information logging.
+In-Reply-To: <20180408094330.GA51669@hak8or>
+Message-ID: <Pine.LNX.4.44L0.1804081038420.20429-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Sun, 8 Apr 2018, Marcin wrote:
 
-> I don't know exactly how the probing works, but I'd assume that we have
-> the correct device pointers in pxa2xx_ac97_dev_probe() and
-> asoc_ssp_probe(), or maybe in pxa2xx_ac97_*_startup() and
-> pxa_ssp_startup().
+> I noticed that when debugging some USB clocking issue that there weren't
+> many ways to tell what the state of the USB clocking system was. This
+> adds a few logging statements to see what the relevant code is trying to
+> do.
+> 
+> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
 
-Yes, let's try this way, in the former patch
+It seems like you have added more debugging lines than necessary.
 
-"ASoC: pxa: remove the dmaengine compat need" :
-+++ b/sound/arm/pxa2xx-pcm-lib.c
-@@ -126,7 +127,7 @@ int __pxa2xx_pcm_open(struct snd_pcm_substream *substream)
-                return ret;
- 
-        return snd_dmaengine_pcm_open(
--               substream, dma_request_slave_channel(rtd->platform->dev,
-+               substream, dma_request_slave_channel(rtd->cpu_dai->dev,
-                                                     dma_params->chan_name));
- }
+> --- a/drivers/usb/host/ohci-at91.c
+> +++ b/drivers/usb/host/ohci-at91.c
+> @@ -70,11 +70,12 @@ static const struct ohci_driver_overrides ohci_at91_drv_overrides __initconst =
+>  
+>  /*-------------------------------------------------------------------------*/
+>  
+> -static void at91_start_clock(struct ohci_at91_priv *ohci_at91)
+> +static void at91_start_clock(struct ohci_at91_priv *ohci_at91, struct device *dev)
+>  {
+>  	if (ohci_at91->clocked)
+>  		return;
+>  
+> +	dev_dbg(dev, "Enabling hclk, iclk, and setting fclk to 48 Mhz\n");
 
-The cpu_dai device should be either pxa27x_ac97 or pxa-ssp-dai.<Id>, and amend
-the dma slave map accordingly.
+Here you list all the clocks and give one frequency.
 
-Cheers.
+>  	clk_set_rate(ohci_at91->fclk, 48000000);
+>  	clk_prepare_enable(ohci_at91->hclk);
+>  	clk_prepare_enable(ohci_at91->iclk);
 
--- 
-Robert
+> @@ -104,12 +106,19 @@ static void at91_start_hc(struct platform_device *pdev)
+>  	/*
+>  	 * Start the USB clocks.
+>  	 */
+> -	at91_start_clock(ohci_at91);
+> +	at91_start_clock(ohci_at91, &pdev->dev);
+>  
+>  	/*
+>  	 * The USB host controller must remain in reset.
+>  	 */
+>  	writel(0, &regs->control);
+> +
+> +	/*
+> +	 * Say what the clocks are set to.
+> +	 */
+> +	dev_dbg(&pdev->dev, "hclk set to: %lu hz\n", clk_get_rate(ohci_at91->hclk));
+> +	dev_dbg(&pdev->dev, "iclk set to: %lu hz\n", clk_get_rate(ohci_at91->iclk));
+> +	dev_dbg(&pdev->dev, "fclk set to: %lu hz\n", clk_get_rate(ohci_at91->fclk));
+
+Here you list all the clocks a second time and give all the 
+frequencies.
+
+>  }
+>  
+>  static void at91_stop_hc(struct platform_device *pdev)
+
+Alan Stern
