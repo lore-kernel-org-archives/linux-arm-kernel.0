@@ -1,47 +1,43 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sun, 8 Apr 2018 14:57:00 +0000
-Subject: [PATCH 3/3] irqchip/meson-gpio: add support for Meson-AXG SoCs
-In-Reply-To: <20180408145700.23520-1-yixun.lan@amlogic.com>
-References: <20180408145700.23520-1-yixun.lan@amlogic.com>
-Message-ID: <20180408145700.23520-4-yixun.lan@amlogic.com>
+Date: Sun, 8 Apr 2018 15:10:45 +0000
+Subject: [PATCH] ARM64: dts: meson-axg: add GPIO interrupt controller support
+Message-ID: <20180408151045.1138-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Meson-AXG SoC uses the same GPIO interrupt controller IP block as the other
-Meson SoCs. A total of 100 pins can be spied on, which is the sum of:
-- 255:100 Undefined(no interrupt)
-- 99:84, 16 pins on bank GPIOY
-- 83:61, 23 pins on bank GPIOX
-- 60:40, 21 pins on bank GPIOA
-- 39:25, 15 pins on bank BOOT
-- 24:14, 11 pins on bank GPIOZ
-- 13:0 , 14 pins in the AO domain
+Add the GPIO interrupt controller driver which found in the Amlogic's
+Meson-AXG SoC, the controller share the similar ASIC IP as other meson SoCs.
 
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- drivers/irqchip/irq-meson-gpio.c | 5 +++++
- 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/irqchip/irq-meson-gpio.c b/drivers/irqchip/irq-meson-gpio.c
-index a59bdbc0b9bb..7b531fd075b8 100644
---- a/drivers/irqchip/irq-meson-gpio.c
-+++ b/drivers/irqchip/irq-meson-gpio.c
-@@ -63,11 +63,16 @@ static const struct meson_gpio_irq_params gxl_params = {
- 	.nr_hwirq = 110,
- };
+---
+Hi Kevin
+ Please note this patch depend on the GPIO interrupt driver here[0]
+
+[0] http://lkml.kernel.org/r/20180408145700.23520-1-yixun.lan at amlogic.com
+---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index b58808eb3cc8..c1105065de99 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -120,6 +120,15 @@
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
  
-+static const struct meson_gpio_irq_params axg_params = {
-+	.nr_hwirq = 100,
-+};
++			gpio_intc: interrupt-controller at f080 {
++				compatible = "amlogic,meson-gpio-intc";
++				reg = <0x0 0xf080 0x0 0x10>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				amlogic,channel-interrupts = <64 65 66 67 68 69 70 71>;
++				status = "disabled";
++			};
 +
- static const struct of_device_id meson_irq_gpio_matches[] = {
- 	{ .compatible = "amlogic,meson8-gpio-intc", .data = &meson8_params },
- 	{ .compatible = "amlogic,meson8b-gpio-intc", .data = &meson8b_params },
- 	{ .compatible = "amlogic,meson-gxbb-gpio-intc", .data = &gxbb_params },
- 	{ .compatible = "amlogic,meson-gxl-gpio-intc", .data = &gxl_params },
-+	{ .compatible = "amlogic,meson-axg-gpio-intc", .data = &axg_params },
- 	{ }
- };
- 
+ 			pwm_ab: pwm at 1b000 {
+ 				compatible = "amlogic,meson-axg-ee-pwm";
+ 				reg = <0x0 0x1b000 0x0 0x20>;
 -- 
 2.16.2
