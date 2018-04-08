@@ -1,41 +1,18 @@
-From: marcin@ziemianowicz.com (Marcin)
-Date: Sun, 8 Apr 2018 05:44:23 -0400
-Subject: [PATCH 2/2] clk: at91: Fix for PLL set_rate changes not being
- actually written to PLL peripheral bits
-Message-ID: <20180408094423.GA51702@hak8or>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 8 Apr 2018 11:54:49 +0200
+Subject: [PATCH 1/2] clk: at91: Added more information logging.
+In-Reply-To: <20180408094330.GA51669@hak8or>
+References: <20180408094330.GA51669@hak8or>
+Message-ID: <20180408095449.GA31179@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a USB device is connected to the USB host port on the SAM9N12 then
-you get "-62" error which seems to indicate USB replies from the device
-are timing out. Looking around, I saw the USB bus was running at half
-speed. Going further, it seems that in ..._set_rate() the PLL wasn't
-actually being adjusted. Writing the multiplier and divider values to
-the peripheral fixes the bus running at half speed.
+On Sun, Apr 08, 2018 at 05:43:30AM -0400, Marcin wrote:
+> I noticed that when debugging some USB clocking issue that there weren't
+> many ways to tell what the state of the USB clocking system was. This
+> adds a few logging statements to see what the relevant code is trying to
+> do.
+> 
+> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
 
-Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
----
- drivers/clk/at91/clk-pll.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-index 534961766ae5..db7155fe9346 100644
---- a/drivers/clk/at91/clk-pll.c
-+++ b/drivers/clk/at91/clk-pll.c
-@@ -288,6 +288,14 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	pll->div = div;
- 	pll->mul = mul;
- 
-+	// Set the PLL as per above div and mil values.
-+	regmap_update_bits(pll->regmap, AT91_CKGR_PLLBR,
-+		AT91_PMC_DIV | AT91_PMC_MUL,
-+		(div << 0) | (mul << 16));
-+
-+	pr_debug("clk-pll: setting new rate, (%lu hz / %u) * %u = %lu hz\n",
-+		parent_rate, div, mul, rate);
-+
- 	return 0;
- }
- 
--- 
-2.16.3
+Your "From:" line doesn't match this name :(
