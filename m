@@ -1,101 +1,259 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Sat, 07 Apr 2018 18:08:40 -0700
-Subject: [PATCH 2/2 v2] drm/pl111: Enable device-specific assigned memory
-In-Reply-To: <20180406141935.6801-2-linus.walleij@linaro.org>
+Date: Sat, 07 Apr 2018 18:16:29 -0700
+Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
+In-Reply-To: <20180406141935.6801-1-linus.walleij@linaro.org>
 References: <20180406141935.6801-1-linus.walleij@linaro.org>
- <20180406141935.6801-2-linus.walleij@linaro.org>
-Message-ID: <87fu46o67b.fsf@anholt.net>
+Message-ID: <87d0zao5ua.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Linus Walleij <linus.walleij@linaro.org> writes:
 
-> The Versatile Express has 8 MB of dedicated video RAM (VRAM)
-> on the motherboard, which is what we should be using for the
-> PL111 if available. On this platform, the memory backplane
-> is constructed so that only this memory will work properly
-> with the CLCD on the motherboard, using any other memory
-> region just gives random snow on the display.
+> The Versatile Express uses a special configuration controller
+> deeply embedded in the system motherboard FPGA to multiplex the
+> two to three (!) CLCD instances out to the single SiI9022
+> bridge.
 >
-> The CA9 Versatile Express also has a PL111 instance on its
-> core tile. This is OK, it has been tested with the motherboard
-> VRAM and that works just as fine as regular CMA memory.
+> Set up an extra file with the logic to probe to the FPGA mux
+> register on the system controller bus, then parse the memory
+> range argument to figure out what path the CLCD signal is
+> actually taking, and set up the mux accordingly.
 >
-> The memory is assigned to the device using the memory-region
-> device tree property and a "shared-dma-pool" reserved
-> memory pool like this:
+> If there is a CLCD instance on the core tile (the daughterboard
+> with the CPUs fitted) then that CLCD instance will take
+> precedence since it can address all memory.
 >
-> reserved-memory {
->         #address-cells = <1>;
->         #size-cells = <1>;
->         ranges;
->
->         vram: vram at 48000000 {
->                 compatible = "shared-dma-pool";
->                 reg = <0x48000000 0x00800000>;
->                 no-map;
->         };
-> };
->
-> clcd at 1f000 {
->         compatible = "arm,pl111", "arm,primecell";
-> 	(...)
->         memory-region = <&vram>;
-> }?;
+> Scale down the Versatile Express to 16BPP so we can support a
+> 1024x768 display despite the bus bandwidth restrictions on this
+> platform.
 >
 > Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Mali DP Maintainers <malidp@foss.arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
 > ChangeLog v1->v2:
-> - Make sure to also call of_reserved_mem_device_release() at
->   remove() and errorpath.
+> - No changes just reposting rebased on mainline changes.
 > ---
->  drivers/gpu/drm/pl111/pl111_drv.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/pl111/Makefile          |   1 +
+>  drivers/gpu/drm/pl111/pl111_drm.h       |   3 +-
+>  drivers/gpu/drm/pl111/pl111_versatile.c |  48 ++++++++++++++-
+>  drivers/gpu/drm/pl111/pl111_vexpress.c  | 106 ++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++++
+>  5 files changed, 178 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
+>  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
 >
-> diff --git a/drivers/gpu/drm/pl111/pl111_drv.c b/drivers/gpu/drm/pl111/pl111_drv.c
-> index 4621259d5387..bc57c15d9fe4 100644
-> --- a/drivers/gpu/drm/pl111/pl111_drv.c
-> +++ b/drivers/gpu/drm/pl111/pl111_drv.c
-> @@ -60,6 +60,7 @@
->  #include <linux/slab.h>
+> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
+> index 9c5e8dba8ac6..19a8189dc54f 100644
+> --- a/drivers/gpu/drm/pl111/Makefile
+> +++ b/drivers/gpu/drm/pl111/Makefile
+> @@ -3,6 +3,7 @@ pl111_drm-y +=	pl111_display.o \
+>  		pl111_versatile.o \
+>  		pl111_drv.o
+>  
+> +pl111_drm-$(CONFIG_ARCH_VEXPRESS) += pl111_vexpress.o
+>  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
+>  
+>  obj-$(CONFIG_DRM_PL111) += pl111_drm.o
+> diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+> index 8639b2d4ddf7..916154ac733a 100644
+> --- a/drivers/gpu/drm/pl111/pl111_drm.h
+> +++ b/drivers/gpu/drm/pl111/pl111_drm.h
+> @@ -64,7 +64,8 @@ struct pl111_drm_dev_private {
+>  	struct drm_bridge *bridge;
+>  	struct drm_simple_display_pipe pipe;
+>  
+> -	void *regs;
+> +	void __iomem *clcd_memory;
+
+This doesn't seem to be used anywhere.
+
+> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
+> index 9302f516045e..569edf02a36a 100644
+> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
+> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
+> @@ -1,12 +1,14 @@
+>  #include <linux/amba/clcd-regs.h>
+>  #include <linux/device.h>
 >  #include <linux/of.h>
->  #include <linux/of_graph.h>
-> +#include <linux/of_reserved_mem.h>
->  
+> +#include <linux/of_platform.h>
+>  #include <linux/regmap.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/bitops.h>
+>  #include <linux/module.h>
 >  #include <drm/drmP.h>
->  #include <drm/drm_atomic_helper.h>
-> @@ -257,6 +258,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  	drm->dev_private = priv;
->  	priv->variant = variant;
+>  #include "pl111_versatile.h"
+> +#include "pl111_vexpress.h"
+>  #include "pl111_drm.h"
 >  
-> +	ret = of_reserved_mem_device_init(dev);
-> +	if (!ret)
-> +		dev_info(dev, "using device-specific reserved memory\n");
+>  static struct regmap *versatile_syscon_map;
+> @@ -22,6 +24,7 @@ enum versatile_clcd {
+>  	REALVIEW_CLCD_PB11MP,
+>  	REALVIEW_CLCD_PBA8,
+>  	REALVIEW_CLCD_PBX,
+> +	VEXPRESS_CLCD_V2M,
+>  };
+>  
+>  static const struct of_device_id versatile_clcd_of_match[] = {
+> @@ -53,6 +56,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
+>  		.compatible = "arm,realview-pbx-syscon",
+>  		.data = (void *)REALVIEW_CLCD_PBX,
+>  	},
+> +	{
+> +		.compatible = "arm,vexpress-muxfpga",
+> +		.data = (void *)VEXPRESS_CLCD_V2M,
+> +	},
+>  	{},
+>  };
+>  
+> @@ -286,12 +293,26 @@ static const struct pl111_variant_data pl111_realview = {
+>  	.fb_bpp = 16,
+>  };
+>  
+> +/*
+> + * Versatile Express PL111 variant, again we just push the maximum
+> + * BPP to 16 to be able to get 1024x768 without saturating the memory
+> + * bus. The clockdivider also seems broken on the Versatile Express.
+> + */
+> +static const struct pl111_variant_data pl111_vexpress = {
+> +	.name = "PL111 Versatile Express",
+> +	.formats = pl111_realview_pixel_formats,
+> +	.nformats = ARRAY_SIZE(pl111_realview_pixel_formats),
+> +	.fb_bpp = 16,
+> +	.broken_clockdivider = true,
+> +};
 > +
->  	if (of_property_read_u32(dev->of_node, "max-memory-bandwidth",
->  				 &priv->memory_bw)) {
->  		dev_info(dev, "no max memory bandwidth specified, assume unlimited\n");
-> @@ -275,7 +280,8 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
->  	priv->regs = devm_ioremap_resource(dev, &amba_dev->res);
->  	if (IS_ERR(priv->regs)) {
->  		dev_err(dev, "%s failed mmio\n", __func__);
-> -		return PTR_ERR(priv->regs);
-> +		ret = PTR_ERR(priv->regs);
-> +		goto mem_rel;
+>  int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>  {
+>  	const struct of_device_id *clcd_id;
+>  	enum versatile_clcd versatile_clcd_type;
+>  	struct device_node *np;
+>  	struct regmap *map;
+> +	int ret;
+>  
+>  	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
+>  					     &clcd_id);
+> @@ -301,7 +322,25 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
 >  	}
+>  	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
+>  
+> -	map = syscon_node_to_regmap(np);
+> +	/* Versatile Express special handling */
+> +	if (versatile_clcd_type == VEXPRESS_CLCD_V2M) {
+> +		struct platform_device *pdev;
+> +
+> +		/* Call into deep Vexpress configuration API */
+> +		pdev = of_find_device_by_node(np);
+> +		if (!pdev) {
+> +			dev_err(dev, "can't find the sysreg device, deferring\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +		map = dev_get_drvdata(&pdev->dev);
+> +		if (!map) {
+> +			dev_err(dev, "sysreg has not yet probed\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +	} else {
+> +		map = syscon_node_to_regmap(np);
+> +	}
+> +
+>  	if (IS_ERR(map)) {
+>  		dev_err(dev, "no Versatile syscon regmap\n");
+>  		return PTR_ERR(map);
+> @@ -340,6 +379,13 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>  		priv->variant_display_disable = pl111_realview_clcd_disable;
+>  		dev_info(dev, "set up callbacks for RealView PL111\n");
+>  		break;
+> +	case VEXPRESS_CLCD_V2M:
+> +		priv->variant = &pl111_vexpress;
+> +		dev_info(dev, "initializing Versatile Express PL111\n");
+> +		ret = pl111_vexpress_clcd_init(dev, priv, map);
+> +		if (ret)
+> +			return ret;
+> +		break;
+>  	default:
+>  		dev_info(dev, "unknown Versatile system controller\n");
+>  		break;
+> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.c b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> new file mode 100644
+> index 000000000000..720244f497fe
+> --- /dev/null
+> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> @@ -0,0 +1,106 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Versatile Express PL111 handling
+> + * Copyright (C) 2018 Linus Walleij
+> + *
+> + * This module binds to the "arm,vexpress-muxfpga" device on the
+> + * Versatile Express configuration bus and sets up which CLCD instance
+> + * gets muxed out on the DVI bridge.
+> + */
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/vexpress.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include "pl111_drm.h"
+> +#include "pl111_vexpress.h"
+> +
+> +#define VEXPRESS_FPGAMUX_MOTHERBOARD		0x00
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_1	0x01
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_2	0x02
+> +
+> +static bool daughterboard_muxed = false;
+> +static bool motherboard_muxed = false;
+> +
+> +int pl111_vexpress_clcd_init(struct device *dev,
+> +			     struct pl111_drm_dev_private *priv,
+> +			     struct regmap *map)
+> +{
+> +	struct device_node *memory;
+> +	u32 val;
+> +	int ret;
+> +
+> +	/*
+> +	 * The CLCD on the motherboard has a special memory region and
+> +	 * does not make use of CMA. We differentiate between the different
+> +	 * CLCD controllers using this memory region phandle.
+> +	 */
+> +	memory = of_parse_phandle(dev->of_node, "memory-region", 0);
+> +	if (!memory) {
+> +		if (motherboard_muxed) {
+> +			dev_info(dev, "motherboard CLCD muxed in\n");
+> +			dev_info(dev, "daughterboard takes precedence\n");
+> +			dev_info(dev, "motherboard CLCD will not be muxed out\n");
+> +		}
+> +		dev_info(dev,
+> +			 "DVI muxed to daughterboard 1 (core tile) CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_DAUGHTERBOARD_1;
+> +		daughterboard_muxed = true;
+> +	} else {
+> +		priv->clcd_memory = of_iomap(memory, 0);
+> +		if (!priv->clcd_memory)
+> +			dev_err(dev, "could not remap CLCD memory\n");
+> +		/* Fall through and try to use CMA */
+> +		if (daughterboard_muxed) {
+> +			dev_info(dev, "daughterboard takes precedence\n");
+> +			dev_info(dev, "motherboard CLCD will not be muxed out\n");
+> +			return -ENODEV;
+> +		}
+> +		dev_info(dev, "DVI muxed to motherboard CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_MOTHERBOARD;
+> +		motherboard_muxed = true;
+> +	}
 
-Shouldn't this error path be jumping to dev_unref, as well?  We're
-trying to match drm_dev_alloc(), right?
-
-I'm still a little bothered that we're allowing imports to pl111 of CMA
-buffers that we can't scan out.  Could we just refuse all
-.gem_prime_import*() on this platform?
+I'm confused by global bools here.  It seems like we're trying to
+coordinate between the instantiation of multiple CLCDs here, to set up
+the mux appropriately.  Does it make sense to do things that way, if
+probe order is unreliable?
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180407/792f9cc3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180407/c021d538/attachment-0001.sig>
