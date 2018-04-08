@@ -1,32 +1,47 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sun, 8 Apr 2018 14:56:59 +0000
-Subject: [PATCH 2/3] dt-bindings: interrupt-controller: New binding for
- Meson-AXG SoC
+Date: Sun, 8 Apr 2018 14:57:00 +0000
+Subject: [PATCH 3/3] irqchip/meson-gpio: add support for Meson-AXG SoCs
 In-Reply-To: <20180408145700.23520-1-yixun.lan@amlogic.com>
 References: <20180408145700.23520-1-yixun.lan@amlogic.com>
-Message-ID: <20180408145700.23520-3-yixun.lan@amlogic.com>
+Message-ID: <20180408145700.23520-4-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the dt-binding documentation to support new compatible string
-for the GPIO interrupt controller which found in Amlogic's Meson-AXG SoC.
+The Meson-AXG SoC uses the same GPIO interrupt controller IP block as the other
+Meson SoCs. A total of 100 pins can be spied on, which is the sum of:
+- 255:100 Undefined(no interrupt)
+- 99:84, 16 pins on bank GPIOY
+- 83:61, 23 pins on bank GPIOX
+- 60:40, 21 pins on bank GPIOA
+- 39:25, 15 pins on bank BOOT
+- 24:14, 11 pins on bank GPIOZ
+- 13:0 , 14 pins in the AO domain
 
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- .../devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-meson-gpio.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
-index c753d99d43db..89674ad8a097 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
-@@ -14,6 +14,7 @@ Required properties:
-     "amlogic,meson8b-gpio-intc" for meson8b SoCs (S805) or
-     "amlogic,meson-gxbb-gpio-intc" for GXBB SoCs (S905) or
-     "amlogic,meson-gxl-gpio-intc" for GXL SoCs (S905X, S912)
-+    "amlogic,meson-axg-gpio-intc" for AXG SoCs (A113D, A113X)
- - interrupt-parent : a phandle to the GIC the interrupts are routed to.
-    Usually this is provided at the root level of the device tree as it is
-    common to most of the SoC.
+diff --git a/drivers/irqchip/irq-meson-gpio.c b/drivers/irqchip/irq-meson-gpio.c
+index a59bdbc0b9bb..7b531fd075b8 100644
+--- a/drivers/irqchip/irq-meson-gpio.c
++++ b/drivers/irqchip/irq-meson-gpio.c
+@@ -63,11 +63,16 @@ static const struct meson_gpio_irq_params gxl_params = {
+ 	.nr_hwirq = 110,
+ };
+ 
++static const struct meson_gpio_irq_params axg_params = {
++	.nr_hwirq = 100,
++};
++
+ static const struct of_device_id meson_irq_gpio_matches[] = {
+ 	{ .compatible = "amlogic,meson8-gpio-intc", .data = &meson8_params },
+ 	{ .compatible = "amlogic,meson8b-gpio-intc", .data = &meson8b_params },
+ 	{ .compatible = "amlogic,meson-gxbb-gpio-intc", .data = &gxbb_params },
+ 	{ .compatible = "amlogic,meson-gxl-gpio-intc", .data = &gxl_params },
++	{ .compatible = "amlogic,meson-axg-gpio-intc", .data = &axg_params },
+ 	{ }
+ };
+ 
 -- 
 2.16.2
