@@ -1,172 +1,69 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sun, 8 Apr 2018 11:00:57 +0800
-Subject: [PATCH v3 1/6] clk: meson: aoclk: refactor common code into
- dedicated file
-In-Reply-To: <152303996277.94378.9360089743935547432@swboyd.mtv.corp.google.com>
-References: <20180328025050.221585-1-yixun.lan@amlogic.com>
- <20180328025050.221585-2-yixun.lan@amlogic.com>
- <152303996277.94378.9360089743935547432@swboyd.mtv.corp.google.com>
-Message-ID: <9b56df24-7906-f539-51ec-b9f8b785e020@amlogic.com>
+Date: Sun, 8 Apr 2018 11:19:31 +0800
+Subject: [PATCH v4 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
+Message-ID: <20180408031938.153474-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Stephen
- thanks for the review
+  This patch try to add AO clock and Reset driver for Amlogic's
+Meson-AXG SoC.
+  Please note that patch 7 need to wait for the DTS changes[3] merged
+into mainline first, otherwise it will break the serial console.
 
-On 04/07/18 02:39, Stephen Boyd wrote:
-> Quoting Yixun Lan (2018-03-27 19:50:45)
->> diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
->> index 9ec23ae9a219..5a922639a264 100644
->> --- a/drivers/clk/meson/gxbb-aoclk.c
->> +++ b/drivers/clk/meson/gxbb-aoclk.c
->> @@ -165,38 +135,39 @@ static int gxbb_aoclkc_probe(struct platform_device *pdev)
->>                 return -ENODEV;
->>         }
->>  
->> -       /* Reset Controller */
->> -       rstc->regmap = regmap;
->> -       rstc->data = gxbb_aoclk_reset;
->> -       rstc->reset.ops = &gxbb_aoclk_reset_ops;
->> -       rstc->reset.nr_resets = ARRAY_SIZE(gxbb_aoclk_reset);
->> -       rstc->reset.of_node = dev->of_node;
->> -       ret = devm_reset_controller_register(dev, &rstc->reset);
->> -
->> -       /*
->> -        * Populate regmap and register all clks
->> -        */
->> -       for (clkid = 0; clkid < ARRAY_SIZE(gxbb_aoclk_gate); clkid++) {
->> -               gxbb_aoclk_gate[clkid]->map = regmap;
->> -
->> -               ret = devm_clk_hw_register(dev,
->> -                                          gxbb_aoclk_onecell_data.hws[clkid]);
->> -               if (ret)
->> -                       return ret;
->> -       }
->> -
->>         /* Specific clocks */
->>         cec_32k_ao.regmap = regmap;
->>         ret = devm_clk_hw_register(dev, &cec_32k_ao.hw);
->> -       if (ret)
->> +       if (ret) {
->> +               dev_err(&pdev->dev, "clk cec_32k_ao register failed.\n");
->>                 return ret;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static struct meson_aoclk_data gxbb_aoclkc_data = {
-> 
-> Can this be const?
-> 
-sure, I'll update at v4
->> +       .reset_reg      = AO_RTI_GEN_CNTL_REG0,
->> +       .num_reset      = ARRAY_SIZE(gxbb_aoclk_reset),
->> +       .reset          = gxbb_aoclk_reset,
->> +       .num_clks       = ARRAY_SIZE(gxbb_aoclk_gate),
->> +       .clks           = gxbb_aoclk_gate,
->> +       .hw_data        = &gxbb_aoclk_onecell_data,
->> +};
->> +
->> diff --git a/drivers/clk/meson/meson-aoclk.c b/drivers/clk/meson/meson-aoclk.c
->> new file mode 100644
->> index 000000000000..36067c801f7b
->> --- /dev/null
->> +++ b/drivers/clk/meson/meson-aoclk.c
->> @@ -0,0 +1,79 @@
->> +// SPDX-License-Identifier: GPL-2.0+
->> +/*
->> + * Amlogic Meson-AXG Clock Controller Driver
->> + *
->> + * Copyright (c) 2016 BayLibre, SAS.
->> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->> + *
->> + * Copyright (c) 2018 Amlogic, inc.
->> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
->> + * Author: Yixun Lan <yixun.lan@amlogic.com>
->> + */
->> +
->> +#include <linux/platform_device.h>
->> +#include <linux/reset-controller.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/init.h>
->> +#include <linux/of_device.h>
->> +#include "clk-regmap.h"
->> +#include "meson-aoclk.h"
->> +
->> +static int meson_aoclk_do_reset(struct reset_controller_dev *rcdev,
->> +                              unsigned long id)
->> +{
->> +       struct meson_aoclk_reset_controller *rstc =
->> +               container_of(rcdev, struct meson_aoclk_reset_controller, reset);
->> +
->> +       return regmap_write(rstc->regmap, rstc->data->reset_reg,
->> +                           BIT(rstc->data->reset[id]));
->> +}
->> +
->> +static const struct reset_control_ops meson_aoclk_reset_ops = {
->> +       .reset = meson_aoclk_do_reset,
->> +};
->> +
->> +int meson_aoclkc_probe(struct platform_device *pdev)
->> +{
->> +       struct meson_aoclk_reset_controller *rstc;
->> +       struct meson_aoclk_data *data;
->> +       struct device *dev = &pdev->dev;
->> +       struct regmap *regmap;
->> +       int ret, clkid;
->> +
->> +       data = (struct meson_aoclk_data *)
->> +               of_device_get_match_data(dev);
->> +       if (!data)
->> +               return -ENODEV;
->> +
->> +       rstc = devm_kzalloc(dev, sizeof(*rstc), GFP_KERNEL);
->> +       if (!rstc)
->> +               return -ENOMEM;
->> +
->> +       regmap = syscon_node_to_regmap(of_get_parent(dev->of_node));
->> +       if (IS_ERR(regmap)) {
->> +               dev_err(dev, "failed to get regmap\n");
->> +               return -ENODEV;
->> +       }
->> +
->> +       /* Reset Controller */
->> +       rstc->data = data;
->> +       rstc->regmap = regmap;
->> +       rstc->reset.ops = &meson_aoclk_reset_ops;
->> +       rstc->reset.nr_resets = data->num_reset,
->> +       rstc->reset.of_node = dev->of_node;
->> +       ret = devm_reset_controller_register(dev, &rstc->reset);
-> 
-> Please check the return value here.
-> 
-will do, thanks for pointing out this
+ patch 1: factor the common code into a dedicated file
+ patch 3-5: add the aoclk driver for AXG SoC
+ patch 6-7: drop unnecessary clock flags
 
->> +
->> +       /*
->> +        * Populate regmap and register all clks
->> +        */
->> +       for (clkid = 0; clkid < data->num_clks; clkid++) {
->> +               data->clks[clkid]->map = regmap;
->> +
->> +               ret = devm_clk_hw_register(dev, data->hw_data->hws[clkid]);
->> +               if (ret)
->> +                       return ret;
->> +       }
->> +
->> +       return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
->> +               data->hw_data);
-> 
-> Use devm_ variant?
-> 
-sure
-> I suppose because code is moving in this patch that it would be better
-> to make improvements in another patch so that this patch is a pure code
-> movement change instead of a movement + improvement change.
-> 
-I think it's a good idea to fix this in another independent patch
+changes since v3 at [4]: 
+ - add 'const' contraint to the read-only data
+ - switch to devm_of_clk_add_hw_provider API
+ - check return value of devm_reset_controller_register
 
-also I will address the comments you raised in another mail thread
+changes since v2 at [2]: 
+ - rework meson_aoclkc_probe() which leverage the of_match_data
+ - merge patch 5-6 into this series
+ - seperate DTS patch, will send to Kevin Hilman independently
+ 
+changes since v1 at [0]: 
+ - rebase to clk-meson's branch 'next/drivers' [1]
+ - fix license, update to BSD-3-Clause
+ - drop un-used include header file
 
-Yixun
+[0] https://lkml.kernel.org/r/20180209070026.193879-1-yixun.lan at amlogic.com
+[1] git://github.com/BayLibre/clk-meson.git branch: next-drivers
+[2] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
+[3] https://lkml.kernel.org/r/20180326081809.49493-4-yixun.lan at amlogic.com
+[4] https://lkml.kernel.org/r/20180328025050.221585-1-yixun.lan at amlogic.com
+
+
+Qiufang Dai (1):
+  clk: meson-axg: Add AO Clock and Reset controller driver
+
+Yixun Lan (6):
+  clk: meson: aoclk: refactor common code into dedicated file
+  clk: meson: migrate to devm_of_clk_add_hw_provider API
+  dt-bindings: clock: axg-aoclkc: New binding for Meson-AXG SoC
+  dt-bindings: clock: reset: Add AXG AO Clock and Reset Bindings
+  clk: meson: drop CLK_SET_RATE_PARENT flag
+  clk: meson: drop CLK_IGNORE_UNUSED flag
+
+ .../bindings/clock/amlogic,gxbb-aoclkc.txt         |   1 +
+ drivers/clk/meson/Makefile                         |   4 +-
+ drivers/clk/meson/axg-aoclk.c                      | 163 +++++++++++++++++++++
+ drivers/clk/meson/axg-aoclk.h                      |  31 ++++
+ drivers/clk/meson/gxbb-aoclk.c                     |  92 ++++--------
+ drivers/clk/meson/gxbb-aoclk.h                     |   7 +
+ drivers/clk/meson/meson-aoclk.c                    |  83 +++++++++++
+ drivers/clk/meson/meson-aoclk.h                    |  35 +++++
+ include/dt-bindings/clock/axg-aoclkc.h             |  26 ++++
+ include/dt-bindings/reset/axg-aoclkc.h             |  20 +++
+ 10 files changed, 399 insertions(+), 63 deletions(-)
+ create mode 100644 drivers/clk/meson/axg-aoclk.c
+ create mode 100644 drivers/clk/meson/axg-aoclk.h
+ create mode 100644 drivers/clk/meson/meson-aoclk.c
+ create mode 100644 drivers/clk/meson/meson-aoclk.h
+ create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
+ create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+
+-- 
+2.15.1
