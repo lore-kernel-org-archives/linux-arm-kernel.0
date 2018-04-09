@@ -1,48 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 9 Apr 2018 15:29:32 +0200
-Subject: [PATCH/RFC] soc: bcm2835: Make !RASPBERRYPI_FIRMWARE dummies
- return failure
-In-Reply-To: <2047337098.98106.1523186884813@email.1und1.de>
-References: <1523178315-30562-1-git-send-email-geert@linux-m68k.org>
- <2047337098.98106.1523186884813@email.1und1.de>
-Message-ID: <CAMuHMdWua5swcrNsvB5pbiMpuSyHSSoQhYSaqeq0ctP2csPtTA@mail.gmail.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Tue, 10 Apr 2018 05:36:32 +0800
+Subject: [PATCH v11 0/4] set VSESR_EL2 by user space and support NOTIFY_SEI
+ notification
+Message-ID: <1523309796-36423-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+1. Detect whether KVM can set set guest SError syndrome
+2. Support to Set VSESR_EL2 and inject SError by user space.
+3. Support live migration to keep SError pending state and VSESR_EL2 value.
+4. ACPI 6.1 adds support for NOTIFY_SEI as a GHES notification mechanism, so support this
+   notification in software, KVM or kernel ARCH code call handle_guest_sei() to let ACP driver
+   to handle this notification.
 
-On Sun, Apr 8, 2018 at 1:28 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
->> Geert Uytterhoeven <geert@linux-m68k.org> hat am 8. April 2018 um 11:05 geschrieben:
->> If CONFIG_RASPBERRYPI_FIRMWARE=n:
->>
->>     drivers/gpio/gpio-raspberrypi-exp.c: In function ?rpi_exp_gpio_get_polarity?:
->>     drivers/gpio/gpio-raspberrypi-exp.c:71: warning: ?get.polarity? is used uninitialized in this function
->>     drivers/gpio/gpio-raspberrypi-exp.c: In function ?rpi_exp_gpio_get_direction?:
->>     drivers/gpio/gpio-raspberrypi-exp.c:150: warning: ?get.direction? is used uninitialized in this function
->>
->> The dummy firmware interface functions return 0, which means success,
->> causing subsequent code to make use of the never initialized output
->> parameter.
->
-> i think this is more theoritical, because we need to get rpi_firmware first and in this case it's NULL.
+Change since V10:
 
-Sure, I just want to get rid of the ugly warnings when compile-testing.
-Most dummy functions for other subsystems return error codes.
+Address James's comments, thanks James
+1. Merge the helper function with the user.
+2. Move the ISS_MASK into pend_guest_serror() to clear top bits
+3. Make kvm_vcpu_events struct align to 4 bytes
+4. Add something check in the kvm_arm_vcpu_set_events()
+5. Check kvm_arm_vcpu_get/set_events()'s return value.
+6. Initialise kvm_vcpu_events to 0 so that padding transferred to user-space doesn't
+    contain kernel stack.
 
->> Fix this by making the dummy functions return an error code (-ENOSYS)
->> instead.
->
-> Anyway i'm okay with the change.
+Dongjiu Geng (4):
+  arm64: KVM: export the capability to set guest SError syndrome
+  arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+  ACPI / APEI: Add SEI notification type support for ARMv8
+  arm64: handle NOTIFY_SEI notification by the APEI driver
 
-OK, thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
+ Documentation/virtual/kvm/api.txt    | 39 ++++++++++++++++++++++++--
+ arch/arm/include/asm/kvm_host.h      |  6 ++++
+ arch/arm/kvm/guest.c                 | 12 ++++++++
+ arch/arm64/include/asm/kvm_emulate.h |  5 ++++
+ arch/arm64/include/asm/kvm_host.h    |  7 +++++
+ arch/arm64/include/asm/system_misc.h |  1 +
+ arch/arm64/include/uapi/asm/kvm.h    | 12 ++++++++
+ arch/arm64/kernel/traps.c            |  4 +++
+ arch/arm64/kvm/guest.c               | 31 +++++++++++++++++++++
+ arch/arm64/kvm/inject_fault.c        |  7 ++++-
+ arch/arm64/kvm/reset.c               |  4 +++
+ arch/arm64/mm/fault.c                | 10 +++++++
+ drivers/acpi/apei/Kconfig            | 15 ++++++++++
+ drivers/acpi/apei/ghes.c             | 53 ++++++++++++++++++++++++++++++++++++
+ include/acpi/ghes.h                  |  1 +
+ include/uapi/linux/kvm.h             |  1 +
+ virt/kvm/arm/arm.c                   | 21 ++++++++++++++
+ 17 files changed, 226 insertions(+), 3 deletions(-)
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+1.9.1
