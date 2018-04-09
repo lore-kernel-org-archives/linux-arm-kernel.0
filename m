@@ -1,50 +1,51 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon, 9 Apr 2018 21:03:24 +0200
-Subject: [PATCHv2 09/12] arm64/kvm: preserve host HCR_EL2 value
-In-Reply-To: <20180409145709.dneotb6xaznw44c4@lakrids.cambridge.arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-10-mark.rutland@arm.com>
- <20180206123915.GA21802@cbox>
- <20180409145709.dneotb6xaznw44c4@lakrids.cambridge.arm.com>
-Message-ID: <20180409190324.GG10904@cbox>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Mon, 9 Apr 2018 15:18:38 -0400
+Subject: [PATCH v3] xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE
+In-Reply-To: <bd84cd4b-1834-b631-303c-3e190ad7676d@oracle.com>
+References: <20180409093629.9621-1-paul.durrant@citrix.com>
+ <bd84cd4b-1834-b631-303c-3e190ad7676d@oracle.com>
+Message-ID: <3baffa60-bcca-cbf3-f056-db30a6c5178c@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 03:57:09PM +0100, Mark Rutland wrote:
-> On Tue, Feb 06, 2018 at 01:39:15PM +0100, Christoffer Dall wrote:
-> > On Mon, Nov 27, 2017 at 04:38:03PM +0000, Mark Rutland wrote:
-> > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > > index 525c01f48867..2205f0be3ced 100644
-> > > --- a/arch/arm64/kvm/hyp/switch.c
-> > > +++ b/arch/arm64/kvm/hyp/switch.c
-> > > @@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> > >  {
-> > >  	u64 val;
-> > >  
-> > > +	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
-> > > +
-> > 
-> > Looking back at this, it seems excessive to switch this at every
-> > round-trip.  I think it should be possible to have this as a single
-> > global (or per-CPU) variable that gets restored directly when returning
-> > from the VM.
-> 
-> I suspect this needs to be per-cpu, to account for heterogeneous
-> systems.
-> 
-> I guess if we move hcr_el2 into kvm_cpu_context, that gives us a
-> per-vcpu copy for guests, and a per-cpu copy for the host (in the global
-> kvm_host_cpu_state).
-> 
-> I'll have a look at how gnarly that turns out. I'm not sure how we can
-> initialise that sanely for the !VHE case to match whatever el2_setup
-> did.
+On 04/09/2018 12:36 PM, Boris Ostrovsky wrote:
+> On 04/09/2018 05:36 AM, Paul Durrant wrote:
+>> My recent Xen patch series introduces a new HYPERVISOR_memory_op to
+>> support direct priv-mapping of certain guest resources (such as ioreq
+>> pages, used by emulators) by a tools domain, rather than having to access
+>> such resources via the guest P2M.
+>>
+>> This patch adds the necessary infrastructure to the privcmd driver and
+>> Xen MMU code to support direct resource mapping.
+>>
+>> NOTE: The adjustment in the MMU code is partially cosmetic. Xen will now
+>>       allow a PV tools domain to map guest pages either by GFN or MFN, thus
+>>       the term 'mfn' has been swapped for 'pfn' in the lower layers of the
+>>       remap code.
+>>
+>> Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
+> Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>
+> I think this will have to wait until 4.18 though, it's somewhat late for
+> current merge window right now.
 
-There's no harm in jumping down to EL2 to read a register during the
-initialization phase.  All it requires is an annotation of the callee
-function, and a kvm_call_hyp(), and it's actually quite fast unless you
-start saving/restoring a bunch of additional system registers.  See how
-we call __kvm_set_tpidr_el2() for example.
 
-Thanks,
--Christoffer
+Warns on 32-bit ARM build:
+
+? CC????? drivers/xen/privcmd.o
+In file included from /data/upstream/linux-xen/include/linux/kernel.h:14:0,
+???????????????? from /data/upstream/linux-xen/drivers/xen/privcmd.c:11:
+/data/upstream/linux-xen/drivers/xen/privcmd.c: In function
+?privcmd_ioctl_mmap_resource?:
+/data/upstream/linux-xen/drivers/xen/privcmd.c:788:33: warning: cast to
+pointer from integer of different size [-Wint-to-pointer-cast]
+??? pr_info("pfn[%u] = %p\n", i, (void *)pfns[i]);
+???????????????????????????????? ^
+/data/upstream/linux-xen/include/linux/printk.h:308:34: note: in
+definition of macro ?pr_info?
+? printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
+????????????????????????????????? ^~~~~~~~~~~
+? AR????? drivers/xen/xen-privcmd.o
+
+
+-boris
