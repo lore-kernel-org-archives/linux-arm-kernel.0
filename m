@@ -1,72 +1,96 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 9 Apr 2018 15:37:00 +0100
-Subject: [PATCHv2 10/12] arm64/kvm: context-switch ptrauth registers
-In-Reply-To: <20180409125818.GE10904@cbox>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-11-mark.rutland@arm.com>
- <20180206123847.GY21802@cbox>
- <20180309142838.uvcv3mhvqqlprktt@lakrids.cambridge.arm.com>
- <20180409125818.GE10904@cbox>
-Message-ID: <20180409143700.w4uynkhdon36purz@lakrids.cambridge.arm.com>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Mon, 9 Apr 2018 17:37:09 +0300
+Subject: [PATCH V2 3/9] dt-bindings: Tegra186 tachometer device tree
+ bindings
+In-Reply-To: <CAL_Jsq+AsUiWWBQ7K4OUM58KqQbvBHuFYmXxXLwr7viwoKW-Yw@mail.gmail.com>
+References: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
+ <1521607244-29734-4-git-send-email-rrajk@nvidia.com>
+ <20180327145249.xjoo42qow34ksdle@rob-hp-laptop>
+ <867aace8-dac7-51d4-bd46-15919b58b37d@kapsi.fi>
+ <CAL_Jsq+AsUiWWBQ7K4OUM58KqQbvBHuFYmXxXLwr7viwoKW-Yw@mail.gmail.com>
+Message-ID: <615d6771-00c3-a4a7-a99f-ec4f6e667c8f@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 02:58:18PM +0200, Christoffer Dall wrote:
-> Hi Mark,
-> 
-> [Sorry for late reply]
-> 
-> On Fri, Mar 09, 2018 at 02:28:38PM +0000, Mark Rutland wrote:
-> > On Tue, Feb 06, 2018 at 01:38:47PM +0100, Christoffer Dall wrote:
-> > > On Mon, Nov 27, 2017 at 04:38:04PM +0000, Mark Rutland wrote:
-> > > > When pointer authentication is supported, a guest may wish to use it.
-> > > > This patch adds the necessary KVM infrastructure for this to work, with
-> > > > a semi-lazy context switch of the pointer auth state.
-> > > > 
-> > > > When we schedule a vcpu, 
-> > > 
-> > > That's not quite what the code does, the code only does this when we
-> > > schedule back a preempted or blocked vcpu thread.
-> > 
-> > Does that only leave the case of the vCPU being scheduled for the first
-> > time? Or am I missing something else?
-> > 
-> > [...]
-> 
-> In the current patch, you're only calling kvm_arm_vcpu_ptrauth_disable()
-> from kvm_arch_sched_in() which is only called on the preempt notifier
-> patch, which leaves out every time we enter the guest from userspace and
-> therefore also the initial run of the vCPU (assuming there's no
-> preemption in the kernel prior to running the first time).
-> 
-> vcpu_load() takes care of all the cases.
 
-I see.
 
-> > > I still find this decision to begin trapping again quite arbitrary, and
-> > > would at least prefer this to be in vcpu_load (which would make the
-> > > behavior match the commit text as well).
-> > 
-> > Sure, done.
-> > 
-> > > My expectation would be that if a guest is running software with pointer
-> > > authentication enabled, then it's likely to either keep using the
-> > > feature, or not use it at all, so I would make this a one-time flag.
-> > 
-> > I think it's likely that some applications will use ptrauth while others
-> > do not. Even if the gust OS supports ptrauth, KVM may repeatedly preempt
-> > an application that doesn't use it, and we'd win in that case.
-> > 
-> > There are also some rarer cases, like kexec in a guest from a
-> > ptrauth-aware kernel to a ptrauth-oblivious one.
-> > 
-> > I don't have strong feelings either way, and I have no data.
+On 04/09/2018 04:21 PM, Rob Herring wrote:
+> On Mon, Apr 9, 2018 at 12:38 AM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
+>> Rob,
 > 
-> I think your intuition sounds sane, and let's reset the flag on every
-> vcpu_load, and we can always revisit when we have hardware and data if
-> someone reports a performance issue.
+> Please don't top post to lists.
+> 
+>> this binding is for a specific IP block (for measuring/aggregating input
+>> pulses) on the Tegra186 SoC, so I don't think it fits into any generic
+>> binding.
+> 
+> What is it hooked up to to measure? You only mention "fan" five times
+> in the doc.
 
-Cool. I've switched to vcpu_load() locally, and will use that in v3.
+In practice, fans.
+
+> 
+> You have #pwm-cells too, so this block has PWM output as well? If not,
+> then where's the PWM for the fan control because there is no point in
+> having fan tach without some control mechanism.
+
+It doesn't provide a PWM output. The (Linux) PWM framework provides 
+functionality in both directions - control and capture. But if the 
+device tree #pwm-cells/pwms properties are only for control, we may need 
+to introduce a new #capture-pwm-cells/capture-pwms or similar.
+
+The idea is that the generic fan node can then specify two pwms, one for 
+control and one for capture, to enable e.g. closed-loop control (I'm not 
+personally familiar with the usecase for this but I could imagine 
+something like that). The control PWM can be something completely 
+different, maybe not a PWM in the first place (e.g. some fixed voltage).
+
+> 
+> There's only so many ways to control fans and types of fans, so yes,
+> the interface of control and feedback lines between a fan and its
+> controller should absolutely be generic.
+
+I'm not quite getting what you mean by this. Clearly we need a custom 
+compatibility string for the tachometer as it's a different hardware 
+block with different programming than others. Or are you complaining 
+about the nvidia,pulse-per-rev/capture-window-len properties?
 
 Thanks,
-Mark.
+Mikko
+
+> 
+> Rob
+> 
+>>
+>> Thanks,
+>> Mikko
+>>
+>>
+>> On 03/27/2018 05:52 PM, Rob Herring wrote:
+>>>
+>>> On Wed, Mar 21, 2018 at 10:10:38AM +0530, Rajkumar Rampelli wrote:
+>>>>
+>>>> Supply Device tree binding documentation for the NVIDIA
+>>>> Tegra186 SoC's Tachometer Controller
+>>>>
+>>>> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
+>>>> ---
+>>>>
+>>>> V2: Renamed compatible string to "nvidia,tegra186-pwm-tachometer"
+>>>>       Renamed dt property values of clock-names and reset-names to
+>>>> "tachometer"
+>>>>       from "tach"
+>>>
+>>>
+>>> Read my prior comments on v1.
+>>>
+>>> Rob
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
