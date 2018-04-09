@@ -1,45 +1,49 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  9 Apr 2018 16:09:20 +0100
-Subject: [PATCH] arm64: dts: juno: drop unnecessary address-cells and
- size-cells properties
-In-Reply-To: <1523270385-30461-1-git-send-email-sudeep.holla@arm.com>
-References: <1523270385-30461-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1523286560-30889-1-git-send-email-sudeep.holla@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 9 Apr 2018 17:19:32 +0200
+Subject: [PATCH V3] ARM: dts: imx6q: Add support for the DHCOM iMX6 SoM
+ and PDK2
+In-Reply-To: <20180409114847.GC14582@dragon>
+References: <20180318173403.31460-1-marex@denx.de>
+ <CAOMZO5BHyVf2N8q7oKpe3XEYAT77yR7WYWFeuofQihkP6+moUA@mail.gmail.com>
+ <f22b8d2a-c8e4-94ab-3b87-9758c02ca63a@denx.de>
+ <e860af85-0e80-5dea-8783-5cbab43d9fc8@denx.de>
+ <20180409114847.GC14582@dragon>
+Message-ID: <da03e08d-49a0-6d5a-b34c-12b47213e252@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-/smb at 8000000/motherboard/gpio_keys node doesn't have "ranges" or "reg"
-property in child nodes. So it's unnecessary to have address-cells
-as well as size-cells properties which results in below warning.
+On 04/09/2018 01:48 PM, Shawn Guo wrote:
+> On Sun, Apr 08, 2018 at 06:40:04PM +0200, Marek Vasut wrote:
+>> On 03/27/2018 09:32 PM, Marek Vasut wrote:
+>>> On 03/20/2018 04:36 PM, Fabio Estevam wrote:
+>>>> On Sun, Mar 18, 2018 at 2:34 PM, Marek Vasut <marex@denx.de> wrote:
+>>>>> Add support for the DH i.MX6 Quad based SoM and a PDK2 evaluation board.
+>>>>> The evaluation board features three serial ports, USB OTG, USB host with
+>>>>> an USB hub, Fast or Gigabit ethernet, eMMC, uSD, SD, mSATA, analog audio,
+>>>>> PCIe and HDMI video output.
+>>>>>
+>>>>> All of the aforementioned features are supported by this patch.
+>>>>>
+>>>>> Signed-off-by: Marek Vasut <marex@denx.de>
+>>>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>>>>> Cc: Shawn Guo <shawnguo@kernel.org>
+>>>>
+>>>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>>>
+>>> Shawn, any response to this ?
+>>
+>> Another two weeks have passed and still zero feedback.
+>>
+>> I was complaining about getting no feedback on patches from you for long
+>> periods of time before, and that it is extremely demotivating for a
+>> contributor. It seems the situation has not improved at all.
+> 
+> This version looks good to me.  But please be aware of that we are in the
+> middle of 4.17 merge window, and my tree is kinda frozen until 4.17-rc1
+> is available.
 
-Warning (avoid_unnecessary_addr_size):
-/smb at 8000000/motherboard/gpio_keys:
-	unnecessary #address-cells/#size-cells without "ranges" or child "reg"
-	property
+I see, so another release missed ?
 
-This patch drops the unnecessary address+size-cell properties.
-
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 2 --
- 1 file changed, 2 deletions(-)
-
-(Missed cc-ed people earlier)
-
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index 2ac43221ddb6..69804c5f1197 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -56,8 +56,6 @@
-
- 			gpio_keys {
- 				compatible = "gpio-keys";
--				#address-cells = <1>;
--				#size-cells = <0>;
-
- 				power-button {
- 					debounce_interval = <50>;
---
-2.7.4
+-- 
+Best regards,
+Marek Vasut
