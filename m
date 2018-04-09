@@ -1,39 +1,35 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Mon,  9 Apr 2018 12:59:14 +0200
-Subject: [PATCH 1/5] dt-bindings: display: bridge: lvds-transmitter: add ti,
- ds90c185
+Date: Mon,  9 Apr 2018 12:59:15 +0200
+Subject: [PATCH 2/5] dt-bindings: display: atmel: add optional output-mode
+ property
 In-Reply-To: <20180409105918.20792-1-peda@axentia.se>
 References: <20180409105918.20792-1-peda@axentia.se>
-Message-ID: <20180409105918.20792-2-peda@axentia.se>
+Message-ID: <20180409105918.20792-3-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Start list of actual chips compatible with "lvds-encoder".
+Useful for beating cases where an output mode selection heuristic
+fails.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- .../devicetree/bindings/display/bridge/lvds-transmitter.txt       | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt b/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt
-index fd39ad34c383..50220190c203 100644
---- a/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/lvds-transmitter.txt
-@@ -22,7 +22,13 @@ among others.
+diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+index 82f2acb3d374..dc478455b883 100644
+--- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
++++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+@@ -10,6 +10,10 @@ Required properties:
+  - #address-cells: should be set to 1.
+  - #size-cells: should be set to 0.
  
- Required properties:
- 
--- compatible: Must be "lvds-encoder"
-+- compatible: Must be one or more of the following
-+  - "ti,ds90c185" for the TI DS90C185 FPD-Link Serializer
-+  - "lvds-encoder" for a generic LVDS encoder device
++Optional properties:
++ - output-mode: override any output mode selection hueristic and force a
++   particular output mode. One of "rgb444", "rgb565", "rgb666" and "rgb888".
 +
-+  When compatible with the generic version, nodes must list the
-+  device-specific version corresponding to the device first
-+  followed by the generic version.
- 
- Required nodes:
- 
+ Required children nodes:
+  Children nodes are encoding available output ports and their connections
+  to external devices using the OF graph reprensentation (see ../graph.txt).
 -- 
 2.11.0
