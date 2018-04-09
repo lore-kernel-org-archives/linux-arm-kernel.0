@@ -1,70 +1,76 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 9 Apr 2018 12:20:49 +0900
-Subject: [PATCH] pinctrl/samsung: Correct EINTG banks order
-In-Reply-To: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <CA+Ln22HAkE55HDEQD2H2ixTzDOhjmZ6=vT0+SKZDyDUq2c35zA@mail.gmail.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Mon, 9 Apr 2018 09:31:34 +0530
+Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
+In-Reply-To: <20180406020948.GE19607@linaro.org>
+References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
+ <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
+ <20180313102158.GI25863@linaro.org>
+ <20180313104715.prurmrizho4ddc4l@lakrids.cambridge.arm.com>
+ <20180313110747.GJ25863@linaro.org>
+ <20180313112016.ocx4qqhji3zfwjhs@lakrids.cambridge.arm.com>
+ <CACi5LpN4DTYFVSVqru2j0y=CKr2ztrJ1gCW32sJBU=oUV2fcWw@mail.gmail.com>
+ <20180314021050.GK25863@linaro.org>
+ <20180314182448.bnvjtgyzipsuxcbe@lakrids.cambridge.arm.com>
+ <CACi5LpNyx5VKO6mYB1yXNPENPKhAfAJ7cUSBeVzVtXfF6+EPwg@mail.gmail.com>
+ <20180406020948.GE19607@linaro.org>
+Message-ID: <CACi5LpPe_C0fLFzsAHPD54X=D+AsYjvSyZi0yt_6=wFrWmvetw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+Hi Akashi,
 
-2018-04-09 3:07 GMT+09:00 Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>:
-> All banks with GPIO interrupts should be at beginning
-> of bank array and without any other types of banks between them.
-> This order is expected by exynos_eint_gpio_irq, when doing
-> interrupt group to bank translation.
-> Otherwise, kernel NULL pointer dereference would happen
-> when trying to handle interrupt, due to wrong bank being looked up.
-> Observed on s5pv210, when trying to handle gpj0 interrupt,
-> where kernel was mapping it to gpi bank.
-
-Thanks for the patch! Looks like it might be fixing quite an ugly bug indeed.
-
-Just one comment for exynos3250 change below.
-
+On Fri, Apr 6, 2018 at 7:39 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Bhupesh,
 >
-> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-exynos-arm.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+> On Fri, Mar 16, 2018 at 03:05:10PM +0530, Bhupesh Sharma wrote:
+>> On Wed, Mar 14, 2018 at 11:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Wed, Mar 14, 2018 at 11:10:53AM +0900, AKASHI Takahiro wrote:
+>> >> If kaslr-seed has a critical value in terms of security, is kexec-tools
+>> >> a right place? It is exposed to user space albeit for a short time of period.
+>> >
+>> > The kernel zeroes the seed in the DT at boot time, so the current seed
+>> > isn't visible to userspace.
+>> >
+>> > If kexec-tools generates a seed, and inserts it into the DTB that it
+>> > loads, this is only visible to kexec tools or other applications which
+>> > can inspect its memory, so I don't think this is much of a concern.
+>> > Anything with such privilege can presumably kexec() to arbitrary code
+>> > anyhow.
+>> >
+>> > The next kernel will then zero its seed in the DT at boot time, so
+>> > similarly this won't be visible to userspace on the new kernel.
+>> >
+>> > FWIW, having kexec tools generate a seed for the kexec_load() case makes
+>> > sense to me.
+>>
+>> Fair enough. I will try to take a stab at the same and come back with
+>> my findings on this thread.
 >
-> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos-arm.c b/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
-> index 90c2744..de4ab07 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
-> @@ -105,12 +105,12 @@ static const struct samsung_pin_bank_data s5pv210_pin_bank[] __initconst = {
->         EXYNOS_PIN_BANK_EINTG(7, 0x1c0, "gpg1", 0x38),
->         EXYNOS_PIN_BANK_EINTG(7, 0x1e0, "gpg2", 0x3c),
->         EXYNOS_PIN_BANK_EINTG(7, 0x200, "gpg3", 0x40),
-> -       EXYNOS_PIN_BANK_EINTN(7, 0x220, "gpi"),
->         EXYNOS_PIN_BANK_EINTG(8, 0x240, "gpj0", 0x44),
->         EXYNOS_PIN_BANK_EINTG(6, 0x260, "gpj1", 0x48),
->         EXYNOS_PIN_BANK_EINTG(8, 0x280, "gpj2", 0x4c),
->         EXYNOS_PIN_BANK_EINTG(8, 0x2a0, "gpj3", 0x50),
->         EXYNOS_PIN_BANK_EINTG(5, 0x2c0, "gpj4", 0x54),
-> +       EXYNOS_PIN_BANK_EINTN(7, 0x220, "gpi"),
->         EXYNOS_PIN_BANK_EINTN(8, 0x2e0, "mp01"),
->         EXYNOS_PIN_BANK_EINTN(4, 0x300, "mp02"),
->         EXYNOS_PIN_BANK_EINTN(8, 0x320, "mp03"),
-> @@ -158,9 +158,6 @@ static const struct samsung_pin_bank_data exynos3250_pin_banks0[] __initconst =
->
->  /* pin banks of exynos3250 pin-controller 1 */
->  static const struct samsung_pin_bank_data exynos3250_pin_banks1[] __initconst = {
-> -       EXYNOS_PIN_BANK_EINTN(8, 0x120, "gpe0"),
-> -       EXYNOS_PIN_BANK_EINTN(8, 0x140, "gpe1"),
-> -       EXYNOS_PIN_BANK_EINTN(3, 0x180, "gpe2"),
->         EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpk0", 0x08),
+> How's your progress here?
 
-It looks like gpk0 starts with eint_offset = 0x08. Depending on what
-the SVC register returns on this SoC, it might be group 0, which would
-be fine, but also group 2, which would require this bank to be at
-exynos3250_pin_banks1[2]... (or changing the way group is translated
-to bank pointer, e.g. by subtracting (eint_offset / 4) from the group
-number.
+I am almost done with the implementation.
+Unfortunately I lost most of the last week trying to revive my arm64
+board (which supports
+EFI_RNG_PROTOCOL and hence can be used to test the kaslr-seed related
+stuff), so I was not
+able to test the implementation.
 
-Sylwester, would you be able to check which group number is returned
-for GPK0 bank in SVC register on Exynos 3250?
+Now that the board is up, I think I can test and thrash out any
+missing clogs in the approach.
 
-Best regards,
-Tomasz
+> I've already added kaslr support (i.e. "virtual randomisation") to
+> my kexec_file patch set.
+> # just a few lines of code, though
+
+Hmm, have you sent out a new version already (kexec_file_load), as the last
+version in my inbox still mentions in the cover letter that we need a
+EFI stub like approach
+to really support CONFIG_RANDOMIZE_BASE. Or, am I missing something?
+
+I would love to have a look at the patch and try it at my end, so
+could you please share
+a pointer to the same.
+
+Regards,
+Bhupesh
