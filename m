@@ -1,30 +1,29 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 9 Apr 2018 19:37:45 +0800
-Subject: [PATCH RESEND v6 0/6] provide power off support for iMX6 with
- external PMIC
-In-Reply-To: <20180305102524.5905-1-o.rempel@pengutronix.de>
-References: <20180305102524.5905-1-o.rempel@pengutronix.de>
-Message-ID: <20180409113744.GA14582@dragon>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 9 Apr 2018 13:39:44 +0200
+Subject: [PATCH V2 1/2] cpufreq: scmi: Don't validate the frequency table
+ twice
+In-Reply-To: <5ce48bce-4fcf-1e0a-6b78-f588fbf7e4a5@arm.com>
+References: <cover.1522749887.git.viresh.kumar@linaro.org>
+ <442ecfd0a5bddf32c912c449b072d8a0139318fc.1522749887.git.viresh.kumar@linaro.org>
+ <5ce48bce-4fcf-1e0a-6b78-f588fbf7e4a5@arm.com>
+Message-ID: <CAJZ5v0hGgLAK2MRx0tEpTt5Hh9i_9zwhFJPsOsxQ+fOSiLBr_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 05, 2018 at 11:25:17AM +0100, Oleksij Rempel wrote:
-> This patch series is providing power off support for Freescale/NXP iMX6 based
-> boards with external power management integrated circuit (PMIC).
-> As a first step the PMIC is configured to turn off the system if the
-> standby pin is asserted. On second step we assert the standby pin.
-> For this reason we need to use pm_power_off_prepare.
-> 
-> Usage of stnadby pin for power off is described in official iMX6
-> documentation.
-> 
-> 2018.03.05:
-> As this patch set touches multiple subsystems I think it would make
-> sense for Shawn Guo to take the all patch set.
-> The only part which didn't receive an ACK is regulator stuff. So I would
-> hope that Mark Brown can ACK it.
+On Wed, Apr 4, 2018 at 11:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+> (I have exact patches ready :), was on vacation)
 
-Besides regulator changes, I did not see an ACK on kernel/reboot.c
-either.
+What am I expected to do with this one?
 
-Shawn
+> On 03/04/18 11:07, Viresh Kumar wrote:
+>> The cpufreq core is already validating the CPU frequency table after
+>> calling the ->init() callback of the cpufreq drivers and the drivers
+>> don't need to do the same anymore. Though they need to set the
+>> policy->freq_table field directly from the ->init() callback now.
+>>
+>> Stop validating the frequency table from scmi driver.
+>>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
