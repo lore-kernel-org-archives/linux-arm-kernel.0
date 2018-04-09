@@ -1,530 +1,131 @@
-From: npcomplete13@gmail.com (Vivek Unune)
-Date: Mon,  9 Apr 2018 18:31:53 -0400
-Subject: [PATCH v2] ARM: dts: BCM5301X: Make usb3 phy use mdio phy driver
-In-Reply-To: <20180315135647.48456-1-npcomplete13@gmail.com>
-References: <20180315135647.48456-1-npcomplete13@gmail.com>
-Message-ID: <20180409223153.41893-1-npcomplete13@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon,  9 Apr 2018 16:00:38 -0700
+Subject: [PATCH 1/3] drm/vc4: Remove the need for the GPU-subsystem DT node.
+Message-ID: <20180409230040.1100-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, usb3 phy in bcm5301x.dtsi uses platform driver which
-requires register range "ccb-mii" <0x18003000 0x1000>. This range
-overlaps with mdio cmd and param registers (<0x18003000 0x8>).
-Essentially, the platform driver partly acts like a mdio bus
-driver, hence to use of this register range.
+The GPU subsystem node was a workaround to have a central device to
+bind V3D and display to.  Following the lead of 246774d17fc0
+("drm/etnaviv: remove the need for a gpu-subsystem DT node"), remove
+the subsystem node usage and just create a platform device for the DRM
+device to attach to if any of the subsystem devices are present.
 
-In some Northstar devices like Linksys EA9500, secondary switch
-is connected via external mdio. The only way to access and
-configure the external switch is via mdio bus. When we enable the
-mdio bus in it's current state, the mdio bus and any child buses
-fail to register because of the register range overlap.
-
-On Northstar, the usb3 phy is connected at address 0x10 on the
-internal mdio bus. This change moves the usb3_phy node and makes
-it a child node of internal mdio bus.
-
-Thanks to Rafa? Mi?ecki's commit af850e14a7ae
-("phy: bcm-ns-usb3: add MDIO driver using proper bus layer") the
-same usb3 platform driver can now act as usb3 phy mdio driver.
-
-Tested on Linksys Panamera (EA9500)
-
-Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
+Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
-v2: Disabled usb3_phy by default, then enabled in dts where
-    necessary
----
- arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts        |  4 +++
- arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts        |  4 +++
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  |  4 +++
- arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts    |  4 +++
- arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       |  4 +++
- arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       |  4 +++
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        |  4 +++
- arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     |  4 +++
- arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      |  4 +++
- arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        |  4 +++
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts |  4 +++
- arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts  |  4 +++
- arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts      |  4 +++
- arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts      |  4 +++
- arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts |  4 +++
- arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts        |  4 +++
- arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts  |  4 +++
- arch/arm/boot/dts/bcm4709-linksys-ea9200.dts       |  4 +++
- arch/arm/boot/dts/bcm4709-netgear-r7000.dts        |  4 +++
- arch/arm/boot/dts/bcm4709-netgear-r8000.dts        |  4 +++
- arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  |  4 +++
- arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      |  4 +++
- arch/arm/boot/dts/bcm47094-linksys-panamera.dts    |  4 +++
- arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts      |  4 +++
- arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts      |  4 +++
- arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      |  4 +++
- arch/arm/boot/dts/bcm47094-netgear-r8500.dts       |  4 +++
- arch/arm/boot/dts/bcm47094.dtsi                    |  7 +++--
- arch/arm/boot/dts/bcm5301x.dtsi                    | 35 +++++++++++++++++-----
- arch/arm/boot/dts/bcm94708.dts                     |  4 +++
- arch/arm/boot/dts/bcm94709.dts                     |  4 +++
- arch/arm/boot/dts/bcm953012er.dts                  |  4 +++
- arch/arm/boot/dts/bcm953012hr.dts                  |  4 +++
- arch/arm/boot/dts/bcm953012k.dts                   |  4 +++
- 35 files changed, 175 insertions(+), 11 deletions(-)
- create mode 100755 patchdts.sh
+ .../bindings/display/brcm,bcm-vc4.txt         |  7 ----
+ drivers/gpu/drm/vc4/vc4_drv.c                 | 33 ++++++++++++++-----
+ drivers/gpu/drm/vc4/vc4_hvs.c                 |  1 +
+ drivers/gpu/drm/vc4/vc4_v3d.c                 |  1 +
+ 4 files changed, 27 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
-index 4175174e589a..c9e49e63db9f 100644
---- a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
-+++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
-@@ -101,3 +101,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-index 8fa033fea959..7e6848980098 100644
---- a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-+++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-@@ -91,3 +91,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index 8b64caabaad8..6663bdc27163 100644
---- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-+++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -147,3 +147,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts b/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts
-index 126ab5867772..8ffb6f49a87f 100644
---- a/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts
-+++ b/arch/arm/boot/dts/bcm4708-linksys-ea6300-v1.dts
-@@ -39,3 +39,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-index f591b0f256d8..837ab26f28a3 100644
---- a/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-+++ b/arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts
-@@ -58,3 +58,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-index 50d65d8fbd9a..d1f7154ad622 100644
---- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-+++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
-@@ -59,3 +59,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index d7c34fa72b4b..d9b518ec3e62 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -91,3 +91,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-index bb66cebe0bd8..9ae81d053ba1 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
-@@ -94,3 +94,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-index 83a4c60bb431..913624b54696 100644
---- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-+++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-@@ -159,3 +159,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-index 0800a964f2fe..fa2b795c1e80 100644
---- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-+++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
-@@ -85,3 +85,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-index c2af33eb47de..6a58344feedb 100644
---- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
-@@ -129,3 +129,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-index 87ea6ba664f5..bc25c7b6ed82 100644
---- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-+++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
-@@ -115,3 +115,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts b/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
-index 9b5759849983..04f6b798342a 100644
---- a/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
-+++ b/arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
-@@ -58,3 +58,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts b/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
-index ba1c19b1b3eb..747eccdf2581 100644
---- a/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
-+++ b/arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
-@@ -106,3 +106,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-index 3ed8de42cb48..5915533e58fb 100644
---- a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-+++ b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-@@ -100,3 +100,7 @@
- &usb2 {
- 	vcc-gpio = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-index df473cc41572..5a37580191b4 100644
---- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-+++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
-@@ -73,3 +73,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-index 92058c73ee59..5c1221bb68de 100644
---- a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-+++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-@@ -128,3 +128,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts b/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts
-index 3d1d9c2c4efc..fa08eecae510 100644
---- a/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts
-+++ b/arch/arm/boot/dts/bcm4709-linksys-ea9200.dts
-@@ -40,3 +40,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-index f43ab4721456..0046ad0fab23 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
-@@ -112,3 +112,7 @@
- &usb3 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-index d266131652ad..7ba26ef0c924 100644
---- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-+++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-@@ -182,3 +182,7 @@
- &usb3 {
- 	vcc-gpio = <&chipcommon 0 GPIO_ACTIVE_HIGH>;
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-index ec4a50e440f6..aa37323cf045 100644
---- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-+++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-@@ -105,3 +105,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-index 7cc7d344fe5b..808d7efcc113 100644
---- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-+++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-@@ -120,3 +120,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-index b6750f70dffb..d9f538c3cddb 100644
---- a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-+++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-@@ -34,3 +34,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts b/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts
-index ecd22a246746..e337f65cd047 100644
---- a/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts
-+++ b/arch/arm/boot/dts/bcm47094-luxul-abr-4500.dts
-@@ -61,3 +61,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts b/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
-index 15ffb1abc440..f75ec243c405 100644
---- a/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
-+++ b/arch/arm/boot/dts/bcm47094-luxul-xbr-4500.dts
-@@ -61,3 +61,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-index bc1d1e10d4ac..a3852f85f119 100644
---- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-+++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-@@ -101,3 +101,7 @@
- &spi_nor {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-index 859929973158..578fa1a29bd5 100644
---- a/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-+++ b/arch/arm/boot/dts/bcm47094-netgear-r8500.dts
-@@ -92,3 +92,7 @@
- 		};
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-index 4840a782fc05..f7c3e274b354 100644
---- a/arch/arm/boot/dts/bcm47094.dtsi
-+++ b/arch/arm/boot/dts/bcm47094.dtsi
-@@ -7,9 +7,10 @@
- #include "bcm4708.dtsi"
+diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+index 284e2b14cfbe..5fd4717101d6 100644
+--- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
++++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+@@ -4,9 +4,6 @@ The VC4 device present on the Raspberry Pi includes a display system
+ with HDMI output and the HVS (Hardware Video Scaler) for compositing
+ display planes.
  
- / {
--	usb3_phy: usb3-phy {
--		compatible = "brcm,ns-bx-usb3-phy";
--	};
-+};
-+
-+&usb3_phy {
-+	compatible = "brcm,ns-bx-usb3-phy";
- };
- 
- &uart0 {
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 9a076c409f4e..f65aca8e0fc0 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -154,13 +154,6 @@
- 		clock-names = "phy-ref-clk";
- 	};
- 
--	usb3_phy: usb3-phy {
--		compatible = "brcm,ns-ax-usb3-phy";
--		reg = <0x18105000 0x1000>, <0x18003000 0x1000>;
--		reg-names = "dmp", "ccb-mii";
--		#phy-cells = <0>;
--	};
+-Required properties for VC4:
+-- compatible:	Should be "brcm,bcm2835-vc4" or "brcm,cygnus-vc4"
 -
- 	axi at 18000000 {
- 		compatible = "brcm,bus-axi";
- 		reg = <0x18000000 0x1000>;
-@@ -359,7 +352,33 @@
- 		reg = <0x18003000 0x8>;
- 		#size-cells = <1>;
- 		#address-cells = <0>;
--		status = "disabled";
-+	};
-+
-+	mdio-bus-mux {
-+		compatible = "mdio-mux-mmioreg";
-+		mdio-parent-bus = <&mdio>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x18003000 0x4>;
-+		mux-mask = <0x200>;
-+
-+		mdio at 0 {
-+			reg = <0x0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			usb3_phy: usb3-phy at 10 {
-+				compatible = "brcm,ns-ax-usb3-phy";
-+				reg = <0x10>;
-+				usb3-dmp-syscon = <&usb3_dmp>;
-+				#phy-cells = <0>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+
-+	usb3_dmp: syscon at 18105000 {
-+		reg = <0x18105000 0x1000>;
- 	};
+ Required properties for Pixel Valve:
+ - compatible:	Should be one of "brcm,bcm2835-pixelvalve0",
+ 		  "brcm,bcm2835-pixelvalve1", or "brcm,bcm2835-pixelvalve2"
+@@ -153,10 +150,6 @@ v3d: v3d at 7ec00000 {
+ 	interrupts = <1 10>;
+ };
  
- 	i2c0: i2c at 18009000 {
-diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
-index 2e08c895f281..24a80584d8b2 100644
---- a/arch/arm/boot/dts/bcm94708.dts
-+++ b/arch/arm/boot/dts/bcm94708.dts
-@@ -42,3 +42,7 @@
- 		reg = <0x00000000 0x08000000>;
- 	};
+-vc4: gpu {
+-	compatible = "brcm,bcm2835-vc4";
+-};
+-
+ panel: panel {
+ 	compatible = "ontat,yx700wv03", "simple-panel";
+ 
+diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
+index 7c95ed5c5cac..d282ab7de03a 100644
+--- a/drivers/gpu/drm/vc4/vc4_drv.c
++++ b/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -364,22 +364,34 @@ static int vc4_platform_drm_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id vc4_of_match[] = {
+-	{ .compatible = "brcm,bcm2835-vc4", },
+-	{ .compatible = "brcm,cygnus-vc4", },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, vc4_of_match);
+-
+ static struct platform_driver vc4_platform_driver = {
+ 	.probe		= vc4_platform_drm_probe,
+ 	.remove		= vc4_platform_drm_remove,
+ 	.driver		= {
+ 		.name	= "vc4-drm",
+-		.of_match_table = vc4_of_match,
+ 	},
  };
+ 
++static bool
++driver_of_table_has_a_match(const struct platform_driver *driver)
++{
++	int i;
 +
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm94709.dts b/arch/arm/boot/dts/bcm94709.dts
-index c37616c67edc..ff778540ae87 100644
---- a/arch/arm/boot/dts/bcm94709.dts
-+++ b/arch/arm/boot/dts/bcm94709.dts
-@@ -42,3 +42,7 @@
- 		reg = <0x00000000 0x08000000>;
- 	};
++	for (i = 0; driver->driver.of_match_table[i].compatible; i++) {
++		const char *compat = driver->driver.of_match_table[i].compatible;
++		struct device_node *node;
++
++		while ((node = of_find_compatible_node(node, NULL, compat))) {
++			if (of_device_is_available(node)) {
++				of_node_put(node);
++				return true;
++			}
++		}
++	}
++
++	return false;
++}
++
+ static int __init vc4_drm_register(void)
+ {
+ 	int ret;
+@@ -389,6 +401,11 @@ static int __init vc4_drm_register(void)
+ 	if (ret)
+ 		return ret;
+ 
++	if (driver_of_table_has_a_match(&vc4_v3d_driver) ||
++	    driver_of_table_has_a_match(&vc4_hvs_driver)) {
++		platform_device_register_simple("vc4-drm", -1, NULL, 0);
++	}
++
+ 	return platform_driver_register(&vc4_platform_driver);
+ }
+ 
+diff --git a/drivers/gpu/drm/vc4/vc4_hvs.c b/drivers/gpu/drm/vc4/vc4_hvs.c
+index 2b62fc5b8d85..730813ee74ae 100644
+--- a/drivers/gpu/drm/vc4/vc4_hvs.c
++++ b/drivers/gpu/drm/vc4/vc4_hvs.c
+@@ -262,6 +262,7 @@ static const struct of_device_id vc4_hvs_dt_match[] = {
+ 	{ .compatible = "brcm,bcm2835-hvs" },
+ 	{}
  };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm953012er.dts b/arch/arm/boot/dts/bcm953012er.dts
-index 40e694bfe5ca..4f23dc300bc3 100644
---- a/arch/arm/boot/dts/bcm953012er.dts
-+++ b/arch/arm/boot/dts/bcm953012er.dts
-@@ -90,3 +90,7 @@
- 		};
- 	};
++MODULE_DEVICE_TABLE(of, vc4_hvs_dt_match);
+ 
+ struct platform_driver vc4_hvs_driver = {
+ 	.probe = vc4_hvs_dev_probe,
+diff --git a/drivers/gpu/drm/vc4/vc4_v3d.c b/drivers/gpu/drm/vc4/vc4_v3d.c
+index bfc2fa73d2ae..e77e9ebbab4b 100644
+--- a/drivers/gpu/drm/vc4/vc4_v3d.c
++++ b/drivers/gpu/drm/vc4/vc4_v3d.c
+@@ -459,6 +459,7 @@ static const struct of_device_id vc4_v3d_dt_match[] = {
+ 	{ .compatible = "brcm,vc4-v3d" },
+ 	{}
  };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm953012hr.dts b/arch/arm/boot/dts/bcm953012hr.dts
-index 3076e81699cf..42b72f3bf575 100644
---- a/arch/arm/boot/dts/bcm953012hr.dts
-+++ b/arch/arm/boot/dts/bcm953012hr.dts
-@@ -95,3 +95,7 @@
- 		reg = <0x00700000 0x00900000>;
- 	};
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
-index 79c168e2714b..f06f3c094c51 100644
---- a/arch/arm/boot/dts/bcm953012k.dts
-+++ b/arch/arm/boot/dts/bcm953012k.dts
-@@ -113,3 +113,7 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+        status = "okay";
-+};
++MODULE_DEVICE_TABLE(of, vc4_v3d_dt_match);
+ 
+ struct platform_driver vc4_v3d_driver = {
+ 	.probe = vc4_v3d_dev_probe,
 -- 
-2.11.0
+2.17.0
