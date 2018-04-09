@@ -1,56 +1,108 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 9 Apr 2018 11:22:29 +0200
-Subject: [PATCH 0/7] sunxi: Add DT representation for the MBUS controller
-In-Reply-To: <CAL_Jsq+cURC780ivftY1v3P59g5UKAHwb48raXXB6huQ2KBvuQ@mail.gmail.com>
-References: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
- <CAL_Jsq+cURC780ivftY1v3P59g5UKAHwb48raXXB6huQ2KBvuQ@mail.gmail.com>
-Message-ID: <20180409092229.ljcnsqgv7wh2s4op@flea>
+Date: Mon, 9 Apr 2018 11:24:31 +0200
+Subject: [PATCH v5 08/13] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180408110932.7ef29ed2@dell-desktop.home>
+References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
+ <20180403061836.3926-9-mylene.josserand@bootlin.com>
+ <20180403091218.t6xuq6csjp4uyy5u@flea>
+ <20180403220628.19c9acaf@dell-desktop.home>
+ <20180404074515.r6nbkpcyy6vfelbr@flea>
+ <20180408110932.7ef29ed2@dell-desktop.home>
+Message-ID: <20180409092431.yfupppnbypnx6ha5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, Apr 03, 2018 at 11:03:30AM -0500, Rob Herring wrote:
-> On Tue, Apr 3, 2018 at 8:29 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > Hi,
-> >
-> > We've had for quite some time to hack around in our drivers to take into
-> > account the fact that our DMA accesses are not done through the parent
-> > node, but through another bus with a different mapping than the CPU for the
-> > RAM (0 instead of 0x40000000 for most SoCs).
-> >
-> > After some discussion after the submission of a camera device suffering of
-> > the same hacks, I've decided to put together a serie that introduce a
-> > property called dma-parent that allows to express the DMA relationship
-> > between a master and its bus, even if they are not direct parents in the DT.
+On Sun, Apr 08, 2018 at 11:09:32AM +0200, Myl?ne Josserand wrote:
+> Hello Maxime,
 > 
-> Reading thru v6 of the camera driver, it seems like having
-> intermediate buses would solve the problem in your case?
+> On Wed, 4 Apr 2018 09:45:15 +0200
+> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> 
+> > On Tue, Apr 03, 2018 at 10:06:28PM +0200, Myl?ne Josserand wrote:
+> > > Hello,
+> > > 
+> > > Thank you for the review.
+> > > 
+> > > On Tue, 3 Apr 2018 11:12:18 +0200
+> > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > >   
+> > > > On Tue, Apr 03, 2018 at 08:18:31AM +0200, Myl?ne Josserand wrote:  
+> > > > > Add the initialization of CNTVOFF for sun8i-a83t.
+> > > > > 
+> > > > > For boot CPU, Create a new machine that handles this
+> > > > > function's call in an "init_early" callback.
+> > > > > For secondary CPUs, add this function into secondary_startup
+> > > > > assembly entry.
+> > > > > 
+> > > > > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > > > > ---
+> > > > >  arch/arm/mach-sunxi/headsmp.S |  1 +
+> > > > >  arch/arm/mach-sunxi/sunxi.c   | 18 +++++++++++++++++-
+> > > > >  2 files changed, 18 insertions(+), 1 deletion(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> > > > > index 79890fbe5613..b586b7cf803a 100644
+> > > > > --- a/arch/arm/mach-sunxi/headsmp.S
+> > > > > +++ b/arch/arm/mach-sunxi/headsmp.S
+> > > > > @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+> > > > >  
+> > > > >  ENTRY(sunxi_mc_smp_secondary_startup)
+> > > > >  	bl	sunxi_mc_smp_cluster_cache_enable
+> > > > > +	bl	smp_init_cntvoff
+> > > > >  	b	secondary_startup
+> > > > >  ENDPROC(sunxi_mc_smp_secondary_startup)
+> > > > >  
+> > > > > diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> > > > > index 5e9602ce1573..090784108c0a 100644
+> > > > > --- a/arch/arm/mach-sunxi/sunxi.c
+> > > > > +++ b/arch/arm/mach-sunxi/sunxi.c
+> > > > > @@ -16,6 +16,7 @@
+> > > > >  #include <linux/platform_device.h>
+> > > > >  
+> > > > >  #include <asm/mach/arch.h>
+> > > > > +#include <asm/smp_cntvoff.h>
+> > > > >  
+> > > > >  static const char * const sunxi_board_dt_compat[] = {
+> > > > >  	"allwinner,sun4i-a10",
+> > > > > @@ -62,7 +63,6 @@ MACHINE_END
+> > > > >  static const char * const sun8i_board_dt_compat[] = {
+> > > > >  	"allwinner,sun8i-a23",
+> > > > >  	"allwinner,sun8i-a33",
+> > > > > -	"allwinner,sun8i-a83t",
+> > > > >  	"allwinner,sun8i-h2-plus",
+> > > > >  	"allwinner,sun8i-h3",
+> > > > >  	"allwinner,sun8i-r40",
+> > > > > @@ -75,6 +75,22 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+> > > > >  	.dt_compat	= sun8i_board_dt_compat,
+> > > > >  MACHINE_END
+> > > > >  
+> > > > > +void __init sun8i_cntvoff_init(void)
+> > > > > +{
+> > > > > +	smp_init_cntvoff();    
+> > > > 
+> > > > Can't this be moved to the SMP setup code?  
+> > > 
+> > > I tried to put it in the first lines of "sunxi_mc_smp_init" function
+> > > but it did not work. I tried to find some callbacks to have an
+> > > early "init" and I only found the "init_early"'s one. There is probably
+> > > another way to handle that so do not hesitate to tell me any ideas.  
+> > 
+> > It's hard to say without more context about why it doesn't work. Have
+> > you checked the order between early_initcall, the timer initialization
+> > function and init_early?
+> > 
+> 
+> Yes, I tested it. I wanted to test it again to give more context. Here
+> is the boot log: http://code.bulix.org/n1x864-315948?raw
+> I added printk in the 3 functions (with "===========>").
+> 
+> The "init_early" and "sun6i_timer" are executed before
+> "arch_timer_of_init" (which is the function that parses the DT property
+> that we used previously "arm,cpu-registers-not-fw-configured").
+> The "sunxi_mc_smp_init" function is called later so I guess that is why
+> it is not working in that case.
 
-I guess it would yes, but I guess it wouldn't model the hardware
-properly since this seems to be really a bus only meant to do DMA, and
-you're not accessing the registers of the device through that bus.
-
-And as far as I know, the DT implies that the topology is the one of
-the "control" side of the devices.
-
-We'll also need eventually to have retrieve the MBUS endpoints ID to
-be able to support perf and PM QoS properly.
-
-> As Arnd mentioned in that thread, something new needs to address all
-> the deficiencies with dma-ranges and describing DMA bus topologies.
-> This doesn't address the needs of describing bus interconnects.
-> There's been some efforts by the QCom folks with an interconnect
-> binding. They've mostly punted (for now at least) to not describing
-> the whole interconnect in DT and keeping the details in a driver.
-
-Is it that patch serie? https://lkml.org/lkml/2018/3/9/856
-
-> On the flip side, this does mirror the established pattern used by
-> interrupts, so maybe it's okay on it's own. I'll wait for others to
-> comment.
-
-We'll see how it turns out then :)
+Ok. Make sure to mention that in your commit log.
 
 Maxime
 
@@ -64,4 +116,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/425800b0/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/1d5b5127/attachment.sig>
