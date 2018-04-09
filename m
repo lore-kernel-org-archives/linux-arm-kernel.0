@@ -1,37 +1,20 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 09 Apr 2018 14:03:45 +0200
-Subject: [PATCH v4 2/7] clk: meson: migrate to
- devm_of_clk_add_hw_provider API
-In-Reply-To: <20180408031938.153474-3-yixun.lan@amlogic.com>
-References: <20180408031938.153474-1-yixun.lan@amlogic.com>
- <20180408031938.153474-3-yixun.lan@amlogic.com>
-Message-ID: <1523275425.2764.20.camel@baylibre.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 9 Apr 2018 14:05:28 +0200
+Subject: [PATCH v3 3/3] ARM: dts: iwg23s-sbc: Add support for iWave
+ G23S-SBC based on RZ/G1C
+In-Reply-To: <1522754379-64116-4-git-send-email-biju.das@bp.renesas.com>
+References: <1522754379-64116-1-git-send-email-biju.das@bp.renesas.com>
+ <1522754379-64116-4-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20180409120528.txqyslcsb767aplz@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2018-04-08 at 11:19 +0800, Yixun Lan wrote:
-> There is a protential memory leak, as of_clk_del_provider is
-> never called if of_clk_add_hw_provider has been executed.
-> Fix this by using devm variant API.
+On Tue, Apr 03, 2018 at 12:19:39PM +0100, Biju Das wrote:
+> Add support for iWave iW-RainboW-G23S single board computer based on
+>  RZ/G1C.
 > 
-> Suggested-by: Stephen Boyd <sboyd@kernel.org>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please make this the 1st patch of the series and add the proper fixes tag.
-
-> ---
->  drivers/clk/meson/meson-aoclk.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/meson/meson-aoclk.c b/drivers/clk/meson/meson-aoclk.c
-> index 14862c22e20d..14a1e46a4de6 100644
-> --- a/drivers/clk/meson/meson-aoclk.c
-> +++ b/drivers/clk/meson/meson-aoclk.c
-> @@ -78,6 +78,6 @@ int meson_aoclkc_probe(struct platform_device *pdev)
->  			return ret;
->  	}
->  
-> -	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-> +	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
->  		(void *) data->hw_data);
->  }
+Thanks, applied for v4.18.
