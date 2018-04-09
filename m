@@ -1,150 +1,194 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Apr 2018 13:47:50 +0100
-Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <20180409123042.GD10904@cbox>
-References: <20180215175803.6870-1-marc.zyngier@arm.com>
- <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
- <86o9k63f7a.wl-marc.zyngier@arm.com>
- <CAFEAcA8XYV=oSX81ON4CGDt0kfG1cgROqj30OC2Ov=bYhLSYig@mail.gmail.com>
- <20180306092134.4bfbz34yhqfrfdlf@kamzik.brq.redhat.com>
- <8042f946-49bf-5fc1-f513-4b76ccd5f7d6@arm.com>
- <CAFEAcA-t1QvjW6eFQ4U+8odj0p_01F8sktpvN9KrZ1Kc-FhtnQ@mail.gmail.com>
- <86169dc0-b13c-fab9-eaca-363d3873ad10@arm.com> <20180409123042.GD10904@cbox>
-Message-ID: <cf0f94ba-f5b7-79ca-1625-1235a5fec8b5@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 09 Apr 2018 15:51:12 +0300
+Subject: [PATCH v2 0/5] allow override of bus format in bridges
+In-Reply-To: <8bba78e3-ed61-4648-d4a4-5d12dd9ef11d@axentia.se>
+References: <20180326212447.7380-1-peda@axentia.se>
+ <9af25e5a-7334-b07c-ff49-46530df6b1aa@axentia.se>
+ <8bba78e3-ed61-4648-d4a4-5d12dd9ef11d@axentia.se>
+Message-ID: <1535937.JbitjzqBjA@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Drew, who's look at the whole save/restore thing extensively
+Hi Peter,
 
-On 09/04/18 13:30, Christoffer Dall wrote:
-> On Thu, Mar 15, 2018 at 07:26:48PM +0000, Marc Zyngier wrote:
->> On 15/03/18 19:13, Peter Maydell wrote:
->>> On 15 March 2018 at 19:00, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 06/03/18 09:21, Andrew Jones wrote:
->>>>> On Mon, Mar 05, 2018 at 04:47:55PM +0000, Peter Maydell wrote:
->>>>>> On 2 March 2018 at 11:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>>>> On Fri, 02 Mar 2018 10:44:48 +0000,
->>>>>>> Auger Eric wrote:
->>>>>>>> I understand the get/set is called as part of the migration process.
->>>>>>>> So my understanding is the benefit of this series is migration fails in
->>>>>>>> those cases:
->>>>>>>>
->>>>>>>>> =0.2 source -> 0.1 destination
->>>>>>>> 0.1 source -> >=0.2 destination
->>>>>>>
->>>>>>> It also fails in the case where you migrate a 1.0 guest to something
->>>>>>> that cannot support it.
->>>>>>
->>>>>> I think it would be useful if we could write out the various
->>>>>> combinations of source, destination and what we expect/want to
->>>>>> have happen. My gut feeling here is that we're sacrificing
->>>>>> exact migration compatibility in favour of having the guest
->>>>>> automatically get the variant-2 mitigations, but it's not clear
->>>>>> to me exactly which migration combinations that's intended to
->>>>>> happen for. Marc?
->>>>>>
->>>>>> If this wasn't a mitigation issue the desired behaviour would be
->>>>>> straightforward:
->>>>>>  * kernel should default to 0.2 on the basis that
->>>>>>    that's what it did before
->>>>>>  * new QEMU version should enable 1.0 by default for virt-2.12
->>>>>>    and 0.2 for virt-2.11 and earlier
->>>>>>  * PSCI version info shouldn't appear in migration stream unless
->>>>>>    it's something other than 0.2
->>>>>> But that would leave some setups (which?) unnecessarily without the
->>>>>> mitigation, so we're not doing that. The question is, exactly
->>>>>> what *are* we aiming for?
->>>>>
->>>>> The reason Marc dropped this patch from the series it was first introduced
->>>>> in was because we didn't have the aim 100% understood. We want the
->>>>> mitigation by default, but also to have the least chance of migration
->>>>> failure, and when we must fail (because we're not doing the
->>>>> straightforward approach listed above, which would prevent failures), then
->>>>> we want to fail with the least amount of damage to the user.
->>>>>
->>>>> I experimented with a couple different approaches and provided tables[1]
->>>>> with my results. I even recommended an approach, but I may have changed
->>>>> my mind after reading Marc's follow-up[2]. The thread continues from
->>>>> there as well with follow-ups from Christoffer, Marc, and myself. Anyway,
->>>>> Marc did this repost for us to debate it and work out the best approach
->>>>> here.
->>>> It doesn't look like we've made much progress on this, which makes me
->>>> think that we probably don't need anything of the like.
->>>
->>> I was waiting for a better explanation from you of what we're trying to
->>> achieve. If you want to take the "do nothing" approach then a list
->>> also of what migrations succeed/fail/break in that case would also
->>> be useful.
->>>
->>> (I am somewhat lazily trying to avoid having to spend time reverse
->>> engineering the "what are we trying to do and what effects are
->>> we accepting" parts from the patch and the code that's already gone
->>> into the kernel.)
->>
->> OK, let me (re)state the problem:
->>
->> For a guest that requests PSCI 0.2 (i.e. all guests from the past 4 or 5
->> years), we now silently upgrade the PSCI version to 1.0 allowing the new
->> SMCCC to be discovered, and the ARCH_WORKAROUND_1 service to be called.
->>
->> Things get funny, specially with migration (and the way QEMU works).
->>
->> If we "do nothing":
->>
->> (1) A guest migrating from an "old" host to a "new" host will silently
->> see its PSCI version upgraded. Not a big deal in my opinion, as 1.0 is a
->> strict superset of 0.2 (apart from the version number...).
->>
->> (2) A guest migrating from a "new" host to an "old" host will silently
->> loose its Spectre v2 mitigation. That's quite a big deal.
->>
->> (3, not related to migration) A guest having a hardcoded knowledge of
->> PSCI 0.2 will se that we've changed something, and may decide to catch
->> fire. Oh well.
->>
->> If we take this patch:
->>
->> (1) still exists
+On Monday, 9 April 2018 10:04:05 EEST Peter Rosin wrote:
+> On 2018-04-04 14:35, Peter Rosin wrote:
+> > On 2018-04-04 11:07, Laurent Pinchart wrote:
+> >> On Wednesday, 4 April 2018 09:34:41 EEST Daniel Vetter wrote:
+> >>> On Wed, Apr 4, 2018 at 12:28 AM, Laurent Pinchart wrote:
+> >>>> On Wednesday, 28 March 2018 10:08:26 EEST Daniel Vetter wrote:
+> >>>>> On Mon, Mar 26, 2018 at 11:24:42PM +0200, Peter Rosin wrote:
+> >>>>>> Hi!
+> >>>>>> 
+> >>>>>> [I got to v2 sooner than expected]
+> >>>>>> 
+> >>>>>> I have an Atmel sama5d31 hooked up to an lvds encoder and then
+> >>>>>> on to an lvds panel. Which seems like something that has been
+> >>>>>> done one or two times before...
+> >>>>>> 
+> >>>>>> The problem is that the bus_format of the SoC and the panel do
+> >>>>>> not agree. The SoC driver (atmel-hlcdc) can handle the
+> >>>>>> rgb444, rgb565, rgb666 and rgb888 bus formats. The hardware is
+> >>>>>> wired for the rgb565 case. The lvds encoder supports rgb888 on
+> >>>>>> its input side with the LSB wires for each color simply pulled
+> >>>>>> down internally in the encoder in my case which means that the
+> >>>>>> rgb565 bus_format is the format that works best. And the panel
+> >>>>>> is expecting lvds (vesa-24), which is what the encoder outputs.
+> >>>>>> 
+> >>>>>> The reason I "blame" the bus_format of the drm_connector is that
+> >>>>>> with the below DT snippet, things do not work *exactly* due to
+> >>>>>> that. At least, it starts to work if I hack the panel-lvds driver
+> >>>>>> to report the rgb565 bus_format instead of vesa-24.
+> >>>>>> 
+> >>>>>>     panel: panel {
+> >>>>>>             compatible = "panel-lvds";
+> >>>>>>             
+> >>>>>>             width-mm = <304>;
+> >>>>>>             height-mm = <228;
+> >>>>>>             
+> >>>>>>             data-mapping = "vesa-24";
+> >>>>>>             
+> >>>>>>             panel-timing {
+> >>>>>>                     // 1024x768 @ 60Hz (typical)
+> >>>>>>                     clock-frequency = <52140000 65000000 71100000>;
+> >>>>>>                     hactive = <1024>;
+> >>>>>>                     vactive = <768>;
+> >>>>>>                     hfront-porch = <48 88 88>;
+> >>>>>>                     hback-porch = <96 168 168>;
+> >>>>>>                     hsync-len = <32 64 64>;
+> >>>>>>                     vfront-porch = <8 13 14>;
+> >>>>>>                     vback-porch = <8 13 14>;
+> >>>>>>                     vsync-len = <8 12 14>;
+> >>>>>>             };
+> >>>>>>             
+> >>>>>>             port {
+> >>>>>>                     panel_input: endpoint {
+> >>>>>>                             remote-endpoint = <&lvds_encoder_output>;
+> >>>>>>                     };
+> >>>>>>             };
+> >>>>>>     };
+> >>>>>>     
+> >>>>>>     lvds-encoder {
+> >>>>>>             compatible = "ti,ds90c185", "lvds-encoder";
+> >>>>>>             
+> >>>>>>             ports {
+> >>>>>>                     #address-cells = <1>;
+> >>>>>>                     #size-cells = <0>;
+> >>>>>>                     
+> >>>>>>                     port at 0 {
+> >>>>>>                             reg = <0>;
+> >>>>>>                             
+> >>>>>>                             lvds_encoder_input: endpoint {
+> >>>>>>                                     remote-endpoint =
+> >>>>>>                                     <&hlcdc_output>;
+> >>>>>>                             };
+> >>>>>>                     };
+> >>>>>>                     
+> >>>>>>                     port at 1 {
+> >>>>>>                             reg = <1>;
+> >>>>>>                             
+> >>>>>>                             lvds_encoder_output: endpoint {
+> >>>>>>                                     remote-endpoint = <&panel_input>;
+> >>>>>>                             };
+> >>>>>>                     };
+> >>>>>>             };
+> >>>>>>     };
+> >>>>>> 
+> >>>>>> But, instead of perverting the panel-lvds driver with support
+> >>>>>> for a totally fake non-lvds bus_format, I intruduce an API that
+> >>>>>> allows display controller drivers to query the required bus_format of
+> >>>>>> any intermediate bridges, and match up with that instead of the
+> >>>>>> formats given by the drm_connector. I trigger this with this addition
+> >>>>>> to the lvds-encoder DT node:
+> >>>>>>             interface-pix-fmt = "rgb565";
+> >>>>>> 
+> >>>>>> Naming is hard though, so I'm not sure if that's good?
+> >>>>>> 
+> >>>>>> I threw in the first patch, since that is the actual lvds encoder
+> >>>>>> I have in this case.
+> >>>>>> 
+> >>>>>> Suggestions welcome.
+> >>>>> 
+> >>>>> Took a quick look, feels rather un-atomic. And there's beend
+> >>>>> discussing for other bridge related state that we might want to track
+> >>>>> (like the full adjusted_mode that might need to be adjusted at each
+> >>>>> stage in the chain). So here's my suggestions:
+> >>>>> 
+> >>>>> - Add an optional per-bridge internal state struct using the support
+> >>>>>   in https://dri.freedesktop.org/docs/drm/gpu/drm-kms.html#handling-> >>>>>   driver-private-state
+> >>>>>   
+> >>>>>   Yes it says "driver private", but since bridge is just helper stuff
+> >>>>>   that's all included. "driver private" == "not exposed as uapi" here.
+> >>>>>   Include all the usual convenience wrappers to get at the state for a
+> >>>>>   bridge.
+> >>>>> 
+> >>>>> - Then stuff your bus_format into that new drm_bridge_state struct.
+> >>>>> 
+> >>>>> - Add a new bridge callback atomic_check, which gets that bridge state
+> >>>>>   as parameter (similar to all the other atomic_check functions).
+> >>>>> 
+> >>>>> This way we can even handle the bus_format dynamically, through the
+> >>>>> atomic framework your bridge's atomic_check callback can look at the
+> >>>>> entire atomic state (both up and down the chain if needed), it all
+> >>>>> neatly fits into atomic overall and it's much easier to extend.
+> >>>> 
+> >>>> While I think we'll eventually need bridge states, I don't think that's
+> >>>> need yet. The bus formats reported by this patch series are static.
+> >>>> We're not talking about the currently configured format for a bridge,
+> >>>> but about the list of supported formats. This is similar to the
+> >>>> bus_formats field present in the drm_display_info structure. There is
+> >>>> thus in my opinion no need to interface this with atomic until we need
+> >>>> to track the current format (and I think that will indeed happen at
+> >>>> some point, but I don't think Peter needs this feature for now). That's
+> >>>> why I've told Peter that I would like a bridge API to report the
+> >>>> information and haven't requested a state-based implementation.
+> >>> 
+> >>> If it's static, why a dynamic callback? Just add it to struct
+> >>> drm_bridge, require it's filled out before registering the bridge,
+> >>> done.
+> >> 
+> >> If I remember correctly I mentioned both options in my initial proposal,
+> >> without a personal preference. A new field in struct drm_bridge would
+> >> certainly work for me.
+> > 
+> > You did. Ok, so v3 coming up...
 > 
-> No problem, IMHO.
+> Nope, v3 is not coming up. This feels like an impossible mission for me, as
+> this changes core DRM design, and it would just be too much of a time sink
+> for me. Besides, the final paragraph of the nice long "state of
+> bridges"-mail from Laurent, i.e.
 > 
->>
->> (2) will now fail to migrate. I see this as a feature.
+> On 2018-04-04 15:07, Laurent Pinchart wrote:
+> > Finally, still regarding Peter's case, the decision to output RGB565
+> > instead of RGB888 (which the LVDS encoder expects) is due to PCB routing
+> > between the display controller and the LVDS encoder. This isn't a
+> > property of the LVDS encoder or the display controller, but of their
+> > hardware connection. This patch series uses a DT property in the LVDS
+> > encoder DT node to convey that information, but wouldn't it be equally
+> > correct (or incorrect :-)) to instead use a DT property in the display
+> > controller DT node ?
 > 
-> Yes, I agree.  This is actually the most important reason for doing
-> anything beyond what's already merged.
+> hints at where I'm going. The reason is that I have a patch (that needs some
+> polish, will post soon) that makes the atmel-hlcdc driver use components in
+> order to hook it with the tda998x driver (an hdmi encoder), and there too I
+> need the atmel-hlcdc driver to use rgb565 output. And in that case there
+> are no bridges involved, so the proposed solution in this series has zero
+> hope of being adequate. It simply seems that forcing the output mode in the
+> atmel-hlcdc driver is what fixes the root cause.
+> 
+> End result; the only thing that survives this series is the interesting
+> discussion and patch 1/5. But I will include that patch in the alternative
+> solution, so you can drop this series entirely...
 
-Indeed, and that's the reason I wrote this patch the first place.
+I feel some disappointment here. I would like to make it very clear that your 
+work was appreciated. Not all efforts turn into patches that get merged 
+upstream, and some of the greatest work only results in ideas that are then 
+taken over by other developers. Even if this patch series ends up being 
+dropped, it served as a very useful experiment to get us closer to a good 
+solution to the problem. As such the time and efforts you have invested in it 
+are certainly not wasted and were very helpful.
 
-> 
->>
->> (3) can be worked around by setting the "PSCI version pseudo register"
->> to 0.2.
-> 
-> Nice to have, but we're probably not expecting this to be of major
-> concern.  I initially thought it was a nice debugging feature as well,
-> but that may be a ridiculous point.
-> 
->>
->> These are the main things I can think of at the moment.
-> 
-> So I think we we should merge this patch.
-> 
-> If userspace then wants to support "migrate from explicitly set v0.2 new
-> kernel to old kernel", then it must add specific support to filter out
-> the register from the register list; not that I think anyone will need
-> that or bother to implement it.
-> 
-> In other words, I think you should merge this:
-> 
-> Reviewed-by: Christoffer Dall <cdall@kernel.org>
-> 
-
-Thanks. One issue is that we've now missed the 4.16 train, and that this
-effectively is an ABI change (a fairly minor one, but still). Would we
-consider slapping this as a retrospective fix to 4.16-stable, or keep it
-as a 4.17 feature?
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+
+Laurent Pinchart
