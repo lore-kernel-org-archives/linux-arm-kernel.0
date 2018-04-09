@@ -1,118 +1,100 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Mon,  9 Apr 2018 06:24:48 -0700
-Subject: [PATCH v5] net: thunderx: rework mac addresses list to u64 array
-In-Reply-To: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
-References: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
-Message-ID: <20180409132448.22278-1-Vadim.Lomovtsev@caviumnetworks.com>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Mon, 9 Apr 2018 14:26:16 +0100
+Subject: [PATCH/RFC] soc: bcm2835: Make !RASPBERRYPI_FIRMWARE dummies
+ return failure
+In-Reply-To: <2047337098.98106.1523186884813@email.1und1.de>
+References: <1523178315-30562-1-git-send-email-geert@linux-m68k.org>
+ <2047337098.98106.1523186884813@email.1und1.de>
+Message-ID: <6542f11f-35c0-78ae-30f7-510797105c07@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+On 08/04/2018 12:28, Stefan Wahren wrote:
+> Hi Geert,
+> 
+> [add Phil]
+> 
+>> Geert Uytterhoeven <geert@linux-m68k.org> hat am 8. April 2018 um 11:05 geschrieben:
+>>
+>>
+>> If CONFIG_RASPBERRYPI_FIRMWARE=n:
+>>
+>>     drivers/gpio/gpio-raspberrypi-exp.c: In function ?rpi_exp_gpio_get_polarity?:
+>>     drivers/gpio/gpio-raspberrypi-exp.c:71: warning: ?get.polarity? is used uninitialized in this function
+>>     drivers/gpio/gpio-raspberrypi-exp.c: In function ?rpi_exp_gpio_get_direction?:
+>>     drivers/gpio/gpio-raspberrypi-exp.c:150: warning: ?get.direction? is used uninitialized in this function
+>>
+>> The dummy firmware interface functions return 0, which means success,
+>> causing subsequent code to make use of the never initialized output
+>> parameter.
+> 
+> i think this is more theoritical, because we need to get rpi_firmware first and in this case it's NULL.
+> 
+>>
+>> Fix this by making the dummy functions return an error code (-ENOSYS)
+>> instead.
+> 
+> Anyway i'm okay with the change.
+> 
+>>
+>> Note that this assumes the firmware always fills in the requested data
+>> in the CONFIG_RASPBERRYPI_FIRMWARE=y case.
+> 
+> Unfortunately i don't know.
 
-It is too expensive to pass u64 values via linked list, instead
-allocate array for them by overall number of mac addresses from netdev.
+The firmware overwrites the request code with an error return value. If this appears
+and has an error value of zero (RPI_FIRMWARE_STATUS_SUCCESS) then the firmware has
+written any expected fields.
 
-This eventually removes multiple kmalloc() calls, aviod memory
-fragmentation and allow to put single null check on kmalloc
-return value in order to prevent a potential null pointer dereference.
-
-Addresses-Coverity-ID: 1467429 ("Dereference null return value")
-Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
----
-Changes from v1 to v2:
- - C99 syntax: update xcast_addr_list struct field mc[0] -> mc[];
-Changes from v2 to v3:
- - update commit description with 'Reported-by: Dan Carpenter';
- - update size calculations for mc list to offsetof() call
-   instead of explicit arithmetic;
-Changes from v3 to v4:
- - change loop control variable type from u8 to int, accordingly
-   to mc_count size;
-Changes from v4 to v5:
- - remove explicit initialization of 'idx' variable as per review comment;
----
- drivers/net/ethernet/cavium/thunder/nic.h        |  7 +-----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 28 +++++++++---------------
- 2 files changed, 11 insertions(+), 24 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 5fc46c5a4f36..448d1fafc827 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -265,14 +265,9 @@ struct nicvf_drv_stats {
- 
- struct cavium_ptp;
- 
--struct xcast_addr {
--	struct list_head list;
--	u64              addr;
--};
--
- struct xcast_addr_list {
--	struct list_head list;
- 	int              count;
-+	u64              mc[];
- };
- 
- struct nicvf_work {
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 1e9a31fef729..707db3304396 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
- 						  work.work);
- 	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
- 	union nic_mbx mbx = {};
--	struct xcast_addr *xaddr, *next;
-+	int idx;
- 
- 	if (!vf_work)
- 		return;
-@@ -1956,16 +1956,10 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
- 	/* check if we have any specific MACs to be added to PF DMAC filter */
- 	if (vf_work->mc) {
- 		/* now go through kernel list of MACs and add them one by one */
--		list_for_each_entry_safe(xaddr, next,
--					 &vf_work->mc->list, list) {
-+		for (idx = 0; idx < vf_work->mc->count; idx++) {
- 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
--			mbx.xcast.data.mac = xaddr->addr;
-+			mbx.xcast.data.mac = vf_work->mc->mc[idx];
- 			nicvf_send_msg_to_pf(nic, &mbx);
--
--			/* after receiving ACK from PF release memory */
--			list_del(&xaddr->list);
--			kfree(xaddr);
--			vf_work->mc->count--;
- 		}
- 		kfree(vf_work->mc);
- 	}
-@@ -1996,17 +1990,15 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
- 			mode |= BGX_XCAST_MCAST_FILTER;
- 			/* here we need to copy mc addrs */
- 			if (netdev_mc_count(netdev)) {
--				struct xcast_addr *xaddr;
--
--				mc_list = kmalloc(sizeof(*mc_list), GFP_ATOMIC);
--				INIT_LIST_HEAD(&mc_list->list);
-+				mc_list = kmalloc(offsetof(typeof(*mc_list),
-+							   mc[netdev_mc_count(netdev)]),
-+						  GFP_ATOMIC);
-+				if (unlikely(!mc_list))
-+					return;
-+				mc_list->count = 0;
- 				netdev_hw_addr_list_for_each(ha, &netdev->mc) {
--					xaddr = kmalloc(sizeof(*xaddr),
--							GFP_ATOMIC);
--					xaddr->addr =
-+					mc_list->mc[mc_list->count] =
- 						ether_addr_to_u64(ha->addr);
--					list_add_tail(&xaddr->list,
--						      &mc_list->list);
- 					mc_list->count++;
- 				}
- 			}
--- 
-2.14.3
+> 
+>>
+>> Fixes: d45f1a563b92dac7 ("staging: vc04_services: fix up rpi firmware functions")
+>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>> ---
+>> Should get.polarity resp. get.direction be preinitialized instead,
+>> like is done for get.state?
+>>
+>> static int rpi_exp_gpio_get(struct gpio_chip *gc, unsigned int off)
+>> {
+>>         ...
+>>         get.state = 0;          /* storage for returned value */
+>>
+>>         ret = rpi_firmware_property(gpio->fw, RPI_FIRMWARE_GET_GPIO_STATE,
+>>                                          &get, sizeof(get));
+>>         ...
+>> }
+>>
+>> This would avoid returning uninitialized data if the firmware did not
+>> fill in the requested data.
+>> ---
+>>  include/soc/bcm2835/raspberrypi-firmware.h | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
+>> index 50df5b28d2c9df6e..8ee8991aa099af3a 100644
+>> --- a/include/soc/bcm2835/raspberrypi-firmware.h
+>> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
+>> @@ -143,13 +143,13 @@ struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node);
+>>  static inline int rpi_firmware_property(struct rpi_firmware *fw, u32 tag,
+>>  					void *data, size_t len)
+>>  {
+>> -	return 0;
+>> +	return -ENOSYS;
+>>  }
+>>  
+>>  static inline int rpi_firmware_property_list(struct rpi_firmware *fw,
+>>  					     void *data, size_t tag_size)
+>>  {
+>> -	return 0;
+>> +	return -ENOSYS;
+>>  }
+>>  
+>>  static inline struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node)
+>> -- 
+>> 2.7.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
