@@ -1,53 +1,76 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 9 Apr 2018 16:53:01 +0100
-Subject: [PATCH v8 07/14] ARM: dts: rockchip: add clocks in iommu nodes
-In-Reply-To: <10157755.JROavG9E9U@diego>
-References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
- <20180323073814.5802-8-jeffy.chen@rock-chips.com>
- <CAAObsKCkg4+Ji=HPXnHCoxF9g0=uBgx+f+p-ehZ_D4Ld5RVVgg@mail.gmail.com>
- <10157755.JROavG9E9U@diego>
-Message-ID: <df522a01-6f4a-bb96-4423-19965b078a1b@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 9 Apr 2018 17:54:20 +0200
+Subject: [PATCH 02/10] locking/qspinlock: Remove unbounded cmpxchg loop
+ from locking slowpath
+In-Reply-To: <20180409145409.GA9661@arm.com>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <1522947547-24081-3-git-send-email-will.deacon@arm.com>
+ <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
+ <20180409105835.GC23134@arm.com> <20180409145409.GA9661@arm.com>
+Message-ID: <20180409155420.GB4082@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/18 16:44, Heiko St?bner wrote:
-> Hi Tomeu,
-> 
-> Am Montag, 9. April 2018, 16:41:56 CEST schrieb Tomeu Vizoso:
->> in today's linux-next, the DRM driver fails to probe because the iommu
->> driver fails to find the aclk. I need to apply this patch for things
->> to work again.
-> 
-> Thanks for catching that issue.
-> 
-> This seems to expose a backwards-compatibility issue, as this breaks
-> all old devicetrees, so should get a proper fix, apart from me applying
-> the dt-patch I missed.
-> 
-> Looking at the iommu-clock-handling patch, I imagine this part as
-> the culprit:
-> 
-> +	iommu->num_clocks = ARRAY_SIZE(rk_iommu_clocks);
-> +	iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
-> +				     sizeof(*iommu->clocks), GFP_KERNEL);
-> +	if (!iommu->clocks)
-> +		return -ENOMEM;
-> 
-> The clk-bulk functions seem to work with simple for loops and
-> should (as the other standard clock functions) just work fine with
-> an empty struct, so I guess a simple
-> 
-> 	if (!iommu->clocks && iommu->num_clocks > 0)
-> 		return -ENOMEM;
-> 
-> should hopefully be enough. I'll try to give this a test later on
-> if nobody beats me to it :-)
+On Mon, Apr 09, 2018 at 03:54:09PM +0100, Will Deacon wrote:
 
-But iommu->num_clocks is clearly set to a nonzero compile-time constant 
-at this point ;)
+> diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+> index 19261af9f61e..71eb5e3a3d91 100644
+> --- a/kernel/locking/qspinlock.c
+> +++ b/kernel/locking/qspinlock.c
+> @@ -139,6 +139,20 @@ static __always_inline void clear_pending_set_locked(struct qspinlock *lock)
+>  	WRITE_ONCE(lock->locked_pending, _Q_LOCKED_VAL);
+>  }
+>  
+> +/**
+> + * set_pending_fetch_acquire - set the pending bit and return the old lock
+> + *                             value with acquire semantics.
+> + * @lock: Pointer to queued spinlock structure
+> + *
+> + * *,*,* -> *,1,*
+> + */
+> +static __always_inline u32 set_pending_fetch_acquire(struct qspinlock *lock)
+> +{
+> +	u32 val = xchg_relaxed(&lock->pending, 1) << _Q_PENDING_OFFSET;
+> +	val |= (atomic_read_acquire(&lock->val) & ~_Q_PENDING_MASK);
+> +	return val;
+> +}
 
-I'd assume it's the return from devm_clk_bulk_get() which needs to 
-special-case the "no clocks found" case from any other error, and *then* 
-blat num_clocks to 0 if so.
+> @@ -289,18 +315,26 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+>  		return;
+>  
+>  	/*
+> -	 * If we observe any contention; queue.
+> +	 * If we observe queueing, then queue ourselves.
+>  	 */
+> -	if (val & ~_Q_LOCKED_MASK)
+> +	if (val & _Q_TAIL_MASK)
+>  		goto queue;
+>  
+>  	/*
+> +	 * We didn't see any queueing, so have one more try at snatching
+> +	 * the lock in case it became available whilst we were taking the
+> +	 * slow path.
+> +	 */
+> +	if (queued_spin_trylock(lock))
+> +		return;
+> +
+> +	/*
+>  	 * trylock || pending
+>  	 *
+>  	 * 0,0,0 -> 0,0,1 ; trylock
+>  	 * 0,0,1 -> 0,1,1 ; pending
+>  	 */
+> +	val = set_pending_fetch_acquire(lock);
+>  	if (!(val & ~_Q_LOCKED_MASK)) {
 
-Robin.
+So, if I remember that partial paper correctly, the atomc_read_acquire()
+can see 'arbitrary' old values for everything except the pending byte,
+which it just wrote and will fwd into our load, right?
+
+But I think coherence requires the read to not be older than the one
+observed by the trylock before (since it uses c-cas its acquire can be
+elided).
+
+I think this means we can miss a concurrent unlock vs the fetch_or. And
+I think that's fine, if we still see the lock set we'll needlessly 'wait'
+for it go become unlocked.
