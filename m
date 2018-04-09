@@ -1,93 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  9 Apr 2018 18:07:06 +0100
-Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
-Message-ID: <20180409170706.23541-1-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Apr 2018 18:19:59 +0100
+Subject: [PATCH 02/10] locking/qspinlock: Remove unbounded cmpxchg loop
+ from locking slowpath
+In-Reply-To: <20180409155420.GB4082@hirez.programming.kicks-ass.net>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <1522947547-24081-3-git-send-email-will.deacon@arm.com>
+ <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
+ <20180409105835.GC23134@arm.com> <20180409145409.GA9661@arm.com>
+ <20180409155420.GB4082@hirez.programming.kicks-ass.net>
+Message-ID: <20180409171959.GB9661@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before entering the guest, we check whether our VMID is still
-part of the current generation. In order to avoid taking a lock,
-we start with checking that the generation is still current, and
-only if not current do we take the lock, recheck, and update the
-generation and VMID.
+On Mon, Apr 09, 2018 at 05:54:20PM +0200, Peter Zijlstra wrote:
+> On Mon, Apr 09, 2018 at 03:54:09PM +0100, Will Deacon wrote:
+> > @@ -289,18 +315,26 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+> >  		return;
+> >  
+> >  	/*
+> > -	 * If we observe any contention; queue.
+> > +	 * If we observe queueing, then queue ourselves.
+> >  	 */
+> > -	if (val & ~_Q_LOCKED_MASK)
+> > +	if (val & _Q_TAIL_MASK)
+> >  		goto queue;
+> >  
+> >  	/*
+> > +	 * We didn't see any queueing, so have one more try at snatching
+> > +	 * the lock in case it became available whilst we were taking the
+> > +	 * slow path.
+> > +	 */
+> > +	if (queued_spin_trylock(lock))
+> > +		return;
+> > +
+> > +	/*
+> >  	 * trylock || pending
+> >  	 *
+> >  	 * 0,0,0 -> 0,0,1 ; trylock
+> >  	 * 0,0,1 -> 0,1,1 ; pending
+> >  	 */
+> > +	val = set_pending_fetch_acquire(lock);
+> >  	if (!(val & ~_Q_LOCKED_MASK)) {
+> 
+> So, if I remember that partial paper correctly, the atomc_read_acquire()
+> can see 'arbitrary' old values for everything except the pending byte,
+> which it just wrote and will fwd into our load, right?
+> 
+> But I think coherence requires the read to not be older than the one
+> observed by the trylock before (since it uses c-cas its acquire can be
+> elided).
+> 
+> I think this means we can miss a concurrent unlock vs the fetch_or. And
+> I think that's fine, if we still see the lock set we'll needlessly 'wait'
+> for it go become unlocked.
 
-This leaves open a small race: A vcpu can bump up the global
-generation number as well as the VM's, but has not updated
-the VMID itself yet.
+Ah, but there is a related case that doesn't work. If the lock becomes
+free just before we set pending, then another CPU can succeed on the
+fastpath. We'll then set pending, but the lockword we get back may still
+have the locked byte of 0, so two people end up holding the lock.
 
-At that point another vcpu from the same VM comes in, checks
-the generation (and finds it not needing anything), and jumps
-into the guest. At this point, we end-up with two vcpus belonging
-to the same VM running with two different VMIDs. Eventually, the
-VMID used by the second vcpu will get reassigned, and things will
-really go wrong...
+I think it's worth giving this a go with the added trylock, but I can't
+see a way to avoid the atomic_fetch_or at the moment.
 
-A simple solution would be to drop this initial check, and always take
-the lock. This is likely to cause performance issues. A middle ground
-is to convert the spinlock to a rwlock, and only take the read lock
-on the fast path. If the check fails at that point, drop it and
-acquire the write lock, rechecking the condition.
-
-This ensures that the above scenario doesn't occur.
-
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-I haven't seen any reply from Shannon, so reposting this to
-a slightly wider audience for feedback.
-
- virt/kvm/arm/arm.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index dba629c5f8ac..a4c1b76240df 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -63,7 +63,7 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
- static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
- static u32 kvm_next_vmid;
- static unsigned int kvm_vmid_bits __read_mostly;
--static DEFINE_SPINLOCK(kvm_vmid_lock);
-+static DEFINE_RWLOCK(kvm_vmid_lock);
- 
- static bool vgic_present;
- 
-@@ -473,11 +473,16 @@ static void update_vttbr(struct kvm *kvm)
- {
- 	phys_addr_t pgd_phys;
- 	u64 vmid;
-+	bool new_gen;
- 
--	if (!need_new_vmid_gen(kvm))
-+	read_lock(&kvm_vmid_lock);
-+	new_gen = need_new_vmid_gen(kvm);
-+	read_unlock(&kvm_vmid_lock);
-+
-+	if (!new_gen)
- 		return;
- 
--	spin_lock(&kvm_vmid_lock);
-+	write_lock(&kvm_vmid_lock);
- 
- 	/*
- 	 * We need to re-check the vmid_gen here to ensure that if another vcpu
-@@ -485,7 +490,7 @@ static void update_vttbr(struct kvm *kvm)
- 	 * use the same vmid.
- 	 */
- 	if (!need_new_vmid_gen(kvm)) {
--		spin_unlock(&kvm_vmid_lock);
-+		write_unlock(&kvm_vmid_lock);
- 		return;
- 	}
- 
-@@ -519,7 +524,7 @@ static void update_vttbr(struct kvm *kvm)
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
- 	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
- 
--	spin_unlock(&kvm_vmid_lock);
-+	write_unlock(&kvm_vmid_lock);
- }
- 
- static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
--- 
-2.14.2
+Will
