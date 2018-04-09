@@ -1,34 +1,42 @@
-From: jglisse@redhat.com (Jerome Glisse)
-Date: Mon, 9 Apr 2018 10:53:56 -0400
-Subject: [PATCH 0/3] move __HAVE_ARCH_PTE_SPECIAL in Kconfig
-In-Reply-To: <20180409140721.GI21835@dhcp22.suse.cz>
-References: <1523282229-20731-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <20180409140721.GI21835@dhcp22.suse.cz>
-Message-ID: <20180409145344.GA3285@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 9 Apr 2018 15:57:09 +0100
+Subject: [PATCHv2 09/12] arm64/kvm: preserve host HCR_EL2 value
+In-Reply-To: <20180206123915.GA21802@cbox>
+References: <20171127163806.31435-1-mark.rutland@arm.com>
+ <20171127163806.31435-10-mark.rutland@arm.com>
+ <20180206123915.GA21802@cbox>
+Message-ID: <20180409145709.dneotb6xaznw44c4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 04:07:21PM +0200, Michal Hocko wrote:
-> On Mon 09-04-18 15:57:06, Laurent Dufour wrote:
-> > The per architecture __HAVE_ARCH_PTE_SPECIAL is defined statically in the
-> > per architecture header files. This doesn't allow to make other
-> > configuration dependent on it.
-> > 
-> > This series is moving the __HAVE_ARCH_PTE_SPECIAL into the Kconfig files,
-> > setting it automatically when architectures was already setting it in
-> > header file.
-> > 
-> > There is no functional change introduced by this series.
+On Tue, Feb 06, 2018 at 01:39:15PM +0100, Christoffer Dall wrote:
+> On Mon, Nov 27, 2017 at 04:38:03PM +0000, Mark Rutland wrote:
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 525c01f48867..2205f0be3ced 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+> >  {
+> >  	u64 val;
+> >  
+> > +	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
+> > +
 > 
-> I would just fold all three patches into a single one. It is much easier
-> to review that those selects are done properly when you can see that the
-> define is set for the same architecture.
-> 
-> In general, I like the patch. It is always quite painful to track per
-> arch defines.
+> Looking back at this, it seems excessive to switch this at every
+> round-trip.  I think it should be possible to have this as a single
+> global (or per-CPU) variable that gets restored directly when returning
+> from the VM.
 
-You can also add Reviewed-by: J?r?me Glisse <jglisse@redhat> my grep fu
-showed no place that was forgotten.
+I suspect this needs to be per-cpu, to account for heterogeneous
+systems.
 
-Cheers,
-J?r?me
+I guess if we move hcr_el2 into kvm_cpu_context, that gives us a
+per-vcpu copy for guests, and a per-cpu copy for the host (in the global
+kvm_host_cpu_state).
+
+I'll have a look at how gnarly that turns out. I'm not sure how we can
+initialise that sanely for the !VHE case to match whatever el2_setup
+did.
+
+Thanks,
+Mark.
