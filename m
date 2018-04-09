@@ -1,137 +1,21 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon, 9 Apr 2018 23:22:43 +0200
-Subject: [RFC PATCH v3 4/4] KVM: arm64: Optimise FPSIMD handling to
- reduce guest/host thrashing
-In-Reply-To: <1523271182-22130-5-git-send-email-Dave.Martin@arm.com>
-References: <1523271182-22130-1-git-send-email-Dave.Martin@arm.com>
- <1523271182-22130-5-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180409212243.GI10904@cbox>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Apr 2018 16:23:42 -0500
+Subject: [PATCH 6/7] clk: sunxi-ng: sun5i: Export the MBUS clock
+In-Reply-To: <6d6004e057609109f6b3a0c014c30f7914eb4401.1522761929.git-series.maxime.ripard@bootlin.com>
+References: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
+ <6d6004e057609109f6b3a0c014c30f7914eb4401.1522761929.git-series.maxime.ripard@bootlin.com>
+Message-ID: <20180409212342.xoxmbm6onj2xjmu3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On Mon, Apr 09, 2018 at 11:53:02AM +0100, Dave Martin wrote:
-> This patch refactors KVM to align the host and guest FPSIMD
-> save/restore logic with each other for arm64.  This reduces the
-> number of redundant save/restore operations that must occur, and
-> reduces the common-case IRQ blackout time during guest exit storms
-> by saving the host state lazily and optimising away the need to
-> restore the host state before returning to the run loop.
+On Tue, Apr 03, 2018 at 03:29:19PM +0200, Maxime Ripard wrote:
+> The MBUS clock is used by the MBUS controller, so let's export it so that
+> we can use it in our DT node.
 > 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun5i.h      | 4 ----
+>  include/dt-bindings/clock/sun5i-ccu.h | 2 +-
+>  2 files changed, 1 insertion(+), 5 deletions(-)
 
-[...]
-
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index db08a54..74c5a46 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-
-[...]
-
-> @@ -1054,15 +1066,20 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
->  	local_bh_enable();
->  }
->  
-> +void fpsimd_flush_state(unsigned int *cpu)
-
-This API looks strange to me, and doesn't seem to be called from
-elsewhere.  Wouldn't it be more clear if it took a struct thread_struct
-pointer instead, or if the logic remained embedded in
-fpsimd_flush_task_state ?
-
-> +{
-> +	*cpu = NR_CPUS;
-> +}
-> +
->  /*
->   * Invalidate live CPU copies of task t's FPSIMD state
->   */
->  void fpsimd_flush_task_state(struct task_struct *t)
->  {
-> -	t->thread.fpsimd_cpu = NR_CPUS;
-> +	fpsimd_flush_state(&t->thread.fpsimd_cpu);
->  }
->  
-> -static inline void fpsimd_flush_cpu_state(void)
-> +void fpsimd_flush_cpu_state(void)
->  {
->  	__this_cpu_write(fpsimd_last_state.st, NULL);
->  }
-
-[...]
-
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 8605e04..797b259 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -27,6 +27,7 @@
->  #include <asm/kvm_mmu.h>
->  #include <asm/fpsimd.h>
->  #include <asm/debug-monitors.h>
-> +#include <asm/thread_info.h>
->  
->  static bool __hyp_text __fpsimd_enabled_nvhe(void)
->  {
-> @@ -47,24 +48,40 @@ bool __hyp_text __fpsimd_enabled(void)
->  	return __fpsimd_is_enabled()();
->  }
->  
-> -static void __hyp_text __activate_traps_vhe(void)
-> +static bool update_fp_enabled(struct kvm_vcpu *vcpu)
-
-I think this needs a __hyp_text in the unlikely case that this function
-is not inlined in the _nvhe caller by the compiler.
-
-> +{
-> +	if (vcpu->arch.host_thread_info->flags & _TIF_FOREIGN_FPSTATE) {
-> +		vcpu->arch.host_fpsimd_state = NULL;
-> +		vcpu->arch.fp_enabled = false;
-> +	}
-
-I'm not clear why the above logic can't go into kvm_arch_vcpu_load_fp
-and why we can't simply check TIF_FOREIGN_FPSTATE in __hyp_switch_fpsimd
-instead?
-
-> +
-> +	return vcpu->arch.fp_enabled;
-> +}
-> +
-> +static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
->  {
->  	u64 val;
->  
->  	val = read_sysreg(cpacr_el1);
->  	val |= CPACR_EL1_TTA;
-> -	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
-> +	val &= ~CPACR_EL1_ZEN;
-> +	if (!update_fp_enabled(vcpu))
-> +		val &= ~CPACR_EL1_FPEN;
-> +
->  	write_sysreg(val, cpacr_el1);
->  
->  	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
->  }
->  
-> -static void __hyp_text __activate_traps_nvhe(void)
-> +static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
->  {
->  	u64 val;
->  
->  	val = CPTR_EL2_DEFAULT;
-> -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
-> +	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
-> +	if (!update_fp_enabled(vcpu))
-> +		val |= CPTR_EL2_TFP;
-> +
->  	write_sysreg(val, cptr_el2);
->  }
->  
-
-[...]
-
-Otherwise this approach looks quite good to me overall.  Are you
-planning to add SVE support before removing the RFC from this series?
-
-Thanks,
--Christoffer
+Reviewed-by: Rob Herring <robh@kernel.org>
