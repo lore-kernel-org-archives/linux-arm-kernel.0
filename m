@@ -1,69 +1,134 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Apr 2018 11:47:07 +0100
-Subject: [PATCH 10/10] locking/qspinlock: Elide back-to-back RELEASE
- operations with smp_wmb()
-In-Reply-To: <20180407054711.rldyfcmni2wtblyu@tardis>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <1522947547-24081-11-git-send-email-will.deacon@arm.com>
- <20180407054711.rldyfcmni2wtblyu@tardis>
-Message-ID: <20180409104707.GB23134@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon,  9 Apr 2018 11:53:01 +0100
+Subject: [RFC PATCH v3 3/4] KVM: arm64: Convert lazy FPSIMD context switch
+ trap to C
+In-Reply-To: <1523271182-22130-1-git-send-email-Dave.Martin@arm.com>
+References: <1523271182-22130-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1523271182-22130-4-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boqun,
+To make the lazy FPSIMD context switch trap code easier to hack on,
+this patch converts it to C.
 
-On Sat, Apr 07, 2018 at 01:47:11PM +0800, Boqun Feng wrote:
-> On Thu, Apr 05, 2018 at 05:59:07PM +0100, Will Deacon wrote:
-> > @@ -340,12 +341,17 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
-> >  		goto release;
-> >  
-> >  	/*
-> > +	 * Ensure that the initialisation of @node is complete before we
-> > +	 * publish the updated tail and potentially link @node into the
-> 
-> I think it might be better if we mention exactly where we "publish the
-> updated tail" and "link @node", how about:
-> 
-> 	* publish the update tail via xchg_tail() and potentially link
-> 	* @node into the waitqueue via WRITE_ONCE(->next,..) below.
-> 
-> and also add comments below like:
-> 
-> > +	 * waitqueue.
-> > +	 */
-> > +	smp_wmb();
-> > +
-> > +	/*
-> >  	 * We have already touched the queueing cacheline; don't bother with
-> >  	 * pending stuff.
-> >  	 *
-> >  	 * p,*,* -> n,*,*
-> > -	 *
-> > -	 * RELEASE, such that the stores to @node must be complete.
-> 
-> 	* publish the updated tail
-> 
-> >  	 */
-> >  	old = xchg_tail(lock, tail);
-> >  	next = NULL;
-> > @@ -356,15 +362,7 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
-> >  	 */
-> >  	if (old & _Q_TAIL_MASK) {
-> >  		prev = decode_tail(old);
-> > -
-> > -		/*
-> > -		 * We must ensure that the stores to @node are observed before
-> > -		 * the write to prev->next. The address dependency from
-> > -		 * xchg_tail is not sufficient to ensure this because the read
-> > -		 * component of xchg_tail is unordered with respect to the
-> > -		 * initialisation of @node.
-> > -		 */
-> > -		smp_store_release(&prev->next, node);
-> 
-> 		/* Eventually link @node to the wait queue */
-> 	
-> Thoughts?
+This is not amazingly efficient, but the trap should typically only
+be taken once per host context switch.
 
-I'll make some changes along these lines for v2. Thanks!
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Will
+---
+
+Since RFCv1:
+
+ * Fix indentation to be consistent with the rest of the file.
+ * Add missing ! to write back to sp with attempting to push regs.
+---
+ arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
+ arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
+ 2 files changed, 46 insertions(+), 35 deletions(-)
+
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index fdd1068..47c6a78 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -176,41 +176,28 @@ ENTRY(__fpsimd_guest_restore)
+ 	// x1: vcpu
+ 	// x2-x29,lr: vcpu regs
+ 	// vcpu x0-x1 on the stack
+-	stp	x2, x3, [sp, #-16]!
+-	stp	x4, lr, [sp, #-16]!
+-
+-alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+-	mrs	x2, cptr_el2
+-	bic	x2, x2, #CPTR_EL2_TFP
+-	msr	cptr_el2, x2
+-alternative_else
+-	mrs	x2, cpacr_el1
+-	orr	x2, x2, #CPACR_EL1_FPEN
+-	msr	cpacr_el1, x2
+-alternative_endif
+-	isb
+-
+-	mov	x3, x1
+-
+-	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
+-	kern_hyp_va x0
+-	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+-	bl	__fpsimd_save_state
+-
+-	add	x2, x3, #VCPU_CONTEXT
+-	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+-	bl	__fpsimd_restore_state
+-
+-	// Skip restoring fpexc32 for AArch64 guests
+-	mrs	x1, hcr_el2
+-	tbnz	x1, #HCR_RW_SHIFT, 1f
+-	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
+-	msr	fpexc32_el2, x4
+-1:
+-	ldp	x4, lr, [sp], #16
+-	ldp	x2, x3, [sp], #16
+-	ldp	x0, x1, [sp], #16
+-
++	stp	x2, x3, [sp, #-144]!
++	stp	x4, x5, [sp, #16]
++	stp	x6, x7, [sp, #32]
++	stp	x8, x9, [sp, #48]
++	stp	x10, x11, [sp, #64]
++	stp	x12, x13, [sp, #80]
++	stp	x14, x15, [sp, #96]
++	stp	x16, x17, [sp, #112]
++	stp	x18, lr, [sp, #128]
++
++	bl	__hyp_switch_fpsimd
++
++	ldp	x4, x5, [sp, #16]
++	ldp	x6, x7, [sp, #32]
++	ldp	x8, x9, [sp, #48]
++	ldp	x10, x11, [sp, #64]
++	ldp	x12, x13, [sp, #80]
++	ldp	x14, x15, [sp, #96]
++	ldp	x16, x17, [sp, #112]
++	ldp	x18, lr, [sp, #128]
++	ldp	x0, x1, [sp, #144]
++	ldp	x2, x3, [sp], #160
+ 	eret
+ ENDPROC(__fpsimd_guest_restore)
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 870f4b1..8605e04 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -440,6 +440,30 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 	return exit_code;
+ }
+ 
++void __hyp_text __hyp_switch_fpsimd(u64 esr __always_unused,
++				    struct kvm_vcpu *vcpu)
++{
++	kvm_cpu_context_t *host_ctxt;
++
++	if (has_vhe())
++		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
++			     cpacr_el1);
++	else
++		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
++			     cptr_el2);
++
++	isb();
++
++	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
++	__fpsimd_save_state(&host_ctxt->gp_regs.fp_regs);
++	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
++
++	/* Skip restoring fpexc32 for AArch64 guests */
++	if (!(read_sysreg(hcr_el2) & HCR_RW))
++		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
++			     fpexc32_el2);
++}
++
+ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
+ 
+ static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par,
+-- 
+2.1.4
