@@ -1,65 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Apr 2018 18:19:59 +0100
-Subject: [PATCH 02/10] locking/qspinlock: Remove unbounded cmpxchg loop
- from locking slowpath
-In-Reply-To: <20180409155420.GB4082@hirez.programming.kicks-ass.net>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <1522947547-24081-3-git-send-email-will.deacon@arm.com>
- <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
- <20180409105835.GC23134@arm.com> <20180409145409.GA9661@arm.com>
- <20180409155420.GB4082@hirez.programming.kicks-ass.net>
-Message-ID: <20180409171959.GB9661@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 9 Apr 2018 10:54:58 -0700
+Subject: [PATCH 1/2] coresight: Use %px to print pcsr instead of %p
+In-Reply-To: <20180409161056.GA13134@leoy-ThinkPad-X240s>
+References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
+ <1520961871-11196-2-git-send-email-mathieu.poirier@linaro.org>
+ <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
+ <CANLsYkwseQo1+PfTuhkgvx=AyLs3dL+zkSxwbkuu9JhLwTDqHQ@mail.gmail.com>
+ <20180409161056.GA13134@leoy-ThinkPad-X240s>
+Message-ID: <CAGXu5jKSj2V0mmKwXzQC_U+5d38Sfomy0Xpz18Dfoh1doXrF8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 05:54:20PM +0200, Peter Zijlstra wrote:
-> On Mon, Apr 09, 2018 at 03:54:09PM +0100, Will Deacon wrote:
-> > @@ -289,18 +315,26 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
-> >  		return;
-> >  
-> >  	/*
-> > -	 * If we observe any contention; queue.
-> > +	 * If we observe queueing, then queue ourselves.
-> >  	 */
-> > -	if (val & ~_Q_LOCKED_MASK)
-> > +	if (val & _Q_TAIL_MASK)
-> >  		goto queue;
-> >  
-> >  	/*
-> > +	 * We didn't see any queueing, so have one more try at snatching
-> > +	 * the lock in case it became available whilst we were taking the
-> > +	 * slow path.
-> > +	 */
-> > +	if (queued_spin_trylock(lock))
-> > +		return;
-> > +
-> > +	/*
-> >  	 * trylock || pending
-> >  	 *
-> >  	 * 0,0,0 -> 0,0,1 ; trylock
-> >  	 * 0,0,1 -> 0,1,1 ; pending
-> >  	 */
-> > +	val = set_pending_fetch_acquire(lock);
-> >  	if (!(val & ~_Q_LOCKED_MASK)) {
-> 
-> So, if I remember that partial paper correctly, the atomc_read_acquire()
-> can see 'arbitrary' old values for everything except the pending byte,
-> which it just wrote and will fwd into our load, right?
-> 
-> But I think coherence requires the read to not be older than the one
-> observed by the trylock before (since it uses c-cas its acquire can be
-> elided).
-> 
-> I think this means we can miss a concurrent unlock vs the fetch_or. And
-> I think that's fine, if we still see the lock set we'll needlessly 'wait'
-> for it go become unlocked.
+On Mon, Apr 9, 2018 at 9:10 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> Hi Mathieu, Kees,
+>
+> On Fri, Apr 06, 2018 at 09:47:31AM -0600, Mathieu Poirier wrote:
+>> On 5 April 2018 at 00:26, Kees Cook <keescook@chromium.org> wrote:
+>> > On Tue, Mar 13, 2018 at 10:24 AM, Mathieu Poirier
+>> > <mathieu.poirier@linaro.org> wrote:
+>> >> From: Leo Yan <leo.yan@linaro.org>
+>> >>
+>> >> Commit ad67b74d2469 ("printk: hash addresses printed with %p") lets
+>> >> printk specifier %p to hash all addresses before printing, this was
+>> >> resulting in the high 32 bits of pcsr can only output zeros.  So
+>> >> module cannot completely print pc value and it's pointless for debugging
+>> >> purpose.
+>> >>
+>> >> This patch fixes this by using %px to print pcsr instead.
+>> >
+>> > Why is %p (and now %px) needed here at all? %pS is already used, which
+>> > should give useful debugging details, yes?
+>>
+>> Hey Leo,
+>>
+>> I've taken a second look at this and Kees has a point, %pS should be
+>> sufficient here.  Please test again and see if %px is absolutely
+>> necessary.  If you think that is the case please provide a snapshot of
+>> the corner case that makes the change mandatory.
+>
+> Sorry I missed replying for this patch due to my email filter and
+> thanks for suggestion.
+>
+> I can think out one case which should use %px: if CPU is locked up in
+> firmwares (e.g. NS-EL2 or ARM-TF in S-EL3), we can rely on %px to read
+> back PC hex value; for this case the CPU PC address is out of kernel
+> space.
+>
+> How about you guys think for this?
 
-Ah, but there is a related case that doesn't work. If the lock becomes
-free just before we set pending, then another CPU can succeed on the
-fastpath. We'll then set pending, but the lockword we get back may still
-have the locked byte of 0, so two people end up holding the lock.
+Wouldn't %pS still give you a meaningful offset?
 
-I think it's worth giving this a go with the added trylock, but I can't
-see a way to avoid the atomic_fetch_or at the moment.
+-Kees
 
-Will
+-- 
+Kees Cook
+Pixel Security
