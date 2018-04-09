@@ -1,35 +1,43 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 9 Apr 2018 19:46:19 +0800
-Subject: [PATCH 1/7] ARM: multi_v7_defconfig: add OCOTP driver for NXP SoCs
-In-Reply-To: <CAK8P3a2xhOEVF87WYCPLiw66XM1ydA9JCbf+2s4ZDApw9V5STQ@mail.gmail.com>
-References: <20180318203442.19759-1-stefan@agner.ch>
- <20180326073214.GB8857@dragon>
- <CAK8P3a2xhOEVF87WYCPLiw66XM1ydA9JCbf+2s4ZDApw9V5STQ@mail.gmail.com>
-Message-ID: <20180409114618.GB14582@dragon>
+Date: Mon, 9 Apr 2018 19:48:49 +0800
+Subject: [PATCH V3] ARM: dts: imx6q: Add support for the DHCOM iMX6 SoM
+ and PDK2
+In-Reply-To: <e860af85-0e80-5dea-8783-5cbab43d9fc8@denx.de>
+References: <20180318173403.31460-1-marex@denx.de>
+ <CAOMZO5BHyVf2N8q7oKpe3XEYAT77yR7WYWFeuofQihkP6+moUA@mail.gmail.com>
+ <f22b8d2a-c8e4-94ab-3b87-9758c02ca63a@denx.de>
+ <e860af85-0e80-5dea-8783-5cbab43d9fc8@denx.de>
+Message-ID: <20180409114847.GC14582@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 03:40:33PM +0200, Arnd Bergmann wrote:
-> On Mon, Mar 26, 2018 at 9:32 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > On Sun, Mar 18, 2018 at 09:34:36PM +0100, Stefan Agner wrote:
-> >> Enable on-chip OTP NVMEM support for NXP i.MX and VF610 SoCs.
-> >> Since OTP values might be required by drivers required during
-> >> boot, make sure the driver is built-in (e.g. i.MX thermal
-> >> driver).
+On Sun, Apr 08, 2018 at 06:40:04PM +0200, Marek Vasut wrote:
+> On 03/27/2018 09:32 PM, Marek Vasut wrote:
+> > On 03/20/2018 04:36 PM, Fabio Estevam wrote:
+> >> On Sun, Mar 18, 2018 at 2:34 PM, Marek Vasut <marex@denx.de> wrote:
+> >>> Add support for the DH i.MX6 Quad based SoM and a PDK2 evaluation board.
+> >>> The evaluation board features three serial ports, USB OTG, USB host with
+> >>> an USB hub, Fast or Gigabit ethernet, eMMC, uSD, SD, mSATA, analog audio,
+> >>> PCIe and HDMI video output.
+> >>>
+> >>> All of the aforementioned features are supported by this patch.
+> >>>
+> >>> Signed-off-by: Marek Vasut <marex@denx.de>
+> >>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> >>> Cc: Shawn Guo <shawnguo@kernel.org>
 > >>
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >
-> > Arnd,
-> >
-> > The series looks good to me.  In general, I keep myself away from
-> > multi_v7_defconfig changes, but if you expect a pull-request from me, I
-> > can do that.  Let me know how you want to apply the patches.
+> >> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> > 
+> > Shawn, any response to this ?
 > 
-> I would generally prefer that your defconfig pull requests contain changes
-> to both the imx specific and the generic defconfig files. It's much easier
-> for me to handle any conflicts when they arise during a merge than
-> to pick up the individual patches.
+> Another two weeks have passed and still zero feedback.
+> 
+> I was complaining about getting no feedback on patches from you for long
+> periods of time before, and that it is extremely demotivating for a
+> contributor. It seems the situation has not improved at all.
 
-Noted, thanks for the comments, Arnd.
+This version looks good to me.  But please be aware of that we are in the
+middle of 4.17 merge window, and my tree is kinda frozen until 4.17-rc1
+is available.
 
 Shawn
