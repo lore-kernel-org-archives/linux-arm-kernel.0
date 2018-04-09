@@ -1,56 +1,89 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 9 Apr 2018 11:27:30 +0200
-Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
-In-Reply-To: <204e97cb-2f39-00f0-fd4e-3aa9a51f7cac@orpaltech.com>
-References: <20180403154449.2443-1-ssuloev@orpaltech.com>
- <20180403154449.2443-4-ssuloev@orpaltech.com>
- <20180404065048.n76r3ytuznd6fqsl@flea>
- <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
- <20180405091913.ky4dnmszoobn2xry@flea>
- <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
- <20180405131735.GB12349@sirena.org.uk>
- <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
- <20180406073441.xesojvzc3deljhoy@flea>
- <204e97cb-2f39-00f0-fd4e-3aa9a51f7cac@orpaltech.com>
-Message-ID: <20180409092730.2moyhl5aaktjwbyn@flea>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 9 Apr 2018 11:28:40 +0200
+Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
+In-Reply-To: <20180409043138.GF19607@linaro.org>
+References: <20180313102158.GI25863@linaro.org>
+ <20180313104715.prurmrizho4ddc4l@lakrids.cambridge.arm.com>
+ <20180313110747.GJ25863@linaro.org>
+ <20180313112016.ocx4qqhji3zfwjhs@lakrids.cambridge.arm.com>
+ <CACi5LpN4DTYFVSVqru2j0y=CKr2ztrJ1gCW32sJBU=oUV2fcWw@mail.gmail.com>
+ <20180314021050.GK25863@linaro.org>
+ <20180314182448.bnvjtgyzipsuxcbe@lakrids.cambridge.arm.com>
+ <CACi5LpNyx5VKO6mYB1yXNPENPKhAfAJ7cUSBeVzVtXfF6+EPwg@mail.gmail.com>
+ <20180406020948.GE19607@linaro.org>
+ <CACi5LpPe_C0fLFzsAHPD54X=D+AsYjvSyZi0yt_6=wFrWmvetw@mail.gmail.com>
+ <20180409043138.GF19607@linaro.org>
+Message-ID: <CAKv+Gu-s13JifH5f_BH_LUbSQYFyOW5QQGjN=ZqwBjTs-BMjYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 06, 2018 at 06:48:23PM +0300, Sergey Suloev wrote:
-> On 04/06/2018 10:34 AM, Maxime Ripard wrote:
-> > On Thu, Apr 05, 2018 at 04:44:16PM +0300, Sergey Suloev wrote:
-> > > On 04/05/2018 04:17 PM, Mark Brown wrote:
-> > > > On Thu, Apr 05, 2018 at 12:59:35PM +0300, Sergey Suloev wrote:
-> > > > > On 04/05/2018 12:19 PM, Maxime Ripard wrote:
-> > > > > > The point of that patch was precisely to allow to send more data than
-> > > > > > the FIFO. You're breaking that behaviour without any justification,
-> > > > > > and this is not ok.
-> > > > > I am sorry, but you can't. That's a hardware limitation.
-> > > > Are you positive about that?  Normally you can add things to hardware
-> > > > FIFOs while they're being drained so so long as you can keep data
-> > > > flowing in at least as fast as it's being consumed.
-> > > Well, normally yes, but this is not the case with the hardware that I own.
-> > > My a20 (BPiM1+) and a31 (BPiM2) boards behaves differently. With a transfer
-> > > larger than FIFO then TC interrupt never happens.
-> > Because you're not supposed to have a transfer larger than the FIFO,
-> > but to have to setup at first a transfer the size of the FIFO, and
-> > then when it's (or starts to be) depleted, fill it up again.
-> 
-> According to what you said the driver must implement
-> "transfer_one_message" instead of "transfer_one"
+On 9 April 2018 at 06:31, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> Hi,
+>
+> On Mon, Apr 09, 2018 at 09:31:34AM +0530, Bhupesh Sharma wrote:
+>> Hi Akashi,
+>>
+>> On Fri, Apr 6, 2018 at 7:39 AM, AKASHI Takahiro
+>> <takahiro.akashi@linaro.org> wrote:
+>> > Bhupesh,
+>> >
+>> > On Fri, Mar 16, 2018 at 03:05:10PM +0530, Bhupesh Sharma wrote:
+>> >> On Wed, Mar 14, 2018 at 11:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> > On Wed, Mar 14, 2018 at 11:10:53AM +0900, AKASHI Takahiro wrote:
+>> >> >> If kaslr-seed has a critical value in terms of security, is kexec-tools
+>> >> >> a right place? It is exposed to user space albeit for a short time of period.
+>> >> >
+>> >> > The kernel zeroes the seed in the DT at boot time, so the current seed
+>> >> > isn't visible to userspace.
+>> >> >
+>> >> > If kexec-tools generates a seed, and inserts it into the DTB that it
+>> >> > loads, this is only visible to kexec tools or other applications which
+>> >> > can inspect its memory, so I don't think this is much of a concern.
+>> >> > Anything with such privilege can presumably kexec() to arbitrary code
+>> >> > anyhow.
+>> >> >
+>> >> > The next kernel will then zero its seed in the DT at boot time, so
+>> >> > similarly this won't be visible to userspace on the new kernel.
+>> >> >
+>> >> > FWIW, having kexec tools generate a seed for the kexec_load() case makes
+>> >> > sense to me.
+>> >>
+>> >> Fair enough. I will try to take a stab at the same and come back with
+>> >> my findings on this thread.
+>> >
+>> > How's your progress here?
+>>
+>> I am almost done with the implementation.
+>> Unfortunately I lost most of the last week trying to revive my arm64
+>> board (which supports
+>> EFI_RNG_PROTOCOL and hence can be used to test the kaslr-seed related
+>> stuff), so I was not
+>> able to test the implementation.
+>>
+>> Now that the board is up, I think I can test and thrash out any
+>> missing clogs in the approach.
+>
+> Sounds good.
+>
+>> > I've already added kaslr support (i.e. "virtual randomisation") to
+>> > my kexec_file patch set.
+>> > # just a few lines of code, though
+>>
+>> Hmm, have you sent out a new version already (kexec_file_load), as the last
+>> version in my inbox still mentions in the cover letter that we need a
+>> EFI stub like approach
+>> to really support CONFIG_RANDOMIZE_BASE. Or, am I missing something?
+>
+> No, not yet.
+> While I've also added some sort of "physical randomisation",
+> I'd like to put my post on hold until v4.17-rc1.
+>
+>> I would love to have a look at the patch and try it at my end, so
+>> could you please share
+>> a pointer to the same.
+>
+> Your test will be very much appreciated.
+>
 
-I'm not sure what makes you think that I said that.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/310d2734/attachment.sig>
+Does this mean we have decided that we will enable KASLR in the kdump
+kernel anyway, even if x86 disables it explicitly?
