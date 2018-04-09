@@ -1,327 +1,182 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon,  9 Apr 2018 15:38:45 +0900
-Subject: [PATCH net-next 3/3] net: ethernet: ave: add support for phy-mode
- setting of system controller
-In-Reply-To: <1523255925-6469-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1523255925-6469-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1523255925-6469-4-git-send-email-hayashi.kunihiko@socionext.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 9 Apr 2018 09:04:05 +0200
+Subject: [PATCH v2 0/5] allow override of bus format in bridges
+In-Reply-To: <9af25e5a-7334-b07c-ff49-46530df6b1aa@axentia.se>
+References: <20180326212447.7380-1-peda@axentia.se> <2233231.my6BbD3pcT@avalon>
+ <CAKMK7uH-=BqU+vuePTq4joY3XS2ypvtSKYvpv1LLyovPpSXv6A@mail.gmail.com>
+ <1563250.XEJxFDuW0h@avalon> <9af25e5a-7334-b07c-ff49-46530df6b1aa@axentia.se>
+Message-ID: <8bba78e3-ed61-4648-d4a4-5d12dd9ef11d@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for specifying system controller that configures
-phy-mode setting.
+On 2018-04-04 14:35, Peter Rosin wrote:
+> On 2018-04-04 11:07, Laurent Pinchart wrote:
+>> Hi Daniel,
+>>
+>> On Wednesday, 4 April 2018 09:34:41 EEST Daniel Vetter wrote:
+>>> On Wed, Apr 4, 2018 at 12:28 AM, Laurent Pinchart wrote:
+>>>> On Wednesday, 28 March 2018 10:08:26 EEST Daniel Vetter wrote:
+>>>>> On Mon, Mar 26, 2018 at 11:24:42PM +0200, Peter Rosin wrote:
+>>>>>> Hi!
+>>>>>>
+>>>>>> [I got to v2 sooner than expected]
+>>>>>>
+>>>>>> I have an Atmel sama5d31 hooked up to an lvds encoder and then
+>>>>>> on to an lvds panel. Which seems like something that has been
+>>>>>> done one or two times before...
+>>>>>>
+>>>>>> The problem is that the bus_format of the SoC and the panel do
+>>>>>> not agree. The SoC driver (atmel-hlcdc) can handle the
+>>>>>> rgb444, rgb565, rgb666 and rgb888 bus formats. The hardware is
+>>>>>> wired for the rgb565 case. The lvds encoder supports rgb888 on
+>>>>>> its input side with the LSB wires for each color simply pulled
+>>>>>> down internally in the encoder in my case which means that the
+>>>>>> rgb565 bus_format is the format that works best. And the panel
+>>>>>> is expecting lvds (vesa-24), which is what the encoder outputs.
+>>>>>>
+>>>>>> The reason I "blame" the bus_format of the drm_connector is that
+>>>>>> with the below DT snippet, things do not work *exactly* due to
+>>>>>> that. At least, it starts to work if I hack the panel-lvds driver
+>>>>>> to report the rgb565 bus_format instead of vesa-24.
+>>>>>>
+>>>>>>     panel: panel {
+>>>>>>             compatible = "panel-lvds";
+>>>>>>             
+>>>>>>             width-mm = <304>;
+>>>>>>             height-mm = <228;
+>>>>>>             
+>>>>>>             data-mapping = "vesa-24";
+>>>>>>             
+>>>>>>             panel-timing {
+>>>>>>                     // 1024x768 @ 60Hz (typical)
+>>>>>>                     clock-frequency = <52140000 65000000 71100000>;
+>>>>>>                     hactive = <1024>;
+>>>>>>                     vactive = <768>;
+>>>>>>                     hfront-porch = <48 88 88>;
+>>>>>>                     hback-porch = <96 168 168>;
+>>>>>>                     hsync-len = <32 64 64>;
+>>>>>>                     vfront-porch = <8 13 14>;
+>>>>>>                     vback-porch = <8 13 14>;
+>>>>>>                     vsync-len = <8 12 14>;
+>>>>>>             };
+>>>>>>             
+>>>>>>             port {
+>>>>>>                     panel_input: endpoint {
+>>>>>>                             remote-endpoint = <&lvds_encoder_output>;
+>>>>>>                     };
+>>>>>>             };
+>>>>>>     };
+>>>>>>     
+>>>>>>     lvds-encoder {
+>>>>>>             compatible = "ti,ds90c185", "lvds-encoder";
+>>>>>>             
+>>>>>>             ports {
+>>>>>>                     #address-cells = <1>;
+>>>>>>                     #size-cells = <0>;
+>>>>>>                     
+>>>>>>                     port at 0 {
+>>>>>>                             reg = <0>;
+>>>>>>                             
+>>>>>>                             lvds_encoder_input: endpoint {
+>>>>>>                                     remote-endpoint = <&hlcdc_output>;
+>>>>>>                             };
+>>>>>>                     };
+>>>>>>                     
+>>>>>>                     port at 1 {
+>>>>>>                             reg = <1>;
+>>>>>>                             
+>>>>>>                             lvds_encoder_output: endpoint {
+>>>>>>                                     remote-endpoint = <&panel_input>;
+>>>>>>                             };
+>>>>>>                     };
+>>>>>>             };
+>>>>>>     };
+>>>>>>
+>>>>>> But, instead of perverting the panel-lvds driver with support
+>>>>>> for a totally fake non-lvds bus_format, I intruduce an API that allows
+>>>>>> display controller drivers to query the required bus_format of any
+>>>>>> intermediate bridges, and match up with that instead of the formats
+>>>>>> given by the drm_connector. I trigger this with this addition to the
+>>>>>>
+>>>>>> lvds-encoder DT node:
+>>>>>>             interface-pix-fmt = "rgb565";
+>>>>>>
+>>>>>> Naming is hard though, so I'm not sure if that's good?
+>>>>>>
+>>>>>> I threw in the first patch, since that is the actual lvds encoder
+>>>>>> I have in this case.
+>>>>>>
+>>>>>> Suggestions welcome.
+>>>>>
+>>>>> Took a quick look, feels rather un-atomic. And there's beend discussing
+>>>>> for other bridge related state that we might want to track (like the full
+>>>>> adjusted_mode that might need to be adjusted at each stage in the chain).
+>>>>> So here's my suggestions:
+>>>>>
+>>>>> - Add an optional per-bridge internal state struct using the support in
+>>>>>   https://dri.freedesktop.org/docs/drm/gpu/drm-kms.html#handling-driver-> >>   private-state
+>>>>>
+>>>>>   Yes it says "driver private", but since bridge is just helper stuff
+>>>>>   that's all included. "driver private" == "not exposed as uapi" here.
+>>>>>   Include all the usual convenience wrappers to get at the state for a
+>>>>>   bridge.
+>>>>>
+>>>>> - Then stuff your bus_format into that new drm_bridge_state struct.
+>>>>>
+>>>>> - Add a new bridge callback atomic_check, which gets that bridge state as
+>>>>>   parameter (similar to all the other atomic_check functions).
+>>>>>
+>>>>> This way we can even handle the bus_format dynamically, through the
+>>>>> atomic framework your bridge's atomic_check callback can look at the
+>>>>> entire atomic state (both up and down the chain if needed), it all neatly
+>>>>> fits into atomic overall and it's much easier to extend.
+>>>>
+>>>> While I think we'll eventually need bridge states, I don't think that's
+>>>> need yet. The bus formats reported by this patch series are static. We're
+>>>> not talking about the currently configured format for a bridge, but about
+>>>> the list of supported formats. This is similar to the bus_formats field
+>>>> present in the drm_display_info structure. There is thus in my opinion no
+>>>> need to interface this with atomic until we need to track the current
+>>>> format (and I think that will indeed happen at some point, but I don't
+>>>> think Peter needs this feature for now). That's why I've told Peter that
+>>>> I would like a bridge API to report the information and haven't requested
+>>>> a state-based implementation.
+>>>
+>>> If it's static, why a dynamic callback? Just add it to struct
+>>> drm_bridge, require it's filled out before registering the bridge,
+>>> done.
+>>
+>> If I remember correctly I mentioned both options in my initial proposal, 
+>> without a personal preference. A new field in struct drm_bridge would 
+>> certainly work for me.
+> 
+> You did. Ok, so v3 coming up...
 
-According to the DT property "phy-mode", it's necessary to configure the
-controller, which is used to choose the settings of the MAC suitable,
-for example, mdio pin connections, internal clocks, and so on.
+Nope, v3 is not coming up. This feels like an impossible mission for me, as
+this changes core DRM design, and it would just be too much of a time sink for
+me. Besides, the final paragraph of the nice long "state of bridges"-mail from
+Laurent, i.e.
 
-Supported phy-modes are SoC-dependent. The driver allows phy-mode to set
-"internal" if the SoC has a built-in PHY, and {"mii", "rmii", "rgmii"}
-if the SoC supports each mode. So we have to check whether the phy-mode
-is valid or not.
+On 2018-04-04 15:07, Laurent Pinchart wrote:
+> Finally, still regarding Peter's case, the decision to output RGB565 instead 
+> of RGB888 (which the LVDS encoder expects) is due to PCB routing between the 
+> display controller and the LVDS encoder. This isn't a property of the LVDS 
+> encoder or the display controller, but of their hardware connection. This 
+> patch series uses a DT property in the LVDS encoder DT node to convey that 
+> information, but wouldn't it be equally correct (or incorrect :-)) to instead 
+> use a DT property in the display controller DT node ?
 
-This adds the following features for each SoC:
-- check whether the SoC supports the specified phy-mode
-- configure the controller accroding to phy-mode
+hints at where I'm going. The reason is that I have a patch (that needs some
+polish, will post soon) that makes the atmel-hlcdc driver use components in
+order to hook it with the tda998x driver (an hdmi encoder), and there too
+I need the atmel-hlcdc driver to use rgb565 output. And in that case there
+are no bridges involved, so the proposed solution in this series has zero
+hope of being adequate. It simply seems that forcing the output mode in the
+atmel-hlcdc driver is what fixes the root cause.
 
-The DT property accepts one argument to distinguish them for multiple MAC
-instances.
+End result; the only thing that survives this series is the interesting
+discussion and patch 1/5. But I will include that patch in the alternative
+solution, so you can drop this series entirely...
 
-ethernet at 65000000 {
-	...
-	socionext,syscon-phy-mode = <&soc_glue 0>;
-};
-
-ethernet at 65200000 {
-	...
-	socionext,syscon-phy-mode = <&soc_glue 1>;
-};
-
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
- drivers/net/ethernet/socionext/Kconfig   |   2 +
- drivers/net/ethernet/socionext/sni_ave.c | 150 ++++++++++++++++++++++++++++---
- 2 files changed, 140 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/net/ethernet/socionext/Kconfig b/drivers/net/ethernet/socionext/Kconfig
-index 6bcfe27..b80048c 100644
---- a/drivers/net/ethernet/socionext/Kconfig
-+++ b/drivers/net/ethernet/socionext/Kconfig
-@@ -14,6 +14,8 @@ if NET_VENDOR_SOCIONEXT
- config SNI_AVE
- 	tristate "Socionext AVE ethernet support"
- 	depends on (ARCH_UNIPHIER || COMPILE_TEST) && OF
-+	depends on HAS_IOMEM
-+	select MFD_SYSCON
- 	select PHYLIB
- 	---help---
- 	  Driver for gigabit ethernet MACs, called AVE, in the
-diff --git a/drivers/net/ethernet/socionext/sni_ave.c b/drivers/net/ethernet/socionext/sni_ave.c
-index 52940bd..f7eccee 100644
---- a/drivers/net/ethernet/socionext/sni_ave.c
-+++ b/drivers/net/ethernet/socionext/sni_ave.c
-@@ -11,6 +11,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/iopoll.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/mii.h>
- #include <linux/module.h>
- #include <linux/netdevice.h>
-@@ -18,6 +19,7 @@
- #include <linux/of_mdio.h>
- #include <linux/of_platform.h>
- #include <linux/phy.h>
-+#include <linux/regmap.h>
- #include <linux/reset.h>
- #include <linux/types.h>
- #include <linux/u64_stats_sync.h>
-@@ -197,6 +199,11 @@
- #define AVE_INTM_COUNT		20
- #define AVE_FORCE_TXINTCNT	1
- 
-+/* SG */
-+#define SG_ETPINMODE		0x540
-+#define SG_ETPINMODE_EXTPHY	BIT(1)	/* for LD11 */
-+#define SG_ETPINMODE_RMII(ins)	BIT(ins)
-+
- #define IS_DESC_64BIT(p)	((p)->data->is_desc_64bit)
- 
- #define AVE_MAX_CLKS		4
-@@ -228,12 +235,6 @@ struct ave_desc_info {
- 	struct ave_desc *desc;	/* skb info related descriptor */
- };
- 
--struct ave_soc_data {
--	bool	is_desc_64bit;
--	const char	*clock_names[AVE_MAX_CLKS];
--	const char	*reset_names[AVE_MAX_RSTS];
--};
--
- struct ave_stats {
- 	struct	u64_stats_sync	syncp;
- 	u64	packets;
-@@ -257,6 +258,9 @@ struct ave_private {
- 	phy_interface_t		phy_mode;
- 	struct phy_device	*phydev;
- 	struct mii_bus		*mdio;
-+	struct regmap		*regmap;
-+	unsigned int		pinmode_mask;
-+	unsigned int		pinmode_val;
- 
- 	/* stats */
- 	struct ave_stats	stats_rx;
-@@ -279,6 +283,14 @@ struct ave_private {
- 	const struct ave_soc_data *data;
- };
- 
-+struct ave_soc_data {
-+	bool	is_desc_64bit;
-+	const char	*clock_names[AVE_MAX_CLKS];
-+	const char	*reset_names[AVE_MAX_RSTS];
-+	int	(*get_pinmode)(struct ave_private *priv,
-+			       phy_interface_t phy_mode, u32 arg);
-+};
-+
- static u32 ave_desc_read(struct net_device *ndev, enum desc_id id, int entry,
- 			 int offset)
- {
-@@ -1179,6 +1191,11 @@ static int ave_init(struct net_device *ndev)
- 		}
- 	}
- 
-+	ret = regmap_update_bits(priv->regmap, SG_ETPINMODE,
-+				 priv->pinmode_mask, priv->pinmode_val);
-+	if (ret)
-+		return ret;
-+
- 	ave_global_reset(ndev);
- 
- 	mdio_np = of_get_child_by_name(np, "mdio");
-@@ -1537,6 +1554,7 @@ static int ave_probe(struct platform_device *pdev)
- 	const struct ave_soc_data *data;
- 	struct device *dev = &pdev->dev;
- 	char buf[ETHTOOL_FWVERS_LEN];
-+	struct of_phandle_args args;
- 	phy_interface_t phy_mode;
- 	struct ave_private *priv;
- 	struct net_device *ndev;
-@@ -1559,12 +1577,6 @@ static int ave_probe(struct platform_device *pdev)
- 		dev_err(dev, "phy-mode not found\n");
- 		return -EINVAL;
- 	}
--	if ((!phy_interface_mode_is_rgmii(phy_mode)) &&
--	    phy_mode != PHY_INTERFACE_MODE_RMII &&
--	    phy_mode != PHY_INTERFACE_MODE_MII) {
--		dev_err(dev, "phy-mode is invalid\n");
--		return -EINVAL;
--	}
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
-@@ -1656,6 +1668,26 @@ static int ave_probe(struct platform_device *pdev)
- 		priv->nrsts++;
- 	}
- 
-+	ret = of_parse_phandle_with_fixed_args(np,
-+					       "socionext,syscon-phy-mode",
-+					       1, 0, &args);
-+	if (ret) {
-+		netdev_err(ndev, "can't get syscon-phy-mode property\n");
-+		goto out_free_netdev;
-+	}
-+	priv->regmap = syscon_node_to_regmap(args.np);
-+	of_node_put(args.np);
-+	if (IS_ERR(priv->regmap)) {
-+		netdev_err(ndev, "can't map syscon-phy-mode\n");
-+		ret = PTR_ERR(priv->regmap);
-+		goto out_free_netdev;
-+	}
-+	ret = priv->data->get_pinmode(priv, phy_mode, args.args[0]);
-+	if (ret) {
-+		netdev_err(ndev, "invalid phy-mode setting\n");
-+		goto out_free_netdev;
-+	}
-+
- 	priv->mdio = devm_mdiobus_alloc(dev);
- 	if (!priv->mdio) {
- 		ret = -ENOMEM;
-@@ -1715,6 +1747,95 @@ static int ave_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int ave_pro4_get_pinmode(struct ave_private *priv,
-+				phy_interface_t phy_mode, u32 arg)
-+{
-+	if (arg > 0)
-+		return -EINVAL;
-+
-+	priv->pinmode_mask = SG_ETPINMODE_RMII(0);
-+
-+	switch (phy_mode) {
-+	case PHY_INTERFACE_MODE_RMII:
-+		priv->pinmode_val = SG_ETPINMODE_RMII(0);
-+		break;
-+	case PHY_INTERFACE_MODE_MII:
-+	case PHY_INTERFACE_MODE_RGMII:
-+		priv->pinmode_val = 0;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int ave_ld11_get_pinmode(struct ave_private *priv,
-+				phy_interface_t phy_mode, u32 arg)
-+{
-+	if (arg > 0)
-+		return -EINVAL;
-+
-+	priv->pinmode_mask = SG_ETPINMODE_EXTPHY | SG_ETPINMODE_RMII(0);
-+
-+	switch (phy_mode) {
-+	case PHY_INTERFACE_MODE_INTERNAL:
-+		priv->pinmode_val = 0;
-+		break;
-+	case PHY_INTERFACE_MODE_RMII:
-+		priv->pinmode_val = SG_ETPINMODE_EXTPHY | SG_ETPINMODE_RMII(0);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int ave_ld20_get_pinmode(struct ave_private *priv,
-+				phy_interface_t phy_mode, u32 arg)
-+{
-+	if (arg > 0)
-+		return -EINVAL;
-+
-+	priv->pinmode_mask = SG_ETPINMODE_RMII(0);
-+
-+	switch (phy_mode) {
-+	case PHY_INTERFACE_MODE_RMII:
-+		priv->pinmode_val = SG_ETPINMODE_RMII(0);
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII:
-+		priv->pinmode_val = 0;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int ave_pxs3_get_pinmode(struct ave_private *priv,
-+				phy_interface_t phy_mode, u32 arg)
-+{
-+	if (arg > 1)
-+		return -EINVAL;
-+
-+	priv->pinmode_mask = SG_ETPINMODE_RMII(arg);
-+
-+	switch (phy_mode) {
-+	case PHY_INTERFACE_MODE_RMII:
-+		priv->pinmode_val = SG_ETPINMODE_RMII(arg);
-+		break;
-+	case PHY_INTERFACE_MODE_RGMII:
-+		priv->pinmode_val = 0;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static const struct ave_soc_data ave_pro4_data = {
- 	.is_desc_64bit = false,
- 	.clock_names = {
-@@ -1723,6 +1844,7 @@ static const struct ave_soc_data ave_pro4_data = {
- 	.reset_names = {
- 		"gio", "ether",
- 	},
-+	.get_pinmode = ave_pro4_get_pinmode,
- };
- 
- static const struct ave_soc_data ave_pxs2_data = {
-@@ -1733,6 +1855,7 @@ static const struct ave_soc_data ave_pxs2_data = {
- 	.reset_names = {
- 		"ether",
- 	},
-+	.get_pinmode = ave_pro4_get_pinmode,
- };
- 
- static const struct ave_soc_data ave_ld11_data = {
-@@ -1743,6 +1866,7 @@ static const struct ave_soc_data ave_ld11_data = {
- 	.reset_names = {
- 		"ether",
- 	},
-+	.get_pinmode = ave_ld11_get_pinmode,
- };
- 
- static const struct ave_soc_data ave_ld20_data = {
-@@ -1753,6 +1877,7 @@ static const struct ave_soc_data ave_ld20_data = {
- 	.reset_names = {
- 		"ether",
- 	},
-+	.get_pinmode = ave_ld20_get_pinmode,
- };
- 
- static const struct ave_soc_data ave_pxs3_data = {
-@@ -1763,6 +1888,7 @@ static const struct ave_soc_data ave_pxs3_data = {
- 	.reset_names = {
- 		"ether",
- 	},
-+	.get_pinmode = ave_pxs3_get_pinmode,
- };
- 
- static const struct of_device_id of_ave_match[] = {
--- 
-2.7.4
+Cheers,
+Peter
