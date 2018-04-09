@@ -1,27 +1,55 @@
-From: rientjes@google.com (David Rientjes)
-Date: Mon, 9 Apr 2018 13:08:31 -0700 (PDT)
-Subject: [PATCH 2/3] mm: replace __HAVE_ARCH_PTE_SPECIAL
-In-Reply-To: <20180409175757.GA12938@infradead.org>
-References: <1523282229-20731-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <1523282229-20731-3-git-send-email-ldufour@linux.vnet.ibm.com>
- <20180409175757.GA12938@infradead.org>
-Message-ID: <alpine.DEB.2.21.1804091307480.56406@chino.kir.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Apr 2018 15:10:27 -0500
+Subject: [PATCH v3 2/8] DT: reset: renesas,rzn1-reboot: document RZ/N1
+ reboot driver
+In-Reply-To: <1522309629-10152-3-git-send-email-michel.pollet@bp.renesas.com>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-3-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <20180409201027.ydlvyx72mrt5fphh@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Apr 2018, Christoph Hellwig wrote:
+On Thu, Mar 29, 2018 at 08:46:58AM +0100, Michel Pollet wrote:
+> The Renesas RZ/N1 Family (Part #R9A06G0xx) requires a driver
+> as part of the sysctrl MFD to handle rebooting the CA7 cores.
+> This documents the driver bindings.
+> 
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> ---
+>  .../bindings/power/renesas,rzn1-reboot.txt           | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> new file mode 100644
+> index 0000000..f592769
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> @@ -0,0 +1,20 @@
+> +DT bindings for the Renesas RZ/N1 Reboot Driver
+> +
+> +== Reboot Driver Node ==
+> +
+> +The reboot driver is always a subnode of the system controller node, see
+> +renesas,rzn1-sysctrl.txt for details.
+> +
+> +Bindings:
+> ++ Required:
+> +	compatible = "renesas,rzn1-reboot";
+> +
+> +Example:
+> +	sysctrl: sysctrl at 4000c000 {
+> +		compatible = "renesas,rzn1-sysctrl", "syscon", "simple-mfd";
 
-> > -#ifdef __HAVE_ARCH_PTE_SPECIAL
-> > +#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
-> >  # define HAVE_PTE_SPECIAL 1
-> >  #else
-> >  # define HAVE_PTE_SPECIAL 0
-> 
-> I'd say kill this odd indirection and just use the
-> CONFIG_ARCH_HAS_PTE_SPECIAL symbol directly.
-> 
-> 
+Are there other functions for this block? If so, please define a 
+complete binding for the block.
 
-Agree, and I think it would be easier to audit/review if patches 1 and 3 
-were folded together to see the relationship between the newly added 
-selects and what #define's it is replacing.  Otherwise, looks good!
+> +		reg = <0x4000c000 0x1000>;
+> +
+> +		reboot {
+> +			compatible = "renesas,rzn1-reboot";
+
+Why is this node needed? The driver for "renesas,rzn1-sysctrl" should 
+be able to register as a reboot handler/driver/provider.
+
+Rob
