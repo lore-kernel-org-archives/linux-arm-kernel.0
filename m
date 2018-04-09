@@ -1,30 +1,47 @@
-From: david@lechnology.com (David Lechner)
-Date: Sun, 8 Apr 2018 15:11:26 -0500
-Subject: [PATCH v2] ARM: davinci: dm644x: remove unnecessary
- postcore_initcall()
-In-Reply-To: <20180406123820.21679-1-nsekhar@ti.com>
-References: <20180406123820.21679-1-nsekhar@ti.com>
-Message-ID: <bf45cf15-95ea-632b-f03c-cca4ef1d933e@lechnology.com>
+From: Alexander.Levin@microsoft.com (Sasha Levin)
+Date: Mon, 9 Apr 2018 00:24:14 +0000
+Subject: [PATCH AUTOSEL for 4.9 104/293] arm64: pass machine size to sparse
+In-Reply-To: <20180409002239.163177-1-alexander.levin@microsoft.com>
+References: <20180409002239.163177-1-alexander.levin@microsoft.com>
+Message-ID: <20180409002239.163177-104-alexander.levin@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2018 07:38 AM, Sekhar Nori wrote:
-> dm644x_init_devices() is unnecessarily implemented as a
-> postcore_initcall().
-> 
-> This does not cause any issues now, but creates issues when
-> converting to common clock framework where clocks themselves
-> become platform devices and are initialized later. Because of
-> this, device clock acquisition and runtime PM on that device
-> fails.
-> 
-> Move the call to .init_machine() callback along with rest of
-> platform device's registration.
-> 
-> While at it, convert it to return void since return value is
-> ignored by caller anyway.
-> 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
+From: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 
-Reviewed-by: David Lechner <david@lechnology.com>
+[ Upstream commit f5d284900c0f960e318a063f4c40826b6e3aa6a8 ]
+
+When using sparse on the arm64 tree we get many thousands of
+warnings like 'constant ... is so big it is unsigned long long'
+or 'shift too big (32) for type unsigned long'. This happens
+because by default sparse considers the machine as 32bit and
+defines the size of the types accordingly.
+
+Fix this by passing the '-m64' flag to sparse so that
+sparse can correctly define longs as being 64bit.
+
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+---
+ arch/arm64/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 92110c2c6c59..bc66f4b6a1cb 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -58,7 +58,7 @@ LD		+= -EL
+ UTS_MACHINE	:= aarch64
+ endif
+ 
+-CHECKFLAGS	+= -D__aarch64__
++CHECKFLAGS	+= -D__aarch64__ -m64
+ 
+ ifeq ($(CONFIG_ARM64_MODULE_CMODEL_LARGE), y)
+ KBUILD_CFLAGS_MODULE	+= -mcmodel=large
+-- 
+2.15.1
