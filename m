@@ -1,42 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 9 Apr 2018 15:57:09 +0100
-Subject: [PATCHv2 09/12] arm64/kvm: preserve host HCR_EL2 value
-In-Reply-To: <20180206123915.GA21802@cbox>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-10-mark.rutland@arm.com>
- <20180206123915.GA21802@cbox>
-Message-ID: <20180409145709.dneotb6xaznw44c4@lakrids.cambridge.arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 09 Apr 2018 11:00:16 -0400 (EDT)
+Subject: [PATCH v5] net: thunderx: rework mac addresses list to u64 array
+In-Reply-To: <20180409132448.22278-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
+ <20180409132448.22278-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180409.110016.166919257730352493.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 06, 2018 at 01:39:15PM +0100, Christoffer Dall wrote:
-> On Mon, Nov 27, 2017 at 04:38:03PM +0000, Mark Rutland wrote:
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > index 525c01f48867..2205f0be3ced 100644
-> > --- a/arch/arm64/kvm/hyp/switch.c
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
-> >  {
-> >  	u64 val;
-> >  
-> > +	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
-> > +
+From: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+Date: Mon,  9 Apr 2018 06:24:48 -0700
+
+> From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 > 
-> Looking back at this, it seems excessive to switch this at every
-> round-trip.  I think it should be possible to have this as a single
-> global (or per-CPU) variable that gets restored directly when returning
-> from the VM.
+> It is too expensive to pass u64 values via linked list, instead
+> allocate array for them by overall number of mac addresses from netdev.
+> 
+> This eventually removes multiple kmalloc() calls, aviod memory
+> fragmentation and allow to put single null check on kmalloc
+> return value in order to prevent a potential null pointer dereference.
+> 
+> Addresses-Coverity-ID: 1467429 ("Dereference null return value")
+> Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-I suspect this needs to be per-cpu, to account for heterogeneous
-systems.
-
-I guess if we move hcr_el2 into kvm_cpu_context, that gives us a
-per-vcpu copy for guests, and a per-cpu copy for the host (in the global
-kvm_host_cpu_state).
-
-I'll have a look at how gnarly that turns out. I'm not sure how we can
-initialise that sanely for the !VHE case to match whatever el2_setup
-did.
-
-Thanks,
-Mark.
+Applied, thanks.
