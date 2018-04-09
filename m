@@ -1,22 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Apr 2018 13:47:43 -0500
-Subject: [PATCH v2 08/10] dt-bindings: iio: adc: at91-sama5d2_adc: add
- channel specific consumer info
-In-Reply-To: <1522153963-1121-9-git-send-email-eugen.hristev@microchip.com>
-References: <1522153963-1121-1-git-send-email-eugen.hristev@microchip.com>
- <1522153963-1121-9-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180409184743.zu7ihom6tvi7aino@rob-hp-laptop>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Mon, 9 Apr 2018 20:54:33 +0200
+Subject: [PATCH v4 0/6] PCI: aardvark: misc fixes and improvements
+In-Reply-To: <20180409162356.GB14533@e107981-ln.cambridge.arm.com>
+References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
+ <20180409162356.GB14533@e107981-ln.cambridge.arm.com>
+Message-ID: <20180409205433.4eb78a45@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 27, 2018 at 03:32:41PM +0300, Eugen Hristev wrote:
-> Added defines for channel consumer device-tree binding
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> ---
->  .../devicetree/bindings/iio/adc/at91-sama5d2_adc.txt     |  9 +++++++++
->  include/dt-bindings/iio/adc/at91-sama5d2_adc.h           | 16 ++++++++++++++++
->  2 files changed, 25 insertions(+)
->  create mode 100644 include/dt-bindings/iio/adc/at91-sama5d2_adc.h
+Hello Lorenzo,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Thanks for your feedback!
+
+On Mon, 9 Apr 2018 17:23:56 +0100, Lorenzo Pieralisi wrote:
+
+> it is not just improvements, these look like significant bug fixes too.
+> 
+> Let me know which patches we should prioritize since hopefully they can
+> be sent during v4.17-rc* releases, I will queue the rest for the next
+> merge window.
+
+The patches that are bug fixes are marked with a "Fixes:" tag and are
+Cc'ed to stable.
+
+So, the following patches are fixes:
+
+[PATCH v4 1/6] PCI: aardvark: Fix logic in advk_pcie_{rd,wr}_conf()
+[PATCH v4 2/6] PCI: aardvark: Set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
+[PATCH v4 3/6] PCI: aardvark: Use ISR1 instead of ISR0 interrupt in legacy irq mode
+[PATCH v4 4/6] PCI: aardvark: Fix PCIe Max Read Request Size setting
+
+The following patches are improvements:
+
+[PATCH v4 5/6] PCI: aardvark: Introduce an advk_pcie_valid_device() helper
+[PATCH v4 6/6] PCI: aardvark: Remove PCIe outbound window configuration
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
