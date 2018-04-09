@@ -1,34 +1,91 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon,  9 Apr 2018 12:59:18 +0200
-Subject: [PATCH 5/5] drm/atmel-hlcdc: fix broken release date
-In-Reply-To: <20180409105918.20792-1-peda@axentia.se>
-References: <20180409105918.20792-1-peda@axentia.se>
-Message-ID: <20180409105918.20792-6-peda@axentia.se>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 9 Apr 2018 11:55:08 +0100
+Subject: [RFC PATCH v2 3/3] KVM: arm64: Optimise FPSIMD handling to
+ reduce guest/host thrashing
+In-Reply-To: <86tvsnqr3l.wl-marc.zyngier@arm.com>
+References: <1523026864-15413-1-git-send-email-Dave.Martin@arm.com>
+ <1523026864-15413-4-git-send-email-Dave.Martin@arm.com>
+ <86tvsnqr3l.wl-marc.zyngier@arm.com>
+Message-ID: <20180409105507.GU16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bump the minor version while at it.
+On Sat, Apr 07, 2018 at 10:54:22AM +0100, Marc Zyngier wrote:
+> On Fri, 06 Apr 2018 16:01:04 +0100,
+> Dave Martin wrote:
+> 
+> Hi Dave,
+> 
+> > 
+> > This patch refactors KVM to align the host and guest FPSIMD
+> > save/restore logic with each other for arm64.  This reduces the
+> > number of redundant save/restore operations that must occur, and
+> > reduces the common-case IRQ blackout time during guest exit storms
+> > by saving the host state lazily and optimising away the need to
+> > restore the host state before returning to the run loop.
+> > 
+> > Four hooks are defined in order to enable this:
+> > 
+> >  * kvm_arch_vcpu_run_map_fp():
+> >    Called on PID change to map necessary bits of current to Hyp.
+> > 
+> >  * kvm_arch_vcpu_load_fp():
+> >    Set up FP/SIMD for entering the KVM run loop (parse as
+> >    "vcpu_load fp").
+> > 
+> >  * kvm_arch_vcpu_park_fp():
+> >    Get FP/SIMD into a safe state for re-enabling interrupts after a
+> >    guest exit back to the run loop.
+> 
+> It would be good if you could outline what this hook does, and what
+> "safe state" means in this context.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+[...]
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index b411038890a9..aec0e0e05edb 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -782,9 +782,9 @@ static struct drm_driver atmel_hlcdc_dc_driver = {
- 	.fops = &fops,
- 	.name = "atmel-hlcdc",
- 	.desc = "Atmel HLCD Controller DRM",
--	.date = "20141504",
-+	.date = "20180409",
- 	.major = 1,
--	.minor = 0,
-+	.minor = 1,
- };
- 
- static int atmel_hlcdc_dc_drm_init(struct platform_device *pdev)
--- 
-2.11.0
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index d3af3f4..cf0f457 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -362,10 +362,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+> >  	kvm_arm_set_running_vcpu(vcpu);
+> >  	kvm_vgic_load(vcpu);
+> >  	kvm_timer_vcpu_load(vcpu);
+> > +	kvm_arch_vcpu_load_fp(vcpu);
+> 
+> Can't find this function.
+
+[...]
+
+> > @@ -772,6 +774,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  		if (static_branch_unlikely(&userspace_irqchip_in_use))
+> >  			kvm_timer_sync_hwstate(vcpu);
+> >  
+> > +		kvm_arch_vcpu_park_fp(vcpu);
+> 
+> This isn't defined either. I have the feeling that you've missed a
+> "git add" at some point.
+> 
+> > +
+> >  		/*
+> >  		 * We may have taken a host interrupt in HYP mode (ie
+> >  		 * while executing the guest). This interrupt is still
+> > @@ -816,16 +820,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> >  	return ret;
+> >  }
+
+[...]
+
+> The structure seems quite sensible, and I'm looking forward to seeing
+> the missing bits. Also, it looks like this was done on top of
+> 4.16. I'm afraid 4.17 is going to bring a number of conflicts, but
+> nothing that should have any material impact.
+
+Hmmm, looks like I dropped an added file when flattening my draft series.
+
+See separate repost -- sorry about that.
+
+
+I've kept it on v4.16 just while things stabilise.
+
+Cheers
+---Dave
