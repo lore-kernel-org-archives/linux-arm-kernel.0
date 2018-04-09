@@ -1,40 +1,43 @@
-From: longman@redhat.com (Waiman Long)
-Date: Mon, 9 Apr 2018 15:33:21 -0400
-Subject: [PATCH 02/10] locking/qspinlock: Remove unbounded cmpxchg loop
- from locking slowpath
-In-Reply-To: <20180409145409.GA9661@arm.com>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <1522947547-24081-3-git-send-email-will.deacon@arm.com>
- <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
- <20180409105835.GC23134@arm.com> <20180409145409.GA9661@arm.com>
-Message-ID: <5e7211d4-43f0-297e-dbbc-8e87721f96b8@redhat.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 09 Apr 2018 12:39:37 -0700
+Subject: [PATCH/RFC] soc: bcm2835: Make !RASPBERRYPI_FIRMWARE dummies
+ return failure
+In-Reply-To: <1523178315-30562-1-git-send-email-geert@linux-m68k.org>
+References: <1523178315-30562-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <87muycw4na.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2018 10:54 AM, Will Deacon wrote:
->
->>> I am not against this patch, but we certainly need to find out a way to
->>> bring the performance number up closer to what it is before applying
->>> the patch.
->> We certainly need to *understand* where the drop is coming from, because
->> the two-threaded case is still just a CAS on x86 with and without this
->> patch series. Generally, there's a throughput cost when ensuring fairness
->> and forward-progress otherwise we'd all be using test-and-set.
-> Whilst I think we still need to address my questions above, I've had a
-> crack at the diff below. Please can you give it a spin? It sticks a trylock
-> on the slowpath before setting pending and replaces the CAS-based set
-> with an xchg (which I *think* is safe, but will need to ponder it some
-> more).
->
-> Thanks,
->
-> Will
->
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-Unfortunately, this patch didn't help.
+> If CONFIG_RASPBERRYPI_FIRMWARE=n:
+>
+>     drivers/gpio/gpio-raspberrypi-exp.c: In function ?rpi_exp_gpio_get_polarity?:
+>     drivers/gpio/gpio-raspberrypi-exp.c:71: warning: ?get.polarity? is used uninitialized in this function
+>     drivers/gpio/gpio-raspberrypi-exp.c: In function ?rpi_exp_gpio_get_direction?:
+>     drivers/gpio/gpio-raspberrypi-exp.c:150: warning: ?get.direction? is used uninitialized in this function
+>
+> The dummy firmware interface functions return 0, which means success,
+> causing subsequent code to make use of the never initialized output
+> parameter.
+>
+> Fix this by making the dummy functions return an error code (-ENOSYS)
+> instead.
+>
+> Note that this assumes the firmware always fills in the requested data
+> in the CONFIG_RASPBERRYPI_FIRMWARE=y case.
+>
+> Fixes: d45f1a563b92dac7 ("staging: vc04_services: fix up rpi firmware functions")
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-pending count = 777
-queuing count = 9,991,272
-locking rate = 4,087 kop/s
+You should definitely not be calling these if rpi_firmware_get() failed,
+so this seems like a good solution.
 
--Longman
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/427f33ca/attachment-0001.sig>
