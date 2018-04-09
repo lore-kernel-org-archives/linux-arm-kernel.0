@@ -1,140 +1,58 @@
 From: Alexander.Levin@microsoft.com (Sasha Levin)
-Date: Mon, 9 Apr 2018 00:24:21 +0000
-Subject: [PATCH AUTOSEL for 4.9 112/293] ARM: 8683/1: ARM32: Support mremap()
- for sigpage/vDSO
+Date: Mon, 9 Apr 2018 00:24:47 +0000
+Subject: [PATCH AUTOSEL for 4.9 146/293] arm64: pass endianness info to sparse
 In-Reply-To: <20180409002239.163177-1-alexander.levin@microsoft.com>
 References: <20180409002239.163177-1-alexander.levin@microsoft.com>
-Message-ID: <20180409002239.163177-112-alexander.levin@microsoft.com>
+Message-ID: <20180409002239.163177-146-alexander.levin@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Safonov <dsafonov@virtuozzo.com>
+From: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 
-[ Upstream commit 280e87e98c09b85b617c7b2752c8b504c4ea98f6 ]
+[ Upstream commit bcde519e8c325f3cc1fcf443eb6466e6bb3a3aca ]
 
-CRIU restores application mappings on the same place where they
-were before Checkpoint. That means, that we need to move vDSO
-and sigpage during restore on exactly the same place where
-they were before C/R.
+ARM64 depends on the macro __AARCH64EB__ being defined or not
+to correctly select or define endian-specific macros, structures
+or pieces of code.
 
-Make mremap() code update mm->context.{sigpage,vdso} pointers
-during VMA move. Sigpage is used for landing after handling
-a signal - if the pointer is not updated during moving, the
-application might crash on any signal after mremap().
+This macro is predefined by the compiler but sparse knows nothing
+about it and thus may pre-process files differently from what
+gcc would.
 
-vDSO pointer on ARM32 is used only for setting auxv at this moment,
-update it during mremap() in case of future usage.
+Fix this by passing '-D__AARCH64EL__' or '-D__AARCH64EB__' to
+sparse depending of the endianness of the kernel, like defined
+by GCC.
 
-Without those updates, current work of CRIU on ARM32 is not reliable.
-Historically, we error Checkpointing if we find vDSO page on ARM32
-and suggest user to disable CONFIG_VDSO.
-But that's not correct - it goes from x86 where signal processing
-is ended in vDSO blob. For arm32 it's sigpage, which is not disabled
-with `CONFIG_VDSO=n'.
+Note: In most case it won't change anything since most arm64 use
+      little-endian (but an allyesconfig would use big-endian!).
 
-Looks like C/R was working by luck - because userspace on ARM32 at
-this moment always sets SA_RESTORER.
-
-Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
-Acked-by: Andy Lutomirski <luto@amacapital.net>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Cyrill Gorcunov <gorcunov@openvz.org>
-Cc: Pavel Emelyanov <xemul@virtuozzo.com>
-Cc: Christopher Covington <cov@codeaurora.org>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+CC: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
 ---
- arch/arm/kernel/process.c |  8 ++++++++
- arch/arm/kernel/vdso.c    | 18 ++++++++++++++++++
- arch/x86/entry/vdso/vma.c |  3 ---
- mm/mmap.c                 |  4 ++++
- 4 files changed, 30 insertions(+), 3 deletions(-)
+ arch/arm64/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 91d2d5b01414..ca4a3c0f04c6 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -401,9 +401,17 @@ static unsigned long sigpage_addr(const struct mm_struct *mm,
- static struct page *signal_page;
- extern struct page *get_signal_page(void);
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index bc66f4b6a1cb..b0babc09577d 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -48,11 +48,13 @@ KBUILD_AFLAGS	+= $(lseinstr)
  
-+static int sigpage_mremap(const struct vm_special_mapping *sm,
-+		struct vm_area_struct *new_vma)
-+{
-+	current->mm->context.sigpage = new_vma->vm_start;
-+	return 0;
-+}
-+
- static const struct vm_special_mapping sigpage_mapping = {
- 	.name = "[sigpage]",
- 	.pages = &signal_page,
-+	.mremap = sigpage_mremap,
- };
- 
- int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index 53cf86cf2d1a..a4d6dc0f2427 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -54,8 +54,26 @@ static const struct vm_special_mapping vdso_data_mapping = {
- 	.pages = &vdso_data_page,
- };
- 
-+static int vdso_mremap(const struct vm_special_mapping *sm,
-+		struct vm_area_struct *new_vma)
-+{
-+	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
-+	unsigned long vdso_size;
-+
-+	/* without VVAR page */
-+	vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
-+
-+	if (vdso_size != new_size)
-+		return -EINVAL;
-+
-+	current->mm->context.vdso = new_vma->vm_start;
-+
-+	return 0;
-+}
-+
- static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
- 	.name = "[vdso]",
-+	.mremap = vdso_mremap,
- };
- 
- struct elfinfo {
-diff --git a/arch/x86/entry/vdso/vma.c b/arch/x86/entry/vdso/vma.c
-index 23c881caabd1..2f10de80d76c 100644
---- a/arch/x86/entry/vdso/vma.c
-+++ b/arch/x86/entry/vdso/vma.c
-@@ -76,9 +76,6 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
- 	if (image->size != new_size)
- 		return -EINVAL;
- 
--	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
--		return -EFAULT;
--
- 	vdso_fix_landing(image, new_vma);
- 	current->mm->context.vdso = (void __user *)new_vma->vm_start;
- 
-diff --git a/mm/mmap.c b/mm/mmap.c
-index 45ac5b973459..cdef4ae94b10 100644
---- a/mm/mmap.c
-+++ b/mm/mmap.c
-@@ -3168,8 +3168,12 @@ static int special_mapping_mremap(struct vm_area_struct *new_vma)
- {
- 	struct vm_special_mapping *sm = new_vma->vm_private_data;
- 
-+	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
-+		return -EFAULT;
-+
- 	if (sm->mremap)
- 		return sm->mremap(sm, new_vma);
-+
- 	return 0;
- }
- 
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
++CHECKFLAGS	+= -D__AARCH64EB__
+ AS		+= -EB
+ LD		+= -EB
+ UTS_MACHINE	:= aarch64_be
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
++CHECKFLAGS	+= -D__AARCH64EL__
+ AS		+= -EL
+ LD		+= -EL
+ UTS_MACHINE	:= aarch64
 -- 
 2.15.1
