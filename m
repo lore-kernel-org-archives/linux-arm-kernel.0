@@ -1,33 +1,74 @@
-From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
-Date: Mon, 9 Apr 2018 18:17:16 +0200
-Subject: [PATCH 0/3] move __HAVE_ARCH_PTE_SPECIAL in Kconfig
-In-Reply-To: <17b19aac-fed7-23a2-013c-43ca867152e9@synopsys.com>
-References: <1523282229-20731-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <17b19aac-fed7-23a2-013c-43ca867152e9@synopsys.com>
-Message-ID: <21c34965-ec30-4d7f-aeaf-cb3da9758a0e@linux.vnet.ibm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 9 Apr 2018 17:23:56 +0100
+Subject: [PATCH v4 0/6] PCI: aardvark: misc fixes and improvements
+In-Reply-To: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
+References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180409162356.GB14533@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/2018 18:03, Vineet Gupta wrote:
-> On 04/09/2018 06:57 AM, Laurent Dufour wrote:
->> The per architecture __HAVE_ARCH_PTE_SPECIAL is defined statically in the
->> per architecture header files. This doesn't allow to make other
->> configuration dependent on it.
+On Fri, Apr 06, 2018 at 04:55:30PM +0200, Thomas Petazzoni wrote:
+> Bjorn, Lorenzo,
 > 
-> So I understand this series has more "readability" value and I'm fine with this
-> change but I wonder if you really would want to make something depend on it or
-> make this de-configurable. PTE special is really a fundamental construct - e.g.
-> it is used for anon mapped pages where zero page has been wired up etc...
+> This patch series brings a number of improvements to the aardvark
+> PCIe.
 
-I don't want it to be de-configurable. This is almost like
-ARCH_SUPPORTS_MEMORY_FAILURE, ARCH_USES_HIGH_VMA_FLAGS, ARCH_HAS_HMM...
+Hi Thomas,
 
-These values are selected by per architecture Kconfig files and are not exposed
-through the configuration menu.
+it is not just improvements, these look like significant bug fixes too.
 
-Concerning making something depend on it, I will probably make
-CONFIG_SPECULATIVE_PAGE_FAULT introduced by the SPF series dependent on it.
-For details, please see https://lkml.org/lkml/2018/3/13/1143
+Let me know which patches we should prioritize since hopefully they can
+be sent during v4.17-rc* releases, I will queue the rest for the next
+merge window.
 
 Thanks,
-Laurent.
+Lorenzo
+
+> 
+> Changes since v3:
+> 
+>  - Introduced advk_pcie_valid_device() late in the series, so that the
+>    patch fixing the logic in the PCIe configuration space read/write
+>    function does not depend on it. This is needed as we don't want the
+>    advk_pcie_valid_device() addition to go to stable.
+> 
+> Changes since v2:
+> 
+>  - Rebased on v4.16-rc7
+> 
+>  - Dropped the patches disabling L0S and aligning the MPS between RC
+>    and EP, since we are working on a different solution, implementing
+>    a proper root port. Therefore, this patch series only has the
+>    (hopefully) non-controversial changes.
+> 
+>  - Add a patch (PATCH 1) that factorizes the logic to decide if the
+>    target of a configuration space access is a valid device or not
+>    into a advk_pcie_valid_device() helper, and adjust PATCH 2
+>    accordingly.
+> 
+>  - Drop unused PCIE_BDF macro in PATCH 3.
+> 
+> Best regards,
+> 
+> Thomas Petazzoni
+> 
+> 
+> 
+> Evan Wang (2):
+>   PCI: aardvark: Fix PCIe Max Read Request Size setting
+>   PCI: aardvark: Remove PCIe outbound window configuration
+> 
+> Thomas Petazzoni (1):
+>   PCI: aardvark: Introduce an advk_pcie_valid_device() helper
+> 
+> Victor Gu (3):
+>   PCI: aardvark: Fix logic in advk_pcie_{rd,wr}_conf()
+>   PCI: aardvark: Set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
+>   PCI: aardvark: Use ISR1 instead of ISR0 interrupt in legacy irq mode
+> 
+>  drivers/pci/host/pci-aardvark.c | 117 ++++++++++++++--------------------------
+>  1 file changed, 39 insertions(+), 78 deletions(-)
+> 
+> -- 
+> 2.14.3
+> 
