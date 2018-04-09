@@ -1,163 +1,54 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon, 9 Apr 2018 12:26:27 +0200
-Subject: [RFC PATCH v2 2/3] KVM: arm64: Convert lazy FPSIMD context
- switch trap to C
-In-Reply-To: <c1bbee2f-6087-c871-d68a-3d5ea84e0b8f@arm.com>
-References: <1523026864-15413-1-git-send-email-Dave.Martin@arm.com>
- <1523026864-15413-3-git-send-email-Dave.Martin@arm.com>
- <5da0c912-8adb-db89-08b1-fb557b461678@arm.com>
- <20180406155151.GS16308@e103592.cambridge.arm.com>
- <20180409094433.GA10904@cbox>
- <c1bbee2f-6087-c871-d68a-3d5ea84e0b8f@arm.com>
-Message-ID: <20180409102627.GC10904@cbox>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Mon, 9 Apr 2018 13:26:23 +0300
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <20180409092730.2moyhl5aaktjwbyn@flea>
+References: <20180403154449.2443-1-ssuloev@orpaltech.com>
+ <20180403154449.2443-4-ssuloev@orpaltech.com>
+ <20180404065048.n76r3ytuznd6fqsl@flea>
+ <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
+ <20180405091913.ky4dnmszoobn2xry@flea>
+ <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
+ <20180405131735.GB12349@sirena.org.uk>
+ <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
+ <20180406073441.xesojvzc3deljhoy@flea>
+ <204e97cb-2f39-00f0-fd4e-3aa9a51f7cac@orpaltech.com>
+ <20180409092730.2moyhl5aaktjwbyn@flea>
+Message-ID: <94a394bd-89bf-9334-c500-4cbadf4c1044@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 11:00:40AM +0100, Marc Zyngier wrote:
-> On 09/04/18 10:44, Christoffer Dall wrote:
-> > On Fri, Apr 06, 2018 at 04:51:53PM +0100, Dave Martin wrote:
-> >> On Fri, Apr 06, 2018 at 04:25:57PM +0100, Marc Zyngier wrote:
-> >>> Hi Dave,
-> >>>
-> >>> On 06/04/18 16:01, Dave Martin wrote:
-> >>>> To make the lazy FPSIMD context switch trap code easier to hack on,
-> >>>> this patch converts it to C.
-> >>>>
-> >>>> This is not amazingly efficient, but the trap should typically only
-> >>>> be taken once per host context switch.
-> >>>>
-> >>>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> >>>>
-> >>>> ---
-> >>>>
-> >>>> Since RFCv1:
-> >>>>
-> >>>>  * Fix indentation to be consistent with the rest of the file.
-> >>>>  * Add missing ! to write back to sp with attempting to push regs.
-> >>>> ---
-> >>>>  arch/arm64/kvm/hyp/entry.S  | 57 +++++++++++++++++----------------------------
-> >>>>  arch/arm64/kvm/hyp/switch.c | 24 +++++++++++++++++++
-> >>>>  2 files changed, 46 insertions(+), 35 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-> >>>> index fdd1068..47c6a78 100644
-> >>>> --- a/arch/arm64/kvm/hyp/entry.S
-> >>>> +++ b/arch/arm64/kvm/hyp/entry.S
-> >>>> @@ -176,41 +176,28 @@ ENTRY(__fpsimd_guest_restore)
-> >>>>  	// x1: vcpu
-> >>>>  	// x2-x29,lr: vcpu regs
-> >>>>  	// vcpu x0-x1 on the stack
-> >>>> -	stp	x2, x3, [sp, #-16]!
-> >>>> -	stp	x4, lr, [sp, #-16]!
-> >>>> -
-> >>>> -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-> >>>> -	mrs	x2, cptr_el2
-> >>>> -	bic	x2, x2, #CPTR_EL2_TFP
-> >>>> -	msr	cptr_el2, x2
-> >>>> -alternative_else
-> >>>> -	mrs	x2, cpacr_el1
-> >>>> -	orr	x2, x2, #CPACR_EL1_FPEN
-> >>>> -	msr	cpacr_el1, x2
-> >>>> -alternative_endif
-> >>>> -	isb
-> >>>> -
-> >>>> -	mov	x3, x1
-> >>>> -
-> >>>> -	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
-> >>>> -	kern_hyp_va x0
-> >>>> -	add	x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> >>>> -	bl	__fpsimd_save_state
-> >>>> -
-> >>>> -	add	x2, x3, #VCPU_CONTEXT
-> >>>> -	add	x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
-> >>>> -	bl	__fpsimd_restore_state
-> >>>> -
-> >>>> -	// Skip restoring fpexc32 for AArch64 guests
-> >>>> -	mrs	x1, hcr_el2
-> >>>> -	tbnz	x1, #HCR_RW_SHIFT, 1f
-> >>>> -	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
-> >>>> -	msr	fpexc32_el2, x4
-> >>>> -1:
-> >>>> -	ldp	x4, lr, [sp], #16
-> >>>> -	ldp	x2, x3, [sp], #16
-> >>>> -	ldp	x0, x1, [sp], #16
-> >>>> -
-> >>>> +	stp	x2, x3, [sp, #-144]!
-> >>>> +	stp	x4, x5, [sp, #16]
-> >>>> +	stp	x6, x7, [sp, #32]
-> >>>> +	stp	x8, x9, [sp, #48]
-> >>>> +	stp	x10, x11, [sp, #64]
-> >>>> +	stp	x12, x13, [sp, #80]
-> >>>> +	stp	x14, x15, [sp, #96]
-> >>>> +	stp	x16, x17, [sp, #112]
-> >>>> +	stp	x18, lr, [sp, #128]
-> >>>> +
-> >>>> +	bl	__hyp_switch_fpsimd
-> >>>> +
-> >>>> +	ldp	x4, x5, [sp, #16]
-> >>>> +	ldp	x6, x7, [sp, #32]
-> >>>> +	ldp	x8, x9, [sp, #48]
-> >>>> +	ldp	x10, x11, [sp, #64]
-> >>>> +	ldp	x12, x13, [sp, #80]
-> >>>> +	ldp	x14, x15, [sp, #96]
-> >>>> +	ldp	x16, x17, [sp, #112]
-> >>>> +	ldp	x18, lr, [sp, #128]
-> >>>> +	ldp	x0, x1, [sp, #144]
-> >>>> +	ldp	x2, x3, [sp], #160
-> >>>
-> >>> I can't say I'm overly thrilled with adding another save/restore 
-> >>> sequence. How about treating it like a real guest exit instead? Granted, 
-> >>> there is a bit more overhead to it, but as you pointed out above, this 
-> >>> should be pretty rare...
-> >>
-> >> I have no objection to handling this after exiting back to
-> >> __kvm_vcpu_run(), provided the performance is deemed acceptable.
-> >>
-> > 
-> > My guess is that it's going to be visible on non-VHE systems, and given
-> > that we're doing all of this for performance in the first place, I'm not
-> > exceited about that approach either.
-> 
-> My rational is that, as we don't disable FP access across most
-> exit/entry sequences, we still significantly benefit from the optimization.
-> 
+On 04/09/2018 12:27 PM, Maxime Ripard wrote:
+> On Fri, Apr 06, 2018 at 06:48:23PM +0300, Sergey Suloev wrote:
+>> On 04/06/2018 10:34 AM, Maxime Ripard wrote:
+>>> On Thu, Apr 05, 2018 at 04:44:16PM +0300, Sergey Suloev wrote:
+>>>> On 04/05/2018 04:17 PM, Mark Brown wrote:
+>>>>> On Thu, Apr 05, 2018 at 12:59:35PM +0300, Sergey Suloev wrote:
+>>>>>> On 04/05/2018 12:19 PM, Maxime Ripard wrote:
+>>>>>>> The point of that patch was precisely to allow to send more data than
+>>>>>>> the FIFO. You're breaking that behaviour without any justification,
+>>>>>>> and this is not ok.
+>>>>>> I am sorry, but you can't. That's a hardware limitation.
+>>>>> Are you positive about that?  Normally you can add things to hardware
+>>>>> FIFOs while they're being drained so so long as you can keep data
+>>>>> flowing in at least as fast as it's being consumed.
+>>>> Well, normally yes, but this is not the case with the hardware that I own.
+>>>> My a20 (BPiM1+) and a31 (BPiM2) boards behaves differently. With a transfer
+>>>> larger than FIFO then TC interrupt never happens.
+>>> Because you're not supposed to have a transfer larger than the FIFO,
+>>> but to have to setup at first a transfer the size of the FIFO, and
+>>> then when it's (or starts to be) depleted, fill it up again.
+>> According to what you said the driver must implement
+>> "transfer_one_message" instead of "transfer_one"
+> I'm not sure what makes you think that I said that.
+>
+> Maxime
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Yes, but we will take that cost every time we've blocked (and someone
-else used fpsimd) or every time we've returned to user space.  True,
-that's slow anywhow, but still...
-
-> > I thought it was acceptable to do another save/restore, because it was
-> > only the GPRs (and equivalent to what the compiler would generate for a
-> > function call?) and thus not susceptible to the complexities of sysreg
-> > save/restores.
-> 
-> Sysreg? 
-
-What I meant was that this is not saving/restoring any of the system
-registers, which is where we've had the most changes and maintenance,
-but is restricted to GPRs, but anyway...
-
-> That's not what I'm proposing. What I'm proposing here is that
-> we treat FP exception as a shallow exit that immediately returns to the
-> guest without touching them. The overhead is an extra save/restore of
-> the host's x19-x30, if I got my maths right. I agree that this is
-> significant, but I'd like to measure this overhead before we go one way
-> or the other.
-
-...sorry, I didn't realize it was a shallow exit you suggested.  That's
-a different story, and that would probably be in the noise if we
-measured it.
-
-> 
-> > Another alternative would be to go back to Dave's original approach of
-> > implementing the fpsimd state update to the host's structure in assembly
-> > directly, but I was having a hard time understanding that.  Perhaps I
-> > just need to try harder.
-> I'd rather stick to the current C approach, no matter how we perform the
-> save/restore. It feels a lot more readable and maintainable in the long run.
-> 
-
-Agreed.
-
-Thanks,
--Christoffer
+Because current implementation tries to send more than FIFO-depth of 
+data in a single call to "transfer_one" which is wrong.
