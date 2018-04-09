@@ -1,31 +1,27 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Mon, 9 Apr 2018 12:36:25 -0400
-Subject: [PATCH v3] xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE
-In-Reply-To: <20180409093629.9621-1-paul.durrant@citrix.com>
-References: <20180409093629.9621-1-paul.durrant@citrix.com>
-Message-ID: <bd84cd4b-1834-b631-303c-3e190ad7676d@oracle.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 9 Apr 2018 09:44:34 -0700
+Subject: Speology of old handheld.org site
+In-Reply-To: <87in902ymf.fsf@belgarion.home>
+References: <87in902ymf.fsf@belgarion.home>
+Message-ID: <8dbb00c8-6a17-3462-f911-97b800b3a296@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2018 05:36 AM, Paul Durrant wrote:
-> My recent Xen patch series introduces a new HYPERVISOR_memory_op to
-> support direct priv-mapping of certain guest resources (such as ioreq
-> pages, used by emulators) by a tools domain, rather than having to access
-> such resources via the guest P2M.
->
-> This patch adds the necessary infrastructure to the privcmd driver and
-> Xen MMU code to support direct resource mapping.
->
-> NOTE: The adjustment in the MMU code is partially cosmetic. Xen will now
->       allow a PV tools domain to map guest pages either by GFN or MFN, thus
->       the term 'mfn' has been swapped for 'pfn' in the lower layers of the
->       remap code.
->
-> Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
+On 04/09/2018 08:22 AM, Robert Jarzmik wrote:
+> Hi Phlipp and Paul,
+> 
+> I've got a "recent" hx4700 I'm going to convert to Linux.
+> I was kinda hopping following this :
+> http://www.handhelds.org/moin/moin.cgi/HpIpaqHx4700OriginalBootloader
+> 
+> Unfortunately handhelds.org is down. Would either of you have kept a copy or
+> notes that could help me :
+>  - backup the old WinCE (d2s bootloader command or something along these lines)
+>  - install the booloader that enables uploading and booting a kernel on the
+>  USB/SD card.
 
-Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Have you tried web.archive.org? It seems to have retained a snapshot:
 
-I think this will have to wait until 4.18 though, it's somewhat late for
-current merge window right now.
-
--boris
+http://web.archive.org/web/20100713033736/http://www.handhelds.org/moin/moin.cgi/HpIpaqHx4700OriginalBootloader
+-- 
+Florian
