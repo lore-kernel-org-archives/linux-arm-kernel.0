@@ -1,68 +1,118 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Apr 2018 08:21:17 -0500
-Subject: [PATCH V2 3/9] dt-bindings: Tegra186 tachometer device tree
- bindings
-In-Reply-To: <867aace8-dac7-51d4-bd46-15919b58b37d@kapsi.fi>
-References: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
- <1521607244-29734-4-git-send-email-rrajk@nvidia.com>
- <20180327145249.xjoo42qow34ksdle@rob-hp-laptop>
- <867aace8-dac7-51d4-bd46-15919b58b37d@kapsi.fi>
-Message-ID: <CAL_Jsq+AsUiWWBQ7K4OUM58KqQbvBHuFYmXxXLwr7viwoKW-Yw@mail.gmail.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Mon,  9 Apr 2018 06:24:48 -0700
+Subject: [PATCH v5] net: thunderx: rework mac addresses list to u64 array
+In-Reply-To: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
+References: <20180406195354.16037-1-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20180409132448.22278-1-Vadim.Lomovtsev@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 9, 2018 at 12:38 AM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
-> Rob,
+From: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
 
-Please don't top post to lists.
+It is too expensive to pass u64 values via linked list, instead
+allocate array for them by overall number of mac addresses from netdev.
 
-> this binding is for a specific IP block (for measuring/aggregating input
-> pulses) on the Tegra186 SoC, so I don't think it fits into any generic
-> binding.
+This eventually removes multiple kmalloc() calls, aviod memory
+fragmentation and allow to put single null check on kmalloc
+return value in order to prevent a potential null pointer dereference.
 
-What is it hooked up to to measure? You only mention "fan" five times
-in the doc.
+Addresses-Coverity-ID: 1467429 ("Dereference null return value")
+Fixes: 37c3347eb247 ("net: thunderx: add ndo_set_rx_mode callback implementation for VF")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@cavium.com>
+---
+Changes from v1 to v2:
+ - C99 syntax: update xcast_addr_list struct field mc[0] -> mc[];
+Changes from v2 to v3:
+ - update commit description with 'Reported-by: Dan Carpenter';
+ - update size calculations for mc list to offsetof() call
+   instead of explicit arithmetic;
+Changes from v3 to v4:
+ - change loop control variable type from u8 to int, accordingly
+   to mc_count size;
+Changes from v4 to v5:
+ - remove explicit initialization of 'idx' variable as per review comment;
+---
+ drivers/net/ethernet/cavium/thunder/nic.h        |  7 +-----
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 28 +++++++++---------------
+ 2 files changed, 11 insertions(+), 24 deletions(-)
 
-You have #pwm-cells too, so this block has PWM output as well? If not,
-then where's the PWM for the fan control because there is no point in
-having fan tach without some control mechanism.
-
-There's only so many ways to control fans and types of fans, so yes,
-the interface of control and feedback lines between a fan and its
-controller should absolutely be generic.
-
-Rob
-
->
-> Thanks,
-> Mikko
->
->
-> On 03/27/2018 05:52 PM, Rob Herring wrote:
->>
->> On Wed, Mar 21, 2018 at 10:10:38AM +0530, Rajkumar Rampelli wrote:
->>>
->>> Supply Device tree binding documentation for the NVIDIA
->>> Tegra186 SoC's Tachometer Controller
->>>
->>> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
->>> ---
->>>
->>> V2: Renamed compatible string to "nvidia,tegra186-pwm-tachometer"
->>>      Renamed dt property values of clock-names and reset-names to
->>> "tachometer"
->>>      from "tach"
->>
->>
->> Read my prior comments on v1.
->>
->> Rob
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 5fc46c5a4f36..448d1fafc827 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -265,14 +265,9 @@ struct nicvf_drv_stats {
+ 
+ struct cavium_ptp;
+ 
+-struct xcast_addr {
+-	struct list_head list;
+-	u64              addr;
+-};
+-
+ struct xcast_addr_list {
+-	struct list_head list;
+ 	int              count;
++	u64              mc[];
+ };
+ 
+ struct nicvf_work {
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 1e9a31fef729..707db3304396 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -1929,7 +1929,7 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 						  work.work);
+ 	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
+ 	union nic_mbx mbx = {};
+-	struct xcast_addr *xaddr, *next;
++	int idx;
+ 
+ 	if (!vf_work)
+ 		return;
+@@ -1956,16 +1956,10 @@ static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
+ 	/* check if we have any specific MACs to be added to PF DMAC filter */
+ 	if (vf_work->mc) {
+ 		/* now go through kernel list of MACs and add them one by one */
+-		list_for_each_entry_safe(xaddr, next,
+-					 &vf_work->mc->list, list) {
++		for (idx = 0; idx < vf_work->mc->count; idx++) {
+ 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
+-			mbx.xcast.data.mac = xaddr->addr;
++			mbx.xcast.data.mac = vf_work->mc->mc[idx];
+ 			nicvf_send_msg_to_pf(nic, &mbx);
+-
+-			/* after receiving ACK from PF release memory */
+-			list_del(&xaddr->list);
+-			kfree(xaddr);
+-			vf_work->mc->count--;
+ 		}
+ 		kfree(vf_work->mc);
+ 	}
+@@ -1996,17 +1990,15 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
+ 			mode |= BGX_XCAST_MCAST_FILTER;
+ 			/* here we need to copy mc addrs */
+ 			if (netdev_mc_count(netdev)) {
+-				struct xcast_addr *xaddr;
+-
+-				mc_list = kmalloc(sizeof(*mc_list), GFP_ATOMIC);
+-				INIT_LIST_HEAD(&mc_list->list);
++				mc_list = kmalloc(offsetof(typeof(*mc_list),
++							   mc[netdev_mc_count(netdev)]),
++						  GFP_ATOMIC);
++				if (unlikely(!mc_list))
++					return;
++				mc_list->count = 0;
+ 				netdev_hw_addr_list_for_each(ha, &netdev->mc) {
+-					xaddr = kmalloc(sizeof(*xaddr),
+-							GFP_ATOMIC);
+-					xaddr->addr =
++					mc_list->mc[mc_list->count] =
+ 						ether_addr_to_u64(ha->addr);
+-					list_add_tail(&xaddr->list,
+-						      &mc_list->list);
+ 					mc_list->count++;
+ 				}
+ 			}
+-- 
+2.14.3
