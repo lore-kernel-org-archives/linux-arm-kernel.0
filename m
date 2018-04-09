@@ -1,126 +1,347 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Mon,  9 Apr 2018 12:59:16 +0200
-Subject: [PATCH 3/5] drm/atmel-hlcdc: allow overriding the output mode
+Date: Mon,  9 Apr 2018 12:59:17 +0200
+Subject: [PATCH 4/5] drm/atmel-hlcdc: add support for connecting to tda998x
+ HDMI encoder
 In-Reply-To: <20180409105918.20792-1-peda@axentia.se>
 References: <20180409105918.20792-1-peda@axentia.se>
-Message-ID: <20180409105918.20792-4-peda@axentia.se>
+Message-ID: <20180409105918.20792-5-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This beats the heuristic that the connector is involved in what format
-should be output for cases where this fails.
-
-E.g. if there is a bridge that changes format between the encoder and the
-connector, or if the encoder and connector provided by the tda998x driver
-is in use in which case the connector does not advertize and format at
-all.
+When the of-graph points to a tda998x-compatible HDMI encoder, register
+as a component master and bind to the encoder/connector provided by
+the tda998x driver.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 12 ++++++------
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c   | 19 +++++++++++++++++++
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h   |  8 ++++++++
- 3 files changed, 33 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     |  81 ++++++++++++--
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  15 +++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 130 +++++++++++++++++++++++
+ 3 files changed, 220 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-index d73281095fac..9bfff228f893 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-@@ -220,12 +220,6 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
- 	drm_crtc_vblank_on(c);
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+index dccd0be548a9..b411038890a9 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+@@ -20,6 +20,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/component.h>
+ #include <linux/irq.h>
+ #include <linux/irqchip.h>
+ #include <linux/module.h>
+@@ -568,10 +569,13 @@ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
+ 
+ 	drm_mode_config_init(dev);
+ 
+-	ret = atmel_hlcdc_create_outputs(dev);
+-	if (ret) {
+-		dev_err(dev->dev, "failed to create HLCDC outputs: %d\n", ret);
+-		return ret;
++	if (!dc->is_componentized) {
++		ret = atmel_hlcdc_create_outputs(dev);
++		if (ret) {
++			dev_err(dev->dev,
++				"failed to create HLCDC outputs: %d\n", ret);
++			return ret;
++		}
+ 	}
+ 
+ 	ret = atmel_hlcdc_create_planes(dev);
+@@ -586,6 +590,16 @@ static int atmel_hlcdc_dc_modeset_init(struct drm_device *dev)
+ 		return ret;
+ 	}
+ 
++	if (dc->is_componentized) {
++		ret = component_bind_all(dev->dev, dev);
++		if (ret < 0)
++			return ret;
++
++		ret = atmel_hlcdc_add_component_encoder(dev);
++		if (ret < 0)
++			return ret;
++	}
++
+ 	dev->mode_config.min_width = dc->desc->min_width;
+ 	dev->mode_config.min_height = dc->desc->min_height;
+ 	dev->mode_config.max_width = dc->desc->max_width;
+@@ -618,6 +632,9 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
+ 	if (!dc)
+ 		return -ENOMEM;
+ 
++	dc->is_componentized =
++		atmel_hlcdc_get_external_components(dev->dev, NULL) > 0;
++
+ 	dc->wq = alloc_ordered_workqueue("atmel-hlcdc-dc", 0);
+ 	if (!dc->wq)
+ 		return -ENOMEM;
+@@ -770,7 +787,7 @@ static struct drm_driver atmel_hlcdc_dc_driver = {
+ 	.minor = 0,
+ };
+ 
+-static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
++static int atmel_hlcdc_dc_drm_init(struct platform_device *pdev)
+ {
+ 	struct drm_device *ddev;
+ 	int ret;
+@@ -798,7 +815,7 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
+ 	return ret;
  }
  
--#define ATMEL_HLCDC_RGB444_OUTPUT	BIT(0)
--#define ATMEL_HLCDC_RGB565_OUTPUT	BIT(1)
--#define ATMEL_HLCDC_RGB666_OUTPUT	BIT(2)
--#define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
--#define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
--
- static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+-static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
++static int atmel_hlcdc_dc_drm_fini(struct platform_device *pdev)
  {
- 	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
-@@ -237,6 +231,12 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+ 	struct drm_device *ddev = platform_get_drvdata(pdev);
  
- 	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
+@@ -809,6 +826,58 @@ static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-+	if (crtc->dc->force_output_mode) {
-+		hstate = drm_crtc_state_to_atmel_hlcdc_crtc_state(state);
-+		hstate->output_mode = fls(crtc->dc->force_output_mode) - 1;
++static int atmel_hlcdc_bind(struct device *dev)
++{
++	return atmel_hlcdc_dc_drm_init(to_platform_device(dev));
++}
++
++static void atmel_hlcdc_unbind(struct device *dev)
++{
++	struct drm_device *ddev = dev_get_drvdata(dev);
++
++	/* Check if a subcomponent has already triggered the unloading. */
++	if (!ddev->dev_private)
++		return;
++
++	atmel_hlcdc_dc_drm_fini(to_platform_device(dev));
++}
++
++static const struct component_master_ops atmel_hlcdc_comp_ops = {
++	.bind = atmel_hlcdc_bind,
++	.unbind = atmel_hlcdc_unbind,
++};
++
++static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
++{
++	struct component_match *match = NULL;
++	int ret;
++
++	ret = atmel_hlcdc_get_external_components(&pdev->dev, &match);
++	if (ret < 0)
++		return ret;
++	else if (ret)
++		return component_master_add_with_match(&pdev->dev,
++						       &atmel_hlcdc_comp_ops,
++						       match);
++	else
++		return atmel_hlcdc_dc_drm_init(pdev);
++}
++
++static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
++{
++	int ret;
++
++	ret = atmel_hlcdc_get_external_components(&pdev->dev, NULL);
++	if (ret < 0)
++		return ret;
++	else if (ret)
++		component_master_del(&pdev->dev, &atmel_hlcdc_comp_ops);
++	else
++		atmel_hlcdc_dc_drm_fini(pdev);
++
++	return 0;
++}
++
+ #ifdef CONFIG_PM_SLEEP
+ static int atmel_hlcdc_dc_drm_suspend(struct device *dev)
+ {
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+index a810171b9353..53f780827889 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+@@ -377,6 +377,10 @@ struct atmel_hlcdc_plane_properties {
+  * @wq: display controller workqueue
+  * @suspend: used to store the HLCDC state when entering suspend
+  * @commit: used for async commit handling
++ * @external_encoder: used encoder when componentized
++ * @external_connector: used connector when componentized
++ * @connector_funcs: original helper funcs of the external connector
++ * @is_componentized: operating mode
+  */
+ struct atmel_hlcdc_dc {
+ 	const struct atmel_hlcdc_dc_desc *desc;
+@@ -394,6 +398,12 @@ struct atmel_hlcdc_dc {
+ 		wait_queue_head_t wait;
+ 		bool pending;
+ 	} commit;
++
++	struct drm_encoder *external_encoder;
++	struct drm_connector *external_connector;
++	const struct drm_connector_helper_funcs *connector_funcs;
++
++	bool is_componentized;
+ };
+ 
+ extern struct atmel_hlcdc_formats atmel_hlcdc_plane_rgb_formats;
+@@ -463,4 +473,9 @@ int atmel_hlcdc_crtc_create(struct drm_device *dev);
+ 
+ int atmel_hlcdc_create_outputs(struct drm_device *dev);
+ 
++struct component_match;
++int atmel_hlcdc_add_component_encoder(struct drm_device *dev);
++int atmel_hlcdc_get_external_components(struct device *dev,
++					struct component_match **match);
++
+ #endif /* DRM_ATMEL_HLCDC_H */
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+index 8db51fb131db..3f86527e0473 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+@@ -6,6 +6,11 @@
+  * Author: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+  * Author: Boris BREZILLON <boris.brezillon@free-electrons.com>
+  *
++ * Handling of external components adapted from the tilcdc driver
++ * by Peter Rosin <peda@axentia.se>. That original code had:
++ *   Copyright (C) 2015 Texas Instruments
++ *   Author: Jyri Sarha <jsarha@ti.com>
++ *
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms of the GNU General Public License version 2 as published by
+  * the Free Software Foundation.
+@@ -19,6 +24,7 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/component.h>
+ #include <linux/of_graph.h>
+ 
+ #include <drm/drmP.h>
+@@ -88,3 +94,127 @@ int atmel_hlcdc_create_outputs(struct drm_device *dev)
+ 
+ 	return ret;
+ }
++
++static int atmel_hlcdc_external_mode_valid(struct drm_connector *connector,
++					   struct drm_display_mode *mode)
++{
++	struct atmel_hlcdc_dc *dc = connector->dev->dev_private;
++	int ret;
++
++	ret = atmel_hlcdc_dc_mode_valid(dc, mode);
++	if (ret != MODE_OK)
++		return ret;
++
++	if (WARN_ON(dc->external_connector != connector))
++		return MODE_ERROR;
++	if (WARN_ON(!dc->connector_funcs))
++		return MODE_ERROR;
++
++	if (IS_ERR(dc->connector_funcs) || !dc->connector_funcs->mode_valid)
++		return MODE_OK;
++
++	/* The connector has its own mode_valid, call it. */
++	return dc->connector_funcs->mode_valid(connector, mode);
++}
++
++static int atmel_hlcdc_add_external_connector(struct drm_device *dev,
++					      struct drm_connector *connector)
++{
++	struct atmel_hlcdc_dc *dc = dev->dev_private;
++	struct drm_connector_helper_funcs *connector_funcs;
++
++	/* There should never be more than one connector. */
++	if (WARN_ON(dc->external_connector))
++		return -EINVAL;
++
++	dc->external_connector = connector;
++	connector_funcs = devm_kzalloc(dev->dev, sizeof(*connector_funcs),
++				       GFP_KERNEL);
++	if (!connector_funcs)
++		return -ENOMEM;
++
++	/*
++	 * connector->helper_private always contains the struct
++	 * connector_helper_funcs pointer. For the atmel-hlcdc crtc
++	 * to have a say if a specific mode is Ok, we install our
++	 * own helper functions. In our helper functions we copy
++	 * everything else but use our own mode_valid() (above).
++	 */
++	if (connector->helper_private) {
++		dc->connector_funcs = connector->helper_private;
++		*connector_funcs = *dc->connector_funcs;
++	} else {
++		dc->connector_funcs = ERR_PTR(-ENOENT);
++	}
++	connector_funcs->mode_valid = atmel_hlcdc_external_mode_valid;
++	drm_connector_helper_add(connector, connector_funcs);
++
++	dev_dbg(dev->dev, "External connector '%s' connected\n",
++		connector->name);
++
++	return 0;
++}
++
++static struct drm_connector *
++atmel_hlcdc_encoder_find_connector(struct drm_device *dev,
++				   struct drm_encoder *encoder)
++{
++	struct drm_connector *connector;
++	int i;
++
++	list_for_each_entry(connector, &dev->mode_config.connector_list, head)
++		for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++)
++			if (connector->encoder_ids[i] == encoder->base.id)
++				return connector;
++
++	dev_err(dev->dev, "No connector found for %s encoder (id %d)\n",
++		encoder->name, encoder->base.id);
++
++	return NULL;
++}
++
++int atmel_hlcdc_add_component_encoder(struct drm_device *dev)
++{
++	struct atmel_hlcdc_dc *dc = dev->dev_private;
++	struct drm_connector *connector;
++	struct drm_encoder *encoder;
++
++	list_for_each_entry(encoder, &dev->mode_config.encoder_list, head) {
++		if (encoder->possible_crtcs & (1 << dc->crtc->index))
++			break;
++	}
++
++	if (!encoder) {
++		dev_err(dev->dev, "%s: No suitable encoder found\n", __func__);
++		return -ENODEV;
++	}
++
++	connector = atmel_hlcdc_encoder_find_connector(dev, encoder);
++	if (!connector)
++		return -ENODEV;
++
++	return atmel_hlcdc_add_external_connector(dev, connector);
++}
++
++static int dev_match_of(struct device *dev, void *data)
++{
++	return dev->of_node == data;
++}
++
++int atmel_hlcdc_get_external_components(struct device *dev,
++					struct component_match **match)
++{
++	struct device_node *node;
++
++	node = of_graph_get_remote_node(dev->of_node, 0, 0);
++
++	if (!of_device_is_compatible(node, "nxp,tda998x")) {
++		of_node_put(node);
 +		return 0;
 +	}
 +
- 	for_each_new_connector_in_state(state->state, connector, cstate, i) {
- 		struct drm_display_info *info = &connector->display_info;
- 		unsigned int supported_fmts = 0;
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index c1ea5c36b006..dccd0be548a9 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -600,6 +600,7 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
- 	struct platform_device *pdev = to_platform_device(dev->dev);
- 	const struct of_device_id *match;
- 	struct atmel_hlcdc_dc *dc;
-+	const char *output_mode;
- 	int ret;
- 
- 	match = of_match_node(atmel_hlcdc_of_match, dev->dev->parent->of_node);
-@@ -634,6 +635,24 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
- 
- 	pm_runtime_enable(dev->dev);
- 
-+	ret = of_property_read_string(dev->dev->of_node,
-+				      "output-mode", &output_mode);
-+	if (!ret) {
-+		if (!strcmp(output_mode, "rgb444")) {
-+			dc->force_output_mode = ATMEL_HLCDC_RGB444_OUTPUT;
-+		} else if (!strcmp(output_mode, "rgb565")) {
-+			dc->force_output_mode = ATMEL_HLCDC_RGB565_OUTPUT;
-+		} else if (!strcmp(output_mode, "rgb666")) {
-+			dc->force_output_mode = ATMEL_HLCDC_RGB666_OUTPUT;
-+		} else if (!strcmp(output_mode, "rgb888")) {
-+			dc->force_output_mode = ATMEL_HLCDC_RGB888_OUTPUT;
-+		} else {
-+			dev_err(dev->dev, "unknown output-mode\n");
-+			ret = -EINVAL;
-+			goto err_destroy_wq;
-+		}
-+	}
-+
- 	ret = drm_vblank_init(dev, 1);
- 	if (ret < 0) {
- 		dev_err(dev->dev, "failed to initialize vblank\n");
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-index ab32d5b268d2..a810171b9353 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-@@ -153,6 +153,12 @@
- 
- #define ATMEL_HLCDC_MAX_LAYERS			6
- 
-+#define ATMEL_HLCDC_RGB444_OUTPUT		BIT(0)
-+#define ATMEL_HLCDC_RGB565_OUTPUT		BIT(1)
-+#define ATMEL_HLCDC_RGB666_OUTPUT		BIT(2)
-+#define ATMEL_HLCDC_RGB888_OUTPUT		BIT(3)
-+#define ATMEL_HLCDC_OUTPUT_MODE_MASK		GENMASK(3, 0)
-+
- /**
-  * Atmel HLCDC Layer registers layout structure
-  *
-@@ -365,6 +371,7 @@ struct atmel_hlcdc_plane_properties {
-  * @hlcdc: pointer to the atmel_hlcdc structure provided by the MFD device
-  * @fbdev: framebuffer device attached to the Display Controller
-  * @crtc: CRTC provided by the display controller
-+ * @force_output_mode: if set, this output mode beats the selection heuristic
-  * @planes: instantiated planes
-  * @layers: active HLCDC layers
-  * @wq: display controller workqueue
-@@ -376,6 +383,7 @@ struct atmel_hlcdc_dc {
- 	struct dma_pool *dscrpool;
- 	struct atmel_hlcdc *hlcdc;
- 	struct drm_crtc *crtc;
-+	unsigned int force_output_mode;
- 	struct atmel_hlcdc_layer *layers[ATMEL_HLCDC_MAX_LAYERS];
- 	struct workqueue_struct *wq;
- 	struct {
++	if (match)
++		drm_of_component_match_add(dev, match, dev_match_of, node);
++	of_node_put(node);
++	return 1;
++}
 -- 
 2.11.0
