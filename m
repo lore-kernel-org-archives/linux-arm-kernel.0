@@ -1,45 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 9 Apr 2018 10:24:41 +0200
-Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
-In-Reply-To: <86vad7qc21.wl-marc.zyngier@arm.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-8-mylene.josserand@bootlin.com>
- <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
- <20180404155909.148085f7@dell-desktop.home>
- <86vad7qc21.wl-marc.zyngier@arm.com>
-Message-ID: <CAMuHMdUoUVF+WYrPG1Dx515_de_2nhGhLfn9+tJUm5jgs1uz0w@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 9 Apr 2018 10:53:56 +0200
+Subject: SUN6I a31 OPP table clock issue
+In-Reply-To: <c309c971-7559-e1d9-dc9f-2f7a7ad6f3cb@orpaltech.com>
+References: <c309c971-7559-e1d9-dc9f-2f7a7ad6f3cb@orpaltech.com>
+Message-ID: <20180409085356.goemvdy3ecyqoghp@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2018 at 4:30 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Wed, 04 Apr 2018 14:59:09 +0100,
-> Myl?ne Josserand wrote:
+On Sat, Apr 07, 2018 at 10:53:10PM +0300, Sergey Suloev wrote:
+> I was able to catch oops coming from OPP table on BananaPi M2.
+> 
+> https://pastebin.com/ZRaXTtEx
+> 
+> Let me know if need more detail.
 
-[Marc: stuck in ISO-8859-1? ;-]
+Of course we do.
 
->> > It'd be good to take this opportunity to refactor the shmobile code.
->>
->> I can do it in this series but I do not have any shmobile platforms so
->> I will not be able to test my modifications (only compilation).
->>
->> If someone can test it for me (who?), it is okay for me to refactor this
->> code :)
->
-> I guess you could Cc the shmobile folks (Geert Uytterhoeven, Simon
-> Horman), and get them to review/test the changes.
+Which kernel version was this for? With which configuration? What
+makes you say it's related to the OPP table, is it a regression or
+something you just noticed?
 
-Correct. I can test on a remote R-Car E2 ALT board that needs it.
-
-P.S. Interestingly, none of the Renesas CA15 SoCs seem to suffer from it,
-     only CA7.
-
-Gr{oetje,eeting}s,
-
-                        Geert
+Maxime
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/cd58ac63/attachment.sig>
