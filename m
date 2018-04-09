@@ -1,50 +1,33 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 10 Apr 2018 00:10:56 +0800
-Subject: [PATCH 1/2] coresight: Use %px to print pcsr instead of %p
-In-Reply-To: <CANLsYkwseQo1+PfTuhkgvx=AyLs3dL+zkSxwbkuu9JhLwTDqHQ@mail.gmail.com>
-References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
- <1520961871-11196-2-git-send-email-mathieu.poirier@linaro.org>
- <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
- <CANLsYkwseQo1+PfTuhkgvx=AyLs3dL+zkSxwbkuu9JhLwTDqHQ@mail.gmail.com>
-Message-ID: <20180409161056.GA13134@leoy-ThinkPad-X240s>
+From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
+Date: Mon, 9 Apr 2018 18:17:16 +0200
+Subject: [PATCH 0/3] move __HAVE_ARCH_PTE_SPECIAL in Kconfig
+In-Reply-To: <17b19aac-fed7-23a2-013c-43ca867152e9@synopsys.com>
+References: <1523282229-20731-1-git-send-email-ldufour@linux.vnet.ibm.com>
+ <17b19aac-fed7-23a2-013c-43ca867152e9@synopsys.com>
+Message-ID: <21c34965-ec30-4d7f-aeaf-cb3da9758a0e@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu, Kees,
-
-On Fri, Apr 06, 2018 at 09:47:31AM -0600, Mathieu Poirier wrote:
-> On 5 April 2018 at 00:26, Kees Cook <keescook@chromium.org> wrote:
-> > On Tue, Mar 13, 2018 at 10:24 AM, Mathieu Poirier
-> > <mathieu.poirier@linaro.org> wrote:
-> >> From: Leo Yan <leo.yan@linaro.org>
-> >>
-> >> Commit ad67b74d2469 ("printk: hash addresses printed with %p") lets
-> >> printk specifier %p to hash all addresses before printing, this was
-> >> resulting in the high 32 bits of pcsr can only output zeros.  So
-> >> module cannot completely print pc value and it's pointless for debugging
-> >> purpose.
-> >>
-> >> This patch fixes this by using %px to print pcsr instead.
-> >
-> > Why is %p (and now %px) needed here at all? %pS is already used, which
-> > should give useful debugging details, yes?
+On 09/04/2018 18:03, Vineet Gupta wrote:
+> On 04/09/2018 06:57 AM, Laurent Dufour wrote:
+>> The per architecture __HAVE_ARCH_PTE_SPECIAL is defined statically in the
+>> per architecture header files. This doesn't allow to make other
+>> configuration dependent on it.
 > 
-> Hey Leo,
-> 
-> I've taken a second look at this and Kees has a point, %pS should be
-> sufficient here.  Please test again and see if %px is absolutely
-> necessary.  If you think that is the case please provide a snapshot of
-> the corner case that makes the change mandatory.
+> So I understand this series has more "readability" value and I'm fine with this
+> change but I wonder if you really would want to make something depend on it or
+> make this de-configurable. PTE special is really a fundamental construct - e.g.
+> it is used for anon mapped pages where zero page has been wired up etc...
 
-Sorry I missed replying for this patch due to my email filter and
-thanks for suggestion.
+I don't want it to be de-configurable. This is almost like
+ARCH_SUPPORTS_MEMORY_FAILURE, ARCH_USES_HIGH_VMA_FLAGS, ARCH_HAS_HMM...
 
-I can think out one case which should use %px: if CPU is locked up in
-firmwares (e.g. NS-EL2 or ARM-TF in S-EL3), we can rely on %px to read
-back PC hex value; for this case the CPU PC address is out of kernel
-space.
+These values are selected by per architecture Kconfig files and are not exposed
+through the configuration menu.
 
-How about you guys think for this?
+Concerning making something depend on it, I will probably make
+CONFIG_SPECULATIVE_PAGE_FAULT introduced by the SPF series dependent on it.
+For details, please see https://lkml.org/lkml/2018/3/13/1143
 
 Thanks,
-Leo Yan
+Laurent.
