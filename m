@@ -1,29 +1,30 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 9 Apr 2018 13:39:44 +0200
-Subject: [PATCH V2 1/2] cpufreq: scmi: Don't validate the frequency table
- twice
-In-Reply-To: <5ce48bce-4fcf-1e0a-6b78-f588fbf7e4a5@arm.com>
-References: <cover.1522749887.git.viresh.kumar@linaro.org>
- <442ecfd0a5bddf32c912c449b072d8a0139318fc.1522749887.git.viresh.kumar@linaro.org>
- <5ce48bce-4fcf-1e0a-6b78-f588fbf7e4a5@arm.com>
-Message-ID: <CAJZ5v0hGgLAK2MRx0tEpTt5Hh9i_9zwhFJPsOsxQ+fOSiLBr_w@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 9 Apr 2018 12:40:22 +0100
+Subject: [PATCH RESEND v6 0/6] provide power off support for iMX6 with
+ external PMIC
+In-Reply-To: <20180409113744.GA14582@dragon>
+References: <20180305102524.5905-1-o.rempel@pengutronix.de>
+ <20180409113744.GA14582@dragon>
+Message-ID: <20180409114022.GE11532@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 4, 2018 at 11:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
-> (I have exact patches ready :), was on vacation)
+On Mon, Apr 09, 2018 at 07:37:45PM +0800, Shawn Guo wrote:
+> On Mon, Mar 05, 2018 at 11:25:17AM +0100, Oleksij Rempel wrote:
 
-What am I expected to do with this one?
+> > As this patch set touches multiple subsystems I think it would make
+> > sense for Shawn Guo to take the all patch set.
+> > The only part which didn't receive an ACK is regulator stuff. So I would
+> > hope that Mark Brown can ACK it.
 
-> On 03/04/18 11:07, Viresh Kumar wrote:
->> The cpufreq core is already validating the CPU frequency table after
->> calling the ->init() callback of the cpufreq drivers and the drivers
->> don't need to do the same anymore. Though they need to set the
->> policy->freq_table field directly from the ->init() callback now.
->>
->> Stop validating the frequency table from scmi driver.
->>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> Besides regulator changes, I did not see an ACK on kernel/reboot.c
+> either.
+
+Right, that's the big blocker here.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/1561968a/attachment-0001.sig>
