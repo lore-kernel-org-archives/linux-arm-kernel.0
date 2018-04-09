@@ -1,57 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 9 Apr 2018 12:26:00 +0100
-Subject: [PATCH] arm64: avoid race condition issue in dump_backtrace
-In-Reply-To: <1523174328.26617.91.camel@mtksdccf07>
-References: <1521687960-3744-1-git-send-email-ji.zhang@mediatek.com>
- <20180322055929.z25brvwlmdighz66@salmiak>
- <1521711329.26617.31.camel@mtksdccf07>
- <20180326113932.2i6qp3776jtmcqk4@lakrids.cambridge.arm.com>
- <1522229612.26617.47.camel@mtksdccf07>
- <20180328101240.moo44g5qd3qjuxgn@lakrids.cambridge.arm.com>
- <1522397292.26617.63.camel@mtksdccf07>
- <20180404090431.rqwtaqovipxa5gta@lakrids.cambridge.arm.com>
- <1523174328.26617.91.camel@mtksdccf07>
-Message-ID: <20180409112559.uh76jpiytznymw6w@lakrids.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 9 Apr 2018 13:28:29 +0200
+Subject: SUN6I a31 OPP table clock issue
+In-Reply-To: <8b797d9c-b2fb-e49b-daa2-e4e15753f3fa@orpaltech.com>
+References: <c309c971-7559-e1d9-dc9f-2f7a7ad6f3cb@orpaltech.com>
+ <20180409085356.goemvdy3ecyqoghp@flea>
+ <8b797d9c-b2fb-e49b-daa2-e4e15753f3fa@orpaltech.com>
+Message-ID: <20180409112829.dckferoj6n2j2sbj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 08, 2018 at 03:58:48PM +0800, Ji.Zhang wrote:
-> Yes, I see where the loop is, I have missed that the loop may cross
-> different stacks.
-> Define a nesting order and check against is a good idea, and it can
-> resolve the issue exactly, but as you mentioned before, we have no idea
-> how to handle with overflow and sdei stack, and the nesting order is
-> strongly related with the scenario of the stack, which means if someday
-> we add another stack, we should consider the relationship of the new
-> stack with other stacks. From the perspective of your experts, is that
-> suitable for doing this in unwind?
-> 
-> Or could we just find some way easier but not so accurate, eg.
-> Proposal 1: 
-> When we do unwind and detect that the stack spans, record the last fp of
-> previous stack and next time if we get into the same stack, compare it
-> with that last fp, the new fp should still smaller than last fp, or
-> there should be potential loop.
-> For example, when we unwind from irq to task, we record the last fp in
-> irq stack such as last_irq_fp, and if it unwind task stack back to irq
-> stack, no matter if it is the same irq stack with previous, just let it
-> go and compare the new irq fp with last_irq_fp, although the process may
-> be wrong since from task stack it could not unwind to irq stack, but the
-> whole process will eventually stop.
+On Mon, Apr 09, 2018 at 01:35:42PM +0300, Sergey Suloev wrote:
+> On 04/09/2018 11:53 AM, Maxime Ripard wrote:
+> > On Sat, Apr 07, 2018 at 10:53:10PM +0300, Sergey Suloev wrote:
+> > > I was able to catch oops coming from OPP table on BananaPi M2.
+> > > 
+> > > https://pastebin.com/ZRaXTtEx
+> > > 
+> > > Let me know if need more detail.
+> > Of course we do.
+> > 
+> > Which kernel version was this for? With which configuration? What
+> > makes you say it's related to the OPP table, is it a regression or
+> > something you just noticed?
+>
+> Ok, first of all, I am having the problem using linus tree, 4.16 as it is,
+> with no extra patches.
 
-I agree that saving the last fp per-stack could work.
+Your kernel version is marked as dirty in your logs, which means you
+have local changes. So it doesn't really qualify as "as is".
 
-> Proposal 2:
-> So far we have four types of stack: task, irq, overflow and sdei, could
-> we just assume that the MAX number of stack spanning is just 3
-> times?(task->irq->overflow->sdei or task->irq->sdei->overflow), if yes,
-> we can just check the number of stack spanning when we detect the stack
-> spans.
+> My config file is here [1].
+> The problem is easily avoided by just commenting all freqs out of the OPP
+> table except for 1008 MHz, i.e. things work well when there is no freq
+> switch at all.
+> It makes me think that there might be an issue in A31 clocks driver as it is
+> the only important component used by cpufreq-dt.
+> As of cpufreq-dt driver it seems ok because works fine on other boards.
 
-I also agree that counting the number of stack transitions will prevent
-an inifinite loop, even if less accurately than proposal 1.
+Could you add some printk's to ccu_mux_notifier_nb to see which
+pointer is NULL?
 
-I don't have a strong preference either way.
+Maxime
 
-Thanks,
-Mark.
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/8f93bff4/attachment.sig>
