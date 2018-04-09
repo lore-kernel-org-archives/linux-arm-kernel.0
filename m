@@ -1,104 +1,67 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 9 Apr 2018 17:05:39 +0800
-Subject: [xlnx:xlnx_rebase_v4.14 315/842] drivers/usb/dwc3/gadget.c:1131:34:
- error: 'dma' undeclared
-Message-ID: <201804091722.MkiNlvAW%fengguang.wu@intel.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 9 Apr 2018 11:22:29 +0200
+Subject: [PATCH 0/7] sunxi: Add DT representation for the MBUS controller
+In-Reply-To: <CAL_Jsq+cURC780ivftY1v3P59g5UKAHwb48raXXB6huQ2KBvuQ@mail.gmail.com>
+References: <cover.54a07919b9d7fe8d7c90e9f4929648013e641cff.1522761929.git-series.maxime.ripard@bootlin.com>
+ <CAL_Jsq+cURC780ivftY1v3P59g5UKAHwb48raXXB6huQ2KBvuQ@mail.gmail.com>
+Message-ID: <20180409092229.ljcnsqgv7wh2s4op@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
-head:   fe04d2ee0dfea6b5fdbb04f4f6dbcaa13bfd2fda
-commit: bc64ac010c4d6375b22c488aad712ccfb072319b [315/842] usb: dwc3: gadget: fix queue remaining sg list trb first
-config: sh-allmodconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout bc64ac010c4d6375b22c488aad712ccfb072319b
-        # save the attached .config to linux build tree
-        make.cross ARCH=sh 
+Hi Rob,
 
-Note: the xlnx/xlnx_rebase_v4.14 HEAD fe04d2ee0dfea6b5fdbb04f4f6dbcaa13bfd2fda builds fine.
-      It only hurts bisectibility.
+On Tue, Apr 03, 2018 at 11:03:30AM -0500, Rob Herring wrote:
+> On Tue, Apr 3, 2018 at 8:29 AM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > Hi,
+> >
+> > We've had for quite some time to hack around in our drivers to take into
+> > account the fact that our DMA accesses are not done through the parent
+> > node, but through another bus with a different mapping than the CPU for the
+> > RAM (0 instead of 0x40000000 for most SoCs).
+> >
+> > After some discussion after the submission of a camera device suffering of
+> > the same hacks, I've decided to put together a serie that introduce a
+> > property called dma-parent that allows to express the DMA relationship
+> > between a master and its bus, even if they are not direct parents in the DT.
+> 
+> Reading thru v6 of the camera driver, it seems like having
+> intermediate buses would solve the problem in your case?
 
-All errors (new ones prefixed by >>):
+I guess it would yes, but I guess it wouldn't model the hardware
+properly since this seems to be really a bus only meant to do DMA, and
+you're not accessing the registers of the device through that bus.
 
-   drivers/usb/dwc3/gadget.c: In function 'dwc3_prepare_one_trb_sg':
->> drivers/usb/dwc3/gadget.c:1131:34: error: 'dma' undeclared (first use in this function)
-      dwc3_prepare_one_trb(dep, req, dma, length,
-                                     ^~~
-   drivers/usb/dwc3/gadget.c:1131:34: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/usb/dwc3/gadget.c:1131:3: error: too many arguments to function 'dwc3_prepare_one_trb'
-      dwc3_prepare_one_trb(dep, req, dma, length,
-      ^~~~~~~~~~~~~~~~~~~~
-   drivers/usb/dwc3/gadget.c:1015:13: note: declared here
-    static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
-                ^~~~~~~~~~~~~~~~~~~~
+And as far as I know, the DT implies that the topology is the one of
+the "control" side of the devices.
 
-vim +/dma +1131 drivers/usb/dwc3/gadget.c
+We'll also need eventually to have retrieve the MBUS endpoints ID to
+be able to support perf and PM QoS properly.
 
-  1085	
-  1086	static void dwc3_prepare_one_trb_sg(struct dwc3_ep *dep,
-  1087			struct dwc3_request *req)
-  1088	{
-  1089		struct scatterlist *sg = req->sg_to_start;
-  1090		struct scatterlist *s;
-  1091		int		i;
-  1092		unsigned int remaining = req->request.num_mapped_sgs
-  1093			- req->num_queued_sgs;
-  1094	
-  1095		for_each_sg(sg, s, remaining, i) {
-  1096			unsigned int length = req->request.length;
-  1097			unsigned int maxp = usb_endpoint_maxp(dep->endpoint.desc);
-  1098			unsigned int rem = length % maxp;
-  1099			unsigned chain = true;
-  1100	
-  1101			if (sg_is_last(s))
-  1102				chain = false;
-  1103	
-  1104			if (rem && usb_endpoint_dir_out(dep->endpoint.desc) && !chain) {
-  1105				struct dwc3	*dwc = dep->dwc;
-  1106				struct dwc3_trb	*trb;
-  1107	
-  1108				req->unaligned = true;
-  1109	
-  1110				/* prepare normal TRB */
-  1111				dwc3_prepare_one_trb(dep, req, true, i);
-  1112	
-  1113				/* Now prepare one extra TRB to align transfer size */
-  1114				trb = &dep->trb_pool[dep->trb_enqueue];
-  1115				__dwc3_prepare_one_trb(dep, trb, dwc->bounce_addr,
-  1116						maxp - rem, false, 0,
-  1117						req->request.stream_id,
-  1118						req->request.short_not_ok,
-  1119						req->request.no_interrupt);
-  1120			} else {
-  1121				dwc3_prepare_one_trb(dep, req, chain, i);
-  1122			}
-  1123	
-  1124			/* In the case where not able to queue trbs for all sgs in
-  1125			 * request because of trb not available, update sg_to_start
-  1126			 * to next sg from which we can start queing trbs once trbs
-  1127			 * availbale
-  1128			 */
-  1129			req->sg_to_start = sg_next(s);
-  1130			req->num_queued_sgs++;
-> 1131			dwc3_prepare_one_trb(dep, req, dma, length,
-  1132					chain, i);
-  1133	
-  1134			if (!dwc3_calc_trbs_left(dep))
-  1135				break;
-  1136		}
-  1137	}
-  1138	
+> As Arnd mentioned in that thread, something new needs to address all
+> the deficiencies with dma-ranges and describing DMA bus topologies.
+> This doesn't address the needs of describing bus interconnects.
+> There's been some efforts by the QCom folks with an interconnect
+> binding. They've mostly punted (for now at least) to not describing
+> the whole interconnect in DT and keeping the details in a driver.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Is it that patch serie? https://lkml.org/lkml/2018/3/9/856
+
+> On the flip side, this does mirror the established pattern used by
+> interrupts, so maybe it's okay on it's own. I'll wait for others to
+> comment.
+
+We'll see how it turns out then :)
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 46760 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/ff27fd0a/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/425800b0/attachment.sig>
