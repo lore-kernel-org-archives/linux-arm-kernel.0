@@ -1,52 +1,104 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Apr 2018 10:04:30 +0100
-Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
-In-Reply-To: <CAMuHMdUoUVF+WYrPG1Dx515_de_2nhGhLfn9+tJUm5jgs1uz0w@mail.gmail.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-8-mylene.josserand@bootlin.com>
- <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
- <20180404155909.148085f7@dell-desktop.home>
- <86vad7qc21.wl-marc.zyngier@arm.com>
- <CAMuHMdUoUVF+WYrPG1Dx515_de_2nhGhLfn9+tJUm5jgs1uz0w@mail.gmail.com>
-Message-ID: <bd94a149-267e-1089-7884-1bf0c7602c43@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 9 Apr 2018 17:05:39 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 315/842] drivers/usb/dwc3/gadget.c:1131:34:
+ error: 'dma' undeclared
+Message-ID: <201804091722.MkiNlvAW%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/04/18 09:24, Geert Uytterhoeven wrote:
-> On Wed, Apr 4, 2018 at 4:30 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On Wed, 04 Apr 2018 14:59:09 +0100,
->> Myl?ne Josserand wrote:
-> 
-> [Marc: stuck in ISO-8859-1? ;-]
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   fe04d2ee0dfea6b5fdbb04f4f6dbcaa13bfd2fda
+commit: bc64ac010c4d6375b22c488aad712ccfb072319b [315/842] usb: dwc3: gadget: fix queue remaining sg list trb first
+config: sh-allmodconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout bc64ac010c4d6375b22c488aad712ccfb072319b
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
-I have no idea what Wanderlust does (that's what I use on my laptop).
-But Thunderbird definitely interprets the original posting as '?', which
-should work with a 8859-1. I need to have a look at how to get UTF-8 to
-be the default... (I hate email clients).
+Note: the xlnx/xlnx_rebase_v4.14 HEAD fe04d2ee0dfea6b5fdbb04f4f6dbcaa13bfd2fda builds fine.
+      It only hurts bisectibility.
 
-> 
->>>> It'd be good to take this opportunity to refactor the shmobile code.
->>>
->>> I can do it in this series but I do not have any shmobile platforms so
->>> I will not be able to test my modifications (only compilation).
->>>
->>> If someone can test it for me (who?), it is okay for me to refactor this
->>> code :)
->>
->> I guess you could Cc the shmobile folks (Geert Uytterhoeven, Simon
->> Horman), and get them to review/test the changes.
-> 
-> Correct. I can test on a remote R-Car E2 ALT board that needs it.
-> 
-> P.S. Interestingly, none of the Renesas CA15 SoCs seem to suffer from it,
->      only CA7.
+All errors (new ones prefixed by >>):
 
-I suspect A15 has the courtesy of resetting CNTVOFF to zero, and A7
-doesn't. But the letter of the architecture is that it has an "UNKNOWN
-reset value".
+   drivers/usb/dwc3/gadget.c: In function 'dwc3_prepare_one_trb_sg':
+>> drivers/usb/dwc3/gadget.c:1131:34: error: 'dma' undeclared (first use in this function)
+      dwc3_prepare_one_trb(dep, req, dma, length,
+                                     ^~~
+   drivers/usb/dwc3/gadget.c:1131:34: note: each undeclared identifier is reported only once for each function it appears in
+>> drivers/usb/dwc3/gadget.c:1131:3: error: too many arguments to function 'dwc3_prepare_one_trb'
+      dwc3_prepare_one_trb(dep, req, dma, length,
+      ^~~~~~~~~~~~~~~~~~~~
+   drivers/usb/dwc3/gadget.c:1015:13: note: declared here
+    static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
+                ^~~~~~~~~~~~~~~~~~~~
 
-Thanks,
+vim +/dma +1131 drivers/usb/dwc3/gadget.c
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+  1085	
+  1086	static void dwc3_prepare_one_trb_sg(struct dwc3_ep *dep,
+  1087			struct dwc3_request *req)
+  1088	{
+  1089		struct scatterlist *sg = req->sg_to_start;
+  1090		struct scatterlist *s;
+  1091		int		i;
+  1092		unsigned int remaining = req->request.num_mapped_sgs
+  1093			- req->num_queued_sgs;
+  1094	
+  1095		for_each_sg(sg, s, remaining, i) {
+  1096			unsigned int length = req->request.length;
+  1097			unsigned int maxp = usb_endpoint_maxp(dep->endpoint.desc);
+  1098			unsigned int rem = length % maxp;
+  1099			unsigned chain = true;
+  1100	
+  1101			if (sg_is_last(s))
+  1102				chain = false;
+  1103	
+  1104			if (rem && usb_endpoint_dir_out(dep->endpoint.desc) && !chain) {
+  1105				struct dwc3	*dwc = dep->dwc;
+  1106				struct dwc3_trb	*trb;
+  1107	
+  1108				req->unaligned = true;
+  1109	
+  1110				/* prepare normal TRB */
+  1111				dwc3_prepare_one_trb(dep, req, true, i);
+  1112	
+  1113				/* Now prepare one extra TRB to align transfer size */
+  1114				trb = &dep->trb_pool[dep->trb_enqueue];
+  1115				__dwc3_prepare_one_trb(dep, trb, dwc->bounce_addr,
+  1116						maxp - rem, false, 0,
+  1117						req->request.stream_id,
+  1118						req->request.short_not_ok,
+  1119						req->request.no_interrupt);
+  1120			} else {
+  1121				dwc3_prepare_one_trb(dep, req, chain, i);
+  1122			}
+  1123	
+  1124			/* In the case where not able to queue trbs for all sgs in
+  1125			 * request because of trb not available, update sg_to_start
+  1126			 * to next sg from which we can start queing trbs once trbs
+  1127			 * availbale
+  1128			 */
+  1129			req->sg_to_start = sg_next(s);
+  1130			req->num_queued_sgs++;
+> 1131			dwc3_prepare_one_trb(dep, req, dma, length,
+  1132					chain, i);
+  1133	
+  1134			if (!dwc3_calc_trbs_left(dep))
+  1135				break;
+  1136		}
+  1137	}
+  1138	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 46760 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/ff27fd0a/attachment-0001.gz>
