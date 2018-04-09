@@ -1,134 +1,34 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon, 9 Apr 2018 22:51:39 +0200
-Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
-In-Reply-To: <20180409170706.23541-1-marc.zyngier@arm.com>
-References: <20180409170706.23541-1-marc.zyngier@arm.com>
-Message-ID: <20180409205139.GH10904@cbox>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Apr 2018 16:12:44 -0500
+Subject: [net-next PATCH v3 01/11] soc: ti: K2G: enhancement to support
+ QMSS in K2G NAVSS
+In-Reply-To: <1522679881-25643-2-git-send-email-m-karicheri2@ti.com>
+References: <1522679881-25643-1-git-send-email-m-karicheri2@ti.com>
+ <1522679881-25643-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20180409211244.cq45hzntyuppnkjc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 06:07:06PM +0100, Marc Zyngier wrote:
-> Before entering the guest, we check whether our VMID is still
-> part of the current generation. In order to avoid taking a lock,
-> we start with checking that the generation is still current, and
-> only if not current do we take the lock, recheck, and update the
-> generation and VMID.
+On Mon, Apr 02, 2018 at 10:37:51AM -0400, Murali Karicheri wrote:
+> Navigator Subsystem (NAVSS) available on K2G SoC has a cut down
+> version of QMSS with less number of queues, internal linking ram
+> with lesser number of buffers etc.  It doesn't have status and
+> explicit push register space as in QMSS available on other K2 SoCs.
+> So define reg indices specific to QMSS on K2G. This patch introduces
+> "ti,66ak2g-navss-qm" compatibility to identify QMSS on K2G NAVSS
+> and to customize the dts handling code. Per Device manual,
+> descriptors with index less than or equal to regions0_size is in region 0
+> in the case of K2 QMSS where as for QMSS on K2G, descriptors with index
+> less than regions0_size is in region 0. So update the size accordingly in
+> the regions0_size bits of the linking ram size 0 register.
 > 
-> This leaves open a small race: A vcpu can bump up the global
-> generation number as well as the VM's, but has not updated
-> the VMID itself yet.
-> 
-> At that point another vcpu from the same VM comes in, checks
-> the generation (and finds it not needing anything), and jumps
-> into the guest. At this point, we end-up with two vcpus belonging
-> to the same VM running with two different VMIDs. Eventually, the
-> VMID used by the second vcpu will get reassigned, and things will
-> really go wrong...
-> 
-> A simple solution would be to drop this initial check, and always take
-> the lock. This is likely to cause performance issues. A middle ground
-> is to convert the spinlock to a rwlock, and only take the read lock
-> on the fast path. If the check fails at that point, drop it and
-> acquire the write lock, rechecking the condition.
-> 
-> This ensures that the above scenario doesn't occur.
-> 
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
 > ---
-> I haven't seen any reply from Shannon, so reposting this to
-> a slightly wider audience for feedback.
-> 
->  virt/kvm/arm/arm.c | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index dba629c5f8ac..a4c1b76240df 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -63,7 +63,7 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
->  static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
->  static u32 kvm_next_vmid;
->  static unsigned int kvm_vmid_bits __read_mostly;
-> -static DEFINE_SPINLOCK(kvm_vmid_lock);
-> +static DEFINE_RWLOCK(kvm_vmid_lock);
->  
->  static bool vgic_present;
->  
-> @@ -473,11 +473,16 @@ static void update_vttbr(struct kvm *kvm)
->  {
->  	phys_addr_t pgd_phys;
->  	u64 vmid;
-> +	bool new_gen;
->  
-> -	if (!need_new_vmid_gen(kvm))
-> +	read_lock(&kvm_vmid_lock);
-> +	new_gen = need_new_vmid_gen(kvm);
-> +	read_unlock(&kvm_vmid_lock);
-> +
-> +	if (!new_gen)
->  		return;
->  
-> -	spin_lock(&kvm_vmid_lock);
-> +	write_lock(&kvm_vmid_lock);
->  
->  	/*
->  	 * We need to re-check the vmid_gen here to ensure that if another vcpu
-> @@ -485,7 +490,7 @@ static void update_vttbr(struct kvm *kvm)
->  	 * use the same vmid.
->  	 */
->  	if (!need_new_vmid_gen(kvm)) {
-> -		spin_unlock(&kvm_vmid_lock);
-> +		write_unlock(&kvm_vmid_lock);
->  		return;
->  	}
->  
-> @@ -519,7 +524,7 @@ static void update_vttbr(struct kvm *kvm)
->  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
->  	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
->  
-> -	spin_unlock(&kvm_vmid_lock);
-> +	write_unlock(&kvm_vmid_lock);
->  }
->  
->  static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
-> -- 
-> 2.14.2
-> 
+>  .../bindings/soc/ti/keystone-navigator-qmss.txt    |  9 ++-
 
-The above looks correct to me.  I am wondering if something like the
-following would also work, which may be slightly more efficient,
-although I doubt the difference can be measured:
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index dba629c5f8ac..7ac869bcad21 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -458,7 +458,9 @@ void force_vm_exit(const cpumask_t *mask)
-  */
- static bool need_new_vmid_gen(struct kvm *kvm)
- {
--	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
-+	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
-+	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
-+	return unlikely(kvm->arch.vmid_gen != current_vmid_gen);
- }
- 
- /**
-@@ -508,10 +510,11 @@ static void update_vttbr(struct kvm *kvm)
- 		kvm_call_hyp(__kvm_flush_vm_context);
- 	}
- 
--	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
- 	kvm->arch.vmid = kvm_next_vmid;
- 	kvm_next_vmid++;
- 	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
-+	smp_wmb();
-+	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
- 
- 	/* update vttbr to be used with the new vmid */
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
-
-
-Thanks,
--Christoffer
+>  drivers/soc/ti/knav_qmss.h                         |  6 ++
+>  drivers/soc/ti/knav_qmss_queue.c                   | 90 ++++++++++++++++------
+>  3 files changed, 82 insertions(+), 23 deletions(-)
