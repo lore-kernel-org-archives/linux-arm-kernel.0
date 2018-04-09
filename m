@@ -1,96 +1,75 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Mon, 9 Apr 2018 17:37:09 +0300
-Subject: [PATCH V2 3/9] dt-bindings: Tegra186 tachometer device tree
- bindings
-In-Reply-To: <CAL_Jsq+AsUiWWBQ7K4OUM58KqQbvBHuFYmXxXLwr7viwoKW-Yw@mail.gmail.com>
-References: <1521607244-29734-1-git-send-email-rrajk@nvidia.com>
- <1521607244-29734-4-git-send-email-rrajk@nvidia.com>
- <20180327145249.xjoo42qow34ksdle@rob-hp-laptop>
- <867aace8-dac7-51d4-bd46-15919b58b37d@kapsi.fi>
- <CAL_Jsq+AsUiWWBQ7K4OUM58KqQbvBHuFYmXxXLwr7viwoKW-Yw@mail.gmail.com>
-Message-ID: <615d6771-00c3-a4a7-a99f-ec4f6e667c8f@kapsi.fi>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 9 Apr 2018 22:37:42 +0800
+Subject: [PATCH v5 0/7] clk: meson-axg: Add AO Cloclk and Reset driver
+Message-ID: <20180409143749.71197-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+  This patch try to add AO clock and Reset driver for Amlogic's
+Meson-AXG SoC.
+  Please note that patch 7 need to wait for the DTS changes[3] merged
+into mainline first, otherwise it will break the serial console.
 
+ patch 2: factor the common code into a dedicated file
+ patch 3-5: add the aoclk driver for AXG SoC
+ patch 6-7: drop unnecessary clock flags
 
-On 04/09/2018 04:21 PM, Rob Herring wrote:
-> On Mon, Apr 9, 2018 at 12:38 AM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
->> Rob,
-> 
-> Please don't top post to lists.
-> 
->> this binding is for a specific IP block (for measuring/aggregating input
->> pulses) on the Tegra186 SoC, so I don't think it fits into any generic
->> binding.
-> 
-> What is it hooked up to to measure? You only mention "fan" five times
-> in the doc.
+changes since v4 at [5]: 
+ - fix return err
+ - introduce CONFIG_COMMON_CLK_MESON_AO
+ - format/style minor fix
 
-In practice, fans.
+changes since v3 at [4]: 
+ - add 'const' contraint to the read-only data
+ - switch to devm_of_clk_add_hw_provider API
+ - check return value of devm_reset_controller_register
 
-> 
-> You have #pwm-cells too, so this block has PWM output as well? If not,
-> then where's the PWM for the fan control because there is no point in
-> having fan tach without some control mechanism.
+changes since v2 at [2]: 
+ - rework meson_aoclkc_probe() which leverage the of_match_data
+ - merge patch 5-6 into this series
+ - seperate DTS patch, will send to Kevin Hilman independently
+ 
+changes since v1 at [0]: 
+ - rebase to clk-meson's branch 'next/drivers' [1]
+ - fix license, update to BSD-3-Clause
+ - drop un-used include header file
 
-It doesn't provide a PWM output. The (Linux) PWM framework provides 
-functionality in both directions - control and capture. But if the 
-device tree #pwm-cells/pwms properties are only for control, we may need 
-to introduce a new #capture-pwm-cells/capture-pwms or similar.
+[0] https://lkml.kernel.org/r/20180209070026.193879-1-yixun.lan at amlogic.com
+[1] git://github.com/BayLibre/clk-meson.git branch: next-drivers
+[2] https://lkml.kernel.org/r/20180323143816.200573-1-yixun.lan at amlogic.com
+[3] https://lkml.kernel.org/r/20180326081809.49493-4-yixun.lan at amlogic.com
+[4] https://lkml.kernel.org/r/20180328025050.221585-1-yixun.lan at amlogic.com
+[5] https://lkml.kernel.org/r/20180408031938.153474-1-yixun.lan at amlogic.com
 
-The idea is that the generic fan node can then specify two pwms, one for 
-control and one for capture, to enable e.g. closed-loop control (I'm not 
-personally familiar with the usecase for this but I could imagine 
-something like that). The control PWM can be something completely 
-different, maybe not a PWM in the first place (e.g. some fixed voltage).
+Qiufang Dai (1):
+  clk: meson-axg: Add AO Clock and Reset controller driver
 
-> 
-> There's only so many ways to control fans and types of fans, so yes,
-> the interface of control and feedback lines between a fan and its
-> controller should absolutely be generic.
+Yixun Lan (6):
+  clk: meson: migrate to devm_of_clk_add_hw_provider API
+  clk: meson: aoclk: refactor common code into dedicated file
+  dt-bindings: clock: axg-aoclkc: New binding for Meson-AXG SoC
+  dt-bindings: clock: reset: Add AXG AO Clock and Reset Bindings
+  clk: meson: drop CLK_SET_RATE_PARENT flag
+  clk: meson: drop CLK_IGNORE_UNUSED flag
 
-I'm not quite getting what you mean by this. Clearly we need a custom 
-compatibility string for the tachometer as it's a different hardware 
-block with different programming than others. Or are you complaining 
-about the nvidia,pulse-per-rev/capture-window-len properties?
+ .../bindings/clock/amlogic,gxbb-aoclkc.txt         |   1 +
+ drivers/clk/meson/Kconfig                          |   8 +
+ drivers/clk/meson/Makefile                         |   3 +-
+ drivers/clk/meson/axg-aoclk.c                      | 163 +++++++++++++++++++++
+ drivers/clk/meson/axg-aoclk.h                      |  31 ++++
+ drivers/clk/meson/gxbb-aoclk.c                     |  92 ++++--------
+ drivers/clk/meson/gxbb-aoclk.h                     |   7 +
+ drivers/clk/meson/meson-aoclk.c                    |  82 +++++++++++
+ drivers/clk/meson/meson-aoclk.h                    |  35 +++++
+ include/dt-bindings/clock/axg-aoclkc.h             |  26 ++++
+ include/dt-bindings/reset/axg-aoclkc.h             |  20 +++
+ 11 files changed, 406 insertions(+), 62 deletions(-)
+ create mode 100644 drivers/clk/meson/axg-aoclk.c
+ create mode 100644 drivers/clk/meson/axg-aoclk.h
+ create mode 100644 drivers/clk/meson/meson-aoclk.c
+ create mode 100644 drivers/clk/meson/meson-aoclk.h
+ create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
+ create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
 
-Thanks,
-Mikko
-
-> 
-> Rob
-> 
->>
->> Thanks,
->> Mikko
->>
->>
->> On 03/27/2018 05:52 PM, Rob Herring wrote:
->>>
->>> On Wed, Mar 21, 2018 at 10:10:38AM +0530, Rajkumar Rampelli wrote:
->>>>
->>>> Supply Device tree binding documentation for the NVIDIA
->>>> Tegra186 SoC's Tachometer Controller
->>>>
->>>> Signed-off-by: Rajkumar Rampelli <rrajk@nvidia.com>
->>>> ---
->>>>
->>>> V2: Renamed compatible string to "nvidia,tegra186-pwm-tachometer"
->>>>       Renamed dt property values of clock-names and reset-names to
->>>> "tachometer"
->>>>       from "tach"
->>>
->>>
->>> Read my prior comments on v1.
->>>
->>> Rob
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+2.15.1
