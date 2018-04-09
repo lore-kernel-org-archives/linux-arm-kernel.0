@@ -1,91 +1,41 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 9 Apr 2018 11:55:08 +0100
-Subject: [RFC PATCH v2 3/3] KVM: arm64: Optimise FPSIMD handling to
- reduce guest/host thrashing
-In-Reply-To: <86tvsnqr3l.wl-marc.zyngier@arm.com>
-References: <1523026864-15413-1-git-send-email-Dave.Martin@arm.com>
- <1523026864-15413-4-git-send-email-Dave.Martin@arm.com>
- <86tvsnqr3l.wl-marc.zyngier@arm.com>
-Message-ID: <20180409105507.GU16308@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 9 Apr 2018 11:50:01 +0100
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <94a394bd-89bf-9334-c500-4cbadf4c1044@orpaltech.com>
+References: <20180404065048.n76r3ytuznd6fqsl@flea>
+ <a6044902-8977-3ce1-d7d5-c6797341a5d0@orpaltech.com>
+ <20180405091913.ky4dnmszoobn2xry@flea>
+ <ee4adb1e-caf6-32f6-33d6-d8dd94d232cf@orpaltech.com>
+ <20180405131735.GB12349@sirena.org.uk>
+ <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
+ <20180406073441.xesojvzc3deljhoy@flea>
+ <204e97cb-2f39-00f0-fd4e-3aa9a51f7cac@orpaltech.com>
+ <20180409092730.2moyhl5aaktjwbyn@flea>
+ <94a394bd-89bf-9334-c500-4cbadf4c1044@orpaltech.com>
+Message-ID: <20180409105001.GC11532@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 07, 2018 at 10:54:22AM +0100, Marc Zyngier wrote:
-> On Fri, 06 Apr 2018 16:01:04 +0100,
-> Dave Martin wrote:
-> 
-> Hi Dave,
-> 
-> > 
-> > This patch refactors KVM to align the host and guest FPSIMD
-> > save/restore logic with each other for arm64.  This reduces the
-> > number of redundant save/restore operations that must occur, and
-> > reduces the common-case IRQ blackout time during guest exit storms
-> > by saving the host state lazily and optimising away the need to
-> > restore the host state before returning to the run loop.
-> > 
-> > Four hooks are defined in order to enable this:
-> > 
-> >  * kvm_arch_vcpu_run_map_fp():
-> >    Called on PID change to map necessary bits of current to Hyp.
-> > 
-> >  * kvm_arch_vcpu_load_fp():
-> >    Set up FP/SIMD for entering the KVM run loop (parse as
-> >    "vcpu_load fp").
-> > 
-> >  * kvm_arch_vcpu_park_fp():
-> >    Get FP/SIMD into a safe state for re-enabling interrupts after a
-> >    guest exit back to the run loop.
-> 
-> It would be good if you could outline what this hook does, and what
-> "safe state" means in this context.
+On Mon, Apr 09, 2018 at 01:26:23PM +0300, Sergey Suloev wrote:
+> On 04/09/2018 12:27 PM, Maxime Ripard wrote:
+> > On Fri, Apr 06, 2018 at 06:48:23PM +0300, Sergey Suloev wrote:
+> > > On 04/06/2018 10:34 AM, Maxime Ripard wrote:
 
-[...]
+> > > According to what you said the driver must implement
+> > > "transfer_one_message" instead of "transfer_one"
 
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index d3af3f4..cf0f457 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -362,10 +362,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
-> >  	kvm_arm_set_running_vcpu(vcpu);
-> >  	kvm_vgic_load(vcpu);
-> >  	kvm_timer_vcpu_load(vcpu);
-> > +	kvm_arch_vcpu_load_fp(vcpu);
-> 
-> Can't find this function.
+> > I'm not sure what makes you think that I said that.
 
-[...]
+> Because current implementation tries to send more than FIFO-depth of data in
+> a single call to "transfer_one" which is wrong.
 
-> > @@ -772,6 +774,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  		if (static_branch_unlikely(&userspace_irqchip_in_use))
-> >  			kvm_timer_sync_hwstate(vcpu);
-> >  
-> > +		kvm_arch_vcpu_park_fp(vcpu);
-> 
-> This isn't defined either. I have the feeling that you've missed a
-> "git add" at some point.
-> 
-> > +
-> >  		/*
-> >  		 * We may have taken a host interrupt in HYP mode (ie
-> >  		 * while executing the guest). This interrupt is still
-> > @@ -816,16 +820,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  	return ret;
-> >  }
-
-[...]
-
-> The structure seems quite sensible, and I'm looking forward to seeing
-> the missing bits. Also, it looks like this was done on top of
-> 4.16. I'm afraid 4.17 is going to bring a number of conflicts, but
-> nothing that should have any material impact.
-
-Hmmm, looks like I dropped an added file when flattening my draft series.
-
-See separate repost -- sorry about that.
-
-
-I've kept it on v4.16 just while things stabilise.
-
-Cheers
----Dave
+No, that's absolutely not the case.  All any of these functions has to
+do is transfer whatever they were asked to, how they do it is not at all
+important to the framework.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180409/392f06a1/attachment.sig>
