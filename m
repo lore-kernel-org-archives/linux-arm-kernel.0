@@ -1,44 +1,50 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 9 Apr 2018 20:54:33 +0200
-Subject: [PATCH v4 0/6] PCI: aardvark: misc fixes and improvements
-In-Reply-To: <20180409162356.GB14533@e107981-ln.cambridge.arm.com>
-References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
- <20180409162356.GB14533@e107981-ln.cambridge.arm.com>
-Message-ID: <20180409205433.4eb78a45@windsurf>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Mon, 9 Apr 2018 21:03:24 +0200
+Subject: [PATCHv2 09/12] arm64/kvm: preserve host HCR_EL2 value
+In-Reply-To: <20180409145709.dneotb6xaznw44c4@lakrids.cambridge.arm.com>
+References: <20171127163806.31435-1-mark.rutland@arm.com>
+ <20171127163806.31435-10-mark.rutland@arm.com>
+ <20180206123915.GA21802@cbox>
+ <20180409145709.dneotb6xaznw44c4@lakrids.cambridge.arm.com>
+Message-ID: <20180409190324.GG10904@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lorenzo,
-
-Thanks for your feedback!
-
-On Mon, 9 Apr 2018 17:23:56 +0100, Lorenzo Pieralisi wrote:
-
-> it is not just improvements, these look like significant bug fixes too.
+On Mon, Apr 09, 2018 at 03:57:09PM +0100, Mark Rutland wrote:
+> On Tue, Feb 06, 2018 at 01:39:15PM +0100, Christoffer Dall wrote:
+> > On Mon, Nov 27, 2017 at 04:38:03PM +0000, Mark Rutland wrote:
+> > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > > index 525c01f48867..2205f0be3ced 100644
+> > > --- a/arch/arm64/kvm/hyp/switch.c
+> > > +++ b/arch/arm64/kvm/hyp/switch.c
+> > > @@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+> > >  {
+> > >  	u64 val;
+> > >  
+> > > +	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
+> > > +
+> > 
+> > Looking back at this, it seems excessive to switch this at every
+> > round-trip.  I think it should be possible to have this as a single
+> > global (or per-CPU) variable that gets restored directly when returning
+> > from the VM.
 > 
-> Let me know which patches we should prioritize since hopefully they can
-> be sent during v4.17-rc* releases, I will queue the rest for the next
-> merge window.
+> I suspect this needs to be per-cpu, to account for heterogeneous
+> systems.
+> 
+> I guess if we move hcr_el2 into kvm_cpu_context, that gives us a
+> per-vcpu copy for guests, and a per-cpu copy for the host (in the global
+> kvm_host_cpu_state).
+> 
+> I'll have a look at how gnarly that turns out. I'm not sure how we can
+> initialise that sanely for the !VHE case to match whatever el2_setup
+> did.
 
-The patches that are bug fixes are marked with a "Fixes:" tag and are
-Cc'ed to stable.
+There's no harm in jumping down to EL2 to read a register during the
+initialization phase.  All it requires is an annotation of the callee
+function, and a kvm_call_hyp(), and it's actually quite fast unless you
+start saving/restoring a bunch of additional system registers.  See how
+we call __kvm_set_tpidr_el2() for example.
 
-So, the following patches are fixes:
-
-[PATCH v4 1/6] PCI: aardvark: Fix logic in advk_pcie_{rd,wr}_conf()
-[PATCH v4 2/6] PCI: aardvark: Set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
-[PATCH v4 3/6] PCI: aardvark: Use ISR1 instead of ISR0 interrupt in legacy irq mode
-[PATCH v4 4/6] PCI: aardvark: Fix PCIe Max Read Request Size setting
-
-The following patches are improvements:
-
-[PATCH v4 5/6] PCI: aardvark: Introduce an advk_pcie_valid_device() helper
-[PATCH v4 6/6] PCI: aardvark: Remove PCIe outbound window configuration
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Thanks,
+-Christoffer
