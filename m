@@ -1,51 +1,119 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Mon, 9 Apr 2018 15:18:38 -0400
-Subject: [PATCH v3] xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE
-In-Reply-To: <bd84cd4b-1834-b631-303c-3e190ad7676d@oracle.com>
-References: <20180409093629.9621-1-paul.durrant@citrix.com>
- <bd84cd4b-1834-b631-303c-3e190ad7676d@oracle.com>
-Message-ID: <3baffa60-bcca-cbf3-f056-db30a6c5178c@oracle.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Apr 2018 14:24:56 -0500
+Subject: [PATCH v3 1/4] dt-bindings: mfd: Add Gateworks System Controller
+ bindings
+In-Reply-To: <CAJ+vNU1cJFYTv3N6TZQ3k-VQw=0jxHEntpMxeSAOhWAb_ap81g@mail.gmail.com>
+References: <1522250043-8065-1-git-send-email-tharvey@gateworks.com>
+ <1522250043-8065-2-git-send-email-tharvey@gateworks.com>
+ <20180328162416.GB25325@roeck-us.net>
+ <CAJ+vNU2aUN4ME3+RA3DNPO75O6vPBcQpuRSfQJ4_Ns_zQAtCCQ@mail.gmail.com>
+ <20180328202321.GA21664@roeck-us.net>
+ <CAJ+vNU1cJFYTv3N6TZQ3k-VQw=0jxHEntpMxeSAOhWAb_ap81g@mail.gmail.com>
+Message-ID: <20180409192456.ne4zgdqozucquk42@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2018 12:36 PM, Boris Ostrovsky wrote:
-> On 04/09/2018 05:36 AM, Paul Durrant wrote:
->> My recent Xen patch series introduces a new HYPERVISOR_memory_op to
->> support direct priv-mapping of certain guest resources (such as ioreq
->> pages, used by emulators) by a tools domain, rather than having to access
->> such resources via the guest P2M.
->>
->> This patch adds the necessary infrastructure to the privcmd driver and
->> Xen MMU code to support direct resource mapping.
->>
->> NOTE: The adjustment in the MMU code is partially cosmetic. Xen will now
->>       allow a PV tools domain to map guest pages either by GFN or MFN, thus
->>       the term 'mfn' has been swapped for 'pfn' in the lower layers of the
->>       remap code.
->>
->> Signed-off-by: Paul Durrant <paul.durrant@citrix.com>
-> Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->
-> I think this will have to wait until 4.18 though, it's somewhat late for
-> current merge window right now.
+On Wed, Mar 28, 2018 at 01:53:53PM -0700, Tim Harvey wrote:
+> On Wed, Mar 28, 2018 at 1:23 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On Wed, Mar 28, 2018 at 12:17:34PM -0700, Tim Harvey wrote:
+> >> On Wed, Mar 28, 2018 at 9:24 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+> >> > On Wed, Mar 28, 2018 at 08:14:00AM -0700, Tim Harvey wrote:
+> >> >> This patch adds documentation of device-tree bindings for the
+> >> >> Gateworks System Controller (GSC).
+> >> >>
+> >> >> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> >> >> ---
+> >> >> v3:
+> >> >>  - replaced _ with -
+> >> >>  - remove input bindings
+> >> >>  - added full description of hwmon
+> >> >>  - fix unit address of hwmon child nodes
+> >> >>
+> >> >> ---
+> >> >>  .../devicetree/bindings/mfd/gateworks-gsc.txt      | 135 +++++++++++++++++++++
+> >> >>  1 file changed, 135 insertions(+)
+> >> >>  create mode 100644 Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+> >> >>
+> >> >> diff --git a/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+> >> >> new file mode 100644
+> >> >> index 0000000..8f530ed
+> >> >> --- /dev/null
+> >> >> +++ b/Documentation/devicetree/bindings/mfd/gateworks-gsc.txt
+> >> >> @@ -0,0 +1,135 @@
+> >> >> +Gateworks System Controller multi-function device
+> >> >> +
+> >> >> +The GSC is a Multifunction I2C slave device with the following submodules:
+> >> >> +- WDT
+> >> >> +- GPIO
+> >> >> +- Pushbutton controller
+> >> >> +- HWMON
+> >> >> +
+> >> >> +Required properties:
+> >> >> +- compatible : Must be "gw,gsc"
+> >> >> +- reg: I2C address of the device
+> >> >> +- interrupts: interrupt triggered by GSC_IRQ# signal
+> >> >> +- interrupt-parent: Interrupt controller GSC is connected to
+> >> >> +- #interrupt-cells: should be <1>, index of the interrupt within the
+> >> >> +  controller, in accordance with the "one cell" variant of
+> >> >> +  <devicetree/bindings/interrupt-controller/interrupt.txt>
+> >> >> +
+> >> >> +Optional nodes:
+> >> >> +* watchdog:
+> >> >> +The GSC provides a Watchdog monitor which can power cycle the board's
+> >> >> +primary power supply on most board models when tripped.
+> >> >> +
+> >> >> +Required watchdog properties:
+> >> >> +- compatible: must be "gw,gsc-watchdog"
+> >> >> +
+> >> >> +* hwmon:
+> >> >> +The GSC provides a set of Analog to Digitcal Converter (ADC) pins used for
+> >> >> +temperature and/or voltage monitoring.
+> >> >> +
+> >> >> +Required hwmon properties:
+> >> >> +- compatible: must be "gw,gsc-hwmon"
+> >> >> +
+> >> >
+> >> > "hwmon" is a very Linux specific term. It might make sense to find a more
+> >> > generic term.
+> >>
+> >> The 'hwmon' driver supports child nodes that fall into the following category:
+> >>  - temperature sensor (GSC internal temperature sensor - i2c registers
+> >> returns value in C*10)
+> >>  - voltage rails (two types here; cooked: i2c registers return
+> >> pre-scaled value in mV), raw: i2c registers return a raw ADC value
+> >> that must be scaled based on ADC internal ref voltage and resolution
+> >> and adjusted for a voltage divider to convert to mV
+> >>  - fan setpoints (I'll explain these below)
+> >>
+> >> I called the node 'gw,gsc-hwmon' because the driver fits into the
+> >> 'hwmon' API. Isn't that appropriate here for the driver compatible
+> >> string?
+> >>
+> >
+> > Devicetree properties are supposed to be OS independent.
 
++1
 
-Warns on 32-bit ARM build:
+> >
+> >> >
+> >> >> +Optional hwmon properties:
+> >> >> +- gw,reference-voltage: ADC reference voltage (mV) used in scaling raw ADCs
+> >> >
+> >> > AFAIK devicetree likes to specify voltages in uV.
+> >>
+> >> There are currently plenty of dt props specified in mV (grep -r mV
+> >> Documentation/devicetree/bindings/).
+> >>
+> >
+> > "But so many others are speeding, why do I get a ticket ?"
+> >
+> > Please discuss with Rob.
+> 
+> Yes - hoping for feedback on mV vs uV as well as naming of hwmon mfd child node.
 
-? CC????? drivers/xen/privcmd.o
-In file included from /data/upstream/linux-xen/include/linux/kernel.h:14:0,
-???????????????? from /data/upstream/linux-xen/drivers/xen/privcmd.c:11:
-/data/upstream/linux-xen/drivers/xen/privcmd.c: In function
-?privcmd_ioctl_mmap_resource?:
-/data/upstream/linux-xen/drivers/xen/privcmd.c:788:33: warning: cast to
-pointer from integer of different size [-Wint-to-pointer-cast]
-??? pr_info("pfn[%u] = %p\n", i, (void *)pfns[i]);
-???????????????????????????????? ^
-/data/upstream/linux-xen/include/linux/printk.h:308:34: note: in
-definition of macro ?pr_info?
-? printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
-????????????????????????????????? ^~~~~~~~~~~
-? AR????? drivers/xen/xen-privcmd.o
+Use what is defined in 
+Documentation/devicetree/bindings/property-units.txt. If you don't like 
+what is there, then add to it first. But generally you should have some 
+reason why what's there doesn't work for you.
 
-
--boris
+Rob
