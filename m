@@ -1,66 +1,134 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 9 Apr 2018 14:12:56 +0200
-Subject: [PATCH 0/5] Add tda998x (HDMI) support to atmel-hlcdc
-In-Reply-To: <20180409120217.GQ16141@n2100.armlinux.org.uk>
-References: <20180409105918.20792-1-peda@axentia.se>
- <20180409111733.GP16141@n2100.armlinux.org.uk>
- <bbc7a992-5f17-c108-2b6a-01a585e6e315@axentia.se>
- <20180409120217.GQ16141@n2100.armlinux.org.uk>
-Message-ID: <56a4e7ac-62b1-9f0e-5d30-cfc9dae0fb2e@axentia.se>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Mon, 9 Apr 2018 14:30:42 +0200
+Subject: [REPOST PATCH] arm/arm64: KVM: Add PSCI version selection API
+In-Reply-To: <86169dc0-b13c-fab9-eaca-363d3873ad10@arm.com>
+References: <20180215175803.6870-1-marc.zyngier@arm.com>
+ <db215c1e-0ce8-32e4-d131-e790bebf353e@redhat.com>
+ <86o9k63f7a.wl-marc.zyngier@arm.com>
+ <CAFEAcA8XYV=oSX81ON4CGDt0kfG1cgROqj30OC2Ov=bYhLSYig@mail.gmail.com>
+ <20180306092134.4bfbz34yhqfrfdlf@kamzik.brq.redhat.com>
+ <8042f946-49bf-5fc1-f513-4b76ccd5f7d6@arm.com>
+ <CAFEAcA-t1QvjW6eFQ4U+8odj0p_01F8sktpvN9KrZ1Kc-FhtnQ@mail.gmail.com>
+ <86169dc0-b13c-fab9-eaca-363d3873ad10@arm.com>
+Message-ID: <20180409123042.GD10904@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-09 14:02, Russell King - ARM Linux wrote:
-> On Mon, Apr 09, 2018 at 01:44:22PM +0200, Peter Rosin wrote:
->> On 2018-04-09 13:17, Russell King - ARM Linux wrote:
->>> On Mon, Apr 09, 2018 at 12:59:13PM +0200, Peter Rosin wrote:
->>>> During this, I found that the tda998x driver never sets the format in
->>>> the connector display_info. Thus, the atmel-hlcdc driver fails to select
->>>> output format. Since I had similar problems with ds90c185 lvds encoder
->>>> I added patches to override the atmel-hlcdc output format via a DT
->>>> property and things start to play together.
->>>
->>> That sounds like a hack.  The tda998x driver doesn't set the format
->>> because it pre-dates the addition of this information in the display
->>> info structure, and none of its current users require that information.
->>>
->>> As you're the first to require it, rather than working around the
->>> driver by adding stuff to DT, it would be much better to improve the
->>> driver by adding this information.
->>>
->>> Thanks.
->>
->> Even if I improved the tda998x driver, it would not be correct.
->>
->> The background is that while the atmel-hlcdc driver supports rgb888,
->> our PCB is only wired for rgb565. And the tda19988 has rgb888 input
->> (we have the lsb bits tied to ground on our PCB). So, the tda998x
->> driver can request rgb888 and the atmel-hlcdc driver can say ok,
->> but it still would not be correct. So, where exactly do you suggest
->> that I model the narrowing of the display format?
+On Thu, Mar 15, 2018 at 07:26:48PM +0000, Marc Zyngier wrote:
+> On 15/03/18 19:13, Peter Maydell wrote:
+> > On 15 March 2018 at 19:00, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> On 06/03/18 09:21, Andrew Jones wrote:
+> >>> On Mon, Mar 05, 2018 at 04:47:55PM +0000, Peter Maydell wrote:
+> >>>> On 2 March 2018 at 11:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >>>>> On Fri, 02 Mar 2018 10:44:48 +0000,
+> >>>>> Auger Eric wrote:
+> >>>>>> I understand the get/set is called as part of the migration process.
+> >>>>>> So my understanding is the benefit of this series is migration fails in
+> >>>>>> those cases:
+> >>>>>>
+> >>>>>>> =0.2 source -> 0.1 destination
+> >>>>>> 0.1 source -> >=0.2 destination
+> >>>>>
+> >>>>> It also fails in the case where you migrate a 1.0 guest to something
+> >>>>> that cannot support it.
+> >>>>
+> >>>> I think it would be useful if we could write out the various
+> >>>> combinations of source, destination and what we expect/want to
+> >>>> have happen. My gut feeling here is that we're sacrificing
+> >>>> exact migration compatibility in favour of having the guest
+> >>>> automatically get the variant-2 mitigations, but it's not clear
+> >>>> to me exactly which migration combinations that's intended to
+> >>>> happen for. Marc?
+> >>>>
+> >>>> If this wasn't a mitigation issue the desired behaviour would be
+> >>>> straightforward:
+> >>>>  * kernel should default to 0.2 on the basis that
+> >>>>    that's what it did before
+> >>>>  * new QEMU version should enable 1.0 by default for virt-2.12
+> >>>>    and 0.2 for virt-2.11 and earlier
+> >>>>  * PSCI version info shouldn't appear in migration stream unless
+> >>>>    it's something other than 0.2
+> >>>> But that would leave some setups (which?) unnecessarily without the
+> >>>> mitigation, so we're not doing that. The question is, exactly
+> >>>> what *are* we aiming for?
+> >>>
+> >>> The reason Marc dropped this patch from the series it was first introduced
+> >>> in was because we didn't have the aim 100% understood. We want the
+> >>> mitigation by default, but also to have the least chance of migration
+> >>> failure, and when we must fail (because we're not doing the
+> >>> straightforward approach listed above, which would prevent failures), then
+> >>> we want to fail with the least amount of damage to the user.
+> >>>
+> >>> I experimented with a couple different approaches and provided tables[1]
+> >>> with my results. I even recommended an approach, but I may have changed
+> >>> my mind after reading Marc's follow-up[2]. The thread continues from
+> >>> there as well with follow-ups from Christoffer, Marc, and myself. Anyway,
+> >>> Marc did this repost for us to debate it and work out the best approach
+> >>> here.
+> >> It doesn't look like we've made much progress on this, which makes me
+> >> think that we probably don't need anything of the like.
+> > 
+> > I was waiting for a better explanation from you of what we're trying to
+> > achieve. If you want to take the "do nothing" approach then a list
+> > also of what migrations succeed/fail/break in that case would also
+> > be useful.
+> > 
+> > (I am somewhat lazily trying to avoid having to spend time reverse
+> > engineering the "what are we trying to do and what effects are
+> > we accepting" parts from the patch and the code that's already gone
+> > into the kernel.)
 > 
-> That isn't described in your covering email to the series - instead,
-> your cover sounds like you're working around a deficiency in the
-> tda998x driver.
+> OK, let me (re)state the problem:
+> 
+> For a guest that requests PSCI 0.2 (i.e. all guests from the past 4 or 5
+> years), we now silently upgrade the PSCI version to 1.0 allowing the new
+> SMCCC to be discovered, and the ARCH_WORKAROUND_1 service to be called.
+> 
+> Things get funny, specially with migration (and the way QEMU works).
+> 
+> If we "do nothing":
+> 
+> (1) A guest migrating from an "old" host to a "new" host will silently
+> see its PSCI version upgraded. Not a big deal in my opinion, as 1.0 is a
+> strict superset of 0.2 (apart from the version number...).
+> 
+> (2) A guest migrating from a "new" host to an "old" host will silently
+> loose its Spectre v2 mitigation. That's quite a big deal.
+> 
+> (3, not related to migration) A guest having a hardcoded knowledge of
+> PSCI 0.2 will se that we've changed something, and may decide to catch
+> fire. Oh well.
+> 
+> If we take this patch:
+> 
+> (1) still exists
 
-Sorry, my bad, And sorry for the confusion.
+No problem, IMHO.
 
-> I think you need to make it clear that the reason you need the DT
-> property is because of the way the hardware is wired, not because of
-> the missing bus format in the TDA998x driver.  From what you've just
-> described, the missing bus format is merely incidental to the issue,
-> and whether TDA998x provided this or not, you'd still need to override
-> it.
+> 
+> (2) will now fail to migrate. I see this as a feature.
 
-I'll reword if/when I send v2.
+Yes, I agree.  This is actually the most important reason for doing
+anything beyond what's already merged.
 
-> If we were to add the bus format to the tda998x at a later date, I
-> would hope your driver would ignore it in this situation?
+> 
+> (3) can be worked around by setting the "PSCI version pseudo register"
+> to 0.2.
 
-Assuming that by "your driver" you mean the atmel-hlcdc driver (which
-isn't mine), then yes, with the override in place anything the tda998x
-driver says about the connector format will still result in what the
-forced output mode says from the atmel-hlcdc driver.
+Nice to have, but we're probably not expecting this to be of major
+concern.  I initially thought it was a nice debugging feature as well,
+but that may be a ridiculous point.
 
-Cheers,
-Peter
+> 
+> These are the main things I can think of at the moment.
+
+So I think we we should merge this patch.
+
+If userspace then wants to support "migrate from explicitly set v0.2 new
+kernel to old kernel", then it must add specific support to filter out
+the register from the register list; not that I think anyone will need
+that or bother to implement it.
+
+In other words, I think you should merge this:
+
+Reviewed-by: Christoffer Dall <cdall@kernel.org>
