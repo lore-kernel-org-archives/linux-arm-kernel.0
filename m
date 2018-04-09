@@ -1,39 +1,69 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  9 Apr 2018 11:39:45 +0100
-Subject: [PATCH] arm64: dts: juno: drop unnecessary address-cells and
- size-cells properties
-Message-ID: <1523270385-30461-1-git-send-email-sudeep.holla@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Apr 2018 11:47:07 +0100
+Subject: [PATCH 10/10] locking/qspinlock: Elide back-to-back RELEASE
+ operations with smp_wmb()
+In-Reply-To: <20180407054711.rldyfcmni2wtblyu@tardis>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <1522947547-24081-11-git-send-email-will.deacon@arm.com>
+ <20180407054711.rldyfcmni2wtblyu@tardis>
+Message-ID: <20180409104707.GB23134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-/smb at 8000000/motherboard/gpio_keys node doesn't have "ranges" or "reg"
-property in child nodes. So it's unnecessary to have address-cells
-as well as size-cells properties which results in below warning.
+Hi Boqun,
 
-Warning (avoid_unnecessary_addr_size):
-/smb at 8000000/motherboard/gpio_keys:
-	unnecessary #address-cells/#size-cells without "ranges" or child "reg"
-	property
+On Sat, Apr 07, 2018 at 01:47:11PM +0800, Boqun Feng wrote:
+> On Thu, Apr 05, 2018 at 05:59:07PM +0100, Will Deacon wrote:
+> > @@ -340,12 +341,17 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+> >  		goto release;
+> >  
+> >  	/*
+> > +	 * Ensure that the initialisation of @node is complete before we
+> > +	 * publish the updated tail and potentially link @node into the
+> 
+> I think it might be better if we mention exactly where we "publish the
+> updated tail" and "link @node", how about:
+> 
+> 	* publish the update tail via xchg_tail() and potentially link
+> 	* @node into the waitqueue via WRITE_ONCE(->next,..) below.
+> 
+> and also add comments below like:
+> 
+> > +	 * waitqueue.
+> > +	 */
+> > +	smp_wmb();
+> > +
+> > +	/*
+> >  	 * We have already touched the queueing cacheline; don't bother with
+> >  	 * pending stuff.
+> >  	 *
+> >  	 * p,*,* -> n,*,*
+> > -	 *
+> > -	 * RELEASE, such that the stores to @node must be complete.
+> 
+> 	* publish the updated tail
+> 
+> >  	 */
+> >  	old = xchg_tail(lock, tail);
+> >  	next = NULL;
+> > @@ -356,15 +362,7 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+> >  	 */
+> >  	if (old & _Q_TAIL_MASK) {
+> >  		prev = decode_tail(old);
+> > -
+> > -		/*
+> > -		 * We must ensure that the stores to @node are observed before
+> > -		 * the write to prev->next. The address dependency from
+> > -		 * xchg_tail is not sufficient to ensure this because the read
+> > -		 * component of xchg_tail is unordered with respect to the
+> > -		 * initialisation of @node.
+> > -		 */
+> > -		smp_store_release(&prev->next, node);
+> 
+> 		/* Eventually link @node to the wait queue */
+> 	
+> Thoughts?
 
-This patch drops the unnecessary address+size-cell properties.
+I'll make some changes along these lines for v2. Thanks!
 
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-index 2ac43221ddb6..69804c5f1197 100644
---- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-@@ -56,8 +56,6 @@
- 
- 			gpio_keys {
- 				compatible = "gpio-keys";
--				#address-cells = <1>;
--				#size-cells = <0>;
- 
- 				power-button {
- 					debounce_interval = <50>;
--- 
-2.7.4
+Will
