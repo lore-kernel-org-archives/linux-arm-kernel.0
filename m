@@ -1,51 +1,83 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Mon, 9 Apr 2018 14:49:15 +0300
-Subject: SUN6I a31 OPP table clock issue
-In-Reply-To: <20180409112829.dckferoj6n2j2sbj@flea>
-References: <c309c971-7559-e1d9-dc9f-2f7a7ad6f3cb@orpaltech.com>
- <20180409085356.goemvdy3ecyqoghp@flea>
- <8b797d9c-b2fb-e49b-daa2-e4e15753f3fa@orpaltech.com>
- <20180409112829.dckferoj6n2j2sbj@flea>
-Message-ID: <0b71957c-ee99-7d82-4b17-ee98c6fa9594@orpaltech.com>
+From: rohitkr@codeaurora.org (Rohit Kumar)
+Date: Mon, 9 Apr 2018 17:23:58 +0530
+Subject: [alsa-devel] [PATCH v4 14/24] ASoC: qdsp6: q6asm: Add support to
+ audio stream apis
+In-Reply-To: <20180310022456.26739-15-srinivas.kandagatla@linaro.org>
+References: <20180310022456.26739-1-srinivas.kandagatla@linaro.org>
+ <20180310022456.26739-15-srinivas.kandagatla@linaro.org>
+Message-ID: <3661b4c5-c79d-d73e-5e95-57e849775517@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/09/2018 02:28 PM, Maxime Ripard wrote:
-> On Mon, Apr 09, 2018 at 01:35:42PM +0300, Sergey Suloev wrote:
->> On 04/09/2018 11:53 AM, Maxime Ripard wrote:
->>> On Sat, Apr 07, 2018 at 10:53:10PM +0300, Sergey Suloev wrote:
->>>> I was able to catch oops coming from OPP table on BananaPi M2.
->>>>
->>>> https://pastebin.com/ZRaXTtEx
->>>>
->>>> Let me know if need more detail.
->>> Of course we do.
->>>
->>> Which kernel version was this for? With which configuration? What
->>> makes you say it's related to the OPP table, is it a regression or
->>> something you just noticed?
->> Ok, first of all, I am having the problem using linus tree, 4.16 as it is,
->> with no extra patches.
-> Your kernel version is marked as dirty in your logs, which means you
-> have local changes. So it doesn't really qualify as "as is".
-well, yeah, there is a small change but in? absolutely different area
->
->> My config file is here [1].
->> The problem is easily avoided by just commenting all freqs out of the OPP
->> table except for 1008 MHz, i.e. things work well when there is no freq
->> switch at all.
->> It makes me think that there might be an issue in A31 clocks driver as it is
->> the only important component used by cpufreq-dt.
->> As of cpufreq-dt driver it seems ok because works fine on other boards.
-> Could you add some printk's to ccu_mux_notifier_nb to see which
-> pointer is NULL?
-ok
 
-> Maxime
+
+On 3/10/2018 7:54 AM, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 >
+> This patch adds support to open, write and media format commands
+> in the q6asm module.
 >
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Reviewed-and-Tested-by: Rohit kumar <rohitkr@codeaurora.org>
+> ---
+>   sound/soc/qcom/qdsp6/q6asm.c | 744 ++++++++++++++++++++++++++++++++++++++++++-
+>   sound/soc/qcom/qdsp6/q6asm.h |  49 +++
+>   2 files changed, 792 insertions(+), 1 deletion(-)
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+> index 8a2ca2ff9ce8..ddbf526358bd 100644
+> --- a/sound/soc/qcom/qdsp6/q6asm.c
+> +++ b/sound/soc/qcom/qdsp6/q6asm.c
+> @@ -9,6 +9,8 @@
+>   #include <linux/device.h>
+>   #include <linux/spinlock.h>
+>   #include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <uapi/sound/asound.h>
+>   #include <linux/delay.h>
+>   #include <linux/slab.h>
+>   #include <linux/mm.h>
+> @@ -17,10 +19,36 @@
+>   #include "q6dsp-errno.h"
+>   #include "q6dsp-common.h"
+>   
+> +#define ASM_STREAM_CMD_CLOSE			0x00010BCD
+> +#define ASM_STREAM_CMD_FLUSH			0x00010BCE
+> +#define ASM_SESSION_CMD_PAUSE			0x00010BD3
+> +#define ASM_DATA_CMD_EOS			0x00010BDB
+> +#define ASM_DEFAULT_POPP_TOPOLOGY		0x00010BE4
+Use NULL topology instead of default topology.
+#define ASM_NULL_POPP_TOPOLOGY???????????????????? 0x00010C68
+> +#define ASM_STREAM_CMD_FLUSH_READBUFS		0x00010C09
+> +#define ASM_STREAM_CMD_SET_ENCDEC_PARAM		0x00010C10
+[..]
+> +	q6asm_add_hdr(ac, &open.hdr, sizeof(open), true, ac->stream_id);
+> +
+> +	open.hdr.opcode = ASM_STREAM_CMD_OPEN_WRITE_V3;
+> +	open.mode_flags = 0x00;
+> +	open.mode_flags |= ASM_LEGACY_STREAM_SESSION;
+> +
+> +	/* source endpoint : matrix */
+> +	open.sink_endpointype = ASM_END_POINT_DEVICE_MATRIX;
+> +	open.bits_per_sample = bits_per_sample;
+> +	open.postprocopo_id = ASM_DEFAULT_POPP_TOPOLOGY;
+ ?open.postprocopo_id = ASM_NULL_POPP_TOPOLOGY;
+> +
+> +	switch (format) {
+> +	case FORMAT_LINEAR_PCM:
+> +		open.dec_fmt_id = ASM_MEDIA_FMT_MULTI_CHANNEL_PCM_V2;
+> +		break;
+> +	default:
+> +		dev_err(ac->dev, "Invalid format 0x%x\n", format);
+> +		return -EINVAL;
+> +	}
+> +
+> +	rc = q6asm_ac_send_cmd_sync(ac, &open);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	ac->io_mode |= ASM_TUN_WRITE_IO_MODE;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(q6asm_open_write);
