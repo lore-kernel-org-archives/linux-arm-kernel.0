@@ -1,36 +1,28 @@
-From: tuomas@tuxera.com (Tuomas Tynkkynen)
-Date: Tue, 10 Apr 2018 17:51:19 +0300
-Subject: [PATCH] ARM: dts: sunxi: Change sun7i-a20-olimex-som204-evb to not
- use cd-inverted
-Message-ID: <20180410145119.27362-1-tuomas@tuxera.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 10 Apr 2018 10:53:40 -0400 (EDT)
+Subject: [PATCH net-next 0/3] ave: fix the activation issues for some
+ UniPhier SoCs
+In-Reply-To: <1523255925-6469-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1523255925-6469-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180410.105340.1495043678546637765.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 45e01f401a2a16 ("ARM: dts: sunxi: Switch MMC nodes away from
-cd-inverted property") changed most of the sunxi boards away from using
-the cd-inverted property in MMC nodes. However, the
-sun7i-a20-olimex-som204-evb board which got merged concurrently with
-that commit is now using cd-inverted. Switch it away from using
-cd-inverted to be consistent with rest of the sunxi boards.
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Date: Mon,  9 Apr 2018 15:38:42 +0900
 
-Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
----
- arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+> This add the following stuffs to fix the activation issues and satisfy
+> requirements for AVE ethernet driver implemented on some UniPhier SoCs.
+> 
+> - Add support for additional necessary clocks and resets, because the kernel
+>   is stalled on Pro4 due to lack of them.
+> 
+> - Check whether the SoC supports the specified phy-mode
+> 
+> - Add DT property support indicating system controller that has the feature
+>   for configurating phy-mode including built-in phy on LD11.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-index eae8e267b9ef..3d7b5c848fef 100644
---- a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-@@ -172,8 +172,7 @@
- 	pinctrl-0 = <&mmc0_pins_a>;
- 	vmmc-supply = <&reg_vcc3v3>;
- 	bus-width = <4>;
--	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&pio 7 1 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
--- 
-2.16.3
+The net-next tree is currently closed, please resubmit this when the merge
+window is open and I explicitly open the net-next tree for submissions again.
+
+Thank you.
