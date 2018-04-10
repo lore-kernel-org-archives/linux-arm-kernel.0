@@ -1,101 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Apr 2018 09:19:26 +0200
-Subject: [PATCH v6 20/25] drivers: firmware: psci: Introduce
- psci_dt_topology_init()
-In-Reply-To: <20180314173833.dyu7jtweu233rfi4@lakrids.cambridge.arm.com>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
- <1521046715-30683-21-git-send-email-ulf.hansson@linaro.org>
- <20180314173833.dyu7jtweu233rfi4@lakrids.cambridge.arm.com>
-Message-ID: <CAPDyKFpJQZ87ViwZxX_yBnKPzgRv5YxbLz=qxScBTMCvY6e2vw@mail.gmail.com>
+From: abhijitnaik27@gmail.com (abhijit)
+Date: Tue, 10 Apr 2018 13:00:42 +0530
+Subject: A200 driver submission for Linux mainline kernel
+Message-ID: <2b051c2c-59c4-2ea6-8f70-58dd16b02e8a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 March 2018 at 18:38, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Mar 14, 2018 at 05:58:30PM +0100, Ulf Hansson wrote:
->> In case the hierarchical layout is used in DT, we want to initialize the
->> corresponding PM domain topology for the CPUs, by using the generic PM
->> domain (aka genpd) infrastructure.
->>
->> At first glance, it may seem feasible to hook into the existing
->> psci_dt_init() function, although because it's called quite early in the
->> boot sequence, allocating the dynamic data structure for a genpd doesn't
->> work.
->>
->> Therefore, let's export a new init function for PSCI,
->> psci_dt_topology_init(), which the ARM machine code should call from a
->> suitable initcall.
->>
->> Succeeding to initialize the PM domain topology, which means at least one
->> instance of a genpd becomes created, allows us to continue to enable the
->> PSCI OS initiated mode for the platform. If everything turns out fine,
->> let's print a message in log to inform the user about the changed mode.
->>
->> In case of any failures, we stick to the default PSCI Platform Coordinated
->> mode.
->
-> For kexec/kdump we'll need to explicitly set the suspend mode to
-> platform coordinated if for whatever reason we choose not to use OSI.
+Hi All,
 
-Could you please elaborate on this? I am not really understanding what
-you are suggesting me to do and why.
+I have tested A200/Z430 3D driver for Freescale IMX535/537 SoC by using 
+port from freedreno. I wanted to submit driver patch to linux 4.14.1 for 
+mainlining A200 driver support
 
->
->>
->> Cc: Lina Iyer <ilina@codeaurora.org>
->> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  drivers/firmware/psci.c | 31 +++++++++++++++++++++++++++++++
->>  include/linux/psci.h    |  2 ++
->>  2 files changed, 33 insertions(+)
->>
->> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
->> index 463f78c..45d55fc 100644
->> --- a/drivers/firmware/psci.c
->> +++ b/drivers/firmware/psci.c
->> @@ -723,6 +723,37 @@ int __init psci_dt_init(void)
->>       return ret;
->>  }
->>
->> +int __init psci_dt_topology_init(void)
->> +{
->> +     struct device_node *np;
->> +     int ret;
->> +
->> +     if (!psci_has_osi_support())
->> +             return 0;
->> +
->> +     np = of_find_matching_node_and_match(NULL, psci_of_match, NULL);
->> +     if (!np)
->> +             return -ENODEV;
->> +
->> +     /* Initialize the CPU PM domains based on topology described in DT. */
->> +     ret = psci_dt_init_pm_domains(np);
->> +     if (ret <= 0)
->> +             goto out;
->> +
->> +     /* Enable OSI mode. */
->> +     ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
->> +                          PSCI_1_0_SUSPEND_MODE_OSI, 0, 0);
->
-> IIUC, this patch will need to be moved after the subsequent two patches
-> to ensure that this series bisects cleanly.
+Currently w.r.t 4.14.1 kernel, the patch has, 109 files changes, 279170 
+insertions, 60 deletions
 
-Actually not.
+Major part of the code is taken from A200 support from Freescale Linux 
+(2.6.35, 
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/?h=imx_2.6.35)
 
-$subject patch adds a new init function, which purpose is to
-initialize the PSCI PM domains. At this point none is calling it.
+My question was, can I submit the patch for Linux 4.14.1 kernel for 
+mainlining purpose instead of linux-next?
 
-The following changes, builds on top, making it possible to add CPU
-devices to the PSCI PM domains (if the PM domains has been created and
-OSI mode successfully enabled) and also to properly deal CPU hotplug
-when OSI mode is enabled.
+Please point me to any case-study where such huge enhancements were 
+mainlined in the past.
 
-The purpose doing it this way is to keep changes small and
-review-able, but in principle I can squash 20, 21 and 22 - if you
-prefer.
+Any suggestions for optimizing the mainlining process?
 
-Again, thanks for reviewing!
+Regards,
 
-Kind regards
-Uffe
+ ?? Abhijit
