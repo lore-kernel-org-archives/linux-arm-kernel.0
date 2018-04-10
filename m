@@ -1,22 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 10 Apr 2018 20:28:13 +0200 (CEST)
-Subject: [PATCH 1/3] drm/vc4: Remove the need for the GPU-subsystem DT
- node.
-In-Reply-To: <20180409230040.1100-1-eric@anholt.net>
-References: <20180409230040.1100-1-eric@anholt.net>
-Message-ID: <8806871.109949.1523384893773@email.1und1.de>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Tue, 10 Apr 2018 11:32:04 -0700
+Subject: [PATCH v3 02/10] Documentations: ioctl: Add ioctl numbers for PECI
+ subsystem
+In-Reply-To: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180410183212.16787-3-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+This commit Updates ioctl-number.txt to reflect ioctl numbers being
+used by the PECI subsystem.
 
-> Eric Anholt <eric@anholt.net> hat am 10. April 2018 um 01:00 geschrieben:
-> 
-> 
-> The GPU subsystem node was a workaround to have a central device to
-> bind V3D and display to.  Following the lead of 246774d17fc0
-> ("drm/etnaviv: remove the need for a gpu-subsystem DT node"), remove
-> the subsystem node usage and just create a platform device for the DRM
-> device to attach to if any of the subsystem devices are present.
+Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Cc: Alan Cox <alan@linux.intel.com>
+Cc: Andrew Jeffery <andrew@aj.id.au>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Andy Shevchenko <andriy.shevchenko@intel.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Fengguang Wu <fengguang.wu@intel.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: Haiyue Wang <haiyue.wang@linux.intel.com>
+Cc: James Feist <james.feist@linux.intel.com>
+Cc: Jason M Biils <jason.m.bills@linux.intel.com>
+Cc: Jean Delvare <jdelvare@suse.com>
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Julia Cartwright <juliac@eso.teric.us>
+Cc: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
+Cc: Milton Miller II <miltonm@us.ibm.com>
+Cc: Pavel Machek <pavel@ucw.cz>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
+Cc: Sumeet R Pawnikar <sumeet.r.pawnikar@intel.com>
+Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
+---
+ Documentation/ioctl/ioctl-number.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-i didn't test it. Does the code change keep the backward compatibility with older DT?
+diff --git a/Documentation/ioctl/ioctl-number.txt b/Documentation/ioctl/ioctl-number.txt
+index 84bb74dcae12..4bc3a65d7204 100644
+--- a/Documentation/ioctl/ioctl-number.txt
++++ b/Documentation/ioctl/ioctl-number.txt
+@@ -323,6 +323,8 @@ Code  Seq#(hex)	Include File		Comments
+ 0xB3	00	linux/mmc/ioctl.h
+ 0xB4	00-0F	linux/gpio.h		<mailto:linux-gpio@vger.kernel.org>
+ 0xB5	00-0F	uapi/linux/rpmsg.h	<mailto:linux-remoteproc@vger.kernel.org>
++0xB6	00-0F	uapi/linux/peci-ioctl.h	PECI subsystem
++					<mailto:jae.hyun.yoo@linux.intel.com>
+ 0xC0	00-0F	linux/usb/iowarrior.h
+ 0xCA	00-0F	uapi/misc/cxl.h
+ 0xCA	10-2F	uapi/misc/ocxl.h
+-- 
+2.16.2
