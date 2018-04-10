@@ -1,67 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Apr 2018 19:34:44 +0100
-Subject: [PATCH] irqchip/gic-v3: Support v2m frame backwards compatibility
- mode
-In-Reply-To: <152338426182.180276.1835672071236851795@swboyd.mtv.corp.google.com>
-References: <20170320223614.1351-1-sboyd@codeaurora.org>
- <bac1e827-3860-d92c-7bb4-eaf9840c608f@arm.com>
- <20180410170155.6e07113d@windsurf>
- <a4451252-35e4-e63f-8cca-a072f90fa9ad@arm.com>
- <152338426182.180276.1835672071236851795@swboyd.mtv.corp.google.com>
-Message-ID: <05b943f7-b3f0-ebdf-06e7-140000442a77@arm.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 10 Apr 2018 11:32:09 -0700
+Subject: [PATCH v3 1/2] soc: imx: gpcv2: Do not pass static memory as platform
+ data
+Message-ID: <20180410183210.28052-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Platform device core assumes the ownership of dev.platform_data as
+well as that it is dynamically allocated and it will try to kfree it
+as a part of platform_device_release(). Change the code to use
+platform_device_add_data() n instead of a pointer to a static memory
+to avoid causing a BUG() when calling platform_device_put().
 
-On 10/04/18 19:17, Stephen Boyd wrote:
-> Quoting Marc Zyngier (2018-04-10 08:23:00)
->> On 10/04/18 16:01, Thomas Petazzoni wrote:
->>
->>> In the upcoming Armada 8KP, we have a GICv3, which has built-in support
->>> for memory-triggered SPIs, thanks to the GICD_SETSPI_NSR and
->>> GICD_CLRSPI_NSR, and the ICU will directly use this GICv3
->>> functionality. We would therefore very much like to have this GICv3
->>> feature provided as a MSI controller, which as Marc said would require
->>> supporting level-triggered MSIs.
->>>
->>> Marc, let me know how we can collaborate on this topic. I'm able to
->>> either test some preliminary patches, or work on such patches if
->>> necessary (preferably with some initial directions).
->>
->> I have a vague idea how to support this. Given that level-triggered MSIs
->> have to be platform MSIs (because it is just madness otherwise), we can
->> probably store an extra message in the struct platform_msi_desc for the
->> "lower the line" write. On activation, you'd get two callbacks, probably
->> with a flag of some sort to indicate whether this is for the rising or
->> falling edge. The thing I'm unclear about so far is how to let the
->> generic MSI layer know that we're dealing with such an interrupt without
->> make a total mess of everything. It is probably done by marking the
->> interrupt level triggered, but there are some corner cases.
->>
->> And if that works, the PCI stuff will come for free (it is just a matter
->> of implementing a new irqdomain on top of the base GICv3 one).
->>
->> I'll try to spend some time on it in the coming couple of weeks, but
->> will have to rely on you for the testing (as I don't have much in the
->> way of HW).
-> 
-> I resent these patches late last year[1]. On the HW I had at the time we
-> were trying to support PCIe devices and we didn't need level interrupts.
-> I thought Marc had agreed to accept the patches without the level
-> interrupt support as long as we described the range of interrupts that
-> were supported but that doesn't seem to be the case anymore.
+The problem can be reproduced by artificially enabling the error path
+of platform_device_add() call (around line 357).
 
-My suggestion was to add the same level of functionality to the GICv3
-driver, and not to reuse the GICv2m driver. This would have allowed us
-to enable level interrupts at a later time. Obviously, I wasn't clear
-enough about what I wanted to see.
+Note that this change also allows us to constify imx7_pgc_domains,
+since we no longer need to be able to modify it.
 
-So this time, we'll do it the other way around: plug in level
-interrupts, and PCI/MSI will (mostly) appear for free.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
 
-Thanks,
+Changes since [v2]:
 
-	M.
+    - Patch reworked to use platform_device_add_data() as per request from Shawn
+
+Changes since [v1]:
+
+    - Replaced devm_kzalloc() with devm_kmalloc() as per suggestion from Stefan
+
+[v1] lkml.kernel.org/r/20180110161608.13015-1-andrew.smirnov at gmail.com
+[v2] lkml.kernel.org/r/20180122150748.1742-1-andrew.smirnov at gmail.com
+
+ drivers/soc/imx/gpcv2.c | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
+index afc7ecc3c187..f4e3bd40c72e 100644
+--- a/drivers/soc/imx/gpcv2.c
++++ b/drivers/soc/imx/gpcv2.c
+@@ -155,7 +155,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
+ 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
+ }
+ 
+-static struct imx7_pgc_domain imx7_pgc_domains[] = {
++static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+ 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
+ 		.genpd = {
+ 			.name      = "mipi-phy",
+@@ -321,11 +321,6 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
+-		domain = &imx7_pgc_domains[domain_index];
+-		domain->regmap = regmap;
+-		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
+-		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
+-
+ 		pd_pdev = platform_device_alloc("imx7-pgc-domain",
+ 						domain_index);
+ 		if (!pd_pdev) {
+@@ -334,7 +329,20 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
+ 			return -ENOMEM;
+ 		}
+ 
+-		pd_pdev->dev.platform_data = domain;
++		ret = platform_device_add_data(pd_pdev,
++					       &imx7_pgc_domains[domain_index],
++					       sizeof(imx7_pgc_domains[domain_index]));
++		if (ret) {
++			platform_device_put(pd_pdev);
++			of_node_put(np);
++			return ret;
++		}
++
++		domain = pd_pdev->dev.platform_data;
++		domain->regmap = regmap;
++		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
++		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
++
+ 		pd_pdev->dev.parent = dev;
+ 		pd_pdev->dev.of_node = np;
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.14.3
