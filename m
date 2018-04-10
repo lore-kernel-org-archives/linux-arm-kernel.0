@@ -1,30 +1,41 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 10 Apr 2018 10:43:45 +0200
-Subject: [PATCH] MAINTAINERS: Migrate oxnas list to groups.io
-Message-ID: <1523349825-1969-1-git-send-email-narmstrong@baylibre.com>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Tue, 10 Apr 2018 09:30:05 +0100
+Subject: [PATCH v4 5/8] dt-bindings: arm: Document the RZN1D-DB board
+In-Reply-To: <1523349015-37985-1-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523349015-37985-1-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <1523349015-37985-6-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The linux-oxnas migrates from tuxfamily to groups.io for a simpler
-administration and maintainance.
+This documents the RZ/N1 bindings for the RZN1D-DB board.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 ---
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6d296bd..f846da2 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1743,7 +1743,7 @@ F:	arch/arm/mach-orion5x/ts78xx-*
- ARM/OXNAS platform support
- M:	Neil Armstrong <narmstrong@baylibre.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--L:	linux-oxnas at lists.tuxfamily.org (moderated for non-subscribers)
-+L:	linux-oxnas at groups.io (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-oxnas/
- F:	arch/arm/boot/dts/ox8*.dts*
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index d3d1df9..024caf7 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -47,7 +47,8 @@ SoCs:
+     compatible = "renesas,r8a77980"
+   - R-Car D3 (R8A77995)
+     compatible = "renesas,r8a77995"
+-
++  - RZ/N1D (R9A06G032)
++    compatible = "renesas,r9a06g032", "renesas,rzn1"
+ 
+ Boards:
+ 
+@@ -104,6 +105,8 @@ Boards:
+     compatible = "renesas,porter", "renesas,r8a7791"
+   - RSKRZA1 (YR0K77210C000BE)
+     compatible = "renesas,rskrza1", "renesas,r7s72100"
++  - RZN1D-DB (RZ/N1D Demo Board for the RZ/N1D 400 pins package)
++    compatible = "renesas,rzn1d400-db", "renesas,r9a06g032", "renesas,rzn1"
+   - Salvator-X (RTP0RC7795SIPB0010S)
+     compatible = "renesas,salvator-x", "renesas,r8a7795"
+   - Salvator-X (RTP0RC7796SIPB0011S)
 -- 
 2.7.4
