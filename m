@@ -1,22 +1,53 @@
 From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
-Date: Tue, 10 Apr 2018 18:42:39 +0200
-Subject: [PATCH v2 1/2] mm: introduce ARCH_HAS_PTE_SPECIAL
-In-Reply-To: <20180410160932.GB3614@bombadil.infradead.org>
+Date: Tue, 10 Apr 2018 18:44:00 +0200
+Subject: [PATCH v2 2/2] mm: remove odd HAVE_PTE_SPECIAL
+In-Reply-To: <3f20ac8b-20b8-f052-bc44-dcc0316354ca@arm.com>
 References: <1523373951-10981-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <1523373951-10981-2-git-send-email-ldufour@linux.vnet.ibm.com>
- <20180410160932.GB3614@bombadil.infradead.org>
-Message-ID: <a732ef2b-445f-9ad8-014b-247c8c5d500b@linux.vnet.ibm.com>
+ <1523373951-10981-3-git-send-email-ldufour@linux.vnet.ibm.com>
+ <3f20ac8b-20b8-f052-bc44-dcc0316354ca@arm.com>
+Message-ID: <1521dc0e-e9f8-d10f-e213-1b1552eb03fa@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2018 18:09, Matthew Wilcox wrote:
-> On Tue, Apr 10, 2018 at 05:25:50PM +0200, Laurent Dufour wrote:
->>  arch/powerpc/include/asm/pte-common.h                  | 3 ---
->>  arch/riscv/Kconfig                                     | 1 +
->>  arch/s390/Kconfig                                      | 1 +
-> 
-> You forgot to delete __HAVE_ARCH_PTE_SPECIAL from
-> arch/riscv/include/asm/pgtable-bits.h
 
-Damned !
-Thanks for catching it.
+
+On 10/04/2018 17:58, Robin Murphy wrote:
+> On 10/04/18 16:25, Laurent Dufour wrote:
+>> Remove the additional define HAVE_PTE_SPECIAL and rely directly on
+>> CONFIG_ARCH_HAS_PTE_SPECIAL.
+>>
+>> There is no functional change introduced by this patch
+>>
+>> Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
+>> ---
+>> ? mm/memory.c | 23 ++++++++++-------------
+>> ? 1 file changed, 10 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/mm/memory.c b/mm/memory.c
+>> index 96910c625daa..53b6344a90d2 100644
+>> --- a/mm/memory.c
+>> +++ b/mm/memory.c
+>> @@ -817,19 +817,13 @@ static void print_bad_pte(struct vm_area_struct *vma,
+>> unsigned long addr,
+>> ?? * PFNMAP mappings in order to support COWable mappings.
+>> ?? *
+>> ?? */
+>> -#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
+>> -# define HAVE_PTE_SPECIAL 1
+>> -#else
+>> -# define HAVE_PTE_SPECIAL 0
+>> -#endif
+>> ? struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
+>> ?????????????????? pte_t pte, bool with_public_device)
+>> ? {
+>> ????? unsigned long pfn = pte_pfn(pte);
+>> ? -??? if (HAVE_PTE_SPECIAL) {
+>> -??????? if (likely(!pte_special(pte)))
+>> -??????????? goto check_pfn;
+>> +#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
+> 
+> Nit: Couldn't you use IS_ENABLED(CONFIG_ARCH_HAS_PTE_SPECIAL) within the
+> existing code structure to avoid having to add these #ifdefs?
+
+I agree, that would be better. I didn't thought about this option..
+Thanks for reporting this.
