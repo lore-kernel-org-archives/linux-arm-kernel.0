@@ -1,43 +1,66 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Apr 2018 11:11:43 +0200
-Subject: A200 driver submission for Linux mainline kernel
-In-Reply-To: <01f5f95e-d957-bc32-b8a8-94784523d095@gmail.com>
-References: <01f5f95e-d957-bc32-b8a8-94784523d095@gmail.com>
-Message-ID: <1523351503.4981.1.camel@pengutronix.de>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Tue, 10 Apr 2018 10:24:47 +0100
+Subject: [PATCH] arm64: dts: juno: drop unnecessary address-cells and
+ size-cells properties
+In-Reply-To: <1523286560-30889-1-git-send-email-sudeep.holla@arm.com>
+References: <1523270385-30461-1-git-send-email-sudeep.holla@arm.com>
+ <1523286560-30889-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180410092447.GE10254@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhijit,
+On Mon, Apr 09, 2018 at 04:09:20PM +0100, Sudeep Holla wrote:
+> /smb at 8000000/motherboard/gpio_keys node doesn't have "ranges" or "reg"
+> property in child nodes. So it's unnecessary to have address-cells
+> as well as size-cells properties which results in below warning.
+> 
+> Warning (avoid_unnecessary_addr_size):
+> /smb at 8000000/motherboard/gpio_keys:
+> 	unnecessary #address-cells/#size-cells without "ranges" or child "reg"
+> 	property
+> 
+> This patch drops the unnecessary address+size-cell properties.
+> 
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Am Dienstag, den 10.04.2018, 13:28 +0530 schrieb abhijit:
-> Hi All,
-> 
-> I have tested A200/Z430 3D driver for Freescale IMX535/537 SoC by using?
-> port from freedreno. I wanted to submit driver patch to linux 4.14.1 for?
-> mainlining A200 driver support
-> 
-> Currently w.r.t 4.14.1 kernel, the patch has, 109 files changes, 279170?
-> insertions, 60 deletions
-> 
-> Major part of the code is taken from A200 support from Freescale Linux?
-> (2.6.35,?
-> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/?h=imx_2.6.35)
-> 
-> My question was, can I submit the patch for Linux 4.14.1 kernel for?
-> mainlining purpose instead of linux-next?
-> 
-> Please point me to any case-study where such huge enhancements were?
-> mainlined in the past.
-> 
-> Any suggestions for optimizing the mainlining process?
+Looks like the sensible thing to do!
 
-The downstream driver will not be acceptable to mainline. It's not just
-the size of the driver itself, but it's just full of cruft and doesn't
-integrate with any of the modern kernel frameworks.
+Reviewed-by: Liviu Dudau <liviu.dudau@arm.com>
 
-If you are going to mainline this driver, it likely needs a full
-rewrite as a proper DRM driver, with a userspace interface sanctioned
-by the Linux DRM community.
+Best regards,
+Liviu
 
-Regards,
-Lucas
+> ---
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> (Missed cc-ed people earlier)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> index 2ac43221ddb6..69804c5f1197 100644
+> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> @@ -56,8 +56,6 @@
+> 
+>  			gpio_keys {
+>  				compatible = "gpio-keys";
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> 
+>  				power-button {
+>  					debounce_interval = <50>;
+> --
+> 2.7.4
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
