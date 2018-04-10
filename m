@@ -1,34 +1,67 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 10 Apr 2018 12:39:22 -0700
-Subject: [PATCH 1/3] drm/vc4: Remove the need for the GPU-subsystem DT
- node.
-In-Reply-To: <8806871.109949.1523384893773@email.1und1.de>
-References: <20180409230040.1100-1-eric@anholt.net>
- <8806871.109949.1523384893773@email.1und1.de>
-Message-ID: <87efjmq2ad.fsf@anholt.net>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Tue, 10 Apr 2018 12:38:44 -0700
+Subject: [PATCH v6 08/11] firmware: xilinx: Add debugfs for query data API
+In-Reply-To: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1523389127-14243-9-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+From: Rajan Vaja <rajanv@xilinx.com>
 
-> Hi Eric,
->
->> Eric Anholt <eric@anholt.net> hat am 10. April 2018 um 01:00 geschrieben:
->> 
->> 
->> The GPU subsystem node was a workaround to have a central device to
->> bind V3D and display to.  Following the lead of 246774d17fc0
->> ("drm/etnaviv: remove the need for a gpu-subsystem DT node"), remove
->> the subsystem node usage and just create a platform device for the DRM
->> device to attach to if any of the subsystem devices are present.
->
-> i didn't test it. Does the code change keep the backward compatibility with older DT?
+Add debugfs file to query platform specific data from firmware
+using debugfs interface.
 
-Yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180410/77e2b6df/attachment.sig>
+Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+---
+ drivers/firmware/xilinx/zynqmp-debug.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
+index 148dbff..1cb69f7 100644
+--- a/drivers/firmware/xilinx/zynqmp-debug.c
++++ b/drivers/firmware/xilinx/zynqmp-debug.c
+@@ -33,6 +33,7 @@ static char debugfs_buf[PAGE_SIZE];
+ static struct pm_api_info pm_api_list[] = {
+ 	PM_API(PM_GET_API_VERSION),
+ 	PM_API(PM_IOCTL),
++	PM_API(PM_QUERY_DATA),
+ };
+ 
+ /**
+@@ -105,6 +106,32 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
+ 			sprintf(debugfs_buf, "IOCTL return value: %u\n",
+ 				pm_api_ret[1]);
+ 		break;
++	case PM_QUERY_DATA:
++	{
++		struct zynqmp_pm_query_data qdata = {0};
++
++		qdata.qid = pm_api_arg[0];
++		qdata.arg1 = pm_api_arg[1];
++		qdata.arg2 = pm_api_arg[2];
++		qdata.arg3 = pm_api_arg[3];
++
++		ret = eemi_ops->query_data(qdata, pm_api_ret);
++		if (ret)
++			break;
++
++		if (qdata.qid == PM_QID_CLOCK_GET_NAME)
++			sprintf(debugfs_buf, "Clock name = %s\n",
++				(char *)pm_api_ret);
++		else if (qdata.qid == PM_QID_CLOCK_GET_FIXEDFACTOR_PARAMS)
++			sprintf(debugfs_buf, "Multiplier = %d, Divider = %d\n",
++				pm_api_ret[1], pm_api_ret[2]);
++		else
++			sprintf(debugfs_buf,
++				"data[0] = 0x%08x\ndata[1] = 0x%08x\n data[2] = 0x%08x\ndata[3] = 0x%08x\n",
++				pm_api_ret[0], pm_api_ret[1],
++				pm_api_ret[2], pm_api_ret[3]);
++		break;
++	}
+ 	default:
+ 		sprintf(debugfs_buf, "Unsupported PM-API request\n");
+ 		ret = -EINVAL;
+-- 
+2.7.4
