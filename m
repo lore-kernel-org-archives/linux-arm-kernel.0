@@ -1,146 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 Apr 2018 11:51:19 +0100
-Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
-In-Reply-To: <20180409205139.GH10904@cbox>
-References: <20180409170706.23541-1-marc.zyngier@arm.com>
- <20180409205139.GH10904@cbox>
-Message-ID: <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 10 Apr 2018 12:54:17 +0200
+Subject: [PATCH v8 07/14] ARM: dts: rockchip: add clocks in iommu nodes
+In-Reply-To: <5686492.Vgpi8vPSL1@diego>
+References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
+ <2255884.b1SkkUdh3X@diego> <5686492.Vgpi8vPSL1@diego>
+Message-ID: <1720770.fWGWCFZ36p@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 10:51:39PM +0200, Christoffer Dall wrote:
-> On Mon, Apr 09, 2018 at 06:07:06PM +0100, Marc Zyngier wrote:
-> > Before entering the guest, we check whether our VMID is still
-> > part of the current generation. In order to avoid taking a lock,
-> > we start with checking that the generation is still current, and
-> > only if not current do we take the lock, recheck, and update the
-> > generation and VMID.
+Am Montag, 9. April 2018, 23:49:58 CEST schrieb Heiko St?bner:
+> Am Montag, 9. April 2018, 17:55:40 CEST schrieb Heiko St?bner:
+> > Am Montag, 9. April 2018, 17:53:01 CEST schrieb Robin Murphy:
+> > > On 09/04/18 16:44, Heiko St?bner wrote:
+> > > > Hi Tomeu,
+> > > > 
+> > > > Am Montag, 9. April 2018, 16:41:56 CEST schrieb Tomeu Vizoso:
+> > > >> in today's linux-next, the DRM driver fails to probe because the iommu
+> > > >> driver fails to find the aclk. I need to apply this patch for things
+> > > >> to work again.
+> > > > 
+> > > > Thanks for catching that issue.
+> > > > 
+> > > > This seems to expose a backwards-compatibility issue, as this breaks
+> > > > all old devicetrees, so should get a proper fix, apart from me applying
+> > > > the dt-patch I missed.
+> > > > 
+> > > > Looking at the iommu-clock-handling patch, I imagine this part as
+> > > > the culprit:
+> > > > 
+> > > > +	iommu->num_clocks = ARRAY_SIZE(rk_iommu_clocks);
+> > > > +	iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
+> > > > +				     sizeof(*iommu->clocks), GFP_KERNEL);
+> > > > +	if (!iommu->clocks)
+> > > > +		return -ENOMEM;
+> > > > 
+> > > > The clk-bulk functions seem to work with simple for loops and
+> > > > should (as the other standard clock functions) just work fine with
+> > > > an empty struct, so I guess a simple
+> > > > 
+> > > > 	if (!iommu->clocks && iommu->num_clocks > 0)
+> > > > 	
+> > > > 		return -ENOMEM;
+> > > > 
+> > > > should hopefully be enough. I'll try to give this a test later on
+> > > > if nobody beats me to it :-)
+> > > 
+> > > But iommu->num_clocks is clearly set to a nonzero compile-time constant
+> > > at this point ;)
+> > > 
+> > > I'd assume it's the return from devm_clk_bulk_get() which needs to
+> > > special-case the "no clocks found" case from any other error, and *then*
+> > > blat num_clocks to 0 if so.
 > > 
-> > This leaves open a small race: A vcpu can bump up the global
-> > generation number as well as the VM's, but has not updated
-> > the VMID itself yet.
+> > you're right of course. Looking at it again, I now clearly see the
+> > ARRAY_SIZE and am wondering what made me think num_clocks would be
+> > runtime-read.
 > > 
-> > At that point another vcpu from the same VM comes in, checks
-> > the generation (and finds it not needing anything), and jumps
-> > into the guest. At this point, we end-up with two vcpus belonging
-> > to the same VM running with two different VMIDs. Eventually, the
-> > VMID used by the second vcpu will get reassigned, and things will
-> > really go wrong...
-> > 
-> > A simple solution would be to drop this initial check, and always take
-> > the lock. This is likely to cause performance issues. A middle ground
-> > is to convert the spinlock to a rwlock, and only take the read lock
-> > on the fast path. If the check fails at that point, drop it and
-> > acquire the write lock, rechecking the condition.
-> > 
-> > This ensures that the above scenario doesn't occur.
-> > 
-> > Reported-by: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> > I haven't seen any reply from Shannon, so reposting this to
-> > a slightly wider audience for feedback.
-> > 
-> >  virt/kvm/arm/arm.c | 15 ++++++++++-----
-> >  1 file changed, 10 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index dba629c5f8ac..a4c1b76240df 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -63,7 +63,7 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
-> >  static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
-> >  static u32 kvm_next_vmid;
-> >  static unsigned int kvm_vmid_bits __read_mostly;
-> > -static DEFINE_SPINLOCK(kvm_vmid_lock);
-> > +static DEFINE_RWLOCK(kvm_vmid_lock);
-> >  
-> >  static bool vgic_present;
-> >  
-> > @@ -473,11 +473,16 @@ static void update_vttbr(struct kvm *kvm)
-> >  {
-> >  	phys_addr_t pgd_phys;
-> >  	u64 vmid;
-> > +	bool new_gen;
-> >  
-> > -	if (!need_new_vmid_gen(kvm))
-> > +	read_lock(&kvm_vmid_lock);
-> > +	new_gen = need_new_vmid_gen(kvm);
-> > +	read_unlock(&kvm_vmid_lock);
-> > +
-> > +	if (!new_gen)
-> >  		return;
-> >  
-> > -	spin_lock(&kvm_vmid_lock);
-> > +	write_lock(&kvm_vmid_lock);
-> >  
-> >  	/*
-> >  	 * We need to re-check the vmid_gen here to ensure that if another vcpu
-> > @@ -485,7 +490,7 @@ static void update_vttbr(struct kvm *kvm)
-> >  	 * use the same vmid.
-> >  	 */
-> >  	if (!need_new_vmid_gen(kvm)) {
-> > -		spin_unlock(&kvm_vmid_lock);
-> > +		write_unlock(&kvm_vmid_lock);
-> >  		return;
-> >  	}
-> >  
-> > @@ -519,7 +524,7 @@ static void update_vttbr(struct kvm *kvm)
-> >  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
-> >  	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
-> >  
-> > -	spin_unlock(&kvm_vmid_lock);
-> > +	write_unlock(&kvm_vmid_lock);
-> >  }
-> >  
-> >  static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
-> > -- 
-> > 2.14.2
-> > 
+> > Must be those 25?C today ;-)
 > 
-> The above looks correct to me.  I am wondering if something like the
-> following would also work, which may be slightly more efficient,
-> although I doubt the difference can be measured:
+> In any case, this does not seem to fully fix the issue ... or be more exact 
+> seems to be the only issue.
 > 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index dba629c5f8ac..7ac869bcad21 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -458,7 +458,9 @@ void force_vm_exit(const cpumask_t *mask)
->   */
->  static bool need_new_vmid_gen(struct kvm *kvm)
->  {
-> -	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
-> +	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
-> +	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
-> +	return unlikely(kvm->arch.vmid_gen != current_vmid_gen);
->  }
->  
->  /**
-> @@ -508,10 +510,11 @@ static void update_vttbr(struct kvm *kvm)
->  		kvm_call_hyp(__kvm_flush_vm_context);
->  	}
->  
-> -	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
->  	kvm->arch.vmid = kvm_next_vmid;
->  	kvm_next_vmid++;
->  	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
-> +	smp_wmb();
-> +	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
->  
->  	/* update vttbr to be used with the new vmid */
->  	pgd_phys = virt_to_phys(kvm->arch.pgd);
+> - With 4.16 both pinky and kevin have working displays.
+> - When I was merging display patches to drm-misc, I did boot-tests on
+>   both pinky and kevin, keeping their displays in a working state.
 > 
+> - With current torvalds head (iommu not merged yet)
+> e9092d0d9796 ("Fix subtle macro variable shadowing in min_not_zero()")
+> 
+> I get display output on rk3399-kevin (edp), but not on
+> rk3288-pinky (edp + hdmi). [components + hdmi device+modes get
+> recognized correctly though]
+> 
+> - With iommu changes merged I end up with the failing clock issue
+>   which can be countered by making the iommu-clocks optional.
+> 
+> - After that I get working display output again on kevin but not pinky.
+> 
+> Looks like this needs bisecting.
 
-I think we also need to update kvm->arch.vttbr before updating
-kvm->arch.vmid_gen, otherwise another CPU can come in, see that the
-vmid_gen is up-to-date, jump to hyp, and program a stale VTTBR (with the
-old VMID).
+And it seems the dwc2 vbus thingy was responsible for the other issue I saw.
+With Tomeus fixup patch applied and the series I sent an hour ago, I now
+get display output again on both kevin (rk3399) and pinky (rk3288).
 
-With the smp_wmb() and update of kvm->arch.vmid_gen moved to the end of
-the critical section, I think that works, modulo using READ_ONCE() and
-WRITE_ONCE() to ensure single-copy-atomicity of the fields we access
-locklessly.
-
-Thanks,
-Mark.
+Heiko
