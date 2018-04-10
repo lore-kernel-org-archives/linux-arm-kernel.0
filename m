@@ -1,61 +1,144 @@
-From: abhijitnaik27@gmail.com (abhijit)
-Date: Tue, 10 Apr 2018 17:00:58 +0530
-Subject: A200 driver submission for Linux mainline kernel
-In-Reply-To: <1523351503.4981.1.camel@pengutronix.de>
-References: <01f5f95e-d957-bc32-b8a8-94784523d095@gmail.com>
- <1523351503.4981.1.camel@pengutronix.de>
-Message-ID: <d5c4c679-d87c-eb45-c8c3-bdefc7670b30@gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 10 Apr 2018 14:42:30 +0300
+Subject: [RFC PATCH] sdhci: arasan: Add runtime PM support
+In-Reply-To: <1522302530-27550-1-git-send-email-naranimanish@gmail.com>
+References: <1522302530-27550-1-git-send-email-naranimanish@gmail.com>
+Message-ID: <29f0aae5-3cee-8a37-f5aa-3830f466a759@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+On 29/03/18 08:48, naranimanish at gmail.com wrote:
+> From: Manish Narani <mnarani@xilinx.com>
+> 
+> This patch adds runtime PM support in Arasan SD driver.
+> 
+> Signed-off-by: Manish Narani <mnarani@xilinx.com>
 
-Thank you very much for reply.
+Just a couple of comments about style.
 
-The driver is already integrated with new kernel frame-work and tested 
-with 4.14.1 kernel with KGSL interface.
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 83 +++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 81 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index c33a5f7..47196b5 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/phy/phy.h>
+>  #include <linux/regmap.h>
+>  #include <linux/of.h>
+> @@ -349,6 +350,75 @@ static const struct sdhci_pltfm_data sdhci_arasan_cqe_pdata = {
+>  			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+>  };
+>  
+> +#ifdef CONFIG_PM
+> +/**
+> + * sdhci_arasan_runtime_suspend - Suspend method for the driver
+> + * @dev:	Address of the device structure
+> + * Returns 0 on success and error value on error
+> + *
+> + * Put the device in a low power state.
+> + */
 
-There are some patches for MESA and libdrm patches though
+Kernel style is not to put kerneldoc on callback functions.
 
-I am planning for pushing MESA and DRM patches later. Are you implying 
-to push MESA and libdrm specific changes first?
+> +static int sdhci_arasan_runtime_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> +	int ret;
+> +
+> +	ret = sdhci_runtime_suspend_host(host);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> +		mmc_retune_needed(host->mmc);
+> +
+> +	clk_disable(pltfm_host->clk);
+> +	clk_disable(sdhci_arasan->clk_ahb);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * sdhci_arasan_runtime_resume - Resume method for the driver
+> + * @dev:	Address of the device structure
+> + * Returns 0 on success and error value on error
+> + *
+> + * Resume operation after suspend
+> + */
 
-Regards,
+Kernel style is not to put kerneldoc on callback functions.
 
- ? Abhijit
-
-
-On Tuesday 10 April 2018 02:41 PM, Lucas Stach wrote:
-> Hi Abhijit,
->
-> Am Dienstag, den 10.04.2018, 13:28 +0530 schrieb abhijit:
->> Hi All,
->>
->> I have tested A200/Z430 3D driver for Freescale IMX535/537 SoC by using
->> port from freedreno. I wanted to submit driver patch to linux 4.14.1 for
->> mainlining A200 driver support
->>
->> Currently w.r.t 4.14.1 kernel, the patch has, 109 files changes, 279170
->> insertions, 60 deletions
->>
->> Major part of the code is taken from A200 support from Freescale Linux
->> (2.6.35,
->> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/?h=imx_2.6.35)
->>
->> My question was, can I submit the patch for Linux 4.14.1 kernel for
->> mainlining purpose instead of linux-next?
->>
->> Please point me to any case-study where such huge enhancements were
->> mainlined in the past.
->>
->> Any suggestions for optimizing the mainlining process?
-> The downstream driver will not be acceptable to mainline. It's not just
-> the size of the driver itself, but it's just full of cruft and doesn't
-> integrate with any of the modern kernel frameworks.
->
-> If you are going to mainline this driver, it likely needs a full
-> rewrite as a proper DRM driver, with a userspace interface sanctioned
-> by the Linux DRM community.
->
-> Regards,
-> Lucas
+> +static int sdhci_arasan_runtime_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> +	int ret;
+> +
+> +	ret = clk_enable(sdhci_arasan->clk_ahb);
+> +	if (ret) {
+> +		dev_err(dev, "Cannot enable AHB clock.\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_enable(pltfm_host->clk);
+> +	if (ret) {
+> +		dev_err(dev, "Cannot enable SD clock.\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = sdhci_runtime_resume_host(host);
+> +	if (ret)
+> +		goto out;
+> +
+> +	return 0;
+> +out:
+> +	clk_disable(pltfm_host->clk);
+> +	clk_disable(sdhci_arasan->clk_ahb);
+> +
+> +	return ret;
+> +}
+> +#endif /* ! CONFIG_PM */
+> +
+>  #ifdef CONFIG_PM_SLEEP
+>  /**
+>   * sdhci_arasan_suspend - Suspend method for the driver
+> @@ -443,8 +513,11 @@ static int sdhci_arasan_resume(struct device *dev)
+>  }
+>  #endif /* ! CONFIG_PM_SLEEP */
+>  
+> -static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+> -			 sdhci_arasan_resume);
+> +static const struct dev_pm_ops sdhci_arasan_dev_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_arasan_suspend, sdhci_arasan_resume)
+> +	SET_RUNTIME_PM_OPS(sdhci_arasan_runtime_suspend,
+> +			   sdhci_arasan_runtime_resume, NULL)
+> +};
+>  
+>  static const struct of_device_id sdhci_arasan_of_match[] = {
+>  	/* SoC-specific compatible strings w/ soc_ctl_map */
+> @@ -806,6 +879,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_add_host;
+>  
+> +	pm_runtime_set_active(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_set_autosuspend_delay(&pdev->dev, 2000);
+> +	pm_runtime_mark_last_busy(&pdev->dev);
+> +	pm_runtime_use_autosuspend(&pdev->dev);
+> +
+>  	return 0;
+>  
+>  err_add_host:
+> 
