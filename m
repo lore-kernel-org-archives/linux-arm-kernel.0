@@ -1,86 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Apr 2018 16:37:12 +0100
-Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
-In-Reply-To: <20180410152419.inzprhuqhx26keuq@lakrids.cambridge.arm.com>
-References: <20180409170706.23541-1-marc.zyngier@arm.com>
- <20180409205139.GH10904@cbox>
- <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
- <20180410150540.GK10904@cbox>
- <20180410152419.inzprhuqhx26keuq@lakrids.cambridge.arm.com>
-Message-ID: <f90f8486-10c7-ce42-94a8-abaabd80ebb7@arm.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Tue, 10 Apr 2018 17:41:18 +0200
+Subject: [PATCH] irqchip/gic-v3: Support v2m frame backwards
+ compatibility mode
+In-Reply-To: <a4451252-35e4-e63f-8cca-a072f90fa9ad@arm.com>
+References: <20170320223614.1351-1-sboyd@codeaurora.org>
+ <bac1e827-3860-d92c-7bb4-eaf9840c608f@arm.com>
+ <20180410170155.6e07113d@windsurf>
+ <a4451252-35e4-e63f-8cca-a072f90fa9ad@arm.com>
+Message-ID: <20180410174118.0aa1d137@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/18 16:24, Mark Rutland wrote:
-> On Tue, Apr 10, 2018 at 05:05:40PM +0200, Christoffer Dall wrote:
->> On Tue, Apr 10, 2018 at 11:51:19AM +0100, Mark Rutland wrote:
->>> I think we also need to update kvm->arch.vttbr before updating
->>> kvm->arch.vmid_gen, otherwise another CPU can come in, see that the
->>> vmid_gen is up-to-date, jump to hyp, and program a stale VTTBR (with the
->>> old VMID).
->>>
->>> With the smp_wmb() and update of kvm->arch.vmid_gen moved to the end of
->>> the critical section, I think that works, modulo using READ_ONCE() and
->>> WRITE_ONCE() to ensure single-copy-atomicity of the fields we access
->>> locklessly.
->>
->> Indeed, you're right.  I would look something like this, then:
->>
->> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->> index 2e43f9d42bd5..6cb08995e7ff 100644
->> --- a/virt/kvm/arm/arm.c
->> +++ b/virt/kvm/arm/arm.c
->> @@ -450,7 +450,9 @@ void force_vm_exit(const cpumask_t *mask)
->>   */
->>  static bool need_new_vmid_gen(struct kvm *kvm)
->>  {
->> -	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
->> +	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
->> +	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
->> +	return unlikely(READ_ONCE(kvm->arch.vmid_gen) != current_vmid_gen);
->>  }
->>  
->>  /**
->> @@ -500,7 +502,6 @@ static void update_vttbr(struct kvm *kvm)
->>  		kvm_call_hyp(__kvm_flush_vm_context);
->>  	}
->>  
->> -	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
->>  	kvm->arch.vmid = kvm_next_vmid;
->>  	kvm_next_vmid++;
->>  	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
->> @@ -509,7 +510,10 @@ static void update_vttbr(struct kvm *kvm)
->>  	pgd_phys = virt_to_phys(kvm->arch.pgd);
->>  	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
->>  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
->> -	kvm->arch.vttbr = pgd_phys | vmid;
->> +	WRITE_ONCE(kvm->arch.vttbr, pgd_phys | vmid);
->> +
->> +	smp_wmb(); /* Ensure vttbr update is observed before vmid_gen update */
->> +	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
->>  
->>  	spin_unlock(&kvm_vmid_lock);
->>  }
-> 
-> I think that's right, yes.
-> 
-> We could replace the smp_{r,w}mb() barriers with an acquire of the
-> kvm_vmid_gen and a release of kvm->arch.vmid_gen, but if we're really
-> trying to optimize things there are larger algorithmic changes necessary
-> anyhow.
-> 
->> It's probably easier to convince ourselves about the correctness of
->> Marc's code using a rwlock instead, though.  Thoughts?
-> 
-> I believe that Marc's preference was the rwlock; I have no preference
-> either way.
+Hello,
 
-I don't mind either way. If you can be bothered to write a proper commit
-log for this, I'll take it. What I'd really want is Shannon to indicate
-whether or not this solves the issue he was seeing.
+Thanks for your feedback!
 
-Thanks,
+On Tue, 10 Apr 2018 16:23:00 +0100, Marc Zyngier wrote:
 
-	M.
+> > In the current Marvell Armada 7K/8K, we have a unit called the ICU
+> > that turns wired level interrupts on one side of the chip into MSIs,
+> > signaled to the GIC through a special unit called GICP, which allowed
+> > to trigger SPIs in the GIC-400 by doing memory writes. See
+> > irq-mvebu-icu.c and irq-mvebu-gicp.c for the two sides of the story
+> > (MSI consumer and MSI provider). We have one hack between those two
+> > drivers: because those interrupts are level-triggered, we need the
+> > addresses of two registers, while 'struct msi_msg' only allows to pass
+> > one address, assuming MSIs are edge-triggered.  
+> 
+> So effectively, the GICP/GIC400 combination is a poor-man GICv3 MBI
+> (Message Based Interrupt -- we love overloaded acronyms) implementation.
+
+Yes, that's what it is. I thought it was already clear for you, since
+you already spent a great deal of time working with me on ICU/GICP back
+when it was submitted and merged (and thank you for that!).
+
+> > Marc, let me know how we can collaborate on this topic. I'm able to
+> > either test some preliminary patches, or work on such patches if
+> > necessary (preferably with some initial directions).  
+> 
+> I have a vague idea how to support this. Given that level-triggered MSIs
+> have to be platform MSIs (because it is just madness otherwise), we can
+> probably store an extra message in the struct platform_msi_desc for the
+> "lower the line" write.
+
+Is there a problem with extending the msi_msg structure with an
+additional address ? It could be transparent for existing users of
+msi_msg, who would continue to use just address_lo/address_hi/data,
+while users needing level-triggered MSIs would use the new fields in
+addition to the existing ones. But perhaps I'm missing something.
+
+> On activation, you'd get two callbacks, probably with a flag of some
+> sort to indicate whether this is for the rising or falling edge.
+
+What you call "activation" is when ->write_msg() gets called on the MSI
+consumer side, to configure its HW so that it knows how to trigger its
+MSIs ?
+
+> The thing I'm unclear about so far is how to let the generic MSI layer
+> know that we're dealing with such an interrupt without make a total
+> mess of everything. It is probably done by marking the interrupt
+> level triggered, but there are some corner cases.
+
+Certainly me not fully understand the generic MSI layer, but why does
+it need to be aware of the interrupt being level vs. edge ?
+
+> And if that works, the PCI stuff will come for free (it is just a
+> matter of implementing a new irqdomain on top of the base GICv3 one).
+
+I've lost you here :)
+
+> I'll try to spend some time on it in the coming couple of weeks, but
+> will have to rely on you for the testing (as I don't have much in the
+> way of HW).
+
+I can definitely make some tests, I have actual HW to test this.
+
+Best regards,
+
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
