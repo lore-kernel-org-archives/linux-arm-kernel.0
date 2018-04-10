@@ -1,38 +1,88 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 10 Apr 2018 17:12:37 +0300
-Subject: [PATCH] ARM: avoid Cortex-A9 livelock on tight dmb loops
-In-Reply-To: <20180410134149.GQ5700@atomide.com>
-References: <E1f5qij-00033R-Sl@rmk-PC.armlinux.org.uk>
- <20180410134149.GQ5700@atomide.com>
-Message-ID: <685f80e3-30b3-8806-b81c-8de456507001@ti.com>
+From: chunkeey@gmail.com (Christian Lamparter)
+Date: Tue, 10 Apr 2018 16:18:15 +0200
+Subject: [PATCH v3 1/2] gpiolib: do not add duplicated GPIO Pin ranges
+Message-ID: <20180410141816.30452-1-chunkeey@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/18 16:41, Tony Lindgren wrote:
-> * Russell King <rmk+kernel@armlinux.org.uk> [180410 10:43]:
->> diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
->> index 021b5a8b9c0a..d4ddc78b2a0b 100644
->> --- a/arch/arm/mach-omap2/prm_common.c
->> +++ b/arch/arm/mach-omap2/prm_common.c
->> @@ -523,7 +523,7 @@ void omap_prm_reset_system(void)
->>   	prm_ll_data->reset_system();
->>   
->>   	while (1)
->> -		cpu_relax();
->> +		cpu_do_idle();
->>   }
->>   
-> 
-> Hmm we need to check so the added WFI here does not cause an
-> undesired change to a low power state. Adding Tero to Cc also.
+look if a GPIO range with the same ID has already
+been registered.
 
-Generally it is a bad idea to call arbitrary WFI within OMAP 
-architecture, as this triggers a PRCM power transition and will most 
-likely cause a hang if not controlled properly.
+For pinctrls that are set up through devicetree, the
+GPIO Range might be already set by the the gpio-ranges
+property.
+(see Documentation/devicetree/bindings/gpio/gpio.txt)
 
-Has this patch been tested on any platform that supports proper power 
-management?
+Signed-off-by: Christian Lamparter <chunkeey@gmail.com>
+---
+ drivers/gpio/gpiolib.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
--Tero
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 43aeb07343ec..3882e1ff85fa 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -2069,6 +2069,19 @@ int gpiochip_generic_config(struct gpio_chip *chip, unsigned offset,
+ }
+ EXPORT_SYMBOL_GPL(gpiochip_generic_config);
+ 
++static struct gpio_pin_range *gpiochip_find_by_id(struct gpio_chip *chip,
++						  unsigned int id)
++{
++	struct gpio_pin_range *pin_range;
++	struct gpio_device *gdev = chip->gpiodev;
++
++	list_for_each_entry(pin_range, &gdev->pin_ranges, node) {
++		if (pin_range->range.id == id)
++			return pin_range;
++	}
++	return NULL;
++}
++
+ #ifdef CONFIG_PINCTRL
+ 
+ /**
+@@ -2086,6 +2099,20 @@ int gpiochip_add_pingroup_range(struct gpio_chip *chip,
+ 	struct gpio_device *gdev = chip->gpiodev;
+ 	int ret;
+ 
++	/*
++	 * look if a GPIO range with the same ID has already been registered.
++	 * For pinctrls that are set up through devicetree, the GPIO Range
++	 * might be already set by the the gpio-ranges property.
++	 * (see Documentation/devicetree/bindings/gpio/gpio.txt)
++	 */
++	pin_range = gpiochip_find_by_id(chip, gpio_offset);
++	if (pin_range) {
++		chip_dbg(chip, "found existing GPIO range %d->%d - skipping\n",
++				gpio_offset,
++				gpio_offset + pin_range->range.npins - 1);
++		return 0;
++	}
++
+ 	pin_range = kzalloc(sizeof(*pin_range), GFP_KERNEL);
+ 	if (!pin_range) {
+ 		chip_err(chip, "failed to allocate pin ranges\n");
+@@ -2139,6 +2166,20 @@ int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+ 	struct gpio_device *gdev = chip->gpiodev;
+ 	int ret;
+ 
++	/*
++	 * look if a GPIO range with the same ID has already been registered.
++	 * For pinctrls that are set up through devicetree, the GPIO Range
++	 * might be already set by the the gpio-ranges property.
++	 * (see Documentation/devicetree/bindings/gpio/gpio.txt)
++	 */
++	pin_range = gpiochip_find_by_id(chip, gpio_offset);
++	if (pin_range) {
++		chip_dbg(chip, "found existing GPIO range %d->%d - skipping\n",
++			 gpio_offset,
++			 gpio_offset + pin_range->range.npins - 1);
++		return 0;
++	}
++
+ 	pin_range = kzalloc(sizeof(*pin_range), GFP_KERNEL);
+ 	if (!pin_range) {
+ 		chip_err(chip, "failed to allocate pin ranges\n");
+-- 
+2.17.0
