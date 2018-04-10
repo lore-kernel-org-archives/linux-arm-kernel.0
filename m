@@ -1,163 +1,35 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Tue, 10 Apr 2018 17:05:40 +0200
-Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
-In-Reply-To: <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
-References: <20180409170706.23541-1-marc.zyngier@arm.com>
- <20180409205139.GH10904@cbox>
- <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
-Message-ID: <20180410150540.GK10904@cbox>
+From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
+Date: Tue, 10 Apr 2018 17:10:52 +0200
+Subject: [PATCH 2/3] mm: replace __HAVE_ARCH_PTE_SPECIAL
+In-Reply-To: <alpine.DEB.2.21.1804091307480.56406@chino.kir.corp.google.com>
+References: <1523282229-20731-1-git-send-email-ldufour@linux.vnet.ibm.com>
+ <1523282229-20731-3-git-send-email-ldufour@linux.vnet.ibm.com>
+ <20180409175757.GA12938@infradead.org>
+ <alpine.DEB.2.21.1804091307480.56406@chino.kir.corp.google.com>
+Message-ID: <3a330851-d545-ebd8-e74c-c44e12220c24@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 11:51:19AM +0100, Mark Rutland wrote:
-> On Mon, Apr 09, 2018 at 10:51:39PM +0200, Christoffer Dall wrote:
-> > On Mon, Apr 09, 2018 at 06:07:06PM +0100, Marc Zyngier wrote:
-> > > Before entering the guest, we check whether our VMID is still
-> > > part of the current generation. In order to avoid taking a lock,
-> > > we start with checking that the generation is still current, and
-> > > only if not current do we take the lock, recheck, and update the
-> > > generation and VMID.
-> > > 
-> > > This leaves open a small race: A vcpu can bump up the global
-> > > generation number as well as the VM's, but has not updated
-> > > the VMID itself yet.
-> > > 
-> > > At that point another vcpu from the same VM comes in, checks
-> > > the generation (and finds it not needing anything), and jumps
-> > > into the guest. At this point, we end-up with two vcpus belonging
-> > > to the same VM running with two different VMIDs. Eventually, the
-> > > VMID used by the second vcpu will get reassigned, and things will
-> > > really go wrong...
-> > > 
-> > > A simple solution would be to drop this initial check, and always take
-> > > the lock. This is likely to cause performance issues. A middle ground
-> > > is to convert the spinlock to a rwlock, and only take the read lock
-> > > on the fast path. If the check fails at that point, drop it and
-> > > acquire the write lock, rechecking the condition.
-> > > 
-> > > This ensures that the above scenario doesn't occur.
-> > > 
-> > > Reported-by: Mark Rutland <mark.rutland@arm.com>
-> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > ---
-> > > I haven't seen any reply from Shannon, so reposting this to
-> > > a slightly wider audience for feedback.
-> > > 
-> > >  virt/kvm/arm/arm.c | 15 ++++++++++-----
-> > >  1 file changed, 10 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > > index dba629c5f8ac..a4c1b76240df 100644
-> > > --- a/virt/kvm/arm/arm.c
-> > > +++ b/virt/kvm/arm/arm.c
-> > > @@ -63,7 +63,7 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
-> > >  static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
-> > >  static u32 kvm_next_vmid;
-> > >  static unsigned int kvm_vmid_bits __read_mostly;
-> > > -static DEFINE_SPINLOCK(kvm_vmid_lock);
-> > > +static DEFINE_RWLOCK(kvm_vmid_lock);
-> > >  
-> > >  static bool vgic_present;
-> > >  
-> > > @@ -473,11 +473,16 @@ static void update_vttbr(struct kvm *kvm)
-> > >  {
-> > >  	phys_addr_t pgd_phys;
-> > >  	u64 vmid;
-> > > +	bool new_gen;
-> > >  
-> > > -	if (!need_new_vmid_gen(kvm))
-> > > +	read_lock(&kvm_vmid_lock);
-> > > +	new_gen = need_new_vmid_gen(kvm);
-> > > +	read_unlock(&kvm_vmid_lock);
-> > > +
-> > > +	if (!new_gen)
-> > >  		return;
-> > >  
-> > > -	spin_lock(&kvm_vmid_lock);
-> > > +	write_lock(&kvm_vmid_lock);
-> > >  
-> > >  	/*
-> > >  	 * We need to re-check the vmid_gen here to ensure that if another vcpu
-> > > @@ -485,7 +490,7 @@ static void update_vttbr(struct kvm *kvm)
-> > >  	 * use the same vmid.
-> > >  	 */
-> > >  	if (!need_new_vmid_gen(kvm)) {
-> > > -		spin_unlock(&kvm_vmid_lock);
-> > > +		write_unlock(&kvm_vmid_lock);
-> > >  		return;
-> > >  	}
-> > >  
-> > > @@ -519,7 +524,7 @@ static void update_vttbr(struct kvm *kvm)
-> > >  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
-> > >  	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
-> > >  
-> > > -	spin_unlock(&kvm_vmid_lock);
-> > > +	write_unlock(&kvm_vmid_lock);
-> > >  }
-> > >  
-> > >  static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
-> > > -- 
-> > > 2.14.2
-> > > 
-> > 
-> > The above looks correct to me.  I am wondering if something like the
-> > following would also work, which may be slightly more efficient,
-> > although I doubt the difference can be measured:
-> > 
-
-[...]
-
+On 09/04/2018 22:08, David Rientjes wrote:
+> On Mon, 9 Apr 2018, Christoph Hellwig wrote:
 > 
-> I think we also need to update kvm->arch.vttbr before updating
-> kvm->arch.vmid_gen, otherwise another CPU can come in, see that the
-> vmid_gen is up-to-date, jump to hyp, and program a stale VTTBR (with the
-> old VMID).
+>>> -#ifdef __HAVE_ARCH_PTE_SPECIAL
+>>> +#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
+>>>  # define HAVE_PTE_SPECIAL 1
+>>>  #else
+>>>  # define HAVE_PTE_SPECIAL 0
+>>
+>> I'd say kill this odd indirection and just use the
+>> CONFIG_ARCH_HAS_PTE_SPECIAL symbol directly.
+>>
+>>
 > 
-> With the smp_wmb() and update of kvm->arch.vmid_gen moved to the end of
-> the critical section, I think that works, modulo using READ_ONCE() and
-> WRITE_ONCE() to ensure single-copy-atomicity of the fields we access
-> locklessly.
+> Agree, and I think it would be easier to audit/review if patches 1 and 3 
+> were folded together to see the relationship between the newly added 
+> selects and what #define's it is replacing.  Otherwise, looks good!
+>
 
-Indeed, you're right.  I would look something like this, then:
-
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 2e43f9d42bd5..6cb08995e7ff 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -450,7 +450,9 @@ void force_vm_exit(const cpumask_t *mask)
-  */
- static bool need_new_vmid_gen(struct kvm *kvm)
- {
--	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
-+	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
-+	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
-+	return unlikely(READ_ONCE(kvm->arch.vmid_gen) != current_vmid_gen);
- }
- 
- /**
-@@ -500,7 +502,6 @@ static void update_vttbr(struct kvm *kvm)
- 		kvm_call_hyp(__kvm_flush_vm_context);
- 	}
- 
--	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
- 	kvm->arch.vmid = kvm_next_vmid;
- 	kvm_next_vmid++;
- 	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
-@@ -509,7 +510,10 @@ static void update_vttbr(struct kvm *kvm)
- 	pgd_phys = virt_to_phys(kvm->arch.pgd);
- 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
--	kvm->arch.vttbr = pgd_phys | vmid;
-+	WRITE_ONCE(kvm->arch.vttbr, pgd_phys | vmid);
-+
-+	smp_wmb(); /* Ensure vttbr update is observed before vmid_gen update */
-+	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
- 
- 	spin_unlock(&kvm_vmid_lock);
- }
-
-It's probably easier to convince ourselves about the correctness of
-Marc's code using a rwlock instead, though.  Thoughts?
+Ok I will fold the 3 patches and introduce a new one removing HAVE_PTE_SPECIAL.
 
 Thanks,
--Christoffer
+Laurent.
