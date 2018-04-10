@@ -1,63 +1,30 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 10 Apr 2018 07:44:27 +0800
-Subject: [PATCH 1/2] coresight: Use %px to print pcsr instead of %p
-In-Reply-To: <CAGXu5jKSj2V0mmKwXzQC_U+5d38Sfomy0Xpz18Dfoh1doXrF8w@mail.gmail.com>
-References: <1520961871-11196-1-git-send-email-mathieu.poirier@linaro.org>
- <1520961871-11196-2-git-send-email-mathieu.poirier@linaro.org>
- <CAGXu5jJKG1Qo4r537uER3_i-kkZvq2BKfXM0pGTb+jZ1JfZT_w@mail.gmail.com>
- <CANLsYkwseQo1+PfTuhkgvx=AyLs3dL+zkSxwbkuu9JhLwTDqHQ@mail.gmail.com>
- <20180409161056.GA13134@leoy-ThinkPad-X240s>
- <CAGXu5jKSj2V0mmKwXzQC_U+5d38Sfomy0Xpz18Dfoh1doXrF8w@mail.gmail.com>
-Message-ID: <20180409234427.GA14399@leoy-ThinkPad-X240s>
+From: marcin@ziemianowicz.com (Marcin Ziemianowicz)
+Date: Mon, 9 Apr 2018 20:15:51 -0400
+Subject: [PATCH v2 0/2] clk: at91: Added more information logging
+Message-ID: <20180410001551.GA62208@hak8or>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+This is a series of patches which resolves set_rate() for the PLL not
+having any effect and therefore the USB Host port not working. Also, a
+few messages were added which may be helpful in the future when others
+are working with USB clocking.
 
-On Mon, Apr 09, 2018 at 10:54:58AM -0700, Kees Cook wrote:
-> On Mon, Apr 9, 2018 at 9:10 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> > Hi Mathieu, Kees,
-> >
-> > On Fri, Apr 06, 2018 at 09:47:31AM -0600, Mathieu Poirier wrote:
-> >> On 5 April 2018 at 00:26, Kees Cook <keescook@chromium.org> wrote:
-> >> > On Tue, Mar 13, 2018 at 10:24 AM, Mathieu Poirier
-> >> > <mathieu.poirier@linaro.org> wrote:
-> >> >> From: Leo Yan <leo.yan@linaro.org>
-> >> >>
-> >> >> Commit ad67b74d2469 ("printk: hash addresses printed with %p") lets
-> >> >> printk specifier %p to hash all addresses before printing, this was
-> >> >> resulting in the high 32 bits of pcsr can only output zeros.  So
-> >> >> module cannot completely print pc value and it's pointless for debugging
-> >> >> purpose.
-> >> >>
-> >> >> This patch fixes this by using %px to print pcsr instead.
-> >> >
-> >> > Why is %p (and now %px) needed here at all? %pS is already used, which
-> >> > should give useful debugging details, yes?
-> >>
-> >> Hey Leo,
-> >>
-> >> I've taken a second look at this and Kees has a point, %pS should be
-> >> sufficient here.  Please test again and see if %px is absolutely
-> >> necessary.  If you think that is the case please provide a snapshot of
-> >> the corner case that makes the change mandatory.
-> >
-> > Sorry I missed replying for this patch due to my email filter and
-> > thanks for suggestion.
-> >
-> > I can think out one case which should use %px: if CPU is locked up in
-> > firmwares (e.g. NS-EL2 or ARM-TF in S-EL3), we can rely on %px to read
-> > back PC hex value; for this case the CPU PC address is out of kernel
-> > space.
-> >
-> > How about you guys think for this?
-> 
-> Wouldn't %pS still give you a meaningful offset?
+Changes since V1:
+  Added patch set cover letter
+  Shortened lines which were over >80 characters long
+  > Comment by Greg Kroah-Hartman about "from" field in email addressed
+  > Comment by Alan Stern about redundant debug lines addressed
 
-My fault, I tested at my side %pS does output offset for PC value
-out of kernel space (e.g. when PC = 0x12345678).
+hak8or (2):
+  clk: at91: Added more information logging.
+  clk: at91: Fix for PLL set_rate changes not being actually written to
+    PLL peripheral bits
 
-Thank you for the suggestions ;)  Will send new patch for the fixing.
+ drivers/clk/at91/clk-pll.c   | 14 +++++++++++++-
+ drivers/clk/at91/clk-usb.c   | 10 ++++++++--
+ drivers/usb/host/ohci-at91.c | 16 ++++++++++------
+ 3 files changed, 31 insertions(+), 9 deletions(-)
 
-Thanks,
-Leo Yan
+-- 
+2.17.0
