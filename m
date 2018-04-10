@@ -1,175 +1,363 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 10 Apr 2018 11:54:39 +0200
-Subject: [PATCH v2 1/2] clk: at91: Added more information logging.
-In-Reply-To: <20180410001621.GA62230@hak8or>
-References: <20180410001621.GA62230@hak8or>
-Message-ID: <20180410095439.GA2745@piout.net>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Tue, 10 Apr 2018 10:57:37 +0100
+Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
+In-Reply-To: <20180406141935.6801-1-linus.walleij@linaro.org>
+References: <20180406141935.6801-1-linus.walleij@linaro.org>
+Message-ID: <20180410095737.GF10254@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-On 09/04/2018 20:16:21-0400, Marcin Ziemianowicz wrote:
-> I noticed that when debugging some USB clocking issue that there weren't
-> many ways to tell what the state of the USB clocking system was. This
-> adds a few logging statements to see what the relevant code is trying to
-> do.
+I need to do a bit of archeology to get my Versatile Express back
+to working order in order to test your patches, which might not
+happen this week or so, but I have some comments on your approach
+which I would like clarification on.
+
+On Fri, Apr 06, 2018 at 04:19:34PM +0200, Linus Walleij wrote:
+> The Versatile Express uses a special configuration controller
+> deeply embedded in the system motherboard FPGA to multiplex the
+> two to three (!) CLCD instances out to the single SiI9022
+> bridge.
+
+That configuration controller is already supported by the
+drivers/misc/vexpress-syscfg.c driver and the muxfpga node is present
+in arch/arm/boot/dts/vexpress-v2m-rs1.dtsi (and vexpress-v2m.dtsi for
+older CoreTiles that don't use the RS1 memory map).
+
 > 
-> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
+> Set up an extra file with the logic to probe to the FPGA mux
+> register on the system controller bus, then parse the memory
+> range argument to figure out what path the CLCD signal is
+> actually taking, and set up the mux accordingly.
+
+I'm not sure you need all this extra code, I would have thought that
+all you want is to use the regmap that you already have in order to
+switch the MUX to the correct input. The MUXFPGA in the DT is already
+setup to use function 7 (which is the function you need for FPGA), you
+just need a property in the PL111 node to tell you which "site" you are
+on (Motherboard, Daughterboard 1 or 2) and use the relevant value when
+setting the regmap.
+
+Info on what the correct values are are here:
+http://infocenter.arm.com/help/topic/com.arm.doc.dui0447j/CACDEFGH.html#CACCGJFF
+
+> 
+> If there is a CLCD instance on the core tile (the daughterboard
+> with the CPUs fitted) then that CLCD instance will take
+> precedence since it can address all memory.
+
+What does "take precedence" mean here? You mean prefer to switch the MUX
+to that source instead of using the MB? That should always be the
+default choice, as the MB CLCD is mostly for boot up info being
+displayed and it is known to have horrendous performance.
+
+Best regards,
+Liviu
+
+> 
+> Scale down the Versatile Express to 16BPP so we can support a
+> 1024x768 display despite the bus bandwidth restrictions on this
+> platform.
+> 
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/clk/at91/clk-pll.c   |  6 +++++-
->  drivers/clk/at91/clk-usb.c   | 10 ++++++++--
->  drivers/usb/host/ohci-at91.c | 16 ++++++++++------
->  3 files changed, 23 insertions(+), 9 deletions(-)
+> ChangeLog v1->v2:
+> - No changes just reposting rebased on mainline changes.
+> ---
+>  drivers/gpu/drm/pl111/Makefile          |   1 +
+>  drivers/gpu/drm/pl111/pl111_drm.h       |   3 +-
+>  drivers/gpu/drm/pl111/pl111_versatile.c |  48 ++++++++++++++-
+>  drivers/gpu/drm/pl111/pl111_vexpress.c  | 106 ++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 +++++++
+>  5 files changed, 178 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
+>  create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
 > 
-> diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-> index 7d3223fc7161..534961766ae5 100644
-> --- a/drivers/clk/at91/clk-pll.c
-> +++ b/drivers/clk/at91/clk-pll.c
-> @@ -133,6 +133,7 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
->  {
->  	struct clk_pll *pll = to_clk_pll(hw);
->  	unsigned int pllr;
-> +	unsigned long recalcedrate;
->  	u16 mul;
->  	u8 div;
+> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
+> index 9c5e8dba8ac6..19a8189dc54f 100644
+> --- a/drivers/gpu/drm/pl111/Makefile
+> +++ b/drivers/gpu/drm/pl111/Makefile
+> @@ -3,6 +3,7 @@ pl111_drm-y +=	pl111_display.o \
+>  		pl111_versatile.o \
+>  		pl111_drv.o
 >  
-> @@ -144,7 +145,10 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
->  	if (!div || !mul)
->  		return 0;
+> +pl111_drm-$(CONFIG_ARCH_VEXPRESS) += pl111_vexpress.o
+>  pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
 >  
-> -	return (parent_rate / div) * (mul + 1);
-> +	recalcedrate = (parent_rate / div) * (mul + 1);
-> +	pr_debug("clk-pll: calculating new rate, (%lu hz / %u) * %u = %lu hz\n",
-> +		parent_rate, div, mul, recalcedrate);
-This is not properly aligned. Also, I'm not a huge fan of adding that
-kind of debug messages. Isn't the rate already present in debugfs ?
-
-> +	return recalcedrate;
->  }
+>  obj-$(CONFIG_DRM_PL111) += pl111_drm.o
+> diff --git a/drivers/gpu/drm/pl111/pl111_drm.h b/drivers/gpu/drm/pl111/pl111_drm.h
+> index 8639b2d4ddf7..916154ac733a 100644
+> --- a/drivers/gpu/drm/pl111/pl111_drm.h
+> +++ b/drivers/gpu/drm/pl111/pl111_drm.h
+> @@ -64,7 +64,8 @@ struct pl111_drm_dev_private {
+>  	struct drm_bridge *bridge;
+>  	struct drm_simple_display_pipe pipe;
 >  
->  static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
-> diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
-> index 791770a563fc..2fa877e99bac 100644
-> --- a/drivers/clk/at91/clk-usb.c
-> +++ b/drivers/clk/at91/clk-usb.c
-> @@ -48,11 +48,15 @@ static unsigned long at91sam9x5_clk_usb_recalc_rate(struct clk_hw *hw,
->  	struct at91sam9x5_clk_usb *usb = to_at91sam9x5_clk_usb(hw);
->  	unsigned int usbr;
->  	u8 usbdiv;
-> +	unsigned int calcdclock;
+> -	void *regs;
+> +	void __iomem *clcd_memory;
+> +	void __iomem *regs;
+>  	u32 memory_bw;
+>  	u32 ienb;
+>  	u32 ctrl;
+> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
+> index 9302f516045e..569edf02a36a 100644
+> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
+> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
+> @@ -1,12 +1,14 @@
+>  #include <linux/amba/clcd-regs.h>
+>  #include <linux/device.h>
+>  #include <linux/of.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/regmap.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/bitops.h>
+>  #include <linux/module.h>
+>  #include <drm/drmP.h>
+>  #include "pl111_versatile.h"
+> +#include "pl111_vexpress.h"
+>  #include "pl111_drm.h"
 >  
->  	regmap_read(usb->regmap, AT91_PMC_USB, &usbr);
->  	usbdiv = (usbr & AT91_PMC_OHCIUSBDIV) >> SAM9X5_USB_DIV_SHIFT;
+>  static struct regmap *versatile_syscon_map;
+> @@ -22,6 +24,7 @@ enum versatile_clcd {
+>  	REALVIEW_CLCD_PB11MP,
+>  	REALVIEW_CLCD_PBA8,
+>  	REALVIEW_CLCD_PBX,
+> +	VEXPRESS_CLCD_V2M,
+>  };
 >  
-> -	return DIV_ROUND_CLOSEST(parent_rate, (usbdiv + 1));
-> +	calcdclock = DIV_ROUND_CLOSEST(parent_rate, (usbdiv + 1));
-> +	pr_debug("clk-usb: calculating new rate, %lu hz / %u = %u hz\n",
-> +		parent_rate, usbdiv + 1, calcdclock);
-> +	return calcdclock;
->  }
+>  static const struct of_device_id versatile_clcd_of_match[] = {
+> @@ -53,6 +56,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
+>  		.compatible = "arm,realview-pbx-syscon",
+>  		.data = (void *)REALVIEW_CLCD_PBX,
+>  	},
+> +	{
+> +		.compatible = "arm,vexpress-muxfpga",
+> +		.data = (void *)VEXPRESS_CLCD_V2M,
+> +	},
+>  	{},
+>  };
 >  
->  static int at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
-> @@ -98,7 +102,6 @@ static int at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
->  		if (!best_diff)
->  			break;
->  	}
-> -
-
-Unrelated change
-
->  	if (best_rate < 0)
->  		return best_rate;
+> @@ -286,12 +293,26 @@ static const struct pl111_variant_data pl111_realview = {
+>  	.fb_bpp = 16,
+>  };
 >  
-> @@ -142,6 +145,9 @@ static int at91sam9x5_clk_usb_set_rate(struct clk_hw *hw, unsigned long rate,
->  	if (div > SAM9X5_USB_MAX_DIV + 1 || !div)
->  		return -EINVAL;
->  
-> +	pr_debug("clk-usb: setting USB clock divider to %lu hz / %lu = %lu hz\n",
-> +		parent_rate, div, rate);
+> +/*
+> + * Versatile Express PL111 variant, again we just push the maximum
+> + * BPP to 16 to be able to get 1024x768 without saturating the memory
+> + * bus. The clockdivider also seems broken on the Versatile Express.
+> + */
+> +static const struct pl111_variant_data pl111_vexpress = {
+> +	.name = "PL111 Versatile Express",
+> +	.formats = pl111_realview_pixel_formats,
+> +	.nformats = ARRAY_SIZE(pl111_realview_pixel_formats),
+> +	.fb_bpp = 16,
+> +	.broken_clockdivider = true,
+> +};
 > +
->  	regmap_update_bits(usb->regmap, AT91_PMC_USB, AT91_PMC_OHCIUSBDIV,
->  			   (div - 1) << SAM9X5_USB_DIV_SHIFT);
->  
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index 5ad9e9bdc8ee..c57a239918f9 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -70,11 +70,13 @@ static const struct ohci_driver_overrides ohci_at91_drv_overrides __initconst =
->  
->  /*-------------------------------------------------------------------------*/
->  
-> -static void at91_start_clock(struct ohci_at91_priv *ohci_at91)
-> +static void at91_start_clock(struct ohci_at91_priv *ohci_at91,
-> +				struct device *dev)
-
-This is not properly aligned either
-
+>  int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
 >  {
->  	if (ohci_at91->clocked)
->  		return;
+>  	const struct of_device_id *clcd_id;
+>  	enum versatile_clcd versatile_clcd_type;
+>  	struct device_node *np;
+>  	struct regmap *map;
+> +	int ret;
 >  
-> +	dev_dbg(dev, "Enabling hclk, iclk, and setting fclk to 48 Mhz\n");
->  	clk_set_rate(ohci_at91->fclk, 48000000);
->  	clk_prepare_enable(ohci_at91->hclk);
->  	clk_prepare_enable(ohci_at91->iclk);
-> @@ -82,11 +84,13 @@ static void at91_start_clock(struct ohci_at91_priv *ohci_at91)
->  	ohci_at91->clocked = true;
->  }
->  
-> -static void at91_stop_clock(struct ohci_at91_priv *ohci_at91)
-> +static void at91_stop_clock(struct ohci_at91_priv *ohci_at91,
-> +				struct device *dev)
->  {
->  	if (!ohci_at91->clocked)
->  		return;
->  
-> +	dev_dbg(dev, "Disabling hclk, iclk, and fclk\n");
->  	clk_disable_unprepare(ohci_at91->fclk);
->  	clk_disable_unprepare(ohci_at91->iclk);
->  	clk_disable_unprepare(ohci_at91->hclk);
-> @@ -104,7 +108,7 @@ static void at91_start_hc(struct platform_device *pdev)
->  	/*
->  	 * Start the USB clocks.
->  	 */
-> -	at91_start_clock(ohci_at91);
-> +	at91_start_clock(ohci_at91, &pdev->dev);
->  
->  	/*
->  	 * The USB host controller must remain in reset.
-> @@ -128,7 +132,7 @@ static void at91_stop_hc(struct platform_device *pdev)
->  	/*
->  	 * Stop the USB clocks.
->  	 */
-> -	at91_stop_clock(ohci_at91);
-> +	at91_stop_clock(ohci_at91, &pdev->dev);
->  }
->  
->  
-> @@ -623,7 +627,7 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
->  
->  		/* flush the writes */
->  		(void) ohci_readl (ohci, &ohci->regs->control);
-> -		at91_stop_clock(ohci_at91);
-> +		at91_stop_clock(ohci_at91, dev);
+>  	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
+>  					     &clcd_id);
+> @@ -301,7 +322,25 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
 >  	}
+>  	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
 >  
->  	return ret;
-> @@ -638,7 +642,7 @@ ohci_hcd_at91_drv_resume(struct device *dev)
->  	if (ohci_at91->wakeup)
->  		disable_irq_wake(hcd->irq);
->  
-> -	at91_start_clock(ohci_at91);
-> +	at91_start_clock(ohci_at91, dev);
->  
->  	ohci_resume(hcd, false);
->  
+> -	map = syscon_node_to_regmap(np);
+> +	/* Versatile Express special handling */
+> +	if (versatile_clcd_type == VEXPRESS_CLCD_V2M) {
+> +		struct platform_device *pdev;
+> +
+> +		/* Call into deep Vexpress configuration API */
+> +		pdev = of_find_device_by_node(np);
+> +		if (!pdev) {
+> +			dev_err(dev, "can't find the sysreg device, deferring\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +		map = dev_get_drvdata(&pdev->dev);
+> +		if (!map) {
+> +			dev_err(dev, "sysreg has not yet probed\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +	} else {
+> +		map = syscon_node_to_regmap(np);
+> +	}
+> +
+>  	if (IS_ERR(map)) {
+>  		dev_err(dev, "no Versatile syscon regmap\n");
+>  		return PTR_ERR(map);
+> @@ -340,6 +379,13 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>  		priv->variant_display_disable = pl111_realview_clcd_disable;
+>  		dev_info(dev, "set up callbacks for RealView PL111\n");
+>  		break;
+> +	case VEXPRESS_CLCD_V2M:
+> +		priv->variant = &pl111_vexpress;
+> +		dev_info(dev, "initializing Versatile Express PL111\n");
+> +		ret = pl111_vexpress_clcd_init(dev, priv, map);
+> +		if (ret)
+> +			return ret;
+> +		break;
+>  	default:
+>  		dev_info(dev, "unknown Versatile system controller\n");
+>  		break;
+> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.c b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> new file mode 100644
+> index 000000000000..720244f497fe
+> --- /dev/null
+> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> @@ -0,0 +1,106 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Versatile Express PL111 handling
+> + * Copyright (C) 2018 Linus Walleij
+> + *
+> + * This module binds to the "arm,vexpress-muxfpga" device on the
+> + * Versatile Express configuration bus and sets up which CLCD instance
+> + * gets muxed out on the DVI bridge.
+> + */
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/vexpress.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include "pl111_drm.h"
+> +#include "pl111_vexpress.h"
+> +
+> +#define VEXPRESS_FPGAMUX_MOTHERBOARD		0x00
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_1	0x01
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_2	0x02
+> +
+> +static bool daughterboard_muxed = false;
+> +static bool motherboard_muxed = false;
+> +
+> +int pl111_vexpress_clcd_init(struct device *dev,
+> +			     struct pl111_drm_dev_private *priv,
+> +			     struct regmap *map)
+> +{
+> +	struct device_node *memory;
+> +	u32 val;
+> +	int ret;
+> +
+> +	/*
+> +	 * The CLCD on the motherboard has a special memory region and
+> +	 * does not make use of CMA. We differentiate between the different
+> +	 * CLCD controllers using this memory region phandle.
+> +	 */
+> +	memory = of_parse_phandle(dev->of_node, "memory-region", 0);
+> +	if (!memory) {
+> +		if (motherboard_muxed) {
+> +			dev_info(dev, "motherboard CLCD muxed in\n");
+> +			dev_info(dev, "daughterboard takes precedence\n");
+> +			dev_info(dev, "motherboard CLCD will not be muxed out\n");
+> +		}
+> +		dev_info(dev,
+> +			 "DVI muxed to daughterboard 1 (core tile) CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_DAUGHTERBOARD_1;
+> +		daughterboard_muxed = true;
+> +	} else {
+> +		priv->clcd_memory = of_iomap(memory, 0);
+> +		if (!priv->clcd_memory)
+> +			dev_err(dev, "could not remap CLCD memory\n");
+> +		/* Fall through and try to use CMA */
+> +		if (daughterboard_muxed) {
+> +			dev_info(dev, "daughterboard takes precedence\n");
+> +			dev_info(dev, "motherboard CLCD will not be muxed out\n");
+> +			return -ENODEV;
+> +		}
+> +		dev_info(dev, "DVI muxed to motherboard CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_MOTHERBOARD;
+> +		motherboard_muxed = true;
+> +	}
+> +
+> +	ret = regmap_write(map, 0, val);
+> +	if (ret) {
+> +		dev_err(dev, "error setting DVI muxmode\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * This sets up the regmap pointer that will then be retrieved by
+> + * the detection code in pl111_versatile.c and passed in to the
+> + * pl111_vexpress_clcd_init() function above.
+> + */
+> +static int vexpress_muxfpga_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct regmap *map;
+> +
+> +	map = devm_regmap_init_vexpress_config(&pdev->dev);
+> +	if (IS_ERR(map))
+> +		return PTR_ERR(map);
+> +	dev_set_drvdata(dev, map);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id vexpress_muxfpga_match[] = {
+> +	{ .compatible = "arm,vexpress-muxfpga", }
+> +};
+> +
+> +static struct platform_driver vexpress_muxfpga_driver = {
+> +	.driver = {
+> +		.name = "vexpress-muxfpga",
+> +		.of_match_table = of_match_ptr(vexpress_muxfpga_match),
+> +	},
+> +	.probe = vexpress_muxfpga_probe,
+> +};
+> +
+> +module_platform_driver(vexpress_muxfpga_driver);
+> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.h b/drivers/gpu/drm/pl111/pl111_vexpress.h
+> new file mode 100644
+> index 000000000000..49876417f7b6
+> --- /dev/null
+> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.h
+> @@ -0,0 +1,22 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +
+> +struct device;
+> +struct pl111_drm_dev_private;
+> +struct regmap;
+> +
+> +#ifdef CONFIG_ARCH_VEXPRESS
+> +
+> +int pl111_vexpress_clcd_init(struct device *dev,
+> +			     struct pl111_drm_dev_private *priv,
+> +			     struct regmap *map);
+> +
+> +#else
+> +
+> +static int inline pl111_vexpress_clcd_init(struct device *dev,
+> +					   struct pl111_drm_dev_private *priv,
+> +					   struct regmap *map)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +#endif
 > -- 
-> 2.17.0
-> 
+> 2.14.3
 > 
 
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
