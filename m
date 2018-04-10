@@ -1,46 +1,53 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 10 Apr 2018 14:51:38 +0200
-Subject: [PATCH v2 2/5] ARM: timer-sp: Use of_clk_get_parent_count() instead
- of open coding
-In-Reply-To: <1523364701-15383-1-git-send-email-geert+renesas@glider.be>
-References: <1523364701-15383-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1523364701-15383-3-git-send-email-geert+renesas@glider.be>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 10 Apr 2018 10:01:12 -0300
+Subject: A200 driver submission for Linux mainline kernel
+In-Reply-To: <01f5f95e-d957-bc32-b8a8-94784523d095@gmail.com>
+References: <01f5f95e-d957-bc32-b8a8-94784523d095@gmail.com>
+Message-ID: <CAOMZO5C0pnPgeJ7MLX_f+1qZjJ6FF=ap6ytdm-OoCMsvcw_mEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-This depends on "[PATCH v2 1/5] clk: Extract OF clock helpers in
-<linux/of_clk.h>".
+Hi Abhijit,
 
-v2:
-  - of_clk_get_parent_count() was moved to <linux/of_clk.h>,
-  - Dropped RFC, as a dummy is now available in the !CONFIG_COMMON_CLK
-    case.
----
- drivers/clocksource/timer-sp804.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On Tue, Apr 10, 2018 at 4:58 AM, abhijit <abhijitnaik27@gmail.com> wrote:
+> Hi All,
+>
+> I have tested A200/Z430 3D driver for Freescale IMX535/537 SoC by using port
+> from freedreno. I wanted to submit driver patch to linux 4.14.1 for
+> mainlining A200 driver support
+>
+> Currently w.r.t 4.14.1 kernel, the patch has, 109 files changes, 279170
+> insertions, 60 deletions
+>
+> Major part of the code is taken from A200 support from Freescale Linux
+> (2.6.35,
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/?h=imx_2.6.35)
+>
+> My question was, can I submit the patch for Linux 4.14.1 kernel for
+> mainlining purpose instead of linux-next?
 
-diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
-index 3ac9dec9a03852f9..e01222ea888ff9d2 100644
---- a/drivers/clocksource/timer-sp804.c
-+++ b/drivers/clocksource/timer-sp804.c
-@@ -27,6 +27,7 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_clk.h>
- #include <linux/of_irq.h>
- #include <linux/sched_clock.h>
- 
-@@ -245,7 +246,7 @@ static int __init sp804_of_init(struct device_node *np)
- 		clk1 = NULL;
- 
- 	/* Get the 2nd clock if the timer has 3 timer clocks */
--	if (of_count_phandle_with_args(np, "clocks", "#clock-cells") == 3) {
-+	if (of_clk_get_parent_count(np) == 3) {
- 		clk2 = of_clk_get(np, 1);
- 		if (IS_ERR(clk2)) {
- 			pr_err("sp804: %s clock not found: %d\n", np->name,
--- 
-2.7.4
+As you are adding a new feature, it is better to base your work
+against linux-next or against 4.17-rc1 when it becomes available.
+
+> Please point me to any case-study where such huge enhancements were
+> mainlined in the past.
+
+You can take a look at:
+
+commit a8c21a5451d831e67b7a6fb910f9ca8bc7b43554
+Author: The etnaviv authors <dri-devel@lists.freedesktop.org>
+Date:   Thu Dec 3 18:21:29 2015 +0100
+
+    drm/etnaviv: add initial etnaviv DRM driver
+
+    This adds the etnaviv DRM driver and hooks it up in Makefiles
+    and Kconfig.
+
+    Signed-off-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+    Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+    Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+
+Regards,
+
+Fabio Estevam
