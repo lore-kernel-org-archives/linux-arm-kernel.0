@@ -1,22 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Apr 2018 16:41:46 +0200
-Subject: [PATCH] MAINTAINERS: Migrate oxnas list to groups.io
-In-Reply-To: <1523349825-1969-1-git-send-email-narmstrong@baylibre.com>
-References: <1523349825-1969-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAK8P3a2PACp3fzg+jfvdAwaxZNQkP391nNy7nnW8wBqGVpkzKg@mail.gmail.com>
+From: tuomas@tuxera.com (Tuomas Tynkkynen)
+Date: Tue, 10 Apr 2018 17:51:19 +0300
+Subject: [PATCH] ARM: dts: sunxi: Change sun7i-a20-olimex-som204-evb to not
+ use cd-inverted
+Message-ID: <20180410145119.27362-1-tuomas@tuxera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 10:43 AM, Neil Armstrong
-<narmstrong@baylibre.com> wrote:
-> The linux-oxnas migrates from tuxfamily to groups.io for a simpler
-> administration and maintainance.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  MAINTAINERS | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Commit 45e01f401a2a16 ("ARM: dts: sunxi: Switch MMC nodes away from
+cd-inverted property") changed most of the sunxi boards away from using
+the cd-inverted property in MMC nodes. However, the
+sun7i-a20-olimex-som204-evb board which got merged concurrently with
+that commit is now using cd-inverted. Switch it away from using
+cd-inverted to be consistent with rest of the sunxi boards.
 
-Applied to fixes branch.
+Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-    Arnd
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
+index eae8e267b9ef..3d7b5c848fef 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
+@@ -172,8 +172,7 @@
+ 	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_vcc3v3>;
+ 	bus-width = <4>;
+-	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.16.3
