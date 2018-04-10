@@ -1,64 +1,394 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 10 Apr 2018 14:50:08 -0500
-Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
- Extended Tags
-In-Reply-To: <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
-References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
- <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Tue, 10 Apr 2018 14:57:11 -0500
+Subject: [PATCH 5/5] powerpc:dts:pm: add power management node
+In-Reply-To: <20180329013143.22527-5-ran.wang_1@nxp.com>
+References: <20180329013143.22527-1-ran.wang_1@nxp.com>
+ <20180329013143.22527-5-ran.wang_1@nxp.com>
+Message-ID: <CADRPPNQXH3+eGNV417BRVnFZgPoTF7aut32DmZZ-0xJKB9TJ9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 02:41:44PM -0500, Bjorn Helgaas wrote:
-> On Wed, Apr 04, 2018 at 06:50:09PM -0400, Sinan Kaya wrote:
-> > Per PCIe r3.1, sec 2.2.6.2 and 7.8.4, a Requester may not use 8-bit Tags
-> > unless its Extended Tag Field Enable is set, but all Receivers/Completers
-> > must handle 8-bit Tags correctly regardless of their Extended Tag Field
-> > Enable.
-> > 
-> > Some devices do not handle 8-bit Tags as Completers, so add a quirk for
-> > them.  If we find such a device, we disable Extended Tags for the entire
-> > hierarchy to make peer-to-peer DMA possible.
-> > 
-> > The Broadcom HT1100/HT2000/HT2100 seems to have issues with handling 8-bit
-> > tags.  Mark it as broken.
-> > 
-> > Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
-> > Link: https://bugzilla.kernel.org/show_bug.cgi?id=196197
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> 
-> Applied to pci/enumeration for v4.18, thanks!
+On Wed, Mar 28, 2018 at 8:31 PM, Ran Wang <ran.wang_1@nxp.com> wrote:
+> Enable Power Management feature on device tree, including MPC8536,
+> MPC8544, MPC8548, MPC8572, P1010, P1020, P1021, P1022, P2020, P2041,
+> P3041, T104X, T1024.
 
-Actually, this is a really annoying issue and I think the fix is
-appropriate for v4.17, so I moved it to my for-linus branch.
+There are no device tree bindings documented for the properties and
+compatible strings used in the patch. Please update the binding
+documents first before adding them into device tree.
 
-> > ---
-> >  drivers/pci/quirks.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> > index 8b14bd3..f012742 100644
-> > --- a/drivers/pci/quirks.c
-> > +++ b/drivers/pci/quirks.c
-> > @@ -4813,9 +4813,13 @@ static void quirk_no_ext_tags(struct pci_dev *pdev)
-> >  
-> >  	pci_walk_bus(bridge->bus, pci_configure_extended_tags, NULL);
-> >  }
-> > +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0132, quirk_no_ext_tags);
-> >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0140, quirk_no_ext_tags);
-> > +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0141, quirk_no_ext_tags);
-> >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0142, quirk_no_ext_tags);
-> >  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0144, quirk_no_ext_tags);
-> > +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0420, quirk_no_ext_tags);
-> > +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS, 0x0422, quirk_no_ext_tags);
-> >  
-> >  #ifdef CONFIG_PCI_ATS
-> >  /*
-> > -- 
-> > 2.7.4
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> Signed-off-by: Zhao Chenhui <chenhui.zhao@freescale.com>
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> ---
+>  arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi |   14 ++++++-
+>  arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi |    2 +
+>  arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi |    2 +
+>  arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi |    2 +
+>  arch/powerpc/boot/dts/fsl/p1010si-post.dtsi   |    8 ++++
+>  arch/powerpc/boot/dts/fsl/p1020si-post.dtsi   |    5 +++
+>  arch/powerpc/boot/dts/fsl/p1021si-post.dtsi   |    5 +++
+>  arch/powerpc/boot/dts/fsl/p1022si-post.dtsi   |    9 +++--
+>  arch/powerpc/boot/dts/fsl/p2020si-post.dtsi   |   14 +++++++
+>  arch/powerpc/boot/dts/fsl/pq3-power.dtsi      |   48 +++++++++++++++++++++++++
+>  arch/powerpc/boot/dts/fsl/t1024rdb.dts        |    2 +-
+>  arch/powerpc/boot/dts/fsl/t1040rdb.dts        |    2 +-
+>  arch/powerpc/boot/dts/fsl/t1042rdb.dts        |    2 +-
+>  arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts     |    2 +-
+>  14 files changed, 108 insertions(+), 9 deletions(-)
+>  create mode 100644 arch/powerpc/boot/dts/fsl/pq3-power.dtsi
+>
+> diff --git a/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
+> index 4193570..fba40a1 100644
+> --- a/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
+> @@ -199,6 +199,10 @@
+>
+>  /include/ "pq3-dma-0.dtsi"
+>  /include/ "pq3-etsec1-0.dtsi"
+> +       enet0: ethernet at 24000 {
+> +               fsl,wake-on-filer;
+> +               fsl,pmc-handle = <&etsec1_clk>;
+> +       };
+>  /include/ "pq3-etsec1-timer-0.dtsi"
+>
+>         usb at 22000 {
+> @@ -222,9 +226,10 @@
+>         };
+>
+>  /include/ "pq3-etsec1-2.dtsi"
+> -
+> -       ethernet at 26000 {
+> +       enet2: ethernet at 26000 {
+>                 cell-index = <1>;
+> +               fsl,wake-on-filer;
+> +               fsl,pmc-handle = <&etsec3_clk>;
+>         };
+>
+>         usb at 2b000 {
+> @@ -249,4 +254,9 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+> +       power at e0070 {
+> +               compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
+> +       };
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
+> index b68eb11..ea7416a 100644
+> --- a/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
+> @@ -188,4 +188,6 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
+> index 579d76c..dddb737 100644
+> --- a/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
+> @@ -156,4 +156,6 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
+> index 49294cf..40a6cff 100644
+> --- a/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
+> @@ -193,4 +193,6 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
+> index 1b4aafc..47b62a8 100644
+> --- a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
+> @@ -173,6 +173,8 @@
+>
+>  /include/ "pq3-etsec2-0.dtsi"
+>         enet0: ethernet at b0000 {
+> +               fsl,pmc-handle = <&etsec1_clk>;
+> +
+>                 queue-group at b0000 {
+>                         fsl,rx-bit-map = <0xff>;
+>                         fsl,tx-bit-map = <0xff>;
+> @@ -181,6 +183,8 @@
+>
+>  /include/ "pq3-etsec2-1.dtsi"
+>         enet1: ethernet at b1000 {
+> +               fsl,pmc-handle = <&etsec2_clk>;
+> +
+>                 queue-group at b1000 {
+>                         fsl,rx-bit-map = <0xff>;
+>                         fsl,tx-bit-map = <0xff>;
+> @@ -189,6 +193,8 @@
+>
+>  /include/ "pq3-etsec2-2.dtsi"
+>         enet2: ethernet at b2000 {
+> +               fsl,pmc-handle = <&etsec3_clk>;
+> +
+>                 queue-group at b2000 {
+>                         fsl,rx-bit-map = <0xff>;
+>                         fsl,tx-bit-map = <0xff>;
+> @@ -201,4 +207,6 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
+> index 642dc3a..cc4c746 100644
+> --- a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
+> @@ -163,14 +163,17 @@
+>
+>  /include/ "pq3-etsec2-0.dtsi"
+>         enet0: enet0_grp2: ethernet at b0000 {
+> +               fsl,pmc-handle = <&etsec1_clk>;
+>         };
+>
+>  /include/ "pq3-etsec2-1.dtsi"
+>         enet1: enet1_grp2: ethernet at b1000 {
+> +               fsl,pmc-handle = <&etsec2_clk>;
+>         };
+>
+>  /include/ "pq3-etsec2-2.dtsi"
+>         enet2: enet2_grp2: ethernet at b2000 {
+> +               fsl,pmc-handle = <&etsec3_clk>;
+>         };
+>
+>         global-utilities at e0000 {
+> @@ -178,6 +181,8 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+>  };
+>
+>  /include/ "pq3-etsec2-grp2-0.dtsi"
+> diff --git a/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
+> index 407cb5f..378195d 100644
+> --- a/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
+> @@ -159,14 +159,17 @@
+>
+>  /include/ "pq3-etsec2-0.dtsi"
+>         enet0: enet0_grp2: ethernet at b0000 {
+> +               fsl,pmc-handle = <&etsec1_clk>;
+>         };
+>
+>  /include/ "pq3-etsec2-1.dtsi"
+>         enet1: enet1_grp2: ethernet at b1000 {
+> +               fsl,pmc-handle = <&etsec2_clk>;
+>         };
+>
+>  /include/ "pq3-etsec2-2.dtsi"
+>         enet2: enet2_grp2: ethernet at b2000 {
+> +               fsl,pmc-handle = <&etsec3_clk>;
+>         };
+>
+>         global-utilities at e0000 {
+> @@ -174,6 +177,8 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+>  };
+>
+>  &qe {
+> diff --git a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
+> index 5f51b7b..6ac21e8 100644
+> --- a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
+> @@ -225,11 +225,13 @@
+>  /include/ "pq3-etsec2-0.dtsi"
+>         enet0: enet0_grp2: ethernet at b0000 {
+>                 fsl,wake-on-filer;
+> +               fsl,pmc-handle = <&etsec1_clk>;
+>         };
+>
+>  /include/ "pq3-etsec2-1.dtsi"
+>         enet1: enet1_grp2: ethernet at b1000 {
+>                 fsl,wake-on-filer;
+> +               fsl,pmc-handle = <&etsec2_clk>;
+>         };
+>
+>         global-utilities at e0000 {
+> @@ -238,9 +240,10 @@
+>                 fsl,has-rstcr;
+>         };
+>
+> -       power at e0070{
+> -               compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
+> -               reg = <0xe0070 0x20>;
+> +/include/ "pq3-power.dtsi"
+> +       power at e0070 {
+> +               compatible = "fsl,p1022-pmc", "fsl,mpc8536-pmc",
+> +                               "fsl,mpc8548-pmc";
+>         };
+>
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi b/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
+> index 884e01b..2c4787c 100644
+> --- a/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
+> +++ b/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
+> @@ -175,6 +175,10 @@
+>                 compatible = "fsl-usb2-dr-v1.6", "fsl-usb2-dr";
+>         };
+>  /include/ "pq3-etsec1-0.dtsi"
+> +       enet0: ethernet at 24000 {
+> +               fsl,pmc-handle = <&etsec1_clk>;
+> +
+> +       };
+>  /include/ "pq3-etsec1-timer-0.dtsi"
+>
+>         ptp_clock at 24e00 {
+> @@ -183,7 +187,15 @@
+>
+>
+>  /include/ "pq3-etsec1-1.dtsi"
+> +       enet1: ethernet at 25000 {
+> +               fsl,pmc-handle = <&etsec2_clk>;
+> +       };
+> +
+>  /include/ "pq3-etsec1-2.dtsi"
+> +       enet2: ethernet at 26000 {
+> +               fsl,pmc-handle = <&etsec3_clk>;
+> +       };
+> +
+>  /include/ "pq3-esdhc-0.dtsi"
+>         sdhc at 2e000 {
+>                 compatible = "fsl,p2020-esdhc", "fsl,esdhc";
+> @@ -198,4 +210,6 @@
+>                 reg = <0xe0000 0x1000>;
+>                 fsl,has-rstcr;
+>         };
+> +
+> +/include/ "pq3-power.dtsi"
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/pq3-power.dtsi b/arch/powerpc/boot/dts/fsl/pq3-power.dtsi
+> new file mode 100644
+> index 0000000..5a760b3
+> --- /dev/null
+> +++ b/arch/powerpc/boot/dts/fsl/pq3-power.dtsi
+> @@ -0,0 +1,48 @@
+> +/*
+> + * PQ3 Power Management device tree stub
+> + *
+> + * Copyright 2012-2013 Freescale Semiconductor Inc.
+> + *
+> + * Redistribution and use in source and binary forms, with or without
+> + * modification, are permitted provided that the following conditions are met:
+> + *     * Redistributions of source code must retain the above copyright
+> + *       notice, this list of conditions and the following disclaimer.
+> + *     * Redistributions in binary form must reproduce the above copyright
+> + *       notice, this list of conditions and the following disclaimer in the
+> + *       documentation and/or other materials provided with the distribution.
+> + *     * Neither the name of Freescale Semiconductor nor the
+> + *       names of its contributors may be used to endorse or promote products
+> + *       derived from this software without specific prior written permission.
+> + *
+> + *
+> + * ALTERNATIVELY, this software may be distributed under the terms of the
+> + * GNU General Public License ("GPL") as published by the Free Software
+> + * Foundation, either version 2 of that License or (at your option) any
+> + * later version.
+> + *
+> + * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
+> + * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+> + * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+> + * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
+> + * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+> + * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+> + * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+> + * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+> + * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +power at e0070 {
+> +       compatible = "fsl,mpc8548-pmc";
+> +       reg = <0xe0070 0x20>;
+> +
+> +       etsec1_clk: soc-clk at 24 {
+> +               fsl,pmcdr-mask = <0x00000080>;
+> +       };
+> +       etsec2_clk: soc-clk at 25 {
+> +               fsl,pmcdr-mask = <0x00000040>;
+> +       };
+> +       etsec3_clk: soc-clk at 26 {
+> +               fsl,pmcdr-mask = <0x00000020>;
+> +       };
+> +};
+> diff --git a/arch/powerpc/boot/dts/fsl/t1024rdb.dts b/arch/powerpc/boot/dts/fsl/t1024rdb.dts
+> index 73a6453..95fc694 100644
+> --- a/arch/powerpc/boot/dts/fsl/t1024rdb.dts
+> +++ b/arch/powerpc/boot/dts/fsl/t1024rdb.dts
+> @@ -91,7 +91,7 @@
+>                 board-control at 2,0 {
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+> -                       compatible = "fsl,t1024-cpld";
+> +                       compatible = "fsl,t1024-cpld", "fsl,deepsleep-cpld";
+>                         reg = <3 0 0x300>;
+>                         ranges = <0 3 0 0x300>;
+>                         bank-width = <1>;
+> diff --git a/arch/powerpc/boot/dts/fsl/t1040rdb.dts b/arch/powerpc/boot/dts/fsl/t1040rdb.dts
+> index 65ff34c..825665c 100644
+> --- a/arch/powerpc/boot/dts/fsl/t1040rdb.dts
+> +++ b/arch/powerpc/boot/dts/fsl/t1040rdb.dts
+> @@ -70,7 +70,7 @@
+>
+>         ifc: localbus at ffe124000 {
+>                 cpld at 3,0 {
+> -                       compatible = "fsl,t1040rdb-cpld";
+> +                       compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
+>                 };
+>         };
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/t1042rdb.dts b/arch/powerpc/boot/dts/fsl/t1042rdb.dts
+> index 3ebb712..0997643 100644
+> --- a/arch/powerpc/boot/dts/fsl/t1042rdb.dts
+> +++ b/arch/powerpc/boot/dts/fsl/t1042rdb.dts
+> @@ -68,7 +68,7 @@
+>
+>         ifc: localbus at ffe124000 {
+>                 cpld at 3,0 {
+> -                       compatible = "fsl,t1042rdb-cpld";
+> +                       compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
+>                 };
+>         };
+>  };
+> diff --git a/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts b/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
+> index 8ec3ff4..b10cab1 100644
+> --- a/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
+> +++ b/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
+> @@ -41,7 +41,7 @@
+>
+>         ifc: localbus at ffe124000 {
+>                 cpld at 3,0 {
+> -                       compatible = "fsl,t1042rdb_pi-cpld";
+> +                       compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
+>                 };
+>         };
+>
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
