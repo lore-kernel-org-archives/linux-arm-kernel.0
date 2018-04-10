@@ -1,14 +1,15 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 10 Apr 2018 11:32:03 -0700
-Subject: [PATCH v3 01/10] Documentations: dt-bindings: Add documents of
- generic PECI bus, adapter and client drivers
+Date: Tue, 10 Apr 2018 11:32:06 -0700
+Subject: [PATCH v3 04/10] Documentations: dt-bindings: Add a document of PECI
+ adapter driver for Aspeed AST24xx/25xx SoCs
 In-Reply-To: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
 References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180410183212.16787-2-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180410183212.16787-5-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds documents of generic PECI bus, adapter and client drivers.
+This commit adds a dt-bindings document of PECI adapter driver for Aspeed
+AST24xx/25xx SoCs.
 
 Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
@@ -34,93 +35,74 @@ Cc: Randy Dunlap <rdunlap@infradead.org>
 Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
 Cc: Sumeet R Pawnikar <sumeet.r.pawnikar@intel.com>
 ---
- .../devicetree/bindings/peci/peci-adapter.txt      | 23 ++++++++++++++++++++
- .../devicetree/bindings/peci/peci-bus.txt          | 15 +++++++++++++
- .../devicetree/bindings/peci/peci-client.txt       | 25 ++++++++++++++++++++++
- 3 files changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/peci/peci-adapter.txt
- create mode 100644 Documentation/devicetree/bindings/peci/peci-bus.txt
- create mode 100644 Documentation/devicetree/bindings/peci/peci-client.txt
+ .../devicetree/bindings/peci/peci-aspeed.txt       | 60 ++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
 
-diff --git a/Documentation/devicetree/bindings/peci/peci-adapter.txt b/Documentation/devicetree/bindings/peci/peci-adapter.txt
+diff --git a/Documentation/devicetree/bindings/peci/peci-aspeed.txt b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
 new file mode 100644
-index 000000000000..9221374f6b11
+index 000000000000..4598bb8c20fa
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/peci/peci-adapter.txt
-@@ -0,0 +1,23 @@
-+Generic device tree configuration for PECI adapters.
++++ b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
+@@ -0,0 +1,60 @@
++Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
 +
 +Required properties:
-+- compatible     : Should contain hardware specific definition strings that can
-+		   match an adapter driver implementation.
-+- reg            : Should contain PECI controller registers location and length.
-+- #address-cells : Should be <1>.
-+- #size-cells    : Should be <0>.
++- compatible        : Should be "aspeed,ast2400-peci" or "aspeed,ast2500-peci"
++		      - aspeed,ast2400-peci: Aspeed AST2400 family PECI
++					     controller
++		      - aspeed,ast2500-peci: Aspeed AST2500 family PECI
++					     controller
++- reg               : Should contain PECI controller registers location and
++		      length.
++- #address-cells    : Should be <1>.
++- #size-cells       : Should be <0>.
++- interrupts        : Should contain PECI controller interrupt.
++- clocks            : Should contain clock source for PECI controller.
++		      Should reference clkin.
++- clock_frequency   : Should contain the operation frequency of PECI controller
++		      in units of Hz.
++		      187500 ~ 24000000
++
++Optional properties:
++- msg-timing-nego   : Message timing negotiation period. This value will
++		      determine the period of message timing negotiation to be
++		      issued by PECI controller. The unit of the programmed
++		      value is four times of PECI clock period.
++		      0 ~ 255 (default: 1)
++- addr-timing-nego  : Address timing negotiation period. This value will
++		      determine the period of address timing negotiation to be
++		      issued by PECI controller. The unit of the programmed
++		      value is four times of PECI clock period.
++		      0 ~ 255 (default: 1)
++- rd-sampling-point : Read sampling point selection. The whole period of a bit
++		      time will be divided into 16 time frames. This value will
++		      determine the time frame in which the controller will
++		      sample PECI signal for data read back. Usually in the
++		      middle of a bit time is the best.
++		      0 ~ 15 (default: 8)
++- cmd_timeout_ms    : Command timeout in units of ms.
++		      1 ~ 60000 (default: 1000)
 +
 +Example:
-+	peci: peci at 10000000 {
++	peci: peci at 1e78b000 {
 +		compatible = "simple-bus";
 +		#address-cells = <1>;
 +		#size-cells = <1>;
-+		ranges = <0x0 0x10000000 0x1000>;
++		ranges = <0x0 0x1e78b000 0x60>;
 +
 +		peci0: peci-bus at 0 {
-+			compatible = "soc,soc-peci";
-+			reg = <0x0 0x1000>;
++			compatible = "aspeed,ast2500-peci";
++			reg = <0x0 0x60>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+		};
-+	};
-diff --git a/Documentation/devicetree/bindings/peci/peci-bus.txt b/Documentation/devicetree/bindings/peci/peci-bus.txt
-new file mode 100644
-index 000000000000..90bcc791ccb0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/peci/peci-bus.txt
-@@ -0,0 +1,15 @@
-+Generic device tree configuration for PECI buses.
-+
-+Required properties:
-+- compatible     : Should be "simple-bus".
-+- #address-cells : Should be <1>.
-+- #size-cells    : Should be <1>.
-+- ranges         : Should contain PECI controller registers ranges.
-+
-+Example:
-+	peci: peci at 10000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0x10000000 0x1000>;
-+	};
-diff --git a/Documentation/devicetree/bindings/peci/peci-client.txt b/Documentation/devicetree/bindings/peci/peci-client.txt
-new file mode 100644
-index 000000000000..8e2bfd8532f6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/peci/peci-client.txt
-@@ -0,0 +1,25 @@
-+Generic device tree configuration for PECI clients.
-+
-+Required properties:
-+- compatible : Should contain target device specific definition strings that can
-+	       match a client driver implementation.
-+- reg        : Should contain address of a client CPU. Address range of CPU
-+	       clients is starting from 0x30 based on PECI specification.
-+	       <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
-+
-+Example:
-+	peci-bus at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		< more properties >
-+
-+		function at cpu0 {
-+			compatible = "device,function";
-+			reg = <0x30>;
-+		};
-+
-+		function at cpu1 {
-+			compatible = "device,function";
-+			reg = <0x31>;
++			interrupts = <15>;
++			clocks = <&clk_clkin>;
++			clock-frequency = <24000000>;
++			msg-timing-nego = <1>;
++			addr-timing-nego = <1>;
++			rd-sampling-point = <8>;
++			cmd-timeout-ms = <1000>;
 +		};
 +	};
 -- 
