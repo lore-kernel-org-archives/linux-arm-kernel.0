@@ -1,47 +1,45 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 10 Apr 2018 11:42:31 -0700
-Subject: [PATCH] arm64: dts: apq8096-db820c: Add micro sd card supplies
-In-Reply-To: <20180410135426.15508-1-srinivas.kandagatla@linaro.org>
-References: <20180410135426.15508-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180410184231.GA23948@tuxbook-pro>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Tue, 10 Apr 2018 20:49:14 +0200
+Subject: [PATCH] drm/amdgpu: limit DMA size to PAGE_SIZE for
+ scatter-gather buffers
+In-Reply-To: <1523384705-3976-1-git-send-email-okaya@codeaurora.org>
+References: <1523384705-3976-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <a267625f-259d-d873-f727-76531d86429b@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 10 Apr 06:54 PDT 2018, Srinivas Kandagatla wrote:
+Am 10.04.2018 um 20:25 schrieb Sinan Kaya:
+> Code is expecing to observe the same number of buffers returned from
+> dma_map_sg() function compared to sg_alloc_table_from_pages(). This
+> doesn't hold true universally especially for systems with IOMMU.
+>
+> IOMMU driver tries to combine buffers into a single DMA address as much
+> as it can. The right thing is to tell the DMA layer how much combining
+> IOMMU can do.
 
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> 
-> This patch adds missing microSD card supplies, without this uSD
-> card will not be detected.
-> 
+Good catch, but wrong place to set this.
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Please move it into the device initialization functions.
 
 Regards,
-Bjorn
+Christian.
 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-> index 1c8f1b86472d..f8191f64eb84 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-> @@ -87,6 +87,8 @@
->  			pinctrl-0 = <&sdc2_clk_on &sdc2_cmd_on &sdc2_data_on &sdc2_cd_on>;
->  			pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off &sdc2_cd_off>;
->  			cd-gpios = <&msmgpio 38 0x1>;
-> +			vmmc-supply = <&pm8994_l21>;
-> +			vqmmc-supply = <&pm8994_l13>;
->  			status = "okay";
->  		};
->  
-> -- 
-> 2.16.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>   drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+> index e4bb435..02465cd 100644
+> --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+> +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
+> @@ -787,6 +787,8 @@ static int amdgpu_ttm_tt_pin_userptr(struct ttm_tt *ttm)
+>   	enum dma_data_direction direction = write ?
+>   		DMA_BIDIRECTIONAL : DMA_TO_DEVICE;
+>   
+> +	dma_set_max_seg_size(adev->dev, PAGE_SIZE);
+> +
+>   	r = sg_alloc_table_from_pages(ttm->sg, ttm->pages, ttm->num_pages, 0,
+>   				      ttm->num_pages << PAGE_SHIFT,
+>   				      GFP_KERNEL);
