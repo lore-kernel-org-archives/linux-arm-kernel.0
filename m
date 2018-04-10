@@ -1,68 +1,77 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 10 Apr 2018 10:32:12 +0200
-Subject: [PATCH v2 2/2] clk: at91: Fix for PLL set_rate changes not
- being actually written to PLL peripheral bits
-In-Reply-To: <20180410001649.GA62245@hak8or>
-References: <20180410001649.GA62245@hak8or>
-Message-ID: <20180410103212.7bb1d48c@bbrezillon>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Tue, 10 Apr 2018 09:30:00 +0100
+Subject: [PATCH v4 0/8] arm: Base support for Renesas RZN1D-DB Board
+Message-ID: <1523349015-37985-1-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+This series adds the plain basic support for booting a bare
+kernel on the RZ/N1D-DB Board. It's been trimmed to the strict
+minimum as a 'base', further patches that will add the
+rest of the support, pinctrl, clock architecture and quite
+a few others.
 
-On Mon, 9 Apr 2018 20:16:49 -0400
-Marcin Ziemianowicz <marcin@ziemianowicz.com> wrote:
+Thanks for the comments on the previous versions!
 
-> When a USB device is connected to the USB host port on the SAM9N12 then
-> you get "-62" error which seems to indicate USB replies from the device
-> are timing out. Looking around, I saw the USB bus was running at half
-> speed. Going further, it seems that in ..._set_rate() the PLL wasn't
-> actually being adjusted. Writing the multiplier and divider values to
-> the peripheral fixes the bus running at half speed.
-> 
-> Signed-off-by: Marcin Ziemianowicz <marcin@ziemianowicz.com>
-> ---
->  drivers/clk/at91/clk-pll.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
-> index 534961766ae5..db7155fe9346 100644
-> --- a/drivers/clk/at91/clk-pll.c
-> +++ b/drivers/clk/at91/clk-pll.c
-> @@ -288,6 +288,14 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
->  	pll->div = div;
->  	pll->mul = mul;
->  
-> +	// Set the PLL as per above div and mil values.
-					    ^ mul
+v4:
+ + Fixes for suggestions by Simon Horman
+ + Fixes for suggestions by Jacopo Mondi
+ + Fixes for suggestions by Geert Uytterhoeven
+ + Renamed the r9a06g0xx.dtsi file, given up on trying to get a family
+   common file in, so dropped potential RZ/N1S support and now only
+   focus on RZ/N1D for this patchset.
+ + Added 'always-on' to the architected timer node, because it is.
+ + Added ARCH_R9A06G032, to match others patterns like RCAR
+ + Sorted the .dts files, added empty lines as required.
+ + Fixed patch prefixes to match git-log for bindings&dts
+ + Merged board .dts & Makefile changes together
+ + Rebased on next-20180410
+v3:
+ + Fixes for suggestions by Geert Uytterhoeven
+ + Removed SoC Specific renesas,r9a06g032-xxx, as it's not needed for now.
+ + Kept renesas,rzn1 as a family/generic for this family.
+ + Fixed a couple of the commit messages.
+ + Added Geert's Reviewed-By where appropriate.
+v2:
+ + Fixes for suggestions by Simon Horman
+ + Fixes for suggestions by Rob Herring
+ + Fixes for suggestions by Geert Uytterhoeven
+ + Removed the mach file
+ + Added a MFD base for the sysctrl block
+ + Added a regmap based sub driver for the reboot handler
+ + Renamed the files to match shmobile conventions
+ + Adapted the compatible= strings to reflect 'family' vs 'part'
+   distinction.
+ + Removed the sysctrl.h file entirelly.
+ + Fixed every warnings from the DTC compiler on W=12 mode.
+ + Split the device-tree patches from the code.
 
-Please do not use C++-style comments, use /* comment */ instead.
+Michel Pollet (8):
+  arm: shmobile: Add the RZ/N1 arch to the shmobile Kconfig
+  arm: shmobile: Add the RZ/N1D (R9A06G032) to the shmobile Kconfig
+  dt-bindings: mfd: renesas,rzn1-sysctrl: document RZ/N1 sysctrl node
+  dt-bindings: reset: renesas,rzn1-reboot: document RZ/N1 reboot driver
+  dt-bindings: arm: Document the RZN1D-DB board
+  ARM: dts: Renesas RZ/N1 SoC base device tree file
+  ARM: dts: Renesas RZN1D-DB Board base file
+  reset: Renesas RZ/N1 reboot driver
 
-> +	regmap_update_bits(pll->regmap, AT91_CKGR_PLLBR,
+ Documentation/devicetree/bindings/arm/shmobile.txt |   5 +-
+ .../bindings/mfd/renesas,rzn1-sysctrl.txt          |  23 +++++
+ .../bindings/power/renesas,rzn1-reboot.txt         |  23 +++++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts        |  29 ++++++
+ arch/arm/boot/dts/r9a06g032.dtsi                   |  94 ++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig                     |   9 ++
+ drivers/power/reset/Kconfig                        |   7 ++
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/rzn1-reboot.c                  | 105 +++++++++++++++++++++
+ 10 files changed, 296 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+ create mode 100644 arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts
+ create mode 100644 arch/arm/boot/dts/r9a06g032.dtsi
+ create mode 100644 drivers/power/reset/rzn1-reboot.c
 
-You hardcode the PLL ID here. What if this function if called for PLLA?
-
-> +		AT91_PMC_DIV | AT91_PMC_MUL,
-
-You should use PLL_MUL_MASK(layout) and PLL_DIV_MASK to do that.
-
-> +		(div << 0) | (mul << 16));
-
-This is wrong. The clk has the CLK_SET_RATE_GATE set, which means the
-rate cannot be updated if the PLL is not gated, and if you look at
-clk_pll_prepare(), you'll see that div and mul fields are updated
-there. Now, maybe there's a bug in clk_pll_prepare(), but
-clk_pll_set_rate() is definitely not the place where we want ->div and
-->mul to be written to the register.
-
-> +
-> +	pr_debug("clk-pll: setting new rate, (%lu hz / %u) * %u = %lu hz\n",
-> +		parent_rate, div, mul, rate);
-> +
->  	return 0;
->  }
->  
-
-Regards,
-
-Boris
+-- 
+2.7.4
