@@ -1,67 +1,83 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Apr 2018 14:25:52 +0200
-Subject: [PATCH v6 20/25] drivers: firmware: psci: Introduce
- psci_dt_topology_init()
-In-Reply-To: <20180410111043.t577a43a3bvjpkc7@lakrids.cambridge.arm.com>
-References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
- <1521046715-30683-21-git-send-email-ulf.hansson@linaro.org>
- <20180314173833.dyu7jtweu233rfi4@lakrids.cambridge.arm.com>
- <CAPDyKFpJQZ87ViwZxX_yBnKPzgRv5YxbLz=qxScBTMCvY6e2vw@mail.gmail.com>
- <20180410111043.t577a43a3bvjpkc7@lakrids.cambridge.arm.com>
-Message-ID: <CAPDyKFrVNtv6Z3r5DkVXVooszyJTqaBxwg9wm94aw7v3SyA4tg@mail.gmail.com>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Tue, 10 Apr 2018 20:40:06 +0800
+Subject: [PATCH] drm/rockchip: fix VOP vblank race
+In-Reply-To: <20180328160351.23763-1-john@metanate.com>
+References: <20180328160351.23763-1-john@metanate.com>
+Message-ID: <38a49065-4667-4d91-3191-ec81b03cba44@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2018 at 13:10, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Apr 10, 2018 at 09:19:26AM +0200, Ulf Hansson wrote:
->> On 14 March 2018 at 18:38, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Wed, Mar 14, 2018 at 05:58:30PM +0100, Ulf Hansson wrote:
->> >> In case the hierarchical layout is used in DT, we want to initialize the
->> >> corresponding PM domain topology for the CPUs, by using the generic PM
->> >> domain (aka genpd) infrastructure.
->> >>
->> >> At first glance, it may seem feasible to hook into the existing
->> >> psci_dt_init() function, although because it's called quite early in the
->> >> boot sequence, allocating the dynamic data structure for a genpd doesn't
->> >> work.
->> >>
->> >> Therefore, let's export a new init function for PSCI,
->> >> psci_dt_topology_init(), which the ARM machine code should call from a
->> >> suitable initcall.
->> >>
->> >> Succeeding to initialize the PM domain topology, which means at least one
->> >> instance of a genpd becomes created, allows us to continue to enable the
->> >> PSCI OS initiated mode for the platform. If everything turns out fine,
->> >> let's print a message in log to inform the user about the changed mode.
->> >>
->> >> In case of any failures, we stick to the default PSCI Platform Coordinated
->> >> mode.
->> >
->> > For kexec/kdump we'll need to explicitly set the suspend mode to
->> > platform coordinated if for whatever reason we choose not to use OSI.
->>
->> Could you please elaborate on this? I am not really understanding what
->> you are suggesting me to do and why.
+Reviewed-by: Sandy huang <hjc@rock-chips.com>
+
+? 2018/3/29 0:03, John Keeping ??:
+> We have seen a case of a bad reference count for vblanks with the
+> Rockchip VOP:
 >
-> Sorry for not being clear.
+> 	------------[ cut here ]------------
+> 	WARNING: CPU: 1 PID: 383 at drivers/gpu/drm/drm_irq.c:1198 drm_vblank_put+0x40/0xcc
+> 	Modules linked in: brcmfmac brcmutil
+> 	CPU: 1 PID: 383 Comm: kworker/u8:2 Not tainted 4.9.75-rt60 #1
+> 	Hardware name: Rockchip (Device Tree)
+> 	Workqueue: events_unbound flip_worker
+> 	Backtrace:
+> 	[<c010b7b0>] (dump_backtrace) from [<c010ba4c>] (show_stack+0x18/0x1c)
+> 	 r7:c0b1b13c r6:600b0013 r5:00000000 r4:c0b1b13c
+> 	[<c010ba34>] (show_stack) from [<c032d248>] (dump_stack+0x78/0x94)
+> 	[<c032d1d0>] (dump_stack) from [<c011e6e8>] (__warn+0xe4/0x104)
+> 	 r7:00000009 r6:c03cf26c r5:00000000 r4:00000000
+> 	[<c011e604>] (__warn) from [<c011e7c0>] (warn_slowpath_null+0x28/0x30)
+> 	 r9:eeb443a0 r8:eeb443c8 r7:ee8a5ec0 r6:ee8a5ec0 r5:edb47f00 r4:ee096200
+> 	[<c011e798>] (warn_slowpath_null) from [<c03cf26c>] (drm_vblank_put+0x40/0xcc)
+> 	[<c03cf22c>] (drm_vblank_put) from [<c03cf310>] (drm_crtc_vblank_put+0x18/0x1c)
+> 	 r5:edb47f00 r4:ee3c8a80
+> 	[<c03cf2f8>] (drm_crtc_vblank_put) from [<c03ef9b4>] (vop_fb_unref_worker+0x18/0x24)
+> 	[<c03ef99c>] (vop_fb_unref_worker) from [<c03df194>] (flip_worker+0x98/0xb4)
+> 	 r5:edb47f00 r4:eeb443a8
+> 	[<c03df0fc>] (flip_worker) from [<c0134808>] (process_one_work+0x1a8/0x2fc)
+> 	 r9:00000000 r8:ee807d00 r7:00000000 r6:ee809c00 r5:eeb443a8 r4:edfe5f80
+> 	[<c0134660>] (process_one_work) from [<c01358ec>] (worker_thread+0x2ac/0x458)
+> 	 r10:00000088 r9:edfe5f98 r8:ee809c2c r7:c0b04100 r6:ee809c00 r5:ee809c00
+> 	 r4:edfe5f80
+> 	[<c0135640>] (worker_thread) from [<c013a0bc>] (kthread+0xfc/0x10c)
+> 	 r10:00000000 r9:00000000 r8:c0135640 r7:edfe5f80 r6:00000000 r5:edf0e240
+> 	 r4:ee8a4000 r3:ed194e00
+> 	[<c0139fc0>] (kthread) from [<c0107cb8>] (ret_from_fork+0x14/0x3c)
+> 	 r8:00000000 r7:00000000 r6:00000000 r5:c0139fc0 r4:edf0e240
+> 	---[ end trace 0000000000000002 ]---
 >
-> What I'd like to see is that we always call SET_SUSPEND_MODE before
-> invoking CPU_SUSPEND. Either deciding early if we can use OSI, or always
-> setting it to platform co-ordinated early on in boot and later switching
-> it over.
+> It seems that this is caused by unfortunate timing between
+> vop_crtc_atomic_flush() and vop_handle_vblank() given the following
+> ordering:
 >
-> That way we can be sure of the suspend mode, even if we've kexec'd from
-> a kernel that had fiddled with it.
-
-Right, good point. Let's me update the patch to deal with that.
-
-One thing though, kexec from a "new" kernel having OSI mode enabled
-into an "old" kernel that doesn't even have the new OSI mode support
-in psci driver, is going to be difficult to deal with.
-On the other hand I guess that isn't a very important usecase we need
-to cover, or is it?
-
-[...]
-
-Kind regards
-Uffe
+> 	atomic_flush		handle_vblank
+> 	------------		-------------
+>
+> 	drm_flip_work_queue
+> 	set_bit
+> 	     			if (test_and_clear_bit(...))
+> 	     				drm_flip_work_commit
+> 	drm_vblank_get
+>
+> This results in vop_fb_unref_worker (called as flip work) decrementing
+> the vblank refcount before it has been incremented.
+>
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 6755a9eea4b2..d4e1400aedf3 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -1017,9 +1017,9 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
+>   			continue;
+>   
+>   		drm_framebuffer_get(old_plane_state->fb);
+> +		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+>   		drm_flip_work_queue(&vop->fb_unref_work, old_plane_state->fb);
+>   		set_bit(VOP_PENDING_FB_UNREF, &vop->pending);
+> -		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+>   	}
+>   }
+>   
