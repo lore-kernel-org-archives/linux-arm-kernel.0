@@ -1,42 +1,74 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 10 Apr 2018 16:18:01 -0400
-Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
- Extended Tags
-In-Reply-To: <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
-References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
- <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
- <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1c94361d-7a8d-ad18-12e5-1612326a54db@codeaurora.org>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Tue, 10 Apr 2018 22:19:49 +0200
+Subject: [PATCH 1/4] ARM: Allow this header to be included by assembly
+ files
+In-Reply-To: <20180223210923.544-2-f.fainelli@gmail.com>
+References: <20180223210923.544-1-f.fainelli@gmail.com>
+ <20180223210923.544-2-f.fainelli@gmail.com>
+Message-ID: <20180410221949.0be82368@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/10/2018 3:50 PM, Bjorn Helgaas wrote:
-> On Tue, Apr 10, 2018 at 02:41:44PM -0500, Bjorn Helgaas wrote:
->> On Wed, Apr 04, 2018 at 06:50:09PM -0400, Sinan Kaya wrote:
->>> Per PCIe r3.1, sec 2.2.6.2 and 7.8.4, a Requester may not use 8-bit Tags
->>> unless its Extended Tag Field Enable is set, but all Receivers/Completers
->>> must handle 8-bit Tags correctly regardless of their Extended Tag Field
->>> Enable.
->>>
->>> Some devices do not handle 8-bit Tags as Completers, so add a quirk for
->>> them.  If we find such a device, we disable Extended Tags for the entire
->>> hierarchy to make peer-to-peer DMA possible.
->>>
->>> The Broadcom HT1100/HT2000/HT2100 seems to have issues with handling 8-bit
->>> tags.  Mark it as broken.
->>>
->>> Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
->>> Link: https://bugzilla.kernel.org/show_bug.cgi?id=196197
->>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> Applied to pci/enumeration for v4.18, thanks!
-> Actually, this is a really annoying issue and I think the fix is
-> appropriate for v4.17, so I moved it to my for-linus branch.
-> 
+Hello,
 
-I agree. It causes boot issues on some AMD Opteron machines. It should
-probably be back-ported too. 
+On Fri, 23 Feb 2018 13:09:20 -0800
+Florian Fainelli <f.fainelli@gmail.com> wrote:
+
+> From: Doug Berger <opendmb@gmail.com>
+> 
+> The constants defined in this file are equally useful in assembly and C
+> source files. The arm64 architecture version of this file allows
+> inclusion in both assembly and C source files, so this this commit adds
+> that capability to the arm architecture version so that the constants
+> don't need to be defined in multiple places.
+> 
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/include/asm/cputype.h | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> index cb546425da8a..e7632f536633 100644
+> --- a/arch/arm/include/asm/cputype.h
+> +++ b/arch/arm/include/asm/cputype.h
+> @@ -2,9 +2,6 @@
+>  #ifndef __ASM_ARM_CPUTYPE_H
+>  #define __ASM_ARM_CPUTYPE_H
+>  
+> -#include <linux/stringify.h>
+> -#include <linux/kernel.h>
+> -
+>  #define CPUID_ID	0
+>  #define CPUID_CACHETYPE	1
+>  #define CPUID_TCM	2
+> @@ -98,6 +95,11 @@
+>  /* Qualcomm implemented cores */
+>  #define ARM_CPU_PART_SCORPION		0x510002d0
+>  
+> +#ifndef __ASSEMBLY__
+> +
+> +#include <linux/stringify.h>
+> +#include <linux/kernel.h>
+> +
+>  extern unsigned int processor_id;
+>  
+>  #ifdef CONFIG_CPU_CP15
+> @@ -326,4 +328,6 @@ static inline int __attribute_const__ cpuid_feature_extract_field(u32 features,
+>  #define cpuid_feature_extract(reg, field) \
+>  	cpuid_feature_extract_field(read_cpuid_ext(reg), field)
+>  
+> +#endif /* __ASSEMBLY__ */
+> +
+>  #endif
+
+Tested-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+
+Thanks!
+
+Best regards,
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
