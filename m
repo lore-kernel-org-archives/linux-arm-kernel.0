@@ -1,15 +1,13 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 10 Apr 2018 11:32:09 -0700
-Subject: [PATCH v3 07/10] Documentation: dt-bindings: Add documents for PECI
- hwmon client drivers
+Date: Tue, 10 Apr 2018 11:32:12 -0700
+Subject: [PATCH v3 10/10] Add a maintainer for the PECI subsystem
 In-Reply-To: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
 References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180410183212.16787-8-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180410183212.16787-11-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds dt-bindings documents for PECI cputemp and dimmtemp client
-drivers.
+This commit adds a maintainer information for the PECI subsystem.
 
 Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
@@ -35,72 +33,29 @@ Cc: Randy Dunlap <rdunlap@infradead.org>
 Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
 Cc: Sumeet R Pawnikar <sumeet.r.pawnikar@intel.com>
 ---
- .../devicetree/bindings/hwmon/peci-cputemp.txt     | 24 +++++++++++++++++++++
- .../devicetree/bindings/hwmon/peci-dimmtemp.txt    | 25 ++++++++++++++++++++++
- 2 files changed, 49 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
- create mode 100644 Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt b/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
-new file mode 100644
-index 000000000000..d5530ef9cfd2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
-@@ -0,0 +1,24 @@
-+Bindings for Intel PECI (Platform Environment Control Interface) cputemp driver.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5cd5ff0e4428..3e6917e1ad31 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -10965,6 +10965,16 @@ L:	platform-driver-x86 at vger.kernel.org
+ S:	Maintained
+ F:	drivers/platform/x86/peaq-wmi.c
+ 
++PECI SUBSYSTEM
++M:	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
++M:	Jason M Biils <jason.m.bills@linux.intel.com>
++S:	Maintained
++F:	Documentation/devicetree/bindings/peci/
++F:	drivers/peci/
++F:	drivers/hwmon/peci-*.c
++F:	include/linux/peci.h
++F:	include/uapi/linux/peci-ioctl.h
 +
-+Required properties:
-+- compatible : Should be "intel,peci-cputemp".
-+- reg        : Should contain address of a client CPU. Address range of CPU
-+	       clients is starting from 0x30 based on PECI specification.
-+	       <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
-+
-+Example:
-+	peci-bus at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		< more properties >
-+
-+		peci-cputemp at cpu0 {
-+			compatible = "intel,peci-cputemp";
-+			reg = <0x30>;
-+		};
-+
-+		peci-cputemp at cpu1 {
-+			compatible = "intel,peci-cputemp";
-+			reg = <0x31>;
-+		};
-+	};
-diff --git a/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt b/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
-new file mode 100644
-index 000000000000..56e5deb61e5c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
-@@ -0,0 +1,25 @@
-+Bindings for Intel PECI (Platform Environment Control Interface) dimmtemp
-+driver.
-+
-+Required properties:
-+- compatible : Should be "intel,peci-dimmtemp".
-+- reg        : Should contain address of a client CPU. Address range of CPU
-+	       clients is starting from 0x30 based on PECI specification.
-+	       <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
-+
-+Example:
-+	peci-bus at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		< more properties >
-+
-+		peci-dimmtemp at cpu0 {
-+			compatible = "intel,peci-dimmtemp";
-+			reg = <0x30>;
-+		};
-+
-+		peci-dimmtemp at cpu1 {
-+			compatible = "intel,peci-dimmtemp";
-+			reg = <0x31>;
-+		};
-+	};
+ PER-CPU MEMORY ALLOCATOR
+ M:	Tejun Heo <tj@kernel.org>
+ M:	Christoph Lameter <cl@linux.com>
 -- 
 2.16.2
