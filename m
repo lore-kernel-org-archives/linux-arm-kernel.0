@@ -1,32 +1,75 @@
-From: rientjes@google.com (David Rientjes)
-Date: Tue, 10 Apr 2018 13:51:06 -0700 (PDT)
-Subject: [PATCH v2 1/2] mm: introduce ARCH_HAS_PTE_SPECIAL
-In-Reply-To: <a732ef2b-445f-9ad8-014b-247c8c5d500b@linux.vnet.ibm.com>
-References: <1523373951-10981-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <1523373951-10981-2-git-send-email-ldufour@linux.vnet.ibm.com>
- <20180410160932.GB3614@bombadil.infradead.org>
- <a732ef2b-445f-9ad8-014b-247c8c5d500b@linux.vnet.ibm.com>
-Message-ID: <alpine.DEB.2.21.1804101350250.79494@chino.kir.corp.google.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 10 Apr 2018 16:59:55 -0400
+Subject: [PATCH V2] drm/amdgpu: limit DMA size to PAGE_SIZE for scatter-gather
+ buffers
+Message-ID: <1523394001-4615-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Apr 2018, Laurent Dufour wrote:
+Code is expecing to observe the same number of buffers returned from
+dma_map_sg() function compared to sg_alloc_table_from_pages(). This
+doesn't hold true universally especially for systems with IOMMU.
 
-> > On Tue, Apr 10, 2018 at 05:25:50PM +0200, Laurent Dufour wrote:
-> >>  arch/powerpc/include/asm/pte-common.h                  | 3 ---
-> >>  arch/riscv/Kconfig                                     | 1 +
-> >>  arch/s390/Kconfig                                      | 1 +
-> > 
-> > You forgot to delete __HAVE_ARCH_PTE_SPECIAL from
-> > arch/riscv/include/asm/pgtable-bits.h
-> 
-> Damned !
-> Thanks for catching it.
-> 
+IOMMU driver tries to combine buffers into a single DMA address as much
+as it can. The right thing is to tell the DMA layer how much combining
+IOMMU can do.
 
-Squashing the two patches together at least allowed it to be caught 
-easily.  After it's fixed, feel free to add
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/gpu/drm/amd/amdgpu/gmc_v6_0.c | 2 +-
+ drivers/gpu/drm/amd/amdgpu/gmc_v7_0.c | 1 +
+ drivers/gpu/drm/amd/amdgpu/gmc_v8_0.c | 1 +
+ drivers/gpu/drm/amd/amdgpu/gmc_v9_0.c | 1 +
+ 4 files changed, 4 insertions(+), 1 deletion(-)
 
-	Acked-by: David Rientjes <rientjes@google.com>
-
-Thanks for doing this!
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v6_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v6_0.c
+index 8e28270..1b031eb 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v6_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v6_0.c
+@@ -851,7 +851,7 @@ static int gmc_v6_0_sw_init(void *handle)
+ 		pci_set_consistent_dma_mask(adev->pdev, DMA_BIT_MASK(32));
+ 		dev_warn(adev->dev, "amdgpu: No coherent DMA available.\n");
+ 	}
+-
++	dma_set_max_seg_size(adev->dev, PAGE_SIZE);
+ 	r = gmc_v6_0_init_microcode(adev);
+ 	if (r) {
+ 		dev_err(adev->dev, "Failed to load mc firmware!\n");
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v7_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v7_0.c
+index 86e9d682..0a4b2cc1 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v7_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v7_0.c
+@@ -999,6 +999,7 @@ static int gmc_v7_0_sw_init(void *handle)
+ 		pci_set_consistent_dma_mask(adev->pdev, DMA_BIT_MASK(32));
+ 		pr_warn("amdgpu: No coherent DMA available\n");
+ 	}
++	dma_set_max_seg_size(adev->dev, PAGE_SIZE);
+ 
+ 	r = gmc_v7_0_init_microcode(adev);
+ 	if (r) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v8_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v8_0.c
+index 9a813d8..b171529 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v8_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v8_0.c
+@@ -1096,6 +1096,7 @@ static int gmc_v8_0_sw_init(void *handle)
+ 		pci_set_consistent_dma_mask(adev->pdev, DMA_BIT_MASK(32));
+ 		pr_warn("amdgpu: No coherent DMA available\n");
+ 	}
++	dma_set_max_seg_size(adev->dev, PAGE_SIZE);
+ 
+ 	r = gmc_v8_0_init_microcode(adev);
+ 	if (r) {
+diff --git a/drivers/gpu/drm/amd/amdgpu/gmc_v9_0.c b/drivers/gpu/drm/amd/amdgpu/gmc_v9_0.c
+index 3b7e7af..36e658ab 100644
+--- a/drivers/gpu/drm/amd/amdgpu/gmc_v9_0.c
++++ b/drivers/gpu/drm/amd/amdgpu/gmc_v9_0.c
+@@ -855,6 +855,7 @@ static int gmc_v9_0_sw_init(void *handle)
+ 		pci_set_consistent_dma_mask(adev->pdev, DMA_BIT_MASK(32));
+ 		printk(KERN_WARNING "amdgpu: No coherent DMA available.\n");
+ 	}
++	dma_set_max_seg_size(adev->dev, PAGE_SIZE);
+ 
+ 	r = gmc_v9_0_mc_init(adev);
+ 	if (r)
+-- 
+2.7.4
