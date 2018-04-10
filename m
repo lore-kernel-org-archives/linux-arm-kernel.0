@@ -1,213 +1,127 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 10 Apr 2018 11:32:02 -0700
-Subject: [PATCH v3 00/10] PECI device driver introduction
-Message-ID: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+Date: Tue, 10 Apr 2018 11:32:03 -0700
+Subject: [PATCH v3 01/10] Documentations: dt-bindings: Add documents of
+ generic PECI bus, adapter and client drivers
+In-Reply-To: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180410183212.16787-2-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduction of the Platform Environment Control Interface (PECI) bus
-device driver. PECI is a one-wire bus interface that provides a
-communication channel between an Intel processor and chipset components to
-external monitoring or control devices. PECI is designed to support the
-following sideband functions:
+This commit adds documents of generic PECI bus, adapter and client drivers.
 
-* Processor and DRAM thermal management
-  - Processor fan speed control is managed by comparing Digital Thermal
-    Sensor (DTS) thermal readings acquired via PECI against the
-    processor-specific fan speed control reference point, or TCONTROL. Both
-    TCONTROL and DTS thermal readings are accessible via the processor PECI
-    client. These variables are referenced to a common temperature, the TCC
-    activation point, and are both defined as negative offsets from that
-    reference.
-  - PECI based access to the processor package configuration space provides
-    a means for Baseboard Management Controllers (BMC) or other platform
-    management devices to actively manage the processor and memory power
-    and thermal features.
-
-* Platform Manageability
-  - Platform manageability functions including thermal, power, and error
-    monitoring. Note that platform 'power' management includes monitoring
-    and control for both the processor and DRAM subsystem to assist with
-    data center power limiting.
-  - PECI allows read access to certain error registers in the processor MSR
-    space and status monitoring registers in the PCI configuration space
-    within the processor and downstream devices.
-  - PECI permits writes to certain registers in the processor PCI
-    configuration space.
-
-* Processor Interface Tuning and Diagnostics
-  - Processor interface tuning and diagnostics capabilities
-    (Intel Interconnect BIST). The processors Intel Interconnect Built In
-    Self Test (Intel IBIST) allows for infield diagnostic capabilities in
-    the Intel UPI and memory controller interfaces. PECI provides a port to
-    execute these diagnostics via its PCI Configuration read and write
-    capabilities.
-
-* Failure Analysis
-  - Output the state of the processor after a failure for analysis via
-    Crashdump.
-
-PECI uses a single wire for self-clocking and data transfer. The bus
-requires no additional control lines. The physical layer is a self-clocked
-one-wire bus that begins each bit with a driven, rising edge from an idle
-level near zero volts. The duration of the signal driven high depends on
-whether the bit value is a logic '0' or logic '1'. PECI also includes
-variable data transfer rate established with every message. In this way, it
-is highly flexible even though underlying logic is simple.
-
-The interface design was optimized for interfacing between an Intel
-processor and chipset components in both single processor and multiple
-processor environments. The single wire interface provides low board
-routing overhead for the multiple load connections in the congested routing
-area near the processor and chipset components. Bus speed, error checking,
-and low protocol overhead provides adequate link bandwidth and reliability
-to transfer critical device operating conditions and configuration
-information.
-
-This implementation provides the basic framework to add PECI extensions to
-the Linux bus and device models. A hardware specific 'Adapter' driver can
-be attached to the PECI bus to provide sideband functions described above.
-It is also possible to access all devices on an adapter from userspace
-through the /dev interface. A device specific 'Client' driver also can be
-attached to the PECI bus so each processor client's features can be
-supported by the 'Client' driver through an adapter connection in the bus.
-This patch set includes Aspeed 24xx/25xx PECI driver and PECI
-cputemp/dimmtemp drivers as the first implementation for both adapter and
-client drivers on the PECI bus framework.
-
-Please review.
-
-Thanks,
-
--Jae
-
-Changes from v2:
-* Divided peci-hwmon driver into two drivers, peci-cputemp and
-  peci-dimmtemp.
-* Added generic dt binding documents for PECI bus, adapter and client.
-* Removed in_atomic() call from the PECI core driver.
-* Improved PECI commands masking logic.
-* Added permission check logic for PECI ioctls.
-* Removed unnecessary type casts.
-* Fixed some invalid error return codes.
-* Added the mark_updated() function to improve update interval checking
-  logic.
-* Fixed a bug in populated DIMM checking function.
-* Fixed some typo, grammar and style issues in documents.
-* Rewrote hwmon drivers to use devm_hwmon_device_register_with_info API.
-* Made peci_match_id() function as a static.
-* Replaced a deprecated create_singlethread_workqueue() call with an
-  alloc_ordered_workqueue() call.
-* Reordered local variable definitions in reversed xmas tree notation.
-* Listed up client CPUs that can be supported by peci-cputemp and
-  peci-dimmtemp hwmon drivers.
-* Added CPU generation detection logic which checks CPUID signature through
-  PECI connection.
-* Improved interrupt handling logic in the Aspeed PECI adapter driver.
-* Fixed SPDX license identifier style in header files.
-* Changed some macros in peci.h to static inline functions.
-* Dropped sleepable context checking code in peci-core.
-* Adjusted rt_mutex protection scope in peci-core.
-* Moved adapter->xfer() checking code into peci_register_adapter().
-* Improved PECI command retry checking logic.
-* Changed ioctl base from 'P' to 0xb6 to avoid confiliction and updated
-  ioctl-number.txt to reflect the ioctl number of PECI subsystem.
-* Added a comment to describe PECI retry action.
-* Simplified return code handling of peci_ioctl_ping().
-* Changed type of peci_ioctl_fn[] to static const.
-* Fixed range checking code for valid PECI commands.
-* Fixed the error return code on invalid PECI commands.
-* Fixed incorrect definitions of PECI ioctl and its handling logic.
-
-Changes from v1:
-* Additionally implemented a core driver to support PECI linux bus driver
-  model.
-* Modified Aspeed PECI driver to make that to be an adapter driver in PECI
-  bus.
-* Modified PECI hwmon driver to make that to be a client driver in PECI
-  bus.
-* Simplified hwmon driver attribute labels and removed redundant strings.
-* Removed core_nums from device tree setting of hwmon driver and modified
-  core number detection logic to check the resolved_core register in client
-  CPU's local PCI configuration area.
-* Removed dimm_nums from device tree setting of hwmon driver and added
-  populated DIMM detection logic to support dynamic creation.
-* Removed indexing gap on core temperature and DIMM temperature attributes.
-* Improved hwmon registration and dynamic attribute creation logic.
-* Fixed structure definitions in PECI uapi header to make that use __u8,
-  __u16 and etc.
-* Modified wait_for_completion_interruptible_timeout error handling logic
-  in Aspeed PECI driver to deliver errors correctly.
-* Removed low-level xfer command from ioctl and kept only high-level PECI
-  command suite as ioctls.
-* Fixed I/O timeout logic in Aspeed PECI driver using ktime.
-* Added a function into hwmon driver to simplify update delay checking.
-* Added a function into hwmon driver to convert 10.6 to millidegree.
-* Dropped non-standard attributes in hwmon driver.
-* Fixed OF table for hwmon to make it indicate as a PECI client of Intel
-  CPU target.
-* Added a maintainer of PECI subsystem into MAINTAINERS document.
-
-Fengguang Wu (1):
-  drivers/peci: Add support for PECI bus driver core
-
-
-Jae Hyun Yoo (10):
-  Documentations: dt-bindings: Add documents of generic PECI bus,
-    adapter and client drivers
-  Documentations: ioctl: Add ioctl numbers for PECI subsystem
-  drivers/peci: Add support for PECI bus driver core
-  Documentations: dt-bindings: Add a document of PECI adapter driver for
-    Aspeed AST24xx/25xx SoCs
-  ARM: dts: aspeed: peci: Add PECI node
-  drivers/peci: Add a PECI adapter driver for Aspeed AST24xx/AST25xx
-  Documentation: dt-bindings: Add documents for PECI hwmon client
-    drivers
-  Documentation: hwmon: Add documents for PECI hwmon client drivers
-  drivers/hwmon: Add PECI hwmon client drivers
-  Add a maintainer for the PECI subsystem
-
- .../devicetree/bindings/hwmon/peci-cputemp.txt     |   24 +
- .../devicetree/bindings/hwmon/peci-dimmtemp.txt    |   25 +
- .../devicetree/bindings/peci/peci-adapter.txt      |   23 +
- .../devicetree/bindings/peci/peci-aspeed.txt       |   60 +
- .../devicetree/bindings/peci/peci-bus.txt          |   15 +
- .../devicetree/bindings/peci/peci-client.txt       |   25 +
- Documentation/hwmon/peci-cputemp                   |   88 ++
- Documentation/hwmon/peci-dimmtemp                  |   50 +
- Documentation/ioctl/ioctl-number.txt               |    2 +
- MAINTAINERS                                        |   10 +
- arch/arm/boot/dts/aspeed-g4.dtsi                   |   25 +
- arch/arm/boot/dts/aspeed-g5.dtsi                   |   25 +
- drivers/Kconfig                                    |    2 +
- drivers/Makefile                                   |    1 +
- drivers/hwmon/Kconfig                              |   28 +
- drivers/hwmon/Makefile                             |    2 +
- drivers/hwmon/peci-cputemp.c                       |  783 ++++++++++++
- drivers/hwmon/peci-dimmtemp.c                      |  432 +++++++
- drivers/peci/Kconfig                               |   45 +
- drivers/peci/Makefile                              |    9 +
- drivers/peci/peci-aspeed.c                         |  504 ++++++++
- drivers/peci/peci-core.c                           | 1291 ++++++++++++++++++++
- include/linux/peci.h                               |  107 ++
- include/uapi/linux/peci-ioctl.h                    |  200 +++
- 24 files changed, 3776 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
- create mode 100644 Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
+Reviewed-by: James Feist <james.feist@linux.intel.com>
+Reviewed-by: Vernon Mauery <vernon.mauery@linux.intel.com>
+Cc: Alan Cox <alan@linux.intel.com>
+Cc: Andrew Jeffery <andrew@aj.id.au>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Andy Shevchenko <andriy.shevchenko@intel.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Fengguang Wu <fengguang.wu@intel.com>
+Cc: Greg KH <gregkh@linuxfoundation.org>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: Jason M Biils <jason.m.bills@linux.intel.com>
+Cc: Jean Delvare <jdelvare@suse.com>
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Julia Cartwright <juliac@eso.teric.us>
+Cc: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
+Cc: Milton Miller II <miltonm@us.ibm.com>
+Cc: Pavel Machek <pavel@ucw.cz>
+Cc: Randy Dunlap <rdunlap@infradead.org>
+Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
+Cc: Sumeet R Pawnikar <sumeet.r.pawnikar@intel.com>
+---
+ .../devicetree/bindings/peci/peci-adapter.txt      | 23 ++++++++++++++++++++
+ .../devicetree/bindings/peci/peci-bus.txt          | 15 +++++++++++++
+ .../devicetree/bindings/peci/peci-client.txt       | 25 ++++++++++++++++++++++
+ 3 files changed, 63 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/peci/peci-adapter.txt
- create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
  create mode 100644 Documentation/devicetree/bindings/peci/peci-bus.txt
  create mode 100644 Documentation/devicetree/bindings/peci/peci-client.txt
- create mode 100644 Documentation/hwmon/peci-cputemp
- create mode 100644 Documentation/hwmon/peci-dimmtemp
- create mode 100644 drivers/hwmon/peci-cputemp.c
- create mode 100644 drivers/hwmon/peci-dimmtemp.c
- create mode 100644 drivers/peci/Kconfig
- create mode 100644 drivers/peci/Makefile
- create mode 100644 drivers/peci/peci-aspeed.c
- create mode 100644 drivers/peci/peci-core.c
- create mode 100644 include/linux/peci.h
- create mode 100644 include/uapi/linux/peci-ioctl.h
 
+diff --git a/Documentation/devicetree/bindings/peci/peci-adapter.txt b/Documentation/devicetree/bindings/peci/peci-adapter.txt
+new file mode 100644
+index 000000000000..9221374f6b11
+--- /dev/null
++++ b/Documentation/devicetree/bindings/peci/peci-adapter.txt
+@@ -0,0 +1,23 @@
++Generic device tree configuration for PECI adapters.
++
++Required properties:
++- compatible     : Should contain hardware specific definition strings that can
++		   match an adapter driver implementation.
++- reg            : Should contain PECI controller registers location and length.
++- #address-cells : Should be <1>.
++- #size-cells    : Should be <0>.
++
++Example:
++	peci: peci at 10000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x10000000 0x1000>;
++
++		peci0: peci-bus at 0 {
++			compatible = "soc,soc-peci";
++			reg = <0x0 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/peci/peci-bus.txt b/Documentation/devicetree/bindings/peci/peci-bus.txt
+new file mode 100644
+index 000000000000..90bcc791ccb0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/peci/peci-bus.txt
+@@ -0,0 +1,15 @@
++Generic device tree configuration for PECI buses.
++
++Required properties:
++- compatible     : Should be "simple-bus".
++- #address-cells : Should be <1>.
++- #size-cells    : Should be <1>.
++- ranges         : Should contain PECI controller registers ranges.
++
++Example:
++	peci: peci at 10000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x10000000 0x1000>;
++	};
+diff --git a/Documentation/devicetree/bindings/peci/peci-client.txt b/Documentation/devicetree/bindings/peci/peci-client.txt
+new file mode 100644
+index 000000000000..8e2bfd8532f6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/peci/peci-client.txt
+@@ -0,0 +1,25 @@
++Generic device tree configuration for PECI clients.
++
++Required properties:
++- compatible : Should contain target device specific definition strings that can
++	       match a client driver implementation.
++- reg        : Should contain address of a client CPU. Address range of CPU
++	       clients is starting from 0x30 based on PECI specification.
++	       <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
++
++Example:
++	peci-bus at 0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		< more properties >
++
++		function at cpu0 {
++			compatible = "device,function";
++			reg = <0x30>;
++		};
++
++		function at cpu1 {
++			compatible = "device,function";
++			reg = <0x31>;
++		};
++	};
 -- 
 2.16.2
