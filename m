@@ -1,21 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 10 Apr 2018 08:53:53 -0500
-Subject: [PATCH v7 4/9] dt-bindings: gpio: Add gpio nodes for Actions
- S900 SoC
-In-Reply-To: <20180404172258.7678-5-manivannan.sadhasivam@linaro.org>
-References: <20180404172258.7678-1-manivannan.sadhasivam@linaro.org>
- <20180404172258.7678-5-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180410135353.yyyv54ik6nkimb6j@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Apr 2018 06:55:16 -0700
+Subject: [BUG] Fix drivers/memory O= build
+In-Reply-To: <ba6087c5-c69e-1adc-9d9d-0ef5b19fb30e@ti.com>
+References: <20180406102519.GN16141@n2100.armlinux.org.uk>
+ <20180406164615.GL5700@atomide.com>
+ <06568f5b-3e4a-f761-7242-85dcc8aeb6a5@oracle.com>
+ <20180406185505.GD10990@n2100.armlinux.org.uk>
+ <CAK7LNARbST+-oy-J9B2Q2vSp0nhnn9gqOnT7urZdjQZhSpYB-Q@mail.gmail.com>
+ <20180407133817.GE10990@n2100.armlinux.org.uk>
+ <ba6087c5-c69e-1adc-9d9d-0ef5b19fb30e@ti.com>
+Message-ID: <20180410135516.GT5700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2018 at 10:52:53PM +0530, Manivannan Sadhasivam wrote:
-> Add gpio nodes for Actions Semi S900 SoC.
-> 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> ---
->  .../devicetree/bindings/gpio/actions,owl-gpio.txt  | 87 ++++++++++++++++++++++
->  1 file changed, 87 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/actions,owl-gpio.txt
+* Dave Gerlach <d-gerlach@ti.com> [180409 16:07]:
+> I've inlined the changes below. I will send a proper split up series if it's
+> considered acceptable.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Seems fine from my point of view. No need to split the patch, best to
+do the fix as a single patch.
+
+We should test build it also with make randconfigs though.
+
+So assuming others are OK with this and it does not introduce
+new randconfig build errors:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
