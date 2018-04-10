@@ -1,14 +1,15 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 10 Apr 2018 11:32:10 -0700
-Subject: [PATCH v3 08/10] Documentation: hwmon: Add documents for PECI hwmon
- client drivers
+Date: Tue, 10 Apr 2018 11:32:09 -0700
+Subject: [PATCH v3 07/10] Documentation: dt-bindings: Add documents for PECI
+ hwmon client drivers
 In-Reply-To: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
 References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180410183212.16787-9-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180410183212.16787-8-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds hwmon documents for PECI cputemp and dimmtemp drivers.
+This commit adds dt-bindings documents for PECI cputemp and dimmtemp client
+drivers.
 
 Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
@@ -34,161 +35,72 @@ Cc: Randy Dunlap <rdunlap@infradead.org>
 Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
 Cc: Sumeet R Pawnikar <sumeet.r.pawnikar@intel.com>
 ---
- Documentation/hwmon/peci-cputemp  | 88 +++++++++++++++++++++++++++++++++++++++
- Documentation/hwmon/peci-dimmtemp | 50 ++++++++++++++++++++++
- 2 files changed, 138 insertions(+)
- create mode 100644 Documentation/hwmon/peci-cputemp
- create mode 100644 Documentation/hwmon/peci-dimmtemp
+ .../devicetree/bindings/hwmon/peci-cputemp.txt     | 24 +++++++++++++++++++++
+ .../devicetree/bindings/hwmon/peci-dimmtemp.txt    | 25 ++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
+ create mode 100644 Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
 
-diff --git a/Documentation/hwmon/peci-cputemp b/Documentation/hwmon/peci-cputemp
+diff --git a/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt b/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
 new file mode 100644
-index 000000000000..cdd5ea49a4a2
+index 000000000000..d5530ef9cfd2
 --- /dev/null
-+++ b/Documentation/hwmon/peci-cputemp
-@@ -0,0 +1,88 @@
-+Kernel driver peci-cputemp
-+==========================
++++ b/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
+@@ -0,0 +1,24 @@
++Bindings for Intel PECI (Platform Environment Control Interface) cputemp driver.
 +
-+Supported chips:
-+	One of Intel server CPUs listed below which is connected to a PECI bus.
-+		* Intel Xeon E5/E7 v3 server processors
-+			Intel Xeon E5-14xx v3 family
-+			Intel Xeon E5-24xx v3 family
-+			Intel Xeon E5-16xx v3 family
-+			Intel Xeon E5-26xx v3 family
-+			Intel Xeon E5-46xx v3 family
-+			Intel Xeon E7-48xx v3 family
-+			Intel Xeon E7-88xx v3 family
-+		* Intel Xeon E5/E7 v4 server processors
-+			Intel Xeon E5-16xx v4 family
-+			Intel Xeon E5-26xx v4 family
-+			Intel Xeon E5-46xx v4 family
-+			Intel Xeon E7-48xx v4 family
-+			Intel Xeon E7-88xx v4 family
-+		* Intel Xeon Scalable server processors
-+			Intel Xeon Bronze family
-+			Intel Xeon Silver family
-+			Intel Xeon Gold family
-+			Intel Xeon Platinum family
-+	Addresses scanned: PECI client address 0x30 - 0x37
-+	Datasheet: Available from http://www.intel.com/design/literature.htm
++Required properties:
++- compatible : Should be "intel,peci-cputemp".
++- reg        : Should contain address of a client CPU. Address range of CPU
++	       clients is starting from 0x30 based on PECI specification.
++	       <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
 +
-+Author:
-+	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
++Example:
++	peci-bus at 0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		< more properties >
 +
-+Description
-+-----------
++		peci-cputemp at cpu0 {
++			compatible = "intel,peci-cputemp";
++			reg = <0x30>;
++		};
 +
-+This driver implements a generic PECI hwmon feature which provides Digital
-+Thermal Sensor (DTS) thermal readings of the CPU package and CPU cores that are
-+accessible using the PECI Client Command Suite via the processor PECI client.
-+
-+All temperature values are given in millidegree Celsius and will be measurable
-+only when the target CPU is powered on.
-+
-+sysfs attributes
-+----------------
-+
-+temp1_label		"Die"
-+temp1_input		Provides current die temperature of the CPU package.
-+temp1_max		Provides thermal control temperature of the CPU package
-+			which is also known as Tcontrol.
-+temp1_crit		Provides shutdown temperature of the CPU package which
-+			is also known as the maximum processor junction
-+			temperature, Tjmax or Tprochot.
-+temp1_crit_hyst		Provides the hysteresis value from Tcontrol to Tjmax of
-+			the CPU package.
-+
-+temp2_label		"DTS margin"
-+temp2_input		Provides current DTS thermal margin to Tcontrol of the
-+			CPU package. Value 0 means it reaches to Tcontrol
-+			temperature. Sub-zero value means the die temperature
-+			goes across Tconrtol to Tjmax.
-+temp2_min		Provides the minimum DTS thermal margin to Tcontrol of
-+			the CPU package.
-+temp2_lcrit		Provides the value when the CPU package temperature
-+			reaches to Tjmax.
-+
-+temp3_label		"Tcontrol"
-+temp3_input		Provides current Tcontrol temperature of the CPU
-+			package which is also known as Fan Temperature target.
-+			Indicates the relative value from thermal monitor trip
-+			temperature at which fans should be engaged.
-+temp3_crit		Provides Tcontrol critical value of the CPU package
-+			which is same to Tjmax.
-+
-+temp4_label		"Tthrottle"
-+temp4_input		Provides current Tthrottle temperature of the CPU
-+			package. Used for throttling temperature. If this value
-+			is allowed and lower than Tjmax - the throttle will
-+			occur and reported at lower than Tjmax.
-+
-+temp5_label		"Tjmax"
-+temp5_input		Provides the maximum junction temperature, Tjmax of the
-+			CPU package.
-+
-+temp[6-*]_label		Provides string "Core X", where X is resolved core
-+			number.
-+temp[6-*]_input		Provides current temperature of each core.
-+temp[6-*]_max		Provides thermal control temperature of the core.
-+temp[6-*]_crit		Provides shutdown temperature of the core.
-+temp[6-*]_crit_hyst	Provides the hysteresis value from Tcontrol to Tjmax of
-+			the core.
-diff --git a/Documentation/hwmon/peci-dimmtemp b/Documentation/hwmon/peci-dimmtemp
++		peci-cputemp at cpu1 {
++			compatible = "intel,peci-cputemp";
++			reg = <0x31>;
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt b/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
 new file mode 100644
-index 000000000000..c54f2526188c
+index 000000000000..56e5deb61e5c
 --- /dev/null
-+++ b/Documentation/hwmon/peci-dimmtemp
-@@ -0,0 +1,50 @@
-+Kernel driver peci-dimmtemp
-+===========================
++++ b/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+@@ -0,0 +1,25 @@
++Bindings for Intel PECI (Platform Environment Control Interface) dimmtemp
++driver.
 +
-+Supported chips:
-+	One of Intel server CPUs listed below which is connected to a PECI bus.
-+		* Intel Xeon E5/E7 v3 server processors
-+			Intel Xeon E5-14xx v3 family
-+			Intel Xeon E5-24xx v3 family
-+			Intel Xeon E5-16xx v3 family
-+			Intel Xeon E5-26xx v3 family
-+			Intel Xeon E5-46xx v3 family
-+			Intel Xeon E7-48xx v3 family
-+			Intel Xeon E7-88xx v3 family
-+		* Intel Xeon E5/E7 v4 server processors
-+			Intel Xeon E5-16xx v4 family
-+			Intel Xeon E5-26xx v4 family
-+			Intel Xeon E5-46xx v4 family
-+			Intel Xeon E7-48xx v4 family
-+			Intel Xeon E7-88xx v4 family
-+		* Intel Xeon Scalable server processors
-+			Intel Xeon Bronze family
-+			Intel Xeon Silver family
-+			Intel Xeon Gold family
-+			Intel Xeon Platinum family
-+	Addresses scanned: PECI client address 0x30 - 0x37
-+	Datasheet: Available from http://www.intel.com/design/literature.htm
++Required properties:
++- compatible : Should be "intel,peci-dimmtemp".
++- reg        : Should contain address of a client CPU. Address range of CPU
++	       clients is starting from 0x30 based on PECI specification.
++	       <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
 +
-+Author:
-+	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
++Example:
++	peci-bus at 0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		< more properties >
 +
-+Description
-+-----------
++		peci-dimmtemp at cpu0 {
++			compatible = "intel,peci-dimmtemp";
++			reg = <0x30>;
++		};
 +
-+This driver implements a generic PECI hwmon feature which provides Digital
-+Thermal Sensor (DTS) thermal readings of DIMM components that are accessible
-+using the PECI Client Command Suite via the processor PECI client.
-+
-+All temperature values are given in millidegree Celsius and will be measurable
-+only when the target CPU is powered on.
-+
-+sysfs attributes
-+----------------
-+
-+temp[N]_label		Provides string "DIMM CI", where C is DIMM channel and
-+			I is DIMM index of the populated DIMM.
-+temp[N]_input		Provides current temperature of the populated DIMM.
-+
-+Note:
-+	DIMM temperature attributes will appear when the client CPU's BIOS
-+	completes memory training and testing.
++		peci-dimmtemp at cpu1 {
++			compatible = "intel,peci-dimmtemp";
++			reg = <0x31>;
++		};
++	};
 -- 
 2.16.2
