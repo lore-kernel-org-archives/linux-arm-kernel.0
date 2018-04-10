@@ -1,39 +1,54 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Tue, 10 Apr 2018 15:59:41 +0200
-Subject: [PATCH v5 2/3] ARM: ftrace/recordmcount: filter relocation types
-In-Reply-To: <DM5PR2101MB1032EF6B16414765AA0BAB19FBBE0@DM5PR2101MB1032.namprd21.prod.outlook.com>
-References: <20180406143939.14642-3-alexander.sverdlin@nokia.com>
- <DM5PR2101MB1032EF6B16414765AA0BAB19FBBE0@DM5PR2101MB1032.namprd21.prod.outlook.com>
-Message-ID: <85c043e6-2926-33a2-3d3a-572fbfe905bb@nokia.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 10 Apr 2018 16:05:04 +0200
+Subject: [PATCH v3 3/6] spi: sun6i: restrict transfer length in PIO-mode
+In-Reply-To: <0e2fefa5-b6e7-5e42-cf6e-8fc921f972dd@orpaltech.com>
+References: <20180405131735.GB12349@sirena.org.uk>
+ <8159c3a5-af74-9f13-aedb-7ecc708bdff6@orpaltech.com>
+ <20180406073441.xesojvzc3deljhoy@flea>
+ <204e97cb-2f39-00f0-fd4e-3aa9a51f7cac@orpaltech.com>
+ <20180409092730.2moyhl5aaktjwbyn@flea>
+ <94a394bd-89bf-9334-c500-4cbadf4c1044@orpaltech.com>
+ <20180409105001.GC11532@sirena.org.uk>
+ <67c2006b-17f2-2459-e3c9-e91e3c694d8c@orpaltech.com>
+ <20180409113603.2iexkqvyeqmysp5e@flea>
+ <0e2fefa5-b6e7-5e42-cf6e-8fc921f972dd@orpaltech.com>
+Message-ID: <20180410140504.i7kszskwxuoygt5s@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sasha,
+On Mon, Apr 09, 2018 at 02:59:57PM +0300, Sergey Suloev wrote:
+> > > But as soon as sun4i SPI driver? is correctly declaring
+> > > max_transfer_size then "smart" clients will work well by limiting a
+> > > single transfer size to FIFO depth. I tested it with real hardware,
+> > > again.
+> > This is really not my point. What would prevent you from doing
+> > multiple transfers in that case, and filling the FIFO entirely,
+> > waiting for it to be done, then resuming until you have sent the right
+> > number of bytes?
+>
+> Because it makes no sense IMHO. I can't see any single point in allowing
+> long PIO transfers. Can you find at least one ?
 
-On 10/04/18 15:50, Sasha Levin wrote:
-> This commit has been processed by the -stable helper bot and determined
-> to be a high probability candidate for -stable trees. (score: 46.9374)
-> 
-> The bot has tested the following trees: v4.16.1, v4.15.16, v4.14.33, v4.9.93, v4.4.127.
-> 
-> v4.16.1: Build OK!
-> v4.15.16: Build OK!
-> v4.14.33: Build OK!
-> v4.9.93: Failed to apply! Possible dependencies:
->     9648dc15772d ("recordmcount: arm: Implement make_nop")
-> 
-> v4.4.127: Failed to apply! Possible dependencies:
->     9648dc15772d ("recordmcount: arm: Implement make_nop")
-> 
-> 
-> Please let us know if you'd like to have this patch included in a stable tree.
+I'm probably going to state the obvious here, but to allow long transfers?
 
-IMO this doesn't make sense to include this in stable alone, I cannot imagine
-compiler would ever generate something broken with the current sources.
+> I think we should reuse as much SPI core code as possible. The SPI
+> core can handle an SPI message with multiple transfers, all we need
+> is to have max_transfer_size = FIFO depth and restrict it in
+> transfer_one().
 
-It only makes sense with the whole series, but I personally do not think
-the whole series belongs to stable.
+There's not a single call to the max_transfer_size hook in the SPI
+core in 4.16, so that seems a bit too optimistic.
+
+Maxime
 
 -- 
-Best regards,
-Alexander Sverdlin.
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180410/ab69b7d9/attachment-0001.sig>
