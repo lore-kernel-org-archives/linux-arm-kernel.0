@@ -1,71 +1,146 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 10 Apr 2018 11:41:49 +0100
-Subject: [PATCH] ARM: avoid Cortex-A9 livelock on tight dmb loops
-Message-ID: <E1f5qij-00033R-Sl@rmk-PC.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Apr 2018 11:51:19 +0100
+Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
+In-Reply-To: <20180409205139.GH10904@cbox>
+References: <20180409170706.23541-1-marc.zyngier@arm.com>
+ <20180409205139.GH10904@cbox>
+Message-ID: <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Executing loops such as:
+On Mon, Apr 09, 2018 at 10:51:39PM +0200, Christoffer Dall wrote:
+> On Mon, Apr 09, 2018 at 06:07:06PM +0100, Marc Zyngier wrote:
+> > Before entering the guest, we check whether our VMID is still
+> > part of the current generation. In order to avoid taking a lock,
+> > we start with checking that the generation is still current, and
+> > only if not current do we take the lock, recheck, and update the
+> > generation and VMID.
+> > 
+> > This leaves open a small race: A vcpu can bump up the global
+> > generation number as well as the VM's, but has not updated
+> > the VMID itself yet.
+> > 
+> > At that point another vcpu from the same VM comes in, checks
+> > the generation (and finds it not needing anything), and jumps
+> > into the guest. At this point, we end-up with two vcpus belonging
+> > to the same VM running with two different VMIDs. Eventually, the
+> > VMID used by the second vcpu will get reassigned, and things will
+> > really go wrong...
+> > 
+> > A simple solution would be to drop this initial check, and always take
+> > the lock. This is likely to cause performance issues. A middle ground
+> > is to convert the spinlock to a rwlock, and only take the read lock
+> > on the fast path. If the check fails at that point, drop it and
+> > acquire the write lock, rechecking the condition.
+> > 
+> > This ensures that the above scenario doesn't occur.
+> > 
+> > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> > I haven't seen any reply from Shannon, so reposting this to
+> > a slightly wider audience for feedback.
+> > 
+> >  virt/kvm/arm/arm.c | 15 ++++++++++-----
+> >  1 file changed, 10 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> > index dba629c5f8ac..a4c1b76240df 100644
+> > --- a/virt/kvm/arm/arm.c
+> > +++ b/virt/kvm/arm/arm.c
+> > @@ -63,7 +63,7 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+> >  static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+> >  static u32 kvm_next_vmid;
+> >  static unsigned int kvm_vmid_bits __read_mostly;
+> > -static DEFINE_SPINLOCK(kvm_vmid_lock);
+> > +static DEFINE_RWLOCK(kvm_vmid_lock);
+> >  
+> >  static bool vgic_present;
+> >  
+> > @@ -473,11 +473,16 @@ static void update_vttbr(struct kvm *kvm)
+> >  {
+> >  	phys_addr_t pgd_phys;
+> >  	u64 vmid;
+> > +	bool new_gen;
+> >  
+> > -	if (!need_new_vmid_gen(kvm))
+> > +	read_lock(&kvm_vmid_lock);
+> > +	new_gen = need_new_vmid_gen(kvm);
+> > +	read_unlock(&kvm_vmid_lock);
+> > +
+> > +	if (!new_gen)
+> >  		return;
+> >  
+> > -	spin_lock(&kvm_vmid_lock);
+> > +	write_lock(&kvm_vmid_lock);
+> >  
+> >  	/*
+> >  	 * We need to re-check the vmid_gen here to ensure that if another vcpu
+> > @@ -485,7 +490,7 @@ static void update_vttbr(struct kvm *kvm)
+> >  	 * use the same vmid.
+> >  	 */
+> >  	if (!need_new_vmid_gen(kvm)) {
+> > -		spin_unlock(&kvm_vmid_lock);
+> > +		write_unlock(&kvm_vmid_lock);
+> >  		return;
+> >  	}
+> >  
+> > @@ -519,7 +524,7 @@ static void update_vttbr(struct kvm *kvm)
+> >  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
+> >  	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
+> >  
+> > -	spin_unlock(&kvm_vmid_lock);
+> > +	write_unlock(&kvm_vmid_lock);
+> >  }
+> >  
+> >  static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+> > -- 
+> > 2.14.2
+> > 
+> 
+> The above looks correct to me.  I am wondering if something like the
+> following would also work, which may be slightly more efficient,
+> although I doubt the difference can be measured:
+> 
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index dba629c5f8ac..7ac869bcad21 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -458,7 +458,9 @@ void force_vm_exit(const cpumask_t *mask)
+>   */
+>  static bool need_new_vmid_gen(struct kvm *kvm)
+>  {
+> -	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
+> +	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
+> +	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
+> +	return unlikely(kvm->arch.vmid_gen != current_vmid_gen);
+>  }
+>  
+>  /**
+> @@ -508,10 +510,11 @@ static void update_vttbr(struct kvm *kvm)
+>  		kvm_call_hyp(__kvm_flush_vm_context);
+>  	}
+>  
+> -	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+>  	kvm->arch.vmid = kvm_next_vmid;
+>  	kvm_next_vmid++;
+>  	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
+> +	smp_wmb();
+> +	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+>  
+>  	/* update vttbr to be used with the new vmid */
+>  	pgd_phys = virt_to_phys(kvm->arch.pgd);
+> 
 
-	while (1)
-		cpu_relax();
+I think we also need to update kvm->arch.vttbr before updating
+kvm->arch.vmid_gen, otherwise another CPU can come in, see that the
+vmid_gen is up-to-date, jump to hyp, and program a stale VTTBR (with the
+old VMID).
 
-with interrupts disabled results in a livelock of the entire system,
-as other CPUs are prevented making progress.  This is most noticable
-as a failure of crashdump kexec, which stops just after issuing:
+With the smp_wmb() and update of kvm->arch.vmid_gen moved to the end of
+the critical section, I think that works, modulo using READ_ONCE() and
+WRITE_ONCE() to ensure single-copy-atomicity of the fields we access
+locklessly.
 
-	Loading crashdump kernel...
-
-to the system console.  Two other locations of these loops within the
-ARM code have been identified and fixed up.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/kernel/machine_kexec.c  | 3 ++-
- arch/arm/kernel/smp.c            | 2 +-
- arch/arm/mach-omap2/prm_common.c | 2 +-
- 3 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 6b38d7a634c1..75d4f5ce6cfd 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -91,8 +91,9 @@ void machine_crash_nonpanic_core(void *unused)
- 
- 	set_cpu_online(smp_processor_id(), false);
- 	atomic_dec(&waiting_for_crash_ipi);
-+
- 	while (1)
--		cpu_relax();
-+		cpu_do_idle();
- }
- 
- static void machine_kexec_mask_interrupts(void)
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 5c7ec00a500e..cbaba4a15a3a 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -568,7 +568,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 	local_irq_disable();
- 
- 	while (1)
--		cpu_relax();
-+		cpu_do_idle();
- }
- 
- static DEFINE_PER_CPU(struct completion *, cpu_completion);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 021b5a8b9c0a..d4ddc78b2a0b 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -523,7 +523,7 @@ void omap_prm_reset_system(void)
- 	prm_ll_data->reset_system();
- 
- 	while (1)
--		cpu_relax();
-+		cpu_do_idle();
- }
- 
- /**
--- 
-2.7.4
+Thanks,
+Mark.
