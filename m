@@ -1,30 +1,40 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 10 Apr 2018 08:42:47 +0200
-Subject: [PATCH V2 1/2] cpufreq: scmi: Don't validate the frequency table
- twice
-In-Reply-To: <d86012d8-f98f-b9e9-aa0b-032ef0ee9c9c@arm.com>
-References: <cover.1522749887.git.viresh.kumar@linaro.org>
- <442ecfd0a5bddf32c912c449b072d8a0139318fc.1522749887.git.viresh.kumar@linaro.org>
- <5ce48bce-4fcf-1e0a-6b78-f588fbf7e4a5@arm.com>
- <CAJZ5v0hGgLAK2MRx0tEpTt5Hh9i_9zwhFJPsOsxQ+fOSiLBr_w@mail.gmail.com>
- <d86012d8-f98f-b9e9-aa0b-032ef0ee9c9c@arm.com>
-Message-ID: <CAJZ5v0jwTevHFss-CriUDavLFT2mvZKVb2Bnm2bYxBbAy4zfzA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 10 Apr 2018 09:06:26 +0200
+Subject: [PATCH] pinctrl/samsung: Correct EINTG banks order
+In-Reply-To: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <CAJKOXPdckxVfwU60=e7e6trbiB78ETE=G2vuY1kCrcKHaU2CzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 9, 2018 at 3:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 09/04/18 12:39, Rafael J. Wysocki wrote:
->> On Wed, Apr 4, 2018 at 11:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>
->>> (I have exact patches ready :), was on vacation)
->>
->> What am I expected to do with this one?
->>
->
-> Sorry for not being explicit. I assumed you can pick up this patch along
-> with 2/2 removing the function, that's why I just acked the patch. The
-> SCMI code is now merged.
+On Sun, Apr 8, 2018 at 8:07 PM, Pawe? Chmiel
+<pawel.mikolaj.chmiel@gmail.com> wrote:
+> All banks with GPIO interrupts should be at beginning
+> of bank array and without any other types of banks between them.
+> This order is expected by exynos_eint_gpio_irq, when doing
+> interrupt group to bank translation.
+> Otherwise, kernel NULL pointer dereference would happen
+> when trying to handle interrupt, due to wrong bank being looked up.
+> Observed on s5pv210, when trying to handle gpj0 interrupt,
+> where kernel was mapping it to gpi bank.
 
-OK, applied now, thanks!
+Thanks for the patch. The issue looks real although one thing was
+missed - there is a gap in SVC group between GPK2 and GPL0 (pointed by
+Marek Szyprowski):
+
+0x0 - EINT_23 - gpk0
+0x1 - EINT_24 - gpk1
+0x2 - EINT_25 - gpk2
+0x4 - EINT_27 - gpl0
+0x7 - EINT_8 - gpm0
+
+Maybe this should be done differently - to remove such hidden
+requirement entirely in favor of another parameter of
+EXYNOS_PIN_BANK_EINTG argument? Anyway if such hidden requirement
+stays, then please document it in the source code (it maybe next to
+PIN order... or next macro... or also in exynos_eint_gpio_irq()).
+
+Beside that please add cc-stable and appropriate fixes tag,
+
+Best regards,
+Krzysztof
