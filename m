@@ -1,40 +1,86 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 10 Apr 2018 09:06:26 +0200
-Subject: [PATCH] pinctrl/samsung: Correct EINTG banks order
-In-Reply-To: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <CAJKOXPdckxVfwU60=e7e6trbiB78ETE=G2vuY1kCrcKHaU2CzA@mail.gmail.com>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Tue, 10 Apr 2018 07:08:45 +0000
+Subject: [PATCH v3 2/8] DT: reset: renesas,rzn1-reboot: document RZ/N1
+ reboot driver
+In-Reply-To: <20180409201027.ydlvyx72mrt5fphh@rob-hp-laptop>
+References: <1522309629-10152-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1522309629-10152-3-git-send-email-michel.pollet@bp.renesas.com>
+ <20180409201027.ydlvyx72mrt5fphh@rob-hp-laptop>
+Message-ID: <OSBPR01MB2054DA948D0301F20AB9F1EDD2BE0@OSBPR01MB2054.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 8, 2018 at 8:07 PM, Pawe? Chmiel
-<pawel.mikolaj.chmiel@gmail.com> wrote:
-> All banks with GPIO interrupts should be at beginning
-> of bank array and without any other types of banks between them.
-> This order is expected by exynos_eint_gpio_irq, when doing
-> interrupt group to bank translation.
-> Otherwise, kernel NULL pointer dereference would happen
-> when trying to handle interrupt, due to wrong bank being looked up.
-> Observed on s5pv210, when trying to handle gpj0 interrupt,
-> where kernel was mapping it to gpi bank.
+Hi Rob,
 
-Thanks for the patch. The issue looks real although one thing was
-missed - there is a gap in SVC group between GPK2 and GPL0 (pointed by
-Marek Szyprowski):
+On 09 April 2018 21:10,  Rob Herring wrote:
+> On Thu, Mar 29, 2018 at 08:46:58AM +0100, Michel Pollet wrote:
+> > The Renesas RZ/N1 Family (Part #R9A06G0xx) requires a driver as part
+> > of the sysctrl MFD to handle rebooting the CA7 cores.
+> > This documents the driver bindings.
+> >
+> > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> > ---
+> >  .../bindings/power/renesas,rzn1-reboot.txt           | 20
+> ++++++++++++++++++++
+> >  1 file changed, 20 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> > b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> > new file mode 100644
+> > index 0000000..f592769
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/power/renesas,rzn1-
+> reboot.txt
+> > @@ -0,0 +1,20 @@
+> > +DT bindings for the Renesas RZ/N1 Reboot Driver
+> > +
+> > +== Reboot Driver Node ==
+> > +
+> > +The reboot driver is always a subnode of the system controller node,
+> > +see renesas,rzn1-sysctrl.txt for details.
+> > +
+> > +Bindings:
+> > ++ Required:
+> > +compatible = "renesas,rzn1-reboot";
+> > +
+> > +Example:
+> > +sysctrl: sysctrl at 4000c000 {
+> > +compatible = "renesas,rzn1-sysctrl", "syscon", "simple-mfd";
+>
+> Are there other functions for this block? If so, please define a complete
+> binding for the block.
 
-0x0 - EINT_23 - gpk0
-0x1 - EINT_24 - gpk1
-0x2 - EINT_25 - gpk2
-0x4 - EINT_27 - gpl0
-0x7 - EINT_8 - gpm0
+There are indeed multiple functions for this particular IP block. It's pretty much a
+kitchen sink of clocks, pinmux, reboot, watchdog, SMP and probably a couple
+more I forgot about!
 
-Maybe this should be done differently - to remove such hidden
-requirement entirely in favor of another parameter of
-EXYNOS_PIN_BANK_EINTG argument? Anyway if such hidden requirement
-stays, then please document it in the source code (it maybe next to
-PIN order... or next macro... or also in exynos_eint_gpio_irq()).
+We've discussed this MFD structure with Geert, we picked that because if I
+were to add all these callbacks/drivers to a 'sysctrl' driver, it'd end up looking
+like ... a mach-xx.c file in the end!
+So the current version is just a placeholder for a single driver for now, but it
+won't last, there's already a SMP core enable driver lined up next...
 
-Beside that please add cc-stable and appropriate fixes tag,
+>
+> > +reg = <0x4000c000 0x1000>;
+> > +
+> > +reboot {
+> > +compatible = "renesas,rzn1-reboot";
+>
+> Why is this node needed? The driver for "renesas,rzn1-sysctrl" should be
+> able to register as a reboot handler/driver/provider.
 
-Best regards,
-Krzysztof
+Please see above...
+
+>
+> Rob
+
+Thanks for your input!
+Michel
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
