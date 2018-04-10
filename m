@@ -1,76 +1,202 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Tue, 10 Apr 2018 12:20:47 +0200
-Subject: [PATCH] Input: atmel_mxt_ts - add missing compatible strings to
- OF device table
-In-Reply-To: <20180410095340.24074-1-javierm@redhat.com>
-References: <20180410095340.24074-1-javierm@redhat.com>
-Message-ID: <CAFqH_50O=V2jh3FDJ+udqL_F2s5W4G+KF1USHR_dKaT82_3EXw@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 10 Apr 2018 11:32:50 +0100
+Subject: [RFC PATCH v3 4/4] KVM: arm64: Optimise FPSIMD handling to
+ reduce guest/host thrashing
+In-Reply-To: <20180409212243.GI10904@cbox>
+References: <1523271182-22130-1-git-send-email-Dave.Martin@arm.com>
+ <1523271182-22130-5-git-send-email-Dave.Martin@arm.com>
+ <20180409212243.GI10904@cbox>
+Message-ID: <20180410103250.GW16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Javier!
+On Mon, Apr 09, 2018 at 11:22:43PM +0200, Christoffer Dall wrote:
+> Hi Dave,
+> 
+> On Mon, Apr 09, 2018 at 11:53:02AM +0100, Dave Martin wrote:
+> > This patch refactors KVM to align the host and guest FPSIMD
+> > save/restore logic with each other for arm64.  This reduces the
+> > number of redundant save/restore operations that must occur, and
+> > reduces the common-case IRQ blackout time during guest exit storms
+> > by saving the host state lazily and optimising away the need to
+> > restore the host state before returning to the run loop.
+> > 
+> 
+> [...]
+> 
+> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > index db08a54..74c5a46 100644
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> 
+> [...]
+> 
+> > @@ -1054,15 +1066,20 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
+> >  	local_bh_enable();
+> >  }
+> >  
+> > +void fpsimd_flush_state(unsigned int *cpu)
+> 
+> This API looks strange to me, and doesn't seem to be called from
+> elsewhere.  Wouldn't it be more clear if it took a struct thread_struct
+> pointer instead, or if the logic remained embedded in
+> fpsimd_flush_task_state ?
 
-2018-04-10 11:53 GMT+02:00 Javier Martinez Canillas <javierm@redhat.com>:
-> Commit af503716ac14 ("i2c: core: report OF style module alias for devices
-> registered via OF") fixed how the I2C core reports the module alias when
-> devices are registered via OF.
->
-> But the atmel_mxt_ts driver only has an "atmel,maxtouch" compatible in its
-> OF device ID table, so if a Device Tree is using a different one, autoload
-> won't be working for the module (the matching works because the I2C device
-> ID table is used as a fallback).
->
-> So add compatible strings for each of the entries in the I2C device table.
->
-> Fixes: af503716ac14 ("i2c: core: report OF style module alias for devices registered via OF")
-> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
-> ---
->
->  Documentation/devicetree/bindings/input/atmel,maxtouch.txt | 6 +++++-
->  drivers/input/touchscreen/atmel_mxt_ts.c                   | 4 ++++
->  2 files changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-> index 23e3abc3fdef..cd43fb8bc2ce 100644
-> --- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-> +++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-> @@ -1,8 +1,12 @@
->  Atmel maXTouch touchscreen/touchpad
->
->  Required properties:
-> -- compatible:
-> +- compatible: Must be one of the following
-> +    atmel,qt602240_ts
-> +    atmel,atmel_mxt_ts
-> +    atmel,atmel_mxt_tp
->      atmel,maxtouch
-> +    atmel,mXT224
->
->  - reg: The I2C address of the device
->
-> diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
-> index 7659bc48f1db..e8ef83f168d6 100644
-> --- a/drivers/input/touchscreen/atmel_mxt_ts.c
-> +++ b/drivers/input/touchscreen/atmel_mxt_ts.c
-> @@ -3238,7 +3238,11 @@ static int __maybe_unused mxt_resume(struct device *dev)
->  static SIMPLE_DEV_PM_OPS(mxt_pm_ops, mxt_suspend, mxt_resume);
->
->  static const struct of_device_id mxt_of_match[] = {
-> +       { .compatible = "atmel,qt602240_ts", },
-> +       { .compatible = "atmel,atmel_mxt_ts", },
-> +       { .compatible = "atmel,atmel_mxt_tp", },
->         { .compatible = "atmel,maxtouch", },
-> +       { .compatible = "atmel,mXT224", },
->         {},
->  };
->  MODULE_DEVICE_TABLE(of, mxt_of_match);
-> --
-> 2.14.3
->
+Hmmm, thanks for spotting this -- it's a throwback to my previous
+approach.
 
-The Samsung Chromebook Plus is one of the affected devices, with
-current mainline the module is not autoloaded, this patch fixes the
-issue.
+I had intended to align KVM fully with the way host tasks' context is
+tracked, and this would involve a "most recent cpu FPSIMD loaded on"
+field in struct vcpu_arch: for ABI reasons this can't easily be tacked
+onto the end of struct user_fpsimd_state, so it would be necessary for
+it to be a separate field and passed to the relevant maintenance
+functions as a separate parameter.
 
-Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+This approach would allow the vcpu FPSIMD state to remain in the regs
+across a context switch without the need to reload it, but this also
+means that some flushing/invalidation of this cached view of the state
+would be needed around KVM_GET_ONE_REG etc. and at vcpu destruction
+time.  This function would be part of such a maintenance API.
+
+For now though, this seemed like extra complexity for dubious benefit.
+
+Unless you think it's worth pursuing this optimisation I should
+probably get rid of this function.  We can always bring this back
+later if we choose.
+
+> > +{
+> > +	*cpu = NR_CPUS;
+> > +}
+> > +
+> >  /*
+> >   * Invalidate live CPU copies of task t's FPSIMD state
+> >   */
+> >  void fpsimd_flush_task_state(struct task_struct *t)
+> >  {
+> > -	t->thread.fpsimd_cpu = NR_CPUS;
+> > +	fpsimd_flush_state(&t->thread.fpsimd_cpu);
+> >  }
+> >  
+> > -static inline void fpsimd_flush_cpu_state(void)
+> > +void fpsimd_flush_cpu_state(void)
+> >  {
+> >  	__this_cpu_write(fpsimd_last_state.st, NULL);
+> >  }
+> 
+> [...]
+> 
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 8605e04..797b259 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -27,6 +27,7 @@
+> >  #include <asm/kvm_mmu.h>
+> >  #include <asm/fpsimd.h>
+> >  #include <asm/debug-monitors.h>
+> > +#include <asm/thread_info.h>
+> >  
+> >  static bool __hyp_text __fpsimd_enabled_nvhe(void)
+> >  {
+> > @@ -47,24 +48,40 @@ bool __hyp_text __fpsimd_enabled(void)
+> >  	return __fpsimd_is_enabled()();
+> >  }
+> >  
+> > -static void __hyp_text __activate_traps_vhe(void)
+> > +static bool update_fp_enabled(struct kvm_vcpu *vcpu)
+> 
+> I think this needs a __hyp_text in the unlikely case that this function
+> is not inlined in the _nvhe caller by the compiler.
+
+You're right.  I'll add it.
+
+> > +{
+> > +	if (vcpu->arch.host_thread_info->flags & _TIF_FOREIGN_FPSTATE) {
+> > +		vcpu->arch.host_fpsimd_state = NULL;
+> > +		vcpu->arch.fp_enabled = false;
+> > +	}
+> 
+> I'm not clear why the above logic can't go into kvm_arch_vcpu_load_fp
+> and why we can't simply check TIF_FOREIGN_FPSTATE in __hyp_switch_fpsimd
+> instead?
+
+The situation can change in between _load_fp() and here, because of
+kernel-mode NEON.
+
+Also, we can't defer this check to __hyp_switch_fpsimd() because this is
+the logic for deciding whether to re-enable the Hyp FPSIMD trap in the
+first place.
+
+
+Here's a scenario:
+
+ * We're on a second iteration of the run loop, with the vcpu state loaded:
+ * fp_enabled = true, TIF_FOREIGN_FPSTATE is clear,
+   executing in the host with irqs enabled.
+
+ * A softirq uses kernel-mode NEON:
+ * vcpu FPSIMD state is saved back to memory
+ * TIF_FOREIGN_FPSTATE now set
+ * CPU FPSIMD regs now contain garbage
+
+ * local_irq_disable(), and enter guest
+
+ * fp_enabled == true, but out of date:
+ * update_fp_enabled detects this condition by observing that
+   TIF_FOREIGN_FPSTATE is set and clearing fp_enabled.
+ * the (updated) value of fp_enabled determines that the FPSIMD trap
+   should be enabled
+
+ * __hyp_switch_fpsimd() saves no host state (because it was already
+   saved and anyway host_fpsimd_state is NULL)
+ * __hyp_switch_fpsimd() loads the guest state
+
+
+Is there a way to simplify the code that doesn't break this?
+
+> 
+> > +
+> > +	return vcpu->arch.fp_enabled;
+> > +}
+> > +
+> > +static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+> >  {
+> >  	u64 val;
+> >  
+> >  	val = read_sysreg(cpacr_el1);
+> >  	val |= CPACR_EL1_TTA;
+> > -	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+> > +	val &= ~CPACR_EL1_ZEN;
+> > +	if (!update_fp_enabled(vcpu))
+> > +		val &= ~CPACR_EL1_FPEN;
+> > +
+> >  	write_sysreg(val, cpacr_el1);
+> >  
+> >  	write_sysreg(kvm_get_hyp_vector(), vbar_el1);
+> >  }
+> >  
+> > -static void __hyp_text __activate_traps_nvhe(void)
+> > +static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+> >  {
+> >  	u64 val;
+> >  
+> >  	val = CPTR_EL2_DEFAULT;
+> > -	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+> > +	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+> > +	if (!update_fp_enabled(vcpu))
+> > +		val |= CPTR_EL2_TFP;
+> > +
+> >  	write_sysreg(val, cptr_el2);
+> >  }
+> >  
+> 
+> [...]
+> 
+> Otherwise this approach looks quite good to me overall.  Are you
+> planning to add SVE support before removing the RFC from this series?
+
+Yes :)
+
+(I've been delaying that while we get the basic approach sorted out.)
+
+Cheers
+---Dave
