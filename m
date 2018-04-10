@@ -1,35 +1,74 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 10 Apr 2018 15:01:52 +0200
-Subject: [PATCH v2 5/5] pinctrl: sunxi: Use of_clk_get_parent_count()
- instead of open coding
-In-Reply-To: <1523364701-15383-6-git-send-email-geert+renesas@glider.be>
-References: <1523364701-15383-1-git-send-email-geert+renesas@glider.be>
- <1523364701-15383-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180410130152.cccquujj7j6asv5b@flea>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 10 Apr 2018 15:02:46 +0200
+Subject: [RFC PATCH] sdhci: arasan: Add runtime PM support
+In-Reply-To: <c8a29949-c220-1319-02f4-c5b0b9601dc8@intel.com>
+References: <1522302530-27550-1-git-send-email-naranimanish@gmail.com>
+ <29f0aae5-3cee-8a37-f5aa-3830f466a759@intel.com>
+ <b02c6970-f4f5-53af-2834-710ff3b7cbaa@xilinx.com>
+ <c8a29949-c220-1319-02f4-c5b0b9601dc8@intel.com>
+Message-ID: <98f0c8c1-3f85-8775-f6cd-9097fb254446@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 02:51:41PM +0200, Geert Uytterhoeven wrote:
-> A new open coder has crept in since 470b73a38470e8ba ("pinctrl: sunxi:
-> Use of_clk_get_parent_count() instead of open coding"), replace it.
+On 10.4.2018 14:17, Adrian Hunter wrote:
+> On 10/04/18 15:06, Michal Simek wrote:
+>> Hi Adrian,
+>>
+>> On 10.4.2018 13:42, Adrian Hunter wrote:
+>>> On 29/03/18 08:48, naranimanish at gmail.com wrote:
+>>>> From: Manish Narani <mnarani@xilinx.com>
+>>>>
+>>>> This patch adds runtime PM support in Arasan SD driver.
+>>>>
+>>>> Signed-off-by: Manish Narani <mnarani@xilinx.com>
+>>>
+>>> Just a couple of comments about style.
+>>>
+>>>> ---
+>>>>  drivers/mmc/host/sdhci-of-arasan.c | 83 +++++++++++++++++++++++++++++++++++++-
+>>>>  1 file changed, 81 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+>>>> index c33a5f7..47196b5 100644
+>>>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>>>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>>>> @@ -23,6 +23,7 @@
+>>>>  #include <linux/mfd/syscon.h>
+>>>>  #include <linux/module.h>
+>>>>  #include <linux/of_device.h>
+>>>> +#include <linux/pm_runtime.h>
+>>>>  #include <linux/phy/phy.h>
+>>>>  #include <linux/regmap.h>
+>>>>  #include <linux/of.h>
+>>>> @@ -349,6 +350,75 @@ static const struct sdhci_pltfm_data sdhci_arasan_cqe_pdata = {
+>>>>  			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+>>>>  };
+>>>>  
+>>>> +#ifdef CONFIG_PM
+>>>> +/**
+>>>> + * sdhci_arasan_runtime_suspend - Suspend method for the driver
+>>>> + * @dev:	Address of the device structure
+>>>> + * Returns 0 on success and error value on error
+>>>> + *
+>>>> + * Put the device in a low power state.
+>>>> + */
+>>>
+>>> Kernel style is not to put kerneldoc on callback functions.
+>>
+>> I have never read that there are some sort of list of functions which
+>> shouldn't be covered by kernel-doc.
+>> What's the problem with using kerneldoc format here? Maybe I am not
+>> getting your comments.
 > 
-> of_clk_get_parent_count() was moved to <linux/of_clk.h>, so include that
-> instead of <linux/clk-provider.h>.
+> It is not a list of functions.  It is any implementation of a well-known
+> callback. i.e. we already know what ->runtime_suspend() is for, so we don't
+> need untold numbers of drivers describing it in comments.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Personally in general I can't see any issue with it especially for
+people who has no idea how these callbacks are working but I understand
+your concern here especially when there is anything specific written in
+connection to this device.
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180410/d806aba5/attachment.sig>
+Thanks,
+Michal
