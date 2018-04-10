@@ -1,66 +1,39 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 10 Apr 2018 11:57:51 +0300
-Subject: [PATCH v3 05/11] dt-bindings: input: touchscreen:
- resistive-adc-touch: create bindings
+Date: Tue, 10 Apr 2018 11:57:56 +0300
+Subject: [PATCH v3 10/11] ARM: dts: at91: sama5d2: add channel cells for ADC
+ device
 In-Reply-To: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
 References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1523350677-27106-6-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1523350677-27106-11-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added bindings for generic resistive touchscreen ADC.
+Preparing the ADC device to connect channel consumer drivers
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
-Changes in v3:
- - renamed file and compatible to exclude "generic" keyword
- - removed the pressure threshold property, added it as a common
-touchscreen property in the touchscreen common bindings in a separate
-commit.
+ arch/arm/boot/dts/sama5d2.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Changes in v2:
- - modified bindings to have a generic resistive touchscreen adc driver
-instead of specific architecture one.
-
- .../input/touchscreen/resistive-adc-touch.txt      | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/resistive-adc-touch.txt
-
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/resistive-adc-touch.txt b/Documentation/devicetree/bindings/input/touchscreen/resistive-adc-touch.txt
-new file mode 100644
-index 0000000..1c4e4a8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/touchscreen/resistive-adc-touch.txt
-@@ -0,0 +1,30 @@
-+Generic resistive touchscreen ADC
-+
-+Required properties:
-+
-+ - compatible: must be "resistive-adc-touch"
-+The device must be connected to an ADC device that provides channels for
-+position measurement and optional pressure.
-+Refer to ../iio/iio-bindings.txt for details
-+ - iio-channels: must have at least two channels connected to an ADC device.
-+These should correspond to the channels exposed by the ADC device and should
-+have the right index as the ADC device registers them. These channels
-+represent the relative position on the "x" and "y" axes.
-+ - iio-channel-names: must have all the channels' names. Mandatory channels
-+are "x" and "y".
-+
-+Optional properties:
-+ - iio-channels: The third channel named "pressure" is optional and can be
-+used if the ADC device also measures pressure besides position.
-+If this channel is missing, pressure will be ignored and the touchscreen
-+will only report position.
-+ - iio-channel-names: optional channel named "pressure".
-+
-+Example:
-+
-+	resistive_touch: resistive_touch {
-+		compatible = "resistive-adc-touch";
-+		touchscreen-threshold-pressure = <50000>;
-+		io-channels = <&adc 24>, <&adc 25>, <&adc 26>;
-+		io-channel-names = "x", "y", "pressure";
-+	};
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 61f68e5..f06ba99 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -47,6 +47,7 @@
+ #include <dt-bindings/dma/at91.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/clock/at91.h>
++#include <dt-bindings/iio/adc/at91-sama5d2_adc.h>
+ 
+ / {
+ 	model = "Atmel SAMA5D2 family SoC";
+@@ -1437,6 +1438,7 @@
+ 				atmel,max-sample-rate-hz = <20000000>;
+ 				atmel,startup-time-ms = <4>;
+ 				atmel,trigger-edge-type = <IRQ_TYPE_EDGE_RISING>;
++				#io-channel-cells = <1>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.7.4
