@@ -1,71 +1,69 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 10 Apr 2018 11:57:52 +0300
-Subject: [PATCH v3 06/11] iio: inkern: add module put/get on iio dev module
- when requesting channels
+Date: Tue, 10 Apr 2018 11:57:55 +0300
+Subject: [PATCH v3 09/11] dt-bindings: iio: adc: at91-sama5d2_adc: add channel
+ specific consumer info
 In-Reply-To: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
 References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1523350677-27106-7-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1523350677-27106-10-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When requesting channels for a particular consumer device,
-besides requesting the device (incrementing the reference counter), also
-do it for the driver module of the iio dev. This will avoid the situation
-where the producer IIO device can be removed and the consumer is still
-present in the kernel.
+Added defines for channel consumer device-tree binding
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/iio/inkern.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/iio/adc/at91-sama5d2_adc.txt     |  9 +++++++++
+ include/dt-bindings/iio/adc/at91-sama5d2_adc.h           | 16 ++++++++++++++++
+ 2 files changed, 25 insertions(+)
+ create mode 100644 include/dt-bindings/iio/adc/at91-sama5d2_adc.h
 
-diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
-index ec98790..68d9b87 100644
---- a/drivers/iio/inkern.c
-+++ b/drivers/iio/inkern.c
-@@ -11,6 +11,7 @@
- #include <linux/slab.h>
- #include <linux/mutex.h>
- #include <linux/of.h>
-+#include <linux/module.h>
+diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+index 6469a4c..4a3c1d4 100644
+--- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+@@ -21,6 +21,14 @@ Optional properties:
+   - dmas: Phandle to dma channel for the ADC.
+   - dma-names: Must be "rx" when dmas property is being used.
+   See ../../dma/dma.txt for details.
++  - #io-channel-cells: in case consumer drivers are attached, this must be 1.
++  See <Documentation/devicetree/bindings/iio/iio-bindings.txt> for details.
++
++Properties for consumer drivers:
++  - Consumer drivers can be connected to this producer device, as specified
++  in <Documentation/devicetree/bindings/iio/iio-bindings.txt>
++  - Channels exposed are specified in:
++  <dt-bindings/iio/adc/at91-sama5d2_adc.txt>
  
- #include <linux/iio/iio.h>
- #include "iio_core.h"
-@@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
- 	if (index < 0)
- 		goto err_put;
- 	channel->channel = &indio_dev->channels[index];
-+	try_module_get(channel->indio_dev->driver_module);
+ Example:
  
- 	return 0;
- 
-@@ -256,8 +258,10 @@ static struct iio_channel *of_iio_channel_get_all(struct device *dev)
- 	return chans;
- 
- error_free_chans:
--	for (i = 0; i < mapind; i++)
-+	for (i = 0; i < mapind; i++) {
-+		module_put(chans[i].indio_dev->driver_module);
- 		iio_device_put(chans[i].indio_dev);
-+	}
- 	kfree(chans);
- 	return ERR_PTR(ret);
+@@ -38,4 +46,5 @@ adc: adc at fc030000 {
+ 	atmel,trigger-edge-type = <IRQ_TYPE_EDGE_BOTH>;
+ 	dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
+ 	dma-names = "rx";
++	#io-channel-cells = <1>;
  }
-@@ -351,6 +355,7 @@ void iio_channel_release(struct iio_channel *channel)
- {
- 	if (!channel)
- 		return;
-+	module_put(channel->indio_dev->driver_module);
- 	iio_device_put(channel->indio_dev);
- 	kfree(channel);
- }
-@@ -482,6 +487,7 @@ void iio_channel_release_all(struct iio_channel *channels)
- 	struct iio_channel *chan = &channels[0];
- 
- 	while (chan->indio_dev) {
-+		module_put(chan->indio_dev->driver_module);
- 		iio_device_put(chan->indio_dev);
- 		chan++;
- 	}
+diff --git a/include/dt-bindings/iio/adc/at91-sama5d2_adc.h b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
+new file mode 100644
+index 0000000..70f99db
+--- /dev/null
++++ b/include/dt-bindings/iio/adc/at91-sama5d2_adc.h
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * This header provides constants for configuring the AT91 SAMA5D2 ADC
++ */
++
++#ifndef _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
++#define _DT_BINDINGS_IIO_ADC_AT91_SAMA5D2_ADC_H
++
++/* X relative position channel index */
++#define AT91_SAMA5D2_ADC_X_CHANNEL		24
++/* Y relative position channel index */
++#define AT91_SAMA5D2_ADC_Y_CHANNEL		25
++/* pressure channel index */
++#define AT91_SAMA5D2_ADC_P_CHANNEL		26
++
++#endif
 -- 
 2.7.4
