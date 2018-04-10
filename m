@@ -1,86 +1,102 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 10 Apr 2018 12:54:17 +0200
-Subject: [PATCH v8 07/14] ARM: dts: rockchip: add clocks in iommu nodes
-In-Reply-To: <5686492.Vgpi8vPSL1@diego>
-References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
- <2255884.b1SkkUdh3X@diego> <5686492.Vgpi8vPSL1@diego>
-Message-ID: <1720770.fWGWCFZ36p@phil>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Apr 2018 12:10:43 +0100
+Subject: [PATCH v6 20/25] drivers: firmware: psci: Introduce
+ psci_dt_topology_init()
+In-Reply-To: <CAPDyKFpJQZ87ViwZxX_yBnKPzgRv5YxbLz=qxScBTMCvY6e2vw@mail.gmail.com>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+ <1521046715-30683-21-git-send-email-ulf.hansson@linaro.org>
+ <20180314173833.dyu7jtweu233rfi4@lakrids.cambridge.arm.com>
+ <CAPDyKFpJQZ87ViwZxX_yBnKPzgRv5YxbLz=qxScBTMCvY6e2vw@mail.gmail.com>
+Message-ID: <20180410111043.t577a43a3bvjpkc7@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 9. April 2018, 23:49:58 CEST schrieb Heiko St?bner:
-> Am Montag, 9. April 2018, 17:55:40 CEST schrieb Heiko St?bner:
-> > Am Montag, 9. April 2018, 17:53:01 CEST schrieb Robin Murphy:
-> > > On 09/04/18 16:44, Heiko St?bner wrote:
-> > > > Hi Tomeu,
-> > > > 
-> > > > Am Montag, 9. April 2018, 16:41:56 CEST schrieb Tomeu Vizoso:
-> > > >> in today's linux-next, the DRM driver fails to probe because the iommu
-> > > >> driver fails to find the aclk. I need to apply this patch for things
-> > > >> to work again.
-> > > > 
-> > > > Thanks for catching that issue.
-> > > > 
-> > > > This seems to expose a backwards-compatibility issue, as this breaks
-> > > > all old devicetrees, so should get a proper fix, apart from me applying
-> > > > the dt-patch I missed.
-> > > > 
-> > > > Looking at the iommu-clock-handling patch, I imagine this part as
-> > > > the culprit:
-> > > > 
-> > > > +	iommu->num_clocks = ARRAY_SIZE(rk_iommu_clocks);
-> > > > +	iommu->clocks = devm_kcalloc(iommu->dev, iommu->num_clocks,
-> > > > +				     sizeof(*iommu->clocks), GFP_KERNEL);
-> > > > +	if (!iommu->clocks)
-> > > > +		return -ENOMEM;
-> > > > 
-> > > > The clk-bulk functions seem to work with simple for loops and
-> > > > should (as the other standard clock functions) just work fine with
-> > > > an empty struct, so I guess a simple
-> > > > 
-> > > > 	if (!iommu->clocks && iommu->num_clocks > 0)
-> > > > 	
-> > > > 		return -ENOMEM;
-> > > > 
-> > > > should hopefully be enough. I'll try to give this a test later on
-> > > > if nobody beats me to it :-)
-> > > 
-> > > But iommu->num_clocks is clearly set to a nonzero compile-time constant
-> > > at this point ;)
-> > > 
-> > > I'd assume it's the return from devm_clk_bulk_get() which needs to
-> > > special-case the "no clocks found" case from any other error, and *then*
-> > > blat num_clocks to 0 if so.
-> > 
-> > you're right of course. Looking at it again, I now clearly see the
-> > ARRAY_SIZE and am wondering what made me think num_clocks would be
-> > runtime-read.
-> > 
-> > Must be those 25?C today ;-)
+On Tue, Apr 10, 2018 at 09:19:26AM +0200, Ulf Hansson wrote:
+> On 14 March 2018 at 18:38, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Mar 14, 2018 at 05:58:30PM +0100, Ulf Hansson wrote:
+> >> In case the hierarchical layout is used in DT, we want to initialize the
+> >> corresponding PM domain topology for the CPUs, by using the generic PM
+> >> domain (aka genpd) infrastructure.
+> >>
+> >> At first glance, it may seem feasible to hook into the existing
+> >> psci_dt_init() function, although because it's called quite early in the
+> >> boot sequence, allocating the dynamic data structure for a genpd doesn't
+> >> work.
+> >>
+> >> Therefore, let's export a new init function for PSCI,
+> >> psci_dt_topology_init(), which the ARM machine code should call from a
+> >> suitable initcall.
+> >>
+> >> Succeeding to initialize the PM domain topology, which means at least one
+> >> instance of a genpd becomes created, allows us to continue to enable the
+> >> PSCI OS initiated mode for the platform. If everything turns out fine,
+> >> let's print a message in log to inform the user about the changed mode.
+> >>
+> >> In case of any failures, we stick to the default PSCI Platform Coordinated
+> >> mode.
+> >
+> > For kexec/kdump we'll need to explicitly set the suspend mode to
+> > platform coordinated if for whatever reason we choose not to use OSI.
 > 
-> In any case, this does not seem to fully fix the issue ... or be more exact 
-> seems to be the only issue.
-> 
-> - With 4.16 both pinky and kevin have working displays.
-> - When I was merging display patches to drm-misc, I did boot-tests on
->   both pinky and kevin, keeping their displays in a working state.
-> 
-> - With current torvalds head (iommu not merged yet)
-> e9092d0d9796 ("Fix subtle macro variable shadowing in min_not_zero()")
-> 
-> I get display output on rk3399-kevin (edp), but not on
-> rk3288-pinky (edp + hdmi). [components + hdmi device+modes get
-> recognized correctly though]
-> 
-> - With iommu changes merged I end up with the failing clock issue
->   which can be countered by making the iommu-clocks optional.
-> 
-> - After that I get working display output again on kevin but not pinky.
-> 
-> Looks like this needs bisecting.
+> Could you please elaborate on this? I am not really understanding what
+> you are suggesting me to do and why.
 
-And it seems the dwc2 vbus thingy was responsible for the other issue I saw.
-With Tomeus fixup patch applied and the series I sent an hour ago, I now
-get display output again on both kevin (rk3399) and pinky (rk3288).
+Sorry for not being clear.
 
-Heiko
+What I'd like to see is that we always call SET_SUSPEND_MODE before
+invoking CPU_SUSPEND. Either deciding early if we can use OSI, or always
+setting it to platform co-ordinated early on in boot and later switching
+it over.
+
+That way we can be sure of the suspend mode, even if we've kexec'd from
+a kernel that had fiddled with it.
+
+> >> Cc: Lina Iyer <ilina@codeaurora.org>
+> >> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >> ---
+> >>  drivers/firmware/psci.c | 31 +++++++++++++++++++++++++++++++
+> >>  include/linux/psci.h    |  2 ++
+> >>  2 files changed, 33 insertions(+)
+> >>
+> >> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> >> index 463f78c..45d55fc 100644
+> >> --- a/drivers/firmware/psci.c
+> >> +++ b/drivers/firmware/psci.c
+> >> @@ -723,6 +723,37 @@ int __init psci_dt_init(void)
+> >>       return ret;
+> >>  }
+> >>
+> >> +int __init psci_dt_topology_init(void)
+> >> +{
+> >> +     struct device_node *np;
+> >> +     int ret;
+> >> +
+> >> +     if (!psci_has_osi_support())
+> >> +             return 0;
+> >> +
+> >> +     np = of_find_matching_node_and_match(NULL, psci_of_match, NULL);
+> >> +     if (!np)
+> >> +             return -ENODEV;
+> >> +
+> >> +     /* Initialize the CPU PM domains based on topology described in DT. */
+> >> +     ret = psci_dt_init_pm_domains(np);
+> >> +     if (ret <= 0)
+> >> +             goto out;
+> >> +
+> >> +     /* Enable OSI mode. */
+> >> +     ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
+> >> +                          PSCI_1_0_SUSPEND_MODE_OSI, 0, 0);
+> >
+> > IIUC, this patch will need to be moved after the subsequent two patches
+> > to ensure that this series bisects cleanly.
+> 
+> Actually not.
+> 
+> $subject patch adds a new init function, which purpose is to
+> initialize the PSCI PM domains. At this point none is calling it.
+
+Ah. I missed the fact there were no callers. Sorry for the noise!
+
+Thanks,
+Mark.
