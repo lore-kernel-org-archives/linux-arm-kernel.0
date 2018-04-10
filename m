@@ -1,144 +1,324 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 10 Apr 2018 14:42:30 +0300
-Subject: [RFC PATCH] sdhci: arasan: Add runtime PM support
-In-Reply-To: <1522302530-27550-1-git-send-email-naranimanish@gmail.com>
-References: <1522302530-27550-1-git-send-email-naranimanish@gmail.com>
-Message-ID: <29f0aae5-3cee-8a37-f5aa-3830f466a759@intel.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 10 Apr 2018 13:46:29 +0200
+Subject: [PATCH v8 07/14] ARM: dts: rockchip: add clocks in iommu nodes
+In-Reply-To: <20180323073814.5802-8-jeffy.chen@rock-chips.com>
+References: <20180323073814.5802-1-jeffy.chen@rock-chips.com>
+ <20180323073814.5802-8-jeffy.chen@rock-chips.com>
+Message-ID: <2267884.YgWmziWd1G@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/18 08:48, naranimanish at gmail.com wrote:
-> From: Manish Narani <mnarani@xilinx.com>
+Am Freitag, 23. M?rz 2018, 08:38:07 CEST schrieb Jeffy Chen:
+> Add clocks in iommu nodes, since we are going to control clocks in
+> rockchip iommu driver.
 > 
-> This patch adds runtime PM support in Arasan SD driver.
-> 
-> Signed-off-by: Manish Narani <mnarani@xilinx.com>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-Just a couple of comments about style.
+applied for 4.18 after splitting arm32+arm64 parts into 2 patches
+and adapting the subject for the arm64 variant.
+
+Please don't mix arm32+arm64 devicetree patches in the future.
+
+
+Thanks
+Heiko
 
 > ---
->  drivers/mmc/host/sdhci-of-arasan.c | 83 +++++++++++++++++++++++++++++++++++++-
->  1 file changed, 81 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index c33a5f7..47196b5 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -23,6 +23,7 @@
->  #include <linux/mfd/syscon.h>
->  #include <linux/module.h>
->  #include <linux/of_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/phy/phy.h>
->  #include <linux/regmap.h>
->  #include <linux/of.h>
-> @@ -349,6 +350,75 @@ static const struct sdhci_pltfm_data sdhci_arasan_cqe_pdata = {
->  			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
->  };
->  
-> +#ifdef CONFIG_PM
-> +/**
-> + * sdhci_arasan_runtime_suspend - Suspend method for the driver
-> + * @dev:	Address of the device structure
-> + * Returns 0 on success and error value on error
-> + *
-> + * Put the device in a low power state.
-> + */
-
-Kernel style is not to put kerneldoc on callback functions.
-
-> +static int sdhci_arasan_runtime_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sdhci_host *host = platform_get_drvdata(pdev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
-> +	int ret;
-> +
-> +	ret = sdhci_runtime_suspend_host(host);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
-> +		mmc_retune_needed(host->mmc);
-> +
-> +	clk_disable(pltfm_host->clk);
-> +	clk_disable(sdhci_arasan->clk_ahb);
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * sdhci_arasan_runtime_resume - Resume method for the driver
-> + * @dev:	Address of the device structure
-> + * Returns 0 on success and error value on error
-> + *
-> + * Resume operation after suspend
-> + */
-
-Kernel style is not to put kerneldoc on callback functions.
-
-> +static int sdhci_arasan_runtime_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct sdhci_host *host = platform_get_drvdata(pdev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
-> +	int ret;
-> +
-> +	ret = clk_enable(sdhci_arasan->clk_ahb);
-> +	if (ret) {
-> +		dev_err(dev, "Cannot enable AHB clock.\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_enable(pltfm_host->clk);
-> +	if (ret) {
-> +		dev_err(dev, "Cannot enable SD clock.\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = sdhci_runtime_resume_host(host);
-> +	if (ret)
-> +		goto out;
-> +
-> +	return 0;
-> +out:
-> +	clk_disable(pltfm_host->clk);
-> +	clk_disable(sdhci_arasan->clk_ahb);
-> +
-> +	return ret;
-> +}
-> +#endif /* ! CONFIG_PM */
-> +
->  #ifdef CONFIG_PM_SLEEP
->  /**
->   * sdhci_arasan_suspend - Suspend method for the driver
-> @@ -443,8 +513,11 @@ static int sdhci_arasan_resume(struct device *dev)
->  }
->  #endif /* ! CONFIG_PM_SLEEP */
->  
-> -static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
-> -			 sdhci_arasan_resume);
-> +static const struct dev_pm_ops sdhci_arasan_dev_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_arasan_suspend, sdhci_arasan_resume)
-> +	SET_RUNTIME_PM_OPS(sdhci_arasan_runtime_suspend,
-> +			   sdhci_arasan_runtime_resume, NULL)
-> +};
->  
->  static const struct of_device_id sdhci_arasan_of_match[] = {
->  	/* SoC-specific compatible strings w/ soc_ctl_map */
-> @@ -806,6 +879,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->  	if (ret)
->  		goto err_add_host;
->  
-> +	pm_runtime_set_active(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
-> +	pm_runtime_set_autosuspend_delay(&pdev->dev, 2000);
-> +	pm_runtime_mark_last_busy(&pdev->dev);
-> +	pm_runtime_use_autosuspend(&pdev->dev);
-> +
->  	return 0;
->  
->  err_add_host:
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6:
+> Add clk names, and modify all iommu nodes in all existing rockchip dts
+> 
+> Changes in v5:
+> Remove clk names.
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  arch/arm/boot/dts/rk3036.dtsi            |  2 ++
+>  arch/arm/boot/dts/rk322x.dtsi            |  8 ++++++++
+>  arch/arm/boot/dts/rk3288.dtsi            | 12 ++++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3328.dtsi | 10 ++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3368.dtsi | 10 ++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 14 ++++++++++++--
+>  6 files changed, 54 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+> index a97458112ff6..567a6a725f9c 100644
+> --- a/arch/arm/boot/dts/rk3036.dtsi
+> +++ b/arch/arm/boot/dts/rk3036.dtsi
+> @@ -197,6 +197,8 @@
+>  		reg = <0x10118300 0x100>;
+>  		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vop_mmu";
+> +		clocks = <&cru ACLK_LCDC>, <&cru HCLK_LCDC>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+> index df1e47858675..be80e9a2c9af 100644
+> --- a/arch/arm/boot/dts/rk322x.dtsi
+> +++ b/arch/arm/boot/dts/rk322x.dtsi
+> @@ -584,6 +584,8 @@
+>  		reg = <0x20020800 0x100>;
+>  		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vpu_mmu";
+> +		clocks = <&cru ACLK_VPU>, <&cru HCLK_VPU>;
+> +		clock-names = "aclk", "iface";
+>  		iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -593,6 +595,8 @@
+>  		reg = <0x20030480 0x40>, <0x200304c0 0x40>;
+>  		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vdec_mmu";
+> +		clocks = <&cru ACLK_RKVDEC>, <&cru HCLK_RKVDEC>;
+> +		clock-names = "aclk", "iface";
+>  		iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -602,6 +606,8 @@
+>  		reg = <0x20053f00 0x100>;
+>  		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vop_mmu";
+> +		clocks = <&cru ACLK_VOP>, <&cru HCLK_VOP>;
+> +		clock-names = "aclk", "iface";
+>  		iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -611,6 +617,8 @@
+>  		reg = <0x20070800 0x100>;
+>  		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "iep_mmu";
+> +		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
+> +		clock-names = "aclk", "iface";
+>  		iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index be9acb6d28a1..d7e49d29ace5 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -959,6 +959,8 @@
+>  		reg = <0x0 0xff900800 0x0 0x40>;
+>  		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "iep_mmu";
+> +		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -968,6 +970,8 @@
+>  		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
+>  		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "isp_mmu";
+> +		clocks = <&cru ACLK_ISP>, <&cru HCLK_ISP>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		rockchip,disable-mmu-reset;
+>  		status = "disabled";
+> @@ -1027,6 +1031,8 @@
+>  		reg = <0x0 0xff930300 0x0 0x100>;
+>  		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vopb_mmu";
+> +		clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>;
+> +		clock-names = "aclk", "iface";
+>  		power-domains = <&power RK3288_PD_VIO>;
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+> @@ -1075,6 +1081,8 @@
+>  		reg = <0x0 0xff940300 0x0 0x100>;
+>  		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vopl_mmu";
+> +		clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>;
+> +		clock-names = "aclk", "iface";
+>  		power-domains = <&power RK3288_PD_VIO>;
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+> @@ -1206,6 +1214,8 @@
+>  		reg = <0x0 0xff9a0800 0x0 0x100>;
+>  		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vpu_mmu";
+> +		clocks = <&cru ACLK_VCODEC>, <&cru HCLK_VCODEC>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -1215,6 +1225,8 @@
+>  		reg = <0x0 0xff9c0440 0x0 0x40>, <0x0 0xff9c0480 0x0 0x40>;
+>  		interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "hevc_mmu";
+> +		clocks = <&cru ACLK_HEVC>, <&cru HCLK_HEVC>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> index be2bfbc6b483..b8e9da15e00c 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> @@ -595,6 +595,8 @@
+>  		reg = <0x0 0xff330200 0 0x100>;
+>  		interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "h265e_mmu";
+> +		clocks = <&cru ACLK_H265>, <&cru PCLK_H265>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -604,6 +606,8 @@
+>  		reg = <0x0 0xff340800 0x0 0x40>;
+>  		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vepu_mmu";
+> +		clocks = <&cru ACLK_VPU>, <&cru HCLK_VPU>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -613,6 +617,8 @@
+>  		reg = <0x0 0xff350800 0x0 0x40>;
+>  		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vpu_mmu";
+> +		clocks = <&cru ACLK_VPU>, <&cru HCLK_VPU>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -622,6 +628,8 @@
+>  		reg = <0x0 0xff360480 0x0 0x40>, <0x0 0xff3604c0 0x0 0x40>;
+>  		interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "rkvdec_mmu";
+> +		clocks = <&cru ACLK_RKVDEC>, <&cru HCLK_RKVDEC>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -631,6 +639,8 @@
+>  		reg = <0x0 0xff373f00 0x0 0x100>;
+>  		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vop_mmu";
+> +		clocks = <&cru ACLK_VOP>, <&cru HCLK_VOP>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> index 03458ac44201..ad91ced78649 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> @@ -742,6 +742,8 @@
+>  		reg = <0x0 0xff900800 0x0 0x100>;
+>  		interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "iep_mmu";
+> +		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -752,6 +754,8 @@
+>  		      <0x0 0xff915000 0x0 0x100>;
+>  		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "isp_mmu";
+> +		clocks = <&cru ACLK_ISP>, <&cru HCLK_ISP>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		rockchip,disable-mmu-reset;
+>  		status = "disabled";
+> @@ -762,6 +766,8 @@
+>  		reg = <0x0 0xff930300 0x0 0x100>;
+>  		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vop_mmu";
+> +		clocks = <&cru ACLK_VOP>, <&cru HCLK_VOP>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -772,6 +778,8 @@
+>  		      <0x0 0xff9a0480 0x0 0x40>;
+>  		interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "hevc_mmu";
+> +		clocks = <&cru ACLK_VIDEO>, <&cru HCLK_VIDEO>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -782,6 +790,8 @@
+>  		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
+>  			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+>  		interrupt-names = "vepu_mmu", "vdpu_mmu";
+> +		clocks = <&cru ACLK_VIDEO>, <&cru HCLK_VIDEO>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 4550c0f82be9..56f6bb31b399 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -1234,6 +1234,8 @@
+>  		reg = <0x0 0xff650800 0x0 0x40>;
+>  		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH 0>;
+>  		interrupt-names = "vpu_mmu";
+> +		clocks = <&cru ACLK_VCODEC>, <&cru HCLK_VCODEC>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -1243,6 +1245,8 @@
+>  		reg = <0x0 0xff660480 0x0 0x40>, <0x0 0xff6604c0 0x0 0x40>;
+>  		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH 0>;
+>  		interrupt-names = "vdec_mmu";
+> +		clocks = <&cru ACLK_VDU>, <&cru HCLK_VDU>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -1252,6 +1256,8 @@
+>  		reg = <0x0 0xff670800 0x0 0x40>;
+>  		interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH 0>;
+>  		interrupt-names = "iep_mmu";
+> +		clocks = <&cru ACLK_IEP>, <&cru HCLK_IEP>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+>  	};
+> @@ -1599,7 +1605,7 @@
+>  		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
+>  		interrupt-names = "vopl_mmu";
+>  		clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>;
+> -		clock-names = "aclk", "hclk";
+> +		clock-names = "aclk", "iface";
+>  		power-domains = <&power RK3399_PD_VOPL>;
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+> @@ -1656,7 +1662,7 @@
+>  		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH 0>;
+>  		interrupt-names = "vopb_mmu";
+>  		clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>;
+> -		clock-names = "aclk", "hclk";
+> +		clock-names = "aclk", "iface";
+>  		power-domains = <&power RK3399_PD_VOPB>;
+>  		#iommu-cells = <0>;
+>  		status = "disabled";
+> @@ -1667,6 +1673,8 @@
+>  		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
+>  		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH 0>;
+>  		interrupt-names = "isp0_mmu";
+> +		clocks = <&cru ACLK_ISP0_NOC>, <&cru HCLK_ISP0_NOC>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		rockchip,disable-mmu-reset;
+>  		status = "disabled";
+> @@ -1677,6 +1685,8 @@
+>  		reg = <0x0 0xff924000 0x0 0x100>, <0x0 0xff925000 0x0 0x100>;
+>  		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH 0>;
+>  		interrupt-names = "isp1_mmu";
+> +		clocks = <&cru ACLK_ISP1_NOC>, <&cru HCLK_ISP1_NOC>;
+> +		clock-names = "aclk", "iface";
+>  		#iommu-cells = <0>;
+>  		rockchip,disable-mmu-reset;
+>  		status = "disabled";
 > 
