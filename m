@@ -1,77 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 Apr 2018 16:24:20 +0100
-Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
-In-Reply-To: <20180410150540.GK10904@cbox>
-References: <20180409170706.23541-1-marc.zyngier@arm.com>
- <20180409205139.GH10904@cbox>
- <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
- <20180410150540.GK10904@cbox>
-Message-ID: <20180410152419.inzprhuqhx26keuq@lakrids.cambridge.arm.com>
+From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
+Date: Tue, 10 Apr 2018 17:25:49 +0200
+Subject: [PATCH v2 0/2] move __HAVE_ARCH_PTE_SPECIAL in Kconfig
+Message-ID: <1523373951-10981-1-git-send-email-ldufour@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 05:05:40PM +0200, Christoffer Dall wrote:
-> On Tue, Apr 10, 2018 at 11:51:19AM +0100, Mark Rutland wrote:
-> > I think we also need to update kvm->arch.vttbr before updating
-> > kvm->arch.vmid_gen, otherwise another CPU can come in, see that the
-> > vmid_gen is up-to-date, jump to hyp, and program a stale VTTBR (with the
-> > old VMID).
-> > 
-> > With the smp_wmb() and update of kvm->arch.vmid_gen moved to the end of
-> > the critical section, I think that works, modulo using READ_ONCE() and
-> > WRITE_ONCE() to ensure single-copy-atomicity of the fields we access
-> > locklessly.
-> 
-> Indeed, you're right.  I would look something like this, then:
-> 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 2e43f9d42bd5..6cb08995e7ff 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -450,7 +450,9 @@ void force_vm_exit(const cpumask_t *mask)
->   */
->  static bool need_new_vmid_gen(struct kvm *kvm)
->  {
-> -	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
-> +	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
-> +	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
-> +	return unlikely(READ_ONCE(kvm->arch.vmid_gen) != current_vmid_gen);
->  }
->  
->  /**
-> @@ -500,7 +502,6 @@ static void update_vttbr(struct kvm *kvm)
->  		kvm_call_hyp(__kvm_flush_vm_context);
->  	}
->  
-> -	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
->  	kvm->arch.vmid = kvm_next_vmid;
->  	kvm_next_vmid++;
->  	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
-> @@ -509,7 +510,10 @@ static void update_vttbr(struct kvm *kvm)
->  	pgd_phys = virt_to_phys(kvm->arch.pgd);
->  	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
->  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
-> -	kvm->arch.vttbr = pgd_phys | vmid;
-> +	WRITE_ONCE(kvm->arch.vttbr, pgd_phys | vmid);
-> +
-> +	smp_wmb(); /* Ensure vttbr update is observed before vmid_gen update */
-> +	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
->  
->  	spin_unlock(&kvm_vmid_lock);
->  }
+The per architecture __HAVE_ARCH_PTE_SPECIAL is defined statically in the
+per architecture header files. This doesn't allow to make other
+configuration dependent on it.
 
-I think that's right, yes.
+The first patch of this series is replacing __HAVE_ARCH_PTE_SPECIAL by
+CONFIG_ARCH_HAS_PTE_SPECIAL defined into the Kconfig files,
+setting it automatically when architectures was already setting it in
+header file.
 
-We could replace the smp_{r,w}mb() barriers with an acquire of the
-kvm_vmid_gen and a release of kvm->arch.vmid_gen, but if we're really
-trying to optimize things there are larger algorithmic changes necessary
-anyhow.
+The second patch is removing the odd define HAVE_PTE_SPECIAL which is a
+duplicate of CONFIG_ARCH_HAS_PTE_SPECIAL.
 
-> It's probably easier to convince ourselves about the correctness of
-> Marc's code using a rwlock instead, though.  Thoughts?
+There is no functional change introduced by this series.
 
-I believe that Marc's preference was the rwlock; I have no preference
-either way.
+Laurent Dufour (2):
+  mm: introduce ARCH_HAS_PTE_SPECIAL
+  mm: remove odd HAVE_PTE_SPECIAL
 
-Thanks,
-Mark.
+ .../features/vm/pte_special/arch-support.txt       |  2 +-
+ arch/arc/Kconfig                                   |  1 +
+ arch/arc/include/asm/pgtable.h                     |  2 --
+ arch/arm/Kconfig                                   |  1 +
+ arch/arm/include/asm/pgtable-3level.h              |  1 -
+ arch/arm64/Kconfig                                 |  1 +
+ arch/arm64/include/asm/pgtable.h                   |  2 --
+ arch/powerpc/Kconfig                               |  1 +
+ arch/powerpc/include/asm/book3s/64/pgtable.h       |  3 ---
+ arch/powerpc/include/asm/pte-common.h              |  3 ---
+ arch/riscv/Kconfig                                 |  1 +
+ arch/s390/Kconfig                                  |  1 +
+ arch/s390/include/asm/pgtable.h                    |  1 -
+ arch/sh/Kconfig                                    |  1 +
+ arch/sh/include/asm/pgtable.h                      |  2 --
+ arch/sparc/Kconfig                                 |  1 +
+ arch/sparc/include/asm/pgtable_64.h                |  3 ---
+ arch/x86/Kconfig                                   |  1 +
+ arch/x86/include/asm/pgtable_types.h               |  1 -
+ include/linux/pfn_t.h                              |  4 ++--
+ mm/Kconfig                                         |  3 +++
+ mm/gup.c                                           |  4 ++--
+ mm/memory.c                                        | 23 ++++++++++------------
+ 23 files changed, 27 insertions(+), 36 deletions(-)
+
+-- 
+2.7.4
