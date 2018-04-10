@@ -1,95 +1,61 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Tue, 10 Apr 2018 12:38:45 -0700
-Subject: [PATCH v6 09/11] firmware: xilinx: Add debugfs for clock control APIs
+Date: Tue, 10 Apr 2018 12:38:37 -0700
+Subject: [PATCH v6 01/11] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
 In-Reply-To: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
 References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1523389127-14243-10-git-send-email-jollys@xilinx.com>
+Message-ID: <1523389127-14243-2-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rajan Vaja <rajanv@xilinx.com>
 
-Add debugfs file to control clocks using firmware APIs
-through debugfs interface.
+Add documentation to describe Xilinx ZynqMP firmware driver
+bindings. Firmware driver provides an interface to firmware
+APIs. Interface APIs can be used by any driver to communicate
+to PMUFW (Platform Management Unit).
 
 Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
 ---
- drivers/firmware/xilinx/zynqmp-debug.c | 48 ++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
 
-diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
-index 1cb69f7..837fcd1 100644
---- a/drivers/firmware/xilinx/zynqmp-debug.c
-+++ b/drivers/firmware/xilinx/zynqmp-debug.c
-@@ -34,6 +34,15 @@ static struct pm_api_info pm_api_list[] = {
- 	PM_API(PM_GET_API_VERSION),
- 	PM_API(PM_IOCTL),
- 	PM_API(PM_QUERY_DATA),
-+	PM_API(PM_CLOCK_ENABLE),
-+	PM_API(PM_CLOCK_DISABLE),
-+	PM_API(PM_CLOCK_GETSTATE),
-+	PM_API(PM_CLOCK_SETDIVIDER),
-+	PM_API(PM_CLOCK_GETDIVIDER),
-+	PM_API(PM_CLOCK_SETRATE),
-+	PM_API(PM_CLOCK_GETRATE),
-+	PM_API(PM_CLOCK_SETPARENT),
-+	PM_API(PM_CLOCK_GETPARENT),
- };
- 
- /**
-@@ -87,6 +96,7 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
- 	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
- 	u32 pm_api_version;
- 	int ret;
-+	u64 rate;
- 
- 	if (!eemi_ops)
- 		return -ENXIO;
-@@ -132,6 +142,44 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
- 				pm_api_ret[2], pm_api_ret[3]);
- 		break;
- 	}
-+	case PM_CLOCK_ENABLE:
-+		ret = eemi_ops->clock_enable(pm_api_arg[0]);
-+		break;
-+	case PM_CLOCK_DISABLE:
-+		ret = eemi_ops->clock_disable(pm_api_arg[0]);
-+		break;
-+	case PM_CLOCK_GETSTATE:
-+		ret = eemi_ops->clock_getstate(pm_api_arg[0], &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Clock state: %u\n",
-+				pm_api_ret[0]);
-+		break;
-+	case PM_CLOCK_SETDIVIDER:
-+		ret = eemi_ops->clock_setdivider(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_CLOCK_GETDIVIDER:
-+		ret = eemi_ops->clock_getdivider(pm_api_arg[0], &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Divider Value: %d\n",
-+				pm_api_ret[0]);
-+		break;
-+	case PM_CLOCK_SETRATE:
-+		ret = eemi_ops->clock_setrate(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_CLOCK_GETRATE:
-+		ret = eemi_ops->clock_getrate(pm_api_arg[0], &rate);
-+		if (!ret)
-+			sprintf(debugfs_buf, "Clock rate :%llu\n", rate);
-+		break;
-+	case PM_CLOCK_SETPARENT:
-+		ret = eemi_ops->clock_setparent(pm_api_arg[0], pm_api_arg[1]);
-+		break;
-+	case PM_CLOCK_GETPARENT:
-+		ret = eemi_ops->clock_getparent(pm_api_arg[0], &pm_api_ret[0]);
-+		if (!ret)
-+			sprintf(debugfs_buf,
-+				"Clock parent Index: %u\n", pm_api_ret[0]);
-+		break;
- 	default:
- 		sprintf(debugfs_buf, "Unsupported PM-API request\n");
- 		ret = -EINVAL;
+diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+new file mode 100644
+index 0000000..1b431d9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+@@ -0,0 +1,29 @@
++-----------------------------------------------------------------
++Device Tree Bindings for the Xilinx Zynq MPSoC Firmware Interface
++-----------------------------------------------------------------
++
++The zynqmp-firmware node describes the interface to platform firmware.
++ZynqMP has an interface to communicate with secure firmware. Firmware
++driver provides an interface to firmware APIs. Interface APIs can be
++used by any driver to communicate to PMUFW(Platform Management Unit).
++These requests include clock management, pin control, device control,
++power management service, FPGA service and other platform management
++services.
++
++Required properties:
++ - compatible:	Must contain:	"xlnx,zynqmp-firmware"
++ - method:	The method of calling the PM-API firmware layer.
++		Permitted values are:
++		  - "smc" : SMC #0, following the SMCCC
++		  - "hvc" : HVC #0, following the SMCCC
++
++-------
++Example
++-------
++
++firmware {
++	zynqmp_firmware: zynqmp-firmware {
++		compatible = "xlnx,zynqmp-firmware";
++		method = "smc";
++	};
++};
 -- 
 2.7.4
