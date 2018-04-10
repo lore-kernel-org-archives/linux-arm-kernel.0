@@ -1,103 +1,49 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Tue, 10 Apr 2018 12:38:36 -0700
-Subject: [PATCH v6 00/11] drivers: Introduce firmware dnd clock river for
- ZynqMP core
-Message-ID: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+Date: Tue, 10 Apr 2018 12:38:43 -0700
+Subject: [PATCH v6 07/11] firmware: xilinx: Add debugfs for IOCTL API
+In-Reply-To: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+References: <1523389127-14243-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1523389127-14243-8-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is adding communication layer with firmware and clock driver who uses 
-those APIs to communicate with PMU.
-Firmware driver provides an interface to firmware APIs.Interface APIs can be used by any driver to communicate to
-PMUFW(Platform Management Unit). All requests go through ATF.
-This patchset adds CCF compliant clock driver for ZynqMP.Clock driver queries supported clock information from 
-firmware and regiters pll and output clocks with CCF.
+From: Rajan Vaja <rajanv@xilinx.com>
 
-v6:
- - Broke patch series to have base FW driver and Clock driver user
- - Incorporated code review comments from last FW and Clock driver patch series. Discussed below:
-	https://patchwork.kernel.org/patch/10230759/
-	https://patchwork.kernel.org/patch/10250047/
+Add debugfs file to set/get IOCTL using debugfs interface.
 
-v5:
- - Added ATF version check support
- - Updated some functions to be static 
- - Minor function name corrections
+Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+---
+ drivers/firmware/xilinx/zynqmp-debug.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-v4:
- - Changed clock setrate/getrate API prototype to support 64 bit rate
- - Defined macros for get_node_status return values
- - Moved DT node as a child of firmware
- - Changed debugfs APIs to return data to debugfs buffer instead of dumping to kernel log
- - Minor changes to incorporate other review comments from v3 patch series
-
-v3:
- - added some fixes to firmware-ggs.c
- - updated pinmux get/set function argument names to specify function id instead of node id
- - added new pinctrl query macros
- - incorporated review comments from v2 patch series
-
-v2:
- - change SPDX-License-Identifier license text style
- - split patch into multiple patches
- - Updated copyrights
- - Added ABI documentation
- - incorporated logical review comments from previuos patch. Discussed below:
-	https://patchwork.kernel.org/patch/10150665/
-
-Jolly Shah (1):
-  drivers: clk: Add ZynqMP clock driver
-
-Rajan Vaja (10):
-  dt-bindings: firmware: Add bindings for ZynqMP firmware
-  firmware: xilinx: Add Zynqmp firmware driver
-  firmware: xilinx: Add zynqmp IOCTL API for device control
-  firmware: xilinx: Add query data API
-  firmware: xilinx: Add clock APIs
-  firmware: xilinx: Add debugfs interface
-  firmware: xilinx: Add debugfs for IOCTL API
-  firmware: xilinx: Add debugfs for query data API
-  firmware: xilinx: Add debugfs for clock control APIs
-  dt-bindings: clock: Add bindings for ZynqMP clock driver
-
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  82 +++
- arch/arm64/Kconfig.platforms                       |   1 +
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/zynqmp/Kconfig                         |  11 +
- drivers/clk/zynqmp/Makefile                        |   4 +
- drivers/clk/zynqmp/clk-gate-zynqmp.c               | 146 ++++
- drivers/clk/zynqmp/clk-mux-zynqmp.c                | 150 +++++
- drivers/clk/zynqmp/clk-zynqmp.h                    |  53 ++
- drivers/clk/zynqmp/clkc.c                          | 737 +++++++++++++++++++++
- drivers/clk/zynqmp/divider.c                       | 219 ++++++
- drivers/clk/zynqmp/pll.c                           | 345 ++++++++++
- drivers/firmware/Kconfig                           |   1 +
- drivers/firmware/Makefile                          |   1 +
- drivers/firmware/xilinx/Kconfig                    |  23 +
- drivers/firmware/xilinx/Makefile                   |   5 +
- drivers/firmware/xilinx/zynqmp-debug.c             | 297 +++++++++
- drivers/firmware/xilinx/zynqmp-debug.h             |  22 +
- drivers/firmware/xilinx/zynqmp.c                   | 538 +++++++++++++++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
- include/linux/firmware/xlnx-zynqmp.h               | 115 ++++
- 21 files changed, 2868 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
- create mode 100644 drivers/clk/zynqmp/Kconfig
- create mode 100644 drivers/clk/zynqmp/Makefile
- create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
- create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
- create mode 100644 drivers/clk/zynqmp/clkc.c
- create mode 100644 drivers/clk/zynqmp/divider.c
- create mode 100644 drivers/clk/zynqmp/pll.c
- create mode 100644 drivers/firmware/xilinx/Kconfig
- create mode 100644 drivers/firmware/xilinx/Makefile
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.c
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
- create mode 100644 drivers/firmware/xilinx/zynqmp.c
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
- create mode 100644 include/linux/firmware/xlnx-zynqmp.h
-
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
+index 4800366..148dbff 100644
+--- a/drivers/firmware/xilinx/zynqmp-debug.c
++++ b/drivers/firmware/xilinx/zynqmp-debug.c
+@@ -32,6 +32,7 @@ static char debugfs_buf[PAGE_SIZE];
+ #define PM_API(id)		 {id, #id, strlen(#id)}
+ static struct pm_api_info pm_api_list[] = {
+ 	PM_API(PM_GET_API_VERSION),
++	PM_API(PM_IOCTL),
+ };
+ 
+ /**
+@@ -95,6 +96,15 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
+ 		sprintf(debugfs_buf, "PM-API Version = %d.%d\n",
+ 			pm_api_version >> 16, pm_api_version & 0xffff);
+ 		break;
++	case PM_IOCTL:
++		ret = eemi_ops->ioctl(pm_api_arg[0], pm_api_arg[1],
++				      pm_api_arg[2], pm_api_arg[3],
++				      &pm_api_ret[0]);
++		if (!ret && (pm_api_arg[1] == IOCTL_GET_PLL_FRAC_MODE ||
++			     pm_api_arg[1] == IOCTL_GET_PLL_FRAC_DATA))
++			sprintf(debugfs_buf, "IOCTL return value: %u\n",
++				pm_api_ret[1]);
++		break;
+ 	default:
+ 		sprintf(debugfs_buf, "Unsupported PM-API request\n");
+ 		ret = -EINVAL;
 -- 
 2.7.4
