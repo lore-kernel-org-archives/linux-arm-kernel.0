@@ -1,94 +1,91 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 10 Apr 2018 16:57:06 -0700
-Subject: [PATCH V4] PM / core: fix deferred probe breaking suspend resume order
-Message-ID: <1523404626-1466-1-git-send-email-fkan@apm.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 11 Apr 2018 09:30:09 +0800
+Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
+In-Reply-To: <f90f8486-10c7-ce42-94a8-abaabd80ebb7@arm.com>
+References: <20180409170706.23541-1-marc.zyngier@arm.com>
+ <20180409205139.GH10904@cbox>
+ <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
+ <20180410150540.GK10904@cbox>
+ <20180410152419.inzprhuqhx26keuq@lakrids.cambridge.arm.com>
+ <f90f8486-10c7-ce42-94a8-abaabd80ebb7@arm.com>
+Message-ID: <5ACD6521.5090500@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When bridge and its endpoint is enumerated the devices are added to the
-dpm list. Afterward, the bridge defers probe when IOMMU is not ready.
-This causes the bridge to be moved to the end of the dpm list when
-deferred probe kicks in. The order of the dpm list for bridge and
-endpoint is reversed.
 
-Add reordering code to move the bridge and its children and consumers to
-the end of the pm list so the order for suspend and resume is not altered.
-The code also move device and its children and consumers to the tail of
-device_kset list if it is registered.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Toan Le <toanle@apm.com>
----
- V4:
-	1. additional comment change from Rafael
- V3:
-	1. additional code comment changes
- V2:
-        1. change patch title from "move device and its children..."
-        2. move define based on Bjorn's comment
-        3. rename function name and comment content
+On 2018/4/10 23:37, Marc Zyngier wrote:
+> On 10/04/18 16:24, Mark Rutland wrote:
+>> On Tue, Apr 10, 2018 at 05:05:40PM +0200, Christoffer Dall wrote:
+>>> On Tue, Apr 10, 2018 at 11:51:19AM +0100, Mark Rutland wrote:
+>>>> I think we also need to update kvm->arch.vttbr before updating
+>>>> kvm->arch.vmid_gen, otherwise another CPU can come in, see that the
+>>>> vmid_gen is up-to-date, jump to hyp, and program a stale VTTBR (with the
+>>>> old VMID).
+>>>>
+>>>> With the smp_wmb() and update of kvm->arch.vmid_gen moved to the end of
+>>>> the critical section, I think that works, modulo using READ_ONCE() and
+>>>> WRITE_ONCE() to ensure single-copy-atomicity of the fields we access
+>>>> locklessly.
+>>>
+>>> Indeed, you're right.  I would look something like this, then:
+>>>
+>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+>>> index 2e43f9d42bd5..6cb08995e7ff 100644
+>>> --- a/virt/kvm/arm/arm.c
+>>> +++ b/virt/kvm/arm/arm.c
+>>> @@ -450,7 +450,9 @@ void force_vm_exit(const cpumask_t *mask)
+>>>   */
+>>>  static bool need_new_vmid_gen(struct kvm *kvm)
+>>>  {
+>>> -	return unlikely(kvm->arch.vmid_gen != atomic64_read(&kvm_vmid_gen));
+>>> +	u64 current_vmid_gen = atomic64_read(&kvm_vmid_gen);
+>>> +	smp_rmb(); /* Orders read of kvm_vmid_gen and kvm->arch.vmid */
+>>> +	return unlikely(READ_ONCE(kvm->arch.vmid_gen) != current_vmid_gen);
+>>>  }
+>>>  
+>>>  /**
+>>> @@ -500,7 +502,6 @@ static void update_vttbr(struct kvm *kvm)
+>>>  		kvm_call_hyp(__kvm_flush_vm_context);
+>>>  	}
+>>>  
+>>> -	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+>>>  	kvm->arch.vmid = kvm_next_vmid;
+>>>  	kvm_next_vmid++;
+>>>  	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
+>>> @@ -509,7 +510,10 @@ static void update_vttbr(struct kvm *kvm)
+>>>  	pgd_phys = virt_to_phys(kvm->arch.pgd);
+>>>  	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
+>>>  	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
+>>> -	kvm->arch.vttbr = pgd_phys | vmid;
+>>> +	WRITE_ONCE(kvm->arch.vttbr, pgd_phys | vmid);
+>>> +
+>>> +	smp_wmb(); /* Ensure vttbr update is observed before vmid_gen update */
+>>> +	kvm->arch.vmid_gen = atomic64_read(&kvm_vmid_gen);
+>>>  
+>>>  	spin_unlock(&kvm_vmid_lock);
+>>>  }
+>>
+>> I think that's right, yes.
+>>
+>> We could replace the smp_{r,w}mb() barriers with an acquire of the
+>> kvm_vmid_gen and a release of kvm->arch.vmid_gen, but if we're really
+>> trying to optimize things there are larger algorithmic changes necessary
+>> anyhow.
+>>
+>>> It's probably easier to convince ourselves about the correctness of
+>>> Marc's code using a rwlock instead, though.  Thoughts?
+>>
+>> I believe that Marc's preference was the rwlock; I have no preference
+>> either way.
+> 
+> I don't mind either way. If you can be bothered to write a proper commit
+> log for this, I'll take it. What I'd really want is Shannon to indicate
+> whether or not this solves the issue he was seeing.
+> 
+I'll test Marc's patch. This will take about 3 days since it's not 100%
+reproducible.
 
- drivers/base/base.h |  3 +++
- drivers/base/core.c | 20 ++++++++++++++++++++
- drivers/base/dd.c   |  4 +---
- 3 files changed, 24 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/base/base.h b/drivers/base/base.h
-index d800de6..a75c302 100644
---- a/drivers/base/base.h
-+++ b/drivers/base/base.h
-@@ -161,3 +161,6 @@ static inline void module_remove_driver(struct device_driver *drv) { }
- extern void device_links_no_driver(struct device *dev);
- extern bool device_links_busy(struct device *dev);
- extern void device_links_unbind_consumers(struct device *dev);
-+
-+/* device pm support */
-+void device_pm_move_to_tail(struct device *dev);
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index 110230d..eaa5d9f 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -148,6 +148,26 @@ static int device_reorder_to_tail(struct device *dev, void *not_used)
- }
- 
- /**
-+ * device_pm_move_to_tail - Move set of devices to the end of device lists
-+ * @dev: Device to move
-+ *
-+ * This is a device_reorder_to_tail() wrapper taking the requisite locks.
-+ *
-+ * It moves the @dev along with all of its children and all of its consumers
-+ * to the ends of the device_kset and dpm_list, recursively.
-+ */
-+void device_pm_move_to_tail(struct device *dev)
-+{
-+	int idx;
-+
-+	idx = device_links_read_lock();
-+	device_pm_lock();
-+	device_reorder_to_tail(dev, NULL);
-+	device_pm_unlock();
-+	device_links_read_unlock(idx);
-+}
-+
-+/**
-  * device_link_add - Create a link between two devices.
-  * @consumer: Consumer end of the link.
-  * @supplier: Supplier end of the link.
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 2c964f5..96fab29 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -123,9 +123,7 @@ static void deferred_probe_work_func(struct work_struct *work)
- 		 * the list is a good order for suspend but deferred
- 		 * probe makes that very unsafe.
- 		 */
--		device_pm_lock();
--		device_pm_move_last(dev);
--		device_pm_unlock();
-+		device_pm_move_to_tail(dev);
- 
- 		dev_dbg(dev, "Retrying from deferred list\n");
- 		if (initcall_debug && !initcalls_done)
+Thanks,
 -- 
-1.8.3.1
+Shannon
