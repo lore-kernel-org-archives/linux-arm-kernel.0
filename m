@@ -1,58 +1,81 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 11 Apr 2018 13:10:41 -0400
-Subject: [PATCH v3 2/2] MIPS: io: add a barrier after register read in
- readX()
-In-Reply-To: <0f1a4719-9a6f-0df0-7fd9-a25c10e824f5@codeaurora.org>
-References: <1522760109-16497-1-git-send-email-okaya@codeaurora.org>
- <1522760109-16497-2-git-send-email-okaya@codeaurora.org>
- <41e184ae-689e-93c9-7b15-0c68bd624130@codeaurora.org>
- <b748fdcb-e09f-9fe3-dc74-30b6a7d40cbe@codeaurora.org>
- <20180406212601.GA1730@saruman>
- <0f1a4719-9a6f-0df0-7fd9-a25c10e824f5@codeaurora.org>
-Message-ID: <14a663f6-2ea5-230b-2cd0-e42d05d0d7ea@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Apr 2018 19:01:09 +0100
+Subject: [PATCH v2 02/13] locking/qspinlock: Bound spinning on pending->locked
+ transition in slowpath
+In-Reply-To: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
+References: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1523469680-17699-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/7/2018 5:43 PM, Sinan Kaya wrote:
-> On 4/6/2018 5:26 PM, James Hogan wrote:
->> On Fri, Apr 06, 2018 at 02:15:57PM -0400, Sinan Kaya wrote:
->>> On 4/5/2018 9:34 PM, Sinan Kaya wrote:
->>>> Can we get these merged to 4.17? 
->>>>
->>>> There was a consensus to fix the architectures having API violation issues.
->>>> https://www.mail-archive.com/netdev at vger.kernel.org/msg225971.html
->>>>
->>>>
->>>
->>> Any news on the MIPS front? Is this something that Arnd can merge? or does it have
->>> to go through the MIPS tree.
->>
->> It needs some MIPS input really. I'll try and take a look soon. Thanks
->> for the nudge.
->>
->>> It feels like the MIPS is dead since nobody replied to me in the last few weeks on
->>> a very important topic.
->>
->> Not dead, just both maintainers heavily distracted by real life right
->> now (which sadly, for me at least, trumps this very important topic) and
->> doing the best they can given the circumstances.
-> 
-> Thanks for the reply. Glad to hear somebody cares.
+If a locker taking the qspinlock slowpath reads a lock value indicating
+that only the pending bit is set, then it will spin whilst the
+concurrent pending->locked transition takes effect.
 
+Unfortunately, there is no guarantee that such a transition will ever be
+observed since concurrent lockers could continuously set pending and
+hand over the lock amongst themselves, leading to starvation. Whilst
+this would probably resolve in practice, it means that it is not
+possible to prove liveness properties about the lock and means that lock
+acquisition time is unbounded.
 
-How is the likelihood of getting this fixed on 4.17 kernel? There was an agreement
-to fix all architectures. MIPS is the only one left.
+Rather than removing the pending->locked spinning from the slowpath
+altogether (which has been shown to heavily penalise a 2-threaded
+locking stress test on x86), this patch replaces the explicit spinning
+with a call to atomic_cond_read_relaxed and allows the architecture to
+provide a bound on the number of spins. For architectures that can
+respond to changes in cacheline state in their smp_cond_load implementation,
+it should be sufficient to use the default bound of 1.
 
-> 
->>
->> Cheers
->> James
->>
-> 
-> 
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@kernel.org>
+Suggested-by: Waiman Long <longman@redhat.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ kernel/locking/qspinlock.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-
+diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+index d880296245c5..396701e8c62d 100644
+--- a/kernel/locking/qspinlock.c
++++ b/kernel/locking/qspinlock.c
+@@ -77,6 +77,18 @@
+ #endif
+ 
+ /*
++ * The pending bit spinning loop count.
++ * This heuristic is used to limit the number of lockword accesses
++ * made by atomic_cond_read_relaxed when waiting for the lock to
++ * transition out of the "== _Q_PENDING_VAL" state. We don't spin
++ * indefinitely because there's no guarantee that we'll make forward
++ * progress.
++ */
++#ifndef _Q_PENDING_LOOPS
++#define _Q_PENDING_LOOPS	1
++#endif
++
++/*
+  * Per-CPU queue node structures; we can never have more than 4 nested
+  * contexts: task, softirq, hardirq, nmi.
+  *
+@@ -306,13 +318,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+ 		return;
+ 
+ 	/*
+-	 * wait for in-progress pending->locked hand-overs
++	 * Wait for in-progress pending->locked hand-overs with a bounded
++	 * number of spins so that we guarantee forward progress.
+ 	 *
+ 	 * 0,1,0 -> 0,0,1
+ 	 */
+ 	if (val == _Q_PENDING_VAL) {
+-		while ((val = atomic_read(&lock->val)) == _Q_PENDING_VAL)
+-			cpu_relax();
++		int cnt = _Q_PENDING_LOOPS;
++		val = atomic_cond_read_relaxed(&lock->val,
++					       (VAL != _Q_PENDING_VAL) || !cnt--);
+ 	}
+ 
+ 	/*
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.1.4
