@@ -1,54 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Apr 2018 19:01:19 +0100
-Subject: [PATCH v2 12/13] locking/qspinlock: Use try_cmpxchg instead of
- cmpxchg when locking
+Date: Wed, 11 Apr 2018 19:01:14 +0100
+Subject: [PATCH v2 07/13] locking/mcs: Use smp_cond_load_acquire() in mcs spin
+ loop
 In-Reply-To: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
 References: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1523469680-17699-13-git-send-email-will.deacon@arm.com>
+Message-ID: <1523469680-17699-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When reaching the head of an uncontended queue on the qspinlock slow-path,
-using a try_cmpxchg instead of a cmpxchg operation to transition the
-lock work to _Q_LOCKED_VAL generates slightly better code for x86 and
-pretty much identical code for arm64.
+From: Jason Low <jason.low2@hp.com>
 
-Cc: Ingo Molnar <mingo@kernel.org>
-Reported-by: Peter Zijlstra <peterz@infradead.org>
+For qspinlocks on ARM64, we would like to use WFE instead
+of purely spinning. Qspinlocks internally have lock
+contenders spin on an MCS lock.
+
+Update arch_mcs_spin_lock_contended() such that it uses
+the new smp_cond_load_acquire() so that ARM64 can also
+override this spin loop with its own implementation using WFE.
+
+On x86, this can also be cheaper than spinning on
+smp_load_acquire().
+
+Signed-off-by: Jason Low <jason.low2@hp.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/locking/qspinlock.c | 19 +++++++++----------
- 1 file changed, 9 insertions(+), 10 deletions(-)
+ kernel/locking/mcs_spinlock.h | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
-index fa5d2ab369f9..1e3ddc42135e 100644
---- a/kernel/locking/qspinlock.c
-+++ b/kernel/locking/qspinlock.c
-@@ -467,16 +467,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 	 * Otherwise, we only need to grab the lock.
- 	 */
+diff --git a/kernel/locking/mcs_spinlock.h b/kernel/locking/mcs_spinlock.h
+index f046b7ce9dd6..5e10153b4d3c 100644
+--- a/kernel/locking/mcs_spinlock.h
++++ b/kernel/locking/mcs_spinlock.h
+@@ -23,13 +23,15 @@ struct mcs_spinlock {
  
--	/* In the PV case we might already have _Q_LOCKED_VAL set */
--	if ((val & _Q_TAIL_MASK) == tail) {
--		/*
--		 * The atomic_cond_read_acquire() call above has provided the
--		 * necessary acquire semantics required for locking.
--		 */
--		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
--		if (old == val)
--			goto release; /* No contention */
--	}
-+	/*
-+	 * In the PV case we might already have _Q_LOCKED_VAL set.
-+	 *
-+	 * The atomic_cond_read_acquire() call above has provided the
-+	 * necessary acquire semantics required for locking.
-+	 */
-+	if (((val & _Q_TAIL_MASK) == tail) &&
-+	    atomic_try_cmpxchg_relaxed(&lock->val, &val, _Q_LOCKED_VAL))
-+		goto release; /* No contention */
+ #ifndef arch_mcs_spin_lock_contended
+ /*
+- * Using smp_load_acquire() provides a memory barrier that ensures
+- * subsequent operations happen after the lock is acquired.
++ * Using smp_cond_load_acquire() provides the acquire semantics
++ * required so that subsequent operations happen after the
++ * lock is acquired. Additionally, some architectures such as
++ * ARM64 would like to do spin-waiting instead of purely
++ * spinning, and smp_cond_load_acquire() provides that behavior.
+  */
+ #define arch_mcs_spin_lock_contended(l)					\
+ do {									\
+-	while (!(smp_load_acquire(l)))					\
+-		cpu_relax();						\
++	smp_cond_load_acquire(l, VAL);					\
+ } while (0)
+ #endif
  
- 	/* Either somebody is queued behind us or _Q_PENDING_VAL is set */
- 	set_locked(lock);
 -- 
 2.1.4
