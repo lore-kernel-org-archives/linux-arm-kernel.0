@@ -1,61 +1,35 @@
-From: longman@redhat.com (Waiman Long)
-Date: Wed, 11 Apr 2018 16:35:25 -0400
-Subject: [PATCH v2 04/13] locking/qspinlock: Remove unbounded cmpxchg loop
- from locking slowpath
-In-Reply-To: <674fd9c0-e3f3-9ae0-dd0a-7ccc085c1706@redhat.com>
-References: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
- <1523469680-17699-5-git-send-email-will.deacon@arm.com>
- <674fd9c0-e3f3-9ae0-dd0a-7ccc085c1706@redhat.com>
-Message-ID: <d0fb47ef-bfd7-a2b8-7c0d-14d8f18aa608@redhat.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 11 Apr 2018 16:48:54 -0400
+Subject: [PATCH v3 2/2] MIPS: io: add a barrier after register read in
+ readX()
+In-Reply-To: <20180411202616.GA14760@jhogan-linux.mipstec.com>
+References: <1522760109-16497-1-git-send-email-okaya@codeaurora.org>
+ <1522760109-16497-2-git-send-email-okaya@codeaurora.org>
+ <41e184ae-689e-93c9-7b15-0c68bd624130@codeaurora.org>
+ <b748fdcb-e09f-9fe3-dc74-30b6a7d40cbe@codeaurora.org>
+ <20180406212601.GA1730@saruman>
+ <0f1a4719-9a6f-0df0-7fd9-a25c10e824f5@codeaurora.org>
+ <14a663f6-2ea5-230b-2cd0-e42d05d0d7ea@codeaurora.org>
+ <20180411202616.GA14760@jhogan-linux.mipstec.com>
+Message-ID: <abcad691-2ac8-ffc5-30a2-77ad6781664a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2018 03:34 PM, Waiman Long wrote:
-> On 04/11/2018 02:01 PM, Will Deacon wrote:
->> @@ -485,15 +499,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
->>  	 * claim the lock:
->>  	 *
->>  	 * n,0,0 -> 0,0,1 : lock, uncontended
->> -	 * *,0,0 -> *,0,1 : lock, contended
->> +	 * *,*,0 -> *,*,1 : lock, contended
->>  	 *
->> -	 * If the queue head is the only one in the queue (lock value == tail),
->> -	 * clear the tail code and grab the lock. Otherwise, we only need
->> -	 * to grab the lock.
->> +	 * If the queue head is the only one in the queue (lock value == tail)
->> +	 * and nobody is pending, clear the tail code and grab the lock.
->> +	 * Otherwise, we only need to grab the lock.
->>  	 */
->>  	for (;;) {
->>  		/* In the PV case we might already have _Q_LOCKED_VAL set */
->> -		if ((val & _Q_TAIL_MASK) != tail) {
->> +		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
->>  			set_locked(lock);
->>  			break;
->>  		}
-> I don't think it is right to just grab the lock when the pending bit is
-> set. I believe it will cause problem.
->
-> Preserving the the pending bit should be just
->
-> diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
-> index 35367cc..76d9124 100644
-> --- a/kernel/locking/qspinlock.c
-> +++ b/kernel/locking/qspinlock.c
-> @@ -511,7 +511,8 @@ void queued_spin_lock_slowpath(struct qspinlock
-> *lock, u32 v
->                  * necessary acquire semantics required for locking. At most
->                  * two iterations of this loop may be ran.
->                  */
-> -               old = atomic_cmpxchg_relaxed(&lock->val, val,
-> _Q_LOCKED_VAL);
-> +               old = atomic_cmpxchg_relaxed(&lock->val, val,
-> +                       _Q_LOCKED_VAL | (val & _Q_PENDING_MASK));
->                 if (old == val)
->                         goto release;   /* No contention */
+On 4/11/2018 4:26 PM, James Hogan wrote:
+> On Wed, Apr 11, 2018 at 01:10:41PM -0400, Sinan Kaya wrote:
+>> How is the likelihood of getting this fixed on 4.17 kernel?
+> 
+> High.
+> 
 
-After some more thought and reviewing the rests of the patchset, I now
-think your change here is OK. Sorry for the noise.
+Thanks for the confirmation.
 
-Cheers,
-Longman
+> Thanks
+> James
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
