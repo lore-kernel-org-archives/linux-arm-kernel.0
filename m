@@ -1,31 +1,41 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 11 Apr 2018 12:23:38 -0400
-Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
- Extended Tags
-In-Reply-To: <20180411141922.GA13832@kroah.com>
-References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
- <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
- <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
- <1c94361d-7a8d-ad18-12e5-1612326a54db@codeaurora.org>
- <20180411135151.GB91792@bhelgaas-glaptop.roam.corp.google.com>
- <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
- <20180411140849.GA12557@kroah.com>
- <1290e3d3-e7f0-a4f5-925d-2b7c2cb42b93@codeaurora.org>
- <20180411141922.GA13832@kroah.com>
-Message-ID: <d7b78270-c3ff-8c88-1ac0-f9467fb54da2@codeaurora.org>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 11 Apr 2018 19:26:56 +0300
+Subject: [PATCH v2] media: omap3isp: fix unbalanced dma_iommu_mapping
+In-Reply-To: <e0151287-f294-3540-9b12-a96e05db61c0@ti.com>
+References: <20180314154136.16468-1-s-anna@ti.com> <5767280.aLITpzbm0N@avalon>
+ <e0151287-f294-3540-9b12-a96e05db61c0@ti.com>
+Message-ID: <20180411162655.gigmuzna624xcxx2@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2018 10:19 AM, Greg Kroah-Hartman wrote:
-> Next time explicitly ask the question, don't expect someone to rummage
-> through an email to determine what you are thinking.  You are being lazy
-> by just adding someone else to an email thread like this, be considerate
-> and take the time to explain yourself when asking someone else to do
-> work.
+On Mon, Mar 26, 2018 at 11:40:58AM -0500, Suman Anna wrote:
+> Hi Mauro,
+> 
+> On 03/21/2018 05:26 AM, Laurent Pinchart wrote:
+> > Hi Suman,
+> > 
+> > Thank you for the patch.
+> > 
+> > On Wednesday, 14 March 2018 17:41:36 EET Suman Anna wrote:
+> >> The OMAP3 ISP driver manages its MMU mappings through the IOMMU-aware
+> >> ARM DMA backend. The current code creates a dma_iommu_mapping and
+> >> attaches this to the ISP device, but never detaches the mapping in
+> >> either the probe failure paths or the driver remove path resulting
+> >> in an unbalanced mapping refcount and a memory leak. Fix this properly.
+> >>
+> >> Reported-by: Pavel Machek <pavel@ucw.cz>
+> >> Signed-off-by: Suman Anna <s-anna@ti.com>
+> >> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> > 
+> > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> I don't see this patch in -next yet, can you pick up this patch at your
+> earliest?
 
-Sorry, I should have stripped irrelevant pieces like you said.
+Here:
+
+<URL:https://patchwork.linuxtv.org/patch/48599/>
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
