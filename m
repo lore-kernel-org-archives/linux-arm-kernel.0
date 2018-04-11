@@ -1,54 +1,73 @@
-From: hejianet@gmail.com (Jia He)
-Date: Wed, 11 Apr 2018 00:21:57 -0700
-Subject: [PATCH v8 6/6] mm: page_alloc: reduce unnecessary binary search in
- early_pfn_valid()
-In-Reply-To: <1523431317-30612-1-git-send-email-hejianet@gmail.com>
-References: <1523431317-30612-1-git-send-email-hejianet@gmail.com>
-Message-ID: <1523431317-30612-7-git-send-email-hejianet@gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Apr 2018 09:39:24 +0200
+Subject: [PATCH v6 0/5] drm/blend: Support generic plane-wide alpha
+Message-ID: <cover.637c90251afd1eb6d5564a3c50beda2a3d51160a.1523432341.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-where possible") optimized the loop in memmap_init_zone(). But there is
-still some room for improvement. E.g. in early_pfn_valid(), if pfn and
-pfn+1 are in the same memblock region, we can record the last returned
-memblock region index and check whether pfn++ is still in the same
-region.
+Hi,
 
-Currently it only improve the performance on arm/arm64 and will have no
-impact on other arches.
+This serie aims at enhancing the support for plane-wide alpha in the
+drivers that are implementing it at the moment, by turning it into a
+generic property and converting the drivers (rcar-du and atmel-hclcdc). It
+also introduces support for it in the sun4i driver.
 
-For the performance improvement, after this set, I can see the time
-overhead of memmap_init() is reduced from 41313 us to 24345 us in my
-armv8a server(QDF2400 with 96G memory).
+Let me know what you think,
+Maxime
 
-Signed-off-by: Jia He <jia.he@hxt-semitech.com>
----
- include/linux/mmzone.h | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Changes from v5:
+  - Added back a comment about the pixel values not being pre-multiplied as
+    suggested by Laurent
 
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index c40297d..426db40 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -1271,11 +1271,16 @@ static inline int pfn_present(unsigned long pfn)
- #define pfn_to_nid(pfn)		(0)
- #endif
- 
--#define early_pfn_valid(pfn)	pfn_valid(pfn)
- #ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
- extern ulong memblock_next_valid_pfn(ulong pfn);
- #define next_valid_pfn(pfn)	memblock_next_valid_pfn(pfn)
--#endif
-+
-+extern int pfn_valid_region(ulong pfn);
-+#define early_pfn_valid(pfn)	pfn_valid_region(pfn)
-+#else
-+#define early_pfn_valid(pfn)    pfn_valid(pfn)
-+#endif /*CONFIG_HAVE_ARCH_PFN_VALID*/
-+
- void sparse_init(void);
- #else
- #define sparse_init()	do {} while (0)
+Changes from v4:
+  - Removed the premultiplied alpha mention
+  - Added Eric Reviewed-by
+
+Changes from v3:
+  - Rebased on current drm-misc-next
+  - Made the alpha property a 16 bits property, and have the drivers
+    drop the lowest 8 bits
+  - Removed the csv documentation, and documented it in the doc instead
+
+Changes from v2:
+  - Rebased on current drm-misc-next
+  - Removed the patches already applied
+  - Split the patch implementing the automatic pipe assignment in two
+
+Changes from v1:
+  - Document the behaviour on concurrent usage of the alpha property and an
+    alpha component in the format
+  - Allowed for higher alpha values
+  - Moved the alpha value from a helper to the struct drm_format_info
+  - Collected tags
+  - Rebased on current drm-misc-next
+
+Maxime Ripard (5):
+  drm/blend: Add a generic alpha property
+  drm/atmel-hclcdc: Convert to the new generic alpha property
+  drm/rcar-du: Convert to the new generic alpha property
+  drm/sun4i: Add support for plane alpha
+  drm/docs: Remove the rcar alpha from the csv file
+
+ Documentation/gpu/kms-properties.csv            |  1 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 13 +---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 89 ++----------------
+ drivers/gpu/drm/drm_atomic.c                    |  4 +-
+ drivers/gpu/drm/drm_atomic_helper.c             |  4 +-
+ drivers/gpu/drm/drm_blend.c                     | 39 ++++++++-
+ drivers/gpu/drm/rcar-du/rcar_du_drv.h           |  1 +-
+ drivers/gpu/drm/rcar-du/rcar_du_kms.c           |  5 +-
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c         | 15 +--
+ drivers/gpu/drm/rcar-du/rcar_du_plane.h         |  2 +-
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c           | 42 +--------
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.h           |  3 +-
+ drivers/gpu/drm/sun4i/sun4i_backend.c           | 16 ++-
+ drivers/gpu/drm/sun4i/sun4i_backend.h           |  3 +-
+ drivers/gpu/drm/sun4i/sun4i_layer.c             |  2 +-
+ include/drm/drm_blend.h                         |  3 +-
+ include/drm/drm_plane.h                         |  6 +-
+ 17 files changed, 97 insertions(+), 151 deletions(-)
+
+base-commit: d31b5c91a27b768ee221fe677eb0b18b4cfb9df8
 -- 
-2.7.4
+git-series 0.9.1
