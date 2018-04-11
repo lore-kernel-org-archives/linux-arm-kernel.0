@@ -1,50 +1,39 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Wed, 11 Apr 2018 09:44:46 +0200
-Subject: [PATCH v5 07/13] ARM: smp: Add initialization of CNTVOFF
-In-Reply-To: <CAMuHMdUoUVF+WYrPG1Dx515_de_2nhGhLfn9+tJUm5jgs1uz0w@mail.gmail.com>
-References: <20180403061836.3926-1-mylene.josserand@bootlin.com>
- <20180403061836.3926-8-mylene.josserand@bootlin.com>
- <06308f46-ce7c-ddeb-ebca-abd1153138ba@arm.com>
- <20180404155909.148085f7@dell-desktop.home>
- <86vad7qc21.wl-marc.zyngier@arm.com>
- <CAMuHMdUoUVF+WYrPG1Dx515_de_2nhGhLfn9+tJUm5jgs1uz0w@mail.gmail.com>
-Message-ID: <20180411094446.468c7f99@dell-desktop.home>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Apr 2018 09:48:08 +0200
+Subject: [linux-sunxi] [PATCH v3] ARM: sun8i: v40: enable USB host ports
+ for Banana Pi M2 Berry
+In-Reply-To: <CAGb2v651vpy3jdFY56CQi4yBU1wh01ecPn9cO9fiXkfed35QDA@mail.gmail.com>
+References: <20180406140344.9457-1-icenowy@aosc.io>
+ <CAGb2v651vpy3jdFY56CQi4yBU1wh01ecPn9cO9fiXkfed35QDA@mail.gmail.com>
+Message-ID: <20180411074808.eogpgm3xtercmnay@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, 9 Apr 2018 10:24:41 +0200
-Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-
-> On Wed, Apr 4, 2018 at 4:30 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On Wed, 04 Apr 2018 14:59:09 +0100,
-> > Myl?ne Josserand wrote:  
-> 
-> [Marc: stuck in ISO-8859-1? ;-]
-> 
-> >> > It'd be good to take this opportunity to refactor the shmobile code.  
-> >>
-> >> I can do it in this series but I do not have any shmobile platforms so
-> >> I will not be able to test my modifications (only compilation).
-> >>
-> >> If someone can test it for me (who?), it is okay for me to refactor this
-> >> code :)  
+On Mon, Apr 09, 2018 at 03:33:34PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Apr 6, 2018 at 10:03 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> > Banana Pi M2 Berry has an on-board USB Hub that provides 4 USB Type-A
+> > ports, and it's connected to the USB1 port of the SoC.
 > >
-> > I guess you could Cc the shmobile folks (Geert Uytterhoeven, Simon
-> > Horman), and get them to review/test the changes.  
+> > Enable it.
+> >
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > 
-> Correct. I can test on a remote R-Car E2 ALT board that needs it.
+> Verified against public schematics.
+> 
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-Great, thank you!
+Applied for 4.18
 
-I will add you in CC in my next version, then.
-
-Best regards,
-
-Myl?ne
+Maxime
 
 -- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Maxime Ripard, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
-http://bootlin.com
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180411/3a74464f/attachment-0001.sig>
