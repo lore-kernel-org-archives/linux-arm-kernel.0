@@ -1,28 +1,43 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 11 Apr 2018 08:59:58 -0700
-Subject: [PATCH v3 0/2] kexec-tools: arm64: Enable D-cache in purgatory
-In-Reply-To: <5599813d-f83c-d154-287a-c131c48292ca@arm.com>
-References: <cover.1495514291.git.panand@redhat.com>
- <59312080.1090906@arm.com> <1963984d-e78e-a5b2-f1a2-fb0a789a505e@redhat.com>
- <CAB=otbT23ySN4VC6G0sBKF5p4SvsnG8PS-C_beBgn8YJUsbw9Q@mail.gmail.com>
- <71f0a333-8bfb-3755-c9fd-e30bf2280339@cisco.com>
- <5599813d-f83c-d154-287a-c131c48292ca@arm.com>
-Message-ID: <79a879dc-e729-15ff-a5df-42684bd7e22a@infradead.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 11 Apr 2018 16:19:22 +0200
+Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
+ Extended Tags
+In-Reply-To: <1290e3d3-e7f0-a4f5-925d-2b7c2cb42b93@codeaurora.org>
+References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
+ <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
+ <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
+ <1c94361d-7a8d-ad18-12e5-1612326a54db@codeaurora.org>
+ <20180411135151.GB91792@bhelgaas-glaptop.roam.corp.google.com>
+ <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
+ <20180411140849.GA12557@kroah.com>
+ <1290e3d3-e7f0-a4f5-925d-2b7c2cb42b93@codeaurora.org>
+Message-ID: <20180411141922.GA13832@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2018 06:28 AM, James Morse wrote:
-> We ended up with the check-summing code because its the default behaviour of
-> kexec-tools on other architectures.
+On Wed, Apr 11, 2018 at 10:13:11AM -0400, Sinan Kaya wrote:
+> On 4/11/2018 10:08 AM, Greg Kroah-Hartman wrote:
+> >>> So I added these stable tags:
+> >>>
+> >>>   CC: stable at vger.kernel.org      # v4.11: 62ce94a7a5a5 PCI: Mark Broadcom HT2100 Root Port Extended Tags as broken
+> >>>   CC: stable at vger.kernel.org      # v4.11
+> >>>
+> >>> I'm not sure I'm using the stable request correctly, but my intent is:
 > 
-> One alternative is to rip it out for arm64.
+> Asking if we placed the tags correctly. Sounds like we did.
+> 
+> >>>
+> >>>   - 62ce94a7a5a5 appeared in v4.14, so cherry-pick 62ce94a7a5a5 to
+> >>>     v4.11 through v4.13
+> >>>   - cherry-pick *this* patch on top of 62ce94a7a5a5 to v4.11 and later
+> > Bjorn is correct here, why are you dragging me into this?
+> 
+> Thanks
 
-Or add arm64 support to kexec-lite:
+Next time explicitly ask the question, don't expect someone to rummage
+through an email to determine what you are thinking.  You are being lazy
+by just adding someone else to an email thread like this, be considerate
+and take the time to explain yourself when asking someone else to do
+work.
 
-  https://github.com/antonblanchard/kexec-lite
-
-Or accept my bypass patch:
-
-  http://lists.infradead.org/pipermail/kexec/2015-October/014573.html
-
--Geoff
+greg k-h
