@@ -1,67 +1,102 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Apr 2018 19:01:12 +0100
-Subject: [PATCH v2 05/13] locking/qspinlock: Kill cmpxchg loop when claiming
- lock from head of queue
+Date: Wed, 11 Apr 2018 19:01:18 +0100
+Subject: [PATCH v2 11/13] locking/qspinlock: Elide back-to-back RELEASE
+ operations with smp_wmb()
 In-Reply-To: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
 References: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1523469680-17699-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1523469680-17699-12-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a queued locker reaches the head of the queue, it claims the lock
-by setting _Q_LOCKED_VAL in the lockword. If there isn't contention, it
-must also clear the tail as part of this operation so that subsequent
-lockers can avoid taking the slowpath altogether.
+The qspinlock slowpath must ensure that the MCS node is fully initialised
+before it can be reached by another other CPU. This is currently enforced
+by using a RELEASE operation when updating the tail and also when linking
+the node into the waitqueue (since the control dependency off xchg_tail
+is insufficient to enforce sufficient ordering -- see 95bcade33a8a
+("locking/qspinlock: Ensure node is initialised before updating prev->next")).
 
-Currently this is expressed as a cmpxchg loop that practically only
-runs up to two iterations. This is confusing to the reader and unhelpful
-to the compiler. Rewrite the cmpxchg loop without the loop, so that a
-failed cmpxchg implies that there is contention and we just need to
-write to _Q_LOCKED_VAL without considering the rest of the lockword.
+Back-to-back RELEASE operations may be expensive on some architectures,
+particularly those that implement them using fences under the hood. We
+can replace the two RELEASE operations with a single smp_wmb() fence and
+use RELAXED operations for the subsequent publishing of the node.
 
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/locking/qspinlock.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+ kernel/locking/qspinlock.c | 33 +++++++++++++++++----------------
+ 1 file changed, 17 insertions(+), 16 deletions(-)
 
 diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
-index a8fc402b3f3a..01b660442d87 100644
+index 7b8c81ebb15e..fa5d2ab369f9 100644
 --- a/kernel/locking/qspinlock.c
 +++ b/kernel/locking/qspinlock.c
-@@ -505,24 +505,21 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- 	 * and nobody is pending, clear the tail code and grab the lock.
- 	 * Otherwise, we only need to grab the lock.
- 	 */
--	for (;;) {
--		/* In the PV case we might already have _Q_LOCKED_VAL set */
--		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
--			set_locked(lock);
--			break;
--		}
-+
-+	/* In the PV case we might already have _Q_LOCKED_VAL set */
-+	if ((val & _Q_TAIL_MASK) == tail) {
- 		/*
- 		 * The smp_cond_load_acquire() call above has provided the
--		 * necessary acquire semantics required for locking. At most
--		 * two iterations of this loop may be ran.
-+		 * necessary acquire semantics required for locking.
- 		 */
- 		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
- 		if (old == val)
--			goto release;	/* No contention */
--
--		val = old;
-+			goto release; /* No contention */
- 	}
- 
-+	/* Either somebody is queued behind us or _Q_PENDING_VAL is set */
-+	set_locked(lock);
-+
+@@ -164,10 +164,10 @@ static __always_inline void clear_pending_set_locked(struct qspinlock *lock)
+ static __always_inline u32 xchg_tail(struct qspinlock *lock, u32 tail)
+ {
  	/*
- 	 * contended path; wait for next if not observed yet, release.
+-	 * Use release semantics to make sure that the MCS node is properly
+-	 * initialized before changing the tail code.
++	 * We can use relaxed semantics since the caller ensures that the
++	 * MCS node is properly initialized before updating the tail.
  	 */
+-	return (u32)xchg_release(&lock->tail,
++	return (u32)xchg_relaxed(&lock->tail,
+ 				 tail >> _Q_TAIL_OFFSET) << _Q_TAIL_OFFSET;
+ }
+ 
+@@ -212,10 +212,11 @@ static __always_inline u32 xchg_tail(struct qspinlock *lock, u32 tail)
+ 	for (;;) {
+ 		new = (val & _Q_LOCKED_PENDING_MASK) | tail;
+ 		/*
+-		 * Use release semantics to make sure that the MCS node is
+-		 * properly initialized before changing the tail code.
++		 * We can use relaxed semantics since the caller ensures that
++		 * the MCS node is properly initialized before updating the
++		 * tail.
+ 		 */
+-		old = atomic_cmpxchg_release(&lock->val, val, new);
++		old = atomic_cmpxchg_relaxed(&lock->val, val, new);
+ 		if (old == val)
+ 			break;
+ 
+@@ -388,12 +389,18 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+ 		goto release;
+ 
+ 	/*
++	 * Ensure that the initialisation of @node is complete before we
++	 * publish the updated tail via xchg_tail() and potentially link
++	 * @node into the waitqueue via WRITE_ONCE(prev->next, node) below.
++	 */
++	smp_wmb();
++
++	/*
++	 * Publish the updated tail.
+ 	 * We have already touched the queueing cacheline; don't bother with
+ 	 * pending stuff.
+ 	 *
+ 	 * p,*,* -> n,*,*
+-	 *
+-	 * RELEASE, such that the stores to @node must be complete.
+ 	 */
+ 	old = xchg_tail(lock, tail);
+ 	next = NULL;
+@@ -405,14 +412,8 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+ 	if (old & _Q_TAIL_MASK) {
+ 		prev = decode_tail(old);
+ 
+-		/*
+-		 * We must ensure that the stores to @node are observed before
+-		 * the write to prev->next. The address dependency from
+-		 * xchg_tail is not sufficient to ensure this because the read
+-		 * component of xchg_tail is unordered with respect to the
+-		 * initialisation of @node.
+-		 */
+-		smp_store_release(&prev->next, node);
++		/* Link @node into the waitqueue. */
++		WRITE_ONCE(prev->next, node);
+ 
+ 		pv_wait_node(node, prev);
+ 		arch_mcs_spin_lock_contended(&node->locked);
 -- 
 2.1.4
