@@ -1,42 +1,60 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 11 Apr 2018 11:15:37 +0200
-Subject: Speology of old handheld.org site
-In-Reply-To: <8dbb00c8-6a17-3462-f911-97b800b3a296@gmail.com> (Florian
- Fainelli's message of "Mon, 9 Apr 2018 09:44:34 -0700")
-References: <87in902ymf.fsf@belgarion.home>
- <8dbb00c8-6a17-3462-f911-97b800b3a296@gmail.com>
-Message-ID: <87efjm2jeu.fsf@belgarion.home>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Wed, 11 Apr 2018 11:17:04 +0200
+Subject: [PATCH V2] drm/amdgpu: limit DMA size to PAGE_SIZE for
+ scatter-gather buffers
+In-Reply-To: <20180411062602.GA29109@hr-amur2>
+References: <1523394001-4615-1-git-send-email-okaya@codeaurora.org>
+ <20180411062602.GA29109@hr-amur2>
+Message-ID: <6f99b01f-2f3c-7263-9df8-f8a73f4a9372@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Fainelli <f.fainelli@gmail.com> writes:
+Am 11.04.2018 um 08:26 schrieb Huang Rui:
+> On Tue, Apr 10, 2018 at 04:59:55PM -0400, Sinan Kaya wrote:
+>> Code is expecing to observe the same number of buffers returned from
+>> dma_map_sg() function compared to sg_alloc_table_from_pages(). This
+>> doesn't hold true universally especially for systems with IOMMU.
+>>
+>> IOMMU driver tries to combine buffers into a single DMA address as much
+>> as it can. The right thing is to tell the DMA layer how much combining
+>> IOMMU can do.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Sinan, I guess Christian's suggestion is to add amdgpu_device_init function
+> like here:
 
-> On 04/09/2018 08:22 AM, Robert Jarzmik wrote:
->> Hi Phlipp and Paul,
->> 
->> I've got a "recent" hx4700 I'm going to convert to Linux.
->> I was kinda hopping following this :
->> http://www.handhelds.org/moin/moin.cgi/HpIpaqHx4700OriginalBootloader
->> 
->> Unfortunately handhelds.org is down. Would either of you have kept a copy or
->> notes that could help me :
->>  - backup the old WinCE (d2s bootloader command or something along these lines)
->>  - install the booloader that enables uploading and booting a kernel on the
->>  USB/SD card.
+Yes, exactly. Looks like Sinan just tried to place the call next to 
+pci_set_dma_mask()/pci_set_consistent_dma_mask().
+
+Not necessary a bad idea, but in this case not optimal.
+
+Sinan please refine your patch as Rui suggested and resend.
+
+Thanks,
+Christian.
+
 >
-> Have you tried web.archive.org? It seems to have retained a snapshot:
+> 8<-------
+> diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+> index 0e798b3..9b96771 100644
+> --- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+> +++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
+> @@ -2339,6 +2339,8 @@ int amdgpu_device_init(struct amdgpu_device *adev,
+>          /* init the mode config */
+>          drm_mode_config_init(adev->ddev);
 >
-> http://web.archive.org/web/20100713033736/http://www.handhelds.org/moin/moin.cgi/HpIpaqHx4700OriginalBootloader
-
-Thanks Florian, that helps.
-
-I still have the question which lacks an answer : how are you all uploading your
-kernels to the hx4700 on the fly ? Do you have a "trick" to make usb (ymodem or
-usbnet) work ? Are you using SDGSystems bootloader or another one ?
-
-Or put it simply : how did you do to maintain the hx4700 and try new kernels ?
-
-Cheers.
-
--- 
-Robert
+> +       dma_set_max_seg_size(adev->dev, PAGE_SIZE);
+> +
+>          r = amdgpu_device_ip_init(adev);
+>          if (r) {
+>                  /* failed in exclusive mode due to timeout */
+> 8<-------
+>
+> After that, we don't do it in each generation.
+>
+> Thanks,
+> Ray
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
