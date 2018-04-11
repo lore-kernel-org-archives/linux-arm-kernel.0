@@ -1,85 +1,65 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Wed, 11 Apr 2018 17:03:29 +0300
-Subject: [PATCH v2] clk: imx: Set CLK_SET_RATE_GATE for gate and divider clocks
-In-Reply-To: <1521812006-6173-1-git-send-email-abel.vesa@nxp.com>
-References: <1521812006-6173-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <1523455409-7771-1-git-send-email-abel.vesa@nxp.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 11 Apr 2018 16:08:49 +0200
+Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
+ Extended Tags
+In-Reply-To: <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
+References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
+ <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
+ <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
+ <1c94361d-7a8d-ad18-12e5-1612326a54db@codeaurora.org>
+ <20180411135151.GB91792@bhelgaas-glaptop.roam.corp.google.com>
+ <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
+Message-ID: <20180411140849.GA12557@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawnguo@kernel.org>
+On Wed, Apr 11, 2018 at 10:02:07AM -0400, Sinan Kaya wrote:
+> +GregKH
 
-Add flag CLK_SET_RATE_GATE for i.MX gate and divider clocks on which the
-client drivers usually make clk_set_rate() call, so that the call will fail
-when clock is still on instead of standing the risk of running into glitch
-issue. Rate cannot be changed when the clock is enabled due to the glitchy
-multiplexers.
+Why?
 
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-[initial patch from imx internal repo]
-Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-[carried over from 3.14 and also applied the flag to newer functions]
----
+> On 4/11/2018 9:51 AM, Bjorn Helgaas wrote:
+> > On Tue, Apr 10, 2018 at 04:18:01PM -0400, Sinan Kaya wrote:
+> >> On 4/10/2018 3:50 PM, Bjorn Helgaas wrote:
+> >>> On Tue, Apr 10, 2018 at 02:41:44PM -0500, Bjorn Helgaas wrote:
+> >>>> On Wed, Apr 04, 2018 at 06:50:09PM -0400, Sinan Kaya wrote:
+> >>>>> Per PCIe r3.1, sec 2.2.6.2 and 7.8.4, a Requester may not use 8-bit Tags
+> >>>>> unless its Extended Tag Field Enable is set, but all Receivers/Completers
+> >>>>> must handle 8-bit Tags correctly regardless of their Extended Tag Field
+> >>>>> Enable.
+> >>>>>
+> >>>>> Some devices do not handle 8-bit Tags as Completers, so add a quirk for
+> >>>>> them.  If we find such a device, we disable Extended Tags for the entire
+> >>>>> hierarchy to make peer-to-peer DMA possible.
+> >>>>>
+> >>>>> The Broadcom HT1100/HT2000/HT2100 seems to have issues with handling 8-bit
+> >>>>> tags.  Mark it as broken.
+> >>>>>
+> >>>>> Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
+> >>>>> Link: https://bugzilla.kernel.org/show_bug.cgi?id=196197
+> >>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >>>> Applied to pci/enumeration for v4.18, thanks!
+> >>> Actually, this is a really annoying issue and I think the fix is
+> >>> appropriate for v4.17, so I moved it to my for-linus branch.
+> >>>
+> >>
+> >> I agree. It causes boot issues on some AMD Opteron machines. It should
+> >> probably be back-ported too. 
+> > 
+> > We started enabling extended tags with 60db3a4d8cc9 ("PCI: Enable PCIe
+> > Extended Tags if supported"), which appeared in v4.11.
+> > 
+> > So I added these stable tags:
+> > 
+> >   CC: stable at vger.kernel.org      # v4.11: 62ce94a7a5a5 PCI: Mark Broadcom HT2100 Root Port Extended Tags as broken
+> >   CC: stable at vger.kernel.org      # v4.11
+> > 
+> > I'm not sure I'm using the stable request correctly, but my intent is:
+> > 
+> >   - 62ce94a7a5a5 appeared in v4.14, so cherry-pick 62ce94a7a5a5 to
+> >     v4.11 through v4.13
+> >   - cherry-pick *this* patch on top of 62ce94a7a5a5 to v4.11 and later
 
-Changes since v1:
- - changed ownership as per initial patch
+Bjorn is correct here, why are you dragging me into this?
 
- drivers/clk/imx/clk.h | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 8076ec0..753ebc4 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -96,7 +96,8 @@ static inline struct clk *imx_clk_fixed_factor(const char *name,
- static inline struct clk *imx_clk_divider(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift, u8 width)
- {
--	return clk_register_divider(NULL, name, parent, CLK_SET_RATE_PARENT,
-+	return clk_register_divider(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE,
- 			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
-@@ -140,7 +141,8 @@ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+	return clk_register_gate2(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
- 			shift, 0x3, 0, &imx_ccm_lock, NULL);
- }
- 
-@@ -155,7 +157,8 @@ static inline struct clk *imx_clk_gate2_shared(const char *name,
- 		const char *parent, void __iomem *reg, u8 shift,
- 		unsigned int *share_count)
- {
--	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT, reg,
-+	return clk_register_gate2(NULL, name, parent,
-+			CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE, reg,
- 			shift, 0x3, 0, &imx_ccm_lock, share_count);
- }
- 
-@@ -164,8 +167,8 @@ static inline struct clk *imx_clk_gate2_shared2(const char *name,
- 		unsigned int *share_count)
- {
- 	return clk_register_gate2(NULL, name, parent, CLK_SET_RATE_PARENT |
--				  CLK_OPS_PARENT_ENABLE, reg, shift, 0x3, 0,
--				  &imx_ccm_lock, share_count);
-+			CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
-+			reg, shift, 0x3, 0, &imx_ccm_lock, share_count);
- }
- 
- static inline struct clk *imx_clk_gate2_cgr(const char *name,
-@@ -187,7 +190,7 @@ static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
- 	return clk_register_gate2(NULL, name, parent,
--			CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE,
-+		CLK_SET_RATE_PARENT | CLK_SET_RATE_GATE | CLK_OPS_PARENT_ENABLE,
- 			reg, shift, 0x3, 0, &imx_ccm_lock, NULL);
- }
- 
--- 
-2.7.4
+greg k-h
