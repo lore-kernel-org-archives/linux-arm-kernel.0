@@ -1,34 +1,34 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 11 Apr 2018 10:19:25 +0200
-Subject: [PATCH] ARM: dts: sunxi: Change sun7i-a20-olimex-som204-evb to
- not use cd-inverted
-In-Reply-To: <20180410145119.27362-1-tuomas@tuxera.com>
-References: <20180410145119.27362-1-tuomas@tuxera.com>
-Message-ID: <20180411081925.hjhobvessykaiqoq@flea>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 11 Apr 2018 10:33:15 +0200
+Subject: [PATCH v3 2/2] mm: remove odd HAVE_PTE_SPECIAL
+In-Reply-To: <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
+References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
+ <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
+Message-ID: <20180411083315.GA23400@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 05:51:19PM +0300, Tuomas Tynkkynen wrote:
-> Commit 45e01f401a2a16 ("ARM: dts: sunxi: Switch MMC nodes away from
-> cd-inverted property") changed most of the sunxi boards away from using
-> the cd-inverted property in MMC nodes. However, the
-> sun7i-a20-olimex-som204-evb board which got merged concurrently with
-> that commit is now using cd-inverted. Switch it away from using
-> cd-inverted to be consistent with rest of the sunxi boards.
-> 
-> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+On Wed 11-04-18 10:03:36, Laurent Dufour wrote:
+> @@ -881,7 +876,8 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
+>  
+>  	if (is_zero_pfn(pfn))
+>  		return NULL;
+> -check_pfn:
+> +
+> +check_pfn: __maybe_unused
+>  	if (unlikely(pfn > highest_memmap_pfn)) {
+>  		print_bad_pte(vma, addr, pte, NULL);
+>  		return NULL;
+> @@ -891,7 +887,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
+>  	 * NOTE! We still have PageReserved() pages in the page tables.
+>  	 * eg. VDSO mappings can cause them to exist.
+>  	 */
+> -out:
+> +out: __maybe_unused
+>  	return pfn_to_page(pfn);
 
-Applied, thanks!
-Maxime
+Why do we need this ugliness all of the sudden?
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180411/dec31094/attachment.sig>
+Michal Hocko
+SUSE Labs
