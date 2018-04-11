@@ -1,38 +1,40 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 11 Apr 2018 10:13:11 -0400
-Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
- Extended Tags
-In-Reply-To: <20180411140849.GA12557@kroah.com>
-References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
- <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
- <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
- <1c94361d-7a8d-ad18-12e5-1612326a54db@codeaurora.org>
- <20180411135151.GB91792@bhelgaas-glaptop.roam.corp.google.com>
- <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
- <20180411140849.GA12557@kroah.com>
-Message-ID: <1290e3d3-e7f0-a4f5-925d-2b7c2cb42b93@codeaurora.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 11 Apr 2018 22:16:36 +0800
+Subject: [PATCH 0/5] Add support in dwmac-sun8i for accessing EMAC clock
+Message-ID: <20180411141641.14675-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/2018 10:08 AM, Greg Kroah-Hartman wrote:
->>> So I added these stable tags:
->>>
->>>   CC: stable at vger.kernel.org      # v4.11: 62ce94a7a5a5 PCI: Mark Broadcom HT2100 Root Port Extended Tags as broken
->>>   CC: stable at vger.kernel.org      # v4.11
->>>
->>> I'm not sure I'm using the stable request correctly, but my intent is:
+On some Allwinner SoCs, the EMAC clock register is in another device's
+emory space, e.g. on A64 it's in the memory space of SRAM controller.
 
-Asking if we placed the tags correctly. Sounds like we did.
+This patchset adds the possibility for the device to export the EMAC
+clock register as a single-register regmap.
 
->>>
->>>   - 62ce94a7a5a5 appeared in v4.14, so cherry-pick 62ce94a7a5a5 to
->>>     v4.11 through v4.13
->>>   - cherry-pick *this* patch on top of 62ce94a7a5a5 to v4.11 and later
-> Bjorn is correct here, why are you dragging me into this?
+PATCH 1 adds the device tree binding for dwmac-sun8i to use another
+device's regmap.
 
-Thanks
+PATCH 2 and 3 are dwmac-sun8i refactors.
+
+PATCH 4 exports the EMAC clock regmap in the SRAM controller driver.
+
+PATCH 5 enable SRAM controller in the A64 device tree (replaces
+syscon), and bind dwmac-sun8i to it.
+
+Chen-Yu Tsai (2):
+  net: stmmac: dwmac-sun8i: Use regmap_field for syscon register access
+  net: stmmac: dwmac-sun8i: Allow getting syscon regmap from device
+
+Icenowy Zheng (3):
+  dt-bindings: allow dwmac-sun8i to use other devices' exported regmap
+  drivers: soc: sunxi: export a regmap for EMAC clock reg on A64
+  arm64: allwinner: a64: add SRAM controller device tree node
+
+ .../devicetree/bindings/net/dwmac-sun8i.txt        |  5 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 23 +++++-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  | 85 +++++++++++++++++++---
+ drivers/soc/sunxi/sunxi_sram.c                     | 48 +++++++++++-
+ 4 files changed, 141 insertions(+), 20 deletions(-)
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.15.1
