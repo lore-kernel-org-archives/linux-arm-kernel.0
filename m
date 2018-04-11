@@ -1,90 +1,34 @@
-From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
-Date: Wed, 11 Apr 2018 11:03:37 +0200
-Subject: [PATCH v3 2/2] mm: remove odd HAVE_PTE_SPECIAL
-In-Reply-To: <de6ee514-8b7e-24d0-a7ee-a8887e8b0ae9@c-s.fr>
-References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
- <de6ee514-8b7e-24d0-a7ee-a8887e8b0ae9@c-s.fr>
-Message-ID: <93ed4fe4-dd1e-51be-948b-d53b16de21c5@linux.vnet.ibm.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 11 Apr 2018 14:38:55 +0530
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <1522665546-10035-3-git-send-email-radheys@xilinx.com>
+References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
+ <1522665546-10035-3-git-send-email-radheys@xilinx.com>
+Message-ID: <20180411090854.GY6014@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 02, 2018 at 04:09:02PM +0530, Radhey Shyam Pandey wrote:
 
+> +
+> +		if (chan->xdev->has_axieth_connected) {
+> +			seg = list_first_entry(&desc->segments,
+> +					struct xilinx_axidma_tx_segment, node);
+> +			if (cb.callback_param) {
+> +				app_w = (u32 *) cb.callback_param;
 
-On 11/04/2018 10:58, Christophe LEROY wrote:
-> 
-> 
-> Le 11/04/2018 ? 10:03, Laurent Dufour a ?crit?:
->> Remove the additional define HAVE_PTE_SPECIAL and rely directly on
->> CONFIG_ARCH_HAS_PTE_SPECIAL.
->>
->> There is no functional change introduced by this patch
->>
->> Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
->> ---
->> ? mm/memory.c | 19 ++++++++-----------
->> ? 1 file changed, 8 insertions(+), 11 deletions(-)
->>
->> diff --git a/mm/memory.c b/mm/memory.c
->> index 96910c625daa..7f7dc7b2a341 100644
->> --- a/mm/memory.c
->> +++ b/mm/memory.c
->> @@ -817,17 +817,12 @@ static void print_bad_pte(struct vm_area_struct *vma,
->> unsigned long addr,
->> ?? * PFNMAP mappings in order to support COWable mappings.
->> ?? *
->> ?? */
->> -#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
->> -# define HAVE_PTE_SPECIAL 1
->> -#else
->> -# define HAVE_PTE_SPECIAL 0
->> -#endif
->> ? struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
->> ?????????????????? pte_t pte, bool with_public_device)
->> ? {
->> ????? unsigned long pfn = pte_pfn(pte);
->> ? -??? if (HAVE_PTE_SPECIAL) {
->> +??? if (IS_ENABLED(CONFIG_ARCH_HAS_PTE_SPECIAL)) {
->> ????????? if (likely(!pte_special(pte)))
->> ????????????? goto check_pfn;
->> ????????? if (vma->vm_ops && vma->vm_ops->find_special_page)
->> @@ -862,7 +857,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
->> unsigned long addr,
->> ????????? return NULL;
->> ????? }
->> ? -??? /* !HAVE_PTE_SPECIAL case follows: */
->> +??? /* !CONFIG_ARCH_HAS_PTE_SPECIAL case follows: */
->> ? ????? if (unlikely(vma->vm_flags & (VM_PFNMAP|VM_MIXEDMAP))) {
->> ????????? if (vma->vm_flags & VM_MIXEDMAP) {
->> @@ -881,7 +876,8 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
->> unsigned long addr,
->> ? ????? if (is_zero_pfn(pfn))
->> ????????? return NULL;
->> -check_pfn:
->> +
->> +check_pfn: __maybe_unused
-> 
-> See below
-> 
->> ????? if (unlikely(pfn > highest_memmap_pfn)) {
->> ????????? print_bad_pte(vma, addr, pte, NULL);
->> ????????? return NULL;
->> @@ -891,7 +887,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
->> unsigned long addr,
->> ?????? * NOTE! We still have PageReserved() pages in the page tables.
->> ?????? * eg. VDSO mappings can cause them to exist.
->> ?????? */
->> -out:
->> +out: __maybe_unused
-> 
-> Why do you need that change ?
-> 
-> There is no reason for the compiler to complain. It would complain if the goto
-> was within a #ifdef, but all the purpose of using IS_ENABLED() is to allow the
-> compiler to properly handle all possible cases. That's all the force of
-> IS_ENABLED() compared to ifdefs, and that the reason why they are plebicited,
-> ref Linux Codying style for a detailed explanation.
+why are you interpreting callback_param? This is plainly wrong.
+we do not know what is the interpretation of callback_param and it is
+internal to submitter.
 
-Fair enough.
+What exactly is the problem you are trying to solve?
 
-Should I submit a v4 just to remove these so ugly __maybe_unused ?
+> +				hw = &seg->hw;
+> +				*app_w = hw->status & XILINX_DMA_MAX_TRANS_LEN;
+> +				memcpy(app_w, hw->app, sizeof(u32) *
+> +					XILINX_DMA_NUM_APP_WORDS);
+> +			}
+
+-- 
+~Vinod
