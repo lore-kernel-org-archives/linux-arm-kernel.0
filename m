@@ -1,66 +1,69 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 11 Apr 2018 12:55:08 -0600
-Subject: [VERY RFC 0/2] iommu: optionally skip attaching to a DMA domain
-Message-ID: <20180411185510.11594-1-jcrouse@codeaurora.org>
+Date: Wed, 11 Apr 2018 12:55:09 -0600
+Subject: [PATCH 1/2] iommu: Gracefully allow drivers to not attach to a
+ default domain
+In-Reply-To: <20180411185510.11594-1-jcrouse@codeaurora.org>
+References: <20180411185510.11594-1-jcrouse@codeaurora.org>
+Message-ID: <20180411185510.11594-2-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been struggling with a problem for a while and I haven't been able to come
-up with a clean solution. Rob convinced me to stop complaining and do
-_something_ and hopefully this can spur a good discussion.
+Provide individual device drivers the chance to gracefully refuse
+to attach a device to the default domain. If the attach_device
+op returns -ENOTSUPP don't print a error message and don't set
+group->domain but still return success from iommu_group_add_dev().
 
-The scenario is basically this: The MSM GPU wants to manage its own IOMMU
-virtual address space in lieu of using the DMA API to do so. The most important
-reason is that when per-instance pagetables [1] are enabled each file descriptor
-uses its own pagetable which are dynamically switched between contexts. In
-conjunction with this we use a split pagetable scheme to allow global buffers 
-be persistently mapped so even a single pagetable has multiple ranges that need
-to be utilized based on buffer type.
+This allows all the usual APIs to work and the next domain to try
+to attach will take group->domain for itself and everything will
+proceed as normal.
 
-Obviously the DMA API isn't suitable for this kind of specialized use. We want
-to push it off to the side, allocate our own domain, and use it directly with
-the IOMMU APIs. In a perfect world we would just not use the DMA API and attach
-our own domain and that would be the end of the story. Unfortunately this is not
-a perfect world.
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+---
+ drivers/iommu/iommu.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-In order to switch the pagetable from the GPU the SoC has some special wiring so
-that the GPU can reprogram the TTBR0 register in the IOMMU to the appropriate
-value. For a variety of reasons the hardware is hardcoded to only be able to
-access context bank 0 in the SMMU device. Long story short; if the DMA
-domain is allocated during bus enumeration and attached to context bank 0 then
-by the time we get to the driver domain we have long since lost our chance to
-get the context bank we need.
-
-After going back and forth and trying a few possible options it seems like the
-"easiest" solution" is to skip attaching the DMA domain in the first place. But
-we still need to create a default domain and set up the IOMMU groups correctly
-so that when the GPU driver comes along it can attach the device and everything
-will Just Work (TM). Rob suggested that we should use a blacklist of devices
-that choose to not participate so thats what I'm offering as a starting point
-for discussion.
-
-The first patch in this series allows the specific IOMMU driver to gracefully
-skip attaching a device by returning -ENOSUPP. In that case, the core will
-skip printing error messages and it won't attach the domain to the group but
-it still allows the group to get created so that the IOMMU device is properly
-set up. In arch_setup_dma_ops() the call to iommu_get_domain_for_dev() will
-return NULL and the IOMMU ops won't be set up.
-
-The second patch implements the blacklist in arm-smmu.c based on the compatible
-string of the GPU device and returns -ENOTSUPP.
-
-I tested this with my current per-instance pagetable stack and it does the job
-but I am very much in the market for better ideas.
-
-[1] https://patchwork.freedesktop.org/series/38729/
-
-Jordan Crouse (2):
-  iommu: Gracefully allow drivers to not attach to a default domain
-  iommu/arm-smmu: Add list of devices to opt out of DMA domains
-
- drivers/iommu/arm-smmu.c | 23 +++++++++++++++++++++++
- drivers/iommu/iommu.c    | 18 ++++++++++++++----
- 2 files changed, 37 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 69fef991c651..2403cce138d2 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -592,7 +592,7 @@ int iommu_group_add_device(struct iommu_group *group, struct device *dev)
+ 	if (group->domain)
+ 		ret = __iommu_attach_device(group->domain, dev);
+ 	mutex_unlock(&group->mutex);
+-	if (ret)
++	if (ret && ret != -ENOTSUPP)
+ 		goto err_put_group;
+ 
+ 	/* Notify any listeners about change to group. */
+@@ -617,7 +617,9 @@ int iommu_group_add_device(struct iommu_group *group, struct device *dev)
+ 	sysfs_remove_link(&dev->kobj, "iommu_group");
+ err_free_device:
+ 	kfree(device);
+-	pr_err("Failed to add device %s to group %d: %d\n", dev_name(dev), group->id, ret);
++	if (ret != -ENOTSUPP)
++		pr_err("Failed to add device %s to group %d: %d\n",
++			dev_name(dev), group->id, ret);
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(iommu_group_add_device);
+@@ -1039,8 +1041,16 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
+ 
+ 	ret = iommu_group_add_device(group, dev);
+ 	if (ret) {
+-		iommu_group_put(group);
+-		return ERR_PTR(ret);
++		/*
++		 * If the driver chooses not to bind the device, reset
++		 * group->domain so a new domain can be added later
++		 */
++		if (ret == -ENOTSUPP)
++			group->domain = NULL;
++		else {
++			iommu_group_put(group);
++			return ERR_PTR(ret);
++		}
+ 	}
+ 
+ 	return group;
 -- 
 2.16.1
