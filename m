@@ -1,46 +1,90 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 11 Apr 2018 14:35:26 +0530
-Subject: [RFC 1/6] dt-bindings: dma: xilinx_dma: Add optional property
- has_axieth_connected
-In-Reply-To: <1522665546-10035-2-git-send-email-radheys@xilinx.com>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-2-git-send-email-radheys@xilinx.com>
-Message-ID: <20180411090525.GX6014@localhost>
+From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
+Date: Wed, 11 Apr 2018 11:03:37 +0200
+Subject: [PATCH v3 2/2] mm: remove odd HAVE_PTE_SPECIAL
+In-Reply-To: <de6ee514-8b7e-24d0-a7ee-a8887e8b0ae9@c-s.fr>
+References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
+ <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
+ <de6ee514-8b7e-24d0-a7ee-a8887e8b0ae9@c-s.fr>
+Message-ID: <93ed4fe4-dd1e-51be-948b-d53b16de21c5@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2018 at 04:09:01PM +0530, Radhey Shyam Pandey wrote:
-> Add an optional AXI DMA property 'has_axieth_connected'. This can be
-> specified to indicate that AXI DMA is connected to AXI Ethernet in
-> hardware design and dma driver needs to do some additional handling.
 
-1. why are DT people and list not added to this? I have added that
-2. should we have a property for a specific peripheral? Wouldn't it help to have
-a generic property for peripheral connected which can be scaled to more IPs
-being connected in future?
-3. Please use right subsystem name, it damengine: not dma:
 
+On 11/04/2018 10:58, Christophe LEROY wrote:
 > 
-> Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
-> ---
->  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> index a2b8bfa..5d592e3 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> @@ -42,6 +42,7 @@ Optional properties:
->  	the hardware.
->  Optional properties for AXI DMA:
->  - xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
-> +- xlnx,axieth-connected: Tells whether AXI DMA is connected to AXI Ethernet.
->  Optional properties for VDMA:
->  - xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
->  	It takes following values:
-> -- 
-> 1.7.1
+> Le 11/04/2018 ? 10:03, Laurent Dufour a ?crit?:
+>> Remove the additional define HAVE_PTE_SPECIAL and rely directly on
+>> CONFIG_ARCH_HAS_PTE_SPECIAL.
+>>
+>> There is no functional change introduced by this patch
+>>
+>> Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
+>> ---
+>> ? mm/memory.c | 19 ++++++++-----------
+>> ? 1 file changed, 8 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/mm/memory.c b/mm/memory.c
+>> index 96910c625daa..7f7dc7b2a341 100644
+>> --- a/mm/memory.c
+>> +++ b/mm/memory.c
+>> @@ -817,17 +817,12 @@ static void print_bad_pte(struct vm_area_struct *vma,
+>> unsigned long addr,
+>> ?? * PFNMAP mappings in order to support COWable mappings.
+>> ?? *
+>> ?? */
+>> -#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
+>> -# define HAVE_PTE_SPECIAL 1
+>> -#else
+>> -# define HAVE_PTE_SPECIAL 0
+>> -#endif
+>> ? struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
+>> ?????????????????? pte_t pte, bool with_public_device)
+>> ? {
+>> ????? unsigned long pfn = pte_pfn(pte);
+>> ? -??? if (HAVE_PTE_SPECIAL) {
+>> +??? if (IS_ENABLED(CONFIG_ARCH_HAS_PTE_SPECIAL)) {
+>> ????????? if (likely(!pte_special(pte)))
+>> ????????????? goto check_pfn;
+>> ????????? if (vma->vm_ops && vma->vm_ops->find_special_page)
+>> @@ -862,7 +857,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
+>> unsigned long addr,
+>> ????????? return NULL;
+>> ????? }
+>> ? -??? /* !HAVE_PTE_SPECIAL case follows: */
+>> +??? /* !CONFIG_ARCH_HAS_PTE_SPECIAL case follows: */
+>> ? ????? if (unlikely(vma->vm_flags & (VM_PFNMAP|VM_MIXEDMAP))) {
+>> ????????? if (vma->vm_flags & VM_MIXEDMAP) {
+>> @@ -881,7 +876,8 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
+>> unsigned long addr,
+>> ? ????? if (is_zero_pfn(pfn))
+>> ????????? return NULL;
+>> -check_pfn:
+>> +
+>> +check_pfn: __maybe_unused
 > 
+> See below
+> 
+>> ????? if (unlikely(pfn > highest_memmap_pfn)) {
+>> ????????? print_bad_pte(vma, addr, pte, NULL);
+>> ????????? return NULL;
+>> @@ -891,7 +887,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
+>> unsigned long addr,
+>> ?????? * NOTE! We still have PageReserved() pages in the page tables.
+>> ?????? * eg. VDSO mappings can cause them to exist.
+>> ?????? */
+>> -out:
+>> +out: __maybe_unused
+> 
+> Why do you need that change ?
+> 
+> There is no reason for the compiler to complain. It would complain if the goto
+> was within a #ifdef, but all the purpose of using IS_ENABLED() is to allow the
+> compiler to properly handle all possible cases. That's all the force of
+> IS_ENABLED() compared to ifdefs, and that the reason why they are plebicited,
+> ref Linux Codying style for a detailed explanation.
 
--- 
-~Vinod
+Fair enough.
+
+Should I submit a v4 just to remove these so ugly __maybe_unused ?
