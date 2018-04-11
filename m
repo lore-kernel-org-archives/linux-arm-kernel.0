@@ -1,109 +1,137 @@
-From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
-Date: Wed, 11 Apr 2018 12:32:07 +0200
-Subject: [PATCH v3 2/2] mm: remove odd HAVE_PTE_SPECIAL
-In-Reply-To: <278a5212-b962-9a3a-cc86-76cac744afab@c-s.fr>
-References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
- <de6ee514-8b7e-24d0-a7ee-a8887e8b0ae9@c-s.fr>
- <93ed4fe4-dd1e-51be-948b-d53b16de21c5@linux.vnet.ibm.com>
- <278a5212-b962-9a3a-cc86-76cac744afab@c-s.fr>
-Message-ID: <32655c37-91cb-17aa-58e7-74254e2673a0@linux.vnet.ibm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Apr 2018 11:46:56 +0100
+Subject: [PATCH] arm64: avoid race condition issue in dump_backtrace
+In-Reply-To: <1523428228.26617.100.camel@mtksdccf07>
+References: <20180322055929.z25brvwlmdighz66@salmiak>
+ <1521711329.26617.31.camel@mtksdccf07>
+ <20180326113932.2i6qp3776jtmcqk4@lakrids.cambridge.arm.com>
+ <1522229612.26617.47.camel@mtksdccf07>
+ <20180328101240.moo44g5qd3qjuxgn@lakrids.cambridge.arm.com>
+ <1522397292.26617.63.camel@mtksdccf07>
+ <20180404090431.rqwtaqovipxa5gta@lakrids.cambridge.arm.com>
+ <1523174328.26617.91.camel@mtksdccf07>
+ <20180409112559.uh76jpiytznymw6w@lakrids.cambridge.arm.com>
+ <1523428228.26617.100.camel@mtksdccf07>
+Message-ID: <20180411104656.4afhb4durpntxqxl@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2018 11:09, Christophe LEROY wrote:
-> 
-> 
-> Le 11/04/2018 ? 11:03, Laurent Dufour a ?crit?:
->>
->>
->> On 11/04/2018 10:58, Christophe LEROY wrote:
->>>
->>>
->>> Le 11/04/2018 ? 10:03, Laurent Dufour a ?crit?:
->>>> Remove the additional define HAVE_PTE_SPECIAL and rely directly on
->>>> CONFIG_ARCH_HAS_PTE_SPECIAL.
->>>>
->>>> There is no functional change introduced by this patch
->>>>
->>>> Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
->>>> ---
->>>> ?? mm/memory.c | 19 ++++++++-----------
->>>> ?? 1 file changed, 8 insertions(+), 11 deletions(-)
->>>>
->>>> diff --git a/mm/memory.c b/mm/memory.c
->>>> index 96910c625daa..7f7dc7b2a341 100644
->>>> --- a/mm/memory.c
->>>> +++ b/mm/memory.c
->>>> @@ -817,17 +817,12 @@ static void print_bad_pte(struct vm_area_struct *vma,
->>>> unsigned long addr,
->>>> ??? * PFNMAP mappings in order to support COWable mappings.
->>>> ??? *
->>>> ??? */
->>>> -#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
->>>> -# define HAVE_PTE_SPECIAL 1
->>>> -#else
->>>> -# define HAVE_PTE_SPECIAL 0
->>>> -#endif
->>>> ?? struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long
->>>> addr,
->>>> ??????????????????? pte_t pte, bool with_public_device)
->>>> ?? {
->>>> ?????? unsigned long pfn = pte_pfn(pte);
->>>> ?? -??? if (HAVE_PTE_SPECIAL) {
->>>> +??? if (IS_ENABLED(CONFIG_ARCH_HAS_PTE_SPECIAL)) {
->>>> ?????????? if (likely(!pte_special(pte)))
->>>> ?????????????? goto check_pfn;
->>>> ?????????? if (vma->vm_ops && vma->vm_ops->find_special_page)
->>>> @@ -862,7 +857,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
->>>> unsigned long addr,
->>>> ?????????? return NULL;
->>>> ?????? }
->>>> ?? -??? /* !HAVE_PTE_SPECIAL case follows: */
->>>> +??? /* !CONFIG_ARCH_HAS_PTE_SPECIAL case follows: */
->>>> ?? ????? if (unlikely(vma->vm_flags & (VM_PFNMAP|VM_MIXEDMAP))) {
->>>> ?????????? if (vma->vm_flags & VM_MIXEDMAP) {
->>>> @@ -881,7 +876,8 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
->>>> unsigned long addr,
->>>> ?? ????? if (is_zero_pfn(pfn))
->>>> ?????????? return NULL;
->>>> -check_pfn:
->>>> +
->>>> +check_pfn: __maybe_unused
->>>
->>> See below
->>>
->>>> ?????? if (unlikely(pfn > highest_memmap_pfn)) {
->>>> ?????????? print_bad_pte(vma, addr, pte, NULL);
->>>> ?????????? return NULL;
->>>> @@ -891,7 +887,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma,
->>>> unsigned long addr,
->>>> ??????? * NOTE! We still have PageReserved() pages in the page tables.
->>>> ??????? * eg. VDSO mappings can cause them to exist.
->>>> ??????? */
->>>> -out:
->>>> +out: __maybe_unused
->>>
->>> Why do you need that change ?
->>>
->>> There is no reason for the compiler to complain. It would complain if the goto
->>> was within a #ifdef, but all the purpose of using IS_ENABLED() is to allow the
->>> compiler to properly handle all possible cases. That's all the force of
->>> IS_ENABLED() compared to ifdefs, and that the reason why they are plebicited,
->>> ref Linux Codying style for a detailed explanation.
->>
->> Fair enough.
->>
->> Should I submit a v4 just to remove these so ugly __maybe_unused ?
->>
-> 
-> Most likely, unless the mm maintainer agrees to remove them by himself when
-> applying your patch ?
+On Wed, Apr 11, 2018 at 02:30:28PM +0800, Ji.Zhang wrote:
+> On Mon, 2018-04-09 at 12:26 +0100, Mark Rutland wrote:
+> > On Sun, Apr 08, 2018 at 03:58:48PM +0800, Ji.Zhang wrote:
+> > > Yes, I see where the loop is, I have missed that the loop may cross
+> > > different stacks.
+> > > Define a nesting order and check against is a good idea, and it can
+> > > resolve the issue exactly, but as you mentioned before, we have no idea
+> > > how to handle with overflow and sdei stack, and the nesting order is
+> > > strongly related with the scenario of the stack, which means if someday
+> > > we add another stack, we should consider the relationship of the new
+> > > stack with other stacks. From the perspective of your experts, is that
+> > > suitable for doing this in unwind?
+> > > 
+> > > Or could we just find some way easier but not so accurate, eg.
+> > > Proposal 1: 
+> > > When we do unwind and detect that the stack spans, record the last fp of
+> > > previous stack and next time if we get into the same stack, compare it
+> > > with that last fp, the new fp should still smaller than last fp, or
+> > > there should be potential loop.
+> > > For example, when we unwind from irq to task, we record the last fp in
+> > > irq stack such as last_irq_fp, and if it unwind task stack back to irq
+> > > stack, no matter if it is the same irq stack with previous, just let it
+> > > go and compare the new irq fp with last_irq_fp, although the process may
+> > > be wrong since from task stack it could not unwind to irq stack, but the
+> > > whole process will eventually stop.
+> > 
+> > I agree that saving the last fp per-stack could work.
+> > 
+> > > Proposal 2:
+> > > So far we have four types of stack: task, irq, overflow and sdei, could
+> > > we just assume that the MAX number of stack spanning is just 3
+> > > times?(task->irq->overflow->sdei or task->irq->sdei->overflow), if yes,
+> > > we can just check the number of stack spanning when we detect the stack
+> > > spans.
+> > 
+> > I also agree that counting the number of stack transitions will prevent
+> > an inifinite loop, even if less accurately than proposal 1.
+> > 
+> > I don't have a strong preference either way.
+> Thank you for your comment.
+> Compared with proposal 1 and 2, I decide to use proposal2 since
+> proposal1 seems a little complicated and it is not as easy as proposal2
+> when new stack is added.
+> The sample is as below:
+> diff --git a/arch/arm64/include/asm/stacktrace.h
+> b/arch/arm64/include/asm/stacktrace.h
+> index 902f9ed..72d1f34 100644
+> --- a/arch/arm64/include/asm/stacktrace.h
+> +++ b/arch/arm64/include/asm/stacktrace.h
+> @@ -92,4 +92,22 @@ static inline bool on_accessible_stack(struct
+> task_struct *tsk, unsigned long sp
+>         return false;
+>  }
+>  
+> +#define MAX_STACK_SPAN 3
 
-That was my point.
+Depending on configuration we can have:
 
-Andrew, should I send a v4 or could you wipe the 2 __maybe_unsued when applying
-the patch ?
+* task
+* irq
+* overflow (optional with VMAP_STACK)
+* sdei (optional with ARM_SDE_INTERFACE && VMAP_STACK)
+
+So 3 isn't always correct.
+
+Also, could we please call this something like MAX_NR_STACKS?
+
+> +DECLARE_PER_CPU(int, num_stack_span);
+
+I'm pretty sure we can call unwind_frame() in a preemptible context, so
+this isn't safe.
+
+Put this counter into the struct stackframe, and call it something like
+nr_stacks;
+
+[...]
+
+> +DEFINE_PER_CPU(int, num_stack_span);
+
+As above, this can go.
+
+> +
+>  /*
+>   * AArch64 PCS assigns the frame pointer to x29.
+>   *
+> @@ -56,6 +58,20 @@ int notrace unwind_frame(struct task_struct *tsk,
+> struct stackframe *frame)
+>         frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
+>         frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+>  
+> +       if (!on_same_stack(tsk, fp, frame->fp)) {
+> +               int num = (int)__this_cpu_read(num_stack_span);
+> +
+> +               if (num >= MAX_STACK_SPAN)
+> +                       return -EINVAL;
+> +               num++;
+> +               __this_cpu_write(num_stack_span, num);
+> +               fp = frame->fp + 0x8;
+> +       }
+> +       if (fp <= frame->fp) {
+> +               pr_notice("fp invalid, stop unwind\n");
+> +               return -EINVAL;
+> +       }
+
+I think this can be simplified to something like:
+
+	bool same_stack;
+
+	same_stack = on_same_stack(tsk, fp, frame->fp);
+
+	if (fp <= frame->fp && same_stack)
+		return -EINVAL;
+	if (!same_stack && ++frame->nr_stacks > MAX_NR_STACKS)
+		return -EINVAL;
+
+... assuming we add nr_stacks to struct stackframe.
 
 Thanks,
-Laurent.
+Mark.
