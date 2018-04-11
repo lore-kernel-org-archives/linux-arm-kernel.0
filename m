@@ -1,44 +1,38 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 11 Apr 2018 10:49:36 +0200
-Subject: [PATCH v3 2/2] mm: remove odd HAVE_PTE_SPECIAL
-In-Reply-To: <5bd1bb46-8f71-e6db-7fb7-43d023a37f58@linux.vnet.ibm.com>
-References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
- <20180411083315.GA23400@dhcp22.suse.cz>
- <5bd1bb46-8f71-e6db-7fb7-43d023a37f58@linux.vnet.ibm.com>
-Message-ID: <20180411084936.GC23400@dhcp22.suse.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Apr 2018 10:51:29 +0200
+Subject: [PATCH] MAINTAINERS: Update ASPEED entry with details
+In-Reply-To: <CACPK8XeD354AGXVunToR=RGQuSKWZ8vKSXH+DZey+udEE-Am_A@mail.gmail.com>
+References: <20180222050324.21531-1-joel@jms.id.au>
+ <CACPK8XeD354AGXVunToR=RGQuSKWZ8vKSXH+DZey+udEE-Am_A@mail.gmail.com>
+Message-ID: <CAK8P3a146q8+Y0XKsPUD7ZW4qHoUetpkupfqVOWPxBi6ruwQSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 11-04-18 10:41:23, Laurent Dufour wrote:
-> On 11/04/2018 10:33, Michal Hocko wrote:
-> > On Wed 11-04-18 10:03:36, Laurent Dufour wrote:
-> >> @@ -881,7 +876,8 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
-> >>  
-> >>  	if (is_zero_pfn(pfn))
-> >>  		return NULL;
-> >> -check_pfn:
-> >> +
-> >> +check_pfn: __maybe_unused
-> >>  	if (unlikely(pfn > highest_memmap_pfn)) {
-> >>  		print_bad_pte(vma, addr, pte, NULL);
-> >>  		return NULL;
-> >> @@ -891,7 +887,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
-> >>  	 * NOTE! We still have PageReserved() pages in the page tables.
-> >>  	 * eg. VDSO mappings can cause them to exist.
-> >>  	 */
-> >> -out:
-> >> +out: __maybe_unused
-> >>  	return pfn_to_page(pfn);
-> > 
-> > Why do we need this ugliness all of the sudden?
-> Indeed the compiler doesn't complaint but in theory it should since these
-> labels are not used depending on CONFIG_ARCH_HAS_PTE_SPECIAL.
+On Wed, Apr 11, 2018 at 6:06 AM, Joel Stanley <joel@jms.id.au> wrote:
+> Hey Arnd,
+>
+> On 22 February 2018 at 15:33, Joel Stanley <joel@jms.id.au> wrote:
+>> I am interested in all ASPEED drivers, and the previous match wasn't
+>> grabbing files in nested directories. Use N instead.
+>>
+>> Add the arm kernel mailing list so that patches get reviewed there, and
+>> the linux-aspeed list which exists only so I can use patchwork to track
+>> patches.
+>>
+>> Add Andrew as a reviewer, because he is involved in reviewing ASPEED
+>> stuff.
+>>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>
+> can you please pick this one up? It would be great to get it into
+> fixes as Andrew and I have been missing being cc'd on stuff we would
+> have like to review.
 
-Well, such a warning would be quite pointless so I would rather not make
-the code ugly. The value of unused label is quite questionable to start
-with...
+Sure, applied to the fixes branch now.
 
--- 
-Michal Hocko
-SUSE Labs
+In general, when you want a patch to be applied, please send it to
+arm at kernel.org so we know it's for us. As a rule, I don't pick up patches
+otherwise but assume that you are asking for feedback and/or Acks
+but will resend it once everyone is happy with the change.
+
+      Arnd
