@@ -1,65 +1,58 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 11 Apr 2018 16:08:49 +0200
-Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
- Extended Tags
-In-Reply-To: <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
-References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
- <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
- <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
- <1c94361d-7a8d-ad18-12e5-1612326a54db@codeaurora.org>
- <20180411135151.GB91792@bhelgaas-glaptop.roam.corp.google.com>
- <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
-Message-ID: <20180411140849.GA12557@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Apr 2018 07:11:39 -0700
+Subject: [PATCH] ARM: avoid Cortex-A9 livelock on tight dmb loops
+In-Reply-To: <20180411125210.GF10990@n2100.armlinux.org.uk>
+References: <E1f5qij-00033R-Sl@rmk-PC.armlinux.org.uk>
+ <20180410134149.GQ5700@atomide.com>
+ <685f80e3-30b3-8806-b81c-8de456507001@ti.com>
+ <20180411125210.GF10990@n2100.armlinux.org.uk>
+Message-ID: <20180411141139.GU5700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 10:02:07AM -0400, Sinan Kaya wrote:
-> +GregKH
+* Russell King - ARM Linux <linux@armlinux.org.uk> [180411 12:53]:
+> On Tue, Apr 10, 2018 at 05:12:37PM +0300, Tero Kristo wrote:
+> > On 10/04/18 16:41, Tony Lindgren wrote:
+> > >* Russell King <rmk+kernel@armlinux.org.uk> [180410 10:43]:
+> > >>diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+> > >>index 021b5a8b9c0a..d4ddc78b2a0b 100644
+> > >>--- a/arch/arm/mach-omap2/prm_common.c
+> > >>+++ b/arch/arm/mach-omap2/prm_common.c
+> > >>@@ -523,7 +523,7 @@ void omap_prm_reset_system(void)
+> > >>  	prm_ll_data->reset_system();
+> > >>  	while (1)
+> > >>-		cpu_relax();
+> > >>+		cpu_do_idle();
+> > >>  }
+> > >
+> > >Hmm we need to check so the added WFI here does not cause an
+> > >undesired change to a low power state. Adding Tero to Cc also.
+> > 
+> > Generally it is a bad idea to call arbitrary WFI within OMAP architecture,
+> > as this triggers a PRCM power transition and will most likely cause a hang
+> > if not controlled properly.
+> > 
+> > Has this patch been tested on any platform that supports proper power
+> > management?
+> 
+> That will also go for the other locations in this patch too, as they
+> are all callable on _any_ platform.
+> 
+> It sounds like we need to abstract this so that platforms where "wfi"
+> is complex can handle the "spin on this CPU forever" appropriately.
+> 
+> While we could use dsb, we're asking a CPU to indefinitely spin in a
+> tight loop, which isn't going to be good for power consumption - what
+> if we have three CPUs doing that, could it push a SoC over the thermal
+> limits?  I don't think that's a question we can confidently answer
+> except for specific SoCs.
 
-Why?
+We already have code in the kernel (and in the bootrom) to "park" a
+cpu after starting. But using it without resetting the cpu would require
+1-1 memory mapping or modifying the code. That is if we wanted to use
+the same code also for parking the cpus for kexec without resetting
+them.
 
-> On 4/11/2018 9:51 AM, Bjorn Helgaas wrote:
-> > On Tue, Apr 10, 2018 at 04:18:01PM -0400, Sinan Kaya wrote:
-> >> On 4/10/2018 3:50 PM, Bjorn Helgaas wrote:
-> >>> On Tue, Apr 10, 2018 at 02:41:44PM -0500, Bjorn Helgaas wrote:
-> >>>> On Wed, Apr 04, 2018 at 06:50:09PM -0400, Sinan Kaya wrote:
-> >>>>> Per PCIe r3.1, sec 2.2.6.2 and 7.8.4, a Requester may not use 8-bit Tags
-> >>>>> unless its Extended Tag Field Enable is set, but all Receivers/Completers
-> >>>>> must handle 8-bit Tags correctly regardless of their Extended Tag Field
-> >>>>> Enable.
-> >>>>>
-> >>>>> Some devices do not handle 8-bit Tags as Completers, so add a quirk for
-> >>>>> them.  If we find such a device, we disable Extended Tags for the entire
-> >>>>> hierarchy to make peer-to-peer DMA possible.
-> >>>>>
-> >>>>> The Broadcom HT1100/HT2000/HT2100 seems to have issues with handling 8-bit
-> >>>>> tags.  Mark it as broken.
-> >>>>>
-> >>>>> Fixes: 60db3a4d8cc9 ("PCI: Enable PCIe Extended Tags if supported")
-> >>>>> Link: https://bugzilla.kernel.org/show_bug.cgi?id=196197
-> >>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >>>> Applied to pci/enumeration for v4.18, thanks!
-> >>> Actually, this is a really annoying issue and I think the fix is
-> >>> appropriate for v4.17, so I moved it to my for-linus branch.
-> >>>
-> >>
-> >> I agree. It causes boot issues on some AMD Opteron machines. It should
-> >> probably be back-ported too. 
-> > 
-> > We started enabling extended tags with 60db3a4d8cc9 ("PCI: Enable PCIe
-> > Extended Tags if supported"), which appeared in v4.11.
-> > 
-> > So I added these stable tags:
-> > 
-> >   CC: stable at vger.kernel.org      # v4.11: 62ce94a7a5a5 PCI: Mark Broadcom HT2100 Root Port Extended Tags as broken
-> >   CC: stable at vger.kernel.org      # v4.11
-> > 
-> > I'm not sure I'm using the stable request correctly, but my intent is:
-> > 
-> >   - 62ce94a7a5a5 appeared in v4.14, so cherry-pick 62ce94a7a5a5 to
-> >     v4.11 through v4.13
-> >   - cherry-pick *this* patch on top of 62ce94a7a5a5 to v4.11 and later
+Regards,
 
-Bjorn is correct here, why are you dragging me into this?
-
-greg k-h
+Tony
