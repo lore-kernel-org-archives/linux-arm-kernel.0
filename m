@@ -1,214 +1,87 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 11 Apr 2018 17:34:48 +0200
-Subject: [PATCH] mtd: nand: raw: atmel: add module param to avoid using dma
-In-Reply-To: <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
-References: <20180329131054.22506-1-peda@axentia.se>
- <20180329153322.5e2fc1e7@bbrezillon>
- <ed87cf13-a69a-6115-f0a8-5f51c4957d1d@axentia.se>
- <20180329154416.5c1a0013@bbrezillon>
- <b740406a-e91c-67ad-24a3-cbdbe259d00d@axentia.se>
- <20180402142249.7e076a64@bbrezillon>
- <e0d9bd59-8031-e387-676e-dc5811170a0c@axentia.se>
- <20180402212843.164d5d21@bbrezillon> <20180402222020.1d344c14@bbrezillon>
- <d7e6f78d-b57b-4d0f-c07c-ca6c1930cd51@axentia.se>
- <20180403091813.5fb5c18c@bbrezillon>
- <d0afd431-6e51-a9b7-c103-ecf1f6e07c2e@axentia.se>
-Message-ID: <959d826d-1a98-ca22-acee-a4548427fcd3@microchip.com>
+From: andrea.parri@amarulasolutions.com (Andrea Parri)
+Date: Wed, 11 Apr 2018 17:39:01 +0200
+Subject: [PATCH 00/10] kernel/locking: qspinlock improvements
+In-Reply-To: <20180411102003.rjfrcmc4fjukehst@armageddon.cambridge.arm.com>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <20180406132249.GA7071@andrea>
+ <20180411102003.rjfrcmc4fjukehst@armageddon.cambridge.arm.com>
+Message-ID: <20180411153901.GA14205@andrea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2018 at 16:44, Peter Rosin wrote:
-> Hi Nicolas,
+On Wed, Apr 11, 2018 at 11:20:04AM +0100, Catalin Marinas wrote:
+> On Fri, Apr 06, 2018 at 03:22:49PM +0200, Andrea Parri wrote:
+> > On Thu, Apr 05, 2018 at 05:58:57PM +0100, Will Deacon wrote:
+> > > I've been kicking the tyres further on qspinlock and with this set of patches
+> > > I'm happy with the performance and fairness properties. In particular, the
+> > > locking algorithm now guarantees forward progress whereas the implementation
+> > > in mainline can starve threads indefinitely in cmpxchg loops.
+> > > 
+> > > Catalin has also implemented a model of this using TLA to prove that the
+> > > lock is fair, although this doesn't take the memory model into account:
+> > > 
+> > > https://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/kernel-tla.git/commit/
+> > 
+> > Nice!  I'll dig into this formalization, but my guess is that our model
+> > (and axiomatic models "a-la-herd", in general) are not well-suited when
+> > it comes to study properties such as fairness, liveness...
 > 
-> Boris asked for your input on this (the datasheet difference appears to
-> have no bearing on the issue) elsewhere in the tree of messages. It's
-> now been a week or so and I'm starting to wonder if you missed this
-> altogether or if you are simply out of office or something?
-
-Hi Peter,
-
-I didn't dig into this issue with matrix datasheet reset values and your 
-findings below. I'll try to move forward with your detailed explanation 
-and with my contacts within the "product" team internally.
-
-However, I have the feeling that this sounds a little bit familiar to me 
-and that the pins drive strength for the NAND Flash *and* LCD must be 
-positioned to "Medium drive" at least for these interfaces (register 
-PIO_CFGR).
-
-We use this particular setting for our own vendor branch and found that 
-the LCD and NAND Flash was far more sable on *some HW boards*. Here is 
-an example for NAND but you can find the same for LCD:
-https://github.com/linux4sam/linux-at91/commit/99d9e4c8848a2f16cc5b34bb27e588ca7504b695
-Obviously the "drive strength" property added by Ludovic has been 
-proposed but is not accepted yet in Mainline and this is why you don't 
-see it positioned here.
-
-If it feels like an issue with "crosstalk" it might be the reason why. 
-For overruns or underruns, it's true that I would say that it's not 
-related and that dealing with the matrix is the way to go.
-
-You can simply test this using devmem2 and see if it's better.
-
-Hope that it helps.
-Best regards,
-   Nicolas
-
-> On 2018-04-03 09:18, Boris Brezillon wrote:
->> On Tue, 3 Apr 2018 08:11:30 +0200
->> Peter Rosin <peda@axentia.se> wrote:
->>
->>> On 2018-04-02 22:20, Boris Brezillon wrote:
->>>> On Mon, 2 Apr 2018 21:28:43 +0200
->>>> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
->>>>    
->>>>> On Mon, 2 Apr 2018 19:59:39 +0200
->>>>> Peter Rosin <peda@axentia.se> wrote:
->>>>>   
->>>>>> On 2018-04-02 14:22, Boris Brezillon wrote:
->>>>>>> On Thu, 29 Mar 2018 16:27:12 +0200
->>>>>>> Peter Rosin <peda@axentia.se> wrote:
->>>>>>>        
->>>>>>>> On 2018-03-29 15:44, Boris Brezillon wrote:
->>>>>>>>> On Thu, 29 Mar 2018 15:37:43 +0200
->>>>>>>>> Peter Rosin <peda@axentia.se> wrote:
->>>>>>>>>          
->>>>>>>>>> On 2018-03-29 15:33, Boris Brezillon wrote:
->>>>>>>>>>> On Thu, 29 Mar 2018 15:10:54 +0200
->>>>>>>>>>> Peter Rosin <peda@axentia.se> wrote:
->>>>>>>>>>>            
->>>>>>>>>>>> On a sama5d31 with a Full-HD dual LVDS panel (132MHz pixel clock) NAND
->>>>>>>>>>>> flash accesses have a tendency to cause display disturbances. Add a
->>>>>>>>>>>> module param to disable DMA from the NAND controller, since that fixes
->>>>>>>>>>>> the display problem for me.
->>>>>>>>>>>>
->>>>>>>>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
->>>>>>>>>>>> ---
->>>>>>>>>>>>   drivers/mtd/nand/raw/atmel/nand-controller.c | 7 ++++++-
->>>>>>>>>>>>   1 file changed, 6 insertions(+), 1 deletion(-)
->>>>>>>>>>>>
->>>>>>>>>>>> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
->>>>>>>>>>>> index b2f00b398490..2ff7a77c7b8e 100644
->>>>>>>>>>>> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
->>>>>>>>>>>> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
->>>>>>>>>>>> @@ -129,6 +129,11 @@
->>>>>>>>>>>>   #define DEFAULT_TIMEOUT_MS			1000
->>>>>>>>>>>>   #define MIN_DMA_LEN				128
->>>>>>>>>>>>   
->>>>>>>>>>>> +static bool atmel_nand_avoid_dma __read_mostly;
->>>>>>>>>>>> +
->>>>>>>>>>>> +MODULE_PARM_DESC(avoiddma, "Avoid using DMA");
->>>>>>>>>>>> +module_param_named(avoiddma, atmel_nand_avoid_dma, bool, 0400);
->>>>>>>>>>>
->>>>>>>>>>> I'm not a big fan of those driver specific cmdline parameters. Can't we
->>>>>>>>>>> instead give an higher priority to HLCDC master using the bus matrix?
->>>>>>>>>>
->>>>>>>>>> I don't know if it will be enough, but we sure can try. However, I have
->>>>>>>>>> no idea how to do that. I will happily test stuff though...
->>>>>>>>>
->>>>>>>>> There's no interface to configure that from Linux, but you can try to
->>>>>>>>> tweak it with devmem and if that does the trick, maybe we can expose a
->>>>>>>>> way to configure that from Linux. For more details, see the "Bus Matrix
->>>>>>>>> (MATRIX)" section in Atmel datasheets.
->>>>>>>>
->>>>>>>> I don't seem to succeed in changing the registers I think I need to change.
->>>>>>>> I can poke the "Write Protection Mode Register" by writing MAT0 and MAT1 to
->>>>>>>> it.
->>>>>>>
->>>>>>> You mean 0x4D415400, right? ("MAT0" != 0x4D415400).
->>>>>>
->>>>>> Bits 1 through 7 do not matter, so even though not equal they are (or
->>>>>> should be) equivalent. But I did use 0x4d415400. I simply used the
->>>>>> shorter syntax since that was easier to type and conveyed the relevant
->>>>>> info.
->>>>>
->>>>> Ok.
->>>>>   
->>>>>>      
->>>>>>>> But when I try to write to "Priority Registers B For Slaves" it doesn't
->>>>>>>> take, regardless of write protect mode.
->>>>>>>
->>>>>>> Did you check MATRIX_WPSR after writing to MATRIX_PRXSY?
->>>>>>
->>>>>> No, but did it again and checked, see transcript below.
->>>>>
->>>>> I don't use devmem2. Is 'readback' information accurate or is it
->>>>> always what's been written? Because when you write 0x33 to 0xFFFFECBC,
->>>>> 0x33 is read back, but just after that, when you read it again it's 0.
->>>>>   
->>>>>> BTW, how do I
->>>>>> know which master is in use for the LCD controller? 8 or 9? Both?
->>>>>
->>>>> It's configurable on a per-layer basis through the SIF bit in
->>>>> LCDC_<layer>CFG0. The driver tries to dispatch the load on those 2 AHB
->>>>> masters [1].
->>>>>   
->>>>>> And
->>>>>> which DDR slave is the target? 7, 8, 9 or 10? More than one?
->>>>>
->>>>> This, I don't know. I guess all of them can be used.
->>>>
->>>> Looks like I was wrong. According to "Table 15-3. SAMA5D3 Master to
->>>> Slave Access", LCDC port 0 can only access DDR port 2 and LCDC port 1
->>>> can only access DDR port 3.
->>>
->>> About that table, someone with HW-knowledge should have a real close
->>> look at it! Why?
->>>
->>> I peeked at all the PRxSy registers and there are a lot of '3' entries
->>> for all the MxPR fields. In fact, the '3' entries align very neatly
->>> with the checks in this "Master to Slave Access" table. Except they
->>> don't, after a while.
->>>
->>> Here's how the table looks in my datasheet:
->>>
->>>   0 vv--v--v--vvvv-
->>>   1 vv--v--v--vvvv-
->>>   2 vv-------------
->>>   3 vv--------vvv--
->>>   4 vv-------------
->>>   5 v--------------
->>>   6 vv--vv-vvvvvvvv
->>>     v--------------
->>>   7 v--------------
->>>   8 --v-v--v-------
->>>   9 -v---v--v--v---
->>> 10 ---------vv-vvv
->>> 11 v--v-----------
->>> 12 v-----v--------
->>>
->>> And here's the '3' entries when digging in the registers (the extra
->>> dash at the end is for the 16th non-existent slave):
->>>
->>>   0 33--3--3--3333--
->>>   1 33--3--3--3333--
->>>   2 33--------------
->>>   3 -3--------333---
->>>   4 33--------------
->>>   5 3---------------
->>>   6 33--33-33333333-
->>>   7 --3-3--3--------
->>>   8 -3---3--3--3----
->>>   9 --3-3--3-33-333-
->>> 10 3--3------------
->>> 11 3-----3---------
->>> 12 ----------------
->>> 13 ----------------
->>> 14 ----------------
->>> 15 ----------------
->>>
->>> There's a big mismatch for the four DDR2 lines in the table; they
->>> seem to map to only three registers. Other than that, the only tweak
->>> or anomaly is that first entry (Cortex A5) for master 3 (Int ROM).
->>>
->>> *time passes*
->>>
->>> Arrrgh!! You say "Table 15-3". This is Table 14-3 for me! I believe
->>> I'm using the latest datasheet (02-Feb-16). What are you reading???!?
->>
->> Oops, I was reading an old datasheet (from 2014).
+> Maybe someone with a background in formal methods could give a better
+> answer. How TLA+ works is closer to rmem [1] (operational model,
+> exhaustive memoised state search) than herd. Liveness verification
+> requires checking that, under certain fairness properties, some state is
+> eventually reached. IOW, it tries to show that either all state change
+> graphs lead to (go through) such state or that there are cycles in the
+> graph and the state is never reached. I don't know whether herd could be
+> modified to check liveness. I'm not sure it can handle infinite loops
+> either (the above model checks an infinite lock/unlock loop on each
+> CPU and that's easier to implement in a tool with memoised states).
 > 
+> The TLA+ model above assumes sequential consistency, so no memory
+> ordering taken into account. One could build an operational model in
+> TLA+ that's equivalent to the axiomatic one (e.g. following the Flat
+> model equivalence as in [2]), however, liveness checking (at least with
+> TLA+) is orders of magnitude slower than safety. Any small variation has
+> an exponential impact on the state space, so likely to be impractical.
+> For specific parts of the algorithm, you may be able to use a poor man's
+> ordering by e.g. writing two accesses in two different orders so the
+> model checks both combinations.
+> 
+> There are papers (e.g. [3]) on how to convert liveness checking to
+> safety checking but I haven't dug further. I think it's easier/faster if
+> you do liveness checking with a simplified model and separately check
+> the safety with respect to memory ordering on tools like herd.
+
+Indeed.  A fundamental problem, AFAICT, is to formalize that concept of
+'[it] will _eventually_ happen'.  Consider a simple example:
+
+	{ x = 0}
+
+	P0	|   P1
+		|
+	x = 1	|   while (!x)
+		|  	 ;
+
+herd 'knows' that:
+
+	- on the 1st iteration of the 'while' loop, the load from x
+	  can return the value 0 or 1 (only);
+
+	- on the 2nd iteration of the 'while' loop, the load from x
+	  can return the value 0 or 1;
+
+	- [ ... and 'so on'! ]
+
+but this is pretty much all herd knows about this snippet by now ... ;)
+
+Thanks,
+  Andrea
 
 
--- 
-Nicolas Ferre
+> 
+> [1] http://www.cl.cam.ac.uk/~sf502/regressions/rmem/
+> [2] http://www.cl.cam.ac.uk/~pes20/armv8-mca/armv8-mca-draft.pdf
+> [3] https://www.sciencedirect.com/science/article/pii/S1571066104804109
+> 
+> -- 
+> Catalin
