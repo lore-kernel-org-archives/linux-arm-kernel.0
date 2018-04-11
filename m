@@ -1,45 +1,46 @@
-From: christophe.leroy@c-s.fr (Christophe LEROY)
-Date: Wed, 11 Apr 2018 10:59:58 +0200
-Subject: [PATCH v3 2/2] mm: remove odd HAVE_PTE_SPECIAL
-In-Reply-To: <5bd1bb46-8f71-e6db-7fb7-43d023a37f58@linux.vnet.ibm.com>
-References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
- <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
- <20180411083315.GA23400@dhcp22.suse.cz>
- <5bd1bb46-8f71-e6db-7fb7-43d023a37f58@linux.vnet.ibm.com>
-Message-ID: <fd1be042-c957-feb3-05d5-11244a3626da@c-s.fr>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 11 Apr 2018 14:35:26 +0530
+Subject: [RFC 1/6] dt-bindings: dma: xilinx_dma: Add optional property
+ has_axieth_connected
+In-Reply-To: <1522665546-10035-2-git-send-email-radheys@xilinx.com>
+References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
+ <1522665546-10035-2-git-send-email-radheys@xilinx.com>
+Message-ID: <20180411090525.GX6014@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 02, 2018 at 04:09:01PM +0530, Radhey Shyam Pandey wrote:
+> Add an optional AXI DMA property 'has_axieth_connected'. This can be
+> specified to indicate that AXI DMA is connected to AXI Ethernet in
+> hardware design and dma driver needs to do some additional handling.
 
-
-Le 11/04/2018 ? 10:41, Laurent Dufour a ?crit?:
-> On 11/04/2018 10:33, Michal Hocko wrote:
->> On Wed 11-04-18 10:03:36, Laurent Dufour wrote:
->>> @@ -881,7 +876,8 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
->>>   
->>>   	if (is_zero_pfn(pfn))
->>>   		return NULL;
->>> -check_pfn:
->>> +
->>> +check_pfn: __maybe_unused
->>>   	if (unlikely(pfn > highest_memmap_pfn)) {
->>>   		print_bad_pte(vma, addr, pte, NULL);
->>>   		return NULL;
->>> @@ -891,7 +887,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
->>>   	 * NOTE! We still have PageReserved() pages in the page tables.
->>>   	 * eg. VDSO mappings can cause them to exist.
->>>   	 */
->>> -out:
->>> +out: __maybe_unused
->>>   	return pfn_to_page(pfn);
->>
->> Why do we need this ugliness all of the sudden?
-> Indeed the compiler doesn't complaint but in theory it should since these
-> labels are not used depending on CONFIG_ARCH_HAS_PTE_SPECIAL.
-
-Why should it complain ?
-
-Regards
-Christophe
+1. why are DT people and list not added to this? I have added that
+2. should we have a property for a specific peripheral? Wouldn't it help to have
+a generic property for peripheral connected which can be scaled to more IPs
+being connected in future?
+3. Please use right subsystem name, it damengine: not dma:
 
 > 
+> Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
+> ---
+>  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> index a2b8bfa..5d592e3 100644
+> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
+> @@ -42,6 +42,7 @@ Optional properties:
+>  	the hardware.
+>  Optional properties for AXI DMA:
+>  - xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
+> +- xlnx,axieth-connected: Tells whether AXI DMA is connected to AXI Ethernet.
+>  Optional properties for VDMA:
+>  - xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
+>  	It takes following values:
+> -- 
+> 1.7.1
+> 
+
+-- 
+~Vinod
