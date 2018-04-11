@@ -1,389 +1,385 @@
-From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
-Date: Wed, 11 Apr 2018 10:03:35 +0200
-Subject: [PATCH v3 1/2] mm: introduce ARCH_HAS_PTE_SPECIAL
-In-Reply-To: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
-References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
-Message-ID: <1523433816-14460-2-git-send-email-ldufour@linux.vnet.ibm.com>
+From: ran.wang_1@nxp.com (Ran Wang)
+Date: Wed, 11 Apr 2018 14:35:50 +0800
+Subject: [PATCH v2 5/6] powerpc:dts:pm: add power management node
+In-Reply-To: <20180411063551.30368-1-ran.wang_1@nxp.com>
+References: <20180411063551.30368-1-ran.wang_1@nxp.com>
+Message-ID: <20180411063551.30368-5-ran.wang_1@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the PTE special supports is turned on in per architecture header
-files. Most of the time, it is defined in arch/*/include/asm/pgtable.h
-depending or not on some other per architecture static definition.
+Enable Power Management feature on device tree, including MPC8536,
+MPC8544, MPC8548, MPC8572, P1010, P1020, P1021, P1022, P2020, P2041,
+P3041, T104X, T1024.
 
-This patch introduce a new configuration variable to manage this directly
-in the Kconfig files. It would later replace __HAVE_ARCH_PTE_SPECIAL.
-
-Here notes for some architecture where the definition of
-__HAVE_ARCH_PTE_SPECIAL is not obvious:
-
-arm
- __HAVE_ARCH_PTE_SPECIAL which is currently defined in
-arch/arm/include/asm/pgtable-3level.h which is included by
-arch/arm/include/asm/pgtable.h when CONFIG_ARM_LPAE is set.
-So select ARCH_HAS_PTE_SPECIAL if ARM_LPAE.
-
-powerpc
-__HAVE_ARCH_PTE_SPECIAL is defined in 2 files:
- - arch/powerpc/include/asm/book3s/64/pgtable.h
- - arch/powerpc/include/asm/pte-common.h
-The first one is included if (PPC_BOOK3S & PPC64) while the second is
-included in all the other cases.
-So select ARCH_HAS_PTE_SPECIAL all the time.
-
-sparc:
-__HAVE_ARCH_PTE_SPECIAL is defined if defined(__sparc__) &&
-defined(__arch64__) which are defined through the compiler in
-sparc/Makefile if !SPARC32 which I assume to be if SPARC64.
-So select ARCH_HAS_PTE_SPECIAL if SPARC64
-
-There is no functional change introduced by this patch.
-
-Suggested-by: Jerome Glisse <jglisse@redhat>
-Reviewed-by: Jerome Glisse <jglisse@redhat>
-Acked-by: David Rientjes <rientjes@google.com>
-Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
+Signed-off-by: Zhao Chenhui <chenhui.zhao@freescale.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 ---
- Documentation/features/vm/pte_special/arch-support.txt | 2 +-
- arch/arc/Kconfig                                       | 1 +
- arch/arc/include/asm/pgtable.h                         | 2 --
- arch/arm/Kconfig                                       | 1 +
- arch/arm/include/asm/pgtable-3level.h                  | 1 -
- arch/arm64/Kconfig                                     | 1 +
- arch/arm64/include/asm/pgtable.h                       | 2 --
- arch/powerpc/Kconfig                                   | 1 +
- arch/powerpc/include/asm/book3s/64/pgtable.h           | 3 ---
- arch/powerpc/include/asm/pte-common.h                  | 3 ---
- arch/riscv/Kconfig                                     | 1 +
- arch/riscv/include/asm/pgtable-bits.h                  | 3 ---
- arch/s390/Kconfig                                      | 1 +
- arch/s390/include/asm/pgtable.h                        | 1 -
- arch/sh/Kconfig                                        | 1 +
- arch/sh/include/asm/pgtable.h                          | 2 --
- arch/sparc/Kconfig                                     | 1 +
- arch/sparc/include/asm/pgtable_64.h                    | 3 ---
- arch/x86/Kconfig                                       | 1 +
- arch/x86/include/asm/pgtable_types.h                   | 1 -
- include/linux/pfn_t.h                                  | 4 ++--
- mm/Kconfig                                             | 3 +++
- mm/gup.c                                               | 4 ++--
- mm/memory.c                                            | 2 +-
- 24 files changed, 18 insertions(+), 27 deletions(-)
+Changes in v2:
+  - no change
 
-diff --git a/Documentation/features/vm/pte_special/arch-support.txt b/Documentation/features/vm/pte_special/arch-support.txt
-index 055004f467d2..cd05924ea875 100644
---- a/Documentation/features/vm/pte_special/arch-support.txt
-+++ b/Documentation/features/vm/pte_special/arch-support.txt
-@@ -1,6 +1,6 @@
- #
- # Feature name:          pte_special
--#         Kconfig:       __HAVE_ARCH_PTE_SPECIAL
-+#         Kconfig:       ARCH_HAS_PTE_SPECIAL
- #         description:   arch supports the pte_special()/pte_mkspecial() VM APIs
- #
-     -----------------------
-diff --git a/arch/arc/Kconfig b/arch/arc/Kconfig
-index d76bf4a83740..8516e2b0239a 100644
---- a/arch/arc/Kconfig
-+++ b/arch/arc/Kconfig
-@@ -44,6 +44,7 @@ config ARC
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_KERNEL_GZIP
- 	select HAVE_KERNEL_LZMA
-+	select ARCH_HAS_PTE_SPECIAL
+ arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi |   14 ++++++-
+ arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi |    2 +
+ arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi |    2 +
+ arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi |    2 +
+ arch/powerpc/boot/dts/fsl/p1010si-post.dtsi   |    8 ++++
+ arch/powerpc/boot/dts/fsl/p1020si-post.dtsi   |    5 +++
+ arch/powerpc/boot/dts/fsl/p1021si-post.dtsi   |    5 +++
+ arch/powerpc/boot/dts/fsl/p1022si-post.dtsi   |    9 +++--
+ arch/powerpc/boot/dts/fsl/p2020si-post.dtsi   |   14 +++++++
+ arch/powerpc/boot/dts/fsl/pq3-power.dtsi      |   48 +++++++++++++++++++++++++
+ arch/powerpc/boot/dts/fsl/t1024rdb.dts        |    2 +-
+ arch/powerpc/boot/dts/fsl/t1040rdb.dts        |    2 +-
+ arch/powerpc/boot/dts/fsl/t1042rdb.dts        |    2 +-
+ arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts     |    2 +-
+ 14 files changed, 108 insertions(+), 9 deletions(-)
+ create mode 100644 arch/powerpc/boot/dts/fsl/pq3-power.dtsi
+
+diff --git a/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
+index 4193570..fba40a1 100644
+--- a/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/mpc8536si-post.dtsi
+@@ -199,6 +199,10 @@
  
- config MIGHT_HAVE_PCI
- 	bool
-diff --git a/arch/arc/include/asm/pgtable.h b/arch/arc/include/asm/pgtable.h
-index 08fe33830d4b..8ec5599a0957 100644
---- a/arch/arc/include/asm/pgtable.h
-+++ b/arch/arc/include/asm/pgtable.h
-@@ -320,8 +320,6 @@ PTE_BIT_FUNC(mkexec,	|= (_PAGE_EXECUTE));
- PTE_BIT_FUNC(mkspecial,	|= (_PAGE_SPECIAL));
- PTE_BIT_FUNC(mkhuge,	|= (_PAGE_HW_SZ));
+ /include/ "pq3-dma-0.dtsi"
+ /include/ "pq3-etsec1-0.dtsi"
++	enet0: ethernet at 24000 {
++		fsl,wake-on-filer;
++		fsl,pmc-handle = <&etsec1_clk>;
++	};
+ /include/ "pq3-etsec1-timer-0.dtsi"
  
--#define __HAVE_ARCH_PTE_SPECIAL
+ 	usb at 22000 {
+@@ -222,9 +226,10 @@
+ 	};
+ 
+ /include/ "pq3-etsec1-2.dtsi"
 -
- static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
- {
- 	return __pte((pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot));
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a7f8e7f4b88f..c088c851b235 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -8,6 +8,7 @@ config ARM
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_FORTIFY_SOURCE
-+	select ARCH_HAS_PTE_SPECIAL if ARM_LPAE
- 	select ARCH_HAS_SET_MEMORY
- 	select ARCH_HAS_PHYS_TO_DMA
- 	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 2a4836087358..6d50a11d7793 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -219,7 +219,6 @@ static inline pte_t pte_mkspecial(pte_t pte)
- 	pte_val(pte) |= L_PTE_SPECIAL;
- 	return pte;
- }
--#define	__HAVE_ARCH_PTE_SPECIAL
+-	ethernet at 26000 {
++	enet2: ethernet at 26000 {
+ 		cell-index = <1>;
++		fsl,wake-on-filer;
++		fsl,pmc-handle = <&etsec3_clk>;
+ 	};
  
- #define pmd_write(pmd)		(pmd_isclear((pmd), L_PMD_SECT_RDONLY))
- #define pmd_dirty(pmd)		(pmd_isset((pmd), L_PMD_SECT_DIRTY))
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index eb2cf4938f6d..9a3f1b1ab50c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -17,6 +17,7 @@ config ARM64
- 	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
- 	select ARCH_HAS_KCOV
- 	select ARCH_HAS_MEMBARRIER_SYNC_CORE
-+	select ARCH_HAS_PTE_SPECIAL
- 	select ARCH_HAS_SET_MEMORY
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_STRICT_KERNEL_RWX
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 7e2c27e63cd8..b96c8a186908 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -306,8 +306,6 @@ static inline int pte_same(pte_t pte_a, pte_t pte_b)
- #define HPAGE_MASK		(~(HPAGE_SIZE - 1))
- #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
- 
--#define __HAVE_ARCH_PTE_SPECIAL
--
- static inline pte_t pgd_pte(pgd_t pgd)
- {
- 	return __pte(pgd_val(pgd));
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index c32a181a7cbb..f7415fe25c07 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -141,6 +141,7 @@ config PPC
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_PHYS_TO_DMA
- 	select ARCH_HAS_PMEM_API                if PPC64
-+	select ARCH_HAS_PTE_SPECIAL
- 	select ARCH_HAS_MEMBARRIER_CALLBACKS
- 	select ARCH_HAS_SCALED_CPUTIME		if VIRT_CPU_ACCOUNTING_NATIVE
- 	select ARCH_HAS_SG_CHAIN
-diff --git a/arch/powerpc/include/asm/book3s/64/pgtable.h b/arch/powerpc/include/asm/book3s/64/pgtable.h
-index 47b5ffc8715d..b3ac8948b257 100644
---- a/arch/powerpc/include/asm/book3s/64/pgtable.h
-+++ b/arch/powerpc/include/asm/book3s/64/pgtable.h
-@@ -319,9 +319,6 @@ extern unsigned long pci_io_base;
- /* Advertise special mapping type for AGP */
- #define HAVE_PAGE_AGP
- 
--/* Advertise support for _PAGE_SPECIAL */
--#define __HAVE_ARCH_PTE_SPECIAL
--
- #ifndef __ASSEMBLY__
- 
- /*
-diff --git a/arch/powerpc/include/asm/pte-common.h b/arch/powerpc/include/asm/pte-common.h
-index c4a72c7a8c83..03dfddb1f49a 100644
---- a/arch/powerpc/include/asm/pte-common.h
-+++ b/arch/powerpc/include/asm/pte-common.h
-@@ -216,9 +216,6 @@ static inline bool pte_user(pte_t pte)
- #define PAGE_AGP		(PAGE_KERNEL_NC)
- #define HAVE_PAGE_AGP
- 
--/* Advertise support for _PAGE_SPECIAL */
--#define __HAVE_ARCH_PTE_SPECIAL
--
- #ifndef _PAGE_READ
- /* if not defined, we should not find _PAGE_WRITE too */
- #define _PAGE_READ 0
-diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
-index 23d8acca5c90..92d331ea11bd 100644
---- a/arch/riscv/Kconfig
-+++ b/arch/riscv/Kconfig
-@@ -34,6 +34,7 @@ config RISCV
- 	select THREAD_INFO_IN_TASK
- 	select RISCV_TIMER
- 	select GENERIC_IRQ_MULTI_HANDLER
-+	select ARCH_HAS_PTE_SPECIAL
- 
- config MMU
- 	def_bool y
-diff --git a/arch/riscv/include/asm/pgtable-bits.h b/arch/riscv/include/asm/pgtable-bits.h
-index 997ddbb1d370..2fa2942be221 100644
---- a/arch/riscv/include/asm/pgtable-bits.h
-+++ b/arch/riscv/include/asm/pgtable-bits.h
-@@ -42,7 +42,4 @@
- 					  _PAGE_WRITE | _PAGE_EXEC |	\
- 					  _PAGE_USER | _PAGE_GLOBAL))
- 
--/* Advertise support for _PAGE_SPECIAL */
--#define __HAVE_ARCH_PTE_SPECIAL
--
- #endif /* _ASM_RISCV_PGTABLE_BITS_H */
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index 32a0d5b958bf..5f1f4997e7e9 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -72,6 +72,7 @@ config S390
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
- 	select ARCH_HAS_KCOV
-+	select ARCH_HAS_PTE_SPECIAL
- 	select ARCH_HAS_SET_MEMORY
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_STRICT_KERNEL_RWX
-diff --git a/arch/s390/include/asm/pgtable.h b/arch/s390/include/asm/pgtable.h
-index 2d24d33bf188..9809694e1389 100644
---- a/arch/s390/include/asm/pgtable.h
-+++ b/arch/s390/include/asm/pgtable.h
-@@ -171,7 +171,6 @@ static inline int is_module_addr(void *addr)
- #define _PAGE_WRITE	0x020		/* SW pte write bit */
- #define _PAGE_SPECIAL	0x040		/* SW associated with special page */
- #define _PAGE_UNUSED	0x080		/* SW bit for pgste usage state */
--#define __HAVE_ARCH_PTE_SPECIAL
- 
- #ifdef CONFIG_MEM_SOFT_DIRTY
- #define _PAGE_SOFT_DIRTY 0x002		/* SW pte soft dirty bit */
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 97fe29316476..a6c75b6806d2 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -50,6 +50,7 @@ config SUPERH
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_FUTEX_CMPXCHG if FUTEX
- 	select HAVE_NMI
-+	select ARCH_HAS_PTE_SPECIAL
- 	help
- 	  The SuperH is a RISC processor targeted for use in embedded systems
- 	  and consumer electronics; it was also used in the Sega Dreamcast
-diff --git a/arch/sh/include/asm/pgtable.h b/arch/sh/include/asm/pgtable.h
-index 89c513a982fc..f6abfe2bca93 100644
---- a/arch/sh/include/asm/pgtable.h
-+++ b/arch/sh/include/asm/pgtable.h
-@@ -156,8 +156,6 @@ extern void page_table_range_init(unsigned long start, unsigned long end,
- #define HAVE_ARCH_UNMAPPED_AREA
- #define HAVE_ARCH_UNMAPPED_AREA_TOPDOWN
- 
--#define __HAVE_ARCH_PTE_SPECIAL
--
- #include <asm-generic/pgtable.h>
- 
- #endif /* __ASM_SH_PGTABLE_H */
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index 8767e45f1b2b..6b5a4f05dcb2 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -86,6 +86,7 @@ config SPARC64
- 	select ARCH_USE_QUEUED_SPINLOCKS
- 	select GENERIC_TIME_VSYSCALL
- 	select ARCH_CLOCKSOURCE_DATA
-+	select ARCH_HAS_PTE_SPECIAL
- 
- config ARCH_DEFCONFIG
- 	string
-diff --git a/arch/sparc/include/asm/pgtable_64.h b/arch/sparc/include/asm/pgtable_64.h
-index 44d6ac47e035..1393a8ac596b 100644
---- a/arch/sparc/include/asm/pgtable_64.h
-+++ b/arch/sparc/include/asm/pgtable_64.h
-@@ -117,9 +117,6 @@ bool kern_addr_valid(unsigned long addr);
- #define _PAGE_PMD_HUGE    _AC(0x0100000000000000,UL) /* Huge page            */
- #define _PAGE_PUD_HUGE    _PAGE_PMD_HUGE
- 
--/* Advertise support for _PAGE_SPECIAL */
--#define __HAVE_ARCH_PTE_SPECIAL
--
- /* SUN4U pte bits... */
- #define _PAGE_SZ4MB_4U	  _AC(0x6000000000000000,UL) /* 4MB Page             */
- #define _PAGE_SZ512K_4U	  _AC(0x4000000000000000,UL) /* 512K Page            */
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index d8983df5a2bc..2399c8ce02be 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -57,6 +57,7 @@ config X86
- 	select ARCH_HAS_KCOV			if X86_64
- 	select ARCH_HAS_MEMBARRIER_SYNC_CORE
- 	select ARCH_HAS_PMEM_API		if X86_64
-+	select ARCH_HAS_PTE_SPECIAL
- 	select ARCH_HAS_REFCOUNT
- 	select ARCH_HAS_UACCESS_FLUSHCACHE	if X86_64
- 	select ARCH_HAS_SET_MEMORY
-diff --git a/arch/x86/include/asm/pgtable_types.h b/arch/x86/include/asm/pgtable_types.h
-index 1e5a40673953..99fff853c944 100644
---- a/arch/x86/include/asm/pgtable_types.h
-+++ b/arch/x86/include/asm/pgtable_types.h
-@@ -65,7 +65,6 @@
- #define _PAGE_PKEY_BIT2	(_AT(pteval_t, 0))
- #define _PAGE_PKEY_BIT3	(_AT(pteval_t, 0))
- #endif
--#define __HAVE_ARCH_PTE_SPECIAL
- 
- #define _PAGE_PKEY_MASK (_PAGE_PKEY_BIT0 | \
- 			 _PAGE_PKEY_BIT1 | \
-diff --git a/include/linux/pfn_t.h b/include/linux/pfn_t.h
-index a03c2642a87c..21713dc14ce2 100644
---- a/include/linux/pfn_t.h
-+++ b/include/linux/pfn_t.h
-@@ -122,7 +122,7 @@ pud_t pud_mkdevmap(pud_t pud);
- #endif
- #endif /* __HAVE_ARCH_PTE_DEVMAP */
- 
--#ifdef __HAVE_ARCH_PTE_SPECIAL
-+#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
- static inline bool pfn_t_special(pfn_t pfn)
- {
- 	return (pfn.val & PFN_SPECIAL) == PFN_SPECIAL;
-@@ -132,5 +132,5 @@ static inline bool pfn_t_special(pfn_t pfn)
- {
- 	return false;
- }
--#endif /* __HAVE_ARCH_PTE_SPECIAL */
-+#endif /* CONFIG_ARCH_HAS_PTE_SPECIAL */
- #endif /* _LINUX_PFN_T_H_ */
-diff --git a/mm/Kconfig b/mm/Kconfig
-index d5004d82a1d6..1ea3e4a6a123 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -752,3 +752,6 @@ config GUP_BENCHMARK
- 	  performance of get_user_pages_fast().
- 
- 	  See tools/testing/selftests/vm/gup_benchmark.c
+ 	usb at 2b000 {
+@@ -249,4 +254,9 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
 +
-+config ARCH_HAS_PTE_SPECIAL
-+	bool
-diff --git a/mm/gup.c b/mm/gup.c
-index 76af4cfeaf68..d19bfbadd32a 100644
---- a/mm/gup.c
-+++ b/mm/gup.c
-@@ -1351,7 +1351,7 @@ static void undo_dev_pagemap(int *nr, int nr_start, struct page **pages)
- 	}
- }
++/include/ "pq3-power.dtsi"
++	power at e0070 {
++		compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
++	};
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
+index b68eb11..ea7416a 100644
+--- a/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/mpc8544si-post.dtsi
+@@ -188,4 +188,6 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
++
++/include/ "pq3-power.dtsi"
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
+index 579d76c..dddb737 100644
+--- a/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/mpc8548si-post.dtsi
+@@ -156,4 +156,6 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
++
++/include/ "pq3-power.dtsi"
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi b/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
+index 49294cf..40a6cff 100644
+--- a/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/mpc8572si-post.dtsi
+@@ -193,4 +193,6 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
++
++/include/ "pq3-power.dtsi"
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
+index 1b4aafc..47b62a8 100644
+--- a/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/p1010si-post.dtsi
+@@ -173,6 +173,8 @@
  
--#ifdef __HAVE_ARCH_PTE_SPECIAL
-+#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
- static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
- 			 int write, struct page **pages, int *nr)
- {
-@@ -1427,7 +1427,7 @@ static int gup_pte_range(pmd_t pmd, unsigned long addr, unsigned long end,
- {
- 	return 0;
- }
--#endif /* __HAVE_ARCH_PTE_SPECIAL */
-+#endif /* CONFIG_ARCH_HAS_PTE_SPECIAL */
+ /include/ "pq3-etsec2-0.dtsi"
+ 	enet0: ethernet at b0000 {
++		fsl,pmc-handle = <&etsec1_clk>;
++
+ 		queue-group at b0000 {
+ 			fsl,rx-bit-map = <0xff>;
+ 			fsl,tx-bit-map = <0xff>;
+@@ -181,6 +183,8 @@
  
- #if defined(__HAVE_ARCH_PTE_DEVMAP) && defined(CONFIG_TRANSPARENT_HUGEPAGE)
- static int __gup_device_huge(unsigned long pfn, unsigned long addr,
-diff --git a/mm/memory.c b/mm/memory.c
-index a1f990e33e38..96910c625daa 100644
---- a/mm/memory.c
-+++ b/mm/memory.c
-@@ -817,7 +817,7 @@ static void print_bad_pte(struct vm_area_struct *vma, unsigned long addr,
-  * PFNMAP mappings in order to support COWable mappings.
-  *
-  */
--#ifdef __HAVE_ARCH_PTE_SPECIAL
-+#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
- # define HAVE_PTE_SPECIAL 1
- #else
- # define HAVE_PTE_SPECIAL 0
+ /include/ "pq3-etsec2-1.dtsi"
+ 	enet1: ethernet at b1000 {
++		fsl,pmc-handle = <&etsec2_clk>;
++
+ 		queue-group at b1000 {
+ 			fsl,rx-bit-map = <0xff>;
+ 			fsl,tx-bit-map = <0xff>;
+@@ -189,6 +193,8 @@
+ 
+ /include/ "pq3-etsec2-2.dtsi"
+ 	enet2: ethernet at b2000 {
++		fsl,pmc-handle = <&etsec3_clk>;
++
+ 		queue-group at b2000 {
+ 			fsl,rx-bit-map = <0xff>;
+ 			fsl,tx-bit-map = <0xff>;
+@@ -201,4 +207,6 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
++
++/include/ "pq3-power.dtsi"
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
+index 642dc3a..cc4c746 100644
+--- a/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/p1020si-post.dtsi
+@@ -163,14 +163,17 @@
+ 
+ /include/ "pq3-etsec2-0.dtsi"
+ 	enet0: enet0_grp2: ethernet at b0000 {
++		fsl,pmc-handle = <&etsec1_clk>;
+ 	};
+ 
+ /include/ "pq3-etsec2-1.dtsi"
+ 	enet1: enet1_grp2: ethernet at b1000 {
++		fsl,pmc-handle = <&etsec2_clk>;
+ 	};
+ 
+ /include/ "pq3-etsec2-2.dtsi"
+ 	enet2: enet2_grp2: ethernet at b2000 {
++		fsl,pmc-handle = <&etsec3_clk>;
+ 	};
+ 
+ 	global-utilities at e0000 {
+@@ -178,6 +181,8 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
++
++/include/ "pq3-power.dtsi"
+ };
+ 
+ /include/ "pq3-etsec2-grp2-0.dtsi"
+diff --git a/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
+index 407cb5f..378195d 100644
+--- a/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/p1021si-post.dtsi
+@@ -159,14 +159,17 @@
+ 
+ /include/ "pq3-etsec2-0.dtsi"
+ 	enet0: enet0_grp2: ethernet at b0000 {
++		fsl,pmc-handle = <&etsec1_clk>;
+ 	};
+ 
+ /include/ "pq3-etsec2-1.dtsi"
+ 	enet1: enet1_grp2: ethernet at b1000 {
++		fsl,pmc-handle = <&etsec2_clk>;
+ 	};
+ 
+ /include/ "pq3-etsec2-2.dtsi"
+ 	enet2: enet2_grp2: ethernet at b2000 {
++		fsl,pmc-handle = <&etsec3_clk>;
+ 	};
+ 
+ 	global-utilities at e0000 {
+@@ -174,6 +177,8 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
++
++/include/ "pq3-power.dtsi"
+ };
+ 
+ &qe {
+diff --git a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
+index 5f51b7b..6ac21e8 100644
+--- a/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/p1022si-post.dtsi
+@@ -225,11 +225,13 @@
+ /include/ "pq3-etsec2-0.dtsi"
+ 	enet0: enet0_grp2: ethernet at b0000 {
+ 		fsl,wake-on-filer;
++		fsl,pmc-handle = <&etsec1_clk>;
+ 	};
+ 
+ /include/ "pq3-etsec2-1.dtsi"
+ 	enet1: enet1_grp2: ethernet at b1000 {
+ 		fsl,wake-on-filer;
++		fsl,pmc-handle = <&etsec2_clk>;
+ 	};
+ 
+ 	global-utilities at e0000 {
+@@ -238,9 +240,10 @@
+ 		fsl,has-rstcr;
+ 	};
+ 
+-	power at e0070{
+-		compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
+-		reg = <0xe0070 0x20>;
++/include/ "pq3-power.dtsi"
++	power at e0070 {
++		compatible = "fsl,p1022-pmc", "fsl,mpc8536-pmc",
++				"fsl,mpc8548-pmc";
+ 	};
+ 
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi b/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
+index 884e01b..2c4787c 100644
+--- a/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/p2020si-post.dtsi
+@@ -175,6 +175,10 @@
+ 		compatible = "fsl-usb2-dr-v1.6", "fsl-usb2-dr";
+ 	};
+ /include/ "pq3-etsec1-0.dtsi"
++	enet0: ethernet at 24000 {
++		fsl,pmc-handle = <&etsec1_clk>;
++
++	};
+ /include/ "pq3-etsec1-timer-0.dtsi"
+ 
+ 	ptp_clock at 24e00 {
+@@ -183,7 +187,15 @@
+ 
+ 
+ /include/ "pq3-etsec1-1.dtsi"
++	enet1: ethernet at 25000 {
++		fsl,pmc-handle = <&etsec2_clk>;
++	};
++
+ /include/ "pq3-etsec1-2.dtsi"
++	enet2: ethernet at 26000 {
++		fsl,pmc-handle = <&etsec3_clk>;
++	};
++
+ /include/ "pq3-esdhc-0.dtsi"
+ 	sdhc at 2e000 {
+ 		compatible = "fsl,p2020-esdhc", "fsl,esdhc";
+@@ -198,4 +210,6 @@
+ 		reg = <0xe0000 0x1000>;
+ 		fsl,has-rstcr;
+ 	};
++
++/include/ "pq3-power.dtsi"
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/pq3-power.dtsi b/arch/powerpc/boot/dts/fsl/pq3-power.dtsi
+new file mode 100644
+index 0000000..5a760b3
+--- /dev/null
++++ b/arch/powerpc/boot/dts/fsl/pq3-power.dtsi
+@@ -0,0 +1,48 @@
++/*
++ * PQ3 Power Management device tree stub
++ *
++ * Copyright 2012-2013 Freescale Semiconductor Inc.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above copyright
++ *       notice, this list of conditions and the following disclaimer in the
++ *       documentation and/or other materials provided with the distribution.
++ *     * Neither the name of Freescale Semiconductor nor the
++ *       names of its contributors may be used to endorse or promote products
++ *       derived from this software without specific prior written permission.
++ *
++ *
++ * ALTERNATIVELY, this software may be distributed under the terms of the
++ * GNU General Public License ("GPL") as published by the Free Software
++ * Foundation, either version 2 of that License or (at your option) any
++ * later version.
++ *
++ * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++ * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
++ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++power at e0070 {
++	compatible = "fsl,mpc8548-pmc";
++	reg = <0xe0070 0x20>;
++
++	etsec1_clk: soc-clk at 24 {
++		fsl,pmcdr-mask = <0x00000080>;
++	};
++	etsec2_clk: soc-clk at 25 {
++		fsl,pmcdr-mask = <0x00000040>;
++	};
++	etsec3_clk: soc-clk at 26 {
++		fsl,pmcdr-mask = <0x00000020>;
++	};
++};
+diff --git a/arch/powerpc/boot/dts/fsl/t1024rdb.dts b/arch/powerpc/boot/dts/fsl/t1024rdb.dts
+index 73a6453..95fc694 100644
+--- a/arch/powerpc/boot/dts/fsl/t1024rdb.dts
++++ b/arch/powerpc/boot/dts/fsl/t1024rdb.dts
+@@ -91,7 +91,7 @@
+ 		board-control at 2,0 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			compatible = "fsl,t1024-cpld";
++			compatible = "fsl,t1024-cpld", "fsl,deepsleep-cpld";
+ 			reg = <3 0 0x300>;
+ 			ranges = <0 3 0 0x300>;
+ 			bank-width = <1>;
+diff --git a/arch/powerpc/boot/dts/fsl/t1040rdb.dts b/arch/powerpc/boot/dts/fsl/t1040rdb.dts
+index 65ff34c..825665c 100644
+--- a/arch/powerpc/boot/dts/fsl/t1040rdb.dts
++++ b/arch/powerpc/boot/dts/fsl/t1040rdb.dts
+@@ -70,7 +70,7 @@
+ 
+ 	ifc: localbus at ffe124000 {
+ 		cpld at 3,0 {
+-			compatible = "fsl,t1040rdb-cpld";
++			compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
+ 		};
+ 	};
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/t1042rdb.dts b/arch/powerpc/boot/dts/fsl/t1042rdb.dts
+index 3ebb712..0997643 100644
+--- a/arch/powerpc/boot/dts/fsl/t1042rdb.dts
++++ b/arch/powerpc/boot/dts/fsl/t1042rdb.dts
+@@ -68,7 +68,7 @@
+ 
+ 	ifc: localbus at ffe124000 {
+ 		cpld at 3,0 {
+-			compatible = "fsl,t1042rdb-cpld";
++			compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
+ 		};
+ 	};
+ };
+diff --git a/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts b/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
+index 8ec3ff4..b10cab1 100644
+--- a/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
++++ b/arch/powerpc/boot/dts/fsl/t1042rdb_pi.dts
+@@ -41,7 +41,7 @@
+ 
+ 	ifc: localbus at ffe124000 {
+ 		cpld at 3,0 {
+-			compatible = "fsl,t1042rdb_pi-cpld";
++			compatible = "fsl,t104xrdb-cpld", "fsl,deepsleep-cpld";
+ 		};
+ 	};
+ 
 -- 
-2.7.4
+1.7.1
