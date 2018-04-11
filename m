@@ -1,65 +1,62 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 11 Apr 2018 22:16:41 +0800
-Subject: [PATCH 5/5] arm64: allwinner: a64: add SRAM controller device tree
- node
-In-Reply-To: <20180411141641.14675-1-icenowy@aosc.io>
-References: <20180411141641.14675-1-icenowy@aosc.io>
-Message-ID: <20180411141641.14675-6-icenowy@aosc.io>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 11 Apr 2018 10:33:14 -0400
+Subject: [PATCH V2] drm/amdgpu: limit DMA size to PAGE_SIZE for
+ scatter-gather buffers
+In-Reply-To: <32b82296-bba5-b5f1-266b-45c1ed66da94@arm.com>
+References: <1523394001-4615-1-git-send-email-okaya@codeaurora.org>
+ <32b82296-bba5-b5f1-266b-45c1ed66da94@arm.com>
+Message-ID: <1a1d0069-c8d3-cc0d-cf1c-8e90e4a2b0d7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 has a SRAM controller, and in the device tree currently
-we have a syscon node to enable EMAC driver to access the EMAC clock
-register. As SRAM controller driver can now export regmap for this
-register, replace the syscon node to the SRAM controller device node,
-and let EMAC driver to acquire its EMAC clock regmap.
+On 4/11/2018 8:03 AM, Robin Murphy wrote:
+> On 10/04/18 21:59, Sinan Kaya wrote:
+>> Code is expecing to observe the same number of buffers returned from
+>> dma_map_sg() function compared to sg_alloc_table_from_pages(). This
+>> doesn't hold true universally especially for systems with IOMMU.
+> 
+> So why not fix said code? It's clearly not a real hardware limitation, and the map_sg() APIs have potentially returned fewer than nents since forever, so there's really no excuse.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+Sure, I'll take a better fix if there is one.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1b2ef28c42bd..1c37659d9d41 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -168,10 +168,25 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		syscon: syscon at 1c00000 {
--			compatible = "allwinner,sun50i-a64-system-controller",
--				"syscon";
-+		sram_controller: sram-controller at 1c00000 {
-+			compatible = "allwinner,sun50i-a64-sram-controller";
- 			reg = <0x01c00000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			sram_c: sram at 18000 {
-+				compatible = "mmio-sram";
-+				reg = <0x00018000 0x28000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x00018000 0x28000>;
-+
-+				de2_sram: sram-section at 0 {
-+					compatible = "allwinner,sun50i-a64-sram-c";
-+					reg = <0x0000 0x28000>;
-+				};
-+			};
- 		};
- 
- 		dma: dma-controller at 1c02000 {
-@@ -599,7 +614,7 @@
- 
- 		emac: ethernet at 1c30000 {
- 			compatible = "allwinner,sun50i-a64-emac";
--			syscon = <&syscon>;
-+			syscon = <&sram_controller>;
- 			reg = <0x01c30000 0x10000>;
- 			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "macirq";
+> 
+>> IOMMU driver tries to combine buffers into a single DMA address as much
+>> as it can. The right thing is to tell the DMA layer how much combining
+>> IOMMU can do.
+> 
+> Disagree; this is a dodgy hack, since you'll now end up passing scatterlists into dma_map_sg() which already violate max_seg_size to begin with, and I think a conscientious DMA API implementation would be at rights to fail the mapping for that reason (I know arm64 happens not to, but that was a deliberate design decision to make my life easier at the time).
+> 
+> As a short-term fix, at least do something like what i915 does and constrain the table allocation to the desired segment size as well, so things remain self-consistent. But still never claim that faking a hardware constraint as a workaround for a driver shortcoming is "the right thing to do" ;)
+
+You are asking for something like this from here, right?
+
+https://elixir.bootlin.com/linux/v4.16.1/source/drivers/gpu/drm/i915/i915_gem_dmabuf.c#L58
+
+
+	ret = sg_alloc_table(st, obj->mm.pages->nents, GFP_KERNEL);
+	if (ret)
+		goto err_free;
+
+	src = obj->mm.pages->sgl;
+	dst = st->sgl;
+	for (i = 0; i < obj->mm.pages->nents; i++) {
+		sg_set_page(dst, sg_page(src), src->length, 0);
+		dst = sg_next(dst);
+		src = sg_next(src);
+	}
+
+This seems to allocate the scatter gather list and fill it in manually before passing it
+to dma_map_sg(). I'll give it a try. 
+
+Just double checking.
+
+> 
+> Robin.
+> 
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+
+
 -- 
-2.15.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
