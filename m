@@ -1,185 +1,231 @@
-From: gomonovych@gmail.com (Vasyl Gomonovych)
-Date: Wed, 11 Apr 2018 21:16:29 +0200
-Subject: [PATCH] soc: ti: knav_qmss: Use percpu instead atomic for stats
- counter
-Message-ID: <20180411191629.21545-1-gomonovych@gmail.com>
+From: longman@redhat.com (Waiman Long)
+Date: Wed, 11 Apr 2018 15:34:25 -0400
+Subject: [PATCH v2 04/13] locking/qspinlock: Remove unbounded cmpxchg loop
+ from locking slowpath
+In-Reply-To: <1523469680-17699-5-git-send-email-will.deacon@arm.com>
+References: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
+ <1523469680-17699-5-git-send-email-will.deacon@arm.com>
+Message-ID: <674fd9c0-e3f3-9ae0-dd0a-7ccc085c1706@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hwqueue has collect statistics in heavy use queue_pop/queu_push functions
-for cache efficiency and make push/pop faster use percpu variables.
-For performance reasons, driver should keep descriptor in software handler
-as short as possible and quickly return it back to hardware queue.
-Descriptors coming into driver from hardware after pop and return back
-by push to reduce descriptor lifetime in driver collect statistics on percpu.
+On 04/11/2018 02:01 PM, Will Deacon wrote:
+> The qspinlock locking slowpath utilises a "pending" bit as a simple form
+> of an embedded test-and-set lock that can avoid the overhead of explicit
+> queuing in cases where the lock is held but uncontended. This bit is
+> managed using a cmpxchg loop which tries to transition the uncontended
+> lock word from (0,0,0) -> (0,0,1) or (0,0,1) -> (0,1,1).
+>
+> Unfortunately, the cmpxchg loop is unbounded and lockers can be starved
+> indefinitely if the lock word is seen to oscillate between unlocked
+> (0,0,0) and locked (0,0,1). This could happen if concurrent lockers are
+> able to take the lock in the cmpxchg loop without queuing and pass it
+> around amongst themselves.
+>
+> This patch fixes the problem by unconditionally setting _Q_PENDING_VAL
+> using atomic_fetch_or, and then inspecting the old value to see whether
+> we need to spin on the current lock owner, or whether we now effectively
+> hold the lock. The tricky scenario is when concurrent lockers end up
+> queuing on the lock and the lock becomes available, causing us to see
+> a lockword of (n,0,0). With pending now set, simply queuing could lead
+> to deadlock as the head of the queue may not have observed the pending
+> flag being cleared. Conversely, if the head of the queue did observe
+> pending being cleared, then it could transition the lock from (n,0,0) ->
+> (0,0,1) meaning that any attempt to "undo" our setting of the pending
+> bit could race with a concurrent locker trying to set it.
+>
+> We handle this race by preserving the pending bit when taking the lock
+> after reaching the head of the queue and leaving the tail entry intact
+> if we saw pending set, because we know that the tail is going to be
+> updated shortly.
+>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  kernel/locking/qspinlock.c | 102 ++++++++++++++++++++++++++-------------------
+>  1 file changed, 58 insertions(+), 44 deletions(-)
+>
+> diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+> index 396701e8c62d..a8fc402b3f3a 100644
+> --- a/kernel/locking/qspinlock.c
+> +++ b/kernel/locking/qspinlock.c
+> @@ -162,6 +162,17 @@ struct __qspinlock {
+>  
+>  #if _Q_PENDING_BITS == 8
+>  /**
+> + * clear_pending - clear the pending bit.
+> + * @lock: Pointer to queued spinlock structure
+> + *
+> + * *,1,* -> *,0,*
+> + */
+> +static __always_inline void clear_pending(struct qspinlock *lock)
+> +{
+> +	WRITE_ONCE(lock->pending, 0);
+> +}
+> +
+> +/**
+>   * clear_pending_set_locked - take ownership and clear the pending bit.
+>   * @lock: Pointer to queued spinlock structure
+>   *
+> @@ -201,6 +212,17 @@ static __always_inline u32 xchg_tail(struct qspinlock *lock, u32 tail)
+>  #else /* _Q_PENDING_BITS == 8 */
+>  
+>  /**
+> + * clear_pending - clear the pending bit.
+> + * @lock: Pointer to queued spinlock structure
+> + *
+> + * *,1,* -> *,0,*
+> + */
+> +static __always_inline void clear_pending(struct qspinlock *lock)
+> +{
+> +	atomic_andnot(_Q_PENDING_VAL, &lock->val);
+> +}
+> +
+> +/**
+>   * clear_pending_set_locked - take ownership and clear the pending bit.
+>   * @lock: Pointer to queued spinlock structure
+>   *
+> @@ -306,7 +328,7 @@ static __always_inline u32  __pv_wait_head_or_lock(struct qspinlock *lock,
+>  void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+>  {
+>  	struct mcs_spinlock *prev, *next, *node;
+> -	u32 new, old, tail;
+> +	u32 old, tail;
+>  	int idx;
+>  
+>  	BUILD_BUG_ON(CONFIG_NR_CPUS >= (1U << _Q_TAIL_CPU_BITS));
+> @@ -330,58 +352,50 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+>  	}
+>  
+>  	/*
+> +	 * If we observe any contention; queue.
+> +	 */
+> +	if (val & ~_Q_LOCKED_MASK)
+> +		goto queue;
+> +
+> +	/*
+>  	 * trylock || pending
+>  	 *
+>  	 * 0,0,0 -> 0,0,1 ; trylock
+>  	 * 0,0,1 -> 0,1,1 ; pending
+>  	 */
+> -	for (;;) {
+> +	val = atomic_fetch_or_acquire(_Q_PENDING_VAL, &lock->val);
+> +	if (!(val & ~_Q_LOCKED_MASK)) {
+>  		/*
+> -		 * If we observe any contention; queue.
+> +		 * we're pending, wait for the owner to go away.
+> +		 *
+> +		 * *,1,1 -> *,1,0
+> +		 *
+> +		 * this wait loop must be a load-acquire such that we match the
+> +		 * store-release that clears the locked bit and create lock
+> +		 * sequentiality; this is because not all
+> +		 * clear_pending_set_locked() implementations imply full
+> +		 * barriers.
+>  		 */
+> -		if (val & ~_Q_LOCKED_MASK)
+> -			goto queue;
+> -
+> -		new = _Q_LOCKED_VAL;
+> -		if (val == new)
+> -			new |= _Q_PENDING_VAL;
+> +		if (val & _Q_LOCKED_MASK) {
+> +			smp_cond_load_acquire(&lock->val.counter,
+> +					      !(VAL & _Q_LOCKED_MASK));
+> +		}
+>  
+>  		/*
+> -		 * Acquire semantic is required here as the function may
+> -		 * return immediately if the lock was free.
+> +		 * take ownership and clear the pending bit.
+> +		 *
+> +		 * *,1,0 -> *,0,1
+>  		 */
+> -		old = atomic_cmpxchg_acquire(&lock->val, val, new);
+> -		if (old == val)
+> -			break;
+> -
+> -		val = old;
+> -	}
+> -
+> -	/*
+> -	 * we won the trylock
+> -	 */
+> -	if (new == _Q_LOCKED_VAL)
+> +		clear_pending_set_locked(lock);
+>  		return;
+> +	}
+>  
+>  	/*
+> -	 * we're pending, wait for the owner to go away.
+> -	 *
+> -	 * *,1,1 -> *,1,0
+> -	 *
+> -	 * this wait loop must be a load-acquire such that we match the
+> -	 * store-release that clears the locked bit and create lock
+> -	 * sequentiality; this is because not all clear_pending_set_locked()
+> -	 * implementations imply full barriers.
+> -	 */
+> -	smp_cond_load_acquire(&lock->val.counter, !(VAL & _Q_LOCKED_MASK));
+> -
+> -	/*
+> -	 * take ownership and clear the pending bit.
+> -	 *
+> -	 * *,1,0 -> *,0,1
+> +	 * If pending was clear but there are waiters in the queue, then
+> +	 * we need to undo our setting of pending before we queue ourselves.
+>  	 */
+> -	clear_pending_set_locked(lock);
+> -	return;
+> +	if (!(val & _Q_PENDING_MASK))
+> +		clear_pending(lock);
+>  
+>  	/*
+>  	 * End of pending bit optimistic spinning and beginning of MCS
+> @@ -485,15 +499,15 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+>  	 * claim the lock:
+>  	 *
+>  	 * n,0,0 -> 0,0,1 : lock, uncontended
+> -	 * *,0,0 -> *,0,1 : lock, contended
+> +	 * *,*,0 -> *,*,1 : lock, contended
+>  	 *
+> -	 * If the queue head is the only one in the queue (lock value == tail),
+> -	 * clear the tail code and grab the lock. Otherwise, we only need
+> -	 * to grab the lock.
+> +	 * If the queue head is the only one in the queue (lock value == tail)
+> +	 * and nobody is pending, clear the tail code and grab the lock.
+> +	 * Otherwise, we only need to grab the lock.
+>  	 */
+>  	for (;;) {
+>  		/* In the PV case we might already have _Q_LOCKED_VAL set */
+> -		if ((val & _Q_TAIL_MASK) != tail) {
+> +		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
+>  			set_locked(lock);
+>  			break;
+>  		}
 
-Signed-off-by: Vasyl Gomonovych <gomonovych@gmail.com>
----
- drivers/soc/ti/knav_qmss.h       | 14 ++++++----
- drivers/soc/ti/knav_qmss_queue.c | 60 ++++++++++++++++++++++++++--------------
- 2 files changed, 48 insertions(+), 26 deletions(-)
+I don't think it is right to just grab the lock when the pending bit is
+set. I believe it will cause problem.
 
-diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
-index 905b974d1bdc..22f409b86107 100644
---- a/drivers/soc/ti/knav_qmss.h
-+++ b/drivers/soc/ti/knav_qmss.h
-@@ -19,6 +19,8 @@
- #ifndef __KNAV_QMSS_H__
- #define __KNAV_QMSS_H__
- 
-+#include <linux/percpu.h>
-+
- #define THRESH_GTE	BIT(7)
- #define THRESH_LT	0
- 
-@@ -162,11 +164,11 @@ struct knav_qmgr_info {
-  * notifies:			notifier counts
-  */
- struct knav_queue_stats {
--	atomic_t	 pushes;
--	atomic_t	 pops;
--	atomic_t	 push_errors;
--	atomic_t	 pop_errors;
--	atomic_t	 notifies;
-+	unsigned int pushes;
-+	unsigned int pops;
-+	unsigned int push_errors;
-+	unsigned int pop_errors;
-+	unsigned int notifies;
- };
- 
- /**
-@@ -283,7 +285,7 @@ struct knav_queue_inst {
- struct knav_queue {
- 	struct knav_reg_queue __iomem	*reg_push, *reg_pop, *reg_peek;
- 	struct knav_queue_inst		*inst;
--	struct knav_queue_stats	stats;
-+	struct knav_queue_stats __percpu	*stats;
- 	knav_queue_notify_fn		notifier_fn;
- 	void				*notifier_fn_arg;
- 	atomic_t			notifier_enabled;
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index 77d6b5c03aae..384d70bd8605 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -83,7 +83,7 @@ void knav_queue_notify(struct knav_queue_inst *inst)
- 			continue;
- 		if (WARN_ON(!qh->notifier_fn))
- 			continue;
--		atomic_inc(&qh->stats.notifies);
-+		this_cpu_inc(qh->stats->notifies);
- 		qh->notifier_fn(qh->notifier_fn_arg);
- 	}
- 	rcu_read_unlock();
-@@ -214,6 +214,12 @@ static struct knav_queue *__knav_queue_open(struct knav_queue_inst *inst,
- 	if (!qh)
- 		return ERR_PTR(-ENOMEM);
- 
-+	qh->stats = alloc_percpu(struct knav_queue_stats);
-+	if (!qh->stats) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
- 	qh->flags = flags;
- 	qh->inst = inst;
- 	id = inst->id - inst->qmgr->start_queue;
-@@ -229,13 +235,17 @@ static struct knav_queue *__knav_queue_open(struct knav_queue_inst *inst,
- 		if (range->ops && range->ops->open_queue)
- 			ret = range->ops->open_queue(range, inst, flags);
- 
--		if (ret) {
--			devm_kfree(inst->kdev->dev, qh);
--			return ERR_PTR(ret);
--		}
-+		if (ret)
-+			goto err;
- 	}
- 	list_add_tail_rcu(&qh->list, &inst->handles);
- 	return qh;
-+
-+err:
-+	if (qh->stats)
-+		free_percpu(qh->stats);
-+	devm_kfree(inst->kdev->dev, qh);
-+	return ERR_PTR(ret);
- }
- 
- static struct knav_queue *
-@@ -411,6 +421,12 @@ static void knav_queue_debug_show_instance(struct seq_file *s,
- {
- 	struct knav_device *kdev = inst->kdev;
- 	struct knav_queue *qh;
-+	int cpu = 0;
-+	int pushes = 0;
-+	int pops = 0;
-+	int push_errors = 0;
-+	int pop_errors = 0;
-+	int notifies = 0;
- 
- 	if (!knav_queue_is_busy(inst))
- 		return;
-@@ -418,19 +434,22 @@ static void knav_queue_debug_show_instance(struct seq_file *s,
- 	seq_printf(s, "\tqueue id %d (%s)\n",
- 		   kdev->base_id + inst->id, inst->name);
- 	for_each_handle_rcu(qh, inst) {
--		seq_printf(s, "\t\thandle %p: ", qh);
--		seq_printf(s, "pushes %8d, ",
--			   atomic_read(&qh->stats.pushes));
--		seq_printf(s, "pops %8d, ",
--			   atomic_read(&qh->stats.pops));
--		seq_printf(s, "count %8d, ",
--			   knav_queue_get_count(qh));
--		seq_printf(s, "notifies %8d, ",
--			   atomic_read(&qh->stats.notifies));
--		seq_printf(s, "push errors %8d, ",
--			   atomic_read(&qh->stats.push_errors));
--		seq_printf(s, "pop errors %8d\n",
--			   atomic_read(&qh->stats.pop_errors));
-+		for_each_possible_cpu(cpu) {
-+			pushes += per_cpu_ptr(qh->stats, cpu)->pushes;
-+			pops += per_cpu_ptr(qh->stats, cpu)->pops;
-+			push_errors += per_cpu_ptr(qh->stats, cpu)->push_errors;
-+			pop_errors += per_cpu_ptr(qh->stats, cpu)->pop_errors;
-+			notifies += per_cpu_ptr(qh->stats, cpu)->notifies;
-+		}
-+
-+		seq_printf(s, "\t\thandle %p: pushes %8d, pops %8d, count %8d, notifies %8d, push errors %8d, pop errors %8d\n",
-+				qh,
-+				pushes,
-+				pops,
-+				knav_queue_get_count(qh),
-+				notifies,
-+				push_errors,
-+				pop_errors);
- 	}
- }
- 
-@@ -547,6 +566,7 @@ void knav_queue_close(void *qhandle)
- 		if (range->ops && range->ops->close_queue)
- 			range->ops->close_queue(range, inst);
- 	}
-+	free_percpu(qh->stats);
- 	devm_kfree(inst->kdev->dev, qh);
- }
- EXPORT_SYMBOL_GPL(knav_queue_close);
-@@ -620,7 +640,7 @@ int knav_queue_push(void *qhandle, dma_addr_t dma,
- 	val = (u32)dma | ((size / 16) - 1);
- 	writel_relaxed(val, &qh->reg_push[0].ptr_size_thresh);
- 
--	atomic_inc(&qh->stats.pushes);
-+	this_cpu_inc(qh->stats->pushes);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(knav_queue_push);
-@@ -658,7 +678,7 @@ dma_addr_t knav_queue_pop(void *qhandle, unsigned *size)
- 	if (size)
- 		*size = ((val & DESC_SIZE_MASK) + 1) * 16;
- 
--	atomic_inc(&qh->stats.pops);
-+	this_cpu_inc(qh->stats->pops);
- 	return dma;
- }
- EXPORT_SYMBOL_GPL(knav_queue_pop);
--- 
-2.14.1
+Preserving the the pending bit should be just
+
+diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+index 35367cc..76d9124 100644
+--- a/kernel/locking/qspinlock.c
++++ b/kernel/locking/qspinlock.c
+@@ -511,7 +511,8 @@ void queued_spin_lock_slowpath(struct qspinlock
+*lock, u32 v
+                 * necessary acquire semantics required for locking. At most
+                 * two iterations of this loop may be ran.
+                 */
+-               old = atomic_cmpxchg_relaxed(&lock->val, val,
+_Q_LOCKED_VAL);
++               old = atomic_cmpxchg_relaxed(&lock->val, val,
++                       _Q_LOCKED_VAL | (val & _Q_PENDING_MASK));
+                if (old == val)
+                        goto release;   /* No contention */
+
+Cheers,
+Longman
