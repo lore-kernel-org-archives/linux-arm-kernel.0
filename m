@@ -1,83 +1,56 @@
-From: Paul.Durrant@citrix.com (Paul Durrant)
-Date: Wed, 11 Apr 2018 09:50:25 +0000
-Subject: [PATCH v4] xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE
-In-Reply-To: <8fff31d5-7eb4-33e8-0fc8-c5bb1ab47eba@arm.com>
-References: <20180410075820.11081-1-paul.durrant@citrix.com>
- <8fff31d5-7eb4-33e8-0fc8-c5bb1ab47eba@arm.com>
-Message-ID: <68f3d9b993d644e8ab137ccecceb575c@AMSPEX02CL03.citrite.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 11 Apr 2018 11:52:44 +0200
+Subject: [PATCH] pinctrl/samsung: Correct EINTG banks order
+In-Reply-To: <CA+Ln22FAmBHrxEvQpBPV1p=Kg2g+XCHn=HQJCNSUhFv+Jtf6xA@mail.gmail.com>
+References: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <CAJKOXPdckxVfwU60=e7e6trbiB78ETE=G2vuY1kCrcKHaU2CzA@mail.gmail.com>
+ <CA+Ln22Eabq0HH6YmCSFwLd68w3DU4xTX2BiNAeLe_tnG6282Xg@mail.gmail.com>
+ <CA+Ln22FAmBHrxEvQpBPV1p=Kg2g+XCHn=HQJCNSUhFv+Jtf6xA@mail.gmail.com>
+Message-ID: <CAJKOXPcWQUHHhf2gV3u4fu=wuVf3qxOYwNdj0c_JFc+zqfJUkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Julien Grall [mailto:julien.grall at arm.com]
-> Sent: 11 April 2018 10:46
-> To: Paul Durrant <Paul.Durrant@citrix.com>; xen-devel at lists.xenproject.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Cc: Juergen Gross <jgross@suse.com>; Thomas Gleixner
-> <tglx@linutronix.de>; Stefano Stabellini <sstabellini@kernel.org>; Ingo
-> Molnar <mingo@redhat.com>
-> Subject: Re: [PATCH v4] xen/privcmd: add
-> IOCTL_PRIVCMD_MMAP_RESOURCE
-> 
-> Hi,
-> 
-> On 10/04/18 08:58, Paul Durrant wrote:
-> > +static long privcmd_ioctl_mmap_resource(struct file *file, void __user
-> *udata)
-> > +{
-> > +	struct privcmd_data *data = file->private_data;
-> > +	struct mm_struct *mm = current->mm;
-> > +	struct vm_area_struct *vma;
-> > +	struct privcmd_mmap_resource kdata;
-> > +	xen_pfn_t *pfns = NULL;
-> > +	struct xen_mem_acquire_resource xdata;
-> > +	int rc;
-> > +
-> > +	if (copy_from_user(&kdata, udata, sizeof(kdata)))
-> > +		return -EFAULT;
-> > +
-> > +	/* If restriction is in place, check the domid matches */
-> > +	if (data->domid != DOMID_INVALID && data->domid != kdata.dom)
-> > +		return -EPERM;
-> > +
-> > +	down_write(&mm->mmap_sem);
-> > +
-> > +	vma = find_vma(mm, kdata.addr);
-> > +	if (!vma || vma->vm_ops != &privcmd_vm_ops) {
-> > +		rc = -EINVAL;
-> > +		goto out;
-> > +	}
-> > +
-> > +	pfns = kcalloc(kdata.num, sizeof(*pfns), GFP_KERNEL);
-> > +	if (!pfns) {
-> > +		rc = -ENOMEM;
-> > +		goto out;
-> > +	}
-> > +
-> > +	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-> > +		struct page **pages;
-> > +		unsigned int i;
-> > +
-> > +		rc = alloc_empty_pages(vma, kdata.num);
-> > +		if (rc < 0)
-> > +			goto out;
-> > +
-> > +		pages = vma->vm_private_data;
-> > +		for (i = 0; i < kdata.num; i++)
-> > +			pfns[i] = page_to_pfn(pages[i]);
-> 
-> I don't think this is going to work well if the hypervisor is using a
-> different granularity for the page.
-> 
-> Imagine Xen is using 4K but the kernel 64K. You would end up to have the
-> resource not mapped contiguously in the memory.
+On Wed, Apr 11, 2018 at 10:36 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> 2018-04-10 17:38 GMT+09:00 Tomasz Figa <tomasz.figa@gmail.com>:
+>> 2018-04-10 16:06 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+>>> On Sun, Apr 8, 2018 at 8:07 PM, Pawe? Chmiel
+>>> <pawel.mikolaj.chmiel@gmail.com> wrote:
+>>>> All banks with GPIO interrupts should be at beginning
+>>>> of bank array and without any other types of banks between them.
+>>>> This order is expected by exynos_eint_gpio_irq, when doing
+>>>> interrupt group to bank translation.
+>>>> Otherwise, kernel NULL pointer dereference would happen
+>>>> when trying to handle interrupt, due to wrong bank being looked up.
+>>>> Observed on s5pv210, when trying to handle gpj0 interrupt,
+>>>> where kernel was mapping it to gpi bank.
+>>>
+>>> Thanks for the patch. The issue looks real although one thing was
+>>> missed - there is a gap in SVC group between GPK2 and GPL0 (pointed by
+>>> Marek Szyprowski):
+>>>
+>>> 0x0 - EINT_23 - gpk0
+>>> 0x1 - EINT_24 - gpk1
+>>> 0x2 - EINT_25 - gpk2
+>>> 0x4 - EINT_27 - gpl0
+>>> 0x7 - EINT_8 - gpm0
+>>>
+>>> Maybe this should be done differently - to remove such hidden
+>>> requirement entirely in favor of another parameter of
+>>> EXYNOS_PIN_BANK_EINTG argument?
+>>
+>> Perhaps let's limit this patch to s5pv210 and Exynos5410 alone, where
+>> a simple swap of bank order in the arrays should be okay.
+>>
+>> We might also need to have some fixes on 4x12, because I noticed that
+>> in exynos4x12_pin_banks0[] there is a hole in eint_offsets between
+>> gpd1 and gpf0 and exynos4x12_pin_banks1[] starts with gpk0 that has
+>> eint_offset equal to 0x08 (not 0).
+>
+> To close the loop, after talking offline and checking the
+> documentation, Exynos4x12 is fine, because the group numbers in SVC
+> register actually match what is defined in bank arrays.
 
-Good point. I do need to take account of the kernel page size in this case.
+Great! Thanks for checking.
 
-  Paul
-
-> 
-> Cheers,
-> 
-> --
-> Julien Grall
+Best regards,
+Krzysztof
