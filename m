@@ -1,8 +1,8 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 11 Apr 2018 16:19:22 +0200
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 11 Apr 2018 12:23:38 -0400
 Subject: [PATCH] PCI: quirk HT1100 & HT2000 and one HT2100 Root Ports for
  Extended Tags
-In-Reply-To: <1290e3d3-e7f0-a4f5-925d-2b7c2cb42b93@codeaurora.org>
+In-Reply-To: <20180411141922.GA13832@kroah.com>
 References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
  <20180410194144.GD54986@bhelgaas-glaptop.roam.corp.google.com>
  <20180410195008.GE54986@bhelgaas-glaptop.roam.corp.google.com>
@@ -11,33 +11,21 @@ References: <1522882209-9743-1-git-send-email-okaya@codeaurora.org>
  <ecdad8f4-6996-cfe0-d005-fbc67ba3cd79@codeaurora.org>
  <20180411140849.GA12557@kroah.com>
  <1290e3d3-e7f0-a4f5-925d-2b7c2cb42b93@codeaurora.org>
-Message-ID: <20180411141922.GA13832@kroah.com>
+ <20180411141922.GA13832@kroah.com>
+Message-ID: <d7b78270-c3ff-8c88-1ac0-f9467fb54da2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 10:13:11AM -0400, Sinan Kaya wrote:
-> On 4/11/2018 10:08 AM, Greg Kroah-Hartman wrote:
-> >>> So I added these stable tags:
-> >>>
-> >>>   CC: stable at vger.kernel.org      # v4.11: 62ce94a7a5a5 PCI: Mark Broadcom HT2100 Root Port Extended Tags as broken
-> >>>   CC: stable at vger.kernel.org      # v4.11
-> >>>
-> >>> I'm not sure I'm using the stable request correctly, but my intent is:
-> 
-> Asking if we placed the tags correctly. Sounds like we did.
-> 
-> >>>
-> >>>   - 62ce94a7a5a5 appeared in v4.14, so cherry-pick 62ce94a7a5a5 to
-> >>>     v4.11 through v4.13
-> >>>   - cherry-pick *this* patch on top of 62ce94a7a5a5 to v4.11 and later
-> > Bjorn is correct here, why are you dragging me into this?
-> 
-> Thanks
+On 4/11/2018 10:19 AM, Greg Kroah-Hartman wrote:
+> Next time explicitly ask the question, don't expect someone to rummage
+> through an email to determine what you are thinking.  You are being lazy
+> by just adding someone else to an email thread like this, be considerate
+> and take the time to explain yourself when asking someone else to do
+> work.
 
-Next time explicitly ask the question, don't expect someone to rummage
-through an email to determine what you are thinking.  You are being lazy
-by just adding someone else to an email thread like this, be considerate
-and take the time to explain yourself when asking someone else to do
-work.
+Sorry, I should have stripped irrelevant pieces like you said.
 
-greg k-h
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
