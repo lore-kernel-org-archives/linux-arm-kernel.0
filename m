@@ -1,7 +1,7 @@
 From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Wed, 11 Apr 2018 11:23:02 +0100
-Subject: [PATCH 1/3] arm64: Remove duplicate include
-Message-ID: <1523442182-10846-1-git-send-email-vincenzo.frascino@arm.com>
+Date: Wed, 11 Apr 2018 11:24:46 +0100
+Subject: arm64: Remove duplicate include
+Message-ID: <1523442286-11714-1-git-send-email-vincenzo.frascino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,7 +9,6 @@ In armv8_deprecated asm/cpufeature.h has been included twice.
 
 This patch removes the double inclusion.
 
-Change-Id: I5e2772457a61127c14a4a430d542ddf57decd396
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
  arch/arm64/kernel/armv8_deprecated.c | 3 +--
