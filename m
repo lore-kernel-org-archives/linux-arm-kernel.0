@@ -1,66 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Apr 2018 14:10:12 +0100
-Subject: [PATCH] ARM: avoid Cortex-A9 livelock on tight dmb loops
-In-Reply-To: <5985b6df-d19c-c30e-1044-466ee388e74e@ti.com>
-References: <E1f5qij-00033R-Sl@rmk-PC.armlinux.org.uk>
- <20180410134149.GQ5700@atomide.com>
- <685f80e3-30b3-8806-b81c-8de456507001@ti.com>
- <20180411125210.GF10990@n2100.armlinux.org.uk>
- <5985b6df-d19c-c30e-1044-466ee388e74e@ti.com>
-Message-ID: <20180411131011.GG10990@n2100.armlinux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 11 Apr 2018 15:16:16 +0200
+Subject: [PATCH] arm64: zynqmp: Use serdev for zcu100 BT
+Message-ID: <0ce3b4f588f1d9a83cfe99b93af3514f4d893273.1523452571.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 06:29:21PM +0530, Keerthy wrote:
-> On Wednesday 11 April 2018 06:22 PM, Russell King - ARM Linux wrote:
-> > That will also go for the other locations in this patch too, as they
-> > are all callable on _any_ platform.
-> > 
-> > It sounds like we need to abstract this so that platforms where "wfi"
-> > is complex can handle the "spin on this CPU forever" appropriately.
-> > 
-> > While we could use dsb, we're asking a CPU to indefinitely spin in a
-> > tight loop, which isn't going to be good for power consumption - what
-> > if we have three CPUs doing that, could it push a SoC over the thermal
-> > limits?  I don't think that's a question we can confidently answer
-> > except for specific SoCs.
-> 
-> Yes. If the ondemand governor detects that CPU was busy greater than
-> 80% of the time it bumps to the highest OPP and can lead to higher
-> temperatures though CPU might not be doing anything useful.
+Mainline started to use serdev interface for uart attached devices.
+Change description to reflect it.
 
-That probably wouldn't happen - all these paths are concerned with
-stopping CPUs doing something as a result of either a panic, a crash
-or a failed attempt to reset the system.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-We'd enter them in whatever operating state the system was in at the
-time, which is indeterminant.  What we can be relatively sure about
-is that no further operating state transitions will occur.
+ arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-For example, in the case of a crash with kexec and a crashdump kernel
-loaded, the non-crashing CPUs end up in machine_crash_nonpanic_core().
-Should kexec fail, then the system stops leaving all but one CPU
-spinning in that function in whatever operating state they were in,
-which could be the highest OPP.
-
-This means that, for example, in the case of a four CPU system, three
-CPUs will be spinning hard on whatever instructions we have there,
-while one CPU is trying to perform cache operations to prepare to boot
-the crashdump kernel.
-
-For a panic, it's very similar - the CPUs which didn't call panic()
-are directed to ipi_cpu_stop() where they spin.  By default, a panic()
-halts the panicing CPU and nothing further happens, so the other CPUs
-will endlessly spin in the same way as above.  The panicing CPU may
-be waiting for the panic timeout to expire before trying to reboot the
-system.
-
-The OMAP reset case is slightly different, because that's a case of
-failure-to-reboot - combine that with a panic timeout, and you can end
-up with _all_ CPUs in the system indefinitely spinning hard in a tight
-loop.
-
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+index 3e862a9faf26..c7f713c8e69e 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dts
+@@ -89,12 +89,6 @@
+ 			gpios = <&gpio 25 GPIO_ACTIVE_HIGH>;
+ 			default-state = "on";
+ 		};
+-
+-		bt_power {
+-			label = "bt_power";
+-			gpios = <&gpio 8 GPIO_ACTIVE_HIGH>;
+-			default-state = "on";
+-		};
+ 	};
+ 
+ 	wmmcsdio_fixed: fixedregulator-mmcsdio {
+@@ -267,6 +261,10 @@
+ 
+ &uart0 {
+ 	status = "okay";
++	bluetooth {
++		compatible = "ti,wl1831-st";
++		enable-gpios = <&gpio 8 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &uart1 {
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.17.0
