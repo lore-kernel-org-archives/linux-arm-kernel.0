@@ -1,79 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Apr 2018 19:01:17 +0100
-Subject: [PATCH v2 10/13] locking/qspinlock: Make queued_spin_unlock use
- smp_store_release
+Date: Wed, 11 Apr 2018 19:01:12 +0100
+Subject: [PATCH v2 05/13] locking/qspinlock: Kill cmpxchg loop when claiming
+ lock from head of queue
 In-Reply-To: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
 References: <1523469680-17699-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1523469680-17699-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1523469680-17699-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A qspinlock can be unlocked simply by writing zero to the locked byte.
-This can be implemented in the generic code, so do that and remove the
-arch-specific override for x86 in the !PV case.
+When a queued locker reaches the head of the queue, it claims the lock
+by setting _Q_LOCKED_VAL in the lockword. If there isn't contention, it
+must also clear the tail as part of this operation so that subsequent
+lockers can avoid taking the slowpath altogether.
+
+Currently this is expressed as a cmpxchg loop that practically only
+runs up to two iterations. This is confusing to the reader and unhelpful
+to the compiler. Rewrite the cmpxchg loop without the loop, so that a
+failed cmpxchg implies that there is contention and we just need to
+write to _Q_LOCKED_VAL without considering the rest of the lockword.
 
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/x86/include/asm/qspinlock.h | 17 ++++++-----------
- include/asm-generic/qspinlock.h  |  2 +-
- 2 files changed, 7 insertions(+), 12 deletions(-)
+ kernel/locking/qspinlock.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/arch/x86/include/asm/qspinlock.h b/arch/x86/include/asm/qspinlock.h
-index da1370ad206d..3e70bed8a978 100644
---- a/arch/x86/include/asm/qspinlock.h
-+++ b/arch/x86/include/asm/qspinlock.h
-@@ -9,6 +9,12 @@
- 
- #define _Q_PENDING_LOOPS	(1 << 9)
- 
-+#ifdef CONFIG_PARAVIRT_SPINLOCKS
-+extern void native_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
-+extern void __pv_init_lock_hash(void);
-+extern void __pv_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
-+extern void __raw_callee_save___pv_queued_spin_unlock(struct qspinlock *lock);
-+
- #define	queued_spin_unlock queued_spin_unlock
- /**
-  * queued_spin_unlock - release a queued spinlock
-@@ -21,12 +27,6 @@ static inline void native_queued_spin_unlock(struct qspinlock *lock)
- 	smp_store_release(&lock->locked, 0);
- }
- 
--#ifdef CONFIG_PARAVIRT_SPINLOCKS
--extern void native_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
--extern void __pv_init_lock_hash(void);
--extern void __pv_queued_spin_lock_slowpath(struct qspinlock *lock, u32 val);
--extern void __raw_callee_save___pv_queued_spin_unlock(struct qspinlock *lock);
--
- static inline void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
- {
- 	pv_queued_spin_lock_slowpath(lock, val);
-@@ -42,11 +42,6 @@ static inline bool vcpu_is_preempted(long cpu)
- {
- 	return pv_vcpu_is_preempted(cpu);
- }
--#else
--static inline void queued_spin_unlock(struct qspinlock *lock)
--{
--	native_queued_spin_unlock(lock);
--}
- #endif
- 
- #ifdef CONFIG_PARAVIRT
-diff --git a/include/asm-generic/qspinlock.h b/include/asm-generic/qspinlock.h
-index b37b4ad7eb94..a8ed0a352d75 100644
---- a/include/asm-generic/qspinlock.h
-+++ b/include/asm-generic/qspinlock.h
-@@ -100,7 +100,7 @@ static __always_inline void queued_spin_unlock(struct qspinlock *lock)
- 	/*
- 	 * unlock() needs release semantics:
+diff --git a/kernel/locking/qspinlock.c b/kernel/locking/qspinlock.c
+index a8fc402b3f3a..01b660442d87 100644
+--- a/kernel/locking/qspinlock.c
++++ b/kernel/locking/qspinlock.c
+@@ -505,24 +505,21 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+ 	 * and nobody is pending, clear the tail code and grab the lock.
+ 	 * Otherwise, we only need to grab the lock.
  	 */
--	(void)atomic_sub_return_release(_Q_LOCKED_VAL, &lock->val);
-+	smp_store_release(&lock->locked, 0);
- }
- #endif
+-	for (;;) {
+-		/* In the PV case we might already have _Q_LOCKED_VAL set */
+-		if ((val & _Q_TAIL_MASK) != tail || (val & _Q_PENDING_MASK)) {
+-			set_locked(lock);
+-			break;
+-		}
++
++	/* In the PV case we might already have _Q_LOCKED_VAL set */
++	if ((val & _Q_TAIL_MASK) == tail) {
+ 		/*
+ 		 * The smp_cond_load_acquire() call above has provided the
+-		 * necessary acquire semantics required for locking. At most
+-		 * two iterations of this loop may be ran.
++		 * necessary acquire semantics required for locking.
+ 		 */
+ 		old = atomic_cmpxchg_relaxed(&lock->val, val, _Q_LOCKED_VAL);
+ 		if (old == val)
+-			goto release;	/* No contention */
+-
+-		val = old;
++			goto release; /* No contention */
+ 	}
  
++	/* Either somebody is queued behind us or _Q_PENDING_VAL is set */
++	set_locked(lock);
++
+ 	/*
+ 	 * contended path; wait for next if not observed yet, release.
+ 	 */
 -- 
 2.1.4
