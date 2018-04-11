@@ -1,109 +1,406 @@
-From: ran.wang_1@nxp.com (Ran Wang)
-Date: Wed, 11 Apr 2018 14:35:51 +0800
-Subject: [PATCH v2 6/6] fsl_pmc: update device bindings
-In-Reply-To: <20180411063551.30368-1-ran.wang_1@nxp.com>
-References: <20180411063551.30368-1-ran.wang_1@nxp.com>
-Message-ID: <20180411063551.30368-6-ran.wang_1@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 11 Apr 2018 09:06:57 +0200
+Subject: [PATCH 3/3] ARM: dts: sun7i: Add support for the Ainol AW1 tablet
+In-Reply-To: <20180410213129.24049-3-contact@paulk.fr>
+References: <20180410213129.24049-1-contact@paulk.fr>
+ <20180410213129.24049-3-contact@paulk.fr>
+Message-ID: <20180411070657.kw6uckqtmwb7p5hf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Li Yang <leoli@freescale.com>
+Hi,
 
-Signed-off-by: Li Yang <leoyang.li@nxp.com>
-Signed-off-by: Zhao Chenhui <chenhui.zhao@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
-Changes in v2:
-  - new file
+On Tue, Apr 10, 2018 at 11:31:29PM +0200, Paul Kocialkowski wrote:
+> This adds support for the Ainol AW1, an A20-based 7" tablet from Ainol.
+> 
+> The following board-specific features are supported:
+> * LCD panel
+> * Backlight
+> * USB OTG
+> * Buttons
+> * Touchscreen (doesn't work without non-free firmware)
+> * Accelerometer
+> * Battery
+> 
+> The following are untested:
+> * Audio output
+> * Audio speakers
+> * USB via SPCI connector
+> 
+> The following are not supported:
+> * Wi-Fi
+> * Bluetooth
+> * NAND
+> * Audio via SPCI connector
+> 
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+>  arch/arm/boot/dts/Makefile                |   1 +
+>  arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts | 358 ++++++++++++++++++++++++++++++
+>  2 files changed, 359 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 9f7133b6fba0..03bfacebfdbd 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -929,6 +929,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
+>  	sun6i-a31s-sinovoip-bpi-m2.dtb \
+>  	sun6i-a31s-yones-toptech-bs1078-v2.dtb
+>  dtb-$(CONFIG_MACH_SUN7I) += \
+> +	sun7i-a20-ainol-aw1.dtb \
+>  	sun7i-a20-bananapi.dtb \
+>  	sun7i-a20-bananapi-m1-plus.dtb \
+>  	sun7i-a20-bananapro.dtb \
+> diff --git a/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> new file mode 100644
+> index 000000000000..697586991aea
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-ainol-aw1.dts
+> @@ -0,0 +1,358 @@
+> +/*
+> + * Copyright 2018 Paul Kocialkowski <contact@paulk.fr>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
 
- .../devicetree/bindings/powerpc/fsl/pmc.txt        |   59 +++++++++++--------
- 1 files changed, 34 insertions(+), 25 deletions(-)
+Can you use an SPDX header instead of the whole license text?
 
-diff --git a/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt b/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
-index 07256b7..f1f749f 100644
---- a/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
-+++ b/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
-@@ -9,15 +9,20 @@ Properties:
- 
-   "fsl,mpc8548-pmc" should be listed for any chip whose PMC is
-   compatible.  "fsl,mpc8536-pmc" should also be listed for any chip
--  whose PMC is compatible, and implies deep-sleep capability.
-+  whose PMC is compatible, and implies deep-sleep capability and
-+  wake on user defined packet(wakeup on ARP).
-+
-+  "fsl,p1022-pmc" should be listed for any chip whose PMC is
-+  compatible, and implies lossless Ethernet capability during sleep.
- 
-   "fsl,mpc8641d-pmc" should be listed for any chip whose PMC is
-   compatible; all statements below that apply to "fsl,mpc8548-pmc" also
-   apply to "fsl,mpc8641d-pmc".
- 
-   Compatibility does not include bit assignments in SCCR/PMCDR/DEVDISR; these
--  bit assignments are indicated via the sleep specifier in each device's
--  sleep property.
-+  bit assignments are indicated via the clock nodes.  Device which has a
-+  controllable clock source should have a "fsl,pmc-handle" property pointing
-+  to the clock node.
- 
- - reg: For devices compatible with "fsl,mpc8349-pmc", the first resource
-   is the PMC block, and the second resource is the Clock Configuration
-@@ -33,31 +38,35 @@ Properties:
-   this is a phandle to an "fsl,gtm" node on which timer 4 can be used as
-   a wakeup source from deep sleep.
- 
--Sleep specifiers:
-+Clock nodes:
-+The clock nodes are to describe the masks in PM controller registers for each
-+soc clock.
-+- fsl,pmcdr-mask: For "fsl,mpc8548-pmc"-compatible devices, the mask will be
-+  ORed into PMCDR before suspend if the device using this clock is the wake-up
-+  source and need to be running during low power mode; clear the mask if
-+  otherwise.
- 
--  fsl,mpc8349-pmc: Sleep specifiers consist of one cell.  For each bit
--  that is set in the cell, the corresponding bit in SCCR will be saved
--  and cleared on suspend, and restored on resume.  This sleep controller
--  supports disabling and resuming devices at any time.
-+- fsl,sccr-mask: For "fsl,mpc8349-pmc"-compatible devices, the corresponding
-+  bit specified by the mask in SCCR will be saved and cleared on suspend, and
-+  restored on resume.
- 
--  fsl,mpc8536-pmc: Sleep specifiers consist of three cells, the third of
--  which will be ORed into PMCDR upon suspend, and cleared from PMCDR
--  upon resume.  The first two cells are as described for fsl,mpc8578-pmc.
--  This sleep controller only supports disabling devices during system
--  sleep, or permanently.
--
--  fsl,mpc8548-pmc: Sleep specifiers consist of one or two cells, the
--  first of which will be ORed into DEVDISR (and the second into
--  DEVDISR2, if present -- this cell should be zero or absent if the
--  hardware does not have DEVDISR2) upon a request for permanent device
--  disabling.  This sleep controller does not support configuring devices
--  to disable during system sleep (unless supported by another compatible
--  match), or dynamically.
-+- fsl,devdisr-mask: Contain one or two cells, depending on the availability of
-+  DEVDISR2 register.  For compatible devices, the mask will be ORed into DEVDISR
-+  or DEVDISR2 when the clock should be permenently disabled.
- 
- Example:
- 
--	power at b00 {
--		compatible = "fsl,mpc8313-pmc", "fsl,mpc8349-pmc";
--		reg = <0xb00 0x100 0xa00 0x100>;
--		interrupts = <80 8>;
-+	power at e0070 {
-+		compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
-+		reg = <0xe0070 0x20>;
-+
-+		etsec1_clk: soc-clk at 24 {
-+			fsl,pmcdr-mask = <0x00000080>;
-+		};
-+		etsec2_clk: soc-clk at 25 {
-+			fsl,pmcdr-mask = <0x00000040>;
-+		};
-+		etsec3_clk: soc-clk at 26 {
-+			fsl,pmcdr-mask = <0x00000020>;
-+		};
- 	};
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun7i-a20.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/pwm/pwm.h>
+> +
+> +/ {
+> +	model = "Ainol AW1";
+> +	compatible = "ainol,ainol-aw1", "allwinner,sun7i-a20";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	backlight: backlight {
+> +		compatible = "pwm-backlight";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&backlight_enable_pin>;
+
+You don't need any of the pinctrl nodes for the GPIOs
+
+> +		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
+> +		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+> +		default-brightness-level = <5>;
+> +		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
+> +	};
+> +
+> +	panel: panel {
+> +		compatible = "innolux,at070tn92";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		power-supply = <&panel_power>;
+> +		backlight = <&backlight>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			panel_input: endpoint at 0 {
+> +				reg = <0>;
+> +				remote-endpoint = <&tcon0_out_panel>;
+> +			};
+> +		};
+> +	};
+> +
+> +	panel_power: panel_power {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&panel_power_pin>;
+> +		regulator-name = "panel-power";
+> +		regulator-min-microvolt = <10400000>;
+> +		regulator-max-microvolt = <10400000>;
+> +		gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
+> +		enable-active-high;
+
+Sigh, we should really convert regulator-fixed to use the proper GPIO
+API here...
+
+> +		regulator-boot-on;
+> +	};
+> +};
+> +
+> +&codec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&codec_pa_pin>;
+> +	allwinner,pa-gpios = <&pio 7 15 GPIO_ACTIVE_HIGH>; /* PH15 */
+> +	status = "okay";
+> +};
+> +
+> +&cpu0 {
+> +	cpu-supply = <&reg_dcdc2>;
+> +};
+
+How was CPUfreq tested?
+
+> +
+> +&de {
+> +	status = "okay";
+> +};
+> +
+> +&ehci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ehci1 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins_a>;
+> +	status = "okay";
+> +
+> +	axp209: pmic at 34 {
+> +		reg = <0x34>;
+> +		interrupt-parent = <&nmi_intc>;
+> +		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins_a>;
+> +	status = "okay";
+> +
+> +	lis3dh: accelerometer at 18 {
+> +		compatible = "st,lis3dh-accel";
+> +		reg = <0x18>;
+> +		vdd-supply = <&reg_vcc3v3>;
+> +		vddio-supply = <&reg_vcc3v3>;
+> +		st,drdy-int-pin = <1>;
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c2_pins_a>;
+> +	status = "okay";
+> +	clock-frequency = <400000>; /* 400 KHz required for GSL1680. */
+
+I'm not sure that comment is worth it. The only device there is the
+touchscreen, so it's kind of obvious that it's the device that needs
+that frequency.
+
+> +
+> +	gsl1680: touchscreen at 40 {
+> +		compatible = "silead,gsl1680";
+> +		reg = <0x40>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&touchscreen_power_pin>;
+> +		interrupt-parent = <&pio>;
+> +		interrupts = <7 21 IRQ_TYPE_EDGE_FALLING>; /* EINT21 (PH21) */
+> +		power-gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>; /* PH20 */
+> +		firmware-name = "gsl1680-ainol-aw1.fw";
+> +		touchscreen-size-x = <480>;
+> +		touchscreen-size-y = <800>;
+> +		touchscreen-swapped-x-y;
+> +		touchscreen-inverted-y;
+> +		silead,max-fingers = <5>;
+> +	};
+> +};
+> +
+> +&lradc {
+> +	vref-supply = <&reg_vcc3v0>;
+
+You should use the proper regulator from the PMIC here.
+
+> +	status = "okay";
+> +
+> +	button at 571 {
+> +		label = "Volume Up";
+> +		linux,code = <KEY_VOLUMEUP>;
+> +		channel = <0>;
+> +		voltage = <571428>;
+> +	};
+> +
+> +	button at 761 {
+> +		label = "Volume Down";
+> +		linux,code = <KEY_VOLUMEDOWN>;
+> +		channel = <0>;
+> +		voltage = <761904>;
+> +	};
+> +
+> +	button at 952 {
+> +		label = "Home";
+> +		linux,code = <KEY_HOME>;
+> +		channel = <0>;
+> +		voltage = <952380>;
+> +	};
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+
+And here too.
+
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&ohci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci1 {
+> +	status = "okay";
+> +};
+> +
+> +&otg_sram {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	panel_power_pin: panel_power_pin at 0 {
+> +		pins = "PH8";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	backlight_enable_pin: backlight_enable_pin at 0 {
+> +		pins = "PH7";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	touchscreen_power_pin: touchscreen_power_pin at 0 {
+> +		pins = "PH20";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	codec_pa_pin: codec_pa_pin at 0 {
+> +		pins = "PH15";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+> +		pins = "PH4";
+> +		function = "gpio_in";
+> +		bias-pull-up;
+> +	};
+> +
+> +	usb0_vbus_pin: usb0_vbus_pin at 0 {
+> +		pins = "PB9";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	usb1_vbus_pin: usb1_vbus_pin at 0 {
+> +		pins = "PH6";
+> +		function = "gpio_out";
+> +	};
+> +
+> +	usb2_vbus_pin: usb2_vbus_pin at 0 {
+> +		pins = "PH3";
+> +		function = "gpio_out";
+> +	};
+> +};
+> +
+> +&pwm {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pwm0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&tcon0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&lcd_rgb666_pins>;
+> +	status = "okay";
+> +};
+> +
+> +&tcon0_out {
+> +	tcon0_out_panel: endpoint at 0 {
+> +		reg = <0>;
+> +		remote-endpoint = <&panel_input>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&usb_otg {
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&usb0_id_detect_pin>;
+> +	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
+> +	usb0_vbus_power-supply = <&usb_power_supply>;
+> +	usb0_vbus-supply = <&reg_usb0_vbus>;
+> +	usb1_vbus-supply = <&reg_usb1_vbus>;
+> +	usb2_vbus-supply = <&reg_usb2_vbus>;
+
+And here as well.
+
+Maxime
+
 -- 
-1.7.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180411/e9a79ba7/attachment.sig>
