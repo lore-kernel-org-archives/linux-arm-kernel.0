@@ -1,111 +1,88 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Thu, 12 Apr 2018 01:19:54 +0200
-Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: dts: sun7i: Add RGB666 pins
- definition
-In-Reply-To: <588060914d3b6899f6812daa4969f61bf750c91b.camel@paulk.fr>
-References: <20180410213129.24049-1-contact@paulk.fr>
- <20180410213129.24049-2-contact@paulk.fr>
- <e7f68882-c333-12ac-c122-20b0d7b65666@micronovasrl.com>
- <588060914d3b6899f6812daa4969f61bf750c91b.camel@paulk.fr>
-Message-ID: <1f71f768-2c3d-a241-a368-e55f4677a279@micronovasrl.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 11 Apr 2018 19:32:55 -0400
+Subject: [VERY RFC 0/2] iommu: optionally skip attaching to a DMA domain
+In-Reply-To: <20180411185510.11594-1-jcrouse@codeaurora.org>
+References: <20180411185510.11594-1-jcrouse@codeaurora.org>
+Message-ID: <CAF6AEGvVRPzGO00UqyiD2vBwZn4kDdr8rnBf2Tr4ypS0pRpHLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Apr 11, 2018 at 2:55 PM, Jordan Crouse <jcrouse@codeaurora.org> wrote:
+> I've been struggling with a problem for a while and I haven't been able to come
+> up with a clean solution. Rob convinced me to stop complaining and do
+> _something_ and hopefully this can spur a good discussion.
+>
+> The scenario is basically this: The MSM GPU wants to manage its own IOMMU
+> virtual address space in lieu of using the DMA API to do so. The most important
+> reason is that when per-instance pagetables [1] are enabled each file descriptor
+> uses its own pagetable which are dynamically switched between contexts. In
+> conjunction with this we use a split pagetable scheme to allow global buffers
+> be persistently mapped so even a single pagetable has multiple ranges that need
+> to be utilized based on buffer type.
+>
+> Obviously the DMA API isn't suitable for this kind of specialized use. We want
+> to push it off to the side, allocate our own domain, and use it directly with
+> the IOMMU APIs. In a perfect world we would just not use the DMA API and attach
+> our own domain and that would be the end of the story. Unfortunately this is not
+> a perfect world.
+>
+> In order to switch the pagetable from the GPU the SoC has some special wiring so
+> that the GPU can reprogram the TTBR0 register in the IOMMU to the appropriate
+> value. For a variety of reasons the hardware is hardcoded to only be able to
+> access context bank 0 in the SMMU device. Long story short; if the DMA
+> domain is allocated during bus enumeration and attached to context bank 0 then
+> by the time we get to the driver domain we have long since lost our chance to
+> get the context bank we need.
+>
+> After going back and forth and trying a few possible options it seems like the
+> "easiest" solution" is to skip attaching the DMA domain in the first place. But
+> we still need to create a default domain and set up the IOMMU groups correctly
+> so that when the GPU driver comes along it can attach the device and everything
+> will Just Work (TM). Rob suggested that we should use a blacklist of devices
+> that choose to not participate so thats what I'm offering as a starting point
+> for discussion.
 
-Il 12/04/2018 01:09, Paul Kocialkowski ha scritto:
-> Hi,
-> 
-> Le jeudi 12 avril 2018 ? 00:22 +0200, Giulio Benetti a ?crit :
->> Hi,
->>
->> Il 10/04/2018 23:31, Paul Kocialkowski ha scritto:
->>> This adds the pins definition for RGB666 LCD panels on the A20. It
->>> was
->>> imported from the A33 definition, that concernes the same set of
->>> pins.
->>>
->>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->>> ---
->>>    arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
->>>    1 file changed, 8 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi
->>> b/arch/arm/boot/dts/sun7i-a20.dtsi
->>> index e529e4ff2174..f46af8675cfa 100644
->>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
->>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
->>> @@ -781,6 +781,14 @@
->>>    				function = "ir1";
->>>    			};
->>>    
->>> +			lcd_rgb666_pins: lcd_rgb666 at 0 {
->>
->> I point you to this Thread and back:
->> https://lists.freedesktop.org/archives/dri-devel/2018-March/170688.htm
->> l
->>
->> I did the same for rgb888, so good part is discussed.
->>
->> IMHO I would:
->> - call lcd0_rgb666_pins, since this is for LCD0 interface
->> - same as above, call lcd0-rgb666, take care about using "-" instad
->> of
->> "_" that can cause DTC warnings.
->> - remove @0 since only this set can achieve LCD0 RGB666, and I
->>     don't think there will be other combinations.
-> 
-> I even responded to that discussion but overlooked these aspects when
-> crafting this patch. Thanks for the summary :)
+in an ideal world, the dma-mapping layer magic would not be forced on
+a driver, but would be an opt-in thing (ie. driver's ->probe() calls
+dma_setup_magic_iommu_stuff(dev)), and becomes more of a helper layer
+that drivers could opt-in to.. but that changes how things work
+significantly at iommu probe time and probably touches a lot of
+drivers.  A property in dt would be the easy down-stream solution, but
+this is mostly about the driver (but also about how the firmware
+works, so maybe dt is not out of bounds?).  The black-list approach is
+fairly simple, although maybe a bit of a point-solution.  (Although
+the number of drivers this problem applies to might not be much
+greater than 1.)
 
-You're welcome, I've forgotten you've been involved discussing
-that patch so i've pointed you something yours :)
-Anyway it should help.
+So short version, very interested if anyone has better suggestions.
+Because we really need to do *something* here.
 
-Best regards
+BR,
+-R
 
--- 
-Giulio Benetti
-CTO
-
-MICRONOVA SRL
-Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-Tel. 049/8931563 - Fax 049/8931346
-Cod.Fiscale - P.IVA 02663420285
-Capitale Sociale ? 26.000 i.v.
-Iscritta al Reg. Imprese di Padova N. 02663420285
-Numero R.E.A. 258642
-
-> 
->> Kind regards
->>
->> -- 
->> Giulio Benetti
->> CTO
->>
->> MICRONOVA SRL
->> Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
->> Tel. 049/8931563 - Fax 049/8931346
->> Cod.Fiscale - P.IVA 02663420285
->> Capitale Sociale ? 26.000 i.v.
->> Iscritta al Reg. Imprese di Padova N. 02663420285
->> Numero R.E.A. 258642
->>
->>
->>> +				pins = "PD2", "PD3", "PD4", "PD5",
->>> "PD6", "PD7",
->>> +				       "PD10", "PD11", "PD12",
->>> "PD13", "PD14", "PD15",
->>> +				       "PD18", "PD19", "PD20",
->>> "PD21", "PD22", "PD23",
->>> +				       "PD24", "PD25", "PD26",
->>> "PD27";
->>> +				function = "lcd0";
->>> +			};
->>> +
->>>    			mmc0_pins_a: mmc0 at 0 {
->>>    				pins = "PF0", "PF1", "PF2",
->>>    				       "PF3", "PF4", "PF5";
->>>
->>
->>
+> The first patch in this series allows the specific IOMMU driver to gracefully
+> skip attaching a device by returning -ENOSUPP. In that case, the core will
+> skip printing error messages and it won't attach the domain to the group but
+> it still allows the group to get created so that the IOMMU device is properly
+> set up. In arch_setup_dma_ops() the call to iommu_get_domain_for_dev() will
+> return NULL and the IOMMU ops won't be set up.
+>
+> The second patch implements the blacklist in arm-smmu.c based on the compatible
+> string of the GPU device and returns -ENOTSUPP.
+>
+> I tested this with my current per-instance pagetable stack and it does the job
+> but I am very much in the market for better ideas.
+>
+> [1] https://patchwork.freedesktop.org/series/38729/
+>
+> Jordan Crouse (2):
+>   iommu: Gracefully allow drivers to not attach to a default domain
+>   iommu/arm-smmu: Add list of devices to opt out of DMA domains
+>
+>  drivers/iommu/arm-smmu.c | 23 +++++++++++++++++++++++
+>  drivers/iommu/iommu.c    | 18 ++++++++++++++----
+>  2 files changed, 37 insertions(+), 4 deletions(-)
+>
+> --
+> 2.16.1
+>
