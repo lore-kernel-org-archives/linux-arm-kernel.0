@@ -1,83 +1,51 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 11 Apr 2018 14:43:25 +0200
-Subject: [PATCH v4 0/8] drm/sun4i: Allwinner MIPI-DSI support
-In-Reply-To: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
-References: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
-Message-ID: <20180411124325.youvfpws27l2wesf@flea>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Apr 2018 13:52:11 +0100
+Subject: [PATCH] ARM: avoid Cortex-A9 livelock on tight dmb loops
+In-Reply-To: <685f80e3-30b3-8806-b81c-8de456507001@ti.com>
+References: <E1f5qij-00033R-Sl@rmk-PC.armlinux.org.uk>
+ <20180410134149.GQ5700@atomide.com>
+ <685f80e3-30b3-8806-b81c-8de456507001@ti.com>
+Message-ID: <20180411125210.GF10990@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 04, 2018 at 11:57:08AM +0200, Maxime Ripard wrote:
-> Hi,
+On Tue, Apr 10, 2018 at 05:12:37PM +0300, Tero Kristo wrote:
+> On 10/04/18 16:41, Tony Lindgren wrote:
+> >* Russell King <rmk+kernel@armlinux.org.uk> [180410 10:43]:
+> >>diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+> >>index 021b5a8b9c0a..d4ddc78b2a0b 100644
+> >>--- a/arch/arm/mach-omap2/prm_common.c
+> >>+++ b/arch/arm/mach-omap2/prm_common.c
+> >>@@ -523,7 +523,7 @@ void omap_prm_reset_system(void)
+> >>  	prm_ll_data->reset_system();
+> >>  	while (1)
+> >>-		cpu_relax();
+> >>+		cpu_do_idle();
+> >>  }
+> >
+> >Hmm we need to check so the added WFI here does not cause an
+> >undesired change to a low power state. Adding Tero to Cc also.
 > 
-> Here is an preliminary version of the MIPI-DSI support for the Allwinner
-> SoCs.
+> Generally it is a bad idea to call arbitrary WFI within OMAP architecture,
+> as this triggers a PRCM power transition and will most likely cause a hang
+> if not controlled properly.
 > 
-> This controller can be found on a number of recent SoCs, such as the
-> A31, A33 or the A64.
-> 
-> Given the sparse documentation, there's a number of obscure areas, but
-> the current implementation has been tested with a 4-lanes DSI panel on
-> an A33.
-> 
-> The support is a bit rough around the edges at the time, and some artifacts
-> are still shown on the screen for some reasons. Wider testing with
-> different display will hopefully nail those down.
-> 
-> This needs the regmap_mmio_attach_clk, on its way to Linus in 4.17.
-> 
-> Let me know what you think,
-> Maxime
-> 
-> Changes from v3:
->   - Rebased on top of current drm-misc-next
->   - Switched to SPDX license header
->   - Made the ECC array const
->   - Split the big DSI patch into two, one to add the DSI driver and one to
->     add the TCON bits.
->   - Removed the dithering code
->   - Changed the DT labels to remove the indices
->   - Used sleeps instead of delays in the panel driver
->   - Used the backlight_enable / _disable functions
->   - Added Chen-Yu's Reviewed-by
-> 
-> Changes from v2:
->   - Added a ports node under the DSI node
->   - Changed the huarui panel driver to an ili9881c driver
->   - Changed the panel vendor to bananapi
->   - Made the init table static in the panel driver
->   - Dropped the huarui vendor patch for the DT doc.
-> 
-> Changes from v1:
->   - Rebased on 4.16-rc1
->   - Constified a few function arguments and structures
->   - Reworked the DT binding example a bit
->   - Reworked the panel driver to check for DSI return codes, and use DCS
->     helpers when possible
-> 
-> Maxime Ripard (8):
->   drm/sun4i: tcon: Add TRI finish interrupt for vblank
->   dt-bindings: display: Add Allwinner MIPI-DSI bindings
->   drm/sun4i: Add Allwinner A31 MIPI-DSI controller support
->   drm/sun4i: Tie the DSI controller in the TCON
->   dt-bindings: panel: Add the Ilitek ILI9881c panel documentation
->   drm/panel: Add Ilitek ILI9881c panel driver
->   ARM: dts: sun8i: a33: Add the DSI-related nodes
->   [DO NOT MERGE] arm: dts: sun8i: bpi-m2m: Add DSI display
+> Has this patch been tested on any platform that supports proper power
+> management?
 
-I just pushed the patches 1-4 and 7. I'll wait for some feedback from
-Thierry for the panel driver.
+That will also go for the other locations in this patch too, as they
+are all callable on _any_ platform.
 
-Maxime
+It sounds like we need to abstract this so that platforms where "wfi"
+is complex can handle the "spin on this CPU forever" appropriately.
+
+While we could use dsb, we're asking a CPU to indefinitely spin in a
+tight loop, which isn't going to be good for power consumption - what
+if we have three CPUs doing that, could it push a SoC over the thermal
+limits?  I don't think that's a question we can confidently answer
+except for specific SoCs.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180411/05bac6ce/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
