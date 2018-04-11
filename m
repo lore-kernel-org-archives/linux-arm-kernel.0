@@ -1,201 +1,109 @@
 From: ran.wang_1@nxp.com (Ran Wang)
-Date: Wed, 11 Apr 2018 14:35:48 +0800
-Subject: [PATCH v2 3/6] powerpc/cache: add cache flush operation for various
- e500
+Date: Wed, 11 Apr 2018 14:35:51 +0800
+Subject: [PATCH v2 6/6] fsl_pmc: update device bindings
 In-Reply-To: <20180411063551.30368-1-ran.wang_1@nxp.com>
 References: <20180411063551.30368-1-ran.wang_1@nxp.com>
-Message-ID: <20180411063551.30368-3-ran.wang_1@nxp.com>
+Message-ID: <20180411063551.30368-6-ran.wang_1@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Various e500 core have different cache architecture, so they
-need different cache flush operations. Therefore, add a callback
-function cpu_flush_caches to the struct cpu_spec. The cache flush
-operation for the specific kind of e500 is selected at init time.
-The callback function will flush all caches in the current cpu.
+From: Li Yang <leoli@freescale.com>
 
-Signed-off-by: Chenhui Zhao <chenhui.zhao@freescale.com>
-Reviewed-by: Yang Li <LeoLi@freescale.com>
-Reviewed-by: Jose Rivera <German.Rivera@freescale.com>
+Signed-off-by: Li Yang <leoyang.li@nxp.com>
+Signed-off-by: Zhao Chenhui <chenhui.zhao@nxp.com>
 Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 ---
 Changes in v2:
-  - no change
+  - new file
 
- arch/powerpc/include/asm/cputable.h       |   12 ++++
- arch/powerpc/kernel/asm-offsets.c         |    3 +
- arch/powerpc/kernel/cpu_setup_fsl_booke.S |   81 +++++++++++++++++++++++++++++
- arch/powerpc/kernel/cputable.c            |    4 ++
- 4 files changed, 100 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/powerpc/fsl/pmc.txt        |   59 +++++++++++--------
+ 1 files changed, 34 insertions(+), 25 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/cputable.h b/arch/powerpc/include/asm/cputable.h
-index 2e2bacb..d04c46d 100644
---- a/arch/powerpc/include/asm/cputable.h
-+++ b/arch/powerpc/include/asm/cputable.h
-@@ -44,6 +44,14 @@ enum powerpc_pmc_type {
- extern int machine_check_e500(struct pt_regs *regs);
- extern int machine_check_e200(struct pt_regs *regs);
- extern int machine_check_47x(struct pt_regs *regs);
-+
-+#if defined(CONFIG_E500) || defined(CONFIG_PPC_E500MC)
-+extern void __flush_caches_e500v2(void);
-+extern void __flush_caches_e500mc(void);
-+extern void __flush_caches_e5500(void);
-+extern void __flush_caches_e6500(void);
-+#endif
-+
- int machine_check_8xx(struct pt_regs *regs);
+diff --git a/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt b/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
+index 07256b7..f1f749f 100644
+--- a/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
++++ b/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
+@@ -9,15 +9,20 @@ Properties:
  
- extern void cpu_down_flush_e500v2(void);
-@@ -70,6 +78,10 @@ struct cpu_spec {
- 	/* flush caches inside the current cpu */
- 	void (*cpu_down_flush)(void);
+   "fsl,mpc8548-pmc" should be listed for any chip whose PMC is
+   compatible.  "fsl,mpc8536-pmc" should also be listed for any chip
+-  whose PMC is compatible, and implies deep-sleep capability.
++  whose PMC is compatible, and implies deep-sleep capability and
++  wake on user defined packet(wakeup on ARP).
++
++  "fsl,p1022-pmc" should be listed for any chip whose PMC is
++  compatible, and implies lossless Ethernet capability during sleep.
  
-+#if defined(CONFIG_E500) || defined(CONFIG_PPC_E500MC)
-+	/* flush caches of the cpu which is running the function */
-+	void (*cpu_flush_caches)(void);
-+#endif
- 	/* number of performance monitor counters */
- 	unsigned int	num_pmcs;
- 	enum powerpc_pmc_type pmc_type;
-diff --git a/arch/powerpc/kernel/asm-offsets.c b/arch/powerpc/kernel/asm-offsets.c
-index ea5eb91..cb4b869 100644
---- a/arch/powerpc/kernel/asm-offsets.c
-+++ b/arch/powerpc/kernel/asm-offsets.c
-@@ -351,6 +351,9 @@ int main(void)
- 	OFFSET(CPU_SPEC_FEATURES, cpu_spec, cpu_features);
- 	OFFSET(CPU_SPEC_SETUP, cpu_spec, cpu_setup);
- 	OFFSET(CPU_SPEC_RESTORE, cpu_spec, cpu_restore);
-+#if defined(CONFIG_E500) || defined(CONFIG_PPC_E500MC)
-+	OFFSET(CPU_FLUSH_CACHES, cpu_spec, cpu_flush_caches);
-+#endif
+   "fsl,mpc8641d-pmc" should be listed for any chip whose PMC is
+   compatible; all statements below that apply to "fsl,mpc8548-pmc" also
+   apply to "fsl,mpc8641d-pmc".
  
- 	OFFSET(pbe_address, pbe, address);
- 	OFFSET(pbe_orig_address, pbe, orig_address);
-diff --git a/arch/powerpc/kernel/cpu_setup_fsl_booke.S b/arch/powerpc/kernel/cpu_setup_fsl_booke.S
-index 462aed9..e94eb41 100644
---- a/arch/powerpc/kernel/cpu_setup_fsl_booke.S
-+++ b/arch/powerpc/kernel/cpu_setup_fsl_booke.S
-@@ -345,3 +345,84 @@ _GLOBAL(cpu_down_flush_e5500)
- /* L1 Data Cache of e6500 contains no modified data, no flush is required */
- _GLOBAL(cpu_down_flush_e6500)
- 	blr
+   Compatibility does not include bit assignments in SCCR/PMCDR/DEVDISR; these
+-  bit assignments are indicated via the sleep specifier in each device's
+-  sleep property.
++  bit assignments are indicated via the clock nodes.  Device which has a
++  controllable clock source should have a "fsl,pmc-handle" property pointing
++  to the clock node.
+ 
+ - reg: For devices compatible with "fsl,mpc8349-pmc", the first resource
+   is the PMC block, and the second resource is the Clock Configuration
+@@ -33,31 +38,35 @@ Properties:
+   this is a phandle to an "fsl,gtm" node on which timer 4 can be used as
+   a wakeup source from deep sleep.
+ 
+-Sleep specifiers:
++Clock nodes:
++The clock nodes are to describe the masks in PM controller registers for each
++soc clock.
++- fsl,pmcdr-mask: For "fsl,mpc8548-pmc"-compatible devices, the mask will be
++  ORed into PMCDR before suspend if the device using this clock is the wake-up
++  source and need to be running during low power mode; clear the mask if
++  otherwise.
+ 
+-  fsl,mpc8349-pmc: Sleep specifiers consist of one cell.  For each bit
+-  that is set in the cell, the corresponding bit in SCCR will be saved
+-  and cleared on suspend, and restored on resume.  This sleep controller
+-  supports disabling and resuming devices at any time.
++- fsl,sccr-mask: For "fsl,mpc8349-pmc"-compatible devices, the corresponding
++  bit specified by the mask in SCCR will be saved and cleared on suspend, and
++  restored on resume.
+ 
+-  fsl,mpc8536-pmc: Sleep specifiers consist of three cells, the third of
+-  which will be ORed into PMCDR upon suspend, and cleared from PMCDR
+-  upon resume.  The first two cells are as described for fsl,mpc8578-pmc.
+-  This sleep controller only supports disabling devices during system
+-  sleep, or permanently.
+-
+-  fsl,mpc8548-pmc: Sleep specifiers consist of one or two cells, the
+-  first of which will be ORed into DEVDISR (and the second into
+-  DEVDISR2, if present -- this cell should be zero or absent if the
+-  hardware does not have DEVDISR2) upon a request for permanent device
+-  disabling.  This sleep controller does not support configuring devices
+-  to disable during system sleep (unless supported by another compatible
+-  match), or dynamically.
++- fsl,devdisr-mask: Contain one or two cells, depending on the availability of
++  DEVDISR2 register.  For compatible devices, the mask will be ORed into DEVDISR
++  or DEVDISR2 when the clock should be permenently disabled.
+ 
+ Example:
+ 
+-	power at b00 {
+-		compatible = "fsl,mpc8313-pmc", "fsl,mpc8349-pmc";
+-		reg = <0xb00 0x100 0xa00 0x100>;
+-		interrupts = <80 8>;
++	power at e0070 {
++		compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
++		reg = <0xe0070 0x20>;
 +
-+_GLOBAL(__flush_caches_e500v2)
-+	mflr r0
-+	bl	flush_dcache_L1
-+	mtlr r0
-+	blr
-+
-+_GLOBAL(__flush_caches_e500mc)
-+_GLOBAL(__flush_caches_e5500)
-+	mflr r0
-+	bl	flush_dcache_L1
-+	bl	flush_backside_L2_cache
-+	mtlr r0
-+	blr
-+
-+/* L1 Data Cache of e6500 contains no modified data, no flush is required */
-+_GLOBAL(__flush_caches_e6500)
-+	blr
-+
-+	/* r3 = virtual address of L2 controller, WIMG = 01xx */
-+_GLOBAL(flush_disable_L2)
-+	/* It's a write-through cache, so only invalidation is needed. */
-+	mbar
-+	isync
-+	lwz	r4, 0(r3)
-+	li	r5, 1
-+	rlwimi	r4, r5, 30, 0xc0000000
-+	stw	r4, 0(r3)
-+
-+	/* Wait for the invalidate to finish */
-+1:	lwz	r4, 0(r3)
-+	andis.	r4, r4, 0x4000
-+	bne	1b
-+	mbar
-+
-+	blr
-+
-+	/* r3 = virtual address of L2 controller, WIMG = 01xx */
-+_GLOBAL(invalidate_enable_L2)
-+	mbar
-+	isync
-+	lwz	r4, 0(r3)
-+	li	r5, 3
-+	rlwimi	r4, r5, 30, 0xc0000000
-+	stw	r4, 0(r3)
-+
-+	/* Wait for the invalidate to finish */
-+1:	lwz	r4, 0(r3)
-+	andis.	r4, r4, 0x4000
-+	bne	1b
-+	mbar
-+
-+	blr
-+
-+/* Flush L1 d-cache, invalidate and disable d-cache and i-cache */
-+_GLOBAL(__flush_disable_L1)
-+	mflr	r10
-+	bl	flush_dcache_L1	/* Flush L1 d-cache */
-+	mtlr	r10
-+
-+	mfspr	r4, SPRN_L1CSR0	/* Invalidate and disable d-cache */
-+	li	r5, 2
-+	rlwimi	r4, r5, 0, 3
-+
-+	msync
-+	isync
-+	mtspr	SPRN_L1CSR0, r4
-+	isync
-+
-+1:	mfspr	r4, SPRN_L1CSR0	/* Wait for the invalidate to finish */
-+	andi.	r4, r4, 2
-+	bne	1b
-+
-+	mfspr	r4, SPRN_L1CSR1	/* Invalidate and disable i-cache */
-+	li	r5, 2
-+	rlwimi	r4, r5, 0, 3
-+
-+	mtspr	SPRN_L1CSR1, r4
-+	isync
-+
-+	blr
-diff --git a/arch/powerpc/kernel/cputable.c b/arch/powerpc/kernel/cputable.c
-index c40a9fc..eec3ca7 100644
---- a/arch/powerpc/kernel/cputable.c
-+++ b/arch/powerpc/kernel/cputable.c
-@@ -2100,6 +2100,7 @@
- 		.machine_check		= machine_check_e500,
- 		.platform		= "ppc8548",
- 		.cpu_down_flush		= cpu_down_flush_e500v2,
-+		.cpu_flush_caches	= __flush_caches_e500v2,
- 	},
- #else
- 	{	/* e500mc */
-@@ -2120,6 +2121,7 @@
- 		.machine_check		= machine_check_e500mc,
- 		.platform		= "ppce500mc",
- 		.cpu_down_flush		= cpu_down_flush_e500mc,
-+		.cpu_flush_caches	= __flush_caches_e500mc,
- 	},
- #endif /* CONFIG_PPC_E500MC */
- #endif /* CONFIG_PPC32 */
-@@ -2145,6 +2147,7 @@
- 		.machine_check		= machine_check_e500mc,
- 		.platform		= "ppce5500",
- 		.cpu_down_flush		= cpu_down_flush_e5500,
-+		.cpu_flush_caches	= __flush_caches_e5500,
- 	},
- 	{	/* e6500 */
- 		.pvr_mask		= 0xffff0000,
-@@ -2168,6 +2171,7 @@
- 		.machine_check		= machine_check_e500mc,
- 		.platform		= "ppce6500",
- 		.cpu_down_flush		= cpu_down_flush_e6500,
-+		.cpu_flush_caches	= __flush_caches_e6500,
- 	},
- #endif /* CONFIG_PPC_E500MC */
- #ifdef CONFIG_PPC32
++		etsec1_clk: soc-clk at 24 {
++			fsl,pmcdr-mask = <0x00000080>;
++		};
++		etsec2_clk: soc-clk at 25 {
++			fsl,pmcdr-mask = <0x00000040>;
++		};
++		etsec3_clk: soc-clk at 26 {
++			fsl,pmcdr-mask = <0x00000020>;
++		};
+ 	};
 -- 
 1.7.1
