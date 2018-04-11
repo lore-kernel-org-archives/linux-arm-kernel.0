@@ -1,32 +1,89 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Apr 2018 10:09:47 +0530
-Subject: [PATCH V7 00/13] drivers: Boot Constraint core
-In-Reply-To: <1523367652.4981.9.camel@pengutronix.de>
-References: <cover.1519380923.git.viresh.kumar@linaro.org>
- <20180322012606.vuaemu3pvpeojtwr@vireshk-mac-ubuntu>
- <20180323150420.GA21152@kroah.com>
- <cbcfeb15-d940-f066-739d-25adfe09f019@linaro.org>
- <1523367652.4981.9.camel@pengutronix.de>
-Message-ID: <20180411043947.GK7671@vireshk-i7>
+From: hejianet@gmail.com (Jia He)
+Date: Wed, 11 Apr 2018 12:47:18 +0800
+Subject: [PATCH v5 1/5] mm: page_alloc: remain memblock_next_valid_pfn()
+ on arm and arm64
+In-Reply-To: <CAKv+Gu_CwWnW15jyTCY55akAikEjbgK4zRq_9=YuSDot3O3dQg@mail.gmail.com>
+References: <1522636236-12625-1-git-send-email-hejianet@gmail.com>
+ <1522636236-12625-2-git-send-email-hejianet@gmail.com>
+ <CAKv+Gu96_sC1Q6-w4O-AXFZzNnH1WoGwJfqvSR+Q_k_bZbrUGg@mail.gmail.com>
+ <41445229-043c-976f-3961-13770163444f@gmail.com>
+ <CAKv+Gu_CwWnW15jyTCY55akAikEjbgK4zRq_9=YuSDot3O3dQg@mail.gmail.com>
+Message-ID: <4577f3be-1183-c857-6933-ca182fb34a2f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-04-18, 15:40, Lucas Stach wrote:
-> Can you please describe how this bootconstraints core integration is
-> simpler than a "run things at max performance until late kernel init",
-> which could be triggered by a simple initcall similar to what is done
-> for clocks and regulators?
-> 
-> To me the bootcontraints stuff looks like a fairly complex solution and
-> your use-case doesn't even sound like you strictly want to keep a
-> bootloader configuration, but rather run things at max performance
-> until you are reasonably sure that you got all the necessary bandwidth
-> requests.
 
-What about this case where drivers of some of the devices used during
-boot are built as modules, like display, HDMI, etc., and would be
-available only after userspace is up. We need to take care of their
-bandwidth requirements as well, until the time their driver comes up.
+
+On 4/2/2018 3:53 PM, Ard Biesheuvel Wrote:
+> On 2 April 2018 at 09:49, Jia He <hejianet@gmail.com> wrote:
+>>
+>> On 4/2/2018 2:55 PM, Ard Biesheuvel Wrote:
+>>> On 2 April 2018 at 04:30, Jia He <hejianet@gmail.com> wrote:
+>>>> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+>>>> where possible") optimized the loop in memmap_init_zone(). But it causes
+>>>> possible panic bug. So Daniel Vacek reverted it later.
+>>>>
+>>>> But as suggested by Daniel Vacek, it is fine to using memblock to skip
+>>>> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+>>>>
+>>>> On arm and arm64, memblock is used by default. But generic version of
+>>>> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+>>>> not always return the next valid one but skips more resulting in some
+>>>> valid frames to be skipped (as if they were invalid). And that's why
+>>>> kernel was eventually crashing on some !arm machines.
+>>>>
+>>>> And as verified by Eugeniu Rosca, arm can benifit from commit
+>>>> b92df1de5d28. So remain the memblock_next_valid_pfn on arm{,64} and move
+>>>> the related codes to arm64 arch directory.
+>>>>
+>>>> Suggested-by: Daniel Vacek <neelx@redhat.com>
+>>>> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+>>> Hello Jia,
+>>>
+>>> Apologies for chiming in late.
+>> no problem, thanks for your comments  ;-)
+>>>
+>>> If we are going to rearchitect this, I'd rather we change the loop in
+>>> memmap_init_zone() so that we skip to the next valid PFN directly
+>>> rather than skipping to the last invalid PFN so that the pfn++ in the
+>> hmm... Maybe this macro name makes you confused
+>>
+>> pfn = skip_to_last_invalid_pfn(pfn);
+>>
+>> how about skip_to_next_valid_pfn?
+>>
+>>> for () results in the next value. Can we replace the pfn++ there with
+>>> a function calls that defaults to 'return pfn + 1', but does the skip
+>>> for architectures that implement it?
+>> I am not sure I understand your question here.
+>> With this patch, on !arm arches, skip_to_last_invalid_pfn is equal to (pfn),
+>> and will be increased
+>> when for{} loop continue. We only *skip* to the start pfn of next valid
+>> region when
+>> CONFIG_HAVE_MEMBLOCK and CONFIG_HAVE_ARCH_PFN_VALID(arm/arm64 supports
+>> both).
+>>
+> What I am saying is that the loop in memmap_init_zone
+>
+> for (pfn = start_pfn; pfn < end_pfn; pfn++) { ... }
+>
+> should be replaced by something like
+>
+> for (pfn = start_pfn; pfn < end_pfn; pfn = next_valid_pfn(pfn))
+After further thinking, IMO, pfn = next_valid_pfn(pfn) might have impact on
+
+memmap_init_zone loop.
+
+e.g.context != MEMMAP_EARLY, pfn will not be checked by early_pfn_valid, thus
+It will change the memhotplug logic.
+
+So I would choose the old implementation:
+		if (!early_pfn_valid(pfn)) {
+			pfn = next_valid_pfn(pfn) - 1;
+			continue;
+		}
+Any comments? Thanks
 
 -- 
-viresh
+Cheers,
+Jia
