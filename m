@@ -1,87 +1,68 @@
-From: andrea.parri@amarulasolutions.com (Andrea Parri)
-Date: Wed, 11 Apr 2018 17:39:01 +0200
-Subject: [PATCH 00/10] kernel/locking: qspinlock improvements
-In-Reply-To: <20180411102003.rjfrcmc4fjukehst@armageddon.cambridge.arm.com>
-References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
- <20180406132249.GA7071@andrea>
- <20180411102003.rjfrcmc4fjukehst@armageddon.cambridge.arm.com>
-Message-ID: <20180411153901.GA14205@andrea>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Apr 2018 17:40:02 +0200
+Subject: [GIT PULL] asm-generic fixes for v4.17-rc1
+Message-ID: <CAK8P3a081_hkr5d0FRWpTaT-AsJoqznsS1=_WF4JVLTUOupUgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 11:20:04AM +0100, Catalin Marinas wrote:
-> On Fri, Apr 06, 2018 at 03:22:49PM +0200, Andrea Parri wrote:
-> > On Thu, Apr 05, 2018 at 05:58:57PM +0100, Will Deacon wrote:
-> > > I've been kicking the tyres further on qspinlock and with this set of patches
-> > > I'm happy with the performance and fairness properties. In particular, the
-> > > locking algorithm now guarantees forward progress whereas the implementation
-> > > in mainline can starve threads indefinitely in cmpxchg loops.
-> > > 
-> > > Catalin has also implemented a model of this using TLA to prove that the
-> > > lock is fair, although this doesn't take the memory model into account:
-> > > 
-> > > https://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/kernel-tla.git/commit/
-> > 
-> > Nice!  I'll dig into this formalization, but my guess is that our model
-> > (and axiomatic models "a-la-herd", in general) are not well-suited when
-> > it comes to study properties such as fairness, liveness...
-> 
-> Maybe someone with a background in formal methods could give a better
-> answer. How TLA+ works is closer to rmem [1] (operational model,
-> exhaustive memoised state search) than herd. Liveness verification
-> requires checking that, under certain fairness properties, some state is
-> eventually reached. IOW, it tries to show that either all state change
-> graphs lead to (go through) such state or that there are cycles in the
-> graph and the state is never reached. I don't know whether herd could be
-> modified to check liveness. I'm not sure it can handle infinite loops
-> either (the above model checks an infinite lock/unlock loop on each
-> CPU and that's easier to implement in a tool with memoised states).
-> 
-> The TLA+ model above assumes sequential consistency, so no memory
-> ordering taken into account. One could build an operational model in
-> TLA+ that's equivalent to the axiomatic one (e.g. following the Flat
-> model equivalence as in [2]), however, liveness checking (at least with
-> TLA+) is orders of magnitude slower than safety. Any small variation has
-> an exponential impact on the state space, so likely to be impractical.
-> For specific parts of the algorithm, you may be able to use a poor man's
-> ordering by e.g. writing two accesses in two different orders so the
-> model checks both combinations.
-> 
-> There are papers (e.g. [3]) on how to convert liveness checking to
-> safety checking but I haven't dug further. I think it's easier/faster if
-> you do liveness checking with a simplified model and separately check
-> the safety with respect to memory ordering on tools like herd.
+The following changes since commit 0adb32858b0bddf4ada5f364a84ed60b196dbcda:
 
-Indeed.  A fundamental problem, AFAICT, is to formalize that concept of
-'[it] will _eventually_ happen'.  Consider a simple example:
+  Linux 4.16 (2018-04-01 14:20:27 -0700)
 
-	{ x = 0}
+are available in the git repository at:
 
-	P0	|   P1
-		|
-	x = 1	|   while (!x)
-		|  	 ;
+  git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arnd/asm-generic.git
+tags/asm-generic
 
-herd 'knows' that:
+for you to fetch changes up to a71e7c44ffb7baea0c0795824afc34cc0bc1a301:
 
-	- on the 1st iteration of the 'while' loop, the load from x
-	  can return the value 0 or 1 (only);
+  io: change writeX_relaxed() to remove barriers (2018-04-10 16:37:34 +0200)
 
-	- on the 2nd iteration of the 'while' loop, the load from x
-	  can return the value 0 or 1;
+----------------------------------------------------------------
+asm-generic fixes for v4.17-rc1
 
-	- [ ... and 'so on'! ]
+I have one regression fix for a minor build problem after the architecture
+removal series, plus a rework of the barriers in the readl/writel
+functions, thanks to work by Sinan Kaya:
 
-but this is pretty much all herd knows about this snippet by now ... ;)
+This started from a discussion on the linuxpcc and rdma mailing lists
+[1]. To summarize, we decided that architectures are responsible to
+serialize readl() and writel() accesses on a device MMIO space relative
+to DMA performed by that device.
 
-Thanks,
-  Andrea
+This series provides a pessimistic implementation of that behavior for
+asm-generic/io.h, which is in turn used by a number of architectures
+(h8300, microblaze, nios2, openrisc, s390, sparc, um, unicore32, and
+xtensa). Some of those presumably need no extra barriers, or something
+weaker than rmb()/wmb(), and they are advised to override the new default
+for better performance.
 
+For inb()/outb(), the same barriers are used, but architectures might
+want to add another barrier to outb() here if that can guarantee
+non-posted behavior (some architectures can, others cannot do that).
 
-> 
-> [1] http://www.cl.cam.ac.uk/~sf502/regressions/rmem/
-> [2] http://www.cl.cam.ac.uk/~pes20/armv8-mca/armv8-mca-draft.pdf
-> [3] https://www.sciencedirect.com/science/article/pii/S1571066104804109
-> 
-> -- 
-> Catalin
+The readl_relaxed()/writel_relaxed() family of functions retains the
+existing behavior with no extra barriers.
+
+[1]: https://lists.ozlabs.org/pipermail/linuxppc-dev/2018-March/170481.html
+
+----------------------------------------------------------------
+Liu, Changcheng (1):
+      dts: remove cris & metag dts hard link file
+
+Sinan Kaya (7):
+      io: define several IO & PIO barrier types for the asm-generic version
+      io: define stronger ordering for the default readX() implementation
+      io: define stronger ordering for the default writeX() implementation
+      io: change outX() to have their own IO barrier overrides
+      io: change inX() to have their own IO barrier overrides
+      io: change readX_relaxed() to remove barriers
+      io: change writeX_relaxed() to remove barriers
+
+ include/asm-generic/io.h           | 161
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++------------
+ scripts/dtc/include-prefixes/cris  |   1 -
+ scripts/dtc/include-prefixes/metag |   1 -
+ 3 files changed, 143 insertions(+), 20 deletions(-)
+ delete mode 120000 scripts/dtc/include-prefixes/cris
+ delete mode 120000 scripts/dtc/include-prefixes/metag
