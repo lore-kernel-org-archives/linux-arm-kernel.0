@@ -1,57 +1,33 @@
-From: sgoel@codeaurora.org (Goel, Sameer)
-Date: Wed, 11 Apr 2018 09:54:49 -0600
-Subject: [PATCH] iommu/arm-smmu-v3: Set GBPA to abort all transactions
-In-Reply-To: <20180405112622.GE23485@arm.com>
-References: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
- <20180405112622.GE23485@arm.com>
-Message-ID: <0b58c706-e2f9-83c0-7936-f13de79e2010@codeaurora.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 11 Apr 2018 08:56:32 -0700
+Subject: [PATCH v6 0/5] drm/blend: Support generic plane-wide alpha
+In-Reply-To: <cover.637c90251afd1eb6d5564a3c50beda2a3d51160a.1523432341.git-series.maxime.ripard@bootlin.com>
+References: <cover.637c90251afd1eb6d5564a3c50beda2a3d51160a.1523432341.git-series.maxime.ripard@bootlin.com>
+Message-ID: <87fu41pwi7.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Maxime Ripard <maxime.ripard@bootlin.com> writes:
 
+> Hi,
+>
+> This serie aims at enhancing the support for plane-wide alpha in the
+> drivers that are implementing it at the moment, by turning it into a
+> generic property and converting the drivers (rcar-du and atmel-hclcdc). It
+> also introduces support for it in the sun4i driver.
+>
+> Let me know what you think,
+> Maxime
+>
+> Changes from v5:
+>   - Added back a comment about the pixel values not being pre-multiplied as
+>     suggested by Laurent
 
-On 4/5/2018 5:26 AM, Will Deacon wrote:
-> On Wed, Mar 28, 2018 at 09:39:40AM -0500, Timur Tabi wrote:
->> From: Sameer Goel <sgoel@codeaurora.org>
->>
->> Set SMMU_GBPA to abort all incoming translations during the SMMU reset
->> when SMMUEN==0.
->>
->> This prevents a race condition where a stray DMA from the crashed primary
->> kernel can try to access an IOVA address as an invalid PA when SMMU is
->> disabled during reset in the crash kernel.
->>
->> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 3f2f1fc68b52..c04a89310c59 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -2458,6 +2458,18 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
->>  	if (reg & CR0_SMMUEN)
->>  		dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
->>  
->> +	/*
->> +	 * Abort all incoming translations. This can happen in a kdump case
->> +	 * where SMMU is initialized when a prior DMA is pending. Just
->> +	 * disabling the SMMU in this case might result in writes to invalid
->> +	 * PAs.
->> +	 */
->> +	ret = arm_smmu_update_gbpa(smmu, 1, GBPA_ABORT);
->> +	if (ret) {
->> +		dev_err(smmu->dev, "GBPA not responding to update\n");
->> +		return ret;
->> +	}
-> 
-> This needs to be predicated on the disable_bypass option, otherwise I think
-> it will cause regressions for systems that rely on passthrough.
-Ok, I'll make the change.
-> 
-> Will
-> 
-
--- 
- Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+I like that comment.  Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180411/47323eee/attachment.sig>
