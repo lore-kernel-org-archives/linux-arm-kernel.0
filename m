@@ -1,37 +1,69 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 11 Apr 2018 18:11:22 -0400
-Subject: [PATCH V3] drm/amdgpu: limit DMA size to PAGE_SIZE for scatter-gather
- buffers
-Message-ID: <1523484684-10426-1-git-send-email-okaya@codeaurora.org>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Thu, 12 Apr 2018 00:22:09 +0200
+Subject: [PATCH 2/3] ARM: dts: sun7i: Add RGB666 pins definition
+In-Reply-To: <20180410213129.24049-2-contact@paulk.fr>
+References: <20180410213129.24049-1-contact@paulk.fr>
+ <20180410213129.24049-2-contact@paulk.fr>
+Message-ID: <e7f68882-c333-12ac-c122-20b0d7b65666@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code is expecing to observe the same number of buffers returned from
-dma_map_sg() function compared to sg_alloc_table_from_pages(). This
-doesn't hold true universally especially for systems with IOMMU.
+Hi,
 
-The hardware actually needs the dma_address on a page by page basis.
-Joining multiple consecutive pages into one entry is just additional
-overhead which we don't need.
+Il 10/04/2018 23:31, Paul Kocialkowski ha scritto:
+> This adds the pins definition for RGB666 LCD panels on the A20. It was
+> imported from the A33 definition, that concernes the same set of pins.
+> 
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+>   arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+>   1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index e529e4ff2174..f46af8675cfa 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -781,6 +781,14 @@
+>   				function = "ir1";
+>   			};
+>   
+> +			lcd_rgb666_pins: lcd_rgb666 at 0 {
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/gpu/drm/amd/amdgpu/amdgpu_device.c | 3 +++
- 1 file changed, 3 insertions(+)
+I point you to this Thread and back:
+https://lists.freedesktop.org/archives/dri-devel/2018-March/170688.html
 
-diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
-index af1b879..91abe1a 100644
---- a/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
-+++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_device.c
-@@ -1948,6 +1948,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
- 	/* init the mode config */
- 	drm_mode_config_init(adev->ddev);
- 
-+	/* limit scatter-gather buffer size to PAGE_SIZE */
-+	dma_set_max_seg_size(adev->dev, PAGE_SIZE);
-+
- 	r = amdgpu_device_ip_init(adev);
- 	if (r) {
- 		/* failed in exclusive mode due to timeout */
+I did the same for rgb888, so good part is discussed.
+
+IMHO I would:
+- call lcd0_rgb666_pins, since this is for LCD0 interface
+- same as above, call lcd0-rgb666, take care about using "-" instad of 
+"_" that can cause DTC warnings.
+- remove @0 since only this set can achieve LCD0 RGB666, and I
+   don't think there will be other combinations.
+
+Kind regards
+
 -- 
-2.7.4
+Giulio Benetti
+CTO
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
+
+
+> +				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
+> +				       "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
+> +				       "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
+> +				       "PD24", "PD25", "PD26", "PD27";
+> +				function = "lcd0";
+> +			};
+> +
+>   			mmc0_pins_a: mmc0 at 0 {
+>   				pins = "PF0", "PF1", "PF2",
+>   				       "PF3", "PF4", "PF5";
+> 
