@@ -1,111 +1,238 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 11 Apr 2018 09:39:28 +0200
-Subject: [PATCH v6 4/5] drm/sun4i: Add support for plane alpha
+Date: Wed, 11 Apr 2018 09:39:26 +0200
+Subject: [PATCH v6 2/5] drm/atmel-hclcdc: Convert to the new generic alpha
+ property
 In-Reply-To: <cover.637c90251afd1eb6d5564a3c50beda2a3d51160a.1523432341.git-series.maxime.ripard@bootlin.com>
 References: <cover.637c90251afd1eb6d5564a3c50beda2a3d51160a.1523432341.git-series.maxime.ripard@bootlin.com>
-Message-ID: <13e89f0d2f2b55752a22eb8c4f37f325246a3a9c.1523432341.git-series.maxime.ripard@bootlin.com>
+Message-ID: <e5e97e2aae129600233e0983b748e4ba51ced239.1523432341.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our backend supports a per-plane alpha property. Support it through our new
-helper.
+Now that we have support for per-plane alpha in the core, let's use it.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 16 +++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_backend.h |  3 +++
- drivers/gpu/drm/sun4i/sun4i_layer.c   |  2 ++
- 3 files changed, 18 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    | 13 +---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 89 ++----------------
+ 2 files changed, 14 insertions(+), 88 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 9bad54f3de38..de0a76dfa1a2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -295,6 +295,15 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
- 	DRM_DEBUG_DRIVER("Switching display backend interlaced mode %s\n",
- 			 interlaced ? "on" : "off");
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+index ab32d5b268d2..60c937f42114 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+@@ -299,7 +299,6 @@ struct atmel_hlcdc_layer {
+ struct atmel_hlcdc_plane {
+ 	struct drm_plane base;
+ 	struct atmel_hlcdc_layer layer;
+-	struct atmel_hlcdc_plane_properties *properties;
+ };
  
-+	val = SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA(state->alpha >> 8);
-+	if (state->alpha != DRM_BLEND_ALPHA_OPAQUE)
-+		val |= SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN;
-+	regmap_update_bits(backend->engine.regs,
-+			   SUN4I_BACKEND_ATTCTL_REG0(layer),
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_MASK |
-+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN,
-+			   val);
-+
- 	if (sun4i_backend_format_is_yuv(fb->format->format))
- 		return sun4i_backend_update_yuv_format(backend, layer, plane);
+ static inline struct atmel_hlcdc_plane *
+@@ -346,18 +345,6 @@ struct atmel_hlcdc_dc_desc {
+ };
  
-@@ -490,7 +499,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
- 				 drm_get_format_name(fb->format->format,
- 						     &format_name));
--		if (fb->format->has_alpha)
-+		if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
- 			num_alpha_planes++;
+ /**
+- * Atmel HLCDC Plane properties.
+- *
+- * This structure stores plane property definitions.
+- *
+- * @alpha: alpha blending (or transparency) property
+- * @rotation: rotation property
+- */
+-struct atmel_hlcdc_plane_properties {
+-	struct drm_property *alpha;
+-};
+-
+-/**
+  * Atmel HLCDC Display Controller.
+  *
+  * @desc: HLCDC Display Controller description
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index e18800ed7cd1..73c875db45f4 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -31,7 +31,6 @@
+  * @src_y: y buffer position
+  * @src_w: buffer width
+  * @src_h: buffer height
+- * @alpha: alpha blending of the plane
+  * @disc_x: x discard position
+  * @disc_y: y discard position
+  * @disc_w: discard width
+@@ -54,8 +53,6 @@ struct atmel_hlcdc_plane_state {
+ 	uint32_t src_w;
+ 	uint32_t src_h;
  
- 		if (sun4i_backend_format_is_yuv(fb->format->format)) {
-@@ -548,7 +557,8 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+-	u8 alpha;
+-
+ 	int disc_x;
+ 	int disc_y;
+ 	int disc_w;
+@@ -385,7 +382,7 @@ atmel_hlcdc_plane_update_general_settings(struct atmel_hlcdc_plane *plane,
+ 			cfg |= ATMEL_HLCDC_LAYER_LAEN;
+ 		else
+ 			cfg |= ATMEL_HLCDC_LAYER_GAEN |
+-			       ATMEL_HLCDC_LAYER_GA(state->alpha);
++			       ATMEL_HLCDC_LAYER_GA(state->base.alpha >> 8);
  	}
  
- 	/* We can't have an alpha plane at the lowest position */
--	if (plane_states[0]->fb->format->has_alpha)
-+	if (plane_states[0]->fb->format->has_alpha ||
-+	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
- 		return -EINVAL;
+ 	if (state->disc_h && state->disc_w)
+@@ -553,7 +550,7 @@ atmel_hlcdc_plane_prepare_disc_area(struct drm_crtc_state *c_state)
  
- 	for (i = 1; i < num_planes; i++) {
-@@ -560,7 +570,7 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 		 * The only alpha position is the lowest plane of the
- 		 * second pipe.
- 		 */
--		if (fb->format->has_alpha)
-+		if (fb->format->has_alpha || (p_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
- 			current_pipe++;
+ 		if (!ovl_s->fb ||
+ 		    ovl_s->fb->format->has_alpha ||
+-		    ovl_state->alpha != 255)
++		    ovl_s->alpha != DRM_BLEND_ALPHA_OPAQUE)
+ 			continue;
  
- 		s_state->pipe = current_pipe;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 316f2179e9e1..4caee0392fa4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -68,12 +68,15 @@
- #define SUN4I_BACKEND_CKMIN_REG			0x884
- #define SUN4I_BACKEND_CKCFG_REG			0x888
- #define SUN4I_BACKEND_ATTCTL_REG0(l)		(0x890 + (0x4 * (l)))
-+#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_MASK	GENMASK(31, 24)
-+#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA(x)		((x) << 24)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK	BIT(15)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(x)		((x) << 15)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL_MASK	GENMASK(11, 10)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_PRISEL(x)			((x) << 10)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN		BIT(2)
- #define SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN		BIT(1)
-+#define SUN4I_BACKEND_ATTCTL_REG0_LAY_GLBALPHA_EN	BIT(0)
+ 		/* TODO: implement a smarter hidden area detection */
+@@ -829,51 +826,18 @@ static void atmel_hlcdc_plane_destroy(struct drm_plane *p)
+ 	drm_plane_cleanup(p);
+ }
  
- #define SUN4I_BACKEND_ATTCTL_REG1(l)		(0x8a0 + (0x4 * (l)))
- #define SUN4I_BACKEND_ATTCTL_REG1_LAY_HSCAFCT		GENMASK(15, 14)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 2949a3c912c1..750ad24de1d7 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -37,6 +37,7 @@ static void sun4i_backend_layer_reset(struct drm_plane *plane)
- 	if (state) {
- 		plane->state = &state->state;
- 		plane->state->plane = plane;
-+		plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
- 		plane->state->zpos = layer->id;
+-static int atmel_hlcdc_plane_atomic_set_property(struct drm_plane *p,
+-						 struct drm_plane_state *s,
+-						 struct drm_property *property,
+-						 uint64_t val)
+-{
+-	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
+-	struct atmel_hlcdc_plane_properties *props = plane->properties;
+-	struct atmel_hlcdc_plane_state *state =
+-			drm_plane_state_to_atmel_hlcdc_plane_state(s);
+-
+-	if (property == props->alpha)
+-		state->alpha = val;
+-	else
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+-static int atmel_hlcdc_plane_atomic_get_property(struct drm_plane *p,
+-					const struct drm_plane_state *s,
+-					struct drm_property *property,
+-					uint64_t *val)
+-{
+-	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
+-	struct atmel_hlcdc_plane_properties *props = plane->properties;
+-	const struct atmel_hlcdc_plane_state *state =
+-		container_of(s, const struct atmel_hlcdc_plane_state, base);
+-
+-	if (property == props->alpha)
+-		*val = state->alpha;
+-	else
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+-static int atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane,
+-				struct atmel_hlcdc_plane_properties *props)
++static int atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane)
+ {
+ 	const struct atmel_hlcdc_layer_desc *desc = plane->layer.desc;
+ 
+ 	if (desc->type == ATMEL_HLCDC_OVERLAY_LAYER ||
+-	    desc->type == ATMEL_HLCDC_CURSOR_LAYER)
+-		drm_object_attach_property(&plane->base.base,
+-					   props->alpha, 255);
++	    desc->type == ATMEL_HLCDC_CURSOR_LAYER) {
++		int ret;
++
++		ret = drm_plane_create_alpha_property(&plane->base);
++		if (ret)
++			return ret;
++	}
+ 
+ 	if (desc->layout.xstride && desc->layout.pstride) {
+ 		int ret;
+@@ -988,8 +952,8 @@ static void atmel_hlcdc_plane_reset(struct drm_plane *p)
+ 			return;
+ 		}
+ 
+-		state->alpha = 255;
+ 		p->state = &state->base;
++		p->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
+ 		p->state->plane = p;
  	}
  }
-@@ -167,6 +168,7 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 			     &sun4i_backend_layer_helper_funcs);
- 	layer->backend = backend;
+@@ -1042,13 +1006,10 @@ static const struct drm_plane_funcs layer_plane_funcs = {
+ 	.reset = atmel_hlcdc_plane_reset,
+ 	.atomic_duplicate_state = atmel_hlcdc_plane_atomic_duplicate_state,
+ 	.atomic_destroy_state = atmel_hlcdc_plane_atomic_destroy_state,
+-	.atomic_set_property = atmel_hlcdc_plane_atomic_set_property,
+-	.atomic_get_property = atmel_hlcdc_plane_atomic_get_property,
+ };
  
-+	drm_plane_create_alpha_property(&layer->plane);
- 	drm_plane_create_zpos_property(&layer->plane, 0, 0,
- 				       SUN4I_BACKEND_NUM_LAYERS - 1);
+ static int atmel_hlcdc_plane_create(struct drm_device *dev,
+-				    const struct atmel_hlcdc_layer_desc *desc,
+-				    struct atmel_hlcdc_plane_properties *props)
++				    const struct atmel_hlcdc_layer_desc *desc)
+ {
+ 	struct atmel_hlcdc_dc *dc = dev->dev_private;
+ 	struct atmel_hlcdc_plane *plane;
+@@ -1060,7 +1021,6 @@ static int atmel_hlcdc_plane_create(struct drm_device *dev,
+ 		return -ENOMEM;
  
+ 	atmel_hlcdc_layer_init(&plane->layer, desc, dc->hlcdc->regmap);
+-	plane->properties = props;
+ 
+ 	if (desc->type == ATMEL_HLCDC_BASE_LAYER)
+ 		type = DRM_PLANE_TYPE_PRIMARY;
+@@ -1081,7 +1041,7 @@ static int atmel_hlcdc_plane_create(struct drm_device *dev,
+ 			     &atmel_hlcdc_layer_plane_helper_funcs);
+ 
+ 	/* Set default property values*/
+-	ret = atmel_hlcdc_plane_init_properties(plane, props);
++	ret = atmel_hlcdc_plane_init_properties(plane);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1090,34 +1050,13 @@ static int atmel_hlcdc_plane_create(struct drm_device *dev,
+ 	return 0;
+ }
+ 
+-static struct atmel_hlcdc_plane_properties *
+-atmel_hlcdc_plane_create_properties(struct drm_device *dev)
+-{
+-	struct atmel_hlcdc_plane_properties *props;
+-
+-	props = devm_kzalloc(dev->dev, sizeof(*props), GFP_KERNEL);
+-	if (!props)
+-		return ERR_PTR(-ENOMEM);
+-
+-	props->alpha = drm_property_create_range(dev, 0, "alpha", 0, 255);
+-	if (!props->alpha)
+-		return ERR_PTR(-ENOMEM);
+-
+-	return props;
+-}
+-
+ int atmel_hlcdc_create_planes(struct drm_device *dev)
+ {
+ 	struct atmel_hlcdc_dc *dc = dev->dev_private;
+-	struct atmel_hlcdc_plane_properties *props;
+ 	const struct atmel_hlcdc_layer_desc *descs = dc->desc->layers;
+ 	int nlayers = dc->desc->nlayers;
+ 	int i, ret;
+ 
+-	props = atmel_hlcdc_plane_create_properties(dev);
+-	if (IS_ERR(props))
+-		return PTR_ERR(props);
+-
+ 	dc->dscrpool = dmam_pool_create("atmel-hlcdc-dscr", dev->dev,
+ 				sizeof(struct atmel_hlcdc_dma_channel_dscr),
+ 				sizeof(u64), 0);
+@@ -1130,7 +1069,7 @@ int atmel_hlcdc_create_planes(struct drm_device *dev)
+ 		    descs[i].type != ATMEL_HLCDC_CURSOR_LAYER)
+ 			continue;
+ 
+-		ret = atmel_hlcdc_plane_create(dev, &descs[i], props);
++		ret = atmel_hlcdc_plane_create(dev, &descs[i]);
+ 		if (ret)
+ 			return ret;
+ 	}
 -- 
 git-series 0.9.1
