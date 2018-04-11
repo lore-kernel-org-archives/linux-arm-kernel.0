@@ -1,47 +1,38 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 Apr 2018 16:14:23 +0100
-Subject: [PATCH v2 1/2] dmaengine: stm32-mdma: align TLEN and buffer
- length on burst
-In-Reply-To: <1523457879-9869-2-git-send-email-pierre-yves.mordret@st.com>
-References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
- <1523457879-9869-2-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <9a2a267c-2b0b-0d6a-c762-47e7d37f84ea@arm.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Wed, 11 Apr 2018 10:20:27 -0500
+Subject: [PATCH] ARM: socfpga_defconfig: Remove QSPI Sector 4K size force
+In-Reply-To: <1522093800-7822-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1522093800-7822-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <1e858591-aaae-72f0-de0f-40aea11e502a@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/18 15:44, Pierre-Yves MORDRET wrote:
-> Both buffer Transfer Length (TLEN if any) and transfer size have to be
-> aligned on burst size (burst beats*bus width).
+Hi. Any comments on this patch?
+
+On 03/26/2018 02:50 PM, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->    Version history:
->      v1:
->         * Initial
->      v2:
-> ---
-> ---
->   drivers/dma/stm32-mdma.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> Remove QSPI Sector 4K size force which is causing QSPI boot
+> problems with the JFFS2 root filesystem.
 > 
-> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-> index daa1602..fbcffa2 100644
-> --- a/drivers/dma/stm32-mdma.c
-> +++ b/drivers/dma/stm32-mdma.c
-> @@ -413,7 +413,7 @@ static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
->   	u32 best_burst = max_burst;
->   	u32 burst_len = best_burst * width;
->   
-> -	while ((burst_len > 0) && (tlen % burst_len)) {
-> +	while ((burst_len > 0) && (((tlen | buf_len) & (burst_len - 1)) != 0)) {
->   		best_burst = best_burst >> 1;
->   		burst_len = best_burst * width;
->   	}
-
-FWIW, doesn't that whole loop come down to just:
-
-	burst_len = min(ffs(tlen | buf_len), max_burst * width);
-
-?
-
-Robin.
+> Fixes the following error:
+>       "Magic bitmask 0x1985 not found at ..."
+> 
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+>   arch/arm/configs/socfpga_defconfig | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+> index 2620ce790db0..371fca4e1ab7 100644
+> --- a/arch/arm/configs/socfpga_defconfig
+> +++ b/arch/arm/configs/socfpga_defconfig
+> @@ -57,6 +57,7 @@ CONFIG_MTD_M25P80=y
+>   CONFIG_MTD_NAND=y
+>   CONFIG_MTD_NAND_DENALI_DT=y
+>   CONFIG_MTD_SPI_NOR=y
+> +# CONFIG_MTD_SPI_NOR_USE_4K_SECTORS is not set
+>   CONFIG_SPI_CADENCE_QUADSPI=y
+>   CONFIG_OF_OVERLAY=y
+>   CONFIG_OF_CONFIGFS=y
+> 
