@@ -1,27 +1,24 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 11 Apr 2018 11:54:40 +0100
-Subject: arm64: Remove duplicate include
-In-Reply-To: <1523442286-11714-1-git-send-email-vincenzo.frascino@arm.com>
-References: <1523442286-11714-1-git-send-email-vincenzo.frascino@arm.com>
-Message-ID: <8d572a80-36d2-05ba-97ae-4879bc6cb560@arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 11 Apr 2018 13:09:36 +0200
+Subject: [PATCH v3 2/2] mm: remove odd HAVE_PTE_SPECIAL
+In-Reply-To: <32655c37-91cb-17aa-58e7-74254e2673a0@linux.vnet.ibm.com>
+References: <1523433816-14460-1-git-send-email-ldufour@linux.vnet.ibm.com>
+ <1523433816-14460-3-git-send-email-ldufour@linux.vnet.ibm.com>
+ <de6ee514-8b7e-24d0-a7ee-a8887e8b0ae9@c-s.fr>
+ <93ed4fe4-dd1e-51be-948b-d53b16de21c5@linux.vnet.ibm.com>
+ <278a5212-b962-9a3a-cc86-76cac744afab@c-s.fr>
+ <32655c37-91cb-17aa-58e7-74254e2673a0@linux.vnet.ibm.com>
+Message-ID: <20180411110936.GG23400@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(nit: missing PATCH in the $subject, also cc maintainers, you can use
-scripts/maintainers.pl to get the list)
+On Wed 11-04-18 12:32:07, Laurent Dufour wrote:
+[...]
+> Andrew, should I send a v4 or could you wipe the 2 __maybe_unsued when applying
+> the patch ?
 
-On 11/04/18 11:24, Vincenzo Frascino wrote:
-> In armv8_deprecated asm/cpufeature.h has been included twice.
-> 
-> This patch removes the double inclusion.
-> 
-
-While at this, can you fix other instances too:
-
-arch/arm64/include/asm/kvm_mmu.h: asm/cpufeature.h
-arch/arm64/kernel/fpsimd.c: linux/prctl.h
-arch/arm64/kernel/ptrace.c: linux/compat.h
-
+A follow $patch-fix should be better rather than post this again and
+spam people with more emails.
 -- 
-Regards,
-Sudeep
+Michal Hocko
+SUSE Labs
