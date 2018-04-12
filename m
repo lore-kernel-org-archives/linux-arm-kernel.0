@@ -1,36 +1,47 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 12 Apr 2018 14:22:17 +0100
-Subject: [PATCH 2/2] ARM: kexec: record parent context registers for non-crash
- CPUs
-Message-ID: <E1f6cB7-0004AG-U5@rmk-PC.armlinux.org.uk>
+From: cphealy@gmail.com (Chris Healy)
+Date: Thu, 12 Apr 2018 07:14:39 -0700
+Subject: [PATCH 1/3] ARM: dts: imx6: RDU2: bump SoC/PU operating points by
+ 25mV
+In-Reply-To: <20180412131556.11073-1-l.stach@pengutronix.de>
+References: <20180412131556.11073-1-l.stach@pengutronix.de>
+Message-ID: <CAFXsbZqO+jewUYsKtzHsmRJFedYp48TK9u5Aq36ips=5Y1BawQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-How we got to machine_crash_nonpanic_core() (iow, from an IPI, etc) is
-not interesting for debugging a crash.  The more interesting context
-is the parent context prior to the IPI being received.
+Tested-by: Chris Healy <cphealy@gmail.com>
 
-Record the parent context register state rather than the register state
-in machine_crash_nonpanic_core(), which is more relevant to the failing
-condition.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/kernel/machine_kexec.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 39dc6bf4610a..43918872b783 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -83,7 +83,7 @@ void machine_crash_nonpanic_core(void *unused)
- {
- 	struct pt_regs regs;
- 
--	crash_setup_regs(&regs, NULL);
-+	crash_setup_regs(&regs, get_irq_regs());
- 	printk(KERN_DEBUG "CPU %u will stop doing anything useful since another CPU has crashed\n",
- 	       smp_processor_id());
- 	crash_save_cpu(&regs, smp_processor_id());
--- 
-2.7.4
+On Thu, Apr 12, 2018 at 6:15 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> This bumps the SoC/PU domain operating points by 25mV, giving a total
+> of 75mV margin to the minimum required voltages. This gets rid of
+> brown-outs seen due to voltage drop-out on the board.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> index 72f52fcecee1..4bc14b8e9a66 100644
+> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> @@ -263,6 +263,17 @@
+>         };
+>  };
+>
+> +&cpu0 {
+> +       fsl,soc-operating-points = <
+> +               /* ARM kHz  SOC-PU uV */
+> +               1200000 1300000
+> +               996000  1275000
+> +               852000  1275000
+> +               792000  1200000
+> +               396000  1200000
+> +       >;
+> +};
+> +
+>  &reg_arm {
+>         vin-supply = <&sw1a_reg>;
+>  };
+> --
+> 2.16.3
+>
