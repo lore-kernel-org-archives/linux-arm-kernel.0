@@ -1,48 +1,33 @@
-From: cphealy@gmail.com (Chris Healy)
-Date: Thu, 12 Apr 2018 07:15:36 -0700
-Subject: [PATCH 3/3] ARM: dts: imx6: RDU2: add eGalax touchscreen
-In-Reply-To: <20180412131556.11073-3-l.stach@pengutronix.de>
-References: <20180412131556.11073-1-l.stach@pengutronix.de>
- <20180412131556.11073-3-l.stach@pengutronix.de>
-Message-ID: <CAFXsbZqxoSTKcP+P8jFw8TG68coJ2w2C_BCDrPAiRHkTQLgYWg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 Apr 2018 07:16:39 -0700
+Subject: [PATCH 08/14] ARM: OMAP2: Add functions to save and restore
+ pinctrl context.
+In-Reply-To: <1523505239-16229-9-git-send-email-j-keerthy@ti.com>
+References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
+ <1523505239-16229-9-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180412141639.GV5700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Chris Healy <cphealy@gmail.com>
+Hi,
 
+* Keerthy <j-keerthy@ti.com> [180412 03:56]:
+> From: Russ Dill <Russ.Dill@gmail.com>
+> 
+> This adds a pair of context save/restore functions to save/restore the
+> state of a set of pinctrl registers. This simplifies some of the AM33XX
+> PM code as some of the pinctrl registers are lost when the per power
+> domain loses power. The pincrtl code can perform the necessary
+> save/restore.
 
-On Thu, Apr 12, 2018 at 6:15 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> This touchscreen is present instead of the RMI4 touch on some SKUs of
-> the RDU2. Keep it disabled by default, the bootloader will enable it
-> instead of the RMI4 touch when running on one of those units.
->
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> index 4bc14b8e9a66..4aade2bca670 100644
-> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> @@ -573,6 +573,17 @@
->                 };
->         };
->
-> +       touchscreen at 2a {
-> +               compatible = "eeti,egalax_ts";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_ts>;
-> +               reg = <0x2a>;
-> +               interrupt-parent = <&gpio1>;
-> +               interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-> +               wakeup-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
-> +               status = "disabled";
-> +       };
-> +
->         hpa1: amp at 60 {
->                 compatible = "ti,tpa6130a2";
->                 pinctrl-names = "default";
-> --
-> 2.16.3
->
+So where's the patch adding callers to this code?
+
+If this cannot be done from regular driver suspend/resume calls,
+this probably should be done from cpu_pm notifiers CPU_PM_ENTER and
+CPU_PM_EXIT. We should also do the same for GPIO BTW.
+
+BTW, the subject line is wrong here, it should be "pinctrl" :)
+
+Regards,
+
+Tony
