@@ -1,58 +1,62 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Apr 2018 16:56:28 +0200
-Subject: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow getting syscon
- regmap from device
-In-Reply-To: <20180411141641.14675-4-icenowy@aosc.io>
+Date: Thu, 12 Apr 2018 16:58:06 +0200
+Subject: [PATCH 5/5] arm64: allwinner: a64: add SRAM controller device
+ tree node
+In-Reply-To: <20180411141641.14675-6-icenowy@aosc.io>
 References: <20180411141641.14675-1-icenowy@aosc.io>
- <20180411141641.14675-4-icenowy@aosc.io>
-Message-ID: <20180412145628.iaaeue2imiijwx5d@flea>
+ <20180411141641.14675-6-icenowy@aosc.io>
+Message-ID: <20180412145806.hsvxomh6vousrhq5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
-> From: Chen-Yu Tsai <wens@csie.org>
+Hi,
+
+On Wed, Apr 11, 2018 at 10:16:41PM +0800, Icenowy Zheng wrote:
+> Allwinner A64 has a SRAM controller, and in the device tree currently
+> we have a syscon node to enable EMAC driver to access the EMAC clock
+> register. As SRAM controller driver can now export regmap for this
+> register, replace the syscon node to the SRAM controller device node,
+> and let EMAC driver to acquire its EMAC clock regmap.
 > 
-> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
-> address space; on the A64 SoC this register is in the SRAM controller
-> address space, and with a different offset.
-> 
-> To access the register from another device and hide the internal
-> difference between the device, let it register a regmap named
-> "emac-clock". We can then get the device from the phandle, and
-> retrieve the regmap with dev_get_regmap(); in this situation the
-> regmap_field will be set up to access the only register in the regmap.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> [Icenowy: change to use regmaps with single register, change commit
->  message]
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48 ++++++++++++++++++++++-
->  1 file changed, 46 insertions(+), 2 deletions(-)
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 23 +++++++++++++++++++----
+>  1 file changed, 19 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> index 1037f6c78bca..b61210c0d415 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
->  	.msb = 31,
->  };
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 1b2ef28c42bd..1c37659d9d41 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -168,10 +168,25 @@
+>  		#size-cells = <1>;
+>  		ranges;
 >  
-> +/* Specially exported regmap which contains only EMAC register */
-> +const struct reg_field single_reg_field = {
-> +	.reg = 0,
-> +	.lsb = 0,
-> +	.msb = 31,
-> +};
+> -		syscon: syscon at 1c00000 {
+> -			compatible = "allwinner,sun50i-a64-system-controller",
+> -				"syscon";
+> +		sram_controller: sram-controller at 1c00000 {
+> +			compatible = "allwinner,sun50i-a64-sram-controller";
+>  			reg = <0x01c00000 0x1000>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
 > +
+> +			sram_c: sram at 18000 {
+> +				compatible = "mmio-sram";
+> +				reg = <0x00018000 0x28000>;
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0 0x00018000 0x28000>;
+> +
+> +				de2_sram: sram-section at 0 {
+> +					compatible = "allwinner,sun50i-a64-sram-c";
+> +					reg = <0x0000 0x28000>;
+> +				};
+> +			};
 
-I'm not sure this would be wise. If we ever need some other register
-exported through the regmap, will have to change all the calling sites
-everywhere in the kernel, which will be a pain and will break
-bisectability.
-
-Chen-Yu's (or was it yours?) initial solution with a custom writeable
-hook only allowing a single register seemed like a better one.
+That doesn't look related at all to what's being discussed here, so
+you'd rather add it as part of your DE2-enablement serie (or amend
+your commit log to say why this is important to do it in this patch).
 
 Maxime
 
@@ -66,4 +70,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/bc97122b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/23c2a08d/attachment-0001.sig>
