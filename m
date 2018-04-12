@@ -1,98 +1,49 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Apr 2018 14:29:01 +0200
-Subject: [PATCH v7 3/9] pinctrl: actions: Add Actions S900 pinctrl driver
-In-Reply-To: <94aceb15-63a5-44a3-d0bc-f56adebc27d5@suse.de>
-References: <20180404172258.7678-1-manivannan.sadhasivam@linaro.org>
- <20180404172258.7678-4-manivannan.sadhasivam@linaro.org>
- <CACRpkdZPOSDenSORGVLPuJKPP_iE97mZLXHJLcF2kH5wKPw=tg@mail.gmail.com>
- <94aceb15-63a5-44a3-d0bc-f56adebc27d5@suse.de>
-Message-ID: <CACRpkdbizcaB-EfK_5k-=5GsoMJrtNoE2HBdiZOmA62NnPsZBA@mail.gmail.com>
+Date: Thu, 12 Apr 2018 14:48:56 +0200
+Subject: [PATCH] pinctrl: msm: fix gpio-hog related boot issues
+In-Reply-To: <20180328180705.29147-1-chunkeey@gmail.com>
+References: <20180328180705.29147-1-chunkeey@gmail.com>
+Message-ID: <CACRpkdacDjzF=CR59by8Zd44wJD12Sr5FSTd=Ph_eSH2QYZudA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 2:10 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 12.04.2018 um 11:04 schrieb Linus Walleij:
->> On Wed, Apr 4, 2018 at 7:22 PM, Manivannan Sadhasivam
->> <manivannan.sadhasivam@linaro.org> wrote:
->>
->>> Add pinctrl driver for Actions Semi S900 SoC. The driver supports
->>> pinctrl, pinmux and pinconf functionalities through a range of registers
->>> common to both gpio driver and pinctrl driver.
->>>
->>> Pinmux functionality is available only for the pin groups while the
->>> pinconf functionality is available for both pin groups and individual
->>> pins.
->>>
->>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->>
->> Patch applied for v4.18
->>
->> GOOD WORK!
->>
->> We really need to get this in so that Andreas can work on S500
->> patches with this as a base.
->
-> No, I refused to do that. If his patches get merged, Mani offered that
-> he will take care of rebasing/rewriting S500 part.
+On Wed, Mar 28, 2018 at 8:07 PM, Christian Lamparter <chunkeey@gmail.com> wrote:
 
-OK then.
+> This patch fixes the issue by adding the "gpio-ranges" property
+> to the pinctrl device node of all upstream Qcom SoC, so the
+> ranges are added by of_gpiochip_add_pin_range(), which is
+> called by of_gpiochip_add() before the call to
+> of_gpiochip_scan_gpios() happens.gpiochip_add_pin_range() is longer
+> needed and removed (to prevent adding the same entry to the
+> pinctrldev_list twice).
 
->> If any review comments still remain they can surely be addressed
->> with incremental improvement patches.
->
-> My biggest problem was/is that Mani designed his structs totally
-> different from mine, with no explanation why or how they correlate.
+That's pretty neat!
 
-This kind of clashes happen all the time because of parallel work.
-As much as we all hate to reimplement stuff just because
-coordination is not perfect, it still invariably happens, it's just
-a natural flaw to the way asynchronous development without
-project managers work.
+>                         gpio-controller;
+> +                       gpio-ranges = <&tlmm_pinmux 0 0 90>;
 
-But what is important to keep in mind is that there is no bad
-intent from anyone here, you are both enthusiastic contributors
-and let's keep this friendly.
+nice!
 
-If Manivannan has already offered to update your patch, that's
-great.
+> -       ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
+> -       if (ret) {
+> -               dev_err(pctrl->dev, "Failed to add pin range\n");
+> -               gpiochip_remove(&pctrl->chip);
+> -               return ret;
+> -       }
 
-If you feel any kind of annoyance or aggression toward another
-contributor, then I have a big problem as maintainer, and that
-problem is hard to solve, scary to deal with and extremely
-exhausting and diverting attention from important technical work,
-so please help me as much as you can NOT to give me this
-particular problem.
+If you instead of deleteing this, just wrap it inside
+something like:
 
-> Also I had protested against him defining fake pins for the drive
-> strength. Since I did not have time to review the newer patches yet,
-> please make sure that this is addressed _before_ merging. Changing the
-> binding after the fact is a problem!
+if (!of_property_read_bool(np, "gpio-ranges") {
+  (...)
+}
 
-This is more of a technical issue and a bit of philosophical
-debate on how to partition the hardware so as to be represented
-in the binding.
+You will stay compatible with elder device trees, solving Bj?rns
+issue. You will only be adding hogs to newer device trees with
+the ranges defined anyway.
 
-Let's discuss it. Surely Manivannan can augment his DT
-bindings if there is a problem.
-
-With that in mind, I have a softer stance that some DT
-fundamentalists out there: I do not consider the DT binding as
-etched in stone because it was merged to the kernel tree. I
-see the stone-etching as something that happens when a
-mass-produced system is deployed with a DTB file
-using these bindings in its boot partition. When sold to
-end users.
-
-That means that these bindings can still be augmented
-as long as we are in prototype stage, and if we are just
-talking about hobbyist work using attached device trees
-or booting off media with DTB as a separate target image
-but copied from the kernel tree, we can always augment
-them.
-
-I guess some will disagree with me on this stance.
-But those are my principles.
-If you don't like them, I have others. :D
+Be genereous with comments in the code if you choose this
+approach so everyone realize what is going on.
 
 Yours,
 Linus Walleij
