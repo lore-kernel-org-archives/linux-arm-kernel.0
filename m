@@ -1,89 +1,119 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 12 Apr 2018 09:23:54 +0530
-Subject: [PATCH 09/14] ARM: OMAP2: Drop the concept of certain power domains
- not being able to lose context.
+Date: Thu, 12 Apr 2018 09:23:55 +0530
+Subject: [PATCH 10/14] gpio: omap: Drop the concept of gpio banks not being
+ able to lose context.
 In-Reply-To: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
 References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1523505239-16229-10-git-send-email-j-keerthy@ti.com>
+Message-ID: <1523505239-16229-11-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Russ Dill <Russ.Dill@ti.com>
 
 It isn't much of a win, and with hibernation, everything loses context.
-So Drop the concept of certain power domains not being able to lose
-context.
 
 Signed-off-by: Russ Dill <Russ.Dill@ti.com>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c | 41 ---------------------------------------
- arch/arm/mach-omap2/powerdomain.h |  1 -
- 2 files changed, 42 deletions(-)
+ drivers/gpio/gpio-omap.c                | 38 ++++++++++++---------------------
+ include/linux/platform_data/gpio-omap.h |  1 -
+ 2 files changed, 14 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index ee693f6..f180d22 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -1160,47 +1160,6 @@ int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
- }
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 35971a3..34fde30 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -68,7 +68,7 @@ struct gpio_bank {
+ 	bool dbck_enabled;
+ 	bool is_mpuio;
+ 	bool dbck_flag;
+-	bool loses_context;
++
+ 	bool context_valid;
+ 	int stride;
+ 	u32 width;
+@@ -1198,15 +1198,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
+ #ifdef CONFIG_OF_GPIO
+ 	bank->chip.of_node = of_node_get(node);
+ #endif
+-	if (node) {
+-		if (!of_property_read_bool(node, "ti,gpio-always-on"))
+-			bank->loses_context = true;
+-	} else {
+-		bank->loses_context = pdata->loses_context;
+-
+-		if (bank->loses_context)
+-			bank->get_context_loss_count =
+-				pdata->get_context_loss_count;
++	if (!node) {
++		bank->get_context_loss_count =
++			pdata->get_context_loss_count;
+ 	}
  
- /**
-- * pwrdm_can_ever_lose_context - can this powerdomain ever lose context?
-- * @pwrdm: struct powerdomain *
-- *
-- * Given a struct powerdomain * @pwrdm, returns 1 if the powerdomain
-- * can lose either memory or logic context or if @pwrdm is invalid, or
-- * returns 0 otherwise.  This function is not concerned with how the
-- * powerdomain registers are programmed (i.e., to go off or not); it's
-- * concerned with whether it's ever possible for this powerdomain to
-- * go off while some other part of the chip is active.  This function
-- * assumes that every powerdomain can go to either ON or INACTIVE.
-- */
--bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
--{
--	int i;
--
--	if (!pwrdm) {
--		pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
--			 __func__);
--		return 1;
--	}
--
--	if (pwrdm->pwrsts & PWRSTS_OFF)
--		return 1;
--
--	if (pwrdm->pwrsts & PWRSTS_RET) {
--		if (pwrdm->pwrsts_logic_ret & PWRSTS_OFF)
--			return 1;
--
--		for (i = 0; i < pwrdm->banks; i++)
--			if (pwrdm->pwrsts_mem_ret[i] & PWRSTS_OFF)
--				return 1;
--	}
--
--	for (i = 0; i < pwrdm->banks; i++)
--		if (pwrdm->pwrsts_mem_on[i] & PWRSTS_OFF)
--			return 1;
--
--	return 0;
--}
--
--/**
-  * pwrdm_save_context - save powerdomain registers
-  *
-  * Register state is going to be lost due to a suspend or hibernate
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 9a907fb..a5bdc28 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -247,7 +247,6 @@ u8 pwrdm_get_valid_lp_state(struct powerdomain *pwrdm,
- int pwrdm_pre_transition(struct powerdomain *pwrdm);
- int pwrdm_post_transition(struct powerdomain *pwrdm);
- int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
--bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
+ 	if (bank->regs->set_dataout && bank->regs->clr_dataout)
+@@ -1365,7 +1359,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
+ 	 * been initialised and so initialise it now. Also initialise
+ 	 * the context loss count.
+ 	 */
+-	if (bank->loses_context && !bank->context_valid) {
++	if (!bank->context_valid) {
+ 		omap_gpio_init_context(bank);
  
- extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u8 state);
+ 		if (bank->get_context_loss_count)
+@@ -1386,17 +1380,13 @@ static int omap_gpio_runtime_resume(struct device *dev)
+ 	writel_relaxed(bank->context.risingdetect,
+ 		     bank->base + bank->regs->risingdetect);
+ 
+-	if (bank->loses_context) {
+-		if (!bank->get_context_loss_count) {
+-			omap_gpio_restore_context(bank);
+-		} else {
+-			c = bank->get_context_loss_count(dev);
+-			if (c != bank->context_loss_count) {
+-				omap_gpio_restore_context(bank);
+-			} else {
+-				raw_spin_unlock_irqrestore(&bank->lock, flags);
+-				return 0;
+-			}
++	if (!bank->get_context_loss_count) {
++		omap_gpio_restore_context(bank);
++	} else {
++		c = bank->get_context_loss_count(bank->chip.parent);
++		if (c != bank->context_loss_count) {
++			raw_spin_unlock_irqrestore(&bank->lock, flags);
++			return 0;
+ 		}
+ 	}
+ 
+@@ -1468,7 +1458,7 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
+ 	struct gpio_bank *bank;
+ 
+ 	list_for_each_entry(bank, &omap_gpio_list, node) {
+-		if (!BANK_USED(bank) || !bank->loses_context)
++		if (!BANK_USED(bank))
+ 			continue;
+ 
+ 		bank->power_mode = pwr_mode;
+@@ -1482,7 +1472,7 @@ void omap2_gpio_resume_after_idle(void)
+ 	struct gpio_bank *bank;
+ 
+ 	list_for_each_entry(bank, &omap_gpio_list, node) {
+-		if (!BANK_USED(bank) || !bank->loses_context)
++		if (!BANK_USED(bank))
+ 			continue;
+ 
+ 		pm_runtime_get_sync(bank->chip.parent);
+diff --git a/include/linux/platform_data/gpio-omap.h b/include/linux/platform_data/gpio-omap.h
+index 8612855..77eb187 100644
+--- a/include/linux/platform_data/gpio-omap.h
++++ b/include/linux/platform_data/gpio-omap.h
+@@ -193,7 +193,6 @@ struct omap_gpio_platform_data {
+ 	int bank_width;		/* GPIO bank width */
+ 	int bank_stride;	/* Only needed for omap1 MPUIO */
+ 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
+-	bool loses_context;	/* whether the bank would ever lose context */
+ 	bool is_mpuio;		/* whether the bank is of type MPUIO */
+ 	u32 non_wakeup_gpios;
  
 -- 
 1.9.1
