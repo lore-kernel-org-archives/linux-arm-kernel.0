@@ -1,85 +1,69 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Apr 2018 23:23:30 +0800
-Subject: [linux-sunxi] Re: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow
- getting syscon regmap from device
-In-Reply-To: <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
-References: <20180411141641.14675-1-icenowy@aosc.io>
- <20180411141641.14675-4-icenowy@aosc.io>
- <20180412145628.iaaeue2imiijwx5d@flea>
- <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
-Message-ID: <CAGb2v66Qi2D1qgF3-iVJFAiznMUzzen0nHM5vsPe7Cyi6QTYpw@mail.gmail.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Thu, 12 Apr 2018 11:24:07 -0400
+Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
+In-Reply-To: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
+References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
+Message-ID: <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 11:11 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->
->
-> ? 2018?4?12? GMT+08:00 ??10:56:28, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->>On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
->>> From: Chen-Yu Tsai <wens@csie.org>
->>>
->>> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
->>> address space; on the A64 SoC this register is in the SRAM controller
->>> address space, and with a different offset.
->>>
->>> To access the register from another device and hide the internal
->>> difference between the device, let it register a regmap named
->>> "emac-clock". We can then get the device from the phandle, and
->>> retrieve the regmap with dev_get_regmap(); in this situation the
->>> regmap_field will be set up to access the only register in the
->>regmap.
->>>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> [Icenowy: change to use regmaps with single register, change commit
->>>  message]
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> ---
->>>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48
->>++++++++++++++++++++++-
->>>  1 file changed, 46 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->>b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->>> index 1037f6c78bca..b61210c0d415 100644
->>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->>> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
->>>      .msb = 31,
->>>  };
->>>
->>> +/* Specially exported regmap which contains only EMAC register */
->>> +const struct reg_field single_reg_field = {
->>> +    .reg = 0,
->>> +    .lsb = 0,
->>> +    .msb = 31,
->>> +};
->>> +
->>
->>I'm not sure this would be wise. If we ever need some other register
->>exported through the regmap, will have to change all the calling sites
->>everywhere in the kernel, which will be a pain and will break
->>bisectability.
->
-> In this situation the register can be exported as another
->  regmap. Currently the code will access a regmap with name
-> "emac-clock" for this register.
->
->>
->>Chen-Yu's (or was it yours?) initial solution with a custom writeable
->>hook only allowing a single register seemed like a better one.
->
-> But I remember you mentioned that you want it to hide the
-> difference inside the device.
+As warned by smatch:
+	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
 
-Hi,
+If something goes wrong at readl(), the logic will stay there
+inside an IRQ code forever. This is not the nicest thing to
+do :-)
 
-The idea is that a device can export multiple regmaps. This one,
-the one named "gmac" (in my soon to come v2) or "emac-clock" here,
-is but one of many possible regmaps, and it only exports the register
-needed by the GMAC/EMAC. IMHO it is highly unlikely the same piece of
-hardware would need a second register from the same device. A more
-likely situation would be it needs another register from a different
-device, like on the H6 where the "internal PHY" is not so internal
-from a system bus point of view.
+So, add a timeout there, preventing staying inside the IRQ
+for more than 10ms.
 
-ChenYu
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ drivers/media/rc/st_rc.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
+index d2efd7b2c3bc..c855b177103c 100644
+--- a/drivers/media/rc/st_rc.c
++++ b/drivers/media/rc/st_rc.c
+@@ -96,19 +96,24 @@ static void st_rc_send_lirc_timeout(struct rc_dev *rdev)
+ 
+ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+ {
++	unsigned long timeout;
+ 	unsigned int symbol, mark = 0;
+ 	struct st_rc_device *dev = data;
+ 	int last_symbol = 0;
+-	u32 status;
++	u32 status, int_status;
+ 	DEFINE_IR_RAW_EVENT(ev);
+ 
+ 	if (dev->irq_wake)
+ 		pm_wakeup_event(dev->dev, 0);
+ 
+-	status  = readl(dev->rx_base + IRB_RX_STATUS);
++	/* FIXME: is 10ms good enough ? */
++	timeout = jiffies +  msecs_to_jiffies(10);
++	do {
++		status  = readl(dev->rx_base + IRB_RX_STATUS);
++		if (!(status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)))
++			break;
+ 
+-	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
+-		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
++		int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
+ 		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
+ 			/* discard the entire collection in case of errors!  */
+ 			ir_raw_event_reset(dev->rdev);
+@@ -148,8 +153,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+ 
+ 		}
+ 		last_symbol = 0;
+-		status  = readl(dev->rx_base + IRB_RX_STATUS);
+-	}
++	} while (time_is_after_jiffies(timeout));
+ 
+ 	writel(IRB_RX_INTS, dev->rx_base + IRB_RX_INT_CLEAR);
+ 
+-- 
+2.14.3
