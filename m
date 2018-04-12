@@ -1,116 +1,50 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 12 Apr 2018 13:14:27 +0200
-Subject: [PATCH v7 22/26] drivers: firmware: psci: Introduce
- psci_dt_topology_init()
+Date: Thu, 12 Apr 2018 13:14:29 +0200
+Subject: [PATCH v7 24/26] drivers: firmware: psci: Deal with CPU hotplug when
+ using OSI mode
 In-Reply-To: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
 References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1523531671-27491-23-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1523531671-27491-25-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the hierarchical layout is used in DT, we want to initialize the
-corresponding PM domain topology for the CPUs, by using the generic PM
-domain (aka genpd) infrastructure.
-
-At first glance, it may seem feasible to hook into the existing
-psci_dt_init() function, although because it's called quite early in the
-boot sequence, allocating the dynamic data structure for a genpd doesn't
-work.
-
-Therefore, let's export a new init function for PSCI,
-psci_dt_topology_init(), which the ARM machine code should call from a
-suitable initcall.
-
-Succeeding to initialize the PM domain topology, which means at least one
-instance of a genpd becomes created, allows us to continue to enable the
-PSCI OS initiated mode for the platform. If everything turns out fine,
-let's print a message in log to inform the user about the changed mode.
-
-In case of any failures, we stick to the default PSCI Platform Coordinated
-mode. Moreover, in case the kernel started from a kexec call, let's make
-sure to explicitly default to this mode during boot, in case the previous
-kernel changed the mode.
+To deal with CPU hotplug when OSI mode is used, the CPU device needs to be
+detached from its PM domain (genpd) when putting it offline, otherwise the
+CPU becomes considered as being in use from genpd and runtime PM point of
+view. Obviously, then we also need to re-attach the CPU device when bring
+the CPU back online, so let's do this.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci/psci.c | 38 +++++++++++++++++++++++++++++++++++++-
- include/linux/psci.h         |  2 ++
- 2 files changed, 39 insertions(+), 1 deletion(-)
+ drivers/firmware/psci/psci.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index 463f78c..80c286d 100644
+index 700e0e9..e649673 100644
 --- a/drivers/firmware/psci/psci.c
 +++ b/drivers/firmware/psci/psci.c
-@@ -691,9 +691,14 @@ static int __init psci_1_0_init(struct device_node *np)
- 	if (err)
- 		return err;
+@@ -190,6 +190,10 @@ static int psci_cpu_off(u32 state)
+ 	int err;
+ 	u32 fn;
  
--	if (psci_has_osi_support())
-+	if (psci_has_osi_support()) {
- 		pr_info("OSI mode supported.\n");
- 
-+		/* Make sure we default to PC mode. */
-+		invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
-+			       PSCI_1_0_SUSPEND_MODE_PC, 0, 0);
-+	}
++	/* If running OSI mode, detach the CPU device from its PM domain. */
++	if (psci_osi_mode_enabled)
++		of_genpd_detach_cpu(smp_processor_id());
 +
- 	return 0;
+ 	fn = psci_function_id[PSCI_FN_CPU_OFF];
+ 	err = invoke_psci_fn(fn, state, 0, 0);
+ 	return psci_to_linux_errno(err);
+@@ -204,6 +208,10 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
+ 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
+ 	/* Clear the domain state to start fresh. */
+ 	psci_set_domain_state(0);
++
++	if (!err && psci_osi_mode_enabled)
++		of_genpd_attach_cpu(cpuid);
++
+ 	return psci_to_linux_errno(err);
  }
  
-@@ -723,6 +728,37 @@ int __init psci_dt_init(void)
- 	return ret;
- }
- 
-+int __init psci_dt_topology_init(void)
-+{
-+	struct device_node *np;
-+	int ret;
-+
-+	if (!psci_has_osi_support())
-+		return 0;
-+
-+	np = of_find_matching_node_and_match(NULL, psci_of_match, NULL);
-+	if (!np)
-+		return -ENODEV;
-+
-+	/* Initialize the CPU PM domains based on topology described in DT. */
-+	ret = psci_dt_init_pm_domains(np);
-+	if (ret <= 0)
-+		goto out;
-+
-+	/* Enable OSI mode. */
-+	ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
-+			     PSCI_1_0_SUSPEND_MODE_OSI, 0, 0);
-+	if (ret) {
-+		pr_info("failed to enable OSI mode: %d\n", ret);
-+		goto out;
-+	}
-+
-+	pr_info("OSI mode enabled.\n");
-+out:
-+	of_node_put(np);
-+	return ret;
-+}
-+
- #ifdef CONFIG_ACPI
- /*
-  * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 8b1b3b5..298a044 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -53,8 +53,10 @@ extern struct psci_operations psci_ops;
- 
- #if defined(CONFIG_ARM_PSCI_FW)
- int __init psci_dt_init(void);
-+int __init psci_dt_topology_init(void);
- #else
- static inline int psci_dt_init(void) { return 0; }
-+static inline int psci_dt_topology_init(void) { return 0; }
- #endif
- 
- #if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
 -- 
 2.7.4
