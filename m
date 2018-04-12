@@ -1,27 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Apr 2018 18:24:56 +0100
-Subject: [bug report] locking/qrwlock, arm64: Move rwlock implementation
- over to qrwlocks causes CPU crashes/stalls when killing java processes
-In-Reply-To: <CACgAJHzeS7CNqLaVckNtS5BNTsqe0ac+u0LwJAr1_1i1=OLcnA@mail.gmail.com>
-References: <CACgAJHzeS7CNqLaVckNtS5BNTsqe0ac+u0LwJAr1_1i1=OLcnA@mail.gmail.com>
-Message-ID: <20180412172456.GA27033@arm.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu, 12 Apr 2018 19:35:16 +0200
+Subject: arm64 kvm built with clang doesn't boot
+In-Reply-To: <20180316143119.cdjw4dhm6crcjyrd@lakrids.cambridge.arm.com>
+References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
+ <20180316141313.q5vjmj627rv7r7kf@lakrids.cambridge.arm.com>
+ <20180316143119.cdjw4dhm6crcjyrd@lakrids.cambridge.arm.com>
+Message-ID: <CAAeHK+wqogT5-iZiWzBMyNEtxxTE2JrgcdVK1+6WFgRm77+cRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tai,
+On Fri, Mar 16, 2018 at 3:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Mar 16, 2018 at 02:13:14PM +0000, Mark Rutland wrote:
+>> On Fri, Mar 16, 2018 at 02:49:00PM +0100, Andrey Konovalov wrote:
+>> > Hi!
+>>
+>> Hi,
+>>
+>> > I've recently tried to boot clang built kernel on real hardware
+>> > (Odroid C2 board) instead of using a VM. The issue that I stumbled
+>> > upon is that arm64 kvm built with clang doesn't boot.
+>> >
+>> > Adding -fno-jump-tables compiler flag to arch/arm64/kvm/* helps. There
+>> > was a patch some time ago that did exactly that
+>> > (https://patchwork.kernel.org/patch/10060381/), but it wasn't accepted
+>> > AFAICT (see the discussion on that thread).
+>> >
+>> > What would be the best way to get this fixed?
+>>
+>> I think that patch is our best bet currently, but to save ourselves pain
+>> in future it would be *really* nice if GCC and clang could provide an
+>> option line -fno-absolute-addressing that would implicitly disable any
+>> feature that would generate an absolute address as jump tables do.
+>>
+>> > I've also had to disable CONFIG_JUMP_LABEL to get the kernel boot
+>> > (even without kvm enabled), but that might be a different (though
+>> > related) issue.
+>>
+>> With v4.15 (and clang 5.0.0), I did not have to disable jump labels to
+>> get a kernel booting on a Juno platform, though I did have to pass
+>> -fno-jump-tables to the hyp code.
+>
+> FWIW, with that same compiler and patch applied atop of v4.16-rc4, and
+> some bodges around clang not liking the rX register naming in the SMCCC
+> code, I get a kernel that boots on my Juno, though I immediately hit a
+> KASAN splat:
+>
+> [    8.476766] ==================================================================
+> [    8.483990] BUG: KASAN: slab-out-of-bounds in __d_lookup_rcu+0x350/0x400
+> [    8.490664] Read of size 8 at addr ffff8009336e2a30 by task init/1
 
-On Thu, Apr 12, 2018 at 10:10:40AM -0700, Tai Tri Nguyen wrote:
-> Recently I have observed the CPU crashes/stalls when rebooting after I
-> ran cassandra benchmark.
-> The issue happens randomly.
+Hi Mark!
 
-Please could you share some logs and more details about the crashes and
-stalls? At the moment there's not much we can do with this report :/
+Just FYI, this should be fixed with https://reviews.llvm.org/D44981 +
+https://patchwork.kernel.org/patch/10339103/
 
-Ideally, we'd have steps to reproduce the issue, but it seems that you
-don't have a reliable method for that.
-
-One other thing you could try is removing the WFE from our cmpwait
-implementation in case you have a CPU erratum in that area.
-
-Will
+Thanks!
