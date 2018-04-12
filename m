@@ -1,45 +1,36 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 12 Apr 2018 11:16:10 +0900
-Subject: [PATCH] reset: uniphier: fix USB clock line for LD20
-Message-ID: <1523499370-17757-1-git-send-email-yamada.masahiro@socionext.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Wed, 11 Apr 2018 19:20:28 -0700
+Subject: [PATCH v3 05/10] ARM: dts: aspeed: peci: Add PECI node
+In-Reply-To: <CACPK8Xf7ta43K=POx8J6bAdjvX=wCzy-+HWqHsm+RstQxeetCQ@mail.gmail.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+ <20180410183212.16787-6-jae.hyun.yoo@linux.intel.com>
+ <CACPK8Xf7ta43K=POx8J6bAdjvX=wCzy-+HWqHsm+RstQxeetCQ@mail.gmail.com>
+Message-ID: <64dae4bb-8049-a09d-d0bb-18f6ec52ea63@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For LD20, the bit 5 of the offset 0x200c turned out to be a USB3
-reset.  The hardware document says it is the GIO reset despite LD20
-has no GIO bus, confusingly.
+On 4/11/2018 4:52 AM, Joel Stanley wrote:
+> On 11 April 2018 at 04:02, Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com> wrote:
+>> This commit adds PECI bus/adapter node of AST24xx/AST25xx into
+>> aspeed-g4 and aspeed-g5.
+>>
+> 
+> The patches to the device trees get merged by the ASPEED maintainer
+> (me). Once you have the bindings reviewed you can send the patches to
+> me and the linux-aspeed list (I've got a pending patch to maintainers
+> that will ensure get_maintainers.pl does the right thing as far as
+> email addresses go).
+> 
+> I'd suggest dropping it from your series and re-sending once the
+> bindings and driver are reviewed.
+> 
+> Cheers,
+> 
+> Joel
+> 
 
-Also, fix confusing comments for PXs3.
+Do you mean that bindings and driver of ASPEED peci adapter driver 
+including documents?
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/reset/reset-uniphier.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index 360e06b..ac18f2f 100644
---- a/drivers/reset/reset-uniphier.c
-+++ b/drivers/reset/reset-uniphier.c
-@@ -110,7 +110,7 @@ static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
- 	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
- 	UNIPHIER_RESETX(6, 0x200c, 6),		/* Ether */
- 	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC) */
--	UNIPHIER_RESETX(12, 0x200c, 5),		/* GIO (PCIe, USB3) */
-+	UNIPHIER_RESETX(14, 0x200c, 5),		/* USB30 */
- 	UNIPHIER_RESETX(16, 0x200c, 12),	/* USB30-PHY0 */
- 	UNIPHIER_RESETX(17, 0x200c, 13),	/* USB30-PHY1 */
- 	UNIPHIER_RESETX(18, 0x200c, 14),	/* USB30-PHY2 */
-@@ -127,8 +127,8 @@ static const struct uniphier_reset_data uniphier_pxs3_sys_reset_data[] = {
- 	UNIPHIER_RESETX(6, 0x200c, 9),		/* Ether0 */
- 	UNIPHIER_RESETX(7, 0x200c, 10),		/* Ether1 */
- 	UNIPHIER_RESETX(8, 0x200c, 12),		/* STDMAC */
--	UNIPHIER_RESETX(12, 0x200c, 4),		/* USB30 link (GIO0) */
--	UNIPHIER_RESETX(13, 0x200c, 5),		/* USB31 link (GIO1) */
-+	UNIPHIER_RESETX(12, 0x200c, 4),		/* USB30 link */
-+	UNIPHIER_RESETX(13, 0x200c, 5),		/* USB31 link */
- 	UNIPHIER_RESETX(16, 0x200c, 16),	/* USB30-PHY0 */
- 	UNIPHIER_RESETX(17, 0x200c, 18),	/* USB30-PHY1 */
- 	UNIPHIER_RESETX(18, 0x200c, 20),	/* USB30-PHY2 */
--- 
-2.7.4
+Thanks,
+-Jae
