@@ -1,32 +1,81 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Apr 2018 07:39:32 -0700
-Subject: [PATCH 11/14] gpio: omap: Restore power_mode configuration at
- resume time
-In-Reply-To: <1523505239-16229-12-git-send-email-j-keerthy@ti.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-12-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180412143932.GA5700@atomide.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 12 Apr 2018 16:51:36 +0200
+Subject: [PATCH 3/3] ARM: dts: sun7i: Add support for the Ainol AW1 tablet
+In-Reply-To: <7f6d6a6a5a0cc2d37ebba046509d4f25d3bfa600.camel@paulk.fr>
+References: <20180410213129.24049-1-contact@paulk.fr>
+ <20180410213129.24049-3-contact@paulk.fr>
+ <20180411070657.kw6uckqtmwb7p5hf@flea>
+ <7f6d6a6a5a0cc2d37ebba046509d4f25d3bfa600.camel@paulk.fr>
+Message-ID: <20180412145136.zp2i7u76oinphiiz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [180412 03:56]:
-> From: Dave Gerlach <d-gerlach@ti.com>
+On Thu, Apr 12, 2018 at 01:08:51AM +0200, Paul Kocialkowski wrote:
+> > > +	backlight: backlight {
+> > > +		compatible = "pwm-backlight";
+> > > +		pinctrl-names = "default";
+> > > +		pinctrl-0 = <&backlight_enable_pin>;
+> > 
+> > You don't need any of the pinctrl nodes for the GPIOs
 > 
-> Commit 2dc983c565e0 ("gpio/omap: cleanup prepare_for_idle and
-> resume_after_idle") introduces omap2_gpio_prepare_for_idle and
-> omap2_gpio_resume_after_idle to properly configure gpios that are used
-> as wake sources. When entering off mode, omap2_gpio_prepare_for_idle
-> can set a flag indicating off-mode entry is desired, however once this
-> flag is set it is never cleared, so any additional calls to this
-> function, regardless of the mode, have this flag set.
+> I tried without the pinctrl nodes and got issues on various controllers
+> (e.g. i2c for the touchscreen) because of the missing pinctrl nodes on
+> 4.16. Maybe I'm missing some patches here?
+
+You don't need any patches. What was the error exactly?
+
+> > > +&cpu0 {
+> > > +	cpu-supply = <&reg_dcdc2>;
+> > > +};
+> > 
+> > How was CPUfreq tested?
 > 
-> This patch restores the pwr_mode flag to 0 in
-> omap2_gpio_resume_after_idle to ensure the flag is not misconfigured
-> during non off-mode operation.
+> In fact, I haven't tried it at all, but I can definitely do that with
+> e.g. ssvb's stress test for various cpufreq functioning points.
 
-Seems like this should be applied as a fix, can you please add
-a proper Fixes tag?
+That would be great yes.
 
-Regards,
+> > > +&i2c2 {
+> > > +	pinctrl-names = "default";
+> > > +	pinctrl-0 = <&i2c2_pins_a>;
+> > > +	status = "okay";
+> > > +	clock-frequency = <400000>; /* 400 KHz required for
+> > > GSL1680. */
+> > 
+> > I'm not sure that comment is worth it. The only device there is the
+> > touchscreen, so it's kind of obvious that it's the device that needs
+> > that frequency.
+> 
+> Well, I found a similar comment in the other dts using the same
+> touchscreen controller. Since the information was rather valuable (it
+> made it clear that I needed the same clock frequency for that specific
+> touchscreen),
 
-Tony
+You can have the same kind of comment for pretty much all DT
+lines. you could for example have on the pinctrl property just above
+the comment that the I2C2 on that boards are tied to those pins. But
+that's just redundant, and the SNR would be pretty bad if we were to
+do it everywhere.
+
+> it might help others in the future (even if only when grepping for
+> gsl1680).
+> 
+> > > +
+> > > +	gsl1680: touchscreen at 40 {
+> > > +		compatible = "silead,gsl1680";
+
+You have the gsl1680 two times here, so grep would find it either way.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/8b948e5b/attachment.sig>
