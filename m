@@ -1,80 +1,91 @@
-From: ldufour@linux.vnet.ibm.com (Laurent Dufour)
-Date: Thu, 12 Apr 2018 13:48:53 +0200
-Subject: [PATCH v4] mm: remove odd HAVE_PTE_SPECIAL
-In-Reply-To: <20180411110936.GG23400@dhcp22.suse.cz>
-References: <20180411110936.GG23400@dhcp22.suse.cz>
-Message-ID: <1523533733-25437-1-git-send-email-ldufour@linux.vnet.ibm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Apr 2018 12:56:07 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Set GBPA to abort all transactions
+In-Reply-To: <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
+References: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
+ <3350f0eb84c8c621cf43aa06ed117cfb@www.loen.fr>
+ <3772fb2d-01b7-4820-6d13-a0263654dabc@codeaurora.org>
+ <438a6180-fca8-d3a1-985f-e595529911f3@arm.com>
+ <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
+Message-ID: <265a41d4-ec3c-6697-0340-6830807ea10f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the additional define HAVE_PTE_SPECIAL and rely directly on
-CONFIG_ARCH_HAS_PTE_SPECIAL.
+On 12/04/18 11:17, Robin Murphy wrote:
+> On 11/04/18 17:54, Marc Zyngier wrote:
+>> Hi Sammer,
+>>
+>> On 11/04/18 16:58, Goel, Sameer wrote:
+>>>
+>>>
+>>> On 3/28/2018 9:00 AM, Marc Zyngier wrote:
+>>>> On 2018-03-28 15:39, Timur Tabi wrote:
+>>>>> From: Sameer Goel <sgoel@codeaurora.org>
+>>>>>
+>>>>> Set SMMU_GBPA to abort all incoming translations during the SMMU reset
+>>>>> when SMMUEN==0.
+>>>>>
+>>>>> This prevents a race condition where a stray DMA from the crashed primary
+>>>>> kernel can try to access an IOVA address as an invalid PA when SMMU is
+>>>>> disabled during reset in the crash kernel.
+>>>>>
+>>>>> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
+>>>>> ---
+>>>>>  ?drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
+>>>>>  ?1 file changed, 12 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>>>>> index 3f2f1fc68b52..c04a89310c59 100644
+>>>>> --- a/drivers/iommu/arm-smmu-v3.c
+>>>>> +++ b/drivers/iommu/arm-smmu-v3.c
+>>>>> @@ -2458,6 +2458,18 @@ static int arm_smmu_device_reset(struct
+>>>>> arm_smmu_device *smmu, bool bypass)
+>>>>>  ???? if (reg & CR0_SMMUEN)
+>>>>>  ???????? dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
+>>>>>
+>>>>> +??? /*
+>>>>> +???? * Abort all incoming translations. This can happen in a kdump case
+>>>>> +???? * where SMMU is initialized when a prior DMA is pending. Just
+>>>>> +???? * disabling the SMMU in this case might result in writes to invalid
+>>>>> +???? * PAs.
+>>>>> +???? */
+>>>>> +??? ret = arm_smmu_update_gbpa(smmu, 1, GBPA_ABORT);
+>>>>> +??? if (ret) {
+>>>>> +??????? dev_err(smmu->dev, "GBPA not responding to update\n");
+>>>>> +??????? return ret;
+>>>>> +??? }
+>>>>> +
+>>>>>  ???? ret = arm_smmu_device_disable(smmu);
+>>>>>  ???? if (ret)
+>>>>>  ???????? return ret;
+>>>>
+>>>> A tangential question: can we reliably detect that the SMMU already
+>>>> has valid mappings, which would indicate that we're in a pretty bad
+>>>> shape already by the time we set that bit? For all we know, memory
+>>>> could have been corrupted long before we hit this point, and this
+>>>> patch barely narrows the window of opportunity.
+>>>
+>>> :) Yes that is correct. This only covers the kdump scenario. Trying
+>>> to get some reliability when booting up the crash kernel. The system
+>>> is already in a bad state. I don't think that this will happen in a
+>>> normal scenario. But please point me to the GICv3 change and I'll
+>>> have a look.
+>>
+>> See this:
+>> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/irqchip-4.17&id=6eb486b66a3094cdcd68dc39c9df3a29d6a51dd5#n3407
+> 
+> The nearest equivalent to that is probably the top-level SMMUEN check 
+> that we already have (see the diff context above). To go beyond that 
+> you'd have to chase the old stream table pointer and scan the whole 
+> thing looking for valid contexts, then potentially walk page tables 
+> within those contexts to check for live translations if you really 
+> wanted to be sure. That would be a hell of a lot of work to do in the 
+> boot path.
+Yeah, feels a bit too involved for sanity. I'd simply suggest you taint
+the kernel if you find the SMMU enabled, as you're already on shaky ground.
 
-There is no functional change introduced by this patch
+Thanks,
 
-Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
----
- mm/memory.c | 15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
-
-diff --git a/mm/memory.c b/mm/memory.c
-index 96910c625daa..345e562a138d 100644
---- a/mm/memory.c
-+++ b/mm/memory.c
-@@ -817,17 +817,12 @@ static void print_bad_pte(struct vm_area_struct *vma, unsigned long addr,
-  * PFNMAP mappings in order to support COWable mappings.
-  *
-  */
--#ifdef CONFIG_ARCH_HAS_PTE_SPECIAL
--# define HAVE_PTE_SPECIAL 1
--#else
--# define HAVE_PTE_SPECIAL 0
--#endif
- struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
- 			     pte_t pte, bool with_public_device)
- {
- 	unsigned long pfn = pte_pfn(pte);
- 
--	if (HAVE_PTE_SPECIAL) {
-+	if (IS_ENABLED(CONFIG_ARCH_HAS_PTE_SPECIAL)) {
- 		if (likely(!pte_special(pte)))
- 			goto check_pfn;
- 		if (vma->vm_ops && vma->vm_ops->find_special_page)
-@@ -862,7 +857,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
- 		return NULL;
- 	}
- 
--	/* !HAVE_PTE_SPECIAL case follows: */
-+	/* !CONFIG_ARCH_HAS_PTE_SPECIAL case follows: */
- 
- 	if (unlikely(vma->vm_flags & (VM_PFNMAP|VM_MIXEDMAP))) {
- 		if (vma->vm_flags & VM_MIXEDMAP) {
-@@ -881,6 +876,7 @@ struct page *_vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
- 
- 	if (is_zero_pfn(pfn))
- 		return NULL;
-+
- check_pfn:
- 	if (unlikely(pfn > highest_memmap_pfn)) {
- 		print_bad_pte(vma, addr, pte, NULL);
-@@ -904,7 +900,7 @@ struct page *vm_normal_page_pmd(struct vm_area_struct *vma, unsigned long addr,
- 	/*
- 	 * There is no pmd_special() but there may be special pmds, e.g.
- 	 * in a direct-access (dax) mapping, so let's just replicate the
--	 * !HAVE_PTE_SPECIAL case from vm_normal_page() here.
-+	 * !CONFIG_ARCH_HAS_PTE_SPECIAL case from vm_normal_page() here.
- 	 */
- 	if (unlikely(vma->vm_flags & (VM_PFNMAP|VM_MIXEDMAP))) {
- 		if (vma->vm_flags & VM_MIXEDMAP) {
-@@ -1933,7 +1929,8 @@ static int __vm_insert_mixed(struct vm_area_struct *vma, unsigned long addr,
- 	 * than insert_pfn).  If a zero_pfn were inserted into a VM_MIXEDMAP
- 	 * without pte special, it would there be refcounted as a normal page.
- 	 */
--	if (!HAVE_PTE_SPECIAL && !pfn_t_devmap(pfn) && pfn_t_valid(pfn)) {
-+	if (!IS_ENABLED(CONFIG_ARCH_HAS_PTE_SPECIAL) &&
-+	    !pfn_t_devmap(pfn) && pfn_t_valid(pfn)) {
- 		struct page *page;
- 
- 		/*
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
