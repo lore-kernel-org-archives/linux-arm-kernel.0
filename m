@@ -1,106 +1,95 @@
-From: ldv@altlinux.org (Dmitry V. Levin)
-Date: Thu, 12 Apr 2018 20:35:58 +0300
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
-References: <20180409152253.GD10489@altlinux.org>
- <20180412013435.GA21219@altlinux.org>
- <20180412095811.GC16141@n2100.armlinux.org.uk>
- <20180412110314.GA28070@altlinux.org>
- <20180412121949.GD16141@n2100.armlinux.org.uk>
- <20180412124928.GA29458@altlinux.org>
- <20180412131404.GE16141@n2100.armlinux.org.uk>
- <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
-Message-ID: <20180412173558.GB31781@altlinux.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 12 Apr 2018 10:37:14 -0700
+Subject: [PATCH v3 09/10] drivers/hwmon: Add PECI hwmon client drivers
+In-Reply-To: <89c8c847-87e7-a849-e05d-d32b787e9305@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+ <20180410183212.16787-10-jae.hyun.yoo@linux.intel.com>
+ <20180410222800.GA8484@roeck-us.net>
+ <637d7812-e567-0bc2-4f08-fbdca0ee85d8@linux.intel.com>
+ <292be2d9-e572-2e06-9899-f6c2c53fdefc@roeck-us.net>
+ <7b378954-1ce8-a2d2-5d09-8b6b36c048be@linux.intel.com>
+ <13d4c632-a20e-3c40-066a-1e9df02a0595@roeck-us.net>
+ <89c8c847-87e7-a849-e05d-d32b787e9305@linux.intel.com>
+Message-ID: <20180412173714.GA13496@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 09:50:26AM -0700, Linus Torvalds wrote:
-> Does this attached patch perhaps fix the ARM case?
+On Thu, Apr 12, 2018 at 10:09:51AM -0700, Jae Hyun Yoo wrote:
+[ ... ]
+> >>>>>>+static int find_core_index(struct peci_cputemp *priv, int channel)
+> >>>>>>+{
+> >>>>>>+??? int core_channel = channel - DEFAULT_CHANNEL_NUMS;
+> >>>>>>+??? int idx, found = 0;
+> >>>>>>+
+> >>>>>>+??? for (idx = 0; idx < priv->gen_info->core_max; idx++) {
+> >>>>>>+??????? if (priv->core_mask & BIT(idx)) {
+> >>>>>>+??????????? if (core_channel == found)
+> >>>>>>+??????????????? break;
+> >>>>>>+
+> >>>>>>+??????????? found++;
+> >>>>>>+??????? }
+> >>>>>>+??? }
+> >>>>>>+
+> >>>>>>+??? return idx;
+> >>>>>
+> >>>>>What if nothing is found ?
+> >>>>>
+> >>>>
+> >>>>Core temperature group will be registered only when it detects at
+> >>>>least one core checked by check_resolved_cores(), so
+> >>>>find_core_index() can be called only when priv->core_mask has a
+> >>>>non-zero value. The 'nothing is found' case will not happen.
+> >>>>
+> >>>That doesn't guarantee a match. If what you are saying is correct
+> >>>there should always be
+> >>>a well defined match of channel -> idx, and the search should be
+> >>>unnecessary.
+> >>>
+> >>
+> >>There could be some disabled cores in the resolved core mask bit
+> >>sequence also it should remove indexing gap in channel numbering so it
+> >>is the reason why this search function is needed. Well defined match of
+> >>channel -> idx would not be always satisfied.
+> >>
+> >Are you saying that each call to the function, with the same parameters,
+> >can return a different result ?
+> >
 > 
-> It just uses FPE_FLTUNK as the default si_code for SIGFPE, which seems
-> sane enough. And then gets rid of FPE_FIXME, which should resolve the
-> nasty case.
+> No, the result will be consistent. After reading the priv->core_mask once in
+> check_resolved_cores(), the value will not be changed. I'm saying about this
+> case, for example if core number 2 is unresolved in total 4 cores, then the
+> idx order will be '0, 1, 3' but channel order will be '5, 6, 7' without
+> making any indexing gap.
 > 
-> Hmm? Entirely untested, and I didn't really look at the test-case in
-> question since I can't really run it anyway.
+
+And you yet you claim that this is not well defined ? Or are you concerned
+about the amount of memory consumed by providing an array for the mapping ?
+
+Note that an indexing gap is acceptable and, in many cases, preferred.
+
+[ ... ]
+
+> >>>>>>+
+> >>>>>>+??? dev_dbg(dev, "%s: sensor '%s'\n", dev_name(hwmon_dev),
+> >>>>>>priv->name);
+> >>>>>>+
+> >>>
+> >>>Why does this message display the device name twice ?
+> >>>
+> >>
+> >>For an example, dev_name(hwmon_dev) shows 'hwmon5' and priv->name shows
+> >>'peci-cputemp0'.
+> >>
+> >And dev_dbg() shows another device name. So you'll have something like
+> >
+> >peci-cputemp0: hwmon5: sensor 'peci-cputemp0'
+> >
 > 
-> Well, I could run it all on x86-64, but it doesn't have that FPE_FIXME
-> case at all.
+> Practically it shows like
 > 
->                  Linus
-
->  arch/arm/include/uapi/asm/siginfo.h | 7 -------
->  arch/arm/vfp/vfpmodule.c            | 4 ++--
->  2 files changed, 2 insertions(+), 9 deletions(-)
+> peci-cputemp 0-30:00: hwmon10: sensor 'peci_cputemp.cpu0'
 > 
-> diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
-> index d0513880be21..d87beeedb4c4 100644
-> --- a/arch/arm/include/uapi/asm/siginfo.h
-> +++ b/arch/arm/include/uapi/asm/siginfo.h
-> @@ -3,11 +3,4 @@
->  
->  #include <asm-generic/siginfo.h>
->  
-> -/*
-> - * SIGFPE si_codes
-> - */
-> -#ifdef __KERNEL__
-> -#define FPE_FIXME	0	/* Broken dup of SI_USER */
-> -#endif /* __KERNEL__ */
-> -
->  #endif
+> where 0-30:00 is assigned by peci core.
+> 
 
-Looks like the whole file should go away.
-
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 4c375e11ae95..012c6e690303 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -251,13 +251,13 @@ static void vfp_panic(char *reason, u32 inst)
->   */
->  static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_regs *regs)
->  {
-> -	int si_code = 0;
-> +	int si_code = FPE_FLTUNK;
-
-Note that this change would affect the following code
-at the end of vfp_raise_exceptions:
-
-	if (si_code)
-		vfp_raise_sigfpe(si_code, regs);
-
->  	pr_debug("VFP: raising exceptions %08x\n", exceptions);
->  
->  	if (exceptions == VFP_EXCEPTION_ERROR) {
->  		vfp_panic("unhandled bounce", inst);
-> -		vfp_raise_sigfpe(FPE_FIXME, regs);
-> +		vfp_raise_sigfpe(si_code, regs);
->  		return;
->  	}
->  
-
-To be on the safe side, I'd just change it this way:
-
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 4c375e1..66a73ba 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -257,7 +257,7 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
- 
- 	if (exceptions == VFP_EXCEPTION_ERROR) {
- 		vfp_panic("unhandled bounce", inst);
--		vfp_raise_sigfpe(FPE_FIXME, regs);
-+		vfp_raise_sigfpe(FPE_FLTUNK, regs);
- 		return;
- 	}
-
--- 
-ldv
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/8a5a5062/attachment.sig>
+And what message would you see for cpu1 ?
