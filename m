@@ -1,20 +1,42 @@
-From: rientjes@google.com (David Rientjes)
-Date: Thu, 12 Apr 2018 13:46:36 -0700 (PDT)
-Subject: [PATCH v4] mm: remove odd HAVE_PTE_SPECIAL
-In-Reply-To: <1523533733-25437-1-git-send-email-ldufour@linux.vnet.ibm.com>
-References: <20180411110936.GG23400@dhcp22.suse.cz>
- <1523533733-25437-1-git-send-email-ldufour@linux.vnet.ibm.com>
-Message-ID: <alpine.DEB.2.21.1804121346250.22780@chino.kir.corp.google.com>
+From: jhogan@kernel.org (James Hogan)
+Date: Thu, 12 Apr 2018 22:51:50 +0100
+Subject: [PATCH v3 2/2] MIPS: io: add a barrier after register read in
+ readX()
+In-Reply-To: <1522760109-16497-2-git-send-email-okaya@codeaurora.org>
+References: <1522760109-16497-1-git-send-email-okaya@codeaurora.org>
+ <1522760109-16497-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20180412215149.GA27802@saruman>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Apr 2018, Laurent Dufour wrote:
-
-> Remove the additional define HAVE_PTE_SPECIAL and rely directly on
-> CONFIG_ARCH_HAS_PTE_SPECIAL.
+On Tue, Apr 03, 2018 at 08:55:04AM -0400, Sinan Kaya wrote:
+> While a barrier is present in writeX() function before the register write,
+> a similar barrier is missing in the readX() function after the register
+> read. This could allow memory accesses following readX() to observe
+> stale data.
 > 
-> There is no functional change introduced by this patch
-> 
-> Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
 
-Acked-by: David Rientjes <rientjes@google.com>
+Both patches look like obvious improvements to me, so I'm happy to apply
+to my fixes branch.
+
+I'm guessing the case of a write to DMA buffer (i.e. reusing it) after a
+MMIO readX() (checking DMA complete) being visible to DMA reads prior to
+the readX() is precluded by a control dependency (you shouldn't reuse
+buffer until you've checked DMA is complete).
+
+But why don't we always use wmb() in the writeX() case? Might not the
+cached write to DMA buffer be reordered with the uncached write to MMIO
+register from the coherent DMA point of view? I'm waiting on feedback
+from MIPS hardware folk on this topic.
+
+Cheers
+James
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/086384f7/attachment.sig>
