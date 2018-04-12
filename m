@@ -1,75 +1,20 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 12 Apr 2018 15:10:34 -0500
-Subject: [PATCH 10/14] gpio: omap: Drop the concept of gpio banks not
- being able to lose context.
-In-Reply-To: <20180412142257.GW5700@atomide.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-11-git-send-email-j-keerthy@ti.com>
- <20180412142257.GW5700@atomide.com>
-Message-ID: <3b01e345-6939-f28c-c648-7316d0a410c4@ti.com>
+From: rientjes@google.com (David Rientjes)
+Date: Thu, 12 Apr 2018 13:46:36 -0700 (PDT)
+Subject: [PATCH v4] mm: remove odd HAVE_PTE_SPECIAL
+In-Reply-To: <1523533733-25437-1-git-send-email-ldufour@linux.vnet.ibm.com>
+References: <20180411110936.GG23400@dhcp22.suse.cz>
+ <1523533733-25437-1-git-send-email-ldufour@linux.vnet.ibm.com>
+Message-ID: <alpine.DEB.2.21.1804121346250.22780@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 12 Apr 2018, Laurent Dufour wrote:
 
+> Remove the additional define HAVE_PTE_SPECIAL and rely directly on
+> CONFIG_ARCH_HAS_PTE_SPECIAL.
+> 
+> There is no functional change introduced by this patch
+> 
+> Signed-off-by: Laurent Dufour <ldufour@linux.vnet.ibm.com>
 
-On 04/12/2018 09:22 AM, Tony Lindgren wrote:
-> * Keerthy <j-keerthy@ti.com> [180412 03:56]:
->> From: Russ Dill <Russ.Dill@ti.com>
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -68,7 +68,7 @@ struct gpio_bank {
->>   	bool dbck_enabled;
->>   	bool is_mpuio;
->>   	bool dbck_flag;
->> -	bool loses_context;
->> +
->>   	bool context_valid;
->>   	int stride;
->>   	u32 width;
-> 
-> For some SoCs GPIO bank1 won't lose the context ever. So I'd like to
-> keep loses_context flag around to avoid pointless save and restore.
-> But maybe this still happens with get_context_loss_count and I'm
-> misreading this patch?
-> 
-
-Agree with Tony here. More over, even if platform supports RTC suspend
-(gpio1 context loss) it might support suspend to RAM - gpio1 will not lose context.
-
-Not sure how to handle this correctly now - always-on gpio bank should not be touched 
-by omap device framework during suspend otherwise it may hit "in transition" state forever.
->From another side it must be handled the same way as other gpio banks in case of RTC suspend.
-Q: How to know if current suspend is RTC suspend and not regular suspend to mem?
-
-> However..
-> 
->> @@ -1198,15 +1198,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
->>   #ifdef CONFIG_OF_GPIO
->>   	bank->chip.of_node = of_node_get(node);
->>   #endif
->> -	if (node) {
->> -		if (!of_property_read_bool(node, "ti,gpio-always-on"))
->> -			bank->loses_context = true;
->> -	} else {
->> -		bank->loses_context = pdata->loses_context;
->> -
->> -		if (bank->loses_context)
->> -			bank->get_context_loss_count =
->> -				pdata->get_context_loss_count;
->> +	if (!node) {
->> +		bank->get_context_loss_count =
->> +			pdata->get_context_loss_count;
->>   	}
->>   
->>   	if (bank->regs->set_dataout && bank->regs->clr_dataout)
-> 
-> .. I do have a patch ready here that I'll post after -rc1 to remove
-> CONFIG_OMAP_PM_NOOP related stuff, turns out that's noop anyways :)
-> 
-> So yeah the pdata->get_context_loss_count parts are noop and can
-> be just removed.
-> 
-
--- 
-regards,
--grygorii
+Acked-by: David Rientjes <rientjes@google.com>
