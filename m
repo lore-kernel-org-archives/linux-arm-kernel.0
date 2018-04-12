@@ -1,247 +1,192 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 12 Apr 2018 09:23:50 +0530
-Subject: [PATCH 05/14] ARM: OMAP2: Add functions to save and restore
- powerdomain context
+Date: Thu, 12 Apr 2018 09:23:51 +0530
+Subject: [PATCH 06/14] ARM: AM33XX: Add functions to save/restore am33xx
+ control registers.
 In-Reply-To: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
 References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1523505239-16229-6-git-send-email-j-keerthy@ti.com>
+Message-ID: <1523505239-16229-7-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russ Dill <Russ.Dill@ti.com>
+From: Russ Dill <russ.dill@ti.com>
 
-The powerdomain control registers are stored in the WKUP powerdomain on
-AM33XX/AM43XX, which is lost on RTC-only suspend and also hibernate. This
-adds context save and restore functions for those registers.
-Sometimes the powerdomain state does not need to change,
-perhaps we only need to change memory retention states, so make
-sure the restored state is different from the current state before we wait
-for a transition.
+These registers are part of the wkup domain and are lost during RTC only
+suspend and also hibernation, so storing/restoring their state is
+necessary.
 
+Signed-off-by: Russ Dill <russ.dill@ti.com>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Russ Dill <Russ.Dill@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.c | 60 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h |  7 +++++
- arch/arm/mach-omap2/prm33xx.c     | 31 ++++++++++++++++++++
- arch/arm/mach-omap2/prm44xx.c     | 50 ++++++++++++++++++++++++++++++++
- 4 files changed, 148 insertions(+)
+ arch/arm/mach-omap2/control.c | 84 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/control.h | 52 +++++++++++++++++++++++++++
+ 2 files changed, 136 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 76eb6ec..ee693f6 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -1199,3 +1199,63 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 180da403..d92aa9a 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -619,8 +619,92 @@ void __init omap3_ctrl_init(void)
  
- 	return 0;
+ 	omap3_ctrl_setup_d2d_padconf();
  }
 +
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+ 
++#if defined(CONFIG_SOC_AM33XX) && defined(CONFIG_PM)
++static unsigned long am33xx_control_reg_offsets[] = {
++	AM33XX_CONTROL_SYSCONFIG_OFFSET,
++	AM33XX_CONTROL_STATUS_OFFSET,
++	AM33XX_CONTROL_CORTEX_VBBLDO_CTRL_OFFSET,
++	AM33XX_CONTROL_CORE_SLDO_CTRL_OFFSET,
++	AM33XX_CONTROL_MPU_SLDO_CTRL_OFFSET,
++	AM33XX_CONTROL_CLK32KDIVRATIO_CTRL_OFFSET,
++	AM33XX_CONTROL_BANDGAP_CTRL_OFFSET,
++	AM33XX_CONTROL_BANDGAP_TRIM_OFFSET,
++	AM33XX_CONTROL_PLL_CLKINPULOW_CTRL_OFFSET,
++	AM33XX_CONTROL_MOSC_CTRL_OFFSET,
++	AM33XX_CONTROL_RCOSC_CTRL_OFFSET,
++	AM33XX_CONTROL_DEEPSLEEP_CTRL_OFFSET,
++	AM33XX_CONTROL_INIT_PRIORITY_0_OFFSET,
++	AM33XX_CONTROL_INIT_PRIORITY_1_OFFSET,
++	AM33XX_CONTROL_MMU_CFG_OFFSET,
++	AM33XX_CONTROL_TPTC_CFG_OFFSET,
++	AM33XX_CONTROL_USB_CTRL0_OFFSET,
++	AM33XX_CONTROL_USB_CTRL1_OFFSET,
++	AM33XX_CONTROL_USB_WKUP_CTRL_OFFSET,
++	AM33XX_CONTROL_MREQPRIO_0_OFFSET,
++	AM33XX_CONTROL_MREQPRIO_1_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP1_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP2_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP3_OFFSET,
++	AM33XX_CONTROL_HW_EVENT_SEL_GRP4_OFFSET,
++	AM33XX_CONTROL_SMRT_CTRL_OFFSET,
++	AM33XX_CONTROL_MPUSS_HW_DEBUG_SEL_OFFSET,
++	AM33XX_CONTROL_VREF_CTRL_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_0_3_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_4_7_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_8_11_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_12_15_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_16_19_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_20_23_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_24_27_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_28_31_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_32_35_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_36_39_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_40_43_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_44_47_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_48_51_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_52_55_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_56_59_OFFSET,
++	AM33XX_CONTROL_TPCC_EVT_MUX_60_63_OFFSET,
++	AM33XX_CONTROL_TIMER_EVT_CAPT_OFFSET,
++	AM33XX_CONTROL_ECAP_EVT_CAPT_OFFSET,
++	AM33XX_CONTROL_ADC_EVT_CAPT_OFFSET,
++	AM33XX_CONTROL_RESET_ISO_OFFSET,
++};
++
++static u32 am33xx_control_vals[ARRAY_SIZE(am33xx_control_reg_offsets)];
++
 +/**
-+ * pwrdm_save_context - save powerdomain registers
++ * am33xx_control_save_context - Save the wakeup domain registers
 + *
-+ * Register state is going to be lost due to a suspend or hibernate
-+ * event. Save the powerdomain registers.
++ * Save the wkup domain registers
 + */
-+static int pwrdm_save_context(struct powerdomain *pwrdm, void *unused)
++void am33xx_control_save_context(void)
 +{
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_save_context)
-+		arch_pwrdm->pwrdm_save_context(pwrdm);
-+	return 0;
-+}
++	int i;
 +
-+/**
-+ * pwrdm_save_context - restore powerdomain registers
-+ *
-+ * Restore powerdomain control registers after a suspend or resume
-+ * event.
-+ */
-+static int pwrdm_restore_context(struct powerdomain *pwrdm, void *unused)
-+{
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_restore_context)
-+		arch_pwrdm->pwrdm_restore_context(pwrdm);
-+	return 0;
-+}
-+
-+static int pwrdm_lost_power(struct powerdomain *pwrdm, void *unused)
-+{
-+	int state;
-+
-+	/*
-+	 * Power has been lost across all powerdomains, increment the
-+	 * counter.
-+	 */
-+
-+	state = pwrdm_read_pwrst(pwrdm);
-+	if (state != PWRDM_POWER_OFF) {
-+		pwrdm->state_counter[state]++;
-+		pwrdm->state_counter[PWRDM_POWER_OFF]++;
-+	}
-+	pwrdm->state = state;
-+
-+	return 0;
-+}
-+
-+void pwrdms_save_context(void)
-+{
-+	pwrdm_for_each(pwrdm_save_context, NULL);
-+}
-+
-+void pwrdms_restore_context(void)
-+{
-+	pwrdm_for_each(pwrdm_restore_context, NULL);
-+}
-+
-+void pwrdms_lost_power(void)
-+{
-+	pwrdm_for_each(pwrdm_lost_power, NULL);
-+}
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 28a796c..9a907fb 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -144,6 +144,7 @@ struct powerdomain {
- 	s64 timer;
- 	s64 state_timer[PWRDM_MAX_PWRSTS];
- #endif
-+	u32 context;
- };
- 
- /**
-@@ -198,6 +199,8 @@ struct pwrdm_ops {
- 	int	(*pwrdm_set_lowpwrstchange)(struct powerdomain *pwrdm);
- 	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
- 	int	(*pwrdm_has_voltdm)(void);
-+	void	(*pwrdm_save_context)(struct powerdomain *pwrdm);
-+	void	(*pwrdm_restore_context)(struct powerdomain *pwrdm);
- };
- 
- int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
-@@ -273,4 +276,8 @@ u8 pwrdm_get_valid_lp_state(struct powerdomain *pwrdm,
- extern void pwrdm_lock(struct powerdomain *pwrdm);
- extern void pwrdm_unlock(struct powerdomain *pwrdm);
- 
-+extern void pwrdms_save_context(void);
-+extern void pwrdms_restore_context(void);
-+
-+extern void pwrdms_lost_power(void);
- #endif
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-index ebaf80d..d514166 100644
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -342,6 +342,35 @@ static void am33xx_prm_global_warm_sw_reset(void)
- 				  AM33XX_PRM_RSTCTRL_OFFSET);
- }
- 
-+static void am33xx_pwrdm_save_context(struct powerdomain *pwrdm)
-+{
-+	pwrdm->context = am33xx_prm_read_reg(pwrdm->prcm_offs,
-+						pwrdm->pwrstctrl_offs);
-+	/*
-+	 * Do not save LOWPOWERSTATECHANGE, writing a 1 indicates a request,
-+	 * reading back a 1 indicates a request in progress.
-+	 */
-+	pwrdm->context &= ~AM33XX_LOWPOWERSTATECHANGE_MASK;
-+}
-+
-+static void am33xx_pwrdm_restore_context(struct powerdomain *pwrdm)
-+{
-+	int st, ctrl;
-+
-+	st = am33xx_prm_read_reg(pwrdm->prcm_offs,
-+				 pwrdm->pwrstst_offs);
-+
-+	am33xx_prm_write_reg(pwrdm->context, pwrdm->prcm_offs,
-+			     pwrdm->pwrstctrl_offs);
-+
-+	/* Make sure we only wait for a transition if there is one */
-+	st &= OMAP_POWERSTATEST_MASK;
-+	ctrl = OMAP_POWERSTATEST_MASK & pwrdm->context;
-+
-+	if (st != ctrl)
-+		am33xx_pwrdm_wait_transition(pwrdm);
-+}
-+
- struct pwrdm_ops am33xx_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst		= am33xx_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst		= am33xx_pwrdm_read_next_pwrst,
-@@ -357,6 +386,8 @@ struct pwrdm_ops am33xx_pwrdm_operations = {
- 	.pwrdm_set_mem_retst		= am33xx_pwrdm_set_mem_retst,
- 	.pwrdm_wait_transition		= am33xx_pwrdm_wait_transition,
- 	.pwrdm_has_voltdm		= am33xx_check_vcvp,
-+	.pwrdm_save_context		= am33xx_pwrdm_save_context,
-+	.pwrdm_restore_context		= am33xx_pwrdm_restore_context,
- };
- 
- static struct prm_ll_data am33xx_prm_ll_data = {
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index acb9593..47b657c 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -667,6 +667,54 @@ static int omap4_check_vcvp(void)
- 	return 0;
- }
- 
-+/**
-+ * omap4_pwrdm_save_context - Saves the powerdomain state
-+ * @pwrdm: pointer to individual powerdomain
-+ *
-+ * The function saves the powerdomain state control information.
-+ * This is needed in rtc+ddr modes where we lose powerdomain context.
-+ */
-+static void omap4_pwrdm_save_context(struct powerdomain *pwrdm)
-+{
-+	pwrdm->context = omap4_prminst_read_inst_reg(pwrdm->prcm_partition,
-+						     pwrdm->prcm_offs,
-+						     pwrdm->pwrstctrl_offs);
-+
-+	/*
-+	 * Do not save LOWPOWERSTATECHANGE, writing a 1 indicates a request,
-+	 * reading back a 1 indicates a request in progress.
-+	 */
-+	pwrdm->context &= ~OMAP4430_LOWPOWERSTATECHANGE_MASK;
++	for (i = 0; i < ARRAY_SIZE(am33xx_control_reg_offsets); i++)
++		am33xx_control_vals[i] =
++			omap_ctrl_readl(am33xx_control_reg_offsets[i]);
 +}
 +
 +/**
-+ * omap4_pwrdm_restore_context - Restores the powerdomain state
-+ * @pwrdm: pointer to individual powerdomain
++ * am33xx_control_restore_context - Restore the wakeup domain registers
 + *
-+ * The function restores the powerdomain state control information.
-+ * This is needed in rtc+ddr modes where we lose powerdomain context.
++ * Restore the wkup domain registers
 + */
-+static void omap4_pwrdm_restore_context(struct powerdomain *pwrdm)
++void am33xx_control_restore_context(void)
 +{
-+	int st, ctrl;
++	int i;
 +
-+	st = omap4_prminst_read_inst_reg(pwrdm->prcm_partition,
-+					 pwrdm->prcm_offs,
-+					 pwrdm->pwrstctrl_offs);
-+
-+	omap4_prminst_write_inst_reg(pwrdm->context,
-+				     pwrdm->prcm_partition,
-+				     pwrdm->prcm_offs,
-+				     pwrdm->pwrstctrl_offs);
-+
-+	/* Make sure we only wait for a transition if there is one */
-+	st &= OMAP_POWERSTATEST_MASK;
-+	ctrl = OMAP_POWERSTATEST_MASK & pwrdm->context;
-+
-+	if (st != ctrl)
-+		omap4_pwrdm_wait_transition(pwrdm);
++	for (i = 0; i < ARRAY_SIZE(am33xx_control_reg_offsets); i++)
++		omap_ctrl_writel(am33xx_control_vals[i],
++				 am33xx_control_reg_offsets[i]);
 +}
++#endif /* CONFIG_SOC_AM33XX && CONFIG_PM */
 +
- struct pwrdm_ops omap4_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
-@@ -685,6 +733,8 @@ struct pwrdm_ops omap4_pwrdm_operations = {
- 	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
- 	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
- 	.pwrdm_has_voltdm	= omap4_check_vcvp,
-+	.pwrdm_save_context	= omap4_pwrdm_save_context,
-+	.pwrdm_restore_context	= omap4_pwrdm_restore_context,
- };
+ struct control_init_data {
+ 	int index;
+ 	void __iomem *mem;
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index ec406bc..4c50199 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -409,6 +409,56 @@
+ #define AM33XX_DEV_FEATURE		0x604
+ #define AM33XX_SGX_MASK			BIT(29)
  
- static int omap44xx_prm_late_init(void);
++/* Additional AM33XX CONTROL registers */
++#define AM33XX_CONTROL_SYSCONFIG_OFFSET			0x0010
++#define AM33XX_CONTROL_STATUS_OFFSET			0x0040
++#define AM33XX_CONTROL_CORTEX_VBBLDO_CTRL_OFFSET	0x041c
++#define AM33XX_CONTROL_CORE_SLDO_CTRL_OFFSET		0x0428
++#define AM33XX_CONTROL_MPU_SLDO_CTRL_OFFSET		0x042c
++#define AM33XX_CONTROL_CLK32KDIVRATIO_CTRL_OFFSET	0x0444
++#define AM33XX_CONTROL_BANDGAP_CTRL_OFFSET		0x0448
++#define AM33XX_CONTROL_BANDGAP_TRIM_OFFSET		0x044c
++#define AM33XX_CONTROL_PLL_CLKINPULOW_CTRL_OFFSET	0x0458
++#define AM33XX_CONTROL_MOSC_CTRL_OFFSET			0x0468
++#define AM33XX_CONTROL_RCOSC_CTRL_OFFSET		0x046c
++#define AM33XX_CONTROL_DEEPSLEEP_CTRL_OFFSET		0x0470
++#define AM33XX_CONTROL_INIT_PRIORITY_0_OFFSET		0x0608
++#define AM33XX_CONTROL_INIT_PRIORITY_1_OFFSET		0x060c
++#define AM33XX_CONTROL_MMU_CFG_OFFSET			0x0610
++#define AM33XX_CONTROL_TPTC_CFG_OFFSET			0x0614
++#define AM33XX_CONTROL_USB_CTRL0_OFFSET			0x0620
++#define AM33XX_CONTROL_USB_CTRL1_OFFSET			0x0628
++#define AM33XX_CONTROL_USB_WKUP_CTRL_OFFSET		0x0648
++#define AM33XX_CONTROL_MREQPRIO_0_OFFSET		0x0670
++#define AM33XX_CONTROL_MREQPRIO_1_OFFSET		0x0674
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP1_OFFSET		0x0690
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP2_OFFSET		0x0694
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP3_OFFSET		0x0698
++#define AM33XX_CONTROL_HW_EVENT_SEL_GRP4_OFFSET		0x069c
++#define AM33XX_CONTROL_SMRT_CTRL_OFFSET			0x06a0
++#define AM33XX_CONTROL_MPUSS_HW_DEBUG_SEL_OFFSET	0x06a4
++#define AM33XX_CONTROL_VREF_CTRL_OFFSET			0x0e14
++#define AM33XX_CONTROL_TPCC_EVT_MUX_0_3_OFFSET		0x0f90
++#define AM33XX_CONTROL_TPCC_EVT_MUX_4_7_OFFSET		0x0f94
++#define AM33XX_CONTROL_TPCC_EVT_MUX_8_11_OFFSET		0x0f98
++#define AM33XX_CONTROL_TPCC_EVT_MUX_12_15_OFFSET	0x0f9c
++#define AM33XX_CONTROL_TPCC_EVT_MUX_16_19_OFFSET	0x0fa0
++#define AM33XX_CONTROL_TPCC_EVT_MUX_20_23_OFFSET	0x0fa4
++#define AM33XX_CONTROL_TPCC_EVT_MUX_24_27_OFFSET	0x0fa8
++#define AM33XX_CONTROL_TPCC_EVT_MUX_28_31_OFFSET	0x0fac
++#define AM33XX_CONTROL_TPCC_EVT_MUX_32_35_OFFSET	0x0fb0
++#define AM33XX_CONTROL_TPCC_EVT_MUX_36_39_OFFSET	0x0fb4
++#define AM33XX_CONTROL_TPCC_EVT_MUX_40_43_OFFSET	0x0fb8
++#define AM33XX_CONTROL_TPCC_EVT_MUX_44_47_OFFSET	0x0fbc
++#define AM33XX_CONTROL_TPCC_EVT_MUX_48_51_OFFSET	0x0fc0
++#define AM33XX_CONTROL_TPCC_EVT_MUX_52_55_OFFSET	0x0fc4
++#define AM33XX_CONTROL_TPCC_EVT_MUX_56_59_OFFSET	0x0fc8
++#define AM33XX_CONTROL_TPCC_EVT_MUX_60_63_OFFSET	0x0fcc
++#define AM33XX_CONTROL_TIMER_EVT_CAPT_OFFSET		0x0fd0
++#define AM33XX_CONTROL_ECAP_EVT_CAPT_OFFSET		0x0fd4
++#define AM33XX_CONTROL_ADC_EVT_CAPT_OFFSET		0x0fd8
++#define AM33XX_CONTROL_RESET_ISO_OFFSET			0x1000
++
+ /* CONTROL OMAP STATUS register to identify OMAP3 features */
+ #define OMAP3_CONTROL_OMAP_STATUS	0x044c
+ 
+@@ -467,6 +517,8 @@
+ int omap2_control_base_init(void);
+ int omap_control_init(void);
+ void omap2_set_globals_control(void __iomem *ctrl);
++extern void am33xx_control_save_context(void);
++extern void am33xx_control_restore_context(void);
+ void __init omap3_control_legacy_iomap_init(void);
+ #else
+ #define omap_ctrl_readb(x)		0
 -- 
 1.9.1
