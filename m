@@ -1,28 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 Apr 2018 11:06:39 +0200
-Subject: [PATCH v7 7/9] gpio: Add gpio driver for Actions OWL S900 SoC
-In-Reply-To: <20180404172258.7678-8-manivannan.sadhasivam@linaro.org>
+Date: Thu, 12 Apr 2018 11:08:11 +0200
+Subject: [PATCH v7 8/9] MAINTAINERS: Add reviewer for ACTIONS platforms
+In-Reply-To: <20180404172258.7678-9-manivannan.sadhasivam@linaro.org>
 References: <20180404172258.7678-1-manivannan.sadhasivam@linaro.org>
- <20180404172258.7678-8-manivannan.sadhasivam@linaro.org>
-Message-ID: <CACRpkdaP68mn6GP5fg8eJMDswAiKRrBF5aLj+coGQraPsS-RMA@mail.gmail.com>
+ <20180404172258.7678-9-manivannan.sadhasivam@linaro.org>
+Message-ID: <CACRpkdZLqqwZpcm7WD-RxdO3uyf8rnNHSyqpQaSPgps06xh_hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Apr 4, 2018 at 7:22 PM, Manivannan Sadhasivam
 <manivannan.sadhasivam@linaro.org> wrote:
 
-> Add gpio driver for Actions Semi OWL family S900 SoC. Set of registers
-> controlling the gpio shares the same register range with pinctrl block.
->
-> GPIO registers are organized as 6 banks and each bank controls the
-> maximum of 32 gpios.
+> Since I'll be working on improving support for ACTIONS platforms, adding
+> myself as the reviewer.
 >
 > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 
-Patch applied for v4.18.
+Andreas: are you funneling patches to ARM SoC for the
+Actions stuff? Or who is?
 
-Again: excellent work.
+This should go in through the ARM SoC tree anyways,
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Tell me if things get stuck and I'll apply it to the GPIO tree...
 
 Yours,
 Linus Walleij
