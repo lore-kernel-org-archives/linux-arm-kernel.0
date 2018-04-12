@@ -1,71 +1,89 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 12 Apr 2018 13:14:28 +0200
-Subject: [PATCH v7 23/26] drivers: firmware: psci: Try to attach CPU devices
- to their PM domains
+Date: Thu, 12 Apr 2018 13:14:20 +0200
+Subject: [PATCH v7 15/26] drivers: firmware: psci: Split
+ psci_dt_cpu_init_idle()
 In-Reply-To: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
 References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1523531671-27491-24-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1523531671-27491-16-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the OS initiated CPU suspend mode have been enabled, the PM domain
-topology for CPUs have earlier been created by PSCI. Let's use this
-information in psci_dt_cpu_init_idle() as a condition for when it makes
-sense to try to attach the CPU to its corresponding PM domain, via calling
-of_genpd_attach_cpu().
-
-If the CPU is attached successfully to its PM domain, idle management is
-now fully prepared to be controlled through runtime PM for the CPU.
+Let's split psci_dt_cpu_init_idle() function into two functions, as to
+allow following changes to re-use some of the code.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
 Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/firmware/psci/psci.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/firmware/psci/psci.c | 42 +++++++++++++++++++++++-------------------
+ 1 file changed, 23 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index 80c286d..700e0e9 100644
+index c80ec1d..9788bfc 100644
 --- a/drivers/firmware/psci/psci.c
 +++ b/drivers/firmware/psci/psci.c
-@@ -20,6 +20,7 @@
- #include <linux/linkage.h>
- #include <linux/of.h>
- #include <linux/pm.h>
-+#include <linux/pm_domain.h>
- #include <linux/printk.h>
- #include <linux/psci.h>
- #include <linux/reboot.h>
-@@ -91,6 +92,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
+@@ -270,9 +270,26 @@ static int __init psci_features(u32 psci_func_id)
+ #ifdef CONFIG_CPU_IDLE
+ static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
  
- static DEFINE_PER_CPU(u32, domain_state);
- static u32 psci_cpu_suspend_feature;
-+static bool psci_osi_mode_enabled;
- 
- u32 psci_get_domain_state(void)
- {
-@@ -339,6 +341,14 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- 
- 	/* Idle states parsed correctly, initialize per-cpu pointer */
- 	per_cpu(psci_power_state, cpu) = psci_states;
++static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
++{
++	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
 +
-+	/* If running OSI mode, attach the CPU device to its PM domain. */
-+	if (psci_osi_mode_enabled) {
-+		ret = of_genpd_attach_cpu(cpu);
-+		if (ret)
-+			goto free_mem;
++	if (err) {
++		pr_warn("%pOF missing arm,psci-suspend-param property\n", np);
++		return err;
 +	}
 +
- 	return 0;
++	if (!psci_power_state_is_valid(*state)) {
++		pr_warn("Invalid PSCI power state %#x\n", *state);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ {
+-	int i, ret, count = 0;
++	int i, ret = 0, count = 0;
+ 	u32 *psci_states;
+ 	struct device_node *state_node;
  
- free_mem:
-@@ -753,6 +763,7 @@ int __init psci_dt_topology_init(void)
- 		goto out;
+@@ -291,29 +308,16 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ 		return -ENOMEM;
+ 
+ 	for (i = 0; i < count; i++) {
+-		u32 state;
+-
+ 		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++		ret = psci_dt_parse_state_node(state_node, &psci_states[i]);
++		of_node_put(state_node);
+ 
+-		ret = of_property_read_u32(state_node,
+-					   "arm,psci-suspend-param",
+-					   &state);
+-		if (ret) {
+-			pr_warn(" * %pOF missing arm,psci-suspend-param property\n",
+-				state_node);
+-			of_node_put(state_node);
++		if (ret)
+ 			goto free_mem;
+-		}
+ 
+-		of_node_put(state_node);
+-		pr_debug("psci-power-state %#x index %d\n", state, i);
+-		if (!psci_power_state_is_valid(state)) {
+-			pr_warn("Invalid PSCI power state %#x\n", state);
+-			ret = -EINVAL;
+-			goto free_mem;
+-		}
+-		psci_states[i] = state;
++		pr_debug("psci-power-state %#x index %d\n", psci_states[i], i);
  	}
- 
-+	psci_osi_mode_enabled = true;
- 	pr_info("OSI mode enabled.\n");
- out:
- 	of_node_put(np);
++
+ 	/* Idle states parsed correctly, initialize per-cpu pointer */
+ 	per_cpu(psci_power_state, cpu) = psci_states;
+ 	return 0;
 -- 
 2.7.4
