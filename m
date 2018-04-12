@@ -1,73 +1,85 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 12 Apr 2018 23:11:08 +0800
-Subject: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow getting syscon regmap
- from device
-In-Reply-To: <20180412145628.iaaeue2imiijwx5d@flea>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 Apr 2018 23:23:30 +0800
+Subject: [linux-sunxi] Re: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow
+ getting syscon regmap from device
+In-Reply-To: <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
 References: <20180411141641.14675-1-icenowy@aosc.io>
  <20180411141641.14675-4-icenowy@aosc.io>
  <20180412145628.iaaeue2imiijwx5d@flea>
-Message-ID: <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
+ <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
+Message-ID: <CAGb2v66Qi2D1qgF3-iVJFAiznMUzzen0nHM5vsPe7Cyi6QTYpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2018?4?12? GMT+08:00 ??10:56:28, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
->> From: Chen-Yu Tsai <wens@csie.org>
->> 
->> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
->> address space; on the A64 SoC this register is in the SRAM controller
->> address space, and with a different offset.
->> 
->> To access the register from another device and hide the internal
->> difference between the device, let it register a regmap named
->> "emac-clock". We can then get the device from the phandle, and
->> retrieve the regmap with dev_get_regmap(); in this situation the
->> regmap_field will be set up to access the only register in the
->regmap.
->> 
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> [Icenowy: change to use regmaps with single register, change commit
->>  message]
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48
->++++++++++++++++++++++-
->>  1 file changed, 46 insertions(+), 2 deletions(-)
->> 
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> index 1037f6c78bca..b61210c0d415 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
->>  	.msb = 31,
->>  };
->>  
->> +/* Specially exported regmap which contains only EMAC register */
->> +const struct reg_field single_reg_field = {
->> +	.reg = 0,
->> +	.lsb = 0,
->> +	.msb = 31,
->> +};
->> +
+On Thu, Apr 12, 2018 at 11:11 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
 >
->I'm not sure this would be wise. If we ever need some other register
->exported through the regmap, will have to change all the calling sites
->everywhere in the kernel, which will be a pain and will break
->bisectability.
-
-In this situation the register can be exported as another
- regmap. Currently the code will access a regmap with name
-"emac-clock" for this register.
-
 >
->Chen-Yu's (or was it yours?) initial solution with a custom writeable
->hook only allowing a single register seemed like a better one.
-
-But I remember you mentioned that you want it to hide the
-difference inside the device.
-
+> ? 2018?4?12? GMT+08:00 ??10:56:28, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>>On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
+>>> From: Chen-Yu Tsai <wens@csie.org>
+>>>
+>>> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
+>>> address space; on the A64 SoC this register is in the SRAM controller
+>>> address space, and with a different offset.
+>>>
+>>> To access the register from another device and hide the internal
+>>> difference between the device, let it register a regmap named
+>>> "emac-clock". We can then get the device from the phandle, and
+>>> retrieve the regmap with dev_get_regmap(); in this situation the
+>>> regmap_field will be set up to access the only register in the
+>>regmap.
+>>>
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> [Icenowy: change to use regmaps with single register, change commit
+>>>  message]
+>>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> ---
+>>>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48
+>>++++++++++++++++++++++-
+>>>  1 file changed, 46 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+>>b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+>>> index 1037f6c78bca..b61210c0d415 100644
+>>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+>>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+>>> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
+>>>      .msb = 31,
+>>>  };
+>>>
+>>> +/* Specially exported regmap which contains only EMAC register */
+>>> +const struct reg_field single_reg_field = {
+>>> +    .reg = 0,
+>>> +    .lsb = 0,
+>>> +    .msb = 31,
+>>> +};
+>>> +
+>>
+>>I'm not sure this would be wise. If we ever need some other register
+>>exported through the regmap, will have to change all the calling sites
+>>everywhere in the kernel, which will be a pain and will break
+>>bisectability.
 >
->Maxime
+> In this situation the register can be exported as another
+>  regmap. Currently the code will access a regmap with name
+> "emac-clock" for this register.
+>
+>>
+>>Chen-Yu's (or was it yours?) initial solution with a custom writeable
+>>hook only allowing a single register seemed like a better one.
+>
+> But I remember you mentioned that you want it to hide the
+> difference inside the device.
+
+Hi,
+
+The idea is that a device can export multiple regmaps. This one,
+the one named "gmac" (in my soon to come v2) or "emac-clock" here,
+is but one of many possible regmaps, and it only exports the register
+needed by the GMAC/EMAC. IMHO it is highly unlikely the same piece of
+hardware would need a second register from the same device. A more
+likely situation would be it needs another register from a different
+device, like on the H6 where the "internal PHY" is not so internal
+from a system bus point of view.
+
+ChenYu
