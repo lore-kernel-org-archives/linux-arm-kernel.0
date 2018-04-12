@@ -1,81 +1,76 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Apr 2018 13:19:49 +0100
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <20180412110314.GA28070@altlinux.org>
-References: <20180409152253.GD10489@altlinux.org>
- <20180412013435.GA21219@altlinux.org>
- <20180412095811.GC16141@n2100.armlinux.org.uk>
- <20180412110314.GA28070@altlinux.org>
-Message-ID: <20180412121949.GD16141@n2100.armlinux.org.uk>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 12 Apr 2018 17:50:52 +0530
+Subject: [PATCH v7 3/9] pinctrl: actions: Add Actions S900 pinctrl driver
+In-Reply-To: <94aceb15-63a5-44a3-d0bc-f56adebc27d5@suse.de>
+References: <20180404172258.7678-1-manivannan.sadhasivam@linaro.org>
+ <20180404172258.7678-4-manivannan.sadhasivam@linaro.org>
+ <CACRpkdZPOSDenSORGVLPuJKPP_iE97mZLXHJLcF2kH5wKPw=tg@mail.gmail.com>
+ <94aceb15-63a5-44a3-d0bc-f56adebc27d5@suse.de>
+Message-ID: <20180412122052.wohzjmj27c3hi3vp@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 02:03:14PM +0300, Dmitry V. Levin wrote:
-> On Thu, Apr 12, 2018 at 10:58:11AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Apr 12, 2018 at 04:34:35AM +0300, Dmitry V. Levin wrote:
-> > > A similar commit v4.16-rc1~159^2~37
-> > > ("signal/arm: Document conflicts with SI_USER and SIGFPE") must have
-> > > introduced a similar ABI regression to compat arm.
+Hi Andreas,
+
+On Thu, Apr 12, 2018 at 02:10:28PM +0200, Andreas F?rber wrote:
+> Am 12.04.2018 um 11:04 schrieb Linus Walleij:
+> > On Wed, Apr 4, 2018 at 7:22 PM, Manivannan Sadhasivam
+> > <manivannan.sadhasivam@linaro.org> wrote:
 > > 
-> > So, could you explain how can this change cause a regression?
+> >> Add pinctrl driver for Actions Semi S900 SoC. The driver supports
+> >> pinctrl, pinmux and pinconf functionalities through a range of registers
+> >> common to both gpio driver and pinctrl driver.
+> >>
+> >> Pinmux functionality is available only for the pin groups while the
+> >> pinconf functionality is available for both pin groups and individual
+> >> pins.
+> >>
+> >> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > > 
-> > +#define FPE_FIXME      0
-> > -               vfp_raise_sigfpe(0, regs);
-> > +               vfp_raise_sigfpe(FPE_FIXME, regs);
+> > Patch applied for v4.18
+> > 
+> > GOOD WORK!
+> > 
+> > We really need to get this in so that Andreas can work on S500
+> > patches with this as a base.
 > 
-> No, this hunk hasn't caused the regression, but another one did:
+> No, I refused to do that. If his patches get merged, Mani offered that
+> he will take care of rebasing/rewriting S500 part.
+>
+
+Yes, if you don't have time then I can take this. Since you have already
+sorted out the pin definitions, it will be much easier.
+ 
+> > 
+> > If any review comments still remain they can surely be addressed
+> > with incremental improvement patches.
 > 
-> diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
-> new file mode 100644
-> index 0000000..d051388
-> --- /dev/null
-> +++ b/arch/arm/include/uapi/asm/siginfo.h
-> @@ -0,0 +1,13 @@
-> +#ifndef __ASM_SIGINFO_H
-> +#define __ASM_SIGINFO_H
-> +
-> +#include <asm-generic/siginfo.h>
-> +
-> +/*
-> + * SIGFPE si_codes
-> + */
-> +#ifdef __KERNEL__
-> +#define FPE_FIXME      0       /* Broken dup of SI_USER */
-> +#endif /* __KERNEL__ */
-> +
-> +#endif
+> My biggest problem was/is that Mani designed his structs totally
+> different from mine, with no explanation why or how they correlate.
 > 
-> This is due to FPE_FIXME handling in kernel/signal.c
 
-Building strace 4.22 on ARM and running the test suite reveals no
-problems with the signal_receive test, tested on both 4.14 and 4.16
-kernels - there's no "KERNEL BUG" reports in any of the test results.
-However, stock strace 4.22 source doesn't appear to contain the
-"KERNEL BUG" string anywhere, so this may be a Suse specific addition
-to the test:
+Agree. But we both worked orthogonally and please let me know if you
+find anything wrong with my approach.
 
-~/src/strace-4.22$ grep -ri 'KERNEL BUG' .
-./strace.1:Arguably, every instance of such behavior is a kernel bug.)
-./strace.1.in:Arguably, every instance of such behavior is a kernel bug.)
-./NEWS:  * Worked around a kernel bug in tracing privileged executables.
-./ChangeLog:    aarch64: workaround gcc+kernel bug.
-./ChangeLog:    tests: workaround kernel bugs in seccomp-strict.test and prctl-seccomp-strict.test
-./ChangeLog:    instead.  We don't want the testsuite failing due to kernel bugs.
-./ChangeLog:    First guess is that it's a workaround for old kernel bugs:
-./ChangeLog:    This kernel bug is fixed long ago. This change removes the workaround.
+> Also I had protested against him defining fake pins for the drive
+> strength. Since I did not have time to review the newer patches yet,
+> please make sure that this is addressed _before_ merging. Changing the
+> binding after the fact is a problem!
+> 
 
-Any ideas where the "KERNEL BUG" in Suse builds is coming from?  Any
-ideas how to test it on other architectures (iow, where can we get
-source that contains this test?)
+What do you mean by fake pins for drive strength? All the pins are named
+after the group name given in the datasheet. And I have already mentioned
+in the binding that we can only do group access for these pins. There is
+_no_way_ you can individually configure drive strength for the pins, if you
+do then the entire group will get configured, does this makes sense?
 
-Based on previous experience, unfortunately folk don't tend to report
-user ABI regressions to kernel developers, so we'd probably never know
-that there's a problem - I do think the safer thing would've been to
-leave it well alone, and just accept that we'll end up copying more
-words to userspace than is actually intended.
+Thanks,
+Mani 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> Regards,
+> Andreas
+> 
+> -- 
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N?rnberg)
