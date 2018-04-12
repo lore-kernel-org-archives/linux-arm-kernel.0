@@ -1,79 +1,64 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 12 Apr 2018 17:14:48 +0100
-Subject: [PATCH v11 0/4] set VSESR_EL2 by user space and support
- NOTIFY_SEI notification
-In-Reply-To: <5161fb31-e5bb-872c-3e12-d7d38326aaca@huawei.com>
-References: <1523309796-36423-1-git-send-email-gengdongjiu@huawei.com>
- <d94439b6-9b9a-9bd0-ddec-3bb63ede9461@arm.com>
- <5161fb31-e5bb-872c-3e12-d7d38326aaca@huawei.com>
-Message-ID: <eb65baf4-abb0-570f-f3af-61f505c9de10@arm.com>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Thu, 12 Apr 2018 10:44:10 -0600
+Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
+ sram code
+In-Reply-To: <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
+References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
+ <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
-
-On 12/04/18 07:09, gengdongjiu wrote:
-> On 2018/4/10 22:15, James Morse wrote:
->> On 09/04/18 22:36, Dongjiu Geng wrote:
->>> 1. Detect whether KVM can set set guest SError syndrome
->>> 2. Support to Set VSESR_EL2 and inject SError by user space.
->>> 3. Support live migration to keep SError pending state and VSESR_EL2 value.
->>> 4. ACPI 6.1 adds support for NOTIFY_SEI as a GHES notification mechanism, so support this
->>>    notification in software, KVM or kernel ARCH code call handle_guest_sei() to let ACP driver
->>>    to handle this notification.
->>
->> Please don't post code during the merge-window, will this apply to v4.17-rc1? We
->> can't know until its tagged.
-
-Posting code during the merge-window isn't helpful as the kernel is a moving
-target, its better to wait for an 'rc' to base it on.
-
-> I do not know when it is merge-window. About the apply version, it does not have limited.
-
-'git fetch' Linus' tree and look at the tags. 'v4.16' lost its '-rc' suffixes,
-and there isn't a 'v4.17-rc1' yet, so we are still in the merge window.
-
-Linus sends a message to LKML. eg:
-https://lkml.org/lkml/2018/4/1/175
-
-net-next closes shortly before the merge window, and re-opens afterwards. There
-is a handy web page:
-http://vger.kernel.org/~davem/net-next.html
-
-
->> This series is doing two separate things, please split it into two series.
-> OK, thanks!
+On 4/11/18 9:53 PM, Keerthy wrote:
+> From: Dave Gerlach <d-gerlach@ti.com>
 > 
->>
->> But on the ACPI front: I don't see how any OS can support your NOTIFY_SEI when
->> firmware is ignoring the normal world's PSTATE.A.
->>
->> The latest lobe of that discussion was on the list here:
->> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1611496.html
-> I have replied the mail.
-> I still have some questions that need to clarify with you.
-> After clarification, we will follow that.
-> The question is in the reply of this mail "https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1611496.html"
+> After an RTC+DDR cycle we lose sram context so emif pm functions present
+> in sram are lost. We can check if the first byte of the original
+> code in DDR contains the same first byte as the code in sram, and if
+> they do not match we know we have lost context and must recopy the
+> functions to the previous address to maintain PM functionality.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+>   drivers/memory/ti-emif-pm.c | 24 ++++++++++++++++++++++++
+>   1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/memory/ti-emif-pm.c b/drivers/memory/ti-emif-pm.c
+> index 632651f..ec4a62c 100644
+> --- a/drivers/memory/ti-emif-pm.c
+> +++ b/drivers/memory/ti-emif-pm.c
+> @@ -249,6 +249,25 @@ int ti_emif_get_mem_type(void)
+>   };
+>   MODULE_DEVICE_TABLE(of, ti_emif_of_match);
+>   
+> +#ifdef CONFIG_PM_SLEEP
+> +static int ti_emif_resume(struct device *dev)
+> +{
+> +	unsigned long tmp =
+> +			__raw_readl((void *)emif_instance->ti_emif_sram_virt);
+> +
+> +	/*
+> +	 * Check to see if what we are copying is already present in the
+> +	 * first byte at the destination, only copy if it is not which
+> +	 * indicates we have lost context and sram no longer contains
+> +	 * the PM code
+> +	 */
 
-Lets keep that discussion on v9 then.
+> +	if (tmp != ti_emif_sram)
+> +		ti_emif_push_sram(dev, emif_instance);
+> +
+> +	return 0;
+> +}
+> +#endif /* CONFIG_PM_SLEEP */
+Instead of this indirect method , why can't just check the previous
+deep sleep mode and based on that do copy or not. EMIF power status
+register should have something like that ?
 
+Another minor point is even though there is nothing to do in suspend,
+might be good to have a callback with comment that nothing to do with
+some explanation why not. Don't have strong preference but may for
+better readability.
 
->> As it is, we would need to spot SError being delivered while SError is masked,
->> spray nasty messages about firmware being horrifically buggy, then panic(). For
->> a corrected error, this looks bad, but its preferable to letting firmware
->> silently overwrite the exception registers, causing linux to spin through the
->> vectors 'eret' with all exceptions masked.
->> I still think its best to wait for firmware that does the right thing.
-
-> Let us  discuss that in another mail.
-> In a summary, I think firmware follow below rule can be OK, right?
-> 1. The exception came from the EL that SError should be routed to(according to hcr_EL2.{AMO, TGE}),but PSTATE.A was set, EL3 firmware can't deliver SError;
-
-> 2. The exception came from the EL that SError should not be routed to(according to hcr_EL2.{AMO, TGE}),even though the PSTATE.A was set,EL3 firmware still deliver SError
-
-Problem here, more on v9.
-
-
-Thanks,
-
-James
+Regards,
+Santosh
