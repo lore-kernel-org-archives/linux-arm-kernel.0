@@ -1,48 +1,83 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Apr 2018 10:58:11 +0100
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <20180412013435.GA21219@altlinux.org>
-References: <20180409152253.GD10489@altlinux.org>
- <20180412013435.GA21219@altlinux.org>
-Message-ID: <20180412095811.GC16141@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 12 Apr 2018 11:17:24 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: Set GBPA to abort all transactions
+In-Reply-To: <438a6180-fca8-d3a1-985f-e595529911f3@arm.com>
+References: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
+ <3350f0eb84c8c621cf43aa06ed117cfb@www.loen.fr>
+ <3772fb2d-01b7-4820-6d13-a0263654dabc@codeaurora.org>
+ <438a6180-fca8-d3a1-985f-e595529911f3@arm.com>
+Message-ID: <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 04:34:35AM +0300, Dmitry V. Levin wrote:
-> A similar commit v4.16-rc1~159^2~37
-> ("signal/arm: Document conflicts with SI_USER and SIGFPE") must have
-> introduced a similar ABI regression to compat arm.
+On 11/04/18 17:54, Marc Zyngier wrote:
+> Hi Sammer,
+> 
+> On 11/04/18 16:58, Goel, Sameer wrote:
+>>
+>>
+>> On 3/28/2018 9:00 AM, Marc Zyngier wrote:
+>>> On 2018-03-28 15:39, Timur Tabi wrote:
+>>>> From: Sameer Goel <sgoel@codeaurora.org>
+>>>>
+>>>> Set SMMU_GBPA to abort all incoming translations during the SMMU reset
+>>>> when SMMUEN==0.
+>>>>
+>>>> This prevents a race condition where a stray DMA from the crashed primary
+>>>> kernel can try to access an IOVA address as an invalid PA when SMMU is
+>>>> disabled during reset in the crash kernel.
+>>>>
+>>>> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
+>>>> ---
+>>>>  ?drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
+>>>>  ?1 file changed, 12 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>>>> index 3f2f1fc68b52..c04a89310c59 100644
+>>>> --- a/drivers/iommu/arm-smmu-v3.c
+>>>> +++ b/drivers/iommu/arm-smmu-v3.c
+>>>> @@ -2458,6 +2458,18 @@ static int arm_smmu_device_reset(struct
+>>>> arm_smmu_device *smmu, bool bypass)
+>>>>  ???? if (reg & CR0_SMMUEN)
+>>>>  ???????? dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
+>>>>
+>>>> +??? /*
+>>>> +???? * Abort all incoming translations. This can happen in a kdump case
+>>>> +???? * where SMMU is initialized when a prior DMA is pending. Just
+>>>> +???? * disabling the SMMU in this case might result in writes to invalid
+>>>> +???? * PAs.
+>>>> +???? */
+>>>> +??? ret = arm_smmu_update_gbpa(smmu, 1, GBPA_ABORT);
+>>>> +??? if (ret) {
+>>>> +??????? dev_err(smmu->dev, "GBPA not responding to update\n");
+>>>> +??????? return ret;
+>>>> +??? }
+>>>> +
+>>>>  ???? ret = arm_smmu_device_disable(smmu);
+>>>>  ???? if (ret)
+>>>>  ???????? return ret;
+>>>
+>>> A tangential question: can we reliably detect that the SMMU already
+>>> has valid mappings, which would indicate that we're in a pretty bad
+>>> shape already by the time we set that bit? For all we know, memory
+>>> could have been corrupted long before we hit this point, and this
+>>> patch barely narrows the window of opportunity.
+>>
+>> :) Yes that is correct. This only covers the kdump scenario. Trying
+>> to get some reliability when booting up the crash kernel. The system
+>> is already in a bad state. I don't think that this will happen in a
+>> normal scenario. But please point me to the GICv3 change and I'll
+>> have a look.
+> 
+> See this:
+> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/irqchip-4.17&id=6eb486b66a3094cdcd68dc39c9df3a29d6a51dd5#n3407
 
-So, could you explain how can this change cause a regression?
+The nearest equivalent to that is probably the top-level SMMUEN check 
+that we already have (see the diff context above). To go beyond that 
+you'd have to chase the old stream table pointer and scan the whole 
+thing looking for valid contexts, then potentially walk page tables 
+within those contexts to check for live translations if you really 
+wanted to be sure. That would be a hell of a lot of work to do in the 
+boot path.
 
-+#define FPE_FIXME      0
--               vfp_raise_sigfpe(0, regs);
-+               vfp_raise_sigfpe(FPE_FIXME, regs);
-
-I think you're talking garbage here - look at the damned change.
-It subsitutes a definition for a constant, and vfp_raise_sigfpe()
-ends up receiving exactly the same value bother before and after
-the change.
-
-The change is rather incomplete though because it should have
-also changed:
-
-        int si_code = 0;
-
-as well.
-
-So, the commit log is accurate in this case: it _is_ about
-documenting the conflicting cases between SI_USER and SIGFPE and
-that bit of the change has no ABI effect.
-
-What does slightly annoy me is the creation of uapi/asm/siginfo.h
-to contain a definition that _isn't_ to be exposed as part of the
-UAPI.  If it's not part of the UAPI, it doesn't belong in a UAPI
-header, period.  In any case, I don't think that is exposed to
-userspace.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Robin.
