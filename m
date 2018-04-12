@@ -1,37 +1,23 @@
-From: rob@landley.net (Rob Landley)
-Date: Wed, 11 Apr 2018 20:38:37 -0500
-Subject: [PATCH] Replace unnecessary perl with sed, printf, and the shell $((
- )) operator.
-Message-ID: <9c72100c-b3e4-07ca-1784-fda2ac9d708c@landley.net>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 11 Apr 2018 18:45:02 -0700
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <20180412013435.GA21219@altlinux.org>
+References: <20180409152253.GD10489@altlinux.org>
+ <20180412013435.GA21219@altlinux.org>
+Message-ID: <CA+55aFyzwzSH-fh9M1JLduq6dZXZZ9ZsyHUgJGSDeFZVy5_vtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You can build a kernel in a cross compiling environment that doesn't have perl
-in the $PATH. Commit 429f7a062e3b broke that for 32 bit arm. Fix it.
+On Wed, Apr 11, 2018 at 6:34 PM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+>
+> There is a clear pattern of sneaking in ABI changes using innocently
+> looking commit messages.
 
-Signed-off-by: Rob Landley <rob@landley.net>
----
+Yes, this siginfo stuff has been a mess.
 
- arch/arm/boot/compressed/Makefile |    9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Eric - this needs to stop. Or we need to revert all that garbage entirely.
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 45a6b9b..33ebeb2 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -117,11 +117,10 @@ ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
- asflags-y := -DZIMAGE
- 
- # Supply kernel BSS size to the decompressor via a linker symbol.
--KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
--		perl -e 'while (<>) { \
--			$$bss_start=hex($$1) if /^([[:xdigit:]]+) B __bss_start$$/; \
--			$$bss_end=hex($$1) if /^([[:xdigit:]]+) B __bss_stop$$/; \
--		}; printf "%d\n", $$bss_end - $$bss_start;')
-+KBSS_SZ := $(shell echo $$(($$(printf '%d+%d' $$( \
-+		$(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
-+		sed -n -e 's/^\([^ ]*\) B __bss_start$$/-0x\1/p' \
-+		       -e 's/^\([^ ]*\) B __bss_stop$$/0x\1/p') ) )) )
- LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
- # Supply ZRELADDR to the decompressor via a linker symbol.
- ifneq ($(CONFIG_AUTO_ZRELADDR),y)
+Send a fix. And stop changing the siginfo layout or field values.
+
+                 Linus
