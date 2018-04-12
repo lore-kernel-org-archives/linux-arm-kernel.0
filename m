@@ -1,44 +1,81 @@
-From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Thu, 12 Apr 2018 11:42:35 +0200
-Subject: [PATCH V2] drm/amdgpu: limit DMA size to PAGE_SIZE for
- scatter-gather buffers
-In-Reply-To: <20180412062600.GB30499@lst.de>
-References: <1523394001-4615-1-git-send-email-okaya@codeaurora.org>
- <32b82296-bba5-b5f1-266b-45c1ed66da94@arm.com>
- <20180412062600.GB30499@lst.de>
-Message-ID: <6802bd0c-7da6-659a-7e34-8f05d7c6422c@amd.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 12 Apr 2018 11:54:00 +0200
+Subject: [PATCH v6 23/30] drm/rockchip: analogix_dp: Do not call
+ Analogix code before bind
+In-Reply-To: <20180405095000.9756-24-enric.balletbo@collabora.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+ <CGME20180405095337epcas3p1a8750649c8032d844991db91595da8e5@epcas3p1.samsung.com>
+ <20180405095000.9756-24-enric.balletbo@collabora.com>
+Message-ID: <2fde5d53-0e8d-6a15-7962-0e76532d0926@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.04.2018 um 08:26 schrieb Christoph Hellwig:
-> On Wed, Apr 11, 2018 at 01:03:59PM +0100, Robin Murphy wrote:
->> On 10/04/18 21:59, Sinan Kaya wrote:
->>> Code is expecing to observe the same number of buffers returned from
->>> dma_map_sg() function compared to sg_alloc_table_from_pages(). This
->>> doesn't hold true universally especially for systems with IOMMU.
->> So why not fix said code? It's clearly not a real hardware limitation, and
->> the map_sg() APIs have potentially returned fewer than nents since forever,
->> so there's really no excuse.
-> Yes, relying on dma_map_sg returning the same number of entries as passed
-> it is completely bogus.
+On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
+>
+> Driver callbacks, such as system suspend or resume can be called any
+> time, specifically they can be called before the component bind
+> callback. Let's use dp->adp pointer as a safeguard and skip calling
+> Analogix entry points if it is an ERR_PTR().
 
-I agree that the common DRM functions should be able to deal with both, 
-but we should let the driver side decide if it wants multiple addresses 
-combined or not.
+>From purity PoV I would store either 0 either valid pointer in dp->adp,
+but functionally it should be the same.
+
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+
+?--
+Regards
+Andrzej
+
 
 >
->>> IOMMU driver tries to combine buffers into a single DMA address as much
->>> as it can. The right thing is to tell the DMA layer how much combining
->>> IOMMU can do.
->> Disagree; this is a dodgy hack, since you'll now end up passing
->> scatterlists into dma_map_sg() which already violate max_seg_size to begin
->> with, and I think a conscientious DMA API implementation would be at rights
->> to fail the mapping for that reason (I know arm64 happens not to, but that
->> was a deliberate design decision to make my life easier at the time).
-> Agreed.
-
-Sounds like my understanding of max_seg_size is incorrect, what exactly 
-should that describe?
-
-Thanks,
-Christian.
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>
+>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> index 23317a2269e1..6d45d62466b3 100644
+> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+> @@ -368,6 +368,8 @@ static void rockchip_dp_unbind(struct device *dev, struct device *master,
+>  	analogix_dp_unbind(dp->adp);
+>  	rockchip_drm_psr_unregister(&dp->encoder);
+>  	dp->encoder.funcs->destroy(&dp->encoder);
+> +
+> +	dp->adp = ERR_PTR(-ENODEV);
+>  }
+>  
+>  static const struct component_ops rockchip_dp_component_ops = {
+> @@ -391,6 +393,7 @@ static int rockchip_dp_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	dp->dev = dev;
+> +	dp->adp = ERR_PTR(-ENODEV);
+>  	dp->plat_data.panel = panel;
+>  
+>  	ret = rockchip_dp_of_probe(dp);
+> @@ -414,6 +417,9 @@ static int rockchip_dp_suspend(struct device *dev)
+>  {
+>  	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
+>  
+> +	if (IS_ERR(dp->adp))
+> +		return 0;
+> +
+>  	return analogix_dp_suspend(dp->adp);
+>  }
+>  
+> @@ -421,6 +427,9 @@ static int rockchip_dp_resume(struct device *dev)
+>  {
+>  	struct rockchip_dp_device *dp = dev_get_drvdata(dev);
+>  
+> +	if (IS_ERR(dp->adp))
+> +		return 0;
+> +
+>  	return analogix_dp_resume(dp->adp);
+>  }
+>  #endif
