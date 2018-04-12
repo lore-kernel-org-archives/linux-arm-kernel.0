@@ -1,42 +1,44 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 12 Apr 2018 18:08:58 +0900
-Subject: [PATCH] ARM: omap2: Fix build when using split object directories
-In-Reply-To: <20180412082157.GB4002@localhost.localdomain>
-References: <20180411211543.7923-1-d-gerlach@ti.com>
- <20180412082157.GB4002@localhost.localdomain>
-Message-ID: <CAK7LNAQiq-4daX2K4dPyzN7zr+yfkQWSJ-yy9JHgacPpYFp94w@mail.gmail.com>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Thu, 12 Apr 2018 11:42:35 +0200
+Subject: [PATCH V2] drm/amdgpu: limit DMA size to PAGE_SIZE for
+ scatter-gather buffers
+In-Reply-To: <20180412062600.GB30499@lst.de>
+References: <1523394001-4615-1-git-send-email-okaya@codeaurora.org>
+ <32b82296-bba5-b5f1-266b-45c1ed66da94@arm.com>
+ <20180412062600.GB30499@lst.de>
+Message-ID: <6802bd0c-7da6-659a-7e34-8f05d7c6422c@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-12 17:21 GMT+09:00 Anders Roxell <anders.roxell@linaro.org>:
-> On 2018-04-11 16:15, Dave Gerlach wrote:
->> The sleep33xx and sleep43xx files should not depend on a header file
->> generated in drivers/memory. Remove this dependency and instead allow
->> both drivers/memory and arch/arm/mach-omap2 to generate all macros
->> needed in headers local to their own paths.
->>
->> This fixes an issue where the build fail will when using O= to set a
->> split object directory and arch/arm/mach-omap2 is built before
->> drivers/memory with the following error:
->>
->> .../drivers/memory/emif-asm-offsets.c:1:0: fatal error: can't open drivers/memory/emif-asm-offsets.s for writing: No such file or directory
->> compilation terminated.
->>
->> Fixes: 41d9d44d7258 ("ARM: OMAP2+: pm33xx-core: Add platform code needed for PM")
->> Acked-by: Tony Lindgren <tony@atomide.com>
->> Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Am 12.04.2018 um 08:26 schrieb Christoph Hellwig:
+> On Wed, Apr 11, 2018 at 01:03:59PM +0100, Robin Murphy wrote:
+>> On 10/04/18 21:59, Sinan Kaya wrote:
+>>> Code is expecing to observe the same number of buffers returned from
+>>> dma_map_sg() function compared to sg_alloc_table_from_pages(). This
+>>> doesn't hold true universally especially for systems with IOMMU.
+>> So why not fix said code? It's clearly not a real hardware limitation, and
+>> the map_sg() APIs have potentially returned fewer than nents since forever,
+>> so there's really no excuse.
+> Yes, relying on dma_map_sg returning the same number of entries as passed
+> it is completely bogus.
+
+I agree that the common DRM functions should be able to deal with both, 
+but we should let the driver side decide if it wants multiple addresses 
+combined or not.
+
 >
-> Tested-by: Anders Roxell <anders.roxell@linaro.org>
->
-> Maybe we can remove drivers/memory/Makefile.asm-offsets and move those
-> changes into drivers/memory/Makefile ?
+>>> IOMMU driver tries to combine buffers into a single DMA address as much
+>>> as it can. The right thing is to tell the DMA layer how much combining
+>>> IOMMU can do.
+>> Disagree; this is a dodgy hack, since you'll now end up passing
+>> scatterlists into dma_map_sg() which already violate max_seg_size to begin
+>> with, and I think a conscientious DMA API implementation would be at rights
+>> to fail the mapping for that reason (I know arm64 happens not to, but that
+>> was a deliberate design decision to make my life easier at the time).
+> Agreed.
 
-Agree!
+Sounds like my understanding of max_seg_size is incorrect, what exactly 
+should that describe?
 
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks,
+Christian.
