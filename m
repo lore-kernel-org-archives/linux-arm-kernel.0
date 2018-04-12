@@ -1,88 +1,74 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 12 Apr 2018 09:23:45 +0530
-Subject: [PATCH 00/14] arm: OMAP: AM437X: Save restores patches for rtc mode
- with DDR In self-refresh
-Message-ID: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
+Date: Thu, 12 Apr 2018 09:23:46 +0530
+Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
+ sram code
+In-Reply-To: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
+References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RTC plus DDR in self-refresh is power a saving mode where in the entire
-system including the different voltage rails from PMIC are shutdown except
-the ones feeding on to RTC and DDR. DDR is kept in self-refresh hence the
-contents are preserved. RTC ALARM2 is connected to PMIC_EN line once
-we the ALARM2 is triggered we enter the mode with DDR in self-refresh
-and RTC Ticking. After a predetermined time an RTC ALARM1 triggers waking
-up the system. The control goes to bootloader. The bootloader then checks
-RTC scratchpad registers to confirm it was an rtc_only wakeup and follows
-a different path, configure bare minimal clocks for ddr and then jumps to
-the resume address in another RTC scratchpad registers and transfers the
-control to Kernel. Kernel then restores the saved context.
+From: Dave Gerlach <d-gerlach@ti.com>
 
-This series is a prerequisite for the rtc mode with DDR in self
-refresh mode for am437x series of SoCs. As all the voltage domains
-are shut off apart from RTC and DDR is kept in self refresh
-additional save/restores are needed.
+After an RTC+DDR cycle we lose sram context so emif pm functions present
+in sram are lost. We can check if the first byte of the original
+code in DDR contains the same first byte as the code in sram, and if
+they do not match we know we have lost context and must recopy the
+functions to the previous address to maintain PM functionality.
 
-The series applies cleanly against linux-next branch.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ drivers/memory/ti-emif-pm.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-This mode works only with u-boot built with am43xx_evm_rtconly_defconfig
-
-Dave Gerlach (5):
-  memory: ti-emif-sram: Add resume function to recopy sram code
-  ARM: OMAP2+: omap_hwmod: Introduce HWMOD_NEEDS_REIDLE
-  gpio: omap: Restore power_mode configuration at resume time
-  ARM: hwmod: RTC: Don't assume lock/unlock will be called with irq
-    enabled
-  ARM: OMAP2+: prm44xx: Introduce context save/restore for am43 PRCM IO
-
-Keerthy (1):
-  OMAP: CLK: CLKSRC: Add suspend resume hooks
-
-Russ Dill (7):
-  ARM: OMAP2: Add functions to save and restore clockdomain context
-    en-masse.
-  ARM: OMAP2: Add functions to save and restore omap hwmod context
-    en-masse.
-  ARM: OMAP2: Add functions to save and restore powerdomain context
-  ARM: AM33XX: Add functions to save/restore am33xx control registers.
-  ARM: OMAP2: Add functions to save and restore pinctrl context.
-  ARM: OMAP2: Drop the concept of certain power domains not being able
-    to lose context.
-  gpio: omap: Drop the concept of gpio banks not being able to lose
-    context.
-
-Tero Kristo (1):
-  ARM: AM43XX: Add functions to save/restore am43xx control registers
-
- arch/arm/mach-omap2/clockdomain.c                  |  46 +++++
- arch/arm/mach-omap2/clockdomain.h                  |   8 +
- arch/arm/mach-omap2/cm33xx.c                       |  53 ++++++
- arch/arm/mach-omap2/cminst44xx.c                   |  43 +++++
- arch/arm/mach-omap2/control.c                      | 172 ++++++++++++++++++
- arch/arm/mach-omap2/control.h                      |  65 +++++++
- arch/arm/mach-omap2/omap_device.c                  |  50 +++++
- arch/arm/mach-omap2/omap_device.h                  |   1 +
- arch/arm/mach-omap2/omap_hwmod.c                   | 202 +++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod.h                   |  21 +++
- .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  14 +-
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |   3 +-
- arch/arm/mach-omap2/omap_hwmod_reset.c             |  12 +-
- arch/arm/mach-omap2/powerdomain.c                  |  75 +++++---
- arch/arm/mach-omap2/powerdomain.h                  |   8 +-
- arch/arm/mach-omap2/prm.h                          |   2 +
- arch/arm/mach-omap2/prm33xx.c                      |  31 ++++
- arch/arm/mach-omap2/prm44xx.c                      |  79 ++++++++
- arch/arm/mach-omap2/timer.c                        |  37 ++++
- drivers/gpio/gpio-omap.c                           |  40 ++--
- drivers/memory/ti-emif-pm.c                        |  24 +++
- drivers/pinctrl/core.c                             |   1 +
- drivers/pinctrl/core.h                             |   1 -
- drivers/pinctrl/pinctrl-single.c                   |  50 +++++
- drivers/pinctrl/pinmux.c                           |  22 +++
- include/linux/pinctrl/pinctrl.h                    |   7 +
- include/linux/pinctrl/pinmux.h                     |  16 ++
- include/linux/platform_data/gpio-omap.h            |   1 -
- 28 files changed, 1019 insertions(+), 65 deletions(-)
-
+diff --git a/drivers/memory/ti-emif-pm.c b/drivers/memory/ti-emif-pm.c
+index 632651f..ec4a62c 100644
+--- a/drivers/memory/ti-emif-pm.c
++++ b/drivers/memory/ti-emif-pm.c
+@@ -249,6 +249,25 @@ int ti_emif_get_mem_type(void)
+ };
+ MODULE_DEVICE_TABLE(of, ti_emif_of_match);
+ 
++#ifdef CONFIG_PM_SLEEP
++static int ti_emif_resume(struct device *dev)
++{
++	unsigned long tmp =
++			__raw_readl((void *)emif_instance->ti_emif_sram_virt);
++
++	/*
++	 * Check to see if what we are copying is already present in the
++	 * first byte at the destination, only copy if it is not which
++	 * indicates we have lost context and sram no longer contains
++	 * the PM code
++	 */
++	if (tmp != ti_emif_sram)
++		ti_emif_push_sram(dev, emif_instance);
++
++	return 0;
++}
++#endif /* CONFIG_PM_SLEEP */
++
+ static int ti_emif_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -308,12 +327,17 @@ static int ti_emif_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct dev_pm_ops ti_emif_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(NULL, ti_emif_resume)
++};
++
+ static struct platform_driver ti_emif_driver = {
+ 	.probe = ti_emif_probe,
+ 	.remove = ti_emif_remove,
+ 	.driver = {
+ 		.name = KBUILD_MODNAME,
+ 		.of_match_table = of_match_ptr(ti_emif_of_match),
++		.pm = &ti_emif_pm_ops,
+ 	},
+ };
+ module_platform_driver(ti_emif_driver);
 -- 
 1.9.1
