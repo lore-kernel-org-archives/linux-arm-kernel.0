@@ -1,87 +1,23 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 12 Apr 2018 09:23:59 +0530
-Subject: [PATCH 14/14] ARM: OMAP2+: prm44xx: Introduce context save/restore
- for am43 PRCM IO
-In-Reply-To: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1523505239-16229-15-git-send-email-j-keerthy@ti.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 12 Apr 2018 13:45:54 +0900
+Subject: [PATCH] arm64: dts: uniphier: fix input delay value for legacy
+ mode of eMMC
+In-Reply-To: <1523500291-24008-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1523500291-24008-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAShZOxANg1T=9eGgN1MYRVP3qC1n6i8QO07CChPuge-aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dave Gerlach <d-gerlach@ti.com>
+2018-04-12 11:31 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> The property of the legacy mode for the eMMC PHY turned out to
+> be worng.  Some eMMC devices are unstable due to the set-up/hold
+> timing violation.  Correct the delay value.
 
-There are two registers on am43x needed for IO daisy chain wake to work
-properly, however currently after an RTC+DDR cycle they are lost. We
-must take care to save and restore these before and after entering RTC
-mode otherwise IO daisy chain wake will stop working from DeepSleep
-after resuming.
+Reminder for myself:
+  Fix a type  worng -> wrong
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- arch/arm/mach-omap2/prm.h     |  2 ++
- arch/arm/mach-omap2/prm44xx.c | 29 +++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
-index f0fb508..32e275f 100644
---- a/arch/arm/mach-omap2/prm.h
-+++ b/arch/arm/mach-omap2/prm.h
-@@ -179,6 +179,8 @@ int omap_prm_deassert_hardreset(u8 shift, u8 st_shift, u8 part, s16 prm_mod,
- u32 omap_prm_vp_check_txdone(u8 vp_id);
- void omap_prm_vp_clear_txdone(u8 vp_id);
- 
-+void am43xx_prm_save_context(void);
-+void am43xx_prm_restore_context(void);
- #endif
- 
- 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 47b657c..0d1111e 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -57,6 +57,13 @@
- 	.reconfigure_io_chain	= &omap44xx_prm_reconfigure_io_chain,
- };
- 
-+struct omap_prm_irq_context {
-+	unsigned long irq_enable;
-+	unsigned long pm_ctrl;
-+};
-+
-+static struct omap_prm_irq_context omap_prm_context;
-+
- /*
-  * omap44xx_prm_reset_src_map - map from bits in the PRM_RSTST
-  *   hardware register (which are specific to OMAP44xx SoCs) to reset
-@@ -739,6 +746,28 @@ struct pwrdm_ops omap4_pwrdm_operations = {
- 
- static int omap44xx_prm_late_init(void);
- 
-+void am43xx_prm_save_context(void)
-+{
-+	omap_prm_context.irq_enable =
-+			omap4_prm_read_inst_reg(AM43XX_PRM_OCP_SOCKET_INST,
-+						omap4_prcm_irq_setup.mask);
-+
-+	omap_prm_context.pm_ctrl =
-+			omap4_prm_read_inst_reg(AM43XX_PRM_DEVICE_INST,
-+						omap4_prcm_irq_setup.pm_ctrl);
-+}
-+
-+void am43xx_prm_restore_context(void)
-+{
-+	omap4_prm_write_inst_reg(omap_prm_context.irq_enable,
-+				 OMAP4430_PRM_OCP_SOCKET_INST,
-+				 omap4_prcm_irq_setup.mask);
-+
-+	omap4_prm_write_inst_reg(omap_prm_context.pm_ctrl,
-+				 AM43XX_PRM_DEVICE_INST,
-+				 omap4_prcm_irq_setup.pm_ctrl);
-+}
-+
- /*
-  * XXX document
-  */
+
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
