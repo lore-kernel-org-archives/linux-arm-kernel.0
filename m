@@ -1,42 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 12 Apr 2018 11:55:30 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Set GBPA to abort all transactions
-In-Reply-To: <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
-References: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
- <3350f0eb84c8c621cf43aa06ed117cfb@www.loen.fr>
- <3772fb2d-01b7-4820-6d13-a0263654dabc@codeaurora.org>
- <438a6180-fca8-d3a1-985f-e595529911f3@arm.com>
- <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
-Message-ID: <20180412105530.GC20539@arm.com>
+From: ldv@altlinux.org (Dmitry V. Levin)
+Date: Thu, 12 Apr 2018 14:03:14 +0300
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <20180412095811.GC16141@n2100.armlinux.org.uk>
+References: <20180409152253.GD10489@altlinux.org>
+ <20180412013435.GA21219@altlinux.org>
+ <20180412095811.GC16141@n2100.armlinux.org.uk>
+Message-ID: <20180412110314.GA28070@altlinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 11:17:24AM +0100, Robin Murphy wrote:
-> On 11/04/18 17:54, Marc Zyngier wrote:
-> >On 11/04/18 16:58, Goel, Sameer wrote:
-> >>On 3/28/2018 9:00 AM, Marc Zyngier wrote:
-> >>>A tangential question: can we reliably detect that the SMMU already
-> >>>has valid mappings, which would indicate that we're in a pretty bad
-> >>>shape already by the time we set that bit? For all we know, memory
-> >>>could have been corrupted long before we hit this point, and this
-> >>>patch barely narrows the window of opportunity.
-> >>
-> >>:) Yes that is correct. This only covers the kdump scenario. Trying
-> >>to get some reliability when booting up the crash kernel. The system
-> >>is already in a bad state. I don't think that this will happen in a
-> >>normal scenario. But please point me to the GICv3 change and I'll
-> >>have a look.
-> >
-> >See this:
-> >https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/irqchip-4.17&id=6eb486b66a3094cdcd68dc39c9df3a29d6a51dd5#n3407
+On Thu, Apr 12, 2018 at 10:58:11AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 12, 2018 at 04:34:35AM +0300, Dmitry V. Levin wrote:
+> > A similar commit v4.16-rc1~159^2~37
+> > ("signal/arm: Document conflicts with SI_USER and SIGFPE") must have
+> > introduced a similar ABI regression to compat arm.
 > 
-> The nearest equivalent to that is probably the top-level SMMUEN check that
-> we already have (see the diff context above). To go beyond that you'd have
-> to chase the old stream table pointer and scan the whole thing looking for
-> valid contexts, then potentially walk page tables within those contexts to
-> check for live translations if you really wanted to be sure. That would be a
-> hell of a lot of work to do in the boot path.
+> So, could you explain how can this change cause a regression?
+> 
+> +#define FPE_FIXME      0
+> -               vfp_raise_sigfpe(0, regs);
+> +               vfp_raise_sigfpe(FPE_FIXME, regs);
 
-Yeah, please don't waste time writing a patch to do that! ;)
+No, this hunk hasn't caused the regression, but another one did:
 
-Will
+diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
+new file mode 100644
+index 0000000..d051388
+--- /dev/null
++++ b/arch/arm/include/uapi/asm/siginfo.h
+@@ -0,0 +1,13 @@
++#ifndef __ASM_SIGINFO_H
++#define __ASM_SIGINFO_H
++
++#include <asm-generic/siginfo.h>
++
++/*
++ * SIGFPE si_codes
++ */
++#ifdef __KERNEL__
++#define FPE_FIXME      0       /* Broken dup of SI_USER */
++#endif /* __KERNEL__ */
++
++#endif
+
+This is due to FPE_FIXME handling in kernel/signal.c
+
+
+-- 
+ldv
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/0dccfbf9/attachment-0001.sig>
