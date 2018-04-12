@@ -1,75 +1,66 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 12 Apr 2018 09:23:57 +0530
-Subject: [PATCH 12/14] OMAP: CLK: CLKSRC: Add suspend resume hooks
+Date: Thu, 12 Apr 2018 09:23:58 +0530
+Subject: [PATCH 13/14] ARM: hwmod: RTC: Don't assume lock/unlock will be
+ called with irq enabled
 In-Reply-To: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
 References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1523505239-16229-13-git-send-email-j-keerthy@ti.com>
+Message-ID: <1523505239-16229-14-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the save and restore for clksrc as part of suspend and resume
-so that it saves the counter value and restores. This is needed in
-modes like rtc+ddr in self-refresh not doing this stalls the time.
+From: Dave Gerlach <d-gerlach@ti.com>
 
+When the RTC lock and unlock functions were introduced it was likely
+assumed that they would always be called from irq enabled context, hence
+the use of local_irq_disable/enable. This is no longer true as the
+RTC+DDR path makes a late call during the suspend path after irqs
+have been disabled to enable the RTC hwmod which calls both unlock and
+lock, leading to IRQs being reenabled through the local_irq_enable call
+in omap_hwmod_rtc_lock call.
+
+To avoid this change the local_irq_disable/enable to
+local_irq_save/restore to ensure that from whatever context this is
+called the proper IRQ configuration is maintained.
+
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/mach-omap2/timer.c | 37 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_reset.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 4fb4dc2..35fef97 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -442,6 +442,38 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
- 	return ret;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
+index b68f9c0..d5ddba0 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_reset.c
++++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
+@@ -92,11 +92,13 @@ static void omap_rtc_wait_not_busy(struct omap_hwmod *oh)
+  */
+ void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
+ {
+-	local_irq_disable();
++	unsigned long flags;
++
++	local_irq_save(flags);
+ 	omap_rtc_wait_not_busy(oh);
+ 	omap_hwmod_write(OMAP_RTC_KICK0_VALUE, oh, OMAP_RTC_KICK0_REG);
+ 	omap_hwmod_write(OMAP_RTC_KICK1_VALUE, oh, OMAP_RTC_KICK1_REG);
+-	local_irq_enable();
++	local_irq_restore(flags);
  }
  
-+static unsigned int omap2_gptimer_clksrc_load;
+ /**
+@@ -110,9 +112,11 @@ void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
+  */
+ void omap_hwmod_rtc_lock(struct omap_hwmod *oh)
+ {
+-	local_irq_disable();
++	unsigned long flags;
 +
-+static void omap2_gptimer_clksrc_suspend(struct clocksource *unused)
-+{
-+	struct omap_hwmod *oh;
-+
-+	omap2_gptimer_clksrc_load =
-+		__omap_dm_timer_read_counter(&clksrc, OMAP_TIMER_NONPOSTED);
-+
-+	oh = omap_hwmod_lookup(clocksource_gpt.name);
-+	if (!oh)
-+		return;
-+
-+	omap_hwmod_idle(oh);
-+}
-+
-+static void omap2_gptimer_clksrc_resume(struct clocksource *unused)
-+{
-+	struct omap_hwmod *oh;
-+
-+	oh = omap_hwmod_lookup(clocksource_gpt.name);
-+	if (!oh)
-+		return;
-+
-+	omap_hwmod_enable(oh);
-+
-+	__omap_dm_timer_load_start(&clksrc,
-+				   OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR,
-+				   omap2_gptimer_clksrc_load,
-+				   OMAP_TIMER_NONPOSTED);
-+}
-+
- static void __init omap2_gptimer_clocksource_init(int gptimer_id,
- 						  const char *fck_source,
- 						  const char *property)
-@@ -451,6 +483,11 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
- 	clksrc.id = gptimer_id;
- 	clksrc.errata = omap_dm_timer_get_errata();
- 
-+	if (soc_is_am43xx()) {
-+		clocksource_gpt.suspend = omap2_gptimer_clksrc_suspend;
-+		clocksource_gpt.resume = omap2_gptimer_clksrc_resume;
-+	}
-+
- 	res = omap_dm_timer_init_one(&clksrc, fck_source, property,
- 				     &clocksource_gpt.name,
- 				     OMAP_TIMER_NONPOSTED);
++	local_irq_save(flags);
+ 	omap_rtc_wait_not_busy(oh);
+ 	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK0_REG);
+ 	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK1_REG);
+-	local_irq_enable();
++	local_irq_restore(flags);
+ }
 -- 
 1.9.1
