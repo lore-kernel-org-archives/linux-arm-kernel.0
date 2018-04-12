@@ -1,57 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 12 Apr 2018 14:51:00 +0100
-Subject: [PATCH V2] drm/amdgpu: limit DMA size to PAGE_SIZE for
- scatter-gather buffers
-In-Reply-To: <6802bd0c-7da6-659a-7e34-8f05d7c6422c@amd.com>
-References: <1523394001-4615-1-git-send-email-okaya@codeaurora.org>
- <32b82296-bba5-b5f1-266b-45c1ed66da94@arm.com>
- <20180412062600.GB30499@lst.de>
- <6802bd0c-7da6-659a-7e34-8f05d7c6422c@amd.com>
-Message-ID: <7a3e7459-2965-54c8-ff0c-6edb3a6aecb5@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Apr 2018 14:52:01 +0100
+Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
+In-Reply-To: <CACRpkdaKc28xe1_iBd07qRsGig_yc0Kfm+ZRj8+t+Wd32uMK7w@mail.gmail.com>
+References: <20180412131426.18011-1-linus.walleij@linaro.org>
+ <20180412131737.GF16141@n2100.armlinux.org.uk>
+ <20180412131845.GG16141@n2100.armlinux.org.uk>
+ <CACRpkdaKc28xe1_iBd07qRsGig_yc0Kfm+ZRj8+t+Wd32uMK7w@mail.gmail.com>
+Message-ID: <20180412135201.GH16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/18 10:42, Christian K?nig wrote:
-> Am 12.04.2018 um 08:26 schrieb Christoph Hellwig:
->> On Wed, Apr 11, 2018 at 01:03:59PM +0100, Robin Murphy wrote:
->>> On 10/04/18 21:59, Sinan Kaya wrote:
->>>> Code is expecing to observe the same number of buffers returned from
->>>> dma_map_sg() function compared to sg_alloc_table_from_pages(). This
->>>> doesn't hold true universally especially for systems with IOMMU.
->>> So why not fix said code? It's clearly not a real hardware 
->>> limitation, and
->>> the map_sg() APIs have potentially returned fewer than nents since 
->>> forever,
->>> so there's really no excuse.
->> Yes, relying on dma_map_sg returning the same number of entries as passed
->> it is completely bogus.
+On Thu, Apr 12, 2018 at 03:44:58PM +0200, Linus Walleij wrote:
+> On Thu, Apr 12, 2018 at 3:18 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Thu, Apr 12, 2018 at 02:17:37PM +0100, Russell King - ARM Linux wrote:
+> >> Sorry, I haven't given up my maintainership, as I had already stated.
+> >>
+> >> NAK.
+> >
+> > Oh, sorry, yes, this is fine, this is just the reference platforms.
+> > Please go ahread and pick them up.
 > 
-> I agree that the common DRM functions should be able to deal with both, 
-> but we should let the driver side decide if it wants multiple addresses 
-> combined or not.
+> Thanks Russell!
 > 
->>
->>>> IOMMU driver tries to combine buffers into a single DMA address as much
->>>> as it can. The right thing is to tell the DMA layer how much combining
->>>> IOMMU can do.
->>> Disagree; this is a dodgy hack, since you'll now end up passing
->>> scatterlists into dma_map_sg() which already violate max_seg_size to 
->>> begin
->>> with, and I think a conscientious DMA API implementation would be at 
->>> rights
->>> to fail the mapping for that reason (I know arm64 happens not to, but 
->>> that
->>> was a deliberate design decision to make my life easier at the time).
->> Agreed.
-> 
-> Sounds like my understanding of max_seg_size is incorrect, what exactly 
-> should that describe?
+> Do you still have some of the old ARM references around for the odd
+> tests? I am thinking especially about the IB1 external display for Versatile
+> that I haven't been able to locate for test, it'd be great to know if it
+> works with Erik Anholt's DRM driver.
 
-The segment size and boundary mask are there to represent a device's 
-hardware scatter-gather capabilities - a lot of things have limits on 
-the size and alignment of the data pointed to by a single descriptor 
-(e.g. an xHCI TRB, where the data buffer must not cross a 64KB boundary) 
-- although they can also be relevant to non-scatter-gather devices if 
-they just have limits on how big/aligned a single DMA transfer can be.
+I've never had any of the external displays that plug into the connector
+underneath the character LCD.  I did, at one time, have what was called
+an PP2 which had a LCD display though.
 
-Robin.
+I do have several boards - mainly a few varieties of Integrator CP
+(including one with a stack of FPGA tiles containing bitstreams for
+various development CPUs) - eg, ARM926 based SMP system which was
+never merged into mainline.  Versatile PB926 and Realview EB.
+The PB926 partly runs my test farm here.  The Versatile Express
+CT9x4 is still part of the boot farm, and just about works with
+certain kernels, but I'm pretty sure there's a cache latency bug
+there (I carry patches privately to fix it, but it doesn't appear to
+completely solve it.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
