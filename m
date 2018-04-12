@@ -1,64 +1,36 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Thu, 12 Apr 2018 10:44:10 -0600
-Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
- sram code
-In-Reply-To: <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
-Message-ID: <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 12 Apr 2018 09:50:26 -0700
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <20180412131404.GE16141@n2100.armlinux.org.uk>
+References: <20180409152253.GD10489@altlinux.org>
+ <20180412013435.GA21219@altlinux.org>
+ <20180412095811.GC16141@n2100.armlinux.org.uk>
+ <20180412110314.GA28070@altlinux.org>
+ <20180412121949.GD16141@n2100.armlinux.org.uk>
+ <20180412124928.GA29458@altlinux.org>
+ <20180412131404.GE16141@n2100.armlinux.org.uk>
+Message-ID: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/11/18 9:53 PM, Keerthy wrote:
-> From: Dave Gerlach <d-gerlach@ti.com>
-> 
-> After an RTC+DDR cycle we lose sram context so emif pm functions present
-> in sram are lost. We can check if the first byte of the original
-> code in DDR contains the same first byte as the code in sram, and if
-> they do not match we know we have lost context and must recopy the
-> functions to the previous address to maintain PM functionality.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->   drivers/memory/ti-emif-pm.c | 24 ++++++++++++++++++++++++
->   1 file changed, 24 insertions(+)
-> 
-> diff --git a/drivers/memory/ti-emif-pm.c b/drivers/memory/ti-emif-pm.c
-> index 632651f..ec4a62c 100644
-> --- a/drivers/memory/ti-emif-pm.c
-> +++ b/drivers/memory/ti-emif-pm.c
-> @@ -249,6 +249,25 @@ int ti_emif_get_mem_type(void)
->   };
->   MODULE_DEVICE_TABLE(of, ti_emif_of_match);
->   
-> +#ifdef CONFIG_PM_SLEEP
-> +static int ti_emif_resume(struct device *dev)
-> +{
-> +	unsigned long tmp =
-> +			__raw_readl((void *)emif_instance->ti_emif_sram_virt);
-> +
-> +	/*
-> +	 * Check to see if what we are copying is already present in the
-> +	 * first byte at the destination, only copy if it is not which
-> +	 * indicates we have lost context and sram no longer contains
-> +	 * the PM code
-> +	 */
+Does this attached patch perhaps fix the ARM case?
 
-> +	if (tmp != ti_emif_sram)
-> +		ti_emif_push_sram(dev, emif_instance);
-> +
-> +	return 0;
-> +}
-> +#endif /* CONFIG_PM_SLEEP */
-Instead of this indirect method , why can't just check the previous
-deep sleep mode and based on that do copy or not. EMIF power status
-register should have something like that ?
+It just uses FPE_FLTUNK as the default si_code for SIGFPE, which seems
+sane enough. And then gets rid of FPE_FIXME, which should resolve the
+nasty case.
 
-Another minor point is even though there is nothing to do in suspend,
-might be good to have a callback with comment that nothing to do with
-some explanation why not. Don't have strong preference but may for
-better readability.
+Hmm? Entirely untested, and I didn't really look at the test-case in
+question since I can't really run it anyway.
 
-Regards,
-Santosh
+Well, I could run it all on x86-64, but it doesn't have that FPE_FIXME
+case at all.
+
+                 Linus
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: patch.diff
+Type: text/x-patch
+Size: 1163 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/e30ddd2a/attachment.bin>
