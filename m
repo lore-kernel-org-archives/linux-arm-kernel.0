@@ -1,60 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Apr 2018 07:22:57 -0700
-Subject: [PATCH 10/14] gpio: omap: Drop the concept of gpio banks not
- being able to lose context.
-In-Reply-To: <1523505239-16229-11-git-send-email-j-keerthy@ti.com>
+Date: Thu, 12 Apr 2018 07:27:14 -0700
+Subject: [PATCH 12/14] OMAP: CLK: CLKSRC: Add suspend resume hooks
+In-Reply-To: <1523505239-16229-13-git-send-email-j-keerthy@ti.com>
 References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-11-git-send-email-j-keerthy@ti.com>
-Message-ID: <20180412142257.GW5700@atomide.com>
+ <1523505239-16229-13-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180412142714.GX5700@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Keerthy <j-keerthy@ti.com> [180412 03:56]:
-> From: Russ Dill <Russ.Dill@ti.com>
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -68,7 +68,7 @@ struct gpio_bank {
->  	bool dbck_enabled;
->  	bool is_mpuio;
->  	bool dbck_flag;
-> -	bool loses_context;
-> +
->  	bool context_valid;
->  	int stride;
->  	u32 width;
+> Add the save and restore for clksrc as part of suspend and resume
+> so that it saves the counter value and restores. This is needed in
+> modes like rtc+ddr in self-refresh not doing this stalls the time.
 
-For some SoCs GPIO bank1 won't lose the context ever. So I'd like to
-keep loses_context flag around to avoid pointless save and restore.
-But maybe this still happens with get_context_loss_count and I'm
-misreading this patch?
+I suspect this too should really happen with cpu_pm.
 
-However..
-
-> @@ -1198,15 +1198,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
->  #ifdef CONFIG_OF_GPIO
->  	bank->chip.of_node = of_node_get(node);
->  #endif
-> -	if (node) {
-> -		if (!of_property_read_bool(node, "ti,gpio-always-on"))
-> -			bank->loses_context = true;
-> -	} else {
-> -		bank->loses_context = pdata->loses_context;
-> -
-> -		if (bank->loses_context)
-> -			bank->get_context_loss_count =
-> -				pdata->get_context_loss_count;
-> +	if (!node) {
-> +		bank->get_context_loss_count =
-> +			pdata->get_context_loss_count;
->  	}
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -442,6 +442,38 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
+>  	return ret;
+>  }
 >  
->  	if (bank->regs->set_dataout && bank->regs->clr_dataout)
+> +static unsigned int omap2_gptimer_clksrc_load;
+> +
+> +static void omap2_gptimer_clksrc_suspend(struct clocksource *unused)
+> +{
+> +	struct omap_hwmod *oh;
+> +
+> +	omap2_gptimer_clksrc_load =
+> +		__omap_dm_timer_read_counter(&clksrc, OMAP_TIMER_NONPOSTED);
+> +
+> +	oh = omap_hwmod_lookup(clocksource_gpt.name);
+> +	if (!oh)
+> +		return;
+> +
+> +	omap_hwmod_idle(oh);
+> +}
 
-.. I do have a patch ready here that I'll post after -rc1 to remove
-CONFIG_OMAP_PM_NOOP related stuff, turns out that's noop anyways :)
+Probably no need to look up the hwmod every time? Especially if am437x
+will start supporting deeper idle modes during runtime.
 
-So yeah the pdata->get_context_loss_count parts are noop and can
-be just removed.
+And probably the cpu_pm notifies should be directly in the hwmod
+code so we don't need to add more any more dependencies to hwmod
+functions to timer code. We should have this code move to drivers
+anyways at some point.
 
 Regards,
 
