@@ -1,135 +1,190 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Thu, 12 Apr 2018 20:55:42 +0800
-Subject: [PATCH v11 1/4] arm64: KVM: export the capability to set guest
- SError syndrome
-In-Reply-To: <98360e36-5fb7-aea4-52c3-21595d09419f@arm.com>
-References: <1523309796-36423-1-git-send-email-gengdongjiu@huawei.com>
- <1523309796-36423-2-git-send-email-gengdongjiu@huawei.com>
- <98360e36-5fb7-aea4-52c3-21595d09419f@arm.com>
-Message-ID: <CAMj-D2B3Sf_YmvJJtQjfy+qdvw3==sKyD=7Zd+2+BqHxBd2RRQ@mail.gmail.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 12 Apr 2018 16:06:06 +0300
+Subject: [PATCH v4 1/7] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <20180406173846.GC130399@google.com>
+References: <20180309210958.16672-1-georgi.djakov@linaro.org>
+ <20180309210958.16672-2-georgi.djakov@linaro.org>
+ <20180406173846.GC130399@google.com>
+Message-ID: <2e1f70b5-e62e-33c2-4bcc-c1414c1083c4@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI James,
-  Thanks for the review.
+Hi Matthias,
 
-
-2018-04-10 22:15 GMT+08:00, James Morse <james.morse@arm.com>:
-> Hi Dongjiu Geng,
->
-> On 09/04/18 22:36, Dongjiu Geng wrote:
->> Before user space injects a SError, it needs to know whether it can
->> specify the guest Exception Syndrome, so KVM should tell user space
->> whether it has such capability.
->
-> (you could improve the commit message by briefly explaining how/why
-> user-space
-> would want to do this. As this is patch 1, you don't have the context of
-> the
-> previous patch to say that some systems can provide an ESR with
-> virtual-SError)
-Exactly, thanks for the good comments.
-
->
->
->> diff --git a/Documentation/virtual/kvm/api.txt
->> b/Documentation/virtual/kvm/api.txt
->> index fc3ae95..8a3d708 100644
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -4415,3 +4415,14 @@ Parameters: none
->>  This capability indicates if the flic device will be able to get/set the
->>  AIS states for migration via the KVM_DEV_FLIC_AISM_ALL attribute and
->> allows
->>  to discover this without having to create a flic device.
->> +
->> +8.14 KVM_CAP_ARM_SET_SERROR_ESR
->> +
->> +Architectures: arm, arm64
->> +
->> +This capability indicates that userspace can specify syndrome value
->> reported to
->
-> (Nit: 'the syndrome value')
-will fix it.
-
->
->> +guest OS when guest takes a virtual SError interrupt exception.
->
-> (Nit: 'the guest')
-will fix it.
-
->
->> +If KVM has this capability, userspace can only specify the ISS field for
->> the ESR
->> +syndrome, can not specify the EC field which is not under control by
->> KVM.
->
-> (Nit: 'it can not specify...')
-will fix it.
-
->
->> +If this virtual SError is taken to EL1 using AArch64, this value will be
->> reported
->> +into ISS filed of ESR_EL1.
->
-> (Nit: 'in the ISS field')
-will fix it.
-
->
->
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index 3256b92..38c8a64 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm,
->> long ext)
->>  	case KVM_CAP_ARM_PMU_V3:
->>  		r = kvm_arm_support_pmu_v3();
->>  		break;
->> +	case KVM_CAP_ARM_INJECT_SERROR_ESR:
->> +		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
->> +		break;
->>  	case KVM_CAP_SET_GUEST_DEBUG:
->>  	case KVM_CAP_VCPU_ATTRIBUTES:
->>  		r = 1;
->
-> 'dev_ioctl' feels a bit weird, but we already have cpu_has_32bit_el1() in
-> here.
-
-Yes, although the name is "dev_ioctl", it does not have relationship
-with the device.
-here it mainly check vcpu capability, such as PMU, 32bit EL1 etc.
-
->
->
->> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
->> index 8fb90a0..3587b33 100644
->> --- a/include/uapi/linux/kvm.h
->> +++ b/include/uapi/linux/kvm.h
->> @@ -934,6 +934,7 @@ struct kvm_ppc_resize_hpt {
->>  #define KVM_CAP_S390_AIS_MIGRATION 150
->>  #define KVM_CAP_PPC_GET_CPU_CHAR 151
->>  #define KVM_CAP_S390_BPB 152
->> +#define KVM_CAP_ARM_INJECT_SERROR_ESR 153
+On 04/06/2018 08:38 PM, Matthias Kaehlcke wrote:
+> On Fri, Mar 09, 2018 at 11:09:52PM +0200, Georgi Djakov wrote:
+>> This patch introduce a new API to get requirements and configure the
+>> interconnect buses across the entire chipset to fit with the current
+>> demand.
 >>
->>  #ifdef KVM_CAP_IRQ_ROUTING
->
-> (patch 1&2 should probably be swapped around, as on its own this does
-> thing).
-ok, I will do it.
+>> The API is using a consumer/provider-based model, where the providers are
+>> the interconnect buses and the consumers could be various drivers.
+>> The consumers request interconnect resources (path) between endpoints and
+>> set the desired constraints on this data flow path. The providers receive
+>> requests from consumers and aggregate these requests for all master-slave
+>> pairs on that path. Then the providers configure each participating in the
+>> topology node according to the requested data flow path, physical links and
+>> constraints. The topology could be complicated and multi-tiered and is SoC
+>> specific.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  Documentation/interconnect/interconnect.rst |  96 ++++++
+>>  drivers/Kconfig                             |   2 +
+>>  drivers/Makefile                            |   1 +
+>>  drivers/interconnect/Kconfig                |  10 +
+>>  drivers/interconnect/Makefile               |   1 +
+>>  drivers/interconnect/core.c                 | 489 ++++++++++++++++++++++++++++
+>>  include/linux/interconnect-provider.h       | 109 +++++++
+>>  include/linux/interconnect.h                |  40 +++
+>>  8 files changed, 748 insertions(+)
+>>  create mode 100644 Documentation/interconnect/interconnect.rst
+>>  create mode 100644 drivers/interconnect/Kconfig
+>>  create mode 100644 drivers/interconnect/Makefile
+>>  create mode 100644 drivers/interconnect/core.c
+>>  create mode 100644 include/linux/interconnect-provider.h
+>>  create mode 100644 include/linux/interconnect.h
+>>
+>> diff --git a/Documentation/interconnect/interconnect.rst b/Documentation/interconnect/interconnect.rst
+>> new file mode 100644
+>> index 000000000000..23eba68e8424
+>> --- /dev/null
+>> +++ b/Documentation/interconnect/interconnect.rst
 
->
-> Reviewed-by: James Morse <james.morse@arm.com>
-thanks this Reviewed-by
+[..]
 
->
->
-> Thanks,
->
-> James
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->
+>> +Terminology
+>> +-----------
+>> +
+>> +Interconnect provider is the software definition of the interconnect hardware.
+>> +The interconnect providers on the above diagram are M NoC, S NoC, C NoC and Mem
+>> +NoC.
+> 
+> Should P NoC be part of that list?
+> 
+
+Yes, it should be!
+
+>> +
+>> +Interconnect node is the software definition of the interconnect hardware
+>> +port. Each interconnect provider consists of multiple interconnect nodes,
+>> +which are connected to other SoC components including other interconnect
+>> +providers. The point on the diagram where the CPUs connects to the memory is
+>> +called an interconnect node, which belongs to the Mem NoC interconnect provider.
+>> +
+>> +Interconnect endpoints are the first or the last element of the path. Every
+>> +endpoint is a node, but not every node is an endpoint.
+>> +
+>> +Interconnect path is everything between two endpoints including all the nodes
+>> +that have to be traversed to reach from a source to destination node. It may
+>> +include multiple master-slave pairs across several interconnect providers.
+>> +
+>> +Interconnect consumers are the entities which make use of the data paths exposed
+>> +by the providers. The consumers send requests to providers requesting various
+>> +throughput, latency and priority. Usually the consumers are device drivers, that
+>> +send request based on their needs. An example for a consumer is a video decoder
+>> +that supports various formats and image sizes.
+>> +
+>> +Interconnect providers
+>> +----------------------
+
+[..]
+
+>> +static void node_aggregate(struct icc_node *node)
+>> +{
+>> +	struct icc_req *r;
+>> +	u32 agg_avg = 0;
+> 
+> Should this be u64 to avoid overflow in case of a large number of
+> constraints and high bandwidths?
+
+These values are proposed to be in kbps and u32 seems to be enough for
+now, but in the future we can switch to u64 if needed.
+
+> 
+>> +	u32 agg_peak = 0;
+>> +
+>> +	hlist_for_each_entry(r, &node->req_list, req_node) {
+>> +		/* sum(averages) and max(peaks) */
+>> +		agg_avg += r->avg_bw;
+>> +		agg_peak = max(agg_peak, r->peak_bw);
+>> +	}
+>> +
+>> +	node->avg_bw = agg_avg;
+> 
+> Is it really intended to store the sum of averages here rather than
+> the overall average?
+
+Yes, the intention is to sum all the averages in total, so that the
+hardware is set in a state that would be able to handle the total
+bandwidth passing through a node.
+
+Also in the next version of this patch i have changed this part a bit,
+so that the aggregation could be customized and made platform specific,
+as different platforms could use their own aggregation algorithms other
+than the default sum/max.
+
+> 
+>> +	node->peak_bw = agg_peak;
+>> +}
+>> +
+>> +static void provider_aggregate(struct icc_provider *provider, u32 *avg_bw,
+>> +			       u32 *peak_bw)
+>> +{
+>> +	struct icc_node *n;
+>> +	u32 agg_avg = 0;
+> 
+> See above.
+> 
+>> +	u32 agg_peak = 0;
+>> +
+>> +	/* aggregate for the interconnect provider */
+>> +	list_for_each_entry(n, &provider->nodes, node_list) {
+>> +		/* sum the average and max the peak */
+>> +		agg_avg += n->avg_bw;
+>> +		agg_peak = max(agg_peak, n->peak_bw);
+>> +	}
+>> +
+>> +	*avg_bw = agg_avg;
+> 
+> See above.
+> 
+>> +	*peak_bw = agg_peak;
+>> +}
+>> +
+
+[..]
+
+>> +/**
+>> + * struct icc_node - entity that is part of the interconnect topology
+>> + *
+>> + * @id: platform specific node id
+>> + * @name: node name used in debugfs
+>> + * @links: a list of targets where we can go next when traversing
+>> + * @num_links: number of links to other interconnect nodes
+>> + * @provider: points to the interconnect provider of this node
+>> + * @node_list: list of interconnect nodes associated with @provider
+>> + * @search_list: list used when walking the nodes graph
+>> + * @reverse: pointer to previous node when walking the nodes graph
+>> + * @is_traversed: flag that is used when walking the nodes graph
+>> + * @req_list: a list of QoS constraint requests associated with this node
+>> + * @avg_bw: aggregated value of average bandwidth
+>> + * @peak_bw: aggregated value of peak bandwidth
+>> + * @data: pointer to private data
+>> + */
+>> +struct icc_node {
+>> +	int			id;
+>> +	const char              *name;
+>> +	struct icc_node		**links;
+>> +	size_t			num_links;
+>> +
+>> +	struct icc_provider	*provider;
+>> +	struct list_head	node_list;
+>> +	struct list_head	orphan_list;
+> 
+> orphan_list is not used (nor documented)
+
+It's not used anymore. Will remove!
+
+Thanks,
+Georgi
