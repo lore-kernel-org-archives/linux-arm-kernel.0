@@ -1,91 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 12 Apr 2018 12:56:07 +0100
-Subject: [PATCH] iommu/arm-smmu-v3: Set GBPA to abort all transactions
-In-Reply-To: <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
-References: <1522247980-31892-1-git-send-email-timur@codeaurora.org>
- <3350f0eb84c8c621cf43aa06ed117cfb@www.loen.fr>
- <3772fb2d-01b7-4820-6d13-a0263654dabc@codeaurora.org>
- <438a6180-fca8-d3a1-985f-e595529911f3@arm.com>
- <7756f245-6c63-92d4-d101-4040a45b660b@arm.com>
-Message-ID: <265a41d4-ec3c-6697-0340-6830807ea10f@arm.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 12 Apr 2018 14:10:28 +0200
+Subject: [PATCH v7 3/9] pinctrl: actions: Add Actions S900 pinctrl driver
+In-Reply-To: <CACRpkdZPOSDenSORGVLPuJKPP_iE97mZLXHJLcF2kH5wKPw=tg@mail.gmail.com>
+References: <20180404172258.7678-1-manivannan.sadhasivam@linaro.org>
+ <20180404172258.7678-4-manivannan.sadhasivam@linaro.org>
+ <CACRpkdZPOSDenSORGVLPuJKPP_iE97mZLXHJLcF2kH5wKPw=tg@mail.gmail.com>
+Message-ID: <94aceb15-63a5-44a3-d0bc-f56adebc27d5@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/18 11:17, Robin Murphy wrote:
-> On 11/04/18 17:54, Marc Zyngier wrote:
->> Hi Sammer,
->>
->> On 11/04/18 16:58, Goel, Sameer wrote:
->>>
->>>
->>> On 3/28/2018 9:00 AM, Marc Zyngier wrote:
->>>> On 2018-03-28 15:39, Timur Tabi wrote:
->>>>> From: Sameer Goel <sgoel@codeaurora.org>
->>>>>
->>>>> Set SMMU_GBPA to abort all incoming translations during the SMMU reset
->>>>> when SMMUEN==0.
->>>>>
->>>>> This prevents a race condition where a stray DMA from the crashed primary
->>>>> kernel can try to access an IOVA address as an invalid PA when SMMU is
->>>>> disabled during reset in the crash kernel.
->>>>>
->>>>> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
->>>>> ---
->>>>>  ?drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
->>>>>  ?1 file changed, 12 insertions(+)
->>>>>
->>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>>>> index 3f2f1fc68b52..c04a89310c59 100644
->>>>> --- a/drivers/iommu/arm-smmu-v3.c
->>>>> +++ b/drivers/iommu/arm-smmu-v3.c
->>>>> @@ -2458,6 +2458,18 @@ static int arm_smmu_device_reset(struct
->>>>> arm_smmu_device *smmu, bool bypass)
->>>>>  ???? if (reg & CR0_SMMUEN)
->>>>>  ???????? dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
->>>>>
->>>>> +??? /*
->>>>> +???? * Abort all incoming translations. This can happen in a kdump case
->>>>> +???? * where SMMU is initialized when a prior DMA is pending. Just
->>>>> +???? * disabling the SMMU in this case might result in writes to invalid
->>>>> +???? * PAs.
->>>>> +???? */
->>>>> +??? ret = arm_smmu_update_gbpa(smmu, 1, GBPA_ABORT);
->>>>> +??? if (ret) {
->>>>> +??????? dev_err(smmu->dev, "GBPA not responding to update\n");
->>>>> +??????? return ret;
->>>>> +??? }
->>>>> +
->>>>>  ???? ret = arm_smmu_device_disable(smmu);
->>>>>  ???? if (ret)
->>>>>  ???????? return ret;
->>>>
->>>> A tangential question: can we reliably detect that the SMMU already
->>>> has valid mappings, which would indicate that we're in a pretty bad
->>>> shape already by the time we set that bit? For all we know, memory
->>>> could have been corrupted long before we hit this point, and this
->>>> patch barely narrows the window of opportunity.
->>>
->>> :) Yes that is correct. This only covers the kdump scenario. Trying
->>> to get some reliability when booting up the crash kernel. The system
->>> is already in a bad state. I don't think that this will happen in a
->>> normal scenario. But please point me to the GICv3 change and I'll
->>> have a look.
->>
->> See this:
->> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/tree/drivers/irqchip/irq-gic-v3-its.c?h=irq/irqchip-4.17&id=6eb486b66a3094cdcd68dc39c9df3a29d6a51dd5#n3407
+Am 12.04.2018 um 11:04 schrieb Linus Walleij:
+> On Wed, Apr 4, 2018 at 7:22 PM, Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
 > 
-> The nearest equivalent to that is probably the top-level SMMUEN check 
-> that we already have (see the diff context above). To go beyond that 
-> you'd have to chase the old stream table pointer and scan the whole 
-> thing looking for valid contexts, then potentially walk page tables 
-> within those contexts to check for live translations if you really 
-> wanted to be sure. That would be a hell of a lot of work to do in the 
-> boot path.
-Yeah, feels a bit too involved for sanity. I'd simply suggest you taint
-the kernel if you find the SMMU enabled, as you're already on shaky ground.
+>> Add pinctrl driver for Actions Semi S900 SoC. The driver supports
+>> pinctrl, pinmux and pinconf functionalities through a range of registers
+>> common to both gpio driver and pinctrl driver.
+>>
+>> Pinmux functionality is available only for the pin groups while the
+>> pinconf functionality is available for both pin groups and individual
+>> pins.
+>>
+>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> 
+> Patch applied for v4.18
+> 
+> GOOD WORK!
+> 
+> We really need to get this in so that Andreas can work on S500
+> patches with this as a base.
 
-Thanks,
+No, I refused to do that. If his patches get merged, Mani offered that
+he will take care of rebasing/rewriting S500 part.
 
-	M.
+> 
+> If any review comments still remain they can surely be addressed
+> with incremental improvement patches.
+
+My biggest problem was/is that Mani designed his structs totally
+different from mine, with no explanation why or how they correlate.
+
+Also I had protested against him defining fake pins for the drive
+strength. Since I did not have time to review the newer patches yet,
+please make sure that this is addressed _before_ merging. Changing the
+binding after the fact is a problem!
+
+Regards,
+Andreas
+
 -- 
-Jazz is not dead. It just smells funny...
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
