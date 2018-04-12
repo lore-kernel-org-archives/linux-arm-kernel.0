@@ -1,70 +1,58 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 12 Apr 2018 16:51:36 +0200
-Subject: [PATCH 3/3] ARM: dts: sun7i: Add support for the Ainol AW1 tablet
-In-Reply-To: <7f6d6a6a5a0cc2d37ebba046509d4f25d3bfa600.camel@paulk.fr>
-References: <20180410213129.24049-1-contact@paulk.fr>
- <20180410213129.24049-3-contact@paulk.fr>
- <20180411070657.kw6uckqtmwb7p5hf@flea>
- <7f6d6a6a5a0cc2d37ebba046509d4f25d3bfa600.camel@paulk.fr>
-Message-ID: <20180412145136.zp2i7u76oinphiiz@flea>
+Date: Thu, 12 Apr 2018 16:56:28 +0200
+Subject: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow getting syscon
+ regmap from device
+In-Reply-To: <20180411141641.14675-4-icenowy@aosc.io>
+References: <20180411141641.14675-1-icenowy@aosc.io>
+ <20180411141641.14675-4-icenowy@aosc.io>
+Message-ID: <20180412145628.iaaeue2imiijwx5d@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 01:08:51AM +0200, Paul Kocialkowski wrote:
-> > > +	backlight: backlight {
-> > > +		compatible = "pwm-backlight";
-> > > +		pinctrl-names = "default";
-> > > +		pinctrl-0 = <&backlight_enable_pin>;
-> > 
-> > You don't need any of the pinctrl nodes for the GPIOs
+On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
+> From: Chen-Yu Tsai <wens@csie.org>
 > 
-> I tried without the pinctrl nodes and got issues on various controllers
-> (e.g. i2c for the touchscreen) because of the missing pinctrl nodes on
-> 4.16. Maybe I'm missing some patches here?
-
-You don't need any patches. What was the error exactly?
-
-> > > +&cpu0 {
-> > > +	cpu-supply = <&reg_dcdc2>;
-> > > +};
-> > 
-> > How was CPUfreq tested?
+> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
+> address space; on the A64 SoC this register is in the SRAM controller
+> address space, and with a different offset.
 > 
-> In fact, I haven't tried it at all, but I can definitely do that with
-> e.g. ssvb's stress test for various cpufreq functioning points.
-
-That would be great yes.
-
-> > > +&i2c2 {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&i2c2_pins_a>;
-> > > +	status = "okay";
-> > > +	clock-frequency = <400000>; /* 400 KHz required for
-> > > GSL1680. */
-> > 
-> > I'm not sure that comment is worth it. The only device there is the
-> > touchscreen, so it's kind of obvious that it's the device that needs
-> > that frequency.
+> To access the register from another device and hide the internal
+> difference between the device, let it register a regmap named
+> "emac-clock". We can then get the device from the phandle, and
+> retrieve the regmap with dev_get_regmap(); in this situation the
+> regmap_field will be set up to access the only register in the regmap.
 > 
-> Well, I found a similar comment in the other dts using the same
-> touchscreen controller. Since the information was rather valuable (it
-> made it clear that I needed the same clock frequency for that specific
-> touchscreen),
-
-You can have the same kind of comment for pretty much all DT
-lines. you could for example have on the pinctrl property just above
-the comment that the I2C2 on that boards are tied to those pins. But
-that's just redundant, and the SNR would be pretty bad if we were to
-do it everywhere.
-
-> it might help others in the future (even if only when grepping for
-> gsl1680).
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> [Icenowy: change to use regmaps with single register, change commit
+>  message]
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48 ++++++++++++++++++++++-
+>  1 file changed, 46 insertions(+), 2 deletions(-)
 > 
-> > > +
-> > > +	gsl1680: touchscreen at 40 {
-> > > +		compatible = "silead,gsl1680";
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> index 1037f6c78bca..b61210c0d415 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
+>  	.msb = 31,
+>  };
+>  
+> +/* Specially exported regmap which contains only EMAC register */
+> +const struct reg_field single_reg_field = {
+> +	.reg = 0,
+> +	.lsb = 0,
+> +	.msb = 31,
+> +};
+> +
 
-You have the gsl1680 two times here, so grep would find it either way.
+I'm not sure this would be wise. If we ever need some other register
+exported through the regmap, will have to change all the calling sites
+everywhere in the kernel, which will be a pain and will break
+bisectability.
+
+Chen-Yu's (or was it yours?) initial solution with a custom writeable
+hook only allowing a single register seemed like a better one.
 
 Maxime
 
@@ -78,4 +66,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/8b948e5b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/bc97122b/attachment.sig>
