@@ -1,35 +1,38 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 12 Apr 2018 08:26:00 +0200
-Subject: [PATCH V2] drm/amdgpu: limit DMA size to PAGE_SIZE for
- scatter-gather buffers
-In-Reply-To: <32b82296-bba5-b5f1-266b-45c1ed66da94@arm.com>
-References: <1523394001-4615-1-git-send-email-okaya@codeaurora.org>
- <32b82296-bba5-b5f1-266b-45c1ed66da94@arm.com>
-Message-ID: <20180412062600.GB30499@lst.de>
+From: fabien.dessenne@st.com (Fabien Dessenne)
+Date: Thu, 12 Apr 2018 08:47:39 +0200
+Subject: [PATCH v4 0/2] mailbox: introduce STMicroelectronics STM32 IPCC driver
+Message-ID: <1523515661-8318-1-git-send-email-fabien.dessenne@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 01:03:59PM +0100, Robin Murphy wrote:
-> On 10/04/18 21:59, Sinan Kaya wrote:
->> Code is expecing to observe the same number of buffers returned from
->> dma_map_sg() function compared to sg_alloc_table_from_pages(). This
->> doesn't hold true universally especially for systems with IOMMU.
->
-> So why not fix said code? It's clearly not a real hardware limitation, and 
-> the map_sg() APIs have potentially returned fewer than nents since forever, 
-> so there's really no excuse.
+The STMicroelectronics STM32 Inter-Processor Communication Controller
+(IPCC) is used for communicating data between two processors.
+It provides a non blocking signaling mechanism to post and retrieve
+communication data in an atomic way.
 
-Yes, relying on dma_map_sg returning the same number of entries as passed
-it is completely bogus.
+Changes since v4:
+- add Rob's 'Reviewed-by' in dt bindings
 
->> IOMMU driver tries to combine buffers into a single DMA address as much
->> as it can. The right thing is to tell the DMA layer how much combining
->> IOMMU can do.
->
-> Disagree; this is a dodgy hack, since you'll now end up passing 
-> scatterlists into dma_map_sg() which already violate max_seg_size to begin 
-> with, and I think a conscientious DMA API implementation would be at rights 
-> to fail the mapping for that reason (I know arm64 happens not to, but that 
-> was a deliberate design decision to make my life easier at the time).
+Changes since v3:
+- update after Jassi Brar review: remove 'driver.owner'
 
-Agreed.
+Changes since v2:
+- update bindings and driver according to Rob's comments:
+    - change compatible property to "st,stm32mp1-ipcc"
+    - change "st,proc_id" property to "st,proc-id"
+    - define all interrupts as mandatory
+
+Fabien Dessenne (2):
+  dt-bindings: mailbox: add STMicroelectronics STM32 IPCC binding
+  mailbox: add STMicroelectronics STM32 IPCC driver
+
+ .../devicetree/bindings/mailbox/stm32-ipcc.txt     |  47 +++
+ drivers/mailbox/Kconfig                            |   8 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/stm32-ipcc.c                       | 402 +++++++++++++++++++++
+ 4 files changed, 459 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/stm32-ipcc.txt
+ create mode 100644 drivers/mailbox/stm32-ipcc.c
+
+-- 
+2.7.4
