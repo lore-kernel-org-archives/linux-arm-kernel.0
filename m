@@ -1,29 +1,27 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 12 Apr 2018 10:22:15 -0700
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <20180412172051.GK16141@n2100.armlinux.org.uk>
-References: <20180409152253.GD10489@altlinux.org>
- <20180412013435.GA21219@altlinux.org>
- <20180412095811.GC16141@n2100.armlinux.org.uk>
- <20180412110314.GA28070@altlinux.org>
- <20180412121949.GD16141@n2100.armlinux.org.uk>
- <20180412124928.GA29458@altlinux.org>
- <20180412131404.GE16141@n2100.armlinux.org.uk>
- <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
- <20180412172051.GK16141@n2100.armlinux.org.uk>
-Message-ID: <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 12 Apr 2018 18:24:56 +0100
+Subject: [bug report] locking/qrwlock, arm64: Move rwlock implementation
+ over to qrwlocks causes CPU crashes/stalls when killing java processes
+In-Reply-To: <CACgAJHzeS7CNqLaVckNtS5BNTsqe0ac+u0LwJAr1_1i1=OLcnA@mail.gmail.com>
+References: <CACgAJHzeS7CNqLaVckNtS5BNTsqe0ac+u0LwJAr1_1i1=OLcnA@mail.gmail.com>
+Message-ID: <20180412172456.GA27033@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 10:20 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> This file was created to contain FPE_FIXME, by the "signal/arm: Document
-> conflicts with SI_USER and SIGFPE" commit so if we're removing it, it
-> would be better to remove the whole file.
+Hi Tai,
 
-Fair enough. I'm not going to commit that anyway since I can't test
-it, but yes, if it tests ok that sounds like the right thing to do.
+On Thu, Apr 12, 2018 at 10:10:40AM -0700, Tai Tri Nguyen wrote:
+> Recently I have observed the CPU crashes/stalls when rebooting after I
+> ran cassandra benchmark.
+> The issue happens randomly.
 
-                   Linus
+Please could you share some logs and more details about the crashes and
+stalls? At the moment there's not much we can do with this report :/
+
+Ideally, we'd have steps to reproduce the issue, but it seems that you
+don't have a reliable method for that.
+
+One other thing you could try is removing the WFE from our cmpwait
+implementation in case you have a CPU erratum in that area.
+
+Will
