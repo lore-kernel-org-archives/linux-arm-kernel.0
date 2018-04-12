@@ -1,57 +1,106 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 12 Apr 2018 19:35:16 +0200
-Subject: arm64 kvm built with clang doesn't boot
-In-Reply-To: <20180316143119.cdjw4dhm6crcjyrd@lakrids.cambridge.arm.com>
-References: <CAAeHK+xjnXnrG0p06r-QRcUucYi5vcTJOn3mSS-JVxX9_TYg4w@mail.gmail.com>
- <20180316141313.q5vjmj627rv7r7kf@lakrids.cambridge.arm.com>
- <20180316143119.cdjw4dhm6crcjyrd@lakrids.cambridge.arm.com>
-Message-ID: <CAAeHK+wqogT5-iZiWzBMyNEtxxTE2JrgcdVK1+6WFgRm77+cRA@mail.gmail.com>
+From: ldv@altlinux.org (Dmitry V. Levin)
+Date: Thu, 12 Apr 2018 20:35:58 +0300
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+References: <20180409152253.GD10489@altlinux.org>
+ <20180412013435.GA21219@altlinux.org>
+ <20180412095811.GC16141@n2100.armlinux.org.uk>
+ <20180412110314.GA28070@altlinux.org>
+ <20180412121949.GD16141@n2100.armlinux.org.uk>
+ <20180412124928.GA29458@altlinux.org>
+ <20180412131404.GE16141@n2100.armlinux.org.uk>
+ <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+Message-ID: <20180412173558.GB31781@altlinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 16, 2018 at 3:31 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Mar 16, 2018 at 02:13:14PM +0000, Mark Rutland wrote:
->> On Fri, Mar 16, 2018 at 02:49:00PM +0100, Andrey Konovalov wrote:
->> > Hi!
->>
->> Hi,
->>
->> > I've recently tried to boot clang built kernel on real hardware
->> > (Odroid C2 board) instead of using a VM. The issue that I stumbled
->> > upon is that arm64 kvm built with clang doesn't boot.
->> >
->> > Adding -fno-jump-tables compiler flag to arch/arm64/kvm/* helps. There
->> > was a patch some time ago that did exactly that
->> > (https://patchwork.kernel.org/patch/10060381/), but it wasn't accepted
->> > AFAICT (see the discussion on that thread).
->> >
->> > What would be the best way to get this fixed?
->>
->> I think that patch is our best bet currently, but to save ourselves pain
->> in future it would be *really* nice if GCC and clang could provide an
->> option line -fno-absolute-addressing that would implicitly disable any
->> feature that would generate an absolute address as jump tables do.
->>
->> > I've also had to disable CONFIG_JUMP_LABEL to get the kernel boot
->> > (even without kvm enabled), but that might be a different (though
->> > related) issue.
->>
->> With v4.15 (and clang 5.0.0), I did not have to disable jump labels to
->> get a kernel booting on a Juno platform, though I did have to pass
->> -fno-jump-tables to the hyp code.
->
-> FWIW, with that same compiler and patch applied atop of v4.16-rc4, and
-> some bodges around clang not liking the rX register naming in the SMCCC
-> code, I get a kernel that boots on my Juno, though I immediately hit a
-> KASAN splat:
->
-> [    8.476766] ==================================================================
-> [    8.483990] BUG: KASAN: slab-out-of-bounds in __d_lookup_rcu+0x350/0x400
-> [    8.490664] Read of size 8 at addr ffff8009336e2a30 by task init/1
+On Thu, Apr 12, 2018 at 09:50:26AM -0700, Linus Torvalds wrote:
+> Does this attached patch perhaps fix the ARM case?
+> 
+> It just uses FPE_FLTUNK as the default si_code for SIGFPE, which seems
+> sane enough. And then gets rid of FPE_FIXME, which should resolve the
+> nasty case.
+> 
+> Hmm? Entirely untested, and I didn't really look at the test-case in
+> question since I can't really run it anyway.
+> 
+> Well, I could run it all on x86-64, but it doesn't have that FPE_FIXME
+> case at all.
+> 
+>                  Linus
 
-Hi Mark!
+>  arch/arm/include/uapi/asm/siginfo.h | 7 -------
+>  arch/arm/vfp/vfpmodule.c            | 4 ++--
+>  2 files changed, 2 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
+> index d0513880be21..d87beeedb4c4 100644
+> --- a/arch/arm/include/uapi/asm/siginfo.h
+> +++ b/arch/arm/include/uapi/asm/siginfo.h
+> @@ -3,11 +3,4 @@
+>  
+>  #include <asm-generic/siginfo.h>
+>  
+> -/*
+> - * SIGFPE si_codes
+> - */
+> -#ifdef __KERNEL__
+> -#define FPE_FIXME	0	/* Broken dup of SI_USER */
+> -#endif /* __KERNEL__ */
+> -
+>  #endif
 
-Just FYI, this should be fixed with https://reviews.llvm.org/D44981 +
-https://patchwork.kernel.org/patch/10339103/
+Looks like the whole file should go away.
 
-Thanks!
+> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> index 4c375e11ae95..012c6e690303 100644
+> --- a/arch/arm/vfp/vfpmodule.c
+> +++ b/arch/arm/vfp/vfpmodule.c
+> @@ -251,13 +251,13 @@ static void vfp_panic(char *reason, u32 inst)
+>   */
+>  static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_regs *regs)
+>  {
+> -	int si_code = 0;
+> +	int si_code = FPE_FLTUNK;
+
+Note that this change would affect the following code
+at the end of vfp_raise_exceptions:
+
+	if (si_code)
+		vfp_raise_sigfpe(si_code, regs);
+
+>  	pr_debug("VFP: raising exceptions %08x\n", exceptions);
+>  
+>  	if (exceptions == VFP_EXCEPTION_ERROR) {
+>  		vfp_panic("unhandled bounce", inst);
+> -		vfp_raise_sigfpe(FPE_FIXME, regs);
+> +		vfp_raise_sigfpe(si_code, regs);
+>  		return;
+>  	}
+>  
+
+To be on the safe side, I'd just change it this way:
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 4c375e1..66a73ba 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -257,7 +257,7 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
+ 
+ 	if (exceptions == VFP_EXCEPTION_ERROR) {
+ 		vfp_panic("unhandled bounce", inst);
+-		vfp_raise_sigfpe(FPE_FIXME, regs);
++		vfp_raise_sigfpe(FPE_FLTUNK, regs);
+ 		return;
+ 	}
+
+-- 
+ldv
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/8a5a5062/attachment.sig>
