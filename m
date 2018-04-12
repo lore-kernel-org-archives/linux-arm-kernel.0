@@ -1,36 +1,31 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 12 Apr 2018 09:50:26 -0700
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <20180412131404.GE16141@n2100.armlinux.org.uk>
-References: <20180409152253.GD10489@altlinux.org>
- <20180412013435.GA21219@altlinux.org>
- <20180412095811.GC16141@n2100.armlinux.org.uk>
- <20180412110314.GA28070@altlinux.org>
- <20180412121949.GD16141@n2100.armlinux.org.uk>
- <20180412124928.GA29458@altlinux.org>
- <20180412131404.GE16141@n2100.armlinux.org.uk>
-Message-ID: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 12 Apr 2018 18:55:28 +0200
+Subject: [PATCH 08/15] ASoC: pxa: remove the dmaengine compat need
+In-Reply-To: <20180412152632.GG9929@sirena.org.uk> (Mark Brown's message of
+ "Thu, 12 Apr 2018 16:26:32 +0100")
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-9-robert.jarzmik@free.fr>
+ <20180412152632.GG9929@sirena.org.uk>
+Message-ID: <87a7u82wlb.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Does this attached patch perhaps fix the ARM case?
+Mark Brown <broonie@kernel.org> writes:
 
-It just uses FPE_FLTUNK as the default si_code for SIGFPE, which seems
-sane enough. And then gets rid of FPE_FIXME, which should resolve the
-nasty case.
+> On Mon, Apr 02, 2018 at 04:26:49PM +0200, Robert Jarzmik wrote:
+>> As the pxa architecture switched towards the dmaengine slave map, the
+>> old compatibility mechanism to acquire the dma requestor line number and
+>> priority are not needed anymore.
+>
+> Acked-by: Mark Brown <broonie@kernel.org>
+>
+> If there's no dependency I'm happy to take this for 4.18.
+Thanks for the ack.
 
-Hmm? Entirely untested, and I didn't really look at the test-case in
-question since I can't really run it anyway.
+The patches 1 and 2 are the dependency here, so I'd rather push it through my
+tree once the review is complete.
 
-Well, I could run it all on x86-64, but it doesn't have that FPE_FIXME
-case at all.
+Cheers.
 
-                 Linus
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: patch.diff
-Type: text/x-patch
-Size: 1163 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/e30ddd2a/attachment.bin>
+-- 
+Robert
