@@ -1,139 +1,144 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 12 Apr 2018 13:14:10 +0200
-Subject: [PATCH v7 05/26] PM / Domains: Add helper functions to attach/detach
- CPUs to/from genpd
-In-Reply-To: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
-References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1523531671-27491-6-git-send-email-ulf.hansson@linaro.org>
+Date: Thu, 12 Apr 2018 13:14:05 +0200
+Subject: [PATCH v7 00/26] PM / Domains: Support hierarchical CPU arrangement
+ (PSCI/ARM)
+Message-ID: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce two new genpd helper functions, of_genpd_attach|detach_cpu(),
-which takes the CPU-number as an in-parameter.
+Changes in v7:
+ - Addressed comments concerning the PSCI changes from Mark Rutland, which moves
+   the psci firmware driver to a new firmware subdir and change to force PSCI PC
+   mode during boot to cope with kexec'ed booted kernels.
+ - Added some maintainers in cc for the timer/nohz patches.
+ - Minor update to the new genpd governor, taking into account the state's
+   poweroff latency while validating the sleep duration time.
+ - Addressed a problem pointed out by Geert Uytterhoeven, around calling
+   pm_runtime_get|put() for CPUs that has not been attached to a CPU PM domain.
+ - Re-based on Linus' latest master.
 
-To attach a CPU to a genpd, of_genpd_attach_cpu() starts by fetching the
-struct device belonging to the CPU. Then it calls genpd_dev_pm_attach(),
-which via DT tries to hook up the CPU device to its corresponding PM
-domain. If it succeeds, of_genpd_attach_cpu() continues to prepare/enable
-runtime PM of the device.
 
-To detach a CPU from its PM domain, of_genpd_attach_cpu() reverse the
-operations made from of_genpd_attach_cpu(). However, first it checks that
-the CPU device has a valid PM domain pointer assigned, as to make sure it
-belongs to genpd.
+This series is a re-worked version from Lina Iyer's two series [1] that got
+posted more than a year ago by now. I have picked up the series and done a
+significant re-work of it and here's the result. All patches have been changed,
+some have been dropped, some are entirely new.
 
-Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/base/power/domain.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pm_domain.h   |  9 ++++++
- 2 files changed, 76 insertions(+)
+For those few changes that are kind of similar, I have kept Lina's authorship,
+the rest are now authored by me.
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index e178521..91ea9b2 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2324,6 +2324,73 @@ int genpd_dev_pm_attach(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
- 
-+/**
-+ * of_genpd_attach_cpu() - Attach a CPU to its PM domain
-+ * @cpu: The CPU to be attached.
-+ *
-+ * Try to find the corresponding PM domain provider for the CPU's device. Use
-+ * it to attach the CPU's device to its PM domain. If attaching is completed
-+ * successfully, we enable runtime PM for the CPU's device.
-+ *
-+ * Returns zero on success else a negative error code.
-+ */
-+int of_genpd_attach_cpu(int cpu)
-+{
-+	struct device *dev = get_cpu_device(cpu);
-+	int ret;
-+
-+	if (!dev) {
-+		pr_warn("genpd: no dev for cpu%d\n", cpu);
-+		return -ENODEV;
-+	}
-+
-+	ret = genpd_dev_pm_attach(dev);
-+	if (ret) {
-+		dev_warn(dev, "genpd: attach cpu failed %d\n", ret);
-+		return ret;
-+	}
-+
-+	pm_runtime_irq_safe(dev);
-+	pm_runtime_get_noresume(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+
-+	dev_info(dev, "genpd: attached cpu\n");
-+	return 0;
-+}
-+EXPORT_SYMBOL(of_genpd_attach_cpu);
-+
-+/**
-+ * of_genpd_detach_cpu() - Detach a CPU from its PM domain
-+ * @cpu: The CPU to be detached.
-+ *
-+ * Detach the CPU's device from its corresponding PM domain. If detaching is
-+ * completed successfully, disable runtime PM and restore the runtime PM usage
-+ * count for the CPU's device.
-+ */
-+void of_genpd_detach_cpu(int cpu)
-+{
-+	struct device *dev = get_cpu_device(cpu);
-+
-+	if (!dev) {
-+		pr_warn("genpd: no dev for cpu%d\n", cpu);
-+		return;
-+	}
-+
-+	/* Check that the device is attached to a genpd. */
-+	if (!(dev->pm_domain && dev->pm_domain->detach == genpd_dev_pm_detach))
-+		return;
-+
-+	genpd_dev_pm_detach(dev, true);
-+
-+	pm_runtime_disable(dev);
-+	pm_runtime_put_noidle(dev);
-+	pm_runtime_reinit(dev);
-+
-+	dev_info(dev, "genpd: detached cpu\n");
-+}
-+EXPORT_SYMBOL(of_genpd_detach_cpu);
-+
- static const struct of_device_id idle_state_match[] = {
- 	{ .compatible = "domain-idle-state", },
- 	{ }
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 29ab00c..ccd7c94 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -249,6 +249,8 @@ extern int of_genpd_parse_idle_states(struct device_node *dn,
- 			struct genpd_power_state **states, int *n);
- 
- int genpd_dev_pm_attach(struct device *dev);
-+int of_genpd_attach_cpu(int cpu);
-+void of_genpd_detach_cpu(int cpu);
- #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
- static inline int of_genpd_add_provider_simple(struct device_node *np,
- 					struct generic_pm_domain *genpd)
-@@ -287,6 +289,13 @@ static inline int genpd_dev_pm_attach(struct device *dev)
- 	return -ENODEV;
- }
- 
-+static inline int of_genpd_attach_cpu(int cpu)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline void of_genpd_detach_cpu(int cpu) {}
-+
- static inline
- struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
- {
+ - Lina (or anybody else for that matter) please tell if you think I should
+   change, in regards to what tag/authorship should be for each commit!
+
+Some background:
+
+Overall this series have been discussed over years at various Linux conferences
+and LKML, although let me give a brief introduction and then the rest can be
+read in each changelog.
+
+For ARM, the PSCI firmware interface may be managing the power to the CPUs.
+Depending on the SoC, CPUs may also be arranged in hierarchical manner, which
+could add another level of complexity from a CPU idle management point of view.
+
+PSCI v1.0+ adds support for the so called OS initiated CPU suspend mode, which
+enables a more fine grained method, allowing Linux to get more control, in
+regards to being energy efficient. This is typically useful for these kind of
+complex battery driven platforms.
+
+Now, in principle what is missing today around CPU idle management for these
+SoCs arranging CPUs in a hierarchical manner, that is what this series intends
+to address.
+
+I could potentially have split the series into two parts, but for completeness
+I decided to post it as one. Please tell if want me to change!
+
+ - The first part are changes to generic PM code (genpd, cpu_pm and timers):
+   Patch 1 -> Patch 9.
+
+ - The second part, which depends on the first, are changes specific to
+   PSCI/ARM64 (psci, of, arm64): Patch 10 -> Patch 26.
+
+The series is based on Linus' master as of today. The code has been tested on a
+QCOM 410c dragonboard and I except that test coverage should be increased by
+some more boards shortly (for ARM64 with PSCI OSI support - only a few DT
+changes are needed). You may find the code at:
+
+git.linaro.org/people/ulf.hansson/linux-pm.git next
+
+If for some reason you want to have a look at the previous version, it's
+available at a branch, next_v6, in the same git as above.
+
+Kind regards
+Ulf Hansson
+
+[1]
+https://lwn.net/Articles/716300/
+https://www.spinics.net/lists/arm-kernel/msg566200.html
+
+
+Lina Iyer (6):
+  PM / Domains: Add generic data pointer to genpd_power_state struct
+  timer: Export next wakeup time of a CPU
+  dt: psci: Update DT bindings to support hierarchical PSCI states
+  cpuidle: dt: Support hierarchical CPU idle states
+  drivers: firmware: psci: Support hierarchical CPU idle states
+  arm64: dts: Convert to the hierarchical CPU topology layout for
+    MSM8916
+
+Ulf Hansson (20):
+  PM / Domains: Don't treat zero found compatible idle states as an
+    error
+  PM / Domains: Deal with multiple states but no governor in genpd
+  PM / Domains: Add support for CPU devices to genpd
+  PM / Domains: Add helper functions to attach/detach CPUs to/from genpd
+  PM / Domains: Add genpd governor for CPUs
+  PM / Domains: Extend genpd CPU governor to cope with QoS constraints
+  kernel/cpu_pm: Manage runtime PM in the idle path for CPUs
+  of: base: Add of_get_cpu_state_node() to get idle states for a CPU
+    node
+  drivers: firmware: psci: Move psci to separate directory
+  MAINTAINERS: Update files for PSCI
+  drivers: firmware: psci: Split psci_dt_cpu_init_idle()
+  drivers: firmware: psci: Simplify error path of psci_dt_init()
+  drivers: firmware: psci: Announce support for OS initiated suspend
+    mode
+  drivers: firmware: psci: Prepare to use OS initiated suspend mode
+  drivers: firmware: psci: Share a few internal PSCI functions
+  drivers: firmware: psci: Add support for PM domains using genpd
+  drivers: firmware: psci: Introduce psci_dt_topology_init()
+  drivers: firmware: psci: Try to attach CPU devices to their PM domains
+  drivers: firmware: psci: Deal with CPU hotplug when using OSI mode
+  arm64: kernel: Respect the hierarchical CPU topology in DT for PSCI
+
+ Documentation/devicetree/bindings/arm/psci.txt | 156 +++++++++++++++++++++
+ MAINTAINERS                                    |   2 +-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi          |  53 +++++++-
+ arch/arm64/kernel/setup.c                      |   3 +
+ drivers/base/power/domain.c                    | 156 ++++++++++++++++++++-
+ drivers/base/power/domain_governor.c           |  67 ++++++++-
+ drivers/cpuidle/dt_idle_states.c               |   5 +-
+ drivers/firmware/Kconfig                       |  15 +--
+ drivers/firmware/Makefile                      |   3 +-
+ drivers/firmware/psci/Kconfig                  |  13 ++
+ drivers/firmware/psci/Makefile                 |   4 +
+ drivers/firmware/{ => psci}/psci.c             | 174 ++++++++++++++++++------
+ drivers/firmware/psci/psci.h                   |  19 +++
+ drivers/firmware/{ => psci}/psci_checker.c     |   0
+ drivers/firmware/psci/psci_pm_domain.c         | 180 +++++++++++++++++++++++++
+ drivers/of/base.c                              |  35 +++++
+ include/linux/of.h                             |   8 ++
+ include/linux/pm_domain.h                      |  16 +++
+ include/linux/psci.h                           |   2 +
+ include/linux/tick.h                           |  10 ++
+ include/uapi/linux/psci.h                      |   5 +
+ kernel/cpu_pm.c                                |  11 ++
+ kernel/time/tick-sched.c                       |  11 ++
+ 23 files changed, 878 insertions(+), 70 deletions(-)
+ create mode 100644 drivers/firmware/psci/Kconfig
+ create mode 100644 drivers/firmware/psci/Makefile
+ rename drivers/firmware/{ => psci}/psci.c (83%)
+ create mode 100644 drivers/firmware/psci/psci.h
+ rename drivers/firmware/{ => psci}/psci_checker.c (100%)
+ create mode 100644 drivers/firmware/psci/psci_pm_domain.c
+
 -- 
 2.7.4
