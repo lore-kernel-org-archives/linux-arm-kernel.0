@@ -1,260 +1,439 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 12 Apr 2018 09:23:47 +0530
-Subject: [PATCH 02/14] ARM: OMAP2: Add functions to save and restore
- clockdomain context en-masse.
+Date: Thu, 12 Apr 2018 09:23:48 +0530
+Subject: [PATCH 03/14] ARM: OMAP2+: omap_hwmod: Introduce HWMOD_NEEDS_REIDLE
 In-Reply-To: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
 References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1523505239-16229-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <1523505239-16229-4-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russ Dill <Russ.Dill@ti.com>
+From: Dave Gerlach <d-gerlach@ti.com>
 
-This is used to support suspend modes like RTC-only and hibernate where
-the state of the registers controlling clockdomains is lost.
+Some hwmods will not properly assert signals to the PRCM after a
+context loss if no driver is present which leads to issues with suspend.
+This can be caused by the SYSCONFIG register not being programmed
+correctly by default or a softreset being needed before the module will
+idle. omap_hwmod will program the SYSCONFIG, idle and softreset them
+properly after boot but after the first context loss they will be in
+the wrong state once again so suspend will no longer work as there
+is no driver associated with the hwmod.
 
-Signed-off-by: Russ Dill <Russ.Dill@ti.com>
+Introduce a new flag, HWMOD_NEEDS_REIDLE, to allow these modules to be
+tracked and properly handled. omap_hwmod maintains a list of these
+modules and uses a PM notifier to enable and then idle and softreset the
+hwmods immediately after resume. omap_device will remove hwmods from this
+list when a driver is bound and add the hwmods back if the driver is
+removed to avoid any conflicts and allow the proper pm layer to handle
+things when a driver is present.
+
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/mach-omap2/clockdomain.c | 46 +++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/clockdomain.h |  8 ++++++
- arch/arm/mach-omap2/cm33xx.c      | 53 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/cminst44xx.c  | 43 +++++++++++++++++++++++++++++++
- 4 files changed, 150 insertions(+)
+ arch/arm/mach-omap2/omap_device.c                  |  50 ++++++++
+ arch/arm/mach-omap2/omap_device.h                  |   1 +
+ arch/arm/mach-omap2/omap_hwmod.c                   | 135 +++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod.h                   |  17 +++
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  14 ++-
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |   3 +-
+ 6 files changed, 214 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index b79b1ca..0906380 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -1307,3 +1307,49 @@ int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh)
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index 3b829a5..d1e7942 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -208,6 +208,27 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
++/**
++ * _omap_device_check_reidle_hwmods - check all hwmods in device for reidle flag
++ * @od: struct omap_device *od
++ *
++ * Checks underlying hwmods for reidle flag, if present, remove from hwmod
++ * list and set flag in omap_device to keep track.  Returns 0.
++ */
++static int _omap_device_check_reidle_hwmods(struct omap_device *od)
++{
++	int i;
++
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		if (od->hwmods[i]->flags & HWMOD_NEEDS_REIDLE) {
++			od->flags |= OMAP_DEVICE_HAS_REIDLE_HWMODS;
++			omap_hwmod_disable_reidle(od->hwmods[i]);
++		}
++	}
++
++	return 0;
++}
++
+ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 				      unsigned long event, void *dev)
+ {
+@@ -237,6 +258,13 @@ static int _omap_device_notifier_call(struct notifier_block *nb,
+ 			pm_runtime_set_active(dev);
+ 		}
+ 		break;
++	case BUS_NOTIFY_BOUND_DRIVER:
++		od = to_omap_device(pdev);
++		if (od) {
++			od->_driver_status = BUS_NOTIFY_BOUND_DRIVER;
++			_omap_device_check_reidle_hwmods(od);
++		}
++		break;
+ 	case BUS_NOTIFY_ADD_DEVICE:
+ 		if (pdev->dev.of_node)
+ 			omap_device_build_from_dt(pdev);
+@@ -285,6 +313,24 @@ static int _omap_device_idle_hwmods(struct omap_device *od)
+ 	return ret;
+ }
+ 
++/**
++ * _omap_device_reidle_hwmods - call omap_hwmod_enable_reidle on all hwmods
++ * @od: struct omap_device *od
++ *
++ * Add all underlying hwmods to hwmod reidle list.  Returns 0.
++ */
++static int _omap_device_reidle_hwmods(struct omap_device *od)
++{
++	int i;
++
++	for (i = 0; i < od->hwmods_cnt; i++)
++		if (od->hwmods[i]->flags | HWMOD_NEEDS_REIDLE)
++			omap_hwmod_enable_reidle(od->hwmods[i]);
++
++	/* XXX pass along return value here? */
++	return 0;
++}
++
+ /* Public functions for use by core code */
+ 
+ /**
+@@ -370,6 +416,9 @@ void omap_device_delete(struct omap_device *od)
+ 	if (!od)
+ 		return;
+ 
++	if (od->flags & OMAP_DEVICE_HAS_REIDLE_HWMODS)
++		_omap_device_reidle_hwmods(od);
++
+ 	od->pdev->archdata.od = NULL;
+ 	kfree(od->hwmods);
+ 	kfree(od);
+@@ -821,6 +870,7 @@ struct device *omap_device_get_by_hwmod_name(const char *oh_name)
+ 
+ static int __init omap_device_init(void)
+ {
++	omap_hwmod_setup_reidle();
+ 	bus_register_notifier(&platform_bus_type, &platform_nb);
  	return 0;
  }
+diff --git a/arch/arm/mach-omap2/omap_device.h b/arch/arm/mach-omap2/omap_device.h
+index 786b9c0..5954727 100644
+--- a/arch/arm/mach-omap2/omap_device.h
++++ b/arch/arm/mach-omap2/omap_device.h
+@@ -39,6 +39,7 @@
  
-+/**
-+ * _clkdm_save_context - save the context for the control of this clkdm
-+ *
-+ * Due to a suspend or hibernation operation, the state of the registers
-+ * controlling this clkdm will be lost, save their context.
-+ */
-+static int _clkdm_save_context(struct clockdomain *clkdm, void *ununsed)
-+{
-+	if (!arch_clkdm || !arch_clkdm->clkdm_save_context)
-+		return -EINVAL;
-+
-+	return arch_clkdm->clkdm_save_context(clkdm);
-+}
-+
-+/**
-+ * _clkdm_restore_context - restore context for control of this clkdm
-+ *
-+ * Restore the register values for this clockdomain.
-+ */
-+static int _clkdm_restore_context(struct clockdomain *clkdm, void *ununsed)
-+{
-+	if (!arch_clkdm || !arch_clkdm->clkdm_restore_context)
-+		return -EINVAL;
-+
-+	return arch_clkdm->clkdm_restore_context(clkdm);
-+}
-+
-+/**
-+ * clkdm_save_context - Saves the context for each registered clkdm
-+ *
-+ * Save the context for each registered clockdomain.
-+ */
-+void clkdm_save_context(void)
-+{
-+	clkdm_for_each(_clkdm_save_context, NULL);
-+}
-+
-+/**
-+ * clkdm_restore_context - Restores the context for each registered clkdm
-+ *
-+ * Restore the context for each registered clockdomain.
-+ */
-+void clkdm_restore_context(void)
-+{
-+	clkdm_for_each(_clkdm_restore_context, NULL);
-+}
-diff --git a/arch/arm/mach-omap2/clockdomain.h b/arch/arm/mach-omap2/clockdomain.h
-index 24667a5..c7d0953 100644
---- a/arch/arm/mach-omap2/clockdomain.h
-+++ b/arch/arm/mach-omap2/clockdomain.h
-@@ -141,6 +141,7 @@ struct clockdomain {
- 	int usecount;
- 	int forcewake_count;
- 	struct list_head node;
-+	u32 context;
- };
+ /* omap_device.flags values */
+ #define OMAP_DEVICE_SUSPENDED		BIT(0)
++#define OMAP_DEVICE_HAS_REIDLE_HWMODS	BIT(1)
  
  /**
-@@ -159,6 +160,8 @@ struct clockdomain {
-  * @clkdm_deny_idle: Disable hw supervised idle transitions for clock domain
-  * @clkdm_clk_enable: Put the clkdm in right state for a clock enable
-  * @clkdm_clk_disable: Put the clkdm in right state for a clock disable
-+ * @clkdm_save_context: Save the current clkdm context
-+ * @clkdm_restore_context: Restore the clkdm context
+  * struct omap_device - omap_device wrapper for platform_devices
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e7d23e20..90ad8e7 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -141,6 +141,7 @@
+ #include <linux/cpu.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/suspend.h>
+ #include <linux/bootmem.h>
+ 
+ #include <linux/platform_data/ti-sysc.h>
+@@ -236,6 +237,9 @@ struct omap_hwmod_soc_ops {
+ /* omap_hwmod_list contains all registered struct omap_hwmods */
+ static LIST_HEAD(omap_hwmod_list);
+ 
++/* oh_reidle_list contains all omap_hwmods with HWMOD_NEEDS_REIDLE set */
++static LIST_HEAD(oh_reidle_list);
++
+ /* mpu_oh: used to add/remove MPU initiator from sleepdep list */
+ static struct omap_hwmod *mpu_oh;
+ 
+@@ -2230,6 +2234,28 @@ int omap_hwmod_parse_module_range(struct omap_hwmod *oh,
+ }
+ 
+ /**
++ * _setup_reidle- check hwmod @oh and add to reidle list
++ * @oh: struct omap_hwmod *
++ * @n: (unused)
++ *
++ * Check hwmod for HWMOD_NEEDS_REIDLE flag and add to list if
++ * necessary. Return 0 on success.
++ */
++static int _setup_reidle(struct omap_hwmod *oh, void *data)
++{
++	int ret;
++
++	if (oh->flags & HWMOD_NEEDS_REIDLE) {
++		ret = omap_hwmod_enable_reidle(oh);
++
++		if (!ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++/**
+  * _init_mpu_rt_base - populate the virtual address for a hwmod
+  * @oh: struct omap_hwmod * to locate the virtual address
+  * @data: (unused, caller should pass NULL)
+@@ -2878,6 +2904,54 @@ static int _am33xx_deassert_hardreset(struct omap_hwmod *oh,
+ 					   oh->prcm.omap4.rstst_offs);
+ }
+ 
++/**
++ * _reidle - enable then idle a single hwmod
++ *
++ * enables and then immediately reidles an hwmod, as certain hwmods may
++ * not have their sysconfig registers programmed in an idle friendly state
++ * by default
++ */
++static void _reidle(struct omap_hwmod *oh)
++{
++	pr_debug("omap_hwmod: %s: %s\n", oh->name, __func__);
++
++	omap_hwmod_enable(oh);
++	omap_hwmod_softreset(oh);
++	omap_hwmod_idle(oh);
++}
++
++/**
++ * _reidle_all - enable then idle all hwmods in oh_reidle_list
++ *
++ * Called by pm_notifier to make sure flagged modules do not block suspend
++ * after context loss.
++ */
++static int _reidle_all(void)
++{
++	struct omap_hwmod_list *oh_list_item = NULL;
++
++	list_for_each_entry(oh_list_item, &oh_reidle_list, oh_list) {
++		_reidle(oh_list_item->oh);
++	}
++
++	return 0;
++}
++
++static int _omap_device_pm_notifier(struct notifier_block *self,
++				    unsigned long action, void *dev)
++{
++	switch (action) {
++	case PM_POST_SUSPEND:
++		_reidle_all();
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block pm_nb = {
++	.notifier_call = _omap_device_pm_notifier,
++};
++
+ /* Public functions */
+ 
+ u32 omap_hwmod_read(struct omap_hwmod *oh, u16 reg_offs)
+@@ -3529,6 +3603,52 @@ static int __init omap_hwmod_setup_all(void)
+ omap_postcore_initcall(omap_hwmod_setup_all);
+ 
+ /**
++ * omap_hwmod_enable_reidle - add an omap_hwmod to reidle list
++ * @oh: struct omap_hwmod *
++ *
++ * Adds the omap_hwmod to the oh_reidle_list so it will gets enabled then idled
++ * after each suspend cycle. Returns 0 on success.
++ */
++int omap_hwmod_enable_reidle(struct omap_hwmod *oh)
++{
++	struct omap_hwmod_list *oh_list_item = NULL;
++
++	oh_list_item = kzalloc(sizeof(*oh_list_item), GFP_KERNEL);
++
++	if (!oh_list_item)
++		return -ENOMEM;
++
++	oh_list_item->oh = oh;
++	list_add(&oh_list_item->oh_list, &oh_reidle_list);
++
++	pr_debug("omap_hwmod: %s: added to reidle list\n", oh->name);
++
++	return 0;
++}
++
++/**
++ * omap_hwmod_disable_reidle - remove an omap_hwmod from reidle list
++ * @oh: struct omap_hwmod *
++ *
++ * Remove the omap_hwmod from the oh_reidle_list. Returns 0 on success.
++ */
++int omap_hwmod_disable_reidle(struct omap_hwmod *oh)
++{
++	struct omap_hwmod_list *li, *oh_list_item = NULL;
++
++	list_for_each_entry_safe(oh_list_item, li, &oh_reidle_list, oh_list) {
++		if (oh_list_item->oh == oh) {
++			list_del(&oh_list_item->oh_list);
++			pr_debug("omap_hwmod: %s: removed from reidle list\n",
++				 oh->name);
++			kfree(oh_list_item);
++		}
++	}
++
++	return 0;
++}
++
++/**
+  * omap_hwmod_enable - enable an omap_hwmod
+  * @oh: struct omap_hwmod *
+  *
+@@ -3948,6 +4068,21 @@ void __init omap_hwmod_init(void)
+ }
+ 
+ /**
++ * omap_hwmod_setup_reidle - add hwmods to reidle list and register notifier
++ *
++ * Returns 0 on success.
++ */
++int omap_hwmod_setup_reidle(void)
++{
++	omap_hwmod_for_each(_setup_reidle, NULL);
++
++	if (!list_empty(&oh_reidle_list))
++		register_pm_notifier(&pm_nb);
++
++	return 0;
++}
++
++/**
+  * omap_hwmod_get_main_clk - get pointer to main clock name
+  * @oh: struct omap_hwmod *
+  *
+diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+index c7122ab..f35638b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.h
++++ b/arch/arm/mach-omap2/omap_hwmod.h
+@@ -445,6 +445,10 @@ struct omap_hwmod_omap4_prcm {
+  *     entering HW_AUTO while hwmod is active. This is needed to workaround
+  *     some modules which don't function correctly with HW_AUTO. For example,
+  *     DCAN on DRA7x SoC needs this to workaround errata i893.
++ * HWMOD_NEEDS_REIDLE: Some devices do not assert their MSTANDBY signal by
++ *     default after losing context if no driver is present and using the
++ *     hwmod. This will break subsequent suspend cycles but can be fixed by
++ *     enabling then idling the unused hwmod after each suspend cycle.
   */
- struct clkdm_ops {
- 	int	(*clkdm_add_wkdep)(struct clockdomain *clkdm1, struct clockdomain *clkdm2);
-@@ -175,6 +178,8 @@ struct clkdm_ops {
- 	void	(*clkdm_deny_idle)(struct clockdomain *clkdm);
- 	int	(*clkdm_clk_enable)(struct clockdomain *clkdm);
- 	int	(*clkdm_clk_disable)(struct clockdomain *clkdm);
-+	int	(*clkdm_save_context)(struct clockdomain *clkdm);
-+	int	(*clkdm_restore_context)(struct clockdomain *clkdm);
- };
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -463,6 +467,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_OPT_CLKS_NEEDED			(1 << 14)
+ #define HWMOD_NO_IDLE				(1 << 15)
+ #define HWMOD_CLKDM_NOAUTO			(1 << 16)
++#define HWMOD_NEEDS_REIDLE			(1 << 17)
  
- int clkdm_register_platform_funcs(struct clkdm_ops *co);
-@@ -214,6 +219,9 @@ int clkdm_for_each(int (*fn)(struct clockdomain *clkdm, void *user),
- int clkdm_hwmod_enable(struct clockdomain *clkdm, struct omap_hwmod *oh);
- int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh);
+ /*
+  * omap_hwmod._int_flags definitions
+@@ -611,6 +616,14 @@ struct omap_hwmod {
  
-+void clkdm_save_context(void);
-+void clkdm_restore_context(void);
-+
- extern void __init omap242x_clockdomains_init(void);
- extern void __init omap243x_clockdomains_init(void);
- extern void __init omap3xxx_clockdomains_init(void);
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index 1cc0247..084d454 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -72,6 +72,17 @@ static inline u32 am33xx_cm_rmw_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx)
- 	return v;
- }
+ struct device_node;
  
-+static inline u32 am33xx_cm_read_reg_bits(u16 inst, s16 idx, u32 mask)
-+{
-+	u32 v;
-+
-+	v = am33xx_cm_read_reg(inst, idx);
-+	v &= mask;
-+	v >>= __ffs(mask);
-+
-+	return v;
-+}
-+
- /**
-  * _clkctrl_idlest - read a CM_*_CLKCTRL register; mask & shift IDLEST bitfield
-  * @inst: CM instance register offset (*_INST macro)
-@@ -338,6 +349,46 @@ static u32 am33xx_cm_xlate_clkctrl(u8 part, u16 inst, u16 offset)
- 	return cm_base.pa + inst + offset;
- }
- 
-+/**
-+ * am33xx_clkdm_save_context - Save the clockdomain transition context
-+ * @clkdm: The clockdomain pointer whose context needs to be saved
-+ *
-+ * Save the clockdomain transition context.
++/*
++ * omap_hwmod_list - simple generic container for omap_hwmod lists
 + */
-+static int am33xx_clkdm_save_context(struct clockdomain *clkdm)
-+{
-+	clkdm->context = am33xx_cm_read_reg_bits(clkdm->cm_inst,
-+						 clkdm->clkdm_offs,
-+						 AM33XX_CLKTRCTRL_MASK);
++struct omap_hwmod_list {
++	struct omap_hwmod *oh;
++	struct list_head oh_list;
++};
 +
-+	return 0;
-+}
-+
-+/**
-+ * am33xx_restore_save_context - Restore the clockdomain transition context
-+ * @clkdm: The clockdomain pointer whose context needs to be restored
-+ *
-+ * Restore the clockdomain transition context.
-+ */
-+static int am33xx_clkdm_restore_context(struct clockdomain *clkdm)
-+{
-+	switch (clkdm->context) {
-+	case OMAP34XX_CLKSTCTRL_DISABLE_AUTO:
-+		am33xx_clkdm_deny_idle(clkdm);
-+		break;
-+	case OMAP34XX_CLKSTCTRL_FORCE_SLEEP:
-+		am33xx_clkdm_sleep(clkdm);
-+		break;
-+	case OMAP34XX_CLKSTCTRL_FORCE_WAKEUP:
-+		am33xx_clkdm_wakeup(clkdm);
-+		break;
-+	case OMAP34XX_CLKSTCTRL_ENABLE_AUTO:
-+		am33xx_clkdm_allow_idle(clkdm);
-+		break;
-+	}
-+	return 0;
-+}
-+
- struct clkdm_ops am33xx_clkdm_operations = {
- 	.clkdm_sleep		= am33xx_clkdm_sleep,
- 	.clkdm_wakeup		= am33xx_clkdm_wakeup,
-@@ -345,6 +396,8 @@ struct clkdm_ops am33xx_clkdm_operations = {
- 	.clkdm_deny_idle	= am33xx_clkdm_deny_idle,
- 	.clkdm_clk_enable	= am33xx_clkdm_clk_enable,
- 	.clkdm_clk_disable	= am33xx_clkdm_clk_disable,
-+	.clkdm_save_context	= am33xx_clkdm_save_context,
-+	.clkdm_restore_context	= am33xx_clkdm_restore_context,
- };
+ struct omap_hwmod *omap_hwmod_lookup(const char *name);
+ int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
+ 			void *data);
+@@ -649,6 +662,10 @@ int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
+ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh);
+ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh);
  
- static const struct cm_ll_data am33xx_cm_ll_data = {
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 7deefee..c11ac49 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -481,6 +481,47 @@ static u32 omap4_cminst_xlate_clkctrl(u8 part, u16 inst, u16 offset)
- 	return _cm_bases[part].pa + inst + offset;
- }
- 
-+/**
-+ * omap4_clkdm_save_context - Save the clockdomain modulemode context
-+ * @clkdm: The clockdomain pointer whose context needs to be saved
-+ *
-+ * Save the clockdomain modulemode context.
-+ */
-+static int omap4_clkdm_save_context(struct clockdomain *clkdm)
-+{
-+	clkdm->context = omap4_cminst_read_inst_reg(clkdm->prcm_partition,
-+						    clkdm->cm_inst,
-+						    clkdm->clkdm_offs +
-+						    OMAP4_CM_CLKSTCTRL);
-+	clkdm->context &= OMAP4430_MODULEMODE_MASK;
-+	return 0;
-+}
++int omap_hwmod_setup_reidle(void);
++int omap_hwmod_enable_reidle(struct omap_hwmod *oh);
++int omap_hwmod_disable_reidle(struct omap_hwmod *oh);
 +
-+/**
-+ * omap4_clkdm_restore_context - Restore the clockdomain modulemode context
-+ * @clkdm: The clockdomain pointer whose context needs to be restored
-+ *
-+ * Restore the clockdomain modulemode context.
-+ */
-+static int omap4_clkdm_restore_context(struct clockdomain *clkdm)
-+{
-+	switch (clkdm->context) {
-+	case OMAP34XX_CLKSTCTRL_DISABLE_AUTO:
-+		omap4_clkdm_deny_idle(clkdm);
-+		break;
-+	case OMAP34XX_CLKSTCTRL_FORCE_SLEEP:
-+		omap4_clkdm_sleep(clkdm);
-+		break;
-+	case OMAP34XX_CLKSTCTRL_FORCE_WAKEUP:
-+		omap4_clkdm_wakeup(clkdm);
-+		break;
-+	case OMAP34XX_CLKSTCTRL_ENABLE_AUTO:
-+		omap4_clkdm_allow_idle(clkdm);
-+		break;
-+	}
-+	return 0;
-+}
-+
- struct clkdm_ops omap4_clkdm_operations = {
- 	.clkdm_add_wkdep	= omap4_clkdm_add_wkup_sleep_dep,
- 	.clkdm_del_wkdep	= omap4_clkdm_del_wkup_sleep_dep,
-@@ -496,6 +537,8 @@ struct clkdm_ops omap4_clkdm_operations = {
- 	.clkdm_deny_idle	= omap4_clkdm_deny_idle,
- 	.clkdm_clk_enable	= omap4_clkdm_clk_enable,
- 	.clkdm_clk_disable	= omap4_clkdm_clk_disable,
-+	.clkdm_save_context	= omap4_clkdm_save_context,
-+	.clkdm_restore_context	= omap4_clkdm_restore_context,
- };
- 
- struct clkdm_ops am43xx_clkdm_operations = {
+ int omap_hwmod_for_each_by_class(const char *classname,
+ 				 int (*fn)(struct omap_hwmod *oh,
+ 					   void *user),
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+index 5efe91c..f31ec76 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
+@@ -375,7 +375,8 @@ struct omap_hwmod am33xx_cpgmac0_hwmod = {
+ 	.name		= "cpgmac0",
+ 	.class		= &am33xx_cpgmac0_hwmod_class,
+ 	.clkdm_name	= "cpsw_125mhz_clkdm",
+-	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
++			  HWMOD_NEEDS_REIDLE,
+ 	.main_clk	= "cpsw_125mhz_gclk",
+ 	.mpu_rt_idx	= 1,
+ 	.prcm		= {
+@@ -618,7 +619,7 @@ struct omap_hwmod am33xx_gpmc_hwmod = {
+ 	.class		= &am33xx_gpmc_hwmod_class,
+ 	.clkdm_name	= "l3s_clkdm",
+ 	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
+-	.flags		= DEBUG_OMAP_GPMC_HWMOD_FLAGS,
++	.flags		= DEBUG_OMAP_GPMC_HWMOD_FLAGS | HWMOD_NEEDS_REIDLE,
+ 	.main_clk	= "l3s_gclk",
+ 	.prcm		= {
+ 		.omap4	= {
+@@ -1094,7 +1095,8 @@ struct omap_hwmod am33xx_tptc0_hwmod = {
+ 	.name		= "tptc0",
+ 	.class		= &am33xx_tptc_hwmod_class,
+ 	.clkdm_name	= "l3_clkdm",
+-	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
++			  HWMOD_NEEDS_REIDLE,
+ 	.main_clk	= "l3_gclk",
+ 	.prcm		= {
+ 		.omap4	= {
+@@ -1108,7 +1110,8 @@ struct omap_hwmod am33xx_tptc1_hwmod = {
+ 	.name		= "tptc1",
+ 	.class		= &am33xx_tptc_hwmod_class,
+ 	.clkdm_name	= "l3_clkdm",
+-	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
++			  HWMOD_NEEDS_REIDLE,
+ 	.main_clk	= "l3_gclk",
+ 	.prcm		= {
+ 		.omap4	= {
+@@ -1122,7 +1125,8 @@ struct omap_hwmod am33xx_tptc2_hwmod = {
+ 	.name		= "tptc2",
+ 	.class		= &am33xx_tptc_hwmod_class,
+ 	.clkdm_name	= "l3_clkdm",
+-	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
++			  HWMOD_NEEDS_REIDLE,
+ 	.main_clk	= "l3_gclk",
+ 	.prcm		= {
+ 		.omap4	= {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 53e1ac3..69f7c52 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -301,7 +301,8 @@
+ 	.name		= "usb_otg_hs",
+ 	.class		= &am33xx_usbotg_class,
+ 	.clkdm_name	= "l3s_clkdm",
+-	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
++	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
++			  HWMOD_NEEDS_REIDLE,
+ 	.main_clk	= "usbotg_fck",
+ 	.prcm		= {
+ 		.omap4	= {
 -- 
 1.9.1
