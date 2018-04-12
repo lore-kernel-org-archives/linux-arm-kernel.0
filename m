@@ -1,58 +1,139 @@
-From: ldv@altlinux.org (Dmitry V. Levin)
-Date: Thu, 12 Apr 2018 14:03:14 +0300
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <20180412095811.GC16141@n2100.armlinux.org.uk>
-References: <20180409152253.GD10489@altlinux.org>
- <20180412013435.GA21219@altlinux.org>
- <20180412095811.GC16141@n2100.armlinux.org.uk>
-Message-ID: <20180412110314.GA28070@altlinux.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 12 Apr 2018 13:14:10 +0200
+Subject: [PATCH v7 05/26] PM / Domains: Add helper functions to attach/detach
+ CPUs to/from genpd
+In-Reply-To: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
+References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1523531671-27491-6-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 10:58:11AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Apr 12, 2018 at 04:34:35AM +0300, Dmitry V. Levin wrote:
-> > A similar commit v4.16-rc1~159^2~37
-> > ("signal/arm: Document conflicts with SI_USER and SIGFPE") must have
-> > introduced a similar ABI regression to compat arm.
-> 
-> So, could you explain how can this change cause a regression?
-> 
-> +#define FPE_FIXME      0
-> -               vfp_raise_sigfpe(0, regs);
-> +               vfp_raise_sigfpe(FPE_FIXME, regs);
+Introduce two new genpd helper functions, of_genpd_attach|detach_cpu(),
+which takes the CPU-number as an in-parameter.
 
-No, this hunk hasn't caused the regression, but another one did:
+To attach a CPU to a genpd, of_genpd_attach_cpu() starts by fetching the
+struct device belonging to the CPU. Then it calls genpd_dev_pm_attach(),
+which via DT tries to hook up the CPU device to its corresponding PM
+domain. If it succeeds, of_genpd_attach_cpu() continues to prepare/enable
+runtime PM of the device.
 
-diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
-new file mode 100644
-index 0000000..d051388
---- /dev/null
-+++ b/arch/arm/include/uapi/asm/siginfo.h
-@@ -0,0 +1,13 @@
-+#ifndef __ASM_SIGINFO_H
-+#define __ASM_SIGINFO_H
-+
-+#include <asm-generic/siginfo.h>
-+
-+/*
-+ * SIGFPE si_codes
+To detach a CPU from its PM domain, of_genpd_attach_cpu() reverse the
+operations made from of_genpd_attach_cpu(). However, first it checks that
+the CPU device has a valid PM domain pointer assigned, as to make sure it
+belongs to genpd.
+
+Cc: Lina Iyer <ilina@codeaurora.org>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/base/power/domain.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pm_domain.h   |  9 ++++++
+ 2 files changed, 76 insertions(+)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e178521..91ea9b2 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2324,6 +2324,73 @@ int genpd_dev_pm_attach(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+ 
++/**
++ * of_genpd_attach_cpu() - Attach a CPU to its PM domain
++ * @cpu: The CPU to be attached.
++ *
++ * Try to find the corresponding PM domain provider for the CPU's device. Use
++ * it to attach the CPU's device to its PM domain. If attaching is completed
++ * successfully, we enable runtime PM for the CPU's device.
++ *
++ * Returns zero on success else a negative error code.
 + */
-+#ifdef __KERNEL__
-+#define FPE_FIXME      0       /* Broken dup of SI_USER */
-+#endif /* __KERNEL__ */
++int of_genpd_attach_cpu(int cpu)
++{
++	struct device *dev = get_cpu_device(cpu);
++	int ret;
 +
-+#endif
-
-This is due to FPE_FIXME handling in kernel/signal.c
-
-
++	if (!dev) {
++		pr_warn("genpd: no dev for cpu%d\n", cpu);
++		return -ENODEV;
++	}
++
++	ret = genpd_dev_pm_attach(dev);
++	if (ret) {
++		dev_warn(dev, "genpd: attach cpu failed %d\n", ret);
++		return ret;
++	}
++
++	pm_runtime_irq_safe(dev);
++	pm_runtime_get_noresume(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++
++	dev_info(dev, "genpd: attached cpu\n");
++	return 0;
++}
++EXPORT_SYMBOL(of_genpd_attach_cpu);
++
++/**
++ * of_genpd_detach_cpu() - Detach a CPU from its PM domain
++ * @cpu: The CPU to be detached.
++ *
++ * Detach the CPU's device from its corresponding PM domain. If detaching is
++ * completed successfully, disable runtime PM and restore the runtime PM usage
++ * count for the CPU's device.
++ */
++void of_genpd_detach_cpu(int cpu)
++{
++	struct device *dev = get_cpu_device(cpu);
++
++	if (!dev) {
++		pr_warn("genpd: no dev for cpu%d\n", cpu);
++		return;
++	}
++
++	/* Check that the device is attached to a genpd. */
++	if (!(dev->pm_domain && dev->pm_domain->detach == genpd_dev_pm_detach))
++		return;
++
++	genpd_dev_pm_detach(dev, true);
++
++	pm_runtime_disable(dev);
++	pm_runtime_put_noidle(dev);
++	pm_runtime_reinit(dev);
++
++	dev_info(dev, "genpd: detached cpu\n");
++}
++EXPORT_SYMBOL(of_genpd_detach_cpu);
++
+ static const struct of_device_id idle_state_match[] = {
+ 	{ .compatible = "domain-idle-state", },
+ 	{ }
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 29ab00c..ccd7c94 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -249,6 +249,8 @@ extern int of_genpd_parse_idle_states(struct device_node *dn,
+ 			struct genpd_power_state **states, int *n);
+ 
+ int genpd_dev_pm_attach(struct device *dev);
++int of_genpd_attach_cpu(int cpu);
++void of_genpd_detach_cpu(int cpu);
+ #else /* !CONFIG_PM_GENERIC_DOMAINS_OF */
+ static inline int of_genpd_add_provider_simple(struct device_node *np,
+ 					struct generic_pm_domain *genpd)
+@@ -287,6 +289,13 @@ static inline int genpd_dev_pm_attach(struct device *dev)
+ 	return -ENODEV;
+ }
+ 
++static inline int of_genpd_attach_cpu(int cpu)
++{
++	return -ENODEV;
++}
++
++static inline void of_genpd_detach_cpu(int cpu) {}
++
+ static inline
+ struct generic_pm_domain *of_genpd_remove_last(struct device_node *np)
+ {
 -- 
-ldv
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/0dccfbf9/attachment-0001.sig>
+2.7.4
