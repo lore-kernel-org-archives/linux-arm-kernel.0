@@ -1,77 +1,100 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 12 Apr 2018 14:22:12 +0100
-Subject: [PATCH 1/2] ARM: kexec: fix kdump register saving on panic()
-Message-ID: <E1f6cB2-0004A9-Pa@rmk-PC.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Apr 2018 14:31:58 +0100
+Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
+In-Reply-To: <20180412131426.18011-1-linus.walleij@linaro.org>
+References: <20180412131426.18011-1-linus.walleij@linaro.org>
+Message-ID: <f8ec5de3-243c-04dc-a0e4-386fcf0748c2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a panic() occurs, the kexec code uses smp_send_stop() to stop
-the other CPUs, but this results in the CPU register state not being
-saved, and gdb is unable to inspect the state of other CPUs.
+On 12/04/18 14:14, Linus Walleij wrote:
+> With this I assume maintainership of the Integrator, Versatile
+> and RealView ARM reference machines.
+> 
+> It's no big secret that I've been maintaining them for years,
+> but might as well make it official so I get the mails and
+> don't miss anything.
+> 
+> I have also included some drivers that are closely associated
+> with the ARM reference designs and yet orphaned in the
+> MAINTAINERS file. I can surely maintain them too, or route
+> the question to the right people so it doesn't fall on the
+> floor of upward to the subsystem maintainers who have too much
+> to do already as it is.
+> 
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@kernel.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> If someone has an active interest and wants to comaintain the
+> old ARMv4, ARMv5, ARMv6 and ARMv7 reference designs in this
+> family, you are most welcome.
+> 
+> If you feel that I am expropriating
+> a driver from you, tell me and I will create a separate
+> MAINATINERS entry for that driver and drop it from this one.
+> I put all relevant subsystem mainatainers on CC I think.
+> 
+> If you feel I should split some drivers to separate entries
+> I can do that too.
+> ---
+>  MAINTAINERS | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index c7182d2a9f5c..2991d20cb406 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1026,6 +1026,31 @@ F:	arch/arm/include/asm/arch_timer.h
+>  F:	arch/arm64/include/asm/arch_timer.h
+>  F:	drivers/clocksource/arm_arch_timer.c
+>  
+> +ARM INTEGRATOR, VERSATILE AND REALVIEW SUPPORT
+> +M:	Linus Walleij <linus.walleij@linaro.org>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +F:	Documentation/devicetree/bindings/arm/arm-boards
+> +F:	Documentation/devicetree/bindings/auxdisplay/arm-charlcd.txt
+> +F:	Documentation/devicetree/bindings/clock/arm-integrator.txt
+> +F:	Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
+> +F:	Documentation/devicetree/bindings/mtd/arm-versatile.txt
+> +F:	arch/arm/mach-integrator/
+> +F:	arch/arm/mach-realview/
+> +F:	arch/arm/mach-versatile/
+> +F:	arch/arm/plat-versatile/
+> +F:	arch/arm/boot/dts/arm-realview-*
+> +F:	arch/arm/boot/dts/integrator*
+> +F:	arch/arm/boot/dts/versatile*
+> +F:	drivers/clk/versatile/
+> +F:	drivers/i2c/busses/i2c-versatile.c
+> +F:	drivers/irqchip/irq-versatile-fpga.c
+> +F:	drivers/irqchip/irq-vic.c
+> +F:	drivers/mtd/maps/physmap_of_versatile.c
+> +F:	drivers/power/reset/arm-versatile-reboot.c
+> +F:	drivers/soc/versatile/
+> +F:	drivers/spi/spi-pl022.c
+> +
+>  ARM HDLCD DRM DRIVER
+>  M:	Liviu Dudau <liviu.dudau@arm.com>
+>  S:	Supported
+> 
 
-Commit 0ee59413c967 ("x86/panic: replace smp_send_stop() with kdump
-friendly version in panic path") addressed the issue on x86, but
-ignored other architectures.  Address the issue on ARM by splitting
-out the crash stop implementation to crash_smp_send_stop() and
-adding the necessary protection.
+An excellent move!
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/kernel/machine_kexec.c | 34 ++++++++++++++++++++++------------
- 1 file changed, 22 insertions(+), 12 deletions(-)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 75d4f5ce6cfd..39dc6bf4610a 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -96,6 +96,27 @@ void machine_crash_nonpanic_core(void *unused)
- 		cpu_do_idle();
- }
- 
-+void crash_smp_send_stop(void)
-+{
-+	static int cpus_stopped;
-+	unsigned long msecs;
-+
-+	if (cpus_stopped)
-+		return;
-+
-+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-+	smp_call_function(machine_crash_nonpanic_core, NULL, false);
-+	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-+		mdelay(1);
-+		msecs--;
-+	}
-+	if (atomic_read(&waiting_for_crash_ipi) > 0)
-+		pr_warn("Non-crashing CPUs did not react to IPI\n");
-+
-+	cpus_stopped = 1;
-+}
-+
- static void machine_kexec_mask_interrupts(void)
- {
- 	unsigned int i;
-@@ -121,19 +142,8 @@ static void machine_kexec_mask_interrupts(void)
- 
- void machine_crash_shutdown(struct pt_regs *regs)
- {
--	unsigned long msecs;
--
- 	local_irq_disable();
--
--	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
--	smp_call_function(machine_crash_nonpanic_core, NULL, false);
--	msecs = 1000; /* Wait at most a second for the other cpus to stop */
--	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
--		mdelay(1);
--		msecs--;
--	}
--	if (atomic_read(&waiting_for_crash_ipi) > 0)
--		pr_warn("Non-crashing CPUs did not react to IPI\n");
-+	crash_smp_send_stop();
- 
- 	crash_save_cpu(regs, smp_processor_id());
- 	machine_kexec_mask_interrupts();
+Let me know if you're after more HW, we may have to empty some cupboards
+shortly...
+
+Thanks,
+
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
