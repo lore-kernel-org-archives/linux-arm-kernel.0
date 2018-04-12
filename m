@@ -1,55 +1,37 @@
-From: ldv@altlinux.org (Dmitry V. Levin)
-Date: Thu, 12 Apr 2018 04:34:35 +0300
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <20180409152253.GD10489@altlinux.org>
-References: <20180409152253.GD10489@altlinux.org>
-Message-ID: <20180412013435.GA21219@altlinux.org>
+From: rob@landley.net (Rob Landley)
+Date: Wed, 11 Apr 2018 20:38:37 -0500
+Subject: [PATCH] Replace unnecessary perl with sed, printf, and the shell $((
+ )) operator.
+Message-ID: <9c72100c-b3e4-07ca-1784-fda2ac9d708c@landley.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+You can build a kernel in a cross compiling environment that doesn't have perl
+in the $PATH. Commit 429f7a062e3b broke that for 32 bit arm. Fix it.
 
-On Mon, Apr 09, 2018 at 06:22:53PM +0300, Dmitry V. Levin wrote:
-> There seems to be a regression in v4.16 on ppc compat very similar
-> to sparc compat regression reported earlier at
-> https://marc.info/?l=linux-sparc&m=151501500704383 .
-> 
-> The symptoms are exactly the same: the same signal_receive test from
-> the strace test suite fails with the same diagnostics:
-> https://build.opensuse.org/public/build/home:ldv_alt/openSUSE_Factory_PowerPC/ppc/strace/_log
+Signed-off-by: Rob Landley <rob@landley.net>
+---
 
-The log is big, just look for "KERNEL BUG".
+ arch/arm/boot/compressed/Makefile |    9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-> Unfortunately, I do not have any means to investigate further,
-> so just passing this information on to those who care.
-
-OK, the faulty commit is v4.16-rc1~159^2~39
-("signal/powerpc: Document conflicts with SI_USER and SIGFPE and SIGTRAP").
-
-One might think that a commit called "Document conflicts" shouldn't
-introduce an ABI regression, but this one definitely does by defining
-FPE_FIXME and TRAP_FIXME in arch/powerpc/include/uapi/asm/siginfo.h
-that affect siginfo_layout().
-
-A similar commit v4.16-rc1~159^2~37
-("signal/arm: Document conflicts with SI_USER and SIGFPE") must have
-introduced a similar ABI regression to compat arm.
-
-An earlier commit v4.14-rc1~60^2^2~5
-("signal/sparc: Document a conflict with SI_USER with SIGFPE") introduced
-a similar ABI regression to compat sparc.
-
-There is a clear pattern of sneaking in ABI changes using innocently
-looking commit messages.
-
-
--- 
-ldv
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180412/1b9648bb/attachment.sig>
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 45a6b9b..33ebeb2 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -117,11 +117,10 @@ ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+ asflags-y := -DZIMAGE
+ 
+ # Supply kernel BSS size to the decompressor via a linker symbol.
+-KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
+-		perl -e 'while (<>) { \
+-			$$bss_start=hex($$1) if /^([[:xdigit:]]+) B __bss_start$$/; \
+-			$$bss_end=hex($$1) if /^([[:xdigit:]]+) B __bss_stop$$/; \
+-		}; printf "%d\n", $$bss_end - $$bss_start;')
++KBSS_SZ := $(shell echo $$(($$(printf '%d+%d' $$( \
++		$(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
++		sed -n -e 's/^\([^ ]*\) B __bss_start$$/-0x\1/p' \
++		       -e 's/^\([^ ]*\) B __bss_stop$$/0x\1/p') ) )) )
+ LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
+ # Supply ZRELADDR to the decompressor via a linker symbol.
+ ifneq ($(CONFIG_AUTO_ZRELADDR),y)
