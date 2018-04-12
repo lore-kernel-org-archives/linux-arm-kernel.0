@@ -1,31 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 12 Apr 2018 18:55:28 +0200
-Subject: [PATCH 08/15] ASoC: pxa: remove the dmaengine compat need
-In-Reply-To: <20180412152632.GG9929@sirena.org.uk> (Mark Brown's message of
- "Thu, 12 Apr 2018 16:26:32 +0100")
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <20180402142656.26815-9-robert.jarzmik@free.fr>
- <20180412152632.GG9929@sirena.org.uk>
-Message-ID: <87a7u82wlb.fsf@belgarion.home>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Thu, 12 Apr 2018 10:10:40 -0700
+Subject: [bug report] locking/qrwlock, arm64: Move rwlock implementation over
+ to qrwlocks causes CPU crashes/stalls when killing java processes
+Message-ID: <CACgAJHzeS7CNqLaVckNtS5BNTsqe0ac+u0LwJAr1_1i1=OLcnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+Hi Will,
 
-> On Mon, Apr 02, 2018 at 04:26:49PM +0200, Robert Jarzmik wrote:
->> As the pxa architecture switched towards the dmaengine slave map, the
->> old compatibility mechanism to acquire the dma requestor line number and
->> priority are not needed anymore.
->
-> Acked-by: Mark Brown <broonie@kernel.org>
->
-> If there's no dependency I'm happy to take this for 4.18.
-Thanks for the ack.
+Recently I have observed the CPU crashes/stalls when rebooting after I
+ran cassandra benchmark.
+The issue happens randomly.
 
-The patches 1 and 2 are the dependency here, so I'd rather push it through my
-tree once the review is complete.
+I could reproduce the issue easier by keep starting/killing cassandra
+tests. The issue would occur within about 50 iterations.
 
-Cheers.
+I could also reproduce the issue by keep running/killing specjvm2008.
+However it takes me much longer time to see the CPU crash/stall issue.
 
+I bisected kernel and found that this changelist below is causing the issue.
+
+commit 087133ac90763cd339b6b67f2998f87dcc136c52
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Thu Oct 12 13:20:50 2017 +0100
+
+    locking/qrwlock, arm64: Move rwlock implementation over to qrwlocks
+
+    Now that the qrwlock can make use of WFE, remove our homebrewed rwlock
+    code in favour of the generic queued implementation.
+
+    Tested-by: Waiman Long <longman@redhat.com>
+    Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+    Tested-by: Adam Wallis <awallis@codeaurora.org>
+    Tested-by: Jan Glauber <jglauber@cavium.com>
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+    Acked-by: Peter Zijlstra <peterz@infradead.org>
+    Cc: Jeremy.Linton at arm.com
+    Cc: Linus Torvalds <torvalds@linux-foundation.org>
+    Cc: Thomas Gleixner <tglx@linutronix.de>
+    Cc: boqun.feng at gmail.com
+    Cc: linux-arm-kernel at lists.infradead.org
+    Cc: paulmck at linux.vnet.ibm.com
+    Link: http://lkml.kernel.org/r/1507810851-306-5-git-send-email-will.deacon at arm.com
+    Signed-off-by: Ingo Molnar <mingo@kernel.org>
+
+Do you have any suggestion or thought how to debug it?
+
+Thanks
 -- 
-Robert
+Tai
