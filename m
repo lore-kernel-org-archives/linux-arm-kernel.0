@@ -1,23 +1,42 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 13 Apr 2018 14:39:24 -0700
-Subject: [PATCH 1/2] dt-binding: rng: Add interrupt property for BCM2835
-In-Reply-To: <1511010253-5006-2-git-send-email-stefan.wahren@i2se.com>
-References: <1511010253-5006-1-git-send-email-stefan.wahren@i2se.com>
- <1511010253-5006-2-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <b54e629b-e142-fdae-b166-124b991f8882@gmail.com>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Sat, 14 Apr 2018 00:39:46 +0300
+Subject: [PATCH] spi: meson-axg: Fix error handling in meson_spicc_probe()
+Message-ID: <1523655586-4163-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2017 05:04 AM, Stefan Wahren wrote:
-> As Sylvain Garrigues pointed out the BCM2835 RNG block has an
-> interrupt. Also in preparation for Florian's upcoming patch series
-> add this property to the binding. While we are at it fix the
-> indenting of the example.
-> 
-> Link: https://github.com/raspberrypi/linux/issues/2195
-> CC: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+If devm_spi_register_master() fails in meson_spicc_probe(),
+spicc->core is left undisabled. The patch fixes that.
 
-Applied to devicetree/next, thanks!
+Found by Linux Driver Verification project (linuxtesting.org).
+
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+---
+ drivers/spi/spi-meson-spicc.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/spi/spi-meson-spicc.c b/drivers/spi/spi-meson-spicc.c
+index 5c82910e3480..7fe4488ace57 100644
+--- a/drivers/spi/spi-meson-spicc.c
++++ b/drivers/spi/spi-meson-spicc.c
+@@ -574,10 +574,15 @@ static int meson_spicc_probe(struct platform_device *pdev)
+ 		master->max_speed_hz = rate >> 2;
+ 
+ 	ret = devm_spi_register_master(&pdev->dev, master);
+-	if (!ret)
+-		return 0;
++	if (ret) {
++		dev_err(&pdev->dev, "spi master registration failed\n");
++		goto out_clk;
++	}
+ 
+-	dev_err(&pdev->dev, "spi master registration failed\n");
++	return 0;
++
++out_clk:
++	clk_disable_unprepare(spicc->core);
+ 
+ out_master:
+ 	spi_master_put(master);
 -- 
-Florian
+2.7.4
