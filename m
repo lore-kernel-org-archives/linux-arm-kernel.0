@@ -1,85 +1,32 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Fri, 13 Apr 2018 14:30:41 +0200
-Subject: [PATCH v2 1/2] dmaengine: stm32-mdma: align TLEN and buffer
- length on burst
-In-Reply-To: <7ab2cfcd-07ed-e380-727a-727e78cc0336@arm.com>
-References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
- <1523457879-9869-2-git-send-email-pierre-yves.mordret@st.com>
- <9a2a267c-2b0b-0d6a-c762-47e7d37f84ea@arm.com>
- <22bd0af7-9820-57c5-9215-8185839d7d27@st.com>
- <7ab2cfcd-07ed-e380-727a-727e78cc0336@arm.com>
-Message-ID: <847f092a-d1f9-8902-e1ae-f65dc2f0db7c@st.com>
+From: sean@mess.org (Sean Young)
+Date: Fri, 13 Apr 2018 14:20:52 +0100
+Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
+In-Reply-To: <20180413070050.10d0de84@vento.lan>
+References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
+ <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
+ <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
+ <20180413060646.25b8a19d@vento.lan>
+ <20180413094005.wudyd2y5efaeimg3@gofer.mess.org>
+ <20180413070050.10d0de84@vento.lan>
+Message-ID: <20180413132052.37fudkaxltvwc46v@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Apr 13, 2018 at 07:00:50AM -0300, Mauro Carvalho Chehab wrote:
+> Yeah, we could limit it to run only 512 times (or some other reasonable
+> quantity), but in order to do that, we need to be sure that, on each read(),
+> the FIFO will shift - e. g. no risk of needing to do more than one read
+> to get the next element. That would work if the FIFO is implemented via
+> flip-flops. But if it is implemented via some slow memory, or if the
+> shift logic is implemented via some software on a micro-controller, it
+> may need a few interactions to get the next value.
+> 
+> Without knowing about the hardware implementation, I'd say that setting
+> a max time for the whole FIFO interaction is safer.
 
+Ok. If the 10ms timeout is reached, there really is a problem; should we
+report an error in this case?
 
-On 04/13/2018 01:09 PM, Robin Murphy wrote:
-> On 13/04/18 10:45, Pierre Yves MORDRET wrote:
->> Hi Robin
->>
->> On 04/11/2018 05:14 PM, Robin Murphy wrote:
->>> On 11/04/18 15:44, Pierre-Yves MORDRET wrote:
->>>> Both buffer Transfer Length (TLEN if any) and transfer size have to be
->>>> aligned on burst size (burst beats*bus width).
->>>>
->>>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
->>>> ---
->>>>     Version history:
->>>>       v1:
->>>>          * Initial
->>>>       v2:
->>>> ---
->>>> ---
->>>>    drivers/dma/stm32-mdma.c | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
->>>> index daa1602..fbcffa2 100644
->>>> --- a/drivers/dma/stm32-mdma.c
->>>> +++ b/drivers/dma/stm32-mdma.c
->>>> @@ -413,7 +413,7 @@ static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
->>>>    	u32 best_burst = max_burst;
->>>>    	u32 burst_len = best_burst * width;
->>>>    
->>>> -	while ((burst_len > 0) && (tlen % burst_len)) {
->>>> +	while ((burst_len > 0) && (((tlen | buf_len) & (burst_len - 1)) != 0)) {
->>>>    		best_burst = best_burst >> 1;
->>>>    		burst_len = best_burst * width;
->>>>    	}
->>>
->>> FWIW, doesn't that whole loop come down to just:
->>>
->>> 	burst_len = min(ffs(tlen | buf_len), max_burst * width);
->>
->> No sure it ends as expected. or I miss something or don't understand this statement
->> I tried with "relevant value" : i.e. best_burst = 32, Tlen=128(default) and
->> buf_len = 64, width= 4. This statements gets me something wrong output => 7
->> instead of 16 * 4.
->> I doubt :)
-> 
-> Heh, seems I confused myself halfway through and started thinking 
-> max_burst and width were the exponents x rather than the values 2^x...
-> 
-> A more representative guess should be:
-> 
-> 	min(1 << __ffs(tlen | buf_len), max_burst * width);
-> 
-> but the general point I was trying to make is that a loop checking 
-> whether the bottom n bits of something are zero for different values of 
-> n is unnecessary when n can simply be calculated directly*.
-> 
-> Robin.
+Thanks
 
-Got the point. I figure how to compute this value with __ffs. Your last
-statement doesn't provide the good value, but the spirit is here. I just have to
-adjust with what I want.
-
-Thx
-
-> 
-> 
-> * in the case of this "just the lowest set bit" idiom there's also the 
-> shift-free ((x & (x - 1)) ^ x), but as well as being unreadable it's 
-> generally less efficient than (1 << __ffs(x)) for most modern ISAs.
-> 
+Sean
