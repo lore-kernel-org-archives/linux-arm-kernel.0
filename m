@@ -1,41 +1,172 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 13 Apr 2018 19:27:58 +0200
-Subject: [PATCH 9/9] arm64: dts: broadcom: Add reference to Raspberry Pi 3 B+
+Date: Fri, 13 Apr 2018 19:27:50 +0200
+Subject: [PATCH 1/9] ARM: dts: bcm283x: Fix PWM pin assignment
 In-Reply-To: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
 References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1523640478-4448-10-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1523640478-4448-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a reference to the dts of the Raspberry Pi 3 B+
-in arm, so don't need to maintain the content in arm64.
+All RPi 1 and 2 boards used the PWM (audio out) on pin 40 and 45.
+So it was easy to define them in bcm2835-rpi.dtsi. Starting with RPi 3
+this wont work anymore, because it uses pin 40 and 41. Furthermore the
+Zero variants doesn't have audio out.
 
+This patch fixes this pin conflict by moving the PWM node to the board-level.
+
+Change summary:
+RPi 3 B:      PWM1 45 -> 41
+Zero, Zero W: PWM disabled
+all other:    no functional change
+
+Reported-by: Baruch Siach <baruch@tkos.co.il>
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm64/boot/dts/broadcom/Makefile                 | 3 ++-
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-a.dts      | 6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      | 6 ++++++
+ arch/arm/boot/dts/bcm2835-rpi.dtsi       | 6 ------
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 6 ++++++
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 6 ++++++
+ 8 files changed, 42 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-index 2a2591e..1193a9e 100644
---- a/arch/arm64/boot/dts/broadcom/Makefile
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
--dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
-+dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb \
-+			      bcm2837-rpi-3-b-plus.dtb
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index aa1fc7b..2cd9c5e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -101,6 +101,12 @@
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
  
- subdir-y	+= northstar2
- subdir-y	+= stingray
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
-new file mode 100644
-index 0000000..46ad202
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
-@@ -0,0 +1,2 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include "arm/bcm2837-rpi-3-b-plus.dts"
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_gpio14>;
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+index 425f6b0..067d1f0 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+@@ -96,6 +96,12 @@
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_gpio14>;
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index effa195..cfbdaac 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -103,6 +103,12 @@
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_gpio14>;
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+index 772ec3b..5641d16 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+@@ -96,6 +96,12 @@
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_gpio14>;
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 434483d..31ff602 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -91,6 +91,12 @@
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_gpio14>;
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 6c3cfaa..cb2d6d7 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -83,12 +83,6 @@
+ 	bus-width = <4>;
+ };
+ 
+-&pwm {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
+-	status = "okay";
+-};
+-
+ &usb {
+ 	power-domains = <&power RPI_POWER_DOMAIN_USB>;
+ };
+diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+index 5c339ad..2fef70a 100644
+--- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
++++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+@@ -41,6 +41,12 @@
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_gpio14>;
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index 0b31d99..cc39b6f 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -42,6 +42,12 @@
+ 	};
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
++	status = "okay";
++};
++
+ /* uart0 communicates with the BT module */
+ &uart0 {
+ 	pinctrl-names = "default";
 -- 
 2.7.4
