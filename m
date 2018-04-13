@@ -1,15 +1,15 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 13 Apr 2018 15:52:12 +0200
-Subject: [PATCH v3 1/2] dmaengine: stm32-mdma: align TLEN and buffer length on
- burst
+Date: Fri, 13 Apr 2018 15:52:13 +0200
+Subject: [PATCH v3 2/2] dmaengine: stm32-mdma: Fix incomplete Hw descriptors
+ allocator
 In-Reply-To: <1523627533-7184-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1523627533-7184-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1523627533-7184-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1523627533-7184-3-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both buffer Transfer Length (TLEN if any) and transfer size have to be
-aligned on burst size (burst beats*bus width).
+Only 1 Hw Descriptor is allocated. Loop over required Hw descriptor for
+proper allocation.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -17,33 +17,234 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
     v1:
        * Initial
     v2:
+       * Fix kbuild warning format: /0x%08x/%pad/
     v3:
-       * Get rid of while loop in favor of computed values
+       * use of "offsetof" instead of explicit calculation
 ---
 ---
- drivers/dma/stm32-mdma.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ drivers/dma/stm32-mdma.c | 89 ++++++++++++++++++++++++++++++------------------
+ 1 file changed, 55 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-index daa1602..4c7634c 100644
+index 4c7634c..1ac775f 100644
 --- a/drivers/dma/stm32-mdma.c
 +++ b/drivers/dma/stm32-mdma.c
-@@ -410,13 +410,10 @@ static enum dma_slave_buswidth stm32_mdma_get_max_width(dma_addr_t addr,
- static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
- 				     enum dma_slave_buswidth width)
+@@ -252,13 +252,17 @@ struct stm32_mdma_hwdesc {
+ 	u32 cmdr;
+ } __aligned(64);
+ 
++struct stm32_mdma_desc_node {
++	struct stm32_mdma_hwdesc *hwdesc;
++	dma_addr_t hwdesc_phys;
++};
++
+ struct stm32_mdma_desc {
+ 	struct virt_dma_desc vdesc;
+ 	u32 ccr;
+-	struct stm32_mdma_hwdesc *hwdesc;
+-	dma_addr_t hwdesc_phys;
+ 	bool cyclic;
+ 	u32 count;
++	struct stm32_mdma_desc_node node[];
+ };
+ 
+ struct stm32_mdma_chan {
+@@ -344,30 +348,42 @@ static struct stm32_mdma_desc *stm32_mdma_alloc_desc(
+ 		struct stm32_mdma_chan *chan, u32 count)
  {
--	u32 best_burst = max_burst;
--	u32 burst_len = best_burst * width;
-+	u32 best_burst;
+ 	struct stm32_mdma_desc *desc;
++	int i;
  
--	while ((burst_len > 0) && (tlen % burst_len)) {
--		best_burst = best_burst >> 1;
--		burst_len = best_burst * width;
--	}
-+	best_burst = min((u32)1 << __ffs(tlen | buf_len),
-+			 max_burst * width) / width;
+-	desc = kzalloc(sizeof(*desc), GFP_NOWAIT);
++	desc = kzalloc(offsetof(typeof(*desc), node[count]), GFP_NOWAIT);
+ 	if (!desc)
+ 		return NULL;
  
- 	return (best_burst > 0) ? best_burst : 1;
+-	desc->hwdesc = dma_pool_alloc(chan->desc_pool, GFP_NOWAIT,
+-				      &desc->hwdesc_phys);
+-	if (!desc->hwdesc) {
+-		dev_err(chan2dev(chan), "Failed to allocate descriptor\n");
+-		kfree(desc);
+-		return NULL;
++	for (i = 0; i < count; i++) {
++		desc->node[i].hwdesc =
++			dma_pool_alloc(chan->desc_pool, GFP_NOWAIT,
++				       &desc->node[i].hwdesc_phys);
++		if (!desc->node[i].hwdesc)
++			goto err;
+ 	}
+ 
+ 	desc->count = count;
+ 
+ 	return desc;
++
++err:
++	dev_err(chan2dev(chan), "Failed to allocate descriptor\n");
++	while (--i >= 0)
++		dma_pool_free(chan->desc_pool, desc->node[i].hwdesc,
++			      desc->node[i].hwdesc_phys);
++	kfree(desc);
++	return NULL;
  }
+ 
+ static void stm32_mdma_desc_free(struct virt_dma_desc *vdesc)
+ {
+ 	struct stm32_mdma_desc *desc = to_stm32_mdma_desc(vdesc);
+ 	struct stm32_mdma_chan *chan = to_stm32_mdma_chan(vdesc->tx.chan);
++	int i;
+ 
+-	dma_pool_free(chan->desc_pool, desc->hwdesc, desc->hwdesc_phys);
++	for (i = 0; i < desc->count; i++)
++		dma_pool_free(chan->desc_pool, desc->node[i].hwdesc,
++			      desc->node[i].hwdesc_phys);
+ 	kfree(desc);
+ }
+ 
+@@ -666,18 +682,18 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
+ }
+ 
+ static void stm32_mdma_dump_hwdesc(struct stm32_mdma_chan *chan,
+-				   struct stm32_mdma_hwdesc *hwdesc)
++				   struct stm32_mdma_desc_node *node)
+ {
+-	dev_dbg(chan2dev(chan), "hwdesc:  0x%p\n", hwdesc);
+-	dev_dbg(chan2dev(chan), "CTCR:    0x%08x\n", hwdesc->ctcr);
+-	dev_dbg(chan2dev(chan), "CBNDTR:  0x%08x\n", hwdesc->cbndtr);
+-	dev_dbg(chan2dev(chan), "CSAR:    0x%08x\n", hwdesc->csar);
+-	dev_dbg(chan2dev(chan), "CDAR:    0x%08x\n", hwdesc->cdar);
+-	dev_dbg(chan2dev(chan), "CBRUR:   0x%08x\n", hwdesc->cbrur);
+-	dev_dbg(chan2dev(chan), "CLAR:    0x%08x\n", hwdesc->clar);
+-	dev_dbg(chan2dev(chan), "CTBR:    0x%08x\n", hwdesc->ctbr);
+-	dev_dbg(chan2dev(chan), "CMAR:    0x%08x\n", hwdesc->cmar);
+-	dev_dbg(chan2dev(chan), "CMDR:    0x%08x\n\n", hwdesc->cmdr);
++	dev_dbg(chan2dev(chan), "hwdesc:  %pad\n", &node->hwdesc_phys);
++	dev_dbg(chan2dev(chan), "CTCR:    0x%08x\n", node->hwdesc->ctcr);
++	dev_dbg(chan2dev(chan), "CBNDTR:  0x%08x\n", node->hwdesc->cbndtr);
++	dev_dbg(chan2dev(chan), "CSAR:    0x%08x\n", node->hwdesc->csar);
++	dev_dbg(chan2dev(chan), "CDAR:    0x%08x\n", node->hwdesc->cdar);
++	dev_dbg(chan2dev(chan), "CBRUR:   0x%08x\n", node->hwdesc->cbrur);
++	dev_dbg(chan2dev(chan), "CLAR:    0x%08x\n", node->hwdesc->clar);
++	dev_dbg(chan2dev(chan), "CTBR:    0x%08x\n", node->hwdesc->ctbr);
++	dev_dbg(chan2dev(chan), "CMAR:    0x%08x\n", node->hwdesc->cmar);
++	dev_dbg(chan2dev(chan), "CMDR:    0x%08x\n\n", node->hwdesc->cmdr);
+ }
+ 
+ static void stm32_mdma_setup_hwdesc(struct stm32_mdma_chan *chan,
+@@ -691,7 +707,7 @@ static void stm32_mdma_setup_hwdesc(struct stm32_mdma_chan *chan,
+ 	struct stm32_mdma_hwdesc *hwdesc;
+ 	u32 next = count + 1;
+ 
+-	hwdesc = &desc->hwdesc[count];
++	hwdesc = desc->node[count].hwdesc;
+ 	hwdesc->ctcr = ctcr;
+ 	hwdesc->cbndtr &= ~(STM32_MDMA_CBNDTR_BRC_MK |
+ 			STM32_MDMA_CBNDTR_BRDUM |
+@@ -701,19 +717,20 @@ static void stm32_mdma_setup_hwdesc(struct stm32_mdma_chan *chan,
+ 	hwdesc->csar = src_addr;
+ 	hwdesc->cdar = dst_addr;
+ 	hwdesc->cbrur = 0;
+-	hwdesc->clar = desc->hwdesc_phys + next * sizeof(*hwdesc);
+ 	hwdesc->ctbr = ctbr;
+ 	hwdesc->cmar = config->mask_addr;
+ 	hwdesc->cmdr = config->mask_data;
+ 
+ 	if (is_last) {
+ 		if (is_cyclic)
+-			hwdesc->clar = desc->hwdesc_phys;
++			hwdesc->clar = desc->node[0].hwdesc_phys;
+ 		else
+ 			hwdesc->clar = 0;
++	} else {
++		hwdesc->clar = desc->node[next].hwdesc_phys;
+ 	}
+ 
+-	stm32_mdma_dump_hwdesc(chan, hwdesc);
++	stm32_mdma_dump_hwdesc(chan, &desc->node[count]);
+ }
+ 
+ static int stm32_mdma_setup_xfer(struct stm32_mdma_chan *chan,
+@@ -777,7 +794,7 @@ stm32_mdma_prep_slave_sg(struct dma_chan *c, struct scatterlist *sgl,
+ {
+ 	struct stm32_mdma_chan *chan = to_stm32_mdma_chan(c);
+ 	struct stm32_mdma_desc *desc;
+-	int ret;
++	int i, ret;
+ 
+ 	/*
+ 	 * Once DMA is in setup cyclic mode the channel we cannot assign this
+@@ -803,7 +820,9 @@ stm32_mdma_prep_slave_sg(struct dma_chan *c, struct scatterlist *sgl,
+ 	return vchan_tx_prep(&chan->vchan, &desc->vdesc, flags);
+ 
+ xfer_setup_err:
+-	dma_pool_free(chan->desc_pool, &desc->hwdesc, desc->hwdesc_phys);
++	for (i = 0; i < desc->count; i++)
++		dma_pool_free(chan->desc_pool, desc->node[i].hwdesc,
++			      desc->node[i].hwdesc_phys);
+ 	kfree(desc);
+ 	return NULL;
+ }
+@@ -892,7 +911,9 @@ stm32_mdma_prep_dma_cyclic(struct dma_chan *c, dma_addr_t buf_addr,
+ 	return vchan_tx_prep(&chan->vchan, &desc->vdesc, flags);
+ 
+ xfer_setup_err:
+-	dma_pool_free(chan->desc_pool, &desc->hwdesc, desc->hwdesc_phys);
++	for (i = 0; i < desc->count; i++)
++		dma_pool_free(chan->desc_pool, desc->node[i].hwdesc,
++			      desc->node[i].hwdesc_phys);
+ 	kfree(desc);
+ 	return NULL;
+ }
+@@ -1006,7 +1027,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
+ 			ctcr |= STM32_MDMA_CTCR_PKE;
+ 
+ 		/* Prepare hardware descriptor */
+-		hwdesc = desc->hwdesc;
++		hwdesc = desc->node[0].hwdesc;
+ 		hwdesc->ctcr = ctcr;
+ 		hwdesc->cbndtr = cbndtr;
+ 		hwdesc->csar = src;
+@@ -1017,7 +1038,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
+ 		hwdesc->cmar = 0;
+ 		hwdesc->cmdr = 0;
+ 
+-		stm32_mdma_dump_hwdesc(chan, hwdesc);
++		stm32_mdma_dump_hwdesc(chan, &desc->node[0]);
+ 	} else {
+ 		/* Setup a LLI transfer */
+ 		ctcr |= STM32_MDMA_CTCR_TRGM(STM32_MDMA_LINKED_LIST) |
+@@ -1117,7 +1138,7 @@ static void stm32_mdma_start_transfer(struct stm32_mdma_chan *chan)
+ 	}
+ 
+ 	chan->desc = to_stm32_mdma_desc(vdesc);
+-	hwdesc = chan->desc->hwdesc;
++	hwdesc = chan->desc->node[0].hwdesc;
+ 	chan->curr_hwdesc = 0;
+ 
+ 	stm32_mdma_write(dmadev, STM32_MDMA_CCR(id), chan->desc->ccr);
+@@ -1195,7 +1216,7 @@ static int stm32_mdma_resume(struct dma_chan *c)
+ 	unsigned long flags;
+ 	u32 status, reg;
+ 
+-	hwdesc = &chan->desc->hwdesc[chan->curr_hwdesc];
++	hwdesc = chan->desc->node[chan->curr_hwdesc].hwdesc;
+ 
+ 	spin_lock_irqsave(&chan->vchan.lock, flags);
+ 
+@@ -1265,13 +1286,13 @@ static size_t stm32_mdma_desc_residue(struct stm32_mdma_chan *chan,
+ 				      u32 curr_hwdesc)
+ {
+ 	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
++	struct stm32_mdma_hwdesc *hwdesc = desc->node[0].hwdesc;
+ 	u32 cbndtr, residue, modulo, burst_size;
+ 	int i;
+ 
+ 	residue = 0;
+ 	for (i = curr_hwdesc + 1; i < desc->count; i++) {
+-		struct stm32_mdma_hwdesc *hwdesc = &desc->hwdesc[i];
+-
++		hwdesc = desc->node[i].hwdesc;
+ 		residue += STM32_MDMA_CBNDTR_BNDT(hwdesc->cbndtr);
+ 	}
+ 	cbndtr = stm32_mdma_read(dmadev, STM32_MDMA_CBNDTR(chan->id));
 -- 
 2.7.4
