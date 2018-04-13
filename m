@@ -1,48 +1,38 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 13 Apr 2018 09:06:31 -0500
-Subject: [PATCH] ARM: omap2: Fix build when using split object directories
-In-Reply-To: <CAK7LNAQiq-4daX2K4dPyzN7zr+yfkQWSJ-yy9JHgacPpYFp94w@mail.gmail.com>
-References: <20180411211543.7923-1-d-gerlach@ti.com>
- <20180412082157.GB4002@localhost.localdomain>
- <CAK7LNAQiq-4daX2K4dPyzN7zr+yfkQWSJ-yy9JHgacPpYFp94w@mail.gmail.com>
-Message-ID: <4343a047-18b1-409d-ccda-94e72ea63e2a@ti.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Fri, 13 Apr 2018 11:08:03 -0300
+Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
+In-Reply-To: <20180413132052.37fudkaxltvwc46v@gofer.mess.org>
+References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
+ <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
+ <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
+ <20180413060646.25b8a19d@vento.lan>
+ <20180413094005.wudyd2y5efaeimg3@gofer.mess.org>
+ <20180413070050.10d0de84@vento.lan>
+ <20180413132052.37fudkaxltvwc46v@gofer.mess.org>
+Message-ID: <20180413110803.0599eb2a@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-On 04/12/2018 04:08 AM, Masahiro Yamada wrote:
-> 2018-04-12 17:21 GMT+09:00 Anders Roxell <anders.roxell@linaro.org>:
->> On 2018-04-11 16:15, Dave Gerlach wrote:
->>> The sleep33xx and sleep43xx files should not depend on a header file
->>> generated in drivers/memory. Remove this dependency and instead allow
->>> both drivers/memory and arch/arm/mach-omap2 to generate all macros
->>> needed in headers local to their own paths.
->>>
->>> This fixes an issue where the build fail will when using O= to set a
->>> split object directory and arch/arm/mach-omap2 is built before
->>> drivers/memory with the following error:
->>>
->>> .../drivers/memory/emif-asm-offsets.c:1:0: fatal error: can't open drivers/memory/emif-asm-offsets.s for writing: No such file or directory
->>> compilation terminated.
->>>
->>> Fixes: 41d9d44d7258 ("ARM: OMAP2+: pm33xx-core: Add platform code needed for PM")
->>> Acked-by: Tony Lindgren <tony@atomide.com>
->>> Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>
->> Tested-by: Anders Roxell <anders.roxell@linaro.org>
->>
->> Maybe we can remove drivers/memory/Makefile.asm-offsets and move those
->> changes into drivers/memory/Makefile ?
-> 
-> Agree!
-> 
+Em Fri, 13 Apr 2018 14:20:52 +0100
+Sean Young <sean@mess.org> escreveu:
 
-This is the version of this patch that we want to use, will this go through you?
+> On Fri, Apr 13, 2018 at 07:00:50AM -0300, Mauro Carvalho Chehab wrote:
+> > Yeah, we could limit it to run only 512 times (or some other reasonable
+> > quantity), but in order to do that, we need to be sure that, on each read(),
+> > the FIFO will shift - e. g. no risk of needing to do more than one read
+> > to get the next element. That would work if the FIFO is implemented via
+> > flip-flops. But if it is implemented via some slow memory, or if the
+> > shift logic is implemented via some software on a micro-controller, it
+> > may need a few interactions to get the next value.
+> > 
+> > Without knowing about the hardware implementation, I'd say that setting
+> > a max time for the whole FIFO interaction is safer.  
+> 
+> Ok. If the 10ms timeout is reached, there really is a problem; should we
+> report an error in this case?
 
-Regards,
-Dave
+Maybe, but then it should likely warn only once.
 
-> 
-> 
-> 
+
+Thanks,
+Mauro
