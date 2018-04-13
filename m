@@ -1,120 +1,73 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 13 Apr 2018 13:08:35 +0200
-Subject: [PATCH] thermal/drivers/exynos_tmu: Fix warnings in
- temp_to_code / code_to_temp
-In-Reply-To: <1523617209-1730-1-git-send-email-daniel.lezcano@linaro.org>
-References: <10298074.ogKH1ypqfx@amdc3058>
- <CGME20180413110032epcas4p3e0ef781eecb771b1294b7992d2ee6e6d@epcas4p3.samsung.com>
- <1523617209-1730-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <11044079.DdDvlFD91s@amdc3058>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 13 Apr 2018 12:09:35 +0100
+Subject: [PATCH v2 1/2] dmaengine: stm32-mdma: align TLEN and buffer
+ length on burst
+In-Reply-To: <22bd0af7-9820-57c5-9215-8185839d7d27@st.com>
+References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
+ <1523457879-9869-2-git-send-email-pierre-yves.mordret@st.com>
+ <9a2a267c-2b0b-0d6a-c762-47e7d37f84ea@arm.com>
+ <22bd0af7-9820-57c5-9215-8185839d7d27@st.com>
+Message-ID: <7ab2cfcd-07ed-e380-727a-727e78cc0336@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 13, 2018 01:00:09 PM Daniel Lezcano wrote:
-> The latest driver cleanup introduced a compilation warning
+On 13/04/18 10:45, Pierre Yves MORDRET wrote:
+> Hi Robin
 > 
->  drivers/thermal/samsung/exynos_tmu.c: In function ?exynos_get_temp?:
->  drivers/thermal/samsung/exynos_tmu.c:931:37: warning: ?temp? may be used uninitialized in this function [-Wmaybe-uninitialized]
->    *temp = code_to_temp(data, value) * MCELSIUS;
->                                         ^
+> On 04/11/2018 05:14 PM, Robin Murphy wrote:
+>> On 11/04/18 15:44, Pierre-Yves MORDRET wrote:
+>>> Both buffer Transfer Length (TLEN if any) and transfer size have to be
+>>> aligned on burst size (burst beats*bus width).
+>>>
+>>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+>>> ---
+>>>     Version history:
+>>>       v1:
+>>>          * Initial
+>>>       v2:
+>>> ---
+>>> ---
+>>>    drivers/dma/stm32-mdma.c | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+>>> index daa1602..fbcffa2 100644
+>>> --- a/drivers/dma/stm32-mdma.c
+>>> +++ b/drivers/dma/stm32-mdma.c
+>>> @@ -413,7 +413,7 @@ static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
+>>>    	u32 best_burst = max_burst;
+>>>    	u32 burst_len = best_burst * width;
+>>>    
+>>> -	while ((burst_len > 0) && (tlen % burst_len)) {
+>>> +	while ((burst_len > 0) && (((tlen | buf_len) & (burst_len - 1)) != 0)) {
+>>>    		best_burst = best_burst >> 1;
+>>>    		burst_len = best_burst * width;
+>>>    	}
+>>
+>> FWIW, doesn't that whole loop come down to just:
+>>
+>> 	burst_len = min(ffs(tlen | buf_len), max_burst * width);
 > 
->  drivers/thermal/samsung/exynos_tmu.c: In function ?temp_to_code?
->  drivers/thermal/samsung/exynos_tmu.c:304:9: warning: ?temp_code? may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 					  return temp_code;
-> 					           ^~~~~~~~~
-> 
-> The compiler gives a warning because semantically speaking the
-> function has no default value. However the code path, were the
-> variable is never initialized is a dead branch because the switch
-> statement always choose one of the two cases as the data->cal_type is
-> initialized in the init function to one of both values.
-> 
-> This is unclear as it adds a dependency on the initialization function
-> and it is prone to error. Make things clearer by converting the
-> functions with if ... return statements, thus showing we are expecting
-> the values to be correctly filled before calling this function.
-> 
-> This change fixes the couple of function warnings.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> No sure it ends as expected. or I miss something or don't understand this statement
+> I tried with "relevant value" : i.e. best_burst = 32, Tlen=128(default) and
+> buf_len = 64, width= 4. This statements gets me something wrong output => 7
+> instead of 16 * 4.
+> I doubt :)
 
-Thanks Daniel, this is much better fix.
+Heh, seems I confused myself halfway through and started thinking 
+max_burst and width were the exponents x rather than the values 2^x...
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+A more representative guess should be:
 
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 46 ++++++++++--------------------------
->  1 file changed, 12 insertions(+), 34 deletions(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index 2ec8548..197f267 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -284,24 +284,13 @@ static void exynos_report_trigger(struct exynos_tmu_data *p)
->   */
->  static int temp_to_code(struct exynos_tmu_data *data, u8 temp)
->  {
-> -	int temp_code;
-> -
-> -	switch (data->cal_type) {
-> -	case TYPE_TWO_POINT_TRIMMING:
-> -		temp_code = (temp - EXYNOS_FIRST_POINT_TRIM) *
-> -			(data->temp_error2 - data->temp_error1) /
-> -			(EXYNOS_SECOND_POINT_TRIM - EXYNOS_FIRST_POINT_TRIM) +
-> -			data->temp_error1;
-> -		break;
-> -	case TYPE_ONE_POINT_TRIMMING:
-> -		temp_code = temp + data->temp_error1 - EXYNOS_FIRST_POINT_TRIM;
-> -		break;
-> -	default:
-> -		WARN_ON(1);
-> -		break;
-> -	}
-> +	if (data->cal_type == TYPE_ONE_POINT_TRIMMING)
-> +		return temp + data->temp_error1 - EXYNOS_FIRST_POINT_TRIM;
->  
-> -	return temp_code;
-> +	return (temp - EXYNOS_FIRST_POINT_TRIM) *
-> +		(data->temp_error2 - data->temp_error1) /
-> +		(EXYNOS_SECOND_POINT_TRIM - EXYNOS_FIRST_POINT_TRIM) +
-> +		data->temp_error1;
->  }
->  
->  /*
-> @@ -310,24 +299,13 @@ static int temp_to_code(struct exynos_tmu_data *data, u8 temp)
->   */
->  static int code_to_temp(struct exynos_tmu_data *data, u16 temp_code)
->  {
-> -	int temp;
-> -
-> -	switch (data->cal_type) {
-> -	case TYPE_TWO_POINT_TRIMMING:
-> -		temp = (temp_code - data->temp_error1) *
-> -			(EXYNOS_SECOND_POINT_TRIM - EXYNOS_FIRST_POINT_TRIM) /
-> -			(data->temp_error2 - data->temp_error1) +
-> -			EXYNOS_FIRST_POINT_TRIM;
-> -		break;
-> -	case TYPE_ONE_POINT_TRIMMING:
-> -		temp = temp_code - data->temp_error1 + EXYNOS_FIRST_POINT_TRIM;
-> -		break;
-> -	default:
-> -		WARN_ON(1);
-> -		break;
-> -	}
-> +	if (data->cal_type == TYPE_ONE_POINT_TRIMMING)
-> +		return temp_code - data->temp_error1 + EXYNOS_FIRST_POINT_TRIM;
->  
-> -	return temp;
-> +	return (temp_code - data->temp_error1) *
-> +		(EXYNOS_SECOND_POINT_TRIM - EXYNOS_FIRST_POINT_TRIM) /
-> +		(data->temp_error2 - data->temp_error1) +
-> +		EXYNOS_FIRST_POINT_TRIM;
->  }
->  
->  static void sanitize_temp_error(struct exynos_tmu_data *data, u32 trim_info)
+	min(1 << __ffs(tlen | buf_len), max_burst * width);
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+but the general point I was trying to make is that a loop checking 
+whether the bottom n bits of something are zero for different values of 
+n is unnecessary when n can simply be calculated directly*.
+
+Robin.
+
+
+* in the case of this "just the lowest set bit" idiom there's also the 
+shift-free ((x & (x - 1)) ^ x), but as well as being unreadable it's 
+generally less efficient than (1 << __ffs(x)) for most modern ISAs.
