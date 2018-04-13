@@ -1,67 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Apr 2018 11:56:48 +0100
-Subject: Applied "ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
- "Stopping"" to the asoc tree
-In-Reply-To: <20180330154420.6903-1-colin.king@canonical.com>
-Message-ID: <E1f6wNs-0007Ig-K7@debutante>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 13 Apr 2018 11:59:29 +0100
+Subject: [PATCH 03/37] iommu/sva: Manage process address spaces
+In-Reply-To: <04d4d161-ed72-f6b6-9b94-1d60bd79ef94@codeaurora.org>
+References: <20180212183352.22730-1-jean-philippe.brucker@arm.com>
+ <20180212183352.22730-4-jean-philippe.brucker@arm.com>
+ <04d4d161-ed72-f6b6-9b94-1d60bd79ef94@codeaurora.org>
+Message-ID: <f2ea5af2-dfd6-7463-0eaa-ee9ede87eac1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 10/04/18 19:53, Sinan Kaya wrote:
+> On 2/12/2018 1:33 PM, Jean-Philippe Brucker wrote:
+>> +static void io_mm_detach_all_locked(struct iommu_bond *bond)
+>> +{
+>> +	while (!io_mm_detach_locked(bond));
+>> +}
+>> +
+> 
+> I don't remember if I mentioned this before or not but I think this loop
+> needs a little bit relaxation with yield and maybe an informational message
+> with might help if wait exceeds some time.
 
-   ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" -> "Stopping"
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+Right, at the very least we should have a cpu_relax here. I think this
+bit is going away, though, because I want to lift the possibility of
+calling bind() for the same dev/mm pair multiple times. It's not useful
+in my opinion because that call could only be issued by a given driver.
 
 Thanks,
-Mark
-
->From 78a7d414d5a8e3ea7bc5a636311cfb7ce593ce37 Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Fri, 30 Mar 2018 16:44:20 +0100
-Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
- "Stopping"
-
-Trivial fix to spelling mistake in pr_debug message text
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/atmel/atmel_ssc_dai.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index a1e2c5682dcd..1c7af0ca98ec 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 		if (ret < 0) {
- 			printk(KERN_WARNING
- 					"atmel_ssc_dai: request_irq failure\n");
--			pr_debug("Atmel_ssc_dai: Stoping clock\n");
-+			pr_debug("Atmel_ssc_dai: Stopping clock\n");
- 			clk_disable(ssc_p->ssc->clk);
- 			return ret;
- 		}
--- 
-2.17.0
+Jean
