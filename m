@@ -1,172 +1,40 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 13 Apr 2018 19:27:50 +0200
-Subject: [PATCH 1/9] ARM: dts: bcm283x: Fix PWM pin assignment
+Date: Fri, 13 Apr 2018 19:27:57 +0200
+Subject: [PATCH 8/9] arm64: defconfig: Enable LAN and BT support for RPi 3 B+
 In-Reply-To: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
 References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1523640478-4448-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1523640478-4448-9-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All RPi 1 and 2 boards used the PWM (audio out) on pin 40 and 45.
-So it was easy to define them in bcm2835-rpi.dtsi. Starting with RPi 3
-this wont work anymore, because it uses pin 40 and 41. Furthermore the
-Zero variants doesn't have audio out.
+The Raspberry Pi 3 B+ has a Microchip LAN7515 (connect via USB) and
+a Cypress CYW43455 (connect via UART). This patch enables the necessary
+drivers.
 
-This patch fixes this pin conflict by moving the PWM node to the board-level.
-
-Change summary:
-RPi 3 B:      PWM1 45 -> 41
-Zero, Zero W: PWM disabled
-all other:    no functional change
-
-Reported-by: Baruch Siach <baruch@tkos.co.il>
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-a.dts      | 6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-b.dts      | 6 ++++++
- arch/arm/boot/dts/bcm2835-rpi.dtsi       | 6 ------
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 6 ++++++
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 6 ++++++
- 8 files changed, 42 insertions(+), 6 deletions(-)
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index aa1fc7b..2cd9c5e 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -101,6 +101,12 @@
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_gpio14>;
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-index 425f6b0..067d1f0 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-@@ -96,6 +96,12 @@
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_gpio14>;
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index effa195..cfbdaac 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -103,6 +103,12 @@
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_gpio14>;
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index 772ec3b..5641d16 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -96,6 +96,12 @@
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_gpio14>;
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 434483d..31ff602 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -91,6 +91,12 @@
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_gpio14>;
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 6c3cfaa..cb2d6d7 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -83,12 +83,6 @@
- 	bus-width = <4>;
- };
- 
--&pwm {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
--	status = "okay";
--};
--
- &usb {
- 	power-domains = <&power RPI_POWER_DOMAIN_USB>;
- };
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index 5c339ad..2fef70a 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -41,6 +41,12 @@
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_gpio14>;
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index 0b31d99..cc39b6f 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -42,6 +42,12 @@
- 	};
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
-+	status = "okay";
-+};
-+
- /* uart0 communicates with the BT module */
- &uart0 {
- 	pinctrl-names = "default";
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ecf6137..8ac1feaf 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -159,6 +159,7 @@ CONFIG_BT_LEDS=y
+ # CONFIG_BT_DEBUGFS is not set
+ CONFIG_BT_HCIUART=m
+ CONFIG_BT_HCIUART_LL=y
++CONFIG_BT_HCIUART_BCM=y
+ CONFIG_CFG80211=m
+ CONFIG_MAC80211=m
+ CONFIG_MAC80211_LEDS=y
+@@ -239,6 +240,7 @@ CONFIG_ROCKCHIP_PHY=y
+ CONFIG_USB_PEGASUS=m
+ CONFIG_USB_RTL8150=m
+ CONFIG_USB_RTL8152=m
++CONFIG_USB_LAN78XX=m
+ CONFIG_USB_USBNET=m
+ CONFIG_USB_NET_DM9601=m
+ CONFIG_USB_NET_SR9800=m
 -- 
 2.7.4
