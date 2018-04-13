@@ -1,21 +1,80 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Apr 2018 12:27:18 -0500
-Subject: [PATCH net-next 2/3] dt-bindings: net: ave: add syscon-phy-mode
- property to configure phy-mode setting
-In-Reply-To: <1523255925-6469-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1523255925-6469-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1523255925-6469-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20180413172718.j2kmpjtdpuldqsj4@rob-hp-laptop>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 13 Apr 2018 19:27:51 +0200
+Subject: [PATCH 2/9] ARM: dts: bcm2837: Add missing GPIOs of Expander
+In-Reply-To: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
+References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1523640478-4448-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 03:38:44PM +0900, Kunihiko Hayashi wrote:
-> Add "socionext,syscon-phy-mode" property to specify system controller that
-> configures the settings about phy-mode.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
->  Documentation/devicetree/bindings/net/socionext,uniphier-ave4.txt | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
+After commit a98d90e7d588 ("gpio: raspberrypi-exp: Driver for RPi3 GPIO
+expander via mailbox service") we are able to control the rest of the
+GPIOs of the RPi 3. So add all the missing parts (ACT LED,
+Wifi & BT control, HDMI detect) to the DT.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index cc39b6f..c318bcb 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -20,9 +20,14 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
++			gpios = <&expgpio 2 GPIO_ACTIVE_HIGH>;
+ 		};
+ 	};
++
++	wifi_pwrseq: wifi-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &firmware {
+@@ -48,6 +53,10 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	hpd-gpios = <&expgpio 4 GPIO_ACTIVE_LOW>;
++};
++
+ /* uart0 communicates with the BT module */
+ &uart0 {
+ 	pinctrl-names = "default";
+@@ -57,6 +66,7 @@
+ 	bluetooth {
+ 		compatible = "brcm,bcm43438-bt";
+ 		max-speed = <2000000>;
++		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
+ 	};
+ };
+ 
+@@ -69,11 +79,19 @@
+ 
+ /* SDHCI is used to control the SDIO for wireless */
+ &sdhci {
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&emmc_gpio34>;
+ 	status = "okay";
+ 	bus-width = <4>;
+ 	non-removable;
++	mmc-pwrseq = <&wifi_pwrseq>;
++
++	brcmf: wifi at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++	};
+ };
+ 
+ /* SDHOST is used to drive the SD card */
+-- 
+2.7.4
