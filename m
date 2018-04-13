@@ -1,41 +1,23 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Apr 2018 16:16:44 -0500
-Subject: [PATCH v2 1/5] clk: Extract OF clock helpers in <linux/of_clk.h>
-In-Reply-To: <1523364701-15383-2-git-send-email-geert+renesas@glider.be>
-References: <1523364701-15383-1-git-send-email-geert+renesas@glider.be>
- <1523364701-15383-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20180413211644.wd7lrl4phqtshpzp@rob-hp-laptop>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 13 Apr 2018 14:39:24 -0700
+Subject: [PATCH 1/2] dt-binding: rng: Add interrupt property for BCM2835
+In-Reply-To: <1511010253-5006-2-git-send-email-stefan.wahren@i2se.com>
+References: <1511010253-5006-1-git-send-email-stefan.wahren@i2se.com>
+ <1511010253-5006-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <b54e629b-e142-fdae-b166-124b991f8882@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 02:51:37PM +0200, Geert Uytterhoeven wrote:
-> The use of of_clk_get_parent_{count,name}() and of_clk_init() is not
-> limited to clock providers.
+On 11/18/2017 05:04 AM, Stefan Wahren wrote:
+> As Sylvain Garrigues pointed out the BCM2835 RNG block has an
+> interrupt. Also in preparation for Florian's upcoming patch series
+> add this property to the binding. While we are at it fix the
+> indenting of the example.
 > 
-> Hence move these helpers into their own header file, so callers that are
-> not clock providers no longer have to include <linux/clk-provider.h>.
-> 
-> Suggested-by: Stephen Boyd <sboyd@kernel.org>
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v2:
->   - New.
-> 
-> I have't added an SPDX-License-Identifier line, as
-> <linux/clk-provider.h> also doesn't have one yet.
+> Link: https://github.com/raspberrypi/linux/issues/2195
+> CC: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-Should that matter?
-
-> 
-> Other candidates to be moved here later?
->   - of_clk_get(),
->   - of_clk_get_by_name(),
->   - of_clk_get_from_provider().
-> ---
->  include/linux/clk-provider.h | 14 +-------------
->  include/linux/of_clk.h       | 29 +++++++++++++++++++++++++++++
-
-Please update MAINTAINERS so I am not the maintainer. :)
-
->  2 files changed, 30 insertions(+), 13 deletions(-)
->  create mode 100644 include/linux/of_clk.h
+Applied to devicetree/next, thanks!
+-- 
+Florian
