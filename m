@@ -1,78 +1,41 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Fri, 13 Apr 2018 08:03:16 +0000
-Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
-In-Reply-To: <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
-References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
- <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
-Message-ID: <c9a405b9-4d69-37f0-61a4-b23c0faba033@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Apr 2018 10:39:48 +0200
+Subject: [PATCH v2 2/2] dmaengine: stm32-mdma: Fix incomplete Hw
+ descriptors allocator
+In-Reply-To: <20180413040233.GJ6014@localhost>
+References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
+ <1523457879-9869-3-git-send-email-pierre-yves.mordret@st.com>
+ <20180413040233.GJ6014@localhost>
+Message-ID: <CAMuHMdWNyvveQ73SDrVy=EwkkO6Gd_4hmOkdstpcgzOL44a_mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro
+Hi Vinod,
 
-On 04/12/2018 05:24 PM, Mauro Carvalho Chehab wrote:
-> As warned by smatch:
-> 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
-> 
-> If something goes wrong at readl(), the logic will stay there
-> inside an IRQ code forever. This is not the nicest thing to
-> do :-)
-> 
-> So, add a timeout there, preventing staying inside the IRQ
-> for more than 10ms.
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-> ---
->   drivers/media/rc/st_rc.c | 16 ++++++++++------
->   1 file changed, 10 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
-> index d2efd7b2c3bc..c855b177103c 100644
-> --- a/drivers/media/rc/st_rc.c
-> +++ b/drivers/media/rc/st_rc.c
-> @@ -96,19 +96,24 @@ static void st_rc_send_lirc_timeout(struct rc_dev *rdev)
->   
->   static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
->   {
-> +	unsigned long timeout;
->   	unsigned int symbol, mark = 0;
->   	struct st_rc_device *dev = data;
->   	int last_symbol = 0;
-> -	u32 status;
-> +	u32 status, int_status;
->   	DEFINE_IR_RAW_EVENT(ev);
->   
->   	if (dev->irq_wake)
->   		pm_wakeup_event(dev->dev, 0);
->   
-> -	status  = readl(dev->rx_base + IRB_RX_STATUS);
-> +	/* FIXME: is 10ms good enough ? */
-> +	timeout = jiffies +  msecs_to_jiffies(10);
-> +	do {
-> +		status  = readl(dev->rx_base + IRB_RX_STATUS);
-> +		if (!(status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)))
-> +			break;
->   
-> -	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
-> -		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
-> +		int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
->   		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
->   			/* discard the entire collection in case of errors!  */
->   			ir_raw_event_reset(dev->rdev);
-> @@ -148,8 +153,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
->   
->   		}
->   		last_symbol = 0;
-> -		status  = readl(dev->rx_base + IRB_RX_STATUS);
-> -	}
-> +	} while (time_is_after_jiffies(timeout));
->   
->   	writel(IRB_RX_INTS, dev->rx_base + IRB_RX_INT_CLEAR);
->   
-> 
+On Fri, Apr 13, 2018 at 6:02 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, Apr 11, 2018 at 04:44:39PM +0200, Pierre-Yves MORDRET wrote:
+>
+>>  struct stm32_mdma_desc {
+>>       struct virt_dma_desc vdesc;
+>>       u32 ccr;
+>> -     struct stm32_mdma_hwdesc *hwdesc;
+>> -     dma_addr_t hwdesc_phys;
+>>       bool cyclic;
+>>       u32 count;
+>> +     struct stm32_mdma_desc_node node[];
+>
+> some ppl use node[0] for this but i think either is fine..
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+node[] is the correct one, node[0] may hide future bugs, cfr. commit
+a158531f3c92467d ("gpio: 74x164: Fix crash during .remove()")
 
-Thanks
+Gr{oetje,eeting}s,
 
-Patrice
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
