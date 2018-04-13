@@ -1,85 +1,85 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Fri, 13 Apr 2018 17:48:26 +0530
-Subject: [PATCH v4 0/8] drm/sun4i: Allwinner MIPI-DSI support
-In-Reply-To: <20180413120958.vo4y34q36q2rjyej@flea>
-References: <cover.a3617c4362eac8783f412525e52cf5552d19095d.1522835818.git-series.maxime.ripard@bootlin.com>
- <20180411124325.youvfpws27l2wesf@flea>
- <CAD6G_RRQrj9m=MPdjovEcwJV_fivCMAERSa49Mt0cKGFTicsxA@mail.gmail.com>
- <20180413120958.vo4y34q36q2rjyej@flea>
-Message-ID: <CAD6G_RQrgw2Oopr8uxxev+XN=PERCoR37G7TUur=b=Pvy=6AnA@mail.gmail.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Fri, 13 Apr 2018 14:30:41 +0200
+Subject: [PATCH v2 1/2] dmaengine: stm32-mdma: align TLEN and buffer
+ length on burst
+In-Reply-To: <7ab2cfcd-07ed-e380-727a-727e78cc0336@arm.com>
+References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
+ <1523457879-9869-2-git-send-email-pierre-yves.mordret@st.com>
+ <9a2a267c-2b0b-0d6a-c762-47e7d37f84ea@arm.com>
+ <22bd0af7-9820-57c5-9215-8185839d7d27@st.com>
+ <7ab2cfcd-07ed-e380-727a-727e78cc0336@arm.com>
+Message-ID: <847f092a-d1f9-8902-e1ae-f65dc2f0db7c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2018 at 5:39 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Fri, Apr 13, 2018 at 05:30:04PM +0530, Jagan Teki wrote:
->> On Wed, Apr 11, 2018 at 6:13 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > On Wed, Apr 04, 2018 at 11:57:08AM +0200, Maxime Ripard wrote:
->> >> Hi,
->> >>
->> >> Here is an preliminary version of the MIPI-DSI support for the Allwinner
->> >> SoCs.
->> >>
->> >> This controller can be found on a number of recent SoCs, such as the
->> >> A31, A33 or the A64.
->> >>
->> >> Given the sparse documentation, there's a number of obscure areas, but
->> >> the current implementation has been tested with a 4-lanes DSI panel on
->> >> an A33.
->> >>
->> >> The support is a bit rough around the edges at the time, and some artifacts
->> >> are still shown on the screen for some reasons. Wider testing with
->> >> different display will hopefully nail those down.
->> >>
->> >> This needs the regmap_mmio_attach_clk, on its way to Linus in 4.17.
->> >>
->> >> Let me know what you think,
->> >> Maxime
->> >>
->> >> Changes from v3:
->> >>   - Rebased on top of current drm-misc-next
->> >>   - Switched to SPDX license header
->> >>   - Made the ECC array const
->> >>   - Split the big DSI patch into two, one to add the DSI driver and one to
->> >>     add the TCON bits.
->> >>   - Removed the dithering code
->> >>   - Changed the DT labels to remove the indices
->> >>   - Used sleeps instead of delays in the panel driver
->> >>   - Used the backlight_enable / _disable functions
->> >>   - Added Chen-Yu's Reviewed-by
->> >>
->> >> Changes from v2:
->> >>   - Added a ports node under the DSI node
->> >>   - Changed the huarui panel driver to an ili9881c driver
->> >>   - Changed the panel vendor to bananapi
->> >>   - Made the init table static in the panel driver
->> >>   - Dropped the huarui vendor patch for the DT doc.
->> >>
->> >> Changes from v1:
->> >>   - Rebased on 4.16-rc1
->> >>   - Constified a few function arguments and structures
->> >>   - Reworked the DT binding example a bit
->> >>   - Reworked the panel driver to check for DSI return codes, and use DCS
->> >>     helpers when possible
->> >>
->> >> Maxime Ripard (8):
->> >>   drm/sun4i: tcon: Add TRI finish interrupt for vblank
->> >>   dt-bindings: display: Add Allwinner MIPI-DSI bindings
->> >>   drm/sun4i: Add Allwinner A31 MIPI-DSI controller support
->> >>   drm/sun4i: Tie the DSI controller in the TCON
->> >>   dt-bindings: panel: Add the Ilitek ILI9881c panel documentation
->> >>   drm/panel: Add Ilitek ILI9881c panel driver
->> >>   ARM: dts: sun8i: a33: Add the DSI-related nodes
->> >>   [DO NOT MERGE] arm: dts: sun8i: bpi-m2m: Add DSI display
->>
->> I have reviewed most of the patches and reused for A64 all look fine
->> to me (except the panel driver). May be my issue is not relevant to
->> this thread, but I'm looking for help If I miss anything for A64 [1]
->> and [2] are changes made for A64, the issue is kernel hang while
->> loading sun6i_dsi.
->
-> My guess would be that you're not claiming the DE2 SRAM. See:
-> https://lkml.org/lkml/2018/3/16/1096
 
-Thanks Maxime, will try.
+
+On 04/13/2018 01:09 PM, Robin Murphy wrote:
+> On 13/04/18 10:45, Pierre Yves MORDRET wrote:
+>> Hi Robin
+>>
+>> On 04/11/2018 05:14 PM, Robin Murphy wrote:
+>>> On 11/04/18 15:44, Pierre-Yves MORDRET wrote:
+>>>> Both buffer Transfer Length (TLEN if any) and transfer size have to be
+>>>> aligned on burst size (burst beats*bus width).
+>>>>
+>>>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+>>>> ---
+>>>>     Version history:
+>>>>       v1:
+>>>>          * Initial
+>>>>       v2:
+>>>> ---
+>>>> ---
+>>>>    drivers/dma/stm32-mdma.c | 2 +-
+>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+>>>> index daa1602..fbcffa2 100644
+>>>> --- a/drivers/dma/stm32-mdma.c
+>>>> +++ b/drivers/dma/stm32-mdma.c
+>>>> @@ -413,7 +413,7 @@ static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
+>>>>    	u32 best_burst = max_burst;
+>>>>    	u32 burst_len = best_burst * width;
+>>>>    
+>>>> -	while ((burst_len > 0) && (tlen % burst_len)) {
+>>>> +	while ((burst_len > 0) && (((tlen | buf_len) & (burst_len - 1)) != 0)) {
+>>>>    		best_burst = best_burst >> 1;
+>>>>    		burst_len = best_burst * width;
+>>>>    	}
+>>>
+>>> FWIW, doesn't that whole loop come down to just:
+>>>
+>>> 	burst_len = min(ffs(tlen | buf_len), max_burst * width);
+>>
+>> No sure it ends as expected. or I miss something or don't understand this statement
+>> I tried with "relevant value" : i.e. best_burst = 32, Tlen=128(default) and
+>> buf_len = 64, width= 4. This statements gets me something wrong output => 7
+>> instead of 16 * 4.
+>> I doubt :)
+> 
+> Heh, seems I confused myself halfway through and started thinking 
+> max_burst and width were the exponents x rather than the values 2^x...
+> 
+> A more representative guess should be:
+> 
+> 	min(1 << __ffs(tlen | buf_len), max_burst * width);
+> 
+> but the general point I was trying to make is that a loop checking 
+> whether the bottom n bits of something are zero for different values of 
+> n is unnecessary when n can simply be calculated directly*.
+> 
+> Robin.
+
+Got the point. I figure how to compute this value with __ffs. Your last
+statement doesn't provide the good value, but the spirit is here. I just have to
+adjust with what I want.
+
+Thx
+
+> 
+> 
+> * in the case of this "just the lowest set bit" idiom there's also the 
+> shift-free ((x & (x - 1)) ^ x), but as well as being unreadable it's 
+> generally less efficient than (1 << __ffs(x)) for most modern ISAs.
+> 
