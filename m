@@ -1,104 +1,43 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Apr 2018 12:56:32 -0500
-Subject: [PATCH 1/3] drm/vc4: Remove the need for the GPU-subsystem DT
- node.
-In-Reply-To: <20180409230040.1100-1-eric@anholt.net>
-References: <20180409230040.1100-1-eric@anholt.net>
-Message-ID: <20180413175632.oz62n363g6rxdp6z@rob-hp-laptop>
+Date: Fri, 13 Apr 2018 13:05:49 -0500
+Subject: [PATCH v4 3/8] dt-bindings: mfd: renesas,rzn1-sysctrl: document
+ RZ/N1 sysctrl node
+In-Reply-To: <1523349015-37985-4-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523349015-37985-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1523349015-37985-4-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <20180413180549.yjzkl2yf7osz7myt@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 09, 2018 at 04:00:38PM -0700, Eric Anholt wrote:
-> The GPU subsystem node was a workaround to have a central device to
-> bind V3D and display to.  Following the lead of 246774d17fc0
-> ("drm/etnaviv: remove the need for a gpu-subsystem DT node"), remove
-> the subsystem node usage and just create a platform device for the DRM
-> device to attach to if any of the subsystem devices are present.
+On Tue, Apr 10, 2018 at 09:30:03AM +0100, Michel Pollet wrote:
+> The Renesas RZ/N1 Family (Part #R9A06G0xx) has a multi-function
+> system controller. This documents the node used to encapsulate
+> it's sub drivers.
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 > ---
->  .../bindings/display/brcm,bcm-vc4.txt         |  7 ----
->  drivers/gpu/drm/vc4/vc4_drv.c                 | 33 ++++++++++++++-----
->  drivers/gpu/drm/vc4/vc4_hvs.c                 |  1 +
->  drivers/gpu/drm/vc4/vc4_v3d.c                 |  1 +
->  4 files changed, 27 insertions(+), 15 deletions(-)
+>  .../bindings/mfd/renesas,rzn1-sysctrl.txt          | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-> index 284e2b14cfbe..5fd4717101d6 100644
-> --- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-> +++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-> @@ -4,9 +4,6 @@ The VC4 device present on the Raspberry Pi includes a display system
->  with HDMI output and the HVS (Hardware Video Scaler) for compositing
->  display planes.
->  
-> -Required properties for VC4:
-> -- compatible:	Should be "brcm,bcm2835-vc4" or "brcm,cygnus-vc4"
-> -
->  Required properties for Pixel Valve:
->  - compatible:	Should be one of "brcm,bcm2835-pixelvalve0",
->  		  "brcm,bcm2835-pixelvalve1", or "brcm,bcm2835-pixelvalve2"
-> @@ -153,10 +150,6 @@ v3d: v3d at 7ec00000 {
->  	interrupts = <1 10>;
->  };
->  
-> -vc4: gpu {
-> -	compatible = "brcm,bcm2835-vc4";
-> -};
-> -
->  panel: panel {
->  	compatible = "ontat,yx700wv03", "simple-panel";
->  
-> diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
-> index 7c95ed5c5cac..d282ab7de03a 100644
-> --- a/drivers/gpu/drm/vc4/vc4_drv.c
-> +++ b/drivers/gpu/drm/vc4/vc4_drv.c
-> @@ -364,22 +364,34 @@ static int vc4_platform_drm_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id vc4_of_match[] = {
-> -	{ .compatible = "brcm,bcm2835-vc4", },
-> -	{ .compatible = "brcm,cygnus-vc4", },
-> -	{},
-> -};
-> -MODULE_DEVICE_TABLE(of, vc4_of_match);
-> -
->  static struct platform_driver vc4_platform_driver = {
->  	.probe		= vc4_platform_drm_probe,
->  	.remove		= vc4_platform_drm_remove,
->  	.driver		= {
->  		.name	= "vc4-drm",
-> -		.of_match_table = vc4_of_match,
->  	},
->  };
->  
-> +static bool
-> +driver_of_table_has_a_match(const struct platform_driver *driver)
-> +{
-> +	int i;
+> diff --git a/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt b/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
+> new file mode 100644
+> index 0000000..9897f8f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
+> @@ -0,0 +1,23 @@
+> +DT bindings for the Renesas RZ/N1 System Controller
 > +
-
-> +	for (i = 0; driver->driver.of_match_table[i].compatible; i++) {
-> +		const char *compat = driver->driver.of_match_table[i].compatible;
-> +		struct device_node *node;
+> +== System Controller Node ==
 > +
-> +		while ((node = of_find_compatible_node(node, NULL, compat))) {
-> +			if (of_device_is_available(node)) {
-> +				of_node_put(node);
-> +				return true;
-> +			}
-> +		}
-> +	}
+> +The system controller node currently only hosts a single sub-node to handle
+> +the rebooting of the CPU. Eventually it will host the clock driver, SMP
+> +start handler, watchdog etc.
 
-All this can be replaced with:
+Please submit a complete binding for the h/w block.
 
-node = of_find_matching_node_and_match(NULL, driver->driver.of_match_table, NULL);
-if (of_device_is_available(node)) {
-	of_node_put(node);
-	return true;
-}
+Again, if the only reason you have sub nodes is to define compatible 
+strings and in turn enumerate drivers, then you don't need the nodes in 
+DT. DT is not the only way to instantiate drivers.
 
-> +
-> +	return false;
-> +}
-> +
+Rob
