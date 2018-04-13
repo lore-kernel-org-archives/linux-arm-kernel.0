@@ -1,36 +1,36 @@
 From: radu.pirea@microchip.com (Radu Pirea)
-Date: Fri, 13 Apr 2018 19:11:15 +0300
-Subject: [PATCH 1/3] MAINTAINERS: add usart spi driver
-In-Reply-To: <20180413161117.20274-1-radu.pirea@microchip.com>
-References: <20180413161117.20274-1-radu.pirea@microchip.com>
-Message-ID: <20180413161117.20274-2-radu.pirea@microchip.com>
+Date: Fri, 13 Apr 2018 19:11:14 +0300
+Subject: [PATCH 0/3] Driver for AT91 USART in SPI mode
+Message-ID: <20180413161117.20274-1-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entry for at91 usart spi driver.
+Hello,
 
-Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+I wrote this driver for USART IP that is found in AT91 and SAMA5 SoCs. The
+IP has an internal chip select, but is not used because is deasserted and
+asserted after every byte sent over the wires. Gpio chip selects are used
+instead of internal one. The driver works with actual USART nodes from
+device tree of boards, but compatible must be changed, SCK pin muxed and
+cs-gpio, size-cells and address-cells must be added. Of course, at the end
+of the wires must be an SPI slave linked, not a serial console. :)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8e2a2fddbd19..8f80d0e30573 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9192,6 +9192,13 @@ S:	Supported
- F:	drivers/mtd/nand/raw/atmel/*
- F:	Documentation/devicetree/bindings/mtd/atmel-nand.txt
- 
-+MICROCHIP AT91 USART SPI DRIVER
-+M:	Radu Pirea <radu.pirea@microchip.com>
-+L:	linux-spi at vger.kernel.org
-+S:	Supported
-+F:	drivers/spi/spi-at91-usart.c
-+F:	Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
-+
- MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
- M:	Woojung Huh <Woojung.Huh@microchip.com>
- M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
+I tested the driver on sama5d4-xplained and sama5d3-xplained and works
+without issues.
+
+Radu Pirea (3):
+  MAINTAINERS: add usart spi driver
+  dt-bindings: add binding for at91-usart in spi mode
+  spi: at91-usart: add driver for at91-usart as spi
+
+ .../bindings/spi/microchip,at91-usart-spi.txt |  24 +
+ MAINTAINERS                                   |   7 +
+ drivers/spi/Kconfig                           |   8 +
+ drivers/spi/Makefile                          |   1 +
+ drivers/spi/spi-at91-usart.c                  | 545 ++++++++++++++++++
+ 5 files changed, 585 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
+ create mode 100644 drivers/spi/spi-at91-usart.c
+
 -- 
 2.17.0
