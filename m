@@ -1,69 +1,38 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Fri, 13 Apr 2018 07:00:50 -0300
-Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
-In-Reply-To: <20180413094005.wudyd2y5efaeimg3@gofer.mess.org>
-References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
- <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
- <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
- <20180413060646.25b8a19d@vento.lan>
- <20180413094005.wudyd2y5efaeimg3@gofer.mess.org>
-Message-ID: <20180413070050.10d0de84@vento.lan>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 13 Apr 2018 15:39:22 +0530
+Subject: [PATCH v2 2/2] dmaengine: stm32-mdma: Fix incomplete Hw
+ descriptors allocator
+In-Reply-To: <CAMuHMdWNyvveQ73SDrVy=EwkkO6Gd_4hmOkdstpcgzOL44a_mA@mail.gmail.com>
+References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
+ <1523457879-9869-3-git-send-email-pierre-yves.mordret@st.com>
+ <20180413040233.GJ6014@localhost>
+ <CAMuHMdWNyvveQ73SDrVy=EwkkO6Gd_4hmOkdstpcgzOL44a_mA@mail.gmail.com>
+Message-ID: <20180413100921.GM6014@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 13 Apr 2018 10:40:05 +0100
-Sean Young <sean@mess.org> escreveu:
-
-> On Fri, Apr 13, 2018 at 06:06:46AM -0300, Mauro Carvalho Chehab wrote:
-> > Hi Sean,
-> > 
-> > Em Thu, 12 Apr 2018 23:21:32 +0100
-> > Sean Young <sean@mess.org> escreveu:
-> >   
-> > > On Thu, Apr 12, 2018 at 11:24:07AM -0400, Mauro Carvalho Chehab wrote:  
-> > > > As warned by smatch:
-> > > > 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
-> > > > 
-> > > > If something goes wrong at readl(), the logic will stay there
-> > > > inside an IRQ code forever. This is not the nicest thing to
-> > > > do :-)
-> > > > 
-> > > > So, add a timeout there, preventing staying inside the IRQ
-> > > > for more than 10ms.    
-> > > 
-> > > If we knew how large the fifo was, then we could limit the loop to that many
-> > > iterations (maybe a few extra in case IR arrives while we a reading, but
-> > > IR is much slower than a cpu executing this loop of course).  
-> > 
-> > IR is slower, but this code is called at IRQ time, e. g. when the
-> > controller already received the IR data. Also, it reads directly
-> > via a memory mapped register, with should be fast.  
+On Fri, Apr 13, 2018 at 10:39:48AM +0200, Geert Uytterhoeven wrote:
+> Hi Vinod,
 > 
-> There is a chance that a new IR edge occurs whilst reading the fifo. All of
-> this is academic since we don't know the size of the fifo.
+> On Fri, Apr 13, 2018 at 6:02 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Wed, Apr 11, 2018 at 04:44:39PM +0200, Pierre-Yves MORDRET wrote:
+> >
+> >>  struct stm32_mdma_desc {
+> >>       struct virt_dma_desc vdesc;
+> >>       u32 ccr;
+> >> -     struct stm32_mdma_hwdesc *hwdesc;
+> >> -     dma_addr_t hwdesc_phys;
+> >>       bool cyclic;
+> >>       u32 count;
+> >> +     struct stm32_mdma_desc_node node[];
+> >
+> > some ppl use node[0] for this but i think either is fine..
 > 
-> > I suspect that
-> > 10ms is a lot more time than what would be required to go though
-> > all the FIFO data.  
-> 
-> 10ms seems far too much. The serial_ir prints a warning if it loops more
-> than 255 times (and breaks out of the loop). Since we don't know the size
-> of the fifo, that will be more than enough. We could also limit it to 
-> 512 times, since the raw IR kfifo is 512 and any more than that would
-> not fit in the kfifo anyway. This would exit much quicker than 10ms.
-> 
-> At least winbond-cir has a similar loop, there might be other drivers.
+> node[] is the correct one, node[0] may hide future bugs, cfr. commit
+> a158531f3c92467d ("gpio: 74x164: Fix crash during .remove()")
 
-Yeah, we could limit it to run only 512 times (or some other reasonable
-quantity), but in order to do that, we need to be sure that, on each read(),
-the FIFO will shift - e. g. no risk of needing to do more than one read
-to get the next element. That would work if the FIFO is implemented via
-flip-flops. But if it is implemented via some slow memory, or if the
-shift logic is implemented via some software on a micro-controller, it
-may need a few interactions to get the next value.
+Yeah but it this case it is the last element. But yes it helps to avoid such
+mistakes in future..
 
-Without knowing about the hardware implementation, I'd say that setting
-a max time for the whole FIFO interaction is safer.
-
-Thanks,
-Mauro
+-- 
+~Vinod
