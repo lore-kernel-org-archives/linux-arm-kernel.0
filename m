@@ -1,41 +1,100 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Apr 2018 10:39:48 +0200
-Subject: [PATCH v2 2/2] dmaengine: stm32-mdma: Fix incomplete Hw
- descriptors allocator
-In-Reply-To: <20180413040233.GJ6014@localhost>
-References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
- <1523457879-9869-3-git-send-email-pierre-yves.mordret@st.com>
- <20180413040233.GJ6014@localhost>
-Message-ID: <CAMuHMdWNyvveQ73SDrVy=EwkkO6Gd_4hmOkdstpcgzOL44a_mA@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 13 Apr 2018 10:47:39 +0200
+Subject: [PATCH v7 06/26] timer: Export next wakeup time of a CPU
+In-Reply-To: <1523531671-27491-7-git-send-email-ulf.hansson@linaro.org>
+References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
+ <1523531671-27491-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAJZ5v0j=TL7Pvc6W+ieJ1D3C-9mJKMzmkcSRoHnquAwZC_k+0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-On Fri, Apr 13, 2018 at 6:02 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Wed, Apr 11, 2018 at 04:44:39PM +0200, Pierre-Yves MORDRET wrote:
+On Thu, Apr 12, 2018 at 1:14 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> From: Lina Iyer <lina.iyer@linaro.org>
 >
->>  struct stm32_mdma_desc {
->>       struct virt_dma_desc vdesc;
->>       u32 ccr;
->> -     struct stm32_mdma_hwdesc *hwdesc;
->> -     dma_addr_t hwdesc_phys;
->>       bool cyclic;
->>       u32 count;
->> +     struct stm32_mdma_desc_node node[];
+> Knowing the sleep duration of CPUs, is known to be needed while selecting
+> the most energy efficient idle state for a CPU or a group of CPUs.
 >
-> some ppl use node[0] for this but i think either is fine..
+> However, to be able to compute the sleep duration, we need to know at what
+> time the next expected wakeup is for the CPU. Therefore, let's export this
+> information via a new function, tick_nohz_get_next_wakeup(). Following
+> changes make use of it.
+>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Lina Iyer <ilina@codeaurora.org>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  include/linux/tick.h     | 10 ++++++++++
+>  kernel/time/tick-sched.c | 11 +++++++++++
+>  2 files changed, 21 insertions(+)
+>
+> diff --git a/include/linux/tick.h b/include/linux/tick.h
+> index 389aa25..d341811 100644
+> --- a/include/linux/tick.h
+> +++ b/include/linux/tick.h
+> @@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
+>  extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
+>  extern unsigned long tick_nohz_get_idle_calls(void);
+>  extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
+> +extern ktime_t tick_nohz_get_next_wakeup(int cpu);
+>  extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
+>  extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
+>
+> @@ -151,6 +152,15 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
+>         *delta_next = TICK_NSEC;
+>         return *delta_next;
+>  }
+> +
+> +static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
+> +{
+> +       ktime_t t;
+> +
+> +       /* Next wake up is the tick period, assume it starts now */
+> +       return ktime_add(tick_nohz_get_sleep_length(&t), ktime_get());
+> +}
 
-node[] is the correct one, node[0] may hide future bugs, cfr. commit
-a158531f3c92467d ("gpio: 74x164: Fix crash during .remove()")
+Well, given that tick_nohz_get_sleep_length() is just the above in
+this case, wouldn't it be simpler to return ktime_add(ktime_get(),
+TICK_NSEC) from here?
 
-Gr{oetje,eeting}s,
+> +
+>  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+>  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
+>
+> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+> index 646645e..08db7f3 100644
+> --- a/kernel/time/tick-sched.c
+> +++ b/kernel/time/tick-sched.c
+> @@ -1098,6 +1098,17 @@ unsigned long tick_nohz_get_idle_calls(void)
+>         return ts->idle_calls;
+>  }
+>
+> +/**
+> + * tick_nohz_get_next_wakeup - return the next wake up of the CPU
+> + */
+> +ktime_t tick_nohz_get_next_wakeup(int cpu)
+> +{
+> +       struct clock_event_device *dev =
+> +                       per_cpu(tick_cpu_device.evtdev, cpu);
 
-                        Geert
+I would avoid breaking the line, honestly.
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+If you really really want to avoid going above the 80 chars line
+length limit, why don't you do
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+struct clock_event_device *dev;
+
+dev = per_cpu(tick_cpu_device.evtdev, cpu);
+
+> +
+> +       return dev->next_event;
+> +}
+> +
+>  static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+>  {
+>  #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+> --
