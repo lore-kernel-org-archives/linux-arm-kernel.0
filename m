@@ -1,64 +1,93 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 13 Apr 2018 18:23:27 +0200
-Subject: [PATCH 2/3] dt-bindings: add binding for at91-usart in spi mode
-In-Reply-To: <20180413161117.20274-3-radu.pirea@microchip.com>
-References: <20180413161117.20274-1-radu.pirea@microchip.com>
- <20180413161117.20274-3-radu.pirea@microchip.com>
-Message-ID: <20180413162327.GE22187@piout.net>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 13 Apr 2018 17:27:57 +0100
+Subject: [PATCH v2 14/17] kvm: arm64: Switch to per VM IPA limit
+In-Reply-To: <1522156531-28348-15-git-send-email-suzuki.poulose@arm.com>
+ (Suzuki K. Poulose's message of "Tue, 27 Mar 2018 14:15:24 +0100")
+References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
+ <1522156531-28348-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <87muy7vzoy.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/2018 19:11:16+0300, Radu Pirea wrote:
-> These are bindings for at91-usart IP in spi spi mode. There is no support for
-> internal chip select. Only kind of chip selects available are gpio chip
-> selects.
-> 
-> Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
+Hi Suzuki,
+
+I haven't had a chance to look at the code but noticed one issue below.
+
+Suzuki K Poulose <suzuki.poulose@arm.com> writes:
+
+> Now that we can manage the stage2 page table per VM, switch the
+> configuration details to per VM instance. We keep track of the
+> IPA bits, number of page table levels and the VTCR bits (which
+> depends on the IPA and the number of levels). While at it, remove
+> unused pgd_lock field from kvm_arch for arm64.
+>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  .../bindings/spi/microchip,at91-usart-spi.txt | 24 +++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt b/Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
-> new file mode 100644
-> index 000000000000..92d33ccdffae
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/microchip,at91-usart-spi.txt
-> @@ -0,0 +1,24 @@
-> +* Universal Synchronous Asynchronous Receiver/Transmitter (USART) in SPI mode
+>  arch/arm64/include/asm/kvm_host.h       | 14 ++++++++++++--
+>  arch/arm64/include/asm/kvm_mmu.h        | 11 +++++++++--
+>  arch/arm64/include/asm/stage2_pgtable.h |  1 -
+>  arch/arm64/kvm/hyp/switch.c             |  3 +--
+>  virt/kvm/arm/mmu.c                      |  4 ++++
+>  5 files changed, 26 insertions(+), 7 deletions(-)
+>
+
+[...]
+
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index bb458bf..e86d7f4 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -136,9 +136,10 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+>   */
+>  #define KVM_PHYS_SHIFT	(40)
+>  
+> -#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
+> +#define kvm_phys_shift(kvm)		(kvm->arch.phys_shift)
+>  #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
+>  #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
+> +#define kvm_stage2_levels(kvm)		(kvm->arch.s2_levels)
+>  
+>  static inline bool kvm_page_empty(void *ptr)
+>  {
+
+[...]
+
+> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+> index 33e8ebb..9b75b83 100644
+> --- a/arch/arm64/include/asm/stage2_pgtable.h
+> +++ b/arch/arm64/include/asm/stage2_pgtable.h
+> @@ -44,7 +44,6 @@
+>   */
+>  #define __s2_pgd_ptrs(pa, lvls)	(1 << ((pa) - pt_levels_pgdir_shift((lvls))))
+>  
+> -#define kvm_stage2_levels(kvm)		stage2_pt_levels(kvm_phys_shift(kvm))
+>  #define stage2_pgdir_shift(kvm)	\
+>  		pt_levels_pgdir_shift(kvm_stage2_levels(kvm))
+>  #define stage2_pgdir_size(kvm)		(_AC(1, UL) << stage2_pgdir_shift((kvm)))
+
+[...]
+
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 7a264c6..746f38e 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -753,6 +753,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  		return -EINVAL;
+>  	}
+>  
+> +	/* Make sure we have the stage2 configured for this VM */
+> +	if (WARN_ON(!kvm_stage2_levels(kvm)))
+> +		return -EINVAL;
 > +
-> +Required properties:
-> +- #size-cells      : Must be <0>
-> +- #address-cells   : Must be <1>
-> +- compatible: Should be "microchip,at91sam9g45-usart-spi" or "microchip,sama5d2-usart-spi" 
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain interrupt
-> +- clocks: phandles to input clocks.
-> +- clock-names: tuple listing input clock names.
-> +	Required elements: "usart"
-> +- cs-gpios: chipselects (internal cs not supported)
-> +
-> +Example:
-> +	spi0: spi at f001c000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "microchip,sama5d2-usart-spi", "microchip,at91sam9g45-usart-spi";
 
-I'm pretty sure this will be considered configuration rather than
-hardware description. Why don't you do something like the flexcom mode
-selection?
+This hunk breaks the 32-bit build as kvm_stag2_levels() isn't defined on
+arm.
 
-> +		reg = <0xf001c000 0x100>;
-> +		interrupts = <12 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&usart0_clk>;
-> +		clock-names = "usart";
-> +		cs-gpios = <&pioB 3 0>;
-> +	};
-> -- 
-> 2.17.0
-> 
+Thanks,
+Punit
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+>  	/* Allocate the HW PGD, making sure that each page gets its own refcount */
+>  	pgd = alloc_pages_exact(stage2_pgd_size(kvm), GFP_KERNEL | __GFP_ZERO);
+>  	if (!pgd)
