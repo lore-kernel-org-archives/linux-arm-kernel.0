@@ -1,73 +1,67 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 13 Apr 2018 12:09:35 +0100
-Subject: [PATCH v2 1/2] dmaengine: stm32-mdma: align TLEN and buffer
- length on burst
-In-Reply-To: <22bd0af7-9820-57c5-9215-8185839d7d27@st.com>
-References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
- <1523457879-9869-2-git-send-email-pierre-yves.mordret@st.com>
- <9a2a267c-2b0b-0d6a-c762-47e7d37f84ea@arm.com>
- <22bd0af7-9820-57c5-9215-8185839d7d27@st.com>
-Message-ID: <7ab2cfcd-07ed-e380-727a-727e78cc0336@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 13 Apr 2018 12:24:52 +0100
+Subject: Applied "ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
+ "Stopping"" to the asoc tree
+In-Reply-To: <20180330154420.6903-1-colin.king@canonical.com>
+Message-ID: <E1f6wp2-0000Mn-DN@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/18 10:45, Pierre Yves MORDRET wrote:
-> Hi Robin
-> 
-> On 04/11/2018 05:14 PM, Robin Murphy wrote:
->> On 11/04/18 15:44, Pierre-Yves MORDRET wrote:
->>> Both buffer Transfer Length (TLEN if any) and transfer size have to be
->>> aligned on burst size (burst beats*bus width).
->>>
->>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
->>> ---
->>>     Version history:
->>>       v1:
->>>          * Initial
->>>       v2:
->>> ---
->>> ---
->>>    drivers/dma/stm32-mdma.c | 2 +-
->>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
->>> index daa1602..fbcffa2 100644
->>> --- a/drivers/dma/stm32-mdma.c
->>> +++ b/drivers/dma/stm32-mdma.c
->>> @@ -413,7 +413,7 @@ static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
->>>    	u32 best_burst = max_burst;
->>>    	u32 burst_len = best_burst * width;
->>>    
->>> -	while ((burst_len > 0) && (tlen % burst_len)) {
->>> +	while ((burst_len > 0) && (((tlen | buf_len) & (burst_len - 1)) != 0)) {
->>>    		best_burst = best_burst >> 1;
->>>    		burst_len = best_burst * width;
->>>    	}
->>
->> FWIW, doesn't that whole loop come down to just:
->>
->> 	burst_len = min(ffs(tlen | buf_len), max_burst * width);
-> 
-> No sure it ends as expected. or I miss something or don't understand this statement
-> I tried with "relevant value" : i.e. best_burst = 32, Tlen=128(default) and
-> buf_len = 64, width= 4. This statements gets me something wrong output => 7
-> instead of 16 * 4.
-> I doubt :)
+The patch
 
-Heh, seems I confused myself halfway through and started thinking 
-max_burst and width were the exponents x rather than the values 2^x...
+   ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" -> "Stopping"
 
-A more representative guess should be:
+has been applied to the asoc tree at
 
-	min(1 << __ffs(tlen | buf_len), max_burst * width);
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-but the general point I was trying to make is that a loop checking 
-whether the bottom n bits of something are zero for different values of 
-n is unnecessary when n can simply be calculated directly*.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-Robin.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-* in the case of this "just the lowest set bit" idiom there's also the 
-shift-free ((x & (x - 1)) ^ x), but as well as being unreadable it's 
-generally less efficient than (1 << __ffs(x)) for most modern ISAs.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 78a7d414d5a8e3ea7bc5a636311cfb7ce593ce37 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Fri, 30 Mar 2018 16:44:20 +0100
+Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
+ "Stopping"
+
+Trivial fix to spelling mistake in pr_debug message text
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/atmel/atmel_ssc_dai.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index a1e2c5682dcd..1c7af0ca98ec 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
+ 		if (ret < 0) {
+ 			printk(KERN_WARNING
+ 					"atmel_ssc_dai: request_irq failure\n");
+-			pr_debug("Atmel_ssc_dai: Stoping clock\n");
++			pr_debug("Atmel_ssc_dai: Stopping clock\n");
+ 			clk_disable(ssc_p->ssc->clk);
+ 			return ret;
+ 		}
+-- 
+2.17.0
