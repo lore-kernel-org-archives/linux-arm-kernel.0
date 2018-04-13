@@ -1,100 +1,100 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 13 Apr 2018 10:47:39 +0200
-Subject: [PATCH v7 06/26] timer: Export next wakeup time of a CPU
-In-Reply-To: <1523531671-27491-7-git-send-email-ulf.hansson@linaro.org>
-References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
- <1523531671-27491-7-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAJZ5v0j=TL7Pvc6W+ieJ1D3C-9mJKMzmkcSRoHnquAwZC_k+0w@mail.gmail.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Fri, 13 Apr 2018 06:06:46 -0300
+Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
+In-Reply-To: <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
+References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
+ <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
+ <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
+Message-ID: <20180413060646.25b8a19d@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 1:14 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> From: Lina Iyer <lina.iyer@linaro.org>
->
-> Knowing the sleep duration of CPUs, is known to be needed while selecting
-> the most energy efficient idle state for a CPU or a group of CPUs.
->
-> However, to be able to compute the sleep duration, we need to know at what
-> time the next expected wakeup is for the CPU. Therefore, let's export this
-> information via a new function, tick_nohz_get_next_wakeup(). Following
-> changes make use of it.
->
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Lina Iyer <ilina@codeaurora.org>
-> Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  include/linux/tick.h     | 10 ++++++++++
->  kernel/time/tick-sched.c | 11 +++++++++++
->  2 files changed, 21 insertions(+)
->
-> diff --git a/include/linux/tick.h b/include/linux/tick.h
-> index 389aa25..d341811 100644
-> --- a/include/linux/tick.h
-> +++ b/include/linux/tick.h
-> @@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
->  extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
->  extern unsigned long tick_nohz_get_idle_calls(void);
->  extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
-> +extern ktime_t tick_nohz_get_next_wakeup(int cpu);
->  extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
->  extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
->
-> @@ -151,6 +152,15 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
->         *delta_next = TICK_NSEC;
->         return *delta_next;
->  }
-> +
-> +static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
-> +{
-> +       ktime_t t;
-> +
-> +       /* Next wake up is the tick period, assume it starts now */
-> +       return ktime_add(tick_nohz_get_sleep_length(&t), ktime_get());
-> +}
+Hi Sean,
 
-Well, given that tick_nohz_get_sleep_length() is just the above in
-this case, wouldn't it be simpler to return ktime_add(ktime_get(),
-TICK_NSEC) from here?
+Em Thu, 12 Apr 2018 23:21:32 +0100
+Sean Young <sean@mess.org> escreveu:
 
-> +
->  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
->  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
->
-> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-> index 646645e..08db7f3 100644
-> --- a/kernel/time/tick-sched.c
-> +++ b/kernel/time/tick-sched.c
-> @@ -1098,6 +1098,17 @@ unsigned long tick_nohz_get_idle_calls(void)
->         return ts->idle_calls;
->  }
->
-> +/**
-> + * tick_nohz_get_next_wakeup - return the next wake up of the CPU
-> + */
-> +ktime_t tick_nohz_get_next_wakeup(int cpu)
-> +{
-> +       struct clock_event_device *dev =
-> +                       per_cpu(tick_cpu_device.evtdev, cpu);
+> On Thu, Apr 12, 2018 at 11:24:07AM -0400, Mauro Carvalho Chehab wrote:
+> > As warned by smatch:
+> > 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
+> > 
+> > If something goes wrong at readl(), the logic will stay there
+> > inside an IRQ code forever. This is not the nicest thing to
+> > do :-)
+> > 
+> > So, add a timeout there, preventing staying inside the IRQ
+> > for more than 10ms.  
+> 
+> If we knew how large the fifo was, then we could limit the loop to that many
+> iterations (maybe a few extra in case IR arrives while we a reading, but
+> IR is much slower than a cpu executing this loop of course).
 
-I would avoid breaking the line, honestly.
+IR is slower, but this code is called at IRQ time, e. g. when the
+controller already received the IR data. Also, it reads directly
+via a memory mapped register, with should be fast. I suspect that
+10ms is a lot more time than what would be required to go though
+all the FIFO data.
 
-If you really really want to avoid going above the 80 chars line
-length limit, why don't you do
+> 
+> Patrice is something you could help with?
+> 
+> Thanks
+> 
+> Sean
+> 
+> > 
+> > Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> > ---
+> >  drivers/media/rc/st_rc.c | 16 ++++++++++------
+> >  1 file changed, 10 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
+> > index d2efd7b2c3bc..c855b177103c 100644
+> > --- a/drivers/media/rc/st_rc.c
+> > +++ b/drivers/media/rc/st_rc.c
+> > @@ -96,19 +96,24 @@ static void st_rc_send_lirc_timeout(struct rc_dev *rdev)
+> >  
+> >  static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+> >  {
+> > +	unsigned long timeout;
+> >  	unsigned int symbol, mark = 0;
+> >  	struct st_rc_device *dev = data;
+> >  	int last_symbol = 0;
+> > -	u32 status;
+> > +	u32 status, int_status;
+> >  	DEFINE_IR_RAW_EVENT(ev);
+> >  
+> >  	if (dev->irq_wake)
+> >  		pm_wakeup_event(dev->dev, 0);
+> >  
+> > -	status  = readl(dev->rx_base + IRB_RX_STATUS);
+> > +	/* FIXME: is 10ms good enough ? */
+> > +	timeout = jiffies +  msecs_to_jiffies(10);
+> > +	do {
+> > +		status  = readl(dev->rx_base + IRB_RX_STATUS);
+> > +		if (!(status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)))
+> > +			break;
+> >  
+> > -	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
+> > -		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
+> > +		int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
+> >  		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
+> >  			/* discard the entire collection in case of errors!  */
+> >  			ir_raw_event_reset(dev->rdev);
+> > @@ -148,8 +153,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
+> >  
+> >  		}
+> >  		last_symbol = 0;
+> > -		status  = readl(dev->rx_base + IRB_RX_STATUS);
+> > -	}
+> > +	} while (time_is_after_jiffies(timeout));
+> >  
+> >  	writel(IRB_RX_INTS, dev->rx_base + IRB_RX_INT_CLEAR);
+> >  
+> > -- 
+> > 2.14.3  
 
-struct clock_event_device *dev;
 
-dev = per_cpu(tick_cpu_device.evtdev, cpu);
 
-> +
-> +       return dev->next_event;
-> +}
-> +
->  static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
->  {
->  #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
-> --
+Thanks,
+Mauro
