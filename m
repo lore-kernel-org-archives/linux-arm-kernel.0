@@ -1,93 +1,62 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 13 Apr 2018 17:27:57 +0100
-Subject: [PATCH v2 14/17] kvm: arm64: Switch to per VM IPA limit
-In-Reply-To: <1522156531-28348-15-git-send-email-suzuki.poulose@arm.com>
- (Suzuki K. Poulose's message of "Tue, 27 Mar 2018 14:15:24 +0100")
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-15-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <87muy7vzoy.fsf@e105922-lin.cambridge.arm.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 13 Apr 2018 09:33:17 -0700
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <20180413094211.GN16141@n2100.armlinux.org.uk>
+References: <20180409152253.GD10489@altlinux.org>
+ <20180412013435.GA21219@altlinux.org>
+ <20180412095811.GC16141@n2100.armlinux.org.uk>
+ <20180412110314.GA28070@altlinux.org>
+ <20180412121949.GD16141@n2100.armlinux.org.uk>
+ <20180412124928.GA29458@altlinux.org>
+ <20180412131404.GE16141@n2100.armlinux.org.uk>
+ <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+ <20180412172051.GK16141@n2100.armlinux.org.uk>
+ <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+ <20180413094211.GN16141@n2100.armlinux.org.uk>
+Message-ID: <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-
-I haven't had a chance to look at the code but noticed one issue below.
-
-Suzuki K Poulose <suzuki.poulose@arm.com> writes:
-
-> Now that we can manage the stage2 page table per VM, switch the
-> configuration details to per VM instance. We keep track of the
-> IPA bits, number of page table levels and the VTCR bits (which
-> depends on the IPA and the number of levels). While at it, remove
-> unused pgd_lock field from kvm_arch for arm64.
+On Fri, Apr 13, 2018 at 2:42 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
 >
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h       | 14 ++++++++++++--
->  arch/arm64/include/asm/kvm_mmu.h        | 11 +++++++++--
->  arch/arm64/include/asm/stage2_pgtable.h |  1 -
->  arch/arm64/kvm/hyp/switch.c             |  3 +--
->  virt/kvm/arm/mmu.c                      |  4 ++++
->  5 files changed, 26 insertions(+), 7 deletions(-)
->
+> Yes, it does solve the problem at hand with strace - the exact patch I
+> tested against 4.16 is below.
 
-[...]
+Ok, good.
 
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index bb458bf..e86d7f4 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -136,9 +136,10 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
->   */
->  #define KVM_PHYS_SHIFT	(40)
->  
-> -#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
-> +#define kvm_phys_shift(kvm)		(kvm->arch.phys_shift)
->  #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
->  #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
-> +#define kvm_stage2_levels(kvm)		(kvm->arch.s2_levels)
->  
->  static inline bool kvm_page_empty(void *ptr)
->  {
+> However, FPE_FLTUNK is not defined in older kernels, so while we can
+> fix it this way for the current merge window, that doesn't help 4.16.
 
-[...]
+I wonder if we should even bother with FPE_FLTUNK.
 
-> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-> index 33e8ebb..9b75b83 100644
-> --- a/arch/arm64/include/asm/stage2_pgtable.h
-> +++ b/arch/arm64/include/asm/stage2_pgtable.h
-> @@ -44,7 +44,6 @@
->   */
->  #define __s2_pgd_ptrs(pa, lvls)	(1 << ((pa) - pt_levels_pgdir_shift((lvls))))
->  
-> -#define kvm_stage2_levels(kvm)		stage2_pt_levels(kvm_phys_shift(kvm))
->  #define stage2_pgdir_shift(kvm)	\
->  		pt_levels_pgdir_shift(kvm_stage2_levels(kvm))
->  #define stage2_pgdir_size(kvm)		(_AC(1, UL) << stage2_pgdir_shift((kvm)))
+I suspect we might as well use FPE_FLTINV, I suspect, and not have
+this complexity at all. That case is not worth worrying about, since
+it's a "this shouldn't happen anyway" and the *real* reason will be in
+the kernel logs due to vfs_panic().
 
-[...]
+So it's not like this is something that the user should ever care
+about the si_code about.
 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 7a264c6..746f38e 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -753,6 +753,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
->  		return -EINVAL;
->  	}
->  
-> +	/* Make sure we have the stage2 configured for this VM */
-> +	if (WARN_ON(!kvm_stage2_levels(kvm)))
-> +		return -EINVAL;
-> +
+> Given that the path we're talking about is unlikely to happen (as
+> mentioned in my second paragraph) I still think reverting Eric's patch
+> is the right way forward for older kernels.
 
-This hunk breaks the 32-bit build as kvm_stag2_levels() isn't defined on
-arm.
+I'd much rather get rid of that FPE_FIXME, and leave that whole mess behind.
 
-Thanks,
-Punit
+So the attached patch seems simple and should work with 4.16 too.
 
->  	/* Allocate the HW PGD, making sure that each page gets its own refcount */
->  	pgd = alloc_pages_exact(stage2_pgd_size(kvm), GFP_KERNEL | __GFP_ZERO);
->  	if (!pgd)
+Let's not leave this as some kind of nasty maintenance issue, and just
+go for simple and stupid.
+
+Hmm?
+
+                Linus
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: patch.diff
+Type: text/x-patch
+Size: 1037 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180413/9e2e47ed/attachment.bin>
