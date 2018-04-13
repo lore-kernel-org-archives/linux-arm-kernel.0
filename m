@@ -1,67 +1,50 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 13 Apr 2018 12:24:52 +0100
-Subject: Applied "ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
- "Stopping"" to the asoc tree
-In-Reply-To: <20180330154420.6903-1-colin.king@canonical.com>
-Message-ID: <E1f6wp2-0000Mn-DN@debutante>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 13 Apr 2018 13:35:05 +0200
+Subject: [PATCH] sched: support dynamiQ cluster
+In-Reply-To: <20180412182211.GC4082@hirez.programming.kicks-ass.net>
+References: <CAKfTPtD4skW_3SAk--vBEC5-m1Ua48bjOQYS0pDqW3nPSpsENg@mail.gmail.com>
+ <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
+ <CAKfTPtDy2uUj4amA9MARUz9qS=+urwV2edyQn+fW70hkN+CgoQ@mail.gmail.com>
+ <e8e6e7d0-7744-1dab-7b24-b7ff37df60c8@arm.com>
+ <CAKfTPtCQayuu5-84931ZxzXV1-roV_CfRd_5wXG1oxOEUZmZgw@mail.gmail.com>
+ <20180405154630.GS4589@e105550-lin.cambridge.arm.com>
+ <CAKfTPtBv7BzAqZWTxU9HaCoNjQa2B8usk6dfO1qgofjGYG7S=w@mail.gmail.com>
+ <20180406125825.GT4589@e105550-lin.cambridge.arm.com>
+ <CAKfTPtCfCZzuBgdYzWW_KcT34VTgj6utUF+Q5zSpre+Ky2r4eA@mail.gmail.com>
+ <20180410131950.GU4589@e105550-lin.cambridge.arm.com>
+ <20180412182211.GC4082@hirez.programming.kicks-ass.net>
+Message-ID: <CAKfTPtCXz69f0dCqnAQZtgrz4JjbSHcZfZoiHh8rkCX8Q2dHKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 12 April 2018 at 20:22, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Apr 10, 2018 at 02:19:50PM +0100, Morten Rasmussen wrote:
+>> As said above, I see your point about completion time might suffer in
+>> some cases for low utilization tasks, but I don't see how you can fix
+>> that automagically. ASYM_PACKING has a lot of problematic side-effects.
+>> If use-space knows that completion time is important for a task, there
+>> are already ways to improve that somewhat in mainline (task priority and
+>> pinning), and more powerful solutions in the Android kernel which
+>> Patrick is currently pushing upstream.
+>
+> So I tend to side with Morten on this one. I don't particularly like
+> ASYM_PACKING much, but we already had it for PPC and it works for the
+> small difference in performance ITMI has.
+>
+> At the time Morten already objected to using it for ITMI, and I just
+> haven't had time to look into his proposal for using capacity.
+>
+> But I don't see it working right for big.litte/dynamiq, simply because
+> it is a very strong always big preference, which is against the whole
+> design premisis of big.little (as Morten has been trying to argue).
 
-   ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" -> "Stopping"
+In fact, Little not only gives some better power efficiency but it
+also handles far better some stuff like interrupt handling as an
+example
+Nevertheless, whatever the solution, it will never fit with
+big.Little/dynamiQ system without some EAS as soon as the power
+efficiency is involved in the equation.
+I have planned to test more deeply how ASYM_PACKING works with EAS
+when i will have finished others on going activity.
 
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 78a7d414d5a8e3ea7bc5a636311cfb7ce593ce37 Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Fri, 30 Mar 2018 16:44:20 +0100
-Subject: [PATCH] ASoC: atmel_ssc_dai: fix spelling mistake: "Stoping" ->
- "Stopping"
-
-Trivial fix to spelling mistake in pr_debug message text
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/atmel/atmel_ssc_dai.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index a1e2c5682dcd..1c7af0ca98ec 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -820,7 +820,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
- 		if (ret < 0) {
- 			printk(KERN_WARNING
- 					"atmel_ssc_dai: request_irq failure\n");
--			pr_debug("Atmel_ssc_dai: Stoping clock\n");
-+			pr_debug("Atmel_ssc_dai: Stopping clock\n");
- 			clk_disable(ssc_p->ssc->clk);
- 			return ret;
- 		}
--- 
-2.17.0
+>
