@@ -1,114 +1,69 @@
 From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Fri, 13 Apr 2018 06:52:19 -0300
+Date: Fri, 13 Apr 2018 07:00:50 -0300
 Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
-In-Reply-To: <a83f5846-b93c-b3c5-31fa-a694df54b6b0@free.fr>
+In-Reply-To: <20180413094005.wudyd2y5efaeimg3@gofer.mess.org>
 References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
  <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
- <37713022-870c-829b-bec9-18a62a39782c@free.fr>
- <20180413062558.2285a039@vento.lan>
- <a83f5846-b93c-b3c5-31fa-a694df54b6b0@free.fr>
-Message-ID: <20180413065219.36e18418@vento.lan>
+ <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
+ <20180413060646.25b8a19d@vento.lan>
+ <20180413094005.wudyd2y5efaeimg3@gofer.mess.org>
+Message-ID: <20180413070050.10d0de84@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 13 Apr 2018 11:36:56 +0200
-Mason <slash.tmp@free.fr> escreveu:
+Em Fri, 13 Apr 2018 10:40:05 +0100
+Sean Young <sean@mess.org> escreveu:
 
-> On 13/04/2018 11:25, Mauro Carvalho Chehab wrote:
-> > Em Fri, 13 Apr 2018 11:15:16 +0200
-> > Mason <slash.tmp@free.fr> escreveu:
+> On Fri, Apr 13, 2018 at 06:06:46AM -0300, Mauro Carvalho Chehab wrote:
+> > Hi Sean,
+> > 
+> > Em Thu, 12 Apr 2018 23:21:32 +0100
+> > Sean Young <sean@mess.org> escreveu:
 > >   
-> >> On 12/04/2018 17:24, Mauro Carvalho Chehab wrote:
-> >>  
-> >>> As warned by smatch:
-> >>> 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
-> >>>
-> >>> If something goes wrong at readl(), the logic will stay there
-> >>> inside an IRQ code forever. This is not the nicest thing to
-> >>> do :-)
-> >>>
-> >>> So, add a timeout there, preventing staying inside the IRQ
-> >>> for more than 10ms.
-> >>>
-> >>> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-> >>> ---
-> >>>  drivers/media/rc/st_rc.c | 16 ++++++++++------
-> >>>  1 file changed, 10 insertions(+), 6 deletions(-)
-> >>>
-> >>> diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
-> >>> index d2efd7b2c3bc..c855b177103c 100644
-> >>> --- a/drivers/media/rc/st_rc.c
-> >>> +++ b/drivers/media/rc/st_rc.c
-> >>> @@ -96,19 +96,24 @@ static void st_rc_send_lirc_timeout(struct rc_dev *rdev)
-> >>>  
-> >>>  static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
-> >>>  {
-> >>> +	unsigned long timeout;
-> >>>  	unsigned int symbol, mark = 0;
-> >>>  	struct st_rc_device *dev = data;
-> >>>  	int last_symbol = 0;
-> >>> -	u32 status;
-> >>> +	u32 status, int_status;
-> >>>  	DEFINE_IR_RAW_EVENT(ev);
-> >>>  
-> >>>  	if (dev->irq_wake)
-> >>>  		pm_wakeup_event(dev->dev, 0);
-> >>>  
-> >>> -	status  = readl(dev->rx_base + IRB_RX_STATUS);
-> >>> +	/* FIXME: is 10ms good enough ? */
-> >>> +	timeout = jiffies +  msecs_to_jiffies(10);
-> >>> +	do {
-> >>> +		status  = readl(dev->rx_base + IRB_RX_STATUS);
-> >>> +		if (!(status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)))
-> >>> +			break;
-> >>>  
-> >>> -	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
-> >>> -		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
-> >>> +		int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
-> >>>  		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
-> >>>  			/* discard the entire collection in case of errors!  */
-> >>>  			ir_raw_event_reset(dev->rdev);
-> >>> @@ -148,8 +153,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
-> >>>  
-> >>>  		}
-> >>>  		last_symbol = 0;
-> >>> -		status  = readl(dev->rx_base + IRB_RX_STATUS);
-> >>> -	}
-> >>> +	} while (time_is_after_jiffies(timeout));
-> >>>  
-> >>>  	writel(IRB_RX_INTS, dev->rx_base + IRB_RX_INT_CLEAR);
-> >>>      
-> >>
-> >> Isn't this a place where the iopoll.h helpers might be useful?
-> >>
-> >> e.g. readl_poll_timeout()
-> >>
-> >> https://elixir.bootlin.com/linux/latest/source/include/linux/iopoll.h#L114  
+> > > On Thu, Apr 12, 2018 at 11:24:07AM -0400, Mauro Carvalho Chehab wrote:  
+> > > > As warned by smatch:
+> > > > 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
+> > > > 
+> > > > If something goes wrong at readl(), the logic will stay there
+> > > > inside an IRQ code forever. This is not the nicest thing to
+> > > > do :-)
+> > > > 
+> > > > So, add a timeout there, preventing staying inside the IRQ
+> > > > for more than 10ms.    
+> > > 
+> > > If we knew how large the fifo was, then we could limit the loop to that many
+> > > iterations (maybe a few extra in case IR arrives while we a reading, but
+> > > IR is much slower than a cpu executing this loop of course).  
 > > 
-> > That won't work. Internally[1], readx_poll_timeout() calls
-> > usleep_range().
-> > 
-> > [1] https://elixir.bootlin.com/linux/latest/source/include/linux/iopoll.h#L43
-> > 
-> > It can't be called here, as this loop happens at the irq
-> > handler.  
+> > IR is slower, but this code is called at IRQ time, e. g. when the
+> > controller already received the IR data. Also, it reads directly
+> > via a memory mapped register, with should be fast.  
 > 
-> Sorry, I meant readl_poll_timeout_atomic()
+> There is a chance that a new IR edge occurs whilst reading the fifo. All of
+> this is academic since we don't know the size of the fifo.
+> 
+> > I suspect that
+> > 10ms is a lot more time than what would be required to go though
+> > all the FIFO data.  
+> 
+> 10ms seems far too much. The serial_ir prints a warning if it loops more
+> than 255 times (and breaks out of the loop). Since we don't know the size
+> of the fifo, that will be more than enough. We could also limit it to 
+> 512 times, since the raw IR kfifo is 512 and any more than that would
+> not fit in the kfifo anyway. This would exit much quicker than 10ms.
+> 
+> At least winbond-cir has a similar loop, there might be other drivers.
 
-Ah, ok!
+Yeah, we could limit it to run only 512 times (or some other reasonable
+quantity), but in order to do that, we need to be sure that, on each read(),
+the FIFO will shift - e. g. no risk of needing to do more than one read
+to get the next element. That would work if the FIFO is implemented via
+flip-flops. But if it is implemented via some slow memory, or if the
+shift logic is implemented via some software on a micro-controller, it
+may need a few interactions to get the next value.
 
-> But it might have to be open-coded because of the check for overruns.
-
-Yeah, readl_poll_timeout_atomic() works fine if we wanted to read just
-one value, but in this case, we need a loop to read from a FIFO, and
-we want to ensure that the total time spent there won't be bigger than
-a reasonable limit. So, we would need to open-code it, with is what the
-patch I proposed actually did (except that it uses jiffies instead of
-the high-res clock).
-
-If we take Sean's suggestion of limiting the loop by the FIFO size,
-then readl_poll_timeout_atomic() could indeed be an interesting
-alternative.
+Without knowing about the hardware implementation, I'd say that setting
+a max time for the whole FIFO interaction is safer.
 
 Thanks,
 Mauro
