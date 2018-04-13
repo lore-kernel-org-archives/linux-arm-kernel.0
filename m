@@ -1,40 +1,31 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 13 Apr 2018 19:27:57 +0200
-Subject: [PATCH 8/9] arm64: defconfig: Enable LAN and BT support for RPi 3 B+
+Date: Fri, 13 Apr 2018 19:27:54 +0200
+Subject: [PATCH 5/9] ARM: bcm2835_defconfig: Enable LAN78XX driver
 In-Reply-To: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
 References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1523640478-4448-9-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1523640478-4448-6-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi 3 B+ has a Microchip LAN7515 (connect via USB) and
-a Cypress CYW43455 (connect via UART). This patch enables the necessary
-drivers.
+This patch enables the necessary driver for Raspberry Pi 3 B+,
+which has a LAN7515 chip.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/bcm2835_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index ecf6137..8ac1feaf 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -159,6 +159,7 @@ CONFIG_BT_LEDS=y
- # CONFIG_BT_DEBUGFS is not set
- CONFIG_BT_HCIUART=m
- CONFIG_BT_HCIUART_LL=y
-+CONFIG_BT_HCIUART_BCM=y
- CONFIG_CFG80211=m
- CONFIG_MAC80211=m
- CONFIG_MAC80211_LEDS=y
-@@ -239,6 +240,7 @@ CONFIG_ROCKCHIP_PHY=y
- CONFIG_USB_PEGASUS=m
- CONFIG_USB_RTL8150=m
- CONFIG_USB_RTL8152=m
-+CONFIG_USB_LAN78XX=m
- CONFIG_USB_USBNET=m
- CONFIG_USB_NET_DM9601=m
- CONFIG_USB_NET_SR9800=m
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 8682b15..9fae57c 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -64,6 +64,7 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_SCSI_CONSTANTS=y
+ CONFIG_SCSI_SCAN_ASYNC=y
+ CONFIG_NETDEVICES=y
++CONFIG_USB_LAN78XX=y
+ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_SMSC95XX=y
+ CONFIG_BRCMFMAC=m
 -- 
 2.7.4
