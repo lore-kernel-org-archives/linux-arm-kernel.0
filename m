@@ -1,54 +1,100 @@
-From: sean@mess.org (Sean Young)
-Date: Fri, 13 Apr 2018 10:40:05 +0100
-Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
-In-Reply-To: <20180413060646.25b8a19d@vento.lan>
-References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
- <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
- <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
- <20180413060646.25b8a19d@vento.lan>
-Message-ID: <20180413094005.wudyd2y5efaeimg3@gofer.mess.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Apr 2018 10:42:11 +0100
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+References: <20180409152253.GD10489@altlinux.org>
+ <20180412013435.GA21219@altlinux.org>
+ <20180412095811.GC16141@n2100.armlinux.org.uk>
+ <20180412110314.GA28070@altlinux.org>
+ <20180412121949.GD16141@n2100.armlinux.org.uk>
+ <20180412124928.GA29458@altlinux.org>
+ <20180412131404.GE16141@n2100.armlinux.org.uk>
+ <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+ <20180412172051.GK16141@n2100.armlinux.org.uk>
+ <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+Message-ID: <20180413094211.GN16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2018 at 06:06:46AM -0300, Mauro Carvalho Chehab wrote:
-> Hi Sean,
+On Thu, Apr 12, 2018 at 10:22:15AM -0700, Linus Torvalds wrote:
+> On Thu, Apr 12, 2018 at 10:20 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> >
+> > This file was created to contain FPE_FIXME, by the "signal/arm: Document
+> > conflicts with SI_USER and SIGFPE" commit so if we're removing it, it
+> > would be better to remove the whole file.
 > 
-> Em Thu, 12 Apr 2018 23:21:32 +0100
-> Sean Young <sean@mess.org> escreveu:
-> 
-> > On Thu, Apr 12, 2018 at 11:24:07AM -0400, Mauro Carvalho Chehab wrote:
-> > > As warned by smatch:
-> > > 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
-> > > 
-> > > If something goes wrong at readl(), the logic will stay there
-> > > inside an IRQ code forever. This is not the nicest thing to
-> > > do :-)
-> > > 
-> > > So, add a timeout there, preventing staying inside the IRQ
-> > > for more than 10ms.  
-> > 
-> > If we knew how large the fifo was, then we could limit the loop to that many
-> > iterations (maybe a few extra in case IR arrives while we a reading, but
-> > IR is much slower than a cpu executing this loop of course).
-> 
-> IR is slower, but this code is called at IRQ time, e. g. when the
-> controller already received the IR data. Also, it reads directly
-> via a memory mapped register, with should be fast.
+> Fair enough. I'm not going to commit that anyway since I can't test
+> it, but yes, if it tests ok that sounds like the right thing to do.
 
-There is a chance that a new IR edge occurs whilst reading the fifo. All of
-this is academic since we don't know the size of the fifo.
+Yes, it does solve the problem at hand with strace - the exact patch I
+tested against 4.16 is below.
 
-> I suspect that
-> 10ms is a lot more time than what would be required to go though
-> all the FIFO data.
+Testing this exact code path (exceptions set to VFP_EXCEPTION_ERROR)
+is something that can only happen if the hardware does something stupid,
+and I don't have a way of making it do that, so the code path can't be
+tested.
 
-10ms seems far too much. The serial_ir prints a warning if it loops more
-than 255 times (and breaks out of the loop). Since we don't know the size
-of the fifo, that will be more than enough. We could also limit it to 
-512 times, since the raw IR kfifo is 512 and any more than that would
-not fit in the kfifo anyway. This would exit much quicker than 10ms.
+However, FPE_FLTUNK is not defined in older kernels, so while we can
+fix it this way for the current merge window, that doesn't help 4.16.
+How we solve that depends what happens with Eric's patch (266da65e9156
+("signal: Add FPE_FLTUNK si_code for undiagnosable fp exceptions"))
+that introduces FPE_FLTUNK - and there's also the problem of NSIGFPE,
+which kernel/signal.c uses in the path that selects the siginfo layout.
 
-At least winbond-cir has a similar loop, there might be other drivers.
+Given that the path we're talking about is unlikely to happen (as
+mentioned in my second paragraph) I still think reverting Eric's patch
+is the right way forward for older kernels.
 
-Thanks
-Sean
+(Note, my previous comment about the si_code initialiser was incorrect.)
+
+diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
+deleted file mode 100644
+index d0513880be21..000000000000
+--- a/arch/arm/include/uapi/asm/siginfo.h
++++ /dev/null
+@@ -1,13 +0,0 @@
+-#ifndef __ASM_SIGINFO_H
+-#define __ASM_SIGINFO_H
+-
+-#include <asm-generic/siginfo.h>
+-
+-/*
+- * SIGFPE si_codes
+- */
+-#ifdef __KERNEL__
+-#define FPE_FIXME	0	/* Broken dup of SI_USER */
+-#endif /* __KERNEL__ */
+-
+-#endif
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 4c375e11ae95..8a1a5e6048d2 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -28,6 +28,10 @@
+ #include <asm/thread_notify.h>
+ #include <asm/vfp.h>
+ 
++#ifndef FPE_FLTUNK
++#define FPE_FLTUNK 14
++#endif
++
+ #include "vfpinstr.h"
+ #include "vfp.h"
+ 
+@@ -257,7 +261,7 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
+ 
+ 	if (exceptions == VFP_EXCEPTION_ERROR) {
+ 		vfp_panic("unhandled bounce", inst);
+-		vfp_raise_sigfpe(FPE_FIXME, regs);
++		vfp_raise_sigfpe(FPE_FLTUNK, regs);
+ 		return;
+ 	}
+ 
+
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
