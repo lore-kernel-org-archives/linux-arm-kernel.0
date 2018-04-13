@@ -1,100 +1,48 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Fri, 13 Apr 2018 06:06:46 -0300
-Subject: [PATCH 15/17] media: st_rc: Don't stay on an IRQ handler forever
-In-Reply-To: <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
-References: <d20ab7176b2af82d6b679211edb5f151629d4033.1523546545.git.mchehab@s-opensource.com>
- <16b1993cde965edc096f0833091002dd05d4da7f.1523546545.git.mchehab@s-opensource.com>
- <20180412222132.z7g5enhin2uodbk7@gofer.mess.org>
-Message-ID: <20180413060646.25b8a19d@vento.lan>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Fri, 13 Apr 2018 10:11:36 +0100
+Subject: [PATCH] sched: support dynamiQ cluster
+In-Reply-To: <20180412182211.GC4082@hirez.programming.kicks-ass.net>
+References: <74865492-d9a6-649d-d37c-a5a6a8c28f23@arm.com>
+ <CAKfTPtDy2uUj4amA9MARUz9qS=+urwV2edyQn+fW70hkN+CgoQ@mail.gmail.com>
+ <e8e6e7d0-7744-1dab-7b24-b7ff37df60c8@arm.com>
+ <CAKfTPtCQayuu5-84931ZxzXV1-roV_CfRd_5wXG1oxOEUZmZgw@mail.gmail.com>
+ <20180405154630.GS4589@e105550-lin.cambridge.arm.com>
+ <CAKfTPtBv7BzAqZWTxU9HaCoNjQa2B8usk6dfO1qgofjGYG7S=w@mail.gmail.com>
+ <20180406125825.GT4589@e105550-lin.cambridge.arm.com>
+ <CAKfTPtCfCZzuBgdYzWW_KcT34VTgj6utUF+Q5zSpre+Ky2r4eA@mail.gmail.com>
+ <20180410131950.GU4589@e105550-lin.cambridge.arm.com>
+ <20180412182211.GC4082@hirez.programming.kicks-ass.net>
+Message-ID: <20180413091136.GV4589@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
-
-Em Thu, 12 Apr 2018 23:21:32 +0100
-Sean Young <sean@mess.org> escreveu:
-
-> On Thu, Apr 12, 2018 at 11:24:07AM -0400, Mauro Carvalho Chehab wrote:
-> > As warned by smatch:
-> > 	drivers/media/rc/st_rc.c:110 st_rc_rx_interrupt() warn: this loop depends on readl() succeeding
-> > 
-> > If something goes wrong at readl(), the logic will stay there
-> > inside an IRQ code forever. This is not the nicest thing to
-> > do :-)
-> > 
-> > So, add a timeout there, preventing staying inside the IRQ
-> > for more than 10ms.  
+On Thu, Apr 12, 2018 at 08:22:11PM +0200, Peter Zijlstra wrote:
+> On Tue, Apr 10, 2018 at 02:19:50PM +0100, Morten Rasmussen wrote:
+> > As said above, I see your point about completion time might suffer in
+> > some cases for low utilization tasks, but I don't see how you can fix
+> > that automagically. ASYM_PACKING has a lot of problematic side-effects.
+> > If use-space knows that completion time is important for a task, there
+> > are already ways to improve that somewhat in mainline (task priority and
+> > pinning), and more powerful solutions in the Android kernel which
+> > Patrick is currently pushing upstream.
 > 
-> If we knew how large the fifo was, then we could limit the loop to that many
-> iterations (maybe a few extra in case IR arrives while we a reading, but
-> IR is much slower than a cpu executing this loop of course).
-
-IR is slower, but this code is called at IRQ time, e. g. when the
-controller already received the IR data. Also, it reads directly
-via a memory mapped register, with should be fast. I suspect that
-10ms is a lot more time than what would be required to go though
-all the FIFO data.
-
+> So I tend to side with Morten on this one. I don't particularly like
+> ASYM_PACKING much, but we already had it for PPC and it works for the
+> small difference in performance ITMI has.
 > 
-> Patrice is something you could help with?
+> At the time Morten already objected to using it for ITMI, and I just
+> haven't had time to look into his proposal for using capacity.
 > 
-> Thanks
-> 
-> Sean
-> 
-> > 
-> > Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-> > ---
-> >  drivers/media/rc/st_rc.c | 16 ++++++++++------
-> >  1 file changed, 10 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
-> > index d2efd7b2c3bc..c855b177103c 100644
-> > --- a/drivers/media/rc/st_rc.c
-> > +++ b/drivers/media/rc/st_rc.c
-> > @@ -96,19 +96,24 @@ static void st_rc_send_lirc_timeout(struct rc_dev *rdev)
-> >  
-> >  static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
-> >  {
-> > +	unsigned long timeout;
-> >  	unsigned int symbol, mark = 0;
-> >  	struct st_rc_device *dev = data;
-> >  	int last_symbol = 0;
-> > -	u32 status;
-> > +	u32 status, int_status;
-> >  	DEFINE_IR_RAW_EVENT(ev);
-> >  
-> >  	if (dev->irq_wake)
-> >  		pm_wakeup_event(dev->dev, 0);
-> >  
-> > -	status  = readl(dev->rx_base + IRB_RX_STATUS);
-> > +	/* FIXME: is 10ms good enough ? */
-> > +	timeout = jiffies +  msecs_to_jiffies(10);
-> > +	do {
-> > +		status  = readl(dev->rx_base + IRB_RX_STATUS);
-> > +		if (!(status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)))
-> > +			break;
-> >  
-> > -	while (status & (IRB_FIFO_NOT_EMPTY | IRB_OVERFLOW)) {
-> > -		u32 int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
-> > +		int_status = readl(dev->rx_base + IRB_RX_INT_STATUS);
-> >  		if (unlikely(int_status & IRB_RX_OVERRUN_INT)) {
-> >  			/* discard the entire collection in case of errors!  */
-> >  			ir_raw_event_reset(dev->rdev);
-> > @@ -148,8 +153,7 @@ static irqreturn_t st_rc_rx_interrupt(int irq, void *data)
-> >  
-> >  		}
-> >  		last_symbol = 0;
-> > -		status  = readl(dev->rx_base + IRB_RX_STATUS);
-> > -	}
-> > +	} while (time_is_after_jiffies(timeout));
-> >  
-> >  	writel(IRB_RX_INTS, dev->rx_base + IRB_RX_INT_CLEAR);
-> >  
-> > -- 
-> > 2.14.3  
+> But I don't see it working right for big.litte/dynamiq, simply because
+> it is a very strong always big preference, which is against the whole
+> design premisis of big.little (as Morten has been trying to argue).
 
+In Vincent's defence, vendors do sometimes make design decisions that I
+don't quite understand. So there could be users that really want a
+non-energy-aware big-first policy, but as I said earlier in this thread,
+that could be implemented better with a small tweak to wake_cap() and
+using the misfit patches.
 
-
-Thanks,
-Mauro
+We would have to disable big-first policy and go with the current
+migrate-big-task-to-big-cpus policy as soon as we care about energy. I'm
+happy to give that try and come up with a patch.
