@@ -1,100 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Apr 2018 10:42:11 +0100
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
-References: <20180409152253.GD10489@altlinux.org>
- <20180412013435.GA21219@altlinux.org>
- <20180412095811.GC16141@n2100.armlinux.org.uk>
- <20180412110314.GA28070@altlinux.org>
- <20180412121949.GD16141@n2100.armlinux.org.uk>
- <20180412124928.GA29458@altlinux.org>
- <20180412131404.GE16141@n2100.armlinux.org.uk>
- <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
- <20180412172051.GK16141@n2100.armlinux.org.uk>
- <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
-Message-ID: <20180413094211.GN16141@n2100.armlinux.org.uk>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Fri, 13 Apr 2018 11:45:44 +0200
+Subject: [PATCH v2 1/2] dmaengine: stm32-mdma: align TLEN and buffer
+ length on burst
+In-Reply-To: <9a2a267c-2b0b-0d6a-c762-47e7d37f84ea@arm.com>
+References: <1523457879-9869-1-git-send-email-pierre-yves.mordret@st.com>
+ <1523457879-9869-2-git-send-email-pierre-yves.mordret@st.com>
+ <9a2a267c-2b0b-0d6a-c762-47e7d37f84ea@arm.com>
+Message-ID: <22bd0af7-9820-57c5-9215-8185839d7d27@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 12, 2018 at 10:22:15AM -0700, Linus Torvalds wrote:
-> On Thu, Apr 12, 2018 at 10:20 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> >
-> > This file was created to contain FPE_FIXME, by the "signal/arm: Document
-> > conflicts with SI_USER and SIGFPE" commit so if we're removing it, it
-> > would be better to remove the whole file.
+Hi Robin
+
+On 04/11/2018 05:14 PM, Robin Murphy wrote:
+> On 11/04/18 15:44, Pierre-Yves MORDRET wrote:
+>> Both buffer Transfer Length (TLEN if any) and transfer size have to be
+>> aligned on burst size (burst beats*bus width).
+>>
+>> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+>> ---
+>>    Version history:
+>>      v1:
+>>         * Initial
+>>      v2:
+>> ---
+>> ---
+>>   drivers/dma/stm32-mdma.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+>> index daa1602..fbcffa2 100644
+>> --- a/drivers/dma/stm32-mdma.c
+>> +++ b/drivers/dma/stm32-mdma.c
+>> @@ -413,7 +413,7 @@ static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
+>>   	u32 best_burst = max_burst;
+>>   	u32 burst_len = best_burst * width;
+>>   
+>> -	while ((burst_len > 0) && (tlen % burst_len)) {
+>> +	while ((burst_len > 0) && (((tlen | buf_len) & (burst_len - 1)) != 0)) {
+>>   		best_burst = best_burst >> 1;
+>>   		burst_len = best_burst * width;
+>>   	}
 > 
-> Fair enough. I'm not going to commit that anyway since I can't test
-> it, but yes, if it tests ok that sounds like the right thing to do.
+> FWIW, doesn't that whole loop come down to just:
+> 
+> 	burst_len = min(ffs(tlen | buf_len), max_burst * width);
 
-Yes, it does solve the problem at hand with strace - the exact patch I
-tested against 4.16 is below.
+No sure it ends as expected. or I miss something or don't understand this statement
+I tried with "relevant value" : i.e. best_burst = 32, Tlen=128(default) and
+buf_len = 64, width= 4. This statements gets me something wrong output => 7
+instead of 16 * 4.
+I doubt :)
 
-Testing this exact code path (exceptions set to VFP_EXCEPTION_ERROR)
-is something that can only happen if the hardware does something stupid,
-and I don't have a way of making it do that, so the code path can't be
-tested.
-
-However, FPE_FLTUNK is not defined in older kernels, so while we can
-fix it this way for the current merge window, that doesn't help 4.16.
-How we solve that depends what happens with Eric's patch (266da65e9156
-("signal: Add FPE_FLTUNK si_code for undiagnosable fp exceptions"))
-that introduces FPE_FLTUNK - and there's also the problem of NSIGFPE,
-which kernel/signal.c uses in the path that selects the siginfo layout.
-
-Given that the path we're talking about is unlikely to happen (as
-mentioned in my second paragraph) I still think reverting Eric's patch
-is the right way forward for older kernels.
-
-(Note, my previous comment about the si_code initialiser was incorrect.)
-
-diff --git a/arch/arm/include/uapi/asm/siginfo.h b/arch/arm/include/uapi/asm/siginfo.h
-deleted file mode 100644
-index d0513880be21..000000000000
---- a/arch/arm/include/uapi/asm/siginfo.h
-+++ /dev/null
-@@ -1,13 +0,0 @@
--#ifndef __ASM_SIGINFO_H
--#define __ASM_SIGINFO_H
--
--#include <asm-generic/siginfo.h>
--
--/*
-- * SIGFPE si_codes
-- */
--#ifdef __KERNEL__
--#define FPE_FIXME	0	/* Broken dup of SI_USER */
--#endif /* __KERNEL__ */
--
--#endif
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 4c375e11ae95..8a1a5e6048d2 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -28,6 +28,10 @@
- #include <asm/thread_notify.h>
- #include <asm/vfp.h>
- 
-+#ifndef FPE_FLTUNK
-+#define FPE_FLTUNK 14
-+#endif
-+
- #include "vfpinstr.h"
- #include "vfp.h"
- 
-@@ -257,7 +261,7 @@ static void vfp_raise_exceptions(u32 exceptions, u32 inst, u32 fpscr, struct pt_
- 
- 	if (exceptions == VFP_EXCEPTION_ERROR) {
- 		vfp_panic("unhandled bounce", inst);
--		vfp_raise_sigfpe(FPE_FIXME, regs);
-+		vfp_raise_sigfpe(FPE_FLTUNK, regs);
- 		return;
- 	}
- 
-
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> 
+> ?
+> 
+> Robin.
+> 
