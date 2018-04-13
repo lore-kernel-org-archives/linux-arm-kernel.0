@@ -1,44 +1,28 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 13 Apr 2018 12:53:49 -0700
-Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
- kill() returns wrong values in si_pid and si_uid
-In-Reply-To: <20180413184522.GD16308@e103592.cambridge.arm.com>
-References: <20180412124928.GA29458@altlinux.org>
- <20180412131404.GE16141@n2100.armlinux.org.uk>
- <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
- <20180412172051.GK16141@n2100.armlinux.org.uk>
- <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
- <20180413094211.GN16141@n2100.armlinux.org.uk>
- <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
- <20180413170827.GB16308@e103592.cambridge.arm.com>
- <20180413175407.GO16141@n2100.armlinux.org.uk>
- <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
- <20180413184522.GD16308@e103592.cambridge.arm.com>
-Message-ID: <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 13 Apr 2018 13:01:19 -0700
+Subject: [PATCH 0/9] ARM: bcm283x: RPi 3 B+ support and other improvements
+In-Reply-To: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
+References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <878t9qzxio.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2018 at 11:45 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+Stefan Wahren <stefan.wahren@i2se.com> writes:
+
+> The main focus of the patch series is to provide support for the new
+> Raspberry Pi 3 B+ . The rest are parts which missed the merge window for 4.17.
 >
-> Most uses I've seen do nothing more than use the FPE_xyz value to
-> format diagnostic messages while dying.  I struggled to find code that
-> made a meaningful functional decision based on the value, though that's
-> not proof...
+> Since there are still some issues with LAN78XX, also apply Phil Elwell's
+> patches [1] and Dave Stevenson's patches [2] before testing. But they are not
+> required for the function of this series.    
 
-Yeah. I've seen code that cares about SIGFPE deeply, but it's almost
-invariably about some emulated environment (eg Java VM, or CPU
-emulation).
+This series all looks great to me, and is:
 
-And the siginfo data is basically never good enough for those
-environments anyway on its own, so they will go and look at the actual
-instruction that caused the fault and the register state instead,
-because they need *all* the information.
-
-The cases that use si_code are the ones that just trapped signals in
-order to give a more helpful abort message.
-
-So I could certainly imagine that si_code is actually used by somebody
-who then decides to actuall act differently on it, but aside from
-perhaps printing out a different message, it sounds far-fetched.
-
-                Linus
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180413/f62371fa/attachment.sig>
