@@ -1,80 +1,31 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 13 Apr 2018 19:27:51 +0200
-Subject: [PATCH 2/9] ARM: dts: bcm2837: Add missing GPIOs of Expander
+Date: Fri, 13 Apr 2018 19:27:55 +0200
+Subject: [PATCH 6/9] ARM: bcm2835_defconfig: Enable VCHIQ driver
 In-Reply-To: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
 References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1523640478-4448-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1523640478-4448-7-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit a98d90e7d588 ("gpio: raspberrypi-exp: Driver for RPi3 GPIO
-expander via mailbox service") we are able to control the rest of the
-GPIOs of the RPi 3. So add all the missing parts (ACT LED,
-Wifi & BT control, HDMI detect) to the DT.
+In order to gain more test coverage (e.g. Kernel CI) enable
+the VCHIQ driver.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ arch/arm/configs/bcm2835_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index cc39b6f..c318bcb 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -20,9 +20,14 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
-+			gpios = <&expgpio 2 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- &firmware {
-@@ -48,6 +53,10 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	hpd-gpios = <&expgpio 4 GPIO_ACTIVE_LOW>;
-+};
-+
- /* uart0 communicates with the BT module */
- &uart0 {
- 	pinctrl-names = "default";
-@@ -57,6 +66,7 @@
- 	bluetooth {
- 		compatible = "brcm,bcm43438-bt";
- 		max-speed = <2000000>;
-+		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
- 	};
- };
- 
-@@ -69,11 +79,19 @@
- 
- /* SDHCI is used to control the SDIO for wireless */
- &sdhci {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&emmc_gpio34>;
- 	status = "okay";
- 	bus-width = <4>;
- 	non-removable;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+	};
- };
- 
- /* SDHOST is used to drive the SD card */
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 9fae57c..e4d188f 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -128,6 +128,7 @@ CONFIG_LEDS_TRIGGER_CAMERA=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DMA_BCM2835=y
+ CONFIG_STAGING=y
++CONFIG_BCM2835_VCHIQ=m
+ CONFIG_MAILBOX=y
+ CONFIG_BCM2835_MBOX=y
+ # CONFIG_IOMMU_SUPPORT is not set
 -- 
 2.7.4
