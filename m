@@ -1,188 +1,33 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 13 Apr 2018 19:27:53 +0200
-Subject: [PATCH 4/9] ARM: dts: bcm2837: Add Raspberry Pi 3 B+
-In-Reply-To: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
-References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1523640478-4448-5-git-send-email-stefan.wahren@i2se.com>
+From: Gilles.Buloz@kontron.com (Gilles Buloz)
+Date: Fri, 13 Apr 2018 17:32:06 +0000
+Subject: LS1043A : "synchronous abort" at boot due to PCI config read
+Message-ID: <5AD0E995.3090802@kontron.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Raspberry Pi 3 B+ has the following major differences compared
-to the model 3 B:
-* Microchip LAN7515 (Gigabit Ethernet)
-* Cypress CYW43455 (802.11n/ac and BT 4.2)
+Dear developers,
 
-We need to add the USB LAN chip so the bootloader can add the MAC address.
-This is necessary because there ain't a EEPROM or a valid OTP.  
+I currently have two functional workarounds for this issue but would like to know which one you would recommend, if any :-)
+I'm using a LS1043A CPU (NXP QorIQ Layerscape) and get a "synchronous external abort" when booting because of a PCI config read 
+during PCI scan.
 
-Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts | 108 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi |  27 ++++++++
- 3 files changed, 136 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
+I'm using a custom hardware (based on LS1043ARDB) having a PEX8112 PCIe-to-PCI bridge connected to the LS1043A to have a PCI slot 
+for legacy devices. This bridge only supports PCI-Compatible config accesses (offset 0x00-0xFF).
+On this PCI slot I connect a PCI module made of a PCI-to-PCIe bridge plus PCIe devices behind.
+The problem occurs when the kernel probes the PCIe devices : as they are PCIe devices, the kernel does a PCI config read access at 
+offset 0x100 to check if "PCIe extended capability registers" are accessible (see drivers/pci/probe.c, function 
+pci_cfg_space_size_ext()). Unfortunately the PEX8112 PCIe-to-PCI bridge that is in the path reports an error to the CPU for this 
+access, and it seems there's no way to disable that on this bridge.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7e24249..a300a35 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -75,6 +75,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-a-plus.dtb \
- 	bcm2836-rpi-2-b.dtb \
- 	bcm2837-rpi-3-b.dtb \
-+	bcm2837-rpi-3-b-plus.dtb \
- 	bcm2835-rpi-zero.dtb \
- 	bcm2835-rpi-zero-w.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
-new file mode 100644
-index 0000000..4adb85e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
-@@ -0,0 +1,108 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/dts-v1/;
-+#include "bcm2837.dtsi"
-+#include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-lan7515.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,3-model-b-plus", "brcm,bcm2837";
-+	model = "Raspberry Pi 3 Model B+";
-+
-+	chosen {
-+		/* 8250 auxiliary UART instead of pl011 */
-+		stdout-path = "serial1:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		pwr {
-+			label = "PWR";
-+			gpios = <&expgpio 2 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&firmware {
-+	expgpio: gpio {
-+		compatible = "raspberrypi,firmware-gpio";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		gpio-line-names = "BT_ON",
-+				  "WL_ON",
-+				  "STATUS_LED",
-+				  "LAN_RUN",
-+				  "",
-+				  "CAM_GPIO0",
-+				  "CAM_GPIO1",
-+				  "";
-+		status = "okay";
-+	};
-+};
-+
-+&hdmi {
-+	hpd-gpios = <&gpio 28 GPIO_ACTIVE_LOW>;
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
-+	status = "okay";
-+};
-+
-+/* SDHCI is used to control the SDIO for wireless */
-+&sdhci {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_gpio34>;
-+	status = "okay";
-+	bus-width = <4>;
-+	non-removable;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+	};
-+};
-+
-+/* SDHOST is used to drive the SD card */
-+&sdhost {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhost_gpio48>;
-+	status = "okay";
-+	bus-width = <4>;
-+};
-+
-+/* uart0 communicates with the BT module */
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_ctsrts_gpio30 &uart0_gpio32 &gpclk2_gpio43>;
-+	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm43438-bt";
-+		max-speed = <2000000>;
-+		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+/* uart1 is mapped to the pin header */
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
-new file mode 100644
-index 0000000..169203c
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
-@@ -0,0 +1,27 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/ {
-+	aliases {
-+		ethernet0 = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		usb1_1 at 1 {
-+			compatible = "usb424,2514";
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			ethernet: usbether at 1 {
-+				compatible = "usb424,7800";
-+				reg = <1>;
-+			};
-+		};
-+	};
-+};
--- 
-2.7.4
+The first workaround I found was to patch drivers/pci/host/pci-layerscape.c to have PCIE_ABSERR_SETTING set to 0x9400 instead of 
+0x9401 (for PCIE_ABSERR register) to disable error reporting. This only impacts an NXP part of the Linux kernel code, but I'm not 
+sure this is a good idea (however it seems to be like that on Intel platforms where even MEM accesses to a no-device address return 
+FF without any error).
+
+I've also tried another workaround that works : patch drivers/pci/probe.c to use bus_flags to remember if a bus is behind a bridge 
+without extended address capability, to avoid PCi config read accesses at offset 0x100 in
+pci_cfg_space_size() / pci_cfg_space_size_ext(). But this patch impacts the generic PCI probe method of Linux.
+
+Any Idea to properly handle that issue ?
+
+Best regards
