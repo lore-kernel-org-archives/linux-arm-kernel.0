@@ -1,54 +1,54 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 13 Apr 2018 12:36:33 -0400
-Subject: [PATCH v3 2/2] MIPS: io: add a barrier after register read in
- readX()
-In-Reply-To: <e38a329dfb9c461ab3e91de7b96db3dc@AcuMS.aculab.com>
-References: <1522760109-16497-1-git-send-email-okaya@codeaurora.org>
- <1522760109-16497-2-git-send-email-okaya@codeaurora.org>
- <20180412215149.GA27802@saruman>
- <e38a329dfb9c461ab3e91de7b96db3dc@AcuMS.aculab.com>
-Message-ID: <3688d54c-85f3-6eba-7f13-1cef0a0b5d85@codeaurora.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 13 Apr 2018 18:08:28 +0100
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
+References: <20180412095811.GC16141@n2100.armlinux.org.uk>
+ <20180412110314.GA28070@altlinux.org>
+ <20180412121949.GD16141@n2100.armlinux.org.uk>
+ <20180412124928.GA29458@altlinux.org>
+ <20180412131404.GE16141@n2100.armlinux.org.uk>
+ <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+ <20180412172051.GK16141@n2100.armlinux.org.uk>
+ <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+ <20180413094211.GN16141@n2100.armlinux.org.uk>
+ <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
+Message-ID: <20180413170827.GB16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2018 11:41 AM, David Laight wrote:
-> From: James Hogan
->> Sent: 12 April 2018 22:52
->> On Tue, Apr 03, 2018 at 08:55:04AM -0400, Sinan Kaya wrote:
->>> While a barrier is present in writeX() function before the register write,
->>> a similar barrier is missing in the readX() function after the register
->>> read. This could allow memory accesses following readX() to observe
->>> stale data.
->>>
->>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->>> Reported-by: Arnd Bergmann <arnd@arndb.de>
->>
->> Both patches look like obvious improvements to me, so I'm happy to apply
->> to my fixes branch.
+On Fri, Apr 13, 2018 at 09:33:17AM -0700, Linus Torvalds wrote:
+> On Fri, Apr 13, 2018 at 2:42 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> >
+> > Yes, it does solve the problem at hand with strace - the exact patch I
+> > tested against 4.16 is below.
 > 
-> Don't you also need at least barrier() between the register write in writeX()
-> and the register read in readX()?
-> On ppc you probably need eieio.
-> Or are drivers expected to insert that one?
-> If they need to insert that one then why not all the others??
+> Ok, good.
 > 
+> > However, FPE_FLTUNK is not defined in older kernels, so while we can
+> > fix it this way for the current merge window, that doesn't help 4.16.
+> 
+> I wonder if we should even bother with FPE_FLTUNK.
+> 
+> I suspect we might as well use FPE_FLTINV, I suspect, and not have
+> this complexity at all. That case is not worth worrying about, since
+> it's a "this shouldn't happen anyway" and the *real* reason will be in
+> the kernel logs due to vfs_panic().
+> 
+> So it's not like this is something that the user should ever care
+> about the si_code about.
 
-Good question. The volatile in here should prevent compiler from reordering the
-register read or write instructions. 
+Ack, my intended meaning for FPE_FLTUNK is that the fp exception is
+either spurious or we can't tell easily (or possibly at all) which
+FPE_XXX should be returned.  It's up to userspace to figure it out
+if it really cares.  Previously we were accidentally returning SI_USER
+in si_code for arm64.
 
-static inline type pfx##read##bwlq(const volatile void __iomem *mem)
+This case on arm looks like a more serious error for which FPE_FLTINV
+may be more appropriate anyway.
 
-This is the solution all other architectures rely on especially via
-__raw_readX() and __raw_writeX() API.
+[...]
 
-Now, things can get reordered when it leaves the CPU. This is guaranteed by
-embedding wmb() and rmb() into the writeX() and readX() functions in other
-architectures.
-
-This ordering guarantee has been agreed to be the responsibility of the
-architecture not drivers.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Cheers
+---Dave
