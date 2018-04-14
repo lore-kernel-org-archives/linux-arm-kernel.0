@@ -1,56 +1,62 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sat, 14 Apr 2018 15:54:24 +0200
-Subject: [PATCH 2/5] dt-bindings: display: atmel: add optional output-mode
- property
-In-Reply-To: <20180413174648.zxljbw634o2r4zty@rob-hp-laptop>
-References: <20180409105918.20792-1-peda@axentia.se>
- <20180409105918.20792-3-peda@axentia.se>
- <20180413174648.zxljbw634o2r4zty@rob-hp-laptop>
-Message-ID: <3bf87960-06f8-3224-10d9-4ad76ff446a4@axentia.se>
+From: pawel.mikolaj.chmiel@gmail.com (=?utf-8?B?UGF3ZcWC?= Chmiel)
+Date: Sat, 14 Apr 2018 18:27:09 +0200
+Subject: [PATCH] pinctrl/samsung: Correct EINTG banks order
+In-Reply-To: <CAJKOXPcWQUHHhf2gV3u4fu=wuVf3qxOYwNdj0c_JFc+zqfJUkA@mail.gmail.com>
+References: <1523210867-3806-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <CA+Ln22FAmBHrxEvQpBPV1p=Kg2g+XCHn=HQJCNSUhFv+Jtf6xA@mail.gmail.com>
+ <CAJKOXPcWQUHHhf2gV3u4fu=wuVf3qxOYwNdj0c_JFc+zqfJUkA@mail.gmail.com>
+Message-ID: <2132977.nF3rHrDWU5@acerlaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-13 19:46, Rob Herring wrote:
-> On Mon, Apr 09, 2018 at 12:59:15PM +0200, Peter Rosin wrote:
->> Useful for beating cases where an output mode selection heuristic
->> fails.
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
->> index 82f2acb3d374..dc478455b883 100644
->> --- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
->> +++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
->> @@ -10,6 +10,10 @@ Required properties:
->>   - #address-cells: should be set to 1.
->>   - #size-cells: should be set to 0.
->>  
->> +Optional properties:
->> + - output-mode: override any output mode selection hueristic and force a
->> +   particular output mode. One of "rgb444", "rgb565", "rgb666" and "rgb888".
->> +
+On Wednesday, April 11, 2018 11:52:44 AM CEST Krzysztof Kozlowski wrote:
+> On Wed, Apr 11, 2018 at 10:36 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > 2018-04-10 17:38 GMT+09:00 Tomasz Figa <tomasz.figa@gmail.com>:
+> >> 2018-04-10 16:06 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> >>> On Sun, Apr 8, 2018 at 8:07 PM, Pawe? Chmiel
+> >>> <pawel.mikolaj.chmiel@gmail.com> wrote:
+> >>>> All banks with GPIO interrupts should be at beginning
+> >>>> of bank array and without any other types of banks between them.
+> >>>> This order is expected by exynos_eint_gpio_irq, when doing
+> >>>> interrupt group to bank translation.
+> >>>> Otherwise, kernel NULL pointer dereference would happen
+> >>>> when trying to handle interrupt, due to wrong bank being looked up.
+> >>>> Observed on s5pv210, when trying to handle gpj0 interrupt,
+> >>>> where kernel was mapping it to gpi bank.
+> >>>
+> >>> Thanks for the patch. The issue looks real although one thing was
+> >>> missed - there is a gap in SVC group between GPK2 and GPL0 (pointed by
+> >>> Marek Szyprowski):
+> >>>
+> >>> 0x0 - EINT_23 - gpk0
+> >>> 0x1 - EINT_24 - gpk1
+> >>> 0x2 - EINT_25 - gpk2
+> >>> 0x4 - EINT_27 - gpl0
+> >>> 0x7 - EINT_8 - gpm0
+> >>>
+> >>> Maybe this should be done differently - to remove such hidden
+> >>> requirement entirely in favor of another parameter of
+> >>> EXYNOS_PIN_BANK_EINTG argument?
+> >>
+> >> Perhaps let's limit this patch to s5pv210 and Exynos5410 alone, where
+> >> a simple swap of bank order in the arrays should be okay.
+> >>
+> >> We might also need to have some fixes on 4x12, because I noticed that
+> >> in exynos4x12_pin_banks0[] there is a hole in eint_offsets between
+> >> gpd1 and gpf0 and exynos4x12_pin_banks1[] starts with gpk0 that has
+> >> eint_offset equal to 0x08 (not 0).
+> >
+> > To close the loop, after talking offline and checking the
+> > documentation, Exynos4x12 is fine, because the group numbers in SVC
+> > register actually match what is defined in bank arrays.
 > 
-> This needs to be generic, not just added to some random display 
-> controller binding.
+> Great! Thanks for checking.
 > 
-> It also belongs in the port or endpoint node as is done for camera 
-> interfaces.
+> Best regards,
+> Krzysztof
+> 
 
-Hmm, should I extend media/video-interfaces.txt with more bus types (or since
-I'm targeting parallel interfaces, perhaps the new bus types should be
-autodetected from other props?) or should a write a new binding similar to
-it?
+Thanks for all comments. I'll prepare new version of patches, with all fixes and documentation.
 
-One question regarding bus-width, should it include hsync/vsync/de/clk?
-If yes, how to distinguish rgb565 with all those four from rgb666 with
-only de/clk (some panels do not need hsync/vsync)? 20 lines in both
-cases...
-
-Or are rgb444/rgb565/rgb666/rgb888 already supported by the media video
-interface binding? That's not at all obvious to me.
-
-Cheers,
-Peter
+Best regards
+Pawe?
