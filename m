@@ -1,282 +1,193 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 14 Apr 2018 08:48:11 +0530
-Subject: [PATCH 1/1] dts: qcom: db820c: Add gpio-line-names property
-In-Reply-To: <20180414031811.11351-1-manivannan.sadhasivam@linaro.org>
-References: <20180414031811.11351-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180414031811.11351-2-manivannan.sadhasivam@linaro.org>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Fri, 13 Apr 2018 20:32:24 -0700
+Subject: [bug report] locking/qrwlock, arm64: Move rwlock implementation
+ over to qrwlocks causes CPU crashes/stalls when killing java processes
+In-Reply-To: <CACgAJHz9_JKdO9bn1fiPURNq5S4XGeVNnBKx79JhM7Hcp-Tf-w@mail.gmail.com>
+References: <CACgAJHzeS7CNqLaVckNtS5BNTsqe0ac+u0LwJAr1_1i1=OLcnA@mail.gmail.com>
+ <20180412172456.GA27033@arm.com>
+ <CACgAJHz9_JKdO9bn1fiPURNq5S4XGeVNnBKx79JhM7Hcp-Tf-w@mail.gmail.com>
+Message-ID: <CACgAJHwemngF4XgfTvWkjANYoWO-=HTKrJmJg8VonJPCR8ZxrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio-line-names property for Dragonboard820c based on APQ8096 SoC.
-There are 4 gpio-controllers present on this board, including the
-APQ8096 SoC, PM8994 (GPIO and MPP) and PMI8994 (GPIO).
+Hi Will,
 
-Lines names are derived from 96Boards CE Specification 1.0, Appendix
-"Expansion Connector Signal Description". Line names for PMI8994 MPP
-pins are not added due to the absence of the gpio-controller support.
+I tried to remove wfe from cmpwait and still could reproduce the issue.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 240 +++++++++++++++++++++++++++
- 1 file changed, 240 insertions(+)
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -232,7 +232,6 @@
+        "       ldxr" #sz "\t%" #w "[tmp], %[v]\n"              \
+        "       eor     %" #w "[tmp], %" #w "[tmp], %" #w "[val]\n"     \
+        "       cbnz    %" #w "[tmp], 1f\n"                             \
+-       "       wfe\n"                                                  \
+        "1:"                                                            \
+        : [tmp] "=&r" (tmp), [v] "+Q" (*(unsigned long *)ptr)           \
+        : [val] "r" (val));                                             \
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 1c8f1b86472d..1c1deef031c6 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -19,6 +19,34 @@
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
- 
-+/*
-+ * GPIO name legend: proper name = the GPIO line is used as GPIO
-+ *         NC      = not connected (pin out but not routed from the chip to
-+ *                   anything the board)
-+ *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
-+ *         LSEC    = Low Speed External Connector
-+ *         HSEC    = High Speed External Connector
-+ *         P HSEC  = Primary High Speed External Connector
-+ *         S HSEC  = Secondary High Speed External Connector
-+ *         J14     = Camera Connector
-+ *         TP      = Test Points
-+ *
-+ * Line names are taken from the schematic "DragonBoard 820c",
-+ * drawing no: LM25-P2751-1
-+ *
-+ * For the lines routed to the external connectors the
-+ * lines are named after the 96Boards CE Specification 1.0,
-+ * Appendix "Expansion Connector Signal Description".
-+ *
-+ * When the 96Board naming of a line and the schematic name of
-+ * the same line are in conflict, the 96Board specification
-+ * takes precedence, which means that the external UART on the
-+ * LSEC is named UART0 while the schematic and SoC names this
-+ * UART3. This is only for the informational lines i.e. "[FOO]",
-+ * the GPIO named lines "GPIO-A" thru "GPIO-L" are the only
-+ * ones actually used for GPIO.
-+ */
-+
- / {
- 	aliases {
- 		serial0 = &blsp2_uart1;
-@@ -90,6 +118,218 @@
- 			status = "okay";
- 		};
- 
-+		pinctrl at 1010000 {
-+			gpio-line-names =
-+				"[SPI0_DOUT]", /* GPIO_0, LSEC pin 14 */
-+				"[SPI0_DIN]", /* GPIO_1, LSEC pin 10 */
-+				"[SPI0_CS]", /* GPIO_2, LSEC pin 12 */
-+				"[SPI0_SCLK]", /* GPIO_3, LSEC pin 8 */
-+				"[UART1_TxD]", /* GPIO_4, LSEC pin 11 */
-+				"[UART1_RxD]", /* GPIO_5, LSEC pin 13 */
-+				"[I2C1_SDA]", /* GPIO_6, LSEC pin 21 */
-+				"[I2C1_SCL]", /* GPIO_7, LSEC pin 19 */
-+				"GPIO-H", /* GPIO_8, LSEC pin 30 */
-+				"TP93", /* GPIO_9 */
-+				"GPIO-G", /* GPIO_10, LSEC pin 29 */
-+				"[MDP_VSYNC_S]", /* GPIO_11, P HSEC pin 55 */
-+				"NC", /* GPIO_12 */
-+				"[CSI0_MCLK]", /* GPIO_13, P HSEC pin 15 */
-+				"[CAM_MCLK1]", /* GPIO_14, J14 pin 11 */
-+				"[CSI1_MCLK]", /* GPIO_15, P HSEC pin 17 */
-+				"TP99", /* GPIO_16 */
-+				"[I2C2_SDA]", /* GPIO_17, P HSEC pin 34 */
-+				"[I2C2_SCL]", /* GPIO_18, P HSEC pin 32 */
-+				"[CCI_I2C_SDA1]", /* GPIO_19, S HSEC pin 38 */
-+				"[CCI_I2C_SCL1]", /* GPIO_20, S HSEC pin 36 */
-+				"FLASH_STROBE_EN", /* GPIO_21, S HSEC pin 5 */
-+				"FLASH_STROBE_TRIG", /* GPIO_22, S HSEC pin 1 */
-+				"GPIO-K", /* GPIO_23, LSEC pin 33 */
-+				"GPIO-D", /* GPIO_24, LSEC pin 26 */
-+				"GPIO-I", /* GPIO_25, LSEC pin 31 */
-+				"GPIO-J", /* GPIO_26, LSEC pin 32 */
-+				"BLSP6_I2C_SDA", /* GPIO_27 */
-+				"BLSP6_I2C_SCL", /* GPIO_28 */
-+				"GPIO-B", /* GPIO_29, LSEC pin 24 */
-+				"GPIO30", /* GPIO_30, S HSEC pin 4 */
-+				"HDMI_CEC", /* GPIO_31 */
-+				"HDMI_DDC_CLOCK", /* GPIO_32 */
-+				"HDMI_DDC_DATA", /* GPIO_33 */
-+				"HDMI_HOT_PLUG_DETECT", /* GPIO_34 */
-+				"PCIE0_RST_N", /* GPIO_35 */
-+				"PCIE0_CLKREQ_N", /* GPIO_36 */
-+				"PCIE0_WAKE", /* GPIO_37 */
-+				"SD_CARD_DET_N", /* GPIO_38 */
-+				"TSIF1_SYNC", /* GPIO_39, S HSEC pin 48 */
-+				"W_DISABLE_N", /* GPIO_40 */
-+				"[BLSP9_UART_TX]", /* GPIO_41 */
-+				"[BLSP9_UART_RX]", /* GPIO_42 */
-+				"[BLSP2_UART_CTS_N]", /* GPIO_43 */
-+				"[BLSP2_UART_RFR_N]", /* GPIO_44 */
-+				"[BLSP3_UART_TX]", /* GPIO_45 */
-+				"[BLSP3_UART_RX]", /* GPIO_46 */
-+				"[I2C0_SDA]", /* GPIO_47 LSEC pin 17 */
-+				"[I2C0_SCL]", /* GPIO_48 LSEC pin 15 */
-+				"[UART0_TxD]", /* GPIO_49 LSEC pin 5 */
-+				"[UART0_RxD]", /* GPIO_50 LSEC pin 7 */
-+				"[UART0_CTS]", /* GPIO_51 LSEC pin 3 */
-+				"[UART0_RTS]", /* GPIO_52 LSEC pin 9 */
-+				"[CODEC_INT1_N]", /* GPIO_53 */
-+				"[CODEC_INT2_N]", /* GPIO_54 */
-+				"[BLSP7_I2C_SDA]", /* GPIO_55 */
-+				"[BLSP7_I2C_SCL]", /* GPIO_56 */
-+				"MI2S_MCLK", /* GPIO_57, S HSEC pin 3 */
-+				"[PCM_CLK]", /* GPIO_58 LSEC pin 18 */
-+				"[PCM_FS]", /* GPIO_59 LSEC pin 16 */
-+				"[PCM_DO]", /* GPIO_60 LSEC pin 20 */
-+				"[PCM_DI]", /* GPIO_61 LSEC pin 22 */
-+				"GPIO-E", /* GPIO_62, LSEC pin 27 */
-+				"TP87", /* GPIO_63 */
-+				"[CODEC_RST_N]", /* GPIO_64 */
-+				"[PCM1_CLK]", /* GPIO_65 */
-+				"[PCM1_SYNC]", /* GPIO_66 */
-+				"[PCM1_DIN]", /* GPIO_67 */
-+				"[PCM1_DOUT]", /* GPIO_68 */
-+				"AUDIO_REF_CLK", /* GPIO_69 */
-+				"SLIMBUS_CLK", /* GPIO_70 */
-+				"SLIMBUS_DATA0", /* GPIO_71 */
-+				"SLIMBUS_DATA1", /* GPIO_72 */
-+				"NC", /* GPIO_73 */
-+				"NC", /* GPIO_74 */
-+				"NC", /* GPIO_75 */
-+				"NC", /* GPIO_76 */
-+				"TP94", /* GPIO_77 */
-+				"NC", /* GPIO_78 */
-+				"TP95", /* GPIO_79 */
-+				"GPIO-A", /* GPIO_80, LSEC pin 23 */
-+				"TP88", /* GPIO_81 */
-+				"TP89", /* GPIO_82 */
-+				"TP90", /* GPIO_83 */
-+				"TP91", /* GPIO_84 */
-+				"[SD_DAT0]", /* GPIO_85, HSEC pin 1 */
-+				"[SD_CMD]", /* GPIO_86, HSEC pin 11 */
-+				"[SD_DAT3]", /* GPIO_87, HSEC pin 7 */
-+				"[SD_SCLK]", /* GPIO_88, HSEC pin 9 */
-+				"TSIF1_CLK", /* GPIO_89, S HSEC pin 42 */
-+				"TSIF1_EN", /* GPIO_90, S HSEC pin 46 */
-+				"TSIF1_DATA", /* GPIO_91, S HSEC pin 44 */
-+				"NC", /* GPIO_92 */
-+				"TSIF2_CLK", /* GPIO_93, S HSEC pin 52 */
-+				"TSIF2_EN", /* GPIO_94, S HSEC pin 56 */
-+				"TSIF2_DATA", /* GPIO_95, S HSEC pin 54 */
-+				"TSIF2_SYNC", /* GPIO_96, S HSEC pin 58 */
-+				"NC", /* GPIO_97 */
-+				"CAM1_STANDBY_N", /* GPIO_98 */
-+				"NC", /* GPIO_99 */
-+				"NC", /* GPIO_100 */
-+				"[LCD1_RESET_N]", /* GPIO_101, S HSEC pin 51 */
-+				"BOOT_CONFIG1", /* GPIO_102 */
-+				"USB_HUB_RESET", /* GPIO_103 */
-+				"CAM1_RST_N", /* GPIO_104 */
-+				"NC", /* GPIO_105 */
-+				"NC", /* GPIO_106 */
-+				"NC", /* GPIO_107 */
-+				"NC", /* GPIO_108 */
-+				"NC", /* GPIO_109 */
-+				"NC", /* GPIO_110 */
-+				"NC", /* GPIO_111 */
-+				"NC", /* GPIO_112 */
-+				"PMI8994_BUA", /* GPIO_113 */
-+				"PCIE2_RST_N", /* GPIO_114 */
-+				"PCIE2_CLKREQ_N", /* GPIO_115 */
-+				"PCIE2_WAKE", /* GPIO_116 */
-+				"SSC_IRQ_0", /* GPIO_117 */
-+				"SSC_IRQ_1", /* GPIO_118 */
-+				"SSC_IRQ_2", /* GPIO_119 */
-+				"NC", /* GPIO_120 */
-+				"GPIO121", /* GPIO_121, S HSEC pin 2 */
-+				"NC", /* GPIO_122 */
-+				"SSC_IRQ_6", /* GPIO_123 */
-+				"SSC_IRQ_7", /* GPIO_124 */
-+				"GPIO-C", /* GPIO_125, LSEC pin 25 */
-+				"BOOT_CONFIG5", /* GPIO_126 */
-+				"NC", /* GPIO_127 */
-+				"NC", /* GPIO_128 */
-+				"BOOT_CONFIG7", /* GPIO_129 */
-+				"PCIE1_RST_N", /* GPIO_130 */
-+				"PCIE1_CLKREQ_N", /* GPIO_131 */
-+				"PCIE1_WAKE", /* GPIO_132 */
-+				"GPIO-L", /* GPIO_133, LSEC pin 34 */
-+				"NC", /* GPIO_134 */
-+				"NC", /* GPIO_135 */
-+				"BOOT_CONFIG8", /* GPIO_136 */
-+				"NC", /* GPIO_137 */
-+				"NC", /* GPIO_138 */
-+				"GPS_SSBI2", /* GPIO_139 */
-+				"GPS_SSBI1", /* GPIO_140 */
-+				"NC", /* GPIO_141 */
-+				"NC", /* GPIO_142 */
-+				"NC", /* GPIO_143 */
-+				"BOOT_CONFIG6", /* GPIO_144 */
-+				"NC", /* GPIO_145 */
-+				"NC", /* GPIO_146 */
-+				"NC", /* GPIO_147 */
-+				"NC", /* GPIO_148 */
-+				"NC"; /* GPIO_149 */
-+		};
-+
-+		qcom,spmi at 400f000 {
-+			pmic at 0 {
-+				gpios at c000 {
-+					gpio-line-names =
-+						"NC",
-+						"KEY_VOLP_N",
-+						"NC",
-+						"BL1_PWM",
-+						"GPIO-F", /* LSEC pin 28 */
-+						"BL1_EN",
-+						"NC",
-+						"WLAN_EN",
-+						"NC",
-+						"NC",
-+						"NC",
-+						"NC",
-+						"NC",
-+						"NC",
-+						"DIVCLK1",
-+						"DIVCLK2",
-+						"DIVCLK3",
-+						"DIVCLK4",
-+						"BT_EN",
-+						"PMIC_SLB",
-+						"PMIC_BUA",
-+						"USB_VBUS_DET";
-+				};
-+
-+				mpps at a000 {
-+					gpio-line-names =
-+						"VDDPX_BIAS",
-+						"WIFI_LED",
-+						"NC",
-+						"BT_LED",
-+						"PM_MPP05",
-+						"PM_MPP06",
-+						"PM_MPP07",
-+						"NC";
-+				};
-+			};
-+
-+			pmic at 2 {
-+				gpios at c000 {
-+					gpio-line-names =
-+						"NC",
-+						"SPKR_AMP_EN1",
-+						"SPKR_AMP_EN2",
-+						"TP61",
-+						"NC",
-+						"USB2_VBUS_DET",
-+						"NC",
-+						"NC",
-+						"NC",
-+						"NC";
-+				};
-+			};
-+		};
-+
- 		phy at 34000 {
- 			status = "okay";
- 		};
+I dumped out CPU pc and they seem to be looping in the
+arch_spin_lock() trying to get the lock.
+
+ffff00000810a968 <queued_write_lock_slowpath>:
+ffff00000810a968:       a9bf7bfd        stp     x29, x30, [sp,#-16]!
+ffff00000810a96c:       aa0003e3        mov     x3, x0
+ffff00000810a970:       91001005        add     x5, x0, #0x4
+ffff00000810a974:       910003fd        mov     x29, sp
+ffff00000810a978:       f98000b1        prfm    pstl1strm, [x5]
+ffff00000810a97c:       885ffca1        ldaxr   w1, [x5]
+ffff00000810a980:       11404022        add     w2, w1, #0x10, lsl #12
+ffff00000810a984:       88047ca2        stxr    w4, w2, [x5]
+ffff00000810a988:       35ffffa4        cbnz    w4, ffff00000810a97c
+<queued_write_lock_slowpath+0x14>
+ffff00000810a98c:       4ac14022        eor     w2, w1, w1, ror #16
+ffff00000810a990:       340000c2        cbz     w2, ffff00000810a9a8
+<queued_write_lock_slowpath+0x40>
+ffff00000810a994:       d50320bf        sevl
+ffff00000810a998:       d503205f        wfe
+ffff00000810a99c:       485ffca4        ldaxrh  w4, [x5]
+ffff00000810a9a0:       4a414082        eor     w2, w4, w1, lsr #16
+ffff00000810a9a4:       35ffffa2        cbnz    w2, ffff00000810a998
+<queued_write_lock_slowpath+0x30>
+ffff00000810a9a8:       b9400001        ldr     w1, [x0]
+ffff00000810a9ac:       350000e1        cbnz    w1, ffff00000810a9c8
+<queued_write_lock_slowpath+0x60>
+ffff00000810a9b0:       d2800001        mov     x1, #0x0
+         // #0
+ffff00000810a9b4:       d2801fe2        mov     x2, #0xff
+         // #255
+
+Tai
+
+On Thu, Apr 12, 2018 at 10:49 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
+> Hi Will,
+>
+> Somehow so far I only see the issue when killing Java processes.
+> Here is the log. It's a bit long.
+> I'll try removing wfe as you suggested.
+>
+> [ 2499.459849] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459851] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459855] INFO: rcu_sched self-detected stall on CPU
+>
+> [ 2499.459856] INFO: rcu_sched self-detected stall on CPU
+>
+> [ 2499.459858] INFO: rcu_sched self-detected stall on CPU
+>
+> [ 2499.459861]  1-...!: (11 GPs behind) idle=dee/140000000000001/0
+> softirq=40890/40890 fqs=0
+>
+> [ 2499.459862] INFO: rcu_sched self-detected stall on CPU
+>
+> [ 2499.459864] INFO: rcu_sched self-detected stall on CPU
+>
+> [ 2499.459866] INFO: rcu_sched self-detected stall on CPU
+>
+> [ 2499.459866]
+> [ 2499.459870]  14-...!: (1 GPs behind) idle=a9e/140000000000001/0
+> softirq=42949/42950 fqs=0
+> [ 2499.459871] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459873] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459876] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459878] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459881] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459882]  (t=60744 jiffies g=20044 c=20043 q=4496)
+> [ 2499.459884] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459885] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459886]
+> [ 2499.459890]  0-...!: (11 GPs behind) idle=70a/140000000000001/0
+> softirq=44883/44883 fqs=0
+> [ 2499.459891] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459893] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459896] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459898] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459899] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459901] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459903] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459906] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459907] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459909] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459910] INFO: rcu_sched self-detected stall on CPU
+> [ 2499.459914] rcu_sched kthread starved for 60744 jiffies! g20044
+> c20043 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x402 ->cpu=16
+> [ 2499.459916]  (t=60744 jiffies g=20044 c=20043 q=4506)
+> [ 2499.459916]
+> [ 2499.459920]  6-...!: (2 GPs behind) idle=e0a/140000000000001/0
+> softirq=42006/42006 fqs=0
+> [ 2499.459924]  31-...!: (8 GPs behind) idle=6fe/140000000000001/0
+> softirq=39495/39495 fqs=0
+> [ 2499.459928] rcu_sched       I
+> [ 2499.459930] rcu_sched kthread starved for 60744 jiffies! g20044
+> c20043 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x402 ->cpu=16
+> [ 2499.459932]  (t=60744 jiffies g=20044 c=20043 q=4518)
+> [ 2499.459932]
+> [ 2499.459935]  12-...!: (48 GPs behind) idle=37a/140000000000001/0
+[...]
+> [ 2499.460317] rcu_sched kthread starved for 60744 jiffies! g20044
+> c20043 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x200 ->cpu=16
+> [ 2499.460318]  (t=60744 jiffies g=20044 c=20043 q=4703)
+> [ 2499.460320]  ret_from_fork+0x10/0x18
+> [ 2499.460322]  kthread+0xfc/0x128
+> [ 2499.460323]  rcu_gp_kthread+0x3a8/0x7c0
+> [ 2499.460324]  schedule_timeout+0x17c/0x340
+> [ 2499.460326]  schedule+0x2c/0x84
+> [ 2499.460328]  __schedule+0x308/0x780
+> [ 2499.460332]  __switch_to+0x8c/0xa8
+> [ 2499.460333] Call trace:
+> [ 2499.460334]     0     8      2 0x00000000
+> [ 2499.460335] rcu_sched       R
+> [ 2499.460338] rcu_sched kthread starved for 60744 jiffies! g20044
+> c20043 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x200 ->cpu=16
+> [ 2499.460338]   running task
+> [ 2499.460341]  ret_from_fork+0x10/0x18
+> [ 2499.460342]  kthread+0xfc/0x128
+> [ 2499.460345]  rcu_gp_kthread+0x3a8/0x7c0
+> [ 2499.460347]  schedule_timeout+0x17c/0x340
+> [root at hadoop-slave-1 scripts]# [ 2499.460349]  schedule+0x2c/0x84
+> [ 2499.460351]  __schedule+0x308/0x780
+> [ 2499.460355]  __switch_to+0x8c/0xa8
+>
+> [ 2499.460356] Call trace:
+> [ 2499.460358]     0     8      2 0x00000000
+> [ 2499.460359] rcu_sched       R
+> [ 2499.460362] rcu_sched kthread starved for 60744 jiffies! g20044
+> c20043 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x200 ->cpu=16
+> [ 2499.460363]  ret_from_fork+0x10/0x18
+> [root at hadoop-slave-1 scripts]# [ 2499.460365]  kthread+0xfc/0x128
+> [ 2499.460366]  rcu_gp_kthread+0x3a8/0x7c0
+> [ 2499.460368]  schedule_timeout+0x17c/0x340
+>
+> [ 2499.460370]  schedule+0x2c/0x84
+> [ 2499.460373]  __switch_to+0x8c/0xa8
+> [ 2499.460376]  __schedule+0x308/0x780
+> [ 2499.460377] Call trace:
+> [ 2499.460378]     0     8      2 0x00000000
+[...]
+
+> On Thu, Apr 12, 2018 at 10:24 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Tai,
+>>
+>> On Thu, Apr 12, 2018 at 10:10:40AM -0700, Tai Tri Nguyen wrote:
+>>> Recently I have observed the CPU crashes/stalls when rebooting after I
+>>> ran cassandra benchmark.
+>>> The issue happens randomly.
+>>
+>> Please could you share some logs and more details about the crashes and
+>> stalls? At the moment there's not much we can do with this report :/
+>>
+>> Ideally, we'd have steps to reproduce the issue, but it seems that you
+>> don't have a reliable method for that.
+>>
+>> One other thing you could try is removing the WFE from our cmpwait
+>> implementation in case you have a CPU erratum in that area.
+>>
+>> Will
+>
+>
+>
+> --
+> Tai
+
+
+
 -- 
-2.14.1
+Tai
