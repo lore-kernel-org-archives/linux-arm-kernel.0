@@ -1,41 +1,56 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat, 14 Apr 2018 16:16:38 +0530
-Subject: [PATCH 3/7] bus: add bus driver for accessing Allwinner A64 DE2
-In-Reply-To: <CAGb2v64-sWsFfHThVrcE5ivrf6kZSZa_tkB_GtC=Z+1TLpWV_Q@mail.gmail.com>
-References: <20180316175354.21437-1-icenowy@aosc.io>
- <20180316175354.21437-4-icenowy@aosc.io>
- <CAMty3ZBOSXu=+jQpsdnykioDGsp=VphSnzQdDDs_hh3Y1FPKyg@mail.gmail.com>
- <CAGb2v64-sWsFfHThVrcE5ivrf6kZSZa_tkB_GtC=Z+1TLpWV_Q@mail.gmail.com>
-Message-ID: <CAMty3ZAfBZSc9f5mRxSaYzW6W1JkVkJ7+swMAm3Gg_EFWUkULw@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Sat, 14 Apr 2018 15:54:24 +0200
+Subject: [PATCH 2/5] dt-bindings: display: atmel: add optional output-mode
+ property
+In-Reply-To: <20180413174648.zxljbw634o2r4zty@rob-hp-laptop>
+References: <20180409105918.20792-1-peda@axentia.se>
+ <20180409105918.20792-3-peda@axentia.se>
+ <20180413174648.zxljbw634o2r4zty@rob-hp-laptop>
+Message-ID: <3bf87960-06f8-3224-10d9-4ad76ff446a4@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 14, 2018 at 4:00 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Sat, Apr 14, 2018 at 6:25 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
->> On Fri, Mar 16, 2018 at 11:23 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->>> The "Display Engine 2.0" (usually called DE2) on the Allwinner A64 SoC
->>> is different from the ones on other Allwinner SoCs. It requires a SRAM
->>> region to be claimed, otherwise all DE2 subblocks won't be accessible.
->>>
->>> Add a bus driver for the Allwinner A64 DE2 part which claims the SRAM
->>> region when probing.
+On 2018-04-13 19:46, Rob Herring wrote:
+> On Mon, Apr 09, 2018 at 12:59:15PM +0200, Peter Rosin wrote:
+>> Useful for beating cases where an output mode selection heuristic
+>> fails.
 >>
->> Along with this bus driver, we also need
->> drivers/gpu/drm/sun4i/sun4i_drv.c which can usually drive the
->> pipelines like mixer0 and 1 are the cases for A64?
->
-> I imagine that's the next part to be sent out, after the hardware
-> representation in the device tree has been decided on.
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+>> index 82f2acb3d374..dc478455b883 100644
+>> --- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+>> +++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+>> @@ -10,6 +10,10 @@ Required properties:
+>>   - #address-cells: should be set to 1.
+>>   - #size-cells: should be set to 0.
+>>  
+>> +Optional properties:
+>> + - output-mode: override any output mode selection hueristic and force a
+>> +   particular output mode. One of "rgb444", "rgb565", "rgb666" and "rgb888".
+>> +
+> 
+> This needs to be generic, not just added to some random display 
+> controller binding.
+> 
+> It also belongs in the port or endpoint node as is done for camera 
+> interfaces.
 
-Yeah, this hardware representation along with separate bus driver
-going like in another direction especially if we add pipelines support
-to it, may be we can add sram stuff to platdata of existinf
-sun4i_drv.c
+Hmm, should I extend media/video-interfaces.txt with more bus types (or since
+I'm targeting parallel interfaces, perhaps the new bus types should be
+autodetected from other props?) or should a write a new binding similar to
+it?
 
-Jagan.
+One question regarding bus-width, should it include hsync/vsync/de/clk?
+If yes, how to distinguish rgb565 with all those four from rgb666 with
+only de/clk (some panels do not need hsync/vsync)? 20 lines in both
+cases...
 
--- 
-Jagan Teki
-Senior Linux Kernel Engineer | Amarula Solutions
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Or are rgb444/rgb565/rgb666/rgb888 already supported by the media video
+interface binding? That's not at all obvious to me.
+
+Cheers,
+Peter
