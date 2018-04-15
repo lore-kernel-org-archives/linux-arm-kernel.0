@@ -1,98 +1,50 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Sun, 15 Apr 2018 14:02:39 +0200
-Subject: [PATCH v7 06/26] timer: Export next wakeup time of a CPU
-In-Reply-To: <CAJZ5v0j=TL7Pvc6W+ieJ1D3C-9mJKMzmkcSRoHnquAwZC_k+0w@mail.gmail.com>
-References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
- <1523531671-27491-7-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0j=TL7Pvc6W+ieJ1D3C-9mJKMzmkcSRoHnquAwZC_k+0w@mail.gmail.com>
-Message-ID: <CAPDyKFrQ4eUcuNPp6nUak_LvEP1=FNZ4a8SCd-XwLkPuXv9oFQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 Apr 2018 14:12:06 +0100
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
+References: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+ <20180412172051.GK16141@n2100.armlinux.org.uk>
+ <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+ <20180413094211.GN16141@n2100.armlinux.org.uk>
+ <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
+ <20180413170827.GB16308@e103592.cambridge.arm.com>
+ <20180413175407.GO16141@n2100.armlinux.org.uk>
+ <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
+ <20180413184522.GD16308@e103592.cambridge.arm.com>
+ <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
+Message-ID: <20180415131206.GR16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2018 at 10:47, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Thu, Apr 12, 2018 at 1:14 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> From: Lina Iyer <lina.iyer@linaro.org>
->>
->> Knowing the sleep duration of CPUs, is known to be needed while selecting
->> the most energy efficient idle state for a CPU or a group of CPUs.
->>
->> However, to be able to compute the sleep duration, we need to know at what
->> time the next expected wakeup is for the CPU. Therefore, let's export this
->> information via a new function, tick_nohz_get_next_wakeup(). Following
->> changes make use of it.
->>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Lina Iyer <ilina@codeaurora.org>
->> Cc: Frederic Weisbecker <fweisbec@gmail.com>
->> Cc: Ingo Molnar <mingo@kernel.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  include/linux/tick.h     | 10 ++++++++++
->>  kernel/time/tick-sched.c | 11 +++++++++++
->>  2 files changed, 21 insertions(+)
->>
->> diff --git a/include/linux/tick.h b/include/linux/tick.h
->> index 389aa25..d341811 100644
->> --- a/include/linux/tick.h
->> +++ b/include/linux/tick.h
->> @@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
->>  extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
->>  extern unsigned long tick_nohz_get_idle_calls(void);
->>  extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
->> +extern ktime_t tick_nohz_get_next_wakeup(int cpu);
->>  extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
->>  extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
->>
->> @@ -151,6 +152,15 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
->>         *delta_next = TICK_NSEC;
->>         return *delta_next;
->>  }
->> +
->> +static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
->> +{
->> +       ktime_t t;
->> +
->> +       /* Next wake up is the tick period, assume it starts now */
->> +       return ktime_add(tick_nohz_get_sleep_length(&t), ktime_get());
->> +}
->
-> Well, given that tick_nohz_get_sleep_length() is just the above in
-> this case, wouldn't it be simpler to return ktime_add(ktime_get(),
-> TICK_NSEC) from here?
+On Fri, Apr 13, 2018 at 12:53:49PM -0700, Linus Torvalds wrote:
+> On Fri, Apr 13, 2018 at 11:45 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> >
+> > Most uses I've seen do nothing more than use the FPE_xyz value to
+> > format diagnostic messages while dying.  I struggled to find code that
+> > made a meaningful functional decision based on the value, though that's
+> > not proof...
+> 
+> Yeah. I've seen code that cares about SIGFPE deeply, but it's almost
+> invariably about some emulated environment (eg Java VM, or CPU
+> emulation).
+> 
+> And the siginfo data is basically never good enough for those
+> environments anyway on its own, so they will go and look at the actual
+> instruction that caused the fault and the register state instead,
+> because they need *all* the information.
+> 
+> The cases that use si_code are the ones that just trapped signals in
+> order to give a more helpful abort message.
+> 
+> So I could certainly imagine that si_code is actually used by somebody
+> who then decides to actuall act differently on it, but aside from
+> perhaps printing out a different message, it sounds far-fetched.
 
-Yes!
+Okay, in that case let's just use FPE_FLTINV.  That makes the patch
+easily back-portable for stable kernels.
 
->
->> +
->>  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
->>  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
->>
->> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
->> index 646645e..08db7f3 100644
->> --- a/kernel/time/tick-sched.c
->> +++ b/kernel/time/tick-sched.c
->> @@ -1098,6 +1098,17 @@ unsigned long tick_nohz_get_idle_calls(void)
->>         return ts->idle_calls;
->>  }
->>
->> +/**
->> + * tick_nohz_get_next_wakeup - return the next wake up of the CPU
->> + */
->> +ktime_t tick_nohz_get_next_wakeup(int cpu)
->> +{
->> +       struct clock_event_device *dev =
->> +                       per_cpu(tick_cpu_device.evtdev, cpu);
->
-> I would avoid breaking the line, honestly.
-
-Alright, I have no problem with that.
-
-[,,,]
-
-Thanks for reviewing!
-
-Kind regards
-Uffe
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
