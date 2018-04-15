@@ -1,32 +1,52 @@
-From: my375229675@gmail.com (Yaodong Liu)
-Date: Sun, 15 Apr 2018 12:35:55 +0800
-Subject: [PATCH] ARM: dts: rockchip: disable arm_global_timer for rk3066a
-Message-ID: <1523766955-9001-1-git-send-email-my375229675@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Sun, 15 Apr 2018 13:59:55 +0200
+Subject: [PATCH v7 11/26] of: base: Add of_get_cpu_state_node() to get
+ idle states for a CPU node
+In-Reply-To: <CAL_JsqL=i1mXSW-x2CRAHoyAxG+QtGL1YLGwpJdpQbizrqzv-w@mail.gmail.com>
+References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
+ <1523531671-27491-12-git-send-email-ulf.hansson@linaro.org>
+ <CAL_JsqL=i1mXSW-x2CRAHoyAxG+QtGL1YLGwpJdpQbizrqzv-w@mail.gmail.com>
+Message-ID: <CAPDyKFo8wMetVmUBok_PmhZ6tHLKKn0_23j3PRfyBmXzeMF4VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm_global_timer provides unstable clock to sched_clock, it will
-be selected by default instead of rockchip_timer. The same issue has
-been fixed in rk3188.
+On 13 April 2018 at 17:05, Rob Herring <robh+dt@kernel.org> wrote:
+> On Thu, Apr 12, 2018 at 6:14 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> The CPU's idle state nodes are currently parsed at the common cpuidle DT
+>> library, but also when initializing back-end data for the arch specific CPU
+>> operations, as in the PSCI driver case.
+>>
+>> To avoid open-coding, let's introduce of_get_cpu_state_node(), which takes
+>> the device node for the CPU and the index to the requested idle state node,
+>> as in-parameters. In case a corresponding idle state node is found, it
+>> returns the node with the refcount incremented for it, else it returns
+>> NULL.
+>>
+>> Moreover, for ARM, there are two generic methods, to describe the CPU's
+>> idle states, either via the flattened description through the
+>> "cpu-idle-states" binding [1] or via the hierarchical layout, using the
+>> "power-domains" and the "domain-idle-states" bindings [2]. Hence, let's
+>> take both options into account.
+>>
+>> [1]
+>> Documentation/devicetree/bindings/arm/idle-states.txt
+>> [2]
+>> Documentation/devicetree/bindings/arm/psci.txt
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: Lina Iyer <ilina@codeaurora.org>
+>> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+>> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/of/base.c  | 35 +++++++++++++++++++++++++++++++++++
+>>  include/linux/of.h |  8 ++++++++
+>>  2 files changed, 43 insertions(+)
+>
+> Some reason you didn't add my Reviewed-by from v6?
 
-So we must disable arm_global_timer to get the correct clocksource.
+No, I was just sloppy. My apologies!
 
-Signed-off-by: Yaodong Liu <my375229675@gmail.com>
----
- arch/arm/boot/dts/rk3066a.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 06523ca..1920f93 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -749,3 +749,7 @@
- &emac {
- 	compatible = "rockchip,rk3066-emac";
- };
-+
-+&global_timer {
-+	status = "disabled";
-+};
--- 
-2.7.4
+Kind regards
+Uffe
