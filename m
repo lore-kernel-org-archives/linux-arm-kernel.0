@@ -1,76 +1,32 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 14 Apr 2018 17:55:30 -0300
-Subject: [PATCH] ARM: dts: imx6ul: Add CAAM support
-Message-ID: <1523739330-27363-1-git-send-email-festevam@gmail.com>
+From: my375229675@gmail.com (Yaodong Liu)
+Date: Sun, 15 Apr 2018 12:35:55 +0800
+Subject: [PATCH] ARM: dts: rockchip: disable arm_global_timer for rk3066a
+Message-ID: <1523766955-9001-1-git-send-email-my375229675@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+The arm_global_timer provides unstable clock to sched_clock, it will
+be selected by default instead of rockchip_timer. The same issue has
+been fixed in rk3188.
 
-Add CAAM support on i.MX6UL.
+So we must disable arm_global_timer to get the correct clocksource.
 
-Also, since CAAM is not available on i.MX6ULL the CAAM node
-needs to be deleted in the imx6ull.dtsi.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Yaodong Liu <my375229675@gmail.com>
 ---
- arch/arm/boot/dts/imx6ul.dtsi  | 30 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6ull.dtsi |  2 ++
- 2 files changed, 32 insertions(+)
+ arch/arm/boot/dts/rk3066a.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 1241972..2b854d1 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -769,6 +769,36 @@
- 			reg = <0x02100000 0x100000>;
- 			ranges;
- 
-+			crypto: caam at 2140000 {
-+				compatible = "fsl,imx6ul-caam", "fsl,sec-v4.0";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0x2140000 0x3c000>;
-+				ranges = <0 0x2140000 0x3c000>;
-+				interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_CAAM_IPG>, <&clks IMX6UL_CLK_CAAM_ACLK>,
-+					 <&clks IMX6UL_CLK_CAAM_MEM>;
-+				clock-names = "ipg", "aclk", "mem";
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 06523ca..1920f93 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -749,3 +749,7 @@
+ &emac {
+ 	compatible = "rockchip,rk3066-emac";
+ };
 +
-+				sec_jr0: jr0 at 1000 {
-+					compatible = "fsl,sec-v4.0-job-ring";
-+					reg = <0x1000 0x1000>;
-+					interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+
-+				sec_jr1: jr1 at 2000 {
-+					compatible = "fsl,sec-v4.0-job-ring";
-+					reg = <0x2000 0x1000>;
-+					interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+
-+				sec_jr2: jr2 at 3000 {
-+					compatible = "fsl,sec-v4.0-job-ring";
-+					reg = <0x3000 0x1000>;
-+					interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+
- 			usbotg1: usb at 2184000 {
- 				compatible = "fsl,imx6ul-usb", "fsl,imx27-usb";
- 				reg = <0x02184000 0x200>;
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index 571ddd7..ebc25c9 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -45,6 +45,8 @@
- 
- /* Delete UART8 in AIPS-1 (i.MX6UL specific) */
- /delete-node/ &uart8;
-+/* Delete CAAM node in AIPS-2 (i.MX6UL specific) */
-+/delete-node/ &crypto;
- 
- / {
- 	soc {
++&global_timer {
++	status = "disabled";
++};
 -- 
 2.7.4
