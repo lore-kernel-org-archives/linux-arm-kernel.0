@@ -1,70 +1,95 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Sun, 15 Apr 2018 10:59:09 -0500
-Subject: [RFC PATCH 3/3] signal: Stop special casing TRAP_FIXME and FPE_FIXME
- in siginfo_layout
-In-Reply-To: <87604sa2fu.fsf_-_@xmission.com> (Eric W. Biederman's message of
- "Sun, 15 Apr 2018 10:56:21 -0500")
-References: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
- <20180412172051.GK16141@n2100.armlinux.org.uk>
- <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
- <20180413094211.GN16141@n2100.armlinux.org.uk>
- <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
- <20180413170827.GB16308@e103592.cambridge.arm.com>
- <20180413175407.GO16141@n2100.armlinux.org.uk>
- <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
- <20180413184522.GD16308@e103592.cambridge.arm.com>
- <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
- <20180415131206.GR16141@n2100.armlinux.org.uk>
- <87604sa2fu.fsf_-_@xmission.com>
-Message-ID: <87muy48nqq.fsf_-_@xmission.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Sun, 15 Apr 2018 18:04:16 +0200
+Subject: [PATCH] arm64: export tishift functions to modules
+Message-ID: <20180415160416.28161-1-Jason@zx2c4.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Otherwise modules that use these arithmetic operations will fail to
+link. We accomplish this with EXPORT_SYMBOL in the .S file, but because
+of symbol versioning, we actually need to have a declaration of these
+too in C. So, we introduce asm-prototypes.h, which is the same file name
+and technique used for similar reasons in the m68k arch tree.
 
-After more experience with the cases where no one the si_code of 0 is
-used both as a signal specific si_code, and as SI_USER it appears that
-no one cares about the signal specific si_code case and the good
-solution is to just fix the architectures by using a different si_code.
+While we're at it, we also fix this up to use SPDX, and I personally
+choose to relicense this as GPL2||BSD so that these symbols don't need
+to be export_symbol_gpl, so all modules can use the routines, since
+these are important general purpose compiler-generated function calls.
 
-In none of the conversations has anyone even suggested that anything
-depends on the signal specific redefinition of SI_USER.
-
-There are at least test cases that care when si_code as 0 does not work
-as si_user.
-
-So make things simple and keep the generic code from introducing
-problems by removing the special casing of TRAP_FIXME and FPE_FIXME.
-This will ensure the generic case of sending a signal with kill will
-always set SI_USER and work.
-
-The architecture specific, and signal specific overloads that set
-si_code to 0 will now have problems with signalfd and the 32bit compat
-versions of siginfo copying.  At least until they are fixed.
-
-Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
+Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+Reported-by: PaX Team <pageexec@freemail.hu>
+Cc: stable at vger.kernel.org
 ---
- kernel/signal.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm64/include/asm/asm-prototypes.h | 11 +++++++++++
+ arch/arm64/lib/tishift.S                | 19 ++++++-------------
+ 2 files changed, 17 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm64/include/asm/asm-prototypes.h
 
-diff --git a/kernel/signal.c b/kernel/signal.c
-index d56f4d496c89..fc82d2c0918f 100644
---- a/kernel/signal.c
-+++ b/kernel/signal.c
-@@ -2835,15 +2835,6 @@ enum siginfo_layout siginfo_layout(int sig, int si_code)
- 			layout = SIL_POLL;
- 		else if (si_code < 0)
- 			layout = SIL_RT;
--		/* Tests to support buggy kernel ABIs */
--#ifdef TRAP_FIXME
--		if ((sig == SIGTRAP) && (si_code == TRAP_FIXME))
--			layout = SIL_FAULT;
--#endif
--#ifdef FPE_FIXME
--		if ((sig == SIGFPE) && (si_code == FPE_FIXME))
--			layout = SIL_FAULT;
--#endif
- 	}
- 	return layout;
- }
+diff --git a/arch/arm64/include/asm/asm-prototypes.h b/arch/arm64/include/asm/asm-prototypes.h
+new file mode 100644
+index 000000000000..8f1919e44f51
+--- /dev/null
++++ b/arch/arm64/include/asm/asm-prototypes.h
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
++ *
++ * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
++ */
++
++/* These functions are defined in lib/tishift.S, but need to be declared
++ * here so that symbol versioning picks them up.
++ */
++extern long long __ashlti3(long long a, int b);
++extern long long __ashrti3(long long a, int b);
++extern long long __lshrti3(long long a, int b);
+diff --git a/arch/arm64/lib/tishift.S b/arch/arm64/lib/tishift.S
+index d3db9b2cd479..3bca433973cb 100644
+--- a/arch/arm64/lib/tishift.S
++++ b/arch/arm64/lib/tishift.S
+@@ -1,20 +1,10 @@
+-/*
+- * Copyright (C) 2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
++/* SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * Copyright (C) 2017-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+  */
+ 
+ #include <linux/linkage.h>
++#include <asm-generic/export.h>
+ 
+ ENTRY(__ashlti3)
+ 	cbz	x2, 1f
+@@ -36,6 +26,7 @@ ENTRY(__ashlti3)
+ 	mov	x0, x2
+ 	ret
+ ENDPROC(__ashlti3)
++EXPORT_SYMBOL(__ashlti3)
+ 
+ ENTRY(__ashrti3)
+ 	cbz	x2, 1f
+@@ -57,6 +48,7 @@ ENTRY(__ashrti3)
+ 	mov	x1, x2
+ 	ret
+ ENDPROC(__ashrti3)
++EXPORT_SYMBOL(__ashrti3)
+ 
+ ENTRY(__lshrti3)
+ 	cbz	x2, 1f
+@@ -78,3 +70,4 @@ ENTRY(__lshrti3)
+ 	mov	x1, x2
+ 	ret
+ ENDPROC(__lshrti3)
++EXPORT_SYMBOL(__lshrti3)
 -- 
-2.14.1
+2.17.0
