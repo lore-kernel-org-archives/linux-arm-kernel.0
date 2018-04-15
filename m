@@ -1,52 +1,63 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Sun, 15 Apr 2018 16:59:47 +0200
-Subject: [PATCH 12/12] swiotlb: remove the CONFIG_DMA_DIRECT_OPS ifdefs
-In-Reply-To: <20180415145947.1248-1-hch@lst.de>
-References: <20180415145947.1248-1-hch@lst.de>
-Message-ID: <20180415145947.1248-13-hch@lst.de>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Sun, 15 Apr 2018 10:22:31 -0500
+Subject: sparc/ppc/arm compat siginfo ABI regressions: sending SIGFPE via
+ kill() returns wrong values in si_pid and si_uid
+In-Reply-To: <20180415131206.GR16141@n2100.armlinux.org.uk> (Russell King's
+ message of "Sun, 15 Apr 2018 14:12:06 +0100")
+References: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+ <20180412172051.GK16141@n2100.armlinux.org.uk>
+ <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+ <20180413094211.GN16141@n2100.armlinux.org.uk>
+ <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
+ <20180413170827.GB16308@e103592.cambridge.arm.com>
+ <20180413175407.GO16141@n2100.armlinux.org.uk>
+ <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
+ <20180413184522.GD16308@e103592.cambridge.arm.com>
+ <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
+ <20180415131206.GR16141@n2100.armlinux.org.uk>
+Message-ID: <87lgdocx54.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-swiotlb now selects the DMA_DIRECT_OPS config symbol, so this will
-always be true.
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- lib/swiotlb.c | 4 ----
- 1 file changed, 4 deletions(-)
+> On Fri, Apr 13, 2018 at 12:53:49PM -0700, Linus Torvalds wrote:
+>> On Fri, Apr 13, 2018 at 11:45 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+>> >
+>> > Most uses I've seen do nothing more than use the FPE_xyz value to
+>> > format diagnostic messages while dying.  I struggled to find code that
+>> > made a meaningful functional decision based on the value, though that's
+>> > not proof...
+>> 
+>> Yeah. I've seen code that cares about SIGFPE deeply, but it's almost
+>> invariably about some emulated environment (eg Java VM, or CPU
+>> emulation).
+>> 
+>> And the siginfo data is basically never good enough for those
+>> environments anyway on its own, so they will go and look at the actual
+>> instruction that caused the fault and the register state instead,
+>> because they need *all* the information.
+>> 
+>> The cases that use si_code are the ones that just trapped signals in
+>> order to give a more helpful abort message.
+>> 
+>> So I could certainly imagine that si_code is actually used by somebody
+>> who then decides to actuall act differently on it, but aside from
+>> perhaps printing out a different message, it sounds far-fetched.
+>
+> Okay, in that case let's just use FPE_FLTINV.  That makes the patch
+> easily back-portable for stable kernels.
 
-diff --git a/lib/swiotlb.c b/lib/swiotlb.c
-index 47aeb04c1997..07f260319b82 100644
---- a/lib/swiotlb.c
-+++ b/lib/swiotlb.c
-@@ -692,7 +692,6 @@ void swiotlb_tbl_sync_single(struct device *hwdev, phys_addr_t tlb_addr,
- 	}
- }
- 
--#ifdef CONFIG_DMA_DIRECT_OPS
- static inline bool dma_coherent_ok(struct device *dev, dma_addr_t addr,
- 		size_t size)
- {
-@@ -764,7 +763,6 @@ static bool swiotlb_free_buffer(struct device *dev, size_t size,
- 				 DMA_ATTR_SKIP_CPU_SYNC);
- 	return true;
- }
--#endif
- 
- static void
- swiotlb_full(struct device *dev, size_t size, enum dma_data_direction dir,
-@@ -1045,7 +1043,6 @@ swiotlb_dma_supported(struct device *hwdev, u64 mask)
- 	return __phys_to_dma(hwdev, io_tlb_end - 1) <= mask;
- }
- 
--#ifdef CONFIG_DMA_DIRECT_OPS
- void *swiotlb_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
- 		gfp_t gfp, unsigned long attrs)
- {
-@@ -1089,4 +1086,3 @@ const struct dma_map_ops swiotlb_dma_ops = {
- 	.unmap_page		= swiotlb_unmap_page,
- 	.dma_supported		= swiotlb_dma_supported,
- };
--#endif /* CONFIG_DMA_DIRECT_OPS */
--- 
-2.17.0
+If we want to I don't think  backporting 266da65e9156 ("signal: Add
+FPE_FLTUNK si_code for undiagnosable fp exceptions") would be at
+all difficult.
+
+What it is changing has been stable for quite a while.  The surroundings
+might change and so it might require some trivial manual fixup but I
+don't expect any problems.
+
+Not that I want to derail the consensus but if we want to backport
+similar fixes for arm64 or the other architectures that wind up using
+FPE_FLTUNK for their fix we would need to backport 266da65e9156 anyway.
+
+Eric
