@@ -1,103 +1,110 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 16 Apr 2018 15:42:49 +0200
-Subject: serial: imx: half-duplex RS485 operation with RTS active low
-In-Reply-To: <94f7fcf8873f7607087fc3a59a9422a8@agner.ch>
-References: <0e88706a05a302201be396d2f03c3e9e@agner.ch>
- <20180416092257.frbmooduhm4zrhhl@pengutronix.de>
- <c6059022d48191909d030584f981d1a2@agner.ch>
- <94f7fcf8873f7607087fc3a59a9422a8@agner.ch>
-Message-ID: <20180416134249.vdjyye73elv2p5qr@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Apr 2018 14:44:41 +0100
+Subject: [PATCH] arm64: kasan: avoid pfn_to_nid() before page array is
+ initialized
+Message-ID: <20180416134441.49730-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 03:01:44PM +0200, Stefan Agner wrote:
-> On 16.04.2018 12:29, Stefan Agner wrote:
-> > On 16.04.2018 11:22, Uwe Kleine-K?nig wrote:
-> >> Hi Stefan,
-> >>
-> >> On Mon, Apr 16, 2018 at 11:14:32AM +0200, Stefan Agner wrote:
-> >>> Using upstream I noticed that RS-485 does not work in the default
-> >>> configuration for our platforms (Toradex Apalis/Colibri). Closer
-> >>
-> >> This is an i.MX6?
-> >>
-> > 
-> > Yes, sorry about that.
-> > 
-> > But I think it is i.MX UART specific, I noticed the same behavior on
-> > i.MX 7 too.
-> > 
-> >>> debugging shows that it is related to "serial: imx: default to half
-> >>> duplex rs485".
-> >>>
-> >>> We use the i.MX UART in DTE mode and control the RS-485 transceiver
-> >>> using the RTS signal in low-active mode.
-> >>>
-> >>> 	uart-has-rtscts;
-> >>> 	fsl,dte-mode;
-> >>> 	linux,rs485-enabled-at-boot-time;
-> >>> 	rs485-rts-active-low;
-> >>
-> >> That means you're not using a GPIO for RTS signaling, right?
-> >>
-> > 
-> > I use native RTS capability (which is in DTE mode the CTS signal...)
-> > 
-> >>> Using this setting leads to the RTS signal not getting asserted (the
-> >>> oscilloscope only shows a very short fluke before the start bit is
-> >>> sent).
-> > 
-> > Just FYI, the fluke looks like a proper assert, but it is really only
-> > 50ns wide.
-> > 
-> 
-> Also tried DCE mode, the same behavior.
-> 
-> Two screenshots showing TX/RTS (CTS_B) in different settings:
-> https://imgur.com/a/PbUex
-> 
-> The little fluke disappears when disabling RX before setting CTSC:
-> 
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -657,6 +657,9 @@ static void imx_uart_start_tx(struct uart_port
-> *port)
->         if (port->rs485.flags & SER_RS485_ENABLED) {
->                 u32 ucr2;
->  
-> +               if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
-> +                       imx_uart_stop_rx(port);
-> +
->                 ucr2 = imx_uart_readl(sport, UCR2);
->                 if (port->rs485.flags & SER_RS485_RTS_ON_SEND)
->                         imx_uart_rts_active(sport, &ucr2);
-> @@ -664,9 +667,6 @@ static void imx_uart_start_tx(struct uart_port
-> *port)
->                         imx_uart_rts_inactive(sport, &ucr2);
->                 imx_uart_writel(sport, ucr2, UCR2);
->  
-> -               if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
-> -                       imx_uart_stop_rx(port);
-> -
->                 /*
->                  * Enable transmitter and shifter empty irq only if DMA
-> is off.
->                  * In the DMA case this is done in the tx-callback.
-> 
-> It seems that if the RX path is disabled, CTS_B is no longer
-> controllable. It just stays high. That is not a problem in the high
-> active RTS case... However, it breaks low active half-duplex...
-> 
-> It seems that this thread is describing this situation:
-> https://community.nxp.com/thread/385047
+In arm64's kasan_init(), we use pfn_to_nid() to find the NUMA node a
+span of memory is in, hoping to allocate shadow from the same NUMA node.
+However, at this point, the page array has not been initialized, and
+thus this is bogus.
 
-So better use a gpio instead of the hardware-function?
+Since commit:
 
-Adding a respective check in the driver would be nice though.
+  f165b378bbdf6c8a ("mm: uninitialized struct page poisoning sanity")
 
-Best regards
-Uwe
+... accessing fields of the page array results in a boot time Oops(),
+highlighting this problem:
 
+[    0.000000] Unable to handle kernel paging request at virtual address dfff200000000000
+[    0.000000] Mem abort info:
+[    0.000000]   ESR = 0x96000004
+[    0.000000]   Exception class = DABT (current EL), IL = 32 bits
+[    0.000000]   SET = 0, FnV = 0
+[    0.000000]   EA = 0, S1PTW = 0
+[    0.000000] Data abort info:
+[    0.000000]   ISV = 0, ISS = 0x00000004
+[    0.000000]   CM = 0, WnR = 0
+[    0.000000] [dfff200000000000] address between user and kernel address ranges
+[    0.000000] Internal error: Oops: 96000004 [#1] PREEMPT SMP
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.16.0-07317-gf165b378bbdf #42
+[    0.000000] Hardware name: ARM Juno development board (r1) (DT)
+[    0.000000] pstate: 80000085 (Nzcv daIf -PAN -UAO)
+[    0.000000] pc : __asan_load8+0x8c/0xa8
+[    0.000000] lr : __dump_page+0x3c/0x3b8
+[    0.000000] sp : ffff2000099b7ca0
+[    0.000000] x29: ffff2000099b7ca0 x28: ffff20000a1762c0
+[    0.000000] x27: ffff7e0000000000 x26: ffff2000099dd000
+[    0.000000] x25: ffff200009a3f960 x24: ffff200008f9c38c
+[    0.000000] x23: ffff20000a9d3000 x22: ffff200009735430
+[    0.000000] x21: fffffffffffffffe x20: ffff7e0001e50420
+[    0.000000] x19: ffff7e0001e50400 x18: 0000000000001840
+[    0.000000] x17: ffffffffffff8270 x16: 0000000000001840
+[    0.000000] x15: 0000000000001920 x14: 0000000000000004
+[    0.000000] x13: 0000000000000000 x12: 0000000000000800
+[    0.000000] x11: 1ffff0012d0f89ff x10: ffff10012d0f89ff
+[    0.000000] x9 : 0000000000000000 x8 : ffff8009687c5000
+[    0.000000] x7 : 0000000000000000 x6 : ffff10000f282000
+[    0.000000] x5 : 0000000000000040 x4 : fffffffffffffffe
+[    0.000000] x3 : 0000000000000000 x2 : dfff200000000000
+[    0.000000] x1 : 0000000000000005 x0 : 0000000000000000
+[    0.000000] Process swapper (pid: 0, stack limit = 0x        (ptrval))
+[    0.000000] Call trace:
+[    0.000000]  __asan_load8+0x8c/0xa8
+[    0.000000]  __dump_page+0x3c/0x3b8
+[    0.000000]  dump_page+0xc/0x18
+[    0.000000]  kasan_init+0x2e8/0x5a8
+[    0.000000]  setup_arch+0x294/0x71c
+[    0.000000]  start_kernel+0xdc/0x500
+[    0.000000] Code: aa0403e0 9400063c 17ffffee d343fc00 (38e26800)
+[    0.000000] ---[ end trace 67064f0e9c0cc338 ]---
+[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
+[    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill the idle task! ]---
+
+Let's fix this by using early_pfn_to_nid(), as other architectures do in
+their kasan init code. Note that early_pfn_to_nid acquires the nid from
+the memblock array, which we iterate over in kasan_init(), so this
+should be fine.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: 39d114ddc6822302 ("arm64: add KASAN support")
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/kasan_init.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+Catalin, are you happy to pick this up as a fix for v4.17-rc2?
+
+I spotted this while preparing a v4.17-rc1 Image for fuzzing...
+
+Thanks,
+Mark.
+
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index dabfc1ecda3d..12145874c02b 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -204,7 +204,7 @@ void __init kasan_init(void)
+ 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
+ 
+ 	kasan_map_populate(kimg_shadow_start, kimg_shadow_end,
+-			   pfn_to_nid(virt_to_pfn(lm_alias(_text))));
++			   early_pfn_to_nid(virt_to_pfn(lm_alias(_text))));
+ 
+ 	kasan_populate_zero_shadow((void *)KASAN_SHADOW_START,
+ 				   (void *)mod_shadow_start);
+@@ -224,7 +224,7 @@ void __init kasan_init(void)
+ 
+ 		kasan_map_populate((unsigned long)kasan_mem_to_shadow(start),
+ 				   (unsigned long)kasan_mem_to_shadow(end),
+-				   pfn_to_nid(virt_to_pfn(start)));
++				   early_pfn_to_nid(virt_to_pfn(start)));
+ 	}
+ 
+ 	/*
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.11.0
