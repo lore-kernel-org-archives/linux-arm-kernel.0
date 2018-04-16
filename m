@@ -1,245 +1,606 @@
-From: rishabhb@codeaurora.org (rishabhb at codeaurora.org)
-Date: Mon, 16 Apr 2018 13:50:58 -0700
-Subject: [PATCH v4 2/2] drivers: soc: Add LLCC driver
-In-Reply-To: <CAE=gft5tF-aTCg6Top+uzX-NfM=RGWizc7g09HNiWPPLfmw=Uw@mail.gmail.com>
-References: <1523390893-10904-1-git-send-email-rishabhb@codeaurora.org>
- <1523390893-10904-3-git-send-email-rishabhb@codeaurora.org>
- <CAE=gft6DHtvkLAyAF30p6rwJrs845nxBOxWQ0gmHdJ0VQa4ZxQ@mail.gmail.com>
- <a4d0d993c8bf42d9a2e59078606a4b4d@codeaurora.org>
- <CAE=gft5tF-aTCg6Top+uzX-NfM=RGWizc7g09HNiWPPLfmw=Uw@mail.gmail.com>
-Message-ID: <af00da0284e32d3698db855edbf74e45@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 16 Apr 2018 14:51:02 -0600
+Subject: [PATCH] coresight: Moving framework and drivers to SPDX identifier
+Message-ID: <1523911862-29218-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-16 10:14, Evan Green wrote:
-> On Fri, Apr 13, 2018 at 4:08 PM <rishabhb@codeaurora.org> wrote:
-> 
->> On 2018-04-12 15:02, Evan Green wrote:
->> > Hi Rishabh,
->> >
->> > On Tue, Apr 10, 2018 at 1:09 PM Rishabh Bhatnagar
->> > <rishabhb@codeaurora.org>
->> > wrote:
->> >
->> >> LLCC (Last Level Cache Controller) provides additional cache memory
->> >> in the system. LLCC is partitioned into multiple slices and each
->> >> slice gets its own priority, size, ID and other config parameters.
->> >> LLCC driver programs these parameters for each slice. Clients that
->> >> are assigned to use LLCC need to get information such size & ID of the
->> >> slice they get and activate or deactivate the slice as needed. LLCC
->> >> driver
->> >> provides API for the clients to perform these operations.
->> >
->> >> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
->> >> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
->> >> ---
->> >>   drivers/soc/qcom/Kconfig           |  17 ++
->> >>   drivers/soc/qcom/Makefile          |   2 +
->> >>   drivers/soc/qcom/llcc-sdm845.c     | 110 ++++++++++
->> >>   drivers/soc/qcom/llcc-slice.c      | 404
->> > +++++++++++++++++++++++++++++++++++++
->> >>   include/linux/soc/qcom/llcc-qcom.h | 168 +++++++++++++++
->> >>   5 files changed, 701 insertions(+)
->> >>   create mode 100644 drivers/soc/qcom/llcc-sdm845.c
->> >>   create mode 100644 drivers/soc/qcom/llcc-slice.c
->> >>   create mode 100644 include/linux/soc/qcom/llcc-qcom.h
->> >
->> > [...]
->> >> diff --git a/drivers/soc/qcom/llcc-sdm845.c
->> > b/drivers/soc/qcom/llcc-sdm845.c
->> >> new file mode 100644
->> >> index 0000000..619b226
->> >> --- /dev/null
->> >> +++ b/drivers/soc/qcom/llcc-sdm845.c
->> >> @@ -0,0 +1,110 @@
->> >> +// SPDX-License-Identifier: GPL-2.0
->> >> +/*
->> >> + * Copyright (c) 2017-2018, The Linux Foundation. All rights
->> >> reserved.
->> >> + *
->> >> + */
->> >> +
->> >> +#include <linux/kernel.h>
->> >> +#include <linux/module.h>
->> >> +#include <linux/of.h>
->> >> +#include <linux/of_device.h>
->> >> +#include <linux/soc/qcom/llcc-qcom.h>
->> >> +
->> >> +/*
->> >> + * SCT(System Cache Table) entry contains of the following parameters
->> >
->> > contains the following members:
->> >
->> >> + * name: Name of the client's use case for which the llcc slice is
->> >> used
->> >> + * uid: Unique id for the client's use case
->> >
->> > s/uid/usecase_id/
->> >
->> >> + * slice_id: llcc slice id for each client
->> >> + * max_cap: The maximum capacity of the cache slice provided in KB
->> >> + * priority: Priority of the client used to select victim line for
->> > replacement
->> >> + * fixed_size: Determine if the slice has a fixed capacity
->> >
->> > "Boolean indicating if the slice has a fixed capacity" might be better
->> >
->> >> diff --git a/drivers/soc/qcom/llcc-slice.c
->> >> b/drivers/soc/qcom/llcc-slice.c
->> >> new file mode 100644
->> >> index 0000000..67a81b0
->> >> --- /dev/null
->> >> +++ b/drivers/soc/qcom/llcc-slice.c
->> > ...
->> >> +static int llcc_update_act_ctrl(struct llcc_drv_data *drv, u32 sid,
->> >> +                               u32 act_ctrl_reg_val, u32 status)
->> >> +{
->> >> +       u32 act_ctrl_reg;
->> >> +       u32 status_reg;
->> >> +       u32 slice_status;
->> >> +       int ret = 0;
->> >> +
->> >> +       act_ctrl_reg = drv->bcast_off + LLCC_TRP_ACT_CTRLn(sid);
->> >> +       status_reg = drv->bcast_off + LLCC_TRP_STATUSn(sid);
->> >> +
->> >> +       /*Set the ACTIVE trigger*/
->> >
->> > Add spaces around /* */
->> >
->> >> +       act_ctrl_reg_val |= ACT_CTRL_ACT_TRIG;
->> >> +       ret = regmap_write(drv->regmap, act_ctrl_reg,
->> >> act_ctrl_reg_val);
->> >> +       if (ret)
->> >> +               return ret;
->> >> +
->> >> +       /* Clear the ACTIVE trigger */
->> >> +       act_ctrl_reg_val &= ~ACT_CTRL_ACT_TRIG;
->> >> +       ret = regmap_write(drv->regmap, act_ctrl_reg,
->> >> act_ctrl_reg_val);
->> >> +       if (ret)
->> >> +               return ret;
->> >> +
->> >> +       ret = regmap_read_poll_timeout(drv->regmap, status_reg,
->> > slice_status,
->> >> +                       !(slice_status & status), 0,
->> > LLCC_STATUS_READ_DELAY);
->> >> +       return ret;
->> >> +}
->> >> +
->> >> +/**
->> >> + * llcc_slice_activate - Activate the llcc slice
->> >> + * @desc: Pointer to llcc slice descriptor
->> >> + *
->> >> + * A value zero will be returned on success and a negative errno will
->> >
->> > a value of zero
->> >
->> >> + * be returned in error cases
->> >> + */
->> >> +int llcc_slice_activate(struct llcc_slice_desc *desc)
->> >> +{
->> >> +       int ret;
->> >> +       u32 act_ctrl_val;
->> >> +       struct llcc_drv_data *drv;
->> >> +
->> >> +       if (desc == NULL)
->> >> +               return -EINVAL;
->> >
->> > I think we can remove this check, right?
->> >
->> >> +
->> >> +       drv = dev_get_drvdata(desc->dev);
->> >> +       if (!drv)
->> >> +               return -EINVAL;
->> >> +
->> >> +       mutex_lock(&drv->lock);
->> >> +       if (test_bit(desc->slice_id, drv->bitmap)) {
->> >> +               mutex_unlock(&drv->lock);
->> >> +               return 0;
->> >> +       }
->> >> +
->> >> +       act_ctrl_val = ACT_CTRL_OPCODE_ACTIVATE <<
->> >> ACT_CTRL_OPCODE_SHIFT;
->> >> +
->> >> +       ret = llcc_update_act_ctrl(drv, desc->slice_id, act_ctrl_val,
->> >> +                                 DEACTIVATE);
->> >> +
->> >> +       __set_bit(desc->slice_id, drv->bitmap);
->> >> +       mutex_unlock(&drv->lock);
->> >> +
->> >> +       return ret;
->> >> +}
->> >> +EXPORT_SYMBOL_GPL(llcc_slice_activate);
->> >> +
->> >> +/**
->> >> + * llcc_slice_deactivate - Deactivate the llcc slice
->> >> + * @desc: Pointer to llcc slice descriptor
->> >> + *
->> >> + * A value zero will be returned on success and a negative errno will
->> >> + * be returned in error cases
->> >> + */
->> >> +int llcc_slice_deactivate(struct llcc_slice_desc *desc)
->> >> +{
->> >> +       u32 act_ctrl_val;
->> >> +       int ret;
->> >> +       struct llcc_drv_data *drv;
->> >> +
->> >> +       if (desc == NULL)
->> >> +               return -EINVAL;
->> >> +
->> >> +       drv = dev_get_drvdata(desc->dev);
->> >> +       if (!drv)
->> >> +               return -EINVAL;
->> >> +
->> >> +       mutex_lock(&drv->lock);
->> >> +       if (!test_bit(desc->slice_id, drv->bitmap)) {
->> >> +               mutex_unlock(&drv->lock);
->> >> +               return 0;
->> >> +       }
->> >> +       act_ctrl_val = ACT_CTRL_OPCODE_DEACTIVATE <<
->> > ACT_CTRL_OPCODE_SHIFT;
->> >> +
->> >> +       ret = llcc_update_act_ctrl(drv, desc->slice_id, act_ctrl_val,
->> >> +                                 ACTIVATE);
->> >> +
->> >> +       __clear_bit(desc->slice_id, drv->bitmap);
->> >> +       mutex_unlock(&drv->lock);
->> >> +
->> >> +       return ret;
->> >> +}
->> >> +EXPORT_SYMBOL_GPL(llcc_slice_deactivate);
->> >> +
->> >> +/**
->> >> + * llcc_get_slice_id - return the slice id
->> >> + * @desc: Pointer to llcc slice descriptor
->> >> + *
->> >> + * A positive value will be returned on success and a negative errno
->> >> will
->> >> + * be returned on error
->> >> + */
->> >> +int llcc_get_slice_id(struct llcc_slice_desc *desc)
->> >> +{
->> >> +       if (!desc)
->> >> +               return -EINVAL;
->> >
->> > Can we remove this check too?
->> >
->> We need this check and the following one to protect against the
->> null pointer access which might happen if client doesn't get
->> the descriptor before accessing size and slice_id.
-> 
-> Is this just to protect against errors made during development, or is 
-> there
-> an expected code path through which this might actually happen? If it's
-> just to protect against developer error, then based on other feedback 
-> I've
-> seen on these lists, the null pointer dereference is preferred, and we
-> should remove this check. If it's an actual expected flow, then I guess
-> clients will call llcc_slice_getd(), see the ERR_PTR(-ENOENT), 
-> transform
-> that into NULL, and then call these other functions anyway?
-> 
-Yes, this is just to protect against development error. I will remove 
-the
-check here and above.
--Rishabh
+Moving all kernel side CoreSight framework and drivers to SPDX identifier.
+
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-cpu-debug.c          | 14 +-------------
+ drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 10 +---------
+ drivers/hwtracing/coresight/coresight-etb10.c              | 13 +++----------
+ drivers/hwtracing/coresight/coresight-etm-cp14.c           | 13 +++----------
+ drivers/hwtracing/coresight/coresight-etm-perf.c           | 13 +------------
+ drivers/hwtracing/coresight/coresight-etm-perf.h           | 13 +------------
+ drivers/hwtracing/coresight/coresight-etm.h                | 13 +++----------
+ drivers/hwtracing/coresight/coresight-etm3x-sysfs.c        | 13 +------------
+ drivers/hwtracing/coresight/coresight-etm3x.c              | 13 +++----------
+ drivers/hwtracing/coresight/coresight-etm4x-sysfs.c        | 13 +------------
+ drivers/hwtracing/coresight/coresight-etm4x.c              | 13 +++----------
+ drivers/hwtracing/coresight/coresight-etm4x.h              | 13 +++----------
+ drivers/hwtracing/coresight/coresight-funnel.c             | 13 +++----------
+ drivers/hwtracing/coresight/coresight-priv.h               | 13 +++----------
+ drivers/hwtracing/coresight/coresight-replicator.c         | 13 +++----------
+ drivers/hwtracing/coresight/coresight-stm.c                | 13 +++----------
+ drivers/hwtracing/coresight/coresight-tmc-etf.c            | 13 +------------
+ drivers/hwtracing/coresight/coresight-tmc-etr.c            | 13 +------------
+ drivers/hwtracing/coresight/coresight-tmc.c                | 10 +---------
+ drivers/hwtracing/coresight/coresight-tmc.h                | 13 +------------
+ drivers/hwtracing/coresight/coresight-tpiu.c               | 13 +++----------
+ drivers/hwtracing/coresight/coresight.c                    | 13 +++----------
+ drivers/hwtracing/coresight/of_coresight.c                 | 13 +++----------
+ include/linux/coresight-pmu.h                              | 13 +------------
+ include/linux/coresight.h                                  | 13 +++----------
+ 25 files changed, 53 insertions(+), 267 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+index 9cdb3fbc8c1f..33d2470b0595 100644
+--- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
++++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+@@ -1,20 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2017 Linaro Limited. All rights reserved.
+  *
+  * Author: Leo Yan <leo.yan@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+- *
+  */
+ #include <linux/amba/bus.h>
+ #include <linux/coresight.h>
+diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index 043da86b0fe9..f6d0571ab9dd 100644
+--- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -1,14 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/amba/bus.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 580cd381adf3..9b6c55523c58 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -1,15 +1,8 @@
+-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+  *
+  * Description: CoreSight Embedded Trace Buffer driver
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <asm/local.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm-cp14.c b/drivers/hwtracing/coresight/coresight-etm-cp14.c
+index 12a220682117..4174a8d355d2 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-cp14.c
++++ b/drivers/hwtracing/coresight/coresight-etm-cp14.c
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+  */
+ 
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 4e5ed6597f2f..677695635211 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -1,18 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright(C) 2015 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <linux/coresight.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+index 3ffc9feb2d64..4197df4faf5e 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.h
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+@@ -1,18 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright(C) 2015 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #ifndef _CORESIGHT_ETM_PERF_H
+diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
+index 70b0a248c321..e8b4549e30e2 100644
+--- a/drivers/hwtracing/coresight/coresight-etm.h
++++ b/drivers/hwtracing/coresight/coresight-etm.h
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+  */
+ 
+ #ifndef _CORESIGHT_CORESIGHT_ETM_H
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+index 6e547ec6fead..9435c1481f61 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+@@ -1,18 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright(C) 2015 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <linux/pm_runtime.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 39f42fdd503d..15ed64d51a5b 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -1,15 +1,8 @@
+-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+  *
+  * Description: CoreSight Program Flow Trace driver
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/kernel.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+index d21961710713..4eb8da785ce0 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+@@ -1,18 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright(C) 2015 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <linux/pm_runtime.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index cf364a514c12..9bc04c50d45b 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2014, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+  */
+ 
+ #include <linux/kernel.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index b3b5ea7b7fb3..b7c4a6f6c6b9 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+  */
+ 
+ #ifndef _CORESIGHT_CORESIGHT_ETM_H
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 9f8ac0bef853..448145a36675 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -1,15 +1,8 @@
+-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+  *
+  * Description: CoreSight Funnel driver
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/kernel.h>
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index f1d0e21d8cab..0e5a74dae6a6 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+  */
+ 
+ #ifndef _CORESIGHT_PRIV_H
+diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+index 3756e71cb8f5..8d2eaaab6c2f 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-replicator.c
+@@ -1,15 +1,8 @@
+-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+  *
+  * Description: CoreSight Replicator driver
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/kernel.h>
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 15e7ef3891f5..c46c70aec1d5 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -1,16 +1,9 @@
+-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+  *
+  * Description: CoreSight System Trace Macrocell driver
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+  * Initial implementation by Pratik Patel
+  * (C) 2014-2015 Pratik Patel <pratikp@codeaurora.org>
+  *
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index e2513b786242..61d849b11c26 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -1,18 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright(C) 2016 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <linux/circ_buf.h>
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index cd8407cb4843..3ce734a75149 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -1,18 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright(C) 2016 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <linux/circ_buf.h>
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 0ea04f588de0..456f122df74f 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+  *
+  * Description: CoreSight Trace Memory Controller driver
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/kernel.h>
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index 8df7a813f537..dfaff077a7fc 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -1,18 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright(C) 2015 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #ifndef _CORESIGHT_TMC_H
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 805f7c2210fe..01b7457fe8fc 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -1,15 +1,8 @@
+-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+  *
+  * Description: CoreSight Trace Port Interface Unit driver
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/kernel.h>
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 132dfbcd90c1..29e834aab539 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+  */
+ 
+ #include <linux/kernel.h>
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index 7c375443ede6..a33a92ebe74b 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+  */
+ 
+ #include <linux/types.h>
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index edfeaba95429..a1a959ba24ff 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -1,18 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright(C) 2015 Linaro Limited. All rights reserved.
+  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #ifndef _LINUX_CORESIGHT_PMU_H
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index d950dad5056a..c265e0468414 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -1,13 +1,6 @@
+-/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+  */
+ 
+ #ifndef _LINUX_CORESIGHT_H
+-- 
+2.7.4
