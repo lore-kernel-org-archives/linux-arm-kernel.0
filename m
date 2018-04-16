@@ -1,131 +1,45 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 16 Apr 2018 15:52:59 -0700
-Subject: [PATCH v3 1/3] drm/vc4: Remove the need for the GPU-subsystem DT node.
-In-Reply-To: <CAL_JsqKJD86tV0jno_cZR=nLoOThT5rjRu3BPpzAwpcHgxSArQ@mail.gmail.com>
-References: <CAL_JsqKJD86tV0jno_cZR=nLoOThT5rjRu3BPpzAwpcHgxSArQ@mail.gmail.com>
-Message-ID: <20180416225259.6571-1-eric@anholt.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Apr 2018 00:01:52 +0100
+Subject: 4.16 OMAP serial transmit corruption?
+In-Reply-To: <20180416212653.GC5671@atomide.com>
+References: <20180416151732.GU16141@n2100.armlinux.org.uk>
+ <20180416154545.GA5671@atomide.com>
+ <20180416212653.GC5671@atomide.com>
+Message-ID: <20180416230152.GK10990@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPU subsystem node was a workaround to have a central device to
-bind V3D and display to.  Following the lead of 246774d17fc0
-("drm/etnaviv: remove the need for a gpu-subsystem DT node"), remove
-the subsystem node usage and just create a platform device for the DRM
-device to attach to if any of the subsystem devices are present.
+On Mon, Apr 16, 2018 at 02:26:53PM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [180416 15:47]:
+> > * Russell King - ARM Linux <linux@armlinux.org.uk> [180416 15:19]:
+> > > Hi,
+> > > 
+> > > I'm not entirely sure what's going on, but I see corrupted characters
+> > > with the serial console on the OMAP4430 SDP board.  During boot,
+> > > everything seems fine, the problem appears to be userspace output.
+> > > 
+> > > For example, if I edit a file, then quit vi:
+> > > 
+> > > :q??%??B??Z?root at omap-4430sdp:~#
+> > 
+> > I don't think I've seen that one. What I've seen few times is
+> > typing a key on the serial console echoing back the previous
+> > character typed while the new character won't get displayed
+> > until hitting keyboard again. Only rebooting the device seems
+> > to solve this. This is with 4430 ES2.3 revision.
+> > 
+> > I wonder if we're missing some parts of errata i202 handling
+> > in omap_8250_mdr1_errataset()?
+> 
+> Trying to see what we might be missing in 8250_omap compared
+> to omap-serial, your description sounds like it could be similar
+> issue compared to what got fixed for omap-serial earlier with
+> commit 0ba5f66836c9 ("tty: serial: OMAP: use a 1-byte RX FIFO
+> threshold in PIO mode").
 
-v2: Simplify the DT walking code.
-v3: Always put the node.
+... except this is the transmit side, not the receive side.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- .../bindings/display/brcm,bcm-vc4.txt         |  7 -----
- drivers/gpu/drm/vc4/vc4_drv.c                 | 28 +++++++++++++------
- drivers/gpu/drm/vc4/vc4_hvs.c                 |  1 +
- drivers/gpu/drm/vc4/vc4_v3d.c                 |  1 +
- 4 files changed, 22 insertions(+), 15 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-index 284e2b14cfbe..5fd4717101d6 100644
---- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-+++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-@@ -4,9 +4,6 @@ The VC4 device present on the Raspberry Pi includes a display system
- with HDMI output and the HVS (Hardware Video Scaler) for compositing
- display planes.
- 
--Required properties for VC4:
--- compatible:	Should be "brcm,bcm2835-vc4" or "brcm,cygnus-vc4"
--
- Required properties for Pixel Valve:
- - compatible:	Should be one of "brcm,bcm2835-pixelvalve0",
- 		  "brcm,bcm2835-pixelvalve1", or "brcm,bcm2835-pixelvalve2"
-@@ -153,10 +150,6 @@ v3d: v3d at 7ec00000 {
- 	interrupts = <1 10>;
- };
- 
--vc4: gpu {
--	compatible = "brcm,bcm2835-vc4";
--};
--
- panel: panel {
- 	compatible = "ontat,yx700wv03", "simple-panel";
- 
-diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
-index 7c95ed5c5cac..e8ba9e7c71d2 100644
---- a/drivers/gpu/drm/vc4/vc4_drv.c
-+++ b/drivers/gpu/drm/vc4/vc4_drv.c
-@@ -364,22 +364,29 @@ static int vc4_platform_drm_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id vc4_of_match[] = {
--	{ .compatible = "brcm,bcm2835-vc4", },
--	{ .compatible = "brcm,cygnus-vc4", },
--	{},
--};
--MODULE_DEVICE_TABLE(of, vc4_of_match);
--
- static struct platform_driver vc4_platform_driver = {
- 	.probe		= vc4_platform_drm_probe,
- 	.remove		= vc4_platform_drm_remove,
- 	.driver		= {
- 		.name	= "vc4-drm",
--		.of_match_table = vc4_of_match,
- 	},
- };
- 
-+static bool
-+driver_of_table_has_a_match(const struct platform_driver *driver)
-+{
-+	struct device_node *node;
-+	bool ret;
-+
-+	node = of_find_matching_node_and_match(NULL,
-+					       driver->driver.of_match_table,
-+					       NULL);
-+	ret = of_device_is_available(node);
-+	of_node_put(node);
-+
-+	return ret;
-+}
-+
- static int __init vc4_drm_register(void)
- {
- 	int ret;
-@@ -389,6 +396,11 @@ static int __init vc4_drm_register(void)
- 	if (ret)
- 		return ret;
- 
-+	if (driver_of_table_has_a_match(&vc4_v3d_driver) ||
-+	    driver_of_table_has_a_match(&vc4_hvs_driver)) {
-+		platform_device_register_simple("vc4-drm", -1, NULL, 0);
-+	}
-+
- 	return platform_driver_register(&vc4_platform_driver);
- }
- 
-diff --git a/drivers/gpu/drm/vc4/vc4_hvs.c b/drivers/gpu/drm/vc4/vc4_hvs.c
-index 2b62fc5b8d85..730813ee74ae 100644
---- a/drivers/gpu/drm/vc4/vc4_hvs.c
-+++ b/drivers/gpu/drm/vc4/vc4_hvs.c
-@@ -262,6 +262,7 @@ static const struct of_device_id vc4_hvs_dt_match[] = {
- 	{ .compatible = "brcm,bcm2835-hvs" },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, vc4_hvs_dt_match);
- 
- struct platform_driver vc4_hvs_driver = {
- 	.probe = vc4_hvs_dev_probe,
-diff --git a/drivers/gpu/drm/vc4/vc4_v3d.c b/drivers/gpu/drm/vc4/vc4_v3d.c
-index bfc2fa73d2ae..e77e9ebbab4b 100644
---- a/drivers/gpu/drm/vc4/vc4_v3d.c
-+++ b/drivers/gpu/drm/vc4/vc4_v3d.c
-@@ -459,6 +459,7 @@ static const struct of_device_id vc4_v3d_dt_match[] = {
- 	{ .compatible = "brcm,vc4-v3d" },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, vc4_v3d_dt_match);
- 
- struct platform_driver vc4_v3d_driver = {
- 	.probe = vc4_v3d_dev_probe,
 -- 
-2.17.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
