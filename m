@@ -1,384 +1,68 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 16 Apr 2018 13:34:50 +0200
-Subject: [PATCH v5 2/7] clk: meson: aoclk: refactor common code into
- dedicated file
-In-Reply-To: <20180409143749.71197-3-yixun.lan@amlogic.com>
-References: <20180409143749.71197-1-yixun.lan@amlogic.com>
- <20180409143749.71197-3-yixun.lan@amlogic.com>
-Message-ID: <1523878490.2601.34.camel@baylibre.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 16 Apr 2018 13:42:56 +0200
+Subject: [PATCH 1/3] usb: gadget: udc: atmel: GPIO inversion is handled
+ by gpiod
+In-Reply-To: <20180416093405.16612-2-romain.izard.pro@gmail.com>
+References: <20180416093405.16612-1-romain.izard.pro@gmail.com>
+ <20180416093405.16612-2-romain.izard.pro@gmail.com>
+Message-ID: <20180416114256.GC2750@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-04-09 at 22:37 +0800, Yixun Lan wrote:
-> We try to refactor the common code into one dedicated file,
-> while preparing to add new Meson-AXG aoclk driver, this would
-> help us to better share the code by all aoclk drivers.
+On Mon, Apr 16, 2018 at 11:34:03AM +0200, Romain Izard wrote:
+> When converting to GPIO descriptors, gpiod_get_value automatically
+> handles the line inversion flags from the device tree.
+
+Thanks, I totally missed it.
+
+Regards
+
 > 
-> Suggested-by: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Do not invert the line twice.
+> 
+> Fixes: 3df034081021fa4b6967ce3364bc7d867ec1c870
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+
 > ---
->  drivers/clk/meson/Kconfig       |  7 ++++
->  drivers/clk/meson/Makefile      |  1 +
->  drivers/clk/meson/gxbb-aoclk.c  | 91 ++++++++++++++---------------------------
->  drivers/clk/meson/gxbb-aoclk.h  |  7 ++++
->  drivers/clk/meson/meson-aoclk.c | 82 +++++++++++++++++++++++++++++++++++++
->  drivers/clk/meson/meson-aoclk.h | 35 ++++++++++++++++
->  6 files changed, 163 insertions(+), 60 deletions(-)
->  create mode 100644 drivers/clk/meson/meson-aoclk.c
->  create mode 100644 drivers/clk/meson/meson-aoclk.h
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 +--
+>  drivers/usb/gadget/udc/atmel_usba_udc.h | 1 -
+>  2 files changed, 1 insertion(+), 3 deletions(-)
 > 
-> diff --git a/drivers/clk/meson/Kconfig b/drivers/clk/meson/Kconfig
-> index d5cbec522aec..fddc7ec7b820 100644
-> --- a/drivers/clk/meson/Kconfig
-> +++ b/drivers/clk/meson/Kconfig
-> @@ -3,6 +3,12 @@ config COMMON_CLK_AMLOGIC
->  	depends on OF
->  	depends on ARCH_MESON || COMPILE_TEST
->  
-> +config COMMON_CLK_MESON_AO
-> +	bool
-> +	depends on OF
-> +	depends on ARCH_MESON || COMPILE_TEST
-> +	select COMMON_CLK_REGMAP_MESON
-> +
->  config COMMON_CLK_REGMAP_MESON
->  	bool
->  	select REGMAP
-> @@ -21,6 +27,7 @@ config COMMON_CLK_GXBB
->  	bool
->  	depends on COMMON_CLK_AMLOGIC
->  	select RESET_CONTROLLER
-> +	select COMMON_CLK_MESON_AO
->  	select COMMON_CLK_REGMAP_MESON
->  	select MFD_SYSCON
->  	help
-> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-> index ffee82e60b7a..0a8df284f4e7 100644
-> --- a/drivers/clk/meson/Makefile
-> +++ b/drivers/clk/meson/Makefile
-> @@ -3,6 +3,7 @@
->  #
->  
->  obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-audio-divider.o
-> +obj-$(CONFIG_COMMON_CLK_MESON_AO) += meson-aoclk.o
->  obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
->  obj-$(CONFIG_COMMON_CLK_GXBB)	 += gxbb.o gxbb-aoclk.o gxbb-aoclk-32k.o
->  obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o
-> diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
-> index eebb580b9e0f..f2e0640a7f74 100644
-> --- a/drivers/clk/meson/gxbb-aoclk.c
-> +++ b/drivers/clk/meson/gxbb-aoclk.c
-> @@ -52,39 +52,13 @@
->   * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
->   * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
->   */
-> -#include <linux/clk-provider.h>
-> -#include <linux/of_address.h>
->  #include <linux/platform_device.h>
-
->  #include <linux/reset-controller.h>
-Not required anymore
-
->  #include <linux/mfd/syscon.h>
-> -#include <linux/regmap.h>
->  #include <linux/init.h>
-Not required
-
-> -#include <linux/delay.h>
-
-> -#include <dt-bindings/clock/gxbb-aoclkc.h>
-> -#include <dt-bindings/reset/gxbb-aoclkc.h>
-Please keep these 2 here
-
->  #include "clk-regmap.h"
->  #include "gxbb-aoclk.h"
->  
-> -struct gxbb_aoclk_reset_controller {
-> -	struct reset_controller_dev reset;
-> -	unsigned int *data;
-> -	struct regmap *regmap;
-> -};
-> -
-> -static int gxbb_aoclk_do_reset(struct reset_controller_dev *rcdev,
-> -			       unsigned long id)
-> -{
-> -	struct gxbb_aoclk_reset_controller *reset =
-> -		container_of(rcdev, struct gxbb_aoclk_reset_controller, reset);
-> -
-> -	return regmap_write(reset->regmap, AO_RTI_GEN_CNTL_REG0,
-> -			    BIT(reset->data[id]));
-> -}
-> -
-> -static const struct reset_control_ops gxbb_aoclk_reset_ops = {
-> -	.reset = gxbb_aoclk_do_reset,
-> -};
-> -
->  #define GXBB_AO_GATE(_name, _bit)					\
->  static struct clk_regmap _name##_ao = {					\
->  	.data = &(struct clk_regmap_gate_data) {			\
-> @@ -117,7 +91,7 @@ static struct aoclk_cec_32k cec_32k_ao = {
->  	},
->  };
->  
-> -static unsigned int gxbb_aoclk_reset[] = {
-> +static const unsigned int gxbb_aoclk_reset[] = {
->  	[RESET_AO_REMOTE] = 16,
->  	[RESET_AO_I2C_MASTER] = 18,
->  	[RESET_AO_I2C_SLAVE] = 19,
-> @@ -135,7 +109,7 @@ static struct clk_regmap *gxbb_aoclk_gate[] = {
->  	[CLKID_AO_IR_BLASTER] = &ir_blaster_ao,
->  };
->  
-> -static struct clk_hw_onecell_data gxbb_aoclk_onecell_data = {
-> +static const struct clk_hw_onecell_data gxbb_aoclk_onecell_data = {
->  	.hws = {
->  		[CLKID_AO_REMOTE] = &remote_ao.hw,
->  		[CLKID_AO_I2C_MASTER] = &i2c_master_ao.hw,
-> @@ -145,58 +119,55 @@ static struct clk_hw_onecell_data gxbb_aoclk_onecell_data = {
->  		[CLKID_AO_IR_BLASTER] = &ir_blaster_ao.hw,
->  		[CLKID_AO_CEC_32K] = &cec_32k_ao.hw,
->  	},
-> -	.num = 7,
-> +	.num = NR_CLKS,
->  };
->  
-> -static int gxbb_aoclkc_probe(struct platform_device *pdev)
-> +static int gxbb_register_cec_ao_32k(struct platform_device *pdev)
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index 27c16399c7e8..0fe3d0feb8f7 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -417,7 +417,7 @@ static inline void usba_int_enb_set(struct usba_udc *udc, u32 val)
+>  static int vbus_is_present(struct usba_udc *udc)
 >  {
-> -	struct gxbb_aoclk_reset_controller *rstc;
->  	struct device *dev = &pdev->dev;
->  	struct regmap *regmap;
-> -	int ret, clkid;
-> -
-> -	rstc = devm_kzalloc(dev, sizeof(*rstc), GFP_KERNEL);
-> -	if (!rstc)
-> -		return -ENOMEM;
-> +	int ret;
+>  	if (udc->vbus_pin)
+> -		return gpiod_get_value(udc->vbus_pin) ^ udc->vbus_pin_inverted;
+> +		return gpiod_get_value(udc->vbus_pin);
 >  
->  	regmap = syscon_node_to_regmap(of_get_parent(dev->of_node));
->  	if (IS_ERR(regmap)) {
->  		dev_err(dev, "failed to get regmap\n");
-> -		return -ENODEV;
-> -	}
-> -
-> -	/* Reset Controller */
-> -	rstc->regmap = regmap;
-> -	rstc->data = gxbb_aoclk_reset;
-> -	rstc->reset.ops = &gxbb_aoclk_reset_ops;
-> -	rstc->reset.nr_resets = ARRAY_SIZE(gxbb_aoclk_reset);
-> -	rstc->reset.of_node = dev->of_node;
-> -	ret = devm_reset_controller_register(dev, &rstc->reset);
-> -
-> -	/*
-> -	 * Populate regmap and register all clks
-> -	 */
-> -	for (clkid = 0; clkid < ARRAY_SIZE(gxbb_aoclk_gate); clkid++) {
-> -		gxbb_aoclk_gate[clkid]->map = regmap;
-> -
-> -		ret = devm_clk_hw_register(dev,
-> -					   gxbb_aoclk_onecell_data.hws[clkid]);
-> -		if (ret)
-> -			return ret;
-> +		return PTR_ERR(regmap);
->  	}
+>  	/* No Vbus detection: Assume always present */
+>  	return 1;
+> @@ -2076,7 +2076,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
 >  
->  	/* Specific clocks */
->  	cec_32k_ao.regmap = regmap;
->  	ret = devm_clk_hw_register(dev, &cec_32k_ao.hw);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "clk cec_32k_ao register failed.\n");
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct meson_aoclk_data gxbb_aoclkc_data = {
-> +	.reset_reg	= AO_RTI_GEN_CNTL_REG0,
-> +	.num_reset	= ARRAY_SIZE(gxbb_aoclk_reset),
-> +	.reset		= gxbb_aoclk_reset,
-> +	.num_clks	= ARRAY_SIZE(gxbb_aoclk_gate),
-> +	.clks		= gxbb_aoclk_gate,
-> +	.hw_data	= &gxbb_aoclk_onecell_data,
-> +};
-> +
-> +static int gxbb_aoclkc_probe(struct platform_device *pdev)
-> +{
-> +	int ret = gxbb_register_cec_ao_32k(pdev);
->  	if (ret)
->  		return ret;
+>  	udc->vbus_pin = devm_gpiod_get_optional(&pdev->dev, "atmel,vbus",
+>  						GPIOD_IN);
+> -	udc->vbus_pin_inverted = gpiod_is_active_low(udc->vbus_pin);
 >  
-> -	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
-> -			&gxbb_aoclk_onecell_data);
-> +	return meson_aoclkc_probe(pdev);
->  }
->  
->  static const struct of_device_id gxbb_aoclkc_match_table[] = {
-> -	{ .compatible = "amlogic,meson-gx-aoclkc" },
-> +	{
-> +		.compatible	= "amlogic,meson-gx-aoclkc",
-> +		.data		= &gxbb_aoclkc_data,
-> +	},
->  	{ }
->  };
->  
-> diff --git a/drivers/clk/meson/gxbb-aoclk.h b/drivers/clk/meson/gxbb-aoclk.h
-> index badc4c22b4ee..b031f1a0213e 100644
-> --- a/drivers/clk/meson/gxbb-aoclk.h
-> +++ b/drivers/clk/meson/gxbb-aoclk.h
-> @@ -8,6 +8,10 @@
->  #ifndef __GXBB_AOCLKC_H
->  #define __GXBB_AOCLKC_H
->  
-> +#include "meson-aoclk.h"
-
-You are not using any of the structure defined in meson-aoclk.h in here.
-Why do you include this here ?
-
-> +
-> +#define NR_CLKS	7
-> +
->  /* AO Configuration Clock registers offsets */
->  #define AO_RTI_PWR_CNTL_REG1	0x0c
->  #define AO_RTI_PWR_CNTL_REG0	0x10
-> @@ -26,4 +30,7 @@ struct aoclk_cec_32k {
->  
->  extern const struct clk_ops meson_aoclk_cec_32k_ops;
->  
-> +#include <dt-bindings/clock/gxbb-aoclkc.h>
-> +#include <dt-bindings/reset/gxbb-aoclkc.h>
-Please drop this.
-
-> +
->  #endif /* __GXBB_AOCLKC_H */
-> diff --git a/drivers/clk/meson/meson-aoclk.c b/drivers/clk/meson/meson-aoclk.c
-> new file mode 100644
-> index 000000000000..74338ef0a62b
-> --- /dev/null
-> +++ b/drivers/clk/meson/meson-aoclk.c
-> @@ -0,0 +1,82 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Amlogic Meson-AXG Clock Controller Driver
-> + *
-> + * Copyright (c) 2016 BayLibre, SAS.
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
-> + * Author: Yixun Lan <yixun.lan@amlogic.com>
-> + */
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/init.h>
-Not required
-
-> +#include <linux/of_device.h>
-> +#include "clk-regmap.h"
-> +#include "meson-aoclk.h"
-> +
-> +static int meson_aoclk_do_reset(struct reset_controller_dev *rcdev,
-> +			       unsigned long id)
-> +{
-> +	struct meson_aoclk_reset_controller *rstc =
-> +		container_of(rcdev, struct meson_aoclk_reset_controller, reset);
-> +
-> +	return regmap_write(rstc->regmap, rstc->data->reset_reg,
-> +			    BIT(rstc->data->reset[id]));
-> +}
-> +
-> +static const struct reset_control_ops meson_aoclk_reset_ops = {
-> +	.reset = meson_aoclk_do_reset,
-> +};
-> +
-> +int meson_aoclkc_probe(struct platform_device *pdev)
-> +{
-> +	struct meson_aoclk_reset_controller *rstc;
-> +	struct meson_aoclk_data *data;
-> +	struct device *dev = &pdev->dev;
-> +	struct regmap *regmap;
-> +	int ret, clkid;
-> +
-> +	data = (struct meson_aoclk_data *) of_device_get_match_data(dev);
-> +	if (!data)
-> +		return -ENODEV;
-> +
-> +	rstc = devm_kzalloc(dev, sizeof(*rstc), GFP_KERNEL);
-> +	if (!rstc)
-> +		return -ENOMEM;
-> +
-> +	regmap = syscon_node_to_regmap(of_get_parent(dev->of_node));
-> +	if (IS_ERR(regmap)) {
-> +		dev_err(dev, "failed to get regmap\n");
-> +		return PTR_ERR(regmap);
-> +	}
-> +
-> +	/* Reset Controller */
-> +	rstc->data = data;
-> +	rstc->regmap = regmap;
-> +	rstc->reset.ops = &meson_aoclk_reset_ops;
-> +	rstc->reset.nr_resets = data->num_reset,
-> +	rstc->reset.of_node = dev->of_node;
-> +	ret = devm_reset_controller_register(dev, &rstc->reset);
-> +	if (ret) {
-> +		dev_err(dev, "failed to register reset controller\n");
-> +		return ret;
-> +	}
-> +
-> +	/*
-> +	 * Populate regmap and register all clks
-> +	 */
-> +	for (clkid = 0; clkid < data->num_clks; clkid++) {
-> +		data->clks[clkid]->map = regmap;
-> +
-> +		ret = devm_clk_hw_register(dev, data->hw_data->hws[clkid]);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
-> +		(void *) data->hw_data);
-> +}
-> diff --git a/drivers/clk/meson/meson-aoclk.h b/drivers/clk/meson/meson-aoclk.h
-> new file mode 100644
-> index 000000000000..ec59e027dd37
-> --- /dev/null
-> +++ b/drivers/clk/meson/meson-aoclk.h
-> @@ -0,0 +1,35 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> +/*
-> + * Copyright (c) 2017 BayLibre, SAS
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
-> + * Author: Yixun Lan <yixun.lan@amlogic.com>
-> + */
-> +
-> +#ifndef __MESON_AOCLK_H__
-> +#define __MESON_AOCLK_H__
-> +
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include "clk-regmap.h"
-> +
-> +struct meson_aoclk_data {
-> +	const unsigned int			reset_reg;
-> +	const int				num_reset;
-> +	const unsigned int			*reset;
-> +	int					num_clks;
-> +	struct clk_regmap			**clks;
-> +	const struct clk_hw_onecell_data	*hw_data;
-> +};
-> +
-> +struct meson_aoclk_reset_controller {
-> +	struct reset_controller_dev		reset;
-> +	const struct meson_aoclk_data		*data;
-> +	struct regmap				*regmap;
-> +};
-> +
-> +int meson_aoclkc_probe(struct platform_device *pdev);
-> +#endif
-> +
+>  	if (fifo_mode == 0) {
+>  		pp = NULL;
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+> index 969ce8f3c3e2..d7eb7cf4fd5c 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.h
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+> @@ -326,7 +326,6 @@ struct usba_udc {
+>  	const struct usba_udc_errata *errata;
+>  	int irq;
+>  	struct gpio_desc *vbus_pin;
+> -	int vbus_pin_inverted;
+>  	int num_ep;
+>  	int configured_ep;
+>  	struct usba_fifo_cfg *fifo_cfg;
+> -- 
+> 2.14.1
+> 
