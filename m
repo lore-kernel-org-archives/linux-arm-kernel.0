@@ -1,59 +1,78 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 16 Apr 2018 10:33:00 +0800
-Subject: [PATCH] spi: mediatek: Use of_device_get_match_data()
+Date: Mon, 16 Apr 2018 10:33:34 +0800
+Subject: [PATCH] soc: mediatek: use of_device_get_match_data()
 In-Reply-To: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
 References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
-Message-ID: <94cba80f703be048666afde1ed53c15c3704c533.1523347340.git.ryder.lee@mediatek.com>
+Message-ID: <b7fffebff04c6b717c568194ac7503144a3302a8.1523347340.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The usage of of_device_get_match_data() reduce the code size a bit.
 
-Also, the only way to call mtk_spi_probe() is to match an entry in
-mtk_spi_of_match[], so of_id cannot be NULL.
+Also, the only way to call pwrap_probe() is to match an entry in
+of_pwrap_match_tbl[], so of_id cannot be NULL.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- drivers/spi/spi-mt65xx.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 13 +++----------
+ drivers/soc/mediatek/mtk-scpsys.c    |  4 +---
+ 2 files changed, 4 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 86bf456..3edc183 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -20,6 +20,7 @@
- #include <linux/ioport.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/of_gpio.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/spi-mt65xx.h>
-@@ -578,7 +579,6 @@ static int mtk_spi_probe(struct platform_device *pdev)
- {
- 	struct spi_master *master;
- 	struct mtk_spi *mdata;
--	const struct of_device_id *of_id;
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index e9e054a..2afae64 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -1458,19 +1458,12 @@ static int pwrap_probe(struct platform_device *pdev)
+ 	int ret, irq;
+ 	struct pmic_wrapper *wrp;
+ 	struct device_node *np = pdev->dev.of_node;
+-	const struct of_device_id *of_id =
+-		of_match_device(of_pwrap_match_tbl, &pdev->dev);
+ 	const struct of_device_id *of_slave_id = NULL;
  	struct resource *res;
- 	int i, irq, ret;
  
-@@ -598,15 +598,9 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 	master->can_dma = mtk_spi_can_dma;
- 	master->setup = mtk_spi_setup;
- 
--	of_id = of_match_node(mtk_spi_of_match, pdev->dev.of_node);
 -	if (!of_id) {
--		dev_err(&pdev->dev, "failed to probe of_node\n");
--		ret = -EINVAL;
--		goto err_put_master;
+-		dev_err(&pdev->dev, "Error: No device match found\n");
+-		return -ENODEV;
 -	}
--
- 	mdata = spi_master_get_devdata(master);
--	mdata->dev_comp = of_id->data;
-+	mdata->dev_comp = of_device_get_match_data(&pdev->dev);
-+
- 	if (mdata->dev_comp->must_tx)
- 		master->flags = SPI_MASTER_MUST_TX;
++	if (np->child)
++		of_slave_id = of_match_node(of_slave_match_tbl, np->child);
  
+-	if (pdev->dev.of_node->child)
+-		of_slave_id = of_match_node(of_slave_match_tbl,
+-					    pdev->dev.of_node->child);
+ 	if (!of_slave_id) {
+ 		dev_dbg(&pdev->dev, "slave pmic should be defined in dts\n");
+ 		return -EINVAL;
+@@ -1482,7 +1475,7 @@ static int pwrap_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, wrp);
+ 
+-	wrp->master = of_id->data;
++	wrp->master = of_device_get_match_data(&pdev->dev);
+ 	wrp->slave = of_slave_id->data;
+ 	wrp->dev = &pdev->dev;
+ 
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 435ce5e..a02a18e 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -973,15 +973,13 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ 
+ static int scpsys_probe(struct platform_device *pdev)
+ {
+-	const struct of_device_id *match;
+ 	const struct scp_subdomain *sd;
+ 	const struct scp_soc_data *soc;
+ 	struct scp *scp;
+ 	struct genpd_onecell_data *pd_data;
+ 	int i, ret;
+ 
+-	match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
+-	soc = (const struct scp_soc_data *)match->data;
++	soc = of_device_get_match_data(&pdev->dev);
+ 
+ 	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
+ 			soc->bus_prot_reg_update);
 -- 
 1.9.1
