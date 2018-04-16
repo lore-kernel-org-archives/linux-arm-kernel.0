@@ -1,29 +1,68 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Mon, 16 Apr 2018 17:52:44 +0200
-Subject: [PATCH v2 0/2] pinctrl/samsung: Fix incorrect EINTG banks order
-Message-ID: <1523893966-8884-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Date: Mon, 16 Apr 2018 17:52:45 +0200
+Subject: [PATCH v2 1/2] pinctrl/samsung: Correct EINTG banks order
+In-Reply-To: <1523893966-8884-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1523893966-8884-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1523893966-8884-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series compose of 2 patches.
+All banks with GPIO interrupts should be at beginning
+of bank array and without any other types of banks between them.
+This order is expected by exynos_eint_gpio_irq, when doing
+interrupt group to bank translation.
+Otherwise, kernel NULL pointer dereference would happen
+when trying to handle interrupt, due to wrong bank being looked up.
+Observed on s5pv210, when trying to handle gpj0 interrupt,
+where kernel was mapping it to gpi bank.
 
-First patch, fixing incorrect order of banks for s5pv210 and exynos5410
-
-Second patch, documenting required order of banks
+Cc: stable at vger.kernel.org
+Fixes: 023e06dfa6882f500b9c86fd61f0b1913aa07f36 ("pinctrl: exynos: add exynos5410 SoC specific data")
+Fixes: 608a26a7bc04a39cfd7041f31ca2b2100113d14e ("pinctrl: Add s5pv210 support to pinctrl-exynos)
+Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+---
 
 Changes from v1:
   - Limit changes to s5pv210 and Exynos5410. Exynos3250 will be handled later.
   - Added cc stable
   - Added fixes tag
-  - Add patch with comments to all banks documenting required order.
+---
+ drivers/pinctrl/samsung/pinctrl-exynos-arm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Pawe? Chmiel (2):
-  pinctrl/samsung: Correct EINTG banks order
-  pinctrl/samsung: Document required order of banks
-
- drivers/pinctrl/samsung/pinctrl-exynos-arm.c   | 30 ++++++++++++++++++++++++--
- drivers/pinctrl/samsung/pinctrl-exynos-arm64.c | 20 +++++++++++++++++
- 2 files changed, 48 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos-arm.c b/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
+index 90c2744..4f4ae66 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
+@@ -105,12 +105,12 @@ static const struct samsung_pin_bank_data s5pv210_pin_bank[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x1c0, "gpg1", 0x38),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x1e0, "gpg2", 0x3c),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x200, "gpg3", 0x40),
+-	EXYNOS_PIN_BANK_EINTN(7, 0x220, "gpi"),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x240, "gpj0", 0x44),
+ 	EXYNOS_PIN_BANK_EINTG(6, 0x260, "gpj1", 0x48),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x280, "gpj2", 0x4c),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x2a0, "gpj3", 0x50),
+ 	EXYNOS_PIN_BANK_EINTG(5, 0x2c0, "gpj4", 0x54),
++	EXYNOS_PIN_BANK_EINTN(7, 0x220, "gpi"),
+ 	EXYNOS_PIN_BANK_EINTN(8, 0x2e0, "mp01"),
+ 	EXYNOS_PIN_BANK_EINTN(4, 0x300, "mp02"),
+ 	EXYNOS_PIN_BANK_EINTN(8, 0x320, "mp03"),
+@@ -630,7 +630,6 @@ static const struct samsung_pin_bank_data exynos5410_pin_banks0[] __initconst =
+ 	EXYNOS_PIN_BANK_EINTG(4, 0x100, "gpc3", 0x20),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x120, "gpc1", 0x24),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x140, "gpc2", 0x28),
+-	EXYNOS_PIN_BANK_EINTN(2, 0x160, "gpm5"),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpd1", 0x2c),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x1A0, "gpe0", 0x30),
+ 	EXYNOS_PIN_BANK_EINTG(2, 0x1C0, "gpe1", 0x34),
+@@ -641,6 +640,7 @@ static const struct samsung_pin_bank_data exynos5410_pin_banks0[] __initconst =
+ 	EXYNOS_PIN_BANK_EINTG(2, 0x260, "gpg2", 0x48),
+ 	EXYNOS_PIN_BANK_EINTG(4, 0x280, "gph0", 0x4c),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x2A0, "gph1", 0x50),
++	EXYNOS_PIN_BANK_EINTN(2, 0x160, "gpm5"),
+ 	EXYNOS_PIN_BANK_EINTN(8, 0x2C0, "gpm7"),
+ 	EXYNOS_PIN_BANK_EINTN(6, 0x2E0, "gpy0"),
+ 	EXYNOS_PIN_BANK_EINTN(4, 0x300, "gpy1"),
 -- 
 2.7.4
