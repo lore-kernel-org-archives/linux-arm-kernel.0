@@ -1,93 +1,237 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 16 Apr 2018 17:46:56 +0100
-Subject: [PATCH] drm/rockchip: fix VOP vblank race
-In-Reply-To: <38a49065-4667-4d91-3191-ec81b03cba44@rock-chips.com>
-References: <20180328160351.23763-1-john@metanate.com>
- <38a49065-4667-4d91-3191-ec81b03cba44@rock-chips.com>
-Message-ID: <20180416174656.6c113081.john@metanate.com>
+From: evgreen@chromium.org (Evan Green)
+Date: Mon, 16 Apr 2018 17:14:19 +0000
+Subject: [PATCH v4 2/2] drivers: soc: Add LLCC driver
+In-Reply-To: <a4d0d993c8bf42d9a2e59078606a4b4d@codeaurora.org>
+References: <1523390893-10904-1-git-send-email-rishabhb@codeaurora.org>
+ <1523390893-10904-3-git-send-email-rishabhb@codeaurora.org>
+ <CAE=gft6DHtvkLAyAF30p6rwJrs845nxBOxWQ0gmHdJ0VQa4ZxQ@mail.gmail.com>
+ <a4d0d993c8bf42d9a2e59078606a4b4d@codeaurora.org>
+Message-ID: <CAE=gft5tF-aTCg6Top+uzX-NfM=RGWizc7g09HNiWPPLfmw=Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sandy,
+On Fri, Apr 13, 2018 at 4:08 PM <rishabhb@codeaurora.org> wrote:
 
-On Tue, 10 Apr 2018 20:40:06 +0800, Sandy Huang wrote:
+> On 2018-04-12 15:02, Evan Green wrote:
+> > Hi Rishabh,
+> >
+> > On Tue, Apr 10, 2018 at 1:09 PM Rishabh Bhatnagar
+> > <rishabhb@codeaurora.org>
+> > wrote:
+> >
+> >> LLCC (Last Level Cache Controller) provides additional cache memory
+> >> in the system. LLCC is partitioned into multiple slices and each
+> >> slice gets its own priority, size, ID and other config parameters.
+> >> LLCC driver programs these parameters for each slice. Clients that
+> >> are assigned to use LLCC need to get information such size & ID of the
+> >> slice they get and activate or deactivate the slice as needed. LLCC
+> >> driver
+> >> provides API for the clients to perform these operations.
+> >
+> >> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+> >> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+> >> ---
+> >>   drivers/soc/qcom/Kconfig           |  17 ++
+> >>   drivers/soc/qcom/Makefile          |   2 +
+> >>   drivers/soc/qcom/llcc-sdm845.c     | 110 ++++++++++
+> >>   drivers/soc/qcom/llcc-slice.c      | 404
+> > +++++++++++++++++++++++++++++++++++++
+> >>   include/linux/soc/qcom/llcc-qcom.h | 168 +++++++++++++++
+> >>   5 files changed, 701 insertions(+)
+> >>   create mode 100644 drivers/soc/qcom/llcc-sdm845.c
+> >>   create mode 100644 drivers/soc/qcom/llcc-slice.c
+> >>   create mode 100644 include/linux/soc/qcom/llcc-qcom.h
+> >
+> > [...]
+> >> diff --git a/drivers/soc/qcom/llcc-sdm845.c
+> > b/drivers/soc/qcom/llcc-sdm845.c
+> >> new file mode 100644
+> >> index 0000000..619b226
+> >> --- /dev/null
+> >> +++ b/drivers/soc/qcom/llcc-sdm845.c
+> >> @@ -0,0 +1,110 @@
+> >> +// SPDX-License-Identifier: GPL-2.0
+> >> +/*
+> >> + * Copyright (c) 2017-2018, The Linux Foundation. All rights
+> >> reserved.
+> >> + *
+> >> + */
+> >> +
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/module.h>
+> >> +#include <linux/of.h>
+> >> +#include <linux/of_device.h>
+> >> +#include <linux/soc/qcom/llcc-qcom.h>
+> >> +
+> >> +/*
+> >> + * SCT(System Cache Table) entry contains of the following parameters
+> >
+> > contains the following members:
+> >
+> >> + * name: Name of the client's use case for which the llcc slice is
+> >> used
+> >> + * uid: Unique id for the client's use case
+> >
+> > s/uid/usecase_id/
+> >
+> >> + * slice_id: llcc slice id for each client
+> >> + * max_cap: The maximum capacity of the cache slice provided in KB
+> >> + * priority: Priority of the client used to select victim line for
+> > replacement
+> >> + * fixed_size: Determine if the slice has a fixed capacity
+> >
+> > "Boolean indicating if the slice has a fixed capacity" might be better
+> >
+> >> diff --git a/drivers/soc/qcom/llcc-slice.c
+> >> b/drivers/soc/qcom/llcc-slice.c
+> >> new file mode 100644
+> >> index 0000000..67a81b0
+> >> --- /dev/null
+> >> +++ b/drivers/soc/qcom/llcc-slice.c
+> > ...
+> >> +static int llcc_update_act_ctrl(struct llcc_drv_data *drv, u32 sid,
+> >> +                               u32 act_ctrl_reg_val, u32 status)
+> >> +{
+> >> +       u32 act_ctrl_reg;
+> >> +       u32 status_reg;
+> >> +       u32 slice_status;
+> >> +       int ret = 0;
+> >> +
+> >> +       act_ctrl_reg = drv->bcast_off + LLCC_TRP_ACT_CTRLn(sid);
+> >> +       status_reg = drv->bcast_off + LLCC_TRP_STATUSn(sid);
+> >> +
+> >> +       /*Set the ACTIVE trigger*/
+> >
+> > Add spaces around /* */
+> >
+> >> +       act_ctrl_reg_val |= ACT_CTRL_ACT_TRIG;
+> >> +       ret = regmap_write(drv->regmap, act_ctrl_reg,
+> >> act_ctrl_reg_val);
+> >> +       if (ret)
+> >> +               return ret;
+> >> +
+> >> +       /* Clear the ACTIVE trigger */
+> >> +       act_ctrl_reg_val &= ~ACT_CTRL_ACT_TRIG;
+> >> +       ret = regmap_write(drv->regmap, act_ctrl_reg,
+> >> act_ctrl_reg_val);
+> >> +       if (ret)
+> >> +               return ret;
+> >> +
+> >> +       ret = regmap_read_poll_timeout(drv->regmap, status_reg,
+> > slice_status,
+> >> +                       !(slice_status & status), 0,
+> > LLCC_STATUS_READ_DELAY);
+> >> +       return ret;
+> >> +}
+> >> +
+> >> +/**
+> >> + * llcc_slice_activate - Activate the llcc slice
+> >> + * @desc: Pointer to llcc slice descriptor
+> >> + *
+> >> + * A value zero will be returned on success and a negative errno will
+> >
+> > a value of zero
+> >
+> >> + * be returned in error cases
+> >> + */
+> >> +int llcc_slice_activate(struct llcc_slice_desc *desc)
+> >> +{
+> >> +       int ret;
+> >> +       u32 act_ctrl_val;
+> >> +       struct llcc_drv_data *drv;
+> >> +
+> >> +       if (desc == NULL)
+> >> +               return -EINVAL;
+> >
+> > I think we can remove this check, right?
+> >
+> >> +
+> >> +       drv = dev_get_drvdata(desc->dev);
+> >> +       if (!drv)
+> >> +               return -EINVAL;
+> >> +
+> >> +       mutex_lock(&drv->lock);
+> >> +       if (test_bit(desc->slice_id, drv->bitmap)) {
+> >> +               mutex_unlock(&drv->lock);
+> >> +               return 0;
+> >> +       }
+> >> +
+> >> +       act_ctrl_val = ACT_CTRL_OPCODE_ACTIVATE <<
+> >> ACT_CTRL_OPCODE_SHIFT;
+> >> +
+> >> +       ret = llcc_update_act_ctrl(drv, desc->slice_id, act_ctrl_val,
+> >> +                                 DEACTIVATE);
+> >> +
+> >> +       __set_bit(desc->slice_id, drv->bitmap);
+> >> +       mutex_unlock(&drv->lock);
+> >> +
+> >> +       return ret;
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(llcc_slice_activate);
+> >> +
+> >> +/**
+> >> + * llcc_slice_deactivate - Deactivate the llcc slice
+> >> + * @desc: Pointer to llcc slice descriptor
+> >> + *
+> >> + * A value zero will be returned on success and a negative errno will
+> >> + * be returned in error cases
+> >> + */
+> >> +int llcc_slice_deactivate(struct llcc_slice_desc *desc)
+> >> +{
+> >> +       u32 act_ctrl_val;
+> >> +       int ret;
+> >> +       struct llcc_drv_data *drv;
+> >> +
+> >> +       if (desc == NULL)
+> >> +               return -EINVAL;
+> >> +
+> >> +       drv = dev_get_drvdata(desc->dev);
+> >> +       if (!drv)
+> >> +               return -EINVAL;
+> >> +
+> >> +       mutex_lock(&drv->lock);
+> >> +       if (!test_bit(desc->slice_id, drv->bitmap)) {
+> >> +               mutex_unlock(&drv->lock);
+> >> +               return 0;
+> >> +       }
+> >> +       act_ctrl_val = ACT_CTRL_OPCODE_DEACTIVATE <<
+> > ACT_CTRL_OPCODE_SHIFT;
+> >> +
+> >> +       ret = llcc_update_act_ctrl(drv, desc->slice_id, act_ctrl_val,
+> >> +                                 ACTIVATE);
+> >> +
+> >> +       __clear_bit(desc->slice_id, drv->bitmap);
+> >> +       mutex_unlock(&drv->lock);
+> >> +
+> >> +       return ret;
+> >> +}
+> >> +EXPORT_SYMBOL_GPL(llcc_slice_deactivate);
+> >> +
+> >> +/**
+> >> + * llcc_get_slice_id - return the slice id
+> >> + * @desc: Pointer to llcc slice descriptor
+> >> + *
+> >> + * A positive value will be returned on success and a negative errno
+> >> will
+> >> + * be returned on error
+> >> + */
+> >> +int llcc_get_slice_id(struct llcc_slice_desc *desc)
+> >> +{
+> >> +       if (!desc)
+> >> +               return -EINVAL;
+> >
+> > Can we remove this check too?
+> >
+> We need this check and the following one to protect against the
+> null pointer access which might happen if client doesn't get
+> the descriptor before accessing size and slice_id.
 
-> Reviewed-by: Sandy huang <hjc@rock-chips.com>
+Is this just to protect against errors made during development, or is there
+an expected code path through which this might actually happen? If it's
+just to protect against developer error, then based on other feedback I've
+seen on these lists, the null pointer dereference is preferred, and we
+should remove this check. If it's an actual expected flow, then I guess
+clients will call llcc_slice_getd(), see the ERR_PTR(-ENOENT), transform
+that into NULL, and then call these other functions anyway?
 
-Thanks for the review, but I don't see this in drm-misc yet.  Are you
-planning to pick this up?
-
-> ? 2018/3/29 0:03, John Keeping ??:
-> > We have seen a case of a bad reference count for vblanks with the
-> > Rockchip VOP:
-> >
-> > 	------------[ cut here ]------------
-> > 	WARNING: CPU: 1 PID: 383 at drivers/gpu/drm/drm_irq.c:1198 drm_vblank_put+0x40/0xcc
-> > 	Modules linked in: brcmfmac brcmutil
-> > 	CPU: 1 PID: 383 Comm: kworker/u8:2 Not tainted 4.9.75-rt60 #1
-> > 	Hardware name: Rockchip (Device Tree)
-> > 	Workqueue: events_unbound flip_worker
-> > 	Backtrace:
-> > 	[<c010b7b0>] (dump_backtrace) from [<c010ba4c>] (show_stack+0x18/0x1c)
-> > 	 r7:c0b1b13c r6:600b0013 r5:00000000 r4:c0b1b13c
-> > 	[<c010ba34>] (show_stack) from [<c032d248>] (dump_stack+0x78/0x94)
-> > 	[<c032d1d0>] (dump_stack) from [<c011e6e8>] (__warn+0xe4/0x104)
-> > 	 r7:00000009 r6:c03cf26c r5:00000000 r4:00000000
-> > 	[<c011e604>] (__warn) from [<c011e7c0>] (warn_slowpath_null+0x28/0x30)
-> > 	 r9:eeb443a0 r8:eeb443c8 r7:ee8a5ec0 r6:ee8a5ec0 r5:edb47f00 r4:ee096200
-> > 	[<c011e798>] (warn_slowpath_null) from [<c03cf26c>] (drm_vblank_put+0x40/0xcc)
-> > 	[<c03cf22c>] (drm_vblank_put) from [<c03cf310>] (drm_crtc_vblank_put+0x18/0x1c)
-> > 	 r5:edb47f00 r4:ee3c8a80
-> > 	[<c03cf2f8>] (drm_crtc_vblank_put) from [<c03ef9b4>] (vop_fb_unref_worker+0x18/0x24)
-> > 	[<c03ef99c>] (vop_fb_unref_worker) from [<c03df194>] (flip_worker+0x98/0xb4)
-> > 	 r5:edb47f00 r4:eeb443a8
-> > 	[<c03df0fc>] (flip_worker) from [<c0134808>] (process_one_work+0x1a8/0x2fc)
-> > 	 r9:00000000 r8:ee807d00 r7:00000000 r6:ee809c00 r5:eeb443a8 r4:edfe5f80
-> > 	[<c0134660>] (process_one_work) from [<c01358ec>] (worker_thread+0x2ac/0x458)
-> > 	 r10:00000088 r9:edfe5f98 r8:ee809c2c r7:c0b04100 r6:ee809c00 r5:ee809c00
-> > 	 r4:edfe5f80
-> > 	[<c0135640>] (worker_thread) from [<c013a0bc>] (kthread+0xfc/0x10c)
-> > 	 r10:00000000 r9:00000000 r8:c0135640 r7:edfe5f80 r6:00000000 r5:edf0e240
-> > 	 r4:ee8a4000 r3:ed194e00
-> > 	[<c0139fc0>] (kthread) from [<c0107cb8>] (ret_from_fork+0x14/0x3c)
-> > 	 r8:00000000 r7:00000000 r6:00000000 r5:c0139fc0 r4:edf0e240
-> > 	---[ end trace 0000000000000002 ]---
-> >
-> > It seems that this is caused by unfortunate timing between
-> > vop_crtc_atomic_flush() and vop_handle_vblank() given the following
-> > ordering:
-> >
-> > 	atomic_flush		handle_vblank
-> > 	------------		-------------
-> >
-> > 	drm_flip_work_queue
-> > 	set_bit
-> > 	     			if (test_and_clear_bit(...))
-> > 	     				drm_flip_work_commit
-> > 	drm_vblank_get
-> >
-> > This results in vop_fb_unref_worker (called as flip work) decrementing
-> > the vblank refcount before it has been incremented.
-> >
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> >   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > index 6755a9eea4b2..d4e1400aedf3 100644
-> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> > @@ -1017,9 +1017,9 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
-> >   			continue;
-> >   
-> >   		drm_framebuffer_get(old_plane_state->fb);
-> > +		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
-> >   		drm_flip_work_queue(&vop->fb_unref_work, old_plane_state->fb);
-> >   		set_bit(VOP_PENDING_FB_UNREF, &vop->pending);
-> > -		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
-> >   	}
-> >   }
-> >     
-> 
-> 
+-Evan
