@@ -1,75 +1,98 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 16 Apr 2018 15:59:14 +0530
-Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
- sram code
-In-Reply-To: <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
- <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
-Message-ID: <d52373eb-1707-17ff-fabb-9f7200cf54c0@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 16 Apr 2018 12:35:24 +0200
+Subject: serial: imx: half-duplex RS485 operation with RTS active low
+In-Reply-To: <20180416095436.7mxh4cqdvlyleryr@lnxeinarv.se.axis.com>
+References: <0e88706a05a302201be396d2f03c3e9e@agner.ch>
+ <20180416095436.7mxh4cqdvlyleryr@lnxeinarv.se.axis.com>
+Message-ID: <775db0158e310ebb17c6143a5b8ff4cd@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thursday 12 April 2018 10:14 PM, santosh.shilimkar at oracle.com wrote:
-> On 4/11/18 9:53 PM, Keerthy wrote:
->> From: Dave Gerlach <d-gerlach@ti.com>
+On 16.04.2018 11:54, Einar Vading wrote:
+> On Mon, Apr 16, 2018 at 11:14:32AM +0200, Stefan Agner wrote:
+>> Hi,
 >>
->> After an RTC+DDR cycle we lose sram context so emif pm functions present
->> in sram are lost. We can check if the first byte of the original
->> code in DDR contains the same first byte as the code in sram, and if
->> they do not match we know we have lost context and must recopy the
->> functions to the previous address to maintain PM functionality.
+>> Using upstream I noticed that RS-485 does not work in the default
+>> configuration for our platforms (Toradex Apalis/Colibri). Closer
+>> debugging shows that it is related to "serial: imx: default to half
+>> duplex rs485".
+> 
+> We where struggling a bit with half duplex rs485 too a while ago.
 >>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->> ? drivers/memory/ti-emif-pm.c | 24 ++++++++++++++++++++++++
->> ? 1 file changed, 24 insertions(+)
+>> We use the i.MX UART in DTE mode and control the RS-485 transceiver
+>> using the RTS signal in low-active mode.
 >>
->> diff --git a/drivers/memory/ti-emif-pm.c b/drivers/memory/ti-emif-pm.c
->> index 632651f..ec4a62c 100644
->> --- a/drivers/memory/ti-emif-pm.c
->> +++ b/drivers/memory/ti-emif-pm.c
->> @@ -249,6 +249,25 @@ int ti_emif_get_mem_type(void)
->> ? };
->> ? MODULE_DEVICE_TABLE(of, ti_emif_of_match);
->> ? +#ifdef CONFIG_PM_SLEEP
->> +static int ti_emif_resume(struct device *dev)
->> +{
->> +??? unsigned long tmp =
->> +??????????? __raw_readl((void *)emif_instance->ti_emif_sram_virt);
->> +
->> +??? /*
->> +???? * Check to see if what we are copying is already present in the
->> +???? * first byte at the destination, only copy if it is not which
->> +???? * indicates we have lost context and sram no longer contains
->> +???? * the PM code
->> +???? */
+>> 	uart-has-rtscts;
+>> 	fsl,dte-mode;
+>> 	linux,rs485-enabled-at-boot-time;
+>> 	rs485-rts-active-low;
+>>
+>> Using this setting leads to the RTS signal not getting asserted (the
+>> oscilloscope only shows a very short fluke before the start bit is
+>> sent).
 > 
->> +??? if (tmp != ti_emif_sram)
->> +??????? ti_emif_push_sram(dev, emif_instance);
->> +
->> +??? return 0;
->> +}
->> +#endif /* CONFIG_PM_SLEEP */
-> Instead of this indirect method , why can't just check the previous
-> deep sleep mode and based on that do copy or not. EMIF power status
-> register should have something like that ?
+> I think this is what we had too. But if I recall we where supposed to be
+> active-high but I think the behavior is the same either way.
 
-I will check if we have a register that tells the previous state of sram.
+With v4.17-rc1, active high RTS, DTE in half duplex mode seems to work
+fine (looks good on an oscilloscope). However, active low seems to be
+broken.
+
+>>
+>> However, using
+>>
+>> 	uart-has-rtscts;
+>> 	fsl,dte-mode;
+>> 	linux,rs485-enabled-at-boot-time;
+>> 	rs485-rts-active-low;
+>> 	rs485-rx-during-tx;
+>>
+>> Asserts the RTS signal low active just fine...
+> 
+> We have a (RTS active high) configuration working for us now with only
+> 
+>     uart-has-rtscts
+> 
+> in DT, and then when using the port we do
+> 
+>     struct serial_rs485 rs485conf;
+>     memset(&rs485conf, 0x00, sizeof(struct serial_rs485));
+> 
+>     rs485conf.flags |= SER_RS485_ENABLED;
+>     rs485conf.flags |= SER_RS485_RTS_ON_SEND;
+>     rs485conf.flags &= ~(SER_RS485_RTS_AFTER_SEND);
+
+>From what I can tell, in v4.17-rc1 this should be equivalent to just:
+
+ 	linux,rs485-enabled-at-boot-time;
 
 > 
-> Another minor point is even though there is nothing to do in suspend,
-> might be good to have a callback with comment that nothing to do with
-> some explanation why not. Don't have strong preference but may for
-> better readability.
+>     f_debug("Calling ioctl...");
+>     if (ioctl (fd, TIOCSRS485, &rs485conf) < 0) {
+>       f_critical("ioctl serial_rs485 failed");
+>       return -1;
+>     }
+> 
+> Hope it helps.
 
-Okay. Thanks a lot for the quick feedback!
+Thanks, I will check using RS485 flags via ioctrl.
 
+--
+Stefan
+
+>>
+>> Is this a known problem? Any idea where that could come from? It looks
+>> as if the receiver part is actually enabling RTS...?
+>>
+>> Also, isn't enabling RX even in half-duplex mode quite common in order
+>> to detect collisions?
+>>
+>> --
+>> Stefan
 > 
-> Regards,
-> Santosh
-> 
-> 
+> // Einar
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
