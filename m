@@ -1,30 +1,31 @@
 From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Mon, 16 Apr 2018 10:34:55 +0100
-Subject: [RFC 0/3] Renesas RZ/N1D SMP enabler
-Message-ID: <1523871304-48517-1-git-send-email-michel.pollet@bp.renesas.com>
+Date: Mon, 16 Apr 2018 10:34:57 +0100
+Subject: [RFC 1/3] dt-bindings: cpu: Add Renesas RZ/N1D SMP enable method.
+In-Reply-To: <1523871304-48517-1-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523871304-48517-1-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <1523871304-48517-3-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*Warning -- this requires the base RZ/N1 support patches already posted *
+Add a special enable method for second CA8 of the Renesas RZ/N1D
+(R9A06G032).
 
-This is a tentative patch series for enabling the second CA7 of the RZ/N1D.
-It's based on a spin_table method, and it reuses the same binding property
-as that driver.
+Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-One question is: Do i have to document it separately, or is it sufficiently
-clear?
-
-Michel Pollet (3):
-  dt-bindings: cpu: Add Renesas RZ/N1D SMP enable method.
-  ARM: dts: Renesas RZ/N1D SMP enable method
-  arm: shmobile: Add the RZ/N1D SMP enabler driver.
-
- Documentation/devicetree/bindings/arm/cpus.txt |  1 +
- arch/arm/boot/dts/r9a06g032.dtsi               |  2 +
- arch/arm/mach-shmobile/Makefile                |  1 +
- arch/arm/mach-shmobile/smp-r9a06g032.c         | 87 ++++++++++++++++++++++++++
- 4 files changed, 91 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
-
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index 29e1dc5..b395d107 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -219,6 +219,7 @@ described below.
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
+ 			    "renesas,apmu"
++			    "renesas,r9a06g032-smp"
+ 			    "rockchip,rk3036-smp"
+ 			    "rockchip,rk3066-smp"
+ 			    "ste,dbx500-smp"
 -- 
 2.7.4
