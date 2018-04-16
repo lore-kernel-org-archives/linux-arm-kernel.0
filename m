@@ -1,42 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Apr 2018 16:45:01 +0100
-Subject: [PATCH] arm64: signal: don't force known signals to SIGKILL
-Message-ID: <20180416154501.56872-1-mark.rutland@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Apr 2018 08:45:45 -0700
+Subject: 4.16 OMAP serial transmit corruption?
+In-Reply-To: <20180416151732.GU16141@n2100.armlinux.org.uk>
+References: <20180416151732.GU16141@n2100.armlinux.org.uk>
+Message-ID: <20180416154545.GA5671@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit:
+* Russell King - ARM Linux <linux@armlinux.org.uk> [180416 15:19]:
+> Hi,
+> 
+> I'm not entirely sure what's going on, but I see corrupted characters
+> with the serial console on the OMAP4430 SDP board.  During boot,
+> everything seems fine, the problem appears to be userspace output.
+> 
+> For example, if I edit a file, then quit vi:
+> 
+> :q??%??B??Z?root at omap-4430sdp:~#
 
-  a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
+I don't think I've seen that one. What I've seen few times is
+typing a key on the serial console echoing back the previous
+character typed while the new character won't get displayed
+until hitting keyboard again. Only rebooting the device seems
+to solve this. This is with 4430 ES2.3 revision.
 
-... any signal which is not SIGKILL will be upgraded to a SIGKILL be
-force_signal_inject(). This includes signals we do expect, such as
-SIGILL triggered by do_undefinstr().
+I wonder if we're missing some parts of errata i202 handling
+in omap_8250_mdr1_errataset()?
 
-Fix the check to use a logical AND rather than a logical OR, permitting
-signals whose layout is SIL_FAULT.
+Also, I'm seeing an issue where the UARTs won't idle on init
+with 8250_omap driver if connected to the wl12xx bluetooth port
+unless I write some data to the port first. It does not seem
+to be related to the rts/cts lines being wired as I've tested
+muxing them out of the way.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/traps.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Regards,
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index ba964da31a25..1cb2749a72bf 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -366,7 +366,7 @@ void force_signal_inject(int signal, int code, unsigned long address)
- 	}
- 
- 	/* Force signals we don't understand to SIGKILL */
--	if (WARN_ON(signal != SIGKILL ||
-+	if (WARN_ON(signal != SIGKILL &&
- 		    siginfo_layout(signal, code) != SIL_FAULT)) {
- 		signal = SIGKILL;
- 	}
--- 
-2.11.0
+Tony
