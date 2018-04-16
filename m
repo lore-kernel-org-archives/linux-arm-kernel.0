@@ -1,18 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Apr 2018 16:35:52 -0500
-Subject: [PATCH] pinctrl: mediatek: update pinmux defintions for MT7623
-In-Reply-To: <c8748c81711b0d41e83418b6c23d82d8c78c7094.1523845138.git.ryder.lee@mediatek.com>
-References: <c8748c81711b0d41e83418b6c23d82d8c78c7094.1523845138.git.ryder.lee@mediatek.com>
-Message-ID: <20180416213552.wbtv2ljwqpxgogqx@rob-hp-laptop>
+Date: Mon, 16 Apr 2018 16:37:30 -0500
+Subject: [RFC 1/3] dt-bindings: cpu: Add Renesas RZ/N1D SMP enable method.
+In-Reply-To: <1523871304-48517-3-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523871304-48517-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1523871304-48517-3-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <20180416213730.isfggqngv6zjxahg@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 10:32:19AM +0800, Ryder Lee wrote:
-> Fulfill the pinmux macros for MT7623
+On Mon, Apr 16, 2018 at 10:34:57AM +0100, Michel Pollet wrote:
+> Add a special enable method for second CA8 of the Renesas RZ/N1D
+> (R9A06G032).
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 > ---
->  include/dt-bindings/pinctrl/mt7623-pinfunc.h | 90 +++++++++++++++++++++++++++-
->  1 file changed, 87 insertions(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
