@@ -1,20 +1,24 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 16 Apr 2018 15:16:48 -0700
-Subject: [PATCH] ARM: B15: Update to support Brahma-B53
-In-Reply-To: <20180223204110.6350-1-f.fainelli@gmail.com>
-References: <20180223204110.6350-1-f.fainelli@gmail.com>
-Message-ID: <20180416221648.31573-1-f.fainelli@gmail.com>
+Date: Mon, 16 Apr 2018 15:17:13 -0700
+Subject: [PATCH 1/4] ARM: Allow this header to be included by assembly
+ files
+In-Reply-To: <20180223210923.544-2-f.fainelli@gmail.com>
+References: <20180223210923.544-1-f.fainelli@gmail.com>
+ <20180223210923.544-2-f.fainelli@gmail.com>
+Message-ID: <20180416221713.31685-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Feb 2018 12:41:10 -0800, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> The B53 CPU design supports up to 8 processors, which moved the RAC_FLUSH_REG
-> offset 0x4 bytes below to make room for a RAC_CONFIG2_REG to control RAC
-> settings for CPU4-7.
+On Fri, 23 Feb 2018 13:09:20 -0800, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> From: Doug Berger <opendmb@gmail.com>
 > 
-> Lookup the processor type (B15 or B53) and adjust the RAC_FLUSH_REG offset
-> accordingly, if we do not know the processor, bail out.
+> The constants defined in this file are equally useful in assembly and C
+> source files. The arm64 architecture version of this file allows
+> inclusion in both assembly and C source files, so this this commit adds
+> that capability to the arm architecture version so that the constants
+> don't need to be defined in multiple places.
 > 
+> Signed-off-by: Doug Berger <opendmb@gmail.com>
 > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
 
