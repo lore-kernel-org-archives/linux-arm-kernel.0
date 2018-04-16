@@ -1,37 +1,103 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 16 Apr 2018 13:12:07 +0000
-Subject: [PATCH v6 28/30] drm/rockchip: Disable PSR from reboot notifier
-In-Reply-To: <a9e436f8-34ec-123a-9c69-efabb4576bea@samsung.com>
-References: <20180405095000.9756-1-enric.balletbo@collabora.com>
- <CGME20180405095117epcas2p2093448b49aab2abd6684bf689f8888d5@epcas2p2.samsung.com>
- <20180405095000.9756-29-enric.balletbo@collabora.com>
- <a9e436f8-34ec-123a-9c69-efabb4576bea@samsung.com>
-Message-ID: <CAAFQd5C_RhqSCfEXNPQ0zH-O1PGk6xGEdvzsSxnfz9kJ5G4Ceg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 16 Apr 2018 15:42:49 +0200
+Subject: serial: imx: half-duplex RS485 operation with RTS active low
+In-Reply-To: <94f7fcf8873f7607087fc3a59a9422a8@agner.ch>
+References: <0e88706a05a302201be396d2f03c3e9e@agner.ch>
+ <20180416092257.frbmooduhm4zrhhl@pengutronix.de>
+ <c6059022d48191909d030584f981d1a2@agner.ch>
+ <94f7fcf8873f7607087fc3a59a9422a8@agner.ch>
+Message-ID: <20180416134249.vdjyye73elv2p5qr@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
+On Mon, Apr 16, 2018 at 03:01:44PM +0200, Stefan Agner wrote:
+> On 16.04.2018 12:29, Stefan Agner wrote:
+> > On 16.04.2018 11:22, Uwe Kleine-K?nig wrote:
+> >> Hi Stefan,
+> >>
+> >> On Mon, Apr 16, 2018 at 11:14:32AM +0200, Stefan Agner wrote:
+> >>> Using upstream I noticed that RS-485 does not work in the default
+> >>> configuration for our platforms (Toradex Apalis/Colibri). Closer
+> >>
+> >> This is an i.MX6?
+> >>
+> > 
+> > Yes, sorry about that.
+> > 
+> > But I think it is i.MX UART specific, I noticed the same behavior on
+> > i.MX 7 too.
+> > 
+> >>> debugging shows that it is related to "serial: imx: default to half
+> >>> duplex rs485".
+> >>>
+> >>> We use the i.MX UART in DTE mode and control the RS-485 transceiver
+> >>> using the RTS signal in low-active mode.
+> >>>
+> >>> 	uart-has-rtscts;
+> >>> 	fsl,dte-mode;
+> >>> 	linux,rs485-enabled-at-boot-time;
+> >>> 	rs485-rts-active-low;
+> >>
+> >> That means you're not using a GPIO for RTS signaling, right?
+> >>
+> > 
+> > I use native RTS capability (which is in DTE mode the CTS signal...)
+> > 
+> >>> Using this setting leads to the RTS signal not getting asserted (the
+> >>> oscilloscope only shows a very short fluke before the start bit is
+> >>> sent).
+> > 
+> > Just FYI, the fluke looks like a proper assert, but it is really only
+> > 50ns wide.
+> > 
+> 
+> Also tried DCE mode, the same behavior.
+> 
+> Two screenshots showing TX/RTS (CTS_B) in different settings:
+> https://imgur.com/a/PbUex
+> 
+> The little fluke disappears when disabling RX before setting CTSC:
+> 
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -657,6 +657,9 @@ static void imx_uart_start_tx(struct uart_port
+> *port)
+>         if (port->rs485.flags & SER_RS485_ENABLED) {
+>                 u32 ucr2;
+>  
+> +               if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
+> +                       imx_uart_stop_rx(port);
+> +
+>                 ucr2 = imx_uart_readl(sport, UCR2);
+>                 if (port->rs485.flags & SER_RS485_RTS_ON_SEND)
+>                         imx_uart_rts_active(sport, &ucr2);
+> @@ -664,9 +667,6 @@ static void imx_uart_start_tx(struct uart_port
+> *port)
+>                         imx_uart_rts_inactive(sport, &ucr2);
+>                 imx_uart_writel(sport, ucr2, UCR2);
+>  
+> -               if (!(port->rs485.flags & SER_RS485_RX_DURING_TX))
+> -                       imx_uart_stop_rx(port);
+> -
+>                 /*
+>                  * Enable transmitter and shifter empty irq only if DMA
+> is off.
+>                  * In the DMA case this is done in the tx-callback.
+> 
+> It seems that if the RX path is disabled, CTS_B is no longer
+> controllable. It just stays high. That is not a problem in the high
+> active RTS case... However, it breaks low active half-duplex...
+> 
+> It seems that this thread is describing this situation:
+> https://community.nxp.com/thread/385047
 
-On Mon, Apr 16, 2018 at 6:57 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
+So better use a gpio instead of the hardware-function?
 
-> On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
-> > From: Tomasz Figa <tfiga@chromium.org>
-> >
-> > It looks like the driver subsystem detaches devices from power domains
-> > at shutdown without consent of the drivers.
+Adding a respective check in the driver would be nice though.
 
-> It looks bit strange. Could you elaborate more on it. Could you show the
-> code performing the detach?
+Best regards
+Uwe
 
-It not only looks strange, but it is strange. The code was present in 4.4:
-
-https://elixir.bootlin.com/linux/v4.4.128/source/drivers/base/platform.c#L553
-
-but was apparently removed in 4.5:
-
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/base/platform.c?h=next-20180416&id=2d30bb0b3889adf09b342722b2ce596c0763bc93
-
-So we might not need this patch anymore.
-
-Best regards,
-Tomasz
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
