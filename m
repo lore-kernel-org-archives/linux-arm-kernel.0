@@ -1,91 +1,125 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 16 Apr 2018 11:59:12 +0200
-Subject: [PATCH v5 4/7] dt-bindings: clock: reset: Add AXG AO Clock and
- Reset Bindings
-In-Reply-To: <20180409143749.71197-5-yixun.lan@amlogic.com>
-References: <20180409143749.71197-1-yixun.lan@amlogic.com>
- <20180409143749.71197-5-yixun.lan@amlogic.com>
-Message-ID: <1523872752.2601.26.camel@baylibre.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 16 Apr 2018 15:33:06 +0530
+Subject: [dragonboard] [PATCH 1/1] dts: qcom: db820c: Add gpio-line-names
+ property
+In-Reply-To: <9acdd412-9b6d-ec63-c5ca-c5fa8d98d489@linaro.org>
+References: <20180414031811.11351-1-manivannan.sadhasivam@linaro.org>
+ <20180414031811.11351-2-manivannan.sadhasivam@linaro.org>
+ <9acdd412-9b6d-ec63-c5ca-c5fa8d98d489@linaro.org>
+Message-ID: <20180416100306.5f6bzkzlsx3ufvw7@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-04-09 at 22:37 +0800, Yixun Lan wrote:
-> Add dt-bindings headers for the Meson-AXG's AO clock and
-> reset controller.
+Hi Todor,
+
+On Mon, Apr 16, 2018 at 11:48:59AM +0300, Todor Tomov wrote:
+> Hi Mani,
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  include/dt-bindings/clock/axg-aoclkc.h | 26 ++++++++++++++++++++++++++
->  include/dt-bindings/reset/axg-aoclkc.h | 20 ++++++++++++++++++++
->  2 files changed, 46 insertions(+)
->  create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
->  create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
-
-Hi Philipp,
-
-Is OK if we take this through clock tree ?
-The related reset controller is actually part of a clock controller driver.
-
-Best Regards
-Jerome
-
+> Thank you for the patch.
 > 
-> diff --git a/include/dt-bindings/clock/axg-aoclkc.h b/include/dt-bindings/clock/axg-aoclkc.h
-> new file mode 100644
-> index 000000000000..61955016a55b
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/axg-aoclkc.h
-> @@ -0,0 +1,26 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
-> +/*
-> + * Copyright (c) 2016 BayLibre, SAS
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
-> + */
-> +
-> +#ifndef DT_BINDINGS_CLOCK_AMLOGIC_MESON_AXG_AOCLK
-> +#define DT_BINDINGS_CLOCK_AMLOGIC_MESON_AXG_AOCLK
-> +
-> +#define CLKID_AO_REMOTE		0
-> +#define CLKID_AO_I2C_MASTER	1
-> +#define CLKID_AO_I2C_SLAVE	2
-> +#define CLKID_AO_UART1		3
-> +#define CLKID_AO_UART2		4
-> +#define CLKID_AO_IR_BLASTER	5
-> +#define CLKID_AO_SAR_ADC	6
-> +#define CLKID_AO_CLK81		7
-> +#define CLKID_AO_SAR_ADC_SEL	8
-> +#define CLKID_AO_SAR_ADC_DIV	9
-> +#define CLKID_AO_SAR_ADC_CLK	10
-> +#define CLKID_AO_ALT_XTAL	11
-> +
-> +#endif
-> diff --git a/include/dt-bindings/reset/axg-aoclkc.h b/include/dt-bindings/reset/axg-aoclkc.h
-> new file mode 100644
-> index 000000000000..d342c0b6b2a7
-> --- /dev/null
-> +++ b/include/dt-bindings/reset/axg-aoclkc.h
-> @@ -0,0 +1,20 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
-> +/*
-> + * Copyright (c) 2016 BayLibre, SAS
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
-> + */
-> +
-> +#ifndef DT_BINDINGS_RESET_AMLOGIC_MESON_AXG_AOCLK
-> +#define DT_BINDINGS_RESET_AMLOGIC_MESON_AXG_AOCLK
-> +
-> +#define RESET_AO_REMOTE		0
-> +#define RESET_AO_I2C_MASTER	1
-> +#define RESET_AO_I2C_SLAVE	2
-> +#define RESET_AO_UART1		3
-> +#define RESET_AO_UART2		4
-> +#define RESET_AO_IR_BLASTER	5
-> +
-> +#endif
+> On 14.04.2018 06:18, Manivannan Sadhasivam wrote:
+> > Add gpio-line-names property for Dragonboard820c based on APQ8096 SoC.
+> > There are 4 gpio-controllers present on this board, including the
+> > APQ8096 SoC, PM8994 (GPIO and MPP) and PMI8994 (GPIO).
+> > 
+> > Lines names are derived from 96Boards CE Specification 1.0, Appendix
+> > "Expansion Connector Signal Description". Line names for PMI8994 MPP
+> > pins are not added due to the absence of the gpio-controller support.
+> > 
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> >  arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 240 +++++++++++++++++++++++++++
+> >  1 file changed, 240 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+> > index 1c8f1b86472d..1c1deef031c6 100644
+> > --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+> > @@ -19,6 +19,34 @@
+> >  #include <dt-bindings/input/input.h>
+> >  #include <dt-bindings/gpio/gpio.h>
+> >  
+> > +/*
+> > + * GPIO name legend: proper name = the GPIO line is used as GPIO
+> > + *         NC      = not connected (pin out but not routed from the chip to
+> > + *                   anything the board)
+> > + *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
+> > + *         LSEC    = Low Speed External Connector
+> > + *         HSEC    = High Speed External Connector
+> > + *         P HSEC  = Primary High Speed External Connector
+> > + *         S HSEC  = Secondary High Speed External Connector
+> > + *         J14     = Camera Connector
+> > + *         TP      = Test Points
+> > + *
+> > + * Line names are taken from the schematic "DragonBoard 820c",
+> > + * drawing no: LM25-P2751-1
+> > + *
+> > + * For the lines routed to the external connectors the
+> > + * lines are named after the 96Boards CE Specification 1.0,
+> > + * Appendix "Expansion Connector Signal Description".
+> > + *
+> > + * When the 96Board naming of a line and the schematic name of
+> > + * the same line are in conflict, the 96Board specification
+> > + * takes precedence, which means that the external UART on the
+> > + * LSEC is named UART0 while the schematic and SoC names this
+> > + * UART3. This is only for the informational lines i.e. "[FOO]",
+> 
+> It seems to me that this can lead to some confusion for cases when
+> some schematic names have 96board names and others don't. (An
+> example below.) However I don't really see any better way to do
+> it. I'm wondering whether adding the schematic name in
+> the comment (for gpios which are named with 96board names)
+> can help a little. What do you think? Or any other idea?
+>
+
+Specifying the schematic names in comments is a good idea!
+
+Linus: Do you have any suggestion here?
+
+> > + * the GPIO named lines "GPIO-A" thru "GPIO-L" are the only
+> > + * ones actually used for GPIO.
+> > + */
+> > +
+> >  / {
+> >  	aliases {
+> >  		serial0 = &blsp2_uart1;
+> > @@ -90,6 +118,218 @@
+> >  			status = "okay";
+> >  		};
+> >  
+> > +		pinctrl at 1010000 {
+> > +			gpio-line-names =
+> > +				"[SPI0_DOUT]", /* GPIO_0, LSEC pin 14 */
+> > +				"[SPI0_DIN]", /* GPIO_1, LSEC pin 10 */
+> > +				"[SPI0_CS]", /* GPIO_2, LSEC pin 12 */
+> > +				"[SPI0_SCLK]", /* GPIO_3, LSEC pin 8 */
+> > +				"[UART1_TxD]", /* GPIO_4, LSEC pin 11 */
+> > +				"[UART1_RxD]", /* GPIO_5, LSEC pin 13 */
+> > +				"[I2C1_SDA]", /* GPIO_6, LSEC pin 21 */
+> > +				"[I2C1_SCL]", /* GPIO_7, LSEC pin 19 */
+> > +				"GPIO-H", /* GPIO_8, LSEC pin 30 */
+> > +				"TP93", /* GPIO_9 */
+> > +				"GPIO-G", /* GPIO_10, LSEC pin 29 */
+> > +				"[MDP_VSYNC_S]", /* GPIO_11, P HSEC pin 55 */
+> > +				"NC", /* GPIO_12 */
+> > +				"[CSI0_MCLK]", /* GPIO_13, P HSEC pin 15 */
+> > +				"[CAM_MCLK1]", /* GPIO_14, J14 pin 11 */
+> > +				"[CSI1_MCLK]", /* GPIO_15, P HSEC pin 17 */
+> 
+> This could be a little misleading.
+> 96Board name / schametic name:
+> CSI0_MCLK / CAM_MCLK0
+> --------- / CAM_MCLK1
+> CSI1_MCLK / CAM_MCLK2
+>
+
+Agree. Will add the schematic names (CAM_MCLKn) in comments.
+
+Thanks,
+Mani
+ 
+> <snip>
+> 
+> -- 
+> Best regards,
+> Todor Tomov
