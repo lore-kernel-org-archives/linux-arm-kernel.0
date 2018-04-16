@@ -1,133 +1,89 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Apr 2018 13:10:35 -0500
-Subject: [PATCH v3 04/10] Documentations: dt-bindings: Add a document of
- PECI adapter driver for Aspeed AST24xx/25xx SoCs
-In-Reply-To: <20180410183212.16787-5-jae.hyun.yoo@linux.intel.com>
-References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
- <20180410183212.16787-5-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180416181035.rcjvt4rlrwaj5yxf@rob-hp-laptop>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 16 Apr 2018 20:11:26 +0200
+Subject: [PATCH v3 2/2] arm64: dts: exynos: Move syscon poweroff and restart
+ nodes under the PMU
+In-Reply-To: <20180416181126.15629-1-krzk@kernel.org>
+References: <20180416181126.15629-1-krzk@kernel.org>
+Message-ID: <20180416181126.15629-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 11:32:06AM -0700, Jae Hyun Yoo wrote:
-> This commit adds a dt-bindings document of PECI adapter driver for Aspeed
-> AST24xx/25xx SoCs.
-> 
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
-> Reviewed-by: James Feist <james.feist@linux.intel.com>
-> Reviewed-by: Vernon Mauery <vernon.mauery@linux.intel.com>
-> Cc: Alan Cox <alan@linux.intel.com>
-> Cc: Andrew Jeffery <andrew@aj.id.au>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Andy Shevchenko <andriy.shevchenko@intel.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Fengguang Wu <fengguang.wu@intel.com>
-> Cc: Greg KH <gregkh@linuxfoundation.org>
-> Cc: Guenter Roeck <linux@roeck-us.net>
-> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
-> Cc: Jean Delvare <jdelvare@suse.com>
-> Cc: Joel Stanley <joel@jms.id.au>
-> Cc: Julia Cartwright <juliac@eso.teric.us>
-> Cc: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
-> Cc: Milton Miller II <miltonm@us.ibm.com>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: Randy Dunlap <rdunlap@infradead.org>
-> Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
-> Cc: Sumeet R Pawnikar <sumeet.r.pawnikar@intel.com>
-> ---
->  .../devicetree/bindings/peci/peci-aspeed.txt       | 60 ++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/peci/peci-aspeed.txt b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> new file mode 100644
-> index 000000000000..4598bb8c20fa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/peci/peci-aspeed.txt
-> @@ -0,0 +1,60 @@
-> +Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
-> +
-> +Required properties:
-> +- compatible        : Should be "aspeed,ast2400-peci" or "aspeed,ast2500-peci"
-> +		      - aspeed,ast2400-peci: Aspeed AST2400 family PECI
-> +					     controller
-> +		      - aspeed,ast2500-peci: Aspeed AST2500 family PECI
-> +					     controller
-> +- reg               : Should contain PECI controller registers location and
-> +		      length.
-> +- #address-cells    : Should be <1>.
-> +- #size-cells       : Should be <0>.
-> +- interrupts        : Should contain PECI controller interrupt.
-> +- clocks            : Should contain clock source for PECI controller.
-> +		      Should reference clkin.
-> +- clock_frequency   : Should contain the operation frequency of PECI controller
-> +		      in units of Hz.
-> +		      187500 ~ 24000000
+The PMU node is the actual block responsible for power management,
+including typical Exynos on/off/restart procedures.  Therefore the
+syscon poweroff and restart nodes logically belong to it.
 
-This is the frequency of the bus or used to derive it? It would be 
-better to specify the bus frequency instead and have the driver 
-calculate its internal freq. And then use "bus-frequency" instead.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-> +
-> +Optional properties:
-> +- msg-timing-nego   : Message timing negotiation period. This value will
-> +		      determine the period of message timing negotiation to be
-> +		      issued by PECI controller. The unit of the programmed
-> +		      value is four times of PECI clock period.
-> +		      0 ~ 255 (default: 1)
-> +- addr-timing-nego  : Address timing negotiation period. This value will
-> +		      determine the period of address timing negotiation to be
-> +		      issued by PECI controller. The unit of the programmed
-> +		      value is four times of PECI clock period.
-> +		      0 ~ 255 (default: 1)
-> +- rd-sampling-point : Read sampling point selection. The whole period of a bit
-> +		      time will be divided into 16 time frames. This value will
-> +		      determine the time frame in which the controller will
-> +		      sample PECI signal for data read back. Usually in the
-> +		      middle of a bit time is the best.
-> +		      0 ~ 15 (default: 8)
-> +- cmd_timeout_ms    : Command timeout in units of ms.
-> +		      1 ~ 60000 (default: 1000)
+---
 
-s/_/-/
+Previously was "Fix missing missing reg warning for syscon restart
+nodes" to fix DTC warnings like:
 
+    arch/arm64/boot/dts/exynos/exynos7-espresso.dtb: Warning (simple_bus_reg):
+        Node /soc/syscon-reboot missing or empty reg/ranges property
 
-All these either need vendor prefixes or should be standard properties 
-for PECI adapters. I think probably the latter case. If so, the first 
-2 should probably be in units of clocks (not 4 clocks). And they should 
-then be documented in the common PECI binding doc.
+but this warnings are gone in v4.17-rc1 since 9130ba884640
+("scripts/dtc: Update to upstream version v1.4.6-9-gaadd0b65c987")
+---
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 14 +++++++-------
+ arch/arm64/boot/dts/exynos/exynos7.dtsi    | 12 ++++++------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
-> +
-> +Example:
-> +	peci: peci at 1e78b000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0x0 0x1e78b000 0x60>;
-
-No need to show this part in examples.
-
-> +
-> +		peci0: peci-bus at 0 {
-> +			compatible = "aspeed,ast2500-peci";
-> +			reg = <0x0 0x60>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			interrupts = <15>;
-> +			clocks = <&clk_clkin>;
-> +			clock-frequency = <24000000>;
-> +			msg-timing-nego = <1>;
-> +			addr-timing-nego = <1>;
-> +			rd-sampling-point = <8>;
-> +			cmd-timeout-ms = <1000>;
-> +		};
-> +	};
-> -- 
-> 2.16.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index c0231d077fa6..01e49159dd91 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -231,13 +231,6 @@
+ 		cpu_on = <0xC4000003>;
+ 	};
+ 
+-	reboot: syscon-reboot {
+-		compatible = "syscon-reboot";
+-		regmap = <&pmu_system_controller>;
+-		offset = <0x400>; /* SWRESET */
+-		mask = <0x1>;
+-	};
+-
+ 	soc: soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -799,6 +792,13 @@
+ 			#clock-cells = <1>;
+ 			clock-names = "clkout16";
+ 			clocks = <&xxti>;
++
++			reboot: syscon-reboot {
++				compatible = "syscon-reboot";
++				regmap = <&pmu_system_controller>;
++				offset = <0x400>; /* SWRESET */
++				mask = <0x1>;
++			};
+ 		};
+ 
+ 		gic: interrupt-controller at 11001000 {
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index ad9dce6894ce..0b98d2334cad 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -494,13 +494,13 @@
+ 		pmu_system_controller: system-controller at 105c0000 {
+ 			compatible = "samsung,exynos7-pmu", "syscon";
+ 			reg = <0x105c0000 0x5000>;
+-		};
+ 
+-		reboot: syscon-reboot {
+-			compatible = "syscon-reboot";
+-			regmap = <&pmu_system_controller>;
+-			offset = <0x0400>;
+-			mask = <0x1>;
++			reboot: syscon-reboot {
++				compatible = "syscon-reboot";
++				regmap = <&pmu_system_controller>;
++				offset = <0x0400>;
++				mask = <0x1>;
++			};
+ 		};
+ 
+ 		rtc: rtc at 10590000 {
+-- 
+2.14.1
