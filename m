@@ -1,60 +1,195 @@
-From: khandual@linux.vnet.ibm.com (Anshuman Khandual)
-Date: Mon, 16 Apr 2018 14:26:07 +0530
-Subject: [PATCH 01/12] iommu-common: move to arch/sparc
-In-Reply-To: <20180415145947.1248-2-hch@lst.de>
-References: <20180415145947.1248-1-hch@lst.de>
- <20180415145947.1248-2-hch@lst.de>
-Message-ID: <f0305a92-b206-1567-3c25-67fbd194047d@linux.vnet.ibm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 16 Apr 2018 11:06:49 +0200
+Subject: [PATCH v6 26/30] drm/rockchip: psr: Avoid redundant calls to
+ .set() callback
+In-Reply-To: <20180405095000.9756-27-enric.balletbo@collabora.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+ <CGME20180405095305epcas1p11a5082d2f0df9d35b953a4932827be0e@epcas1p1.samsung.com>
+ <20180405095000.9756-27-enric.balletbo@collabora.com>
+Message-ID: <c6a89199-a5e0-abad-3e53-3ef12da076b9@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2018 08:29 PM, Christoph Hellwig wrote:
-> This code is only used by sparc, and all new iommu drivers should use the
-> drivers/iommu/ framework.  Also remove the unused exports.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
+>
+> The first time after we call rockchip_drm_do_flush() after
+> rockchip_drm_psr_register(), we go from PSR_DISABLE to PSR_FLUSH. The
+> difference between PSR_DISABLE and PSR_FLUSH is whether or not we have a
+> delayed work pending - PSR is off in either state.  However
+> psr_set_state() only catches the transition from PSR_FLUSH to
+> PSR_DISABLE (which never happens), while going from PSR_DISABLE to
+> PSR_FLUSH triggers a call to psr->set() to disable PSR while it's
+> already disabled. This triggers the eDP PHY power-on sequence without
+> being shut down first and this seems to occasionally leave the encoder
+> unable to later enable PSR. Let's just simplify the state machine and
+> simply consider PSR_DISABLE and PSR_FLUSH the same state. This lets us
+> represent the hardware state by a simple boolean called "enabled" and,
+> while at it, rename the misleading "active" boolean to "inhibit", which
+> represents the purpose much better.
 
-Right, these functions are used only from SPARC architecture. Simple
-git grep confirms it as well. Hence it makes sense to move them into
-arch code instead.
+This phrase has no corresponding part in the patch.
 
-git grep iommu_tbl_pool_init
-----------------------------
+>
+> Also, userspace can (and does) trigger the rockchip_drm_do_flush() path
+> from drmModeDirtyFB() at any time, whether or the encoder is active. If
+> no mode is set, we call into analogix_dp_psr_set() which returns -EINVAL
+> because encoder->crtc is NULL. Avoid this by starting out with
+> psr->allowed set to false.
 
-arch/sparc/include/asm/iommu-common.h:extern void iommu_tbl_pool_init(struct iommu_map_table *iommu,
-arch/sparc/kernel/iommu-common.c:void iommu_tbl_pool_init(struct iommu_map_table *iommu,
-arch/sparc/kernel/iommu.c:      iommu_tbl_pool_init(&iommu->tbl, num_tsb_entries, IO_PAGE_SHIFT,
-arch/sparc/kernel/ldc.c:        iommu_tbl_pool_init(iommu, num_tsb_entries, PAGE_SHIFT,
-arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_pool_init(&atu->tbl, num_iotte, IO_PAGE_SHIFT,
-arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_pool_init(&iommu->tbl, num_tsb_entries, IO_PAGE_SHIFT,
+ditto
 
-git grep iommu_tbl_range_alloc
-------------------------------
+>
+> Signed-off-by: Kristian H. Kristensen <hoegsberg@chromium.org>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 
-arch/sparc/include/asm/iommu-common.h:extern unsigned long iommu_tbl_range_alloc(struct device *dev,
-arch/sparc/kernel/iommu-common.c:unsigned long iommu_tbl_range_alloc(struct device *dev,
-arch/sparc/kernel/iommu.c:      entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages, NULL,
-arch/sparc/kernel/iommu.c:              entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages,
-arch/sparc/kernel/ldc.c:        entry = iommu_tbl_range_alloc(NULL, &iommu->iommu_map_table,
-arch/sparc/kernel/pci_sun4v.c:  entry = iommu_tbl_range_alloc(dev, tbl, npages, NULL,
-arch/sparc/kernel/pci_sun4v.c:  entry = iommu_tbl_range_alloc(dev, tbl, npages, NULL,
-arch/sparc/kernel/pci_sun4v.c:          entry = iommu_tbl_range_alloc(dev, tbl, npages,
+Original author should be first, 1st line of the patch "From:...."
+suggests it should be Tomasz.
 
-git grep iommu_tbl_range_free
------------------------------
+Regards
+Andrzej
 
-arch/sparc/include/asm/iommu-common.h:extern void iommu_tbl_range_free(struct iommu_map_table *iommu,
-arch/sparc/kernel/iommu-common.c:void iommu_tbl_range_free(struct iommu_map_table *iommu, u64 dma_addr,
-arch/sparc/kernel/iommu.c:      iommu_tbl_range_free(&iommu->tbl, dvma, npages, IOMMU_ERROR_CODE);
-arch/sparc/kernel/iommu.c:      iommu_tbl_range_free(&iommu->tbl, bus_addr, npages, IOMMU_ERROR_CODE);
-arch/sparc/kernel/iommu.c:                      iommu_tbl_range_free(&iommu->tbl, vaddr, npages,
-arch/sparc/kernel/iommu.c:              iommu_tbl_range_free(&iommu->tbl, dma_handle, npages,
-arch/sparc/kernel/ldc.c:        iommu_tbl_range_free(&iommu->iommu_map_table, cookie, npages, entry);
-arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, *dma_addrp, npages, IOMMU_ERROR_CODE);
-arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, dvma, npages, IOMMU_ERROR_CODE);
-arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, bus_addr, npages, IOMMU_ERROR_CODE);
-arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, bus_addr, npages, IOMMU_ERROR_CODE);
-arch/sparc/kernel/pci_sun4v.c:                  iommu_tbl_range_free(tbl, vaddr, npages,
-arch/sparc/kernel/pci_sun4v.c:          iommu_tbl_range_free(tbl, dma_handle, npages,
-
-Reviewed-by: Anshuman Khandual <khandual@linux.vnet.ibm.com>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 79 +++++++++--------------------
+>  1 file changed, 23 insertions(+), 56 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> index c8655e625ba2..448c5fde241c 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> @@ -22,19 +22,13 @@
+>  
+>  #define PSR_FLUSH_TIMEOUT_MS	100
+>  
+> -enum psr_state {
+> -	PSR_FLUSH,
+> -	PSR_ENABLE,
+> -	PSR_DISABLE,
+> -};
+> -
+>  struct psr_drv {
+>  	struct list_head	list;
+>  	struct drm_encoder	*encoder;
+>  
+>  	struct mutex		lock;
+>  	bool			active;
+> -	enum psr_state		state;
+> +	bool			enabled;
+>  
+>  	struct delayed_work	flush_work;
+>  	struct work_struct	disable_work;
+> @@ -78,52 +72,22 @@ static struct psr_drv *find_psr_by_encoder(struct drm_encoder *encoder)
+>  	return psr;
+>  }
+>  
+> -static void psr_set_state_locked(struct psr_drv *psr, enum psr_state state)
+> +static int psr_set_state_locked(struct psr_drv *psr, bool enable)
+>  {
+> -	/*
+> -	 * Allowed finite state machine:
+> -	 *
+> -	 *   PSR_ENABLE  < = = = = = >  PSR_FLUSH
+> -	 *       | ^                        |
+> -	 *       | |                        |
+> -	 *       v |                        |
+> -	 *   PSR_DISABLE < - - - - - - - - -
+> -	 */
+> -	if (state == psr->state || !psr->active)
+> -		return;
+> -
+> -	/* Already disabled in flush, change the state, but not the hardware */
+> -	if (state == PSR_DISABLE && psr->state == PSR_FLUSH) {
+> -		psr->state = state;
+> -		return;
+> -	}
+> +	int ret;
+>  
+> -	/* Actually commit the state change to hardware */
+> -	switch (state) {
+> -	case PSR_ENABLE:
+> -		if (psr->set(psr->encoder, true))
+> -			return;
+> -		break;
+> -
+> -	case PSR_DISABLE:
+> -	case PSR_FLUSH:
+> -		if (psr->set(psr->encoder, false))
+> -			return;
+> -		break;
+> -
+> -	default:
+> -		pr_err("%s: Unknown state %d\n", __func__, state);
+> -		return;
+> -	}
+> +	if (!psr->active)
+> +		return -EINVAL;
+>  
+> -	psr->state = state;
+> -}
+> +	if (enable == psr->enabled)
+> +		return 0;
+>  
+> -static void psr_set_state(struct psr_drv *psr, enum psr_state state)
+> -{
+> -	mutex_lock(&psr->lock);
+> -	psr_set_state_locked(psr, state);
+> -	mutex_unlock(&psr->lock);
+> +	ret = psr->set(psr->encoder, enable);
+> +	if (ret)
+> +		return ret;
+> +
+> +	psr->enabled = enable;
+> +	return 0;
+>  }
+>  
+>  static void psr_flush_handler(struct work_struct *work)
+> @@ -131,10 +95,8 @@ static void psr_flush_handler(struct work_struct *work)
+>  	struct psr_drv *psr = container_of(to_delayed_work(work),
+>  					   struct psr_drv, flush_work);
+>  
+> -	/* If the state has changed since we initiated the flush, do nothing */
+>  	mutex_lock(&psr->lock);
+> -	if (psr->state == PSR_FLUSH)
+> -		psr_set_state_locked(psr, PSR_ENABLE);
+> +	psr_set_state_locked(psr, true);
+>  	mutex_unlock(&psr->lock);
+>  }
+>  
+> @@ -176,6 +138,7 @@ int rockchip_drm_psr_deactivate(struct drm_encoder *encoder)
+>  
+>  	mutex_lock(&psr->lock);
+>  	psr->active = false;
+> +	psr->enabled = false;
+>  	mutex_unlock(&psr->lock);
+>  	cancel_delayed_work_sync(&psr->flush_work);
+>  	cancel_work_sync(&psr->disable_work);
+> @@ -187,8 +150,12 @@ EXPORT_SYMBOL(rockchip_drm_psr_deactivate);
+>  static void rockchip_drm_do_flush(struct psr_drv *psr)
+>  {
+>  	cancel_delayed_work_sync(&psr->flush_work);
+> -	psr_set_state(psr, PSR_FLUSH);
+> -	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
+> +
+> +	mutex_lock(&psr->lock);
+> +	if (!psr_set_state_locked(psr, false))
+> +		mod_delayed_work(system_wq, &psr->flush_work,
+> +				 PSR_FLUSH_TIMEOUT_MS);
+> +	mutex_unlock(&psr->lock);
+>  }
+>  
+>  /**
+> @@ -355,8 +322,8 @@ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+>  	INIT_WORK(&psr->disable_work, psr_disable_handler);
+>  	mutex_init(&psr->lock);
+>  
+> -	psr->active = true;
+> -	psr->state = PSR_DISABLE;
+> +	psr->active = false;
+> +	psr->enabled = false;
+>  	psr->encoder = encoder;
+>  	psr->set = psr_set;
+>  
