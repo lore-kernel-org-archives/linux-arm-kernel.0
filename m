@@ -1,24 +1,57 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 16 Apr 2018 13:59:40 +0200
-Subject: [PATCH] ARM: dts: stm32: Enable stm32mp1 clock driver on
- stm32mp157c
-In-Reply-To: <1521098327-13958-1-git-send-email-gabriel.fernandez@st.com>
-References: <1521098327-13958-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <661fd823-d7ba-bafe-3dc9-93fd0cf134fe@st.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Apr 2018 13:09:30 +0100
+Subject: [PATCH] Replace unnecessary perl with sed, printf, and the shell
+ $(( )) operator.
+In-Reply-To: <9c72100c-b3e4-07ca-1784-fda2ac9d708c@landley.net>
+References: <9c72100c-b3e4-07ca-1784-fda2ac9d708c@landley.net>
+Message-ID: <20180416120930.GS16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
-
-On 03/15/2018 08:18 AM, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Wed, Apr 11, 2018 at 08:38:37PM -0500, Rob Landley wrote:
+> You can build a kernel in a cross compiling environment that doesn't have perl
+> in the $PATH. Commit 429f7a062e3b broke that for 32 bit arm. Fix it.
 > 
-> This patch enables stm32mp1 clock driver.
+> Signed-off-by: Rob Landley <rob@landley.net>
+> ---
 > 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>  arch/arm/boot/compressed/Makefile |    9 ++++-----
+>  1 file changed, 4 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 45a6b9b..33ebeb2 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -117,11 +117,10 @@ ccflags-y := -fpic -mno-single-pic-base -fno-builtin -I$(obj)
+>  asflags-y := -DZIMAGE
+>  
+>  # Supply kernel BSS size to the decompressor via a linker symbol.
+> -KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
+> -		perl -e 'while (<>) { \
+> -			$$bss_start=hex($$1) if /^([[:xdigit:]]+) B __bss_start$$/; \
+> -			$$bss_end=hex($$1) if /^([[:xdigit:]]+) B __bss_stop$$/; \
+> -		}; printf "%d\n", $$bss_end - $$bss_start;')
+> +KBSS_SZ := $(shell echo $$(($$(printf '%d+%d' $$( \
+> +		$(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
+> +		sed -n -e 's/^\([^ ]*\) B __bss_start$$/-0x\1/p' \
+> +		       -e 's/^\([^ ]*\) B __bss_stop$$/0x\1/p') ) )) )
 
+This looks more complicated than necessary, and therefore less readable.
+What's wrong with:
 
-Applied on stm32-next.
+KBSS_SZ := $(shell echo $$(($$($(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
+		sed -n -e 's/^\([^ ]*\) B __bss_start$$/-0x\1/p' \
+		       -e 's/^\([^ ]*\) B __bss_stop$$/+0x\1/p') ))
 
-Thanks.
-Alex
+The sed command produces output such as:
+
+-0xc0955e58
++0xc10b0f9c
+
+which the shell is then able to evaluate and produce a decimal number.
+This seems to work fine with both bash and dash.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
