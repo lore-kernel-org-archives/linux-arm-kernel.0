@@ -1,53 +1,29 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 16 Apr 2018 17:59:10 +0200
-Subject: [PATCH v2 1/6] bus: arm-cci: use asm unreachable
-In-Reply-To: <20180325180959.28008-2-stefan@agner.ch>
-References: <20180325180959.28008-1-stefan@agner.ch>
- <20180325180959.28008-2-stefan@agner.ch>
-Message-ID: <e8746b1e0c9e5ff3f0c392a42aa533b8@agner.ch>
+From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
+Date: Mon, 16 Apr 2018 17:52:44 +0200
+Subject: [PATCH v2 0/2] pinctrl/samsung: Fix incorrect EINTG banks order
+Message-ID: <1523893966-8884-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.03.2018 20:09, Stefan Agner wrote:
-> Mixing asm and C code is not recommended in a naked function by
-> gcc and leads to an error when using clang:
->   drivers/bus/arm-cci.c:2107:2: error: non-ASM statement in naked
->   function is not supported
->         unreachable();
->         ^
-> 
-> While the function is marked __naked it actually properly return
-> in asm. There is no need for the unreachable() call.
+This patch series compose of 2 patches.
 
-Hi Arnd,
+First patch, fixing incorrect order of banks for s5pv210 and exynos5410
 
-I think previously changes to this driver went through one of your
-trees, can you pick this up?
+Second patch, documenting required order of banks
 
---
-Stefan
+Changes from v1:
+  - Limit changes to s5pv210 and Exynos5410. Exynos3250 will be handled later.
+  - Added cc stable
+  - Added fixes tag
+  - Add patch with comments to all banks documenting required order.
 
+Pawe? Chmiel (2):
+  pinctrl/samsung: Correct EINTG banks order
+  pinctrl/samsung: Document required order of banks
 
-> 
-> Suggested-by: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Changes in v2:
-> - Don't add assembly ASM_UNREACHABLE, just drop unreachable()
-> 
->  drivers/bus/arm-cci.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 5426c04fe24b..fc2da3a617ac 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -2103,8 +2103,6 @@ asmlinkage void __naked cci_enable_port_for_self(void)
->  	[sizeof_struct_cpu_port] "i" (sizeof(struct cpu_port)),
->  	[sizeof_struct_ace_port] "i" (sizeof(struct cci_ace_port)),
->  	[offsetof_port_phys] "i" (offsetof(struct cci_ace_port, phys)) );
-> -
-> -	unreachable();
->  }
->  
->  /**
+ drivers/pinctrl/samsung/pinctrl-exynos-arm.c   | 30 ++++++++++++++++++++++++--
+ drivers/pinctrl/samsung/pinctrl-exynos-arm64.c | 20 +++++++++++++++++
+ 2 files changed, 48 insertions(+), 2 deletions(-)
+
+-- 
+2.7.4
