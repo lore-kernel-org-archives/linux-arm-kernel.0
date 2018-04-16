@@ -1,24 +1,25 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 16 Apr 2018 16:44:25 +0800
-Subject: [PATCH V6 2/2] thermal: imx: add i.MX7 thermal sensor support
-In-Reply-To: <20180315005140.GB12096@localhost.localdomain>
-References: <1519955970-11365-1-git-send-email-Anson.Huang@nxp.com>
- <1519955970-11365-2-git-send-email-Anson.Huang@nxp.com>
- <AM3PR04MB13158EE8C129D6AEC605A106F5D20@AM3PR04MB1315.eurprd04.prod.outlook.com>
- <1520923865.3766.4.camel@intel.com>
- <20180315005140.GB12096@localhost.localdomain>
-Message-ID: <20180416084423.GG25429@dragon>
+Date: Mon, 16 Apr 2018 16:44:59 +0800
+Subject: [PATCH] ARM: dts: imx7: Move tempmon node out of bus
+In-Reply-To: <1521136930-14660-1-git-send-email-festevam@gmail.com>
+References: <1521136930-14660-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180416084458.GH25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
-
-On Wed, Mar 14, 2018 at 05:51:42PM -0700, Eduardo Valentin wrote:
-> On Tue, Mar 13, 2018 at 02:51:05PM +0800, Zhang Rui wrote:
-> > yeah, will review it and get back to you later.
+On Thu, Mar 15, 2018 at 03:02:10PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> This is in my tree now.
+> Move tempmon node from soc node to root node.
+>     
+> tempmon node does not have any register properties and thus
+> shouldn't be placed on the bus.
+>     
+> This fixes the following build warning with W=1:
+> 
+> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30000000/tempmon missing or empty reg/ranges property
+> 
+> Fixes: de25b9bb4a40 ("ARM: dts: imx7s: add temperature monitor support")
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-It seems that the patch did not make its way to 4.17-rc1?
-
-Shawn
+Applied, thanks.
