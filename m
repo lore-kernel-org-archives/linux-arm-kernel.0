@@ -1,125 +1,94 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Apr 2018 10:13:56 -0500
-Subject: [PATCH v2 6/6] fsl_pmc: update device bindings
-In-Reply-To: <20180411063551.30368-6-ran.wang_1@nxp.com>
-References: <20180411063551.30368-1-ran.wang_1@nxp.com>
- <20180411063551.30368-6-ran.wang_1@nxp.com>
-Message-ID: <20180416151356.r7si6higfrovl53l@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Apr 2018 16:17:32 +0100
+Subject: 4.16 OMAP serial transmit corruption?
+Message-ID: <20180416151732.GU16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 02:35:51PM +0800, Ran Wang wrote:
-> From: Li Yang <leoli@freescale.com>
+Hi,
 
-Needs a commit msg and the subject should give some indication of what 
-the update is. And also start with "dt-bindings: ..."
+I'm not entirely sure what's going on, but I see corrupted characters
+with the serial console on the OMAP4430 SDP board.  During boot,
+everything seems fine, the problem appears to be userspace output.
 
-> 
-> Signed-off-by: Li Yang <leoyang.li@nxp.com>
-> Signed-off-by: Zhao Chenhui <chenhui.zhao@nxp.com>
-> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> ---
-> Changes in v2:
->   - new file
-> 
->  .../devicetree/bindings/powerpc/fsl/pmc.txt        |   59 +++++++++++--------
->  1 files changed, 34 insertions(+), 25 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt b/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
-> index 07256b7..f1f749f 100644
-> --- a/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
-> +++ b/Documentation/devicetree/bindings/powerpc/fsl/pmc.txt
-> @@ -9,15 +9,20 @@ Properties:
->  
->    "fsl,mpc8548-pmc" should be listed for any chip whose PMC is
->    compatible.  "fsl,mpc8536-pmc" should also be listed for any chip
-> -  whose PMC is compatible, and implies deep-sleep capability.
-> +  whose PMC is compatible, and implies deep-sleep capability and
-> +  wake on user defined packet(wakeup on ARP).
-> +
-> +  "fsl,p1022-pmc" should be listed for any chip whose PMC is
-> +  compatible, and implies lossless Ethernet capability during sleep.
->  
->    "fsl,mpc8641d-pmc" should be listed for any chip whose PMC is
->    compatible; all statements below that apply to "fsl,mpc8548-pmc" also
->    apply to "fsl,mpc8641d-pmc".
->  
->    Compatibility does not include bit assignments in SCCR/PMCDR/DEVDISR; these
-> -  bit assignments are indicated via the sleep specifier in each device's
-> -  sleep property.
-> +  bit assignments are indicated via the clock nodes.  Device which has a
-> +  controllable clock source should have a "fsl,pmc-handle" property pointing
-> +  to the clock node.
->  
->  - reg: For devices compatible with "fsl,mpc8349-pmc", the first resource
->    is the PMC block, and the second resource is the Clock Configuration
-> @@ -33,31 +38,35 @@ Properties:
->    this is a phandle to an "fsl,gtm" node on which timer 4 can be used as
->    a wakeup source from deep sleep.
->  
-> -Sleep specifiers:
-> +Clock nodes:
-> +The clock nodes are to describe the masks in PM controller registers for each
-> +soc clock.
-> +- fsl,pmcdr-mask: For "fsl,mpc8548-pmc"-compatible devices, the mask will be
-> +  ORed into PMCDR before suspend if the device using this clock is the wake-up
-> +  source and need to be running during low power mode; clear the mask if
-> +  otherwise.
->  
-> -  fsl,mpc8349-pmc: Sleep specifiers consist of one cell.  For each bit
-> -  that is set in the cell, the corresponding bit in SCCR will be saved
-> -  and cleared on suspend, and restored on resume.  This sleep controller
-> -  supports disabling and resuming devices at any time.
-> +- fsl,sccr-mask: For "fsl,mpc8349-pmc"-compatible devices, the corresponding
-> +  bit specified by the mask in SCCR will be saved and cleared on suspend, and
-> +  restored on resume.
->  
-> -  fsl,mpc8536-pmc: Sleep specifiers consist of three cells, the third of
-> -  which will be ORed into PMCDR upon suspend, and cleared from PMCDR
-> -  upon resume.  The first two cells are as described for fsl,mpc8578-pmc.
-> -  This sleep controller only supports disabling devices during system
-> -  sleep, or permanently.
-> -
-> -  fsl,mpc8548-pmc: Sleep specifiers consist of one or two cells, the
-> -  first of which will be ORed into DEVDISR (and the second into
-> -  DEVDISR2, if present -- this cell should be zero or absent if the
-> -  hardware does not have DEVDISR2) upon a request for permanent device
-> -  disabling.  This sleep controller does not support configuring devices
-> -  to disable during system sleep (unless supported by another compatible
-> -  match), or dynamically.
+For example, if I edit a file, then quit vi:
 
-You seem to be breaking backwards compatibility with this change. I 
-doubt that is okay on these platforms.
+:q??%??B??Z?root at omap-4430sdp:~#
 
+The hexdump of that is:
 
-> +- fsl,devdisr-mask: Contain one or two cells, depending on the availability of
-> +  DEVDISR2 register.  For compatible devices, the mask will be ORed into DEVDISR
-> +  or DEVDISR2 when the clock should be permenently disabled.
->  
->  Example:
->  
-> -	power at b00 {
-> -		compatible = "fsl,mpc8313-pmc", "fsl,mpc8349-pmc";
-> -		reg = <0xb00 0x100 0xa00 0x100>;
-> -		interrupts = <80 8>;
-> +	power at e0070 {
-> +		compatible = "fsl,mpc8536-pmc", "fsl,mpc8548-pmc";
-> +		reg = <0xe0070 0x20>;
-> +
-> +		etsec1_clk: soc-clk at 24 {
-> +			fsl,pmcdr-mask = <0x00000080>;
-> +		};
-> +		etsec2_clk: soc-clk at 25 {
-> +			fsl,pmcdr-mask = <0x00000040>;
-> +		};
-> +		etsec3_clk: soc-clk at 26 {
-> +			fsl,pmcdr-mask = <0x00000020>;
-> +		};
->  	};
-> -- 
-> 1.7.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+00000000  1b 5b 32 35 3b 31 48 1b  5b 30 4b 3a 71 1b db db  |.[25;1H.[0K:q...|
+                                                     ^^^^^
+00000010  da 25 aa da 8a 42 b5 b4  05 5a fd 72 6f 6f 74 40  |.%...B...Z.root@|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000020  6f 6d 61 70 2d 34 34 33  30 73 64 70 3a 7e 23 20  |omap-4430sdp:~# |
+
+This appears to come from these write calls in vi:
+
+write(1, "\33[25;1H\33[0K:"..., 12)     = 12
+write(1, "q"..., 1)                     = 1
+write(1, "\33[1;1H\r\33[25;1H- kexec-test 1/9 11%\33[0K\33[1;1H"..., 44) = 44
+write(1, "\33[25;1H\33[0K"..., 11)      = 11
+
+It appears to be timing related, as stracing vi produces different output:
+
+- k9?root at omap-4430sdp:~#
+
+00000000  1b 5b 32 35 3b 31 48 1b  5b 30 4b 3a 71 1b 5b 31  |.[25;1H.[0K:q.[1|
+00000010  3b 31 48 0d 1b 5b 32 35  3b 31 48 2d 20 6b 39 ff  |;1H..[25;1H- k9.|
+                                                     ^^^^^
+00000020  72 6f 6f 74 40 6f 6d 61  70 2d 34 34 33 30 73 64  |root at omap-4430sd|
+00000030  70 3a 7e 23 20                                    |p:~# |
+
+Similar, but more severe effects can be seen with "dmesg | less":
+
+00000000  0d 72 6f 6f 74 40 6f 6d  61 70 2d 34 34 33 30 73  |.root at omap-4430s|
+00000010  64 70 3a 7e 23 20 64 6d  65 73 67 20 7c 20 6c 65  |dp:~# dmesg | le|
+00000020  73 73 1b 5b 4a 0d 0a 1b  5b 30 3b 30 48 1b 5b 4b  |ss.[J...[0;0H.[K|
+00000030  0d 0a 1b 5b 4b 7e cd d4  a4 68 b4 b5 ca 35 52 da  |...[K~...h...5R.|
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000040  b4 b5 ca 35 52 da b4 b5  ca 35 52 da b4 b5 ca 35  |...5R....5R....5|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000050  52 da b4 b5 ca 35 52 da  b4 b5 ca 35 52 da b4 b5  |R....5R....5R...|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000060  ca 35 52 da b4 b5 ca 35  52 da b4 b5 ca 35 52 da  |.5R....5R....5R.|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000070  b4 b5 ca 35 52 da b4 b5  ca 35 52 da b4 b5 ca 35  |...5R....5R....5|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000080  52 da b4 b5 ca 35 52 da  b4 b5 ca 35 52 da b4 b5  |R....5R....5R...|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000090  ca 35 52 da b4 25 aa da  82 42 b5 b4 b5 6a b4 75  |.5R..%...B...j.u|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+000000a0  6a cd d1 85 b9 91 85 c9  91 81 4a b9 c1 d5 d1 6d  |j.........J....m|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+000000b0  da c1 6a 6d da c1 da 82  42 b5 b4 b5 4a ea eb 8b  |..jm....B...J...|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+000000c0  57 cb eb 16 12 2a cb ab  17 81 7a b9 81 82 a1 e5  |W....*....z.....|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+000000d0  cd a5 8d 85 b1 81 1a 41  55 81 82 c2 c1 6a 52 b4  |.......AU....jR.|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+000000e0  b4 b5 8a 2a cb ab 17 81  b2 95 c9 cd a5 bd b9 81  |...*............|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+000000f0  a2 72 8a b2 72 82 5a 02  42 92 b5 ad 01 c9 b5 ad  |.r..r.Z.B.......|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000100  b5 82 0d b9 0a c9 b5 b1  a5 b9 d5 e1 b9 7a c9 9d  |.............z..|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000110  b9 aa ad a5 02 42 3a 8d  8d 81 b2 95 c9 cd a5 bd  |.....B:.........|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000120  b9 81 a2 72 ba 72 a2 02  42 3a 35 35 2a 29 09 d2  |...r.r..B:55*)..|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000130  52 53 48 68 b4 b5 0a b2  02 9a d5 05 05 a9 ea cb  |RSHh............|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000140  0b 52 14 2e 2e 48 4c 9b  90 31 33 3a 33 30 3a 30  |.R...HL..13:30:0|
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+00000150  39 20 42 53 54 20 32 30  31 38 0d 0a 1b 5b 4b 43  |9 BST 2018...[KC|
+00000160  50 55 3a 20 41 52 4d 76  37 20 50 72 6f 63 65 73  |PU: ARMv7 Proces|
+
+Since this uses a USB adapter (built onto the board) it could be
+that there could be a bug in the driver for that rather than the
+OMAP4430 SDP, but I've no way to check that hypothesis.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
