@@ -1,21 +1,24 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 16 Apr 2018 16:34:27 +0800
-Subject: [PATCH v1] ARM: dts: imx6qdl-sabreauto: add ecspi dts for
- sabreauto board
-In-Reply-To: <1521627768-942-1-git-send-email-yibin.gong@nxp.com>
-References: <1521627768-942-1-git-send-email-yibin.gong@nxp.com>
-Message-ID: <20180416083426.GF25429@dragon>
+Date: Mon, 16 Apr 2018 16:44:25 +0800
+Subject: [PATCH V6 2/2] thermal: imx: add i.MX7 thermal sensor support
+In-Reply-To: <20180315005140.GB12096@localhost.localdomain>
+References: <1519955970-11365-1-git-send-email-Anson.Huang@nxp.com>
+ <1519955970-11365-2-git-send-email-Anson.Huang@nxp.com>
+ <AM3PR04MB13158EE8C129D6AEC605A106F5D20@AM3PR04MB1315.eurprd04.prod.outlook.com>
+ <1520923865.3766.4.camel@intel.com>
+ <20180315005140.GB12096@localhost.localdomain>
+Message-ID: <20180416084423.GG25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 21, 2018 at 06:22:48PM +0800, Robin Gong wrote:
-> DIN pin of SPI-NOR muxed with I2C3_SDA which connected to one gpio expand
-> chip, thus have to disable all those module which compacted by those gpios
-> if enable SPI-NOR support on Sabreauto board.
-> 
-> Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+Hi Eduardo,
 
-I'm not in the position to maintain a bunch of dts files for a single
-board with different device multiplexing options.
+On Wed, Mar 14, 2018 at 05:51:42PM -0700, Eduardo Valentin wrote:
+> On Tue, Mar 13, 2018 at 02:51:05PM +0800, Zhang Rui wrote:
+> > yeah, will review it and get back to you later.
+> 
+> This is in my tree now.
+
+It seems that the patch did not make its way to 4.17-rc1?
 
 Shawn
