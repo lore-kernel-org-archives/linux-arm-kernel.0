@@ -1,37 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 16 Apr 2018 11:56:55 +0530
-Subject: [PATCH v2] ARM: davinci: dm644x: remove unnecessary
- postcore_initcall()
-In-Reply-To: <bf45cf15-95ea-632b-f03c-cca4ef1d933e@lechnology.com>
-References: <20180406123820.21679-1-nsekhar@ti.com>
- <bf45cf15-95ea-632b-f03c-cca4ef1d933e@lechnology.com>
-Message-ID: <7eef1004-4ae3-95d8-ac78-b9a0ef74e4d0@ti.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Mon, 16 Apr 2018 09:54:03 +0300
+Subject: [PATCH] iio: adc: select buffer for at91-sama5d2_adc
+Message-ID: <1523861643-3419-1-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 April 2018 01:41 AM, David Lechner wrote:
-> On 04/06/2018 07:38 AM, Sekhar Nori wrote:
->> dm644x_init_devices() is unnecessarily implemented as a
->> postcore_initcall().
->>
->> This does not cause any issues now, but creates issues when
->> converting to common clock framework where clocks themselves
->> become platform devices and are initialized later. Because of
->> this, device clock acquisition and runtime PM on that device
->> fails.
->>
->> Move the call to .init_machine() callback along with rest of
->> platform device's registration.
->>
->> While at it, convert it to return void since return value is
->> ignored by caller anyway.
->>
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->> ---
-> 
-> Reviewed-by: David Lechner <david@lechnology.com>
+We need to select the buffer code, otherwise we get build errors
+with undefined functions on the trigger and buffer,
+if we select just IIO and then AT91_SAMA5D2_ADC from menuconfig
 
-Applied to v4.18/soc
+This adds a Kconfig 'select' statement like other ADC
+drivers have it already.
+
+Fixes: 5e1a1da0f8c9 ("iio: adc: at91-sama5d2_adc: add hw trigger and buffer support")
+Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+---
+Hello Jonathan,
+
+While you are at it, I also found this small kconfig issue during my tests.
+Would be good to have as a fix as well.
 
 Thanks,
-Sekhar
+Eugen
+
+ drivers/iio/adc/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+index 15606f2..9da7907 100644
+--- a/drivers/iio/adc/Kconfig
++++ b/drivers/iio/adc/Kconfig
+@@ -158,6 +158,7 @@ config AT91_SAMA5D2_ADC
+ 	depends on ARCH_AT91 || COMPILE_TEST
+ 	depends on HAS_IOMEM
+ 	depends on HAS_DMA
++	select IIO_BUFFER
+ 	select IIO_TRIGGERED_BUFFER
+ 	help
+ 	  Say yes here to build support for Atmel SAMA5D2 ADC which is
+-- 
+2.7.4
