@@ -1,40 +1,43 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 16 Apr 2018 12:09:10 +0200
-Subject: [PATCH v5 4/7] dt-bindings: clock: reset: Add AXG AO Clock and
- Reset Bindings
-In-Reply-To: <1523872752.2601.26.camel@baylibre.com>
-References: <20180409143749.71197-1-yixun.lan@amlogic.com>
- <20180409143749.71197-5-yixun.lan@amlogic.com>
- <1523872752.2601.26.camel@baylibre.com>
-Message-ID: <1523873350.5918.6.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Apr 2018 11:20:32 +0100
+Subject: [PATCH] KVM: arm/arm64: Close VMID generation race
+In-Reply-To: <5AD47578.7010103@huawei.com>
+References: <20180409170706.23541-1-marc.zyngier@arm.com>
+ <20180409205139.GH10904@cbox>
+ <20180410105119.yzzzd4lyvlsvtbfy@lakrids.cambridge.arm.com>
+ <20180410150540.GK10904@cbox>
+ <20180410152419.inzprhuqhx26keuq@lakrids.cambridge.arm.com>
+ <f90f8486-10c7-ce42-94a8-abaabd80ebb7@arm.com> <5ACD6521.5090500@huawei.com>
+ <5AD47578.7010103@huawei.com>
+Message-ID: <09e4f259-a49b-8a5a-6b75-7dacfd90fb0e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
-
-On Mon, 2018-04-16 at 11:59 +0200, Jerome Brunet wrote:
-> On Mon, 2018-04-09 at 22:37 +0800, Yixun Lan wrote:
-> > Add dt-bindings headers for the Meson-AXG's AO clock and
-> > reset controller.
-> > 
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> > ---
-> >  include/dt-bindings/clock/axg-aoclkc.h | 26 ++++++++++++++++++++++++++
-> >  include/dt-bindings/reset/axg-aoclkc.h | 20 ++++++++++++++++++++
-> >  2 files changed, 46 insertions(+)
-> >  create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
-> >  create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
+On 16/04/18 11:05, Shannon Zhao wrote:
 > 
-> Hi Philipp,
 > 
-> Is OK if we take this through clock tree ?
-> The related reset controller is actually part of a clock controller driver.
+> On 2018/4/11 9:30, Shannon Zhao wrote:
+>>
+>> On 2018/4/10 23:37, Marc Zyngier wrote:
 
-Absolutely, this should go in together with the driver.
-I see no risk of merge conflicts here.
+[...]
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>>> I don't mind either way. If you can be bothered to write a proper commit
+>>>> log for this, I'll take it. What I'd really want is Shannon to indicate
+>>>> whether or not this solves the issue he was seeing.
+>>>>
+>> I'll test Marc's patch. This will take about 3 days since it's not 100%
+>> reproducible.
+> Hi Marc,
+> 
+> I've run the test for about 4 days. The issue doesn't appear.
+> So Tested-by: Shannon Zhao <zhaoshenglong@huawei.com>
 
-regards
-Philipp
+Thanks Shannon, much appreciated. I'll send the fix upstream towards the
+end of the week.
+
+Cheers,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
