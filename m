@@ -1,98 +1,32 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 16 Apr 2018 12:35:24 +0200
-Subject: serial: imx: half-duplex RS485 operation with RTS active low
-In-Reply-To: <20180416095436.7mxh4cqdvlyleryr@lnxeinarv.se.axis.com>
-References: <0e88706a05a302201be396d2f03c3e9e@agner.ch>
- <20180416095436.7mxh4cqdvlyleryr@lnxeinarv.se.axis.com>
-Message-ID: <775db0158e310ebb17c6143a5b8ff4cd@agner.ch>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 16 Apr 2018 12:35:36 +0200
+Subject: [PATCH 2/3] ARM: exynos_defconfig: enable S6E63J0X03 panel driver
+In-Reply-To: <20180416103537.29518-1-m.szyprowski@samsung.com>
+References: <20180416103537.29518-1-m.szyprowski@samsung.com>
+ <CGME20180416103544eucas1p232a511004fcda0ee20c94153caa1bff7@eucas1p2.samsung.com>
+Message-ID: <20180416103537.29518-2-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.04.2018 11:54, Einar Vading wrote:
-> On Mon, Apr 16, 2018 at 11:14:32AM +0200, Stefan Agner wrote:
->> Hi,
->>
->> Using upstream I noticed that RS-485 does not work in the default
->> configuration for our platforms (Toradex Apalis/Colibri). Closer
->> debugging shows that it is related to "serial: imx: default to half
->> duplex rs485".
-> 
-> We where struggling a bit with half duplex rs485 too a while ago.
->>
->> We use the i.MX UART in DTE mode and control the RS-485 transceiver
->> using the RTS signal in low-active mode.
->>
->> 	uart-has-rtscts;
->> 	fsl,dte-mode;
->> 	linux,rs485-enabled-at-boot-time;
->> 	rs485-rts-active-low;
->>
->> Using this setting leads to the RTS signal not getting asserted (the
->> oscilloscope only shows a very short fluke before the start bit is
->> sent).
-> 
-> I think this is what we had too. But if I recall we where supposed to be
-> active-high but I think the behavior is the same either way.
+Add Samsung S6E63J0X03 DSI panel driver to enable support for display
+panel on Exynos3250-based Samsung Rinato board.
 
-With v4.17-rc1, active high RTS, DTE in half duplex mode seems to work
-fine (looks good on an oscilloscope). However, active low seems to be
-broken.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
->>
->> However, using
->>
->> 	uart-has-rtscts;
->> 	fsl,dte-mode;
->> 	linux,rs485-enabled-at-boot-time;
->> 	rs485-rts-active-low;
->> 	rs485-rx-during-tx;
->>
->> Asserts the RTS signal low active just fine...
-> 
-> We have a (RTS active high) configuration working for us now with only
-> 
->     uart-has-rtscts
-> 
-> in DT, and then when using the port we do
-> 
->     struct serial_rs485 rs485conf;
->     memset(&rs485conf, 0x00, sizeof(struct serial_rs485));
-> 
->     rs485conf.flags |= SER_RS485_ENABLED;
->     rs485conf.flags |= SER_RS485_RTS_ON_SEND;
->     rs485conf.flags &= ~(SER_RS485_RTS_AFTER_SEND);
-
->From what I can tell, in v4.17-rc1 this should be equivalent to just:
-
- 	linux,rs485-enabled-at-boot-time;
-
-> 
->     f_debug("Calling ioctl...");
->     if (ioctl (fd, TIOCSRS485, &rs485conf) < 0) {
->       f_critical("ioctl serial_rs485 failed");
->       return -1;
->     }
-> 
-> Hope it helps.
-
-Thanks, I will check using RS485 flags via ioctrl.
-
---
-Stefan
-
->>
->> Is this a known problem? Any idea where that could come from? It looks
->> as if the receiver part is actually enabling RTS...?
->>
->> Also, isn't enabling RX even in half-duplex mode quite common in order
->> to detect collisions?
->>
->> --
->> Stefan
-> 
-> // Einar
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 629189c62fd1..85b2369d6b20 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -208,6 +208,7 @@ CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_HDMI=y
+ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_PANEL_SAMSUNG_LD9040=y
++CONFIG_DRM_PANEL_SAMSUNG_S6E63J0X03=y
+ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
+ CONFIG_DRM_NXP_PTN3460=y
+ CONFIG_DRM_PARADE_PS8622=y
+-- 
+2.15.0
