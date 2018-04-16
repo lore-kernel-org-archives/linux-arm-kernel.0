@@ -1,87 +1,101 @@
-From: amworsley@gmail.com (Andrew Worsley)
-Date: Mon, 16 Apr 2018 11:22:48 +1000
-Subject: [PATCH] Further cadence i2c buffer overrun fixes
-In-Reply-To: <20180416012248.25891-1-amworsley@gmail.com>
-References: <20180416012248.25891-1-amworsley@gmail.com>
-Message-ID: <20180416012248.25891-2-amworsley@gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Sun, 15 Apr 2018 21:03:32 -0500
+Subject: [RFC PATCH 0/3] Dealing with the aliases of SI_USER
+In-Reply-To: <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
+ (Linus Torvalds's message of "Sun, 15 Apr 2018 11:16:04 -0700")
+References: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
+ <20180412172051.GK16141@n2100.armlinux.org.uk>
+ <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
+ <20180413094211.GN16141@n2100.armlinux.org.uk>
+ <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
+ <20180413170827.GB16308@e103592.cambridge.arm.com>
+ <20180413175407.GO16141@n2100.armlinux.org.uk>
+ <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
+ <20180413184522.GD16308@e103592.cambridge.arm.com>
+ <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
+ <20180415131206.GR16141@n2100.armlinux.org.uk>
+ <87604sa2fu.fsf_-_@xmission.com>
+ <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
+Message-ID: <87tvsb29hn.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After this set of changes ran over 2 days 17 hours with no i2c failures
-at 200kHz. Previously would lock up with BA (Bus Active) bit set
-continously with in a few hours
+Linus Torvalds <torvalds@linux-foundation.org> writes:
 
-Set the transfer size register *before* triggering the operation by
-setting the i2c address register with the slave address.
+> (
+>
+> On Sun, Apr 15, 2018 at 8:56 AM, Eric W. Biederman
+> <ebiederm@xmission.com> wrote:
+>>
+>> Would you consider the patchset below for -rc2?
+>
+> Ugh.
 
-If the transfer is less than one FIFO length clear the hold bit before
-starting the transfer by writing to the i2c address register.
+The point of this series is to squash the potential for regressions even
+from the weird broken code that fills in fields for si_code 0 that do
+not match SI_USER.
 
-Finally for transfer larger than a FIFO in size clear the hold bit
-just before removing the byte that allows the rest of the transfer
-to fit into the FIFO and then complete.
----
- drivers/i2c/busses/i2c-cadence.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+The copy_siginfo_to_user32 never handled that so we don't need to worry
+about that.  All of the signals that abuse si_code 0 go through
+force_sig_info so signalfd can not catch them.  Which means that only
+copy_siginfo_to_user needs to be worried about.
 
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 925f77dfded8..260bd6c67e1f 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -449,10 +449,10 @@ static irqreturn_t cdns_i2c_master_isr(void *ptr)
- 				break;
- 			}
- 
--			*(id->p_recv_buf)++ =
--				cdns_i2c_readreg(CDNS_I2C_DATA_OFFSET);
- 			if (check_hold && id->recv_count == CDNS_I2C_FIFO_DEPTH + 1)
- 				cdns_i2c_clear_bus_hold(id);
-+			*(id->p_recv_buf)++ =
-+				cdns_i2c_readreg(CDNS_I2C_DATA_OFFSET);
- 			id->recv_count--;
- 			id->curr_recv_count--;
- 
-@@ -492,10 +492,6 @@ static irqreturn_t cdns_i2c_master_isr(void *ptr)
- 		} else if (id->recv_count && !hold_quirk &&
- 						!id->curr_recv_count) {
- 
--			/* Set the slave address in address register*/
--			cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
--						CDNS_I2C_ADDR_OFFSET);
--
- 			if (id->recv_count > CDNS_I2C_TRANSFER_SIZE) {
- 				cdns_i2c_writereg(CDNS_I2C_TRANSFER_SIZE,
- 						CDNS_I2C_XFER_SIZE_OFFSET);
-@@ -505,6 +501,10 @@ static irqreturn_t cdns_i2c_master_isr(void *ptr)
- 						CDNS_I2C_XFER_SIZE_OFFSET);
- 				id->curr_recv_count = id->recv_count;
- 			}
-+
-+			/* write the address register - triggers operation */
-+			cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
-+						CDNS_I2C_ADDR_OFFSET);
- 		}
- 
- 		/* Clear hold (if not repeated start) and signal completion */
-@@ -661,15 +661,15 @@ static void cdns_i2c_mrecv(struct cdns_i2c *id)
- 		cdns_i2c_writereg(id->recv_count, CDNS_I2C_XFER_SIZE_OFFSET);
- 	}
- 
--	/* Set the slave address in address register - triggers operation */
--	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
--	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
--						CDNS_I2C_ADDR_OFFSET);
- 	/* Clear the bus hold flag if bytes to receive is less than FIFO size */
- 	if (!id->bus_hold_flag &&
- 		((id->p_msg->flags & I2C_M_RECV_LEN) != I2C_M_RECV_LEN) &&
- 		(id->recv_count <= CDNS_I2C_FIFO_DEPTH))
- 			cdns_i2c_clear_bus_hold(id);
-+	/* Set the slave address in address register - triggers operation */
-+	cdns_i2c_writereg(CDNS_I2C_ENABLED_INTR_MASK, CDNS_I2C_IER_OFFSET);
-+	cdns_i2c_writereg(id->p_msg->addr & CDNS_I2C_ADDR_MASK,
-+						CDNS_I2C_ADDR_OFFSET);
- }
- 
- /**
--- 
-2.11.0
+Last time I was benchmarking I could not see a difference between
+copying the entire siginfo and only a small part so I don't see
+the point of optimizing now.
+
+For an actual cleanup I intend to go farther than you are proposing and
+convert everthing to the set of helper functions I have added to
+kernel/signal.c force_sig_fault, force_sig_mceerr, force_sig_bnderr,
+force_sig_pkuerr.
+
+When I am done there will be maybe 5 instances of clear_siginfo outside
+of those helper functions.  At which point I won't care if we remove
+clear_siginfo and just use memset.  That is a real improvement
+that looks something like: "105 files changed, 933 insertions(+), 1698 deletions(-)"
+That is my end goal with all of this.
+
+You complained to me about regressions and you are right with the
+current handling of FPE_FIXME TRAP_FIXME the code is not bug compatible
+with old versions of linux, and people have noticed.
+
+What this patchset represents is the bare minimum needed to convert
+copy_siginfo_to_user to a copy_to_user, and remove the possibility
+of regressions.
+
+To that end I need to ensure every struct siginfo in the entire
+kernel is memset to 0.  A structure initializer is absolutely
+not enough.  So I don't mind people thinking clear_siginfo is necessary.
+
+
+To that end clear_siginfo where it does not take the size of
+struct siginfo as a parameter is much less suceptible to typos,
+and allows me to ensure every instance of struct siginfo is fully
+initialized.
+
+I fully intend to remove practically every instance of struct siginfo
+from the architecture specific code, and use the aforementioned helpers.
+The trouble is that some of the architecture code need refactoring
+for that to happen.  Even your proposed init_siginfo can't be widely
+used as a common pattern is to fill in siginfo partially in the
+code with si_code and si_signo being filled in almost last.
+
+So in short.  I intend to remove most of these clear_siginfo calls when
+I remove the siginfos later.  This series is focused on making
+copy_siginfo_to_user simple enough we don't need to use siginfo_layout,
+and thus can be fully backwards compatibile with ourselves and we won't
+need to worry about regressions.  I have aimed to keep this simple
+enough we can merge this after -rc1 because we don't want regressions.
+
+Eric
+
+ps.  I intend to place this change first in my series wether or not it makes
+it into -rc2 so that I can be certain we remove any possible regressions
+in behavior on the buggy architectures.  Then I can take my time and
+ensure the non-trivial changes of refactoring etc are done carefully so
+I don't introduce other bugs.  I need that so I can sleep at night.
+
+pps.  I can look at some of your other suggestions but cleverness leads
+to regressions, and if you are going to complain at me harshly when I
+have been being careful and taking things seriously I am not
+particularly willing to take unnecessary chances.
