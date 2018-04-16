@@ -1,34 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Apr 2018 10:36:55 +0100
-Subject: [PATCH 3/3] mfd: axp20x: Correct AXP806 POK interrupt prefix
-In-Reply-To: <20180329043115.7132-4-wens@csie.org>
-References: <20180329043115.7132-1-wens@csie.org>
- <20180329043115.7132-4-wens@csie.org>
-Message-ID: <20180416093655.d2ni7iypccl72xxu@dell>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Mon, 16 Apr 2018 10:34:55 +0100
+Subject: [RFC 0/3] Renesas RZ/N1D SMP enabler
+Message-ID: <1523871304-48517-1-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Mar 2018, Chen-Yu Tsai wrote:
+*Warning -- this requires the base RZ/N1 support patches already posted *
 
-> When AXP806 support was added, POK was incorrectly expanded to PWROK.
-> However, the datasheet lists them as POK[LSNP], which is the same as
-> on the AXP288. Furthermore, the registers associated with POK functions
-> are the same as the PEK on the other AXP PMICs. This suggests that
-> "POK" means "Power On Key", much like "PEK" means "Power Enable Key",
-> instead of "Power OK".
-> 
-> This patch changes the "PWROK" prefix to "POK" for these interrupts.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mfd/axp20x.c       | 8 ++++----
->  include/linux/mfd/axp20x.h | 8 ++++----
->  2 files changed, 8 insertions(+), 8 deletions(-)
+This is a tentative patch series for enabling the second CA7 of the RZ/N1D.
+It's based on a spin_table method, and it reuses the same binding property
+as that driver.
 
-Applied, thanks.
+One question is: Do i have to document it separately, or is it sufficiently
+clear?
+
+Michel Pollet (3):
+  dt-bindings: cpu: Add Renesas RZ/N1D SMP enable method.
+  ARM: dts: Renesas RZ/N1D SMP enable method
+  arm: shmobile: Add the RZ/N1D SMP enabler driver.
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/boot/dts/r9a06g032.dtsi               |  2 +
+ arch/arm/mach-shmobile/Makefile                |  1 +
+ arch/arm/mach-shmobile/smp-r9a06g032.c         | 87 ++++++++++++++++++++++++++
+ 4 files changed, 91 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
