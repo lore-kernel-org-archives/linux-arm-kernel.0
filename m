@@ -1,57 +1,71 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 16 Apr 2018 19:15:37 -0400
-Subject: [PATCH 1/2] parisc: use the asm-generic version for writeX()
-In-Reply-To: <a727e74f-610c-4722-76e9-c1aca2f9e9bd@bell.net>
-References: <1523916078-23049-1-git-send-email-okaya@codeaurora.org>
- <a727e74f-610c-4722-76e9-c1aca2f9e9bd@bell.net>
-Message-ID: <a7b59f43-cea5-0ead-f528-61899570e353@codeaurora.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 17 Apr 2018 07:17:56 +0800
+Subject: [PATCH 1/5] dt-bindings: allow dwmac-sun8i to use other devices'
+ exported regmap
+In-Reply-To: <20180416184745.tqxyvojtcbage4fu@rob-hp-laptop>
+References: <20180411141641.14675-1-icenowy@aosc.io>
+ <20180411141641.14675-2-icenowy@aosc.io>
+ <20180416184745.tqxyvojtcbage4fu@rob-hp-laptop>
+Message-ID: <04C9F795-2680-4220-A39A-7B7D5FD74C4A@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/16/2018 7:09 PM, John David Anglin wrote:
-> On 2018-04-16 6:01 PM, Sinan Kaya wrote:
->> parisc architecture seems to be mapping writeX() and writeX_relaxed() APIs
->> to __raw_writeX() API.
->>
->> __raw_writeX() API doesn't provide any kind of ordering guarantees.
->> commit 755bd04aaf4b ("io: define stronger ordering for the default writeX()
->> implementation") changed asm-generic implementation to use a more
->> conservative approach towards the writeX() API.
->>
->> Drop the arch specific version and rely on the asm-generic version for
->> parisc since parisc version doesn't seem to do anything special with these
->> macros.
-> ? HOSTLD? scripts/mod/modpost
-> In file included from ./arch/parisc/include/asm/hardirq.h:13:0,
-> ???????????????? from ./include/linux/hardirq.h:9,
-> ???????????????? from arch/parisc/kernel/asm-offsets.c:34:
-> ./include/linux/irq.h: In function 'irq_reg_writel':
-> ./include/linux/irq.h:1114:3: error: implicit declaration of function 'writel' [-Werror=implicit-function-declaration]
-> ?? writel(val, gc->reg_base + reg_offset);
-> ?? ^~~~~~
-> ./include/linux/irq.h: In function 'irq_reg_readl':
-> ./include/linux/irq.h:1123:10: error: implicit declaration of function 'readl' [-Werror=implicit-function-declaration]
-> ?? return readl(gc->reg_base + reg_offset);
-> ????????? ^~~~~
-> cc1: some warnings being treated as errors
-> make[1]: *** [Kbuild:58: arch/parisc/kernel/asm-offsets.s] Error 1
-> 
-> Dave
-> 
-
-Thanks for testing. Can you add this on top and see if it helps?
-
---- a/arch/parisc/include/asm/io.h
-+++ b/arch/parisc/include/asm/io.h
-@@ -259,6 +259,7 @@ extern void outsl (unsigned long port, const void *src, unsigned long count);
-  * value for either 32 or 64 bit mode */
- #define F_EXTEND(x) ((unsigned long)((x) | (0xffffffff00000000ULL)))
- 
-+#include <asm-generic/io.h>
- #include <asm-generic/iomap.h>
 
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+? 2018?4?17? GMT+08:00 ??2:47:45, Rob Herring <robh@kernel.org> ??:
+>On Wed, Apr 11, 2018 at 10:16:37PM +0800, Icenowy Zheng wrote:
+>> On some Allwinner SoCs the EMAC clock register needed by dwmac-sun8i
+>is
+>> in another device's memory space. In this situation dwmac-sun8i can
+>use
+>> a regmap exported by the other device with only the EMAC clock
+>register.
+>
+>If this is a clock, then why not use the clock binding?
+
+EMAC clock register is only the datasheet name. It contains
+MII mode selection and delay chain configuration.
+
+>
+>> 
+>> Document this situation in the dwmac-sun8i device tree binding
+>> documentation.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> ---
+>>  Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+>b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+>> index 3d6d5fa0c4d5..0c5f63a80617 100644
+>> --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+>> +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+>> @@ -20,8 +20,9 @@ Required properties:
+>>  - phy-handle: See ethernet.txt
+>>  - #address-cells: shall be 1
+>>  - #size-cells: shall be 0
+>> -- syscon: A phandle to the syscon of the SoC with one of the
+>following
+>> - compatible string:
+>> +- syscon: A phandle to a device which exports the EMAC clock
+>register as a
+>> + regmap or to the syscon of the SoC with one of the following
+>compatible
+>> + string:
+>>    - allwinner,sun8i-h3-system-controller
+>>    - allwinner,sun8i-v3s-system-controller
+>>    - allwinner,sun50i-a64-system-controller
+>> -- 
+>> 2.15.1
+>> 
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree"
+>in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
