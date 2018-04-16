@@ -1,141 +1,18 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 16 Apr 2018 11:51:01 +0200
-Subject: [PATCH v6 29/30] drm/rockchip: Disallow PSR for the whole
- atomic commit
-In-Reply-To: <20180405095000.9756-30-enric.balletbo@collabora.com>
-References: <20180405095000.9756-1-enric.balletbo@collabora.com>
- <CGME20180405095119epcas5p1964fcfc777686af4216a7ff6acd964ce@epcas5p1.samsung.com>
- <20180405095000.9756-30-enric.balletbo@collabora.com>
-Message-ID: <ccd0d30a-e01e-fc56-5983-54ca7c1dbe24@samsung.com>
+From: khandual@linux.vnet.ibm.com (Anshuman Khandual)
+Date: Mon, 16 Apr 2018 15:13:04 +0530
+Subject: [PATCH 04/12] iommu-helper: move the IOMMU_HELPER config symbol
+ to lib/
+In-Reply-To: <20180415145947.1248-5-hch@lst.de>
+References: <20180415145947.1248-1-hch@lst.de>
+ <20180415145947.1248-5-hch@lst.de>
+Message-ID: <69224eb2-7056-4894-36d8-c6e9518df647@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
-> From: Tomasz Figa <tfiga@chromium.org>
->
-> Currently PSR flush is triggered from CRTC's .atomic_begin() callback,
-> which is executed after modeset disables and enables and before plane
-> updates are committed. Since PSR flush and re-enable can be triggered
-> asynchronously by external sources (input event, delayed work), it can
-> race with hardware programming done in the aforementioned stages.
->
-> This patch blocks the PSR completely before hardware programming part
-> begins and unblock after it ends. This relies on reference counted PSR
-> disable introduced with previous patch.
->
-> Cc: Kristian H. Kristensen <hoegsberg@chromium.org>
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Sean Paul <seanpaul@chromium.org>
-> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->
->  drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 61 ++++++++++++++++++++++++++++-
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  7 ----
->  2 files changed, 60 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> index e266539e04e5..d4f4118b482d 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> @@ -167,8 +167,67 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
->  	return ERR_PTR(ret);
->  }
->  
-> +static void
-> +rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
-> +{
-> +	struct drm_crtc *crtc;
-> +	struct drm_crtc_state *crtc_state;
-> +	struct drm_encoder *encoder;
-> +	u32 encoder_mask = 0;
-> +	int i;
-> +
-> +	for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
-> +		encoder_mask |= crtc_state->encoder_mask;
-> +		encoder_mask |= crtc->state->encoder_mask;
+On 04/15/2018 08:29 PM, Christoph Hellwig wrote:
+> This way we have one central definition of it, and user can select it as
+> needed.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-Looks clever and cryptic. More readable would be with
-for_each_oldnew_crtc_in_state.
-Anyway:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-
-?--
-Regards
-Andrzej
-
-> +	}
-> +
-> +	drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
-> +		rockchip_drm_psr_inhibit_get(encoder);
-> +}
-> +
-> +static void
-> +rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
-> +{
-> +	struct drm_crtc *crtc;
-> +	struct drm_crtc_state *crtc_state;
-> +	struct drm_encoder *encoder;
-> +	u32 encoder_mask = 0;
-> +	int i;
-> +
-> +	for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
-> +		encoder_mask |= crtc_state->encoder_mask;
-> +		encoder_mask |= crtc->state->encoder_mask;
-> +	}
-> +
-> +	drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
-> +		rockchip_drm_psr_inhibit_put(encoder);
-> +}
-> +
-> +static void
-> +rockchip_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
-> +{
-> +	struct drm_device *dev = old_state->dev;
-> +
-> +	rockchip_drm_psr_inhibit_get_state(old_state);
-> +
-> +	drm_atomic_helper_commit_modeset_disables(dev, old_state);
-> +
-> +	drm_atomic_helper_commit_modeset_enables(dev, old_state);
-> +
-> +	drm_atomic_helper_commit_planes(dev, old_state,
-> +					DRM_PLANE_COMMIT_ACTIVE_ONLY);
-> +
-> +	rockchip_drm_psr_inhibit_put_state(old_state);
-> +
-> +	drm_atomic_helper_commit_hw_done(old_state);
-> +
-> +	drm_atomic_helper_wait_for_vblanks(dev, old_state);
-> +
-> +	drm_atomic_helper_cleanup_planes(dev, old_state);
-> +}
-> +
->  static const struct drm_mode_config_helper_funcs rockchip_mode_config_helpers = {
-> -	.atomic_commit_tail = drm_atomic_helper_commit_tail_rpm,
-> +	.atomic_commit_tail = rockchip_atomic_helper_commit_tail_rpm,
->  };
->  
->  static const struct drm_mode_config_funcs rockchip_drm_mode_config_funcs = {
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 00f7f3441cf6..f14a10ca4792 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -1029,16 +1029,9 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
->  	}
->  }
->  
-> -static void vop_crtc_atomic_begin(struct drm_crtc *crtc,
-> -				  struct drm_crtc_state *old_crtc_state)
-> -{
-> -	rockchip_drm_psr_flush(crtc);
-> -}
-> -
->  static const struct drm_crtc_helper_funcs vop_crtc_helper_funcs = {
->  	.mode_fixup = vop_crtc_mode_fixup,
->  	.atomic_flush = vop_crtc_atomic_flush,
-> -	.atomic_begin = vop_crtc_atomic_begin,
->  	.atomic_enable = vop_crtc_atomic_enable,
->  	.atomic_disable = vop_crtc_atomic_disable,
->  };
+Reviewed-by: Anshuman Khandual <khandual@linux.vnet.ibm.com>
