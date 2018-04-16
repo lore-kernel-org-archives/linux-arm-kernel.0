@@ -1,110 +1,87 @@
-From: todor.tomov@linaro.org (Todor Tomov)
-Date: Mon, 16 Apr 2018 11:48:59 +0300
-Subject: [dragonboard] [PATCH 1/1] dts: qcom: db820c: Add gpio-line-names
- property
-In-Reply-To: <20180414031811.11351-2-manivannan.sadhasivam@linaro.org>
-References: <20180414031811.11351-1-manivannan.sadhasivam@linaro.org>
- <20180414031811.11351-2-manivannan.sadhasivam@linaro.org>
-Message-ID: <9acdd412-9b6d-ec63-c5ca-c5fa8d98d489@linaro.org>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 16 Apr 2018 10:55:33 +0200
+Subject: [PATCH v6 25/30] drm/rockchip: Cancel PSR enable work before
+ changing the state
+In-Reply-To: <20180405095000.9756-26-enric.balletbo@collabora.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+ <CGME20180405095309epcas2p429f551f81c6fee6e6c7ed674318f4bf2@epcas2p4.samsung.com>
+ <20180405095000.9756-26-enric.balletbo@collabora.com>
+Message-ID: <39f15f1d-c984-d328-4d1f-dc115f71b98f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mani,
-
-Thank you for the patch.
-
-On 14.04.2018 06:18, Manivannan Sadhasivam wrote:
-> Add gpio-line-names property for Dragonboard820c based on APQ8096 SoC.
-> There are 4 gpio-controllers present on this board, including the
-> APQ8096 SoC, PM8994 (GPIO and MPP) and PMI8994 (GPIO).
-> 
-> Lines names are derived from 96Boards CE Specification 1.0, Appendix
-> "Expansion Connector Signal Description". Line names for PMI8994 MPP
-> pins are not added due to the absence of the gpio-controller support.
-> 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
+>
+> If we change the state first and reschedule later, we might have the
+> work executed according to previous scheduled time and end up with PSR
+> re-enabled instantly. Let's cancel the work before changing the state.
+>
+> While at it, consolidate psr_disable_handler() to just call
+> rockchip_drm_do_flush(), as they are both supposed to do the same.
+>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 240 +++++++++++++++++++++++++++
->  1 file changed, 240 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-> index 1c8f1b86472d..1c1deef031c6 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-> @@ -19,6 +19,34 @@
->  #include <dt-bindings/input/input.h>
->  #include <dt-bindings/gpio/gpio.h>
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 20 ++++++++------------
+>  1 file changed, 8 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> index a107845ba97c..c8655e625ba2 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> @@ -138,18 +138,6 @@ static void psr_flush_handler(struct work_struct *work)
+>  	mutex_unlock(&psr->lock);
+>  }
 >  
-> +/*
-> + * GPIO name legend: proper name = the GPIO line is used as GPIO
-> + *         NC      = not connected (pin out but not routed from the chip to
-> + *                   anything the board)
-> + *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
-> + *         LSEC    = Low Speed External Connector
-> + *         HSEC    = High Speed External Connector
-> + *         P HSEC  = Primary High Speed External Connector
-> + *         S HSEC  = Secondary High Speed External Connector
-> + *         J14     = Camera Connector
-> + *         TP      = Test Points
-> + *
-> + * Line names are taken from the schematic "DragonBoard 820c",
-> + * drawing no: LM25-P2751-1
-> + *
-> + * For the lines routed to the external connectors the
-> + * lines are named after the 96Boards CE Specification 1.0,
-> + * Appendix "Expansion Connector Signal Description".
-> + *
-> + * When the 96Board naming of a line and the schematic name of
-> + * the same line are in conflict, the 96Board specification
-> + * takes precedence, which means that the external UART on the
-> + * LSEC is named UART0 while the schematic and SoC names this
-> + * UART3. This is only for the informational lines i.e. "[FOO]",
+> -static void psr_disable_handler(struct work_struct *work)
+> -{
+> -	struct psr_drv *psr = container_of(work, struct psr_drv, disable_work);
+> -
+> -	/* If the state has changed since we initiated the flush, do nothing */
+> -	mutex_lock(&psr->lock);
+> -	if (psr->state == PSR_ENABLE)
+> -		psr_set_state_locked(psr, PSR_FLUSH);
+> -	mutex_unlock(&psr->lock);
+> -	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
+> -}
+> -
+>  /**
+>   * rockchip_drm_psr_activate - activate PSR on the given pipe
+>   * @encoder: encoder to obtain the PSR encoder
+> @@ -198,6 +186,7 @@ EXPORT_SYMBOL(rockchip_drm_psr_deactivate);
+>  
+>  static void rockchip_drm_do_flush(struct psr_drv *psr)
+>  {
+> +	cancel_delayed_work_sync(&psr->flush_work);
+>  	psr_set_state(psr, PSR_FLUSH);
+>  	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
 
-It seems to me that this can lead to some confusion for cases when
-some schematic names have 96board names and others don't. (An
-example below.) However I don't really see any better way to do
-it. I'm wondering whether adding the schematic name in
-the comment (for gpios which are named with 96board names)
-can help a little. What do you think? Or any other idea?
+I guess you can change it to schedule_delayed_work then.
 
-> + * the GPIO named lines "GPIO-A" thru "GPIO-L" are the only
-> + * ones actually used for GPIO.
-> + */
+Anyway:
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+
+?--
+Regards
+Andrzej
+
+
+>  }
+> @@ -244,6 +233,13 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev)
+>  }
+>  EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
+>  
+> +static void psr_disable_handler(struct work_struct *work)
+> +{
+> +	struct psr_drv *psr = container_of(work, struct psr_drv, disable_work);
 > +
->  / {
->  	aliases {
->  		serial0 = &blsp2_uart1;
-> @@ -90,6 +118,218 @@
->  			status = "okay";
->  		};
->  
-> +		pinctrl at 1010000 {
-> +			gpio-line-names =
-> +				"[SPI0_DOUT]", /* GPIO_0, LSEC pin 14 */
-> +				"[SPI0_DIN]", /* GPIO_1, LSEC pin 10 */
-> +				"[SPI0_CS]", /* GPIO_2, LSEC pin 12 */
-> +				"[SPI0_SCLK]", /* GPIO_3, LSEC pin 8 */
-> +				"[UART1_TxD]", /* GPIO_4, LSEC pin 11 */
-> +				"[UART1_RxD]", /* GPIO_5, LSEC pin 13 */
-> +				"[I2C1_SDA]", /* GPIO_6, LSEC pin 21 */
-> +				"[I2C1_SCL]", /* GPIO_7, LSEC pin 19 */
-> +				"GPIO-H", /* GPIO_8, LSEC pin 30 */
-> +				"TP93", /* GPIO_9 */
-> +				"GPIO-G", /* GPIO_10, LSEC pin 29 */
-> +				"[MDP_VSYNC_S]", /* GPIO_11, P HSEC pin 55 */
-> +				"NC", /* GPIO_12 */
-> +				"[CSI0_MCLK]", /* GPIO_13, P HSEC pin 15 */
-> +				"[CAM_MCLK1]", /* GPIO_14, J14 pin 11 */
-> +				"[CSI1_MCLK]", /* GPIO_15, P HSEC pin 17 */
-
-This could be a little misleading.
-96Board name / schametic name:
-CSI0_MCLK / CAM_MCLK0
---------- / CAM_MCLK1
-CSI1_MCLK / CAM_MCLK2
-
-<snip>
-
--- 
-Best regards,
-Todor Tomov
+> +	rockchip_drm_do_flush(psr);
+> +}
+> +
+>  static void psr_input_event(struct input_handle *handle,
+>  			    unsigned int type, unsigned int code,
+>  			    int value)
