@@ -1,19 +1,203 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Apr 2018 15:38:52 -0500
-Subject: [PATCH 3/9] dt-bindings: bcm: Add Raspberry Pi 3 B+
-In-Reply-To: <1523640478-4448-4-git-send-email-stefan.wahren@i2se.com>
+Date: Mon, 16 Apr 2018 15:43:31 -0500
+Subject: [PATCH 4/9] ARM: dts: bcm2837: Add Raspberry Pi 3 B+
+In-Reply-To: <1523640478-4448-5-git-send-email-stefan.wahren@i2se.com>
 References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
- <1523640478-4448-4-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20180416203852.ks7dimndljshcadv@rob-hp-laptop>
+ <1523640478-4448-5-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20180416204331.ft4ehpe5statsw4u@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2018 at 07:27:52PM +0200, Stefan Wahren wrote:
-> This adds the root properties for the Raspberry Pi 3 B+
+On Fri, Apr 13, 2018 at 07:27:53PM +0200, Stefan Wahren wrote:
+> The Raspberry Pi 3 B+ has the following major differences compared
+> to the model 3 B:
+> * Microchip LAN7515 (Gigabit Ethernet)
+> * Cypress CYW43455 (802.11n/ac and BT 4.2)
 > 
+> We need to add the USB LAN chip so the bootloader can add the MAC address.
+> This is necessary because there ain't a EEPROM or a valid OTP.  
+> 
+> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
 > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 > ---
->  Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/boot/dts/Makefile                 |   1 +
+>  arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts | 108 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi |  27 ++++++++
+>  3 files changed, 136 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
+>  create mode 100644 arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 7e24249..a300a35 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -75,6 +75,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+>  	bcm2835-rpi-a-plus.dtb \
+>  	bcm2836-rpi-2-b.dtb \
+>  	bcm2837-rpi-3-b.dtb \
+> +	bcm2837-rpi-3-b-plus.dtb \
+>  	bcm2835-rpi-zero.dtb \
+>  	bcm2835-rpi-zero-w.dtb
+>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
+> new file mode 100644
+> index 0000000..4adb85e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
+> @@ -0,0 +1,108 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/dts-v1/;
+> +#include "bcm2837.dtsi"
+> +#include "bcm2835-rpi.dtsi"
+> +#include "bcm283x-rpi-lan7515.dtsi"
+> +#include "bcm283x-rpi-usb-host.dtsi"
+> +
+> +/ {
+> +	compatible = "raspberrypi,3-model-b-plus", "brcm,bcm2837";
+> +	model = "Raspberry Pi 3 Model B+";
+> +
+> +	chosen {
+> +		/* 8250 auxiliary UART instead of pl011 */
+> +		stdout-path = "serial1:115200n8";
+> +	};
+> +
+> +	memory {
+> +		reg = <0 0x40000000>;
+> +	};
+> +
+> +	leds {
+> +		act {
+> +			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		pwr {
+> +			label = "PWR";
+> +			gpios = <&expgpio 2 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	wifi_pwrseq: wifi-pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> +
+> +&firmware {
+> +	expgpio: gpio {
+> +		compatible = "raspberrypi,firmware-gpio";
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		gpio-line-names = "BT_ON",
+> +				  "WL_ON",
+> +				  "STATUS_LED",
+> +				  "LAN_RUN",
+> +				  "",
+> +				  "CAM_GPIO0",
+> +				  "CAM_GPIO1",
+> +				  "";
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +&hdmi {
+> +	hpd-gpios = <&gpio 28 GPIO_ACTIVE_LOW>;
+> +};
+> +
+> +&pwm {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
+> +	status = "okay";
+> +};
+> +
+> +/* SDHCI is used to control the SDIO for wireless */
+> +&sdhci {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emmc_gpio34>;
+> +	status = "okay";
+> +	bus-width = <4>;
+> +	non-removable;
+> +	mmc-pwrseq = <&wifi_pwrseq>;
+> +
+> +	brcmf: wifi at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +	};
+> +};
+> +
+> +/* SDHOST is used to drive the SD card */
+> +&sdhost {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdhost_gpio48>;
+> +	status = "okay";
+> +	bus-width = <4>;
+> +};
+> +
+> +/* uart0 communicates with the BT module */
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_ctsrts_gpio30 &uart0_gpio32 &gpclk2_gpio43>;
+> +	status = "okay";
+> +
+> +	bluetooth {
+> +		compatible = "brcm,bcm43438-bt";
+> +		max-speed = <2000000>;
+> +		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> +
+> +/* uart1 is mapped to the pin header */
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart1_gpio14>;
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
+> new file mode 100644
+> index 0000000..169203c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Why the separate file? This can be shared?
+
+> @@ -0,0 +1,27 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/ {
+> +	aliases {
+> +		ethernet0 = &ethernet;
+> +	};
+> +};
+> +
+> +&usb {
+> +	usb1 at 1 {
+> +		compatible = "usb424,2514";
+> +		reg = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		usb1_1 at 1 {
+
+usb-port at 1
+
+> +			compatible = "usb424,2514";
+
+There's really 2 levels of hubs?
+
+> +			reg = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			ethernet: usbether at 1 {
+
+ethernet at 1
+
+> +				compatible = "usb424,7800";
+> +				reg = <1>;
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
