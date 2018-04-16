@@ -1,107 +1,29 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 16 Apr 2018 13:35:27 -0600
-Subject: [PATCH 3/3] coresight: Grouping all perf tools oriented section
- together
-In-Reply-To: <1523907327-20979-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1523907327-20979-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1523907327-20979-4-git-send-email-mathieu.poirier@linaro.org>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Mon, 16 Apr 2018 16:42:29 -0300
+Subject: [PATCH v6 24/30] drm/rockchip: Disable PSR on input events
+In-Reply-To: <20180405095000.9756-25-enric.balletbo@collabora.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+ <20180405095000.9756-25-enric.balletbo@collabora.com>
+Message-ID: <aec7e2d36b4599f77bc419b8fe7c415815529c2f.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch groups together section pertaining to the perf tools.  That way
-everything is at the same place rather than spread out.
+On Thu, 2018-04-05 at 11:49 +0200, Enric Balletbo i Serra wrote:
+> From: "Kristian H. Kristensen" <hoegsberg@google.com>
+> 
+> To improve PSR exit latency, we speculatively start exiting when we
+> receive input events. Occasionally, this may lead to false positives,
+> but most of the time we get a head start on coming out of PSR.
+> Depending
+> on how userspace takes to produce a new frame in response to the
+> event,
+> this can completely hide the exit latency. In case of Chrome OS, we
+> typically get the input notifier 50ms or more before the dirty_fb
+> triggered exit.
+> 
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- Documentation/trace/coresight.txt | 72 +++++++++++++++++++--------------------
- 1 file changed, 36 insertions(+), 36 deletions(-)
+Why is this rockchip-specific? It sounds more like something
+we'd want to integrate generically for drivers to leverage.
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-index 8caae8050a60..32c5b159e8fc 100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -345,42 +345,7 @@ More information on the above and other example on how to use Coresight with
- the perf tools can be found in the "HOWTO.md" file of the openCSD gitHub
- repository [3].
- 
--How to use the STM module
---------------------------
--
--Using the System Trace Macrocell module is the same as the tracers - the only
--difference is that clients are driving the trace capture rather
--than the program flow through the code.
--
--As with any other CoreSight component, specifics about the STM tracer can be
--found in sysfs with more information on each entry being found in [1]:
--
--root at genericarmv8:~# ls /sys/bus/coresight/devices/20100000.stm
--enable_source   hwevent_select  port_enable     subsystem       uevent
--hwevent_enable  mgmt            port_select     traceid
--root at genericarmv8:~#
--
--Like any other source a sink needs to be identified and the STM enabled before
--being used:
--
--root at genericarmv8:~# echo 1 > /sys/bus/coresight/devices/20010000.etf/enable_sink
--root at genericarmv8:~# echo 1 > /sys/bus/coresight/devices/20100000.stm/enable_source
--
--From there user space applications can request and use channels using the devfs
--interface provided for that purpose by the generic STM API:
--
--root at genericarmv8:~# ls -l /dev/20100000.stm
--crw-------    1 root     root       10,  61 Jan  3 18:11 /dev/20100000.stm
--root at genericarmv8:~#
--
--Details on how to use the generic STM API can be found here [2].
--
--[1]. Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
--[2]. Documentation/trace/stm.txt
--
--
--Using perf tools
------------------
-+2.1) AutoFDO analysis using the perf tools:
- 
- perf can be used to record and analyze trace of programs.
- 
-@@ -428,3 +393,38 @@ sort example is from the AutoFDO tutorial (https://gcc.gnu.org/wiki/AutoFDO/Tuto
- 	$ taskset -c 2 ./sort_autofdo
- 	Bubble sorting array of 30000 elements
- 	5806 ms
-+
-+
-+How to use the STM module
-+-------------------------
-+
-+Using the System Trace Macrocell module is the same as the tracers - the only
-+difference is that clients are driving the trace capture rather
-+than the program flow through the code.
-+
-+As with any other CoreSight component, specifics about the STM tracer can be
-+found in sysfs with more information on each entry being found in [1]:
-+
-+root at genericarmv8:~# ls /sys/bus/coresight/devices/20100000.stm
-+enable_source   hwevent_select  port_enable     subsystem       uevent
-+hwevent_enable  mgmt            port_select     traceid
-+root at genericarmv8:~#
-+
-+Like any other source a sink needs to be identified and the STM enabled before
-+being used:
-+
-+root at genericarmv8:~# echo 1 > /sys/bus/coresight/devices/20010000.etf/enable_sink
-+root at genericarmv8:~# echo 1 > /sys/bus/coresight/devices/20100000.stm/enable_source
-+
-+From there user space applications can request and use channels using the devfs
-+interface provided for that purpose by the generic STM API:
-+
-+root at genericarmv8:~# ls -l /dev/20100000.stm
-+crw-------    1 root     root       10,  61 Jan  3 18:11 /dev/20100000.stm
-+root at genericarmv8:~#
-+
-+Details on how to use the generic STM API can be found here [2].
-+
-+[1]. Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
-+[2]. Documentation/trace/stm.txt
-+[3]. https://github.com/Linaro/perf-opencsd
--- 
-2.7.4
+Regards,
+Eze
