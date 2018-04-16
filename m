@@ -1,87 +1,60 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 16 Apr 2018 10:55:33 +0200
-Subject: [PATCH v6 25/30] drm/rockchip: Cancel PSR enable work before
- changing the state
-In-Reply-To: <20180405095000.9756-26-enric.balletbo@collabora.com>
-References: <20180405095000.9756-1-enric.balletbo@collabora.com>
- <CGME20180405095309epcas2p429f551f81c6fee6e6c7ed674318f4bf2@epcas2p4.samsung.com>
- <20180405095000.9756-26-enric.balletbo@collabora.com>
-Message-ID: <39f15f1d-c984-d328-4d1f-dc115f71b98f@samsung.com>
+From: khandual@linux.vnet.ibm.com (Anshuman Khandual)
+Date: Mon, 16 Apr 2018 14:26:07 +0530
+Subject: [PATCH 01/12] iommu-common: move to arch/sparc
+In-Reply-To: <20180415145947.1248-2-hch@lst.de>
+References: <20180415145947.1248-1-hch@lst.de>
+ <20180415145947.1248-2-hch@lst.de>
+Message-ID: <f0305a92-b206-1567-3c25-67fbd194047d@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
-> From: Tomasz Figa <tfiga@chromium.org>
->
-> If we change the state first and reschedule later, we might have the
-> work executed according to previous scheduled time and end up with PSR
-> re-enabled instantly. Let's cancel the work before changing the state.
->
-> While at it, consolidate psr_disable_handler() to just call
-> rockchip_drm_do_flush(), as they are both supposed to do the same.
->
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->
->  drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 20 ++++++++------------
->  1 file changed, 8 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-> index a107845ba97c..c8655e625ba2 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
-> @@ -138,18 +138,6 @@ static void psr_flush_handler(struct work_struct *work)
->  	mutex_unlock(&psr->lock);
->  }
->  
-> -static void psr_disable_handler(struct work_struct *work)
-> -{
-> -	struct psr_drv *psr = container_of(work, struct psr_drv, disable_work);
-> -
-> -	/* If the state has changed since we initiated the flush, do nothing */
-> -	mutex_lock(&psr->lock);
-> -	if (psr->state == PSR_ENABLE)
-> -		psr_set_state_locked(psr, PSR_FLUSH);
-> -	mutex_unlock(&psr->lock);
-> -	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
-> -}
-> -
->  /**
->   * rockchip_drm_psr_activate - activate PSR on the given pipe
->   * @encoder: encoder to obtain the PSR encoder
-> @@ -198,6 +186,7 @@ EXPORT_SYMBOL(rockchip_drm_psr_deactivate);
->  
->  static void rockchip_drm_do_flush(struct psr_drv *psr)
->  {
-> +	cancel_delayed_work_sync(&psr->flush_work);
->  	psr_set_state(psr, PSR_FLUSH);
->  	mod_delayed_work(system_wq, &psr->flush_work, PSR_FLUSH_TIMEOUT_MS);
+On 04/15/2018 08:29 PM, Christoph Hellwig wrote:
+> This code is only used by sparc, and all new iommu drivers should use the
+> drivers/iommu/ framework.  Also remove the unused exports.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-I guess you can change it to schedule_delayed_work then.
+Right, these functions are used only from SPARC architecture. Simple
+git grep confirms it as well. Hence it makes sense to move them into
+arch code instead.
 
-Anyway:
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+git grep iommu_tbl_pool_init
+----------------------------
 
-?--
-Regards
-Andrzej
+arch/sparc/include/asm/iommu-common.h:extern void iommu_tbl_pool_init(struct iommu_map_table *iommu,
+arch/sparc/kernel/iommu-common.c:void iommu_tbl_pool_init(struct iommu_map_table *iommu,
+arch/sparc/kernel/iommu.c:      iommu_tbl_pool_init(&iommu->tbl, num_tsb_entries, IO_PAGE_SHIFT,
+arch/sparc/kernel/ldc.c:        iommu_tbl_pool_init(iommu, num_tsb_entries, PAGE_SHIFT,
+arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_pool_init(&atu->tbl, num_iotte, IO_PAGE_SHIFT,
+arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_pool_init(&iommu->tbl, num_tsb_entries, IO_PAGE_SHIFT,
 
+git grep iommu_tbl_range_alloc
+------------------------------
 
->  }
-> @@ -244,6 +233,13 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev)
->  }
->  EXPORT_SYMBOL(rockchip_drm_psr_flush_all);
->  
-> +static void psr_disable_handler(struct work_struct *work)
-> +{
-> +	struct psr_drv *psr = container_of(work, struct psr_drv, disable_work);
-> +
-> +	rockchip_drm_do_flush(psr);
-> +}
-> +
->  static void psr_input_event(struct input_handle *handle,
->  			    unsigned int type, unsigned int code,
->  			    int value)
+arch/sparc/include/asm/iommu-common.h:extern unsigned long iommu_tbl_range_alloc(struct device *dev,
+arch/sparc/kernel/iommu-common.c:unsigned long iommu_tbl_range_alloc(struct device *dev,
+arch/sparc/kernel/iommu.c:      entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages, NULL,
+arch/sparc/kernel/iommu.c:              entry = iommu_tbl_range_alloc(dev, &iommu->tbl, npages,
+arch/sparc/kernel/ldc.c:        entry = iommu_tbl_range_alloc(NULL, &iommu->iommu_map_table,
+arch/sparc/kernel/pci_sun4v.c:  entry = iommu_tbl_range_alloc(dev, tbl, npages, NULL,
+arch/sparc/kernel/pci_sun4v.c:  entry = iommu_tbl_range_alloc(dev, tbl, npages, NULL,
+arch/sparc/kernel/pci_sun4v.c:          entry = iommu_tbl_range_alloc(dev, tbl, npages,
+
+git grep iommu_tbl_range_free
+-----------------------------
+
+arch/sparc/include/asm/iommu-common.h:extern void iommu_tbl_range_free(struct iommu_map_table *iommu,
+arch/sparc/kernel/iommu-common.c:void iommu_tbl_range_free(struct iommu_map_table *iommu, u64 dma_addr,
+arch/sparc/kernel/iommu.c:      iommu_tbl_range_free(&iommu->tbl, dvma, npages, IOMMU_ERROR_CODE);
+arch/sparc/kernel/iommu.c:      iommu_tbl_range_free(&iommu->tbl, bus_addr, npages, IOMMU_ERROR_CODE);
+arch/sparc/kernel/iommu.c:                      iommu_tbl_range_free(&iommu->tbl, vaddr, npages,
+arch/sparc/kernel/iommu.c:              iommu_tbl_range_free(&iommu->tbl, dma_handle, npages,
+arch/sparc/kernel/ldc.c:        iommu_tbl_range_free(&iommu->iommu_map_table, cookie, npages, entry);
+arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, *dma_addrp, npages, IOMMU_ERROR_CODE);
+arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, dvma, npages, IOMMU_ERROR_CODE);
+arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, bus_addr, npages, IOMMU_ERROR_CODE);
+arch/sparc/kernel/pci_sun4v.c:  iommu_tbl_range_free(tbl, bus_addr, npages, IOMMU_ERROR_CODE);
+arch/sparc/kernel/pci_sun4v.c:                  iommu_tbl_range_free(tbl, vaddr, npages,
+arch/sparc/kernel/pci_sun4v.c:          iommu_tbl_range_free(tbl, dma_handle, npages,
+
+Reviewed-by: Anshuman Khandual <khandual@linux.vnet.ibm.com>
