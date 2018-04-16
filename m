@@ -1,34 +1,36 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 16 Apr 2018 18:19:21 +0200
-Subject: [PATCH v4 6/6] ARM: dts: stm32: Enable pwm3 input capture on
- stm32f429i-eval
-In-Reply-To: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
-References: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1523895561-4073-7-git-send-email-fabrice.gasnier@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 16 Apr 2018 18:27:33 +0200
+Subject: [PATCH] ARM: dts: renesas: replace toshiba, mmc-wrprotect-disable
+ with disable-wp
+In-Reply-To: <1523890952-20866-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1523890952-20866-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAMuHMdWYOPPzo6HJF5H+L8x6vWwcQMCYS-eV-Xz0AS2FtQ8c1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable pwm3 input capture on stm32f429i-eval, by using DMA.
+Hi Yamada-san,
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- arch/arm/boot/dts/stm32429i-eval.dts | 3 +++
- 1 file changed, 3 insertions(+)
+On Mon, Apr 16, 2018 at 5:02 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Follow up commit 788778b0d21a ("mmc: tmio: deprecate "toshiba,
+> mmc-wrprotect-disable" DT property").
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 7eb786a..88d878a 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -290,6 +290,9 @@
- &timers3 {
- 	status = "okay";
- 
-+	/* Enable PWM input capture by using dma */
-+	dmas = <&dma1 4 5 0x400 0x0>;
-+	dma-names = "ch1";
- 	pwm {
- 		pinctrl-0 = <&pwm3_pins>;
- 		pinctrl-names = "default";
+Thanks for following up this work.
+
+(I had the exact same changes queued up in my local branch, to be sent out
+ after v4.17-rc1, but you beat me to it ;-)
+
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-1.9.1
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
