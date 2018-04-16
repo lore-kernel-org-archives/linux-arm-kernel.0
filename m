@@ -1,25 +1,110 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 16 Apr 2018 16:44:59 +0800
-Subject: [PATCH] ARM: dts: imx7: Move tempmon node out of bus
-In-Reply-To: <1521136930-14660-1-git-send-email-festevam@gmail.com>
-References: <1521136930-14660-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180416084458.GH25429@dragon>
+From: todor.tomov@linaro.org (Todor Tomov)
+Date: Mon, 16 Apr 2018 11:48:59 +0300
+Subject: [dragonboard] [PATCH 1/1] dts: qcom: db820c: Add gpio-line-names
+ property
+In-Reply-To: <20180414031811.11351-2-manivannan.sadhasivam@linaro.org>
+References: <20180414031811.11351-1-manivannan.sadhasivam@linaro.org>
+ <20180414031811.11351-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <9acdd412-9b6d-ec63-c5ca-c5fa8d98d489@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 15, 2018 at 03:02:10PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Move tempmon node from soc node to root node.
->     
-> tempmon node does not have any register properties and thus
-> shouldn't be placed on the bus.
->     
-> This fixes the following build warning with W=1:
-> 
-> arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30000000/tempmon missing or empty reg/ranges property
-> 
-> Fixes: de25b9bb4a40 ("ARM: dts: imx7s: add temperature monitor support")
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Mani,
 
-Applied, thanks.
+Thank you for the patch.
+
+On 14.04.2018 06:18, Manivannan Sadhasivam wrote:
+> Add gpio-line-names property for Dragonboard820c based on APQ8096 SoC.
+> There are 4 gpio-controllers present on this board, including the
+> APQ8096 SoC, PM8994 (GPIO and MPP) and PMI8994 (GPIO).
+> 
+> Lines names are derived from 96Boards CE Specification 1.0, Appendix
+> "Expansion Connector Signal Description". Line names for PMI8994 MPP
+> pins are not added due to the absence of the gpio-controller support.
+> 
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 240 +++++++++++++++++++++++++++
+>  1 file changed, 240 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+> index 1c8f1b86472d..1c1deef031c6 100644
+> --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+> @@ -19,6 +19,34 @@
+>  #include <dt-bindings/input/input.h>
+>  #include <dt-bindings/gpio/gpio.h>
+>  
+> +/*
+> + * GPIO name legend: proper name = the GPIO line is used as GPIO
+> + *         NC      = not connected (pin out but not routed from the chip to
+> + *                   anything the board)
+> + *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
+> + *         LSEC    = Low Speed External Connector
+> + *         HSEC    = High Speed External Connector
+> + *         P HSEC  = Primary High Speed External Connector
+> + *         S HSEC  = Secondary High Speed External Connector
+> + *         J14     = Camera Connector
+> + *         TP      = Test Points
+> + *
+> + * Line names are taken from the schematic "DragonBoard 820c",
+> + * drawing no: LM25-P2751-1
+> + *
+> + * For the lines routed to the external connectors the
+> + * lines are named after the 96Boards CE Specification 1.0,
+> + * Appendix "Expansion Connector Signal Description".
+> + *
+> + * When the 96Board naming of a line and the schematic name of
+> + * the same line are in conflict, the 96Board specification
+> + * takes precedence, which means that the external UART on the
+> + * LSEC is named UART0 while the schematic and SoC names this
+> + * UART3. This is only for the informational lines i.e. "[FOO]",
+
+It seems to me that this can lead to some confusion for cases when
+some schematic names have 96board names and others don't. (An
+example below.) However I don't really see any better way to do
+it. I'm wondering whether adding the schematic name in
+the comment (for gpios which are named with 96board names)
+can help a little. What do you think? Or any other idea?
+
+> + * the GPIO named lines "GPIO-A" thru "GPIO-L" are the only
+> + * ones actually used for GPIO.
+> + */
+> +
+>  / {
+>  	aliases {
+>  		serial0 = &blsp2_uart1;
+> @@ -90,6 +118,218 @@
+>  			status = "okay";
+>  		};
+>  
+> +		pinctrl at 1010000 {
+> +			gpio-line-names =
+> +				"[SPI0_DOUT]", /* GPIO_0, LSEC pin 14 */
+> +				"[SPI0_DIN]", /* GPIO_1, LSEC pin 10 */
+> +				"[SPI0_CS]", /* GPIO_2, LSEC pin 12 */
+> +				"[SPI0_SCLK]", /* GPIO_3, LSEC pin 8 */
+> +				"[UART1_TxD]", /* GPIO_4, LSEC pin 11 */
+> +				"[UART1_RxD]", /* GPIO_5, LSEC pin 13 */
+> +				"[I2C1_SDA]", /* GPIO_6, LSEC pin 21 */
+> +				"[I2C1_SCL]", /* GPIO_7, LSEC pin 19 */
+> +				"GPIO-H", /* GPIO_8, LSEC pin 30 */
+> +				"TP93", /* GPIO_9 */
+> +				"GPIO-G", /* GPIO_10, LSEC pin 29 */
+> +				"[MDP_VSYNC_S]", /* GPIO_11, P HSEC pin 55 */
+> +				"NC", /* GPIO_12 */
+> +				"[CSI0_MCLK]", /* GPIO_13, P HSEC pin 15 */
+> +				"[CAM_MCLK1]", /* GPIO_14, J14 pin 11 */
+> +				"[CSI1_MCLK]", /* GPIO_15, P HSEC pin 17 */
+
+This could be a little misleading.
+96Board name / schametic name:
+CSI0_MCLK / CAM_MCLK0
+--------- / CAM_MCLK1
+CSI1_MCLK / CAM_MCLK2
+
+<snip>
+
+-- 
+Best regards,
+Todor Tomov
