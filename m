@@ -1,61 +1,72 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 16 Apr 2018 18:19:16 +0200
-Subject: [PATCH v4 1/6] dt-bindings: mfd: stm32-timers: add support for dmas
+Date: Mon, 16 Apr 2018 18:19:19 +0200
+Subject: [PATCH v4 4/6] pwm: stm32: improve capture by tuning counter prescaler
 In-Reply-To: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
 References: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1523895561-4073-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1523895561-4073-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DMAs to STM32 timers. STM32 Timers can support up to 7
-dma requests: up to 4 channels, update, compare and trigger.
-DMAs may be used to transfer data from pwm capture for instance.
-DMA support is made optional, PWM capture support is also an option.
-This is much more wise system-wide to avoid shortage on DMA request
-lines as there's significant amount of timer instances that can
-request up to 7 channels.
+Currently, capture is based on timeout window to configure prescaler.
+PWM capture framework provides 1s window at the time of writing.
+
+There's place for improvement, after input signal has been captured once:
+- Finer tune counter clock prescaler, by using 1st capture result (with
+arbitrary margin).
+- Do a 2nd capture, with scaled capture window.
+This increases accuracy, especially at high rates.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Acked-by: Thierry Reding <thierry.reding@gmail.com>
 ---
- .../devicetree/bindings/mfd/stm32-timers.txt         | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Changes in v2:
+- Adopt DMA read from MFD core.
+---
+ drivers/pwm/pwm-stm32.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/stm32-timers.txt b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-index 1db6e00..0e900b5 100644
---- a/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-+++ b/Documentation/devicetree/bindings/mfd/stm32-timers.txt
-@@ -19,6 +19,11 @@ Required parameters:
- Optional parameters:
- - resets:		Phandle to the parent reset controller.
- 			See ../reset/st,stm32-rcc.txt
-+- dmas:			List of phandle to dma channels that can be used for
-+			this timer instance. There may be up to 7 dma channels.
-+- dma-names:		List of dma names. Must match 'dmas' property. Valid
-+			names are: "ch1", "ch2", "ch3", "ch4", "up", "trig",
-+			"com".
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+index ed3961b..9a50acd 100644
+--- a/drivers/pwm/pwm-stm32.c
++++ b/drivers/pwm/pwm-stm32.c
+@@ -168,7 +168,7 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+ 	unsigned long long prd, div, dty;
+ 	unsigned long rate;
+-	unsigned int psc = 0;
++	unsigned int psc = 0, scale;
+ 	u32 raw_prd, raw_dty;
+ 	int ret = 0;
  
- Optional subnodes:
- - pwm:			See ../pwm/pwm-stm32.txt
-@@ -44,3 +49,18 @@ Example:
- 			reg = <0>;
- 		};
- 	};
+@@ -219,6 +219,28 @@ static int stm32_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	if (ret)
+ 		goto stop;
+ 
++	/*
++	 * Got a capture. Try to improve accuracy at high rates:
++	 * - decrease counter clock prescaler, scale up to max rate.
++	 */
++	if (raw_prd) {
++		u32 max_arr = priv->max_arr - 0x1000; /* arbitrary margin */
 +
-+Example with all dmas:
-+	timer at 40010000 {
-+		...
-+		dmas = <&dmamux1 11 0x400 0x0>,
-+		       <&dmamux1 12 0x400 0x0>,
-+		       <&dmamux1 13 0x400 0x0>,
-+		       <&dmamux1 14 0x400 0x0>,
-+		       <&dmamux1 15 0x400 0x0>,
-+		       <&dmamux1 16 0x400 0x0>,
-+		       <&dmamux1 17 0x400 0x0>;
-+		dma-names = "ch1", "ch2", "ch3", "ch4", "up", "trig", "com";
-+		...
-+		child nodes...
-+	};
++		scale = max_arr / min(max_arr, raw_prd);
++	} else {
++		scale = priv->max_arr; /* bellow resolution, use max scale */
++	}
++
++	if (psc && scale > 1) {
++		/* 2nd measure with new scale */
++		psc /= scale;
++		regmap_write(priv->regmap, TIM_PSC, psc);
++		ret = stm32_pwm_raw_capture(priv, pwm, tmo_ms, &raw_prd,
++					    &raw_dty);
++		if (ret)
++			goto stop;
++	}
++
+ 	prd = (unsigned long long)raw_prd * (psc + 1) * NSEC_PER_SEC;
+ 	result->period = DIV_ROUND_UP_ULL(prd, rate);
+ 	dty = (unsigned long long)raw_dty * (psc + 1) * NSEC_PER_SEC;
 -- 
 1.9.1
