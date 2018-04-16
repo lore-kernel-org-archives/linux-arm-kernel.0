@@ -1,153 +1,34 @@
 From: baolin.wang@linaro.org (Baolin Wang)
-Date: Mon, 16 Apr 2018 10:40:03 +0800
-Subject: [PATCH 1/2] arm64: dts: Add GPIO and GPIO keys device nodes
-Message-ID: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
+Date: Mon, 16 Apr 2018 10:40:04 +0800
+Subject: [PATCH 2/2] arm64: dts: Add the rtc enable clock for watchdog
+In-Reply-To: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
+References: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
+Message-ID: <bc450ea82fe7fbec7e7f74c5cdc8a37d202fe526.1523846102.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device nodes to enable one GPIO controller located on
-digital chip, 2 EIC (external interrupt controller) controllers loacted
-on PMIC and digital chip for Spreadtrum SC9860 platform.
-
-Moreover this patch adds 3 GPIO keys relied on EIC controller to support
-power key and volume up/down keys.
+Add the rtc enable clock for watchdog controller to make it work well.
 
 Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 ---
- arch/arm64/boot/dts/sprd/sc2731.dtsi |   11 ++++++++
- arch/arm64/boot/dts/sprd/sc9860.dtsi |   30 ++++++++++++++++++++
- arch/arm64/boot/dts/sprd/whale2.dtsi |   50 ++++++++++++++++++++++++++++++++++
- 3 files changed, 91 insertions(+)
+ arch/arm64/boot/dts/sprd/whale2.dtsi |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/sprd/sc2731.dtsi b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-index 4331006..98d3b4f 100644
---- a/arch/arm64/boot/dts/sprd/sc2731.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-@@ -24,6 +24,17 @@
- 			interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		pmic_eic: gpio at 300 {
-+			compatible = "sprd,sc27xx-eic";
-+			reg = <0x300>;
-+			interrupt-parent = <&sc2731_pmic>;
-+			interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
- 		regulators {
- 			compatible = "sprd,sc27xx-regulator";
- 
-diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-index 5dbfb79..3066a55 100644
---- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-@@ -7,6 +7,8 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- #include "whale2.dtsi"
- 
- / {
-@@ -679,5 +681,33 @@
- 				};
- 			};
- 		};
-+
-+		gpio-keys {
-+			compatible = "gpio-keys";
-+
-+			key-volumedown {
-+				label = "Volume Down Key";
-+				linux,code = <KEY_VOLUMEDOWN>;
-+				gpios = <&eic_debounce 2 GPIO_ACTIVE_LOW>;
-+				debounce-interval = <2>;
-+				wakeup-source;
-+			};
-+
-+			key-volumeup {
-+				label = "Volume Up Key";
-+				linux,code = <KEY_VOLUMEUP>;
-+				gpios = <&pmic_eic 10 GPIO_ACTIVE_HIGH>;
-+				debounce-interval = <2>;
-+				wakeup-source;
-+			};
-+
-+			key-power {
-+				label = "Power Key";
-+				linux,code = <KEY_POWER>;
-+				gpios = <&pmic_eic 1 GPIO_ACTIVE_HIGH>;
-+				debounce-interval = <2>;
-+				wakeup-source;
-+			};
-+		};
- 	};
- };
 diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index 66a881e..bf7e70c 100644
+index bf7e70c..e9db910 100644
 --- a/arch/arm64/boot/dts/sprd/whale2.dtsi
 +++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -154,6 +154,56 @@
- 				clocks = <&aon_gate CLK_SPLK_EB>;
+@@ -214,8 +214,9 @@
+ 				reg = <0 0x40310000 0 0x1000>;
+ 				interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 				timeout-sec = <12>;
+-				clock-names = "enable";
+-				clocks = <&aon_gate CLK_APCPU_WDG_EB>;
++				clock-names = "enable", "rtc_enable";
++				clocks = <&aon_gate CLK_APCPU_WDG_EB>,
++				       <&aon_gate CLK_AP_WDG_RTC_EB>;
  			};
+ 		};
  
-+			eic_debounce: gpio at 40210000 {
-+				compatible = "sprd,sc9860-eic-debounce";
-+				reg = <0 0x40210000 0 0x80>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			eic_latch: gpio at 40210080 {
-+				compatible = "sprd,sc9860-eic-latch";
-+				reg = <0 0x40210080 0 0x20>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			eic_async: gpio at 402100a0 {
-+				compatible = "sprd,sc9860-eic-async";
-+				reg = <0 0x402100a0 0 0x20>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			eic_sync: gpio at 402100c0 {
-+				compatible = "sprd,sc9860-eic-sync";
-+				reg = <0 0x402100c0 0 0x20>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			ap_gpio: gpio at 40280000 {
-+				compatible = "sprd,sc9860-gpio";
-+				reg = <0 0x40280000 0 0x1000>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
- 			pin_controller: pinctrl at 402a0000 {
- 				compatible = "sprd,sc9860-pinctrl";
- 				reg = <0 0x402a0000 0 0x10000>;
 -- 
 1.7.9.5
