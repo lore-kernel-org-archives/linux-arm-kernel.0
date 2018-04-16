@@ -1,47 +1,29 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 16 Apr 2018 11:34:05 +0200
-Subject: [PATCH 3/3] usb: gadget: udc: atmel: Fix indenting
-In-Reply-To: <20180416093405.16612-1-romain.izard.pro@gmail.com>
-References: <20180416093405.16612-1-romain.izard.pro@gmail.com>
-Message-ID: <20180416093405.16612-4-romain.izard.pro@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Apr 2018 10:36:18 +0100
+Subject: [PATCH 1/3] mfd: axp20x: Const-ify struct mfd_cell and struct
+ resource
+In-Reply-To: <20180329043115.7132-2-wens@csie.org>
+References: <20180329043115.7132-1-wens@csie.org>
+ <20180329043115.7132-2-wens@csie.org>
+Message-ID: <20180416093618.2ajissetbjfpjck5@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the fallout of the conversion to GPIO descriptors in 3df034081021.
+On Thu, 29 Mar 2018, Chen-Yu Tsai wrote:
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+> The axp20x driver has lots of mfd_cell and resource structs.
+> These can all be const-ified.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/axp20x.c       | 44 ++++++++++++++++++++++----------------------
+>  include/linux/mfd/axp20x.h |  2 +-
+>  2 files changed, 23 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index b9623e228609..2f586f2bda7e 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -2277,15 +2277,15 @@ static int usba_udc_probe(struct platform_device *pdev)
- 	if (udc->vbus_pin) {
- 		irq_set_status_flags(gpiod_to_irq(udc->vbus_pin), IRQ_NOAUTOEN);
- 		ret = devm_request_threaded_irq(&pdev->dev,
--					gpiod_to_irq(udc->vbus_pin), NULL,
--					usba_vbus_irq_thread, USBA_VBUS_IRQFLAGS,
--					"atmel_usba_udc", udc);
--			if (ret) {
--				udc->vbus_pin = NULL;
--				dev_warn(&udc->pdev->dev,
--					 "failed to request vbus irq; "
--					 "assuming always on\n");
--			}
-+				gpiod_to_irq(udc->vbus_pin), NULL,
-+				usba_vbus_irq_thread, USBA_VBUS_IRQFLAGS,
-+				"atmel_usba_udc", udc);
-+		if (ret) {
-+			udc->vbus_pin = NULL;
-+			dev_warn(&udc->pdev->dev,
-+				 "failed to request vbus irq; "
-+				 "assuming always on\n");
-+		}
- 	}
- 
- 	ret = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
+Applied, thanks.
+
 -- 
-2.14.1
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
