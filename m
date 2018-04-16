@@ -1,25 +1,22 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 Apr 2018 13:09:10 +0200
-Subject: [PATCH v2 10/19] dt-bindings: dmaengine: rcar-dmac: document
- R8A77965 support
-In-Reply-To: <1519139541-18783-11-git-send-email-jacopo+renesas@jmondi.org>
+Date: Mon, 16 Apr 2018 13:12:06 +0200
+Subject: [PATCH v2 15/19] dt-bindings: gpio: Add support for r8a77965
+In-Reply-To: <1519139541-18783-16-git-send-email-jacopo+renesas@jmondi.org>
 References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-11-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdWS+6g=e-jzve74530zR-fw43oLeJaa+h7TWZ0nyjgMwg@mail.gmail.com>
+ <1519139541-18783-16-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdW4k+GROdy6kKT-3jd7YYGVbKvieyCSEWXGXJyvZg7NGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Jacopo,
 
 On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> Add documentation for r8a77965 compatible string to rcar-dmac device
-> tree bindings documentation.
+> Add compatible string for R-Car M3-N (r8a77965) in gpio-rcar.
 >
 > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-Can you please resend to the DMA engine maintainer?
+Can you please resend to the GPIO maintainer?
 Thanks!
 
 Gr{oetje,eeting}s,
