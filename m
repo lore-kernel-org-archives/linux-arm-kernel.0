@@ -1,25 +1,38 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 16 Apr 2018 20:23:12 +0200
-Subject: [PATCH 3/3] ARM: multi_v7_config: enable S6E63J0X03 panel driver
-In-Reply-To: <20180416103537.29518-3-m.szyprowski@samsung.com>
-References: <20180416103537.29518-1-m.szyprowski@samsung.com>
- <CGME20180416103544eucas1p2cfe8f3c07710237706da176107e839fd@eucas1p2.samsung.com>
- <20180416103537.29518-3-m.szyprowski@samsung.com>
-Message-ID: <20180416182312.sd4cwk32m6ethb7x@kozik-lap>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 16 Apr 2018 20:28:31 +0200
+Subject: [PATCH] MAINTAINERS: Update e-mail address for Christoffer Dall
+Message-ID: <20180416182831.4035-1-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 12:35:37PM +0200, Marek Szyprowski wrote:
-> Add a module with Samsung S6E63J0X03 DSI panel driver to enable support
-> for display panel on Exynos3250-based Samsung Rinato board.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
+Update my e-mail address to a working address.
 
-Thanks, applied.
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ MAINTAINERS | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0a1410d5a621..3e9c99d2620b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7738,7 +7738,7 @@ F:	arch/x86/include/asm/svm.h
+ F:	arch/x86/kvm/svm.c
+ 
+ KERNEL VIRTUAL MACHINE FOR ARM (KVM/arm)
+-M:	Christoffer Dall <christoffer.dall@linaro.org>
++M:	Christoffer Dall <christoffer.dall@arm.com>
+ M:	Marc Zyngier <marc.zyngier@arm.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	kvmarm at lists.cs.columbia.edu
+@@ -7752,7 +7752,7 @@ F:	virt/kvm/arm/
+ F:	include/kvm/arm_*
+ 
+ KERNEL VIRTUAL MACHINE FOR ARM64 (KVM/arm64)
+-M:	Christoffer Dall <christoffer.dall@linaro.org>
++M:	Christoffer Dall <christoffer.dall@arm.com>
+ M:	Marc Zyngier <marc.zyngier@arm.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	kvmarm at lists.cs.columbia.edu
+-- 
+2.14.2
