@@ -1,46 +1,35 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 16 Apr 2018 17:40:18 +0200
-Subject: [PATCH 3/6] spi: spi-s3c64xx: Drop unused enable_datapath()
- function argument
+Date: Mon, 16 Apr 2018 17:40:19 +0200
+Subject: [PATCH 4/6] spi: spi-s3c64xx: Do not ignore timeout errors in
+ polling I/O mode
 In-Reply-To: <20180416154021.25626-1-s.nawrocki@samsung.com>
 References: <20180416154021.25626-1-s.nawrocki@samsung.com>
- <CGME20180416154122epcas1p1ae714af12f8da08783c47fcd820c40e7@epcas1p1.samsung.com>
-Message-ID: <20180416154021.25626-3-s.nawrocki@samsung.com>
+ <CGME20180416154130epcas1p492c86e911db645acf32d960281e8b297@epcas1p4.samsung.com>
+Message-ID: <20180416154021.25626-4-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi pointer argument is not used now so remove it. While at it
-s3c64xx_ prefix is added to the function name.
+Currently timeout errors in polling I/O mode transfer are silently ignored.
+Fix it by returning an error when we time out waiting on the RX FIFO level
+to reach the transfer length.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/spi/spi-s3c64xx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index b7333a883442..e90e60bc1ecc 100644
+index e90e60bc1ecc..d87fa7d9fad3 100644
 --- a/drivers/spi/spi-s3c64xx.c
 +++ b/drivers/spi/spi-s3c64xx.c
-@@ -348,9 +348,8 @@ static bool s3c64xx_spi_can_dma(struct spi_master *master,
- 	return xfer->len > (FIFO_LVL_MASK(sdd) >> 1) + 1;
- }
-
--static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
--				struct spi_device *spi,
--				struct spi_transfer *xfer, int dma_mode)
-+static void s3c64xx_enable_datapath(struct s3c64xx_spi_driver_data *sdd,
-+				    struct spi_transfer *xfer, int dma_mode)
- {
- 	void __iomem *regs = sdd->regs;
- 	u32 modecfg, chcfg;
-@@ -665,7 +664,7 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
- 	sdd->state &= ~RXBUSY;
- 	sdd->state &= ~TXBUSY;
-
--	enable_datapath(sdd, spi, xfer, use_dma);
-+	s3c64xx_enable_datapath(sdd, xfer, use_dma);
-
- 	/* Start the signals */
- 	s3c64xx_spi_set_cs(spi, true);
---
+@@ -502,6 +502,8 @@ static int wait_for_pio(struct s3c64xx_spi_driver_data *sdd,
+ 		status = readl(regs + S3C64XX_SPI_STATUS);
+ 	} while (RX_FIFO_LVL(status, sdd) < xfer->len && --val);
+ 
++	if (!val)
++		return -EIO;
+ 
+ 	/* If it was only Tx */
+ 	if (!xfer->rx_buf) {
+-- 
 2.14.2
