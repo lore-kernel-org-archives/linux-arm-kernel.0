@@ -1,97 +1,88 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 16 Apr 2018 11:25:46 +0100
-Subject: [PATCH v2 14/17] kvm: arm64: Switch to per VM IPA limit
-In-Reply-To: <87muy7vzoy.fsf@e105922-lin.cambridge.arm.com>
-References: <1522156531-28348-1-git-send-email-suzuki.poulose@arm.com>
- <1522156531-28348-15-git-send-email-suzuki.poulose@arm.com>
- <87muy7vzoy.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <684e0890-6dde-58e3-7e9b-6839f6597c67@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 16 Apr 2018 12:29:11 +0200
+Subject: serial: imx: half-duplex RS485 operation with RTS active low
+In-Reply-To: <20180416092257.frbmooduhm4zrhhl@pengutronix.de>
+References: <0e88706a05a302201be396d2f03c3e9e@agner.ch>
+ <20180416092257.frbmooduhm4zrhhl@pengutronix.de>
+Message-ID: <c6059022d48191909d030584f981d1a2@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/18 17:27, Punit Agrawal wrote:
-> Hi Suzuki,
+On 16.04.2018 11:22, Uwe Kleine-K?nig wrote:
+> Hi Stefan,
 > 
-> I haven't had a chance to look at the code but noticed one issue below.
+> On Mon, Apr 16, 2018 at 11:14:32AM +0200, Stefan Agner wrote:
+>> Using upstream I noticed that RS-485 does not work in the default
+>> configuration for our platforms (Toradex Apalis/Colibri). Closer
 > 
-> Suzuki K Poulose <suzuki.poulose@arm.com> writes:
+> This is an i.MX6?
 > 
->> Now that we can manage the stage2 page table per VM, switch the
->> configuration details to per VM instance. We keep track of the
->> IPA bits, number of page table levels and the VTCR bits (which
->> depends on the IPA and the number of levels). While at it, remove
->> unused pgd_lock field from kvm_arch for arm64.
+
+Yes, sorry about that.
+
+But I think it is i.MX UART specific, I noticed the same behavior on
+i.MX 7 too.
+
+>> debugging shows that it is related to "serial: imx: default to half
+>> duplex rs485".
 >>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@kernel.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   arch/arm64/include/asm/kvm_host.h       | 14 ++++++++++++--
->>   arch/arm64/include/asm/kvm_mmu.h        | 11 +++++++++--
->>   arch/arm64/include/asm/stage2_pgtable.h |  1 -
->>   arch/arm64/kvm/hyp/switch.c             |  3 +--
->>   virt/kvm/arm/mmu.c                      |  4 ++++
->>   5 files changed, 26 insertions(+), 7 deletions(-)
+>> We use the i.MX UART in DTE mode and control the RS-485 transceiver
+>> using the RTS signal in low-active mode.
 >>
+>> 	uart-has-rtscts;
+>> 	fsl,dte-mode;
+>> 	linux,rs485-enabled-at-boot-time;
+>> 	rs485-rts-active-low;
 > 
-> [...]
-> 
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index bb458bf..e86d7f4 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -136,9 +136,10 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
->>    */
->>   #define KVM_PHYS_SHIFT	(40)
->>   
->> -#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
->> +#define kvm_phys_shift(kvm)		(kvm->arch.phys_shift)
->>   #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
->>   #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
->> +#define kvm_stage2_levels(kvm)		(kvm->arch.s2_levels)
->>   
->>   static inline bool kvm_page_empty(void *ptr)
->>   {
-> 
-> [...]
-> 
->> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
->> index 33e8ebb..9b75b83 100644
->> --- a/arch/arm64/include/asm/stage2_pgtable.h
->> +++ b/arch/arm64/include/asm/stage2_pgtable.h
->> @@ -44,7 +44,6 @@
->>    */
->>   #define __s2_pgd_ptrs(pa, lvls)	(1 << ((pa) - pt_levels_pgdir_shift((lvls))))
->>   
->> -#define kvm_stage2_levels(kvm)		stage2_pt_levels(kvm_phys_shift(kvm))
->>   #define stage2_pgdir_shift(kvm)	\
->>   		pt_levels_pgdir_shift(kvm_stage2_levels(kvm))
->>   #define stage2_pgdir_size(kvm)		(_AC(1, UL) << stage2_pgdir_shift((kvm)))
-> 
-> [...]
-> 
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 7a264c6..746f38e 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -753,6 +753,10 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
->>   		return -EINVAL;
->>   	}
->>   
->> +	/* Make sure we have the stage2 configured for this VM */
->> +	if (WARN_ON(!kvm_stage2_levels(kvm)))
->> +		return -EINVAL;
->> +
-> 
-> This hunk breaks the 32-bit build as kvm_stag2_levels() isn't defined on
-> arm.
+> That means you're not using a GPIO for RTS signaling, right?
+>  
 
-Thanks for spotting. I have fixed this locally in my next version to check
-for the kvm_phys_shift(), as I plan to delay the levels selection to the
-actual allocation of the table, giving us a fall back to increase the level
-if we are unable to allocate contiguous pages (e.g, 16 * 64K pages with say 46bit
-IPA).
+I use native RTS capability (which is in DTE mode the CTS signal...)
 
+>> Using this setting leads to the RTS signal not getting asserted (the
+>> oscilloscope only shows a very short fluke before the start bit is
+>> sent).
 
-Cheers
-Suzuki
+Just FYI, the fluke looks like a proper assert, but it is really only
+50ns wide.
+
+>>
+>> However, using
+>>
+>> 	uart-has-rtscts;
+>> 	fsl,dte-mode;
+>> 	linux,rs485-enabled-at-boot-time;
+>> 	rs485-rts-active-low;
+>> 	rs485-rx-during-tx;
+>>
+>> Asserts the RTS signal low active just fine...
+>>
+>> Is this a known problem? Any idea where that could come from? It looks
+>> as if the receiver part is actually enabling RTS...?
+> 
+> Which kernel version do you use? My latest rs485 related patches went
+> into v4.17-rc1. With that I managed to make rs485 half duplex work on
+> several customer boards.
+
+I used v4.17-rc1.
+
+I noticed your changes, but I it seems they make no difference, last
+week I noticed the same issue in v4.16.
+
+Do those customer boards use DTE mode?
+
+--
+Stefan
+
+> 
+>> Also, isn't enabling RX even in half-duplex mode quite common in order
+>> to detect collisions?
+> 
+> I don't know.
+> 
+
+Probably also depends on the exact use case and the transceiver
+configuration.
+
+--
+Stefan
