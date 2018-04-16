@@ -1,19 +1,91 @@
-From: khandual@linux.vnet.ibm.com (Anshuman Khandual)
-Date: Mon, 16 Apr 2018 15:27:58 +0530
-Subject: [PATCH 06/12] dma-mapping: move the NEED_DMA_MAP_STATE config
- symbol to lib/Kconfig
-In-Reply-To: <20180415145947.1248-7-hch@lst.de>
-References: <20180415145947.1248-1-hch@lst.de>
- <20180415145947.1248-7-hch@lst.de>
-Message-ID: <1ac5e633-5455-fcb6-6b3c-ea74d6691513@linux.vnet.ibm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 16 Apr 2018 11:59:12 +0200
+Subject: [PATCH v5 4/7] dt-bindings: clock: reset: Add AXG AO Clock and
+ Reset Bindings
+In-Reply-To: <20180409143749.71197-5-yixun.lan@amlogic.com>
+References: <20180409143749.71197-1-yixun.lan@amlogic.com>
+ <20180409143749.71197-5-yixun.lan@amlogic.com>
+Message-ID: <1523872752.2601.26.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2018 08:29 PM, Christoph Hellwig wrote:
-> This way we have one central definition of it, and user can select it as
-> needed.  Note that we now also always select it when CONFIG_DMA_API_DEBUG
-> is select, which fixes some incorrect checks in a few network drivers.
+On Mon, 2018-04-09 at 22:37 +0800, Yixun Lan wrote:
+> Add dt-bindings headers for the Meson-AXG's AO clock and
+> reset controller.
 > 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  include/dt-bindings/clock/axg-aoclkc.h | 26 ++++++++++++++++++++++++++
+>  include/dt-bindings/reset/axg-aoclkc.h | 20 ++++++++++++++++++++
+>  2 files changed, 46 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/axg-aoclkc.h
+>  create mode 100644 include/dt-bindings/reset/axg-aoclkc.h
 
-Reviewed-by: Anshuman Khandual <khandual@linux.vnet.ibm.com>
+Hi Philipp,
+
+Is OK if we take this through clock tree ?
+The related reset controller is actually part of a clock controller driver.
+
+Best Regards
+Jerome
+
+> 
+> diff --git a/include/dt-bindings/clock/axg-aoclkc.h b/include/dt-bindings/clock/axg-aoclkc.h
+> new file mode 100644
+> index 000000000000..61955016a55b
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/axg-aoclkc.h
+> @@ -0,0 +1,26 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
+> +/*
+> + * Copyright (c) 2016 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
+> + */
+> +
+> +#ifndef DT_BINDINGS_CLOCK_AMLOGIC_MESON_AXG_AOCLK
+> +#define DT_BINDINGS_CLOCK_AMLOGIC_MESON_AXG_AOCLK
+> +
+> +#define CLKID_AO_REMOTE		0
+> +#define CLKID_AO_I2C_MASTER	1
+> +#define CLKID_AO_I2C_SLAVE	2
+> +#define CLKID_AO_UART1		3
+> +#define CLKID_AO_UART2		4
+> +#define CLKID_AO_IR_BLASTER	5
+> +#define CLKID_AO_SAR_ADC	6
+> +#define CLKID_AO_CLK81		7
+> +#define CLKID_AO_SAR_ADC_SEL	8
+> +#define CLKID_AO_SAR_ADC_DIV	9
+> +#define CLKID_AO_SAR_ADC_CLK	10
+> +#define CLKID_AO_ALT_XTAL	11
+> +
+> +#endif
+> diff --git a/include/dt-bindings/reset/axg-aoclkc.h b/include/dt-bindings/reset/axg-aoclkc.h
+> new file mode 100644
+> index 000000000000..d342c0b6b2a7
+> --- /dev/null
+> +++ b/include/dt-bindings/reset/axg-aoclkc.h
+> @@ -0,0 +1,20 @@
+> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
+> +/*
+> + * Copyright (c) 2016 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
+> + */
+> +
+> +#ifndef DT_BINDINGS_RESET_AMLOGIC_MESON_AXG_AOCLK
+> +#define DT_BINDINGS_RESET_AMLOGIC_MESON_AXG_AOCLK
+> +
+> +#define RESET_AO_REMOTE		0
+> +#define RESET_AO_I2C_MASTER	1
+> +#define RESET_AO_I2C_SLAVE	2
+> +#define RESET_AO_UART1		3
+> +#define RESET_AO_UART2		4
+> +#define RESET_AO_IR_BLASTER	5
+> +
+> +#endif
