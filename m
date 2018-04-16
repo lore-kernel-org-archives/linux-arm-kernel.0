@@ -1,124 +1,101 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 16 Apr 2018 16:23:04 +0200
-Subject: [PATCH v3 6/7] mmc: sunxi: Add runtime_pm support
-In-Reply-To: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
-References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
-Message-ID: <4514368de4ef7b4224be455f2d9e6090b464e819.1523888566.git-series.maxime.ripard@bootlin.com>
+Date: Mon, 16 Apr 2018 16:31:30 +0200
+Subject: [linux-sunxi] Re: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow
+ getting syscon regmap from device
+In-Reply-To: <CAGb2v66Qi2D1qgF3-iVJFAiznMUzzen0nHM5vsPe7Cyi6QTYpw@mail.gmail.com>
+References: <20180411141641.14675-1-icenowy@aosc.io>
+ <20180411141641.14675-4-icenowy@aosc.io>
+ <20180412145628.iaaeue2imiijwx5d@flea>
+ <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
+ <CAGb2v66Qi2D1qgF3-iVJFAiznMUzzen0nHM5vsPe7Cyi6QTYpw@mail.gmail.com>
+Message-ID: <20180416143130.tls6xtcq3hsv7u7f@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, even if our card was not in use, we didn't shut down our MMC
-controller, which meant that it was still active and clocking the bus.
+On Thu, Apr 12, 2018 at 11:23:30PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Apr 12, 2018 at 11:11 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> > ? 2018?4?12? GMT+08:00 ??10:56:28, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >>On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
+> >>> From: Chen-Yu Tsai <wens@csie.org>
+> >>>
+> >>> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
+> >>> address space; on the A64 SoC this register is in the SRAM controller
+> >>> address space, and with a different offset.
+> >>>
+> >>> To access the register from another device and hide the internal
+> >>> difference between the device, let it register a regmap named
+> >>> "emac-clock". We can then get the device from the phandle, and
+> >>> retrieve the regmap with dev_get_regmap(); in this situation the
+> >>> regmap_field will be set up to access the only register in the
+> >>regmap.
+> >>>
+> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >>> [Icenowy: change to use regmaps with single register, change commit
+> >>>  message]
+> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >>> ---
+> >>>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48
+> >>++++++++++++++++++++++-
+> >>>  1 file changed, 46 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> >>b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> >>> index 1037f6c78bca..b61210c0d415 100644
+> >>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> >>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+> >>> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
+> >>>      .msb = 31,
+> >>>  };
+> >>>
+> >>> +/* Specially exported regmap which contains only EMAC register */
+> >>> +const struct reg_field single_reg_field = {
+> >>> +    .reg = 0,
+> >>> +    .lsb = 0,
+> >>> +    .msb = 31,
+> >>> +};
+> >>> +
+> >>
+> >>I'm not sure this would be wise. If we ever need some other register
+> >>exported through the regmap, will have to change all the calling sites
+> >>everywhere in the kernel, which will be a pain and will break
+> >>bisectability.
+> >
+> > In this situation the register can be exported as another
+> >  regmap. Currently the code will access a regmap with name
+> > "emac-clock" for this register.
+> >
+> >>
+> >>Chen-Yu's (or was it yours?) initial solution with a custom writeable
+> >>hook only allowing a single register seemed like a better one.
+> >
+> > But I remember you mentioned that you want it to hide the
+> > difference inside the device.
+> 
+> The idea is that a device can export multiple regmaps. This one,
+> the one named "gmac" (in my soon to come v2) or "emac-clock" here,
+> is but one of many possible regmaps, and it only exports the register
+> needed by the GMAC/EMAC.
 
-While this obviously means that we could save some power there, it also
-creates issues when it comes to EMC control since we'll have a perfect peak
-at the card clock rate.
+I'm not sure this would be wise either. There's a single register map,
+and as far as I know we don't have a binding to express this in the
+DT. This means that the customer and provider would have to use the
+same name, but without anything actually enforcing it aside from
+"someone in the community knows it".
 
-Let's implement runtime_pm with autosuspend so that we will shut down the
-controller when it's not been in use for quite some time.
+This is not a really good design, and I was actually preferring your
+first option. We shouldn't rely on any undocumented rule. This will be
+easy to break and hard to maintain.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/mmc/host/sunxi-mmc.c | 48 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 48 insertions(+)
+Maxime
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 0165da0d022a..0253deb153a4 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -35,6 +35,7 @@
- #include <linux/of_gpio.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/regulator/consumer.h>
- #include <linux/reset.h>
- #include <linux/scatterlist.h>
-@@ -969,6 +970,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	unsigned long flags;
- 	u32 imask;
- 
-+	if (enable)
-+		pm_runtime_get_noresume(host->dev);
-+
- 	spin_lock_irqsave(&host->lock, flags);
- 
- 	imask = mmc_readl(host, REG_IMASK);
-@@ -981,6 +985,9 @@ static void sunxi_mmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	}
- 	mmc_writel(host, REG_IMASK, imask);
- 	spin_unlock_irqrestore(&host->lock, flags);
-+
-+	if (!enable)
-+		pm_runtime_put_noidle(host->mmc->parent);
- }
- 
- static void sunxi_mmc_hw_reset(struct mmc_host *mmc)
-@@ -1394,6 +1401,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto error_free_dma;
- 
-+	pm_runtime_set_active(&pdev->dev);
-+	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-+	pm_runtime_use_autosuspend(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+
- 	ret = mmc_add_host(mmc);
- 	if (ret)
- 		goto error_free_dma;
-@@ -1414,6 +1426,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
- 	struct sunxi_mmc_host *host = mmc_priv(mmc);
- 
- 	mmc_remove_host(mmc);
-+	pm_runtime_force_suspend(&pdev->dev);
- 	disable_irq(host->irq);
- 	sunxi_mmc_disable(host);
- 	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
-@@ -1422,10 +1435,45 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int sunxi_mmc_runtime_resume(struct device *dev)
-+{
-+	struct mmc_host	*mmc = dev_get_drvdata(dev);
-+	struct sunxi_mmc_host *host = mmc_priv(mmc);
-+	int ret;
-+
-+	ret = sunxi_mmc_enable(host);
-+	if (ret)
-+		return ret;
-+
-+	sunxi_mmc_init_host(host);
-+	sunxi_mmc_set_bus_width(host, mmc->ios.bus_width);
-+	sunxi_mmc_set_clk(host, &mmc->ios);
-+
-+	return 0;
-+}
-+
-+static int sunxi_mmc_runtime_suspend(struct device *dev)
-+{
-+	struct mmc_host	*mmc = dev_get_drvdata(dev);
-+	struct sunxi_mmc_host *host = mmc_priv(mmc);
-+
-+	sunxi_mmc_reset_host(host);
-+	sunxi_mmc_disable(host);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops sunxi_mmc_pm_ops = {
-+	SET_RUNTIME_PM_OPS(sunxi_mmc_runtime_suspend,
-+			   sunxi_mmc_runtime_resume,
-+			   NULL)
-+};
-+
- static struct platform_driver sunxi_mmc_driver = {
- 	.driver = {
- 		.name	= "sunxi-mmc",
- 		.of_match_table = of_match_ptr(sunxi_mmc_of_match),
-+		.pm = &sunxi_mmc_pm_ops,
- 	},
- 	.probe		= sunxi_mmc_probe,
- 	.remove		= sunxi_mmc_remove,
 -- 
-git-series 0.9.1
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180416/facca605/attachment.sig>
