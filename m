@@ -1,485 +1,130 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Mon, 16 Apr 2018 17:06:14 -0500
-Subject: [PATCH] ARM: dts: Add am335x-pocketbeagle
-In-Reply-To: <CAL_JsqJC0NikfJ8CP6456gnm+geHPE2Qx3W8fLU3S9H0sVPkvw@mail.gmail.com>
-References: <20180416192929.22547-1-robertcnelson@gmail.com>
- <CAL_JsqJC0NikfJ8CP6456gnm+geHPE2Qx3W8fLU3S9H0sVPkvw@mail.gmail.com>
-Message-ID: <CAOCHtYgZOfBsGEM=DUBKCmHzT68O8dhPV=eXbjx1HQtNjMpgMA@mail.gmail.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Mon, 16 Apr 2018 15:06:52 -0700
+Subject: [PATCH v2 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <20180416205749.556rbkzaja33oref@rob-hp-laptop>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
+ <20180416205749.556rbkzaja33oref@rob-hp-laptop>
+Message-ID: <aad8e393-01bd-5935-5dd8-d96e54f5aa39@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Rob,
+Hello Rob,
 
-All fixed, posting v2 shortly..
-
-On Mon, Apr 16, 2018 at 3:21 PM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Apr 16, 2018 at 2:29 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
->> PocketBeagle Blue is an ultra-tiny-yet-complete open-source USB-key-fob computer.
+On 04/16/2018 01:57 PM, Rob Herring wrote:
+> On Fri, Apr 13, 2018 at 07:50:34PM -0700, David Collins wrote:
+>> Introduce bindings for RPMh regulator devices found on some
+>> Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
+>> processor within the SoC to make PMIC regulator requests which
+>> are aggregated within the RPMh hardware block along with requests
+>> from other processors in the SoC to determine the final PMIC
+>> regulator hardware state.
 >>
->> This board can be indentified by the BPxx value after A335BNLT (BBB)
->> in the at24 eeprom:
->> BPxx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 50 30 30 |.U3.A335BNLTBP00|]
->>
->> http://beagleboard.org/pocket
->> https://github.com/beagleboard/pocketbeagle
->>
->> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
->> CC: Tony Lindgren <tony@atomide.com>
->> CC: Jason Kridner <jkridner@beagleboard.org>
->> CC: Drew Fustini <drew@beagleboard.org>
->> CC: Peter Robinson <pbrobinson@redhat.com>
+>> Signed-off-by: David Collins <collinsd@codeaurora.org>
 >> ---
->>  arch/arm/boot/dts/Makefile                   |   1 +
->>  arch/arm/boot/dts/am335x-osd335x-common.dtsi | 136 +++++++++++
->>  arch/arm/boot/dts/am335x-pocketbeagle.dts    | 244 +++++++++++++++++++
->>  3 files changed, 381 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/am335x-osd335x-common.dtsi
->>  create mode 100644 arch/arm/boot/dts/am335x-pocketbeagle.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 7e2424957809..5a09ff15743b 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -688,6 +688,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
->>         am335x-pdu001.dtb \
->>         am335x-pepper.dtb \
->>         am335x-phycore-rdk.dtb \
->> +       am335x-pocketbeagle.dtb \
->>         am335x-shc.dtb \
->>         am335x-sbc-t335.dtb \
->>         am335x-sl50.dtb \
->> diff --git a/arch/arm/boot/dts/am335x-osd335x-common.dtsi b/arch/arm/boot/dts/am335x-osd335x-common.dtsi
->> new file mode 100644
->> index 000000000000..184b3a9f1538
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/am335x-osd335x-common.dtsi
->> @@ -0,0 +1,136 @@
->> +/*
->> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->
-> Use SPDX tag.
+>>  .../bindings/regulator/qcom,rpmh-regulator.txt     | 207 +++++++++++++++++++++
+>>  .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 ++++
+>> [...]
+>> +++ b/Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+>> [...]
+>> +- vdd_s1-supply
+> 
+> Use '-' rather than '_' on all these.
 
-Fixed
-
->> + */
->> +
->> +/ {
->> +       cpus {
->> +               cpu at 0 {
->> +                       cpu0-supply = <&dcdc2_reg>;
->> +               };
->> +       };
->> +
->> +       memory at 80000000 {
->> +               device_type = "memory";
->> +               reg = <0x80000000 0x20000000>; /* 512 MB */
->> +       };
->> +};
->> +
->> +&cpu0_opp_table {
->> +       /*
->> +       * Octavo Systems:
->> +       * The EFUSE_SMA register is not programmed for any of the AM335x wafers
->> +       * we get and we are not programming them during our production test.
->> +       * Therefore, from a DEVICE_ID revision point of view, the silicon looks
->> +       * like it is Revision 2.1.  However, from an EFUSE_SMA point of view for
->> +       * the HW OPP table, the silicon looks like it is Revision 1.0 (ie the
->> +       * EFUSE_SMA register reads as all zeros).
->> +       */
->> +       oppnitro-1000000000 {
->> +               opp-supported-hw = <0x06 0x0100>;
->> +       };
->> +};
->> +
->> +&am33xx_pinmux {
->> +       i2c0_pins: pinmux_i2c0_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x988, PIN_INPUT_PULLUP | MUX_MODE0)       /* (C17) I2C0_SDA.I2C0_SDA */
->> +                       AM33XX_IOPAD(0x98c, PIN_INPUT_PULLUP | MUX_MODE0)       /* (C16) I2C0_SCL.I2C0_SCL */
->> +               >;
->> +       };
->> +};
->> +
->> +&i2c0 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&i2c0_pins>;
->> +
->> +       status = "okay";
->> +       clock-frequency = <400000>;
->> +
->> +       tps: tps at 24 {
->> +               reg = <0x24>;
->> +       };
->> +
->> +       baseboard_eeprom: baseboard_eeprom at 50 {
->
-> eeprom at 50
-
-fixed..
-
->
-> Build the dtb with "W=12" and fix all the warnings (unless you've
-> inherited them from the includes).
-
-It looks like i need to clean a few more am335x-* targets, as i used
-pinmux_X_pins quite a bit...
-
->
->> +               compatible = "atmel,24c256";
->> +               reg = <0x50>;
->> +
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               baseboard_data: baseboard_data at 0 {
->> +                       reg = <0 0x100>;
->> +               };
->> +       };
->> +};
->> +
->> +/include/ "tps65217.dtsi"
->> +
->> +&tps {
->> +       interrupts = <7>; /* NMI */
->> +       interrupt-parent = <&intc>;
->> +
->> +       ti,pmic-shutdown-controller;
->> +
->> +       pwrbutton {
->> +               interrupts = <2>;
->> +               status = "okay";
->> +       };
->> +
->> +       regulators {
->> +               dcdc1_reg: regulator at 0 {
->> +                       regulator-name = "vdds_dpr";
->> +                       regulator-always-on;
->> +               };
->> +
->> +               dcdc2_reg: regulator at 1 {
->> +                       /* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
->> +                       regulator-name = "vdd_mpu";
->> +                       regulator-min-microvolt = <925000>;
->> +                       regulator-max-microvolt = <1351500>;
->> +                       regulator-boot-on;
->> +                       regulator-always-on;
->> +               };
->> +
->> +               dcdc3_reg: regulator at 2 {
->> +                       /* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
->> +                       regulator-name = "vdd_core";
->> +                       regulator-min-microvolt = <925000>;
->> +                       regulator-max-microvolt = <1150000>;
->> +                       regulator-boot-on;
->> +                       regulator-always-on;
->> +               };
->> +
->> +               ldo1_reg: regulator at 3 {
->> +                       regulator-name = "vio,vrtc,vdds";
->> +                       regulator-always-on;
->> +               };
->> +
->> +               ldo2_reg: regulator at 4 {
->> +                       regulator-name = "vdd_3v3aux";
->> +                       regulator-always-on;
->> +               };
->> +
->> +               ldo3_reg: regulator at 5 {
->> +                       regulator-name = "vdd_1v8";
->> +                       regulator-min-microvolt = <1800000>;
->> +                       regulator-max-microvolt = <1800000>;
->> +                       regulator-always-on;
->> +               };
->> +
->> +               ldo4_reg: regulator at 6 {
->> +                       regulator-name = "vdd_3v3a";
->> +                       regulator-always-on;
->> +               };
->> +       };
->> +};
->> +
->> +&aes {
->> +       status = "okay";
->> +};
->> +
->> +&sham {
->> +       status = "okay";
->> +};
->> diff --git a/arch/arm/boot/dts/am335x-pocketbeagle.dts b/arch/arm/boot/dts/am335x-pocketbeagle.dts
->> new file mode 100644
->> index 000000000000..c224cde88920
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/am335x-pocketbeagle.dts
->> @@ -0,0 +1,244 @@
->> +/*
->> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->
-> Use SPDX tag.
-
-fixed
-
->
->> + */
->> +/dts-v1/;
->> +
->> +#include "am33xx.dtsi"
->> +#include "am335x-osd335x-common.dtsi"
->> +
->> +/ {
->> +       model = "TI AM335x PocketBeagle";
->> +       compatible = "ti,am335x-pocketbeagle", "ti,am335x-bone", "ti,am33xx";
->> +
->> +       chosen {
->> +               stdout-path = &uart0;
->> +       };
->> +
->> +       leds {
->> +               pinctrl-names = "default";
->> +               pinctrl-0 = <&user_leds_s0>;
->> +
->> +               compatible = "gpio-leds";
->> +
->> +               usr_0_led {
->> +                       label = "beaglebone:green:usr0";
->> +                       gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "heartbeat";
->> +                       default-state = "off";
->> +               };
->> +
->> +               usr_1_led {
->> +                       label = "beaglebone:green:usr1";
->> +                       gpios = <&gpio1 22 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "mmc0";
->> +                       default-state = "off";
->> +               };
->> +
->> +               usr_2_led {
->> +                       label = "beaglebone:green:usr2";
->> +                       gpios = <&gpio1 23 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "cpu0";
->> +                       default-state = "off";
->> +               };
->> +
->> +               usr_3_led {
->> +                       label = "beaglebone:green:usr3";
->> +                       gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
->> +                       default-state = "off";
->> +               };
->> +       };
->> +
->> +       vmmcsd_fixed: fixedregulator0 {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "vmmcsd_fixed";
->> +               regulator-min-microvolt = <3300000>;
->> +               regulator-max-microvolt = <3300000>;
->> +       };
->> +};
->> +
->> +&am33xx_pinmux {
->> +       i2c2_pins: pinmux_i2c2_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x97c, PIN_INPUT_PULLUP | MUX_MODE3)       /* (D17) uart1_rtsn.I2C2_SCL */
->> +                       AM33XX_IOPAD(0x978, PIN_INPUT_PULLUP | MUX_MODE3)       /* (D18) uart1_ctsn.I2C2_SDA */
->> +               >;
->> +       };
->> +
->> +       ehrpwm0_pins: pinmux_ehrpwm0_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x990, PIN_OUTPUT_PULLDOWN | MUX_MODE1)    /* (A13) mcasp0_aclkx.ehrpwm0A */
->> +               >;
->> +       };
->> +
->> +       ehrpwm1_pins: pinmux_ehrpwm1_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x848, PIN_OUTPUT_PULLDOWN | MUX_MODE6)    /* (U14) gpmc_a2.ehrpwm1A */
->> +               >;
->> +       };
->> +
->> +       mmc0_pins: pinmux_mmc0_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x960, PIN_INPUT | MUX_MODE7)              /* (C15) spi0_cs1.gpio0[6] */
->> +                       AM33XX_IOPAD(0x8fc, PIN_INPUT_PULLUP | MUX_MODE0)       /* (G16) mmc0_dat0.mmc0_dat0 */
->> +                       AM33XX_IOPAD(0x8f8, PIN_INPUT_PULLUP | MUX_MODE0)       /* (G15) mmc0_dat1.mmc0_dat1 */
->> +                       AM33XX_IOPAD(0x8f4, PIN_INPUT_PULLUP | MUX_MODE0)       /* (F18) mmc0_dat2.mmc0_dat2 */
->> +                       AM33XX_IOPAD(0x8f0, PIN_INPUT_PULLUP | MUX_MODE0)       /* (F17) mmc0_dat3.mmc0_dat3 */
->> +                       AM33XX_IOPAD(0x904, PIN_INPUT_PULLUP | MUX_MODE0)       /* (G18) mmc0_cmd.mmc0_cmd */
->> +                       AM33XX_IOPAD(0x900, PIN_INPUT_PULLUP | MUX_MODE0)       /* (G17) mmc0_clk.mmc0_clk */
->> +                       AM33XX_IOPAD(0x9a0, PIN_INPUT | MUX_MODE4)              /* (B12) mcasp0_aclkr.mmc0_sdwp */
->> +               >;
->> +       };
->> +
->> +       spi0_pins: pinmux_spi0_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x950, PIN_INPUT_PULLUP | MUX_MODE0)       /* (A17) spi0_sclk.spi0_sclk */
->> +                       AM33XX_IOPAD(0x954, PIN_INPUT_PULLUP | MUX_MODE0)       /* (B17) spi0_d0.spi0_d0 */
->> +                       AM33XX_IOPAD(0x958, PIN_INPUT_PULLUP | MUX_MODE0)       /* (B16) spi0_d1.spi0_d1 */
->> +                       AM33XX_IOPAD(0x95c, PIN_INPUT_PULLUP | MUX_MODE0)       /* (A16) spi0_cs0.spi0_cs0 */
->> +               >;
->> +       };
->> +
->> +       spi1_pins: pinmux_spi1_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x964, PIN_INPUT_PULLUP | MUX_MODE4)       /* (C18) eCAP0_in_PWM0_out.spi1_sclk */
->> +                       AM33XX_IOPAD(0x968, PIN_INPUT_PULLUP | MUX_MODE4)       /* (E18) uart0_ctsn.spi1_d0 */
->> +                       AM33XX_IOPAD(0x96c, PIN_INPUT_PULLUP | MUX_MODE4)       /* (E17) uart0_rtsn.spi1_d1 */
->> +                       AM33XX_IOPAD(0x9b0, PIN_INPUT_PULLUP | MUX_MODE4)       /* (A15) xdma_event_intr0.spi1_cs1 */
->> +               >;
->> +       };
->> +
->> +       user_leds_s0: user_leds_s0 {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x854, PIN_OUTPUT | MUX_MODE7)             /* (V15) gpmc_a5.gpio1[21] - USR_LED_0 */
->> +                       AM33XX_IOPAD(0x858, PIN_OUTPUT | MUX_MODE7)             /* (U15) gpmc_a6.gpio1[22] - USR_LED_1 */
->> +                       AM33XX_IOPAD(0x85c, PIN_OUTPUT | MUX_MODE7)             /* (T15) gpmc_a7.gpio1[23] - USR_LED_2 */
->> +                       AM33XX_IOPAD(0x860, PIN_OUTPUT | MUX_MODE7)             /* (V16) gpmc_a8.gpio1[24] - USR_LED_3 */
->> +               >;
->> +       };
->> +
->> +       uart0_pins: pinmux_uart0_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x970, PIN_INPUT_PULLUP | MUX_MODE0)       /* (E15) uart0_rxd.uart0_rxd */
->> +                       AM33XX_IOPAD(0x974, PIN_OUTPUT_PULLDOWN | MUX_MODE0)    /* (E16) uart0_txd.uart0_txd */
->> +               >;
->> +       };
->> +
->> +       uart4_pins: pinmux_uart4_pins {
->> +               pinctrl-single,pins = <
->> +                       AM33XX_IOPAD(0x870, PIN_INPUT_PULLUP | MUX_MODE6)       /* (T17) gpmc_wait0.uart4_rxd */
->> +                       AM33XX_IOPAD(0x874, PIN_OUTPUT_PULLDOWN | MUX_MODE6)    /* (U17) gpmc_wpn.uart4_txd */
->> +               >;
->> +       };
->> +};
->> +
->> +&epwmss0 {
->> +       status = "okay";
->> +};
->> +
->> +&ehrpwm0 {
->> +       status = "okay";
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&ehrpwm0_pins>;
->> +};
->> +
->> +&epwmss1 {
->> +       status = "okay";
->> +};
->> +
->> +&ehrpwm1 {
->> +       status = "okay";
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&ehrpwm1_pins>;
->> +};
->> +
->> +&i2c0 {
->> +       baseboard_eeprom: baseboard_eeprom at 50 {
->
-> This appears twice?
-
-Correct, now removed and cleaned up...
-
->
->> +               compatible = "atmel,24c256";
->> +               reg = <0x50>;
->> +
->> +               #address-cells = <1>;
->> +               #size-cells = <1>;
->> +               baseboard_data: baseboard_data at 0 {
->> +                       reg = <0 0x100>;
->> +               };
->> +       };
->> +};
->> +
->> +&i2c2 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&i2c2_pins>;
->> +
->> +       status = "okay";
->> +       clock-frequency = <400000>;
->> +};
->> +
->> +&mmc1 {
->> +       status = "okay";
->> +       vmmc-supply = <&vmmcsd_fixed>;
->> +       bus-width = <4>;
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&mmc0_pins>;
->> +       cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
->> +};
->> +
->> +&rtc {
->> +       system-power-controller;
->> +};
->> +
->> +&tscadc {
->> +       status = "okay";
->> +       adc {
->> +               ti,adc-channels = <0 1 2 3 4 5 6 7>;
->> +               ti,chan-step-avg = <16 16 16 16 16 16 16 16>;
->> +               ti,chan-step-opendelay = <0x98 0x98 0x98 0x98 0x98 0x98 0x98 0x98>;
->> +               ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
->> +       };
->> +};
->> +
->> +&uart0 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&uart0_pins>;
->> +
->> +       status = "okay";
->> +};
->> +
->> +&uart4 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&uart4_pins>;
->> +
->> +       status = "okay";
->> +};
->> +
->> +&usb {
->> +       status = "okay";
->> +};
->> +
->> +&usb_ctrl_mod {
->> +       status = "okay";
->> +};
->> +
->> +&usb0_phy {
->> +       status = "okay";
->> +};
->> +
->> +&usb0 {
->> +       status = "okay";
->> +       dr_mode = "otg";
->> +};
->> +
->> +&usb1_phy {
->> +       status = "okay";
->> +};
->> +
->> +&usb1 {
->> +       status = "okay";
->> +       dr_mode = "host";
->> +};
->> +
->> +&cppi41dma  {
->> +       status = "okay";
->> +};
->> --
->> 2.17.0
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I will change this on the next patch set.
 
 
+>> +- vdd_s2-supply
+>> +- vdd_s3-supply
+>> +- vdd_s4-supply
+>> +- vdd_s5-supply
+>> +- vdd_s6-supply
+>> +- vdd_s7-supply
+>> +- vdd_s8-supply
+>> +- vdd_s9-supply
+>> +- vdd_s10-supply
+>> +- vdd_s11-supply
+>> +- vdd_s12-supply
+>> +- vdd_s13-supply
+>> +- vdd_l1_l27-supply
+>> +- vdd_l2_l8_l17-supply
+>> +- vdd_l3_l11-supply
+>> +- vdd_l4_l5-supply
+>> +- vdd_l6-supply
+>> +- vdd_l7_l12_l14_l15-supply
+>> +- vdd_l9-supply
+>> +- vdd_l10_l23_l25-supply
+>> +- vdd_l13_l19_l21-supply
+>> +- vdd_l16_l28-supply
+>> +- vdd_l18_l22-supply
+>> +- vdd_l20_l24-supply
+>> +- vdd_l26-supply
+>> +- vdd_lvs1_lvs2-supply
+>> +- vdd_lvs1_lvs2-supply
+>> +	Usage:      optional (PM8998 only)
+>> +	Value type: <phandle>
+>> +	Definition: phandle of the parent supply regulator of one or more of the
+>> +		    regulators for this PMIC.
+>> +
+>> +- vdd_bob-supply
+>> +	Usage:      optional (PMI8998 only)
+>> +	Value type: <phandle>
+>> +	Definition: BOB regulator parent supply phandle
+>> +
+>> +- vdd_s1-supply
+>> +- vdd_s2-supply
+>> +- vdd_s3-supply
+>> +- vdd_s4-supply
+> 
+> Listed twice?
+> 
+>> +	Usage:      optional (PM8005 only)
+>> +	Value type: <phandle>
+>> +	Definition: phandle of the parent supply regulator of one or more of the
+>> +		    regulators for this PMIC.
+
+I listed vdd_s1-supply to vdd_s4-supply here twice because I wanted to
+group together the supplies supported by each PMIC.  PM8005 only supports
+these 4 regulator supplies.  PM8998 supports these 4 along with many
+others.  How else would suggest that I capture this per-PMIC support
+information?
+
+
+>> +===============================
+>> +Second Level Nodes - Regulators
+>> +===============================
+>> +
+>> +- qcom,regulator-initial-voltage
+>> +	Usage:      optional; VRM regulators only
+>> +	Value type: <u32>
+>> +	Definition: Specifies the initial voltage in microvolts to request for a
+>> +		    VRM regulator.
+>> +
+>> +- regulator-initial-mode
+> 
+> Vendor prefix?
+
+No, this does not need a vendor prefix.  The regulator-initial-mode
+property is already defined for all regulator devices [1]:
+
+    regulator-initial-mode: initial operating mode. The set of possible
+    operating modes depends on the capabilities of every hardware so each
+    device binding documentation explains which values the regulator
+    supports.
+
+The values supported by the property are hardware specific and thus must
+be listed in device specific binding files like this one.  Here is a
+previously merged example: [2].
+
+Thanks,
+David
+
+[1]:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/regulator/regulator.txt?h=v4.17-rc1#n59
+[2]:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/regulator/twl-regulator.txt?h=v4.17-rc1#n60
 
 -- 
-Robert Nelson
-https://rcn-ee.com/
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
