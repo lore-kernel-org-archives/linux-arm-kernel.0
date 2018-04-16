@@ -1,191 +1,295 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 16 Apr 2018 14:53:33 -0600
-Subject: [PATCH] perf tools: coresight: Moving to SPDX identifier
-Message-ID: <1523912013-29331-1-git-send-email-mathieu.poirier@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 Apr 2018 15:57:49 -0500
+Subject: [PATCH v2 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
+Message-ID: <20180416205749.556rbkzaja33oref@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving perf tools CoreSight support to the SPDX identifier.
+On Fri, Apr 13, 2018 at 07:50:34PM -0700, David Collins wrote:
+> Introduce bindings for RPMh regulator devices found on some
+> Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
+> processor within the SoC to make PMIC regulator requests which
+> are aggregated within the RPMh hardware block along with requests
+> from other processors in the SoC to determine the final PMIC
+> regulator hardware state.
+> 
+> Signed-off-by: David Collins <collinsd@codeaurora.org>
+> ---
+>  .../bindings/regulator/qcom,rpmh-regulator.txt     | 207 +++++++++++++++++++++
+>  .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 ++++
+>  2 files changed, 243 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+>  create mode 100644 include/dt-bindings/regulator/qcom,rpmh-regulator.h
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt b/Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+> new file mode 100644
+> index 0000000..69748ea
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/qcom,rpmh-regulator.txt
+> @@ -0,0 +1,207 @@
+> +Qualcomm Technologies, Inc. RPMh Regulators
+> +
+> +rpmh-regulator devices support PMIC regulator management via the Voltage
+> +Regulator Manager (VRM) and Oscillator Buffer (XOB) RPMh accelerators.  The APPS
+> +processor communicates with these hardware blocks via a Resource State
+> +Coordinator (RSC) using command packets.  The VRM allows changing four
+> +parameters for a given regulator: enable state, output voltage, operating mode,
+> +and minimum headroom voltage.  The XOB allows changing only a single parameter
+> +for a given regulator: its enable state.  Despite its name, the XOB is capable
+> +of controlling the enable state of any PMIC peripheral.  It is used for clock
+> +buffers, low-voltage switches, and LDO/SMPS regulators which have a fixed
+> +voltage and mode.
+> +
+> +=======================
+> +Required Node Structure
+> +=======================
+> +
+> +RPMh regulators must be described in two levels of device nodes.  The first
+> +level describes the PMIC containing the regulators and must reside within an
+> +RPMh device node.  The second level describes each regulator within the PMIC
+> +which is to be used on the board.  Each of these regulators maps to a single
+> +RPMh resource.
+> +
+> +The names used for regulator nodes must match those supported by a given PMIC.
+> +Supported regulator node names:
+> +	PM8998:		smps1 - smps13, ldo1 - ldo28, lvs1 - lvs2
+> +	PMI8998:	bob
+> +	PM8005:		smps1 - smps4
+> +
+> +========================
+> +First Level Nodes - PMIC
+> +========================
+> +
+> +- compatible
+> +	Usage:      required
+> +	Value type: <string>
+> +	Definition: Must be one of: "qcom,pm8998-rpmh-regulators",
+> +		    "qcom,pmi8998-rpmh-regulators" or
+> +		    "qcom,pm8005-rpmh-regulators".
+> +
+> +- qcom,pmic-id
+> +	Usage:      required
+> +	Value type: <string>
+> +	Definition: RPMh resource name suffix used for the regulators found on
+> +		    this PMIC.  Typical values: "a", "b", "c", "d", "e", "f".
+> +
+> +- vdd_s1-supply
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- tools/include/linux/coresight-pmu.h             | 13 +------------
- tools/perf/arch/arm/util/auxtrace.c             | 13 +------------
- tools/perf/arch/arm/util/cs-etm.c               | 13 +------------
- tools/perf/arch/arm/util/cs-etm.h               | 13 +------------
- tools/perf/arch/arm/util/pmu.c                  | 13 +------------
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  3 +--
- tools/perf/util/cs-etm.c                        |  3 +--
- tools/perf/util/cs-etm.h                        | 13 +------------
- 8 files changed, 8 insertions(+), 76 deletions(-)
+Use '-' rather than '_' on all these.
 
-diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
-index edfeaba95429..a1a959ba24ff 100644
---- a/tools/include/linux/coresight-pmu.h
-+++ b/tools/include/linux/coresight-pmu.h
-@@ -1,18 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef _LINUX_CORESIGHT_PMU_H
-diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
-index fa639e3e52ac..1ce6bdbda561 100644
---- a/tools/perf/arch/arm/util/auxtrace.c
-+++ b/tools/perf/arch/arm/util/auxtrace.c
-@@ -1,18 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <stdbool.h>
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 5c655ad4621e..2f595cd73da6 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -1,18 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <api/fs/fs.h>
-diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
-index 5256741be549..1a12e64f5127 100644
---- a/tools/perf/arch/arm/util/cs-etm.h
-+++ b/tools/perf/arch/arm/util/cs-etm.h
-@@ -1,18 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef INCLUDE__PERF_CS_ETM_H__
-diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
-index ac4dffc807b8..e047571e6080 100644
---- a/tools/perf/arch/arm/util/pmu.c
-+++ b/tools/perf/arch/arm/util/pmu.c
-@@ -1,18 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <string.h>
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index 640af88331b4..c8b98fa22997 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -1,6 +1,5 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * SPDX-License-Identifier: GPL-2.0
-- *
-  * Copyright(C) 2015-2018 Linaro Limited.
-  *
-  * Author: Tor Jeremiassen <tor@ti.com>
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 1b0d422373be..40020b1ca54f 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -1,6 +1,5 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * SPDX-License-Identifier: GPL-2.0
-- *
-  * Copyright(C) 2015-2018 Linaro Limited.
-  *
-  * Author: Tor Jeremiassen <tor@ti.com>
-diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
-index 5864d5dca616..37f8d48179ca 100644
---- a/tools/perf/util/cs-etm.h
-+++ b/tools/perf/util/cs-etm.h
-@@ -1,18 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef INCLUDE__UTIL_PERF_CS_ETM_H__
--- 
-2.7.4
+> +- vdd_s2-supply
+> +- vdd_s3-supply
+> +- vdd_s4-supply
+> +- vdd_s5-supply
+> +- vdd_s6-supply
+> +- vdd_s7-supply
+> +- vdd_s8-supply
+> +- vdd_s9-supply
+> +- vdd_s10-supply
+> +- vdd_s11-supply
+> +- vdd_s12-supply
+> +- vdd_s13-supply
+> +- vdd_l1_l27-supply
+> +- vdd_l2_l8_l17-supply
+> +- vdd_l3_l11-supply
+> +- vdd_l4_l5-supply
+> +- vdd_l6-supply
+> +- vdd_l7_l12_l14_l15-supply
+> +- vdd_l9-supply
+> +- vdd_l10_l23_l25-supply
+> +- vdd_l13_l19_l21-supply
+> +- vdd_l16_l28-supply
+> +- vdd_l18_l22-supply
+> +- vdd_l20_l24-supply
+> +- vdd_l26-supply
+> +- vdd_lvs1_lvs2-supply
+> +- vdd_lvs1_lvs2-supply
+> +	Usage:      optional (PM8998 only)
+> +	Value type: <phandle>
+> +	Definition: phandle of the parent supply regulator of one or more of the
+> +		    regulators for this PMIC.
+> +
+> +- vdd_bob-supply
+> +	Usage:      optional (PMI8998 only)
+> +	Value type: <phandle>
+> +	Definition: BOB regulator parent supply phandle
+> +
+> +- vdd_s1-supply
+> +- vdd_s2-supply
+> +- vdd_s3-supply
+> +- vdd_s4-supply
+
+Listed twice?
+
+> +	Usage:      optional (PM8005 only)
+> +	Value type: <phandle>
+> +	Definition: phandle of the parent supply regulator of one or more of the
+> +		    regulators for this PMIC.
+> +
+> +===============================
+> +Second Level Nodes - Regulators
+> +===============================
+> +
+> +- qcom,regulator-initial-voltage
+> +	Usage:      optional; VRM regulators only
+> +	Value type: <u32>
+> +	Definition: Specifies the initial voltage in microvolts to request for a
+> +		    VRM regulator.
+> +
+> +- regulator-initial-mode
+
+Vendor prefix?
+
+> +	Usage:      optional; VRM regulators only
+> +	Value type: <u32>
+> +	Definition: Specifies the initial mode to request for a VRM regulator.
+> +		    Supported values are RPMH_REGULATOR_MODE_* which are defined
+> +		    in [1] (i.e. 0 to 3).  This property may be specified even
+> +		    if the regulator-allow-set-load property is not specified.
+> +
+> +- qcom,allowed-drms-modes
+> +	Usage:      required if regulator-allow-set-load is specified;
+> +		    VRM regulators only
+> +	Value type: <prop-encoded-array>
+> +	Definition: A list of integers specifying the PMIC regulator modes which
+> +		    can be configured at runtime based upon consumer load needs.
+> +		    Supported values are RPMH_REGULATOR_MODE_* which are defined
+> +		    in [1] (i.e. 0 to 3).
+> +
+> +- qcom,drms-mode-threshold-currents
+> +	Usage:      required if regulator-allow-set-load is specified;
+> +		    VRM regulators only
+> +	Value type: <prop-encoded-array>
+> +	Definition: A list of integers specifying the maximum allowed load
+> +		    current in microamps for each of the modes listed in
+> +		    qcom,allowed-drms-modes (matched 1-to-1 in order).  Elements
+> +		    must be specified in order from lowest to highest value.
+> +
+> +- qcom,headroom-voltage
+> +	Usage:      optional; VRM regulators only
+> +	Value type: <u32>
+> +	Definition: Specifies the headroom voltage in microvolts to request for
+> +		    a VRM regulator.  RPMh hardware automatically ensures that
+> +		    the parent of this regulator outputs a voltage high enough
+> +		    to satisfy the requested headroom.  Supported values are
+> +		    0 to 511000.
+> +
+> +- qcom,always-wait-for-ack
+> +	Usage:      optional
+> +	Value type: <empty>
+> +	Definition: Boolean flag which indicates that the application processor
+> +		    must wait for an ACK or a NACK from RPMh for every request
+> +		    sent for this regulator including those which are for a
+> +		    strictly lower power state.
+> +
+> +Other properties defined in Documentation/devicetree/bindings/regulator.txt
+> +may also be used.
+> +
+> +[1] include/dt-bindings/regulator/qcom,rpmh-regulator.h
+> +
+> +========
+> +Examples
+> +========
+> +
+> +#include <dt-bindings/regulator/qcom,rpmh-regulator.h>
+> +
+> +&apps_rsc {
+> +	pm8998-rpmh-regulators {
+> +		compatible = "qcom,pm8998-rpmh-regulators";
+> +		qcom,pmic-id = "a";
+> +
+> +		vdd_l7_l12_l14_l15-supply = <&pm8998_s5>;
+> +
+> +		smps2 {
+> +			regulator-min-microvolt = <1100000>;
+> +			regulator-max-microvolt = <1100000>;
+> +			qcom,regulator-initial-voltage = <1100000>;
+> +		};
+> +
+> +		pm8998_s5: smps5 {
+> +			regulator-min-microvolt = <1904000>;
+> +			regulator-max-microvolt = <2040000>;
+> +			qcom,regulator-initial-voltage = <1904000>;
+> +		};
+> +
+> +		ldo7 {
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			qcom,regulator-initial-voltage = <1800000>;
+> +			qcom,headroom-voltage = <56000>;
+> +			regulator-initial-mode = <RPMH_REGULATOR_MODE_LPM>;
+> +			regulator-allow-set-load;
+> +			qcom,allowed-drms-modes =
+> +				<RPMH_REGULATOR_MODE_LPM
+> +				 RPMH_REGULATOR_MODE_HPM>;
+> +			qcom,drms-mode-threshold-currents = <10000 1000000>;
+> +		};
+> +
+> +		lvs1 {
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +		};
+> +	};
+> +
+> +	pmi8998-rpmh-regulators {
+> +		compatible = "qcom,pmi8998-rpmh-regulators";
+> +		qcom,pmic-id = "b";
+> +
+> +		bob {
+> +			regulator-min-microvolt = <3312000>;
+> +			regulator-max-microvolt = <3600000>;
+> +			qcom,regulator-initial-voltage = <3312000>;
+> +			regulator-initial-mode = <RPMH_REGULATOR_MODE_AUTO>;
+> +		};
+> +	};
+> +};
+> diff --git a/include/dt-bindings/regulator/qcom,rpmh-regulator.h b/include/dt-bindings/regulator/qcom,rpmh-regulator.h
+> new file mode 100644
+> index 0000000..4378c4b
+> --- /dev/null
+> +++ b/include/dt-bindings/regulator/qcom,rpmh-regulator.h
+> @@ -0,0 +1,36 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/* Copyright (c) 2018, The Linux Foundation. All rights reserved. */
+> +
+> +#ifndef __QCOM_RPMH_REGULATOR_H
+> +#define __QCOM_RPMH_REGULATOR_H
+> +
+> +/*
+> + * These mode constants may be used for regulator-initial-mode and
+> + * qcom,allowed-drms-modes properties of an RPMh regulator device tree node.
+> + * Each type of regulator supports a subset of the possible modes.
+> + *
+> + * %RPMH_REGULATOR_MODE_RET:	Retention mode in which only an extremely small
+> + *				load current is allowed.  This mode is supported
+> + *				by LDO and SMPS type regulators.
+> + * %RPMH_REGULATOR_MODE_LPM:	Low power mode in which a small load current is
+> + *				allowed.  This mode corresponds to PFM for SMPS
+> + *				and BOB type regulators.  This mode is supported
+> + *				by LDO, HFSMPS, BOB, and PMIC4 FTSMPS type
+> + *				regulators.
+> + * %RPMH_REGULATOR_MODE_AUTO:	Auto mode in which the regulator hardware
+> + *				automatically switches between LPM and HPM based
+> + *				upon the real-time load current.  This mode is
+> + *				supported by HFSMPS, BOB, and PMIC4 FTSMPS type
+> + *				regulators.
+> + * %RPMH_REGULATOR_MODE_HPM:	High power mode in which the full rated current
+> + *				of the regulator is allowed.  This mode
+> + *				corresponds to PWM for SMPS and BOB type
+> + *				regulators.  This mode is supported by all types
+> + *				of regulators.
+> + */
+> +#define RPMH_REGULATOR_MODE_RET		0
+> +#define RPMH_REGULATOR_MODE_LPM		1
+> +#define RPMH_REGULATOR_MODE_AUTO	2
+> +#define RPMH_REGULATOR_MODE_HPM		3
+> +
+> +#endif
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
