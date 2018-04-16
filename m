@@ -1,110 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Apr 2018 09:59:12 -0500
-Subject: [PATCH v4 1/2] Documentation: Documentation for qcom, llcc
-In-Reply-To: <1523390893-10904-2-git-send-email-rishabhb@codeaurora.org>
-References: <1523390893-10904-1-git-send-email-rishabhb@codeaurora.org>
- <1523390893-10904-2-git-send-email-rishabhb@codeaurora.org>
-Message-ID: <20180416145912.ja7d2xd2kqiukrgl@rob-hp-laptop>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 17 Apr 2018 00:02:32 +0900
+Subject: [PATCH] ARM: dts: renesas: replace toshiba,
+ mmc-wrprotect-disable with disable-wp
+Message-ID: <1523890952-20866-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 01:08:12PM -0700, Rishabh Bhatnagar wrote:
-> Documentation for last level cache controller device tree bindings,
-> client bindings usage examples.
+Follow up commit 788778b0d21a ("mmc: tmio: deprecate "toshiba,
+mmc-wrprotect-disable" DT property").
 
-"Documentation: Documentation ..."? That wastes a lot of the subject 
-line... The preferred prefix is "dt-bindings: ..."
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-> 
-> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
-> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
-> ---
->  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 58 ++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-> new file mode 100644
-> index 0000000..497cf0f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
-> @@ -0,0 +1,58 @@
-> +== Introduction==
-> +
-> +LLCC (Last Level Cache Controller) provides last level of cache memory in SOC,
-> +that can be shared by multiple clients. Clients here are different cores in the
-> +SOC, the idea is to minimize the local caches at the clients and migrate to
-> +common pool of memory
-> +
-> +Properties:
-> +- compatible:
-> +	 Usage: required
-> +	 Value type: <string>
-> +	 Definition: must be "qcom,sdm845-llcc"
-> +
-> +- reg:
-> +	 Usage: required
-> +	 Value Type: <prop-encoded-array>
-> +	 Definition: must be addresses and sizes of the LLCC registers
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts | 4 ++--
+ arch/arm/boot/dts/sh73a0.dtsi         | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-How many address ranges?
-
-> +
-> +- #cache-cells:
-
-This is all written as it is a common binding, but it is not one.
-
-You already have most of the configuration data for each client in the 
-driver, I think I'd just put the client connection there too. Is there 
-any variation of this for a given SoC?
-
-> +	 Usage: required
-> +	 Value Type: <u32>
-> +	 Definition: Number of cache cells, must be 1
-> +
-> +- max-slices:
-> +	 usage: required
-> +	 Value Type: <u32>
-> +	 Definition: Number of cache slices supported by hardware
-
-What's a slice?
-
-> +
-> +Example:
-> +
-> +	llcc: qcom,llcc at 1100000 {
-> +		compatible = "qcom,sdm845-llcc";
-> +		reg = <0x1100000 0x250000>;
-> +		#cache-cells = <1>;
-> +		max-slices = <32>;
-> +	};
-> +
-> +== Client ==
-> +
-> +Properties:
-> +- cache-slice-names:
-> +	 Usage: required
-> +	 Value type: <stringlist>
-> +	 Definition: A set of names that identify the usecase names of a
-> +			client that uses cache slice. These strings are
-> +			used to look up the cache slice entries by name.
-> +
-> +- cache-slices:
-> +	 Usage: required
-> +	 Value type: <prop-encoded-array>
-> +	 Definition: The tuple has phandle to llcc device as the first
-> +			argument and the second argument is the usecase
-> +			id of the client.
-> +For Example:
-> +	venus {
-> +		cache-slice-names = "vidsc0", "vidsc1";
-> +	 	cache-slices = <&llcc VIDSC0_ID>, <&llcc VIDSC1_ID>;
-> +	};
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index ec7c86e..125c39c 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -234,7 +234,7 @@
+ &sdhi0 {
+ 	vmmc-supply = <&vcc_sdhi0>;
+ 	bus-width = <4>;
+-	toshiba,mmc-wrprotect-disable;
++	disable-wp;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	status = "okay";
+@@ -244,7 +244,7 @@
+ 	vmmc-supply = <&ape6evm_fixed_3v3>;
+ 	bus-width = <4>;
+ 	broken-cd;
+-	toshiba,mmc-wrprotect-disable;
++	disable-wp;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdhi1_pins>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 914a7c2..39cc586 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -336,7 +336,7 @@
+ 			      GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks SH73A0_CLK_SDHI1>;
+ 		power-domains = <&pd_a3sp>;
+-		toshiba,mmc-wrprotect-disable;
++		disable-wp;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+ 	};
+@@ -348,7 +348,7 @@
+ 			      GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp3_clks SH73A0_CLK_SDHI2>;
+ 		power-domains = <&pd_a3sp>;
+-		toshiba,mmc-wrprotect-disable;
++		disable-wp;
+ 		cap-sd-highspeed;
+ 		status = "disabled";
+ 	};
+-- 
+2.7.4
