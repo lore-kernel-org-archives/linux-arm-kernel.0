@@ -1,131 +1,64 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 16 Apr 2018 10:25:46 -0700
-Subject: [PATCH v2 1/3] drm/vc4: Remove the need for the GPU-subsystem DT node.
-In-Reply-To: <20180413175632.oz62n363g6rxdp6z@rob-hp-laptop>
-References: <20180413175632.oz62n363g6rxdp6z@rob-hp-laptop>
-Message-ID: <20180416172546.32118-1-eric@anholt.net>
+From: ilina@codeaurora.org (Lina Iyer)
+Date: Mon, 16 Apr 2018 11:33:26 -0600
+Subject: [PATCH v7 01/26] PM / Domains: Don't treat zero found compatible
+ idle states as an error
+In-Reply-To: <1523531671-27491-2-git-send-email-ulf.hansson@linaro.org>
+References: <1523531671-27491-1-git-send-email-ulf.hansson@linaro.org>
+ <1523531671-27491-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20180416173326.GD1209@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPU subsystem node was a workaround to have a central device to
-bind V3D and display to.  Following the lead of 246774d17fc0
-("drm/etnaviv: remove the need for a gpu-subsystem DT node"), remove
-the subsystem node usage and just create a platform device for the DRM
-device to attach to if any of the subsystem devices are present.
+On Thu, Apr 12 2018 at 05:14 -0600, Ulf Hansson wrote:
+>Instead of returning -EINVAL from of_genpd_parse_idle_states() in case none
+>compatible states was found, let's return 0 to indicate success. Assign
+>also the out-parameter *states to NULL and *n to 0, to indicate to the
+>caller that zero states have been found/allocated.
+>
+>This enables the caller of of_genpd_parse_idle_states() to easier act on
+>the returned error code.
+>
+>Cc: Lina Iyer <ilina@codeaurora.org>
+>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-v2: Simplify the DT walking code.
+Reviewed-by: Lina Iyer <ilina@codeaurora.org>
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- .../bindings/display/brcm,bcm-vc4.txt         |  7 -----
- drivers/gpu/drm/vc4/vc4_drv.c                 | 29 ++++++++++++++-----
- drivers/gpu/drm/vc4/vc4_hvs.c                 |  1 +
- drivers/gpu/drm/vc4/vc4_v3d.c                 |  1 +
- 4 files changed, 23 insertions(+), 15 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-index 284e2b14cfbe..5fd4717101d6 100644
---- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-+++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-@@ -4,9 +4,6 @@ The VC4 device present on the Raspberry Pi includes a display system
- with HDMI output and the HVS (Hardware Video Scaler) for compositing
- display planes.
- 
--Required properties for VC4:
--- compatible:	Should be "brcm,bcm2835-vc4" or "brcm,cygnus-vc4"
--
- Required properties for Pixel Valve:
- - compatible:	Should be one of "brcm,bcm2835-pixelvalve0",
- 		  "brcm,bcm2835-pixelvalve1", or "brcm,bcm2835-pixelvalve2"
-@@ -153,10 +150,6 @@ v3d: v3d at 7ec00000 {
- 	interrupts = <1 10>;
- };
- 
--vc4: gpu {
--	compatible = "brcm,bcm2835-vc4";
--};
--
- panel: panel {
- 	compatible = "ontat,yx700wv03", "simple-panel";
- 
-diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
-index 7c95ed5c5cac..13b840b534b8 100644
---- a/drivers/gpu/drm/vc4/vc4_drv.c
-+++ b/drivers/gpu/drm/vc4/vc4_drv.c
-@@ -364,22 +364,30 @@ static int vc4_platform_drm_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id vc4_of_match[] = {
--	{ .compatible = "brcm,bcm2835-vc4", },
--	{ .compatible = "brcm,cygnus-vc4", },
--	{},
--};
--MODULE_DEVICE_TABLE(of, vc4_of_match);
--
- static struct platform_driver vc4_platform_driver = {
- 	.probe		= vc4_platform_drm_probe,
- 	.remove		= vc4_platform_drm_remove,
- 	.driver		= {
- 		.name	= "vc4-drm",
--		.of_match_table = vc4_of_match,
- 	},
- };
- 
-+static bool
-+driver_of_table_has_a_match(const struct platform_driver *driver)
-+{
-+	struct device_node *node;
-+
-+	node = of_find_matching_node_and_match(NULL,
-+					       driver->driver.of_match_table,
-+					       NULL);
-+	if (of_device_is_available(node)) {
-+		of_node_put(node);
-+		return true;
-+	}
-+
-+	return false;
-+}
-+
- static int __init vc4_drm_register(void)
- {
- 	int ret;
-@@ -389,6 +397,11 @@ static int __init vc4_drm_register(void)
- 	if (ret)
- 		return ret;
- 
-+	if (driver_of_table_has_a_match(&vc4_v3d_driver) ||
-+	    driver_of_table_has_a_match(&vc4_hvs_driver)) {
-+		platform_device_register_simple("vc4-drm", -1, NULL, 0);
-+	}
-+
- 	return platform_driver_register(&vc4_platform_driver);
- }
- 
-diff --git a/drivers/gpu/drm/vc4/vc4_hvs.c b/drivers/gpu/drm/vc4/vc4_hvs.c
-index 2b62fc5b8d85..730813ee74ae 100644
---- a/drivers/gpu/drm/vc4/vc4_hvs.c
-+++ b/drivers/gpu/drm/vc4/vc4_hvs.c
-@@ -262,6 +262,7 @@ static const struct of_device_id vc4_hvs_dt_match[] = {
- 	{ .compatible = "brcm,bcm2835-hvs" },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, vc4_hvs_dt_match);
- 
- struct platform_driver vc4_hvs_driver = {
- 	.probe = vc4_hvs_dev_probe,
-diff --git a/drivers/gpu/drm/vc4/vc4_v3d.c b/drivers/gpu/drm/vc4/vc4_v3d.c
-index bfc2fa73d2ae..e77e9ebbab4b 100644
---- a/drivers/gpu/drm/vc4/vc4_v3d.c
-+++ b/drivers/gpu/drm/vc4/vc4_v3d.c
-@@ -459,6 +459,7 @@ static const struct of_device_id vc4_v3d_dt_match[] = {
- 	{ .compatible = "brcm,vc4-v3d" },
- 	{}
- };
-+MODULE_DEVICE_TABLE(of, vc4_v3d_dt_match);
- 
- struct platform_driver vc4_v3d_driver = {
- 	.probe = vc4_v3d_dev_probe,
--- 
-2.17.0
+>---
+> drivers/base/power/domain.c | 14 ++++++++++----
+> 1 file changed, 10 insertions(+), 4 deletions(-)
+>
+>diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>index 1ea0e25..c2ef944 100644
+>--- a/drivers/base/power/domain.c
+>+++ b/drivers/base/power/domain.c
+>@@ -2331,8 +2331,8 @@ static int genpd_iterate_idle_states(struct device_node *dn,
+>  *
+>  * Returns the device states parsed from the OF node. The memory for the states
+>  * is allocated by this function and is the responsibility of the caller to
+>- * free the memory after use. If no domain idle states is found it returns
+>- * -EINVAL and in case of errors, a negative error code.
+>+ * free the memory after use. If any or zero compatible domain idle states is
+>+ * found it returns 0 and in case of errors, a negative error code is returned.
+>  */
+> int of_genpd_parse_idle_states(struct device_node *dn,
+> 			struct genpd_power_state **states, int *n)
+>@@ -2341,8 +2341,14 @@ int of_genpd_parse_idle_states(struct device_node *dn,
+> 	int ret;
+>
+> 	ret = genpd_iterate_idle_states(dn, NULL);
+>-	if (ret <= 0)
+>-		return ret < 0 ? ret : -EINVAL;
+>+	if (ret < 0)
+>+		return ret;
+>+
+>+	if (!ret) {
+>+		*states = NULL;
+>+		*n = 0;
+>+		return 0;
+>+	}
+>
+> 	st = kcalloc(ret, sizeof(*st), GFP_KERNEL);
+> 	if (!st)
+>--
+>2.7.4
+>
