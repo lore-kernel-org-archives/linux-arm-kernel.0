@@ -1,21 +1,22 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Apr 2018 13:48:35 -0500
-Subject: [PATCH 1/4] dt-bindings: power: Add Actions Semi S900 SPS
-In-Reply-To: <20180411164036.8046-2-manivannan.sadhasivam@linaro.org>
-References: <20180411164036.8046-1-manivannan.sadhasivam@linaro.org>
- <20180411164036.8046-2-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180416184835.paip4cerjemyqcwn@rob-hp-laptop>
+From: andi@etezian.org (andi at etezian.org)
+Date: Tue, 17 Apr 2018 04:04:00 +0900
+Subject: [PATCH 1/6] spi: spi-s3c64xx: Remove unused driver data structure
+ tgl_spi field
+In-Reply-To: <20180416154021.25626-1-s.nawrocki@samsung.com>
+References: <CGME20180416154055epcas2p4c08bb2254e79368a29eb481cddc59855@epcas2p4.samsung.com>
+ <20180416154021.25626-1-s.nawrocki@samsung.com>
+Message-ID: <3f84e28e946d13afe44fcbebf32cb267@etezian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 11, 2018 at 10:10:33PM +0530, Manivannan Sadhasivam wrote:
-> Define power domains for Actions Semi S900 SoC Smart Power System (SPS).
-> 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> ---
->  .../devicetree/bindings/power/actions,owl-sps.txt  |  2 ++
->  include/dt-bindings/power/owl-s900-powergate.h     | 23 ++++++++++++++++++++++
->  2 files changed, 25 insertions(+)
->  create mode 100644 include/dt-bindings/power/owl-s900-powergate.h
+Hi Sylwester,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On 17.04.2018 00:40, Sylwester Nawrocki wrote:
+> The tgl_spi pointer is now unused so remove it.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+Reviewed-by: Andi Shyti <andi@etezian.org>
+
+Thanks,
+Andi
