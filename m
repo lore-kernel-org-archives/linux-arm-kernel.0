@@ -1,90 +1,102 @@
-From: einar.vading@axis.com (Einar Vading)
-Date: Mon, 16 Apr 2018 11:57:14 +0200
-Subject: serial: imx: half-duplex RS485 operation with RTS active low
-In-Reply-To: <20180416095436.7mxh4cqdvlyleryr@lnxeinarv.se.axis.com>
-References: <0e88706a05a302201be396d2f03c3e9e@agner.ch>
- <20180416095436.7mxh4cqdvlyleryr@lnxeinarv.se.axis.com>
-Message-ID: <20180416095714.hj6lxdoee3zis3mg@lnxeinarv.se.axis.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 16 Apr 2018 11:57:15 +0200
+Subject: [PATCH v6 28/30] drm/rockchip: Disable PSR from reboot notifier
+In-Reply-To: <20180405095000.9756-29-enric.balletbo@collabora.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+ <CGME20180405095117epcas2p2093448b49aab2abd6684bf689f8888d5@epcas2p2.samsung.com>
+ <20180405095000.9756-29-enric.balletbo@collabora.com>
+Message-ID: <a9e436f8-34ec-123a-9c69-efabb4576bea@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 11:54:36AM +0200, Einar Vading wrote:
-> On Mon, Apr 16, 2018 at 11:14:32AM +0200, Stefan Agner wrote:
+On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
+>
+> It looks like the driver subsystem detaches devices from power domains
+> at shutdown without consent of the drivers.
 
-Forgot to mention that we are not using DTE-de mode. We tried to but failed.
+It looks bit strange. Could you elaborate more on it. Could you show the
+code performing the detach?
 
-> > Hi,
-> > 
-> > Using upstream I noticed that RS-485 does not work in the default
-> > configuration for our platforms (Toradex Apalis/Colibri). Closer
-> > debugging shows that it is related to "serial: imx: default to half
-> > duplex rs485".
-> 
-> We where struggling a bit with half duplex rs485 too a while ago.
-> > 
-> > We use the i.MX UART in DTE mode and control the RS-485 transceiver
-> > using the RTS signal in low-active mode.
-> > 
-> > 	uart-has-rtscts;
-> > 	fsl,dte-mode;
-> > 	linux,rs485-enabled-at-boot-time;
-> > 	rs485-rts-active-low;
-> > 
-> > Using this setting leads to the RTS signal not getting asserted (the
-> > oscilloscope only shows a very short fluke before the start bit is
-> > sent).
-> 
-> I think this is what we had too. But if I recall we where supposed to be
-> active-high but I think the behavior is the same either way.
-> > 
-> > However, using
-> > 
-> > 	uart-has-rtscts;
-> > 	fsl,dte-mode;
-> > 	linux,rs485-enabled-at-boot-time;
-> > 	rs485-rts-active-low;
-> > 	rs485-rx-during-tx;
-> > 
-> > Asserts the RTS signal low active just fine...
-> 
-> We have a (RTS active high) configuration working for us now with only
-> 
->     uart-has-rtscts
-> 
-> in DT, and then when using the port we do
-> 
->     struct serial_rs485 rs485conf;
->     memset(&rs485conf, 0x00, sizeof(struct serial_rs485));
-> 
->     rs485conf.flags |= SER_RS485_ENABLED;
->     rs485conf.flags |= SER_RS485_RTS_ON_SEND;
->     rs485conf.flags &= ~(SER_RS485_RTS_AFTER_SEND);
-> 
->     f_debug("Calling ioctl...");
->     if (ioctl (fd, TIOCSRS485, &rs485conf) < 0) {
->       f_critical("ioctl serial_rs485 failed");
->       return -1;
->     }
-> 
-> Hope it helps.
-> > 
-> > Is this a known problem? Any idea where that could come from? It looks
-> > as if the receiver part is actually enabling RTS...?
-> > 
-> > Also, isn't enabling RX even in half-duplex mode quite common in order
-> > to detect collisions?
-> > 
-> > --
-> > Stefan
-> 
-> // Einar
-// Einar
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Regards
+Andrzej
+
+
+>  This means that we might have
+> our power domain turned off behind our back and the only way to avoid
+> problems is to stop doing any hardware programming at some point before
+> the power is cut. A reboot notifier, despite being a misnomer and
+> handling shutdowns as well, is a good place to do it.
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> index e7e16d92d5a1..1bf5cba9a64d 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> @@ -13,6 +13,7 @@
+>   */
+>  
+>  #include <linux/input.h>
+> +#include <linux/reboot.h>
+>  
+>  #include <drm/drmP.h>
+>  #include <drm/drm_crtc_helper.h>
+> @@ -33,6 +34,7 @@ struct psr_drv {
+>  	struct delayed_work	flush_work;
+>  	struct work_struct	disable_work;
+>  
+> +	struct notifier_block	reboot_nb;
+>  	struct input_handler    input_handler;
+>  
+>  	int (*set)(struct drm_encoder *encoder, bool enable);
+> @@ -309,6 +311,24 @@ static const struct input_device_id psr_ids[] = {
+>  	{ },
+>  };
+>  
+> +static int rockchip_drm_psr_reboot_notifier(struct notifier_block *nb,
+> +					    unsigned long action, void *data)
+> +{
+> +	struct psr_drv *psr = container_of(nb, struct psr_drv, reboot_nb);
+> +
+> +	/*
+> +	 * It looks like the driver subsystem detaches devices from power
+> +	 * domains at shutdown without consent of the drivers. This means
+> +	 * that we might have our power domain turned off behind our back
+> +	 * and the only way to avoid problems is to stop doing any hardware
+> +	 * programming after this point, which is achieved by the unbalanced
+> +	 * call below.
+> +	 */
+> +	rockchip_drm_psr_inhibit_get(psr->encoder);
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * rockchip_drm_psr_register - register encoder to psr driver
+>   * @encoder: encoder that obtain the PSR function
+> @@ -361,6 +381,9 @@ int rockchip_drm_psr_register(struct drm_encoder *encoder,
+>  	if (error)
+>  		goto err1;
+>  
+> +	psr->reboot_nb.notifier_call = rockchip_drm_psr_reboot_notifier;
+> +	register_reboot_notifier(&psr->reboot_nb);
+> +
+>  	mutex_lock(&drm_drv->psr_list_lock);
+>  	list_add_tail(&psr->list, &drm_drv->psr_list);
+>  	mutex_unlock(&drm_drv->psr_list_lock);
+> @@ -403,6 +426,7 @@ void rockchip_drm_psr_unregister(struct drm_encoder *encoder)
+>  			WARN_ON(psr->inhibit_count != 1);
+>  
+>  			list_del(&psr->list);
+> +			unregister_reboot_notifier(&psr->reboot_nb);
+>  			input_unregister_handler(&psr->input_handler);
+>  			kfree(psr->input_handler.name);
+>  			kfree(psr);
