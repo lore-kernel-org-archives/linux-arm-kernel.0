@@ -1,101 +1,89 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Sun, 15 Apr 2018 21:03:32 -0500
-Subject: [RFC PATCH 0/3] Dealing with the aliases of SI_USER
-In-Reply-To: <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
- (Linus Torvalds's message of "Sun, 15 Apr 2018 11:16:04 -0700")
-References: <CA+55aFxdg2bYHtbKXb4mT5UuP2GH_qjkc=WeZY-RYHWZFQ2Gng@mail.gmail.com>
- <20180412172051.GK16141@n2100.armlinux.org.uk>
- <CA+55aFwjZqd8J0=veki1g+quQg8amEG4NnMe-h7HFksn=F=x_Q@mail.gmail.com>
- <20180413094211.GN16141@n2100.armlinux.org.uk>
- <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
- <20180413170827.GB16308@e103592.cambridge.arm.com>
- <20180413175407.GO16141@n2100.armlinux.org.uk>
- <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
- <20180413184522.GD16308@e103592.cambridge.arm.com>
- <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
- <20180415131206.GR16141@n2100.armlinux.org.uk>
- <87604sa2fu.fsf_-_@xmission.com>
- <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
-Message-ID: <87tvsb29hn.fsf@xmission.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 16 Apr 2018 10:31:58 +0800
+Subject: [PATCH] clk: mediatek: correct the clocks for MT2701 HDMI PHY module
+Message-ID: <f3248cc94349000b2587d9c6102d56323acba9e0.1523844642.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Torvalds <torvalds@linux-foundation.org> writes:
+The hdmitx_dig_cts clock signal is not a child of clk26m,
+and the actual output of the PLL block is derived from
+the tvdpll via a configurable PLL post-divider.
 
-> (
->
-> On Sun, Apr 15, 2018 at 8:56 AM, Eric W. Biederman
-> <ebiederm@xmission.com> wrote:
->>
->> Would you consider the patchset below for -rc2?
->
-> Ugh.
+It is used as the PLL reference input to the HDMI PHY module.
 
-The point of this series is to squash the potential for regressions even
-from the weird broken code that fills in fields for si_code 0 that do
-not match SI_USER.
+Signed-off-by: Chunhui Dai <chunhui.dai@mediatek.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/clk/mediatek/clk-mt2701.c      |  8 ++++++--
+ include/dt-bindings/clock/mt2701-clk.h | 16 ++++++++--------
+ 2 files changed, 14 insertions(+), 10 deletions(-)
 
-The copy_siginfo_to_user32 never handled that so we don't need to worry
-about that.  All of the signals that abuse si_code 0 go through
-force_sig_info so signalfd can not catch them.  Which means that only
-copy_siginfo_to_user needs to be worried about.
-
-Last time I was benchmarking I could not see a difference between
-copying the entire siginfo and only a small part so I don't see
-the point of optimizing now.
-
-For an actual cleanup I intend to go farther than you are proposing and
-convert everthing to the set of helper functions I have added to
-kernel/signal.c force_sig_fault, force_sig_mceerr, force_sig_bnderr,
-force_sig_pkuerr.
-
-When I am done there will be maybe 5 instances of clear_siginfo outside
-of those helper functions.  At which point I won't care if we remove
-clear_siginfo and just use memset.  That is a real improvement
-that looks something like: "105 files changed, 933 insertions(+), 1698 deletions(-)"
-That is my end goal with all of this.
-
-You complained to me about regressions and you are right with the
-current handling of FPE_FIXME TRAP_FIXME the code is not bug compatible
-with old versions of linux, and people have noticed.
-
-What this patchset represents is the bare minimum needed to convert
-copy_siginfo_to_user to a copy_to_user, and remove the possibility
-of regressions.
-
-To that end I need to ensure every struct siginfo in the entire
-kernel is memset to 0.  A structure initializer is absolutely
-not enough.  So I don't mind people thinking clear_siginfo is necessary.
-
-
-To that end clear_siginfo where it does not take the size of
-struct siginfo as a parameter is much less suceptible to typos,
-and allows me to ensure every instance of struct siginfo is fully
-initialized.
-
-I fully intend to remove practically every instance of struct siginfo
-from the architecture specific code, and use the aforementioned helpers.
-The trouble is that some of the architecture code need refactoring
-for that to happen.  Even your proposed init_siginfo can't be widely
-used as a common pattern is to fill in siginfo partially in the
-code with si_code and si_signo being filled in almost last.
-
-So in short.  I intend to remove most of these clear_siginfo calls when
-I remove the siginfos later.  This series is focused on making
-copy_siginfo_to_user simple enough we don't need to use siginfo_layout,
-and thus can be fully backwards compatibile with ourselves and we won't
-need to worry about regressions.  I have aimed to keep this simple
-enough we can merge this after -rc1 because we don't want regressions.
-
-Eric
-
-ps.  I intend to place this change first in my series wether or not it makes
-it into -rc2 so that I can be certain we remove any possible regressions
-in behavior on the buggy architectures.  Then I can take my time and
-ensure the non-trivial changes of refactoring etc are done carefully so
-I don't introduce other bugs.  I need that so I can sleep at night.
-
-pps.  I can look at some of your other suggestions but cleverness leads
-to regressions, and if you are going to complain at me harshly when I
-have been being careful and taking things seriously I am not
-particularly willing to take unnecessary chances.
+diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+index deca752..4dda898 100644
+--- a/drivers/clk/mediatek/clk-mt2701.c
++++ b/drivers/clk/mediatek/clk-mt2701.c
+@@ -46,8 +46,6 @@
+ 		340 * MHZ),
+ 	FIXED_CLK(CLK_TOP_HDMI_0_PLL340M, "hdmi_0_pll340m", "clk26m",
+ 		340 * MHZ),
+-	FIXED_CLK(CLK_TOP_HDMITX_CLKDIG_CTS, "hdmitx_dig_cts", "clk26m",
+-		300 * MHZ),
+ 	FIXED_CLK(CLK_TOP_HADDS2_FB, "hadds2_fbclk", "clk26m",
+ 		27 * MHZ),
+ 	FIXED_CLK(CLK_TOP_WBG_DIG_416M, "wbg_dig_ck_416m", "clk26m",
+@@ -977,6 +975,10 @@ static int mtk_pericfg_init(struct platform_device *pdev)
+ 				21, 0x2d0, 4, 0x0, 0x2d4, 0),
+ };
+ 
++static const struct mtk_fixed_factor apmixed_fixed_divs[] = {
++	FACTOR(CLK_APMIXED_HDMI_REF, "hdmi_ref", "tvdpll", 1, 1),
++};
++
+ static int mtk_apmixedsys_init(struct platform_device *pdev)
+ {
+ 	struct clk_onecell_data *clk_data;
+@@ -988,6 +990,8 @@ static int mtk_apmixedsys_init(struct platform_device *pdev)
+ 
+ 	mtk_clk_register_plls(node, apmixed_plls, ARRAY_SIZE(apmixed_plls),
+ 								clk_data);
++	mtk_clk_register_factors(apmixed_fixed_divs, ARRAY_SIZE(apmixed_fixed_divs),
++								clk_data);
+ 
+ 	return of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+ }
+diff --git a/include/dt-bindings/clock/mt2701-clk.h b/include/dt-bindings/clock/mt2701-clk.h
+index 24e93df..1956ebb 100644
+--- a/include/dt-bindings/clock/mt2701-clk.h
++++ b/include/dt-bindings/clock/mt2701-clk.h
+@@ -171,13 +171,12 @@
+ #define CLK_TOP_8BDAC				151
+ #define CLK_TOP_WBG_DIG_416M			152
+ #define CLK_TOP_DPI				153
+-#define CLK_TOP_HDMITX_CLKDIG_CTS		154
+-#define CLK_TOP_DSI0_LNTC_DSI			155
+-#define CLK_TOP_AUD_EXT1			156
+-#define CLK_TOP_AUD_EXT2			157
+-#define CLK_TOP_NFI1X_PAD			158
+-#define CLK_TOP_AXISEL_D4			159
+-#define CLK_TOP_NR				160
++#define CLK_TOP_DSI0_LNTC_DSI			154
++#define CLK_TOP_AUD_EXT1			155
++#define CLK_TOP_AUD_EXT2			156
++#define CLK_TOP_NFI1X_PAD			157
++#define CLK_TOP_AXISEL_D4			158
++#define CLK_TOP_NR				159
+ 
+ /* APMIXEDSYS */
+ 
+@@ -194,7 +193,8 @@
+ #define CLK_APMIXED_HADDS2PLL			11
+ #define CLK_APMIXED_AUD2PLL			12
+ #define CLK_APMIXED_TVD2PLL			13
+-#define CLK_APMIXED_NR				14
++#define CLK_APMIXED_HDMI_REF			14
++#define CLK_APMIXED_NR				15
+ 
+ /* DDRPHY */
+ 
+-- 
+1.9.1
