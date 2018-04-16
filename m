@@ -1,21 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 16 Apr 2018 13:43:33 -0400 (EDT)
-Subject: [PATCH] net: mediatek: use of_device_get_match_data()
-In-Reply-To: <9bf87205f84062580934168774d690d4cd2bf26b.1523347340.git.ryder.lee@mediatek.com>
-References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
- <9bf87205f84062580934168774d690d4cd2bf26b.1523347340.git.ryder.lee@mediatek.com>
-Message-ID: <20180416.134333.1584175683168282946.davem@davemloft.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Apr 2018 18:48:26 +0100
+Subject: 4.16 OMAP serial transmit corruption?
+In-Reply-To: <20180416155259.GB5671@atomide.com>
+References: <20180416151732.GU16141@n2100.armlinux.org.uk>
+ <20180416155259.GB5671@atomide.com>
+Message-ID: <20180416174826.GJ10990@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryder Lee <ryder.lee@mediatek.com>
-Date: Mon, 16 Apr 2018 10:33:41 +0800
-
-> The usage of of_device_get_match_data() reduce the code size a bit.
+On Mon, Apr 16, 2018 at 08:52:59AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [180416 15:19]:
+> > Since this uses a USB adapter (built onto the board) it could be
+> > that there could be a bug in the driver for that rather than the
+> > OMAP4430 SDP, but I've no way to check that hypothesis.
 > 
-> Also, the only way to call mtk_probe() is to match an entry in
-> of_mtk_match[], so match cannot be NULL.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> Does it go away when you do a warm reboot of the sdp? Then
+> it should not be related to the USB iff the ftdi chip is bus
+> powered by VBUS.
 
-Applied to net-next.
+Yes, the FTDI chip is bus powered.
+
+I booted, ran vi, quit vi, saw corruption, typed reboot, waited for
+it to reboot, ran vi, quit vi, and still saw corruption.  So the
+reboot seems to have had no effect.
+
+I don't see it with other USB serial consoles on other machines...
+I have two of these using the same FTDI chipset:
+
+Bus 001 Device 021: ID 0403:6011 Future Technology Devices International, Ltd FT4232H Quad HS USB-UART/FIFO IC
+Bus 001 Device 020: ID 0403:6011 Future Technology Devices International, Ltd FT4232H Quad HS USB-UART/FIFO IC
+
+Device 20 is the SDP board, and device 21 is a ZII board.  Both use
+port 2 on the quad ftdi device.  The serial console on the ZII board
+is fine, so that seems to rule out the FTDI driver / FTDI hardware.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
