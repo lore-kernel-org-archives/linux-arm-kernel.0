@@ -1,59 +1,37 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Mon, 16 Apr 2018 15:07:21 +0200
-Subject: [PATCH v2 15/19] dt-bindings: gpio: Add support for r8a77965
-In-Reply-To: <CAMuHMdW4k+GROdy6kKT-3jd7YYGVbKvieyCSEWXGXJyvZg7NGQ@mail.gmail.com>
-References: <1519139541-18783-1-git-send-email-jacopo+renesas@jmondi.org>
- <1519139541-18783-16-git-send-email-jacopo+renesas@jmondi.org>
- <CAMuHMdW4k+GROdy6kKT-3jd7YYGVbKvieyCSEWXGXJyvZg7NGQ@mail.gmail.com>
-Message-ID: <20180416130721.GB3377@w540>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon, 16 Apr 2018 13:12:07 +0000
+Subject: [PATCH v6 28/30] drm/rockchip: Disable PSR from reboot notifier
+In-Reply-To: <a9e436f8-34ec-123a-9c69-efabb4576bea@samsung.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+ <CGME20180405095117epcas2p2093448b49aab2abd6684bf689f8888d5@epcas2p2.samsung.com>
+ <20180405095000.9756-29-enric.balletbo@collabora.com>
+ <a9e436f8-34ec-123a-9c69-efabb4576bea@samsung.com>
+Message-ID: <CAAFQd5C_RhqSCfEXNPQ0zH-O1PGk6xGEdvzsSxnfz9kJ5G4Ceg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Andrzej,
 
-On Mon, Apr 16, 2018 at 01:12:06PM +0200, Geert Uytterhoeven wrote:
-> Hi Jacopo,
->
-> On Tue, Feb 20, 2018 at 4:12 PM, Jacopo Mondi <jacopo+renesas@jmondi.org> wrote:
-> > Add compatible string for R-Car M3-N (r8a77965) in gpio-rcar.
+On Mon, Apr 16, 2018 at 6:57 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
+
+> On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
+> > From: Tomasz Figa <tfiga@chromium.org>
 > >
-> > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Can you please resend to the GPIO maintainer?
-> Thanks!
+> > It looks like the driver subsystem detaches devices from power domains
+> > at shutdown without consent of the drivers.
 
-Thank you for the useful reminder.
+> It looks bit strange. Could you elaborate more on it. Could you show the
+> code performing the detach?
 
->From my original M3-N support series, the following DT binding patches
-have actually to be resent, now that the SoC support is in v4.17-rc1.
+It not only looks strange, but it is strange. The code was present in 4.4:
 
-dt-bindings: dmaengine: rcar-dmac: document R8A77965 support
-dt-bindings: serial: sh-sci: Add support for r8a77965 (H)SCIF
-dt-bindings: net: ravb: Add support for r8a77965 SoC
-dt-bindings: gpio: Add support for r8a77965
+https://elixir.bootlin.com/linux/v4.4.128/source/drivers/base/platform.c#L553
 
-I will resend each one to the appropriate tree maintainer.
+but was apparently removed in 4.5:
 
-Thanks
-   j
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/base/platform.c?h=next-20180416&id=2d30bb0b3889adf09b342722b2ce596c0763bc93
 
+So we might not need this patch anymore.
 
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180416/ac02c299/attachment.sig>
+Best regards,
+Tomasz
