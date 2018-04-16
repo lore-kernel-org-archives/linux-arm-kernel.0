@@ -1,110 +1,18 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Apr 2018 14:44:41 +0100
-Subject: [PATCH] arm64: kasan: avoid pfn_to_nid() before page array is
- initialized
-Message-ID: <20180416134441.49730-1-mark.rutland@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 16 Apr 2018 21:54:18 +0800
+Subject: [PATCH] ARM: dts: imx7d-sdb: add gpio key support
+In-Reply-To: <1521190471-25242-1-git-send-email-Anson.Huang@nxp.com>
+References: <1521190471-25242-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180416135416.GI25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In arm64's kasan_init(), we use pfn_to_nid() to find the NUMA node a
-span of memory is in, hoping to allocate shadow from the same NUMA node.
-However, at this point, the page array has not been initialized, and
-thus this is bogus.
+On Fri, Mar 16, 2018 at 04:54:31PM +0800, Anson Huang wrote:
+> Add support for imx7d-sdb board's gpio keys:
+> 
+> S1(FUNC1): KEY_VOLUMEUP
+> S3(FUNC2): KEY_VOLUMEDOWN
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Since commit:
-
-  f165b378bbdf6c8a ("mm: uninitialized struct page poisoning sanity")
-
-... accessing fields of the page array results in a boot time Oops(),
-highlighting this problem:
-
-[    0.000000] Unable to handle kernel paging request at virtual address dfff200000000000
-[    0.000000] Mem abort info:
-[    0.000000]   ESR = 0x96000004
-[    0.000000]   Exception class = DABT (current EL), IL = 32 bits
-[    0.000000]   SET = 0, FnV = 0
-[    0.000000]   EA = 0, S1PTW = 0
-[    0.000000] Data abort info:
-[    0.000000]   ISV = 0, ISS = 0x00000004
-[    0.000000]   CM = 0, WnR = 0
-[    0.000000] [dfff200000000000] address between user and kernel address ranges
-[    0.000000] Internal error: Oops: 96000004 [#1] PREEMPT SMP
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.16.0-07317-gf165b378bbdf #42
-[    0.000000] Hardware name: ARM Juno development board (r1) (DT)
-[    0.000000] pstate: 80000085 (Nzcv daIf -PAN -UAO)
-[    0.000000] pc : __asan_load8+0x8c/0xa8
-[    0.000000] lr : __dump_page+0x3c/0x3b8
-[    0.000000] sp : ffff2000099b7ca0
-[    0.000000] x29: ffff2000099b7ca0 x28: ffff20000a1762c0
-[    0.000000] x27: ffff7e0000000000 x26: ffff2000099dd000
-[    0.000000] x25: ffff200009a3f960 x24: ffff200008f9c38c
-[    0.000000] x23: ffff20000a9d3000 x22: ffff200009735430
-[    0.000000] x21: fffffffffffffffe x20: ffff7e0001e50420
-[    0.000000] x19: ffff7e0001e50400 x18: 0000000000001840
-[    0.000000] x17: ffffffffffff8270 x16: 0000000000001840
-[    0.000000] x15: 0000000000001920 x14: 0000000000000004
-[    0.000000] x13: 0000000000000000 x12: 0000000000000800
-[    0.000000] x11: 1ffff0012d0f89ff x10: ffff10012d0f89ff
-[    0.000000] x9 : 0000000000000000 x8 : ffff8009687c5000
-[    0.000000] x7 : 0000000000000000 x6 : ffff10000f282000
-[    0.000000] x5 : 0000000000000040 x4 : fffffffffffffffe
-[    0.000000] x3 : 0000000000000000 x2 : dfff200000000000
-[    0.000000] x1 : 0000000000000005 x0 : 0000000000000000
-[    0.000000] Process swapper (pid: 0, stack limit = 0x        (ptrval))
-[    0.000000] Call trace:
-[    0.000000]  __asan_load8+0x8c/0xa8
-[    0.000000]  __dump_page+0x3c/0x3b8
-[    0.000000]  dump_page+0xc/0x18
-[    0.000000]  kasan_init+0x2e8/0x5a8
-[    0.000000]  setup_arch+0x294/0x71c
-[    0.000000]  start_kernel+0xdc/0x500
-[    0.000000] Code: aa0403e0 9400063c 17ffffee d343fc00 (38e26800)
-[    0.000000] ---[ end trace 67064f0e9c0cc338 ]---
-[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
-[    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill the idle task! ]---
-
-Let's fix this by using early_pfn_to_nid(), as other architectures do in
-their kasan init code. Note that early_pfn_to_nid acquires the nid from
-the memblock array, which we iterate over in kasan_init(), so this
-should be fine.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: 39d114ddc6822302 ("arm64: add KASAN support")
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/kasan_init.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-Catalin, are you happy to pick this up as a fix for v4.17-rc2?
-
-I spotted this while preparing a v4.17-rc1 Image for fuzzing...
-
-Thanks,
-Mark.
-
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index dabfc1ecda3d..12145874c02b 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -204,7 +204,7 @@ void __init kasan_init(void)
- 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
- 
- 	kasan_map_populate(kimg_shadow_start, kimg_shadow_end,
--			   pfn_to_nid(virt_to_pfn(lm_alias(_text))));
-+			   early_pfn_to_nid(virt_to_pfn(lm_alias(_text))));
- 
- 	kasan_populate_zero_shadow((void *)KASAN_SHADOW_START,
- 				   (void *)mod_shadow_start);
-@@ -224,7 +224,7 @@ void __init kasan_init(void)
- 
- 		kasan_map_populate((unsigned long)kasan_mem_to_shadow(start),
- 				   (unsigned long)kasan_mem_to_shadow(end),
--				   pfn_to_nid(virt_to_pfn(start)));
-+				   early_pfn_to_nid(virt_to_pfn(start)));
- 	}
- 
- 	/*
--- 
-2.11.0
+Applied, thanks.
