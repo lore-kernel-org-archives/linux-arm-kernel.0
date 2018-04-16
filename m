@@ -1,86 +1,56 @@
-From: xiaolei.li@mediatek.com (xiaolei li)
-Date: Mon, 16 Apr 2018 12:27:37 +0800
-Subject: [PATCH] mtd: nand: mtk: use of_device_get_match_data()
-In-Reply-To: <c3af6d5035e43b53b5cc7ee68f9f1a853ce2a8f9.1523347340.git.ryder.lee@mediatek.com>
-References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
- <c3af6d5035e43b53b5cc7ee68f9f1a853ce2a8f9.1523347340.git.ryder.lee@mediatek.com>
-Message-ID: <1523852857.14673.30.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 16 Apr 2018 12:41:17 +0800
+Subject: [linux-sunxi] [PATCH v2 00/10] Allwinner H3 DVFS support
+In-Reply-To: <20180206044905.30508-1-icenowy@aosc.io>
+References: <20180206044905.30508-1-icenowy@aosc.io>
+Message-ID: <CAGb2v67FaU3_su9XGaGj4zVSoAnpfN8cAhbBHEJu3Owt=Qicmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-04-16 at 10:33 +0800, Ryder Lee wrote:
-> The usage of of_device_get_match_data() reduce the code size a bit.
-> 
-> Also, the only way to call .probe() is to match an entry in
-> .of_match_table[], so of_device_id cannot be NULL.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/mtd/nand/raw/mtk_ecc.c  |  7 +------
->  drivers/mtd/nand/raw/mtk_nand.c | 10 +---------
->  2 files changed, 2 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
-> index 40d86a8..6432bd7 100644
-> --- a/drivers/mtd/nand/raw/mtk_ecc.c
-> +++ b/drivers/mtd/nand/raw/mtk_ecc.c
-> @@ -500,7 +500,6 @@ static int mtk_ecc_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct mtk_ecc *ecc;
->  	struct resource *res;
-> -	const struct of_device_id *of_ecc_id = NULL;
->  	u32 max_eccdata_size;
->  	int irq, ret;
->  
-> @@ -508,11 +507,7 @@ static int mtk_ecc_probe(struct platform_device *pdev)
->  	if (!ecc)
->  		return -ENOMEM;
->  
-> -	of_ecc_id = of_match_device(mtk_ecc_dt_match, &pdev->dev);
-> -	if (!of_ecc_id)
-> -		return -ENODEV;
-> -
-> -	ecc->caps = of_ecc_id->data;
-> +	ecc->caps = of_device_get_match_data(dev);
->  
-Thanks.
+Hi,
 
-Reviewed-by: Xiaolei Li <xiaolei.li@mediatek.com>
+On Tue, Feb 6, 2018 at 12:48 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> This patchset tries to add DVFS support for Allwinner H3 SoC,
+> considering two kinds of adjustable regulators used on H3 boards:
+> SY8106A I2C-controlled regulator and SY8113B regulator (controllable
+> by GPIO with some special designs on the board), and also taking the
+> uncontrollable boards into consider.
+>
+> PATCH 1 and PATCH 2 are for the SY8106A regulator, then PATCH 3 and
+> PATCH 4 are for the r_i2c bus, which is used by boards with SY8106A
+> to communicate with the regulator.
+>
+> PATCH 5 adds the operating points v2 table to the H3 SoC, but with
+> OPPs higher than 1008MHz temporarily dropped.
+>
+> Then there's patches for several tested boards: Orange Pi PC (with
+> SY8106A), Orange Pi One/Zero (with GPIO-adjustable SY8113B) and
+> ALL-H3-CC (unadjustable).
+>
+> Icenowy Zheng (5):
+>   ARM: sun8i: h3: add operating-points-v2 table for CPU
+>   ARM: sun8i: h2+: add SY8113B regulator used by Orange Pi Zero board
+>   ARM: sun8i: h3: add SY8113B regulator used by Orange Pi One board
+>   ARM: sun8i: h3: fix ALL-H3-CC H3 ver VDD-CPUX voltage
+>   ARM: sun8i: h3: set the cpu-supply to VDD-CPUX on ALL-H3-CC H3 ver
+>
+> Ondrej Jirman (5):
+>   dt-bindings: add binding for the SY8106A voltage regulator
+>   regulator: add support for SY8106A regulator
+>   ARM: sunxi: h3/h5: Add r_i2c pinmux node
+>   ARM: sunxi: h3/h5: Add r_i2c I2C controller
+>   ARM: sun8i: h3: Add SY8106A regulator to Orange Pi PC
 
->  	max_eccdata_size = ecc->caps->num_ecc_strength - 1;
->  	max_eccdata_size = ecc->caps->ecc_strength[max_eccdata_size];
-> diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
-> index 6977da3..75c845a 100644
-> --- a/drivers/mtd/nand/raw/mtk_nand.c
-> +++ b/drivers/mtd/nand/raw/mtk_nand.c
-> @@ -1434,7 +1434,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
->  	struct device_node *np = dev->of_node;
->  	struct mtk_nfc *nfc;
->  	struct resource *res;
-> -	const struct of_device_id *of_nfc_id = NULL;
->  	int ret, irq;
->  
->  	nfc = devm_kzalloc(dev, sizeof(*nfc), GFP_KERNEL);
-> @@ -1452,6 +1451,7 @@ static int mtk_nfc_probe(struct platform_device *pdev)
->  	else if (!nfc->ecc)
->  		return -ENODEV;
->  
-> +	nfc->caps = of_device_get_match_data(dev);
->  	nfc->dev = dev;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -1498,14 +1498,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
->  		goto clk_disable;
->  	}
->  
-> -	of_nfc_id = of_match_device(mtk_nfc_id_table, &pdev->dev);
-> -	if (!of_nfc_id) {
-> -		ret = -ENODEV;
-> -		goto clk_disable;
-> -	}
-> -
-> -	nfc->caps = of_nfc_id->data;
-> -
->  	platform_set_drvdata(pdev, nfc);
->  
->  	ret = mtk_nfc_nand_chips_init(dev, nfc);
+I've applied all the device tree patches for 4.18, taking into account
+comments from Maxime. See
+
+    https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git/log/?h=sunxi/h3-h5-for-4.17
+
+Mostly it's just renaming the regulator node names and labels.
+
+Please resend the first two patches to Mark Brown, the regulator
+subsystem maintainer. And you might want to mention the branch
+above in case he needs a use case reference.
+
+Regards
+ChenYu
