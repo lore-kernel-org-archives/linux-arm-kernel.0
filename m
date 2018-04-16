@@ -1,94 +1,229 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 16 Apr 2018 14:46:16 -0700
-Subject: [RFC 3/3] arm: shmobile: Add the RZ/N1D SMP enabler driver.
-In-Reply-To: <1523871304-48517-5-git-send-email-michel.pollet@bp.renesas.com>
-References: <1523871304-48517-1-git-send-email-michel.pollet@bp.renesas.com>
- <1523871304-48517-5-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <9f33a1d2-3c55-2485-a1f2-909def69e5b0@gmail.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Mon, 16 Apr 2018 23:50:22 +0200
+Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
+In-Reply-To: <20180416215032.5023-1-mylene.josserand@bootlin.com>
+References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
+Message-ID: <20180416215032.5023-2-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michel,
+Move the assembly code for cluster cache enabling and resuming
+into an assembly file instead of having it directly in C code.
 
-On 04/16/2018 02:34 AM, Michel Pollet wrote:
-> The Renesas RZ/N1D second CA7 is parked in a ROM pen at boot time, it
-> requires a special enable method to get it started at boot time.
-> 
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+Remove the CFLAGS because we are using the ARM directive "arch"
+instead.
 
-Some few comments below. This patch should probably be re-ordered in
-your patch series, I would expect you to have this become patch 2 and
-have patch 2 be patch 3 (first you add infrastructure for using
-something, then you make use of it).
+Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+---
+ arch/arm/mach-sunxi/Makefile  |  4 +--
+ arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
+ 3 files changed, 85 insertions(+), 81 deletions(-)
+ create mode 100644 arch/arm/mach-sunxi/headsmp.S
 
-> +static int rzn1_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	if (!cpu_bootaddr)
-> +		return -ENODEV;
-> +
-> +	spin_lock(&cpu_lock);
-> +
-> +	writel(virt_to_phys(secondary_startup), cpu_bootaddr);
-
-Consider using __pa_symbol() instead of virt_to_phys() since
-secondary_startup is part of the kernel's linear memory map.
-
-> +	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> +
-> +	spin_unlock(&cpu_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init rzn1_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	struct device_node *dn;
-> +	int ret;
-> +	u32 bootaddr;
-> +
-> +	dn = of_get_cpu_node(1, NULL);
-> +	if (!dn) {
-> +		pr_err("CPU#1: missing device tree node\n");
-> +		return;
-> +	}
-> +	/*
-> +	 * Determine the address from which the CPU is polling.
-> +	 */
-> +	ret = of_property_read_u32(dn, "cpu-release-addr", &bootaddr);
-> +	if (ret)
-> +		pr_err("CPU#1: invalid cpu-release-addr property\n");
-> +
-> +	of_node_put(dn);
-> +	/* The bootloader *does* change this property */
-
-This comment should probably be moved above the function that fetches
-"cpu-release-addr"
-
-> +	pr_info("CPU#1: cpu-release-addr %08x\n", (u32)bootaddr);
-> +
-> +	if (!bootaddr)
-> +		return;
-
-Would not you want to show a message here to help catch such conditions
-
-> +
-> +	cpu_bootaddr = ioremap(bootaddr, sizeof(bootaddr));
-
-Relying on ioremap() to reject values that might be outside of the
-allowed range may be a little fragile, but I can't suggest any better
-alternative.
-
-> +	if (!cpu_bootaddr)
-> +		pr_err("CPU#1: cpu-release-addr map failed\n");
-> +}
-> +
-> +static const struct smp_operations rzn1_smp_ops __initconst = {
-> +	.smp_prepare_cpus = rzn1_smp_prepare_cpus,
-> +	.smp_boot_secondary = rzn1_smp_boot_secondary,
-> +};
-> +CPU_METHOD_OF_DECLARE(rzn1_smp, "renesas,r9a06g032-smp", &rzn1_smp_ops);
-> 
-
-
+diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
+index 7de9cc286d53..7f45071ae74a 100644
+--- a/arch/arm/mach-sunxi/Makefile
++++ b/arch/arm/mach-sunxi/Makefile
+@@ -1,5 +1,3 @@
+-CFLAGS_mc_smp.o	+= -march=armv7-a
+-
+ obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
+-obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o
++obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o headsmp.o
+ obj-$(CONFIG_SMP) += platsmp.o
+diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+new file mode 100644
+index 000000000000..37dc772701f3
+--- /dev/null
++++ b/arch/arm/mach-sunxi/headsmp.S
+@@ -0,0 +1,80 @@
++/* SPDX-License-Identifier: GPL-2.0
++ *
++ * Copyright (c) 2018 Chen-Yu Tsai
++ * Copyright (c) 2018 Bootlin
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ * Myl?ne Josserand <mylene.josserand@bootlin.com>
++ *
++ * SMP support for sunxi based systems with Cortex A7/A15
++ *
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/cputype.h>
++
++ENTRY(sunxi_mc_smp_cluster_cache_enable)
++	.arch	armv7-a
++	/*
++	 * Enable cluster-level coherency, in preparation for turning on the MMU.
++	 *
++	 * Also enable regional clock gating and L2 data latency settings for
++	 * Cortex-A15. These settings are from the vendor kernel.
++	 */
++	mrc	p15, 0, r1, c0, c0, 0
++	movw	r2, #(ARM_CPU_PART_MASK & 0xffff)
++	movt	r2, #(ARM_CPU_PART_MASK >> 16)
++	and	r1, r1, r2
++	movw	r2, #(ARM_CPU_PART_CORTEX_A15 & 0xffff)
++	movt	r2, #(ARM_CPU_PART_CORTEX_A15 >> 16)
++	cmp	r1, r2
++	bne	not_a15
++
++	/* The following is Cortex-A15 specific */
++
++	/* ACTLR2: Enable CPU regional clock gates */
++	mrc p15, 1, r1, c15, c0, 4
++	orr r1, r1, #(0x1 << 31)
++	mcr p15, 1, r1, c15, c0, 4
++
++	/* L2ACTLR */
++	mrc p15, 1, r1, c15, c0, 0
++	/* Enable L2, GIC, and Timer regional clock gates */
++	orr r1, r1, #(0x1 << 26)
++	/* Disable clean/evict from being pushed to external */
++	orr r1, r1, #(0x1<<3)
++	mcr p15, 1, r1, c15, c0, 0
++
++	/* L2CTRL: L2 data RAM latency */
++	mrc p15, 1, r1, c9, c0, 2
++	bic r1, r1, #(0x7 << 0)
++	orr r1, r1, #(0x3 << 0)
++	mcr p15, 1, r1, c9, c0, 2
++
++	/* End of Cortex-A15 specific setup */
++	not_a15:
++
++	/* Get value of sunxi_mc_smp_first_comer */
++	adr	r1, first
++	ldr	r0, [r1]
++	ldr	r0, [r1, r0]
++
++	/* Skip cci_enable_port_for_self if not first comer */
++	cmp	r0, #0
++	bxeq	lr
++	b	cci_enable_port_for_self
++
++	.align 2
++	first: .word sunxi_mc_smp_first_comer - .
++ENDPROC(sunxi_mc_smp_cluster_cache_enable)
++
++ENTRY(sunxi_mc_smp_secondary_startup)
++	bl	sunxi_mc_smp_cluster_cache_enable
++	b	secondary_startup
++ENDPROC(sunxi_mc_smp_secondary_startup)
++
++ENTRY(sunxi_mc_smp_resume)
++	bl	sunxi_mc_smp_cluster_cache_enable
++	b	cpu_resume
++ENDPROC(sunxi_mc_smp_resume)
+diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
+index c0246ec54a0a..727968d6a3e5 100644
+--- a/arch/arm/mach-sunxi/mc_smp.c
++++ b/arch/arm/mach-sunxi/mc_smp.c
+@@ -72,6 +72,9 @@ static void __iomem *cpucfg_base;
+ static void __iomem *prcm_base;
+ static void __iomem *sram_b_smp_base;
+ 
++extern void sunxi_mc_smp_secondary_startup(void);
++extern void sunxi_mc_smp_resume(void);
++
+ static bool sunxi_core_is_cortex_a15(unsigned int core, unsigned int cluster)
+ {
+ 	struct device_node *node;
+@@ -300,74 +303,7 @@ static void sunxi_cluster_cache_disable_without_axi(void)
+ }
+ 
+ static int sunxi_mc_smp_cpu_table[SUNXI_NR_CLUSTERS][SUNXI_CPUS_PER_CLUSTER];
+-static int sunxi_mc_smp_first_comer;
+-
+-/*
+- * Enable cluster-level coherency, in preparation for turning on the MMU.
+- *
+- * Also enable regional clock gating and L2 data latency settings for
+- * Cortex-A15. These settings are from the vendor kernel.
+- */
+-static void __naked sunxi_mc_smp_cluster_cache_enable(void)
+-{
+-	asm volatile (
+-		"mrc	p15, 0, r1, c0, c0, 0\n"
+-		"movw	r2, #" __stringify(ARM_CPU_PART_MASK & 0xffff) "\n"
+-		"movt	r2, #" __stringify(ARM_CPU_PART_MASK >> 16) "\n"
+-		"and	r1, r1, r2\n"
+-		"movw	r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 & 0xffff) "\n"
+-		"movt	r2, #" __stringify(ARM_CPU_PART_CORTEX_A15 >> 16) "\n"
+-		"cmp	r1, r2\n"
+-		"bne	not_a15\n"
+-
+-		/* The following is Cortex-A15 specific */
+-
+-		/* ACTLR2: Enable CPU regional clock gates */
+-		"mrc p15, 1, r1, c15, c0, 4\n"
+-		"orr r1, r1, #(0x1<<31)\n"
+-		"mcr p15, 1, r1, c15, c0, 4\n"
+-
+-		/* L2ACTLR */
+-		"mrc p15, 1, r1, c15, c0, 0\n"
+-		/* Enable L2, GIC, and Timer regional clock gates */
+-		"orr r1, r1, #(0x1<<26)\n"
+-		/* Disable clean/evict from being pushed to external */
+-		"orr r1, r1, #(0x1<<3)\n"
+-		"mcr p15, 1, r1, c15, c0, 0\n"
+-
+-		/* L2CTRL: L2 data RAM latency */
+-		"mrc p15, 1, r1, c9, c0, 2\n"
+-		"bic r1, r1, #(0x7<<0)\n"
+-		"orr r1, r1, #(0x3<<0)\n"
+-		"mcr p15, 1, r1, c9, c0, 2\n"
+-
+-		/* End of Cortex-A15 specific setup */
+-		"not_a15:\n"
+-
+-		/* Get value of sunxi_mc_smp_first_comer */
+-		"adr	r1, first\n"
+-		"ldr	r0, [r1]\n"
+-		"ldr	r0, [r1, r0]\n"
+-
+-		/* Skip cci_enable_port_for_self if not first comer */
+-		"cmp	r0, #0\n"
+-		"bxeq	lr\n"
+-		"b	cci_enable_port_for_self\n"
+-
+-		".align 2\n"
+-		"first: .word sunxi_mc_smp_first_comer - .\n"
+-	);
+-}
+-
+-static void __naked sunxi_mc_smp_secondary_startup(void)
+-{
+-	asm volatile(
+-		"bl	sunxi_mc_smp_cluster_cache_enable\n"
+-		"b	secondary_startup"
+-		/* Let compiler know about sunxi_mc_smp_cluster_cache_enable */
+-		:: "i" (sunxi_mc_smp_cluster_cache_enable)
+-	);
+-}
++int sunxi_mc_smp_first_comer;
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+@@ -637,16 +573,6 @@ static bool __init sunxi_mc_smp_cpu_table_init(void)
+  */
+ typedef typeof(cpu_reset) phys_reset_t;
+ 
+-static void __init __naked sunxi_mc_smp_resume(void)
+-{
+-	asm volatile(
+-		"bl	sunxi_mc_smp_cluster_cache_enable\n"
+-		"b	cpu_resume"
+-		/* Let compiler know about sunxi_mc_smp_cluster_cache_enable */
+-		:: "i" (sunxi_mc_smp_cluster_cache_enable)
+-	);
+-}
+-
+ static int __init nocache_trampoline(unsigned long __unused)
+ {
+ 	phys_reset_t phys_reset;
 -- 
-Florian
+2.11.0
