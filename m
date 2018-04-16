@@ -1,45 +1,171 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 16 Apr 2018 19:48:31 -0400
-Subject: [PATCH 1/2] parisc: use the asm-generic version for writeX()
-In-Reply-To: <1152a7d4-a8f4-ae68-2737-067fa05409cd@codeaurora.org>
-References: <1523916078-23049-1-git-send-email-okaya@codeaurora.org>
- <a727e74f-610c-4722-76e9-c1aca2f9e9bd@bell.net>
- <a7b59f43-cea5-0ead-f528-61899570e353@codeaurora.org>
- <7a9d139e-978b-750d-1bac-8b27e934f781@bell.net>
- <1152a7d4-a8f4-ae68-2737-067fa05409cd@codeaurora.org>
-Message-ID: <4eea352e-07f0-3a99-c9bd-57e117288778@codeaurora.org>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Mon, 16 Apr 2018 16:51:13 -0700
+Subject: [PATCH v3 07/10] Documentation: dt-bindings: Add documents for
+ PECI hwmon client drivers
+In-Reply-To: <aee4e04c-885f-b1d8-9e85-9e741551342f@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+ <20180410183212.16787-8-jae.hyun.yoo@linux.intel.com>
+ <20180416181423.t4vf7sugv6z3aw5h@rob-hp-laptop>
+ <aee4e04c-885f-b1d8-9e85-9e741551342f@linux.intel.com>
+Message-ID: <287e0fd9-b631-2602-2785-7b8aaed7a6b9@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/16/2018 7:44 PM, Sinan Kaya wrote:
->> John David Anglin? dave.anglin at bell.net
+On 4/16/2018 4:22 PM, Jae Hyun Yoo wrote:
+> On 4/16/2018 11:14 AM, Rob Herring wrote:
+>> On Tue, Apr 10, 2018 at 11:32:09AM -0700, Jae Hyun Yoo wrote:
+>>> This commit adds dt-bindings documents for PECI cputemp and dimmtemp 
+>>> client
+>>> drivers.
 >>
+>> "dt-bindings: hwmon: ..." for the subject.
 >>
->> io.log
->>
->>
->>   CC      arch/parisc/kernel/asm-offsets.s
->> In file included from ./arch/parisc/include/asm/io.h:262:0,
->>                  from ./include/linux/io.h:25,
->>                  from ./include/linux/irq.h:25,
->>                  from ./arch/parisc/include/asm/hardirq.h:13,
->>                  from ./include/linux/hardirq.h:9,
->>                  from arch/parisc/kernel/asm-offsets.c:34:
->> ./include/asm-generic/io.h:37:21: error: redefinition of '__raw_readb'
->>  #define __raw_readb __raw_readb
->>                      ^
-> This one is easy to fix:
 > 
-> https://elixir.bootlin.com/linux/latest/source/arch/parisc/include/asm/io.h#L146
+> I'll change the subject.
 > 
-> Remove 146..179.
+>>>
+>>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>>> Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
+>>> Reviewed-by: James Feist <james.feist@linux.intel.com>
+>>> Reviewed-by: Vernon Mauery <vernon.mauery@linux.intel.com>
+>>> Cc: Alan Cox <alan@linux.intel.com>
+>>> Cc: Andrew Jeffery <andrew@aj.id.au>
+>>> Cc: Andrew Lunn <andrew@lunn.ch>
+>>> Cc: Andy Shevchenko <andriy.shevchenko@intel.com>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>>> Cc: Fengguang Wu <fengguang.wu@intel.com>
+>>> Cc: Greg KH <gregkh@linuxfoundation.org>
+>>> Cc: Guenter Roeck <linux@roeck-us.net>
+>>> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
+>>> Cc: Jean Delvare <jdelvare@suse.com>
+>>> Cc: Joel Stanley <joel@jms.id.au>
+>>> Cc: Julia Cartwright <juliac@eso.teric.us>
+>>> Cc: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
+>>> Cc: Milton Miller II <miltonm@us.ibm.com>
+>>> Cc: Pavel Machek <pavel@ucw.cz>
+>>> Cc: Randy Dunlap <rdunlap@infradead.org>
+>>> Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
+>>> Cc: Sumeet R Pawnikar <sumeet.r.pawnikar@intel.com>
+>>> ---
+>>> ? .../devicetree/bindings/hwmon/peci-cputemp.txt???? | 24 
+>>> +++++++++++++++++++++
+>>> ? .../devicetree/bindings/hwmon/peci-dimmtemp.txt??? | 25 
+>>> ++++++++++++++++++++++
+>>> ? 2 files changed, 49 insertions(+)
+>>> ? create mode 100644 
+>>> Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
+>>> ? create mode 100644 
+>>> Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt 
+>>> b/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
+>>> new file mode 100644
+>>> index 000000000000..d5530ef9cfd2
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/hwmon/peci-cputemp.txt
+>>> @@ -0,0 +1,24 @@
+>>> +Bindings for Intel PECI (Platform Environment Control Interface) 
+>>> cputemp driver.
+>>> +
+>>> +Required properties:
+>>> +- compatible : Should be "intel,peci-cputemp".
+>>> +- reg??????? : Should contain address of a client CPU. Address range 
+>>> of CPU
+>>> +?????????? clients is starting from 0x30 based on PECI specification.
+>>> +?????????? <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
+>>
+>> Again, where is PECI_OFFSET_MAX defined? It can't depend on something in
+>> the kernel.
+>>
+> 
+> I'll remove the unnecessary description.
+> 
+>>> +
+>>> +Example:
+>>> +??? peci-bus at 0 {
+>>> +??????? #address-cells = <1>;
+>>> +??????? #size-cells = <0>;
+>>> +??????? < more properties >
+>>> +
+>>> +??????? peci-cputemp at cpu0 {
+>>> +??????????? compatible = "intel,peci-cputemp";
+>>> +??????????? reg = <0x30>;
+>>> +??????? };
+>>> +
+>>> +??????? peci-cputemp at cpu1 {
+>>> +??????????? compatible = "intel,peci-cputemp";
+>>> +??????????? reg = <0x31>;
+>>> +??????? };
+>>> +??? };
+>>> diff --git 
+>>> a/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt 
+>>> b/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+>>> new file mode 100644
+>>> index 000000000000..56e5deb61e5c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/hwmon/peci-dimmtemp.txt
+>>> @@ -0,0 +1,25 @@
+>>> +Bindings for Intel PECI (Platform Environment Control Interface) 
+>>> dimmtemp
+>>> +driver.
+>>> +
+>>> +Required properties:
+>>> +- compatible : Should be "intel,peci-dimmtemp".
+>>> +- reg??????? : Should contain address of a client CPU. Address range 
+>>> of CPU
+>>> +?????????? clients is starting from 0x30 based on PECI specification.
+>>> +?????????? <0x30> .. <0x37> (depends on the PECI_OFFSET_MAX definition)
+>>> +
+>>> +Example:
+>>> +??? peci-bus at 0 {
+>>> +??????? #address-cells = <1>;
+>>> +??????? #size-cells = <0>;
+>>> +??????? < more properties >
+>>> +
+>>> +??????? peci-dimmtemp at cpu0 {
+>>
+>> unit-address is wrong.
+>>
+> 
+> Will fix it using the reg value.
+> 
+>> It is a different bus from cputemp? Otherwise, you have conflicting
+>> addresses. If that's the case, probably should make it clear by showing
+>> different host adapters for each example.
+>>
+> 
+> It could be the same bus with cputemp. Also, client address sharing is 
+> possible by PECI core if the functionality is different. I mean, cputemp 
+> and dimmtemp targeting the same client is possible case like this.
+> peci-cputemp at 30
+> peci-dimmtemp at 30
+> 
 
-I'll try to get a hold of a cross compiler and re-test. The above is a hack.
-I need to do a better job on this.
+Oh, I got your point. Probably, I should change these separate settings 
+into one like
 
-Thanks for the help. I'll post V2 when it is ready.
+peci-client at 30 {
+     compatible = "intel,peci-client";
+     reg = <0x30>;
+};
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Then cputemp and dimmtemp drivers could refer the same compatible 
+string. Will rewrite it.
+
+>>> +??????????? compatible = "intel,peci-dimmtemp";
+>>> +??????????? reg = <0x30>;
+>>> +??????? };
+>>> +
+>>> +??????? peci-dimmtemp at cpu1 {
+>>> +??????????? compatible = "intel,peci-dimmtemp";
+>>> +??????????? reg = <0x31>;
+>>> +??????? };
+>>> +??? };
+>>> -- 
+>>> 2.16.2
+>>>
+>>> -- 
+>>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at? http://vger.kernel.org/majordomo-info.html
