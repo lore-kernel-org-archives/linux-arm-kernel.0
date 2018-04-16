@@ -1,63 +1,47 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 16 Apr 2018 11:34:04 +0200
-Subject: [PATCH 2/3] usb: gadget: udc: atmel: Remove obsolete include
+Date: Mon, 16 Apr 2018 11:34:05 +0200
+Subject: [PATCH 3/3] usb: gadget: udc: atmel: Fix indenting
 In-Reply-To: <20180416093405.16612-1-romain.izard.pro@gmail.com>
 References: <20180416093405.16612-1-romain.izard.pro@gmail.com>
-Message-ID: <20180416093405.16612-3-romain.izard.pro@gmail.com>
+Message-ID: <20180416093405.16612-4-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The include defines the private platform_data structure used with AVR
-platforms. It has no user since 7c55984e191f. Remove it.
+Fix the fallout of the conversion to GPIO descriptors in 3df034081021.
 
 Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c |  1 -
- include/linux/usb/atmel_usba_udc.h      | 24 ------------------------
- 2 files changed, 25 deletions(-)
- delete mode 100644 include/linux/usb/atmel_usba_udc.h
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 0fe3d0feb8f7..b9623e228609 100644
+index b9623e228609..2f586f2bda7e 100644
 --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
 +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -20,7 +20,6 @@
- #include <linux/ctype.h>
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
--#include <linux/usb/atmel_usba_udc.h>
- #include <linux/delay.h>
- #include <linux/of.h>
- #include <linux/irq.h>
-diff --git a/include/linux/usb/atmel_usba_udc.h b/include/linux/usb/atmel_usba_udc.h
-deleted file mode 100644
-index 9bb00df3b53f..000000000000
---- a/include/linux/usb/atmel_usba_udc.h
-+++ /dev/null
-@@ -1,24 +0,0 @@
--/* SPDX-License-Identifier: GPL-2.0 */
--/*
-- * Platform data definitions for Atmel USBA gadget driver.
-- */
--#ifndef __LINUX_USB_USBA_H
--#define __LINUX_USB_USBA_H
--
--struct usba_ep_data {
--	char	*name;
--	int	index;
--	int	fifo_size;
--	int	nr_banks;
--	int	can_dma;
--	int	can_isoc;
--};
--
--struct usba_platform_data {
--	int			vbus_pin;
--	int			vbus_pin_inverted;
--	int			num_ep;
--	struct usba_ep_data	ep[0];
--};
--
--#endif /* __LINUX_USB_USBA_H */
+@@ -2277,15 +2277,15 @@ static int usba_udc_probe(struct platform_device *pdev)
+ 	if (udc->vbus_pin) {
+ 		irq_set_status_flags(gpiod_to_irq(udc->vbus_pin), IRQ_NOAUTOEN);
+ 		ret = devm_request_threaded_irq(&pdev->dev,
+-					gpiod_to_irq(udc->vbus_pin), NULL,
+-					usba_vbus_irq_thread, USBA_VBUS_IRQFLAGS,
+-					"atmel_usba_udc", udc);
+-			if (ret) {
+-				udc->vbus_pin = NULL;
+-				dev_warn(&udc->pdev->dev,
+-					 "failed to request vbus irq; "
+-					 "assuming always on\n");
+-			}
++				gpiod_to_irq(udc->vbus_pin), NULL,
++				usba_vbus_irq_thread, USBA_VBUS_IRQFLAGS,
++				"atmel_usba_udc", udc);
++		if (ret) {
++			udc->vbus_pin = NULL;
++			dev_warn(&udc->pdev->dev,
++				 "failed to request vbus irq; "
++				 "assuming always on\n");
++		}
+ 	}
+ 
+ 	ret = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
 -- 
 2.14.1
