@@ -1,42 +1,26 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Mon, 16 Apr 2018 09:54:03 +0300
-Subject: [PATCH] iio: adc: select buffer for at91-sama5d2_adc
-Message-ID: <1523861643-3419-1-git-send-email-eugen.hristev@microchip.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 16 Apr 2018 15:08:20 +0800
+Subject: [PATCH 1/2] ARM: dts: imx25-pdk: Remove unneeded 'codec-handle'
+ property
+In-Reply-To: <1521049176-22870-1-git-send-email-festevam@gmail.com>
+References: <1521049176-22870-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180416070819.GA25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to select the buffer code, otherwise we get build errors
-with undefined functions on the trigger and buffer,
-if we select just IIO and then AT91_SAMA5D2_ADC from menuconfig
+On Wed, Mar 14, 2018 at 02:39:35PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> The 'codec-handle' property is an optional one and there is really
+> no need to be used here.
+> 
+> As per the comment in the fsl_ssi driver:
+> 
+> "Backward compatible for older bindings by manually triggering the
+> machine driver's probe()."
+> 
+> ,so just remove such uneeded property.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-This adds a Kconfig 'select' statement like other ADC
-drivers have it already.
-
-Fixes: 5e1a1da0f8c9 ("iio: adc: at91-sama5d2_adc: add hw trigger and buffer support")
-Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
----
-Hello Jonathan,
-
-While you are at it, I also found this small kconfig issue during my tests.
-Would be good to have as a fix as well.
-
-Thanks,
-Eugen
-
- drivers/iio/adc/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 15606f2..9da7907 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -158,6 +158,7 @@ config AT91_SAMA5D2_ADC
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	depends on HAS_IOMEM
- 	depends on HAS_DMA
-+	select IIO_BUFFER
- 	select IIO_TRIGGERED_BUFFER
- 	help
- 	  Say yes here to build support for Atmel SAMA5D2 ADC which is
--- 
-2.7.4
+Applied both, thanks.
