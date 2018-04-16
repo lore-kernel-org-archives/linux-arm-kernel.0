@@ -1,34 +1,82 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Mon, 16 Apr 2018 10:40:04 +0800
-Subject: [PATCH 2/2] arm64: dts: Add the rtc enable clock for watchdog
-In-Reply-To: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
-References: <fcea1874b6e3d0243684c133c7b34f2384341a32.1523846102.git.baolin.wang@linaro.org>
-Message-ID: <bc450ea82fe7fbec7e7f74c5cdc8a37d202fe526.1523846102.git.baolin.wang@linaro.org>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 16 Apr 2018 10:33:54 +0800
+Subject: [PATCH] mtd: nand: mtk: use of_device_get_match_data()
+In-Reply-To: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
+References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
+Message-ID: <c3af6d5035e43b53b5cc7ee68f9f1a853ce2a8f9.1523347340.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the rtc enable clock for watchdog controller to make it work well.
+The usage of of_device_get_match_data() reduce the code size a bit.
 
-Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+Also, the only way to call .probe() is to match an entry in
+.of_match_table[], so of_device_id cannot be NULL.
+
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm64/boot/dts/sprd/whale2.dtsi |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/raw/mtk_ecc.c  |  7 +------
+ drivers/mtd/nand/raw/mtk_nand.c | 10 +---------
+ 2 files changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index bf7e70c..e9db910 100644
---- a/arch/arm64/boot/dts/sprd/whale2.dtsi
-+++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -214,8 +214,9 @@
- 				reg = <0 0x40310000 0 0x1000>;
- 				interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
- 				timeout-sec = <12>;
--				clock-names = "enable";
--				clocks = <&aon_gate CLK_APCPU_WDG_EB>;
-+				clock-names = "enable", "rtc_enable";
-+				clocks = <&aon_gate CLK_APCPU_WDG_EB>,
-+				       <&aon_gate CLK_AP_WDG_RTC_EB>;
- 			};
- 		};
+diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
+index 40d86a8..6432bd7 100644
+--- a/drivers/mtd/nand/raw/mtk_ecc.c
++++ b/drivers/mtd/nand/raw/mtk_ecc.c
+@@ -500,7 +500,6 @@ static int mtk_ecc_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct mtk_ecc *ecc;
+ 	struct resource *res;
+-	const struct of_device_id *of_ecc_id = NULL;
+ 	u32 max_eccdata_size;
+ 	int irq, ret;
  
+@@ -508,11 +507,7 @@ static int mtk_ecc_probe(struct platform_device *pdev)
+ 	if (!ecc)
+ 		return -ENOMEM;
+ 
+-	of_ecc_id = of_match_device(mtk_ecc_dt_match, &pdev->dev);
+-	if (!of_ecc_id)
+-		return -ENODEV;
+-
+-	ecc->caps = of_ecc_id->data;
++	ecc->caps = of_device_get_match_data(dev);
+ 
+ 	max_eccdata_size = ecc->caps->num_ecc_strength - 1;
+ 	max_eccdata_size = ecc->caps->ecc_strength[max_eccdata_size];
+diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
+index 6977da3..75c845a 100644
+--- a/drivers/mtd/nand/raw/mtk_nand.c
++++ b/drivers/mtd/nand/raw/mtk_nand.c
+@@ -1434,7 +1434,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
+ 	struct device_node *np = dev->of_node;
+ 	struct mtk_nfc *nfc;
+ 	struct resource *res;
+-	const struct of_device_id *of_nfc_id = NULL;
+ 	int ret, irq;
+ 
+ 	nfc = devm_kzalloc(dev, sizeof(*nfc), GFP_KERNEL);
+@@ -1452,6 +1451,7 @@ static int mtk_nfc_probe(struct platform_device *pdev)
+ 	else if (!nfc->ecc)
+ 		return -ENODEV;
+ 
++	nfc->caps = of_device_get_match_data(dev);
+ 	nfc->dev = dev;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -1498,14 +1498,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
+ 		goto clk_disable;
+ 	}
+ 
+-	of_nfc_id = of_match_device(mtk_nfc_id_table, &pdev->dev);
+-	if (!of_nfc_id) {
+-		ret = -ENODEV;
+-		goto clk_disable;
+-	}
+-
+-	nfc->caps = of_nfc_id->data;
+-
+ 	platform_set_drvdata(pdev, nfc);
+ 
+ 	ret = mtk_nfc_nand_chips_init(dev, nfc);
 -- 
-1.7.9.5
+1.9.1
