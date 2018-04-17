@@ -1,107 +1,55 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Apr 2018 19:59:38 +0800
-Subject: [linux-sunxi] Re: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow
- getting syscon regmap from device
-In-Reply-To: <20180417115243.x42s7ygdpdbhtys2@flea>
-References: <20180411141641.14675-1-icenowy@aosc.io>
- <20180411141641.14675-4-icenowy@aosc.io>
- <20180412145628.iaaeue2imiijwx5d@flea>
- <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
- <CAGb2v66Qi2D1qgF3-iVJFAiznMUzzen0nHM5vsPe7Cyi6QTYpw@mail.gmail.com>
- <20180416143130.tls6xtcq3hsv7u7f@flea>
- <CAGb2v65VLYc1X2bN5v0_1xokZCEkKFYNLzecnE3WeP8goc2KmQ@mail.gmail.com>
- <20180417115243.x42s7ygdpdbhtys2@flea>
-Message-ID: <CAGb2v66e+tWsYqzpOnRaJtjq4OneUOruszYML0FnvAGbXi5qsw@mail.gmail.com>
+From: zhangshaokun@hisilicon.com (Shaokun Zhang)
+Date: Tue, 17 Apr 2018 20:03:09 +0800
+Subject: [PATCH] arm64: mm: drop addr parameter from sync icache and dcache
+Message-ID: <1523966589-62603-1-git-send-email-zhangshaokun@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 7:52 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, Apr 16, 2018 at 10:51:55PM +0800, Chen-Yu Tsai wrote:
->> On Mon, Apr 16, 2018 at 10:31 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > On Thu, Apr 12, 2018 at 11:23:30PM +0800, Chen-Yu Tsai wrote:
->> >> On Thu, Apr 12, 2018 at 11:11 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> >> > ? 2018?4?12? GMT+08:00 ??10:56:28, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->> >> >>On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
->> >> >>> From: Chen-Yu Tsai <wens@csie.org>
->> >> >>>
->> >> >>> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
->> >> >>> address space; on the A64 SoC this register is in the SRAM controller
->> >> >>> address space, and with a different offset.
->> >> >>>
->> >> >>> To access the register from another device and hide the internal
->> >> >>> difference between the device, let it register a regmap named
->> >> >>> "emac-clock". We can then get the device from the phandle, and
->> >> >>> retrieve the regmap with dev_get_regmap(); in this situation the
->> >> >>> regmap_field will be set up to access the only register in the
->> >> >>regmap.
->> >> >>>
->> >> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> >>> [Icenowy: change to use regmaps with single register, change commit
->> >> >>>  message]
->> >> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >> >>> ---
->> >> >>>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48
->> >> >>++++++++++++++++++++++-
->> >> >>>  1 file changed, 46 insertions(+), 2 deletions(-)
->> >> >>>
->> >> >>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> >> >>b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> >> >>> index 1037f6c78bca..b61210c0d415 100644
->> >> >>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> >> >>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
->> >> >>> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
->> >> >>>      .msb = 31,
->> >> >>>  };
->> >> >>>
->> >> >>> +/* Specially exported regmap which contains only EMAC register */
->> >> >>> +const struct reg_field single_reg_field = {
->> >> >>> +    .reg = 0,
->> >> >>> +    .lsb = 0,
->> >> >>> +    .msb = 31,
->> >> >>> +};
->> >> >>> +
->> >> >>
->> >> >>I'm not sure this would be wise. If we ever need some other register
->> >> >>exported through the regmap, will have to change all the calling sites
->> >> >>everywhere in the kernel, which will be a pain and will break
->> >> >>bisectability.
->> >> >
->> >> > In this situation the register can be exported as another
->> >> >  regmap. Currently the code will access a regmap with name
->> >> > "emac-clock" for this register.
->> >> >
->> >> >>
->> >> >>Chen-Yu's (or was it yours?) initial solution with a custom writeable
->> >> >>hook only allowing a single register seemed like a better one.
->> >> >
->> >> > But I remember you mentioned that you want it to hide the
->> >> > difference inside the device.
->> >>
->> >> The idea is that a device can export multiple regmaps. This one,
->> >> the one named "gmac" (in my soon to come v2) or "emac-clock" here,
->> >> is but one of many possible regmaps, and it only exports the register
->> >> needed by the GMAC/EMAC.
->> >
->> > I'm not sure this would be wise either. There's a single register map,
->> > and as far as I know we don't have a binding to express this in the
->> > DT. This means that the customer and provider would have to use the
->> > same name, but without anything actually enforcing it aside from
->> > "someone in the community knows it".
->> >
->> > This is not a really good design, and I was actually preferring your
->> > first option. We shouldn't rely on any undocumented rule. This will be
->> > easy to break and hard to maintain.
->>
->> So, one regmap per device covering the whole register range, and the
->> consumer knows which register to poke by looking at its own compatible.
->>
->> That sound right?
->
-> Yep. And ideally, sending a single serie for both the A64 and the R40
-> cases, in order to provide the big picture.
+The addr parameter isn't used for anything. Let's simplify and get rid of
+it, like arm.
 
-OK. I'll incorporate Icenowy's stuff into my series.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+---
+ arch/arm64/include/asm/pgtable.h | 4 ++--
+ arch/arm64/mm/flush.c            | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-ChenYu
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 7e2c27e..7c4c8f3 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -230,7 +230,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
+ 	}
+ }
+ 
+-extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
++extern void __sync_icache_dcache(pte_t pteval);
+ 
+ /*
+  * PTE bits configuration in the presence of hardware Dirty Bit Management
+@@ -253,7 +253,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	pte_t old_pte;
+ 
+ 	if (pte_present(pte) && pte_user_exec(pte) && !pte_special(pte))
+-		__sync_icache_dcache(pte, addr);
++		__sync_icache_dcache(pte);
+ 
+ 	/*
+ 	 * If the existing pte is valid, check for potential race with
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index e36ed50..1059884 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -58,7 +58,7 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
+ 	flush_ptrace_access(vma, page, uaddr, dst, len);
+ }
+ 
+-void __sync_icache_dcache(pte_t pte, unsigned long addr)
++void __sync_icache_dcache(pte_t pte)
+ {
+ 	struct page *page = pte_page(pte);
+ 
+-- 
+2.7.4
