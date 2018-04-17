@@ -1,34 +1,50 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 17 Apr 2018 19:30:36 +0200
-Subject: [PATCH v6 5/7] remoteproc/davinci: use octal permissions for
- module_param()
+Date: Tue, 17 Apr 2018 19:30:35 +0200
+Subject: [PATCH v6 4/7] remoteproc/davinci: prepare and unprepare the clock
+ where needed
 In-Reply-To: <20180417173038.25510-1-brgl@bgdev.pl>
 References: <20180417173038.25510-1-brgl@bgdev.pl>
-Message-ID: <20180417173038.25510-6-brgl@bgdev.pl>
+Message-ID: <20180417173038.25510-5-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Checkpatch recommends to use octal perms instead of S_IRUGO.
+We're currently switching the platform to using the common clock
+framework. We need to explicitly prepare and unprepare the rproc
+clock.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Acked-by: Suman Anna <s-anna@ti.com>
+Reviewed-by: David Lechner <david@lechnology.com>
 ---
- drivers/remoteproc/da8xx_remoteproc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/remoteproc/da8xx_remoteproc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-index f134192922e0..b668e32996e2 100644
+index 2b24291337b7..f134192922e0 100644
 --- a/drivers/remoteproc/da8xx_remoteproc.c
 +++ b/drivers/remoteproc/da8xx_remoteproc.c
-@@ -25,7 +25,7 @@
- #include "remoteproc_internal.h"
+@@ -149,9 +149,9 @@ static int da8xx_rproc_start(struct rproc *rproc)
  
- static char *da8xx_fw_name;
--module_param(da8xx_fw_name, charp, S_IRUGO);
-+module_param(da8xx_fw_name, charp, 0444);
- MODULE_PARM_DESC(da8xx_fw_name,
- 		 "Name of DSP firmware file in /lib/firmware (if not specified defaults to 'rproc-dsp-fw')");
+ 	writel(rproc->bootaddr, drproc->bootreg);
  
+-	ret = clk_enable(dsp_clk);
++	ret = clk_prepare_enable(dsp_clk);
+ 	if (ret) {
+-		dev_err(dev, "clk_enable() failed: %d\n", ret);
++		dev_err(dev, "clk_prepare_enable() failed: %d\n", ret);
+ 		return ret;
+ 	}
+ 
+@@ -165,7 +165,7 @@ static int da8xx_rproc_stop(struct rproc *rproc)
+ 	struct da8xx_rproc *drproc = rproc->priv;
+ 
+ 	davinci_clk_reset_assert(drproc->dsp_clk);
+-	clk_disable(drproc->dsp_clk);
++	clk_disable_unprepare(drproc->dsp_clk);
+ 
+ 	return 0;
+ }
 -- 
 2.17.0
