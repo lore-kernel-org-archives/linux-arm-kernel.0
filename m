@@ -1,102 +1,94 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Tue, 17 Apr 2018 12:28:52 +0000
-Subject: [RFC 4/6] dmaengine: xilinx_dma: Freeup active list based on
- descriptor completion bit
-In-Reply-To: <20180411091102.GZ6014@localhost>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-5-git-send-email-radheys@xilinx.com>
- <20180411091102.GZ6014@localhost>
-Message-ID: <BN6PR02MB3282D60BCF6A4B40BCC7A5B8C7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 17 Apr 2018 20:30:27 +0800
+Subject: [PATCH v1] clk: mediatek: correct the clocks for MT2701 HDMI PHY
+ module
+Message-ID: <dc75b5b289d1f6e4914e60543c2611f387f0c164.1523944160.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi  Vinod,
+The hdmitx_dig_cts clock signal is not a child of clk26m,
+and the actual output of the PLL block is derived from
+the tvdpll via a configurable PLL post-divider.
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Wednesday, April 11, 2018 2:41 PM
-> To: Radhey Shyam Pandey <radheys@xilinx.com>
-> Cc: dan.j.williams at intel.com; michal.simek at xilinx.com; Appana Durga
-> Kedareswara Rao <appanad@xilinx.com>; Radhey Shyam Pandey
-> <radheys@xilinx.com>; lars at metafoo.de; dmaengine at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [RFC 4/6] dmaengine: xilinx_dma: Freeup active list based on
-> descriptor completion bit
-> 
-> On Mon, Apr 02, 2018 at 04:09:04PM +0530, Radhey Shyam Pandey wrote:
-> > AXIDMA IP sets completion bit to 1 when the transfer is completed. Read
-> > this bit to move descriptor from active list to the done list. This feature
-> > is needed when interrupt delay timeout and IRQThreshold is enabled i.e
-> > Dly_IrqEn is triggered w/o completing Interrupt Threshold.
-> >
-> > Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
-> > ---
-> >  drivers/dma/xilinx/xilinx_dma.c |   18 ++++++++++++++----
-> >  1 files changed, 14 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/dma/xilinx/xilinx_dma.c
-> b/drivers/dma/xilinx/xilinx_dma.c
-> > index 36e1ab9..518465e 100644
-> > --- a/drivers/dma/xilinx/xilinx_dma.c
-> > +++ b/drivers/dma/xilinx/xilinx_dma.c
-> > @@ -103,6 +103,7 @@
-> >  #define XILINX_DMA_PARK_PTR_RD_REF_SHIFT	0
-> >  #define XILINX_DMA_PARK_PTR_RD_REF_MASK		GENMASK(4,
-> 0)
-> >  #define XILINX_DMA_REG_VDMA_VERSION		0x002c
-> > +#define XILINX_DMA_COMP_MASK			BIT(31)
-> >
-> >  /* Register Direct Mode Registers */
-> >  #define XILINX_DMA_REG_VSIZE			0x0000
-> > @@ -1387,16 +1388,25 @@ static void xilinx_dma_issue_pending(struct
-> dma_chan *dchan)
-> >  static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
-> >  {
-> >  	struct xilinx_dma_tx_descriptor *desc, *next;
-> > +	struct xilinx_axidma_tx_segment *seg;
-> >
-> >  	/* This function was invoked with lock held */
-> >  	if (list_empty(&chan->active_list))
-> >  		return;
-> >
-> >  	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
-> > -		list_del(&desc->node);
-> > -		if (!desc->cyclic)
-> > -			dma_cookie_complete(&desc->async_tx);
-> > -		list_add_tail(&desc->node, &chan->done_list);
-> > +
-> > +		seg = list_last_entry(&desc->segments,
-> > +				      struct xilinx_axidma_tx_segment, node);
-> > +		if ((seg->hw.status & XILINX_DMA_COMP_MASK) ||
-> > +			(!chan->xdev->has_axieth_connected)) {
-> 
-> why the second case ? That is not expalined in log?
-In the current implementation, delay timeout is enabled only for
-has_axieth_connected usecase. For ethernet, we need real-time processing
-while still having benefit of interrupt coalescing. Example: In RX interrupt
-coalescing is set to 0x3.  Without delay timeout, DMA engine will wait for
-all frames and then issue completion interrupt. In ethernet usecase, this
-can introduce huge latencies. Delay timeout interrupt will trigger if delay
-time period has expired and we can notify dma client with received frames.
+It is used as the PLL reference input to the HDMI PHY module.
 
-The second case is added to keep the previous implementation as is.(i.e when
-Delay timeout interrupt is not enabled - move all active desc to done list). 
-Sure I will add a description for it in the commit log.
+Fixes: e9862118272a ("clk: mediatek: Add MT2701 clock support")
+Signed-off-by: Chunhui Dai <chunhui.dai@mediatek.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+changes since v1:
+ - add the "Fixes:" tag.
+---
+ drivers/clk/mediatek/clk-mt2701.c      |  8 ++++++--
+ include/dt-bindings/clock/mt2701-clk.h | 16 ++++++++--------
+ 2 files changed, 14 insertions(+), 10 deletions(-)
 
-> 
-> > +			list_del(&desc->node);
-> > +			if (!desc->cyclic)
-> > +				dma_cookie_complete(&desc->async_tx);
-> > +			list_add_tail(&desc->node, &chan->done_list);
-> > +		} else {
-> > +			break;
-> > +		}
-> >  	}
-> >  }
-> >
-> > --
-> > 1.7.1
-> >
-> 
-> --
-> ~Vinod
+diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+index deca752..4dda898 100644
+--- a/drivers/clk/mediatek/clk-mt2701.c
++++ b/drivers/clk/mediatek/clk-mt2701.c
+@@ -46,8 +46,6 @@
+ 		340 * MHZ),
+ 	FIXED_CLK(CLK_TOP_HDMI_0_PLL340M, "hdmi_0_pll340m", "clk26m",
+ 		340 * MHZ),
+-	FIXED_CLK(CLK_TOP_HDMITX_CLKDIG_CTS, "hdmitx_dig_cts", "clk26m",
+-		300 * MHZ),
+ 	FIXED_CLK(CLK_TOP_HADDS2_FB, "hadds2_fbclk", "clk26m",
+ 		27 * MHZ),
+ 	FIXED_CLK(CLK_TOP_WBG_DIG_416M, "wbg_dig_ck_416m", "clk26m",
+@@ -977,6 +975,10 @@ static int mtk_pericfg_init(struct platform_device *pdev)
+ 				21, 0x2d0, 4, 0x0, 0x2d4, 0),
+ };
+ 
++static const struct mtk_fixed_factor apmixed_fixed_divs[] = {
++	FACTOR(CLK_APMIXED_HDMI_REF, "hdmi_ref", "tvdpll", 1, 1),
++};
++
+ static int mtk_apmixedsys_init(struct platform_device *pdev)
+ {
+ 	struct clk_onecell_data *clk_data;
+@@ -988,6 +990,8 @@ static int mtk_apmixedsys_init(struct platform_device *pdev)
+ 
+ 	mtk_clk_register_plls(node, apmixed_plls, ARRAY_SIZE(apmixed_plls),
+ 								clk_data);
++	mtk_clk_register_factors(apmixed_fixed_divs, ARRAY_SIZE(apmixed_fixed_divs),
++								clk_data);
+ 
+ 	return of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+ }
+diff --git a/include/dt-bindings/clock/mt2701-clk.h b/include/dt-bindings/clock/mt2701-clk.h
+index 24e93df..1956ebb 100644
+--- a/include/dt-bindings/clock/mt2701-clk.h
++++ b/include/dt-bindings/clock/mt2701-clk.h
+@@ -171,13 +171,12 @@
+ #define CLK_TOP_8BDAC				151
+ #define CLK_TOP_WBG_DIG_416M			152
+ #define CLK_TOP_DPI				153
+-#define CLK_TOP_HDMITX_CLKDIG_CTS		154
+-#define CLK_TOP_DSI0_LNTC_DSI			155
+-#define CLK_TOP_AUD_EXT1			156
+-#define CLK_TOP_AUD_EXT2			157
+-#define CLK_TOP_NFI1X_PAD			158
+-#define CLK_TOP_AXISEL_D4			159
+-#define CLK_TOP_NR				160
++#define CLK_TOP_DSI0_LNTC_DSI			154
++#define CLK_TOP_AUD_EXT1			155
++#define CLK_TOP_AUD_EXT2			156
++#define CLK_TOP_NFI1X_PAD			157
++#define CLK_TOP_AXISEL_D4			158
++#define CLK_TOP_NR				159
+ 
+ /* APMIXEDSYS */
+ 
+@@ -194,7 +193,8 @@
+ #define CLK_APMIXED_HADDS2PLL			11
+ #define CLK_APMIXED_AUD2PLL			12
+ #define CLK_APMIXED_TVD2PLL			13
+-#define CLK_APMIXED_NR				14
++#define CLK_APMIXED_HDMI_REF			14
++#define CLK_APMIXED_NR				15
+ 
+ /* DDRPHY */
+ 
+-- 
+1.9.1
