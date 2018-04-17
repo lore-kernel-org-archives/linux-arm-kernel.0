@@ -1,40 +1,45 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 17 Apr 2018 13:20:38 +0200
-Subject: [PATCH v6 09/11] ARM: sun8i: smp: Add support for A83T
-In-Reply-To: <20180416215032.5023-10-mylene.josserand@bootlin.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Apr 2018 19:25:15 +0800
+Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
+In-Reply-To: <20180417111737.6dous6eiuvjn33jf@flea>
 References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-10-mylene.josserand@bootlin.com>
-Message-ID: <20180417112038.mw7bfhqw4xwvzxcw@flea>
+ <20180416215032.5023-2-mylene.josserand@bootlin.com>
+ <CAGb2v67VL70yqTF7xq4T3_9zA9T3UT2AV0gGarh1mqvC17r3Mg@mail.gmail.com>
+ <20180417111737.6dous6eiuvjn33jf@flea>
+Message-ID: <CAGb2v67qvk=T7u7bOjVZ7q_qsjJuEOM6iarw7by42ga=EYuYDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 11:50:30PM +0200, Myl?ne Josserand wrote:
-> @@ -535,8 +599,12 @@ static int sunxi_mc_smp_cpu_kill(unsigned int l_cpu)
->  	return !ret;
->  }
->  
-> -static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
-> +static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
->  {
-> +	/* CPU0 hotplug not handled for sun8i-a83t */
-> +	if (is_sun8i)
-> +		if (cpu == 0)
-> +			return false;
->  	return true;
+On Tue, Apr 17, 2018 at 7:17 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Tue, Apr 17, 2018 at 11:12:41AM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Apr 17, 2018 at 5:50 AM, Myl?ne Josserand
+>> <mylene.josserand@bootlin.com> wrote:
+>> > Move the assembly code for cluster cache enabling and resuming
+>> > into an assembly file instead of having it directly in C code.
+>> >
+>> > Remove the CFLAGS because we are using the ARM directive "arch"
+>> > instead.
+>> >
+>> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+>> > ---
+>> >  arch/arm/mach-sunxi/Makefile  |  4 +--
+>> >  arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
+>> >  arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
+>> >  3 files changed, 85 insertions(+), 81 deletions(-)
+>> >  create mode 100644 arch/arm/mach-sunxi/headsmp.S
+>>
+>> I'm still not convinced about this whole "move ASM to separate
+>> file" thing, especially now that you aren't actually adding any
+>> sunxi-specific ASM code beyond a simple function call.
+>>
+>> Could you drop this for now?
+>
+> I'd really like to have this merged actually. There's a significant
+> readibility improvement, so even if there's no particular functional
+> improvement, I'd still call it a win.
 
-I think Chen-Yu told you how to implement the hotplug in the previous
-iteration, did you have time to test it?
+What parts do you consider hard to read? The extra quotes? Trailing
+newline? Or perhaps the __stringify bits?
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/7a427abf/attachment.sig>
+ChenYu
