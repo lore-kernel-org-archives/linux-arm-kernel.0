@@ -1,25 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 17 Apr 2018 14:12:33 +0100
-Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
-In-Reply-To: <CACRpkdb1toYJEaHDZ2QORt+qzN7imH9ugx3xvi1HASoZU0QSiQ@mail.gmail.com>
-References: <20180406141935.6801-1-linus.walleij@linaro.org>
- <20180410095737.GF10254@e110455-lin.cambridge.arm.com>
- <CACRpkdb1toYJEaHDZ2QORt+qzN7imH9ugx3xvi1HASoZU0QSiQ@mail.gmail.com>
-Message-ID: <297aae18-8efc-b7cc-20c2-eb09d72d2dd1@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 17 Apr 2018 08:16:52 -0500
+Subject: [PATCH v3 04/10] Documentations: dt-bindings: Add a document of
+ PECI adapter driver for Aspeed AST24xx/25xx SoCs
+In-Reply-To: <53ff5b2b-eba8-8311-64a9-abd4bc72226d@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+ <20180410183212.16787-5-jae.hyun.yoo@linux.intel.com>
+ <20180416181035.rcjvt4rlrwaj5yxf@rob-hp-laptop>
+ <53ff5b2b-eba8-8311-64a9-abd4bc72226d@linux.intel.com>
+Message-ID: <CAL_Jsq+1wC-KhXPeCSNhCeCih6=CatJbyumO51ucD17Rt7qofw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/04/18 13:32, Linus Walleij wrote:
+On Mon, Apr 16, 2018 at 6:12 PM, Jae Hyun Yoo
+<jae.hyun.yoo@linux.intel.com> wrote:
+> On 4/16/2018 11:10 AM, Rob Herring wrote:
+>>
+>> On Tue, Apr 10, 2018 at 11:32:06AM -0700, Jae Hyun Yoo wrote:
+>>>
+>>> This commit adds a dt-bindings document of PECI adapter driver for Aspeed
+>>> AST24xx/25xx SoCs.
+
 [...]
-> Unfortunately there is just one single vexpress core tile in the
-> upstream kernel that define a CLCD controller, the CA9 (4xA9)
-> that I am using. All the others just use the MB CLCD.
-> 
-> I am thinking there is some never finished DTS upstreaming
-> here that ought to happen so we use the core tile CLCD on some
-> other boards as well.
 
-Barring custom FPGA images, I think V2P-CA9 *is* the only VExpress tile 
-implementing PL11x; all the more recent test chips had HDLCD instead.
+>>> +- clocks            : Should contain clock source for PECI controller.
+>>> +                     Should reference clkin.
+>>> +- clock_frequency   : Should contain the operation frequency of PECI
+>>> controller
+>>> +                     in units of Hz.
+>>> +                     187500 ~ 24000000
+>>
+>>
+>> This is the frequency of the bus or used to derive it? It would be
+>> better to specify the bus frequency instead and have the driver
+>> calculate its internal freq. And then use "bus-frequency" instead.
+>>
+>
+> I agree with you. Actually, it is being used for operation frequency setting
+> of PECI controller module in SoC so it's different from the meaning of
+> "bus-frequency". I'll change it to "operation-frequency".
 
-Robin.
+No, now you've gone from a standard property name to something custom.
+Why do you need to set the frequency in DT if it is not related to the
+interface frequency?
+
+Rob
