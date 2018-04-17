@@ -1,45 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Apr 2018 21:31:17 +0200
-Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
-In-Reply-To: <297aae18-8efc-b7cc-20c2-eb09d72d2dd1@arm.com>
-References: <20180406141935.6801-1-linus.walleij@linaro.org>
- <20180410095737.GF10254@e110455-lin.cambridge.arm.com>
- <CACRpkdb1toYJEaHDZ2QORt+qzN7imH9ugx3xvi1HASoZU0QSiQ@mail.gmail.com>
- <297aae18-8efc-b7cc-20c2-eb09d72d2dd1@arm.com>
-Message-ID: <CACRpkdYPwm=2jhompecL5z_qwhe9UzZHKLKZLYgDK+YV_ZfMag@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 17 Apr 2018 21:39:03 +0200
+Subject: atmel_mxt_ts on droid4: powersave seems to break the driver
+In-Reply-To: <20180417182021.GA67621@dtor-ws>
+References: <20180417073811.GA9450@amd>
+ <20180417182021.GA67621@dtor-ws>
+Message-ID: <20180417193903.GA11082@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 3:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 17/04/18 13:32, Linus Walleij wrote:
-> [...]
->>
->> Unfortunately there is just one single vexpress core tile in the
->> upstream kernel that define a CLCD controller, the CA9 (4xA9)
->> that I am using. All the others just use the MB CLCD.
->>
->> I am thinking there is some never finished DTS upstreaming
->> here that ought to happen so we use the core tile CLCD on some
->> other boards as well.
->
->
-> Barring custom FPGA images, I think V2P-CA9 *is* the only VExpress tile
-> implementing PL11x; all the more recent test chips had HDLCD instead.
+Hi!
 
-Yup it looks like that.
+> > v4.17-rc1 on motorola droid 4.
+> > 
+> > If I disable/reenable touschreen with xinput, it fails, with this in
+> > the logs:
+> > 
+> > [ 1633.749450] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> > [ 1655.938751] atmel_mxt_ts 1-004a: __mxt_read_reg: i2c transfer
+> > failed (-121)
+> > [ 1655.945800] atmel_mxt_ts 1-004a: Failed to read T44 and T5 (-121)
+> > [ 1663.829498] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+> > 
+> > Unfortunately, xscreensaver seems to break it in a similar way.
+> > 
+> 
+> There were a few changes to the Atmel driver, ending with commit
+> 96a938aa214e965d5b4a2f10443b29cad14289b9, but they mostly dealt with
+> removal of platform data and moving to generic device properties...
+> Can you try bisecting this series:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/bleung/chrome-platform.git ib-chrome-platform-input-atmel-mx-ts-platform-removal
+> 
 
-I am restructuring the code to look for any graphics on the
-core tile and only turn on the motherboard CLCD if there is
-no CLCD or HDLCD on the core tile, e.g. if that device node has
-been set to "disabled" or the HDLCD driver is not compiled in
-but the CLCD driver is.
+To avoid any misunderstanding, I'm not saying this is
+regression from v4.16. I did some testing on v4.16 (and it was first
+kernel to work there at all), but I did not have good enough userland
+to play with touchscreen disable/enable.
 
-I found some vague mentions of a LCD display that can be
-connected to the motherboard, so that would then be sitting
-on the CLCD, is this something you ARM guys have seen
-around? In that case I guess the VExpress (etc) would actually
-be able to have two screens, one LCD panel on the motherboard
-CLCD and a DVI from the core tile.
+Plus, I'm not sure this is 100% reproducible, let me play some more.
 
-Yours,
-Linus Walleij
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/986931f0/attachment.sig>
