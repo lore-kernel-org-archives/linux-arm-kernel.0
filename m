@@ -1,33 +1,21 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Apr 2018 11:12:41 +0800
-Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
-In-Reply-To: <20180416215032.5023-2-mylene.josserand@bootlin.com>
+Date: Tue, 17 Apr 2018 11:13:12 +0800
+Subject: [PATCH v6 03/11] ARM: dts: sun8i: Add R_CPUCFG device node for
+ the A83T dtsi
+In-Reply-To: <20180416215032.5023-4-mylene.josserand@bootlin.com>
 References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-2-mylene.josserand@bootlin.com>
-Message-ID: <CAGb2v67VL70yqTF7xq4T3_9zA9T3UT2AV0gGarh1mqvC17r3Mg@mail.gmail.com>
+ <20180416215032.5023-4-mylene.josserand@bootlin.com>
+Message-ID: <CAGb2v67b_-RTF2HyNE5NoWTiHy9BDPR95sxvOYzGbz7=qP_ewA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Apr 17, 2018 at 5:50 AM, Myl?ne Josserand
 <mylene.josserand@bootlin.com> wrote:
-> Move the assembly code for cluster cache enabling and resuming
-> into an assembly file instead of having it directly in C code.
->
-> Remove the CFLAGS because we are using the ARM directive "arch"
-> instead.
+> The R_CPUCFG is a collection of registers needed for SMP bringup
+> on clusters and cluster's reset.
+> For the moment, documentation about this register is found in
+> Allwinner's code only.
 >
 > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> ---
->  arch/arm/mach-sunxi/Makefile  |  4 +--
->  arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
->  3 files changed, 85 insertions(+), 81 deletions(-)
->  create mode 100644 arch/arm/mach-sunxi/headsmp.S
 
-I'm still not convinced about this whole "move ASM to separate
-file" thing, especially now that you aren't actually adding any
-sunxi-specific ASM code beyond a simple function call.
-
-Could you drop this for now?
-
-ChenYu
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
