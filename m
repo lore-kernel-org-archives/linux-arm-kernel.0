@@ -1,62 +1,97 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 18 Apr 2018 03:14:05 +0800
-Subject: [arm-platforms:irq/level-msi 8/9]
- drivers/irqchip/irq-gic-v3-mbi.c:60:23: error: 'pci_msi_domain_write_msg'
- undeclared here (not in a function); did you mean 'irq_domain_is_msi'?
-Message-ID: <201804180303.F10GefxW%fengguang.wu@intel.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 17 Apr 2018 12:19:06 -0700
+Subject: [PATCH v3 06/11] iio: inkern: add module put/get on iio dev
+ module when requesting channels
+In-Reply-To: <67771f4c-d30c-4a28-2a9b-d5585186d60a@microchip.com>
+References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
+ <1523350677-27106-7-git-send-email-eugen.hristev@microchip.com>
+ <20180415203321.1aaaf91e@archlinux>
+ <20180416235821.GF77055@dtor-ws>
+ <67771f4c-d30c-4a28-2a9b-d5585186d60a@microchip.com>
+Message-ID: <20180417191906.GB67621@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/level-msi
-head:   38158ba494401627aff6018b4cd65d17d9a8d3e8
-commit: 0f5775c792c5f600ddbd7e40a73b2444e6829482 [8/9] irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller
-config: arm64-alldefconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 0f5775c792c5f600ddbd7e40a73b2444e6829482
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Hi Eugen,
 
-All errors (new ones prefixed by >>):
+On Tue, Apr 17, 2018 at 10:39:24AM +0300, Eugen Hristev wrote:
+> 
+> 
+> On 17.04.2018 02:58, Dmitry Torokhov wrote:
+> > On Sun, Apr 15, 2018 at 08:33:21PM +0100, Jonathan Cameron wrote:
+> > > On Tue, 10 Apr 2018 11:57:52 +0300
+> > > Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> > > 
+> > > > When requesting channels for a particular consumer device,
+> > > > besides requesting the device (incrementing the reference counter), also
+> > > > do it for the driver module of the iio dev. This will avoid the situation
+> > > > where the producer IIO device can be removed and the consumer is still
+> > > > present in the kernel.
+> > > > 
+> > > > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> > > > ---
+> > > >   drivers/iio/inkern.c | 8 +++++++-
+> > > >   1 file changed, 7 insertions(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+> > > > index ec98790..68d9b87 100644
+> > > > --- a/drivers/iio/inkern.c
+> > > > +++ b/drivers/iio/inkern.c
+> > > > @@ -11,6 +11,7 @@
+> > > >   #include <linux/slab.h>
+> > > >   #include <linux/mutex.h>
+> > > >   #include <linux/of.h>
+> > > > +#include <linux/module.h>
+> > > >   #include <linux/iio/iio.h>
+> > > >   #include "iio_core.h"
+> > > > @@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
+> > > >   	if (index < 0)
+> > > >   		goto err_put;
+> > > >   	channel->channel = &indio_dev->channels[index];
+> > > > +	try_module_get(channel->indio_dev->driver_module);
+> > > 
+> > > And if it fails? (the module we are trying to get is going away...)
+> > > 
+> > > We should try and handle it I think. Be it by just erroring out of here.
+> > 
+> > Even more, this has nothing to do with modules. A device can go away for
+> > any number of reasons (we unbind it manually via sysfs, we pull the USB
+> > plug from the host in case it is USB-connected device, we unload I2C
+> > adapter for the bus device resides on, we kick underlying PCI device)
+> > and we should be able to handle this in some fashion. Handling errors
+> > from reads and ignoring garbage is one of methods.
+> > 
+> > FWIW this is a NACK from me.
+> > 
+> > Thanks.
+> Hello,
+> 
+> This patch is actually a "best effort attempt" for the consumer driver
+> (touch driver) to get a reference to the producer of the data (the IIO
+> device), when it requests the specific channels.
+> As of this moment, there is no attempt whatsoever for the consumer to have a
+> reference on the producer driver. Thus, the producer can be removed at any
+> time, and the consumer will fail ungraciously.
 
->> drivers/irqchip/irq-gic-v3-mbi.c:60:23: error: 'pci_msi_domain_write_msg' undeclared here (not in a function); did you mean 'irq_domain_is_msi'?
-     .irq_write_msi_msg = pci_msi_domain_write_msg,
-                          ^~~~~~~~~~~~~~~~~~~~~~~~
-                          irq_domain_is_msi
-   drivers/irqchip/irq-gic-v3-mbi.c: In function 'mbi_allocate_domains':
-   drivers/irqchip/irq-gic-v3-mbi.c:218:15: error: implicit declaration of function 'pci_msi_create_irq_domain'; did you mean 'msi_create_irq_domain'? [-Werror=implicit-function-declaration]
-     pci_domain = pci_msi_create_irq_domain(parent->fwnode,
-                  ^~~~~~~~~~~~~~~~~~~~~~~~~
-                  msi_create_irq_domain
-   drivers/irqchip/irq-gic-v3-mbi.c:218:13: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     pci_domain = pci_msi_create_irq_domain(parent->fwnode,
-                ^
-   cc1: some warnings being treated as errors
+This is the root of the issue. The consumer should be prepared to handle
+errors from producer.
 
-vim +60 drivers/irqchip/irq-gic-v3-mbi.c
+> I can change the perspective from "best effort" to "mandatory" to get a
+> reference to the producer, or you wish to stop trying to get any reference
+> at all (remove this patch completely) ?
 
-    51	
-    52	/* PCI-specific irqchip */
-    53	static struct irq_chip mbi_msi_irq_chip = {
-    54		.name			= "MSI",
-    55		.irq_mask		= irq_chip_mask_parent,
-    56		.irq_unmask		= irq_chip_unmask_parent,
-    57		.irq_eoi		= irq_chip_eoi_parent,
-    58		.irq_set_type		= irq_chip_set_type_parent,
-    59		.irq_compose_msi_msg	= mbi_compose_msi_msg,
-  > 60		.irq_write_msi_msg	= pci_msi_domain_write_msg,
-    61	};
-    62	
+You should take reference to the device itself (if it is not taken
+already), so it does not disappear completely and you can continue using
+IIO API to access it, and IIO API should be prepared to deal with "dead"
+devices, but as I pointed in my other email, trying to pin the driver
+is quite pointless as there are myriad other ways of device stopping
+working besides module unloading.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 8591 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/f896013f/attachment.gz>
+In any case, I think this problem is outside of the scope of this
+patchset that adds a generic resistive touchscreen, so if you want to
+continue working on this I'd recommend moving it into a separate series.
+
+Thanks.
+
+-- 
+Dmitry
