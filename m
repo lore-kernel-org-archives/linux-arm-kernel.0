@@ -1,100 +1,84 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 17 Apr 2018 12:46:27 +0200
-Subject: [PATCH] arm/twd: avoid waking deeply sleeping CPUs for rate change
- notifier
-Message-ID: <20180417104627.29643-1-l.stach@pengutronix.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 17 Apr 2018 18:46:30 +0800
+Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
+In-Reply-To: <20180416215032.5023-2-mylene.josserand@bootlin.com>
+References: <20180416215032.5023-2-mylene.josserand@bootlin.com>
+Message-ID: <201804171811.BgBq6LBp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current clock notifier sends an IPI to all CPUs, even if they are in
-deep sleep state with the local timer disabled and switched to tick
-broadcast. This needlessly cuts the CPU sleep times, as nothing is gained
-from updating a disabled TWDs rate.
+Hi Myl?ne,
 
-Keep track of the enabled TWDs and only send an IPI to those CPUs with an
-active local timer. As disabled TWDs may now miss a CPU frequency update
-we need to make sure to refresh the rate on re-enabling of the timer.
+Thank you for the patch! Yet something to improve:
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+[auto build test ERROR on arm-soc/for-next]
+[also build test ERROR on v4.17-rc1 next-20180417]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Myl-ne-Josserand/Sunxi-Add-SMP-support-on-A83T/20180417-113911
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All error/warnings (new ones prefixed by >>):
+
+   In file included from arch/arm/include/asm/cputype.h:6:0,
+                    from arch/arm/mach-sunxi/headsmp.S:15:
+>> include/linux/kernel.h:57:0: warning: "ALIGN" redefined
+    #define ALIGN(x, a)  __ALIGN_KERNEL((x), (a))
+    
+   In file included from arch/arm/mach-sunxi/headsmp.S:13:0:
+   include/linux/linkage.h:79:0: note: this is the location of the previous definition
+    #define ALIGN __ALIGN
+    
+   /usr/lib/gcc-cross/arm-linux-gnueabi/7/include/stdarg.h: Assembler messages:
+>> /usr/lib/gcc-cross/arm-linux-gnueabi/7/include/stdarg.h:40: Error: bad instruction `typedef __builtin_va_list __gnuc_va_list'
+>> /usr/lib/gcc-cross/arm-linux-gnueabi/7/include/stdarg.h:99: Error: bad instruction `typedef __gnuc_va_list va_list'
+>> include/linux/stddef.h:10: Error: bad instruction `enum {'
+>> include/linux/stddef.h:11: Error: junk at end of line, first unrecognized character is `,'
+   include/linux/stddef.h:13: Error: junk at end of line, first unrecognized character is `}'
+>> include/linux/bitops.h:29: Error: bad instruction `extern unsigned int __sw_hweight8(unsigned int w)'
+>> include/linux/bitops.h:30: Error: bad instruction `extern unsigned int __sw_hweight16(unsigned int w)'
+>> include/linux/bitops.h:31: Error: bad instruction `extern unsigned int __sw_hweight32(unsigned int w)'
+>> include/linux/bitops.h:32: Error: bad instruction `extern unsigned long __sw_hweight64(__u64 w)'
+>> arch/arm/include/asm/irqflags.h:25: Error: bad instruction `static inline unsigned long arch_local_irq_save(void)'
+>> arch/arm/include/asm/irqflags.h:26: Error: junk at end of line, first unrecognized character is `{'
+>> arch/arm/include/asm/irqflags.h:27: Error: bad instruction `unsigned long flags'
+>> arch/arm/include/asm/irqflags.h:29: Error: bad instruction `asm volatile('
+   arch/arm/include/asm/irqflags.h:30: Error: bad instruction `	mrs	%0, ""cpsr""	@ arch_local_irq_save\n"'
+>> arch/arm/include/asm/irqflags.h:31: Error: bad instruction `	cpsid	i"'
+>> arch/arm/include/asm/irqflags.h:32: Error: junk at end of line, first unrecognized character is `:'
+>> arch/arm/include/asm/irqflags.h:33: Error: bad instruction `return flags'
+   arch/arm/include/asm/irqflags.h:34: Error: junk at end of line, first unrecognized character is `}'
+>> arch/arm/include/asm/irqflags.h:37: Error: bad instruction `static inline void arch_local_irq_enable(void)'
+   arch/arm/include/asm/irqflags.h:38: Error: junk at end of line, first unrecognized character is `{'
+   arch/arm/include/asm/irqflags.h:39: Error: bad instruction `asm volatile('
+>> arch/arm/include/asm/irqflags.h:40: Error: bad instruction `	cpsie i			@ arch_local_irq_enable"'
+   arch/arm/include/asm/irqflags.h:41: Error: junk at end of line, first unrecognized character is `:'
+   arch/arm/include/asm/irqflags.h:42: Error: junk at end of line, first unrecognized character is `:'
+   arch/arm/include/asm/irqflags.h:43: Error: junk at end of line, first unrecognized character is `:'
+   arch/arm/include/asm/irqflags.h:44: Error: junk at end of line, first unrecognized character is `}'
+>> arch/arm/include/asm/irqflags.h:47: Error: bad instruction `static inline void arch_local_irq_disable(void)'
+   arch/arm/include/asm/irqflags.h:48: Error: junk at end of line, first unrecognized character is `{'
+   arch/arm/include/asm/irqflags.h:49: Error: bad instruction `asm volatile('
+>> arch/arm/include/asm/irqflags.h:50: Error: bad instruction `	cpsid i			@ arch_local_irq_disable"'
+   arch/arm/include/asm/irqflags.h:51: Error: junk at end of line, first unrecognized character is `:'
+   arch/arm/include/asm/irqflags.h:52: Error: junk at end of line, first unrecognized character is `:'
+   arch/arm/include/asm/irqflags.h:53: Error: junk at end of line, first unrecognized character is `:'
+   arch/arm/include/asm/irqflags.h:54: Error: junk at end of line, first unrecognized character is `}'
+
 ---
- arch/arm/kernel/smp_twd.c | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index b30eafeef096..a3be30d30cc2 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -32,6 +32,8 @@ static struct clk *twd_clk;
- static unsigned long twd_timer_rate;
- static DEFINE_PER_CPU(bool, percpu_setup_called);
- 
-+static cpumask_var_t active_twd_mask;
-+
- static struct clock_event_device __percpu *twd_evt;
- static unsigned int twd_features =
- 		CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-@@ -39,12 +41,24 @@ static int twd_ppi;
- 
- static int twd_shutdown(struct clock_event_device *clk)
- {
-+	cpumask_clear_cpu(smp_processor_id(), active_twd_mask);
-+
- 	writel_relaxed(0, twd_base + TWD_TIMER_CONTROL);
- 	return 0;
- }
- 
- static int twd_set_oneshot(struct clock_event_device *clk)
- {
-+	cpumask_set_cpu(smp_processor_id(), active_twd_mask);
-+
-+	/*
-+	 * When going from shutdown to oneshot we might have missed some
-+	 * frequency updates if the CPU was sleeping. Make sure to update
-+	 * the timer frequency with the current rate.
-+	 */
-+	if (clockevent_state_shutdown(clk))
-+		clockevents_update_freq(clk, twd_timer_rate);
-+
- 	/* period set, and timer enabled in 'next_event' hook */
- 	writel_relaxed(TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT,
- 		       twd_base + TWD_TIMER_CONTROL);
-@@ -57,6 +71,16 @@ static int twd_set_periodic(struct clock_event_device *clk)
- 			     TWD_TIMER_CONTROL_IT_ENABLE |
- 			     TWD_TIMER_CONTROL_PERIODIC;
- 
-+	cpumask_set_cpu(smp_processor_id(), active_twd_mask);
-+
-+	/*
-+	 * When going from shutdown to periodic we might have missed some
-+	 * frequency updates if the CPU was sleeping. Make sure to update
-+	 * the timer frequency with the current rate.
-+	 */
-+	if (clockevent_state_shutdown(clk))
-+		clockevents_update_freq(clk, twd_timer_rate);
-+
- 	writel_relaxed(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
- 		       twd_base + TWD_TIMER_LOAD);
- 	writel_relaxed(ctrl, twd_base + TWD_TIMER_CONTROL);
-@@ -124,8 +148,8 @@ static int twd_rate_change(struct notifier_block *nb,
- 	 * changing cpu.
- 	 */
- 	if (flags == POST_RATE_CHANGE)
--		on_each_cpu(twd_update_frequency,
--				  (void *)&cnd->new_rate, 1);
-+		on_each_cpu_mask(active_twd_mask, twd_update_frequency,
-+				 (void *)&cnd->new_rate, 1);
- 
- 	return NOTIFY_OK;
- }
-@@ -326,6 +350,9 @@ static int __init twd_local_timer_common_register(struct device_node *np)
- {
- 	int err;
- 
-+	if (!zalloc_cpumask_var(&active_twd_mask, GFP_KERNEL))
-+		return -ENOMEM;
-+
- 	twd_evt = alloc_percpu(struct clock_event_device);
- 	if (!twd_evt) {
- 		err = -ENOMEM;
--- 
-2.16.3
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 65014 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/5db77122/attachment-0001.gz>
