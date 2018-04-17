@@ -1,69 +1,120 @@
 From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Tue, 17 Apr 2018 12:04:20 +0100
-Subject: [PATCH v5 5/6] ARM: dts: Renesas RZN1D-DB Board base file
+Date: Tue, 17 Apr 2018 12:04:19 +0100
+Subject: [PATCH v5 4/6] ARM: dts: Renesas RZ/N1 SoC base device tree file
 In-Reply-To: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
 References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1523963101-56725-6-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <1523963101-56725-5-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a base device tree file for the RZN1-DB board, with only the
-basic support allowing the system to boot to a prompt. Only one UART is
-used, with only a single CPU running.
+This adds the Renesas RZ/N1D (Part #R9A06G032) SoC bare
+bone support.
+
+This currently only handles generic parts (gic, architected timer)
+and a UART.
+For simplicity sake, this also relies on the bootloader to set the
+pinctrl and clocks.
 
 Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 ---
- arch/arm/boot/dts/Makefile                  |  1 +
- arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts | 29 +++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts
+ arch/arm/boot/dts/r9a06g032.dtsi | 89 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r9a06g032.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 052aaf0..a53a677 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -809,6 +809,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
- 	r8a7793-gose.dtb \
- 	r8a7794-alt.dtb \
- 	r8a7794-silk.dtb \
-+	r9a06g032-rzn1d400-db.dtb \
- 	sh73a0-kzm9g.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rv1108-evb.dtb \
-diff --git a/arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts b/arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts
+diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
 new file mode 100644
-index 0000000..5fc2c40
+index 0000000..23c56d7
 --- /dev/null
-+++ b/arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts
-@@ -0,0 +1,29 @@
++++ b/arch/arm/boot/dts/r9a06g032.dtsi
+@@ -0,0 +1,89 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Device Tree Source for the RZN1D-DB Board
++ * Base Device Tree Source for the Renesas RZ/N1D (R9A06G032)
 + *
 + * Copyright (C) 2018 Renesas Electronics Europe Limited
 + *
 + */
 +
-+/dts-v1/;
-+
-+#include "r9a06g032.dtsi"
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
 +/ {
-+	model = "RZN1D-DB Board";
-+	compatible = "renesas,rzn1d400-db",
-+			"renesas,r9a06g032", "renesas,rzn1";
++	compatible = "renesas,r9a06g032", "renesas,rzn1";
++	#address-cells = <1>;
++	#size-cells = <1>;
 +
-+	chosen {
-+		stdout-path = "serial0:115200n8";
++	clkuarts: clkuarts {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <47619047>;
 +	};
 +
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+};
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+&uart0 {
-+	status = "okay";
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <1>;
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		interrupt-parent = <&gic>;
++		ranges;
++
++		reboot at 4000c120 {
++			compatible = "renesas,r9a06g032-reboot",
++					"renesas,rzn1-reboot";
++			reg = <0x4000c120 4>,
++				<0x4000c198 4>;
++		};
++
++		uart0: serial at 40060000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x40060000 0x400>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&clkuarts>;
++			clock-names = "baudclk";
++			status = "disabled";
++		};
++
++		gic: gic at 44101000 {
++			compatible = "arm,cortex-a7-gic", "arm,gic-400";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x44101000 0x1000>, /* Distributer */
++			      <0x44102000 0x2000>, /* CPU interface */
++			      <0x44104000 0x2000>, /* Virt interface control */
++			      <0x44106000 0x2000>; /* Virt CPU interface */
++			interrupts =
++				<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++		};
++	};
++
++	timer {
++		compatible = "arm,cortex-a7-timer",
++			     "arm,armv7-timer";
++		interrupt-parent = <&gic>;
++		arm,cpu-registers-not-fw-configured;
++		always-on;
++		interrupts =
++			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++	};
 +};
 -- 
 2.7.4
