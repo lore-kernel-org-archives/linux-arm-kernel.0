@@ -1,116 +1,46 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 17 Apr 2018 09:46:36 -0600
-Subject: [PATCH 2/3] coresight: Add section for integration with the perf
- tools
-In-Reply-To: <fd4b5238-c995-c374-60c0-e4a32f644ae4@infradead.org>
-References: <1523907327-20979-1-git-send-email-mathieu.poirier@linaro.org>
- <1523907327-20979-3-git-send-email-mathieu.poirier@linaro.org>
- <fd4b5238-c995-c374-60c0-e4a32f644ae4@infradead.org>
-Message-ID: <CANLsYkzc60no4SnjtRvx+0tt-PNCTdqXU=Jnb+GQKbmUMtiiKQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 17 Apr 2018 17:49:25 +0200
+Subject: [PATCH v5 3/6] dt-bindings: arm: Document the RZN1D-DB board
+In-Reply-To: <1523963101-56725-4-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1523963101-56725-4-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdU4upXcYZ_yD2a_=J5VAUE28fni7_NotmchjpYUqCxV=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 April 2018 at 13:48, Randy Dunlap <rdunlap@infradead.org> wrote:
-> On 04/16/2018 12:35 PM, Mathieu Poirier wrote:
->> Adding a section that document how to use the Coresight framework and
->> drivers from the perf tools.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>  Documentation/trace/coresight.txt | 50 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 50 insertions(+)
->>
->> diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
->> index 710c75b6c73f..8caae8050a60 100644
->> --- a/Documentation/trace/coresight.txt
->> +++ b/Documentation/trace/coresight.txt
->> @@ -187,9 +187,18 @@ that can be performed on them (see "struct coresight_ops").  The
->>  specific to that component only.  "Implementation defined" customisations are
->>  expected to be accessed and controlled using those entries.
->>
->> +
->>  How to use the tracer modules
->>  -----------------------------
->>
->> +There is two ways to use the Coresight framework: 1) using the perf cmd line
->
->    There are two ways
->
->> +tools and 2) interacting directly with the Coresight devices using the sysFS
->> +interface.  Preference is given to the former as using the sysFS interface
->> +requires a deep understanding of the Coresight HW.  The following sections
->> +provide details on using both methods.
->> +
->> +1) Using the sysFS interface:
->> +
->>  Before trace collection can start, a coresight sink needs to be identify.
->
->                                                                    identified.
->
->>  There is no limit on the amount of sinks (nor sources) that can be enabled at
->>  any given moment.  As a generic operation, all device pertaining to the sink
->> @@ -295,6 +304,47 @@ Instruction     13570831        0x8026B584      E28DD00C        false   ADD
->>  Instruction     0       0x8026B588      E8BD8000        true    LDM      sp!,{pc}
->>  Timestamp                                       Timestamp: 17107041535
->>
->> +2) Using perf framework:
->> +
->> +Coresight tracers are represented using the Perf framework's Performance
->> +Monitoring Unit (PMU) abstraction.  As such the perf framework takes charge of
->> +controlling when tracing gets enabled based on when the process of interest is
->> +scheduled.  When configured in a system, Coresight PMUs will be listed when
->> +queried by the perf command line tool:
->> +
->> +     linaro at linaro-nano:~$ ./perf list pmu
->> +
->> +             List of pre-defined events (to be used in -e):
->> +
->> +             cs_etm//                                    [Kernel PMU event]
->> +
->> +     linaro at linaro-nano:~$
->> +
->> +Regardless of the number of tracers available in a system (usually equal to the
->> +amount of processor core), the "cs_etm" PMU will be listed only once.
->
-> ?                      cores),
->
->> +
->> +A Coresight PMU works the same way as any other PMUs, i.e the name of the PMU is
->
->                                          any other PMU, i.e.
->
->> +listed along with configuration options within forward slashes '/'.  Since a
->> +Coresight system will typically have more than one sink, the name of the sink to
->> +work with needs to be specified as an event option.  Names for sink to choose
->> +from are listed in sysFS under ($SYSFS)/bus/coresight/devices:
->> +
->> +     root at linaro-nano:~# ls /sys/bus/coresight/devices/
->> +             20010000.etf   20040000.funnel  20100000.stm  22040000.etm
->> +             22140000.etm  230c0000.funnel  23240000.etm 20030000.tpiu
->> +             20070000.etr     20120000.replicator  220c0000.funnel
->> +             23040000.etm  23140000.etm     23340000.etm
->> +
->> +     root at linaro-nano:~# perf record -e cs_etm/@20070000.etr/u --per-thread program
->> +
->> +The syntax within the forward slashes '/' is important.  The '@' character
->> +tells the parser that a sink is about to be specified and that this is the IP
->
-> Can we get away from using "IP" and call it a device or (hardware) module or
-> something more descriptive?
+Hi Michel,
 
-Sure thing.
-
-Thanks for taking the time to read the patch and providing comments.
-
-Mathieu
-
+On Tue, Apr 17, 2018 at 1:04 PM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> This documents the RZ/N1 bindings for the RZN1D-DB board.
 >
->> +to use for the trace session.
->> +
->> +More information on the above and other example on how to use Coresight with
->> +the perf tools can be found in the "HOWTO.md" file of the openCSD gitHub
->> +repository [3].
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
+> ---
+>  Documentation/devicetree/bindings/arm/shmobile.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 >
->
-> --
-> ~Randy
+> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+> index 61b486f..6efb3f1 100644
+> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -51,7 +51,8 @@ SoCs:
+>      compatible = "renesas,r8a77990"
+>    - R-Car D3 (R8A77995)
+>      compatible = "renesas,r8a77995"
+> -
+> +  - RZ/N1D (R9A06G032)
+> +    compatible = "renesas,r9a06g032", "renesas,rzn1"
+
+Why do you need a family-specific compatible value ("renesas,rzn1",
+which is a marketing name)?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
