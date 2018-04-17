@@ -1,83 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Apr 2018 08:12:50 +0100
-Subject: [PATCH v4 2/6] mfd: stm32-timers: add support for dmas
-In-Reply-To: <1523895561-4073-3-git-send-email-fabrice.gasnier@st.com>
-References: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
- <1523895561-4073-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180417071250.yhgl7c7apn7w53xf@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Apr 2018 08:32:56 +0100
+Subject: [PATCH] MAINTAINERS: Update e-mail address for Christoffer Dall
+In-Reply-To: <20180416182831.4035-1-christoffer.dall@arm.com>
+References: <20180416182831.4035-1-christoffer.dall@arm.com>
+Message-ID: <6bb15fe7-cf20-c4e2-d596-fd9e243659e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Apr 2018, Fabrice Gasnier wrote:
-
-> STM32 Timers can support up to 7 DMA requests:
-> - 4 channels, update, compare and trigger.
-> Optionally request part, or all DMAs from stm32-timers MFD core.
+On 16/04/18 19:28, Christoffer Dall wrote:
+> Update my e-mail address to a working address.
 > 
-> Also add routine to implement burst reads using DMA from timer registers.
-> This is exported. So, it can be used by child drivers, PWM capture
-> for instance (but not limited to).
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 > ---
-> Changes in v4:
-> - Lee's comments: Add kerneldoc header, better format comments.
-> Changes in v3:
-> - Basically Lee's comments:
-> - rather create a struct stm32_timers_dma, and place a reference to it
->   in existing ddata (instead of adding priv struct).
-> - rather use a struct device in exported routine prototype, and use
->   standard helpers instead of ddata. Get rid of to_stm32_timers_priv().
-> - simplify error handling in probe (remove a goto)
-> - comment on devm_of_platform_*populate() usage.
+>  MAINTAINERS | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Changes in v2:
-> - Abstract DMA handling from child driver: move it to MFD core
-> - Add comments on optional dma support
-> ---
->  drivers/mfd/stm32-timers.c       | 227 ++++++++++++++++++++++++++++++++++++++-
->  include/linux/mfd/stm32-timers.h |  32 ++++++
->  2 files changed, 257 insertions(+), 2 deletions(-)
-
-[...]
-
-> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
-> index 2aadab6..a04d7a1 100644
-> --- a/include/linux/mfd/stm32-timers.h
-> +++ b/include/linux/mfd/stm32-timers.h
-> @@ -8,6 +8,8 @@
->  #define _LINUX_STM32_GPTIMER_H_
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 0a1410d5a621..3e9c99d2620b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -7738,7 +7738,7 @@ F:	arch/x86/include/asm/svm.h
+>  F:	arch/x86/kvm/svm.c
 >  
->  #include <linux/clk.h>
-> +#include <linux/dmaengine.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/regmap.h>
+>  KERNEL VIRTUAL MACHINE FOR ARM (KVM/arm)
+> -M:	Christoffer Dall <christoffer.dall@linaro.org>
+> +M:	Christoffer Dall <christoffer.dall@arm.com>
+>  M:	Marc Zyngier <marc.zyngier@arm.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  L:	kvmarm at lists.cs.columbia.edu
+> @@ -7752,7 +7752,7 @@ F:	virt/kvm/arm/
+>  F:	include/kvm/arm_*
+>  
+>  KERNEL VIRTUAL MACHINE FOR ARM64 (KVM/arm64)
+> -M:	Christoffer Dall <christoffer.dall@linaro.org>
+> +M:	Christoffer Dall <christoffer.dall@arm.com>
+>  M:	Marc Zyngier <marc.zyngier@arm.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  L:	kvmarm at lists.cs.columbia.edu
+> 
 
-[...]
+I'll queue this as a fix for the next -rc.
 
-> +struct stm32_timers_dma;
-> +
->  struct stm32_timers {
->  	struct clk *clk;
->  	struct regmap *regmap;
->  	u32 max_arr;
-> +	struct stm32_timers_dma *dma; /* Only to be used by the parent */
+Thanks,
 
-I'm confused.  I thought the point of putting this comment in was so
-that you could place the definition of 'stm32_timers_dma' and remove
-the forward declaration?
-
->  };
-> +
-> +int stm32_timers_dma_burst_read(struct device *dev, u32 *buf,
-> +				enum stm32_timers_dmas id, u32 reg,
-> +				unsigned int num_reg, unsigned int bursts,
-> +				unsigned long tmo_ms);
->  #endif
-
+	M.
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
