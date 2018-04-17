@@ -1,150 +1,154 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Tue, 17 Apr 2018 14:37:38 -0500
-Subject: [RFC PATCH 1/3] signal: Ensure every siginfo we send has all bits
- initialized
-In-Reply-To: <20180417132328.GF16308@e103592.cambridge.arm.com> (Dave Martin's
- message of "Tue, 17 Apr 2018 14:23:30 +0100")
-References: <20180413094211.GN16141@n2100.armlinux.org.uk>
- <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
- <20180413170827.GB16308@e103592.cambridge.arm.com>
- <20180413175407.GO16141@n2100.armlinux.org.uk>
- <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
- <20180413184522.GD16308@e103592.cambridge.arm.com>
- <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
- <20180415131206.GR16141@n2100.armlinux.org.uk>
- <87604sa2fu.fsf_-_@xmission.com> <87zi248nte.fsf_-_@xmission.com>
- <20180417132328.GF16308@e103592.cambridge.arm.com>
-Message-ID: <87d0yxzksd.fsf@xmission.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 17 Apr 2018 12:47:55 -0700
+Subject: [v2,2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <2e45c0e5-7e79-3479-de18-9613e8eacf15@codeaurora.org>
+References: <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
+ <20180417182347.GD244487@google.com>
+ <2e45c0e5-7e79-3479-de18-9613e8eacf15@codeaurora.org>
+Message-ID: <20180417194755.GE244487@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin <Dave.Martin@arm.com> writes:
-
-> Hmmm
->
-> memset()/clear_siginfo() may ensure that there are no uninitialised
-> explicit fields except for those in inactive union members, but I'm not
-> sure that this approach is guaranteed to sanitise the padding seen by
-> userspace.
->
-> Rationale below, though it's a bit theoretical...
->
-> With this in mind, I tend agree with Linus that hiding memset() calls
-> from the maintainer may be a bad idea unless they are also hidden from
-> the compiler.  If the compiler sees the memset() it may be able to
-> optimise it in ways that wouldn't be possible for some other random
-> external function call, including optimising all or part of the call
-> out.
->
-> As a result, the breakdown into individual put_user()s etc. in
-> copy_siginfo_to_user() may still be valuable even if all paths have the
-> memset().
-
-The breakdown into individual put_user()s is known to be problematically
-slow, and is actually wrong.
-
-Even exclusing the SI_USER duplication in a small number of cases the
-fields filled out in siginfo by architecture code are not the fields
-that copy_siginfo_to_user is copying.  Which is much worse.  The code
-looks safe but is not.
-
-My intention is to leave 0 instances of clear_siginfo in the
-architecture specific code.  Ideally struct siginfo will be limited to
-kernel/signal.c but I am not certain I can quite get that far.
-The function do_coredump appears to have a legit need for siginfo.
-
-
-> (Rationale for an arch/arm example:)
->
->> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
->> index 4c375e11ae95..adda3fc2dde8 100644
->> --- a/arch/arm/vfp/vfpmodule.c
->> +++ b/arch/arm/vfp/vfpmodule.c
->> @@ -218,8 +218,7 @@ static void vfp_raise_sigfpe(unsigned int sicode, struct pt_regs *regs)
->>  {
->>  	siginfo_t info;
->>  
->> -	memset(&info, 0, sizeof(info));
->> -
->> +	clear_siginfo(&info);
->>  	info.si_signo = SIGFPE;
->
-> /* by c11 (n1570) 6.2.6.1 para 6 [1], all padding bytes in info now take
->    unspecified values */
->
->>  	info.si_code = sicode;
->>  	info.si_addr = (void __user *)(instruction_pointer(regs) - 4);
->
-> /* by c11 (n1570) 6.2.6.1 para 7 [2], all bytes of the union info._sifields
->    other than than those corresponding to _sigfault take unspecified
->    values */
->
-> So I don't see why the compiler needs to ensure that any of the affected
-> bytes are zero: it could potentially skip a lot of the memset() as a
-> result, in theory.
->
-> I've not seen a compiler actually take advantage of that, but I'm now
-> not sure what forbids it.
-
-I took a quick look at gcc-4.9 which I have handy.
-
-The passes -f-no-strict-aliasing which helps, and gcc actually
-documents that if you access things through the union it will
-not take advantage of c11.
-
-gcc-4.9 Documents it this way:
-
-> -fstrict-aliasing'
->      Allow the compiler to assume the strictest aliasing rules
->      applicable to the language being compiled.  For C (and C++), this
->      activates optimizations based on the type of expressions.  In
->      particular, an object of one type is assumed never to reside at the
->      same address as an object of a different type, unless the types are
->      almost the same.  For example, an 'unsigned int' can alias an
->      'int', but not a 'void*' or a 'double'.  A character type may alias
->      any other type.
+On Tue, Apr 17, 2018 at 12:15:18PM -0700, David Collins wrote:
+> On 04/17/2018 11:23 AM, Matthias Kaehlcke wrote:
+> > On Fri, Apr 13, 2018 at 07:50:35PM -0700, David Collins wrote:
+> >> Add the QCOM RPMh regulator driver to manage PMIC regulators
+> >> which are controlled via RPMh on some Qualcomm Technologies, Inc.
+> >> SoCs.  RPMh is a hardware block which contains several
+> >> accelerators which are used to manage various hardware resources
+> >> that are shared between the processors of the SoC.  The final
+> >> hardware state of a regulator is determined within RPMh by
+> >> performing max aggregation of the requests made by all of the
+> >> processors.
+> >> [...]
+> >> +/**
+> >> + * struct rpmh_vreg_hw_data - RPMh regulator hardware configurations
+> >> + * @regulator_type:		RPMh accelerator type used to manage this
+> >> + *				regulator
+> >> + * @ops:			Pointer to regulator ops callback structure
+> >> + * @voltage_range:		The single range of voltages supported by this
+> >> + *				PMIC regulator type
+> >> + * @n_voltages:			The number of unique voltage set points defined
+> >> + *				by voltage_range
+> >> + * @pmic_mode_map:		Array indexed by regulator framework mode
+> >> + *				containing PMIC hardware modes.  Must be large
+> >> + *				enough to index all framework modes supported
+> >> + *				by this regulator hardware type.
+> >> + * @of_map_mode:		Maps an RPMH_REGULATOR_MODE_* mode value defined
+> >> + *				in device tree to a regulator framework mode
+> > 
+> > The name of the field is a bit misleading, this is a map of RPMh mode
+> > to regulator framework mode, the device tree just happens to be the
+> > place where this mapping is defined.
 > 
->      Pay special attention to code like this:
->           union a_union {
->             int i;
->             double d;
->           };
+> of_map_mode name is used here to match the struct regulator_desc field by
+> the same name that it is assigned to [1].  Do you think that the name
+> should be changed to something else?
+
+Thanks, I missed that it's the name of the field in struct
+regulator_desc field, in that case it certainly makes sense to use the
+same name.
+
+> >> +/**
+> >> + * struct rpmh_vreg - individual rpmh regulator data structure encapsulating a
+> >> + *		single regulator device
+> >> + * @rpmh_client:		Handle used for rpmh communications
+> > 
+> > nit: RPMh
 > 
->           int f() {
->             union a_union t;
->             t.d = 3.0;
->             return t.i;
->           }
->      The practice of reading from a different union member than the one
->      most recently written to (called "type-punning") is common.  Even
->      with '-fstrict-aliasing', type-punning is allowed, provided the
->      memory is accessed through the union type.  So, the code above
->      works as expected.
+> I'll change this.
+> 
+> 
+> >> +struct rpmh_vreg {
+> >> +	struct rpmh_client		*rpmh_client;
+> >> +	u32				addr;
+> >> +	struct regulator_desc		rdesc;
+> >> +	const struct rpmh_vreg_hw_data	*hw_data;
+> >> +	enum rpmh_regulator_type	regulator_type;
+> > 
+> > This value is already available via rpmh_vreg->hw_data->regulator_type,
+> > why duplicate it? The field is assigned in rpmh_regulator_init_vreg()
+> > and only read once in the same function, there seems to be no need for
+> > it, not even to improve readability.
+> 
+> This is present to specifically allow for a future change to support
+> overriding the regulator_type value from device tree in order to force
+> RPMh resources to be handled via XOB instead of VRM in a board-specific
+> manner.  I included support of the property qcom,rpmh-resource-type in the
+> first version of this patch.  I removed this property from the second
+> version of the patch based upon review feedback since SDM845 does not
+> explicitly need it (though an upcoming chip will).
+> 
+> I'll remove regulator_type from struct rpmh_vreg.  It shouldn't be
+> particularly painful to add it back in when needed for XOB override support.
+> 
+> 
+> >> +static int rpmh_regulator_vrm_set_load(struct regulator_dev *rdev, int load_uA)
+> >> +{
+> >> +	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+> >> +	int i;
+> >> +
+> >> +	for (i = 0; i < vreg->drms_mode_count - 1; i++)
+> >> +		if (load_uA < vreg->drms_mode_max_uA[i])
+> > 
+> > Shouldn't this be '<='?
+> > 
+> > nit: IMO 'vreg->drms_mode_max_uA[i] >= load_uA' would be more readable.
+> 
+> I chose to use '<' here in order to maintain the non-inclusive limit
+> semantics of the downstream RPMh regulator driver.  E.g. with an LPM
+> threshold of 10000 uA, load_uA == 10000 would result in a request for HPM
+> instead of LPM.
+> 
+> I suppose that I can change this to '<=' to be more logically consistent.
+> 
+> 
+> >> +static const u32 pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+> >> +	[REGULATOR_MODE_STANDBY] = 4,
+> >> +	[REGULATOR_MODE_IDLE]    = 5,
+> >> +	[REGULATOR_MODE_NORMAL]  = -EINVAL,
+> >> +	[REGULATOR_MODE_FAST]    = 7,
+> >> +};
+> > 
+> > Define constants for the modes on the PMIC4 side?
+> 
+> Are you suggesting something like this?
+> 
+> #define PMIC4_LDO_MODE_RETENTION	4
+> #define PMIC4_LDO_MODE_LPM		5
+> #define PMIC4_LDO_MODE_HPM		7
+> 
+> static const u32 pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+> 	[REGULATOR_MODE_STANDBY] = PMIC4_LDO_MODE_RETENTION,
+> 	[REGULATOR_MODE_IDLE]    = PMIC4_LDO_MODE_LPM,
+> 	[REGULATOR_MODE_NORMAL]  = -EINVAL,
+> 	[REGULATOR_MODE_FAST]    = PMIC4_LDO_MODE_HPM,
+> };
+> 
+> #define PMIC4_SMPS_MODE_RETENTION	4
+> #define PMIC4_SMPS_MODE_PFM		5
+> #define PMIC4_SMPS_MODE_AUTO		6
+> #define PMIC4_SMPS_MODE_PWM		7
+> 
+> static const u32 pmic_mode_map_pmic4_smps[REGULATOR_MODE_STANDBY + 1] = {
+> 	[REGULATOR_MODE_STANDBY] = PMIC4_SMPS_MODE_RETENTION,
+> 	[REGULATOR_MODE_IDLE]    = PMIC4_SMPS_MODE_PFM,
+> 	[REGULATOR_MODE_NORMAL]  = PMIC4_SMPS_MODE_AUTO,
+> 	[REGULATOR_MODE_FAST]    = PMIC4_SMPS_MODE_PWM,
+> };
+> 
+> I considered using this approach, but it didn't seem like it increased
+> readability and did increase the line count.  Each of the constants would
+> only be used once.  Would you prefer this style (or something else)?
 
+Personally I prefer this style, since the constants are more
+expressive than the literals. I agree that the 'inline' constant
+definition is a bit noisy, perhaps it would be better to move the
+definitions to the top of the file or group them before the definition
+of pmic_mode_map_pmic4_ldo. Alteratively you could create a
+drivers/regulator/qcom_rpmh-regulator.h and also move the definitions
+of struct struct rpmh_vreg_hw_data, rpmh_vreg, ... there.
 
-> If this can happen, I only see two watertight workarounds:
->
-> 1) Ensure that there is no implicit padding in any UAPI structure, e.g.
-> aeb1f39d814b: ("arm64/ptrace: Avoid uninitialised struct padding in
-> fpr_set()").  This would include tail-padding of any union member that
-> is smaller than the containing union.
->
-> It would be significantly more effort to ensure this for siginfo though.
->
-> 2) Poke all values directly into allocated or user memory directly
-> via pointers to paddingless types; never assign to objects on the kernel
-> stack if you care what ends up in the padding, e.g., what your
-> copy_siginfo_to_user() does prior to this series.
->
->
-> If I'm not barking up the wrong tree, memset() cannot generally be
-> used to determine the value of padding bytes, but it may still be
-> useful for forcing otherwise uninitialised members to sane initial
-> values.
->
-> This likely affects many more things than just siginfo.
+Thanks
 
-Unless gcc has changed it's stance on type-punning through unions
-or it's semantics with -fno-strict_aliasing we should be good.
-
-Eric
+Matthias
