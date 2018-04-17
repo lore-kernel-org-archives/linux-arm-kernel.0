@@ -1,52 +1,150 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 17 Apr 2018 21:39:03 +0200
-Subject: atmel_mxt_ts on droid4: powersave seems to break the driver
-In-Reply-To: <20180417182021.GA67621@dtor-ws>
-References: <20180417073811.GA9450@amd>
- <20180417182021.GA67621@dtor-ws>
-Message-ID: <20180417193903.GA11082@amd>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Tue, 17 Apr 2018 14:37:38 -0500
+Subject: [RFC PATCH 1/3] signal: Ensure every siginfo we send has all bits
+ initialized
+In-Reply-To: <20180417132328.GF16308@e103592.cambridge.arm.com> (Dave Martin's
+ message of "Tue, 17 Apr 2018 14:23:30 +0100")
+References: <20180413094211.GN16141@n2100.armlinux.org.uk>
+ <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
+ <20180413170827.GB16308@e103592.cambridge.arm.com>
+ <20180413175407.GO16141@n2100.armlinux.org.uk>
+ <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
+ <20180413184522.GD16308@e103592.cambridge.arm.com>
+ <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
+ <20180415131206.GR16141@n2100.armlinux.org.uk>
+ <87604sa2fu.fsf_-_@xmission.com> <87zi248nte.fsf_-_@xmission.com>
+ <20180417132328.GF16308@e103592.cambridge.arm.com>
+Message-ID: <87d0yxzksd.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Dave Martin <Dave.Martin@arm.com> writes:
 
-> > v4.17-rc1 on motorola droid 4.
-> > 
-> > If I disable/reenable touschreen with xinput, it fails, with this in
-> > the logs:
-> > 
-> > [ 1633.749450] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> > [ 1655.938751] atmel_mxt_ts 1-004a: __mxt_read_reg: i2c transfer
-> > failed (-121)
-> > [ 1655.945800] atmel_mxt_ts 1-004a: Failed to read T44 and T5 (-121)
-> > [ 1663.829498] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-> > 
-> > Unfortunately, xscreensaver seems to break it in a similar way.
-> > 
+> Hmmm
+>
+> memset()/clear_siginfo() may ensure that there are no uninitialised
+> explicit fields except for those in inactive union members, but I'm not
+> sure that this approach is guaranteed to sanitise the padding seen by
+> userspace.
+>
+> Rationale below, though it's a bit theoretical...
+>
+> With this in mind, I tend agree with Linus that hiding memset() calls
+> from the maintainer may be a bad idea unless they are also hidden from
+> the compiler.  If the compiler sees the memset() it may be able to
+> optimise it in ways that wouldn't be possible for some other random
+> external function call, including optimising all or part of the call
+> out.
+>
+> As a result, the breakdown into individual put_user()s etc. in
+> copy_siginfo_to_user() may still be valuable even if all paths have the
+> memset().
+
+The breakdown into individual put_user()s is known to be problematically
+slow, and is actually wrong.
+
+Even exclusing the SI_USER duplication in a small number of cases the
+fields filled out in siginfo by architecture code are not the fields
+that copy_siginfo_to_user is copying.  Which is much worse.  The code
+looks safe but is not.
+
+My intention is to leave 0 instances of clear_siginfo in the
+architecture specific code.  Ideally struct siginfo will be limited to
+kernel/signal.c but I am not certain I can quite get that far.
+The function do_coredump appears to have a legit need for siginfo.
+
+
+> (Rationale for an arch/arm example:)
+>
+>> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+>> index 4c375e11ae95..adda3fc2dde8 100644
+>> --- a/arch/arm/vfp/vfpmodule.c
+>> +++ b/arch/arm/vfp/vfpmodule.c
+>> @@ -218,8 +218,7 @@ static void vfp_raise_sigfpe(unsigned int sicode, struct pt_regs *regs)
+>>  {
+>>  	siginfo_t info;
+>>  
+>> -	memset(&info, 0, sizeof(info));
+>> -
+>> +	clear_siginfo(&info);
+>>  	info.si_signo = SIGFPE;
+>
+> /* by c11 (n1570) 6.2.6.1 para 6 [1], all padding bytes in info now take
+>    unspecified values */
+>
+>>  	info.si_code = sicode;
+>>  	info.si_addr = (void __user *)(instruction_pointer(regs) - 4);
+>
+> /* by c11 (n1570) 6.2.6.1 para 7 [2], all bytes of the union info._sifields
+>    other than than those corresponding to _sigfault take unspecified
+>    values */
+>
+> So I don't see why the compiler needs to ensure that any of the affected
+> bytes are zero: it could potentially skip a lot of the memset() as a
+> result, in theory.
+>
+> I've not seen a compiler actually take advantage of that, but I'm now
+> not sure what forbids it.
+
+I took a quick look at gcc-4.9 which I have handy.
+
+The passes -f-no-strict-aliasing which helps, and gcc actually
+documents that if you access things through the union it will
+not take advantage of c11.
+
+gcc-4.9 Documents it this way:
+
+> -fstrict-aliasing'
+>      Allow the compiler to assume the strictest aliasing rules
+>      applicable to the language being compiled.  For C (and C++), this
+>      activates optimizations based on the type of expressions.  In
+>      particular, an object of one type is assumed never to reside at the
+>      same address as an object of a different type, unless the types are
+>      almost the same.  For example, an 'unsigned int' can alias an
+>      'int', but not a 'void*' or a 'double'.  A character type may alias
+>      any other type.
 > 
-> There were a few changes to the Atmel driver, ending with commit
-> 96a938aa214e965d5b4a2f10443b29cad14289b9, but they mostly dealt with
-> removal of platform data and moving to generic device properties...
-> Can you try bisecting this series:
+>      Pay special attention to code like this:
+>           union a_union {
+>             int i;
+>             double d;
+>           };
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/bleung/chrome-platform.git ib-chrome-platform-input-atmel-mx-ts-platform-removal
-> 
+>           int f() {
+>             union a_union t;
+>             t.d = 3.0;
+>             return t.i;
+>           }
+>      The practice of reading from a different union member than the one
+>      most recently written to (called "type-punning") is common.  Even
+>      with '-fstrict-aliasing', type-punning is allowed, provided the
+>      memory is accessed through the union type.  So, the code above
+>      works as expected.
 
-To avoid any misunderstanding, I'm not saying this is
-regression from v4.16. I did some testing on v4.16 (and it was first
-kernel to work there at all), but I did not have good enough userland
-to play with touchscreen disable/enable.
 
-Plus, I'm not sure this is 100% reproducible, let me play some more.
+> If this can happen, I only see two watertight workarounds:
+>
+> 1) Ensure that there is no implicit padding in any UAPI structure, e.g.
+> aeb1f39d814b: ("arm64/ptrace: Avoid uninitialised struct padding in
+> fpr_set()").  This would include tail-padding of any union member that
+> is smaller than the containing union.
+>
+> It would be significantly more effort to ensure this for siginfo though.
+>
+> 2) Poke all values directly into allocated or user memory directly
+> via pointers to paddingless types; never assign to objects on the kernel
+> stack if you care what ends up in the padding, e.g., what your
+> copy_siginfo_to_user() does prior to this series.
+>
+>
+> If I'm not barking up the wrong tree, memset() cannot generally be
+> used to determine the value of padding bytes, but it may still be
+> useful for forcing otherwise uninitialised members to sane initial
+> values.
+>
+> This likely affects many more things than just siginfo.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/986931f0/attachment.sig>
+Unless gcc has changed it's stance on type-punning through unions
+or it's semantics with -fno-strict_aliasing we should be good.
+
+Eric
