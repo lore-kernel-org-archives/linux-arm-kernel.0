@@ -1,31 +1,29 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 17 Apr 2018 13:19:02 +0200
-Subject: [PATCH v6 08/11] ARM: sun9i: smp: Add is_sun8i field
-In-Reply-To: <CAGb2v643iepq4B9ukNag8pzAFWiQ6A31ChfXLkxeExhK4jRm=Q@mail.gmail.com>
+Date: Tue, 17 Apr 2018 13:20:38 +0200
+Subject: [PATCH v6 09/11] ARM: sun8i: smp: Add support for A83T
+In-Reply-To: <20180416215032.5023-10-mylene.josserand@bootlin.com>
 References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-9-mylene.josserand@bootlin.com>
- <20180417075233.f2z6wxcazwqheoib@flea>
- <CAGb2v643iepq4B9ukNag8pzAFWiQ6A31ChfXLkxeExhK4jRm=Q@mail.gmail.com>
-Message-ID: <20180417111902.4u6d3mxehxjqibe4@flea>
+ <20180416215032.5023-10-mylene.josserand@bootlin.com>
+Message-ID: <20180417112038.mw7bfhqw4xwvzxcw@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 03:57:07PM +0800, Chen-Yu Tsai wrote:
-> >> @@ -697,6 +700,8 @@ static int __init sunxi_mc_smp_init(void)
-> >>                       break;
-> >>       }
-> >>
-> >> +     is_sun8i = sunxi_mc_smp_data[i].is_sun8i;
-> >> +
-> >
-> > Do we really need to cache it? Can't we just have a pointer to the SMP
-> > data structure and use that instead?
-> 
-> I recommended that. We don't need any of the other fields in the SMP
-> data structure once we're past the init phase. This saves a dereference
-> or two.
+On Mon, Apr 16, 2018 at 11:50:30PM +0200, Myl?ne Josserand wrote:
+> @@ -535,8 +599,12 @@ static int sunxi_mc_smp_cpu_kill(unsigned int l_cpu)
+>  	return !ret;
+>  }
+>  
+> -static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
+> +static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
+>  {
+> +	/* CPU0 hotplug not handled for sun8i-a83t */
+> +	if (is_sun8i)
+> +		if (cpu == 0)
+> +			return false;
+>  	return true;
 
-Fair enough.
+I think Chen-Yu told you how to implement the hotplug in the previous
+iteration, did you have time to test it?
 
 Maxime
 
@@ -39,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/8d70754c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/7a427abf/attachment.sig>
