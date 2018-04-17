@@ -1,56 +1,73 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Tue, 17 Apr 2018 22:53:53 +1000
-Subject: [PATCH 01/12] iommu-common: move to arch/sparc
-In-Reply-To: <f5741528-427d-3537-5498-2080766df0fe@linux.vnet.ibm.com>
-References: <20180415145947.1248-1-hch@lst.de>
- <20180415145947.1248-2-hch@lst.de>
- <f0305a92-b206-1567-3c25-67fbd194047d@linux.vnet.ibm.com>
- <20180416.095833.969403163564136309.davem@davemloft.net>
- <f5741528-427d-3537-5498-2080766df0fe@linux.vnet.ibm.com>
-Message-ID: <87wox60za6.fsf@concordia.ellerman.id.au>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 17 Apr 2018 14:54:48 +0200
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
+ <1522665546-10035-3-git-send-email-radheys@xilinx.com>
+ <20180411090854.GY6014@localhost>
+ <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+Message-ID: <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anshuman Khandual <khandual@linux.vnet.ibm.com> writes:
-> On 04/16/2018 07:28 PM, David Miller wrote:
->> From: Anshuman Khandual <khandual@linux.vnet.ibm.com>
->> Date: Mon, 16 Apr 2018 14:26:07 +0530
->> 
->>> On 04/15/2018 08:29 PM, Christoph Hellwig wrote:
->>>> This code is only used by sparc, and all new iommu drivers should use the
->>>> drivers/iommu/ framework.  Also remove the unused exports.
->>>>
->>>> Signed-off-by: Christoph Hellwig <hch@lst.de>
->>>
->>> Right, these functions are used only from SPARC architecture. Simple
->>> git grep confirms it as well. Hence it makes sense to move them into
->>> arch code instead.
->> 
->> Well, we put these into a common location and used type friendly for
->> powerpc because we hoped powerpc would convert over to using this
->> common piece of code as well.
->> 
->> But nobody did the powerpc work.
- 
-Sorry.
+On 04/17/2018 01:43 PM, Radhey Shyam Pandey wrote:
+> Hi Vinod,
+> 
+>> -----Original Message-----
+>> From: Vinod Koul [mailto:vinod.koul at intel.com]
+>> Sent: Wednesday, April 11, 2018 2:39 PM
+>> To: Radhey Shyam Pandey <radheys@xilinx.com>
+>> Cc: dan.j.williams at intel.com; michal.simek at xilinx.com; Appana Durga
+>> Kedareswara Rao <appanad@xilinx.com>; Radhey Shyam Pandey
+>> <radheys@xilinx.com>; lars at metafoo.de; dmaengine at vger.kernel.org;
+>> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+>> Subject: Re: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control
+>> words to netdev dma client
+>>
+>> On Mon, Apr 02, 2018 at 04:09:02PM +0530, Radhey Shyam Pandey wrote:
+>>
+>>> +
+>>> +		if (chan->xdev->has_axieth_connected) {
+>>> +			seg = list_first_entry(&desc->segments,
+>>> +					struct xilinx_axidma_tx_segment,
+>> node);
+>>> +			if (cb.callback_param) {
+>>> +				app_w = (u32 *) cb.callback_param;
+>>
+>> why are you interpreting callback_param? This is plainly wrong.
+>> we do not know what is the interpretation of callback_param and it is
+>> internal to submitter.
+> In design, if AXI DMA is connected to AXI Ethernet IP there are certain
+> AXI4-Stream Status fields (RX) that we need to pass to ethernet driver
+> along with data buffer. An example includes: checksum fields, packet
+> length etc. To pass these control words there is a structure defined
+> between dmaengine and client. Before calling the client callback
+> stream control words are copied to dma client callback_param struct
+> (only if axieth is connected).
+> 
+> I understand it's not an ideal way and we shouldn't be interpreting
+> callback_param but couldn't find any better alternative of passing
+> custom information from dmaengine to client driver and still be 
+> aligned to the framework.
+> 
+>>
+>> What exactly is the problem you are trying to solve?
+> As mentioned above we need to pass AXI4-stream words(custom
+> data) from dmaengine driver to dma client driver(ethernet) for
+> each DMA descriptor. Current solution populates callback_param
+> struct (only if axieth is connected). Please let me know if there is
+> an alternate solution. 
 
->> If you look at the powerpc iommu support, it's the same code basically
->> for entry allocation.
->
-> I understand. But there are some differences in iommu_table structure,
-> how both regular and large IOMMU pools are being initialized etc. So
-> if the movement of code into SPARC help cleaning up these generic config
-> options in general, I guess we should do that. But I will leave it upto
-> others who have more experience in this area.
->
-> +mpe
+The standard interfaces need to work in a way that a client using them does
+not have to know to which DMA controller it is connected. In a similar way
+the DMA controller shouldn't have any client specific logic for the generic
+interfaces. Otherwise there is no point of having a generic interface.
 
-This is the first I've heard of it, I guess it's probably somewhere on
-Ben's append-only TODO list.
+There are two options.
 
-Some of the code does look very similar, but not 100%. So someone would
-need to do some work to reconcile the two and test the result. TBH I
-doubt we're going to get around to it any time soon. Unless we have a
-volunteer?
+Either you extend the generic interfaces so it can cover your usecase in a
+generic way. E.g. the ability to attach meta data to transfer.
 
-cheers
+Or you can implement a interface that is specific to your DMA controller and
+any client using this interface knows it is talking to your DMA controller.
