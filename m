@@ -1,103 +1,45 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 17 Apr 2018 17:30:42 -0400
-Subject: [net-next PATCH v4 13/13] net: netcp: ethss: k2g: add promiscuous
- mode support
-In-Reply-To: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
-References: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1524000642-23944-14-git-send-email-m-karicheri2@ti.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 17 Apr 2018 14:48:17 -0700
+Subject: [PATCH v3 1/3] drm/vc4: Remove the need for the GPU-subsystem DT
+ node.
+In-Reply-To: <CAL_JsqJxG1b2NO6CJTge=7PuYJgLfD9uzit_GiXbH8B79v+aZQ@mail.gmail.com>
+References: <CAL_JsqKJD86tV0jno_cZR=nLoOThT5rjRu3BPpzAwpcHgxSArQ@mail.gmail.com>
+ <20180416225259.6571-1-eric@anholt.net>
+ <CAL_JsqJxG1b2NO6CJTge=7PuYJgLfD9uzit_GiXbH8B79v+aZQ@mail.gmail.com>
+Message-ID: <87r2ndijxa.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: WingMan Kwok <w-kwok2@ti.com>
+Rob Herring <robh+dt@kernel.org> writes:
 
-This patch adds support for promiscuous mode in k2g's network
-driver. When upper layer instructs to transition from
-non-promiscuous mode to promiscuous mode or vice versa
-K2G network driver needs to configure ALE accordingly
-so that in case of non-promiscuous mode, ALE will not flood
-all unicast packets to host port, while in promiscuous
-mode, it will pass all received unicast packets to
-host port.
+> On Mon, Apr 16, 2018 at 5:52 PM, Eric Anholt <eric@anholt.net> wrote:
+>> The GPU subsystem node was a workaround to have a central device to
+>> bind V3D and display to.  Following the lead of 246774d17fc0
+>> ("drm/etnaviv: remove the need for a gpu-subsystem DT node"), remove
+>> the subsystem node usage and just create a platform device for the DRM
+>> device to attach to if any of the subsystem devices are present.
+>>
+>> v2: Simplify the DT walking code.
+>> v3: Always put the node.
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  .../bindings/display/brcm,bcm-vc4.txt         |  7 -----
+>>  drivers/gpu/drm/vc4/vc4_drv.c                 | 28 +++++++++++++------
+>>  drivers/gpu/drm/vc4/vc4_hvs.c                 |  1 +
+>>  drivers/gpu/drm/vc4/vc4_v3d.c                 |  1 +
+>>  4 files changed, 22 insertions(+), 15 deletions(-)
+>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/net/ethernet/ti/netcp_ethss.c | 56 +++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
-
-diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
-index 5bc7921..6a728d3 100644
---- a/drivers/net/ethernet/ti/netcp_ethss.c
-+++ b/drivers/net/ethernet/ti/netcp_ethss.c
-@@ -2775,6 +2775,61 @@ static inline int gbe_hwtstamp_set(struct gbe_intf *gbe_intf, struct ifreq *req)
- }
- #endif /* CONFIG_TI_CPTS */
- 
-+static int gbe_set_rx_mode(void *intf_priv, bool promisc)
-+{
-+	struct gbe_intf *gbe_intf = intf_priv;
-+	struct gbe_priv *gbe_dev = gbe_intf->gbe_dev;
-+	struct cpsw_ale *ale = gbe_dev->ale;
-+	unsigned long timeout;
-+	int i, ret = -ETIMEDOUT;
-+
-+	/* Disable(1)/Enable(0) Learn for all ports (host is port 0 and
-+	 * slaves are port 1 and up
-+	 */
-+	for (i = 0; i <= gbe_dev->num_slaves; i++) {
-+		cpsw_ale_control_set(ale, i,
-+				     ALE_PORT_NOLEARN, !!promisc);
-+		cpsw_ale_control_set(ale, i,
-+				     ALE_PORT_NO_SA_UPDATE, !!promisc);
-+	}
-+
-+	if (!promisc) {
-+		/* Don't Flood All Unicast Packets to Host port */
-+		cpsw_ale_control_set(ale, 0, ALE_P0_UNI_FLOOD, 0);
-+		dev_vdbg(gbe_dev->dev, "promiscuous mode disabled\n");
-+		return 0;
-+	}
-+
-+	timeout = jiffies + HZ;
-+
-+	/* Clear All Untouched entries */
-+	cpsw_ale_control_set(ale, 0, ALE_AGEOUT, 1);
-+	do {
-+		cpu_relax();
-+		if (cpsw_ale_control_get(ale, 0, ALE_AGEOUT)) {
-+			ret = 0;
-+			break;
-+		}
-+
-+	} while (time_after(timeout, jiffies));
-+
-+	/* Make sure it is not a false timeout */
-+	if (ret && !cpsw_ale_control_get(ale, 0, ALE_AGEOUT))
-+		return ret;
-+
-+	cpsw_ale_control_set(ale, 0, ALE_AGEOUT, 1);
-+
-+	/* Clear all mcast from ALE */
-+	cpsw_ale_flush_multicast(ale,
-+				 GBE_PORT_MASK(gbe_dev->ale_ports),
-+				 -1);
-+
-+	/* Flood All Unicast Packets to Host port */
-+	cpsw_ale_control_set(ale, 0, ALE_P0_UNI_FLOOD, 1);
-+	dev_vdbg(gbe_dev->dev, "promiscuous mode enabled\n");
-+	return ret;
-+}
-+
- static int gbe_ioctl(void *intf_priv, struct ifreq *req, int cmd)
- {
- 	struct gbe_intf *gbe_intf = intf_priv;
-@@ -3529,6 +3584,7 @@ static int gbe_probe(struct netcp_device *netcp_device, struct device *dev,
- 		gbe_dev->max_num_slaves = 8;
- 	} else if (of_device_is_compatible(node, "ti,netcp-gbe-2")) {
- 		gbe_dev->max_num_slaves = 1;
-+		gbe_module.set_rx_mode = gbe_set_rx_mode;
- 	} else if (of_device_is_compatible(node, "ti,netcp-xgbe")) {
- 		gbe_dev->max_num_slaves = 2;
- 	} else {
--- 
-1.9.1
+Unfortunately, on further testing, this ends up broken.  My guess is
+that our new platform device isn't on the same bus, so we don't get our
+dma-ranges translation when we use drm->dev, and that breaks caching
+behavior.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/496ebf3b/attachment-0001.sig>
