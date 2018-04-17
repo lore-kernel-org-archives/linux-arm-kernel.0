@@ -1,33 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Apr 2018 10:31:35 -0700
-Subject: 4.16 OMAP serial transmit corruption?
-In-Reply-To: <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
-References: <20180416151732.GU16141@n2100.armlinux.org.uk>
- <20180416154545.GA5671@atomide.com>
- <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
-Message-ID: <20180417173134.GD5671@atomide.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 17 Apr 2018 18:34:11 +0100
+Subject: [RFC PATCH] arm64: fault: Don't leak data in ESR context for user
+ fault on kernel VA
+In-Reply-To: <20180413142101.GY16308@e103592.cambridge.arm.com>
+References: <20180413100204.9674-1-peter.maydell@linaro.org>
+ <20180413142101.GY16308@e103592.cambridge.arm.com>
+Message-ID: <CAFEAcA_MKzoNV3rAs=wkfxjSXL8twOWcMxcaXct-o=WFmEVMnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vignesh R <vigneshr@ti.com> [180417 09:21]:
-> On Monday 16 April 2018 09:15 PM, Tony Lindgren wrote:
-> > Also, I'm seeing an issue where the UARTs won't idle on init
-> > with 8250_omap driver if connected to the wl12xx bluetooth port
-> > unless I write some data to the port first. It does not seem
-> > to be related to the rts/cts lines being wired as I've tested
-> > muxing them out of the way.
-> 
-> If this instance of UART is using DMA then it might be due an errata
-> worked around in AM33/AM43/DRA7:
-> https://patchwork.kernel.org/patch/6784331/
+On 13 April 2018 at 15:21, Dave Martin <Dave.Martin@arm.com> wrote:
+> There are certain fault types that should never be exposed to
+> userspace, such as TLB conflict aborts, access flag faults, etc.
+> See the changes upstream between v4.16 and torvalds/master (which I had
+> temporarily forgotten about...)
+>
+> Now, __do_user_fault() is called for these cases but the signal has
+> already been mapped to SIGKILL by this point via the fault_info[]
+> table.  It doesn't matter too much what we do in such cases because
+> the user task will be killed on signal delivery and so doesn't get a
+> chance to inspect the ESR contents anyway.  It might be worth expanding
+> the WARN() to catch mismaintenance of the fault_info[] table -- but that
+> may be overkill.  Maybe adding some comments explaining the dependency
+> is sufficient.
 
-It sure sounds similar but UART_ERRATA_CLOCK_DISABLE does not
-seem to help with the reset. Also disabling DMA does not seem
-to help. So far the only way to clear it seems to be to write
-a character (TX) on the device. Then things work just fine
-even without UART_ERRATA_CLOCK_DISABLE set. I'll try to debug
-this more at some point.
+I had a look at the code in current master, and from my reading
+of it it does not call __do_user_fault() for faults like TLB
+conflict aborts, etc. Those all have fault_info[] table entries
+that specify do_bad() as the function pointer, which just returns 1.
+It's only do_page_fault(), do_translation_fault() and do_alignment()
+fault that can get into __do_user_fault().
 
-Regards,
+So I don't think there's any change that needs to be made for this
+point. Am I misunderstanding what you have in mind? If so it would
+probably be simplest if you explained the change you'd like to see.
 
-Tony
+(The changes in master since v4.16 do require a rebase anyway, mostly
+for textual reasons, so I'll base v2 on master unless you have a
+different branch you'd rather I based it on.)
+
+I've made the various other changes you suggest.
+
+thanks
+-- PMM
