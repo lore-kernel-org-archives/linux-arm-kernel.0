@@ -1,43 +1,53 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 17 Apr 2018 11:58:40 +0800
-Subject: [PATCH] media: rc: mtk-cir: use of_device_get_match_data()
-In-Reply-To: <39601fe0c5daf9bcdbb3e44390b671a12d508e00.1523347340.git.ryder.lee@mediatek.com>
-References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
- <39601fe0c5daf9bcdbb3e44390b671a12d508e00.1523347340.git.ryder.lee@mediatek.com>
-Message-ID: <1523937520.12959.2.camel@mtkswgap22>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 17 Apr 2018 00:08:50 -0400
+Subject: [PATCH v2 1/2] parisc: define stronger ordering for the default
+ writeX()
+Message-ID: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-04-16 at 10:34 +0800, Ryder Lee wrote:
-> The usage of of_device_get_match_data() reduce the code size a bit.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/media/rc/mtk-cir.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/drivers/media/rc/mtk-cir.c b/drivers/media/rc/mtk-cir.c
-> index e88eb64..e42efd9 100644
-> --- a/drivers/media/rc/mtk-cir.c
-> +++ b/drivers/media/rc/mtk-cir.c
-> @@ -299,8 +299,6 @@ static int mtk_ir_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
->  	struct device_node *dn = dev->of_node;
-> -	const struct of_device_id *of_id =
-> -		of_match_device(mtk_ir_match, &pdev->dev);
->  	struct resource *res;
->  	struct mtk_ir *ir;
->  	u32 val;
-> @@ -312,7 +310,7 @@ static int mtk_ir_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	ir->dev = dev;
-> -	ir->data = of_id->data;
-> +	ir->data = of_device_get_match_data(dev);
->  
->  	ir->clk = devm_clk_get(dev, "clk");
->  	if (IS_ERR(ir->clk)) {
+parisc architecture seems to be mapping writeX() and writeX_relaxed() APIs
+to __raw_writeX() API.
 
+__raw_writeX() API doesn't provide any kind of ordering guarantees.
+commit 755bd04aaf4b ("io: define stronger ordering for the default writeX()
+implementation") changed asm-generic implementation to use a more
+conservative approach towards the writeX() API.
 
-Acked-by: Sean Wang <sean.wang@mediatek.com>
+Place a barrier() before the register write so that compiler doesn't
+optimize across the regiter operation.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ arch/parisc/include/asm/io.h | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/parisc/include/asm/io.h b/arch/parisc/include/asm/io.h
+index afe493b..2ec6405 100644
+--- a/arch/parisc/include/asm/io.h
++++ b/arch/parisc/include/asm/io.h
+@@ -196,18 +196,22 @@ static inline unsigned long long readq(const volatile void __iomem *addr)
+ 
+ static inline void writeb(unsigned char b, volatile void __iomem *addr)
+ {
++	barrier();
+ 	__raw_writeb(b, addr);
+ }
+ static inline void writew(unsigned short w, volatile void __iomem *addr)
+ {
++	barrier();
+ 	__raw_writew((__u16 __force) cpu_to_le16(w), addr);
+ }
+ static inline void writel(unsigned int l, volatile void __iomem *addr)
+ {
++	barrier();
+ 	__raw_writel((__u32 __force) cpu_to_le32(l), addr);
+ }
+ static inline void writeq(unsigned long long q, volatile void __iomem *addr)
+ {
++	barrier();
+ 	__raw_writeq((__u64 __force) cpu_to_le64(q), addr);
+ }
+ 
+-- 
+2.7.4
