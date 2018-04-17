@@ -1,7 +1,7 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 17 Apr 2018 11:09:25 +0100
-Subject: [GIT PULL] arm64: dts: juno: fixes for v4.17
-Message-ID: <20180417100925.GA16146@e107533-lin>
+Date: Tue, 17 Apr 2018 11:09:49 +0100
+Subject: [GIT PULL] firmware: scmi: fixes for v4.17
+Message-ID: <20180417100949.GB16146@e107533-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,21 +18,21 @@ The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
 are available in the git repository at:
 
-  ssh://git at gitolite.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-fixes-4.17
+  ssh://git at gitolite.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-fixes-4.17
 
-for you to fetch changes up to c326599b29f0dac8d73147309ffd31cce2cfdc05:
+for you to fetch changes up to d27a3c3436a7f68f3affd7991cb4a68e91dd747e:
 
-  arm64: dts: juno: drop unnecessary address-cells and size-cells properties (2018-04-16 10:15:45 +0100)
-
-----------------------------------------------------------------
-ARMv8 Juno DT fix for v4.17
-
-A single patch to fix the new DTC warnings probably enabled during
-v4.17 merge window.
+  firmware: arm_scmi: remove redundant null check on array (2018-04-16 10:15:58 +0100)
 
 ----------------------------------------------------------------
-Sudeep Holla (1):
-      arm64: dts: juno: drop unnecessary address-cells and size-cells properties
+SCMI fix for v4.17
 
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+A single patch eliminating the redundant null pointer check detected
+by CoverityScan("Array compared against 0")
+
+----------------------------------------------------------------
+Colin Ian King (1):
+      firmware: arm_scmi: remove redundant null check on array
+
+ drivers/firmware/arm_scmi/clock.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
