@@ -1,63 +1,88 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 17 Apr 2018 13:06:57 -0700
-Subject: [PATCH v2 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
-References: <cover.1523673467.git.collinsd@codeaurora.org>
- <39b676d2ba7dac2436196cc5a090c6f151498dc8.1523673467.git.collinsd@codeaurora.org>
-Message-ID: <CAD=FV=UxabaHPa-pkGBvQDcmh7e+bqMRX4WdMS8xfhAQSKD9gg@mail.gmail.com>
+From: roman@advem.lv (Roman Yeryomin)
+Date: Tue, 17 Apr 2018 23:33:55 +0300
+Subject: [PATCH] ARM: dts: Fix NAS4220B pin config
+In-Reply-To: <20180417085311.13829-1-linus.walleij@linaro.org>
+References: <20180417085311.13829-1-linus.walleij@linaro.org>
+Message-ID: <39fa170a0b20c73c4ae45975202ead2f@advem.lv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Apr 13, 2018 at 7:50 PM, David Collins <collinsd@codeaurora.org> wrote:
-> Introduce bindings for RPMh regulator devices found on some
-> Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
-> processor within the SoC to make PMIC regulator requests which
-> are aggregated within the RPMh hardware block along with requests
-> from other processors in the SoC to determine the final PMIC
-> regulator hardware state.
->
-> Signed-off-by: David Collins <collinsd@codeaurora.org>
+On 2018-04-17 11:53, Linus Walleij wrote:
+> The DTS file for the NAS4220B had the pin config for the
+> ethernet interface set to the pins in the SL3512 SoC while
+> this system is using SL3516. Fix it by referencing the
+> right SL3516 pins instead of the SL3512 pins.
+> 
+> Cc: stable at vger.kernel.org
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Reported-by: Andreas Fiedler <andreas.fiedler@gmx.net>
+> Reported-by: Roman Yeryomin <roman@advem.lv>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  .../bindings/regulator/qcom,rpmh-regulator.txt     | 207 +++++++++++++++++++++
->  .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 ++++
->  2 files changed, 243 insertions(+)
+> Hi ARM SoC folks: if this gets a Tested-by or similar from
+> someone with the NAS4220B please apply it directly to
+> the ARM SoC tree for fixes.
+> ---
+>  arch/arm/boot/dts/gemini-nas4220b.dts | 28 
+> ++++++++++++++--------------
+>  1 file changed, 14 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts
+> b/arch/arm/boot/dts/gemini-nas4220b.dts
+> index 8bbb6f85d161..4785fbcc41ed 100644
+> --- a/arch/arm/boot/dts/gemini-nas4220b.dts
+> +++ b/arch/arm/boot/dts/gemini-nas4220b.dts
+> @@ -134,37 +134,37 @@
+>  						function = "gmii";
+>  						groups = "gmii_gmac0_grp";
+>  					};
+> -					/* Settings come from OpenWRT */
+> +					/* Settings come from OpenWRT, pins on SL3516 */
+>  					conf0 {
+> -						pins = "R8 GMAC0 RXDV", "U11 GMAC1 RXDV";
+> +						pins = "V8 GMAC0 RXDV", "T10 GMAC1 RXDV";
+>  						skew-delay = <0>;
+>  					};
+>  					conf1 {
+> -						pins = "T8 GMAC0 RXC", "T11 GMAC1 RXC";
+> +						pins = "Y7 GMAC0 RXC", "Y11 GMAC1 RXC";
+>  						skew-delay = <15>;
+>  					};
+>  					conf2 {
+> -						pins = "P8 GMAC0 TXEN", "V11 GMAC1 TXEN";
+> +						pins = "T8 GMAC0 TXEN", "W11 GMAC1 TXEN";
+>  						skew-delay = <7>;
+>  					};
+>  					conf3 {
+> -						pins = "V7 GMAC0 TXC";
+> +						pins = "U8 GMAC0 TXC";
+>  						skew-delay = <11>;
+>  					};
+>  					conf4 {
+> -						pins = "P10 GMAC1 TXC";
+> +						pins = "V11 GMAC1 TXC";
+>  						skew-delay = <10>;
+>  					};
+>  					conf5 {
+>  						/* The data lines all have default skew */
+> -						pins = "U8 GMAC0 RXD0", "V8 GMAC0 RXD1",
+> -						       "P9 GMAC0 RXD2", "R9 GMAC0 RXD3",
+> -						       "U7 GMAC0 TXD0", "T7 GMAC0 TXD1",
+> -						       "R7 GMAC0 TXD2", "P7 GMAC0 TXD3",
+> -						       "R11 GMAC1 RXD0", "P11 GMAC1 RXD1",
+> -						       "V12 GMAC1 RXD2", "U12 GMAC1 RXD3",
+> -						       "R10 GMAC1 TXD0", "T10 GMAC1 TXD1",
+> -						       "U10 GMAC1 TXD2", "V10 GMAC1 TXD3";
+> +						pins = "W8 GMAC0 RXD0", "V9 GMAC0 RXD1",
+> +						       "Y8 GMAC0 RXD2", "U9 GMAC0 RXD3",
+> +						       "T7 GMAC0 TXD0", "U6 GMAC0 TXD1",
+> +						       "V7 GMAC0 TXD2", "U7 GMAC0 TXD3",
+> +						       "Y12 GMAC1 RXD0", "V12 GMAC1 RXD1",
+> +						       "T11 GMAC1 RXD2", "W12 GMAC1 RXD3",
+> +						       "U10 GMAC1 TXD0", "Y10 GMAC1 TXD1",
+> +						       "W10 GMAC1 TXD2", "T9 GMAC1 TXD3";
+>  						skew-delay = <7>;
+>  					};
+>  					/* Set up drive strength on GMAC0 to 16 mA */
 
-I noticed that "qcom,rpmh-resource-type" is now gone.  Not needed
-anymore?  Oh, I see.  Stephen said to add it when it's needed.  OK,
-fine.
-
-
-> +===============================
-> +Second Level Nodes - Regulators
-> +===============================
-> +
-> +- qcom,regulator-initial-voltage
-
-nit: regulator framework tends to include "microvolt" in the name to
-make it really obvious in the device tree what the units are.  Can you
-do that too?
-
-
-> +- qcom,drms-mode-threshold-currents
-
-Could use microamp in the name of the property too...
-
-
-> +                       qcom,allowed-drms-modes =
-> +                               <RPMH_REGULATOR_MODE_LPM
-> +                                RPMH_REGULATOR_MODE_HPM>;
-> +                       qcom,drms-mode-threshold-currents = <10000 1000000>;
-
-optional nit: to make it match downstream drivers, does it make sense
-to change this to:
-
-  <9999 999999>
-
-...so if a driver used to request exactly 10000 mA that it will end up
-with the same mode (no idea if drivers actually do that).
-
-
--Doug
+Tested-by: Roman Yeryomin <roman@advem.lv>
