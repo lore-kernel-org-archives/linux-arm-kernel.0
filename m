@@ -1,33 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 17 Apr 2018 15:31:27 +0530
-Subject: [PATCH 2/2] ARM: dts: da850-lcdk: add unit name for memory node
-In-Reply-To: <20180417100128.23011-1-nsekhar@ti.com>
-References: <20180417100128.23011-1-nsekhar@ti.com>
-Message-ID: <20180417100128.23011-3-nsekhar@ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 17 Apr 2018 12:02:54 +0200
+Subject: [PATCH 3/6] spi: spi-s3c64xx: Drop unused enable_datapath()
+ function argument
+In-Reply-To: <167c0f1a1a9de44574523c7f4a9d137d@etezian.org>
+References: <20180416154021.25626-1-s.nawrocki@samsung.com>
+ <CGME20180416154122epcas1p1ae714af12f8da08783c47fcd820c40e7@epcas1p1.samsung.com>
+ <20180416154021.25626-3-s.nawrocki@samsung.com>
+ <167c0f1a1a9de44574523c7f4a9d137d@etezian.org>
+Message-ID: <71b98ebb-550e-60af-36cb-0196cf738e54@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add unit name for memory node to squash the W=1 warning:
+Hi Andi,
 
-arch/arm/boot/dts/da850-lcdk.dtb: Warning (unit_address_vs_reg): /memory: node has a reg or ranges property, but no unit name
+On 04/16/2018 09:09 PM, andi at etezian.org wrote:
+> On 17.04.2018 00:40, Sylwester Nawrocki wrote:
+>> The spi pointer argument is not used now so remove it. While at it
+>> s3c64xx_ prefix is added to the function name.
+>
+> These for me are two different patches, but in any case it's trivial
+> so that I don't mind it too much.
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/da850-lcdk.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I am going to drop renaming from this patch. There are 2 more functions
+(wait_for_pio(), wait_for_dma()) without prefix, should we rename them
+too or rather leave all 3 as they are now?
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index a1f4d6d5a569..e80839bb071b 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -21,7 +21,7 @@
- 		stdout-path = "serial2:115200n8";
- 	};
- 
--	memory {
-+	memory at c0000000 {
- 		device_type = "memory";
- 		reg = <0xc0000000 0x08000000>;
- 	};
 -- 
-2.16.2
+Regards,
+Sylwester
