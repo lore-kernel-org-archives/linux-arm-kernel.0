@@ -1,35 +1,79 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 17 Apr 2018 17:30:40 -0400
-Subject: [net-next PATCH v4 11/13] net: netcp: support probe deferral
-In-Reply-To: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
-References: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1524000642-23944-12-git-send-email-m-karicheri2@ti.com>
+Date: Tue, 17 Apr 2018 17:30:29 -0400
+Subject: [net-next PATCH v4 00/13] Add support for netcp driver on K2G SoC
+Message-ID: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The netcp driver shouldn't proceed until the knav qmss and dma
-devices are ready. So return -EPROBE_DEFER if these devices are not
-ready.
+K2G SoC is another variant of Keystone family of SoCs. This patch
+series add support for NetCP driver on this SoC. The QMSS found on
+K2G SoC is a cut down version of the QMSS found on other keystone
+devices with less number of queues, internal link ram etc. The patch
+series has 2 patch sets that goes into the drivers/soc and the
+rest has to be applied to net sub system. Please review and merge
+if this looks good.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/net/ethernet/ti/netcp_core.c | 4 ++++
- 1 file changed, 4 insertions(+)
+K2G TRM is located at http://www.ti.com/lit/ug/spruhy8g/spruhy8g.pdf
+Thanks
 
-diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
-index 9c51b25..736f6f7 100644
---- a/drivers/net/ethernet/ti/netcp_core.c
-+++ b/drivers/net/ethernet/ti/netcp_core.c
-@@ -2158,6 +2158,10 @@ static int netcp_probe(struct platform_device *pdev)
- 	struct netcp_module *module;
- 	int ret;
- 
-+	if (!knav_dma_device_ready() ||
-+	    !knav_qmss_device_ready())
-+		return -EPROBE_DEFER;
-+
- 	if (!node) {
- 		dev_err(dev, "could not find device info\n");
- 		return -ENODEV;
+The boot logs on K2G ICE board (tftp boot over Ethernet and from mmc)
+https://pastebin.ubuntu.com/p/yvZ6drFhkW/
+
+
+The boot logs on K2G GP board (tftp boot over Ethernet and from mmc)
+https://pastebin.ubuntu.com/p/QTr6K7s4Zp/
+
+Also regressed boot on K2HK and K2L EVMs as we have modified GBE
+version detection logic (K2E uses same version of NetCP as in K2L.
+So regression on one of them is needed).
+
+Boot log on K2L and K2HK EVMs are at
+https://pastebin.ubuntu.com/p/N9DBdPjbvR/ 
+
+This series applies to net-next master branch.
+
+Change history:
+  v4 - ready for merge to net-next
+       Folded the series "Add promiscous mode support in k2g network driver"
+       into this.
+       Fixed a typo in 5/11 (sgmii to rgmii) based on TI internal comment
+       Reworked 4/11 and title changed to reflect additional changes to
+       exclude sgmii configuration code for 2U cpsw. Use IS_SS_ID_2U()
+       macro for customization.
+       Added Reviewed-by from Rob Herring against 1/13
+  v3 - Addressed comments from Andrew Lunn and Grygorii Strashko
+       against v2. 
+  v2 - Addressed following comments on initial version
+       - split patch 3/5 to multiple patches from Andrew Lunn
+
+Murali Karicheri (11):
+  soc: ti: K2G: enhancement to support QMSS in K2G NAVSS
+  soc: ti: K2G: provide APIs to support driver probe deferral
+  net: netcp: ethss: use macro for checking ss_version consistently
+  net: netcp: ethss: make sgmii configuration conditional
+  net: netcp: ethss: add support for handling rgmii link interface
+  net: netcp: ethss: use rgmii link status for 2u cpsw hardware
+  net: netcp: ethss: map vlan priorities to zero flow
+  net: netcp: ethss: re-use stats handling code for 2u hardware
+  net: netcp: ethss: use of_get_phy_mode() to support different RGMII
+    modes
+  Revert "net: netcp: remove dead code from the driver"
+  net: netcp: support probe deferral
+
+WingMan Kwok (2):
+  net: netcp: add api to support set rx mode in netcp modules
+  net: netcp: ethss: k2g: add promiscuous mode support
+
+ .../bindings/soc/ti/keystone-navigator-qmss.txt    |   9 +-
+ drivers/net/ethernet/ti/netcp.h                    |   3 +
+ drivers/net/ethernet/ti/netcp_core.c               |  32 ++++
+ drivers/net/ethernet/ti/netcp_ethss.c              | 181 +++++++++++++++++----
+ drivers/soc/ti/knav_dma.c                          |   8 +
+ drivers/soc/ti/knav_qmss.h                         |   6 +
+ drivers/soc/ti/knav_qmss_queue.c                   |  98 ++++++++---
+ include/linux/soc/ti/knav_dma.h                    |  12 ++
+ include/linux/soc/ti/knav_qmss.h                   |   1 +
+ 9 files changed, 297 insertions(+), 53 deletions(-)
+
 -- 
 1.9.1
