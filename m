@@ -1,63 +1,83 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 17 Apr 2018 15:59:10 +0200
-Subject: [RESEND PATCH v2 0/4] ARM: davinci: remove the mach-specific
- aemif driver - part 1
-In-Reply-To: <CAMRc=Me6b0e+d6QRTdr7G9zLdqonjxLBp6h6bM_JaF8OytR=QA@mail.gmail.com>
-References: <20180417102917.7794-1-brgl@bgdev.pl>
- <2a2ac117-900c-77b6-f247-49777493e55f@ti.com>
- <CAMpxmJUBFEF7FDp910HwsrNhGhwJDrgRR_9qL0DE5W1M=39MgQ@mail.gmail.com>
- <CAMRc=Me6b0e+d6QRTdr7G9zLdqonjxLBp6h6bM_JaF8OytR=QA@mail.gmail.com>
-Message-ID: <CAMpxmJVa8xCsru4ixBxMmZe4_aDyiuPvfd_wgUTckG5jWahe1g@mail.gmail.com>
+From: liwei213@huawei.com (Li Wei)
+Date: Tue, 17 Apr 2018 22:08:11 +0800
+Subject: [PATCH v9 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+In-Reply-To: <20180417140814.38098-1-liwei213@huawei.com>
+References: <20180417140814.38098-1-liwei213@huawei.com>
+Message-ID: <20180417140814.38098-3-liwei213@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-17 14:41 GMT+02:00 Bartosz Golaszewski <brgl@bgdev.pl>:
-> 2018-04-17 14:36 GMT+02:00 Bartosz Golaszewski <bgolaszewski@baylibre.com>:
->> 2018-04-17 12:53 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
->>> Hi Bartosz,
->>>
->>> On Tuesday 17 April 2018 03:59 PM, Bartosz Golaszewski wrote:
->>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>
->>>> This is the first part of changes required to remove duplicate aemif
->>>> support from mach-davinci.
->>>>
->>>> I actually noticed that one of my previous changes from 2017 broke nand
->>>> in legacy mode - the clock lookup no longer works. This series addresses
->>>> it as well.
->>>>
->>>> First patch just uses a static string for the ti-aemif driver name.
->>>>
->>>> The second adds support for board files to the aemif driver.
->>>>
->>>> Last two add nand support to da850-lcdk in legacy mode and make
->>>> da850-evm use the platform driver instead of the mach-specific one.
->>>>
->>>> If these patches get accepted, I'll prepere a follow-up moving all
->>>> other boards to the new platform driver.
->>>>
->>>> This series applies on top of v8 of David Lechner's CCF series.
->>>
->>> Are there any patches in the series that can safely be applied to v4.17-rc1?
->>>
->>> Thanks,
->>> Sekhar
->>
->> Hi Sekhar,
->>
->> yes, all of them. They're not linked to David's work in any way.
->>
->> Bart
->
-> Oops, -ETOOFAST, I rebased it on top of David's v9, let me check how
-> it works with mainline - it should be mostly fine.
->
-> Bart
+add ufs node document for Hisilicon.
 
-Ok, so the patches apply and build nicely on top of v4.17-rc1, but
-they only actually work with David's v9 branch. On the other hand nand
-doesn't work with mainline now anyway so I assume it's safe to apply
-them and wait for David's patches to be merged.
+Signed-off-by: Li Wei <liwei213@huawei.com>
+---
+ Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 29 ++++++++++++++++++++++
+ .../devicetree/bindings/ufs/ufshcd-pltfrm.txt      | 10 +++++---
+ 2 files changed, 36 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
 
-Thanks,
-Bartosz
+diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+new file mode 100644
+index 000000000000..d49ab7d8f31d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+@@ -0,0 +1,29 @@
++* Hisilicon Universal Flash Storage (UFS) Host Controller
++
++UFS nodes are defined to describe on-chip UFS hardware macro.
++Each UFS Host Controller should have its own node.
++
++Required properties:
++- compatible        : compatible list, contains one of the following -
++					"hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
++					host controller present on Hi36xx chipset.
++- reg               : should contain UFS register address space & UFS SYS CTRL register address,
++- interrupt-parent  : interrupt device
++- interrupts        : interrupt number
++- resets            : reset node register, the "arst" corresponds to reset the APB/AXI bus.
++- reset-names       : describe reset node register
++
++Example:
++
++	ufs: ufs at ff3b0000 {
++		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
++		/* 0: HCI standard */
++		/* 1: UFS SYS CTRL */
++		reg = <0x0 0xff3b0000 0x0 0x1000>,
++			<0x0 0xff3b1000 0x0 0x1000>;
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
++		/* offset: 0x84; bit: 7  */
++		resets = <&crg_rst 0x84 7>;
++		reset-names = "arst";
++	};
+diff --git a/Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt b/Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt
+index c39dfef76a18..adcfb79f63f5 100644
+--- a/Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt
++++ b/Documentation/devicetree/bindings/ufs/ufshcd-pltfrm.txt
+@@ -41,6 +41,8 @@ Optional properties:
+ -lanes-per-direction	: number of lanes available per direction - either 1 or 2.
+ 			  Note that it is assume same number of lanes is used both
+ 			  directions at once. If not specified, default is 2 lanes per direction.
++- resets            : reset node register, the "rst" corresponds to reset the whole UFS IP.
++- reset-names       : describe reset node register
+ 
+ Note: If above properties are not defined it can be assumed that the supply
+ regulators or clocks are always on.
+@@ -61,9 +63,11 @@ Example:
+ 		vccq-max-microamp = 200000;
+ 		vccq2-max-microamp = 200000;
+ 
+-		clocks = <&core 0>, <&ref 0>, <&iface 0>;
+-		clock-names = "core_clk", "ref_clk", "iface_clk";
+-		freq-table-hz = <100000000 200000000>, <0 0>, <0 0>;
++		clocks = <&core 0>, <&ref 0>, <&phy 0>, <&iface 0>;
++		clock-names = "core_clk", "ref_clk", "phy_clk", "iface_clk";
++		freq-table-hz = <100000000 200000000>, <0 0>, <0 0>, <0 0>;
++		resets = <&reset 0 1>;
++		reset-names = "rst";
+ 		phys = <&ufsphy1>;
+ 		phy-names = "ufsphy";
+ 	};
+-- 
+2.15.0
