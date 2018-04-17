@@ -1,94 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 17 Apr 2018 10:31:38 +0200
-Subject: [PATCH v4 3/8] dt-bindings: mfd: renesas,rzn1-sysctrl: document
- RZ/N1 sysctrl node
-In-Reply-To: <OSBPR01MB20548CE7A728549EFA2B9ADBD2B70@OSBPR01MB2054.jpnprd01.prod.outlook.com>
-References: <1523349015-37985-1-git-send-email-michel.pollet@bp.renesas.com>
- <1523349015-37985-4-git-send-email-michel.pollet@bp.renesas.com>
- <20180413180549.yjzkl2yf7osz7myt@rob-hp-laptop>
- <OSBPR01MB20548CE7A728549EFA2B9ADBD2B70@OSBPR01MB2054.jpnprd01.prod.outlook.com>
-Message-ID: <CAMuHMdWoW6QXofvS0Ju5VL1WivmWWMx8c=ppVbKe1+2eO6LsFg@mail.gmail.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Tue, 17 Apr 2018 08:44:14 +0000
+Subject: [PATCH v6 08/17] media: rkisp1: add capture device driver
+In-Reply-To: <20180308094807.9443-9-jacob-chen@iotwrt.com>
+References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
+ <20180308094807.9443-9-jacob-chen@iotwrt.com>
+Message-ID: <CAAFQd5CF9-T24sw9fPw050G=fPha46DnCb8g6m7V2wtNVx_=1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michel,
+Hi Jacob,
 
-On Tue, Apr 17, 2018 at 9:56 AM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> On 13 April 2018 19:06, Rob Herring:
->> On Tue, Apr 10, 2018 at 09:30:03AM +0100, Michel Pollet wrote:
->> > The Renesas RZ/N1 Family (Part #R9A06G0xx) has a multi-function system
->> > controller. This documents the node used to encapsulate it's sub
->> > drivers.
->> >
->> > Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
->> > ---
->> >  .../bindings/mfd/renesas,rzn1-sysctrl.txt          | 23
->> ++++++++++++++++++++++
->> >  1 file changed, 23 insertions(+)
->> >  create mode 100644
->> > Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
->> >
->> > diff --git
->> > a/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
->> > b/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
->> > new file mode 100644
->> > index 0000000..9897f8f
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/mfd/renesas,rzn1-sysctrl.txt
->> > @@ -0,0 +1,23 @@
->> > +DT bindings for the Renesas RZ/N1 System Controller
->> > +
->> > +== System Controller Node ==
->> > +
->> > +The system controller node currently only hosts a single sub-node to
->> > +handle the rebooting of the CPU. Eventually it will host the clock
->> > +driver, SMP start handler, watchdog etc.
->>
->> Please submit a complete binding for the h/w block.
->>
->> Again, if the only reason you have sub nodes is to define compatible strings
->> and in turn enumerate drivers, then you don't need the nodes in DT. DT is
->> not the only way to instantiate drivers.
->
-> I can't document it before I have the code. There is 0.000% chance of my clock
-> driver for example to be upstreamed the way I would imagine making it -- in
-> fact pretty much any other driver will have to be reworked to fit, so documenting
-> bindings first is impossible.
->
-> So, if I understand correctly, you are telling me to make a 'sysctrl' driver and use
-> platform_device to instantiate my sub-drivers? Isn't that what machine files used
-> to do? And they are now banned?
->
-> Geert, any guidance here?
+On Thu, Mar 8, 2018 at 6:49 PM Jacob Chen <jacob-chen@iotwrt.com> wrote:
 
-It depends on how many and which subnodes you want to add to  the sysctrl
-node. Without a complete binding for the block, we cannot know.
-If the major part will be the clock driver, I would make that the main
-driver for the sysctrl node. The clock driver can easily register
-e.g. a simple reset handler.
+> From: Jacob Chen <jacob2.chen@rock-chips.com>
 
-Cfr. the renesas-cpg-mssr driver, which also handles (module) resets.
-There are plenty of other examples of drivers providing multiple
-functionalities (e.g. pinctrl drivers also registering GPIO controllers).
+> This is the capture device interface driver that provides the v4l2
+> user interface. Frames can be received from ISP1.
 
-If a monolithic driver becomes too large, it can still be split using the
-MFD framework.
-E.g. the BD9571 PMIC driver is split in an MFD core driver, and 2 drivers
-for different functionalities:
+Thanks for the patch. Please find my comment inline.
 
-   drivers/gpio/gpio-bd9571mwv.c
-   drivers/mfd/bd9571mwv.c
-   drivers/regulator/bd9571mwv-regulator.c
-   include/linux/mfd/bd9571mwv.h
+[snip]
+> +static int
+> +rkisp1_start_streaming(struct vb2_queue *queue, unsigned int count)
+> +{
+> +       struct rkisp1_stream *stream = queue->drv_priv;
+> +       struct rkisp1_vdev_node *node = &stream->vnode;
+> +       struct rkisp1_device *dev = stream->ispdev;
+> +       struct v4l2_device *v4l2_dev = &dev->v4l2_dev;
+> +       int ret;
+> +
+> +       if (WARN_ON(stream->state != RKISP1_STATE_READY))
+> +               goto return_queued_buf;
 
-Gr{oetje,eeting}s,
+We jump out with ret unitialized here. For reference, it triggers a
+compiler warning for me.
 
-                        Geert
+Note that rather than initializing ret at its definition, I'd recommend
+adding an assignment before the goto statement. This will still let the
+compiler issue warnings, without assuming that the default value is correct.
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Tomasz
