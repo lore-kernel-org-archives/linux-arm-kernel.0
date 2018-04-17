@@ -1,66 +1,53 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 17 Apr 2018 16:15:33 +0200
-Subject: [PATCH v5 2/7] clk: meson: aoclk: refactor common code into
- dedicated file
-In-Reply-To: <759078f5-fcbf-9ef1-6945-67d9d951d8eb@amlogic.com>
-References: <20180409143749.71197-1-yixun.lan@amlogic.com>
- <20180409143749.71197-3-yixun.lan@amlogic.com>
- <1523875084.2601.28.camel@baylibre.com>
- <759078f5-fcbf-9ef1-6945-67d9d951d8eb@amlogic.com>
-Message-ID: <1523974533.2601.95.camel@baylibre.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 17 Apr 2018 22:22:05 +0800
+Subject: [PATCH V2 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz
+ clock source
+In-Reply-To: <1521426645-19246-2-git-send-email-Anson.Huang@nxp.com>
+References: <1521426645-19246-1-git-send-email-Anson.Huang@nxp.com>
+ <1521426645-19246-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180417142203.GM25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-04-17 at 16:16 +0800, Yixun Lan wrote:
-> Hi Jerome
+On Mon, Mar 19, 2018 at 10:30:45AM +0800, Anson Huang wrote:
+> On i.MX6SX SabreAuto board, there is external 24MHz clock
+> source for analog clock2, add this clock source to clock tree.
 > 
-> On 04/16/18 18:38, Jerome Brunet wrote:
-> > > +	 */
-> > > +	for (clkid = 0; clkid < data->num_clks; clkid++) {
-> > > +		data->clks[clkid]->map = regmap;
-> > > +
-> > > +		ret = devm_clk_hw_register(dev, data->hw_data->hws[clkid]);
-> > > +		if (ret)
-> > > +			return ret;
-> > > +	}
-> > > +
-> > > +	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
-> > > +		(void *) data->hw_data);
-> > > +}
-> > 
-> > Missing new line here. Please run checkpatch and pay attention to git warnings
-> > about whitespace errors.
-> > 
-> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+> changes since V1:
+> 	remove unnecessary clocks container.
 
-Google this if you want, As far as I know the C language requires it and makes
-things nice when I cat the file.
+I understand this is suggested by Fabio, but I'm afraid that it's not
+going to work with imx_obtain_fixed_clock() call, which is coded to
+look for clocks under /clocks node.
 
-Anyway, I don't make those rules, It is just how it is.
+Shawn
 
+>  arch/arm/boot/dts/imx6sx-sabreauto.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> I think we actually need to avoid this extra new line, or what's the
-> benefits with new line?
+> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> index 72da5ac..a3b022b 100644
+> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+> @@ -18,6 +18,12 @@
+>  		reg = <0x80000000 0x80000000>;
+>  	};
+>  
+> +	codec_osc: anaclk2 {
+> +		#clock-cells = <0>;
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <24576000>;
+> +	};
+> +
+>  	regulators {
+>  		compatible = "simple-bus";
+>  		#address-cells = <1>;
+> -- 
+> 2.7.4
 > 
-> and besides? I didn't see any complaint from checkpatch.pl ..
-> 
->  ./scripts/checkpatch.pl
-> 0002-clk-meson-aoclk-refactor-common-code-into-dedicated-.patch
-> WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-> #235:
-> new file mode 100644
-> 
-> total: 0 errors, 1 warnings, 302 lines checked
-> 
-> NOTE: For some of the reported defects, checkpatch may be able to
->       mechanically convert to the typical style using --fix or
-> --fix-inplace.
-> 
-> 0002-clk-meson-aoclk-refactor-common-code-into-dedicated-.patch has
-> style problems, please review.
-> 
-> NOTE: If any of the errors are false positives, please report
->       them to the maintainer, see CHECKPATCH in MAINTAINERS.
-> 
-> 
-> Yixun
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
