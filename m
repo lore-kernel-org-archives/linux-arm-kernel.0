@@ -1,63 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 17 Apr 2018 11:21:02 +0300
-Subject: [PATCH v6 07/11] ARM: sun9i: smp: Rename clusters's power-off
-In-Reply-To: <20180416215032.5023-8-mylene.josserand@bootlin.com>
-References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-8-mylene.josserand@bootlin.com>
-Message-ID: <fd19ec26-9240-5ae2-fc6e-d3918ab91d01@cogentembedded.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Apr 2018 09:23:56 +0100
+Subject: [PATCH] arm64: KVM: Demote SVE and LORegion warnings to debug only
+Message-ID: <20180417082356.19492-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+While generating a message about guests probing for SVE/LORegions
+is a useful debugging tool, considering it an error is slightly
+over the top, as this is the only way the guest can find out
+about the presence of the feature.
 
-On 4/17/2018 12:50 AM, Myl?ne Josserand wrote:
+Let's turn these message into kvm_debug so that they can only
+be seen if CONFIG_DYNAMIC_DEBUG, and kept quiet otherwise.
 
-> To prepare the support for sun8i-a83t, rename the variable name
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-    s/variable/macro/ maybe? Also "rename the ... name" sounds tautological...
-
-> that handles the power-off of clusters because it is different from
-> sun9i-a80 to sun8i-a83t.
-> 
-> The power off register for clusters are different from a80 and a83t.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->   arch/arm/mach-sunxi/mc_smp.c | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-> index 727968d6a3e5..03f021d0c73e 100644
-> --- a/arch/arm/mach-sunxi/mc_smp.c
-> +++ b/arch/arm/mach-sunxi/mc_smp.c
-> @@ -60,7 +60,7 @@
->   #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
->   #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
->   #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
-> -#define PRCM_PWROFF_GATING_REG_CLUSTER	BIT(4)
-> +#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
->   #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
->   #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
->   #define PRCM_CPU_SOFT_ENTRY_REG		0x164
-> @@ -255,7 +255,7 @@ static int sunxi_cluster_powerup(unsigned int cluster)
->   
->   	/* clear cluster power gate */
->   	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
-> -	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
-> +	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
->   	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->   	udelay(20);
->   
-> @@ -452,7 +452,7 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
->   	/* gate cluster power */
->   	pr_debug("%s: gate cluster power\n", __func__);
->   	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
-> -	reg |= PRCM_PWROFF_GATING_REG_CLUSTER;
-> +	reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
->   	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
->   	udelay(20);
->   
-
-MBR, Sergei
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 806b0b126a64..6e3b969391fd 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -996,14 +996,12 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+ 
+ 	if (id == SYS_ID_AA64PFR0_EL1) {
+ 		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
+-			pr_err_once("kvm [%i]: SVE unsupported for guests, suppressing\n",
+-				    task_pid_nr(current));
++			kvm_debug("SVE unsupported for guests, suppressing\n");
+ 
+ 		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
+ 	} else if (id == SYS_ID_AA64MMFR1_EL1) {
+ 		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
+-			pr_err_once("kvm [%i]: LORegions unsupported for guests, suppressing\n",
+-				    task_pid_nr(current));
++			kvm_debug("LORegions unsupported for guests, suppressing\n");
+ 
+ 		val &= ~(0xfUL << ID_AA64MMFR1_LOR_SHIFT);
+ 	}
+-- 
+2.14.2
