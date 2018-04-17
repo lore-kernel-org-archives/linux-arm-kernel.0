@@ -1,97 +1,45 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 17 Apr 2018 12:19:06 -0700
-Subject: [PATCH v3 06/11] iio: inkern: add module put/get on iio dev
- module when requesting channels
-In-Reply-To: <67771f4c-d30c-4a28-2a9b-d5585186d60a@microchip.com>
-References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
- <1523350677-27106-7-git-send-email-eugen.hristev@microchip.com>
- <20180415203321.1aaaf91e@archlinux>
- <20180416235821.GF77055@dtor-ws>
- <67771f4c-d30c-4a28-2a9b-d5585186d60a@microchip.com>
-Message-ID: <20180417191906.GB67621@dtor-ws>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Apr 2018 21:31:17 +0200
+Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
+In-Reply-To: <297aae18-8efc-b7cc-20c2-eb09d72d2dd1@arm.com>
+References: <20180406141935.6801-1-linus.walleij@linaro.org>
+ <20180410095737.GF10254@e110455-lin.cambridge.arm.com>
+ <CACRpkdb1toYJEaHDZ2QORt+qzN7imH9ugx3xvi1HASoZU0QSiQ@mail.gmail.com>
+ <297aae18-8efc-b7cc-20c2-eb09d72d2dd1@arm.com>
+Message-ID: <CACRpkdYPwm=2jhompecL5z_qwhe9UzZHKLKZLYgDK+YV_ZfMag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eugen,
+On Tue, Apr 17, 2018 at 3:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 17/04/18 13:32, Linus Walleij wrote:
+> [...]
+>>
+>> Unfortunately there is just one single vexpress core tile in the
+>> upstream kernel that define a CLCD controller, the CA9 (4xA9)
+>> that I am using. All the others just use the MB CLCD.
+>>
+>> I am thinking there is some never finished DTS upstreaming
+>> here that ought to happen so we use the core tile CLCD on some
+>> other boards as well.
+>
+>
+> Barring custom FPGA images, I think V2P-CA9 *is* the only VExpress tile
+> implementing PL11x; all the more recent test chips had HDLCD instead.
 
-On Tue, Apr 17, 2018 at 10:39:24AM +0300, Eugen Hristev wrote:
-> 
-> 
-> On 17.04.2018 02:58, Dmitry Torokhov wrote:
-> > On Sun, Apr 15, 2018 at 08:33:21PM +0100, Jonathan Cameron wrote:
-> > > On Tue, 10 Apr 2018 11:57:52 +0300
-> > > Eugen Hristev <eugen.hristev@microchip.com> wrote:
-> > > 
-> > > > When requesting channels for a particular consumer device,
-> > > > besides requesting the device (incrementing the reference counter), also
-> > > > do it for the driver module of the iio dev. This will avoid the situation
-> > > > where the producer IIO device can be removed and the consumer is still
-> > > > present in the kernel.
-> > > > 
-> > > > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> > > > ---
-> > > >   drivers/iio/inkern.c | 8 +++++++-
-> > > >   1 file changed, 7 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
-> > > > index ec98790..68d9b87 100644
-> > > > --- a/drivers/iio/inkern.c
-> > > > +++ b/drivers/iio/inkern.c
-> > > > @@ -11,6 +11,7 @@
-> > > >   #include <linux/slab.h>
-> > > >   #include <linux/mutex.h>
-> > > >   #include <linux/of.h>
-> > > > +#include <linux/module.h>
-> > > >   #include <linux/iio/iio.h>
-> > > >   #include "iio_core.h"
-> > > > @@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
-> > > >   	if (index < 0)
-> > > >   		goto err_put;
-> > > >   	channel->channel = &indio_dev->channels[index];
-> > > > +	try_module_get(channel->indio_dev->driver_module);
-> > > 
-> > > And if it fails? (the module we are trying to get is going away...)
-> > > 
-> > > We should try and handle it I think. Be it by just erroring out of here.
-> > 
-> > Even more, this has nothing to do with modules. A device can go away for
-> > any number of reasons (we unbind it manually via sysfs, we pull the USB
-> > plug from the host in case it is USB-connected device, we unload I2C
-> > adapter for the bus device resides on, we kick underlying PCI device)
-> > and we should be able to handle this in some fashion. Handling errors
-> > from reads and ignoring garbage is one of methods.
-> > 
-> > FWIW this is a NACK from me.
-> > 
-> > Thanks.
-> Hello,
-> 
-> This patch is actually a "best effort attempt" for the consumer driver
-> (touch driver) to get a reference to the producer of the data (the IIO
-> device), when it requests the specific channels.
-> As of this moment, there is no attempt whatsoever for the consumer to have a
-> reference on the producer driver. Thus, the producer can be removed at any
-> time, and the consumer will fail ungraciously.
+Yup it looks like that.
 
-This is the root of the issue. The consumer should be prepared to handle
-errors from producer.
+I am restructuring the code to look for any graphics on the
+core tile and only turn on the motherboard CLCD if there is
+no CLCD or HDLCD on the core tile, e.g. if that device node has
+been set to "disabled" or the HDLCD driver is not compiled in
+but the CLCD driver is.
 
-> I can change the perspective from "best effort" to "mandatory" to get a
-> reference to the producer, or you wish to stop trying to get any reference
-> at all (remove this patch completely) ?
+I found some vague mentions of a LCD display that can be
+connected to the motherboard, so that would then be sitting
+on the CLCD, is this something you ARM guys have seen
+around? In that case I guess the VExpress (etc) would actually
+be able to have two screens, one LCD panel on the motherboard
+CLCD and a DVI from the core tile.
 
-You should take reference to the device itself (if it is not taken
-already), so it does not disappear completely and you can continue using
-IIO API to access it, and IIO API should be prepared to deal with "dead"
-devices, but as I pointed in my other email, trying to pin the driver
-is quite pointless as there are myriad other ways of device stopping
-working besides module unloading.
-
-In any case, I think this problem is outside of the scope of this
-patchset that adds a generic resistive touchscreen, so if you want to
-continue working on this I'd recommend moving it into a separate series.
-
-Thanks.
-
--- 
-Dmitry
+Yours,
+Linus Walleij
