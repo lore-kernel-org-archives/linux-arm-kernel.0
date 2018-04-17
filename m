@@ -1,78 +1,92 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 17 Apr 2018 09:32:28 +0200
-Subject: v4.17-rc1 on motorola droid d4: WARN_ON from
- drivers/gpu/drm/omapdrm/dss/hdmi4.c
-Message-ID: <20180417073228.GA9246@amd>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Tue, 17 Apr 2018 10:30:46 +0300
+Subject: [PATCH v3 03/11] iio: Add channel for Position Relative
+In-Reply-To: <20180415202942.5c7d50a8@archlinux>
+References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
+ <1523350677-27106-4-git-send-email-eugen.hristev@microchip.com>
+ <20180415202942.5c7d50a8@archlinux>
+Message-ID: <02533699-a2bc-7c0c-4d8a-c10bb0102667@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-While playing with screensaver on droid4:
 
-[ 1047.117462] omap-mcbsp 40124000.mcbsp: CLKS: could not
-clk_set_parent() to prcm_fck
-[ 1047.130432] ------------[ cut here ]------------
-[ 1047.135559] WARNING: CPU: 1 PID: 2942 at
-drivers/gpu/drm/omapdrm/dss/hdmi4.c:667 hdmi_audio_stop+0x5c/0x68
-[ 1047.145294] Modules linked in:
-[ 1047.148376] CPU: 1 PID: 2942 Comm: pulseaudio Not tainted
-4.17.0-rc1-73412-g8f3e00d-dirty #623
-[ 1047.157043] Hardware name: Generic OMAP4 (Flattened Device Tree)
-[ 1047.163085] [<c0111854>] (unwind_backtrace) from [<c010d740>]
-(show_stack+0x10/0x14)
-[ 1047.170898] [<c010d740>] (show_stack) from [<c08fc244>]
-(dump_stack+0xa8/0xe0)
-[ 1047.178161] [<c08fc244>] (dump_stack) from [<c0134d50>]
-(__warn+0xf8/0x124)
-[ 1047.185180] [<c0134d50>] (__warn) from [<c0134db8>]
-(warn_slowpath_null+0x3c/0x48)
-[ 1047.192962] [<c0134db8>] (warn_slowpath_null) from [<c053d9dc>]
-(hdmi_audio_stop+0x5c/0x68)
-[ 1047.192993] [<c053d9dc>] (hdmi_audio_stop) from [<c06f3e2c>]
-(hdmi_dai_trigger+0x6c/0x88)
-[ 1047.193023] [<c06f3e2c>] (hdmi_dai_trigger) from [<c06e0308>]
-(soc_pcm_trigger+0x140/0x184)
-[ 1047.193023] [<c06e0308>] (soc_pcm_trigger) from [<c06afc68>]
-(snd_pcm_do_stop+0x54/0x58)
-[ 1047.193054] [<c06afc68>] (snd_pcm_do_stop) from [<c06afa10>]
-(snd_pcm_action_single+0x38/0x78)
-[ 1047.193054] [<c06afa10>] (snd_pcm_action_single) from [<c06b1c24>]
-(snd_pcm_drop+0x48/0x94)
-[ 1047.193054] [<c06b1c24>] (snd_pcm_drop) from [<c06b2d24>]
-(snd_pcm_ioctl+0x8e0/0x1308)
-[ 1047.193084] [<c06b2d24>] (snd_pcm_ioctl) from [<c02c80cc>]
-(do_vfs_ioctl+0x84/0xa70)
-[ 1047.193084] [<c02c80cc>] (do_vfs_ioctl) from [<c02c8b14>]
-(ksys_ioctl+0x5c/0x80)
-[ 1047.193115] [<c02c8b14>] (ksys_ioctl) from [<c0101000>]
-(ret_fast_syscall+0x0/0x28)
-[ 1047.193115] Exception stack(0xecfc1fa8 to 0xecfc1ff0)
-[ 1047.193115] 1fa0:                   00562308 b1986394 00000015
-00004143 00000000 00562e20
-[ 1047.193115] 1fc0: 00562308 b1986394 0053d4e0 00000036 0000000e
-b6fdbce8 00507d80 bed64644
-[ 1047.193145] 1fe0: b19867c4 bed644c4 b1916be7 b6c8e716
-[ 1047.193145] irq event stamp: 60448
-[ 1047.193145] hardirqs last  enabled at (60447): [<c01c6df4>]
-ktime_get_ts64+0x19c/0x1dc
-[ 1047.193176] hardirqs last disabled at (60448): [<c06b099c>]
-snd_pcm_stream_lock_irq+0x24/0x34
-[ 1047.193176] softirqs last  enabled at (60078): [<c01024a0>]
-__do_softirq+0x2e0/0x59c
-[ 1047.193176] softirqs last disabled at (60031): [<c013c684>]
-irq_exit+0x144/0x194
-[ 1047.193206] ---[ end trace 07b005c418b9f99b ]---
-[ 1062.235626] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
-[ 1092.313934] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+On 15.04.2018 22:29, Jonathan Cameron wrote:
+> On Tue, 10 Apr 2018 11:57:49 +0300
+> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> 
+>> Add new channel type for relative position on a pad.
+>>
+>> These type of analog sensor offers the position of a pen
+>> on a touchpad, and is represented as a voltage, which can be
+>> converted to a position on X and Y axis on the pad.
+>> The channel will hand the relative position on the pad in both directions.
+>>
+>> The channel can then be consumed by a touchscreen driver or
+>> read as-is for a raw indication of the touchpen on a touchpad.
+>>
+>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>> ---
+>> Changes in v2:
+>>   - modified channel name to relative position as suggested.
+>>   - modified kernel version to 4.18 (presumable)
+>>
+>>   Documentation/ABI/testing/sysfs-bus-iio | 12 ++++++++++++
+>>   drivers/iio/industrialio-core.c         |  1 +
+>>   include/uapi/linux/iio/types.h          |  1 +
+>>   tools/iio/iio_event_monitor.c           |  2 ++
+>>   4 files changed, 16 insertions(+)
+>>
+>> diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
+>> index 6a5f34b..42a9287 100644
+>> --- a/Documentation/ABI/testing/sysfs-bus-iio
+>> +++ b/Documentation/ABI/testing/sysfs-bus-iio
+>> @@ -190,6 +190,18 @@ Description:
+>>   		but should match other such assignments on device).
+>>   		Units after application of scale and offset are m/s^2.
+>>   
+>> +What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_x_raw
+>> +What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_y_raw
+>> +KernelVersion:	4.18
+>> +Contact:	linux-iio at vger.kernel.org
+>> +Description:
+>> +		Relative position in direction x or y on a pad (may be
+>> +		arbitrarily assigned but should match other such assignments on
+>> +		device).
+>> +		Units after application of scale and offset are milli percents
+>> +		from the pad's size in both directions. Should be calibrated by
+>> +		the consumer.
+> I know the milli percent comes form the humidity equivalent, but I wonder
+> if we are right to follow that.  10^-5 is a pretty random base unit (though
+> I got argued into it being a standard choice for humidity sensors IIRC...
+> 
+> What do people think?  We could go with 1 for full range or just percent perhaps?
+> 
+> I'm not that fussed about staying consistent with humidity - we are unlikely
+> to end up with sensors doing both anytime soon so there shouldn't be
+> any confusion...
+> 
+> Jonathan
+Hello Jonathan,
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/3f2797bc/attachment.sig>
+For my specific use case, percents are not enough, as this would mean 
+the resolution will be pretty low. If we have a touchpanel of a higher 
+resolution, having the position only ranged 0 to 100 is pretty bad.
+Having millipercents means we can have a resolution up to 100,000 points 
+in range, which is fine for the hardware as of this moment.
+Of course, specific drivers reporting these channels can define a 
+specific range if they desire (report just in the first percent if you 
+wish (0-1000) or so, which would mean a lower resolution.
+Centi-percent would work fine as well I believe (0-10,000 range), but to 
+keep consistent with your suggestion regarding relative humidity, I 
+picked this larger scale.
+In my specific case, since we have a 12 bit ADC, range is 0-4096 for 
+this value.
+Calibrating these values to the actual size of the touchpanel is left 
+for the consumer to do (map 4096x4096 to the actual resolution)
+
+If you have a better idea than milli-percents I can change it, no problem.
+
+Eugen
+>> +
+>>   [...]
