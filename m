@@ -1,97 +1,296 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 17 Apr 2018 12:57:14 +0800
-Subject: [PATCH 2/2] parisc: use the asm-generic version for readX()
-In-Reply-To: <1523916078-23049-2-git-send-email-okaya@codeaurora.org>
-References: <1523916078-23049-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <201804171252.ib5KDLNm%fengguang.wu@intel.com>
+From: k.marinushkin@gmail.com (Kirill Marinushkin)
+Date: Tue, 17 Apr 2018 07:00:28 +0200
+Subject: [PATCH] staging: bcm2835-audio: Disconnect and free vchi_instance on
+ module_exit()
+Message-ID: <20180417050028.19372-1-k.marinushkin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+In the current implementation, vchi_instance is inited during the first
+call of bcm2835_audio_open_connection(), and is never freed. It causes a
+memory leak when the module `snd_bcm2835` is removed.
 
-Thank you for the patch! Yet something to improve:
+Here is how this commit fixes it:
 
-[auto build test ERROR on hp-parisc/for-next]
-[also build test ERROR on v4.17-rc1 next-20180416]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+* the VCHI context (including vchi_instance) is created once in the
+  platform's devres
+* the VCHI context is allocated and connected once during module_init()
+* all created bcm2835_chips have a pointer to this VCHI context
+* bcm2835_audio_open_connection() can access the VCHI context through the
+  associated bcm2835_chip
+* the VCHI context is disconnected and freed once during module_exit()
 
-url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/parisc-use-the-asm-generic-version-for-writeX/20180417-103119
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/deller/parisc-linux.git for-next
-config: parisc-c3000_defconfig (attached as .config)
-compiler: hppa-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=parisc 
+After this commit is applied, I don't see other issues with the module's
+init/exit, so I also remove the associated TODO task.
 
-All errors (new ones prefixed by >>):
+Steps to reproduce the memory leak before this commit:
 
-   In file included from arch/parisc/include/asm/hardirq.h:13:0,
-                    from include/linux/hardirq.h:9,
-                    from arch/parisc/kernel/asm-offsets.c:34:
-   include/linux/irq.h: In function 'irq_reg_writel':
-   include/linux/irq.h:1126:3: error: implicit declaration of function 'writel'; did you mean 'iowrite8'? [-Werror=implicit-function-declaration]
-      writel(val, gc->reg_base + reg_offset);
-      ^~~~~~
-      iowrite8
-   include/linux/irq.h: In function 'irq_reg_readl':
->> include/linux/irq.h:1135:10: error: implicit declaration of function 'readl'; did you mean 'ioread8'? [-Werror=implicit-function-declaration]
-      return readl(gc->reg_base + reg_offset);
-             ^~~~~
-             ioread8
-   cc1: some warnings being treated as errors
-   make[2]: *** [arch/parisc/kernel/asm-offsets.s] Error 1
-   make[2]: Target '__build' not remade because of errors.
-   make[1]: *** [prepare0] Error 2
-   make[1]: Target 'prepare' not remade because of errors.
-   make: *** [sub-make] Error 2
+~~~~
+root at raspberrypi:/home/pi# aplay test0.wav
+Playing WAVE 'test0.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Ster
+^CAborted by signal Interrupt...
+root at raspberrypi:/home/pi# rmmod snd_bcm2835
+root at raspberrypi:/home/pi# modprobe snd_bcm2835
+root at raspberrypi:/home/pi# aplay test0.wav
+Playing WAVE 'test0.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Ster
+^CAborted by signal Interrupt...
+root at raspberrypi:/home/pi# echo scan > /sys/kernel/debug/kmemleak
+root at raspberrypi:/home/pi# cat /sys/kernel/debug/kmemleak
+unreferenced object 0xb6794c00 (size 128):
+  comm "aplay", pid 406, jiffies 36870 (age 116.650s)
+  hex dump (first 32 bytes):
+    08 a5 82 81 01 00 00 00 08 4c 79 b6 08 4c 79 b6  .........Ly..Ly.
+    00 00 00 00 00 00 00 00 ad 4e ad de ff ff ff ff  .........N......
+  backtrace:
+    [<802af5e0>] kmem_cache_alloc_trace+0x294/0x3d0
+    [<806ce620>] vchiq_initialise+0x98/0x1b0
+    [<806d0b34>] vchi_initialise+0x24/0x34
+    [<7f1311ec>] 0x7f1311ec
+    [<7f1303bc>] 0x7f1303bc
+    [<7f130590>] 0x7f130590
+    [<7f111fd8>] snd_pcm_open_substream+0x68/0xc4 [snd_pcm]
+    [<7f112108>] snd_pcm_open+0xd4/0x248 [snd_pcm]
+    [<7f112334>] snd_pcm_playback_open+0x4c/0x6c [snd_pcm]
+    [<7f0e250c>] snd_open+0xa8/0x14c [snd]
+    [<802ce590>] chrdev_open+0xac/0x188
+    [<802c57b4>] do_dentry_open+0x10c/0x314
+    [<802c6ba8>] vfs_open+0x5c/0x88
+    [<802d9a68>] path_openat+0x368/0x944
+    [<802dacd4>] do_filp_open+0x70/0xc4
+    [<802c6f70>] do_sys_open+0x110/0x1d4
+~~~~
 
-vim +1135 include/linux/irq.h
-
-7d828062 Thomas Gleixner 2011-04-03  1109  
-ebf9ff75 Boris Brezillon 2016-09-13  1110  /*
-ebf9ff75 Boris Brezillon 2016-09-13  1111   * The irqsave variants are for usage in non interrupt code. Do not use
-ebf9ff75 Boris Brezillon 2016-09-13  1112   * them in irq_chip callbacks. Use irq_gc_lock() instead.
-ebf9ff75 Boris Brezillon 2016-09-13  1113   */
-ebf9ff75 Boris Brezillon 2016-09-13  1114  #define irq_gc_lock_irqsave(gc, flags)	\
-ebf9ff75 Boris Brezillon 2016-09-13  1115  	raw_spin_lock_irqsave(&(gc)->lock, flags)
-ebf9ff75 Boris Brezillon 2016-09-13  1116  
-ebf9ff75 Boris Brezillon 2016-09-13  1117  #define irq_gc_unlock_irqrestore(gc, flags)	\
-ebf9ff75 Boris Brezillon 2016-09-13  1118  	raw_spin_unlock_irqrestore(&(gc)->lock, flags)
-ebf9ff75 Boris Brezillon 2016-09-13  1119  
-332fd7c4 Kevin Cernekee  2014-11-06  1120  static inline void irq_reg_writel(struct irq_chip_generic *gc,
-332fd7c4 Kevin Cernekee  2014-11-06  1121  				  u32 val, int reg_offset)
-332fd7c4 Kevin Cernekee  2014-11-06  1122  {
-2b280376 Kevin Cernekee  2014-11-06  1123  	if (gc->reg_writel)
-2b280376 Kevin Cernekee  2014-11-06  1124  		gc->reg_writel(val, gc->reg_base + reg_offset);
-2b280376 Kevin Cernekee  2014-11-06  1125  	else
-332fd7c4 Kevin Cernekee  2014-11-06 @1126  		writel(val, gc->reg_base + reg_offset);
-332fd7c4 Kevin Cernekee  2014-11-06  1127  }
-332fd7c4 Kevin Cernekee  2014-11-06  1128  
-332fd7c4 Kevin Cernekee  2014-11-06  1129  static inline u32 irq_reg_readl(struct irq_chip_generic *gc,
-332fd7c4 Kevin Cernekee  2014-11-06  1130  				int reg_offset)
-332fd7c4 Kevin Cernekee  2014-11-06  1131  {
-2b280376 Kevin Cernekee  2014-11-06  1132  	if (gc->reg_readl)
-2b280376 Kevin Cernekee  2014-11-06  1133  		return gc->reg_readl(gc->reg_base + reg_offset);
-2b280376 Kevin Cernekee  2014-11-06  1134  	else
-332fd7c4 Kevin Cernekee  2014-11-06 @1135  		return readl(gc->reg_base + reg_offset);
-332fd7c4 Kevin Cernekee  2014-11-06  1136  }
-332fd7c4 Kevin Cernekee  2014-11-06  1137  
-
-:::::: The code at line 1135 was first introduced by commit
-:::::: 332fd7c4fef5f3b166e93decb07fd69eb24f7998 genirq: Generic chip: Change irq_reg_{readl,writel} arguments
-
-:::::: TO: Kevin Cernekee <cernekee@gmail.com>
-:::::: CC: Jason Cooper <jason@lakedaemon.net>
-
+Signed-off-by: Kirill Marinushkin <k.marinushkin@gmail.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
+Cc: Andy Shevchenko <andy.shevchenko@gmail.com>
+Cc: bcm-kernel-feedback-list at broadcom.com
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devel at driverdev.osuosl.org
+Cc: linux-kernel at vger.kernel.org
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 14302 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/29682d7e/attachment.gz>
+ .../vc04_services/bcm2835-audio/bcm2835-vchiq.c    | 64 +++++++++++++---------
+ .../staging/vc04_services/bcm2835-audio/bcm2835.c  | 43 ++++++++++++++-
+ .../staging/vc04_services/bcm2835-audio/bcm2835.h  | 12 ++++
+ 3 files changed, 91 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
+index 3c6f1d91d22d..389a18f9350a 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-vchiq.c
+@@ -33,7 +33,6 @@
+ 
+ /* ---- Include Files -------------------------------------------------------- */
+ 
+-#include "interface/vchi/vchi.h"
+ #include "vc_vchi_audioserv_defs.h"
+ 
+ /* ---- Private Constants and Types ------------------------------------------ */
+@@ -371,14 +370,46 @@ static int vc_vchi_audio_deinit(struct bcm2835_audio_instance *instance)
+ 	return 0;
+ }
+ 
++int bcm2835_new_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx)
++{
++	int ret;
++
++	/* Initialize and create a VCHI connection */
++	ret = vchi_initialise(&vchi_ctx->vchi_instance);
++	if (ret) {
++		LOG_ERR("%s: failed to initialise VCHI instance (ret=%d)\n",
++			__func__, ret);
++
++		return -EIO;
++	}
++
++	ret = vchi_connect(NULL, 0, vchi_ctx->vchi_instance);
++	if (ret) {
++		LOG_ERR("%s: failed to connect VCHI instance (ret=%d)\n",
++			__func__, ret);
++
++		kfree(vchi_ctx->vchi_instance);
++		vchi_ctx->vchi_instance = NULL;
++
++		return -EIO;
++	}
++
++	return 0;
++}
++
++void bcm2835_free_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx)
++{
++	/* Close the VCHI connection - it will also free vchi_instance */
++	WARN_ON(vchi_disconnect(vchi_ctx->vchi_instance));
++
++	vchi_ctx->vchi_instance = NULL;
++}
++
+ static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream)
+ {
+-	static VCHI_INSTANCE_T vchi_instance;
+-	static VCHI_CONNECTION_T *vchi_connection;
+-	static int initted;
+ 	struct bcm2835_audio_instance *instance =
+ 		(struct bcm2835_audio_instance *)alsa_stream->instance;
+-	int ret;
++	struct bcm2835_vchi_ctx *vhci_ctx = alsa_stream->chip->vchi_ctx;
+ 
+ 	LOG_INFO("%s: start\n", __func__);
+ 	BUG_ON(instance);
+@@ -390,28 +421,9 @@ static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream
+ 		return 0;
+ 	}
+ 
+-	/* Initialize and create a VCHI connection */
+-	if (!initted) {
+-		ret = vchi_initialise(&vchi_instance);
+-		if (ret) {
+-			LOG_ERR("%s: failed to initialise VCHI instance (ret=%d)\n",
+-				__func__, ret);
+-
+-			return -EIO;
+-		}
+-		ret = vchi_connect(NULL, 0, vchi_instance);
+-		if (ret) {
+-			LOG_ERR("%s: failed to connect VCHI instance (ret=%d)\n",
+-				__func__, ret);
+-
+-			kfree(vchi_instance);
+-			return -EIO;
+-		}
+-		initted = 1;
+-	}
+-
+ 	/* Initialize an instance of the audio service */
+-	instance = vc_vchi_audio_init(vchi_instance, &vchi_connection, 1);
++	instance = vc_vchi_audio_init(vhci_ctx->vchi_instance,
++				      &vhci_ctx->vchi_connection, 1);
+ 
+ 	if (IS_ERR(instance)) {
+ 		LOG_ERR("%s: failed to initialize audio service\n", __func__);
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+index 9030d71a3d0b..009c972d93d6 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.c
+@@ -65,6 +65,36 @@ static int snd_devm_add_child(struct device *dev, struct device *child)
+ 	return 0;
+ }
+ 
++static void bcm2835_devm_free_vchi_ctx(struct device *dev, void *res)
++{
++	struct bcm2835_vchi_ctx *vchi_ctx = res;
++
++	bcm2835_free_vchi_ctx(vchi_ctx);
++}
++
++static int bcm2835_devm_add_vchi_ctx(struct device *dev)
++{
++	struct bcm2835_vchi_ctx *vchi_ctx;
++	int ret;
++
++	vchi_ctx = devres_alloc(bcm2835_devm_free_vchi_ctx, sizeof(*vchi_ctx),
++				GFP_KERNEL);
++	if (!vchi_ctx)
++		return -ENOMEM;
++
++	memset(vchi_ctx, 0, sizeof(*vchi_ctx));
++
++	ret = bcm2835_new_vchi_ctx(vchi_ctx);
++	if (ret) {
++		devres_free(vchi_ctx);
++		return ret;
++	}
++
++	devres_add(dev, vchi_ctx);
++
++	return 0;
++}
++
+ static void snd_bcm2835_release(struct device *dev)
+ {
+ 	struct bcm2835_chip *chip = dev_get_drvdata(dev);
+@@ -106,8 +136,6 @@ static int snd_bcm2835_dev_free(struct snd_device *device)
+ 	struct bcm2835_chip *chip = device->device_data;
+ 	struct snd_card *card = chip->card;
+ 
+-	/* TODO: free pcm, ctl */
+-
+ 	snd_device_free(card, chip);
+ 
+ 	return 0;
+@@ -133,6 +161,13 @@ static int snd_bcm2835_create(struct snd_card *card,
+ 
+ 	chip->card = card;
+ 
++	chip->vchi_ctx = devres_find(card->dev->parent,
++				     bcm2835_devm_free_vchi_ctx, NULL, NULL);
++	if (!chip->vchi_ctx) {
++		kfree(chip);
++		return err;
++	}
++
+ 	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
+ 	if (err) {
+ 		kfree(chip);
+@@ -403,6 +438,10 @@ static int snd_bcm2835_alsa_probe_dt(struct platform_device *pdev)
+ 			 numchans);
+ 	}
+ 
++	err = bcm2835_devm_add_vchi_ctx(dev);
++	if (err)
++		return err;
++
+ 	err = snd_add_child_devices(dev, numchans);
+ 	if (err)
+ 		return err;
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
+index f1e43e45fd67..1c82c2ee47dc 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835.h
+@@ -26,6 +26,8 @@
+ #include <sound/pcm-indirect.h>
+ #include <linux/workqueue.h>
+ 
++#include "interface/vchi/vchi.h"
++
+ /*
+  * #define AUDIO_DEBUG_ENABLE
+  * #define AUDIO_VERBOSE_DEBUG_ENABLE
+@@ -97,6 +99,11 @@ enum snd_bcm2835_ctrl {
+ 	PCM_PLAYBACK_DEVICE,
+ };
+ 
++struct bcm2835_vchi_ctx {
++	VCHI_INSTANCE_T vchi_instance;
++	VCHI_CONNECTION_T *vchi_connection;
++};
++
+ /* definition of the chip-specific record */
+ struct bcm2835_chip {
+ 	struct snd_card *card;
+@@ -115,6 +122,8 @@ struct bcm2835_chip {
+ 	unsigned int opened;
+ 	unsigned int spdif_status;
+ 	struct mutex audio_mutex;
++
++	struct bcm2835_vchi_ctx *vchi_ctx;
+ };
+ 
+ struct bcm2835_alsa_stream {
+@@ -153,6 +162,9 @@ int snd_bcm2835_new_simple_pcm(struct bcm2835_chip *chip,
+ int snd_bcm2835_new_hdmi_ctl(struct bcm2835_chip *chip);
+ int snd_bcm2835_new_headphones_ctl(struct bcm2835_chip *chip);
+ 
++int bcm2835_new_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx);
++void bcm2835_free_vchi_ctx(struct bcm2835_vchi_ctx *vchi_ctx);
++
+ int bcm2835_audio_open(struct bcm2835_alsa_stream *alsa_stream);
+ int bcm2835_audio_close(struct bcm2835_alsa_stream *alsa_stream);
+ int bcm2835_audio_set_params(struct bcm2835_alsa_stream *alsa_stream,
+-- 
+2.13.6
