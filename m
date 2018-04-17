@@ -1,30 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Apr 2018 12:17:33 +0100
-Subject: [PATCH 0/3] ASoC: stm32: sai: add support of iec958 controls
-In-Reply-To: <a0552849-47fa-dc72-a512-a3e075adb07f@st.com>
-References: <1520958428-10930-1-git-send-email-olivier.moysan@st.com>
- <a0552849-47fa-dc72-a512-a3e075adb07f@st.com>
-Message-ID: <20180417111733.GG8973@sirena.org.uk>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 17 Apr 2018 13:19:02 +0200
+Subject: [PATCH v6 08/11] ARM: sun9i: smp: Add is_sun8i field
+In-Reply-To: <CAGb2v643iepq4B9ukNag8pzAFWiQ6A31ChfXLkxeExhK4jRm=Q@mail.gmail.com>
+References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
+ <20180416215032.5023-9-mylene.josserand@bootlin.com>
+ <20180417075233.f2z6wxcazwqheoib@flea>
+ <CAGb2v643iepq4B9ukNag8pzAFWiQ6A31ChfXLkxeExhK4jRm=Q@mail.gmail.com>
+Message-ID: <20180417111902.4u6d3mxehxjqibe4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 08:29:17AM +0000, Olivier MOYSAN wrote:
+On Tue, Apr 17, 2018 at 03:57:07PM +0800, Chen-Yu Tsai wrote:
+> >> @@ -697,6 +700,8 @@ static int __init sunxi_mc_smp_init(void)
+> >>                       break;
+> >>       }
+> >>
+> >> +     is_sun8i = sunxi_mc_smp_data[i].is_sun8i;
+> >> +
+> >
+> > Do we really need to cache it? Can't we just have a pointer to the SMP
+> > data structure and use that instead?
+> 
+> I recommended that. We don't need any of the other fields in the SMP
+> data structure once we're past the init phase. This saves a dereference
+> or two.
 
-> I guess the blocking patch in this patchset is the patch "add IEC958 
-> channel status control helper". This patch has been reviewed several 
-> times, but did not get a ack so far.
-> If you think these helpers will not be merged, I will reintegrate the 
-> corresponding code in stm driver.
-> Please let me know, if I need to prepare a v2 without helpers, or if we 
-> can go further in the review of iec helpers patch ?
+Fair enough.
 
-I don't mind either way but you're right here, I'm waiting for Takashi
-to review the first patch.  I'd probably be OK with it just integrated
-into the driver if we have to go that way though.
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 488 bytes
+Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/17ffbb43/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/8d70754c/attachment.sig>
