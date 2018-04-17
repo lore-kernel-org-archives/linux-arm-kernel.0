@@ -1,83 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Apr 2018 10:53:11 +0200
-Subject: [PATCH] ARM: dts: Fix NAS4220B pin config
-Message-ID: <20180417085311.13829-1-linus.walleij@linaro.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 17 Apr 2018 11:07:01 +0200
+Subject: [PATCH 6/6] spi: spi-s3c64xx: Allow higher transfer lengths in
+ polling IO mode
+In-Reply-To: <93a6b80d599a40a39ae396f5dcd7c5b7@etezian.org>
+References: <20180416154021.25626-1-s.nawrocki@samsung.com>
+ <CGME20180416154208epcas1p1774dd679e3564be916901a180315943b@epcas1p1.samsung.com>
+ <20180416154021.25626-6-s.nawrocki@samsung.com>
+ <93a6b80d599a40a39ae396f5dcd7c5b7@etezian.org>
+Message-ID: <4a7a1eb3-a953-c47b-317a-2d96e414961f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DTS file for the NAS4220B had the pin config for the
-ethernet interface set to the pins in the SL3512 SoC while
-this system is using SL3516. Fix it by referencing the
-right SL3516 pins instead of the SL3512 pins.
+Hi Andi,
 
-Cc: stable at vger.kernel.org
-Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-Reported-by: Andreas Fiedler <andreas.fiedler@gmx.net>
-Reported-by: Roman Yeryomin <roman@advem.lv>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC folks: if this gets a Tested-by or similar from
-someone with the NAS4220B please apply it directly to
-the ARM SoC tree for fixes.
----
- arch/arm/boot/dts/gemini-nas4220b.dts | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+On 04/16/2018 09:19 PM, andi at etezian.org wrote:
+> On 17.04.2018 00:40, Sylwester Nawrocki wrote:
+>> Some variants of the SPI controller have no DMA support, in such case
+>> SPI transfers longer than the FIFO length are not currently properly
+>> handled by the driver. Fix it by doing multiple transfers in the
+>> s3c64xx_spi_transfer_one() function if the SPI transfer length exceeds
+>> the FIFO size.
+> 
+> this patch is a mix of cosmetics and what you are actually describing
+> in the commit log...
+> 
+>> @@ -634,11 +634,15 @@ static int s3c64xx_spi_transfer_one(struct
+>> spi_master *master,
+>>  				    struct spi_transfer *xfer)
+>>  {
+>>  	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
+>> +	const unsigned int fifo_len = (FIFO_LVL_MASK(sdd) >> 1) + 1;
+>> +	const void *tx_buf = NULL;
+>> +	void *rx_buf = NULL;
+>> +	int target_len = 0, origin_len = 0;
+>> +	bool use_dma = false;
+>>  	int status;
+>>  	u32 speed;
+>>  	u8 bpw;
+>>  	unsigned long flags;
+>> -	int use_dma;
+> 
+> ... for example 'use_dma' bool instead of int or the 'fifo_len'. I agree
+> with these changes and, even though they are trivial, I would prefer
+> having them in separate patches.
 
-diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
-index 8bbb6f85d161..4785fbcc41ed 100644
---- a/arch/arm/boot/dts/gemini-nas4220b.dts
-+++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-@@ -134,37 +134,37 @@
- 						function = "gmii";
- 						groups = "gmii_gmac0_grp";
- 					};
--					/* Settings come from OpenWRT */
-+					/* Settings come from OpenWRT, pins on SL3516 */
- 					conf0 {
--						pins = "R8 GMAC0 RXDV", "U11 GMAC1 RXDV";
-+						pins = "V8 GMAC0 RXDV", "T10 GMAC1 RXDV";
- 						skew-delay = <0>;
- 					};
- 					conf1 {
--						pins = "T8 GMAC0 RXC", "T11 GMAC1 RXC";
-+						pins = "Y7 GMAC0 RXC", "Y11 GMAC1 RXC";
- 						skew-delay = <15>;
- 					};
- 					conf2 {
--						pins = "P8 GMAC0 TXEN", "V11 GMAC1 TXEN";
-+						pins = "T8 GMAC0 TXEN", "W11 GMAC1 TXEN";
- 						skew-delay = <7>;
- 					};
- 					conf3 {
--						pins = "V7 GMAC0 TXC";
-+						pins = "U8 GMAC0 TXC";
- 						skew-delay = <11>;
- 					};
- 					conf4 {
--						pins = "P10 GMAC1 TXC";
-+						pins = "V11 GMAC1 TXC";
- 						skew-delay = <10>;
- 					};
- 					conf5 {
- 						/* The data lines all have default skew */
--						pins = "U8 GMAC0 RXD0", "V8 GMAC0 RXD1",
--						       "P9 GMAC0 RXD2", "R9 GMAC0 RXD3",
--						       "U7 GMAC0 TXD0", "T7 GMAC0 TXD1",
--						       "R7 GMAC0 TXD2", "P7 GMAC0 TXD3",
--						       "R11 GMAC1 RXD0", "P11 GMAC1 RXD1",
--						       "V12 GMAC1 RXD2", "U12 GMAC1 RXD3",
--						       "R10 GMAC1 TXD0", "T10 GMAC1 TXD1",
--						       "U10 GMAC1 TXD2", "V10 GMAC1 TXD3";
-+						pins = "W8 GMAC0 RXD0", "V9 GMAC0 RXD1",
-+						       "Y8 GMAC0 RXD2", "U9 GMAC0 RXD3",
-+						       "T7 GMAC0 TXD0", "U6 GMAC0 TXD1",
-+						       "V7 GMAC0 TXD2", "U7 GMAC0 TXD3",
-+						       "Y12 GMAC1 RXD0", "V12 GMAC1 RXD1",
-+						       "T11 GMAC1 RXD2", "W12 GMAC1 RXD3",
-+						       "U10 GMAC1 TXD0", "Y10 GMAC1 TXD1",
-+						       "W10 GMAC1 TXD2", "T9 GMAC1 TXD3";
- 						skew-delay = <7>;
- 					};
- 					/* Set up drive strength on GMAC0 to 16 mA */
+Thanks for your review! I will split that into 3 patches then, however
+it seems a bit dubious to have the fifo_len change on its own.
+
 -- 
-2.14.3
+Regards,
+Sylwester
