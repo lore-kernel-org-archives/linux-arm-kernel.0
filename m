@@ -1,102 +1,57 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 17 Apr 2018 10:13:21 +0200
-Subject: [PATCH 4/9] ARM: dts: bcm2837: Add Raspberry Pi 3 B+
-In-Reply-To: <20180416204331.ft4ehpe5statsw4u@rob-hp-laptop>
-References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
- <1523640478-4448-5-git-send-email-stefan.wahren@i2se.com>
- <20180416204331.ft4ehpe5statsw4u@rob-hp-laptop>
-Message-ID: <60625d11-c521-b004-d64c-f72c9c6aac83@i2se.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 17 Apr 2018 16:16:39 +0800
+Subject: [PATCH v5 2/7] clk: meson: aoclk: refactor common code into
+ dedicated file
+In-Reply-To: <1523875084.2601.28.camel@baylibre.com>
+References: <20180409143749.71197-1-yixun.lan@amlogic.com>
+ <20180409143749.71197-3-yixun.lan@amlogic.com>
+ <1523875084.2601.28.camel@baylibre.com>
+Message-ID: <759078f5-fcbf-9ef1-6945-67d9d951d8eb@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Jerome
 
-Am 16.04.2018 um 22:43 schrieb Rob Herring:
-> On Fri, Apr 13, 2018 at 07:27:53PM +0200, Stefan Wahren wrote:
->> The Raspberry Pi 3 B+ has the following major differences compared
->> to the model 3 B:
->> * Microchip LAN7515 (Gigabit Ethernet)
->> * Cypress CYW43455 (802.11n/ac and BT 4.2)
->>
->> We need to add the USB LAN chip so the bootloader can add the MAC address.
->> This is necessary because there ain't a EEPROM or a valid OTP.
->>
->> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> ---
->>   arch/arm/boot/dts/Makefile                 |   1 +
->>   arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts | 108 +++++++++++++++++++++++++++++
->>   arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi |  27 ++++++++
->>   3 files changed, 136 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
->>   create mode 100644 arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
->>
->> ...
->> diff --git a/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
->> new file mode 100644
->> index 0000000..169203c
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
-> Why the separate file? This can be shared?
-
-this comes from the assumption the RPi 3 B+ won't be the only RPi board 
-with a LAN7515. Should i fold it in the dts file as long as we don't 
-have a second board?
-
->
->> @@ -0,0 +1,27 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/ {
->> +	aliases {
->> +		ethernet0 = &ethernet;
->> +	};
->> +};
+On 04/16/18 18:38, Jerome Brunet wrote:
+>> +	 */
+>> +	for (clkid = 0; clkid < data->num_clks; clkid++) {
+>> +		data->clks[clkid]->map = regmap;
 >> +
->> +&usb {
->> +	usb1 at 1 {
->> +		compatible = "usb424,2514";
->> +		reg = <1>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
+>> +		ret = devm_clk_hw_register(dev, data->hw_data->hws[clkid]);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
 >> +
->> +		usb1_1 at 1 {
-> usb-port at 1
->
->> +			compatible = "usb424,2514";
-> There's really 2 levels of hubs?
+>> +	return devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get,
+>> +		(void *) data->hw_data);
+>> +}
+> Missing new line here. Please run checkpatch and pay attention to git warnings
+> about whitespace errors.
+> 
 
-Yes, lsusb -t shows the following:
 
-/:? Bus 01.Port 1: Dev 1, Class=root_hub, Driver=dwc2/1p, 480M
- ??? |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/4p, 480M
- ??????? |__ Port 1: Dev 3, If 0, Class=Hub, Driver=hub/3p, 480M
- ??????????? |__ Port 2: Dev 5, If 0, Class=Human Interface Device, 
-Driver=usbhid, 1.5M
- ??????????? |__ Port 1: Dev 6, If 0, Class=Vendor Specific Class, 
-Driver=lan78xx, 480M
- ??????? |__ Port 2: Dev 7, If 0, Class=Mass Storage, 
-Driver=usb-storage, 480M
- ??????? |__ Port 3: Dev 4, If 0, Class=Human Interface Device, 
-Driver=usbhid, 1.5M
+I think we actually need to avoid this extra new line, or what's the
+benefits with new line?
 
->
->> +			reg = <1>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			ethernet: usbether at 1 {
-> ethernet at 1
->
->> +				compatible = "usb424,7800";
->> +				reg = <1>;
->> +			};
->> +		};
->> +	};
->> +};
->> -- 
->> 2.7.4
->>
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+and besides? I didn't see any complaint from checkpatch.pl ..
+
+ ./scripts/checkpatch.pl
+0002-clk-meson-aoclk-refactor-common-code-into-dedicated-.patch
+WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+#235:
+new file mode 100644
+
+total: 0 errors, 1 warnings, 302 lines checked
+
+NOTE: For some of the reported defects, checkpatch may be able to
+      mechanically convert to the typical style using --fix or
+--fix-inplace.
+
+0002-clk-meson-aoclk-refactor-common-code-into-dedicated-.patch has
+style problems, please review.
+
+NOTE: If any of the errors are false positives, please report
+      them to the maintainer, see CHECKPATCH in MAINTAINERS.
+
+
+Yixun
