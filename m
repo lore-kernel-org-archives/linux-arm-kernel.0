@@ -1,112 +1,78 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 17 Apr 2018 09:37:59 +0200
-Subject: [PATCH v4 2/6] mfd: stm32-timers: add support for dmas
-In-Reply-To: <20180417071250.yhgl7c7apn7w53xf@dell>
-References: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
- <1523895561-4073-3-git-send-email-fabrice.gasnier@st.com>
- <20180417071250.yhgl7c7apn7w53xf@dell>
-Message-ID: <34e30463-6236-a8e4-fd1f-6217612375eb@st.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Tue, 17 Apr 2018 10:39:24 +0300
+Subject: [PATCH v3 06/11] iio: inkern: add module put/get on iio dev
+ module when requesting channels
+In-Reply-To: <20180416235821.GF77055@dtor-ws>
+References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
+ <1523350677-27106-7-git-send-email-eugen.hristev@microchip.com>
+ <20180415203321.1aaaf91e@archlinux> <20180416235821.GF77055@dtor-ws>
+Message-ID: <67771f4c-d30c-4a28-2a9b-d5585186d60a@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2018 09:12 AM, Lee Jones wrote:
-> On Mon, 16 Apr 2018, Fabrice Gasnier wrote:
-> 
->> STM32 Timers can support up to 7 DMA requests:
->> - 4 channels, update, compare and trigger.
->> Optionally request part, or all DMAs from stm32-timers MFD core.
+
+
+On 17.04.2018 02:58, Dmitry Torokhov wrote:
+> On Sun, Apr 15, 2018 at 08:33:21PM +0100, Jonathan Cameron wrote:
+>> On Tue, 10 Apr 2018 11:57:52 +0300
+>> Eugen Hristev <eugen.hristev@microchip.com> wrote:
 >>
->> Also add routine to implement burst reads using DMA from timer registers.
->> This is exported. So, it can be used by child drivers, PWM capture
->> for instance (but not limited to).
+>>> When requesting channels for a particular consumer device,
+>>> besides requesting the device (incrementing the reference counter), also
+>>> do it for the driver module of the iio dev. This will avoid the situation
+>>> where the producer IIO device can be removed and the consumer is still
+>>> present in the kernel.
+>>>
+>>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>>> ---
+>>>   drivers/iio/inkern.c | 8 +++++++-
+>>>   1 file changed, 7 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+>>> index ec98790..68d9b87 100644
+>>> --- a/drivers/iio/inkern.c
+>>> +++ b/drivers/iio/inkern.c
+>>> @@ -11,6 +11,7 @@
+>>>   #include <linux/slab.h>
+>>>   #include <linux/mutex.h>
+>>>   #include <linux/of.h>
+>>> +#include <linux/module.h>
+>>>   
+>>>   #include <linux/iio/iio.h>
+>>>   #include "iio_core.h"
+>>> @@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
+>>>   	if (index < 0)
+>>>   		goto err_put;
+>>>   	channel->channel = &indio_dev->channels[index];
+>>> +	try_module_get(channel->indio_dev->driver_module);
 >>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->> ---
->> Changes in v4:
->> - Lee's comments: Add kerneldoc header, better format comments.
->> Changes in v3:
->> - Basically Lee's comments:
->> - rather create a struct stm32_timers_dma, and place a reference to it
->>   in existing ddata (instead of adding priv struct).
->> - rather use a struct device in exported routine prototype, and use
->>   standard helpers instead of ddata. Get rid of to_stm32_timers_priv().
->> - simplify error handling in probe (remove a goto)
->> - comment on devm_of_platform_*populate() usage.
+>> And if it fails? (the module we are trying to get is going away...)
 >>
->> Changes in v2:
->> - Abstract DMA handling from child driver: move it to MFD core
->> - Add comments on optional dma support
->> ---
->>  drivers/mfd/stm32-timers.c       | 227 ++++++++++++++++++++++++++++++++++++++-
->>  include/linux/mfd/stm32-timers.h |  32 ++++++
->>  2 files changed, 257 insertions(+), 2 deletions(-)
+>> We should try and handle it I think. Be it by just erroring out of here.
 > 
-> [...]
+> Even more, this has nothing to do with modules. A device can go away for
+> any number of reasons (we unbind it manually via sysfs, we pull the USB
+> plug from the host in case it is USB-connected device, we unload I2C
+> adapter for the bus device resides on, we kick underlying PCI device)
+> and we should be able to handle this in some fashion. Handling errors
+> from reads and ignoring garbage is one of methods.
 > 
->> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
->> index 2aadab6..a04d7a1 100644
->> --- a/include/linux/mfd/stm32-timers.h
->> +++ b/include/linux/mfd/stm32-timers.h
->> @@ -8,6 +8,8 @@
->>  #define _LINUX_STM32_GPTIMER_H_
->>  
->>  #include <linux/clk.h>
->> +#include <linux/dmaengine.h>
->> +#include <linux/dma-mapping.h>
->>  #include <linux/regmap.h>
+> FWIW this is a NACK from me.
 > 
-> [...]
-> 
->> +struct stm32_timers_dma;
->> +
->>  struct stm32_timers {
->>  	struct clk *clk;
->>  	struct regmap *regmap;
->>  	u32 max_arr;
->> +	struct stm32_timers_dma *dma; /* Only to be used by the parent */
-> 
-> I'm confused.  I thought the point of putting this comment in was so
-> that you could place the definition of 'stm32_timers_dma' and remove
-> the forward declaration?
+> Thanks.
+Hello,
 
-Hi Lee,
+This patch is actually a "best effort attempt" for the consumer driver 
+(touch driver) to get a reference to the producer of the data (the IIO 
+device), when it requests the specific channels.
+As of this moment, there is no attempt whatsoever for the consumer to 
+have a reference on the producer driver. Thus, the producer can be 
+removed at any time, and the consumer will fail ungraciously.
+I can change the perspective from "best effort" to "mandatory" to get a 
+reference to the producer, or you wish to stop trying to get any 
+reference at all (remove this patch completely) ?
 
-Sorry, if I miss-understood the point then. So, do you wish I both:
-- move the full struct definition in above header ?
-- and keep this comment ?
+Thanks,
+Eugen
 
-+/**
-+ * struct stm32_timers_dma - STM32 timer DMA handling.
-+ * @completion:		end of DMA transfer completion
-+ * @phys_base:		control registers physical base address
-+ * @lock:		protect DMA access
-+ * @chan:		DMA channel in use
-+ * @chans:		DMA channels available for this timer instance
-+ */
-+struct stm32_timers_dma {
-+	struct completion completion;
-+	phys_addr_t phys_base;
-+	struct mutex lock;
-+	struct dma_chan *chan;
-+	struct dma_chan *chans[STM32_TIMERS_MAX_DMAS];
-+};
-
-This will basically expose the struct to child drivers. But I'm ok if
-you think this is acceptable.
-
-I can send a V5 if you wish...
-
-Please advise,
-Best regards,
-Fabrice
-
-> 
->>  };
->> +
->> +int stm32_timers_dma_burst_read(struct device *dev, u32 *buf,
->> +				enum stm32_timers_dmas id, u32 reg,
->> +				unsigned int num_reg, unsigned int bursts,
->> +				unsigned long tmo_ms);
->>  #endif
 > 
