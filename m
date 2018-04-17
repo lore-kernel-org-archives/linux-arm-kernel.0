@@ -1,145 +1,86 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Apr 2018 19:37:24 +0100
-Subject: [PATCHv3 00/11] ARMv8.3 pointer authentication userspace support
-Message-ID: <20180417183735.56985-1-mark.rutland@arm.com>
+Date: Tue, 17 Apr 2018 19:37:27 +0100
+Subject: [PATCHv3 03/11] arm64/kvm: hide ptrauth from guests
+In-Reply-To: <20180417183735.56985-1-mark.rutland@arm.com>
+References: <20180417183735.56985-1-mark.rutland@arm.com>
+Message-ID: <20180417183735.56985-4-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the ARMv8.3 pointer authentication extension,
-enabling userspace return address protection with recent versions of GCC.
+In subsequent patches we're going to expose ptrauth to the host kernel
+and userspace, but things are a bit trickier for guest kernels. For the
+time being, let's hide ptrauth from KVM guests.
 
-Since RFC [1]:
-* Make the KVM context switch (semi-lazy)
-* Rebase to v4.13-rc1
-* Improve pointer authentication documentation
-* Add hwcap documentation
-* Various minor cleanups
+Regardless of how well-behaved the guest kernel is, guest userspace
+could attempt to use ptrauth instructions, triggering a trap to EL2,
+resulting in noise from kvm_handle_unknown_ec(). So let's write up a
+handler for the PAC trap, which silently injects an UNDEF into the
+guest, as if the feature were really missing.
 
-Since v1 [2]:
-* Rebase to v4.15-rc1
-* Settle on per-process keys
-* Strip PACs when unwinding userspace
-* Don't expose an XPAC hwcap (this is implied by ID registers)
-* Leave APIB, ABPDA, APDB, and APGA keys unsupported for now
-* Support IMP DEF algorithms
-* Rely on KVM ID register emulation
-* Various cleanups
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
+---
+ arch/arm64/kvm/handle_exit.c | 18 ++++++++++++++++++
+ arch/arm64/kvm/sys_regs.c    |  9 +++++++++
+ 2 files changed, 27 insertions(+)
 
-Since v2 [3]:
-* Unify HCR_EL2 initialization
-* s/POINTER_AUTHENTICATION/PTR_AUTH/
-* Drop KVM support (for now)
-* Drop detection of generic authentication
-
-While there are use-cases for keys other than APIAKey, the only software that
-I'm aware of with pointer authentication support is GCC, which only makes use
-of APIAKey. I'm happy to add support for other keys as users appear.
-
-I've pushed the series to the arm64/pointer-auth branch [4] of my linux tree.
-I've also pushed out a necessary bootwrapper patch to the pointer-auth branch
-[5] of my bootwrapper repo.
-
-
-Extension Overview 
-==================
-
-The ARMv8.3 pointer authentication extension adds functionality to detect
-modification of pointer values, mitigating certain classes of attack such as
-stack smashing, and making return oriented programming attacks harder
-
-The extension introduces the concept of a pointer authentication code (PAC),
-which is stored in some upper bits of pointers. Each PAC is derived from the
-original pointer, another 64-bit value (e.g. the stack pointer), and a secret
-128-bit key.
-
-New instructions are added which can be used to:
-
-* Insert a PAC into a pointer
-* Strip a PAC from a pointer
-* Authenticate strip a PAC from a pointer
-
-If authentication succeeds, the code is removed, yielding the original pointer.
-If authentication fails, bits are set in the pointer such that it is guaranteed
-to cause a fault if used.
-
-These instructions can make use of four keys:
-
-* APIAKey (A.K.A. Instruction A key)
-* APIBKey (A.K.A. Instruction B key)
-* APDAKey (A.K.A. Data A key)
-* APDBKey (A.K.A. Data B Key)
-
-A subset of these instruction encodings have been allocated from the HINT
-space, and will operate as NOPs on any ARMv8-A parts which do not feature the
-extension (or if purposefully disabled by the kernel). Software using only this
-subset of the instructions should function correctly on all ARMv8-A parts.
-
-Additionally, instructions are added to authenticate small blocks of memory in
-similar fashion, using APGAKey (A.K.A. Generic key).
-
-
-This Series
-===========
-
-This series enables the use of instructions using APIAKey, which is initialised
-and maintained per-process (shared by all threads). This series does not add
-support for APIBKey, APDAKey, APDBKey, nor APGAKey.
-
-I've given this some basic testing with a homebrew test suite. More ideally,
-we'd add some tests to the kernel source tree.
-
-For the time being, pointer authentication functionality is hidden from
-guests via ID register trapping.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-April/498941.html
-[2] https://lkml.kernel.org/r/1500480092-28480-1-git-send-email-mark.rutland at arm.com
-[3] https://lkml.kernel.org/r/20171127163806.31435-1-mark.rutland at arm.com
-[4] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/pointer-auth
-[5] git://git.kernel.org/pub/scm/linux/kernel/git/mark/boot-wrapper-aarch64.git pointer-auth
-
-
-Mark Rutland (11):
-  arm64: add pointer authentication register bits
-  arm64/kvm: consistently handle host HCR_EL2 flags
-  arm64/kvm: hide ptrauth from guests
-  arm64: Don't trap host pointer auth use to EL2
-  arm64/cpufeature: detect pointer authentication
-  asm-generic: mm_hooks: allow hooks to be overridden individually
-  arm64: add basic pointer authentication support
-  arm64: expose user PAC bit positions via ptrace
-  arm64: perf: strip PAC when unwinding userspace
-  arm64: enable pointer authentication
-  arm64: docs: document pointer authentication
-
- Documentation/arm64/booting.txt                |   8 ++
- Documentation/arm64/elf_hwcaps.txt             |   6 ++
- Documentation/arm64/pointer-authentication.txt |  84 ++++++++++++++++++++
- arch/arm64/Kconfig                             |  23 ++++++
- arch/arm64/include/asm/cpucaps.h               |   5 +-
- arch/arm64/include/asm/esr.h                   |   3 +-
- arch/arm64/include/asm/kvm_arm.h               |   3 +
- arch/arm64/include/asm/mmu.h                   |   5 ++
- arch/arm64/include/asm/mmu_context.h           |  25 +++++-
- arch/arm64/include/asm/pointer_auth.h          | 104 +++++++++++++++++++++++++
- arch/arm64/include/asm/sysreg.h                |  30 +++++++
- arch/arm64/include/uapi/asm/hwcap.h            |   1 +
- arch/arm64/include/uapi/asm/ptrace.h           |   7 ++
- arch/arm64/kernel/cpufeature.c                 |  56 +++++++++++++
- arch/arm64/kernel/cpuinfo.c                    |   1 +
- arch/arm64/kernel/head.S                       |   5 +-
- arch/arm64/kernel/perf_callchain.c             |   5 +-
- arch/arm64/kernel/ptrace.c                     |  38 +++++++++
- arch/arm64/kvm/handle_exit.c                   |  18 +++++
- arch/arm64/kvm/hyp/switch.c                    |   2 +-
- arch/arm64/kvm/sys_regs.c                      |   9 +++
- include/asm-generic/mm_hooks.h                 |  11 +++
- include/uapi/linux/elf.h                       |   1 +
- 23 files changed, 441 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/arm64/pointer-authentication.txt
- create mode 100644 arch/arm64/include/asm/pointer_auth.h
-
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index e5e741bfffe1..5114ad691eae 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -173,6 +173,23 @@ static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
+ }
+ 
++/*
++ * Guest usage of a ptrauth instruction (which the guest EL1 did not turn into
++ * a NOP), or guest EL1 access to a ptrauth register.
++ */
++static int kvm_handle_ptrauth(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	/*
++	 * We don't currently suport ptrauth in a guest, and we mask the ID
++	 * registers to prevent well-behaved guests from trying to make use of
++	 * it.
++	 *
++	 * Inject an UNDEF, as if the feature really isn't present.
++	 */
++	kvm_inject_undefined(vcpu);
++	return 1;
++}
++
+ static exit_handle_fn arm_exit_handlers[] = {
+ 	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
+ 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+@@ -195,6 +212,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
+ 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
+ 	[ESR_ELx_EC_FP_ASIMD]	= handle_no_fpsimd,
++	[ESR_ELx_EC_PAC]	= kvm_handle_ptrauth,
+ };
+ 
+ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 806b0b126a64..eee399c35e84 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1000,6 +1000,15 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+ 				    task_pid_nr(current));
+ 
+ 		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
++	} else if (id == SYS_ID_AA64ISAR1_EL1) {
++		const u64 ptrauth_mask = (0xfUL << ID_AA64ISAR1_APA_SHIFT) |
++					 (0xfUL << ID_AA64ISAR1_API_SHIFT) |
++					 (0xfUL << ID_AA64ISAR1_GPA_SHIFT) |
++					 (0xfUL << ID_AA64ISAR1_GPI_SHIFT);
++		if (val & ptrauth_mask)
++			pr_err_once("kvm [%i]: ptrauth unsupported for guests, suppressing\n",
++					task_pid_nr(current));
++		val &= ~ptrauth_mask;
+ 	} else if (id == SYS_ID_AA64MMFR1_EL1) {
+ 		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
+ 			pr_err_once("kvm [%i]: LORegions unsupported for guests, suppressing\n",
 -- 
 2.11.0
