@@ -1,62 +1,42 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 16 Apr 2018 16:58:21 -0700
-Subject: [PATCH v3 06/11] iio: inkern: add module put/get on iio dev
- module when requesting channels
-In-Reply-To: <20180415203321.1aaaf91e@archlinux>
-References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
- <1523350677-27106-7-git-send-email-eugen.hristev@microchip.com>
- <20180415203321.1aaaf91e@archlinux>
-Message-ID: <20180416235821.GF77055@dtor-ws>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Mon, 16 Apr 2018 20:14:57 -0500
+Subject: [PATCH v2] ARM: dts: Add am335x-pocketbeagle
+In-Reply-To: <6A6A9948-48C5-453E-A84F-8B8CA2C00D88@gmail.com>
+References: <20180416220828.19338-1-robertcnelson@gmail.com>
+ <6A6A9948-48C5-453E-A84F-8B8CA2C00D88@gmail.com>
+Message-ID: <CAOCHtYjo=HhGxqFrte5TPo1-UQvwyGHJHMjfZ7HaLCtsjOOhvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 15, 2018 at 08:33:21PM +0100, Jonathan Cameron wrote:
-> On Tue, 10 Apr 2018 11:57:52 +0300
-> Eugen Hristev <eugen.hristev@microchip.com> wrote:
-> 
-> > When requesting channels for a particular consumer device,
-> > besides requesting the device (incrementing the reference counter), also
-> > do it for the driver module of the iio dev. This will avoid the situation
-> > where the producer IIO device can be removed and the consumer is still
-> > present in the kernel.
-> > 
-> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> > ---
-> >  drivers/iio/inkern.c | 8 +++++++-
-> >  1 file changed, 7 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
-> > index ec98790..68d9b87 100644
-> > --- a/drivers/iio/inkern.c
-> > +++ b/drivers/iio/inkern.c
-> > @@ -11,6 +11,7 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/mutex.h>
-> >  #include <linux/of.h>
-> > +#include <linux/module.h>
-> >  
-> >  #include <linux/iio/iio.h>
-> >  #include "iio_core.h"
-> > @@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
-> >  	if (index < 0)
-> >  		goto err_put;
-> >  	channel->channel = &indio_dev->channels[index];
-> > +	try_module_get(channel->indio_dev->driver_module);
-> 
-> And if it fails? (the module we are trying to get is going away...)
-> 
-> We should try and handle it I think. Be it by just erroring out of here.
+On Mon, Apr 16, 2018 at 5:27 PM, Jason Kridner <jkridner@gmail.com> wrote:
+>
+>
+>> On Apr 16, 2018, at 6:08 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
+>>
+>> PocketBeagle is an ultra-tiny-yet-complete open-source USB-key-fob computer.
+>>
+>> This board can be indentified by the BPxx value after A335BNLT (BBB)
+>> in the at24 eeprom:
+>> BPxx [aa 55 33 ee 41 33 33 35  42 4e 4c 54 42 50 30 30 |.U3.A335BNLTBP00|]
+>
+> The EEPROM value isn?t right. We made it PBGL instead of using BNLT.
 
-Even more, this has nothing to do with modules. A device can go away for
-any number of reasons (we unbind it manually via sysfs, we pull the USB
-plug from the host in case it is USB-connected device, we unload I2C
-adapter for the bus device resides on, we kick underlying PCI device)
-and we should be able to handle this in some fashion. Handling errors
-from reads and ignoring garbage is one of methods.
+Thanks Jason,
 
-FWIW this is a NACK from me.
+Yeah I must have got distracted and coped the one off "PocketBone"
+value, in v3 i have it changed to:
 
-Thanks.
++This board family can be indentified by the A335PBGL in the at24 eeprom:
++A2: [aa 55 33 ee 41 33 33 35  50 42 47 4c 30 30 41 32 |.U3.A335PBGL00A2|]
+
+
+> Is there anything preventing the PRU and GPIO pins from being defined? I guess the GPIO pins might not be exposed through SYSFS due to lack of upstream drivers, but could the pinmux at least be set?
+
+Yeah, we could add those default pinmux's too like I did for spi, (we
+use a spidev node, but that can't go mainline)
+
+Regards,
 
 -- 
-Dmitry
+Robert Nelson
+https://rcn-ee.com/
