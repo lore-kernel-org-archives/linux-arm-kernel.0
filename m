@@ -1,75 +1,93 @@
-From: yossim@codeaurora.org (Yossi Mansharoff)
-Date: Tue, 17 Apr 2018 16:56:30 +0300
-Subject: [PATCH v2] arm64: dts: qcom: Collapse usb support into one node
-Message-ID: <1523973390-2387-1-git-send-email-yossim@codeaurora.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 17 Apr 2018 19:27:46 +0530
+Subject: [RESEND PATCH v2 2/4] memory: aemif: add support for board files
+In-Reply-To: <20180417102917.7794-3-brgl@bgdev.pl>
+References: <20180417102917.7794-1-brgl@bgdev.pl>
+ <20180417102917.7794-3-brgl@bgdev.pl>
+Message-ID: <d3584cd9-904c-c737-8a06-92ed05f559ce@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have three device nodes for the same USB hardware
-block, as evident by the reuse of the same reg address multiple
-times. Now that the chipidea driver fully supports OTG with the
-MSM wrapper we can collapse all these nodes into one USB device
-node, reflecting the true nature of the hardware.
+On Tuesday 17 April 2018 03:59 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> Currently aemif is supported in two places separately. By the platform
+> driver in drivers/memory and by a hand crafted driver in mach-davinci.
+> 
+> We want to drop the latter but also keep the legacy mode. Add support
+> for board files to the aemif driver.
+> 
+> The new structure in platform data currently only contains the chip
+> select number, since currently existing users don't require anything
+> else, but it can be extended in the future.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  drivers/memory/ti-aemif.c              | 57 +++++++++++++++++---------
+>  include/linux/platform_data/ti-aemif.h |  9 ++++
+>  2 files changed, 46 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
+> index 588e58d40d1b..27d2b076f465 100644
+> --- a/drivers/memory/ti-aemif.c
+> +++ b/drivers/memory/ti-aemif.c
 
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+> @@ -394,14 +401,24 @@ static int aemif_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/*
+> -	 * Create a child devices explicitly from here to
+> -	 * guarantee that the child will be probed after the AEMIF timing
+> -	 * parameters are set.
+> +	 * Create a child devices explicitly from here to guarantee that the
+> +	 * child will be probed after the AEMIF timing parameters are set.
+>  	 */
+> -	for_each_available_child_of_node(np, child_np) {
+> -		ret = of_platform_populate(child_np, NULL, dev_lookup, dev);
+> -		if (ret < 0)
+> -			goto error;
+> +	if (np) {
+> +		for_each_available_child_of_node(np, child_np) {
+> +			ret = of_platform_populate(child_np, NULL,
+> +						   dev_lookup, dev);
+> +			if (ret < 0)
+> +				goto error;
+> +		}
+> +	} else {
+> +		for (i = 0; i < pdata->num_sub_devices; i++) {
+> +			ret = platform_device_register(&pdata->sub_devices[i]);
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index 9ff8487..1505921 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -18,6 +18,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/sound/apq8016-lpass.h>
-+#include <dt-bindings/mux/mux.h>
- 
- /*
-  * GPIO name legend: proper name = the GPIO line is used as GPIO
-@@ -371,18 +372,18 @@
- 			adp-disable;
- 			hnp-disable;
- 			srp-disable;
--			dr_mode = "host";
--			pinctrl-names = "default";
--			pinctrl-0 = <&usb_sw_sel_pm>;
-+			mux-controls = <&usb_switch>;
-+			mux-control-names = "usb_switch";
-+
- 			ulpi {
- 				phy {
- 					v1p8-supply = <&pm8916_l7>;
- 					v3p3-supply = <&pm8916_l13>;
--					extcon = <&usb_id>;
- 				};
- 			};
- 		};
- 
-+
- 		lpass at 7708000 {
- 			status = "okay";
- 		};
-@@ -512,11 +513,17 @@
- 
- 	usb_id: usb-id {
- 		compatible = "linux,extcon-usb-gpio";
--		vbus-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
-+		id-gpio = <&msmgpio 121 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&usb_id_default>;
- 	};
- 
-+	usb_switch: usb-switch {
-+		compatible = "gpio-mux";
-+		mux-gpios = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
-+		#mux-control-cells = <0>;
-+	};
-+
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Before doing this can we make aemif device the parent of the sub_device?
+
+> +			if (ret) {
+> +				dev_warn(dev, "Error register sub device %s\n",
+> +					 pdata->sub_devices[i].name);
+> +			}
+> +		}
+>  	}
+>  
+>  	return 0;
+> diff --git a/include/linux/platform_data/ti-aemif.h b/include/linux/platform_data/ti-aemif.h
+> index ac72e115093c..dfe8901128c9 100644
+> --- a/include/linux/platform_data/ti-aemif.h
+> +++ b/include/linux/platform_data/ti-aemif.h
+> @@ -16,8 +16,17 @@
+>  
+>  #include <linux/of_platform.h>
+>  
+> +struct aemif_abus_data {
+> +	u32 cs;
+> +};
+> +
+>  struct aemif_platform_data {
+>  	struct of_dev_auxdata *dev_lookup;
+> +	u32 cs_offset;
+> +	struct aemif_abus_data *abus_data;
+> +	size_t num_abus_data;
+> +	struct platform_device *sub_devices;
+> +	size_t num_sub_devices;
+
+It will be nice to add documentation for these members.
+
+Thanks,
+Sekhar
