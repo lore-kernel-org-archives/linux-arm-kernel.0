@@ -1,52 +1,31 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 17 Apr 2018 11:07:01 +0200
-Subject: [PATCH 6/6] spi: spi-s3c64xx: Allow higher transfer lengths in
- polling IO mode
-In-Reply-To: <93a6b80d599a40a39ae396f5dcd7c5b7@etezian.org>
-References: <20180416154021.25626-1-s.nawrocki@samsung.com>
- <CGME20180416154208epcas1p1774dd679e3564be916901a180315943b@epcas1p1.samsung.com>
- <20180416154021.25626-6-s.nawrocki@samsung.com>
- <93a6b80d599a40a39ae396f5dcd7c5b7@etezian.org>
-Message-ID: <4a7a1eb3-a953-c47b-317a-2d96e414961f@samsung.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 17 Apr 2018 17:08:24 +0000
+Subject: [PATCH] pinctrl: meson-axg: fix the range of aobus bank
+Message-ID: <20180417170824.18670-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andi,
+The GPIOAO bank is range from GPIOAO_0 to GPIOAO_13.
 
-On 04/16/2018 09:19 PM, andi at etezian.org wrote:
-> On 17.04.2018 00:40, Sylwester Nawrocki wrote:
->> Some variants of the SPI controller have no DMA support, in such case
->> SPI transfers longer than the FIFO length are not currently properly
->> handled by the driver. Fix it by doing multiple transfers in the
->> s3c64xx_spi_transfer_one() function if the SPI transfer length exceeds
->> the FIFO size.
-> 
-> this patch is a mix of cosmetics and what you are actually describing
-> in the commit log...
-> 
->> @@ -634,11 +634,15 @@ static int s3c64xx_spi_transfer_one(struct
->> spi_master *master,
->>  				    struct spi_transfer *xfer)
->>  {
->>  	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
->> +	const unsigned int fifo_len = (FIFO_LVL_MASK(sdd) >> 1) + 1;
->> +	const void *tx_buf = NULL;
->> +	void *rx_buf = NULL;
->> +	int target_len = 0, origin_len = 0;
->> +	bool use_dma = false;
->>  	int status;
->>  	u32 speed;
->>  	u8 bpw;
->>  	unsigned long flags;
->> -	int use_dma;
-> 
-> ... for example 'use_dma' bool instead of int or the 'fifo_len'. I agree
-> with these changes and, even though they are trivial, I would prefer
-> having them in separate patches.
+Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
+Reported-by: Xingyu Chen <xingyu.chen@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ drivers/pinctrl/meson/pinctrl-meson-axg.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks for your review! I will split that into 3 patches then, however
-it seems a bit dubious to have the fifo_len change on its own.
-
+diff --git a/drivers/pinctrl/meson/pinctrl-meson-axg.c b/drivers/pinctrl/meson/pinctrl-meson-axg.c
+index 4b91ff74779b..99a6ceac8e53 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson-axg.c
++++ b/drivers/pinctrl/meson/pinctrl-meson-axg.c
+@@ -898,7 +898,7 @@ static struct meson_bank meson_axg_periphs_banks[] = {
+ 
+ static struct meson_bank meson_axg_aobus_banks[] = {
+ 	/*   name    first      last      irq	pullen  pull    dir     out     in  */
+-	BANK("AO",   GPIOAO_0,  GPIOAO_9, 0, 13, 0,  16,  0, 0,  0,  0,  0, 16,  1,  0),
++	BANK("AO",   GPIOAO_0,  GPIOAO_13, 0, 13, 0,  16,  0, 0,  0,  0,  0, 16,  1,  0),
+ };
+ 
+ static struct meson_pmx_bank meson_axg_periphs_pmx_banks[] = {
 -- 
-Regards,
-Sylwester
+2.17.0
