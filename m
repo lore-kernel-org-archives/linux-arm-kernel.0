@@ -1,86 +1,63 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 17 Apr 2018 16:37:29 +0200
-Subject: [PATCH] soc: mediatek: use of_device_get_match_data()
-In-Reply-To: <b7fffebff04c6b717c568194ac7503144a3302a8.1523347340.git.ryder.lee@mediatek.com>
-References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
- <b7fffebff04c6b717c568194ac7503144a3302a8.1523347340.git.ryder.lee@mediatek.com>
-Message-ID: <ca67f622-d624-81c1-b8f4-eb5dfe4d5dab@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 17 Apr 2018 15:46:31 +0100
+Subject: [PATCH] arm64: signal: don't force known signals to SIGKILL
+In-Reply-To: <20180416154501.56872-1-mark.rutland@arm.com>
+References: <20180416154501.56872-1-mark.rutland@arm.com>
+Message-ID: <20180417144630.GG16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 04/16/2018 04:33 AM, Ryder Lee wrote:
-> The usage of of_device_get_match_data() reduce the code size a bit.
+On Mon, Apr 16, 2018 at 04:45:01PM +0100, Mark Rutland wrote:
+> Since commit:
 > 
-> Also, the only way to call pwrap_probe() is to match an entry in
-> of_pwrap_match_tbl[], so of_id cannot be NULL.
+>   a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ... any signal which is not SIGKILL will be upgraded to a SIGKILL be
+> force_signal_inject(). This includes signals we do expect, such as
+> SIGILL triggered by do_undefinstr().
+> 
+> Fix the check to use a logical AND rather than a logical OR, permitting
+> signals whose layout is SIL_FAULT.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Fixes: a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Dave Martin <dave.martin@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > ---
-
-Applied to v4.17-next/soc
-
-Thanks.
-
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 13 +++----------
->  drivers/soc/mediatek/mtk-scpsys.c    |  4 +---
->  2 files changed, 4 insertions(+), 13 deletions(-)
+>  arch/arm64/kernel/traps.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index e9e054a..2afae64 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -1458,19 +1458,12 @@ static int pwrap_probe(struct platform_device *pdev)
->  	int ret, irq;
->  	struct pmic_wrapper *wrp;
->  	struct device_node *np = pdev->dev.of_node;
-> -	const struct of_device_id *of_id =
-> -		of_match_device(of_pwrap_match_tbl, &pdev->dev);
->  	const struct of_device_id *of_slave_id = NULL;
->  	struct resource *res;
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index ba964da31a25..1cb2749a72bf 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -366,7 +366,7 @@ void force_signal_inject(int signal, int code, unsigned long address)
+>  	}
 >  
-> -	if (!of_id) {
-> -		dev_err(&pdev->dev, "Error: No device match found\n");
-> -		return -ENODEV;
-> -	}
-> +	if (np->child)
-> +		of_slave_id = of_match_node(of_slave_match_tbl, np->child);
->  
-> -	if (pdev->dev.of_node->child)
-> -		of_slave_id = of_match_node(of_slave_match_tbl,
-> -					    pdev->dev.of_node->child);
->  	if (!of_slave_id) {
->  		dev_dbg(&pdev->dev, "slave pmic should be defined in dts\n");
->  		return -EINVAL;
-> @@ -1482,7 +1475,7 @@ static int pwrap_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, wrp);
->  
-> -	wrp->master = of_id->data;
-> +	wrp->master = of_device_get_match_data(&pdev->dev);
->  	wrp->slave = of_slave_id->data;
->  	wrp->dev = &pdev->dev;
->  
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index 435ce5e..a02a18e 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -973,15 +973,13 @@ static void mtk_register_power_domains(struct platform_device *pdev,
->  
->  static int scpsys_probe(struct platform_device *pdev)
->  {
-> -	const struct of_device_id *match;
->  	const struct scp_subdomain *sd;
->  	const struct scp_soc_data *soc;
->  	struct scp *scp;
->  	struct genpd_onecell_data *pd_data;
->  	int i, ret;
->  
-> -	match = of_match_device(of_scpsys_match_tbl, &pdev->dev);
-> -	soc = (const struct scp_soc_data *)match->data;
-> +	soc = of_device_get_match_data(&pdev->dev);
->  
->  	scp = init_scp(pdev, soc->domains, soc->num_domains, &soc->regs,
->  			soc->bus_prot_reg_update);
-> 
+>  	/* Force signals we don't understand to SIGKILL */
+
+Is it worth updating the comment here?
+
+What's the rationale for this check?
+
+IIRC the purpose of this is to ensure that any siginfo delivered to
+userspace through this path is initialised correctly: so, either the
+signal must be a SIL_FAULT signal (since that's what the subsequent code
+initialises for) or SIGKILL (since userspace can't inspect the siginfo
+post-mortem, so the initialisation doesn't matter in that case).
+
+
+Maybe moving this check before the switch() would make the logic
+clearer.  Not sure though.
+
+> -	if (WARN_ON(signal != SIGKILL ||
+> +	if (WARN_ON(signal != SIGKILL &&
+>  		    siginfo_layout(signal, code) != SIL_FAULT)) {
+>  		signal = SIGKILL;
+>  	}
+
+[...]
+
+Cheers
+---Dave
