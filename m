@@ -1,53 +1,71 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 17 Apr 2018 00:08:50 -0400
-Subject: [PATCH v2 1/2] parisc: define stronger ordering for the default
- writeX()
-Message-ID: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
+Date: Tue, 17 Apr 2018 00:08:51 -0400
+Subject: [PATCH v2 2/2] parisc: define stronger ordering for the default
+ readX()
+In-Reply-To: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
+References: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1523938133-3224-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-parisc architecture seems to be mapping writeX() and writeX_relaxed() APIs
-to __raw_writeX() API.
+parisc architecture seems to be mapping readX() and readX_relaxed() APIs
+to __raw_readX() API.
 
-__raw_writeX() API doesn't provide any kind of ordering guarantees.
-commit 755bd04aaf4b ("io: define stronger ordering for the default writeX()
+__raw_readX() API doesn't provide any kind of ordering guarantees.
+commit 032d59e1cde9 ("io: define stronger ordering for the default readX()
 implementation") changed asm-generic implementation to use a more
-conservative approach towards the writeX() API.
+conservative approach towards the readX() API.
 
-Place a barrier() before the register write so that compiler doesn't
+Place a barrier() after the register read so that compiler doesn't
 optimize across the regiter operation.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/parisc/include/asm/io.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/parisc/include/asm/io.h | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
 diff --git a/arch/parisc/include/asm/io.h b/arch/parisc/include/asm/io.h
-index afe493b..2ec6405 100644
+index 2ec6405..e04c4ef 100644
 --- a/arch/parisc/include/asm/io.h
 +++ b/arch/parisc/include/asm/io.h
-@@ -196,18 +196,22 @@ static inline unsigned long long readq(const volatile void __iomem *addr)
+@@ -179,19 +179,34 @@ static inline void __raw_writeq(unsigned long long b, volatile void __iomem *add
+ 
+ static inline unsigned char readb(const volatile void __iomem *addr)
+ {
+-	return __raw_readb(addr);
++	unsigned char ret;
++
++	ret = __raw_readb(addr);
++	barrier();
++	return ret;
+ }
+ static inline unsigned short readw(const volatile void __iomem *addr)
+ {
+-	return le16_to_cpu((__le16 __force) __raw_readw(addr));
++	unsigned short ret;
++
++	ret = le16_to_cpu((__le16 __force) __raw_readw(addr));
++	barrier();
++	return ret;
+ }
+ static inline unsigned int readl(const volatile void __iomem *addr)
+ {
+-	return le32_to_cpu((__le32 __force) __raw_readl(addr));
++	unsigned int ret;
++	ret = le32_to_cpu((__le32 __force) __raw_readl(addr));
++	barrier();
++	return ret;
+ }
+ static inline unsigned long long readq(const volatile void __iomem *addr)
+ {
+-	return le64_to_cpu((__le64 __force) __raw_readq(addr));
++	unsigned long long ret;
++
++	ret = le64_to_cpu((__le64 __force) __raw_readq(addr));
++	barrier();
++	return ret;
+ }
  
  static inline void writeb(unsigned char b, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writeb(b, addr);
- }
- static inline void writew(unsigned short w, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writew((__u16 __force) cpu_to_le16(w), addr);
- }
- static inline void writel(unsigned int l, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writel((__u32 __force) cpu_to_le32(l), addr);
- }
- static inline void writeq(unsigned long long q, volatile void __iomem *addr)
- {
-+	barrier();
- 	__raw_writeq((__u64 __force) cpu_to_le64(q), addr);
- }
- 
 -- 
 2.7.4
