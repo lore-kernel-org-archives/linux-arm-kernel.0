@@ -1,247 +1,155 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 17 Apr 2018 17:30:30 -0400
-Subject: [net-next PATCH v4 01/13] soc: ti: K2G: enhancement to support QMSS
- in K2G NAVSS
+Date: Tue, 17 Apr 2018 17:30:32 -0400
+Subject: [net-next PATCH v4 03/13] net: netcp: ethss: use macro for checking
+ ss_version consistently
 In-Reply-To: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
 References: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1524000642-23944-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1524000642-23944-4-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Navigator Subsystem (NAVSS) available on K2G SoC has a cut down
-version of QMSS with less number of queues, internal linking ram
-with lesser number of buffers etc.  It doesn't have status and
-explicit push register space as in QMSS available on other K2 SoCs.
-So define reg indices specific to QMSS on K2G. This patch introduces
-"ti,66ak2g-navss-qm" compatibility to identify QMSS on K2G NAVSS
-and to customize the dts handling code. Per Device manual,
-descriptors with index less than or equal to regions0_size is in region 0
-in the case of K2 QMSS where as for QMSS on K2G, descriptors with index
-less than regions0_size is in region 0. So update the size accordingly in
-the regions0_size bits of the linking ram size 0 register.
+Driver currently uses macro for NU and XBE hardwrae, while other
+places for older hardware such as that on K2H/K SoC (version 1.4
+of the cpsw hardware, it explicitly check for the ss_version
+inline. Add a new macro for version 1.4 and use it to customize
+code in the driver. While at it also fix similar issue with
+checking XBE version by re-using existing macro IS_SS_ID_XGBE().
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/soc/ti/keystone-navigator-qmss.txt    |  9 ++-
- drivers/soc/ti/knav_qmss.h                         |  6 ++
- drivers/soc/ti/knav_qmss_queue.c                   | 90 ++++++++++++++++------
- 3 files changed, 82 insertions(+), 23 deletions(-)
+ drivers/net/ethernet/ti/netcp_ethss.c | 29 ++++++++++++++++-------------
+ 1 file changed, 16 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-index 77cd42c..b025770 100644
---- a/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-+++ b/Documentation/devicetree/bindings/soc/ti/keystone-navigator-qmss.txt
-@@ -17,7 +17,8 @@ pool management.
+diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
+index 56dbc0b..1b79fe5 100644
+--- a/drivers/net/ethernet/ti/netcp_ethss.c
++++ b/drivers/net/ethernet/ti/netcp_ethss.c
+@@ -42,7 +42,7 @@
  
+ /* 1G Ethernet SS defines */
+ #define GBE_MODULE_NAME			"netcp-gbe"
+-#define GBE_SS_VERSION_14		0x4ed21104
++#define GBE_SS_VERSION_14		0x4ed2
  
- Required properties:
--- compatible	: Must be "ti,keystone-navigator-qmss";
-+- compatible	: Must be "ti,keystone-navigator-qmss".
-+		: Must be "ti,66ak2g-navss-qm" for QMSS on K2G SoC.
- - clocks	: phandle to the reference clock for this device.
- - queue-range	: <start number> total range of queue numbers for the device.
- - linkram0	: <address size> for internal link ram, where size is the total
-@@ -39,6 +40,12 @@ Required properties:
- 			  - Descriptor memory setup region.
- 			  - Queue Management/Queue Proxy region for queue Push.
- 			  - Queue Management/Queue Proxy region for queue Pop.
-+
-+For QMSS on K2G SoC, following QM reg indexes are used in that order
-+			  - Queue Peek region.
-+			  - Queue configuration region.
-+			  - Queue Management/Queue Proxy region for queue Push/Pop.
-+
- - queue-pools	: child node classifying the queue ranges into pools.
- 		  Queue ranges are grouped into 3 type of pools:
- 		  - qpend	    : pool of qpend(interruptible) queues
-diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
-index 905b974..56866ba4 100644
---- a/drivers/soc/ti/knav_qmss.h
-+++ b/drivers/soc/ti/knav_qmss.h
-@@ -292,6 +292,11 @@ struct knav_queue {
- 	struct list_head		list;
- };
+ #define GBE_SS_REG_INDEX		0
+ #define GBE_SGMII34_REG_INDEX		1
+@@ -72,6 +72,9 @@
+ #define IS_SS_ID_NU(d) \
+ 	(GBE_IDENT((d)->ss_version) == GBE_SS_ID_NU)
  
-+enum qmss_version {
-+	QMSS,
-+	QMSS_66AK2G,
-+};
++#define IS_SS_ID_VER_14(d) \
++	(GBE_IDENT((d)->ss_version) == GBE_SS_VERSION_14)
 +
- struct knav_device {
- 	struct device				*dev;
- 	unsigned				base_id;
-@@ -305,6 +310,7 @@ struct knav_device {
- 	struct list_head			pools;
- 	struct list_head			pdsps;
- 	struct list_head			qmgrs;
-+	enum qmss_version			version;
- };
+ #define GBENU_SS_REG_INDEX		0
+ #define GBENU_SM_REG_INDEX		1
+ #define GBENU_SGMII_MODULE_OFFSET	0x100
+@@ -86,7 +89,7 @@
  
- struct knav_range_ops {
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index 77d6b5c..8526c8e 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -42,6 +42,15 @@
- #define KNAV_QUEUE_PUSH_REG_INDEX	4
- #define KNAV_QUEUE_POP_REG_INDEX	5
+ /* 10G Ethernet SS defines */
+ #define XGBE_MODULE_NAME		"netcp-xgbe"
+-#define XGBE_SS_VERSION_10		0x4ee42100
++#define XGBE_SS_VERSION_10		0x4ee4
  
-+/* Queue manager register indices in DTS for QMSS in K2G NAVSS.
-+ * There are no status and vbusm push registers on this version
-+ * of QMSS. Push registers are same as pop, So all indices above 1
-+ * are to be re-defined
-+ */
-+#define KNAV_L_QUEUE_CONFIG_REG_INDEX	1
-+#define KNAV_L_QUEUE_REGION_REG_INDEX	2
-+#define KNAV_L_QUEUE_PUSH_REG_INDEX	3
-+
- /* PDSP register indices in DTS */
- #define KNAV_QUEUE_PDSP_IRAM_REG_INDEX	0
- #define KNAV_QUEUE_PDSP_REGS_REG_INDEX	1
-@@ -1169,8 +1178,12 @@ static int knav_queue_setup_link_ram(struct knav_device *kdev)
- 		dev_dbg(kdev->dev, "linkram0: dma:%pad, virt:%p, size:%x\n",
- 			&block->dma, block->virt, block->size);
- 		writel_relaxed((u32)block->dma, &qmgr->reg_config->link_ram_base0);
--		writel_relaxed(block->size, &qmgr->reg_config->link_ram_size0);
--
-+		if (kdev->version == QMSS_66AK2G)
-+			writel_relaxed(block->size,
-+				       &qmgr->reg_config->link_ram_size0);
-+		else
-+			writel_relaxed(block->size - 1,
-+				       &qmgr->reg_config->link_ram_size0);
- 		block++;
- 		if (!block->size)
- 			continue;
-@@ -1387,42 +1400,64 @@ static int knav_queue_init_qmgrs(struct knav_device *kdev,
- 		qmgr->reg_peek =
- 			knav_queue_map_reg(kdev, child,
- 					   KNAV_QUEUE_PEEK_REG_INDEX);
--		qmgr->reg_status =
--			knav_queue_map_reg(kdev, child,
--					   KNAV_QUEUE_STATUS_REG_INDEX);
-+
-+		if (kdev->version == QMSS) {
-+			qmgr->reg_status =
-+				knav_queue_map_reg(kdev, child,
-+						   KNAV_QUEUE_STATUS_REG_INDEX);
-+		}
-+
- 		qmgr->reg_config =
- 			knav_queue_map_reg(kdev, child,
-+					   (kdev->version == QMSS_66AK2G) ?
-+					   KNAV_L_QUEUE_CONFIG_REG_INDEX :
- 					   KNAV_QUEUE_CONFIG_REG_INDEX);
- 		qmgr->reg_region =
- 			knav_queue_map_reg(kdev, child,
-+					   (kdev->version == QMSS_66AK2G) ?
-+					   KNAV_L_QUEUE_REGION_REG_INDEX :
- 					   KNAV_QUEUE_REGION_REG_INDEX);
-+
- 		qmgr->reg_push =
- 			knav_queue_map_reg(kdev, child,
--					   KNAV_QUEUE_PUSH_REG_INDEX);
--		qmgr->reg_pop =
--			knav_queue_map_reg(kdev, child,
--					   KNAV_QUEUE_POP_REG_INDEX);
-+					   (kdev->version == QMSS_66AK2G) ?
-+					    KNAV_L_QUEUE_PUSH_REG_INDEX :
-+					    KNAV_QUEUE_PUSH_REG_INDEX);
-+
-+		if (kdev->version == QMSS) {
-+			qmgr->reg_pop =
-+				knav_queue_map_reg(kdev, child,
-+						   KNAV_QUEUE_POP_REG_INDEX);
-+		}
+ #define XGBE_SS_REG_INDEX		0
+ #define XGBE_SM_REG_INDEX		1
+@@ -1915,7 +1918,7 @@ static void keystone_get_ethtool_stats(struct net_device *ndev,
  
--		if (IS_ERR(qmgr->reg_peek) || IS_ERR(qmgr->reg_status) ||
-+		if (IS_ERR(qmgr->reg_peek) ||
-+		    ((kdev->version == QMSS) &&
-+		    (IS_ERR(qmgr->reg_status) || IS_ERR(qmgr->reg_pop))) ||
- 		    IS_ERR(qmgr->reg_config) || IS_ERR(qmgr->reg_region) ||
--		    IS_ERR(qmgr->reg_push) || IS_ERR(qmgr->reg_pop)) {
-+		    IS_ERR(qmgr->reg_push)) {
- 			dev_err(dev, "failed to map qmgr regs\n");
-+			if (kdev->version == QMSS) {
-+				if (!IS_ERR(qmgr->reg_status))
-+					devm_iounmap(dev, qmgr->reg_status);
-+				if (!IS_ERR(qmgr->reg_pop))
-+					devm_iounmap(dev, qmgr->reg_pop);
-+			}
- 			if (!IS_ERR(qmgr->reg_peek))
- 				devm_iounmap(dev, qmgr->reg_peek);
--			if (!IS_ERR(qmgr->reg_status))
--				devm_iounmap(dev, qmgr->reg_status);
- 			if (!IS_ERR(qmgr->reg_config))
- 				devm_iounmap(dev, qmgr->reg_config);
- 			if (!IS_ERR(qmgr->reg_region))
- 				devm_iounmap(dev, qmgr->reg_region);
- 			if (!IS_ERR(qmgr->reg_push))
- 				devm_iounmap(dev, qmgr->reg_push);
--			if (!IS_ERR(qmgr->reg_pop))
--				devm_iounmap(dev, qmgr->reg_pop);
- 			devm_kfree(dev, qmgr);
- 			continue;
- 		}
+ 	gbe_dev = gbe_intf->gbe_dev;
+ 	spin_lock_bh(&gbe_dev->hw_stats_lock);
+-	if (gbe_dev->ss_version == GBE_SS_VERSION_14)
++	if (IS_SS_ID_VER_14(gbe_dev))
+ 		gbe_update_stats_ver14(gbe_dev, data);
+ 	else
+ 		gbe_update_stats(gbe_dev, data);
+@@ -2205,7 +2208,7 @@ static void gbe_port_config(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
+ 		max_rx_len = NETCP_MAX_FRAME_SIZE;
  
-+		/* Use same push register for pop as well */
-+		if (kdev->version == QMSS_66AK2G)
-+			qmgr->reg_pop = qmgr->reg_push;
-+
- 		list_add_tail(&qmgr->list, &kdev->qmgrs);
- 		dev_info(dev, "added qmgr start queue %d, num of queues %d, reg_peek %p, reg_status %p, reg_config %p, reg_region %p, reg_push %p, reg_pop %p\n",
- 			 qmgr->start_queue, qmgr->num_queues,
-@@ -1681,10 +1716,24 @@ static int knav_queue_init_queues(struct knav_device *kdev)
- 	return 0;
- }
- 
-+/* Match table for of_platform binding */
-+static const struct of_device_id keystone_qmss_of_match[] = {
-+	{
-+		.compatible = "ti,keystone-navigator-qmss",
-+	},
-+	{
-+		.compatible = "ti,66ak2g-navss-qm",
-+		.data	= (void *)QMSS_66AK2G,
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, keystone_qmss_of_match);
-+
- static int knav_queue_probe(struct platform_device *pdev)
- {
- 	struct device_node *node = pdev->dev.of_node;
- 	struct device_node *qmgrs, *queue_pools, *regions, *pdsps;
-+	const struct of_device_id *match;
- 	struct device *dev = &pdev->dev;
- 	u32 temp[2];
- 	int ret;
-@@ -1700,6 +1749,10 @@ static int knav_queue_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+ 	/* Enable correct MII mode at SS level */
+-	if ((gbe_dev->ss_version == XGBE_SS_VERSION_10) &&
++	if (IS_SS_ID_XGBE(gbe_dev) &&
+ 	    (slave->link_interface >= XGMII_LINK_MAC_PHY)) {
+ 		xgmii_mode = readl(GBE_REG_ADDR(gbe_dev, ss_regs, control));
+ 		xgmii_mode |= (1 << slave->slave_num);
+@@ -2293,7 +2296,7 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
  	}
  
-+	match = of_match_device(of_match_ptr(keystone_qmss_of_match), dev);
-+	if (match && match->data)
-+		kdev->version = QMSS_66AK2G;
-+
- 	platform_set_drvdata(pdev, kdev);
- 	kdev->dev = dev;
- 	INIT_LIST_HEAD(&kdev->queue_ranges);
-@@ -1815,13 +1868,6 @@ static int knav_queue_remove(struct platform_device *pdev)
- 	return 0;
- }
+ 	if (has_phy) {
+-		if (priv->ss_version == XGBE_SS_VERSION_10)
++		if (IS_SS_ID_XGBE(priv))
+ 			hndlr = xgbe_adjust_link;
  
--/* Match table for of_platform binding */
--static struct of_device_id keystone_qmss_of_match[] = {
--	{ .compatible = "ti,keystone-navigator-qmss", },
--	{},
--};
--MODULE_DEVICE_TABLE(of, keystone_qmss_of_match);
--
- static struct platform_driver keystone_qmss_driver = {
- 	.probe		= knav_queue_probe,
- 	.remove		= knav_queue_remove,
+ 		slave->phy = of_phy_connect(gbe_intf->ndev,
+@@ -2764,7 +2767,7 @@ static void netcp_ethss_timer(struct timer_list *t)
+ 	/* A timer runs as a BH, no need to block them */
+ 	spin_lock(&gbe_dev->hw_stats_lock);
+ 
+-	if (gbe_dev->ss_version == GBE_SS_VERSION_14)
++	if (IS_SS_ID_VER_14(gbe_dev))
+ 		gbe_update_stats_ver14(gbe_dev, NULL);
+ 	else
+ 		gbe_update_stats(gbe_dev, NULL);
+@@ -2807,7 +2810,7 @@ static int gbe_open(void *intf_priv, struct net_device *ndev)
+ 		GBE_RTL_VERSION(reg), GBE_IDENT(reg));
+ 
+ 	/* For 10G and on NetCP 1.5, use directed to port */
+-	if ((gbe_dev->ss_version == XGBE_SS_VERSION_10) || IS_SS_ID_MU(gbe_dev))
++	if (IS_SS_ID_XGBE(gbe_dev) || IS_SS_ID_MU(gbe_dev))
+ 		gbe_intf->tx_pipe.flags = SWITCH_TO_PORT_IN_TAGINFO;
+ 
+ 	if (gbe_dev->enable_ale)
+@@ -2924,7 +2927,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
+ 
+ 	/* Emac regs memmap are contiguous but port regs are not */
+ 	port_reg_num = slave->slave_num;
+-	if (gbe_dev->ss_version == GBE_SS_VERSION_14) {
++	if (IS_SS_ID_VER_14(gbe_dev)) {
+ 		if (slave->slave_num > 1) {
+ 			port_reg_ofs = GBE13_SLAVE_PORT2_OFFSET;
+ 			port_reg_num -= 2;
+@@ -2939,7 +2942,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
+ 		emac_reg_ofs = GBENU_EMAC_OFFSET;
+ 		port_reg_blk_sz = 0x1000;
+ 		emac_reg_blk_sz = 0x1000;
+-	} else if (gbe_dev->ss_version == XGBE_SS_VERSION_10) {
++	} else if (IS_SS_ID_XGBE(gbe_dev)) {
+ 		port_reg_ofs = XGBE10_SLAVE_PORT_OFFSET;
+ 		emac_reg_ofs = XGBE10_EMAC_OFFSET;
+ 		port_reg_blk_sz = 0x30;
+@@ -2955,7 +2958,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
+ 	slave->emac_regs = gbe_dev->switch_regs + emac_reg_ofs +
+ 				(emac_reg_blk_sz * slave->slave_num);
+ 
+-	if (gbe_dev->ss_version == GBE_SS_VERSION_14) {
++	if (IS_SS_ID_VER_14(gbe_dev)) {
+ 		/* Initialize  slave port register offsets */
+ 		GBE_SET_REG_OFS(slave, port_regs, port_vlan);
+ 		GBE_SET_REG_OFS(slave, port_regs, tx_pri_map);
+@@ -2989,7 +2992,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
+ 		GBENU_SET_REG_OFS(slave, emac_regs, mac_control);
+ 		GBENU_SET_REG_OFS(slave, emac_regs, soft_reset);
+ 
+-	} else if (gbe_dev->ss_version == XGBE_SS_VERSION_10) {
++	} else if (IS_SS_ID_XGBE(gbe_dev)) {
+ 		/* Initialize  slave port register offsets */
+ 		XGBE_SET_REG_OFS(slave, port_regs, port_vlan);
+ 		XGBE_SET_REG_OFS(slave, port_regs, tx_pri_map);
+@@ -3508,7 +3511,7 @@ static int gbe_probe(struct netcp_device *netcp_device, struct device *dev,
+ 
+ 		dev_dbg(dev, "ss_version: 0x%08x\n", gbe_dev->ss_version);
+ 
+-		if (gbe_dev->ss_version == GBE_SS_VERSION_14)
++		if (IS_SS_ID_VER_14(gbe_dev))
+ 			ret = set_gbe_ethss14_priv(gbe_dev, node);
+ 		else if (IS_SS_ID_MU(gbe_dev))
+ 			ret = set_gbenu_ethss_priv(gbe_dev, node);
+@@ -3606,7 +3609,7 @@ static int gbe_probe(struct netcp_device *netcp_device, struct device *dev,
+ 
+ 	spin_lock_bh(&gbe_dev->hw_stats_lock);
+ 	for (i = 0; i < gbe_dev->num_stats_mods; i++) {
+-		if (gbe_dev->ss_version == GBE_SS_VERSION_14)
++		if (IS_SS_ID_VER_14(gbe_dev))
+ 			gbe_reset_mod_stats_ver14(gbe_dev, i);
+ 		else
+ 			gbe_reset_mod_stats(gbe_dev, i);
 -- 
 1.9.1
