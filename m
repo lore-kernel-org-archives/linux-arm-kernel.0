@@ -1,71 +1,54 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 17 Apr 2018 00:08:51 -0400
-Subject: [PATCH v2 2/2] parisc: define stronger ordering for the default
- readX()
-In-Reply-To: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
-References: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1523938133-3224-2-git-send-email-okaya@codeaurora.org>
+Date: Tue, 17 Apr 2018 00:11:39 -0400
+Subject: [PATCH 1/2] parisc: use the asm-generic version for writeX()
+In-Reply-To: <4eea352e-07f0-3a99-c9bd-57e117288778@codeaurora.org>
+References: <1523916078-23049-1-git-send-email-okaya@codeaurora.org>
+ <a727e74f-610c-4722-76e9-c1aca2f9e9bd@bell.net>
+ <a7b59f43-cea5-0ead-f528-61899570e353@codeaurora.org>
+ <7a9d139e-978b-750d-1bac-8b27e934f781@bell.net>
+ <1152a7d4-a8f4-ae68-2737-067fa05409cd@codeaurora.org>
+ <4eea352e-07f0-3a99-c9bd-57e117288778@codeaurora.org>
+Message-ID: <3a3b6fe1-c338-488e-3983-0dddf26cc14b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-parisc architecture seems to be mapping readX() and readX_relaxed() APIs
-to __raw_readX() API.
+On 4/16/2018 7:48 PM, Sinan Kaya wrote:
+> On 4/16/2018 7:44 PM, Sinan Kaya wrote:
+>>> John David Anglin? dave.anglin at bell.net
+>>>
+>>>
+>>> io.log
+>>>
+>>>
+>>>   CC      arch/parisc/kernel/asm-offsets.s
+>>> In file included from ./arch/parisc/include/asm/io.h:262:0,
+>>>                  from ./include/linux/io.h:25,
+>>>                  from ./include/linux/irq.h:25,
+>>>                  from ./arch/parisc/include/asm/hardirq.h:13,
+>>>                  from ./include/linux/hardirq.h:9,
+>>>                  from arch/parisc/kernel/asm-offsets.c:34:
+>>> ./include/asm-generic/io.h:37:21: error: redefinition of '__raw_readb'
+>>>  #define __raw_readb __raw_readb
+>>>                      ^
+>> This one is easy to fix:
+>>
+>> https://elixir.bootlin.com/linux/latest/source/arch/parisc/include/asm/io.h#L146
+>>
+>> Remove 146..179.
+> 
+> I'll try to get a hold of a cross compiler and re-test. The above is a hack.
+> I need to do a better job on this.
+> 
+> Thanks for the help. I'll post V2 when it is ready.
+> 
 
-__raw_readX() API doesn't provide any kind of ordering guarantees.
-commit 032d59e1cde9 ("io: define stronger ordering for the default readX()
-implementation") changed asm-generic implementation to use a more
-conservative approach towards the readX() API.
+Converting this to asm-generic turned out to be a much bigger task. I placed
+compiler barriers instead to existing version and posted as follows:
 
-Place a barrier() after the register read so that compiler doesn't
-optimize across the regiter operation.
+[PATCH v2 1/2] parisc: define stronger ordering for the default writeX()
+[PATCH v2 2/2] parisc: define stronger ordering for the default readX()
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- arch/parisc/include/asm/io.h | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
-
-diff --git a/arch/parisc/include/asm/io.h b/arch/parisc/include/asm/io.h
-index 2ec6405..e04c4ef 100644
---- a/arch/parisc/include/asm/io.h
-+++ b/arch/parisc/include/asm/io.h
-@@ -179,19 +179,34 @@ static inline void __raw_writeq(unsigned long long b, volatile void __iomem *add
- 
- static inline unsigned char readb(const volatile void __iomem *addr)
- {
--	return __raw_readb(addr);
-+	unsigned char ret;
-+
-+	ret = __raw_readb(addr);
-+	barrier();
-+	return ret;
- }
- static inline unsigned short readw(const volatile void __iomem *addr)
- {
--	return le16_to_cpu((__le16 __force) __raw_readw(addr));
-+	unsigned short ret;
-+
-+	ret = le16_to_cpu((__le16 __force) __raw_readw(addr));
-+	barrier();
-+	return ret;
- }
- static inline unsigned int readl(const volatile void __iomem *addr)
- {
--	return le32_to_cpu((__le32 __force) __raw_readl(addr));
-+	unsigned int ret;
-+	ret = le32_to_cpu((__le32 __force) __raw_readl(addr));
-+	barrier();
-+	return ret;
- }
- static inline unsigned long long readq(const volatile void __iomem *addr)
- {
--	return le64_to_cpu((__le64 __force) __raw_readq(addr));
-+	unsigned long long ret;
-+
-+	ret = le64_to_cpu((__le64 __force) __raw_readq(addr));
-+	barrier();
-+	return ret;
- }
- 
- static inline void writeb(unsigned char b, volatile void __iomem *addr)
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
