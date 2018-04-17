@@ -1,46 +1,38 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 17 Apr 2018 14:36:01 +0200
-Subject: [RESEND PATCH v2 0/4] ARM: davinci: remove the mach-specific
- aemif driver - part 1
-In-Reply-To: <2a2ac117-900c-77b6-f247-49777493e55f@ti.com>
-References: <20180417102917.7794-1-brgl@bgdev.pl>
- <2a2ac117-900c-77b6-f247-49777493e55f@ti.com>
-Message-ID: <CAMpxmJUBFEF7FDp910HwsrNhGhwJDrgRR_9qL0DE5W1M=39MgQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 17 Apr 2018 18:06:00 +0530
+Subject: [PATCH] ARM: dts: da850: fix W=1 warnings with pinmux node
+Message-ID: <20180417123600.23548-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-17 12:53 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
-> Hi Bartosz,
->
-> On Tuesday 17 April 2018 03:59 PM, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> This is the first part of changes required to remove duplicate aemif
->> support from mach-davinci.
->>
->> I actually noticed that one of my previous changes from 2017 broke nand
->> in legacy mode - the clock lookup no longer works. This series addresses
->> it as well.
->>
->> First patch just uses a static string for the ti-aemif driver name.
->>
->> The second adds support for board files to the aemif driver.
->>
->> Last two add nand support to da850-lcdk in legacy mode and make
->> da850-evm use the platform driver instead of the mach-specific one.
->>
->> If these patches get accepted, I'll prepere a follow-up moving all
->> other boards to the new platform driver.
->>
->> This series applies on top of v8 of David Lechner's CCF series.
->
-> Are there any patches in the series that can safely be applied to v4.17-rc1?
->
-> Thanks,
-> Sekhar
+Remove unused #address-cells and #size-cells from pinmux
+node. This fixes W=1 warnings of the type:
 
-Hi Sekhar,
+arch/arm/boot/dts/da850-lcdk.dtb: Warning (avoid_unnecessary_addr_size): /soc at 1c00000/pinmux at 14120: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
 
-yes, all of them. They're not linked to David's work in any way.
+Tested on DA850 LCDK by checking output of:
 
-Bart
+/sys/kernel/debug/pinctrl/1c14120.pinmux-pinctrl-single/pins
+
+before and after the change.
+
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/boot/dts/da850.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index cba3afd00763..f6f1597b03df 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -55,8 +55,6 @@
+ 		pmx_core: pinmux at 14120 {
+ 			compatible = "pinctrl-single";
+ 			reg = <0x14120 0x50>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+ 			#pinctrl-cells = <2>;
+ 			pinctrl-single,bit-per-mux;
+ 			pinctrl-single,register-width = <32>;
+-- 
+2.16.2
