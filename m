@@ -1,9 +1,9 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Tue, 17 Apr 2018 12:30:50 +0800
-Subject: [PATCH 1/2] parisc: use the asm-generic version for writeX()
-In-Reply-To: <1523916078-23049-1-git-send-email-okaya@codeaurora.org>
-References: <1523916078-23049-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <201804171208.1138HEgL%fengguang.wu@intel.com>
+Date: Tue, 17 Apr 2018 12:57:14 +0800
+Subject: [PATCH 2/2] parisc: use the asm-generic version for readX()
+In-Reply-To: <1523916078-23049-2-git-send-email-okaya@codeaurora.org>
+References: <1523916078-23049-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <201804171252.ib5KDLNm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,10 +31,15 @@ All errors (new ones prefixed by >>):
                     from include/linux/hardirq.h:9,
                     from arch/parisc/kernel/asm-offsets.c:34:
    include/linux/irq.h: In function 'irq_reg_writel':
->> include/linux/irq.h:1126:3: error: implicit declaration of function 'writel'; did you mean 'iowrite8'? [-Werror=implicit-function-declaration]
+   include/linux/irq.h:1126:3: error: implicit declaration of function 'writel'; did you mean 'iowrite8'? [-Werror=implicit-function-declaration]
       writel(val, gc->reg_base + reg_offset);
       ^~~~~~
       iowrite8
+   include/linux/irq.h: In function 'irq_reg_readl':
+>> include/linux/irq.h:1135:10: error: implicit declaration of function 'readl'; did you mean 'ioread8'? [-Werror=implicit-function-declaration]
+      return readl(gc->reg_base + reg_offset);
+             ^~~~~
+             ioread8
    cc1: some warnings being treated as errors
    make[2]: *** [arch/parisc/kernel/asm-offsets.s] Error 1
    make[2]: Target '__build' not remade because of errors.
@@ -42,7 +47,7 @@ All errors (new ones prefixed by >>):
    make[1]: Target 'prepare' not remade because of errors.
    make: *** [sub-make] Error 2
 
-vim +1126 include/linux/irq.h
+vim +1135 include/linux/irq.h
 
 7d828062 Thomas Gleixner 2011-04-03  1109  
 ebf9ff75 Boris Brezillon 2016-09-13  1110  /*
@@ -64,8 +69,17 @@ ebf9ff75 Boris Brezillon 2016-09-13  1119
 332fd7c4 Kevin Cernekee  2014-11-06 @1126  		writel(val, gc->reg_base + reg_offset);
 332fd7c4 Kevin Cernekee  2014-11-06  1127  }
 332fd7c4 Kevin Cernekee  2014-11-06  1128  
+332fd7c4 Kevin Cernekee  2014-11-06  1129  static inline u32 irq_reg_readl(struct irq_chip_generic *gc,
+332fd7c4 Kevin Cernekee  2014-11-06  1130  				int reg_offset)
+332fd7c4 Kevin Cernekee  2014-11-06  1131  {
+2b280376 Kevin Cernekee  2014-11-06  1132  	if (gc->reg_readl)
+2b280376 Kevin Cernekee  2014-11-06  1133  		return gc->reg_readl(gc->reg_base + reg_offset);
+2b280376 Kevin Cernekee  2014-11-06  1134  	else
+332fd7c4 Kevin Cernekee  2014-11-06 @1135  		return readl(gc->reg_base + reg_offset);
+332fd7c4 Kevin Cernekee  2014-11-06  1136  }
+332fd7c4 Kevin Cernekee  2014-11-06  1137  
 
-:::::: The code at line 1126 was first introduced by commit
+:::::: The code at line 1135 was first introduced by commit
 :::::: 332fd7c4fef5f3b166e93decb07fd69eb24f7998 genirq: Generic chip: Change irq_reg_{readl,writel} arguments
 
 :::::: TO: Kevin Cernekee <cernekee@gmail.com>
@@ -80,4 +94,4 @@ Name: .config.gz
 Type: application/gzip
 Size: 14302 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/33b3e95b/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/29682d7e/attachment.gz>
