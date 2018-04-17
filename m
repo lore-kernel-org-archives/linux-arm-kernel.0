@@ -1,33 +1,91 @@
-From: michel.pollet@bp.renesas.com (Michel Pollet)
-Date: Tue, 17 Apr 2018 13:48:02 +0100
-Subject: [PATCH v2 3/3] ARM: dts: Renesas RZ/N1D SMP enable method
-In-Reply-To: <1523969291-41756-1-git-send-email-michel.pollet@bp.renesas.com>
-References: <1523969291-41756-1-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <1523969291-41756-4-git-send-email-michel.pollet@bp.renesas.com>
+From: roman@advem.lv (Roman Yeryomin)
+Date: Tue, 17 Apr 2018 15:53:17 +0300
+Subject: [PATCH] ARM: dts: Fix NAS4220B pin config
+In-Reply-To: <20180417085311.13829-1-linus.walleij@linaro.org>
+References: <20180417085311.13829-1-linus.walleij@linaro.org>
+Message-ID: <308fdf29af9ad7b1e15f39907e6b25d1@advem.lv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a special enable method for the second CA7 of the Renesas RZ/N1D
-(R9A06G032), as well as the default value for the "cpu-release-addr"
-property.
+On 2018-04-17 11:53, Linus Walleij wrote:
+> The DTS file for the NAS4220B had the pin config for the
+> ethernet interface set to the pins in the SL3512 SoC while
+> this system is using SL3516. Fix it by referencing the
+> right SL3516 pins instead of the SL3512 pins.
+> 
+> Cc: stable at vger.kernel.org
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Reported-by: Andreas Fiedler <andreas.fiedler@gmx.net>
+> Reported-by: Roman Yeryomin <roman@advem.lv>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi ARM SoC folks: if this gets a Tested-by or similar from
+> someone with the NAS4220B please apply it directly to
+> the ARM SoC tree for fixes.
+> ---
+>  arch/arm/boot/dts/gemini-nas4220b.dts | 28 
+> ++++++++++++++--------------
+>  1 file changed, 14 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts
+> b/arch/arm/boot/dts/gemini-nas4220b.dts
+> index 8bbb6f85d161..4785fbcc41ed 100644
+> --- a/arch/arm/boot/dts/gemini-nas4220b.dts
+> +++ b/arch/arm/boot/dts/gemini-nas4220b.dts
+> @@ -134,37 +134,37 @@
+>  						function = "gmii";
+>  						groups = "gmii_gmac0_grp";
+>  					};
+> -					/* Settings come from OpenWRT */
+> +					/* Settings come from OpenWRT, pins on SL3516 */
+>  					conf0 {
+> -						pins = "R8 GMAC0 RXDV", "U11 GMAC1 RXDV";
+> +						pins = "V8 GMAC0 RXDV", "T10 GMAC1 RXDV";
+>  						skew-delay = <0>;
+>  					};
+>  					conf1 {
+> -						pins = "T8 GMAC0 RXC", "T11 GMAC1 RXC";
+> +						pins = "Y7 GMAC0 RXC", "Y11 GMAC1 RXC";
+>  						skew-delay = <15>;
+>  					};
+>  					conf2 {
+> -						pins = "P8 GMAC0 TXEN", "V11 GMAC1 TXEN";
+> +						pins = "T8 GMAC0 TXEN", "W11 GMAC1 TXEN";
+>  						skew-delay = <7>;
+>  					};
+>  					conf3 {
+> -						pins = "V7 GMAC0 TXC";
+> +						pins = "U8 GMAC0 TXC";
+>  						skew-delay = <11>;
+>  					};
+>  					conf4 {
+> -						pins = "P10 GMAC1 TXC";
+> +						pins = "V11 GMAC1 TXC";
+>  						skew-delay = <10>;
+>  					};
+>  					conf5 {
+>  						/* The data lines all have default skew */
+> -						pins = "U8 GMAC0 RXD0", "V8 GMAC0 RXD1",
+> -						       "P9 GMAC0 RXD2", "R9 GMAC0 RXD3",
+> -						       "U7 GMAC0 TXD0", "T7 GMAC0 TXD1",
+> -						       "R7 GMAC0 TXD2", "P7 GMAC0 TXD3",
+> -						       "R11 GMAC1 RXD0", "P11 GMAC1 RXD1",
+> -						       "V12 GMAC1 RXD2", "U12 GMAC1 RXD3",
+> -						       "R10 GMAC1 TXD0", "T10 GMAC1 TXD1",
+> -						       "U10 GMAC1 TXD2", "V10 GMAC1 TXD3";
+> +						pins = "W8 GMAC0 RXD0", "V9 GMAC0 RXD1",
+> +						       "Y8 GMAC0 RXD2", "U9 GMAC0 RXD3",
+> +						       "T7 GMAC0 TXD0", "U6 GMAC0 TXD1",
+> +						       "V7 GMAC0 TXD2", "U7 GMAC0 TXD3",
+> +						       "Y12 GMAC1 RXD0", "V12 GMAC1 RXD1",
+> +						       "T11 GMAC1 RXD2", "W12 GMAC1 RXD3",
+> +						       "U10 GMAC1 TXD0", "Y10 GMAC1 TXD1",
+> +						       "W10 GMAC1 TXD2", "T9 GMAC1 TXD3";
+>  						skew-delay = <7>;
+>  					};
+>  					/* Set up drive strength on GMAC0 to 16 mA */
 
-Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
----
- arch/arm/boot/dts/r9a06g032.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+This differs a bit from what I have but could work, will test later...
 
-diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-index 23c56d7..170376d 100644
---- a/arch/arm/boot/dts/r9a06g032.dtsi
-+++ b/arch/arm/boot/dts/r9a06g032.dtsi
-@@ -33,6 +33,8 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <1>;
-+			enable-method = "renesas,r9a06g032-smp";
-+			cpu-release-addr = <0x4000c204>;
- 		};
- 	};
- 
--- 
-2.7.4
+Regards,
+Roman
