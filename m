@@ -1,91 +1,56 @@
-From: roman@advem.lv (Roman Yeryomin)
-Date: Tue, 17 Apr 2018 15:53:17 +0300
-Subject: [PATCH] ARM: dts: Fix NAS4220B pin config
-In-Reply-To: <20180417085311.13829-1-linus.walleij@linaro.org>
-References: <20180417085311.13829-1-linus.walleij@linaro.org>
-Message-ID: <308fdf29af9ad7b1e15f39907e6b25d1@advem.lv>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 17 Apr 2018 22:53:53 +1000
+Subject: [PATCH 01/12] iommu-common: move to arch/sparc
+In-Reply-To: <f5741528-427d-3537-5498-2080766df0fe@linux.vnet.ibm.com>
+References: <20180415145947.1248-1-hch@lst.de>
+ <20180415145947.1248-2-hch@lst.de>
+ <f0305a92-b206-1567-3c25-67fbd194047d@linux.vnet.ibm.com>
+ <20180416.095833.969403163564136309.davem@davemloft.net>
+ <f5741528-427d-3537-5498-2080766df0fe@linux.vnet.ibm.com>
+Message-ID: <87wox60za6.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-17 11:53, Linus Walleij wrote:
-> The DTS file for the NAS4220B had the pin config for the
-> ethernet interface set to the pins in the SL3512 SoC while
-> this system is using SL3516. Fix it by referencing the
-> right SL3516 pins instead of the SL3512 pins.
-> 
-> Cc: stable at vger.kernel.org
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Reported-by: Andreas Fiedler <andreas.fiedler@gmx.net>
-> Reported-by: Roman Yeryomin <roman@advem.lv>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC folks: if this gets a Tested-by or similar from
-> someone with the NAS4220B please apply it directly to
-> the ARM SoC tree for fixes.
-> ---
->  arch/arm/boot/dts/gemini-nas4220b.dts | 28 
-> ++++++++++++++--------------
->  1 file changed, 14 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts
-> b/arch/arm/boot/dts/gemini-nas4220b.dts
-> index 8bbb6f85d161..4785fbcc41ed 100644
-> --- a/arch/arm/boot/dts/gemini-nas4220b.dts
-> +++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-> @@ -134,37 +134,37 @@
->  						function = "gmii";
->  						groups = "gmii_gmac0_grp";
->  					};
-> -					/* Settings come from OpenWRT */
-> +					/* Settings come from OpenWRT, pins on SL3516 */
->  					conf0 {
-> -						pins = "R8 GMAC0 RXDV", "U11 GMAC1 RXDV";
-> +						pins = "V8 GMAC0 RXDV", "T10 GMAC1 RXDV";
->  						skew-delay = <0>;
->  					};
->  					conf1 {
-> -						pins = "T8 GMAC0 RXC", "T11 GMAC1 RXC";
-> +						pins = "Y7 GMAC0 RXC", "Y11 GMAC1 RXC";
->  						skew-delay = <15>;
->  					};
->  					conf2 {
-> -						pins = "P8 GMAC0 TXEN", "V11 GMAC1 TXEN";
-> +						pins = "T8 GMAC0 TXEN", "W11 GMAC1 TXEN";
->  						skew-delay = <7>;
->  					};
->  					conf3 {
-> -						pins = "V7 GMAC0 TXC";
-> +						pins = "U8 GMAC0 TXC";
->  						skew-delay = <11>;
->  					};
->  					conf4 {
-> -						pins = "P10 GMAC1 TXC";
-> +						pins = "V11 GMAC1 TXC";
->  						skew-delay = <10>;
->  					};
->  					conf5 {
->  						/* The data lines all have default skew */
-> -						pins = "U8 GMAC0 RXD0", "V8 GMAC0 RXD1",
-> -						       "P9 GMAC0 RXD2", "R9 GMAC0 RXD3",
-> -						       "U7 GMAC0 TXD0", "T7 GMAC0 TXD1",
-> -						       "R7 GMAC0 TXD2", "P7 GMAC0 TXD3",
-> -						       "R11 GMAC1 RXD0", "P11 GMAC1 RXD1",
-> -						       "V12 GMAC1 RXD2", "U12 GMAC1 RXD3",
-> -						       "R10 GMAC1 TXD0", "T10 GMAC1 TXD1",
-> -						       "U10 GMAC1 TXD2", "V10 GMAC1 TXD3";
-> +						pins = "W8 GMAC0 RXD0", "V9 GMAC0 RXD1",
-> +						       "Y8 GMAC0 RXD2", "U9 GMAC0 RXD3",
-> +						       "T7 GMAC0 TXD0", "U6 GMAC0 TXD1",
-> +						       "V7 GMAC0 TXD2", "U7 GMAC0 TXD3",
-> +						       "Y12 GMAC1 RXD0", "V12 GMAC1 RXD1",
-> +						       "T11 GMAC1 RXD2", "W12 GMAC1 RXD3",
-> +						       "U10 GMAC1 TXD0", "Y10 GMAC1 TXD1",
-> +						       "W10 GMAC1 TXD2", "T9 GMAC1 TXD3";
->  						skew-delay = <7>;
->  					};
->  					/* Set up drive strength on GMAC0 to 16 mA */
+Anshuman Khandual <khandual@linux.vnet.ibm.com> writes:
+> On 04/16/2018 07:28 PM, David Miller wrote:
+>> From: Anshuman Khandual <khandual@linux.vnet.ibm.com>
+>> Date: Mon, 16 Apr 2018 14:26:07 +0530
+>> 
+>>> On 04/15/2018 08:29 PM, Christoph Hellwig wrote:
+>>>> This code is only used by sparc, and all new iommu drivers should use the
+>>>> drivers/iommu/ framework.  Also remove the unused exports.
+>>>>
+>>>> Signed-off-by: Christoph Hellwig <hch@lst.de>
+>>>
+>>> Right, these functions are used only from SPARC architecture. Simple
+>>> git grep confirms it as well. Hence it makes sense to move them into
+>>> arch code instead.
+>> 
+>> Well, we put these into a common location and used type friendly for
+>> powerpc because we hoped powerpc would convert over to using this
+>> common piece of code as well.
+>> 
+>> But nobody did the powerpc work.
+ 
+Sorry.
 
-This differs a bit from what I have but could work, will test later...
+>> If you look at the powerpc iommu support, it's the same code basically
+>> for entry allocation.
+>
+> I understand. But there are some differences in iommu_table structure,
+> how both regular and large IOMMU pools are being initialized etc. So
+> if the movement of code into SPARC help cleaning up these generic config
+> options in general, I guess we should do that. But I will leave it upto
+> others who have more experience in this area.
+>
+> +mpe
 
-Regards,
-Roman
+This is the first I've heard of it, I guess it's probably somewhere on
+Ben's append-only TODO list.
+
+Some of the code does look very similar, but not 100%. So someone would
+need to do some work to reconcile the two and test the result. TBH I
+doubt we're going to get around to it any time soon. Unless we have a
+volunteer?
+
+cheers
