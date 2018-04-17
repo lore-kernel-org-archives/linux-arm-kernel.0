@@ -1,424 +1,103 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Tue, 17 Apr 2018 12:14:04 -0500
-Subject: [PATCH v3] ARM: dts: Add am335x-pocketbeagle
-Message-ID: <20180417171404.13624-1-robertcnelson@gmail.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 17 Apr 2018 10:26:45 -0700
+Subject: [PATCH v2 2/3] coresight: Add section for integration with the
+ perf tools
+In-Reply-To: <1523981287-15370-3-git-send-email-mathieu.poirier@linaro.org>
+References: <1523981287-15370-1-git-send-email-mathieu.poirier@linaro.org>
+ <1523981287-15370-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <a434c2bd-96ab-3f7d-6d78-f69adaac4831@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PocketBeagle is an ultra-tiny-yet-complete open-source USB-key-fob computer.
+On 04/17/18 09:08, Mathieu Poirier wrote:
+> Adding a section that document how to use the Coresight framework and
+> drivers from the perf tools.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-This board family can be indentified by the A335PBGL in the at24 eeprom:
-A2: [aa 55 33 ee 41 33 33 35  50 42 47 4c 30 30 41 32 |.U3.A335PBGL00A2|]
+Acked-by: Randy Dunlap <rdunlap@infradead.org>
 
-http://beagleboard.org/pocket
-https://github.com/beagleboard/pocketbeagle
+Thanks.
 
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-CC: Tony Lindgren <tony@atomide.com>
-CC: Jason Kridner <jkridner@beagleboard.org>
-CC: Drew Fustini <drew@beagleboard.org>
-CC: Peter Robinson <pbrobinson@redhat.com>
----
-Changes in v3:
-- Fix: Board eeprom in subject message. (accidently copied PocketBone)
-Changes in v2:
-- Use SPDX tags.
-- Use eeprom at 50, remove repeated node and fix  and remove '_' to fix node_name_chars_strict Warning
-- Fix: PocketBeagle Name in Subject (not PocketBeagle Blue)
-- Fix: leds remove '_' to fix node_name_chars_strict warning
-- Fix: node_name_chars_strict pinmux_*_pins label's.
----
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/am335x-osd335x-common.dtsi | 124 ++++++++++
- arch/arm/boot/dts/am335x-pocketbeagle.dts    | 237 +++++++++++++++++++
- 3 files changed, 362 insertions(+)
- create mode 100644 arch/arm/boot/dts/am335x-osd335x-common.dtsi
- create mode 100644 arch/arm/boot/dts/am335x-pocketbeagle.dts
+> ---
+>  Documentation/trace/coresight.txt | 52 ++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 51 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+> index 710c75b6c73f..ab0d0f2d5cec 100644
+> --- a/Documentation/trace/coresight.txt
+> +++ b/Documentation/trace/coresight.txt
+> @@ -187,10 +187,19 @@ that can be performed on them (see "struct coresight_ops").  The
+>  specific to that component only.  "Implementation defined" customisations are
+>  expected to be accessed and controlled using those entries.
+>  
+> +
+>  How to use the tracer modules
+>  -----------------------------
+>  
+> -Before trace collection can start, a coresight sink needs to be identify.
+> +There are two ways to use the Coresight framework: 1) using the perf cmd line
+> +tools and 2) interacting directly with the Coresight devices using the sysFS
+> +interface.  Preference is given to the former as using the sysFS interface
+> +requires a deep understanding of the Coresight HW.  The following sections
+> +provide details on using both methods.
+> +
+> +1) Using the sysFS interface:
+> +
+> +Before trace collection can start, a coresight sink needs to be identified.
+>  There is no limit on the amount of sinks (nor sources) that can be enabled at
+>  any given moment.  As a generic operation, all device pertaining to the sink
+>  class will have an "active" entry in sysfs:
+> @@ -295,6 +304,47 @@ Instruction     13570831        0x8026B584      E28DD00C        false   ADD
+>  Instruction     0       0x8026B588      E8BD8000        true    LDM      sp!,{pc}
+>  Timestamp                                       Timestamp: 17107041535
+>  
+> +2) Using perf framework:
+> +
+> +Coresight tracers are represented using the Perf framework's Performance
+> +Monitoring Unit (PMU) abstraction.  As such the perf framework takes charge of
+> +controlling when tracing gets enabled based on when the process of interest is
+> +scheduled.  When configured in a system, Coresight PMUs will be listed when
+> +queried by the perf command line tool:
+> +
+> +	linaro at linaro-nano:~$ ./perf list pmu
+> +
+> +		List of pre-defined events (to be used in -e):
+> +
+> +		cs_etm//                                    [Kernel PMU event]
+> +
+> +	linaro at linaro-nano:~$
+> +
+> +Regardless of the number of tracers available in a system (usually equal to the
+> +amount of processor cores), the "cs_etm" PMU will be listed only once.
+> +
+> +A Coresight PMU works the same way as any other PMU, i.e the name of the PMU is
+> +listed along with configuration options within forward slashes '/'.  Since a
+> +Coresight system will typically have more than one sink, the name of the sink to
+> +work with needs to be specified as an event option.  Names for sink to choose
+> +from are listed in sysFS under ($SYSFS)/bus/coresight/devices:
+> +
+> +	root at linaro-nano:~# ls /sys/bus/coresight/devices/
+> +		20010000.etf   20040000.funnel  20100000.stm  22040000.etm
+> +		22140000.etm  230c0000.funnel  23240000.etm 20030000.tpiu
+> +		20070000.etr     20120000.replicator  220c0000.funnel
+> +		23040000.etm  23140000.etm     23340000.etm
+> +
+> +	root at linaro-nano:~# perf record -e cs_etm/@20070000.etr/u --per-thread program
+> +
+> +The syntax within the forward slashes '/' is important.  The '@' character
+> +tells the parser that a sink is about to be specified and that this is the sink
+> +to use for the trace session.
+> +
+> +More information on the above and other example on how to use Coresight with
+> +the perf tools can be found in the "HOWTO.md" file of the openCSD gitHub
+> +repository [3].
+> +
+>  How to use the STM module
+>  -------------------------
+>  
+> 
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7e2424957809..5a09ff15743b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -688,6 +688,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
- 	am335x-pdu001.dtb \
- 	am335x-pepper.dtb \
- 	am335x-phycore-rdk.dtb \
-+	am335x-pocketbeagle.dtb \
- 	am335x-shc.dtb \
- 	am335x-sbc-t335.dtb \
- 	am335x-sl50.dtb \
-diff --git a/arch/arm/boot/dts/am335x-osd335x-common.dtsi b/arch/arm/boot/dts/am335x-osd335x-common.dtsi
-new file mode 100644
-index 000000000000..d2150d207b7a
---- /dev/null
-+++ b/arch/arm/boot/dts/am335x-osd335x-common.dtsi
-@@ -0,0 +1,124 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * Author: Robert Nelson <robertcnelson@gmail.com>
-+ */
-+
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&dcdc2_reg>;
-+		};
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>; /* 512 MB */
-+	};
-+};
-+
-+&cpu0_opp_table {
-+	/*
-+	* Octavo Systems:
-+	* The EFUSE_SMA register is not programmed for any of the AM335x wafers
-+	* we get and we are not programming them during our production test.
-+	* Therefore, from a DEVICE_ID revision point of view, the silicon looks
-+	* like it is Revision 2.1.  However, from an EFUSE_SMA point of view for
-+	* the HW OPP table, the silicon looks like it is Revision 1.0 (ie the 
-+	* EFUSE_SMA register reads as all zeros).
-+	*/
-+	oppnitro-1000000000 {
-+		opp-supported-hw = <0x06 0x0100>;
-+	};
-+};
-+
-+&am33xx_pinmux {
-+	i2c0_pins: pinmux-i2c0-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x988, PIN_INPUT_PULLUP | MUX_MODE0)	/* (C17) I2C0_SDA.I2C0_SDA */
-+			AM33XX_IOPAD(0x98c, PIN_INPUT_PULLUP | MUX_MODE0)	/* (C16) I2C0_SCL.I2C0_SCL */
-+		>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins>;
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	tps: tps at 24 {
-+		reg = <0x24>;
-+	};
-+};
-+
-+/include/ "tps65217.dtsi"
-+
-+&tps {
-+	interrupts = <7>; /* NMI */
-+	interrupt-parent = <&intc>;
-+
-+	ti,pmic-shutdown-controller;
-+
-+	pwrbutton {
-+		interrupts = <2>;
-+		status = "okay";
-+	};
-+
-+	regulators {
-+		dcdc1_reg: regulator at 0 {
-+			regulator-name = "vdds_dpr";
-+			regulator-always-on;
-+		};
-+
-+		dcdc2_reg: regulator at 1 {
-+			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
-+			regulator-name = "vdd_mpu";
-+			regulator-min-microvolt = <925000>;
-+			regulator-max-microvolt = <1351500>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		dcdc3_reg: regulator at 2 {
-+			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
-+			regulator-name = "vdd_core";
-+			regulator-min-microvolt = <925000>;
-+			regulator-max-microvolt = <1150000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		ldo1_reg: regulator at 3 {
-+			regulator-name = "vio,vrtc,vdds";
-+			regulator-always-on;
-+		};
-+
-+		ldo2_reg: regulator at 4 {
-+			regulator-name = "vdd_3v3aux";
-+			regulator-always-on;
-+		};
-+
-+		ldo3_reg: regulator at 5 {
-+			regulator-name = "vdd_1v8";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+		};
-+
-+		ldo4_reg: regulator at 6 {
-+			regulator-name = "vdd_3v3a";
-+			regulator-always-on;
-+		};
-+	};
-+};
-+
-+&aes {
-+	status = "okay";
-+};
-+
-+&sham {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/am335x-pocketbeagle.dts b/arch/arm/boot/dts/am335x-pocketbeagle.dts
-new file mode 100644
-index 000000000000..62fe5cab9fae
---- /dev/null
-+++ b/arch/arm/boot/dts/am335x-pocketbeagle.dts
-@@ -0,0 +1,237 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * Author: Robert Nelson <robertcnelson@gmail.com>
-+ */
-+/dts-v1/;
-+
-+#include "am33xx.dtsi"
-+#include "am335x-osd335x-common.dtsi"
-+
-+/ {
-+	model = "TI AM335x PocketBeagle";
-+	compatible = "ti,am335x-pocketbeagle", "ti,am335x-bone", "ti,am33xx";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	leds {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usr_leds_pins>;
-+
-+		compatible = "gpio-leds";
-+
-+		usr0 {
-+			label = "beaglebone:green:usr0";
-+			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+
-+		usr1 {
-+			label = "beaglebone:green:usr1";
-+			gpios = <&gpio1 22 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "mmc0";
-+			default-state = "off";
-+		};
-+
-+		usr2 {
-+			label = "beaglebone:green:usr2";
-+			gpios = <&gpio1 23 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "cpu0";
-+			default-state = "off";
-+		};
-+
-+		usr3 {
-+			label = "beaglebone:green:usr3";
-+			gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	vmmcsd_fixed: fixedregulator0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmcsd_fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+};
-+
-+&am33xx_pinmux {
-+	i2c2_pins: pinmux-i2c2-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x97c, PIN_INPUT_PULLUP | MUX_MODE3)	/* (D17) uart1_rtsn.I2C2_SCL */
-+			AM33XX_IOPAD(0x978, PIN_INPUT_PULLUP | MUX_MODE3)	/* (D18) uart1_ctsn.I2C2_SDA */
-+		>;
-+	};
-+
-+	ehrpwm0_pins: pinmux-ehrpwm0-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x990, PIN_OUTPUT_PULLDOWN | MUX_MODE1)	/* (A13) mcasp0_aclkx.ehrpwm0A */
-+		>;
-+	};
-+
-+	ehrpwm1_pins: pinmux-ehrpwm1-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x848, PIN_OUTPUT_PULLDOWN | MUX_MODE6)	/* (U14) gpmc_a2.ehrpwm1A */
-+		>;
-+	};
-+
-+	mmc0_pins: pinmux-mmc0-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x960, PIN_INPUT | MUX_MODE7)		/* (C15) spi0_cs1.gpio0[6] */
-+			AM33XX_IOPAD(0x8fc, PIN_INPUT_PULLUP | MUX_MODE0)	/* (G16) mmc0_dat0.mmc0_dat0 */
-+			AM33XX_IOPAD(0x8f8, PIN_INPUT_PULLUP | MUX_MODE0)	/* (G15) mmc0_dat1.mmc0_dat1 */
-+			AM33XX_IOPAD(0x8f4, PIN_INPUT_PULLUP | MUX_MODE0)	/* (F18) mmc0_dat2.mmc0_dat2 */
-+			AM33XX_IOPAD(0x8f0, PIN_INPUT_PULLUP | MUX_MODE0)	/* (F17) mmc0_dat3.mmc0_dat3 */
-+			AM33XX_IOPAD(0x904, PIN_INPUT_PULLUP | MUX_MODE0)	/* (G18) mmc0_cmd.mmc0_cmd */
-+			AM33XX_IOPAD(0x900, PIN_INPUT_PULLUP | MUX_MODE0)	/* (G17) mmc0_clk.mmc0_clk */
-+			AM33XX_IOPAD(0x9a0, PIN_INPUT | MUX_MODE4)		/* (B12) mcasp0_aclkr.mmc0_sdwp */
-+		>;
-+	};
-+
-+	spi0_pins: pinmux-spi0-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x950, PIN_INPUT_PULLUP | MUX_MODE0)	/* (A17) spi0_sclk.spi0_sclk */
-+			AM33XX_IOPAD(0x954, PIN_INPUT_PULLUP | MUX_MODE0)	/* (B17) spi0_d0.spi0_d0 */
-+			AM33XX_IOPAD(0x958, PIN_INPUT_PULLUP | MUX_MODE0)	/* (B16) spi0_d1.spi0_d1 */
-+			AM33XX_IOPAD(0x95c, PIN_INPUT_PULLUP | MUX_MODE0)	/* (A16) spi0_cs0.spi0_cs0 */
-+		>;
-+	};
-+
-+	spi1_pins: pinmux-spi1-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x964, PIN_INPUT_PULLUP | MUX_MODE4)	/* (C18) eCAP0_in_PWM0_out.spi1_sclk */
-+			AM33XX_IOPAD(0x968, PIN_INPUT_PULLUP | MUX_MODE4)	/* (E18) uart0_ctsn.spi1_d0 */
-+			AM33XX_IOPAD(0x96c, PIN_INPUT_PULLUP | MUX_MODE4)	/* (E17) uart0_rtsn.spi1_d1 */
-+			AM33XX_IOPAD(0x9b0, PIN_INPUT_PULLUP | MUX_MODE4)	/* (A15) xdma_event_intr0.spi1_cs1 */
-+		>;
-+	};
-+
-+	usr_leds_pins: pinmux-usr-leds-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x854, PIN_OUTPUT | MUX_MODE7)		/* (V15) gpmc_a5.gpio1[21] - USR_LED_0 */
-+			AM33XX_IOPAD(0x858, PIN_OUTPUT | MUX_MODE7)		/* (U15) gpmc_a6.gpio1[22] - USR_LED_1 */
-+			AM33XX_IOPAD(0x85c, PIN_OUTPUT | MUX_MODE7)		/* (T15) gpmc_a7.gpio1[23] - USR_LED_2 */
-+			AM33XX_IOPAD(0x860, PIN_OUTPUT | MUX_MODE7)		/* (V16) gpmc_a8.gpio1[24] - USR_LED_3 */
-+		>;
-+	};
-+
-+	uart0_pins: pinmux-uart0-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x970, PIN_INPUT_PULLUP | MUX_MODE0)	/* (E15) uart0_rxd.uart0_rxd */
-+			AM33XX_IOPAD(0x974, PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* (E16) uart0_txd.uart0_txd */
-+		>;
-+	};
-+
-+	uart4_pins: pinmux-uart4-pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x870, PIN_INPUT_PULLUP | MUX_MODE6)	/* (T17) gpmc_wait0.uart4_rxd */
-+			AM33XX_IOPAD(0x874, PIN_OUTPUT_PULLDOWN | MUX_MODE6)	/* (U17) gpmc_wpn.uart4_txd */
-+		>;
-+	};
-+};
-+
-+&epwmss0 {
-+	status = "okay";
-+};
-+
-+&ehrpwm0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ehrpwm0_pins>;
-+};
-+
-+&epwmss1 {
-+	status = "okay";
-+};
-+
-+&ehrpwm1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ehrpwm1_pins>;
-+};
-+
-+&i2c0 {
-+	eeprom: eeprom at 50 {
-+		compatible = "atmel,24c256";
-+		reg = <0x50>;
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins>;
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
-+&mmc1 {
-+	status = "okay";
-+	vmmc-supply = <&vmmcsd_fixed>;
-+	bus-width = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>;
-+	cd-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
-+};
-+
-+&rtc {
-+	system-power-controller;
-+};
-+
-+&tscadc {
-+	status = "okay";
-+	adc {
-+		ti,adc-channels = <0 1 2 3 4 5 6 7>;
-+		ti,chan-step-avg = <16 16 16 16 16 16 16 16>;
-+		ti,chan-step-opendelay = <0x98 0x98 0x98 0x98 0x98 0x98 0x98 0x98>;
-+		ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins>;
-+
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart4_pins>;
-+
-+	status = "okay";
-+};
-+
-+&usb {
-+	status = "okay";
-+};
-+
-+&usb_ctrl_mod {
-+	status = "okay";
-+};
-+
-+&usb0_phy {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+	dr_mode = "otg";
-+};
-+
-+&usb1_phy {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+	dr_mode = "host";
-+};
-+
-+&cppi41dma  {
-+	status = "okay";
-+};
+
 -- 
-2.17.0
+~Randy
