@@ -1,63 +1,66 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 17 Apr 2018 15:46:31 +0100
-Subject: [PATCH] arm64: signal: don't force known signals to SIGKILL
-In-Reply-To: <20180416154501.56872-1-mark.rutland@arm.com>
-References: <20180416154501.56872-1-mark.rutland@arm.com>
-Message-ID: <20180417144630.GG16308@e103592.cambridge.arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 17 Apr 2018 17:53:51 +0300
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
+References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
+ <1522665546-10035-3-git-send-email-radheys@xilinx.com>
+ <20180411090854.GY6014@localhost>
+ <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+ <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
+ <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
+ <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
+Message-ID: <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 04:45:01PM +0100, Mark Rutland wrote:
-> Since commit:
+On 2018-04-17 16:58, Lars-Peter Clausen wrote:
+>>> There are two options.
+>>>
+>>> Either you extend the generic interfaces so it can cover your usecase in a
+>>> generic way. E.g. the ability to attach meta data to transfer.
+>>
+>> Fwiw I have this patch as part of a bigger work to achieve similar results:
 > 
->   a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
+> That's good stuff. Is this in a public tree somewhere?
+
+Not atm. I can not send the user of the new API and I did not wanted to
+send something like this out of the blue w/o context.
+
+But as it is a generic patch, I can send it as well. The only thing is
+that the need for the memcpy, so I might end up with
+ptr = get_metadata_ptr(desc, &size); /* size: in RX the valid size */
+
+and set_metadata_size(); /* in TX to tell how the client placed */
+
+Or something like that, the attach_metadata() as it is works just fine,
+but high throughput might not like the memcpy.
+
+>>> Or you can implement a interface that is specific to your DMA controller and
+>>> any client using this interface knows it is talking to your DMA controller.
+>>
+>> Hrm, so we can have DMA driver specific calls? The reason why TI's keystone 2
+>> navigator DMA support was rejected that it was introducing NAV specific calls
+>> for clients to configure features not yet supported by the framework.
 > 
-> ... any signal which is not SIGKILL will be upgraded to a SIGKILL be
-> force_signal_inject(). This includes signals we do expect, such as
-> SIGILL triggered by do_undefinstr().
+> In my opinion it is OK, somebody else might have different ideas. I mean it
+> is not nice, but it is better than the alternative of overloading the
+> generic API with driver specific semantics or introducing some kind of IOCTL
+> catch all callback.
+
+True, but the generic API can be extended as well to cover new grounds,
+features. Like this metadata thing.
+
+> If there is tight coupling between the DMA core and client and there is no
+> intention of using a generic client the best solution might even be to no
+> use DMAengine at all.
+
+This is how the knav stuff ended up. Well it is only used by networking
+atm, so it is 'fine' to have custom API, but it is not portable.
+
 > 
-> Fix the check to use a logical AND rather than a logical OR, permitting
-> signals whose layout is SIL_FAULT.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Fixes: a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/traps.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index ba964da31a25..1cb2749a72bf 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -366,7 +366,7 @@ void force_signal_inject(int signal, int code, unsigned long address)
->  	}
->  
->  	/* Force signals we don't understand to SIGKILL */
 
-Is it worth updating the comment here?
+- P?ter
 
-What's the rationale for this check?
-
-IIRC the purpose of this is to ensure that any siginfo delivered to
-userspace through this path is initialised correctly: so, either the
-signal must be a SIL_FAULT signal (since that's what the subsequent code
-initialises for) or SIGKILL (since userspace can't inspect the siginfo
-post-mortem, so the initialisation doesn't matter in that case).
-
-
-Maybe moving this check before the switch() would make the logic
-clearer.  Not sure though.
-
-> -	if (WARN_ON(signal != SIGKILL ||
-> +	if (WARN_ON(signal != SIGKILL &&
->  		    siginfo_layout(signal, code) != SIL_FAULT)) {
->  		signal = SIGKILL;
->  	}
-
-[...]
-
-Cheers
----Dave
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
