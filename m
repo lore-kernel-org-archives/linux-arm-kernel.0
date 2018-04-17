@@ -1,53 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 17 Apr 2018 22:22:05 +0800
-Subject: [PATCH V2 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz
- clock source
-In-Reply-To: <1521426645-19246-2-git-send-email-Anson.Huang@nxp.com>
-References: <1521426645-19246-1-git-send-email-Anson.Huang@nxp.com>
- <1521426645-19246-2-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20180417142203.GM25429@dragon>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 17 Apr 2018 16:22:50 +0200
+Subject: [PATCH v2 0/5] update Mediatek MT2712 clock and scpsys support
+In-Reply-To: <6c29df1f-f619-5e11-4160-b58e154f6592@gmail.com>
+References: <20180312070342.4335-1-weiyi.lu@mediatek.com>
+ <1521526068.13313.8.camel@mtksdaap41>
+ <152153061465.254778.3061562183948751301@swboyd.mtv.corp.google.com>
+ <6c29df1f-f619-5e11-4160-b58e154f6592@gmail.com>
+Message-ID: <bcec1e3c-de22-daf5-fda5-53b1569a68a6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 19, 2018 at 10:30:45AM +0800, Anson Huang wrote:
-> On i.MX6SX SabreAuto board, there is external 24MHz clock
-> source for analog clock2, add this clock source to clock tree.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
-> changes since V1:
-> 	remove unnecessary clocks container.
 
-I understand this is suggested by Fabio, but I'm afraid that it's not
-going to work with imx_obtain_fixed_clock() call, which is coded to
-look for clocks under /clocks node.
 
-Shawn
+On 03/21/2018 10:11 AM, Matthias Brugger wrote:
+> 
+> 
+> On 03/20/2018 08:23 AM, Stephen Boyd wrote:
+>> Quoting Weiyi Lu (2018-03-19 23:07:48)
+>>> On Mon, 2018-03-12 at 15:03 +0800, Weiyi Lu wrote:
+>>>> This series is based on v4.16-rc1 and composed of scpsys control (PATCH 1-2) and clock control (PATCH 3-5).
+>>>> Basically, all changes are for the ECO design change of MT2712.
+>>>>
+>>>> changes since v1:
+>>>> - Avoid renumbering clocks. Append new clocks at the bottom of each own subsystem.
+>>>>
+>>> Hi Matthias & Stephen,
+>>>
+>>> Sorry to bother. Just saw patch 1/2 are already pushed to v4.16-next-soc
+>>> and patch 3/5 are applied onto clk-next. What about the patch 4(arm64:
+>>> dts: add clock device nodes of MT2712). Does there any problem remain or
+>>> it cause some problems? Many thanks.
+>>
+>> Patch 4 can go via arm-soc? I'm not planning to apply that patch.
+>>
+> 
+> I can take it through my branch, no problem. But I think it is too late for this
+> cycle. CCing Arnd to confirm.
+> 
 
->  arch/arm/boot/dts/imx6sx-sabreauto.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> index 72da5ac..a3b022b 100644
-> --- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-> @@ -18,6 +18,12 @@
->  		reg = <0x80000000 0x80000000>;
->  	};
->  
-> +	codec_osc: anaclk2 {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <24576000>;
-> +	};
-> +
->  	regulators {
->  		compatible = "simple-bus";
->  		#address-cells = <1>;
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Now pushed to v4.17-next/dts64
+
+Thanks a lot.
