@@ -1,673 +1,1764 @@
-From: Eugeniy.Paltsev@synopsys.com (Eugeniy Paltsev)
-Date: Tue, 17 Apr 2018 15:11:30 +0300
-Subject: [RFC 2/2] dw_mmc: add multislot support
-In-Reply-To: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
-References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
-Message-ID: <20180417121130.25281-3-Eugeniy.Paltsev@synopsys.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 17 Apr 2018 13:21:05 +0100
+Subject: [PATCH] ARM: dts: Restructure Vexpress motherboard includes
+In-Reply-To: <20180417114331.5233-1-linus.walleij@linaro.org>
+References: <20180417114331.5233-1-linus.walleij@linaro.org>
+Message-ID: <86a95dd0-a702-3dce-e69b-20205a519a88@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds missing stuff to support multislot mode in
-DesignWare MMC driver.
+Hi Linus,
 
-The main changes:
- * Add missing slot switch to __dw_mci_start_request() function.
- * Refactor set_ios function:
-   a) Calculate common clock which is
-      suitable for all slots instead of directly use clock value
-      provided by mmc core. We calculate common clock as the minimum
-      among each used slot clocks. This clock is calculated in
-      dw_mci_calc_common_clock() function which is called
-      from set_ios()
-   b) Disable clock only if no other slots are ON.
-   c) Setup clock directly in set_ios() only if no other slots
-      are ON. Otherwise adjust clock in __dw_mci_start_request()
-      function before slot switch.
-   d) Move timings and bus_width setup to separate funcions.
- * Use timing field in each slot structure instead of common field in
-   host structure.
- * Add locks to serialize access to registers.
+On 17/04/18 12:43, Linus Walleij wrote:
+> It is a bit unorthodox to just include a file in the middle
+> of a another DTS file, it breaks the pattern from other device
+> trees and also makes it really hard to reference things
+> across the files with phandles.
+> 
+> Restructure the include for the Versatile Express motherboards
+> to happen at the top of the file, reference the target nodes
+> directly, and indent the motherboard .dtsi files to reflect
+> their actual depth in the hiearchy.
+> 
+> This is a purely syntactic change that result in the same
+> DTB files from the DTS/DTSI files.
 
-NOTE: this patch is based off of v4.17-rc1
+FWIW this is kind of the 32-bit equivalent of d29e849cafe6 ("arm64: dts: 
+juno: remove dtsi nesting inside tree structure") - I seem to recall 
+that whilst the nodes within the DTB remained identical, they did end up 
+in a different order, which at the time gave me problems with the SP804 
+sometimes registering as the first clocksource before the arch timer, 
+and boot subsequently getting stuck in an infinite loop trying to 
+replace it. That doesn't seem to have happened in ages though, so I 
+guess something somewhere might have been fixed...
 
-NOTE: as of today I tested this changes (in singleslot and multislot
-   modes) only on Synopsys HSDK board. But I will get ODROID-XU4 board
-   (with Exynos5422 which has DW MMC controller) the next week
-   so I will test it on this board too to catch any regressions.
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---d29e849cafe6
+>   arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            | 706 +++++++++++----------
+>   arch/arm/boot/dts/vexpress-v2m.dtsi                | 704 ++++++++++----------
+>   arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |   3 +-
+>   arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   5 +-
+>   arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |   5 +-
+>   arch/arm/boot/dts/vexpress-v2p-ca9.dts             |   5 +-
+>   .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      |   5 +-
+>   7 files changed, 718 insertions(+), 715 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+> index 35714ff6f467..7b8ff5b3b912 100644
+> --- a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+> +++ b/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+> @@ -17,426 +17,430 @@
+>    * CHANGES TO vexpress-v2m.dtsi!
+>    */
+>   
+> -	motherboard {
+> -		model = "V2M-P1";
+> -		arm,hbi = <0x190>;
+> -		arm,vexpress,site = <0>;
+> -		arm,v2m-memory-map = "rs1";
+> -		compatible = "arm,vexpress,v2m-p1", "simple-bus";
+> -		#address-cells = <2>; /* SMB chipselect number and offset */
+> -		#size-cells = <1>;
+> -		#interrupt-cells = <1>;
+> -		ranges;
+> -
+> -		flash at 0,00000000 {
+> -			compatible = "arm,vexpress-flash", "cfi-flash";
+> -			reg = <0 0x00000000 0x04000000>,
+> -			      <4 0x00000000 0x04000000>;
+> -			bank-width = <4>;
+> -		};
+> +/ {
+> +	smb at 8000000 {
 
-Signed-off-by: Eugeniy Paltsev <Eugeniy.Paltsev@synopsys.com>
----
- drivers/mmc/host/dw_mmc.c | 325 ++++++++++++++++++++++++++++++++++------------
- drivers/mmc/host/dw_mmc.h |  14 +-
- 2 files changed, 253 insertions(+), 86 deletions(-)
+Nit: Surely "&smb {", given that you've already gone to the length of 
+labelling it in the includers? (plus that should also avoid the need to 
+reindent)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index f8b1e3528e99..e0d30f56cc59 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -261,7 +261,8 @@ static void mci_send_cmd(struct dw_mci_slot *slot, u32 cmd, u32 arg)
- 	mci_writel(host, CMDARG, arg);
- 	wmb(); /* drain writebuffer */
- 	dw_mci_wait_while_busy(host, cmd);
--	mci_writel(host, CMD, SDMMC_CMD_START | cmd);
-+	mci_writel(host, CMD, SDMMC_CMD_START | cmd |
-+			      (slot->id << SDMMC_CMD_CARD_NUM_OFFSET));
- 
- 	if (readl_poll_timeout_atomic(host->regs + SDMMC_CMD, cmd_status,
- 				      !(cmd_status & SDMMC_CMD_START),
-@@ -428,7 +429,8 @@ static void dw_mci_start_command(struct dw_mci *host,
- 	wmb(); /* drain writebuffer */
- 	dw_mci_wait_while_busy(host, cmd_flags);
- 
--	mci_writel(host, CMD, cmd_flags | SDMMC_CMD_START);
-+	mci_writel(host, CMD, cmd_flags | SDMMC_CMD_START |
-+		   (host->cur_slot->id << SDMMC_CMD_CARD_NUM_OFFSET));
- 
- 	/* response expected command only */
- 	if (cmd_flags & SDMMC_CMD_RESP_EXP)
-@@ -1065,7 +1067,7 @@ static void dw_mci_ctrl_thld(struct dw_mci *host, struct mmc_data *data)
- 	 * It's used when HS400 mode is enabled.
- 	 */
- 	if (data->flags & MMC_DATA_WRITE &&
--		!(host->timing != MMC_TIMING_MMC_HS400))
-+		!(host->cur_slot->timing != MMC_TIMING_MMC_HS400))
- 		return;
- 
- 	if (data->flags & MMC_DATA_WRITE)
-@@ -1073,8 +1075,8 @@ static void dw_mci_ctrl_thld(struct dw_mci *host, struct mmc_data *data)
- 	else
- 		enable = SDMMC_CARD_RD_THR_EN;
- 
--	if (host->timing != MMC_TIMING_MMC_HS200 &&
--	    host->timing != MMC_TIMING_UHS_SDR104)
-+	if (host->cur_slot->timing != MMC_TIMING_MMC_HS200 &&
-+	    host->cur_slot->timing != MMC_TIMING_UHS_SDR104)
- 		goto disable;
- 
- 	blksz_depth = blksz / (1 << host->data_shift);
-@@ -1218,13 +1220,45 @@ static void dw_mci_submit_data(struct dw_mci *host, struct mmc_data *data)
- 	}
- }
- 
--static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
-+/* must be called in the locked context */
-+static void dw_mci_setup_clock_off(struct dw_mci_slot *slot)
-+{
-+	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT |
-+			     (slot->id << SDMMC_CMD_CARD_NUM_OFFSET);
-+
-+	if (!slot->host->new_clk_speed) {
-+		mci_writel(slot->host, CLKENA, 0);
-+		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
-+		slot->host->current_speed = 0;
-+	}
-+}
-+
-+static u32 dw_mci_calc_clock_div(struct dw_mci *host)
-+{
-+	unsigned int clock = host->new_clk_speed;
-+	u32 bus_hz = host->bus_hz;
-+	u32 div;
-+
-+	div = bus_hz / clock;
-+	if (bus_hz % clock && bus_hz > clock)
-+		/*
-+		 * move the + 1 after the divide to prevent
-+		 * over-clocking the card.
-+		 */
-+		div += 1;
-+
-+	return (bus_hz != clock) ? DIV_ROUND_UP(div, 2) : 0;
-+}
-+
-+/* must be called in the locked context */
-+static void dw_mci_setup_clock(struct dw_mci_slot *slot, bool force_clkinit)
- {
- 	struct dw_mci *host = slot->host;
--	unsigned int clock = slot->clock;
-+	unsigned int clock = host->new_clk_speed;
- 	u32 div;
- 	u32 clk_en_a;
--	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT;
-+	u32 sdmmc_cmd_bits = SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT |
-+			     (slot->id << SDMMC_CMD_CARD_NUM_OFFSET);
- 
- 	/* We must continue to set bit 28 in CMD until the change is complete */
- 	if (host->state == STATE_WAITING_CMD11_DONE)
-@@ -1233,79 +1267,173 @@ static void dw_mci_setup_bus(struct dw_mci_slot *slot, bool force_clkinit)
- 	if (!clock) {
- 		mci_writel(host, CLKENA, 0);
- 		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
--	} else if (clock != host->current_speed || force_clkinit) {
--		div = host->bus_hz / clock;
--		if (host->bus_hz % clock && host->bus_hz > clock)
--			/*
--			 * move the + 1 after the divide to prevent
--			 * over-clocking the card.
--			 */
--			div += 1;
--
--		div = (host->bus_hz != clock) ? DIV_ROUND_UP(div, 2) : 0;
-+		host->current_speed = 0;
- 
--		if ((clock != slot->__clk_old &&
--			!test_bit(DW_MMC_CARD_NEEDS_POLL, &slot->flags)) ||
--			force_clkinit) {
--			/* Silent the verbose log if calling from PM context */
--			if (!force_clkinit)
--				dev_info(&slot->mmc->class_dev,
--					 "Bus speed (slot %d) = %dHz (slot req %dHz, actual %dHZ div = %d)\n",
--					 slot->id, host->bus_hz, clock,
--					 div ? ((host->bus_hz / div) >> 1) :
--					 host->bus_hz, div);
-+		return;
-+	}
- 
--			/*
--			 * If card is polling, display the message only
--			 * one time at boot time.
--			 */
--			if (slot->mmc->caps & MMC_CAP_NEEDS_POLL &&
--					slot->mmc->f_min == clock)
--				set_bit(DW_MMC_CARD_NEEDS_POLL, &slot->flags);
--		}
-+	if (clock != host->current_speed || force_clkinit) {
-+		div = dw_mci_calc_clock_div(host);
- 
--		/* disable clock */
--		mci_writel(host, CLKENA, 0);
-+		/*
-+		 * Stop all clocks by writing xxxx0000 to the CLKENA register.
-+		 * We don't want to touch LOW_PWR bits to avoid changing for
-+		 * another slot.
-+		 */
-+		clk_en_a = mci_readl(host, CLKENA);
-+		clk_en_a &= ~SDMMC_CLKEN_CLK_ALL;
-+		mci_writel(host, CLKENA, clk_en_a);
- 		mci_writel(host, CLKSRC, 0);
--
--		/* inform CIU */
-+		/* inform CIU about clock disabling */
- 		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
- 
- 		/* set clock to desired speed */
- 		mci_writel(host, CLKDIV, div);
--
--		/* inform CIU */
-+		/* inform CIU about CLKDIV change */
- 		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
- 
- 		/* enable clock; only low power if no SDIO */
--		clk_en_a = SDMMC_CLKEN_ENABLE << slot->id;
--		if (!test_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags))
-+		clk_en_a = mci_readl(host, CLKENA);
-+		clk_en_a |= SDMMC_CLKEN_ENABLE << slot->id;
-+		if (test_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags))
-+			clk_en_a &= ~(SDMMC_CLKEN_LOW_PWR << slot->id);
-+		else
- 			clk_en_a |= SDMMC_CLKEN_LOW_PWR << slot->id;
- 		mci_writel(host, CLKENA, clk_en_a);
--
--		/* inform CIU */
-+		/*
-+		 * Inform CIU about clock enabling and (possibly) LOW_PWR bit
-+		 * change.
-+		 */
- 		mci_send_cmd(slot, sdmmc_cmd_bits, 0);
- 
--		/* keep the last clock value that was requested from core */
--		slot->__clk_old = clock;
-+		host->current_speed = clock;
- 	}
-+}
-+
-+/* must be called with host->lock held */
-+static void dw_mci_setup_timings(struct dw_mci_slot *slot, u8 timing)
-+{
-+	u32 reg;
-+
-+	slot->timing = timing;
-+
-+	/* Set the current slot timings */
-+	reg = mci_readl(slot->host, UHS_REG);
-+
-+	/* DDR mode set */
-+	if (timing == MMC_TIMING_MMC_DDR52 ||
-+	    timing == MMC_TIMING_UHS_DDR50 ||
-+	    timing == MMC_TIMING_MMC_HS400)
-+		reg |= ((0x1 << slot->id) << 16);
-+	else
-+		reg &= ~((0x1 << slot->id) << 16);
- 
--	host->current_speed = clock;
-+	mci_writel(slot->host, UHS_REG, reg);
-+}
-+
-+/* must be called with host->lock held */
-+static void dw_mci_calc_common_clock(struct dw_mci_slot *slot)
-+{
-+	struct dw_mci *host = slot->host;
-+	u32 clock_min = ~0U;
-+	int i;
-+
-+	/*
-+	 * Calculate new clock which is suitable for all slots and save it in
-+	 * host->new_clk_speed
-+	 */
-+	for (i = 0; i < host->num_slots; i++) {
-+		if (host->slot[i] &&
-+		    host->slot[i]->clock &&
-+		    host->slot[i]->clock < clock_min) {
-+			clock_min = host->slot[i]->clock;
-+		}
-+	}
-+
-+	/* all slots have clock == 0 */
-+	if (clock_min == ~0U)
-+		clock_min = 0;
-+
-+	host->new_clk_speed = clock_min;
-+
-+	if (clock_min != host->current_speed)
-+		dev_vdbg(host->dev, "[%u] ios: choose new common clock: %u\n",
-+			 slot->id, clock_min);
-+}
-+
-+/* must be called with host->lock held */
-+static void dw_mci_setup_bus_width(struct dw_mci_slot *slot, u8 bus_width)
-+{
-+	u32 reg;
-+
-+	switch (bus_width) {
-+	case MMC_BUS_WIDTH_4:
-+		slot->ctype = SDMMC_CTYPE_4BIT;
-+		break;
-+	case MMC_BUS_WIDTH_8:
-+		slot->ctype = SDMMC_CTYPE_8BIT;
-+		break;
-+	default:
-+		/* set default 1 bit mode */
-+		slot->ctype = SDMMC_CTYPE_1BIT;
-+	}
- 
- 	/* Set the current slot bus width */
--	mci_writel(host, CTYPE, (slot->ctype << slot->id));
-+	reg = mci_readl(slot->host, CTYPE);
-+	reg &= ~((SDMMC_CTYPE_8BIT | SDMMC_CTYPE_4BIT | SDMMC_CTYPE_1BIT) << slot->id);
-+	reg |= slot->ctype << slot->id;
-+	mci_writel(slot->host, CTYPE, reg);
-+}
-+
-+static void dw_mci_switch_card(struct dw_mci *host, struct dw_mci_slot *prev_slot)
-+{
-+	struct dw_mci_slot *slot = host->cur_slot;
-+	u32 new_id = host->cur_slot->id;
-+	u32 clk_en;
-+
-+	if (!prev_slot)
-+		return;
-+
-+	if (prev_slot->id == new_id)
-+		return;
-+
-+	dev_vdbg(host->dev, "[%u->%u] slot change\n", prev_slot->id, new_id);
-+
-+	/* Stop all clocks by writing xxxx0000 to the CLKENA register. */
-+	clk_en = mci_readl(host, CLKENA);
-+	clk_en &= ~SDMMC_CLKEN_CLK_ALL;
-+	mci_writel(host, CLKENA, clk_en);
-+
-+	/* Inform CIU about clock disabling. */
-+	mci_send_cmd(slot, SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
-+
-+	/* Enable clock, carry about new slot LOW_PWR bit */
-+	if (test_bit(DW_MMC_CARD_NO_LOW_PWR, &slot->flags))
-+		clk_en &= ~(SDMMC_CLKEN_LOW_PWR << new_id);
-+	else
-+		clk_en |= SDMMC_CLKEN_LOW_PWR << new_id;
-+	clk_en |= SDMMC_CLKEN_ENABLE << new_id;
-+	mci_writel(host, CLKENA, clk_en);
-+
-+	/*
-+	 * Inform CIU about clock enabling and (possibly) LOW_PWR bit
-+	 * change.
-+	 */
-+	mci_send_cmd(slot, SDMMC_CMD_UPD_CLK | SDMMC_CMD_PRV_DAT_WAIT, 0);
- }
- 
- static void __dw_mci_start_request(struct dw_mci *host,
- 				   struct dw_mci_slot *slot,
- 				   struct mmc_command *cmd)
- {
-+	struct dw_mci_slot *prev_slot;
- 	struct mmc_request *mrq;
- 	struct mmc_data	*data;
- 	u32 cmdflags;
- 
- 	mrq = slot->mrq;
- 
-+	prev_slot = host->cur_slot;
- 	host->cur_slot = slot;
- 	host->mrq = mrq;
- 
-@@ -1315,6 +1443,12 @@ static void __dw_mci_start_request(struct dw_mci *host,
- 	host->data_status = 0;
- 	host->dir_status = 0;
- 
-+	/* Change common clock frequency if it is required */
-+	dw_mci_setup_clock(slot, false);
-+
-+	/* Swithch to another slot if it is required */
-+	dw_mci_switch_card(host, prev_slot);
-+
- 	data = cmd->data;
- 	if (data) {
- 		mci_writel(host, TMOUT, 0xFFFFFFFF);
-@@ -1422,6 +1556,20 @@ static void dw_mci_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 	spin_unlock_bh(&host->lock);
- }
- 
-+/* must be called with host->lock held */
-+static u8 dw_mci_num_card_is_on(struct dw_mci *host)
-+{
-+	u8 num_card = 0;
-+	int i;
-+
-+	for (i = 0; i < host->num_slots; i++)
-+		if (host->slot[i])
-+			if (test_bit(DW_MMC_CARD_IS_ON, &host->slot[i]->flags))
-+				num_card++;
-+
-+	return num_card;
-+}
-+
- static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- {
- 	struct dw_mci_slot *slot = mmc_priv(mmc);
-@@ -1429,36 +1577,18 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	u32 regs;
- 	int ret;
- 
--	switch (ios->bus_width) {
--	case MMC_BUS_WIDTH_4:
--		slot->ctype = SDMMC_CTYPE_4BIT;
--		break;
--	case MMC_BUS_WIDTH_8:
--		slot->ctype = SDMMC_CTYPE_8BIT;
--		break;
--	default:
--		/* set default 1 bit mode */
--		slot->ctype = SDMMC_CTYPE_1BIT;
--	}
--
--	regs = mci_readl(slot->host, UHS_REG);
--
--	/* DDR mode set */
--	if (ios->timing == MMC_TIMING_MMC_DDR52 ||
--	    ios->timing == MMC_TIMING_UHS_DDR50 ||
--	    ios->timing == MMC_TIMING_MMC_HS400)
--		regs |= ((0x1 << slot->id) << 16);
--	else
--		regs &= ~((0x1 << slot->id) << 16);
-+	spin_lock_bh(&slot->host->lock);
- 
--	mci_writel(slot->host, UHS_REG, regs);
--	slot->host->timing = ios->timing;
-+	dw_mci_setup_bus_width(slot, ios->bus_width);
-+	dw_mci_setup_timings(slot, ios->timing);
- 
- 	/*
- 	 * Use mirror of ios->clock to prevent race with mmc
- 	 * core ios update when finding the minimum.
- 	 */
- 	slot->clock = ios->clock;
-+	/* Calculate new clock which is suitable for all slots */
-+	dw_mci_calc_common_clock(slot);
- 
- 	if (drv_data && drv_data->set_ios)
- 		drv_data->set_ios(slot->host, ios);
-@@ -1481,6 +1611,13 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		mci_writel(slot->host, PWREN, regs);
- 		break;
- 	case MMC_POWER_ON:
-+		set_bit(DW_MMC_CARD_IS_ON, &slot->flags);
-+
-+		/*
-+		 * Don't care about regulators and controller reset in
-+		 * multislot mode as external regulators can't be used in
-+		 * multislot mode. (we explicitly check it in probe function)
-+		 */
- 		if (!slot->host->vqmmc_enabled) {
- 			if (!IS_ERR(mmc->supply.vqmmc)) {
- 				ret = regulator_enable(mmc->supply.vqmmc);
-@@ -1500,13 +1637,20 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 					  SDMMC_CTRL_ALL_RESET_FLAGS);
- 		}
- 
--		/* Adjust clock / bus width after power is up */
--		dw_mci_setup_bus(slot, false);
-+		/*
-+		 * If we are first controller user setup clock. Otherwise
-+		 * clock will be adjusted before request.
-+		 */
-+		if (dw_mci_num_card_is_on(slot->host) == 1)
-+			dw_mci_setup_clock(slot, false);
- 
- 		break;
- 	case MMC_POWER_OFF:
--		/* Turn clock off before power goes down */
--		dw_mci_setup_bus(slot, false);
-+		clear_bit(DW_MMC_CARD_IS_ON, &slot->flags);
-+
-+		/* set clock to 0 only if no other card is ON */
-+		if (dw_mci_num_card_is_on(slot->host) == 0)
-+			dw_mci_setup_clock_off(slot);
- 
- 		if (!IS_ERR(mmc->supply.vmmc))
- 			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-@@ -1525,6 +1669,8 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 
- 	if (slot->host->state == STATE_WAITING_CMD11_DONE && ios->clock != 0)
- 		slot->host->state = STATE_IDLE;
-+
-+	spin_unlock_bh(&slot->host->lock);
- }
- 
- static int dw_mci_card_busy(struct mmc_host *mmc)
-@@ -1553,6 +1699,8 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 	if (drv_data && drv_data->switch_voltage)
- 		return drv_data->switch_voltage(mmc, ios);
- 
-+
-+	spin_lock_bh(&slot->host->lock);
- 	/*
- 	 * Program the voltage.  Note that some instances of dw_mmc may use
- 	 * the UHS_REG for this.  For other instances (like exynos) the UHS_REG
-@@ -1563,6 +1711,8 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 		uhs &= ~v18;
- 	else
- 		uhs |= v18;
-+	mci_writel(host, UHS_REG, uhs);
-+	spin_unlock_bh(&slot->host->lock);
- 
- 	if (!IS_ERR(mmc->supply.vqmmc)) {
- 		ret = mmc_regulator_set_vqmmc(mmc, ios);
-@@ -1574,7 +1724,6 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 			return ret;
- 		}
- 	}
--	mci_writel(host, UHS_REG, uhs);
- 
- 	return 0;
- }
-@@ -1641,6 +1790,7 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
- 		u32 clk_en_a_old;
- 		u32 clk_en_a;
- 
-+		spin_lock(&host->lock);
- 		clk_en_a_old = mci_readl(host, CLKENA);
- 
- 		if (card->type == MMC_TYPE_SDIO ||
-@@ -1657,6 +1807,7 @@ static void dw_mci_init_card(struct mmc_host *mmc, struct mmc_card *card)
- 			mci_send_cmd(slot, SDMMC_CMD_UPD_CLK |
- 				     SDMMC_CMD_PRV_DAT_WAIT, 0);
- 		}
-+		spin_unlock(&host->lock);
- 	}
- }
- 
-@@ -1929,7 +2080,6 @@ static void dw_mci_set_drto(struct dw_mci *host)
- 	drto_div = (mci_readl(host, CLKDIV) & 0xff) * 2;
- 	if (drto_div == 0)
- 		drto_div = 1;
--
- 	drto_ms = DIV_ROUND_UP_ULL((u64)MSEC_PER_SEC * drto_clks * drto_div,
- 				   host->bus_hz);
- 
-@@ -2843,7 +2993,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	slot->sdio_id = host->sdio_id0 + id;
- 	slot->mmc = mmc;
- 	slot->host = host;
--	host->slot[id] = slot;
- 
- 	mmc->ops = &dw_mci_ops;
- 
-@@ -2852,6 +3001,13 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	if (ret)
- 		goto err_host_allocated;
- 
-+	if (host->num_slots > 1 &&
-+	    (!IS_ERR(slot->mmc->supply.vmmc) || !IS_ERR(mmc->supply.vqmmc))) {
-+		dev_err(host->dev,
-+			"external regulators in multislot mode are not supported\n");
-+		goto err_host_allocated;
-+	}
-+
- 	if (!mmc->ocr_avail)
- 		mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
- 
-@@ -2889,6 +3045,9 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 
- 	dw_mci_get_cd(mmc);
- 
-+	/* Add slot to the slot array only if it is allocated successfuly */
-+	host->slot[id] = slot;
-+
- 	ret = mmc_add_host(mmc);
- 	if (ret)
- 		goto err_host_allocated;
-@@ -2900,6 +3059,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	return 0;
- 
- err_host_allocated:
-+	host->slot[id] = NULL;
- 	mmc_free_host(mmc);
- 	return ret;
- }
-@@ -3379,7 +3539,8 @@ int dw_mci_probe(struct dw_mci *host)
- 		host->num_slots = 1;
- 
- 	if (host->num_slots < 1 ||
--	    host->num_slots > SDMMC_GET_SLOT_NUM(mci_readl(host, HCON))) {
-+	    host->num_slots > SDMMC_GET_SLOT_NUM(mci_readl(host, HCON)) ||
-+	    host->num_slots > MAX_MCI_SLOTS) {
- 		dev_err(host->dev,
- 			"Platform data must supply correct num_slots.\n");
- 		ret = -ENODEV;
-@@ -3540,7 +3701,7 @@ int dw_mci_runtime_resume(struct device *dev)
- 			dw_mci_set_ios(slot->mmc, &slot->mmc->ios);
- 
- 		/* Force setup bus to guarantee available clock output */
--		dw_mci_setup_bus(slot, true);
-+		dw_mci_setup_clock(slot, true);
- 	}
- 
- 	/* Now that slots are all setup, we can enable card detect */
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 92ece82c76f2..47d7f20be4de 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -75,7 +75,6 @@ struct dw_mci_dma_slave {
-  *	transfer is in progress.
-  * @stop_abort: The command currently prepared for stoping transfer.
-  * @prev_blksz: The former transfer blksz record.
-- * @timing: Record of current ios timing.
-  * @use_dma: Which DMA channel is in use for the current transfer, zero
-  *	denotes PIO mode.
-  * @using_dma: Whether DMA is in use for the current transfer.
-@@ -103,7 +102,10 @@ struct dw_mci_dma_slave {
-  * @queue: List of slots waiting for access to the controller.
-  * @bus_hz: The rate of @mck in Hz. This forms the basis for MMC bus
-  *	rate and timeout calculations.
-- * @current_speed: Configured rate of the controller.
-+ * @current_speed: Current clock rate of the controller.
-+ * @new_clk_speed: New clock rate of the controller which is suitable for all
-+ *	slots. It is calculated in set_ios function. After applyimg it
-+ *	becomes @current_speed.
-  * @num_slots: Number of slots available.
-  * @fifoth_val: The value of FIFOTH register.
-  * @verid: Denote Version ID.
-@@ -178,7 +180,6 @@ struct dw_mci {
- 	struct mmc_data		*data;
- 	struct mmc_command	stop_abort;
- 	unsigned int		prev_blksz;
--	unsigned char		timing;
- 
- 	/* DMA interface members*/
- 	int			use_dma;
-@@ -208,6 +209,7 @@ struct dw_mci {
- 
- 	u32			bus_hz;
- 	u32			current_speed;
-+	u32			new_clk_speed;
- 	u32			num_slots;
- 	u32			fifoth_val;
- 	u16			verid;
-@@ -364,6 +366,7 @@ struct dw_mci_board {
- /* Clock Enable register defines */
- #define SDMMC_CLKEN_LOW_PWR		BIT(16)
- #define SDMMC_CLKEN_ENABLE		BIT(0)
-+#define SDMMC_CLKEN_CLK_ALL		0xFFFF
- /* time-out register defines */
- #define SDMMC_TMOUT_DATA(n)		_SBF(8, (n))
- #define SDMMC_TMOUT_DATA_MSK		0xFFFFFF00
-@@ -411,6 +414,7 @@ struct dw_mci_board {
- #define SDMMC_CMD_RESP_LONG		BIT(7)
- #define SDMMC_CMD_RESP_EXP		BIT(6)
- #define SDMMC_CMD_INDX(n)		((n) & 0x1F)
-+#define SDMMC_CMD_CARD_NUM_OFFSET	16
- /* Status register defines */
- #define SDMMC_GET_FCNT(x)		(((x)>>17) & 0x1FFF)
- #define SDMMC_STATUS_DMA_REQ		BIT(31)
-@@ -519,6 +523,7 @@ extern int dw_mci_runtime_resume(struct device *device);
-  * @mmc: The mmc_host representing this slot.
-  * @host: The MMC controller this slot is using.
-  * @ctype: Card type for this slot.
-+ * @timing: Record of current ios timing for this slot.
-  * @mrq: mmc_request currently being processed or waiting to be
-  *	processed, or NULL when the slot is idle.
-  * @queue_node: List node for placing this node in the @queue list of
-@@ -535,12 +540,12 @@ struct dw_mci_slot {
- 	struct dw_mci		*host;
- 
- 	u32			ctype;
-+	unsigned char		timing;
- 
- 	struct mmc_request	*mrq;
- 	struct list_head	queue_node;
- 
- 	unsigned int		clock;
--	unsigned int		__clk_old;
- 
- 	unsigned long		flags;
- #define DW_MMC_CARD_PRESENT	0
-@@ -548,6 +553,7 @@ struct dw_mci_slot {
- #define DW_MMC_CARD_NO_LOW_PWR	2
- #define DW_MMC_CARD_NO_USE_HOLD 3
- #define DW_MMC_CARD_NEEDS_POLL	4
-+#define DW_MMC_CARD_IS_ON	5
- 	int			id;
- 	int			sdio_id;
- };
--- 
-2.14.3
+Robin.
+
+> +		motherboard {
+> +			model = "V2M-P1";
+> +			arm,hbi = <0x190>;
+> +			arm,vexpress,site = <0>;
+> +			arm,v2m-memory-map = "rs1";
+> +			compatible = "arm,vexpress,v2m-p1", "simple-bus";
+> +			#address-cells = <2>; /* SMB chipselect number and offset */
+> +			#size-cells = <1>;
+> +			#interrupt-cells = <1>;
+> +			ranges;
+>   
+> -		psram at 1,00000000 {
+> -			compatible = "arm,vexpress-psram", "mtd-ram";
+> -			reg = <1 0x00000000 0x02000000>;
+> -			bank-width = <4>;
+> -		};
+> +			flash at 0,00000000 {
+> +				compatible = "arm,vexpress-flash", "cfi-flash";
+> +				reg = <0 0x00000000 0x04000000>,
+> +				      <4 0x00000000 0x04000000>;
+> +				bank-width = <4>;
+> +			};
+>   
+> -		v2m_video_ram: vram at 2,00000000 {
+> -			compatible = "arm,vexpress-vram";
+> -			reg = <2 0x00000000 0x00800000>;
+> -		};
+> +			psram at 1,00000000 {
+> +				compatible = "arm,vexpress-psram", "mtd-ram";
+> +				reg = <1 0x00000000 0x02000000>;
+> +				bank-width = <4>;
+> +			};
+>   
+> -		ethernet at 2,02000000 {
+> -			compatible = "smsc,lan9118", "smsc,lan9115";
+> -			reg = <2 0x02000000 0x10000>;
+> -			interrupts = <15>;
+> -			phy-mode = "mii";
+> -			reg-io-width = <4>;
+> -			smsc,irq-active-high;
+> -			smsc,irq-push-pull;
+> -			vdd33a-supply = <&v2m_fixed_3v3>;
+> -			vddvario-supply = <&v2m_fixed_3v3>;
+> -		};
+> +			v2m_video_ram: vram at 2,00000000 {
+> +				compatible = "arm,vexpress-vram";
+> +				reg = <2 0x00000000 0x00800000>;
+> +			};
+>   
+> -		usb at 2,03000000 {
+> -			compatible = "nxp,usb-isp1761";
+> -			reg = <2 0x03000000 0x20000>;
+> -			interrupts = <16>;
+> -			port1-otg;
+> -		};
+> +			ethernet at 2,02000000 {
+> +				compatible = "smsc,lan9118", "smsc,lan9115";
+> +				reg = <2 0x02000000 0x10000>;
+> +				interrupts = <15>;
+> +				phy-mode = "mii";
+> +				reg-io-width = <4>;
+> +				smsc,irq-active-high;
+> +				smsc,irq-push-pull;
+> +				vdd33a-supply = <&v2m_fixed_3v3>;
+> +				vddvario-supply = <&v2m_fixed_3v3>;
+> +			};
+>   
+> -		iofpga at 3,00000000 {
+> -			compatible = "simple-bus";
+> -			#address-cells = <1>;
+> -			#size-cells = <1>;
+> -			ranges = <0 3 0 0x200000>;
+> +			usb at 2,03000000 {
+> +				compatible = "nxp,usb-isp1761";
+> +				reg = <2 0x03000000 0x20000>;
+> +				interrupts = <16>;
+> +				port1-otg;
+> +			};
+>   
+> -			v2m_sysreg: sysreg at 10000 {
+> -				compatible = "arm,vexpress-sysreg";
+> -				reg = <0x010000 0x1000>;
+> +			iofpga at 3,00000000 {
+> +				compatible = "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0 3 0 0x200000>;
+>   
+> -				v2m_led_gpios: sys_led {
+> -					compatible = "arm,vexpress-sysreg,sys_led";
+> -					gpio-controller;
+> -					#gpio-cells = <2>;
+> -				};
+> +				v2m_sysreg: sysreg at 10000 {
+> +					compatible = "arm,vexpress-sysreg";
+> +					reg = <0x010000 0x1000>;
+>   
+> -				v2m_mmc_gpios: sys_mci {
+> -					compatible = "arm,vexpress-sysreg,sys_mci";
+> -					gpio-controller;
+> -					#gpio-cells = <2>;
+> +					v2m_led_gpios: sys_led {
+> +						compatible = "arm,vexpress-sysreg,sys_led";
+> +						gpio-controller;
+> +						#gpio-cells = <2>;
+> +					};
+> +
+> +					v2m_mmc_gpios: sys_mci {
+> +						compatible = "arm,vexpress-sysreg,sys_mci";
+> +						gpio-controller;
+> +						#gpio-cells = <2>;
+> +					};
+> +
+> +					v2m_flash_gpios: sys_flash {
+> +						compatible = "arm,vexpress-sysreg,sys_flash";
+> +						gpio-controller;
+> +						#gpio-cells = <2>;
+> +					};
+>   				};
+>   
+> -				v2m_flash_gpios: sys_flash {
+> -					compatible = "arm,vexpress-sysreg,sys_flash";
+> -					gpio-controller;
+> -					#gpio-cells = <2>;
+> +				v2m_sysctl: sysctl at 20000 {
+> +					compatible = "arm,sp810", "arm,primecell";
+> +					reg = <0x020000 0x1000>;
+> +					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&smbclk>;
+> +					clock-names = "refclk", "timclk", "apb_pclk";
+> +					#clock-cells = <1>;
+> +					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
+> +					assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
+> +					assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+>   				};
+> -			};
+>   
+> -			v2m_sysctl: sysctl at 20000 {
+> -				compatible = "arm,sp810", "arm,primecell";
+> -				reg = <0x020000 0x1000>;
+> -				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&smbclk>;
+> -				clock-names = "refclk", "timclk", "apb_pclk";
+> -				#clock-cells = <1>;
+> -				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
+> -				assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
+> -				assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+> -			};
+> +				/* PCI-E I2C bus */
+> +				v2m_i2c_pcie: i2c at 30000 {
+> +					compatible = "arm,versatile-i2c";
+> +					reg = <0x030000 0x1000>;
+>   
+> -			/* PCI-E I2C bus */
+> -			v2m_i2c_pcie: i2c at 30000 {
+> -				compatible = "arm,versatile-i2c";
+> -				reg = <0x030000 0x1000>;
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+>   
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> +					pcie-switch at 60 {
+> +						compatible = "idt,89hpes32h8";
+> +						reg = <0x60>;
+> +					};
+> +				};
+>   
+> -				pcie-switch at 60 {
+> -					compatible = "idt,89hpes32h8";
+> -					reg = <0x60>;
+> +				aaci at 40000 {
+> +					compatible = "arm,pl041", "arm,primecell";
+> +					reg = <0x040000 0x1000>;
+> +					interrupts = <11>;
+> +					clocks = <&smbclk>;
+> +					clock-names = "apb_pclk";
+>   				};
+> -			};
+>   
+> -			aaci at 40000 {
+> -				compatible = "arm,pl041", "arm,primecell";
+> -				reg = <0x040000 0x1000>;
+> -				interrupts = <11>;
+> -				clocks = <&smbclk>;
+> -				clock-names = "apb_pclk";
+> -			};
+> +				mmci at 50000 {
+> +					compatible = "arm,pl180", "arm,primecell";
+> +					reg = <0x050000 0x1000>;
+> +					interrupts = <9 10>;
+> +					cd-gpios = <&v2m_mmc_gpios 0 0>;
+> +					wp-gpios = <&v2m_mmc_gpios 1 0>;
+> +					max-frequency = <12000000>;
+> +					vmmc-supply = <&v2m_fixed_3v3>;
+> +					clocks = <&v2m_clk24mhz>, <&smbclk>;
+> +					clock-names = "mclk", "apb_pclk";
+> +				};
+>   
+> -			mmci at 50000 {
+> -				compatible = "arm,pl180", "arm,primecell";
+> -				reg = <0x050000 0x1000>;
+> -				interrupts = <9 10>;
+> -				cd-gpios = <&v2m_mmc_gpios 0 0>;
+> -				wp-gpios = <&v2m_mmc_gpios 1 0>;
+> -				max-frequency = <12000000>;
+> -				vmmc-supply = <&v2m_fixed_3v3>;
+> -				clocks = <&v2m_clk24mhz>, <&smbclk>;
+> -				clock-names = "mclk", "apb_pclk";
+> -			};
+> +				kmi at 60000 {
+> +					compatible = "arm,pl050", "arm,primecell";
+> +					reg = <0x060000 0x1000>;
+> +					interrupts = <12>;
+> +					clocks = <&v2m_clk24mhz>, <&smbclk>;
+> +					clock-names = "KMIREFCLK", "apb_pclk";
+> +				};
+>   
+> -			kmi at 60000 {
+> -				compatible = "arm,pl050", "arm,primecell";
+> -				reg = <0x060000 0x1000>;
+> -				interrupts = <12>;
+> -				clocks = <&v2m_clk24mhz>, <&smbclk>;
+> -				clock-names = "KMIREFCLK", "apb_pclk";
+> -			};
+> +				kmi at 70000 {
+> +					compatible = "arm,pl050", "arm,primecell";
+> +					reg = <0x070000 0x1000>;
+> +					interrupts = <13>;
+> +					clocks = <&v2m_clk24mhz>, <&smbclk>;
+> +					clock-names = "KMIREFCLK", "apb_pclk";
+> +				};
+>   
+> -			kmi at 70000 {
+> -				compatible = "arm,pl050", "arm,primecell";
+> -				reg = <0x070000 0x1000>;
+> -				interrupts = <13>;
+> -				clocks = <&v2m_clk24mhz>, <&smbclk>;
+> -				clock-names = "KMIREFCLK", "apb_pclk";
+> -			};
+> +				v2m_serial0: uart at 90000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x090000 0x1000>;
+> +					interrupts = <5>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial0: uart at 90000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x090000 0x1000>;
+> -				interrupts = <5>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				v2m_serial1: uart at a0000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x0a0000 0x1000>;
+> +					interrupts = <6>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial1: uart at a0000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x0a0000 0x1000>;
+> -				interrupts = <6>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				v2m_serial2: uart at b0000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x0b0000 0x1000>;
+> +					interrupts = <7>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial2: uart at b0000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x0b0000 0x1000>;
+> -				interrupts = <7>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				v2m_serial3: uart at c0000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x0c0000 0x1000>;
+> +					interrupts = <8>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial3: uart at c0000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x0c0000 0x1000>;
+> -				interrupts = <8>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				wdt at f0000 {
+> +					compatible = "arm,sp805", "arm,primecell";
+> +					reg = <0x0f0000 0x1000>;
+> +					interrupts = <0>;
+> +					clocks = <&v2m_refclk32khz>, <&smbclk>;
+> +					clock-names = "wdogclk", "apb_pclk";
+> +				};
+>   
+> -			wdt at f0000 {
+> -				compatible = "arm,sp805", "arm,primecell";
+> -				reg = <0x0f0000 0x1000>;
+> -				interrupts = <0>;
+> -				clocks = <&v2m_refclk32khz>, <&smbclk>;
+> -				clock-names = "wdogclk", "apb_pclk";
+> -			};
+> +				v2m_timer01: timer at 110000 {
+> +					compatible = "arm,sp804", "arm,primecell";
+> +					reg = <0x110000 0x1000>;
+> +					interrupts = <2>;
+> +					clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
+> +					clock-names = "timclken1", "timclken2", "apb_pclk";
+> +				};
+>   
+> -			v2m_timer01: timer at 110000 {
+> -				compatible = "arm,sp804", "arm,primecell";
+> -				reg = <0x110000 0x1000>;
+> -				interrupts = <2>;
+> -				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
+> -				clock-names = "timclken1", "timclken2", "apb_pclk";
+> -			};
+> +				v2m_timer23: timer at 120000 {
+> +					compatible = "arm,sp804", "arm,primecell";
+> +					reg = <0x120000 0x1000>;
+> +					interrupts = <3>;
+> +					clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&smbclk>;
+> +					clock-names = "timclken1", "timclken2", "apb_pclk";
+> +				};
+>   
+> -			v2m_timer23: timer at 120000 {
+> -				compatible = "arm,sp804", "arm,primecell";
+> -				reg = <0x120000 0x1000>;
+> -				interrupts = <3>;
+> -				clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&smbclk>;
+> -				clock-names = "timclken1", "timclken2", "apb_pclk";
+> -			};
+> +				/* DVI I2C bus */
+> +				v2m_i2c_dvi: i2c at 160000 {
+> +					compatible = "arm,versatile-i2c";
+> +					reg = <0x160000 0x1000>;
+>   
+> -			/* DVI I2C bus */
+> -			v2m_i2c_dvi: i2c at 160000 {
+> -				compatible = "arm,versatile-i2c";
+> -				reg = <0x160000 0x1000>;
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+>   
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> +					dvi-transmitter at 39 {
+> +						compatible = "sil,sii9022-tpi", "sil,sii9022";
+> +						reg = <0x39>;
+> +					};
+>   
+> -				dvi-transmitter at 39 {
+> -					compatible = "sil,sii9022-tpi", "sil,sii9022";
+> -					reg = <0x39>;
+> +					dvi-transmitter at 60 {
+> +						compatible = "sil,sii9022-cpi", "sil,sii9022";
+> +						reg = <0x60>;
+> +					};
+>   				};
+>   
+> -				dvi-transmitter at 60 {
+> -					compatible = "sil,sii9022-cpi", "sil,sii9022";
+> -					reg = <0x60>;
+> +				rtc at 170000 {
+> +					compatible = "arm,pl031", "arm,primecell";
+> +					reg = <0x170000 0x1000>;
+> +					interrupts = <4>;
+> +					clocks = <&smbclk>;
+> +					clock-names = "apb_pclk";
+>   				};
+> -			};
+> -
+> -			rtc at 170000 {
+> -				compatible = "arm,pl031", "arm,primecell";
+> -				reg = <0x170000 0x1000>;
+> -				interrupts = <4>;
+> -				clocks = <&smbclk>;
+> -				clock-names = "apb_pclk";
+> -			};
+>   
+> -			compact-flash at 1a0000 {
+> -				compatible = "arm,vexpress-cf", "ata-generic";
+> -				reg = <0x1a0000 0x100
+> -				       0x1a0100 0xf00>;
+> -				reg-shift = <2>;
+> -			};
+> -
+> -			clcd at 1f0000 {
+> -				compatible = "arm,pl111", "arm,primecell";
+> -				reg = <0x1f0000 0x1000>;
+> -				interrupt-names = "combined";
+> -				interrupts = <14>;
+> -				clocks = <&v2m_oscclk1>, <&smbclk>;
+> -				clock-names = "clcdclk", "apb_pclk";
+> -				memory-region = <&v2m_video_ram>;
+> -				max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
+> -
+> -				port {
+> -					v2m_clcd_pads: endpoint {
+> -						remote-endpoint = <&v2m_clcd_panel>;
+> -						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+> -					};
+> +				compact-flash at 1a0000 {
+> +					compatible = "arm,vexpress-cf", "ata-generic";
+> +					reg = <0x1a0000 0x100
+> +					       0x1a0100 0xf00>;
+> +					reg-shift = <2>;
+>   				};
+>   
+> -				panel {
+> -					compatible = "panel-dpi";
+> +				clcd at 1f0000 {
+> +					compatible = "arm,pl111", "arm,primecell";
+> +					reg = <0x1f0000 0x1000>;
+> +					interrupt-names = "combined";
+> +					interrupts = <14>;
+> +					clocks = <&v2m_oscclk1>, <&smbclk>;
+> +					clock-names = "clcdclk", "apb_pclk";
+> +					memory-region = <&v2m_video_ram>;
+> +					max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
+>   
+>   					port {
+> -						v2m_clcd_panel: endpoint {
+> -							remote-endpoint = <&v2m_clcd_pads>;
+> +						v2m_clcd_pads: endpoint {
+> +							remote-endpoint = <&v2m_clcd_panel>;
+> +							arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+>   						};
+>   					};
+>   
+> -					panel-timing {
+> -						clock-frequency = <25175000>;
+> -						hactive = <640>;
+> -						hback-porch = <40>;
+> -						hfront-porch = <24>;
+> -						hsync-len = <96>;
+> -						vactive = <480>;
+> -						vback-porch = <32>;
+> -						vfront-porch = <11>;
+> -						vsync-len = <2>;
+> +					panel {
+> +						compatible = "panel-dpi";
+> +
+> +						port {
+> +							v2m_clcd_panel: endpoint {
+> +								remote-endpoint = <&v2m_clcd_pads>;
+> +							};
+> +						};
+> +
+> +						panel-timing {
+> +							clock-frequency = <25175000>;
+> +							hactive = <640>;
+> +							hback-porch = <40>;
+> +							hfront-porch = <24>;
+> +							hsync-len = <96>;
+> +							vactive = <480>;
+> +							vback-porch = <32>;
+> +							vfront-porch = <11>;
+> +							vsync-len = <2>;
+> +						};
+>   					};
+>   				};
+>   			};
+> -		};
+>   
+> -		v2m_fixed_3v3: fixed-regulator-0 {
+> -			compatible = "regulator-fixed";
+> -			regulator-name = "3V3";
+> -			regulator-min-microvolt = <3300000>;
+> -			regulator-max-microvolt = <3300000>;
+> -			regulator-always-on;
+> -		};
+> +			v2m_fixed_3v3: fixed-regulator-0 {
+> +				compatible = "regulator-fixed";
+> +				regulator-name = "3V3";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+>   
+> -		v2m_clk24mhz: clk24mhz {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <24000000>;
+> -			clock-output-names = "v2m:clk24mhz";
+> -		};
+> +			v2m_clk24mhz: clk24mhz {
+> +				compatible = "fixed-clock";
+> +				#clock-cells = <0>;
+> +				clock-frequency = <24000000>;
+> +				clock-output-names = "v2m:clk24mhz";
+> +			};
+>   
+> -		v2m_refclk1mhz: refclk1mhz {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <1000000>;
+> -			clock-output-names = "v2m:refclk1mhz";
+> -		};
+> +			v2m_refclk1mhz: refclk1mhz {
+> +				compatible = "fixed-clock";
+> +				#clock-cells = <0>;
+> +				clock-frequency = <1000000>;
+> +				clock-output-names = "v2m:refclk1mhz";
+> +			};
+>   
+> -		v2m_refclk32khz: refclk32khz {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <32768>;
+> -			clock-output-names = "v2m:refclk32khz";
+> -		};
+> +			v2m_refclk32khz: refclk32khz {
+> +				compatible = "fixed-clock";
+> +				#clock-cells = <0>;
+> +				clock-frequency = <32768>;
+> +				clock-output-names = "v2m:refclk32khz";
+> +			};
+>   
+> -		leds {
+> -			compatible = "gpio-leds";
+> +			leds {
+> +				compatible = "gpio-leds";
+>   
+> -			user1 {
+> -				label = "v2m:green:user1";
+> -				gpios = <&v2m_led_gpios 0 0>;
+> -				linux,default-trigger = "heartbeat";
+> -			};
+> +				user1 {
+> +					label = "v2m:green:user1";
+> +					gpios = <&v2m_led_gpios 0 0>;
+> +					linux,default-trigger = "heartbeat";
+> +				};
+>   
+> -			user2 {
+> -				label = "v2m:green:user2";
+> -				gpios = <&v2m_led_gpios 1 0>;
+> -				linux,default-trigger = "mmc0";
+> -			};
+> +				user2 {
+> +					label = "v2m:green:user2";
+> +					gpios = <&v2m_led_gpios 1 0>;
+> +					linux,default-trigger = "mmc0";
+> +				};
+>   
+> -			user3 {
+> -				label = "v2m:green:user3";
+> -				gpios = <&v2m_led_gpios 2 0>;
+> -				linux,default-trigger = "cpu0";
+> -			};
+> +				user3 {
+> +					label = "v2m:green:user3";
+> +					gpios = <&v2m_led_gpios 2 0>;
+> +					linux,default-trigger = "cpu0";
+> +				};
+>   
+> -			user4 {
+> -				label = "v2m:green:user4";
+> -				gpios = <&v2m_led_gpios 3 0>;
+> -				linux,default-trigger = "cpu1";
+> -			};
+> +				user4 {
+> +					label = "v2m:green:user4";
+> +					gpios = <&v2m_led_gpios 3 0>;
+> +					linux,default-trigger = "cpu1";
+> +				};
+>   
+> -			user5 {
+> -				label = "v2m:green:user5";
+> -				gpios = <&v2m_led_gpios 4 0>;
+> -				linux,default-trigger = "cpu2";
+> -			};
+> +				user5 {
+> +					label = "v2m:green:user5";
+> +					gpios = <&v2m_led_gpios 4 0>;
+> +					linux,default-trigger = "cpu2";
+> +				};
+>   
+> -			user6 {
+> -				label = "v2m:green:user6";
+> -				gpios = <&v2m_led_gpios 5 0>;
+> -				linux,default-trigger = "cpu3";
+> -			};
+> +				user6 {
+> +					label = "v2m:green:user6";
+> +					gpios = <&v2m_led_gpios 5 0>;
+> +					linux,default-trigger = "cpu3";
+> +				};
+>   
+> -			user7 {
+> -				label = "v2m:green:user7";
+> -				gpios = <&v2m_led_gpios 6 0>;
+> -				linux,default-trigger = "cpu4";
+> -			};
+> +				user7 {
+> +					label = "v2m:green:user7";
+> +					gpios = <&v2m_led_gpios 6 0>;
+> +					linux,default-trigger = "cpu4";
+> +				};
+>   
+> -			user8 {
+> -				label = "v2m:green:user8";
+> -				gpios = <&v2m_led_gpios 7 0>;
+> -				linux,default-trigger = "cpu5";
+> +				user8 {
+> +					label = "v2m:green:user8";
+> +					gpios = <&v2m_led_gpios 7 0>;
+> +					linux,default-trigger = "cpu5";
+> +				};
+>   			};
+> -		};
+>   
+> -		mcc {
+> -			compatible = "arm,vexpress,config-bus";
+> -			arm,vexpress,config-bridge = <&v2m_sysreg>;
+> +			mcc {
+> +				compatible = "arm,vexpress,config-bus";
+> +				arm,vexpress,config-bridge = <&v2m_sysreg>;
+>   
+> -			oscclk0 {
+> -				/* MCC static memory clock */
+> -				compatible = "arm,vexpress-osc";
+> -				arm,vexpress-sysreg,func = <1 0>;
+> -				freq-range = <25000000 60000000>;
+> -				#clock-cells = <0>;
+> -				clock-output-names = "v2m:oscclk0";
+> -			};
+> +				oscclk0 {
+> +					/* MCC static memory clock */
+> +					compatible = "arm,vexpress-osc";
+> +					arm,vexpress-sysreg,func = <1 0>;
+> +					freq-range = <25000000 60000000>;
+> +					#clock-cells = <0>;
+> +					clock-output-names = "v2m:oscclk0";
+> +				};
+>   
+> -			v2m_oscclk1: oscclk1 {
+> -				/* CLCD clock */
+> -				compatible = "arm,vexpress-osc";
+> -				arm,vexpress-sysreg,func = <1 1>;
+> -				freq-range = <23750000 65000000>;
+> -				#clock-cells = <0>;
+> -				clock-output-names = "v2m:oscclk1";
+> -			};
+> +				v2m_oscclk1: oscclk1 {
+> +					/* CLCD clock */
+> +					compatible = "arm,vexpress-osc";
+> +					arm,vexpress-sysreg,func = <1 1>;
+> +					freq-range = <23750000 65000000>;
+> +					#clock-cells = <0>;
+> +					clock-output-names = "v2m:oscclk1";
+> +				};
+>   
+> -			v2m_oscclk2: oscclk2 {
+> -				/* IO FPGA peripheral clock */
+> -				compatible = "arm,vexpress-osc";
+> -				arm,vexpress-sysreg,func = <1 2>;
+> -				freq-range = <24000000 24000000>;
+> -				#clock-cells = <0>;
+> -				clock-output-names = "v2m:oscclk2";
+> -			};
+> +				v2m_oscclk2: oscclk2 {
+> +					/* IO FPGA peripheral clock */
+> +					compatible = "arm,vexpress-osc";
+> +					arm,vexpress-sysreg,func = <1 2>;
+> +					freq-range = <24000000 24000000>;
+> +					#clock-cells = <0>;
+> +					clock-output-names = "v2m:oscclk2";
+> +				};
+>   
+> -			volt-vio {
+> -				/* Logic level voltage */
+> -				compatible = "arm,vexpress-volt";
+> -				arm,vexpress-sysreg,func = <2 0>;
+> -				regulator-name = "VIO";
+> -				regulator-always-on;
+> -				label = "VIO";
+> -			};
+> +				volt-vio {
+> +					/* Logic level voltage */
+> +					compatible = "arm,vexpress-volt";
+> +					arm,vexpress-sysreg,func = <2 0>;
+> +					regulator-name = "VIO";
+> +					regulator-always-on;
+> +					label = "VIO";
+> +				};
+>   
+> -			temp-mcc {
+> -				/* MCC internal operating temperature */
+> -				compatible = "arm,vexpress-temp";
+> -				arm,vexpress-sysreg,func = <4 0>;
+> -				label = "MCC";
+> -			};
+> +				temp-mcc {
+> +					/* MCC internal operating temperature */
+> +					compatible = "arm,vexpress-temp";
+> +					arm,vexpress-sysreg,func = <4 0>;
+> +					label = "MCC";
+> +				};
+>   
+> -			reset {
+> -				compatible = "arm,vexpress-reset";
+> -				arm,vexpress-sysreg,func = <5 0>;
+> -			};
+> +				reset {
+> +					compatible = "arm,vexpress-reset";
+> +					arm,vexpress-sysreg,func = <5 0>;
+> +				};
+>   
+> -			muxfpga {
+> -				compatible = "arm,vexpress-muxfpga";
+> -				arm,vexpress-sysreg,func = <7 0>;
+> -			};
+> +				muxfpga {
+> +					compatible = "arm,vexpress-muxfpga";
+> +					arm,vexpress-sysreg,func = <7 0>;
+> +				};
+>   
+> -			shutdown {
+> -				compatible = "arm,vexpress-shutdown";
+> -				arm,vexpress-sysreg,func = <8 0>;
+> -			};
+> +				shutdown {
+> +					compatible = "arm,vexpress-shutdown";
+> +					arm,vexpress-sysreg,func = <8 0>;
+> +				};
+>   
+> -			reboot {
+> -				compatible = "arm,vexpress-reboot";
+> -				arm,vexpress-sysreg,func = <9 0>;
+> -			};
+> +				reboot {
+> +					compatible = "arm,vexpress-reboot";
+> +					arm,vexpress-sysreg,func = <9 0>;
+> +				};
+>   
+> -			dvimode {
+> -				compatible = "arm,vexpress-dvimode";
+> -				arm,vexpress-sysreg,func = <11 0>;
+> +				dvimode {
+> +					compatible = "arm,vexpress-dvimode";
+> +					arm,vexpress-sysreg,func = <11 0>;
+> +				};
+>   			};
+>   		};
+>   	};
+> +};
+> diff --git a/arch/arm/boot/dts/vexpress-v2m.dtsi b/arch/arm/boot/dts/vexpress-v2m.dtsi
+> index b0021a816028..9cd5e146abd5 100644
+> --- a/arch/arm/boot/dts/vexpress-v2m.dtsi
+> +++ b/arch/arm/boot/dts/vexpress-v2m.dtsi
+> @@ -18,425 +18,429 @@
+>    * CHANGES TO vexpress-v2m-rs1.dtsi!
+>    */
+>   
+> -	motherboard {
+> -		model = "V2M-P1";
+> -		arm,hbi = <0x190>;
+> -		arm,vexpress,site = <0>;
+> -		compatible = "arm,vexpress,v2m-p1", "simple-bus";
+> -		#address-cells = <2>; /* SMB chipselect number and offset */
+> -		#size-cells = <1>;
+> -		#interrupt-cells = <1>;
+> -		ranges;
+> -
+> -		flash at 0,00000000 {
+> -			compatible = "arm,vexpress-flash", "cfi-flash";
+> -			reg = <0 0x00000000 0x04000000>,
+> -			      <1 0x00000000 0x04000000>;
+> -			bank-width = <4>;
+> -		};
+> +/ {
+> +	smb at 4000000 {
+> +		motherboard {
+> +			model = "V2M-P1";
+> +			arm,hbi = <0x190>;
+> +			arm,vexpress,site = <0>;
+> +			compatible = "arm,vexpress,v2m-p1", "simple-bus";
+> +			#address-cells = <2>; /* SMB chipselect number and offset */
+> +			#size-cells = <1>;
+> +			#interrupt-cells = <1>;
+> +			ranges;
+>   
+> -		psram at 2,00000000 {
+> -			compatible = "arm,vexpress-psram", "mtd-ram";
+> -			reg = <2 0x00000000 0x02000000>;
+> -			bank-width = <4>;
+> -		};
+> +			flash at 0,00000000 {
+> +				compatible = "arm,vexpress-flash", "cfi-flash";
+> +				reg = <0 0x00000000 0x04000000>,
+> +				      <1 0x00000000 0x04000000>;
+> +				bank-width = <4>;
+> +			};
+>   
+> -		v2m_video_ram: vram at 3,00000000 {
+> -			compatible = "arm,vexpress-vram";
+> -			reg = <3 0x00000000 0x00800000>;
+> -		};
+> +			psram at 2,00000000 {
+> +				compatible = "arm,vexpress-psram", "mtd-ram";
+> +				reg = <2 0x00000000 0x02000000>;
+> +				bank-width = <4>;
+> +			};
+>   
+> -		ethernet at 3,02000000 {
+> -			compatible = "smsc,lan9118", "smsc,lan9115";
+> -			reg = <3 0x02000000 0x10000>;
+> -			interrupts = <15>;
+> -			phy-mode = "mii";
+> -			reg-io-width = <4>;
+> -			smsc,irq-active-high;
+> -			smsc,irq-push-pull;
+> -			vdd33a-supply = <&v2m_fixed_3v3>;
+> -			vddvario-supply = <&v2m_fixed_3v3>;
+> -		};
+> +			v2m_video_ram: vram at 3,00000000 {
+> +				compatible = "arm,vexpress-vram";
+> +				reg = <3 0x00000000 0x00800000>;
+> +			};
+>   
+> -		usb at 3,03000000 {
+> -			compatible = "nxp,usb-isp1761";
+> -			reg = <3 0x03000000 0x20000>;
+> -			interrupts = <16>;
+> -			port1-otg;
+> -		};
+> +			ethernet at 3,02000000 {
+> +				compatible = "smsc,lan9118", "smsc,lan9115";
+> +				reg = <3 0x02000000 0x10000>;
+> +				interrupts = <15>;
+> +				phy-mode = "mii";
+> +				reg-io-width = <4>;
+> +				smsc,irq-active-high;
+> +				smsc,irq-push-pull;
+> +				vdd33a-supply = <&v2m_fixed_3v3>;
+> +				vddvario-supply = <&v2m_fixed_3v3>;
+> +			};
+>   
+> -		iofpga at 7,00000000 {
+> -			compatible = "simple-bus";
+> -			#address-cells = <1>;
+> -			#size-cells = <1>;
+> -			ranges = <0 7 0 0x20000>;
+> +			usb at 3,03000000 {
+> +				compatible = "nxp,usb-isp1761";
+> +				reg = <3 0x03000000 0x20000>;
+> +				interrupts = <16>;
+> +				port1-otg;
+> +			};
+>   
+> -			v2m_sysreg: sysreg at 0 {
+> -				compatible = "arm,vexpress-sysreg";
+> -				reg = <0x00000 0x1000>;
+> +			iofpga at 7,00000000 {
+> +				compatible = "simple-bus";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0 7 0 0x20000>;
+>   
+> -				v2m_led_gpios: sys_led {
+> -					compatible = "arm,vexpress-sysreg,sys_led";
+> -					gpio-controller;
+> -					#gpio-cells = <2>;
+> -				};
+> +				v2m_sysreg: sysreg at 0 {
+> +					compatible = "arm,vexpress-sysreg";
+> +					reg = <0x00000 0x1000>;
+>   
+> -				v2m_mmc_gpios: sys_mci {
+> -					compatible = "arm,vexpress-sysreg,sys_mci";
+> -					gpio-controller;
+> -					#gpio-cells = <2>;
+> +					v2m_led_gpios: sys_led {
+> +						compatible = "arm,vexpress-sysreg,sys_led";
+> +						gpio-controller;
+> +						#gpio-cells = <2>;
+> +					};
+> +
+> +					v2m_mmc_gpios: sys_mci {
+> +						compatible = "arm,vexpress-sysreg,sys_mci";
+> +						gpio-controller;
+> +						#gpio-cells = <2>;
+> +					};
+> +
+> +					v2m_flash_gpios: sys_flash {
+> +						compatible = "arm,vexpress-sysreg,sys_flash";
+> +						gpio-controller;
+> +						#gpio-cells = <2>;
+> +					};
+>   				};
+>   
+> -				v2m_flash_gpios: sys_flash {
+> -					compatible = "arm,vexpress-sysreg,sys_flash";
+> -					gpio-controller;
+> -					#gpio-cells = <2>;
+> +				v2m_sysctl: sysctl at 1000 {
+> +					compatible = "arm,sp810", "arm,primecell";
+> +					reg = <0x01000 0x1000>;
+> +					clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&smbclk>;
+> +					clock-names = "refclk", "timclk", "apb_pclk";
+> +					#clock-cells = <1>;
+> +					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
+> +					assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
+> +					assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+>   				};
+> -			};
+>   
+> -			v2m_sysctl: sysctl at 1000 {
+> -				compatible = "arm,sp810", "arm,primecell";
+> -				reg = <0x01000 0x1000>;
+> -				clocks = <&v2m_refclk32khz>, <&v2m_refclk1mhz>, <&smbclk>;
+> -				clock-names = "refclk", "timclk", "apb_pclk";
+> -				#clock-cells = <1>;
+> -				clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
+> -				assigned-clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&v2m_sysctl 3>, <&v2m_sysctl 3>;
+> -				assigned-clock-parents = <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>, <&v2m_refclk1mhz>;
+> -			};
+> +				/* PCI-E I2C bus */
+> +				v2m_i2c_pcie: i2c at 2000 {
+> +					compatible = "arm,versatile-i2c";
+> +					reg = <0x02000 0x1000>;
+>   
+> -			/* PCI-E I2C bus */
+> -			v2m_i2c_pcie: i2c at 2000 {
+> -				compatible = "arm,versatile-i2c";
+> -				reg = <0x02000 0x1000>;
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+>   
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> +					pcie-switch at 60 {
+> +						compatible = "idt,89hpes32h8";
+> +						reg = <0x60>;
+> +					};
+> +				};
+>   
+> -				pcie-switch at 60 {
+> -					compatible = "idt,89hpes32h8";
+> -					reg = <0x60>;
+> +				aaci at 4000 {
+> +					compatible = "arm,pl041", "arm,primecell";
+> +					reg = <0x04000 0x1000>;
+> +					interrupts = <11>;
+> +					clocks = <&smbclk>;
+> +					clock-names = "apb_pclk";
+>   				};
+> -			};
+>   
+> -			aaci at 4000 {
+> -				compatible = "arm,pl041", "arm,primecell";
+> -				reg = <0x04000 0x1000>;
+> -				interrupts = <11>;
+> -				clocks = <&smbclk>;
+> -				clock-names = "apb_pclk";
+> -			};
+> +				mmci at 5000 {
+> +					compatible = "arm,pl180", "arm,primecell";
+> +					reg = <0x05000 0x1000>;
+> +					interrupts = <9 10>;
+> +					cd-gpios = <&v2m_mmc_gpios 0 0>;
+> +					wp-gpios = <&v2m_mmc_gpios 1 0>;
+> +					max-frequency = <12000000>;
+> +					vmmc-supply = <&v2m_fixed_3v3>;
+> +					clocks = <&v2m_clk24mhz>, <&smbclk>;
+> +					clock-names = "mclk", "apb_pclk";
+> +				};
+>   
+> -			mmci at 5000 {
+> -				compatible = "arm,pl180", "arm,primecell";
+> -				reg = <0x05000 0x1000>;
+> -				interrupts = <9 10>;
+> -				cd-gpios = <&v2m_mmc_gpios 0 0>;
+> -				wp-gpios = <&v2m_mmc_gpios 1 0>;
+> -				max-frequency = <12000000>;
+> -				vmmc-supply = <&v2m_fixed_3v3>;
+> -				clocks = <&v2m_clk24mhz>, <&smbclk>;
+> -				clock-names = "mclk", "apb_pclk";
+> -			};
+> +				kmi at 6000 {
+> +					compatible = "arm,pl050", "arm,primecell";
+> +					reg = <0x06000 0x1000>;
+> +					interrupts = <12>;
+> +					clocks = <&v2m_clk24mhz>, <&smbclk>;
+> +					clock-names = "KMIREFCLK", "apb_pclk";
+> +				};
+>   
+> -			kmi at 6000 {
+> -				compatible = "arm,pl050", "arm,primecell";
+> -				reg = <0x06000 0x1000>;
+> -				interrupts = <12>;
+> -				clocks = <&v2m_clk24mhz>, <&smbclk>;
+> -				clock-names = "KMIREFCLK", "apb_pclk";
+> -			};
+> +				kmi at 7000 {
+> +					compatible = "arm,pl050", "arm,primecell";
+> +					reg = <0x07000 0x1000>;
+> +					interrupts = <13>;
+> +					clocks = <&v2m_clk24mhz>, <&smbclk>;
+> +					clock-names = "KMIREFCLK", "apb_pclk";
+> +				};
+>   
+> -			kmi at 7000 {
+> -				compatible = "arm,pl050", "arm,primecell";
+> -				reg = <0x07000 0x1000>;
+> -				interrupts = <13>;
+> -				clocks = <&v2m_clk24mhz>, <&smbclk>;
+> -				clock-names = "KMIREFCLK", "apb_pclk";
+> -			};
+> +				v2m_serial0: uart at 9000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x09000 0x1000>;
+> +					interrupts = <5>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial0: uart at 9000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x09000 0x1000>;
+> -				interrupts = <5>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				v2m_serial1: uart at a000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x0a000 0x1000>;
+> +					interrupts = <6>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial1: uart at a000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x0a000 0x1000>;
+> -				interrupts = <6>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				v2m_serial2: uart at b000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x0b000 0x1000>;
+> +					interrupts = <7>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial2: uart at b000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x0b000 0x1000>;
+> -				interrupts = <7>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				v2m_serial3: uart at c000 {
+> +					compatible = "arm,pl011", "arm,primecell";
+> +					reg = <0x0c000 0x1000>;
+> +					interrupts = <8>;
+> +					clocks = <&v2m_oscclk2>, <&smbclk>;
+> +					clock-names = "uartclk", "apb_pclk";
+> +				};
+>   
+> -			v2m_serial3: uart at c000 {
+> -				compatible = "arm,pl011", "arm,primecell";
+> -				reg = <0x0c000 0x1000>;
+> -				interrupts = <8>;
+> -				clocks = <&v2m_oscclk2>, <&smbclk>;
+> -				clock-names = "uartclk", "apb_pclk";
+> -			};
+> +				wdt at f000 {
+> +					compatible = "arm,sp805", "arm,primecell";
+> +					reg = <0x0f000 0x1000>;
+> +					interrupts = <0>;
+> +					clocks = <&v2m_refclk32khz>, <&smbclk>;
+> +					clock-names = "wdogclk", "apb_pclk";
+> +				};
+>   
+> -			wdt at f000 {
+> -				compatible = "arm,sp805", "arm,primecell";
+> -				reg = <0x0f000 0x1000>;
+> -				interrupts = <0>;
+> -				clocks = <&v2m_refclk32khz>, <&smbclk>;
+> -				clock-names = "wdogclk", "apb_pclk";
+> -			};
+> +				v2m_timer01: timer at 11000 {
+> +					compatible = "arm,sp804", "arm,primecell";
+> +					reg = <0x11000 0x1000>;
+> +					interrupts = <2>;
+> +					clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
+> +					clock-names = "timclken1", "timclken2", "apb_pclk";
+> +				};
+>   
+> -			v2m_timer01: timer at 11000 {
+> -				compatible = "arm,sp804", "arm,primecell";
+> -				reg = <0x11000 0x1000>;
+> -				interrupts = <2>;
+> -				clocks = <&v2m_sysctl 0>, <&v2m_sysctl 1>, <&smbclk>;
+> -				clock-names = "timclken1", "timclken2", "apb_pclk";
+> -			};
+> +				v2m_timer23: timer at 12000 {
+> +					compatible = "arm,sp804", "arm,primecell";
+> +					reg = <0x12000 0x1000>;
+> +					interrupts = <3>;
+> +					clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&smbclk>;
+> +					clock-names = "timclken1", "timclken2", "apb_pclk";
+> +				};
+>   
+> -			v2m_timer23: timer at 12000 {
+> -				compatible = "arm,sp804", "arm,primecell";
+> -				reg = <0x12000 0x1000>;
+> -				interrupts = <3>;
+> -				clocks = <&v2m_sysctl 2>, <&v2m_sysctl 3>, <&smbclk>;
+> -				clock-names = "timclken1", "timclken2", "apb_pclk";
+> -			};
+> +				/* DVI I2C bus */
+> +				v2m_i2c_dvi: i2c at 16000 {
+> +					compatible = "arm,versatile-i2c";
+> +					reg = <0x16000 0x1000>;
+>   
+> -			/* DVI I2C bus */
+> -			v2m_i2c_dvi: i2c at 16000 {
+> -				compatible = "arm,versatile-i2c";
+> -				reg = <0x16000 0x1000>;
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+>   
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> +					dvi-transmitter at 39 {
+> +						compatible = "sil,sii9022-tpi", "sil,sii9022";
+> +						reg = <0x39>;
+> +					};
+>   
+> -				dvi-transmitter at 39 {
+> -					compatible = "sil,sii9022-tpi", "sil,sii9022";
+> -					reg = <0x39>;
+> +					dvi-transmitter at 60 {
+> +						compatible = "sil,sii9022-cpi", "sil,sii9022";
+> +						reg = <0x60>;
+> +					};
+>   				};
+>   
+> -				dvi-transmitter at 60 {
+> -					compatible = "sil,sii9022-cpi", "sil,sii9022";
+> -					reg = <0x60>;
+> +				rtc at 17000 {
+> +					compatible = "arm,pl031", "arm,primecell";
+> +					reg = <0x17000 0x1000>;
+> +					interrupts = <4>;
+> +					clocks = <&smbclk>;
+> +					clock-names = "apb_pclk";
+>   				};
+> -			};
+> -
+> -			rtc at 17000 {
+> -				compatible = "arm,pl031", "arm,primecell";
+> -				reg = <0x17000 0x1000>;
+> -				interrupts = <4>;
+> -				clocks = <&smbclk>;
+> -				clock-names = "apb_pclk";
+> -			};
+>   
+> -			compact-flash at 1a000 {
+> -				compatible = "arm,vexpress-cf", "ata-generic";
+> -				reg = <0x1a000 0x100
+> -				       0x1a100 0xf00>;
+> -				reg-shift = <2>;
+> -			};
+> -
+> -			clcd at 1f000 {
+> -				compatible = "arm,pl111", "arm,primecell";
+> -				reg = <0x1f000 0x1000>;
+> -				interrupt-names = "combined";
+> -				interrupts = <14>;
+> -				clocks = <&v2m_oscclk1>, <&smbclk>;
+> -				clock-names = "clcdclk", "apb_pclk";
+> -				memory-region = <&v2m_video_ram>;
+> -				max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
+> -
+> -				port {
+> -					v2m_clcd_pads: endpoint {
+> -						remote-endpoint = <&v2m_clcd_panel>;
+> -						arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+> -					};
+> +				compact-flash at 1a000 {
+> +					compatible = "arm,vexpress-cf", "ata-generic";
+> +					reg = <0x1a000 0x100
+> +					       0x1a100 0xf00>;
+> +					reg-shift = <2>;
+>   				};
+>   
+> -				panel {
+> -					compatible = "panel-dpi";
+> +				clcd at 1f000 {
+> +					compatible = "arm,pl111", "arm,primecell";
+> +					reg = <0x1f000 0x1000>;
+> +					interrupt-names = "combined";
+> +					interrupts = <14>;
+> +					clocks = <&v2m_oscclk1>, <&smbclk>;
+> +					clock-names = "clcdclk", "apb_pclk";
+> +					memory-region = <&v2m_video_ram>;
+> +					max-memory-bandwidth = <50350000>; /* 16bpp @ 25.175MHz */
+>   
+>   					port {
+> -						v2m_clcd_panel: endpoint {
+> -							remote-endpoint = <&v2m_clcd_pads>;
+> +						v2m_clcd_pads: endpoint {
+> +							remote-endpoint = <&v2m_clcd_panel>;
+> +							arm,pl11x,tft-r0g0b0-pads = <0 8 16>;
+>   						};
+>   					};
+>   
+> -					panel-timing {
+> -						clock-frequency = <25175000>;
+> -						hactive = <640>;
+> -						hback-porch = <40>;
+> -						hfront-porch = <24>;
+> -						hsync-len = <96>;
+> -						vactive = <480>;
+> -						vback-porch = <32>;
+> -						vfront-porch = <11>;
+> -						vsync-len = <2>;
+> +					panel {
+> +						compatible = "panel-dpi";
+> +
+> +						port {
+> +							v2m_clcd_panel: endpoint {
+> +								remote-endpoint = <&v2m_clcd_pads>;
+> +							};
+> +						};
+> +
+> +						panel-timing {
+> +							clock-frequency = <25175000>;
+> +							hactive = <640>;
+> +							hback-porch = <40>;
+> +							hfront-porch = <24>;
+> +							hsync-len = <96>;
+> +							vactive = <480>;
+> +							vback-porch = <32>;
+> +							vfront-porch = <11>;
+> +							vsync-len = <2>;
+> +						};
+>   					};
+>   				};
+>   			};
+> -		};
+>   
+> -		v2m_fixed_3v3: fixed-regulator-0 {
+> -			compatible = "regulator-fixed";
+> -			regulator-name = "3V3";
+> -			regulator-min-microvolt = <3300000>;
+> -			regulator-max-microvolt = <3300000>;
+> -			regulator-always-on;
+> -		};
+> +			v2m_fixed_3v3: fixed-regulator-0 {
+> +				compatible = "regulator-fixed";
+> +				regulator-name = "3V3";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +			};
+>   
+> -		v2m_clk24mhz: clk24mhz {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <24000000>;
+> -			clock-output-names = "v2m:clk24mhz";
+> -		};
+> +			v2m_clk24mhz: clk24mhz {
+> +				compatible = "fixed-clock";
+> +				#clock-cells = <0>;
+> +				clock-frequency = <24000000>;
+> +				clock-output-names = "v2m:clk24mhz";
+> +			};
+>   
+> -		v2m_refclk1mhz: refclk1mhz {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <1000000>;
+> -			clock-output-names = "v2m:refclk1mhz";
+> -		};
+> +			v2m_refclk1mhz: refclk1mhz {
+> +				compatible = "fixed-clock";
+> +				#clock-cells = <0>;
+> +				clock-frequency = <1000000>;
+> +				clock-output-names = "v2m:refclk1mhz";
+> +			};
+>   
+> -		v2m_refclk32khz: refclk32khz {
+> -			compatible = "fixed-clock";
+> -			#clock-cells = <0>;
+> -			clock-frequency = <32768>;
+> -			clock-output-names = "v2m:refclk32khz";
+> -		};
+> +			v2m_refclk32khz: refclk32khz {
+> +				compatible = "fixed-clock";
+> +				#clock-cells = <0>;
+> +				clock-frequency = <32768>;
+> +				clock-output-names = "v2m:refclk32khz";
+> +			};
+>   
+> -		leds {
+> -			compatible = "gpio-leds";
+> +			leds {
+> +				compatible = "gpio-leds";
+>   
+> -			user1 {
+> -				label = "v2m:green:user1";
+> -				gpios = <&v2m_led_gpios 0 0>;
+> -				linux,default-trigger = "heartbeat";
+> -			};
+> +				user1 {
+> +					label = "v2m:green:user1";
+> +					gpios = <&v2m_led_gpios 0 0>;
+> +					linux,default-trigger = "heartbeat";
+> +				};
+>   
+> -			user2 {
+> -				label = "v2m:green:user2";
+> -				gpios = <&v2m_led_gpios 1 0>;
+> -				linux,default-trigger = "mmc0";
+> -			};
+> +				user2 {
+> +					label = "v2m:green:user2";
+> +					gpios = <&v2m_led_gpios 1 0>;
+> +					linux,default-trigger = "mmc0";
+> +				};
+>   
+> -			user3 {
+> -				label = "v2m:green:user3";
+> -				gpios = <&v2m_led_gpios 2 0>;
+> -				linux,default-trigger = "cpu0";
+> -			};
+> +				user3 {
+> +					label = "v2m:green:user3";
+> +					gpios = <&v2m_led_gpios 2 0>;
+> +					linux,default-trigger = "cpu0";
+> +				};
+>   
+> -			user4 {
+> -				label = "v2m:green:user4";
+> -				gpios = <&v2m_led_gpios 3 0>;
+> -				linux,default-trigger = "cpu1";
+> -			};
+> +				user4 {
+> +					label = "v2m:green:user4";
+> +					gpios = <&v2m_led_gpios 3 0>;
+> +					linux,default-trigger = "cpu1";
+> +				};
+>   
+> -			user5 {
+> -				label = "v2m:green:user5";
+> -				gpios = <&v2m_led_gpios 4 0>;
+> -				linux,default-trigger = "cpu2";
+> -			};
+> +				user5 {
+> +					label = "v2m:green:user5";
+> +					gpios = <&v2m_led_gpios 4 0>;
+> +					linux,default-trigger = "cpu2";
+> +				};
+>   
+> -			user6 {
+> -				label = "v2m:green:user6";
+> -				gpios = <&v2m_led_gpios 5 0>;
+> -				linux,default-trigger = "cpu3";
+> -			};
+> +				user6 {
+> +					label = "v2m:green:user6";
+> +					gpios = <&v2m_led_gpios 5 0>;
+> +					linux,default-trigger = "cpu3";
+> +				};
+>   
+> -			user7 {
+> -				label = "v2m:green:user7";
+> -				gpios = <&v2m_led_gpios 6 0>;
+> -				linux,default-trigger = "cpu4";
+> -			};
+> +				user7 {
+> +					label = "v2m:green:user7";
+> +					gpios = <&v2m_led_gpios 6 0>;
+> +					linux,default-trigger = "cpu4";
+> +				};
+>   
+> -			user8 {
+> -				label = "v2m:green:user8";
+> -				gpios = <&v2m_led_gpios 7 0>;
+> -				linux,default-trigger = "cpu5";
+> +				user8 {
+> +					label = "v2m:green:user8";
+> +					gpios = <&v2m_led_gpios 7 0>;
+> +					linux,default-trigger = "cpu5";
+> +				};
+>   			};
+> -		};
+>   
+> -		mcc {
+> -			compatible = "arm,vexpress,config-bus";
+> -			arm,vexpress,config-bridge = <&v2m_sysreg>;
+> +			mcc {
+> +				compatible = "arm,vexpress,config-bus";
+> +				arm,vexpress,config-bridge = <&v2m_sysreg>;
+>   
+> -			oscclk0 {
+> -				/* MCC static memory clock */
+> -				compatible = "arm,vexpress-osc";
+> -				arm,vexpress-sysreg,func = <1 0>;
+> -				freq-range = <25000000 60000000>;
+> -				#clock-cells = <0>;
+> -				clock-output-names = "v2m:oscclk0";
+> -			};
+> +				oscclk0 {
+> +					/* MCC static memory clock */
+> +					compatible = "arm,vexpress-osc";
+> +					arm,vexpress-sysreg,func = <1 0>;
+> +					freq-range = <25000000 60000000>;
+> +					#clock-cells = <0>;
+> +					clock-output-names = "v2m:oscclk0";
+> +				};
+>   
+> -			v2m_oscclk1: oscclk1 {
+> -				/* CLCD clock */
+> -				compatible = "arm,vexpress-osc";
+> -				arm,vexpress-sysreg,func = <1 1>;
+> -				freq-range = <23750000 65000000>;
+> -				#clock-cells = <0>;
+> -				clock-output-names = "v2m:oscclk1";
+> -			};
+> +				v2m_oscclk1: oscclk1 {
+> +					/* CLCD clock */
+> +					compatible = "arm,vexpress-osc";
+> +					arm,vexpress-sysreg,func = <1 1>;
+> +					freq-range = <23750000 65000000>;
+> +					#clock-cells = <0>;
+> +					clock-output-names = "v2m:oscclk1";
+> +				};
+>   
+> -			v2m_oscclk2: oscclk2 {
+> -				/* IO FPGA peripheral clock */
+> -				compatible = "arm,vexpress-osc";
+> -				arm,vexpress-sysreg,func = <1 2>;
+> -				freq-range = <24000000 24000000>;
+> -				#clock-cells = <0>;
+> -				clock-output-names = "v2m:oscclk2";
+> -			};
+> +				v2m_oscclk2: oscclk2 {
+> +					/* IO FPGA peripheral clock */
+> +					compatible = "arm,vexpress-osc";
+> +					arm,vexpress-sysreg,func = <1 2>;
+> +					freq-range = <24000000 24000000>;
+> +					#clock-cells = <0>;
+> +					clock-output-names = "v2m:oscclk2";
+> +				};
+>   
+> -			volt-vio {
+> -				/* Logic level voltage */
+> -				compatible = "arm,vexpress-volt";
+> -				arm,vexpress-sysreg,func = <2 0>;
+> -				regulator-name = "VIO";
+> -				regulator-always-on;
+> -				label = "VIO";
+> -			};
+> +				volt-vio {
+> +					/* Logic level voltage */
+> +					compatible = "arm,vexpress-volt";
+> +					arm,vexpress-sysreg,func = <2 0>;
+> +					regulator-name = "VIO";
+> +					regulator-always-on;
+> +					label = "VIO";
+> +				};
+>   
+> -			temp-mcc {
+> -				/* MCC internal operating temperature */
+> -				compatible = "arm,vexpress-temp";
+> -				arm,vexpress-sysreg,func = <4 0>;
+> -				label = "MCC";
+> -			};
+> +				temp-mcc {
+> +					/* MCC internal operating temperature */
+> +					compatible = "arm,vexpress-temp";
+> +					arm,vexpress-sysreg,func = <4 0>;
+> +					label = "MCC";
+> +				};
+>   
+> -			reset {
+> -				compatible = "arm,vexpress-reset";
+> -				arm,vexpress-sysreg,func = <5 0>;
+> -			};
+> +				reset {
+> +					compatible = "arm,vexpress-reset";
+> +					arm,vexpress-sysreg,func = <5 0>;
+> +				};
+>   
+> -			muxfpga {
+> -				compatible = "arm,vexpress-muxfpga";
+> -				arm,vexpress-sysreg,func = <7 0>;
+> -			};
+> +				muxfpga {
+> +					compatible = "arm,vexpress-muxfpga";
+> +					arm,vexpress-sysreg,func = <7 0>;
+> +				};
+>   
+> -			shutdown {
+> -				compatible = "arm,vexpress-shutdown";
+> -				arm,vexpress-sysreg,func = <8 0>;
+> -			};
+> +				shutdown {
+> +					compatible = "arm,vexpress-shutdown";
+> +					arm,vexpress-sysreg,func = <8 0>;
+> +				};
+>   
+> -			reboot {
+> -				compatible = "arm,vexpress-reboot";
+> -				arm,vexpress-sysreg,func = <9 0>;
+> -			};
+> +				reboot {
+> +					compatible = "arm,vexpress-reboot";
+> +					arm,vexpress-sysreg,func = <9 0>;
+> +				};
+>   
+> -			dvimode {
+> -				compatible = "arm,vexpress-dvimode";
+> -				arm,vexpress-sysreg,func = <11 0>;
+> +				dvimode {
+> +					compatible = "arm,vexpress-dvimode";
+> +					arm,vexpress-sysreg,func = <11 0>;
+> +				};
+>   			};
+>   		};
+>   	};
+> +};
+> \ No newline at end of file
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> index a8ac4e2ed290..3971427a105b 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> @@ -9,6 +9,7 @@
+>    */
+>   
+>   /dts-v1/;
+> +#include "vexpress-v2m-rs1.dtsi"
+>   
+>   / {
+>   	model = "V2P-CA15";
+> @@ -278,8 +279,6 @@
+>   				<0 0 40 &gic 0 40 4>,
+>   				<0 0 41 &gic 0 41 4>,
+>   				<0 0 42 &gic 0 42 4>;
+> -
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+>   	};
+>   
+>   	site2: hsb at 40000000 {
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> index a4c7713edfcd..65a874ea66be 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> @@ -9,6 +9,7 @@
+>    */
+>   
+>   /dts-v1/;
+> +#include "vexpress-v2m-rs1.dtsi"
+>   
+>   / {
+>   	model = "V2P-CA15_CA7";
+> @@ -584,7 +585,7 @@
+>   		};
+>   	};
+>   
+> -	smb at 8000000 {
+> +	smb: smb at 8000000 {
+>   		compatible = "simple-bus";
+>   
+>   		#address-cells = <2>;
+> @@ -641,8 +642,6 @@
+>   				<0 0 40 &gic 0 40 4>,
+>   				<0 0 41 &gic 0 41 4>,
+>   				<0 0 42 &gic 0 42 4>;
+> -
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+>   	};
+>   
+>   	site2: hsb at 40000000 {
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> index 32f1906ffecf..e5b4a7570a01 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> @@ -9,6 +9,7 @@
+>    */
+>   
+>   /dts-v1/;
+> +#include "vexpress-v2m-rs1.dtsi"
+>   
+>   / {
+>   	model = "V2P-CA5s";
+> @@ -191,7 +192,7 @@
+>   		};
+>   	};
+>   
+> -	smb at 8000000 {
+> +	smb: smb at 8000000 {
+>   		compatible = "simple-bus";
+>   
+>   		#address-cells = <2>;
+> @@ -248,8 +249,6 @@
+>   				<0 0 40 &gic 0 40 4>,
+>   				<0 0 41 &gic 0 41 4>,
+>   				<0 0 42 &gic 0 42 4>;
+> -
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+>   	};
+>   
+>   	site2: hsb at 40000000 {
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> index 5814460e0549..fc43873cbdff 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> @@ -9,6 +9,7 @@
+>    */
+>   
+>   /dts-v1/;
+> +#include "vexpress-v2m.dtsi"
+>   
+>   / {
+>   	model = "V2P-CA9";
+> @@ -301,7 +302,7 @@
+>   		};
+>   	};
+>   
+> -	smb at 4000000 {
+> +	smb: smb at 4000000 {
+>   		compatible = "simple-bus";
+>   
+>   		#address-cells = <2>;
+> @@ -357,8 +358,6 @@
+>   				<0 0 40 &gic 0 40 4>,
+>   				<0 0 41 &gic 0 41 4>,
+>   				<0 0 42 &gic 0 42 4>;
+> -
+> -		/include/ "vexpress-v2m.dtsi"
+>   	};
+>   
+>   	site2: hsb at e0000000 {
+> diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+> index 1c9eadc2d71e..38880380e0fa 100644
+> --- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+> +++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+> @@ -13,6 +13,7 @@
+>   /dts-v1/;
+>   
+>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "vexpress-v2m-rs1.dtsi"
+>   
+>   / {
+>   	model = "V2F-1XV7 Cortex-A53x2 SMM";
+> @@ -129,7 +130,7 @@
+>   		};
+>   	};
+>   
+> -	smb at 8000000 {
+> +	smb: smb at 8000000 {
+>   		compatible = "simple-bus";
+>   
+>   		#address-cells = <2>;
+> @@ -186,7 +187,5 @@
+>   				<0 0 40 &gic GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+>   				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+>   				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+> -
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+>   	};
+>   };
+> 
