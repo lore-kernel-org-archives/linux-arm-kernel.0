@@ -1,78 +1,33 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 17 Apr 2018 10:39:24 +0300
-Subject: [PATCH v3 06/11] iio: inkern: add module put/get on iio dev
- module when requesting channels
-In-Reply-To: <20180416235821.GF77055@dtor-ws>
-References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
- <1523350677-27106-7-git-send-email-eugen.hristev@microchip.com>
- <20180415203321.1aaaf91e@archlinux> <20180416235821.GF77055@dtor-ws>
-Message-ID: <67771f4c-d30c-4a28-2a9b-d5585186d60a@microchip.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 17 Apr 2018 09:38:11 +0200
+Subject: atmel_mxt_ts on droid4: powersave seems to break the driver
+Message-ID: <20180417073811.GA9450@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+HI!
 
+v4.17-rc1 on motorola droid 4.
 
-On 17.04.2018 02:58, Dmitry Torokhov wrote:
-> On Sun, Apr 15, 2018 at 08:33:21PM +0100, Jonathan Cameron wrote:
->> On Tue, 10 Apr 2018 11:57:52 +0300
->> Eugen Hristev <eugen.hristev@microchip.com> wrote:
->>
->>> When requesting channels for a particular consumer device,
->>> besides requesting the device (incrementing the reference counter), also
->>> do it for the driver module of the iio dev. This will avoid the situation
->>> where the producer IIO device can be removed and the consumer is still
->>> present in the kernel.
->>>
->>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
->>> ---
->>>   drivers/iio/inkern.c | 8 +++++++-
->>>   1 file changed, 7 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
->>> index ec98790..68d9b87 100644
->>> --- a/drivers/iio/inkern.c
->>> +++ b/drivers/iio/inkern.c
->>> @@ -11,6 +11,7 @@
->>>   #include <linux/slab.h>
->>>   #include <linux/mutex.h>
->>>   #include <linux/of.h>
->>> +#include <linux/module.h>
->>>   
->>>   #include <linux/iio/iio.h>
->>>   #include "iio_core.h"
->>> @@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
->>>   	if (index < 0)
->>>   		goto err_put;
->>>   	channel->channel = &indio_dev->channels[index];
->>> +	try_module_get(channel->indio_dev->driver_module);
->>
->> And if it fails? (the module we are trying to get is going away...)
->>
->> We should try and handle it I think. Be it by just erroring out of here.
-> 
-> Even more, this has nothing to do with modules. A device can go away for
-> any number of reasons (we unbind it manually via sysfs, we pull the USB
-> plug from the host in case it is USB-connected device, we unload I2C
-> adapter for the bus device resides on, we kick underlying PCI device)
-> and we should be able to handle this in some fashion. Handling errors
-> from reads and ignoring garbage is one of methods.
-> 
-> FWIW this is a NACK from me.
-> 
-> Thanks.
-Hello,
+If I disable/reenable touschreen with xinput, it fails, with this in
+the logs:
 
-This patch is actually a "best effort attempt" for the consumer driver 
-(touch driver) to get a reference to the producer of the data (the IIO 
-device), when it requests the specific channels.
-As of this moment, there is no attempt whatsoever for the consumer to 
-have a reference on the producer driver. Thus, the producer can be 
-removed at any time, and the consumer will fail ungraciously.
-I can change the perspective from "best effort" to "mandatory" to get a 
-reference to the producer, or you wish to stop trying to get any 
-reference at all (remove this patch completely) ?
+[ 1633.749450] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
+[ 1655.938751] atmel_mxt_ts 1-004a: __mxt_read_reg: i2c transfer
+failed (-121)
+[ 1655.945800] atmel_mxt_ts 1-004a: Failed to read T44 and T5 (-121)
+[ 1663.829498] cpcap-usb-phy cpcap-usb-phy.0: connected to USB host
 
-Thanks,
-Eugen
+Unfortunately, xscreensaver seems to break it in a similar way.
 
-> 
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/e7ac8cef/attachment.sig>
