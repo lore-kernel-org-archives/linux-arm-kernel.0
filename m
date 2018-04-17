@@ -1,54 +1,42 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 17 Apr 2018 00:11:39 -0400
-Subject: [PATCH 1/2] parisc: use the asm-generic version for writeX()
-In-Reply-To: <4eea352e-07f0-3a99-c9bd-57e117288778@codeaurora.org>
-References: <1523916078-23049-1-git-send-email-okaya@codeaurora.org>
- <a727e74f-610c-4722-76e9-c1aca2f9e9bd@bell.net>
- <a7b59f43-cea5-0ead-f528-61899570e353@codeaurora.org>
- <7a9d139e-978b-750d-1bac-8b27e934f781@bell.net>
- <1152a7d4-a8f4-ae68-2737-067fa05409cd@codeaurora.org>
- <4eea352e-07f0-3a99-c9bd-57e117288778@codeaurora.org>
-Message-ID: <3a3b6fe1-c338-488e-3983-0dddf26cc14b@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Apr 2018 12:17:14 +0800
+Subject: [PATCH] ARM: dts: sun8i: h3: Re-enable EMAC on Orange Pi One
+Message-ID: <20180417041714.27266-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/16/2018 7:48 PM, Sinan Kaya wrote:
-> On 4/16/2018 7:44 PM, Sinan Kaya wrote:
->>> John David Anglin? dave.anglin at bell.net
->>>
->>>
->>> io.log
->>>
->>>
->>>   CC      arch/parisc/kernel/asm-offsets.s
->>> In file included from ./arch/parisc/include/asm/io.h:262:0,
->>>                  from ./include/linux/io.h:25,
->>>                  from ./include/linux/irq.h:25,
->>>                  from ./arch/parisc/include/asm/hardirq.h:13,
->>>                  from ./include/linux/hardirq.h:9,
->>>                  from arch/parisc/kernel/asm-offsets.c:34:
->>> ./include/asm-generic/io.h:37:21: error: redefinition of '__raw_readb'
->>>  #define __raw_readb __raw_readb
->>>                      ^
->> This one is easy to fix:
->>
->> https://elixir.bootlin.com/linux/latest/source/arch/parisc/include/asm/io.h#L146
->>
->> Remove 146..179.
-> 
-> I'll try to get a hold of a cross compiler and re-test. The above is a hack.
-> I need to do a better job on this.
-> 
-> Thanks for the help. I'll post V2 when it is ready.
-> 
+In commit f0842bc5637c ("ARM: dts: sun8i: h3: Enable HDMI output on H3
+boards"), the hunk that enabled HDMI for the Orange Pi One did not add a
 
-Converting this to asm-generic turned out to be a much bigger task. I placed
-compiler barriers instead to existing version and posted as follows:
+    status = "okay";
 
-[PATCH v2 1/2] parisc: define stronger ordering for the default writeX()
-[PATCH v2 2/2] parisc: define stronger ordering for the default readX()
+line for the HDMI node, inadvertenly using the one for the EMAC. This
+resulted in the EMAC now being disabled. Whether this was due to a
+rebase error or some other mishap is unknown.
 
+This patch re-enables the EMAC by adding the status line to its node.
+
+Fixes: f0842bc5637c ("ARM: dts: sun8i: h3: Enable HDMI output on H3 boards")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+First fix for 4.17.
+
+---
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 3328fe583c9b..232f124ce62c 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -117,6 +117,7 @@
+ 	phy-handle = <&int_mii_phy>;
+ 	phy-mode = "mii";
+ 	allwinner,leds-active-low;
++	status = "okay";
+ };
+ 
+ &hdmi {
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.17.0
