@@ -1,114 +1,140 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 17 Apr 2018 13:52:43 +0200
-Subject: [linux-sunxi] Re: [PATCH 3/5] net: stmmac: dwmac-sun8i: Allow
- getting syscon regmap from device
-In-Reply-To: <CAGb2v65VLYc1X2bN5v0_1xokZCEkKFYNLzecnE3WeP8goc2KmQ@mail.gmail.com>
-References: <20180411141641.14675-1-icenowy@aosc.io>
- <20180411141641.14675-4-icenowy@aosc.io>
- <20180412145628.iaaeue2imiijwx5d@flea>
- <A027702A-F3F7-4896-B2B8-E024DA521661@aosc.io>
- <CAGb2v66Qi2D1qgF3-iVJFAiznMUzzen0nHM5vsPe7Cyi6QTYpw@mail.gmail.com>
- <20180416143130.tls6xtcq3hsv7u7f@flea>
- <CAGb2v65VLYc1X2bN5v0_1xokZCEkKFYNLzecnE3WeP8goc2KmQ@mail.gmail.com>
-Message-ID: <20180417115243.x42s7ygdpdbhtys2@flea>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 17 Apr 2018 13:54:32 +0200
+Subject: [PATCH v4 2/6] mfd: stm32-timers: add support for dmas
+In-Reply-To: <20180417101009.do42adq24ltgw4lt@dell>
+References: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
+ <1523895561-4073-3-git-send-email-fabrice.gasnier@st.com>
+ <20180417071250.yhgl7c7apn7w53xf@dell>
+ <34e30463-6236-a8e4-fd1f-6217612375eb@st.com>
+ <20180417101009.do42adq24ltgw4lt@dell>
+Message-ID: <72e211c8-7342-7722-e3e8-75442560bdfe@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 16, 2018 at 10:51:55PM +0800, Chen-Yu Tsai wrote:
-> On Mon, Apr 16, 2018 at 10:31 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Thu, Apr 12, 2018 at 11:23:30PM +0800, Chen-Yu Tsai wrote:
-> >> On Thu, Apr 12, 2018 at 11:11 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> >> > ? 2018?4?12? GMT+08:00 ??10:56:28, Maxime Ripard <maxime.ripard@bootlin.com> ??:
-> >> >>On Wed, Apr 11, 2018 at 10:16:39PM +0800, Icenowy Zheng wrote:
-> >> >>> From: Chen-Yu Tsai <wens@csie.org>
-> >> >>>
-> >> >>> On the Allwinner R40 SoC, the "GMAC clock" register is in the CCU
-> >> >>> address space; on the A64 SoC this register is in the SRAM controller
-> >> >>> address space, and with a different offset.
-> >> >>>
-> >> >>> To access the register from another device and hide the internal
-> >> >>> difference between the device, let it register a regmap named
-> >> >>> "emac-clock". We can then get the device from the phandle, and
-> >> >>> retrieve the regmap with dev_get_regmap(); in this situation the
-> >> >>> regmap_field will be set up to access the only register in the
-> >> >>regmap.
-> >> >>>
-> >> >>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >>> [Icenowy: change to use regmaps with single register, change commit
-> >> >>>  message]
-> >> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> >>> ---
-> >> >>>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 48
-> >> >>++++++++++++++++++++++-
-> >> >>>  1 file changed, 46 insertions(+), 2 deletions(-)
-> >> >>>
-> >> >>> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> >> >>b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> >> >>> index 1037f6c78bca..b61210c0d415 100644
-> >> >>> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> >> >>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-> >> >>> @@ -85,6 +85,13 @@ const struct reg_field old_syscon_reg_field = {
-> >> >>>      .msb = 31,
-> >> >>>  };
-> >> >>>
-> >> >>> +/* Specially exported regmap which contains only EMAC register */
-> >> >>> +const struct reg_field single_reg_field = {
-> >> >>> +    .reg = 0,
-> >> >>> +    .lsb = 0,
-> >> >>> +    .msb = 31,
-> >> >>> +};
-> >> >>> +
-> >> >>
-> >> >>I'm not sure this would be wise. If we ever need some other register
-> >> >>exported through the regmap, will have to change all the calling sites
-> >> >>everywhere in the kernel, which will be a pain and will break
-> >> >>bisectability.
-> >> >
-> >> > In this situation the register can be exported as another
-> >> >  regmap. Currently the code will access a regmap with name
-> >> > "emac-clock" for this register.
-> >> >
-> >> >>
-> >> >>Chen-Yu's (or was it yours?) initial solution with a custom writeable
-> >> >>hook only allowing a single register seemed like a better one.
-> >> >
-> >> > But I remember you mentioned that you want it to hide the
-> >> > difference inside the device.
-> >>
-> >> The idea is that a device can export multiple regmaps. This one,
-> >> the one named "gmac" (in my soon to come v2) or "emac-clock" here,
-> >> is but one of many possible regmaps, and it only exports the register
-> >> needed by the GMAC/EMAC.
-> >
-> > I'm not sure this would be wise either. There's a single register map,
-> > and as far as I know we don't have a binding to express this in the
-> > DT. This means that the customer and provider would have to use the
-> > same name, but without anything actually enforcing it aside from
-> > "someone in the community knows it".
-> >
-> > This is not a really good design, and I was actually preferring your
-> > first option. We shouldn't rely on any undocumented rule. This will be
-> > easy to break and hard to maintain.
+On 04/17/2018 12:10 PM, Lee Jones wrote:
+> On Tue, 17 Apr 2018, Fabrice Gasnier wrote:
 > 
-> So, one regmap per device covering the whole register range, and the
-> consumer knows which register to poke by looking at its own compatible.
+>> On 04/17/2018 09:12 AM, Lee Jones wrote:
+>>> On Mon, 16 Apr 2018, Fabrice Gasnier wrote:
+>>>
+>>>> STM32 Timers can support up to 7 DMA requests:
+>>>> - 4 channels, update, compare and trigger.
+>>>> Optionally request part, or all DMAs from stm32-timers MFD core.
+>>>>
+>>>> Also add routine to implement burst reads using DMA from timer registers.
+>>>> This is exported. So, it can be used by child drivers, PWM capture
+>>>> for instance (but not limited to).
+>>>>
+>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>>>> ---
+>>>> Changes in v4:
+>>>> - Lee's comments: Add kerneldoc header, better format comments.
+>>>> Changes in v3:
+>>>> - Basically Lee's comments:
+>>>> - rather create a struct stm32_timers_dma, and place a reference to it
+>>>>   in existing ddata (instead of adding priv struct).
+>>>> - rather use a struct device in exported routine prototype, and use
+>>>>   standard helpers instead of ddata. Get rid of to_stm32_timers_priv().
+>>>> - simplify error handling in probe (remove a goto)
+>>>> - comment on devm_of_platform_*populate() usage.
+>>>>
+>>>> Changes in v2:
+>>>> - Abstract DMA handling from child driver: move it to MFD core
+>>>> - Add comments on optional dma support
+>>>> ---
+>>>>  drivers/mfd/stm32-timers.c       | 227 ++++++++++++++++++++++++++++++++++++++-
+>>>>  include/linux/mfd/stm32-timers.h |  32 ++++++
+>>>>  2 files changed, 257 insertions(+), 2 deletions(-)
+>>>
+>>> [...]
+>>>
+>>>> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
+>>>> index 2aadab6..a04d7a1 100644
+>>>> --- a/include/linux/mfd/stm32-timers.h
+>>>> +++ b/include/linux/mfd/stm32-timers.h
+>>>> @@ -8,6 +8,8 @@
+>>>>  #define _LINUX_STM32_GPTIMER_H_
+>>>>  
+>>>>  #include <linux/clk.h>
+>>>> +#include <linux/dmaengine.h>
+>>>> +#include <linux/dma-mapping.h>
+>>>>  #include <linux/regmap.h>
+>>>
+>>> [...]
+>>>
+>>>> +struct stm32_timers_dma;
+>>>> +
+>>>>  struct stm32_timers {
+>>>>  	struct clk *clk;
+>>>>  	struct regmap *regmap;
+>>>>  	u32 max_arr;
+>>>> +	struct stm32_timers_dma *dma; /* Only to be used by the parent */
+>>>
+>>> I'm confused.  I thought the point of putting this comment in was so
+>>> that you could place the definition of 'stm32_timers_dma' and remove
+>>> the forward declaration?
+>>
+>> Hi Lee,
+>>
+>> Sorry, if I miss-understood the point then. So, do you wish I both:
+>> - move the full struct definition in above header ?
+>> - and keep this comment ?
 > 
-> That sound right?
+> That was what I thought we agreed.
 
-Yep. And ideally, sending a single serie for both the A64 and the R40
-cases, in order to provide the big picture.
+Hi Lee,
 
-Maxime
+Ok, I'll update this in v5.
+BTW, I'll fix warning reported by Dan:
+> smatch warnings:
+drivers/mfd/stm32-timers.c:165 stm32_timers_dma_burst_read() warn: warn:
+dma_mapping_error() doesn't return an error code
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/74e65df6/attachment.sig>
+Thanks,
+Fabrice
+
+> However, I left the final decision to you.  If you do not think this
+> is a reasonable i.e. the comment alone will not be enough to prevent
+> people from abusing the API, then leave it as it is.
+> 
+> Bear in mind that I think this introduces a build dependency on the
+> MFD driver for *each and every* other source file which includes this
+> header.  If you choose the current solution, you will need to handle
+> that accordingly.
+> 
+>> +/**
+>> + * struct stm32_timers_dma - STM32 timer DMA handling.
+>> + * @completion:		end of DMA transfer completion
+>> + * @phys_base:		control registers physical base address
+>> + * @lock:		protect DMA access
+>> + * @chan:		DMA channel in use
+>> + * @chans:		DMA channels available for this timer instance
+>> + */
+>> +struct stm32_timers_dma {
+>> +	struct completion completion;
+>> +	phys_addr_t phys_base;
+>> +	struct mutex lock;
+>> +	struct dma_chan *chan;
+>> +	struct dma_chan *chans[STM32_TIMERS_MAX_DMAS];
+>> +};
+>>
+>> This will basically expose the struct to child drivers. But I'm ok if
+>> you think this is acceptable.
+>>
+>> I can send a V5 if you wish...
+>>
+>> Please advise,
+>> Best regards,
+>> Fabrice
+>>
+>>>
+>>>>  };
+>>>> +
+>>>> +int stm32_timers_dma_burst_read(struct device *dev, u32 *buf,
+>>>> +				enum stm32_timers_dmas id, u32 reg,
+>>>> +				unsigned int num_reg, unsigned int bursts,
+>>>> +				unsigned long tmo_ms);
+>>>>  #endif
+>>>
+> 
