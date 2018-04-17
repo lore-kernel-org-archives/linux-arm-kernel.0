@@ -1,35 +1,76 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Tue, 17 Apr 2018 22:56:23 +0200
-Subject: [PATCH 1/1] arm: dts: rockchip: default serial for Tinker Board
-Message-ID: <20180417205623.764-1-xypron.glpk@gmx.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 17 Apr 2018 23:10:15 +0200
+Subject: [PATCH V3 3/4] soc: mediatek: pwrap: add mt6351 for mt6797 SoCs
+In-Reply-To: <20180323083238.13569-4-argus.lin@mediatek.com>
+References: <20180323083238.13569-1-argus.lin@mediatek.com>
+ <20180323083238.13569-4-argus.lin@mediatek.com>
+Message-ID: <427130f0-9f7e-22cc-3679-2a8d22124515@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Asus Tinker Board uses serial 2 with 115,200 baud by default for
-communication in U-Boot. The same value is also chosen for other RK3288
-boards.
+Please update the subject line, we don't add mt5797 here.
 
-So let us set the same value in the Tinker Board device tree.
+More comments below.
 
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
----
- arch/arm/boot/dts/rk3288-tinker.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+On 03/23/2018 09:32 AM, argus.lin at mediatek.com wrote:
+> From: Argus Lin <argus.lin@mediatek.com>
+> 
+> mt6351 is a new power management IC and it is
+> used for mt6797 SoCs. We need to add mt6351_regs for
+> pmic register mapping and pmic_mt6351 for
+> register accessing by regmap.
+> 
+> Signed-off-by: Argus Lin <argus.lin@mediatek.com>
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 31 +++++++++++++++++++++++++++++--
+>  1 file changed, 29 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index d0a0a3d7e88d..d81a585fadf5 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -153,6 +153,21 @@ static const u32 mt6397_regs[] = {
+>  	[PWRAP_DEW_CIPHER_SWRST] =	0xbc24,
+>  };
+>  
+> +static const u32 mt6351_regs[] = {
+> +	[PWRAP_DEW_DIO_EN] =		0x02F2,
+> +	[PWRAP_DEW_READ_TEST] =		0x02F4,
+> +	[PWRAP_DEW_WRITE_TEST] =	0x02F6,
+> +	[PWRAP_DEW_CRC_EN] =		0x02FA,
+> +	[PWRAP_DEW_CRC_VAL] =		0x02FC,
+> +	[PWRAP_DEW_CIPHER_KEY_SEL] =	0x0300,
+> +	[PWRAP_DEW_CIPHER_IV_SEL] =	0x0302,
+> +	[PWRAP_DEW_CIPHER_EN] =		0x0304,
+> +	[PWRAP_DEW_CIPHER_RDY] =	0x0306,
+> +	[PWRAP_DEW_CIPHER_MODE] =	0x0308,
+> +	[PWRAP_DEW_CIPHER_SWRST] =	0x030A,
+> +	[PWRAP_DEW_RDDMY_NO] =		0x030C,
+> +};
+> +
+>  enum pwrap_regs {
+>  	PWRAP_MUX_SEL,
+>  	PWRAP_WRAP_EN,
+> @@ -721,6 +736,7 @@ static int mt8135_regs[] = {
+>  
+>  enum pmic_type {
+>  	PMIC_MT6323,
+> +	PMIC_MT6351,
+>  	PMIC_MT6380,
+>  	PMIC_MT6397,
+>  };
+> @@ -1179,8 +1195,6 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_SWRST], 0x0);
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_KEY_SEL], 0x1);
+>  	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_IV_SEL], 0x2);
+> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_LOAD], 0x1);
+> -	pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_START], 0x1);
 
-diff --git a/arch/arm/boot/dts/rk3288-tinker.dts b/arch/arm/boot/dts/rk3288-tinker.dts
-index 346b0d8b474d..127488f9f174 100644
---- a/arch/arm/boot/dts/rk3288-tinker.dts
-+++ b/arch/arm/boot/dts/rk3288-tinker.dts
-@@ -49,6 +49,10 @@
- 	model = "Rockchip RK3288 Tinker Board";
- 	compatible = "asus,rk3288-tinker", "rockchip,rk3288";
- 
-+	chosen {
-+		stdout-path = "serial2:115200n8";
-+	};
-+
- 	memory {
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 		device_type = "memory";
--- 
-2.17.0
+That might break the driver for other devices. You can't just delete these lines
+without explanation. If you think these lines are not needed, then please put
+the deletion in another patch explaining why.
+
+Other then these two comments, patch looks fine.
+
+Regards,
+Matthias
