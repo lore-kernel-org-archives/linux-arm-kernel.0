@@ -1,36 +1,42 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Apr 2018 12:03:58 +0100
-Subject: [PATCH 2/3] dt-bindings: add binding for at91-usart in spi mode
-In-Reply-To: <20180413181251.GG22187@piout.net>
-References: <20180413161117.20274-1-radu.pirea@microchip.com>
- <20180413161117.20274-3-radu.pirea@microchip.com>
- <20180413162327.GE22187@piout.net>
- <8e6c447d-dce5-f9af-e5b2-8d1d863159d6@microchip.com>
- <20180413181251.GG22187@piout.net>
-Message-ID: <20180417110358.GD8973@sirena.org.uk>
+Date: Tue, 17 Apr 2018 12:09:08 +0100
+Subject: [PATCH v4 10/14] dt-bindings: Add support for SAW documentation
+In-Reply-To: <20180409202144.76gjmc6kcn2msffl@rob-hp-laptop>
+References: <1522358807-10413-1-git-send-email-ilialin@codeaurora.org>
+ <1522358807-10413-11-git-send-email-ilialin@codeaurora.org>
+ <20180409202144.76gjmc6kcn2msffl@rob-hp-laptop>
+Message-ID: <20180417110908.GE8973@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 13, 2018 at 08:12:51PM +0200, Alexandre Belloni wrote:
-> On 13/04/2018 19:12:54+0200, Nicolas Ferre wrote:
+On Mon, Apr 09, 2018 at 03:21:44PM -0500, Rob Herring wrote:
+> On Fri, Mar 30, 2018 at 12:26:43AM +0300, Ilia Lin wrote:
+> > Add support for SAW controlled regulators in 8x96.
+> > Document it.
 
-> > This layout of the hardware is completely different from the USART one and
-> > it seems to makes sense to address it with a different hardware description
-> > and so a different compatible string.
+> Perhaps some clue in the subject what subsystem and/or device this 
+> applies to.
 
-> But then, you can end up with two drivers trying to use the same IP
-> because nothing prevents you from writing a DT with both a usart and an
-> spi node enabled for the same IP. request_mem_region() will not help
-> here because then the working driver will depend on the probing order.
+Right, especially given that if people can't find the documentation for
+driver binding changes that's likely to be one of the first compliants.
 
-We don't really have too much in the way of better ideas for how to
-handle this though.  Take a look at how the PXA SSP stuff handles this,
-though that's not really doing too much different it at least layers a
-mechanism on top to avoid collisions.
+> > +- qcom,saw-leader:
+> > +	Usage: optional
+> > +	Value type: <boo>
+> > +	Description: SAW controlled gang leader. Will be configured as
+> > +		     SAW regulator.
+
+> Would the coupled regulator binding work in this case?
+
+Someone would need to get the code working first though depending on
+what the hardware does that might not be the right thing.  It's fairly
+common to have hardware support for grouping multiple physical
+regulators together into a single supply in order to provide more
+current with all the control being done from one of the regulators.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/26668ad7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180417/6156c958/attachment-0001.sig>
