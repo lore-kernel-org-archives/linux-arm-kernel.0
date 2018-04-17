@@ -1,23 +1,25 @@
 From: andi@etezian.org (andi at etezian.org)
-Date: Wed, 18 Apr 2018 03:09:39 +0900
-Subject: [PATCH v2 4/8] spi: spi-s3c64xx: Drop unused enable_datapath()
- function argument
-In-Reply-To: <20180417142954.5507-4-s.nawrocki@samsung.com>
+Date: Wed, 18 Apr 2018 03:11:44 +0900
+Subject: [PATCH v2 5/8] spi: spi-s3c64xx: Add missing s3c64xx_ prefix to
+ function names
+In-Reply-To: <20180417142954.5507-5-s.nawrocki@samsung.com>
 References: <20180417142954.5507-1-s.nawrocki@samsung.com>
- <CGME20180417143039epcas2p39e2c730d107c94e5f9bf104d3a938f90@epcas2p3.samsung.com>
- <20180417142954.5507-4-s.nawrocki@samsung.com>
-Message-ID: <749a25fcaf0ccaed931244dc8d381b98@etezian.org>
+ <CGME20180417143045epcas2p2ac92ce458223a849647265d59b12bc70@epcas2p2.samsung.com>
+ <20180417142954.5507-5-s.nawrocki@samsung.com>
+Message-ID: <eb149117a22b6622d94d5037e753698a@etezian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sylwester,
 
 On 17.04.2018 23:29, Sylwester Nawrocki wrote:
-> The spi pointer argument is not used now so remove it.
+> Add a s3c64xx_ prefix to remaining generic function names so it is 
+> clear
+> the code is part of the driver when grepping or looking at debug logs.
 > 
 > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Thanks for splitting it!
+thank you :)
 
 Reviewed-by: Andi Shyti <andi@etezian.org>
 
