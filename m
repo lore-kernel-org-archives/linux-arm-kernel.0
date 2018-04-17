@@ -1,72 +1,49 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 17 Apr 2018 17:30:38 -0400
-Subject: [net-next PATCH v4 09/13] net: netcp: ethss: use of_get_phy_mode() to
- support different RGMII modes
+Date: Tue, 17 Apr 2018 17:30:39 -0400
+Subject: [net-next PATCH v4 10/13] Revert "net: netcp: remove dead code from
+ the driver"
 In-Reply-To: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
 References: <1524000642-23944-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1524000642-23944-10-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1524000642-23944-11-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy used for K2G allows for internal delays to be added optionally
-to the clock circuitry based on board desing. To add this support,
-enhance the driver to use of_get_phy_mode() to read the phy-mode from
-the phy device and pass the same to phy through of_phy_connect().
+As the probe sequence is not guaranteed contrary to the assumption
+of the commit 2d8e276a9030, same has to be reverted.
+
+commit 2d8e276a9030 ("net: netcp: remove dead code from the driver")
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/net/ethernet/ti/netcp_ethss.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/net/ethernet/ti/netcp_core.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/net/ethernet/ti/netcp_ethss.c b/drivers/net/ethernet/ti/netcp_ethss.c
-index d982dcb..5bc7921 100644
---- a/drivers/net/ethernet/ti/netcp_ethss.c
-+++ b/drivers/net/ethernet/ti/netcp_ethss.c
-@@ -21,6 +21,7 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of_mdio.h>
-+#include <linux/of_net.h>
- #include <linux/of_address.h>
- #include <linux/if_vlan.h>
- #include <linux/ptp_classify.h>
-@@ -707,6 +708,7 @@ struct gbe_slave {
- 	u32				link_interface;
- 	u32				mac_control;
- 	u8				phy_port_t;
-+	struct device_node		*node;
- 	struct device_node		*phy_node;
- 	struct ts_ctl                   ts_ctl;
- 	struct list_head		slave_list;
-@@ -2322,6 +2324,21 @@ static int gbe_slave_open(struct gbe_intf *gbe_intf)
- 		has_phy = true;
- 		phy_mode = PHY_INTERFACE_MODE_SGMII;
- 		slave->phy_port_t = PORT_MII;
-+	} else if (slave->link_interface == RGMII_LINK_MAC_PHY) {
-+		has_phy = true;
-+		phy_mode = of_get_phy_mode(slave->node);
-+		/* if phy-mode is not present, default to
-+		 * PHY_INTERFACE_MODE_RGMII
-+		 */
-+		if (phy_mode < 0)
-+			phy_mode = PHY_INTERFACE_MODE_RGMII;
-+
-+		if (!phy_interface_mode_is_rgmii(phy_mode)) {
-+			dev_err(priv->dev,
-+				"Unsupported phy mode %d\n", phy_mode);
-+			return -EINVAL;
-+		}
-+		slave->phy_port_t = PORT_MII;
- 	} else if (slave->link_interface == XGMII_LINK_MAC_PHY) {
- 		has_phy = true;
- 		phy_mode = PHY_INTERFACE_MODE_NA;
-@@ -2947,6 +2964,7 @@ static int init_slave(struct gbe_priv *gbe_dev, struct gbe_slave *slave,
- 		slave->link_interface = SGMII_LINK_MAC_PHY;
- 	}
+diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
+index f5a7eb2..9c51b25 100644
+--- a/drivers/net/ethernet/ti/netcp_core.c
++++ b/drivers/net/ethernet/ti/netcp_core.c
+@@ -2155,6 +2155,7 @@ static int netcp_probe(struct platform_device *pdev)
+ 	struct device_node *child, *interfaces;
+ 	struct netcp_device *netcp_device;
+ 	struct device *dev = &pdev->dev;
++	struct netcp_module *module;
+ 	int ret;
  
-+	slave->node = node;
- 	slave->open = false;
- 	if ((slave->link_interface == SGMII_LINK_MAC_PHY) ||
- 	    (slave->link_interface == RGMII_LINK_MAC_PHY) ||
+ 	if (!node) {
+@@ -2203,6 +2204,14 @@ static int netcp_probe(struct platform_device *pdev)
+ 	/* Add the device instance to the list */
+ 	list_add_tail(&netcp_device->device_list, &netcp_devices);
+ 
++	/* Probe & attach any modules already registered */
++	mutex_lock(&netcp_modules_lock);
++	for_each_netcp_module(module) {
++		ret = netcp_module_probe(netcp_device, module);
++		if (ret < 0)
++			dev_err(dev, "module(%s) probe failed\n", module->name);
++	}
++	mutex_unlock(&netcp_modules_lock);
+ 	return 0;
+ 
+ probe_quit_interface:
 -- 
 1.9.1
