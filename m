@@ -1,73 +1,46 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 17 Apr 2018 14:54:48 +0200
-Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
- to netdev dma client
-In-Reply-To: <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-3-git-send-email-radheys@xilinx.com>
- <20180411090854.GY6014@localhost>
- <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
-Message-ID: <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 17 Apr 2018 14:03:41 +0100
+Subject: [PATCH] ARM: dts: Restructure Vexpress motherboard includes
+In-Reply-To: <CACRpkda0Fq+b4htyx=8Kez7UGj_jQ-MO1orL=QESQ-JaAAjG=g@mail.gmail.com>
+References: <20180417114331.5233-1-linus.walleij@linaro.org>
+ <86a95dd0-a702-3dce-e69b-20205a519a88@arm.com>
+ <CACRpkda0Fq+b4htyx=8Kez7UGj_jQ-MO1orL=QESQ-JaAAjG=g@mail.gmail.com>
+Message-ID: <b736820a-e851-a8de-06ca-f3c79135825a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2018 01:43 PM, Radhey Shyam Pandey wrote:
-> Hi Vinod,
+On 17/04/18 13:43, Linus Walleij wrote:
+[...]
+>>> +/ {
+>>> +       smb at 8000000 {
+>>
+>>
+>> Nit: Surely "&smb {", given that you've already gone to the length of
+>> labelling it in the includers? (plus that should also avoid the need to
+>> reindent)
 > 
->> -----Original Message-----
->> From: Vinod Koul [mailto:vinod.koul at intel.com]
->> Sent: Wednesday, April 11, 2018 2:39 PM
->> To: Radhey Shyam Pandey <radheys@xilinx.com>
->> Cc: dan.j.williams at intel.com; michal.simek at xilinx.com; Appana Durga
->> Kedareswara Rao <appanad@xilinx.com>; Radhey Shyam Pandey
->> <radheys@xilinx.com>; lars at metafoo.de; dmaengine at vger.kernel.org;
->> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
->> Subject: Re: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control
->> words to netdev dma client
->>
->> On Mon, Apr 02, 2018 at 04:09:02PM +0530, Radhey Shyam Pandey wrote:
->>
->>> +
->>> +		if (chan->xdev->has_axieth_connected) {
->>> +			seg = list_first_entry(&desc->segments,
->>> +					struct xilinx_axidma_tx_segment,
->> node);
->>> +			if (cb.callback_param) {
->>> +				app_w = (u32 *) cb.callback_param;
->>
->> why are you interpreting callback_param? This is plainly wrong.
->> we do not know what is the interpretation of callback_param and it is
->> internal to submitter.
-> In design, if AXI DMA is connected to AXI Ethernet IP there are certain
-> AXI4-Stream Status fields (RX) that we need to pass to ethernet driver
-> along with data buffer. An example includes: checksum fields, packet
-> length etc. To pass these control words there is a structure defined
-> between dmaengine and client. Before calling the client callback
-> stream control words are copied to dma client callback_param struct
-> (only if axieth is connected).
+> I tried that and it didn't work.
 > 
-> I understand it's not an ideal way and we shouldn't be interpreting
-> callback_param but couldn't find any better alternative of passing
-> custom information from dmaengine to client driver and still be 
-> aligned to the framework.
+> I guess it is because the includes go in the reverse parsing order, this
+> file is included into the main DTS.
 > 
->>
->> What exactly is the problem you are trying to solve?
-> As mentioned above we need to pass AXI4-stream words(custom
-> data) from dmaengine driver to dma client driver(ethernet) for
-> each DMA descriptor. Current solution populates callback_param
-> struct (only if axieth is connected). Please let me know if there is
-> an alternate solution. 
+> If the &smb was referenced from the DTS to the definition in
+> the DTSI, it would work fine.
+> 
+> However the reverse, &smb before the node has been defined
+> (it's in the DTS) doesn't work and seems to reflect to top-to-bottom
+> parsing scheme.
 
-The standard interfaces need to work in a way that a client using them does
-not have to know to which DMA controller it is connected. In a similar way
-the DMA controller shouldn't have any client specific logic for the generic
-interfaces. Otherwise there is no point of having a generic interface.
+Ah, right, I'd overlooked that the funky VExpress "one board, many SoCs" 
+setup makes this inclusion backwards compared to the typical usage. I 
+suppose the way to make it more regular would be to add an extra level 
+of indirection, i.e. vexpress-<tile>.dts as just:
 
-There are two options.
+#include vexpress-<tile>.dtsi
+#include vexpress-motherboard.dtsi
 
-Either you extend the generic interfaces so it can cover your usecase in a
-generic way. E.g. the ability to attach meta data to transfer.
+which in no way seems worth the bother. Let's keep this as-is then 
+(although possibly that means we don't really need the smb labels at all?)
 
-Or you can implement a interface that is specific to your DMA controller and
-any client using this interface knows it is talking to your DMA controller.
+Thanks,
+Robin.
