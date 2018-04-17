@@ -1,103 +1,36 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Tue, 17 Apr 2018 12:48:14 +0000
-Subject: [RFC 5/6] dmaengine: xilinx_dma: Program interrupt delay timeout
-In-Reply-To: <20180411091159.GA6014@localhost>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-6-git-send-email-radheys@xilinx.com>
- <20180411091159.GA6014@localhost>
-Message-ID: <BN6PR02MB3282D496EC4D004A5CE37570C7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+From: michel.pollet@bp.renesas.com (Michel Pollet)
+Date: Tue, 17 Apr 2018 13:47:59 +0100
+Subject: [PATCH v2 0/3] Renesas RZ/N1D SMP enabler
+Message-ID: <1523969291-41756-1-git-send-email-michel.pollet@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+*WARNING -- this requires the base RZ/N1 base patches (v5) already posted
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Wednesday, April 11, 2018 2:42 PM
-> To: Radhey Shyam Pandey <radheys@xilinx.com>
-> Cc: dan.j.williams at intel.com; michal.simek at xilinx.com; Appana Durga
-> Kedareswara Rao <appanad@xilinx.com>; Radhey Shyam Pandey
-> <radheys@xilinx.com>; lars at metafoo.de; dmaengine at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [RFC 5/6] dmaengine: xilinx_dma: Program interrupt delay
-> timeout
-> 
-> On Mon, Apr 02, 2018 at 04:09:05PM +0530, Radhey Shyam Pandey wrote:
-> > Program IRQDelay for AXI DMA. The interrupt timeout mechanism causes
-> > the DMA engine to generate an interrupt after the delay time period
-> > has expired. It enables dmaengine to respond in real-time even though
-> > interrupt coalescing is configured.
-> 
-> again you are doing this only for axieth_connected, why is that?
-The initial application was axieth but yes delay timeout feature may
-be needed for other use cases as well. We can make delay timeout
-an optional DT property. Is that fine? 
+This patch series is for enabling the second CA7 of the RZ/N1D.
+It's based on a spin_table method, and it reuses the same binding
+property as that driver.
 
-> 
-> >
-> > Signed-off-by: Radhey Shyam Pandey <radheys@xilinx.com>
-> > ---
-> >  drivers/dma/xilinx/xilinx_dma.c |   16 ++++++++++++++--
-> >  1 files changed, 14 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/dma/xilinx/xilinx_dma.c
-> b/drivers/dma/xilinx/xilinx_dma.c
-> > index 518465e..ab8f1b0 100644
-> > --- a/drivers/dma/xilinx/xilinx_dma.c
-> > +++ b/drivers/dma/xilinx/xilinx_dma.c
-> > @@ -161,8 +161,12 @@
-> >  /* AXI DMA Specific Masks/Bit fields */
-> >  #define XILINX_DMA_MAX_TRANS_LEN	GENMASK(22, 0)
-> >  #define XILINX_DMA_CR_COALESCE_MAX	GENMASK(23, 16)
-> > +#define XILINX_DMA_CR_DELAY_MAX		GENMASK(31, 24)
-> >  #define XILINX_DMA_CR_CYCLIC_BD_EN_MASK	BIT(4)
-> >  #define XILINX_DMA_CR_COALESCE_SHIFT	16
-> > +#define XILINX_DMA_CR_DELAY_SHIFT	24
-> > +#define XILINX_DMA_CR_WAITBOUND_DFT	254
-> > +
-> >  #define XILINX_DMA_BD_SOP		BIT(27)
-> >  #define XILINX_DMA_BD_EOP		BIT(26)
-> >  #define XILINX_DMA_COALESCE_MAX		255
-> > @@ -1294,6 +1298,12 @@ static void xilinx_dma_start_transfer(struct
-> xilinx_dma_chan *chan)
-> >  		reg &= ~XILINX_DMA_CR_COALESCE_MAX;
-> >  		reg |= chan->desc_pendingcount <<
-> >  				  XILINX_DMA_CR_COALESCE_SHIFT;
-> > +
-> > +		if (chan->xdev->has_axieth_connected) {
-> > +			reg  &= ~XILINX_DMA_CR_DELAY_MAX;
-> > +			reg  |= XILINX_DMA_CR_WAITBOUND_DFT <<
-> > +					XILINX_DMA_CR_DELAY_SHIFT;
-> > +		}
-> >  		dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
-> >  	}
-> >
-> > @@ -1508,7 +1518,8 @@ static irqreturn_t xilinx_dma_irq_handler(int irq,
-> void *data)
-> >  		}
-> >  	}
-> >
-> > -	if (status & XILINX_DMA_DMASR_DLY_CNT_IRQ) {
-> > +	if (!chan->xdev->has_axieth_connected && (status &
-> > +			XILINX_DMA_DMASR_DLY_CNT_IRQ)) {
-> >  		/*
-> >  		 * Device takes too long to do the transfer when user
-> requires
-> >  		 * responsiveness.
-> > @@ -1516,7 +1527,8 @@ static irqreturn_t xilinx_dma_irq_handler(int irq,
-> void *data)
-> >  		dev_dbg(chan->dev, "Inter-packet latency too long\n");
-> >  	}
-> >
-> > -	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
-> > +	if (status & (XILINX_DMA_DMASR_FRM_CNT_IRQ |
-> > +		      XILINX_DMA_DMASR_DLY_CNT_IRQ)) {
-> >  		spin_lock(&chan->lock);
-> >  		xilinx_dma_complete_descriptor(chan);
-> >  		chan->idle = true;
-> > --
-> > 1.7.1
-> >
-> 
-> --
-> ~Vinod
+v2:
+  + Added suggestions from Florian Fainelli
+  + Use __pa_symbol()
+  + Simplified logic in prepare_cpu()
+  + Reordered the patches
+  + Rebased on RZN1 Base patch v5
+
+*** BLURB HERE ***
+
+Michel Pollet (3):
+  dt-bindings: cpu: Add Renesas RZ/N1D SMP enable method.
+  arm: shmobile: Add the RZ/N1D SMP enabler driver
+  ARM: dts: Renesas RZ/N1D SMP enable method
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/boot/dts/r9a06g032.dtsi               |  2 +
+ arch/arm/mach-shmobile/Makefile                |  1 +
+ arch/arm/mach-shmobile/smp-r9a06g032.c         | 85 ++++++++++++++++++++++++++
+ 4 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/smp-r9a06g032.c
+
+-- 
+2.7.4
