@@ -1,54 +1,106 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 17 Apr 2018 16:29:49 +0200
-Subject: [PATCH v2 3/8] spi: spi-s3c64xx: Remove unused s3c64xx_spi_hwinit()
- function argument
+Date: Tue, 17 Apr 2018 16:29:51 +0200
+Subject: [PATCH v2 5/8] spi: spi-s3c64xx: Add missing s3c64xx_ prefix to
+ function names
 In-Reply-To: <20180417142954.5507-1-s.nawrocki@samsung.com>
 References: <20180417142954.5507-1-s.nawrocki@samsung.com>
- <CGME20180417143035epcas2p2959c3987da80bf28cacc603168204f4c@epcas2p2.samsung.com>
-Message-ID: <20180417142954.5507-3-s.nawrocki@samsung.com>
+ <CGME20180417143045epcas2p2ac92ce458223a849647265d59b12bc70@epcas2p2.samsung.com>
+Message-ID: <20180417142954.5507-5-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The channel argument is not used and anyway the value could be retrieved
-from the passed driver data structure.
+Add a s3c64xx_ prefix to remaining generic function names so it is clear
+the code is part of the driver when grepping or looking at debug logs.
 
-Reviewed-by: Andi Shyti <andi@etezian.org>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/spi/spi-s3c64xx.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index f0e28adbbc32..4c27426bcb40 100644
+index 5d94915c2738..b9b406138675 100644
 --- a/drivers/spi/spi-s3c64xx.c
 +++ b/drivers/spi/spi-s3c64xx.c
-@@ -891,7 +891,7 @@ static irqreturn_t s3c64xx_spi_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
-
--static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd, int channel)
-+static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd)
+@@ -188,7 +188,7 @@ struct s3c64xx_spi_driver_data {
+ 	unsigned int			port_id;
+ };
+ 
+-static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
++static void s3c64xx_flush_fifo(struct s3c64xx_spi_driver_data *sdd)
  {
- 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
  	void __iomem *regs = sdd->regs;
-@@ -1145,7 +1145,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	pm_runtime_get_sync(&pdev->dev);
-
- 	/* Setup Deufult Mode */
--	s3c64xx_spi_hwinit(sdd, sdd->port_id);
-+	s3c64xx_spi_hwinit(sdd);
-
- 	spin_lock_init(&sdd->lock);
- 	init_completion(&sdd->xfer_completion);
-@@ -1260,7 +1260,7 @@ static int s3c64xx_spi_resume(struct device *dev)
- 	if (ret < 0)
- 		return ret;
-
--	s3c64xx_spi_hwinit(sdd, sdd->port_id);
-+	s3c64xx_spi_hwinit(sdd);
-
- 	return spi_master_resume(master);
+ 	unsigned long loops;
+@@ -348,8 +348,8 @@ static bool s3c64xx_spi_can_dma(struct spi_master *master,
+ 	return xfer->len > (FIFO_LVL_MASK(sdd) >> 1) + 1;
  }
---
+ 
+-static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+-			    struct spi_transfer *xfer, int dma_mode)
++static void s3c64xx_enable_datapath(struct s3c64xx_spi_driver_data *sdd,
++				    struct spi_transfer *xfer, int dma_mode)
+ {
+ 	void __iomem *regs = sdd->regs;
+ 	u32 modecfg, chcfg;
+@@ -439,8 +439,8 @@ static u32 s3c64xx_spi_wait_for_timeout(struct s3c64xx_spi_driver_data *sdd,
+ 	return RX_FIFO_LVL(status, sdd);
+ }
+ 
+-static int wait_for_dma(struct s3c64xx_spi_driver_data *sdd,
+-			struct spi_transfer *xfer)
++static int s3c64xx_wait_for_dma(struct s3c64xx_spi_driver_data *sdd,
++				struct spi_transfer *xfer)
+ {
+ 	void __iomem *regs = sdd->regs;
+ 	unsigned long val;
+@@ -482,8 +482,8 @@ static int wait_for_dma(struct s3c64xx_spi_driver_data *sdd,
+ 	return 0;
+ }
+ 
+-static int wait_for_pio(struct s3c64xx_spi_driver_data *sdd,
+-			struct spi_transfer *xfer)
++static int s3c64xx_wait_for_pio(struct s3c64xx_spi_driver_data *sdd,
++				struct spi_transfer *xfer)
+ {
+ 	void __iomem *regs = sdd->regs;
+ 	unsigned long val;
+@@ -666,7 +666,7 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
+ 	sdd->state &= ~RXBUSY;
+ 	sdd->state &= ~TXBUSY;
+ 
+-	enable_datapath(sdd, xfer, use_dma);
++	s3c64xx_enable_datapath(sdd, xfer, use_dma);
+ 
+ 	/* Start the signals */
+ 	s3c64xx_spi_set_cs(spi, true);
+@@ -674,9 +674,9 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
+ 	spin_unlock_irqrestore(&sdd->lock, flags);
+ 
+ 	if (use_dma)
+-		status = wait_for_dma(sdd, xfer);
++		status = s3c64xx_wait_for_dma(sdd, xfer);
+ 	else
+-		status = wait_for_pio(sdd, xfer);
++		status = s3c64xx_wait_for_pio(sdd, xfer);
+ 
+ 	if (status) {
+ 		dev_err(&spi->dev, "I/O Error: rx-%d tx-%d res:rx-%c tx-%c len-%d\n",
+@@ -694,7 +694,7 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
+ 				dmaengine_terminate_all(sdd->rx_dma.ch);
+ 		}
+ 	} else {
+-		flush_fifo(sdd);
++		s3c64xx_flush_fifo(sdd);
+ 	}
+ 
+ 	return status;
+@@ -928,7 +928,7 @@ static void s3c64xx_spi_hwinit(struct s3c64xx_spi_driver_data *sdd)
+ 	val |= (S3C64XX_SPI_TRAILCNT << S3C64XX_SPI_TRAILCNT_OFF);
+ 	writel(val, regs + S3C64XX_SPI_MODE_CFG);
+ 
+-	flush_fifo(sdd);
++	s3c64xx_flush_fifo(sdd);
+ }
+ 
+ #ifdef CONFIG_OF
+-- 
 2.14.2
