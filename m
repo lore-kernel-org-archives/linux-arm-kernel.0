@@ -1,272 +1,83 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 17 Apr 2018 08:40:35 +0200
-Subject: [PATCH] ARM64: dts: meson-axg: add tdm pins
-Message-ID: <20180417064035.28776-1-jbrunet@baylibre.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Apr 2018 08:12:50 +0100
+Subject: [PATCH v4 2/6] mfd: stm32-timers: add support for dmas
+In-Reply-To: <1523895561-4073-3-git-send-email-fabrice.gasnier@st.com>
+References: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
+ <1523895561-4073-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20180417071250.yhgl7c7apn7w53xf@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add tdm pins to amlogic's A113 device tree
+On Mon, 16 Apr 2018, Fabrice Gasnier wrote:
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 245 +++++++++++++++++++++++++++++
- 1 file changed, 245 insertions(+)
+> STM32 Timers can support up to 7 DMA requests:
+> - 4 channels, update, compare and trigger.
+> Optionally request part, or all DMAs from stm32-timers MFD core.
+> 
+> Also add routine to implement burst reads using DMA from timer registers.
+> This is exported. So, it can be used by child drivers, PWM capture
+> for instance (but not limited to).
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> ---
+> Changes in v4:
+> - Lee's comments: Add kerneldoc header, better format comments.
+> Changes in v3:
+> - Basically Lee's comments:
+> - rather create a struct stm32_timers_dma, and place a reference to it
+>   in existing ddata (instead of adding priv struct).
+> - rather use a struct device in exported routine prototype, and use
+>   standard helpers instead of ddata. Get rid of to_stm32_timers_priv().
+> - simplify error handling in probe (remove a goto)
+> - comment on devm_of_platform_*populate() usage.
+> 
+> Changes in v2:
+> - Abstract DMA handling from child driver: move it to MFD core
+> - Add comments on optional dma support
+> ---
+>  drivers/mfd/stm32-timers.c       | 227 ++++++++++++++++++++++++++++++++++++++-
+>  include/linux/mfd/stm32-timers.h |  32 ++++++
+>  2 files changed, 257 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index b58808eb3cc8..74013965e86a 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -660,6 +660,251 @@
- 						function = "uart_ao_b_z";
- 					};
- 				};
-+
-+				mclk_b_pins: mclk_b {
-+					mux {
-+						groups = "mclk_b";
-+						function = "mclk_b";
-+					};
-+				};
-+
-+				mclk_c_pins: mclk_c {
-+					mux {
-+						groups = "mclk_c";
-+						function = "mclk_c";
-+					};
-+				};
-+
-+				tdma_sclk_pins: tdma_sclk {
-+					mux {
-+						groups = "tdma_sclk";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_sclk_slv_pins: tdma_sclk_slv {
-+					mux {
-+						groups = "tdma_sclk_slv";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_fs_pins: tdma_fs {
-+					mux {
-+						groups = "tdma_fs";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_fs_slv_pins: tdma_fs_slv {
-+					mux {
-+						groups = "tdma_fs_slv";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_din0_pins: tdma_din0 {
-+					mux {
-+						groups = "tdma_din0";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_dout0_x14_pins: tdma_dout0_x14 {
-+					mux {
-+						groups = "tdma_dout0_x14";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_dout0_x15_pins: tdma_dout0_x15 {
-+					mux {
-+						groups = "tdma_dout0_x15";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_dout1_pins: tdma_dout1 {
-+					mux {
-+						groups = "tdma_dout1";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdma_din1_pins: tdma_din1 {
-+					mux {
-+						groups = "tdma_din1";
-+						function = "tdma";
-+					};
-+				};
-+
-+				tdmb_sclk_pins: tdmb_sclk {
-+					mux {
-+						groups = "tdmb_sclk";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_sclk_slv_pins: tdmb_sclk_slv {
-+					mux {
-+						groups = "tdmb_sclk_slv";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_fs_pins: tdmb_fs {
-+					mux {
-+						groups = "tdmb_fs";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_fs_slv_pins: tdmb_fs_slv {
-+					mux {
-+						groups = "tdmb_fs_slv";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_din0_pins: tdmb_din0 {
-+					mux {
-+						groups = "tdmb_din0";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_dout0_pins: tdmb_dout0 {
-+					mux {
-+						groups = "tdmb_dout0";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_din1_pins: tdmb_din1 {
-+					mux {
-+						groups = "tdmb_din1";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_dout1_pins: tdmb_dout1 {
-+					mux {
-+						groups = "tdmb_dout1";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_din2_pins: tdmb_din2 {
-+					mux {
-+						groups = "tdmb_din2";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_dout2_pins: tdmb_dout2 {
-+					mux {
-+						groups = "tdmb_dout2";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_din3_pins: tdmb_din3 {
-+					mux {
-+						groups = "tdmb_din3";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmb_dout3_pins: tdmb_dout3 {
-+					mux {
-+						groups = "tdmb_dout3";
-+						function = "tdmb";
-+					};
-+				};
-+
-+				tdmc_sclk_pins: tdmc_sclk {
-+					mux {
-+						groups = "tdmc_sclk";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_sclk_slv_pins: tdmc_sclk_slv {
-+					mux {
-+						groups = "tdmc_sclk_slv";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_fs_pins: tdmc_fs {
-+					mux {
-+						groups = "tdmc_fs";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_fs_slv_pins: tdmc_fs_slv {
-+					mux {
-+						groups = "tdmc_fs_slv";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_din0_pins: tdmc_din0 {
-+					mux {
-+						groups = "tdmc_din0";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_dout0_pins: tdmc_dout0 {
-+					mux {
-+						groups = "tdmc_dout0";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_din1_pins: tdmc_din1 {
-+					mux {
-+						groups = "tdmc_din1";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_dout1_pins: tdmc_dout1 {
-+					mux {
-+						groups = "tdmc_dout1";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_din2_pins: tdmc_din2 {
-+					mux {
-+						groups = "tdmc_din2";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_dout2_pins: tdmc_dout2 {
-+					mux {
-+						groups = "tdmc_dout2";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_din3_pins: tdmc_din3 {
-+					mux {
-+						groups = "tdmc_din3";
-+						function = "tdmc";
-+					};
-+				};
-+
-+				tdmc_dout3_pins: tdmc_dout3 {
-+					mux {
-+						groups = "tdmc_dout3";
-+						function = "tdmc";
-+					};
-+				};
- 			};
- 		};
- 
+[...]
+
+> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
+> index 2aadab6..a04d7a1 100644
+> --- a/include/linux/mfd/stm32-timers.h
+> +++ b/include/linux/mfd/stm32-timers.h
+> @@ -8,6 +8,8 @@
+>  #define _LINUX_STM32_GPTIMER_H_
+>  
+>  #include <linux/clk.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/regmap.h>
+
+[...]
+
+> +struct stm32_timers_dma;
+> +
+>  struct stm32_timers {
+>  	struct clk *clk;
+>  	struct regmap *regmap;
+>  	u32 max_arr;
+> +	struct stm32_timers_dma *dma; /* Only to be used by the parent */
+
+I'm confused.  I thought the point of putting this comment in was so
+that you could place the definition of 'stm32_timers_dma' and remove
+the forward declaration?
+
+>  };
+> +
+> +int stm32_timers_dma_burst_read(struct device *dev, u32 *buf,
+> +				enum stm32_timers_dmas id, u32 reg,
+> +				unsigned int num_reg, unsigned int bursts,
+> +				unsigned long tmo_ms);
+>  #endif
+
 -- 
-2.14.3
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
