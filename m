@@ -1,31 +1,46 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 17 Apr 2018 17:08:24 +0000
-Subject: [PATCH] pinctrl: meson-axg: fix the range of aobus bank
-Message-ID: <20180417170824.18670-1-yixun.lan@amlogic.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Tue, 17 Apr 2018 11:15:19 +0200
+Subject: [PATCH] clk: stm32: fix: stm32 clock drivers are not compiled by
+ default
+Message-ID: <1523956519-20976-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIOAO bank is range from GPIOAO_0 to GPIOAO_13.
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
-Reported-by: Xingyu Chen <xingyu.chen@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Clock driver is mandatory if the machine is selected.
+Then don't use 'bool' and 'depends on' commands, but 'def_bool'
+with the machine(s).
+
+Fixes: da32d3539fca ("clk: stm32: add configuration flags for each of the stm32 drivers")
+
+
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/pinctrl/meson/pinctrl-meson-axg.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/Kconfig | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-axg.c b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-index 4b91ff74779b..99a6ceac8e53 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-axg.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-axg.c
-@@ -898,7 +898,7 @@ static struct meson_bank meson_axg_periphs_banks[] = {
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 41492e9..34968a3 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -266,15 +266,13 @@ config COMMON_CLK_STM32MP157
+ 	  Support for stm32mp157 SoC family clocks
  
- static struct meson_bank meson_axg_aobus_banks[] = {
- 	/*   name    first      last      irq	pullen  pull    dir     out     in  */
--	BANK("AO",   GPIOAO_0,  GPIOAO_9, 0, 13, 0,  16,  0, 0,  0,  0,  0, 16,  1,  0),
-+	BANK("AO",   GPIOAO_0,  GPIOAO_13, 0, 13, 0,  16,  0, 0,  0,  0,  0, 16,  1,  0),
- };
+ config COMMON_CLK_STM32F
+-	bool "Clock driver for stm32f4 and stm32f7 SoC families"
+-	depends on MACH_STM32F429 || MACH_STM32F469 || MACH_STM32F746
++	def_bool COMMON_CLK && (MACH_STM32F429 || MACH_STM32F469 || MACH_STM32F746)
+ 	help
+ 	---help---
+ 	  Support for stm32f4 and stm32f7 SoC families clocks
  
- static struct meson_pmx_bank meson_axg_periphs_pmx_banks[] = {
+ config COMMON_CLK_STM32H7
+-	bool "Clock driver for stm32h7 SoC family"
+-	depends on MACH_STM32H743
++	def_bool COMMON_CLK && MACH_STM32H743
+ 	help
+ 	---help---
+ 	  Support for stm32h7 SoC family clocks
 -- 
-2.17.0
+1.9.1
