@@ -1,88 +1,78 @@
-From: roman@advem.lv (Roman Yeryomin)
-Date: Tue, 17 Apr 2018 23:33:55 +0300
-Subject: [PATCH] ARM: dts: Fix NAS4220B pin config
-In-Reply-To: <20180417085311.13829-1-linus.walleij@linaro.org>
-References: <20180417085311.13829-1-linus.walleij@linaro.org>
-Message-ID: <39fa170a0b20c73c4ae45975202ead2f@advem.lv>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Tue, 17 Apr 2018 13:40:18 -0700
+Subject: [PATCH v3 07/10] Documentation: dt-bindings: Add documents for
+ PECI hwmon client drivers
+In-Reply-To: <287e0fd9-b631-2602-2785-7b8aaed7a6b9@linux.intel.com>
+References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
+ <20180410183212.16787-8-jae.hyun.yoo@linux.intel.com>
+ <20180416181423.t4vf7sugv6z3aw5h@rob-hp-laptop>
+ <aee4e04c-885f-b1d8-9e85-9e741551342f@linux.intel.com>
+ <287e0fd9-b631-2602-2785-7b8aaed7a6b9@linux.intel.com>
+Message-ID: <6ff697e8-cd20-e551-da13-b614cc39f900@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-17 11:53, Linus Walleij wrote:
-> The DTS file for the NAS4220B had the pin config for the
-> ethernet interface set to the pins in the SL3512 SoC while
-> this system is using SL3516. Fix it by referencing the
-> right SL3516 pins instead of the SL3512 pins.
-> 
-> Cc: stable at vger.kernel.org
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Reported-by: Andreas Fiedler <andreas.fiedler@gmx.net>
-> Reported-by: Roman Yeryomin <roman@advem.lv>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC folks: if this gets a Tested-by or similar from
-> someone with the NAS4220B please apply it directly to
-> the ARM SoC tree for fixes.
-> ---
->  arch/arm/boot/dts/gemini-nas4220b.dts | 28 
-> ++++++++++++++--------------
->  1 file changed, 14 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts
-> b/arch/arm/boot/dts/gemini-nas4220b.dts
-> index 8bbb6f85d161..4785fbcc41ed 100644
-> --- a/arch/arm/boot/dts/gemini-nas4220b.dts
-> +++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-> @@ -134,37 +134,37 @@
->  						function = "gmii";
->  						groups = "gmii_gmac0_grp";
->  					};
-> -					/* Settings come from OpenWRT */
-> +					/* Settings come from OpenWRT, pins on SL3516 */
->  					conf0 {
-> -						pins = "R8 GMAC0 RXDV", "U11 GMAC1 RXDV";
-> +						pins = "V8 GMAC0 RXDV", "T10 GMAC1 RXDV";
->  						skew-delay = <0>;
->  					};
->  					conf1 {
-> -						pins = "T8 GMAC0 RXC", "T11 GMAC1 RXC";
-> +						pins = "Y7 GMAC0 RXC", "Y11 GMAC1 RXC";
->  						skew-delay = <15>;
->  					};
->  					conf2 {
-> -						pins = "P8 GMAC0 TXEN", "V11 GMAC1 TXEN";
-> +						pins = "T8 GMAC0 TXEN", "W11 GMAC1 TXEN";
->  						skew-delay = <7>;
->  					};
->  					conf3 {
-> -						pins = "V7 GMAC0 TXC";
-> +						pins = "U8 GMAC0 TXC";
->  						skew-delay = <11>;
->  					};
->  					conf4 {
-> -						pins = "P10 GMAC1 TXC";
-> +						pins = "V11 GMAC1 TXC";
->  						skew-delay = <10>;
->  					};
->  					conf5 {
->  						/* The data lines all have default skew */
-> -						pins = "U8 GMAC0 RXD0", "V8 GMAC0 RXD1",
-> -						       "P9 GMAC0 RXD2", "R9 GMAC0 RXD3",
-> -						       "U7 GMAC0 TXD0", "T7 GMAC0 TXD1",
-> -						       "R7 GMAC0 TXD2", "P7 GMAC0 TXD3",
-> -						       "R11 GMAC1 RXD0", "P11 GMAC1 RXD1",
-> -						       "V12 GMAC1 RXD2", "U12 GMAC1 RXD3",
-> -						       "R10 GMAC1 TXD0", "T10 GMAC1 TXD1",
-> -						       "U10 GMAC1 TXD2", "V10 GMAC1 TXD3";
-> +						pins = "W8 GMAC0 RXD0", "V9 GMAC0 RXD1",
-> +						       "Y8 GMAC0 RXD2", "U9 GMAC0 RXD3",
-> +						       "T7 GMAC0 TXD0", "U6 GMAC0 TXD1",
-> +						       "V7 GMAC0 TXD2", "U7 GMAC0 TXD3",
-> +						       "Y12 GMAC1 RXD0", "V12 GMAC1 RXD1",
-> +						       "T11 GMAC1 RXD2", "W12 GMAC1 RXD3",
-> +						       "U10 GMAC1 TXD0", "Y10 GMAC1 TXD1",
-> +						       "W10 GMAC1 TXD2", "T9 GMAC1 TXD3";
->  						skew-delay = <7>;
->  					};
->  					/* Set up drive strength on GMAC0 to 16 mA */
+On 4/16/2018 4:51 PM, Jae Hyun Yoo wrote:
+> On 4/16/2018 4:22 PM, Jae Hyun Yoo wrote:
+>> On 4/16/2018 11:14 AM, Rob Herring wrote:
+>>> On Tue, Apr 10, 2018 at 11:32:09AM -0700, Jae Hyun Yoo wrote:
+>>>> This commit adds dt-bindings documents for PECI cputemp and dimmtemp 
+>>>> client
+>>>> drivers.
+>>>
 
-Tested-by: Roman Yeryomin <roman@advem.lv>
+[...]
+
+>>>> +Example:
+>>>> +??? peci-bus at 0 {
+>>>> +??????? #address-cells = <1>;
+>>>> +??????? #size-cells = <0>;
+>>>> +??????? < more properties >
+>>>> +
+>>>> +??????? peci-dimmtemp at cpu0 {
+>>>
+>>> unit-address is wrong.
+>>>
+>>
+>> Will fix it using the reg value.
+>>
+>>> It is a different bus from cputemp? Otherwise, you have conflicting
+>>> addresses. If that's the case, probably should make it clear by showing
+>>> different host adapters for each example.
+>>>
+>>
+>> It could be the same bus with cputemp. Also, client address sharing is 
+>> possible by PECI core if the functionality is different. I mean, 
+>> cputemp and dimmtemp targeting the same client is possible case like 
+>> this.
+>> peci-cputemp at 30
+>> peci-dimmtemp at 30
+>>
+> 
+> Oh, I got your point. Probably, I should change these separate settings 
+> into one like
+> 
+> peci-client at 30 {
+>  ??? compatible = "intel,peci-client";
+>  ??? reg = <0x30>;
+> };
+> 
+> Then cputemp and dimmtemp drivers could refer the same compatible 
+> string. Will rewrite it.
+> 
+
+I've checked it again and realized that it should use function based 
+node name like:
+
+peci-cputemp at 30
+peci-dimmtemp at 30
+
+If it use the same string like 'peci-client at 30', the drivers cannot be 
+selectively enabled. The client address sharing way is well handled in 
+PECI core and this way would be better for the future implementations of 
+other PECI functional drivers such as crash dump driver and so on. So 
+I'm going change the unit-address only.
+
+Thanks,
+
+Jae
