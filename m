@@ -1,92 +1,112 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 17 Apr 2018 10:30:46 +0300
-Subject: [PATCH v3 03/11] iio: Add channel for Position Relative
-In-Reply-To: <20180415202942.5c7d50a8@archlinux>
-References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
- <1523350677-27106-4-git-send-email-eugen.hristev@microchip.com>
- <20180415202942.5c7d50a8@archlinux>
-Message-ID: <02533699-a2bc-7c0c-4d8a-c10bb0102667@microchip.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 17 Apr 2018 09:37:59 +0200
+Subject: [PATCH v4 2/6] mfd: stm32-timers: add support for dmas
+In-Reply-To: <20180417071250.yhgl7c7apn7w53xf@dell>
+References: <1523895561-4073-1-git-send-email-fabrice.gasnier@st.com>
+ <1523895561-4073-3-git-send-email-fabrice.gasnier@st.com>
+ <20180417071250.yhgl7c7apn7w53xf@dell>
+Message-ID: <34e30463-6236-a8e4-fd1f-6217612375eb@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 15.04.2018 22:29, Jonathan Cameron wrote:
-> On Tue, 10 Apr 2018 11:57:49 +0300
-> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+On 04/17/2018 09:12 AM, Lee Jones wrote:
+> On Mon, 16 Apr 2018, Fabrice Gasnier wrote:
 > 
->> Add new channel type for relative position on a pad.
+>> STM32 Timers can support up to 7 DMA requests:
+>> - 4 channels, update, compare and trigger.
+>> Optionally request part, or all DMAs from stm32-timers MFD core.
 >>
->> These type of analog sensor offers the position of a pen
->> on a touchpad, and is represented as a voltage, which can be
->> converted to a position on X and Y axis on the pad.
->> The channel will hand the relative position on the pad in both directions.
+>> Also add routine to implement burst reads using DMA from timer registers.
+>> This is exported. So, it can be used by child drivers, PWM capture
+>> for instance (but not limited to).
 >>
->> The channel can then be consumed by a touchscreen driver or
->> read as-is for a raw indication of the touchpen on a touchpad.
->>
->> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> Reviewed-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 >> ---
+>> Changes in v4:
+>> - Lee's comments: Add kerneldoc header, better format comments.
+>> Changes in v3:
+>> - Basically Lee's comments:
+>> - rather create a struct stm32_timers_dma, and place a reference to it
+>>   in existing ddata (instead of adding priv struct).
+>> - rather use a struct device in exported routine prototype, and use
+>>   standard helpers instead of ddata. Get rid of to_stm32_timers_priv().
+>> - simplify error handling in probe (remove a goto)
+>> - comment on devm_of_platform_*populate() usage.
+>>
 >> Changes in v2:
->>   - modified channel name to relative position as suggested.
->>   - modified kernel version to 4.18 (presumable)
->>
->>   Documentation/ABI/testing/sysfs-bus-iio | 12 ++++++++++++
->>   drivers/iio/industrialio-core.c         |  1 +
->>   include/uapi/linux/iio/types.h          |  1 +
->>   tools/iio/iio_event_monitor.c           |  2 ++
->>   4 files changed, 16 insertions(+)
->>
->> diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
->> index 6a5f34b..42a9287 100644
->> --- a/Documentation/ABI/testing/sysfs-bus-iio
->> +++ b/Documentation/ABI/testing/sysfs-bus-iio
->> @@ -190,6 +190,18 @@ Description:
->>   		but should match other such assignments on device).
->>   		Units after application of scale and offset are m/s^2.
->>   
->> +What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_x_raw
->> +What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_y_raw
->> +KernelVersion:	4.18
->> +Contact:	linux-iio at vger.kernel.org
->> +Description:
->> +		Relative position in direction x or y on a pad (may be
->> +		arbitrarily assigned but should match other such assignments on
->> +		device).
->> +		Units after application of scale and offset are milli percents
->> +		from the pad's size in both directions. Should be calibrated by
->> +		the consumer.
-> I know the milli percent comes form the humidity equivalent, but I wonder
-> if we are right to follow that.  10^-5 is a pretty random base unit (though
-> I got argued into it being a standard choice for humidity sensors IIRC...
+>> - Abstract DMA handling from child driver: move it to MFD core
+>> - Add comments on optional dma support
+>> ---
+>>  drivers/mfd/stm32-timers.c       | 227 ++++++++++++++++++++++++++++++++++++++-
+>>  include/linux/mfd/stm32-timers.h |  32 ++++++
+>>  2 files changed, 257 insertions(+), 2 deletions(-)
 > 
-> What do people think?  We could go with 1 for full range or just percent perhaps?
+> [...]
 > 
-> I'm not that fussed about staying consistent with humidity - we are unlikely
-> to end up with sensors doing both anytime soon so there shouldn't be
-> any confusion...
+>> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
+>> index 2aadab6..a04d7a1 100644
+>> --- a/include/linux/mfd/stm32-timers.h
+>> +++ b/include/linux/mfd/stm32-timers.h
+>> @@ -8,6 +8,8 @@
+>>  #define _LINUX_STM32_GPTIMER_H_
+>>  
+>>  #include <linux/clk.h>
+>> +#include <linux/dmaengine.h>
+>> +#include <linux/dma-mapping.h>
+>>  #include <linux/regmap.h>
 > 
-> Jonathan
-Hello Jonathan,
-
-For my specific use case, percents are not enough, as this would mean 
-the resolution will be pretty low. If we have a touchpanel of a higher 
-resolution, having the position only ranged 0 to 100 is pretty bad.
-Having millipercents means we can have a resolution up to 100,000 points 
-in range, which is fine for the hardware as of this moment.
-Of course, specific drivers reporting these channels can define a 
-specific range if they desire (report just in the first percent if you 
-wish (0-1000) or so, which would mean a lower resolution.
-Centi-percent would work fine as well I believe (0-10,000 range), but to 
-keep consistent with your suggestion regarding relative humidity, I 
-picked this larger scale.
-In my specific case, since we have a 12 bit ADC, range is 0-4096 for 
-this value.
-Calibrating these values to the actual size of the touchpanel is left 
-for the consumer to do (map 4096x4096 to the actual resolution)
-
-If you have a better idea than milli-percents I can change it, no problem.
-
-Eugen
+> [...]
+> 
+>> +struct stm32_timers_dma;
 >> +
->>   [...]
+>>  struct stm32_timers {
+>>  	struct clk *clk;
+>>  	struct regmap *regmap;
+>>  	u32 max_arr;
+>> +	struct stm32_timers_dma *dma; /* Only to be used by the parent */
+> 
+> I'm confused.  I thought the point of putting this comment in was so
+> that you could place the definition of 'stm32_timers_dma' and remove
+> the forward declaration?
+
+Hi Lee,
+
+Sorry, if I miss-understood the point then. So, do you wish I both:
+- move the full struct definition in above header ?
+- and keep this comment ?
+
++/**
++ * struct stm32_timers_dma - STM32 timer DMA handling.
++ * @completion:		end of DMA transfer completion
++ * @phys_base:		control registers physical base address
++ * @lock:		protect DMA access
++ * @chan:		DMA channel in use
++ * @chans:		DMA channels available for this timer instance
++ */
++struct stm32_timers_dma {
++	struct completion completion;
++	phys_addr_t phys_base;
++	struct mutex lock;
++	struct dma_chan *chan;
++	struct dma_chan *chans[STM32_TIMERS_MAX_DMAS];
++};
+
+This will basically expose the struct to child drivers. But I'm ok if
+you think this is acceptable.
+
+I can send a V5 if you wish...
+
+Please advise,
+Best regards,
+Fabrice
+
+> 
+>>  };
+>> +
+>> +int stm32_timers_dma_burst_read(struct device *dev, u32 *buf,
+>> +				enum stm32_timers_dmas id, u32 reg,
+>> +				unsigned int num_reg, unsigned int bursts,
+>> +				unsigned long tmo_ms);
+>>  #endif
+> 
