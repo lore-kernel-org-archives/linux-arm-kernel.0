@@ -1,44 +1,45 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 17 Apr 2018 10:24:06 +0200
-Subject: [PATCH 0/3] Fix an Atmel USBA UDC issue introducted in 4.17-rc1
-In-Reply-To: <20180416093405.16612-1-romain.izard.pro@gmail.com>
-References: <20180416093405.16612-1-romain.izard.pro@gmail.com>
-Message-ID: <cbdab54a-d01a-2668-c3bc-b5b334a555e0@microchip.com>
+From: olivier.moysan@st.com (Olivier MOYSAN)
+Date: Tue, 17 Apr 2018 08:29:17 +0000
+Subject: [PATCH 0/3] ASoC: stm32: sai: add support of iec958 controls
+In-Reply-To: <1520958428-10930-1-git-send-email-olivier.moysan@st.com>
+References: <1520958428-10930-1-git-send-email-olivier.moysan@st.com>
+Message-ID: <a0552849-47fa-dc72-a512-a3e075adb07f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/04/2018 at 11:34, Romain Izard wrote:
-> The use of GPIO descriptors takes care of inversion flags declared in
-> the device tree. The conversion of the Atmel USBA UDC driver introduced
-> in 4.17-rc1 missed it, and as a result the inversion will not work.
-> 
-> In addition, cleanup the code to remove an include left behind after
-> the suppression of the support of platform_data to declare USBA
-> controllers.
-> 
-> These changes have not been tested on any hardware, as I do not have
-> a board that needs to use inverted GPIOs.
-> 
-> Romain Izard (3):
->    usb: gadget: udc: atmel: GPIO inversion is handled by gpiod
->    usb: gadget: udc: atmel: Remove obsolete include
->    usb: gadget: udc: atmel: Fix indenting
+Hello,
 
-To the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+I guess the blocking patch in this patchset is the patch "add IEC958 
+channel status control helper". This patch has been reviewed several 
+times, but did not get a ack so far.
+If you think these helpers will not be merged, I will reintegrate the 
+corresponding code in stm driver.
+Please let me know, if I need to prepare a v2 without helpers, or if we 
+can go further in the review of iec helpers patch ?
 
-Thank you Romain.
-Best regards,
-   Nicolas
-
-> 
->   drivers/usb/gadget/udc/atmel_usba_udc.c | 22 ++++++++++------------
->   drivers/usb/gadget/udc/atmel_usba_udc.h |  1 -
->   include/linux/usb/atmel_usba_udc.h      | 24 ------------------------
->   3 files changed, 10 insertions(+), 37 deletions(-)
->   delete mode 100644 include/linux/usb/atmel_usba_udc.h
-> 
+Best regards
+olivier
 
 
--- 
-Nicolas Ferre
+On 03/13/2018 05:27 PM, Olivier Moysan wrote:
+> This patchset adds support of iec958 controls to STM32 SAI driver.
+> 
+> The patch makes use of iec958 control status helpers previously proposed
+> and discussed through the following threads:
+> https://patchwork.kernel.org/patch/8062601/
+> https://patchwork.kernel.org/patch/8091551/ (v2)
+> https://patchwork.kernel.org/patch/8462961/ (v3)
+> https://patchwork.kernel.org/patch/8533731/ (v4)
+> 
+> Olivier Moysan (3):
+>    ALSA: pcm: add IEC958 channel status control helper
+>    ASoC: stm32: sai: add iec958 controls support
+>    ASoC: dmaengine_pcm: document process callback
+> 
+>   include/sound/dmaengine_pcm.h |   2 +
+>   include/sound/pcm_iec958.h    |  19 +++++++
+>   sound/core/pcm_iec958.c       | 114 ++++++++++++++++++++++++++++++++++++++++++
+>   sound/soc/stm/Kconfig         |   1 +
+>   sound/soc/stm/stm32_sai_sub.c | 101 ++++++++++++++++++++++++++++++++-----
+>   5 files changed, 225 insertions(+), 12 deletions(-)
+> 
