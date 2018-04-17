@@ -1,101 +1,28 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 17 Apr 2018 19:39:00 +0530
-Subject: [RESEND PATCH v2 3/4] ARM: davinci: add aemif & nand support to
- da850-lcdk in legacy mode
-In-Reply-To: <20180417102917.7794-4-brgl@bgdev.pl>
+Date: Tue, 17 Apr 2018 19:42:26 +0530
+Subject: [RESEND PATCH v2 4/4] ARM: davinci: use aemif platform driver in
+ legacy mode for da850-evm
+In-Reply-To: <20180417102917.7794-5-brgl@bgdev.pl>
 References: <20180417102917.7794-1-brgl@bgdev.pl>
- <20180417102917.7794-4-brgl@bgdev.pl>
-Message-ID: <df39067d-a941-4099-2cfe-7602d4047c6f@ti.com>
+ <20180417102917.7794-5-brgl@bgdev.pl>
+Message-ID: <7055b7b9-2a55-73e7-0d82-6d291556accd@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 17 April 2018 03:59 PM, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> We now have support for aemif & nand from board files. As an example
-> add support for nand to da850-lcdk in legacy mode.
+> We now support board files in aemif. Use the platform driver instead
+> of the handcrafted API in da850-evm.
+> 
+> Note: the id of davinci_nand is changed to 0 in order to make it work
+> with the new common-clock framework based psc driver.
 
-Hawkboard is a separate board of its own, although closely related to
-LCDK. Lets refer to it as hawkboard itself, instead of "LCDK in legacy
-mode". So:
-
-ARM: davinci: omapl138-hawk: ...
+Is this now needed after applying my patch dropping clock acquisition
+from DaVinci NAND driver?
 
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++
->  1 file changed, 132 insertions(+)
-> 
-> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-> index 6c997c59a3cd..9c3de56b54e4 100644
-> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-> @@ -16,6 +16,11 @@
->  #include <linux/gpio.h>
->  #include <linux/gpio/machine.h>
->  #include <linux/platform_data/gpio-davinci.h>
-> +#include <linux/platform_data/ti-aemif.h>
-> +#include <linux/mtd/rawnand.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/platform_data/mtd-davinci.h>
-> +#include <linux/platform_data/mtd-davinci-aemif.h>
->  #include <linux/regulator/machine.h>
->  
->  #include <asm/mach-types.h>
-> @@ -162,6 +167,129 @@ static __init void omapl138_hawk_mmc_init(void)
->  	gpiod_remove_lookup_table(&mmc_gpios_table);
->  }
->  
-> +static struct mtd_partition omapl138_hawk_nandflash_partition[] = {
-> +	{
-> +		.name		= "u-boot env",
-> +		.offset		= 0,
-> +		.size		= SZ_128K,
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	 },
-> +	{
-> +		.name		= "u-boot",
-> +		.offset		= MTDPART_OFS_APPEND,
-> +		.size		= SZ_128K,
-
-Can you make it 512K as it is in da850-lcdk.dts ?
-
-> +		.mask_flags	= MTD_WRITEABLE,
-> +	},
-> +	{
-> +		.name		= "free space",
-> +		.offset		= MTDPART_OFS_APPEND,
-> +		.size		= MTDPART_SIZ_FULL,
-> +		.mask_flags	= 0,
-> +	},
-> +};
-
-> +static struct aemif_abus_data omapl138_hawk_aemif_abus_data[] = {
-> +	{
-> +		.cs	= 3,
-> +	}
-> +};
-> +
-> +static struct platform_device omapl138_hawk_aemif_devices[] = {
-> +	{
-> +		.name		= "davinci_nand",
-> +		.id		= 1,
-
-Is there a reason for .id to be set to 1 here? Ideally it should be -1,
-I think since there is a single NAND on the board.
-
-Note that I sent a patch dropping AEMIF clock acquisition from DaVinci
-NAND driver.
-
-> +		.dev		= {
-> +			.platform_data	= &omapl138_hawk_nandflash_data,
-> +		},
-> +		.resource	= omapl138_hawk_nandflash_resource,
-> +		.num_resources	= ARRAY_SIZE(omapl138_hawk_nandflash_resource),
-> +		.id		= 0,
-
-This should have resulted in a double init warning?
 
 Thanks,
 Sekhar
