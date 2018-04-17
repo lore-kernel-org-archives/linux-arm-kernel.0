@@ -1,53 +1,62 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 17 Apr 2018 14:41:30 +0200
-Subject: [RESEND PATCH v2 0/4] ARM: davinci: remove the mach-specific
- aemif driver - part 1
-In-Reply-To: <CAMpxmJUBFEF7FDp910HwsrNhGhwJDrgRR_9qL0DE5W1M=39MgQ@mail.gmail.com>
-References: <20180417102917.7794-1-brgl@bgdev.pl>
- <2a2ac117-900c-77b6-f247-49777493e55f@ti.com>
- <CAMpxmJUBFEF7FDp910HwsrNhGhwJDrgRR_9qL0DE5W1M=39MgQ@mail.gmail.com>
-Message-ID: <CAMRc=Me6b0e+d6QRTdr7G9zLdqonjxLBp6h6bM_JaF8OytR=QA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Apr 2018 14:43:42 +0200
+Subject: [PATCH] ARM: dts: Restructure Vexpress motherboard includes
+In-Reply-To: <86a95dd0-a702-3dce-e69b-20205a519a88@arm.com>
+References: <20180417114331.5233-1-linus.walleij@linaro.org>
+ <86a95dd0-a702-3dce-e69b-20205a519a88@arm.com>
+Message-ID: <CACRpkda0Fq+b4htyx=8Kez7UGj_jQ-MO1orL=QESQ-JaAAjG=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-04-17 14:36 GMT+02:00 Bartosz Golaszewski <bgolaszewski@baylibre.com>:
-> 2018-04-17 12:53 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
->> Hi Bartosz,
+On Tue, Apr 17, 2018 at 2:21 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 17/04/18 12:43, Linus Walleij wrote:
 >>
->> On Tuesday 17 April 2018 03:59 PM, Bartosz Golaszewski wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> This is the first part of changes required to remove duplicate aemif
->>> support from mach-davinci.
->>>
->>> I actually noticed that one of my previous changes from 2017 broke nand
->>> in legacy mode - the clock lookup no longer works. This series addresses
->>> it as well.
->>>
->>> First patch just uses a static string for the ti-aemif driver name.
->>>
->>> The second adds support for board files to the aemif driver.
->>>
->>> Last two add nand support to da850-lcdk in legacy mode and make
->>> da850-evm use the platform driver instead of the mach-specific one.
->>>
->>> If these patches get accepted, I'll prepere a follow-up moving all
->>> other boards to the new platform driver.
->>>
->>> This series applies on top of v8 of David Lechner's CCF series.
+>> It is a bit unorthodox to just include a file in the middle
+>> of a another DTS file, it breaks the pattern from other device
+>> trees and also makes it really hard to reference things
+>> across the files with phandles.
 >>
->> Are there any patches in the series that can safely be applied to v4.17-rc1?
+>> Restructure the include for the Versatile Express motherboards
+>> to happen at the top of the file, reference the target nodes
+>> directly, and indent the motherboard .dtsi files to reflect
+>> their actual depth in the hiearchy.
 >>
->> Thanks,
->> Sekhar
+>> This is a purely syntactic change that result in the same
+>> DTB files from the DTS/DTSI files.
 >
-> Hi Sekhar,
 >
-> yes, all of them. They're not linked to David's work in any way.
->
-> Bart
+> FWIW this is kind of the 32-bit equivalent of d29e849cafe6 ("arm64: dts:
+> juno: remove dtsi nesting inside tree structure") - I seem to recall that
+> whilst the nodes within the DTB remained identical, they did end up in a
+> different order, which at the time gave me problems with the SP804 sometimes
+> registering as the first clocksource before the arch timer, and boot
+> subsequently getting stuck in an infinite loop trying to replace it. That
+> doesn't seem to have happened in ages though, so I guess something somewhere
+> might have been fixed...
 
-Oops, -ETOOFAST, I rebased it on top of David's v9, let me check how
-it works with mainline - it should be mostly fine.
+Yeah it works here and on QEMU so I think we're safe.
 
-Bart
+>> +/ {
+>> +       smb at 8000000 {
+>
+>
+> Nit: Surely "&smb {", given that you've already gone to the length of
+> labelling it in the includers? (plus that should also avoid the need to
+> reindent)
+
+I tried that and it didn't work.
+
+I guess it is because the includes go in the reverse parsing order, this
+file is included into the main DTS.
+
+If the &smb was referenced from the DTS to the definition in
+the DTSI, it would work fine.
+
+However the reverse, &smb before the node has been defined
+(it's in the DTS) doesn't work and seems to reflect to top-to-bottom
+parsing scheme.
+
+I didn't drill deeper into it.
+
+Yours,
+Linus Walleij
