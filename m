@@ -1,52 +1,71 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 17 Apr 2018 11:23:49 +0100
-Subject: [PATCH] KVM: arm/arm64: VGIC: Kick new VCPU on interrupt migration
-Message-ID: <20180417102349.3039-1-andre.przywara@arm.com>
+From: cpandya@codeaurora.org (Chintan Pandya)
+Date: Tue, 17 Apr 2018 15:55:08 +0530
+Subject: [PATCH v8 0/4] Fix issues with huge mapping in ioremap for ARM64
+In-Reply-To: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
+References: <1522742446-5084-1-git-send-email-cpandya@codeaurora.org>
+Message-ID: <b2ea9760-cad4-8f30-98ac-86a04c4d42a4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When vgic_prune_ap_list() finds an interrupt that needs to be migrated
-to a new VCPU, we should notify this VCPU of the pending interrupt,
-since it requires immediate action.
-Kick this VCPU once we have added the new IRQ to the list, but only
-after dropping the locks.
+Ping...
 
-Reported-by: Stefano Stabellini <sstabellini@kernel.org>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- virt/kvm/arm/vgic/vgic.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On 4/3/2018 1:30 PM, Chintan Pandya wrote:
+> This series of patches are follow up work (and depends on)
+> Toshi Kani <toshi.kani@hpe.com>'s patches "fix memory leak/
+> panic in ioremap huge pages".
+> 
+> This series of patches are tested on 4.9 kernel with Cortex-A75
+> based SoC.
+> 
+> These patches can also go into '-stable' branch (if accepted)
+> for 4.6 onwards.
+> 
+>  From V7->V8:
+>   - Properly fixed compilation issue in x86 file
+> 
+>  From V6->V7:
+>   - Fixed compilation issue in x86 case
+>   - V6 patches were not properly enumarated
+> 
+>  From V5->V6:
+>   - Use __flush_tlb_kernel_pgtable() for both PUD and PMD. Remove
+>     "bool tlb_inv" based variance as it is not need now
+>   - Re-naming for consistency
+> 
+>  From V4->V5:
+>   - Add new API __flush_tlb_kernel_pgtable(unsigned long addr)
+>     for kernel addresses
+> 
+>  From V3->V4:
+>   - Add header for 'addr' in x86 implementation
+>   - Re-order pmd/pud clear and table free
+>   - Avoid redundant TLB invalidatation in one perticular case
+> 
+>  From V2->V3:
+>   - Use the exisiting page table free interface to do arm64
+>     specific things
+> 
+>  From V1->V2:
+>   - Rebased my patches on top of "[PATCH v2 1/2] mm/vmalloc:
+>     Add interfaces to free unmapped page table"
+>   - Honored BBM for ARM64
+> 
+> Chintan Pandya (4):
+>    ioremap: Update pgtable free interfaces with addr
+>    arm64: tlbflush: Introduce __flush_tlb_kernel_pgtable
+>    arm64: Implement page table free interfaces
+>    Revert "arm64: Enforce BBM for huge IO/VMAP mappings"
+> 
+>   arch/arm64/include/asm/tlbflush.h |  6 ++++++
+>   arch/arm64/mm/mmu.c               | 37 +++++++++++++++++++++++++------------
+>   arch/x86/mm/pgtable.c             |  8 +++++---
+>   include/asm-generic/pgtable.h     |  8 ++++----
+>   lib/ioremap.c                     |  4 ++--
+>   5 files changed, 42 insertions(+), 21 deletions(-)
+> 
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index e74baec76361..4b6d72939c42 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -594,6 +594,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 
- 	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
- 		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
-+		bool target_vcpu_needs_kick = false;
- 
- 		spin_lock(&irq->irq_lock);
- 
-@@ -664,11 +665,18 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 			list_del(&irq->ap_list);
- 			irq->vcpu = target_vcpu;
- 			list_add_tail(&irq->ap_list, &new_cpu->ap_list_head);
-+			target_vcpu_needs_kick = true;
- 		}
- 
- 		spin_unlock(&irq->irq_lock);
- 		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
- 		spin_unlock_irqrestore(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
-+
-+		if (target_vcpu_needs_kick) {
-+			kvm_make_request(KVM_REQ_IRQ_PENDING, target_vcpu);
-+			kvm_vcpu_kick(target_vcpu);
-+		}
-+
- 		goto retry;
- 	}
- 
+Chintan
 -- 
-2.14.1
+Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center,
+Inc. is a member of the Code Aurora Forum, a Linux Foundation
+Collaborative Project
