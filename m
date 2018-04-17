@@ -1,59 +1,47 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Tue, 17 Apr 2018 15:51:54 +0530
-Subject: [PATCH 6/6 v2] arm64: dts: ls208xa: comply with the iommu map binding
- for fsl_mc
-In-Reply-To: <1523960514-25457-1-git-send-email-nipun.gupta@nxp.com>
-References: <1520260166-29387-1-git-send-email-nipun.gupta@nxp.com>
- <1523960514-25457-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <1523960514-25457-7-git-send-email-nipun.gupta@nxp.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 17 Apr 2018 12:29:13 +0200
+Subject: [RESEND PATCH v2 0/4] ARM: davinci: remove the mach-specific aemif
+ driver - part 1
+Message-ID: <20180417102917.7794-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fsl-mc bus now support the iommu-map property. Comply to this binding for
-fsl_mc bus. This patch also updates the dts w.r.t. the DMA configuration.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+This is the first part of changes required to remove duplicate aemif
+support from mach-davinci.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index f3a40af..1b1c5eb 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -135,6 +135,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
- 
- 		clockgen: clocking at 1300000 {
- 			compatible = "fsl,ls2080a-clockgen";
-@@ -357,6 +358,8 @@
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
- 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
- 			msi-parent = <&its>;
-+			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
-+			dma-coherent;
- 			#address-cells = <3>;
- 			#size-cells = <1>;
- 
-@@ -460,6 +463,8 @@
- 			compatible = "arm,mmu-500";
- 			reg = <0 0x5000000 0 0x800000>;
- 			#global-interrupts = <12>;
-+			#iommu-cells = <1>;
-+			stream-match-mask = <0x7C00>;
- 			interrupts = <0 13 4>, /* global secure fault */
- 				     <0 14 4>, /* combined secure interrupt */
- 				     <0 15 4>, /* global non-secure fault */
-@@ -502,7 +507,6 @@
- 				     <0 204 4>, <0 205 4>,
- 				     <0 206 4>, <0 207 4>,
- 				     <0 208 4>, <0 209 4>;
--			mmu-masters = <&fsl_mc 0x300 0>;
- 		};
- 
- 		dspi: dspi at 2100000 {
+I actually noticed that one of my previous changes from 2017 broke nand
+in legacy mode - the clock lookup no longer works. This series addresses
+it as well.
+
+First patch just uses a static string for the ti-aemif driver name.
+
+The second adds support for board files to the aemif driver.
+
+Last two add nand support to da850-lcdk in legacy mode and make
+da850-evm use the platform driver instead of the mach-specific one.
+
+If these patches get accepted, I'll prepere a follow-up moving all
+other boards to the new platform driver.
+
+This series applies on top of v8 of David Lechner's CCF series.
+
+v1 -> v2:
+- drop the first two patches, which are no longer needed with David's
+  psc driver
+
+Bartosz Golaszewski (4):
+  memory: aemif: don't rely on kbuild for driver's name
+  memory: aemif: add support for board files
+  ARM: davinci: add aemif & nand support to da850-lcdk in legacy mode
+  ARM: davinci: use aemif platform driver in legacy mode for da850-evm
+
+ arch/arm/mach-davinci/board-da850-evm.c     |  93 +++++++-------
+ arch/arm/mach-davinci/board-omapl138-hawk.c | 132 ++++++++++++++++++++
+ drivers/memory/ti-aemif.c                   |  59 +++++----
+ include/linux/platform_data/ti-aemif.h      |   9 ++
+ 4 files changed, 230 insertions(+), 63 deletions(-)
+
 -- 
-1.9.1
+2.17.0
