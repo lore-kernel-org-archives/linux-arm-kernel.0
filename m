@@ -1,49 +1,116 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 17 Apr 2018 17:44:00 +0200
-Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
- to netdev dma client
-In-Reply-To: <20180417154231.GV6014@localhost>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-3-git-send-email-radheys@xilinx.com>
- <20180411090854.GY6014@localhost>
- <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
- <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
- <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
- <20180417154231.GV6014@localhost>
-Message-ID: <9458b509-f3bd-2aae-58f6-24bc83629cb3@metafoo.de>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 17 Apr 2018 09:46:36 -0600
+Subject: [PATCH 2/3] coresight: Add section for integration with the perf
+ tools
+In-Reply-To: <fd4b5238-c995-c374-60c0-e4a32f644ae4@infradead.org>
+References: <1523907327-20979-1-git-send-email-mathieu.poirier@linaro.org>
+ <1523907327-20979-3-git-send-email-mathieu.poirier@linaro.org>
+ <fd4b5238-c995-c374-60c0-e4a32f644ae4@infradead.org>
+Message-ID: <CANLsYkzc60no4SnjtRvx+0tt-PNCTdqXU=Jnb+GQKbmUMtiiKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2018 05:42 PM, Vinod Koul wrote:
-> On Tue, Apr 17, 2018 at 04:46:43PM +0300, Peter Ujfalusi wrote:
-> 
->> @@ -709,6 +709,11 @@ struct dma_filter {
->>   *	be called after period_len bytes have been transferred.
->>   * @device_prep_interleaved_dma: Transfer expression in a generic way.
->>   * @device_prep_dma_imm_data: DMA's 8 byte immediate data to the dst address
->> + * @device_attach_metadata: Some DMA engines can send and receive side band
->> + *	information, commands or parameters which is not transferred within the
->> + *	data stream itself. In such case clients can set the metadata to the
->> + *	given descriptor and it is going to be sent to the peripheral, or in
->> + *	case of DEV_TO_MEM the provided buffer will receive the metadata.
->>   * @device_config: Pushes a new configuration to a channel, return 0 or an error
->>   *	code
->>   * @device_pause: Pauses any transfer happening on a channel. Returns
->> @@ -796,6 +801,9 @@ struct dma_device {
->>  		struct dma_chan *chan, dma_addr_t dst, u64 data,
->>  		unsigned long flags);
->>  
->> +	int (*device_attach_metadata)(struct dma_async_tx_descriptor *desc,
->> +				      void *data, size_t len);
-> 
-> while i am okay with the concept, I would not want to go again the custom
-> pointer route, this is a no-go for me.
-> 
-> Instead lets add the vendor data, define that explicitly. We can use struct,
-> tokens or something else to define these. But lets try to stay away from
-> opaque objects please :-)
+On 16 April 2018 at 13:48, Randy Dunlap <rdunlap@infradead.org> wrote:
+> On 04/16/2018 12:35 PM, Mathieu Poirier wrote:
+>> Adding a section that document how to use the Coresight framework and
+>> drivers from the perf tools.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  Documentation/trace/coresight.txt | 50 +++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 50 insertions(+)
+>>
+>> diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+>> index 710c75b6c73f..8caae8050a60 100644
+>> --- a/Documentation/trace/coresight.txt
+>> +++ b/Documentation/trace/coresight.txt
+>> @@ -187,9 +187,18 @@ that can be performed on them (see "struct coresight_ops").  The
+>>  specific to that component only.  "Implementation defined" customisations are
+>>  expected to be accessed and controlled using those entries.
+>>
+>> +
+>>  How to use the tracer modules
+>>  -----------------------------
+>>
+>> +There is two ways to use the Coresight framework: 1) using the perf cmd line
+>
+>    There are two ways
+>
+>> +tools and 2) interacting directly with the Coresight devices using the sysFS
+>> +interface.  Preference is given to the former as using the sysFS interface
+>> +requires a deep understanding of the Coresight HW.  The following sections
+>> +provide details on using both methods.
+>> +
+>> +1) Using the sysFS interface:
+>> +
+>>  Before trace collection can start, a coresight sink needs to be identify.
+>
+>                                                                    identified.
+>
+>>  There is no limit on the amount of sinks (nor sources) that can be enabled at
+>>  any given moment.  As a generic operation, all device pertaining to the sink
+>> @@ -295,6 +304,47 @@ Instruction     13570831        0x8026B584      E28DD00C        false   ADD
+>>  Instruction     0       0x8026B588      E8BD8000        true    LDM      sp!,{pc}
+>>  Timestamp                                       Timestamp: 17107041535
+>>
+>> +2) Using perf framework:
+>> +
+>> +Coresight tracers are represented using the Perf framework's Performance
+>> +Monitoring Unit (PMU) abstraction.  As such the perf framework takes charge of
+>> +controlling when tracing gets enabled based on when the process of interest is
+>> +scheduled.  When configured in a system, Coresight PMUs will be listed when
+>> +queried by the perf command line tool:
+>> +
+>> +     linaro at linaro-nano:~$ ./perf list pmu
+>> +
+>> +             List of pre-defined events (to be used in -e):
+>> +
+>> +             cs_etm//                                    [Kernel PMU event]
+>> +
+>> +     linaro at linaro-nano:~$
+>> +
+>> +Regardless of the number of tracers available in a system (usually equal to the
+>> +amount of processor core), the "cs_etm" PMU will be listed only once.
+>
+> ?                      cores),
+>
+>> +
+>> +A Coresight PMU works the same way as any other PMUs, i.e the name of the PMU is
+>
+>                                          any other PMU, i.e.
+>
+>> +listed along with configuration options within forward slashes '/'.  Since a
+>> +Coresight system will typically have more than one sink, the name of the sink to
+>> +work with needs to be specified as an event option.  Names for sink to choose
+>> +from are listed in sysFS under ($SYSFS)/bus/coresight/devices:
+>> +
+>> +     root at linaro-nano:~# ls /sys/bus/coresight/devices/
+>> +             20010000.etf   20040000.funnel  20100000.stm  22040000.etm
+>> +             22140000.etm  230c0000.funnel  23240000.etm 20030000.tpiu
+>> +             20070000.etr     20120000.replicator  220c0000.funnel
+>> +             23040000.etm  23140000.etm     23340000.etm
+>> +
+>> +     root at linaro-nano:~# perf record -e cs_etm/@20070000.etr/u --per-thread program
+>> +
+>> +The syntax within the forward slashes '/' is important.  The '@' character
+>> +tells the parser that a sink is about to be specified and that this is the IP
+>
+> Can we get away from using "IP" and call it a device or (hardware) module or
+> something more descriptive?
 
-Well, for all the DMA core cares about the meta-data stream would be as
-opaque as the data stream itself. The data is in the end client specific. It
-is data that sits somewhere in memory that should be send along with the
-actual data to the client.
+Sure thing.
+
+Thanks for taking the time to read the patch and providing comments.
+
+Mathieu
+
+>
+>> +to use for the trace session.
+>> +
+>> +More information on the above and other example on how to use Coresight with
+>> +the perf tools can be found in the "HOWTO.md" file of the openCSD gitHub
+>> +repository [3].
+>
+>
+> --
+> ~Randy
