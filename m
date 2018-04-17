@@ -1,76 +1,57 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Apr 2018 19:37:30 +0100
-Subject: [PATCHv3 06/11] asm-generic: mm_hooks: allow hooks to be overridden
- individually
+Date: Tue, 17 Apr 2018 19:37:28 +0100
+Subject: [PATCHv3 04/11] arm64: Don't trap host pointer auth use to EL2
 In-Reply-To: <20180417183735.56985-1-mark.rutland@arm.com>
 References: <20180417183735.56985-1-mark.rutland@arm.com>
-Message-ID: <20180417183735.56985-7-mark.rutland@arm.com>
+Message-ID: <20180417183735.56985-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, an architecture must either implement all of the mm hooks
-itself, or use all of those provided by the asm-generic implementation.
-When an architecture only needs to override a single hook, it must copy
-the stub implementations from the asm-generic version.
+To allow EL0 (and/or EL1) to use pointer authentication functionality,
+we must ensure that pointer authentication instructions and accesses to
+pointer authentication keys are not trapped to EL2.
 
-To avoid this repetition, allow each hook to be overridden indiviually,
-by placing each under an #ifndef block. As architectures providing their
-own hooks can't include this file today, this shouldn't adversely affect
-any existing hooks.
+This patch ensures that HCR_EL2 is configured appropriately when the
+kernel is booted at EL2. For non-VHE kernels we set HCR_EL2.{API,APK},
+ensuring that EL1 can access keys and permit EL0 use of instructions.
+For VHE kernels host EL0 (TGE && E2H) is unaffected by these settings,
+and it doesn't matter how we configure HCR_EL2.{API,APK}, so we don't
+bother setting them.
+
+This does not enable support for KVM guests, since KVM manages HCR_EL2
+itself when running VMs.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-arch at vger.kernel.org
+Cc: Christoffer Dall <cdall@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
 ---
- include/asm-generic/mm_hooks.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/include/asm/kvm_arm.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/include/asm-generic/mm_hooks.h b/include/asm-generic/mm_hooks.h
-index 8ac4e68a12f0..2b3ee15d3702 100644
---- a/include/asm-generic/mm_hooks.h
-+++ b/include/asm-generic/mm_hooks.h
-@@ -7,31 +7,42 @@
- #ifndef _ASM_GENERIC_MM_HOOKS_H
- #define _ASM_GENERIC_MM_HOOKS_H
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 89b3dda7e3cb..4d57e1e58323 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -23,6 +23,8 @@
+ #include <asm/types.h>
  
-+#ifndef arch_dup_mmap
- static inline int arch_dup_mmap(struct mm_struct *oldmm,
- 				struct mm_struct *mm)
- {
- 	return 0;
- }
-+#endif
+ /* Hyp Configuration Register (HCR) bits */
++#define HCR_API		(UL(1) << 41)
++#define HCR_APK		(UL(1) << 40)
+ #define HCR_TEA		(UL(1) << 37)
+ #define HCR_TERR	(UL(1) << 36)
+ #define HCR_TLOR	(UL(1) << 35)
+@@ -86,7 +88,7 @@
+ 			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW | HCR_TLOR | \
+ 			 HCR_FMO | HCR_IMO)
+ #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
+-#define HCR_HOST_NVHE_FLAGS (HCR_RW)
++#define HCR_HOST_NVHE_FLAGS (HCR_RW | HCR_API | HCR_APK)
+ #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
  
-+#ifndef arch_exit_mmap
- static inline void arch_exit_mmap(struct mm_struct *mm)
- {
- }
-+#endif
- 
-+#ifndef arch_unmap
- static inline void arch_unmap(struct mm_struct *mm,
- 			struct vm_area_struct *vma,
- 			unsigned long start, unsigned long end)
- {
- }
-+#endif
- 
-+#ifndef arch_bprm_mm_init
- static inline void arch_bprm_mm_init(struct mm_struct *mm,
- 				     struct vm_area_struct *vma)
- {
- }
-+#endif
- 
-+#ifndef arch_vma_access_permitted
- static inline bool arch_vma_access_permitted(struct vm_area_struct *vma,
- 		bool write, bool execute, bool foreign)
- {
- 	/* by default, allow everything */
- 	return true;
- }
-+#endif
-+
- #endif	/* _ASM_GENERIC_MM_HOOKS_H */
+ /* TCR_EL2 Registers bits */
 -- 
 2.11.0
