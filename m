@@ -1,104 +1,114 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 17 Apr 2018 14:28:40 -0400
-Subject: [PATCH v2 2/2] parisc: define stronger ordering for the default
- readX()
-In-Reply-To: <1523980508.3310.9.camel@HansenPartnership.com>
-References: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
- <1523938133-3224-2-git-send-email-okaya@codeaurora.org>
- <1523957852.3250.9.camel@HansenPartnership.com>
- <38a1d4e3-cabe-6c39-4355-8d8111637382@codeaurora.org>
- <1523980508.3310.9.camel@HansenPartnership.com>
-Message-ID: <86252a65-265d-e081-b71f-42a0be6b1693@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Apr 2018 19:37:25 +0100
+Subject: [PATCHv3 01/11] arm64: add pointer authentication register bits
+In-Reply-To: <20180417183735.56985-1-mark.rutland@arm.com>
+References: <20180417183735.56985-1-mark.rutland@arm.com>
+Message-ID: <20180417183735.56985-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/17/2018 11:55 AM, James Bottomley wrote:
-> On Tue, 2018-04-17 at 10:13 -0400, Sinan Kaya wrote:
->> Hi James,
->>
->>>
->>> Perhaps if you gave an example of the actual problem you're trying
->>> to fix we could assess if it affects parisc.
->>
->> Let me clarify myself here. Maybe, there is a better solution.
->>
->> 		/* assign ownership */
->> 		desc->status = DEVICE_OWN;
->>
->> 		/* notify device of new descriptors */
->> 		writel(DESC_NOTIFY, doorbell);
->>
->> The difference between writel() and writel_relax() is writel()
->> guarantees memory transactions to be flushed to the device before the
->> register write.
-> 
-> Um, no it doesn't, at least not in PCI.  It guarantees the write will
-> be issued by the memory system, but it may still be cached (called
-> posting) in the PCI bridge.  So it doesn't guarantee the write reaches
-> the device by the time it returns.
+The ARMv8.3 pointer authentication extension adds:
 
+* New fields in ID_AA64ISAR1 to report the presence of pointer
+  authentication functionality.
 
-The correct terminology here would be to use observability. Yes, it can be
-cached in whatever part of the system for some amount of time as long as
-PCI device sees it in the correct order.
+* New control bits in SCTLR_ELx to enable this functionality.
 
-Let's do this exercise. 
-1. OS writes to memory for some descriptor update
-2. OS writes to the device via writel to hit a doorbell
-3. Device comes and fetches the memory contents for the descriptor
+* New system registers to hold the keys necessary for this
+  functionality.
 
-writel() of PA-RISC needs to ensure that 3. cannot bypass 1. This is typically
-done by a write barrier embedded into the writel() on relaxed architectures.
+* A new ESR_ELx.EC code used when the new instructions are affected by
+  configurable traps
 
-> 
->>  writel_relaxed() does not provide any guarantees about the memory
->> and IO operations.
->>
->> Similarly, readl() provides following code to observe the DMA result
->> while readl_relaxed() does not provide this guarantee.
-> 
-> Right, the relaxed operator provides no guarantee of ordering between
-> the memory and IO domains.  However, it's only really a problem on
-> multiple memory controller systems (i.e. NUMA).  Parisc (except
-> superdome, which we don't support) doesn't have this problem.  We also
-> turn of CPU stream reordering, so compile order is retire order on our
-> CPUs (which makes life a lot simpler).
+This patch adds the relevant definitions to <asm/sysreg.h> and
+<asm/esr.h> for these, to be used by subsequent patches.
 
-Good to know.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/esr.h    |  3 ++-
+ arch/arm64/include/asm/sysreg.h | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 1 deletion(-)
 
-> 
->> Ideally, you want to embed rmb() and wmb() into the writel() and
->> readl() to provide this guarantee.
->>  
->> PA-RISC doesn't seem to support neither one of the barrier types. If
->> you are familiar with the architecture, maybe you could guide us
->> here.
->>
->> Is __raw_writeX() enough to provide this guarantee for this
->> architecture?
-> 
-> Well, with the volatile address it is.
-> 
-> The current implementations provide the expected semantics: namely the
-> position in the instruction stream is compile (retire) ordered and
-> issued from memory once retired.  We still do have the write posting
-> problem, but you'll find additional reads in the drivers to flush the
-> posted writes, so I don't actually believe we need anything changing.
-> 
-
-OK. I'll withdraw my patch. I'm just trying to ensure that all architectures
-support writel() semantics. There is an attempt to remove unnecessary
-write barriers from the drivers directory between the descriptor update and
-writel. 
-
-Just checking that PA-RISC won't break after this.
-
-> James
-> 
-> 
-
-
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index ce70c3ffb993..022785162281 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -30,7 +30,8 @@
+ #define ESR_ELx_EC_CP14_LS	(0x06)
+ #define ESR_ELx_EC_FP_ASIMD	(0x07)
+ #define ESR_ELx_EC_CP10_ID	(0x08)
+-/* Unallocated EC: 0x09 - 0x0B */
++#define ESR_ELx_EC_PAC		(0x09)
++/* Unallocated EC: 0x0A - 0x0B */
+ #define ESR_ELx_EC_CP14_64	(0x0C)
+ /* Unallocated EC: 0x0d */
+ #define ESR_ELx_EC_ILL		(0x0E)
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 6171178075dc..426f0eb90101 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -171,6 +171,19 @@
+ #define SYS_TTBR1_EL1			sys_reg(3, 0, 2, 0, 1)
+ #define SYS_TCR_EL1			sys_reg(3, 0, 2, 0, 2)
+ 
++#define SYS_APIAKEYLO_EL1		sys_reg(3, 0, 2, 1, 0)
++#define SYS_APIAKEYHI_EL1		sys_reg(3, 0, 2, 1, 1)
++#define SYS_APIBKEYLO_EL1		sys_reg(3, 0, 2, 1, 2)
++#define SYS_APIBKEYHI_EL1		sys_reg(3, 0, 2, 1, 3)
++
++#define SYS_APDAKEYLO_EL1		sys_reg(3, 0, 2, 2, 0)
++#define SYS_APDAKEYHI_EL1		sys_reg(3, 0, 2, 2, 1)
++#define SYS_APDBKEYLO_EL1		sys_reg(3, 0, 2, 2, 2)
++#define SYS_APDBKEYHI_EL1		sys_reg(3, 0, 2, 2, 3)
++
++#define SYS_APGAKEYLO_EL1		sys_reg(3, 0, 2, 3, 0)
++#define SYS_APGAKEYHI_EL1		sys_reg(3, 0, 2, 3, 1)
++
+ #define SYS_ICC_PMR_EL1			sys_reg(3, 0, 4, 6, 0)
+ 
+ #define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
+@@ -417,9 +430,13 @@
+ #define SYS_ICH_LR15_EL2		__SYS__LR8_EL2(7)
+ 
+ /* Common SCTLR_ELx flags. */
++#define SCTLR_ELx_ENIA	(1 << 31)
++#define SCTLR_ELx_ENIB	(1 << 30)
++#define SCTLR_ELx_ENDA	(1 << 27)
+ #define SCTLR_ELx_EE    (1 << 25)
+ #define SCTLR_ELx_IESB	(1 << 21)
+ #define SCTLR_ELx_WXN	(1 << 19)
++#define SCTLR_ELx_ENDB	(1 << 13)
+ #define SCTLR_ELx_I	(1 << 12)
+ #define SCTLR_ELx_SA	(1 << 3)
+ #define SCTLR_ELx_C	(1 << 2)
+@@ -510,11 +527,24 @@
+ #define ID_AA64ISAR0_AES_SHIFT		4
+ 
+ /* id_aa64isar1 */
++#define ID_AA64ISAR1_GPI_SHIFT		28
++#define ID_AA64ISAR1_GPA_SHIFT		24
+ #define ID_AA64ISAR1_LRCPC_SHIFT	20
+ #define ID_AA64ISAR1_FCMA_SHIFT		16
+ #define ID_AA64ISAR1_JSCVT_SHIFT	12
++#define ID_AA64ISAR1_API_SHIFT		8
++#define ID_AA64ISAR1_APA_SHIFT		4
+ #define ID_AA64ISAR1_DPB_SHIFT		0
+ 
++#define ID_AA64ISAR1_APA_NI		0x0
++#define ID_AA64ISAR1_APA_ARCHITECTED	0x1
++#define ID_AA64ISAR1_API_NI		0x0
++#define ID_AA64ISAR1_API_IMP_DEF	0x1
++#define ID_AA64ISAR1_GPA_NI		0x0
++#define ID_AA64ISAR1_GPA_ARCHITECTED	0x1
++#define ID_AA64ISAR1_GPI_NI		0x0
++#define ID_AA64ISAR1_GPI_IMP_DEF	0x1
++
+ /* id_aa64pfr0 */
+ #define ID_AA64PFR0_CSV3_SHIFT		60
+ #define ID_AA64PFR0_CSV2_SHIFT		56
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
