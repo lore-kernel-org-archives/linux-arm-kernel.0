@@ -1,101 +1,147 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 18 Apr 2018 02:46:00 +0800
-Subject: [arm-platforms:irq/level-msi 8/9] include/linux/dma-iommu.h:93:69:
- error: unknown type name 'dma_addr_t'
-Message-ID: <201804180257.Q6etJ3Ho%fengguang.wu@intel.com>
+From: collinsd@codeaurora.org (David Collins)
+Date: Tue, 17 Apr 2018 12:15:18 -0700
+Subject: [v2,2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180417182347.GD244487@google.com>
+References: <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
+ <20180417182347.GD244487@google.com>
+Message-ID: <2e45c0e5-7e79-3479-de18-9613e8eacf15@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/level-msi
-head:   38158ba494401627aff6018b4cd65d17d9a8d3e8
-commit: 0f5775c792c5f600ddbd7e40a73b2444e6829482 [8/9] irqchip/gic-v3: Add support for Message Based Interrupts as an MSI controller
-config: arm64-allnoconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 0f5775c792c5f600ddbd7e40a73b2444e6829482
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+On 04/17/2018 11:23 AM, Matthias Kaehlcke wrote:
+> On Fri, Apr 13, 2018 at 07:50:35PM -0700, David Collins wrote:
+>> Add the QCOM RPMh regulator driver to manage PMIC regulators
+>> which are controlled via RPMh on some Qualcomm Technologies, Inc.
+>> SoCs.  RPMh is a hardware block which contains several
+>> accelerators which are used to manage various hardware resources
+>> that are shared between the processors of the SoC.  The final
+>> hardware state of a regulator is determined within RPMh by
+>> performing max aggregation of the requests made by all of the
+>> processors.
+>> [...]
+>> +/**
+>> + * struct rpmh_vreg_hw_data - RPMh regulator hardware configurations
+>> + * @regulator_type:		RPMh accelerator type used to manage this
+>> + *				regulator
+>> + * @ops:			Pointer to regulator ops callback structure
+>> + * @voltage_range:		The single range of voltages supported by this
+>> + *				PMIC regulator type
+>> + * @n_voltages:			The number of unique voltage set points defined
+>> + *				by voltage_range
+>> + * @pmic_mode_map:		Array indexed by regulator framework mode
+>> + *				containing PMIC hardware modes.  Must be large
+>> + *				enough to index all framework modes supported
+>> + *				by this regulator hardware type.
+>> + * @of_map_mode:		Maps an RPMH_REGULATOR_MODE_* mode value defined
+>> + *				in device tree to a regulator framework mode
+> 
+> The name of the field is a bit misleading, this is a map of RPMh mode
+> to regulator framework mode, the device tree just happens to be the
+> place where this mapping is defined.
 
-All error/warnings (new ones prefixed by >>):
+of_map_mode name is used here to match the struct regulator_desc field by
+the same name that it is assigned to [1].  Do you think that the name
+should be changed to something else?
 
-   In file included from drivers/irqchip/irq-gic-v3-mbi.c:20:0:
->> include/linux/dma-iommu.h:93:69: error: unknown type name 'dma_addr_t'
-    static inline int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
-                                                                        ^~~~~~~~~~
->> include/linux/dma-iommu.h:106:74: warning: 'struct list_head' declared inside parameter list will not be visible outside of this definition or declaration
-    static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
-                                                                             ^~~~~~~~~
->> drivers/irqchip/irq-gic-v3-mbi.c:60:23: error: 'pci_msi_domain_write_msg' undeclared here (not in a function); did you mean 'msi_domain_free_irqs'?
-     .irq_write_msi_msg = pci_msi_domain_write_msg,
-                          ^~~~~~~~~~~~~~~~~~~~~~~~
-                          msi_domain_free_irqs
-   drivers/irqchip/irq-gic-v3-mbi.c: In function 'mbi_allocate_domains':
->> drivers/irqchip/irq-gic-v3-mbi.c:218:15: error: implicit declaration of function 'pci_msi_create_irq_domain'; did you mean 'msi_create_irq_domain'? [-Werror=implicit-function-declaration]
-     pci_domain = pci_msi_create_irq_domain(parent->fwnode,
-                  ^~~~~~~~~~~~~~~~~~~~~~~~~
-                  msi_create_irq_domain
->> drivers/irqchip/irq-gic-v3-mbi.c:218:13: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     pci_domain = pci_msi_create_irq_domain(parent->fwnode,
-                ^
-   cc1: some warnings being treated as errors
---
-   In file included from drivers//irqchip/irq-gic-v3-mbi.c:20:0:
->> include/linux/dma-iommu.h:93:69: error: unknown type name 'dma_addr_t'
-    static inline int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
-                                                                        ^~~~~~~~~~
->> include/linux/dma-iommu.h:106:74: warning: 'struct list_head' declared inside parameter list will not be visible outside of this definition or declaration
-    static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
-                                                                             ^~~~~~~~~
-   drivers//irqchip/irq-gic-v3-mbi.c:60:23: error: 'pci_msi_domain_write_msg' undeclared here (not in a function); did you mean 'msi_domain_free_irqs'?
-     .irq_write_msi_msg = pci_msi_domain_write_msg,
-                          ^~~~~~~~~~~~~~~~~~~~~~~~
-                          msi_domain_free_irqs
-   drivers//irqchip/irq-gic-v3-mbi.c: In function 'mbi_allocate_domains':
-   drivers//irqchip/irq-gic-v3-mbi.c:218:15: error: implicit declaration of function 'pci_msi_create_irq_domain'; did you mean 'msi_create_irq_domain'? [-Werror=implicit-function-declaration]
-     pci_domain = pci_msi_create_irq_domain(parent->fwnode,
-                  ^~~~~~~~~~~~~~~~~~~~~~~~~
-                  msi_create_irq_domain
-   drivers//irqchip/irq-gic-v3-mbi.c:218:13: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     pci_domain = pci_msi_create_irq_domain(parent->fwnode,
-                ^
-   cc1: some warnings being treated as errors
 
-vim +/dma_addr_t +93 include/linux/dma-iommu.h
+>> +/**
+>> + * struct rpmh_vreg - individual rpmh regulator data structure encapsulating a
+>> + *		single regulator device
+>> + * @rpmh_client:		Handle used for rpmh communications
+> 
+> nit: RPMh
 
-0db2e5d1 Robin Murphy 2015-10-01   92  
-fdbe574e Robin Murphy 2017-01-19  @93  static inline int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
-fdbe574e Robin Murphy 2017-01-19   94  {
-fdbe574e Robin Murphy 2017-01-19   95  	return -ENODEV;
-fdbe574e Robin Murphy 2017-01-19   96  }
-fdbe574e Robin Murphy 2017-01-19   97  
-0db2e5d1 Robin Murphy 2015-10-01   98  static inline void iommu_put_dma_cookie(struct iommu_domain *domain)
-0db2e5d1 Robin Murphy 2015-10-01   99  {
-0db2e5d1 Robin Murphy 2015-10-01  100  }
-0db2e5d1 Robin Murphy 2015-10-01  101  
-44bb7e24 Robin Murphy 2016-09-12  102  static inline void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
-44bb7e24 Robin Murphy 2016-09-12  103  {
-44bb7e24 Robin Murphy 2016-09-12  104  }
-44bb7e24 Robin Murphy 2016-09-12  105  
-273df963 Robin Murphy 2017-03-16 @106  static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
-273df963 Robin Murphy 2017-03-16  107  {
-273df963 Robin Murphy 2017-03-16  108  }
-273df963 Robin Murphy 2017-03-16  109  
+I'll change this.
 
-:::::: The code at line 93 was first introduced by commit
-:::::: fdbe574eb69312a7fbe09674d69c01b80e4ed9dc iommu/dma: Allow MSI-only cookies
 
-:::::: TO: Robin Murphy <robin.murphy@arm.com>
-:::::: CC: Will Deacon <will.deacon@arm.com>
+>> +struct rpmh_vreg {
+>> +	struct rpmh_client		*rpmh_client;
+>> +	u32				addr;
+>> +	struct regulator_desc		rdesc;
+>> +	const struct rpmh_vreg_hw_data	*hw_data;
+>> +	enum rpmh_regulator_type	regulator_type;
+> 
+> This value is already available via rpmh_vreg->hw_data->regulator_type,
+> why duplicate it? The field is assigned in rpmh_regulator_init_vreg()
+> and only read once in the same function, there seems to be no need for
+> it, not even to improve readability.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6595 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/67c9d36b/attachment.gz>
+This is present to specifically allow for a future change to support
+overriding the regulator_type value from device tree in order to force
+RPMh resources to be handled via XOB instead of VRM in a board-specific
+manner.  I included support of the property qcom,rpmh-resource-type in the
+first version of this patch.  I removed this property from the second
+version of the patch based upon review feedback since SDM845 does not
+explicitly need it (though an upcoming chip will).
+
+I'll remove regulator_type from struct rpmh_vreg.  It shouldn't be
+particularly painful to add it back in when needed for XOB override support.
+
+
+>> +static int rpmh_regulator_vrm_set_load(struct regulator_dev *rdev, int load_uA)
+>> +{
+>> +	struct rpmh_vreg *vreg = rdev_get_drvdata(rdev);
+>> +	int i;
+>> +
+>> +	for (i = 0; i < vreg->drms_mode_count - 1; i++)
+>> +		if (load_uA < vreg->drms_mode_max_uA[i])
+> 
+> Shouldn't this be '<='?
+> 
+> nit: IMO 'vreg->drms_mode_max_uA[i] >= load_uA' would be more readable.
+
+I chose to use '<' here in order to maintain the non-inclusive limit
+semantics of the downstream RPMh regulator driver.  E.g. with an LPM
+threshold of 10000 uA, load_uA == 10000 would result in a request for HPM
+instead of LPM.
+
+I suppose that I can change this to '<=' to be more logically consistent.
+
+
+>> +static const u32 pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+>> +	[REGULATOR_MODE_STANDBY] = 4,
+>> +	[REGULATOR_MODE_IDLE]    = 5,
+>> +	[REGULATOR_MODE_NORMAL]  = -EINVAL,
+>> +	[REGULATOR_MODE_FAST]    = 7,
+>> +};
+> 
+> Define constants for the modes on the PMIC4 side?
+
+Are you suggesting something like this?
+
+#define PMIC4_LDO_MODE_RETENTION	4
+#define PMIC4_LDO_MODE_LPM		5
+#define PMIC4_LDO_MODE_HPM		7
+
+static const u32 pmic_mode_map_pmic4_ldo[REGULATOR_MODE_STANDBY + 1] = {
+	[REGULATOR_MODE_STANDBY] = PMIC4_LDO_MODE_RETENTION,
+	[REGULATOR_MODE_IDLE]    = PMIC4_LDO_MODE_LPM,
+	[REGULATOR_MODE_NORMAL]  = -EINVAL,
+	[REGULATOR_MODE_FAST]    = PMIC4_LDO_MODE_HPM,
+};
+
+#define PMIC4_SMPS_MODE_RETENTION	4
+#define PMIC4_SMPS_MODE_PFM		5
+#define PMIC4_SMPS_MODE_AUTO		6
+#define PMIC4_SMPS_MODE_PWM		7
+
+static const u32 pmic_mode_map_pmic4_smps[REGULATOR_MODE_STANDBY + 1] = {
+	[REGULATOR_MODE_STANDBY] = PMIC4_SMPS_MODE_RETENTION,
+	[REGULATOR_MODE_IDLE]    = PMIC4_SMPS_MODE_PFM,
+	[REGULATOR_MODE_NORMAL]  = PMIC4_SMPS_MODE_AUTO,
+	[REGULATOR_MODE_FAST]    = PMIC4_SMPS_MODE_PWM,
+};
+
+I considered using this approach, but it didn't seem like it increased
+readability and did increase the line count.  Each of the constants would
+only be used once.  Would you prefer this style (or something else)?
+
+Thanks,
+David
+
+[1]:
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/linux/regulator/driver.h?h=v4.17-rc1#n370
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
