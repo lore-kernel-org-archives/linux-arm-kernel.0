@@ -1,40 +1,20 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Wed, 18 Apr 2018 15:49:54 +0200
-Subject: [PATCH v4 0/6] PCI: aardvark: misc fixes and improvements
-In-Reply-To: <20180418130230.GB22463@e107981-ln.cambridge.arm.com>
-References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
- <20180409162356.GB14533@e107981-ln.cambridge.arm.com>
- <20180409205433.4eb78a45@windsurf>
- <20180418130230.GB22463@e107981-ln.cambridge.arm.com>
-Message-ID: <20180418154954.2a68fce6@windsurf.numericable.fr>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 18 Apr 2018 15:57:08 +0200
+Subject: [PATCH 0/3] Add R8A77980/Condor PCIe support
+In-Reply-To: <f07e6173-75b3-fe10-81d6-915942a5f4fe@cogentembedded.com>
+References: <f07e6173-75b3-fe10-81d6-915942a5f4fe@cogentembedded.com>
+Message-ID: <20180418135707.ruifzsv3ljgriujg@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 18 Apr 2018 14:02:30 +0100, Lorenzo Pieralisi wrote:
-
-> > So, the following patches are fixes:
-> > 
-> > [PATCH v4 1/6] PCI: aardvark: Fix logic in advk_pcie_{rd,wr}_conf()
-> > [PATCH v4 2/6] PCI: aardvark: Set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
-> > [PATCH v4 3/6] PCI: aardvark: Use ISR1 instead of ISR0 interrupt in legacy irq mode
-> > [PATCH v4 4/6] PCI: aardvark: Fix PCIe Max Read Request Size setting
-> > 
-> > The following patches are improvements:
-> > 
-> > [PATCH v4 5/6] PCI: aardvark: Introduce an advk_pcie_valid_device() helper
-> > [PATCH v4 6/6] PCI: aardvark: Remove PCIe outbound window configuration  
+On Fri, Apr 06, 2018 at 11:11:38PM +0300, Sergei Shtylyov wrote:
+> Hello!
 > 
-> I added those four patches to my pci/host/fixes branch, please have a
-> look if they meet your expectations and if so I will ask Bjorn to send
-> them if he thinks they are fit for -rc*.
+> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20180330-v4.16-rc7' tag. We're adding the R8A77980 PCIe related
+> device nodes and then enable PCIe on the Condor board. These patches depend on
+> the R8A77980 PCIe PHY and PCIEC driver support in order to work properly...
 
-Looks good to me. Those four patches are indeed the ones that would
-ideally be sent during the -rc cycle. Thanks a lot!
+Thanks, I have marked these as deferred.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Please ping me once the dependencies have been accepted.
