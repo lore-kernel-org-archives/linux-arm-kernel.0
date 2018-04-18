@@ -1,81 +1,38 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Wed, 18 Apr 2018 07:51:51 +0200
-Subject: [PATCH v6 07/11] ARM: sun9i: smp: Rename clusters's power-off
-In-Reply-To: <fd19ec26-9240-5ae2-fc6e-d3918ab91d01@cogentembedded.com>
-References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-8-mylene.josserand@bootlin.com>
- <fd19ec26-9240-5ae2-fc6e-d3918ab91d01@cogentembedded.com>
-Message-ID: <20180418075151.3542f7cd@dell-desktop.home>
+From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
+Date: Wed, 18 Apr 2018 09:04:48 +0300
+Subject: [RFC PATCH spi] spi: pxa2xx: pxa2xx_spi_transfer_one() can be
+ static
+In-Reply-To: <20180417195323.GA69680@ivb43>
+References: <201804180300.Pn9JAJQ2%fengguang.wu@intel.com>
+ <20180417195323.GA69680@ivb43>
+Message-ID: <22cf611b-6a88-ec72-bb3c-51f8b62a8019@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, 17 Apr 2018 11:21:02 +0300
-Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> wrote:
-
-> Hello!
+On 04/17/18 22:53, kbuild test robot wrote:
 > 
-> On 4/17/2018 12:50 AM, Myl?ne Josserand wrote:
+> Fixes: d5898e19c0d7 ("spi: pxa2xx: Use core message processing loop")
+> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+> ---
+>   spi-pxa2xx.c |    6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> > To prepare the support for sun8i-a83t, rename the variable name  
-> 
->     s/variable/macro/ maybe? Also "rename the ... name" sounds tautological...
+> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+> index c852ea5..40f1346 100644
+> --- a/drivers/spi/spi-pxa2xx.c
+> +++ b/drivers/spi/spi-pxa2xx.c
+> @@ -911,9 +911,9 @@ static bool pxa2xx_spi_can_dma(struct spi_controller *master,
+>   	       xfer->len >= chip->dma_burst_size;
+>   }
+>   
+> -int pxa2xx_spi_transfer_one(struct spi_controller *master,
+> -			    struct spi_device *spi,
+> -			    struct spi_transfer *transfer)
+> +static int pxa2xx_spi_transfer_one(struct spi_controller *master,
+> +				   struct spi_device *spi,
+> +				   struct spi_transfer *transfer)
 
-Thank you for the correction.
+Thanks Fengguang. I don't understand how I managed to drop "static" 
+while doing manual s/pump_transfers/pxa2xx_spi_transfer_one/ :-)
 
-Best regards,
-
-Myl?ne
-
--- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
-
-> 
-> > that handles the power-off of clusters because it is different from
-> > sun9i-a80 to sun8i-a83t.
-> > 
-> > The power off register for clusters are different from a80 and a83t.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> >   arch/arm/mach-sunxi/mc_smp.c | 6 +++---
-> >   1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-> > index 727968d6a3e5..03f021d0c73e 100644
-> > --- a/arch/arm/mach-sunxi/mc_smp.c
-> > +++ b/arch/arm/mach-sunxi/mc_smp.c
-> > @@ -60,7 +60,7 @@
-> >   #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
-> >   #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
-> >   #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
-> > -#define PRCM_PWROFF_GATING_REG_CLUSTER	BIT(4)
-> > +#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
-> >   #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
-> >   #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
-> >   #define PRCM_CPU_SOFT_ENTRY_REG		0x164
-> > @@ -255,7 +255,7 @@ static int sunxi_cluster_powerup(unsigned int cluster)
-> >   
-> >   	/* clear cluster power gate */
-> >   	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
-> > -	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
-> > +	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
-> >   	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
-> >   	udelay(20);
-> >   
-> > @@ -452,7 +452,7 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
-> >   	/* gate cluster power */
-> >   	pr_debug("%s: gate cluster power\n", __func__);
-> >   	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
-> > -	reg |= PRCM_PWROFF_GATING_REG_CLUSTER;
-> > +	reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
-> >   	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
-> >   	udelay(20);
-> >     
-> 
-> MBR, Sergei
+Reviewed-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
