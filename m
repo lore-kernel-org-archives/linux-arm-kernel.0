@@ -1,31 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Apr 2018 14:49:22 +0100
-Subject: [PATCH v2 6/8] spi: spi-s3c64xx: Fix indentation in the register
- offset definitions
-In-Reply-To: <66b1bc57-8e12-2ec9-3238-c9ddbc1f2ca6@samsung.com>
-References: <20180417142954.5507-1-s.nawrocki@samsung.com>
- <CGME20180417143049epcas2p1a9244272897740ac03d7a21d5dfb5d14@epcas2p1.samsung.com>
- <20180417142954.5507-6-s.nawrocki@samsung.com>
- <20180418104707.GA10061@sirena.org.uk>
- <66b1bc57-8e12-2ec9-3238-c9ddbc1f2ca6@samsung.com>
-Message-ID: <20180418134922.GC10061@sirena.org.uk>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 18 Apr 2018 15:49:54 +0200
+Subject: [PATCH v4 0/6] PCI: aardvark: misc fixes and improvements
+In-Reply-To: <20180418130230.GB22463@e107981-ln.cambridge.arm.com>
+References: <20180406145536.19637-1-thomas.petazzoni@bootlin.com>
+ <20180409162356.GB14533@e107981-ln.cambridge.arm.com>
+ <20180409205433.4eb78a45@windsurf>
+ <20180418130230.GB22463@e107981-ln.cambridge.arm.com>
+Message-ID: <20180418154954.2a68fce6@windsurf.numericable.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 02:17:36PM +0200, Sylwester Nawrocki wrote:
-> On 04/18/2018 12:47 PM, Mark Brown wrote:
+Hello,
 
-> > This doesn't apply against current code, please check and resend.
+On Wed, 18 Apr 2018 14:02:30 +0100, Lorenzo Pieralisi wrote:
 
-> It seems there is no need to resend now as all patches from the series
-> are in your for-4.18 branch.
+> > So, the following patches are fixes:
+> > 
+> > [PATCH v4 1/6] PCI: aardvark: Fix logic in advk_pcie_{rd,wr}_conf()
+> > [PATCH v4 2/6] PCI: aardvark: Set PIO_ADDR_LS correctly in advk_pcie_rd_conf()
+> > [PATCH v4 3/6] PCI: aardvark: Use ISR1 instead of ISR0 interrupt in legacy irq mode
+> > [PATCH v4 4/6] PCI: aardvark: Fix PCIe Max Read Request Size setting
+> > 
+> > The following patches are improvements:
+> > 
+> > [PATCH v4 5/6] PCI: aardvark: Introduce an advk_pcie_valid_device() helper
+> > [PATCH v4 6/6] PCI: aardvark: Remove PCIe outbound window configuration  
+> 
+> I added those four patches to my pci/host/fixes branch, please have a
+> look if they meet your expectations and if so I will ask Bjorn to send
+> them if he thinks they are fit for -rc*.
 
-I applied a bunch of the series yesterday, it looks like something that
-was applied then. 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/12d8e2f6/attachment.sig>
+Looks good to me. Those four patches are indeed the ones that would
+ideally be sent during the -rc cycle. Thanks a lot!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
