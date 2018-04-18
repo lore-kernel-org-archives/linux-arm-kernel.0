@@ -1,42 +1,107 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 18 Apr 2018 11:30:47 +0200
-Subject: [PATCH v6 05/11] ARM: smp: Add initialization of CNTVOFF
-In-Reply-To: <20180416215032.5023-6-mylene.josserand@bootlin.com>
-References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-6-mylene.josserand@bootlin.com>
-Message-ID: <CAMuHMdWFyLCQb=c=gnWokxGFtsQF2i+s1nPWtJJmZPXAQjnu4g@mail.gmail.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Wed, 18 Apr 2018 10:32:27 +0100
+Subject: [PATCH v3 03/11] iio: Add channel for Position Relative
+In-Reply-To: <02533699-a2bc-7c0c-4d8a-c10bb0102667@microchip.com>
+References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
+ <1523350677-27106-4-git-send-email-eugen.hristev@microchip.com>
+ <20180415202942.5c7d50a8@archlinux>
+ <02533699-a2bc-7c0c-4d8a-c10bb0102667@microchip.com>
+Message-ID: <20180418103227.00003a2e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allo Myl?ne,
+On Tue, 17 Apr 2018 10:30:46 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-On Mon, Apr 16, 2018 at 11:50 PM, Myl?ne Josserand
-<mylene.josserand@bootlin.com> wrote:
-> The CNTVOFF register from arch timer is uninitialized.
-> It should be done by the bootloader but it is currently not the case,
-> even for boot CPU because this SoC is booting in secure mode.
-> It leads to an random offset value meaning that each CPU will have a
-> different time, which isn't working very well.
->
-> Add assembly code used for boot CPU and secondary CPU cores to make
-> sure that the CNTVOFF register is initialized. Because this code can
-> be used by different platforms, add this assembly file in ARM's common
-> folder.
+> On 15.04.2018 22:29, Jonathan Cameron wrote:
+> > On Tue, 10 Apr 2018 11:57:49 +0300
+> > Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> >   
+> >> Add new channel type for relative position on a pad.
+> >>
+> >> These type of analog sensor offers the position of a pen
+> >> on a touchpad, and is represented as a voltage, which can be
+> >> converted to a position on X and Y axis on the pad.
+> >> The channel will hand the relative position on the pad in both directions.
+> >>
+> >> The channel can then be consumed by a touchscreen driver or
+> >> read as-is for a raw indication of the touchpen on a touchpad.
+> >>
+> >> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> >> ---
+> >> Changes in v2:
+> >>   - modified channel name to relative position as suggested.
+> >>   - modified kernel version to 4.18 (presumable)
+> >>
+> >>   Documentation/ABI/testing/sysfs-bus-iio | 12 ++++++++++++
+> >>   drivers/iio/industrialio-core.c         |  1 +
+> >>   include/uapi/linux/iio/types.h          |  1 +
+> >>   tools/iio/iio_event_monitor.c           |  2 ++
+> >>   4 files changed, 16 insertions(+)
+> >>
+> >> diff --git a/Documentation/ABI/testing/sysfs-bus-iio b/Documentation/ABI/testing/sysfs-bus-iio
+> >> index 6a5f34b..42a9287 100644
+> >> --- a/Documentation/ABI/testing/sysfs-bus-iio
+> >> +++ b/Documentation/ABI/testing/sysfs-bus-iio
+> >> @@ -190,6 +190,18 @@ Description:
+> >>   		but should match other such assignments on device).
+> >>   		Units after application of scale and offset are m/s^2.
+> >>   
+> >> +What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_x_raw
+> >> +What:		/sys/bus/iio/devices/iio:deviceX/in_positionrelative_y_raw
+> >> +KernelVersion:	4.18
+> >> +Contact:	linux-iio at vger.kernel.org
+> >> +Description:
+> >> +		Relative position in direction x or y on a pad (may be
+> >> +		arbitrarily assigned but should match other such assignments on
+> >> +		device).
+> >> +		Units after application of scale and offset are milli percents
+> >> +		from the pad's size in both directions. Should be calibrated by
+> >> +		the consumer.  
+> > I know the milli percent comes form the humidity equivalent, but I wonder
+> > if we are right to follow that.  10^-5 is a pretty random base unit (though
+> > I got argued into it being a standard choice for humidity sensors IIRC...
+> > 
+> > What do people think?  We could go with 1 for full range or just percent perhaps?
+> > 
+> > I'm not that fussed about staying consistent with humidity - we are unlikely
+> > to end up with sensors doing both anytime soon so there shouldn't be
+> > any confusion...
+> > 
+> > Jonathan  
+> Hello Jonathan,
+> 
+> For my specific use case, percents are not enough, as this would mean 
+> the resolution will be pretty low. If we have a touchpanel of a higher 
+> resolution, having the position only ranged 0 to 100 is pretty bad.
+> Having millipercents means we can have a resolution up to 100,000 points 
+> in range, which is fine for the hardware as of this moment.
+> Of course, specific drivers reporting these channels can define a 
+> specific range if they desire (report just in the first percent if you 
+> wish (0-1000) or so, which would mean a lower resolution.
+> Centi-percent would work fine as well I believe (0-10,000 range), but to 
+> keep consistent with your suggestion regarding relative humidity, I 
+> picked this larger scale.
+> In my specific case, since we have a 12 bit ADC, range is 0-4096 for 
+> this value.
+> Calibrating these values to the actual size of the touchpanel is left 
+> for the consumer to do (map 4096x4096 to the actual resolution)
+> 
+> If you have a better idea than milli-percents I can change it, no problem.
+> 
 
-Thanks for your patch!
+It doesn't actually matter what the defined 'base units' are from a question
+of what we can represent.  That is just handled by suppling an appropriate
+SCALE for the channel.  All this is about is trying to provide something
+consistent rather than having any effect on the actual range.  Will let
+this sit a while longer...
 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+Jonathan
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Eugen
+> >> +
+> >>   [...]  
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
