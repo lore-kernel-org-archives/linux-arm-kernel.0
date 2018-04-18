@@ -1,174 +1,34 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Wed, 18 Apr 2018 16:31:34 +0100
-Subject: [PATCH v5 00/23] ASoC: qcom: Add support to QDSP based Audio
-Message-ID: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 18 Apr 2018 17:35:51 +0200
+Subject: [PATCH 1/2] memory: aemif: don't rely on kbuild for driver's name
+In-Reply-To: <20180418153552.14632-1-brgl@bgdev.pl>
+References: <20180418153552.14632-1-brgl@bgdev.pl>
+Message-ID: <20180418153552.14632-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Thankyou everyone for providing feedback on v4 patchset.
-This patchset aims to provide a basic version of QCOM DSP based
-audio support which is available in downstream andriod kernels.
-This patchset support audio playback on HDMI-RX, MI2S, SLIMBus and
-will add support to other features as we move on.
+We want to use aemif from board files. Use a static name in the
+driver's code.
 
-QDSP has both static and dynamic modules. static modules like AFE
-(Audio FrontEnd), ADM (Audio Device Manager), ASM(Audio Stream Manager)
-and CORE to provide this audio services.
-All these services use APR (Asynchronous Packet Router) protocol
-via smd/glink transport to communicate with Application processor.
-More details on each module is availble in there respective patch.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/memory/ti-aemif.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patchset is tested on DB820c, with HDMI audio playback, MI2S on
-DB410c on top of mainline, Also tested SLIMBus analog audio using
-wcd9355 with an additional patches. Previous version of these
-patches are also tested on SDM845 by Rohit.
-
-Here is my test branch incase someone want to try these patches
-https://git.linaro.org/people/srinivas.kandagatla/linux.git/log/?h=v4.16-qdsp6-v5
-
-Here is block diagram to give a quick overview of the components
-
-
-  +---------+          +---------+         +---------+   
-  |  q6asm  |          |q6routing|         | q6afe   | 
-  |   dais  | <------> |  mixers | <-----> |  dais   |  
-  +---------+          +---------+         +---------+   
-      ^                     ^                   ^
-      |                     |                   |
-      |  +------------------+----------------+  |       
-      |  |                  |                |  |       
-      v  v                  v                v  v       
-  +---------+          +---------+         +---------+ 
-  |   q6ASM |          |  q6ADM  |         |   q6AFE |  
-  +---------+          +---------+         +---------+  
-      ^                     ^                   ^          ^
-      |                     |                   | CPU Side |
-------+---------------------+-------------------+--------
-      |                     |                   |
-      |                     |APR(smd/glink)     | 
-      |                     |                   |
-      |  +------------------+----------------+  |
-      |  |                  |                |  |
-+-----+--+-----------------------------------+--+-------
-      |  |                  |                |  | QDSP Side |
-      v  v                  v                v  v           v
- +---------+          +---------+         +---------+
- |   ASM   | <------> |   ADM   | <-----> |   AFE   |
- +---------+          +---------+         +---------+
-                                               ^
-                                               | 
-                           +-------------------+
-                           |
----------------------------+--------------------------
-                           |            Audio I/O |
-                           v                      v
-    +--------------------------------------------------+
-    |                Audio devices                     |
-    | CODEC | HDMI-TX | PCM  | SLIMBUS | I2S |MI2S |...|
-    |                                                  |
-    +--------------------------------------------------+
-
-
-Changes since v4 (https://lkml.org/lkml/2018/3/9/1207)
- - Updated dt bindings as suggested by Rob H.
- - removed dt patch as db820c requires some more display
-	 dt patches to get hdmi audio.
- - remove static flags in q6core as suggested by Rohit.
- - add Rohits tested and reviewed tag
- - fixed few static checker warnings.
- - use NULL topology flag as suggested by Rohit.
-
-Thanks,
-srini
-
-Srinivas Kandagatla (23):
-  soc: qcom dt-bindings: Add APR bus bindings
-  soc: qcom: Add APR bus driver
-  ASoC: qdsp6: q6common: Add qdsp6 helper functions
-  ASoC: qdsp6: dt-bindings: Add q6afe dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6adm dt bindings
-  ASoC: qdsp6: dt-bindings: Add q6asm dt bindings
-  ASoC: qdsp6: q6afe: Add q6afe driver
-  ASoC: qdsp6: qdafe: Add SLIMBus port Support
-  ASoC: qdsp6: q6afe: Add support to MI2S ports
-  ASoC: qdsp6: q6afe: Add support to MI2S sysclks
-  ASoC: qdsp6: q6adm: Add q6adm driver
-  ASoC: qdsp6: q6asm: Add q6asm driver
-  ASoC: qdsp6: q6asm: Add support to memory map and unmap
-  ASoC: qdsp6: q6asm: Add support to audio stream apis
-  ASoC: qdsp6: q6core: Add q6core driver
-  ASoC: qdsp6: q6routing: Add q6routing driver
-  ASoC: qdsp6: q6routing: Add support to all SLIMBus Mixers
-  ASoC: qdsp6: q6routing: Add support to MI2S Mixers
-  ASoC: qdsp6: q6afe: Add q6afe dai driver
-  ASoC: qdsp6: q6asm: Add q6asm dai driver
-  ASoC: qdsp6: dt-bindings: Add apq8096 machine bindings
-  ASoC: qcom: apq8096: Add db820c machine driver
-  MAINTAINERS: Add myself as co-maintainer of qcom audio
-
- .../devicetree/bindings/soc/qcom/qcom,apr.txt      |   85 ++
- .../devicetree/bindings/sound/qcom,apq8096.txt     |   76 ++
- .../devicetree/bindings/sound/qcom,q6adm.txt       |   33 +
- .../devicetree/bindings/sound/qcom,q6afe.txt       |   88 ++
- .../devicetree/bindings/sound/qcom,q6asm.txt       |   33 +
- MAINTAINERS                                        |    1 +
- drivers/soc/qcom/Kconfig                           |    9 +
- drivers/soc/qcom/Makefile                          |    1 +
- drivers/soc/qcom/apr.c                             |  385 ++++++
- include/dt-bindings/soc/qcom,apr.h                 |   27 +
- include/dt-bindings/sound/qcom,q6afe.h             |   31 +
- include/dt-bindings/sound/qcom,q6asm.h             |   22 +
- include/linux/mod_devicetable.h                    |   11 +
- include/linux/soc/qcom/apr.h                       |  132 ++
- sound/soc/qcom/Kconfig                             |   50 +
- sound/soc/qcom/Makefile                            |    5 +
- sound/soc/qcom/apq8096.c                           |  238 ++++
- sound/soc/qcom/qdsp6/Makefile                      |    8 +
- sound/soc/qcom/qdsp6/q6adm.c                       |  633 ++++++++++
- sound/soc/qcom/qdsp6/q6adm.h                       |   25 +
- sound/soc/qcom/qdsp6/q6afe-dai.c                   |  752 +++++++++++
- sound/soc/qcom/qdsp6/q6afe.c                       | 1068 ++++++++++++++++
- sound/soc/qcom/qdsp6/q6afe.h                       |  193 +++
- sound/soc/qcom/qdsp6/q6asm-dai.c                   |  632 ++++++++++
- sound/soc/qcom/qdsp6/q6asm.c                       | 1310 ++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6asm.h                       |   69 ++
- sound/soc/qcom/qdsp6/q6core.c                      |  380 ++++++
- sound/soc/qcom/qdsp6/q6core.h                      |   15 +
- sound/soc/qcom/qdsp6/q6dsp-common.c                |   66 +
- sound/soc/qcom/qdsp6/q6dsp-common.h                |   24 +
- sound/soc/qcom/qdsp6/q6dsp-errno.h                 |   51 +
- sound/soc/qcom/qdsp6/q6routing.c                   |  982 +++++++++++++++
- sound/soc/qcom/qdsp6/q6routing.h                   |    9 +
- 33 files changed, 7444 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,apq8096.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6adm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6afe.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6asm.txt
- create mode 100644 drivers/soc/qcom/apr.c
- create mode 100644 include/dt-bindings/soc/qcom,apr.h
- create mode 100644 include/dt-bindings/sound/qcom,q6afe.h
- create mode 100644 include/dt-bindings/sound/qcom,q6asm.h
- create mode 100644 include/linux/soc/qcom/apr.h
- create mode 100644 sound/soc/qcom/apq8096.c
- create mode 100644 sound/soc/qcom/qdsp6/Makefile
- create mode 100644 sound/soc/qcom/qdsp6/q6adm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6adm.h
- create mode 100644 sound/soc/qcom/qdsp6/q6afe-dai.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.c
- create mode 100644 sound/soc/qcom/qdsp6/q6afe.h
- create mode 100644 sound/soc/qcom/qdsp6/q6asm-dai.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.c
- create mode 100644 sound/soc/qcom/qdsp6/q6asm.h
- create mode 100644 sound/soc/qcom/qdsp6/q6core.c
- create mode 100644 sound/soc/qcom/qdsp6/q6core.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.c
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-errno.h
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
-
+diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
+index 2744b1b91b57..588e58d40d1b 100644
+--- a/drivers/memory/ti-aemif.c
++++ b/drivers/memory/ti-aemif.c
+@@ -422,7 +422,7 @@ static struct platform_driver aemif_driver = {
+ 	.probe = aemif_probe,
+ 	.remove = aemif_remove,
+ 	.driver = {
+-		.name = KBUILD_MODNAME,
++		.name = "ti-aemif",
+ 		.of_match_table = of_match_ptr(aemif_of_match),
+ 	},
+ };
 -- 
-2.16.2
+2.17.0
