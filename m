@@ -1,56 +1,40 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 18 Apr 2018 10:09:12 +0200
-Subject: [PATCH v2 6/6] drm/atmel-hlcdc: fix broken release date
-In-Reply-To: <20180418094428.6db785dc@bbrezillon>
-References: <20180417131052.16336-1-peda@axentia.se>
- <20180417131052.16336-7-peda@axentia.se> <20180418094428.6db785dc@bbrezillon>
-Message-ID: <3de958e5-c63c-6935-d577-1be626661601@axentia.se>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 18 Apr 2018 13:47:24 +0530
+Subject: [RESEND PATCH v2 0/4] ARM: davinci: remove the mach-specific
+ aemif driver - part 1
+In-Reply-To: <e3fc3019-888c-cbc3-5e1b-e24c30bc4d49@oracle.com>
+References: <20180417102917.7794-1-brgl@bgdev.pl>
+ <2a2ac117-900c-77b6-f247-49777493e55f@ti.com>
+ <CAMpxmJUBFEF7FDp910HwsrNhGhwJDrgRR_9qL0DE5W1M=39MgQ@mail.gmail.com>
+ <e3fc3019-888c-cbc3-5e1b-e24c30bc4d49@oracle.com>
+Message-ID: <4aa845a4-a96f-c574-19a2-3dd5521fa5bd@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-18 09:44, Boris Brezillon wrote:
-> On Tue, 17 Apr 2018 15:10:52 +0200
-> Peter Rosin <peda@axentia.se> wrote:
+On Tuesday 17 April 2018 10:59 PM, Santosh Shilimkar wrote:
+> On 4/17/2018 5:36 AM, Bartosz Golaszewski wrote:
+>> 2018-04-17 12:53 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+>>> Hi Bartosz,
 > 
->> Bump the minor version while at it.
+> [...]
+> 
+>>>> This series applies on top of v8 of David Lechner's CCF series.
+>>>
+>>> Are there any patches in the series that can safely be applied to
+>>> v4.17-rc1?
+> 
 >>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
+>> Hi Sekhar,
 >>
->> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->> index 8523c40fac94..aa48f287b5ca 100644
->> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
->> @@ -763,9 +763,9 @@ static struct drm_driver atmel_hlcdc_dc_driver = {
->>  	.fops = &fops,
->>  	.name = "atmel-hlcdc",
->>  	.desc = "Atmel HLCD Controller DRM",
->> -	.date = "20141504",
-> 
-> I guess I used YYYYDDMM format :-).
-> 
->> +	.date = "20180409",
->>  	.major = 1,
->> -	.minor = 0,
->> +	.minor = 1,
-> 
-> Don't know what the strategy is regarding date and minor version
-> updates. I never had to update that before, so I guess it's not
-> important to userspace anyway.
+>> yes, all of them. They're not linked to David's work in any way.
+>>
+> Please separate the driver/emif/* patches from the series. These
+> are not fixes so they are not rcx candidates. But will queue them
+> up for next merge window. Thanks !!
 
-I have no clue what strategy should be employed. I assume it's
-for easier communication when features are backported into stable
-or distro kernels and users wonder what to expect or for easier
-triage of bug reports or something?? Anyway, I don't really care,
-the date just looked really odd. So feel free to only patch the
-.date to 20140415 or whatever. I'll drop this patch.
+Thanks Santosh! Can you please queue the drivers/emif/ patches on an
+immutable branch based off v4.17-rc1 which I can then merge to queue the
+platform patches?
 
-Cheers,
-Peter
-
->>  };
->>  
->>  static int atmel_hlcdc_dc_drm_init(struct platform_device *pdev)
-> 
+Thanks,
+Sekhar
