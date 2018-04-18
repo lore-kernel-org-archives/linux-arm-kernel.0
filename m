@@ -1,60 +1,91 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 18 Apr 2018 17:35:49 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6ull: add operating points
-In-Reply-To: <20180418145230.10249-2-sebastien.szymanski@armadeus.com>
-References: <20180418145230.10249-1-sebastien.szymanski@armadeus.com>
- <20180418145230.10249-2-sebastien.szymanski@armadeus.com>
-Message-ID: <c5d92c4e36973e3e18980d410e11ec4f@agner.ch>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Wed, 18 Apr 2018 16:31:40 +0100
+Subject: [PATCH v5 06/23] ASoC: qdsp6: dt-bindings: Add q6asm dt bindings
+In-Reply-To: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
+References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180418153157.1960-7-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.04.2018 16:52, S?bastien Szymanski wrote:
-> i.MX6ULL has different operating ranges than i.MX6UL so add the
-> operating points for the i.MX6ULL. A 25mV offset is added to the minimum
-> allowed values like for the i.MX6UL.
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Hi S?bastien,
+This patch add DT bindings for ASM (Audio Stream Manager) DSP module.
 
-Last time I checked there was a DC controller missing for the EVK, so I
-think it was not possible to go to the highest operating points yet.
-Have you tested this on the EVK?
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
+---
+ .../devicetree/bindings/sound/qcom,q6asm.txt       | 33 ++++++++++++++++++++++
+ include/dt-bindings/sound/qcom,q6asm.h             | 22 +++++++++++++++
+ 2 files changed, 55 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6asm.txt
+ create mode 100644 include/dt-bindings/sound/qcom,q6asm.h
 
---
-Stefan
-
-> 
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
-> ---
->  arch/arm/boot/dts/imx6ull.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-> index 571ddd71cdba..7e6273be0291 100644
-> --- a/arch/arm/boot/dts/imx6ull.dtsi
-> +++ b/arch/arm/boot/dts/imx6ull.dtsi
-> @@ -46,6 +46,25 @@
->  /* Delete UART8 in AIPS-1 (i.MX6UL specific) */
->  /delete-node/ &uart8;
->  
-> +&cpu0 {
-> +	operating-points = <
-> +		/* kHz	uV */
-> +		900000	1275000
-> +		792000	1225000
-> +		528000	1175000
-> +		396000	1025000
-> +		198000	950000
-> +	>;
-> +	fsl,soc-operating-points = <
-> +		/* KHz	uV */
-> +		900000	1400000
-> +		792000	1350000
-> +		528000	1175000
-> +		396000	1175000
-> +		198000	1175000
-> +	>;
-> +};
-> +
->  / {
->  	soc {
->  		aips3: aips-bus at 2200000 {
+diff --git a/Documentation/devicetree/bindings/sound/qcom,q6asm.txt b/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
+new file mode 100644
+index 000000000000..d034a50a202a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/qcom,q6asm.txt
+@@ -0,0 +1,33 @@
++Qualcomm Audio Stream Manager (Q6ASM) binding
++
++Q6ASM is one of the APR audio service on Q6DSP.
++Please refer to qcom,apr.txt for details of the coommon apr service bindings
++used by the apr service device.
++
++- but must contain the following property:
++
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "qcom,asm-v<MAJOR-NUMBER>.<MINOR-NUMBER>".
++		    Or "qcom,asm" where the version number can be queried
++		    from DSP.
++		    example "qcom,asm-v2.0"
++
++= ASM DAIs (Digial Audio Interface)
++"dais" subnode of the ASM node represents dai specific configuration
++
++- #sound-dai-cells
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: Must be 1
++
++= EXAMPLE
++
++q6asm {
++	compatible = "qcom,q6asm";
++	reg = <APR_SVC_ASM>;
++	q6asmdai: dais {
++		#sound-dai-cells = <1>;
++	};
++};
+diff --git a/include/dt-bindings/sound/qcom,q6asm.h b/include/dt-bindings/sound/qcom,q6asm.h
+new file mode 100644
+index 000000000000..2e11b15d930d
+--- /dev/null
++++ b/include/dt-bindings/sound/qcom,q6asm.h
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-2.0
++#ifndef __DT_BINDINGS_Q6_ASM_H__
++#define __DT_BINDINGS_Q6_ASM_H__
++
++#define	MSM_FRONTEND_DAI_MULTIMEDIA1	0
++#define	MSM_FRONTEND_DAI_MULTIMEDIA2	1
++#define	MSM_FRONTEND_DAI_MULTIMEDIA3	2
++#define	MSM_FRONTEND_DAI_MULTIMEDIA4	3
++#define	MSM_FRONTEND_DAI_MULTIMEDIA5	4
++#define	MSM_FRONTEND_DAI_MULTIMEDIA6	5
++#define	MSM_FRONTEND_DAI_MULTIMEDIA7	6
++#define	MSM_FRONTEND_DAI_MULTIMEDIA8	7
++#define	MSM_FRONTEND_DAI_MULTIMEDIA9	8
++#define	MSM_FRONTEND_DAI_MULTIMEDIA10	9
++#define	MSM_FRONTEND_DAI_MULTIMEDIA11	10
++#define	MSM_FRONTEND_DAI_MULTIMEDIA12	11
++#define	MSM_FRONTEND_DAI_MULTIMEDIA13	12
++#define	MSM_FRONTEND_DAI_MULTIMEDIA14	13
++#define	MSM_FRONTEND_DAI_MULTIMEDIA15	14
++#define	MSM_FRONTEND_DAI_MULTIMEDIA16	15
++
++#endif /* __DT_BINDINGS_Q6_ASM_H__ */
+-- 
+2.16.2
