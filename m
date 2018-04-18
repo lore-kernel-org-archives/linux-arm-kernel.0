@@ -1,90 +1,31 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 18 Apr 2018 15:48:56 +0300
-Subject: [bug report] coresight: tmc: allocating memory when needed
-Message-ID: <20180418124856.GA5771@mwanda>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 18 Apr 2018 14:52:54 +0200
+Subject: [PATCH] clk: imx6ul: fix periph clk2 clock mux selection
+Message-ID: <20180418125254.4397-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ This bug is a couple years old now so presumably it can't be that
-  serious but maybe it's still worth looking at?  -dan ]
+According to the data sheet the 3rd choice is the bypass clock
+of pll2. This should not have any effect in practice as this
+selection is not used currently.
 
-Hello Mathieu Poirier,
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/clk/imx/clk-imx6ul.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The patch de5461970b3e: "coresight: tmc: allocating memory when
-needed" from May 3, 2016, leads to the following static checker
-warning:
-
-	drivers/hwtracing/coresight/coresight-tmc-etr.c:174 tmc_enable_etr_sink_sysfs()
-	error: uninitialized symbol 'paddr'.
-
-drivers/hwtracing/coresight/coresight-tmc-etr.c
-   121  static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
-   122  {
-   123          int ret = 0;
-   124          bool used = false;
-   125          unsigned long flags;
-   126          void __iomem *vaddr = NULL;
-   127          dma_addr_t paddr;
-                ^^^^^^^^^^^^^^^^
-   128          struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-   129  
-   130  
-   131          /*
-   132           * If we don't have a buffer release the lock and allocate memory.
-   133           * Otherwise keep the lock and move along.
-   134           */
-   135          spin_lock_irqsave(&drvdata->spinlock, flags);
-   136          if (!drvdata->vaddr) {
-                     ^^^^^^^^^^^^^^
-   137                  spin_unlock_irqrestore(&drvdata->spinlock, flags);
-   138  
-   139                  /*
-   140                   * Contiguous  memory can't be allocated while a spinlock is
-   141                   * held.  As such allocate memory here and free it if a buffer
-   142                   * has already been allocated (from a previous session).
-   143                   */
-   144                  vaddr = dma_alloc_coherent(drvdata->dev, drvdata->size,
-   145                                             &paddr, GFP_KERNEL);
-   146                  if (!vaddr)
-   147                          return -ENOMEM;
-   148  
-   149                  /* Let's try again */
-   150                  spin_lock_irqsave(&drvdata->spinlock, flags);
-   151          }
-   152  
-   153          if (drvdata->reading) {
-   154                  ret = -EBUSY;
-   155                  goto out;
-   156          }
-   157  
-   158          /*
-   159           * In sysFS mode we can have multiple writers per sink.  Since this
-   160           * sink is already enabled no memory is needed and the HW need not be
-   161           * touched.
-   162           */
-   163          if (drvdata->mode == CS_MODE_SYSFS)
-   164                  goto out;
-   165  
-   166          /*
-   167           * If drvdata::buf == NULL, use the memory allocated above.
-   168           * Otherwise a buffer still exists from a previous session, so
-   169           * simply use that.
-   170           */
-   171          if (drvdata->buf == NULL) {
-                    ^^^^^^^^^^^^^^^^^^^^
-
-Perhaps ->buf is only NULL when ->vaddr is NULL?  It's surprising that
-we're not testing ->buf in both places.
-
-   172                  used = true;
-   173                  drvdata->vaddr = vaddr;
-   174                  drvdata->paddr = paddr;
-                        ^^^^^^^^^^^^^^^^^^^^^^^
-
-   175                  drvdata->buf = drvdata->vaddr;
-   176          }
-   177  
-   178          drvdata->mode = CS_MODE_SYSFS;
-
-regards,
-dan carpenter
+diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+index 12320118f8de..2ed7dae39008 100644
+--- a/drivers/clk/imx/clk-imx6ul.c
++++ b/drivers/clk/imx/clk-imx6ul.c
+@@ -40,7 +40,7 @@ static const char *axi_alt_sels[] = { "pll2_pfd2_396m", "pll3_pfd1_540m", };
+ static const char *axi_sels[] = {"periph", "axi_alt_sel", };
+ static const char *periph_pre_sels[] = { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll2_198m", };
+ static const char *periph2_pre_sels[] = { "pll2_bus", "pll2_pfd2_396m", "pll2_pfd0_352m", "pll4_audio_div", };
+-static const char *periph_clk2_sels[] = { "pll3_usb_otg", "osc", "osc", };
++static const char *periph_clk2_sels[] = { "pll3_usb_otg", "osc", "pll2_bypass_src", };
+ static const char *periph2_clk2_sels[] = { "pll3_usb_otg", "osc", };
+ static const char *periph_sels[] = { "periph_pre", "periph_clk2", };
+ static const char *periph2_sels[] = { "periph2_pre", "periph2_clk2", };
+-- 
+2.17.0
