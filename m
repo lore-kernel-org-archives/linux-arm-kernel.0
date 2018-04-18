@@ -1,45 +1,96 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 18 Apr 2018 17:37:52 +0200
-Subject: [PATCH 1/3] dt-bindings: iio: stm32-adc: add support for STM32MP1.
-In-Reply-To: <1524065874-434-1-git-send-email-fabrice.gasnier@st.com>
-References: <1524065874-434-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1524065874-434-2-git-send-email-fabrice.gasnier@st.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 18 Apr 2018 17:43:14 +0200
+Subject: [PATCH 1/2] cpufreq: imx6q: check speed grades for i.MX6ULL
+In-Reply-To: <20180418145230.10249-1-sebastien.szymanski@armadeus.com>
+References: <20180418145230.10249-1-sebastien.szymanski@armadeus.com>
+Message-ID: <3b01e6f282514aa10b083a3d0f8400f9@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document support for STM32MP1 ADC. It's quite similar to STM32H7 ADC.
-Introduce "st,stm32mp1-adc" compatible to handle variants of this
-hardware such as vregready flag, interrupts, clock rate.
+On 18.04.2018 16:52, S?bastien Szymanski wrote:
+> Check the max speed supported from the fuses for i.MX6ULL and update the
+> operating points table accordingly.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Thanks for working on this.
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-index e8bb824..9994384 100644
---- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-@@ -24,8 +24,11 @@ Required properties:
- - compatible: Should be one of:
-   "st,stm32f4-adc-core"
-   "st,stm32h7-adc-core"
-+  "st,stm32mp1-adc-core"
- - reg: Offset and length of the ADC block register set.
--- interrupts: Must contain the interrupt for ADC block.
-+- interrupts: One or more interrupts for ADC block. Some parts like stm32f4
-+  and stm32h7 share a common ADC interrupt line. stm32mp1 has separate
-+  lines for each ADC within ADC block.
- - clocks: Core can use up to two clocks, depending on part used:
-   - "adc" clock: for the analog circuitry, common to all ADCs.
-     It's required on stm32f4.
-@@ -53,6 +56,7 @@ Required properties:
- - compatible: Should be one of:
-   "st,stm32f4-adc"
-   "st,stm32h7-adc"
-+  "st,stm32mp1-adc"
- - reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
- - clocks: Input clock private to this ADC instance. It's required only on
-   stm32f4, that has per instance clock input for registers access.
--- 
-1.9.1
+Due to lack of this feature we added operating points directly to the
+board level device tree:
+arch/arm/boot/dts/imx6ull-colibri-wifi.dtsi
+
+> 
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 29 +++++++++++++++++++++++------
+>  1 file changed, 23 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index 83cf631fc9bc..f094687cae52 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -266,6 +266,8 @@ static void imx6q_opp_check_speed_grading(struct
+> device *dev)
+>  }
+>  
+>  #define OCOTP_CFG3_6UL_SPEED_696MHZ	0x2
+> +#define OCOTP_CFG3_6ULL_SPEED_792MHZ	0x2
+> +#define OCOTP_CFG3_6ULL_SPEED_900MHZ	0x3
+>  
+>  static void imx6ul_opp_check_speed_grading(struct device *dev)
+>  {
+> @@ -287,16 +289,30 @@ static void
+> imx6ul_opp_check_speed_grading(struct device *dev)
+>  	 * Speed GRADING[1:0] defines the max speed of ARM:
+>  	 * 2b'00: Reserved;
+>  	 * 2b'01: 528000000Hz;
+> -	 * 2b'10: 696000000Hz;
+> -	 * 2b'11: Reserved;
+> +	 * 2b'10: 696000000Hz on i.MX6UL, 792000000Hz on i.MX6ULL;
+> +	 * 2b'11: 900000000Hz on i.MX6ULL only;
+>  	 * We need to set the max speed of ARM according to fuse map.
+>  	 */
+>  	val = readl_relaxed(base + OCOTP_CFG3);
+>  	val >>= OCOTP_CFG3_SPEED_SHIFT;
+>  	val &= 0x3;
+> -	if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
+> -		if (dev_pm_opp_disable(dev, 696000000))
+> -			dev_warn(dev, "failed to disable 696MHz OPP\n");
+> +
+> +	if (of_machine_is_compatible("fsl,imx6ul")) {
+> +		if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
+> +			if (dev_pm_opp_disable(dev, 696000000))
+> +				dev_warn(dev, "failed to disable 696MHz OPP\n");
+> +	}
+> +
+> +	if (of_machine_is_compatible("fsl,imx6ull")) {
+> +		if (val != OCOTP_CFG3_6ULL_SPEED_792MHZ)
+> +			if (dev_pm_opp_disable(dev, 792000000))
+> +				dev_warn(dev, "failed to disable 792MHz OPP\n");
+> +
+> +		if (val != OCOTP_CFG3_6ULL_SPEED_900MHZ)
+> +			if (dev_pm_opp_disable(dev, 900000000))
+> +				dev_warn(dev, "failed to disable 900MHz OPP\n");
+
+
+We use the 800MHz SKU, so our device tree has no 900MHz setpoint. 
+
+I guess we should remove the operating points in the board level device
+tree then to avoid warnings on boot-up...?
+
+--
+Stefan
+
+> +	}
+> +
+>  	iounmap(base);
+>  put_node:
+>  	of_node_put(np);
+> @@ -356,7 +372,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  		goto put_reg;
+>  	}
+>  
+> -	if (of_machine_is_compatible("fsl,imx6ul"))
+> +	if (of_machine_is_compatible("fsl,imx6ul") ||
+> +	    of_machine_is_compatible("fsl,imx6ull"))
+>  		imx6ul_opp_check_speed_grading(cpu_dev);
+>  	else
+>  		imx6q_opp_check_speed_grading(cpu_dev);
