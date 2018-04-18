@@ -1,154 +1,81 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 18 Apr 2018 15:06:13 +0200
-Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
- to netdev dma client
-In-Reply-To: <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-3-git-send-email-radheys@xilinx.com>
- <20180411090854.GY6014@localhost>
- <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
- <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
- <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
- <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
- <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
- <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
- <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
-Message-ID: <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Wed, 18 Apr 2018 14:15:01 +0100
+Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
+In-Reply-To: <fa2dd630-6c9a-82d0-346c-1fa9530a71da@arm.com>
+References: <20180406141935.6801-1-linus.walleij@linaro.org>
+ <20180410095737.GF10254@e110455-lin.cambridge.arm.com>
+ <CACRpkdb1toYJEaHDZ2QORt+qzN7imH9ugx3xvi1HASoZU0QSiQ@mail.gmail.com>
+ <297aae18-8efc-b7cc-20c2-eb09d72d2dd1@arm.com>
+ <CACRpkdYPwm=2jhompecL5z_qwhe9UzZHKLKZLYgDK+YV_ZfMag@mail.gmail.com>
+ <fa2dd630-6c9a-82d0-346c-1fa9530a71da@arm.com>
+Message-ID: <20180418131501.GN14661@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2018 08:31 AM, Peter Ujfalusi wrote:
+On Wed, Apr 18, 2018 at 12:50:10PM +0100, Robin Murphy wrote:
+> On 17/04/18 20:31, Linus Walleij wrote:
+> > On Tue, Apr 17, 2018 at 3:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > > On 17/04/18 13:32, Linus Walleij wrote:
+> > > [...]
+> > > > 
+> > > > Unfortunately there is just one single vexpress core tile in the
+> > > > upstream kernel that define a CLCD controller, the CA9 (4xA9)
+> > > > that I am using. All the others just use the MB CLCD.
+> > > > 
+> > > > I am thinking there is some never finished DTS upstreaming
+> > > > here that ought to happen so we use the core tile CLCD on some
+> > > > other boards as well.
+> > > 
+> > > 
+> > > Barring custom FPGA images, I think V2P-CA9 *is* the only VExpress tile
+> > > implementing PL11x; all the more recent test chips had HDLCD instead.
+> > 
+> > Yup it looks like that.
+> > 
+> > I am restructuring the code to look for any graphics on the
+> > core tile and only turn on the motherboard CLCD if there is
+> > no CLCD or HDLCD on the core tile, e.g. if that device node has
+> > been set to "disabled" or the HDLCD driver is not compiled in
+> > but the CLCD driver is.
+> > 
+> > I found some vague mentions of a LCD display that can be
+> > connected to the motherboard, so that would then be sitting
+> > on the CLCD, is this something you ARM guys have seen
+> > around? In that case I guess the VExpress (etc) would actually
+> > be able to have two screens, one LCD panel on the motherboard
+> > CLCD and a DVI from the core tile.
 > 
-> On 2018-04-17 18:54, Lars-Peter Clausen wrote:
->> On 04/17/2018 04:53 PM, Peter Ujfalusi wrote:
->>> On 2018-04-17 16:58, Lars-Peter Clausen wrote:
->>>>>> There are two options.
->>>>>>
->>>>>> Either you extend the generic interfaces so it can cover your usecase in a
->>>>>> generic way. E.g. the ability to attach meta data to transfer.
->>>>>
->>>>> Fwiw I have this patch as part of a bigger work to achieve similar results:
->>>>
->>>> That's good stuff. Is this in a public tree somewhere?
->>>
->>> Not atm. I can not send the user of the new API and I did not wanted to
->>> send something like this out of the blue w/o context.
->>>
->>> But as it is a generic patch, I can send it as well. The only thing is
->>> that the need for the memcpy, so I might end up with
->>> ptr = get_metadata_ptr(desc, &size); /* size: in RX the valid size */
->>>
->>> and set_metadata_size(); /* in TX to tell how the client placed */
->>>
->>> Or something like that, the attach_metadata() as it is works just fine,
->>> but high throughput might not like the memcpy.
->>>
->>
->> In the most abstracted way I'd say metadata and data are two different data
->> streams that are correlated and send/received at the same time.
-> 
-> In my case the meatdata is sideband information or parameters for/from
-> the remote end. Like timestamp, algorithm parameters, keys, etc.
-> 
-> It is tight to the data payload, but it is not part of it.
-> 
-> But the API should be generic enough to cover other use cases where
-> clients need to provide additional information.
-> For me, the metadata is part of the descriptor we give and receive back
-> from the DMA, others might have sideband channel to send that.
-> 
-> For metadata handling we could have:
-> 
-> struct dma_desc_metadata_ops {
->    /* To give a buffer for the DMA with the metadata, as it was in my
->     * original patch
->     */
->    int (*desc_attach_metadata)(struct dma_async_tx_descriptor *desc,
->                                void *data, size_t len);
-> 
->    void *(*desc_get_metadata_ptr)(struct dma_async_tx_descriptor *desc,
->                                   size_t *payload_len, size_t *max_len);
->    int (*desc_set_payload_len)(struct dma_async_tx_descriptor *desc,
->                               size_t payload_len);
-> };
-> 
-> Probably a simple flag variable to indicate which of the two modes are
-> supported:
-> 1. Client provided metadata buffer handling
-> Clients provide the buffer via desc_attach_metadata(), the DMA driver
-> will do whatever it needs to do, copy it in place, send it differently,
-> use parameters.
-> In RX the received metadata is going to be placed to the provided buffer.
-> 2. Ability to give the metadata pointer to user to work on it.
-> In TX, clients can use desc_get_metadata_ptr() to get the pointer,
-> current payload size and maximum size of the metadata and can work
-> directly on the buffer to place the data. Then desc_set_payload_len() to
-> let the DMA know how much data is actually placed there.
-> In RX, desc_get_metadata_ptr() will give the user the pointer and the
-> payload size so it can process that information correctly.
-> 
-> DMA driver can implement either or both, but clients must only use
-> either 1 or 2 to work with the metadata.
-> 
-> 
->> Think multi-planar transfer, like for audio when the right and left channel
->> are in separate buffers and not interleaved. Or video with different
->> color/luminance components in separate buffers. This is something that is at
->> the moment not covered by the dmaengine API either.
-> 
-> Hrm, true, but it is hardly the metadata use case. It is more like
-> different DMA transfer type.
+> I don't see anything in the V2M motherboard manual to suggest the IOFPGA
+> CLCD output is routed anywhere other than the DVI mux, and there are
+> certainly no unaccounted-for connectors on the VExpress version currently in
+> front of me (HBI-0190D). The only things I'm immediately aware of having a
+> panel connector directly on the board are Integrator/CP and RealView EB.
 
-When I look at this with my astronaut architect view from high high up above
-I do not see a difference between metadata and multi-planar data.
+Yes, I think the last platform that could have had an LCD display
+attached directly was the Versatile platform, not the VExpress one.
 
-Both split the data that is sent to the peripheral into multiple
-sub-streams, each carrying part of the data. I'm sure there are peripherals
-that interleave data and metadata on the same data stream. Similar to how we
-have left and right channel interleaved in a audio stream.
+Regarding the mux and trying to figure out a clever way of deciding
+which one should have priority: I would not bother adding that to the
+CLCD driver, instead I would expect the bootloader to set the MUX
+correctly. Long time ago, before Juno was a thing and the only platform
+HDLCD was running on was VExpress, I did have a patch to use
+vexpress_config_write() (API before vexpress-config got converted to
+regmap) to set the MUX. Then Juno happened and I've realised it was not
+worth baking into the driver the existence of the MUX, as it was a quirk
+of the board.
 
-What about metadata that is not contiguous and split into multiple segments.
-How do you handle passing a sgl to the metadata interface? And then it
-suddenly looks quite similar to the normal DMA descriptor interface.
+Best regards,
+Liviu
 
-But maybe that's just one abstraction level to high.
-
->>>>>> Or you can implement a interface that is specific to your DMA controller and
->>>>>> any client using this interface knows it is talking to your DMA controller.
->>>>>
->>>>> Hrm, so we can have DMA driver specific calls? The reason why TI's keystone 2
->>>>> navigator DMA support was rejected that it was introducing NAV specific calls
->>>>> for clients to configure features not yet supported by the framework.
->>>>
->>>> In my opinion it is OK, somebody else might have different ideas. I mean it
->>>> is not nice, but it is better than the alternative of overloading the
->>>> generic API with driver specific semantics or introducing some kind of IOCTL
->>>> catch all callback.
->>>
->>> True, but the generic API can be extended as well to cover new grounds,
->>> features. Like this metadata thing.
->>>
->>>> If there is tight coupling between the DMA core and client and there is no
->>>> intention of using a generic client the best solution might even be to no
->>>> use DMAengine at all.
->>>
->>> This is how the knav stuff ended up. Well it is only used by networking
->>> atm, so it is 'fine' to have custom API, but it is not portable.
->>
->> I totally agree generic APIs are better, but not everybody has the resources
->> to rewrite the whole framework just because they want to do this tiny thing
->> that isn't covered by the framework yet. In that case it is better to go
->> with a custom API (that might evolve into a generic API), rather than
->> overloading the generic API and putting a strain on everybody who works on
->> the generic API.
 > 
-> At some point a threshold is reached when the burden of maintaining a
-> custom API is more costly than investing on the extension of the framework.
-> What happens when an existing driver (using DMAengine API) need to be
-> supported on platform where only custom DMA code is available or if you
-> want to migrate to a new DMA from the custom API the drier is wired for?
-> It is just plain pain.
-> At the end what we want to do with DMA: move data from opne place to
-> another (in oversimplified view).
+> Robin.
 
-I think we fully agree on this :)
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
