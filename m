@@ -1,162 +1,63 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 18 Apr 2018 17:35:52 +0200
-Subject: [PATCH 2/2] memory: aemif: add support for board files
-In-Reply-To: <20180418153552.14632-1-brgl@bgdev.pl>
-References: <20180418153552.14632-1-brgl@bgdev.pl>
-Message-ID: <20180418153552.14632-3-brgl@bgdev.pl>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Wed, 18 Apr 2018 16:31:39 +0100
+Subject: [PATCH v5 05/23] ASoC: qdsp6: dt-bindings: Add q6adm dt bindings
+In-Reply-To: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
+References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20180418153157.1960-6-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Currently aemif is supported in two places separately. By the platform
-driver in drivers/memory and by a hand crafted driver in mach-davinci.
+This patch add DT bindings for ADM (Audio Device Manager) DSP module.
+This module implements mixer controls to setup the connections between
+AFE ports and ASM streams.
 
-We want to drop the latter but also keep the legacy mode. Add support
-for board files to the aemif driver.
-
-The new structure in platform data currently only contains the chip
-select number, since currently existing users don't require anything
-else, but it can be extended in the future.
-
-While extending the platform data struct, add kernel docs describing
-its members.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- drivers/memory/ti-aemif.c              | 58 +++++++++++++++++---------
- include/linux/platform_data/ti-aemif.h | 25 +++++++++++
- 2 files changed, 63 insertions(+), 20 deletions(-)
+ .../devicetree/bindings/sound/qcom,q6adm.txt       | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/qcom,q6adm.txt
 
-diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
-index 588e58d40d1b..c9577fda967c 100644
---- a/drivers/memory/ti-aemif.c
-+++ b/drivers/memory/ti-aemif.c
-@@ -339,9 +339,6 @@ static int aemif_probe(struct platform_device *pdev)
- 	struct aemif_platform_data *pdata;
- 	struct of_dev_auxdata *dev_lookup;
- 
--	if (np == NULL)
--		return 0;
--
- 	aemif = devm_kzalloc(dev, sizeof(*aemif), GFP_KERNEL);
- 	if (!aemif)
- 		return -ENOMEM;
-@@ -363,8 +360,10 @@ static int aemif_probe(struct platform_device *pdev)
- 
- 	aemif->clk_rate = clk_get_rate(aemif->clk) / MSEC_PER_SEC;
- 
--	if (of_device_is_compatible(np, "ti,da850-aemif"))
-+	if (np && of_device_is_compatible(np, "ti,da850-aemif"))
- 		aemif->cs_offset = 2;
-+	else if (pdata)
-+		aemif->cs_offset = pdata->cs_offset;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	aemif->base = devm_ioremap_resource(dev, res);
-@@ -373,15 +372,23 @@ static int aemif_probe(struct platform_device *pdev)
- 		goto error;
- 	}
- 
--	/*
--	 * For every controller device node, there is a cs device node that
--	 * describe the bus configuration parameters. This functions iterate
--	 * over these nodes and update the cs data array.
--	 */
--	for_each_available_child_of_node(np, child_np) {
--		ret = of_aemif_parse_abus_config(pdev, child_np);
--		if (ret < 0)
--			goto error;
-+	if (np) {
-+		/*
-+		 * For every controller device node, there is a cs device node
-+		 * that describe the bus configuration parameters. This
-+		 * functions iterate over these nodes and update the cs data
-+		 * array.
-+		 */
-+		for_each_available_child_of_node(np, child_np) {
-+			ret = of_aemif_parse_abus_config(pdev, child_np);
-+			if (ret < 0)
-+				goto error;
-+		}
-+	} else if (pdata && pdata->num_abus_data > 0) {
-+		for (i = 0; i < pdata->num_abus_data; i++, aemif->num_cs++) {
-+			aemif->cs_data[i].cs = pdata->abus_data->cs;
-+			aemif_get_hw_params(pdev, i);
-+		}
- 	}
- 
- 	for (i = 0; i < aemif->num_cs; i++) {
-@@ -394,14 +401,25 @@ static int aemif_probe(struct platform_device *pdev)
- 	}
- 
- 	/*
--	 * Create a child devices explicitly from here to
--	 * guarantee that the child will be probed after the AEMIF timing
--	 * parameters are set.
-+	 * Create a child devices explicitly from here to guarantee that the
-+	 * child will be probed after the AEMIF timing parameters are set.
- 	 */
--	for_each_available_child_of_node(np, child_np) {
--		ret = of_platform_populate(child_np, NULL, dev_lookup, dev);
--		if (ret < 0)
--			goto error;
-+	if (np) {
-+		for_each_available_child_of_node(np, child_np) {
-+			ret = of_platform_populate(child_np, NULL,
-+						   dev_lookup, dev);
-+			if (ret < 0)
-+				goto error;
-+		}
-+	} else {
-+		for (i = 0; i < pdata->num_sub_devices; i++) {
-+			pdata->sub_devices[i].dev.parent = dev;
-+			ret = platform_device_register(&pdata->sub_devices[i]);
-+			if (ret) {
-+				dev_warn(dev, "Error register sub device %s\n",
-+					 pdata->sub_devices[i].name);
-+			}
-+		}
- 	}
- 
- 	return 0;
-diff --git a/include/linux/platform_data/ti-aemif.h b/include/linux/platform_data/ti-aemif.h
-index ac72e115093c..e6407bafcbf8 100644
---- a/include/linux/platform_data/ti-aemif.h
-+++ b/include/linux/platform_data/ti-aemif.h
-@@ -16,8 +16,33 @@
- 
- #include <linux/of_platform.h>
- 
-+/**
-+ * struct aemif_abus_data - Async bus configuration parameters.
-+ *
-+ * @cs - Chip-select number.
-+ */
-+struct aemif_abus_data {
-+	u32 cs;
-+};
+diff --git a/Documentation/devicetree/bindings/sound/qcom,q6adm.txt b/Documentation/devicetree/bindings/sound/qcom,q6adm.txt
+new file mode 100644
+index 000000000000..f1e2df8d2ea8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/qcom,q6adm.txt
+@@ -0,0 +1,33 @@
++Qualcomm Audio Device Manager (Q6ADM) binding
 +
-+/**
-+ * struct aemif_platform_data - Data to set up the TI aemif driver.
-+ *
-+ * @dev_lookup: of_dev_auxdata passed to of_platform_populate() for aemif
-+ *              subdevices.
-+ * @cs_offset: Lowest allowed chip-select number.
-+ * @abus_data: Array of async bus configuration entries.
-+ * @num_abus_data: Number of abus entries.
-+ * @sub_devices: Array of platform subdevices.
-+ * @num_sub_devices: Number of subdevices.
-+ */
- struct aemif_platform_data {
- 	struct of_dev_auxdata *dev_lookup;
-+	u32 cs_offset;
-+	struct aemif_abus_data *abus_data;
-+	size_t num_abus_data;
-+	struct platform_device *sub_devices;
-+	size_t num_sub_devices;
- };
- 
- #endif /* __TI_DAVINCI_AEMIF_DATA_H__ */
++Q6ADM is one of the APR audio service on Q6DSP.
++Please refer to qcom,apr.txt for details of the coommon apr service bindings
++used by the apr service device.
++
++- but must contain the following property:
++
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be "qcom,adm-v<MAJOR-NUMBER>.<MINOR-NUMBER>".
++		   Or "qcom,adm" where the version number can be queried
++		   from DSP.
++		   example "qcom,adm-v2.0"
++
++
++= ADM routing
++"routing" subnode of the ADM node represents adm routing specific configuration
++
++- #sound-dai-cells
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: Must be 0
++
++= EXAMPLE
++q6adm {
++	compatible = "qcom,q6adm";
++	reg = <APR_SVC_ADM>;
++	q6routing: routing {
++		#sound-dai-cells = <0>;
++	};
++};
 -- 
-2.17.0
+2.16.2
