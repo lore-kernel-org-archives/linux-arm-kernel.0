@@ -1,44 +1,38 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 18 Apr 2018 11:08:25 +0800
-Subject: [PATCHv2] ARM: dts: imx6ull: add UART5 input select register
- definitions
-In-Reply-To: <1522246943-2269-1-git-send-email-gerg@linux-m68k.org>
-References: <1522246943-2269-1-git-send-email-gerg@linux-m68k.org>
-Message-ID: <20180418030824.GQ25429@dragon>
+Date: Wed, 18 Apr 2018 11:12:00 +0800
+Subject: [PATCH v5] ARM: imx: Update spi_imx platform data to reflect
+ current state
+In-Reply-To: <20180402200605.13050-1-tpiepho@impinj.com>
+References: <20180402200605.13050-1-tpiepho@impinj.com>
+Message-ID: <20180418031159.GR25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 29, 2018 at 12:22:23AM +1000, Greg Ungerer wrote:
-> The iMX6ULL UART5_RX_DATA_SELECT_INPUT DAISY Register has some different
-> bit definitions to that same register in the iMX6UL.
+On Mon, Apr 02, 2018 at 01:06:05PM -0700, Trent Piepho wrote:
+> The docs for the spi_imx platform data still refer to a -32 offset used to
+> specify a native chip select.  This was removed in commit 602c8f4485cd
+> ("spi: imx: fix use of native chip-selects with devicetree") and no
+> longer works as documented.  Update documentation.
 > 
-> The bits for the iMX6UL:
+> The macro MXC_SPI_CS() is no longer is needed.
 > 
-> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-> 100 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT
-> 101 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT
+> If a board uses all native chip selects, then it's not necessary to
+> specify a chip select array at all, as all native is the default (this is
+> how device-tree configured SPI masters work too).  Most of the spi-imx
+> platform data users have their chip select arrays removed by this patch.
 > 
-> But for the iMX6ULL:
+> This patch also fixes a bug in mx31moboard introduced in the '602 commit.
+> When that board was updated in commit 901f26bce64a ("ARM: imx: set
+> correct chip_select in platform setup") to reflect the SPI change, only
+> SPI bus 2 was updated and SPI bus 1 was left with non-sequential chip
+> selects.  The mc13783 spi device on bus 1 had its chip select updated as
+> if it were on bus 2.
 > 
-> 000 CSI_DATA00_ALT8 ? Selecting Pad: CSI_DATA00 for Mode: ALT8
-> 001 CSI_DATA01_ALT8 ? Selecting Pad: CSI_DATA01 for Mode: ALT8
-> 010 GPIO1_IO04_ALT8 ? Selecting Pad: GPIO1_IO04 for Mode: ALT8
-> 011 GPIO1_IO05_ALT8 ? Selecting Pad: GPIO1_IO05 for Mode: ALT
-> 100 UART1_TX_DATA_ALT9 ? Selecting Pad: UART1_TX_DATA for Mode: ALT9
-> 101 UART1_RX_DATA_ALT9 ? Selecting Pad: UART1_RX_DATA for Mode: ALT9
-> 110 UART5_TX_DATA_ALT0 ? Selecting Pad: UART5_TX_DATA for Mode: ALT0
-> 111 UART5_RX_DATA_ALT0 ? Selecting Pad: UART5_RX_DATA for Mode: ALT0
-> 
-> Specifically for a board I am working on with the serial console on UART5
-> I need to be able to enable UART5_RX_DATA_ALT0 mode. There is no definition
-> for the iMX6ULL version of that in imx6ul-pinfunc.h or imx6ull-pinfunc.h.
-> 
-> Add definitions for the missing UART5 input select register bits of the
-> iMX6ULL.
-> 
-> Signed-off-by: Greg Ungerer <gerg@linux-m68k.org>
+> CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Sascha Hauer <kernel@pengutronix.de>
+> CC: Fabio Estevam <fabio.estevam@nxp.com>
+> Acked-by: Greg Ungerer <gerg@linux-m68k.org>
+> Reviewed-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
 
 Applied, thanks.
