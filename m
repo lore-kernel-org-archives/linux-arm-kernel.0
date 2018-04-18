@@ -1,22 +1,25 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 18 Apr 2018 10:20:26 -0500
-Subject: [PATCH v2 2/2] ARM: dts: da850-lcdk: add unit name for memory node
-In-Reply-To: <20180418092408.2077-3-nsekhar@ti.com>
-References: <20180418092408.2077-1-nsekhar@ti.com>
- <20180418092408.2077-3-nsekhar@ti.com>
-Message-ID: <4843ee2b-bd62-a557-8d63-4a77374bcb2d@lechnology.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 18 Apr 2018 17:20:17 +0200
+Subject: [PATCH] [media] include/media: fix missing | operator when
+ setting cfg
+In-Reply-To: <20180418150617.22489-1-colin.king@canonical.com>
+References: <CGME20180418150622epcas4p4be934b89937c0e50a2f236116c02d7cb@epcas4p4.samsung.com>
+ <20180418150617.22489-1-colin.king@canonical.com>
+Message-ID: <ebce8e36-9125-aecb-b0d1-87f068646e67@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2018 04:24 AM, Sekhar Nori wrote:
-> Add unit name for memory node to squash the W=1 warning:
+On 04/18/2018 05:06 PM, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> arch/arm/boot/dts/da850-lcdk.dtb: Warning (unit_address_vs_reg): /memory: node has a reg or ranges property, but no unit name
+> The value from a readl is being masked with ITE_REG_CIOCAN_MASK however
+> this is not being used and cfg is being re-assigned.  I believe the
+> assignment operator should actually be instead the |= operator.
 > 
-> While at it, drop the device_type property from memory
-> node since its provided by da850.dtsi already.
+> Detected by CoverityScan, CID#1467987 ("Unused value")
 > 
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-> ---
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-Reviewed-by: David Lechner <david@lechnology.com>
+Thanks for the patch.
+
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
