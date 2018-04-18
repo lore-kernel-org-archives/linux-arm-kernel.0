@@ -1,216 +1,41 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 18 Apr 2018 16:05:18 -0600
-Subject: [PATCH v2] perf tools: coresight: Moving to SPDX identifier
-Message-ID: <1524089118-27595-1-git-send-email-mathieu.poirier@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 18 Apr 2018 15:31:17 -0700
+Subject: [PATCH v2] ARM: dts: BCM5301X: Make usb3 phy use mdio phy driver
+In-Reply-To: <20180409223153.41893-1-npcomplete13@gmail.com>
+References: <20180315135647.48456-1-npcomplete13@gmail.com>
+ <20180409223153.41893-1-npcomplete13@gmail.com>
+Message-ID: <68519de5-9a47-9cb5-064c-dc4703aaa508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving perf tools CoreSight support to the SPDX identifier.
+On 04/09/2018 03:31 PM, Vivek Unune wrote:
+> Currently, usb3 phy in bcm5301x.dtsi uses platform driver which
+> requires register range "ccb-mii" <0x18003000 0x1000>. This range
+> overlaps with mdio cmd and param registers (<0x18003000 0x8>).
+> Essentially, the platform driver partly acts like a mdio bus
+> driver, hence to use of this register range.
+> 
+> In some Northstar devices like Linksys EA9500, secondary switch
+> is connected via external mdio. The only way to access and
+> configure the external switch is via mdio bus. When we enable the
+> mdio bus in it's current state, the mdio bus and any child buses
+> fail to register because of the register range overlap.
+> 
+> On Northstar, the usb3 phy is connected at address 0x10 on the
+> internal mdio bus. This change moves the usb3_phy node and makes
+> it a child node of internal mdio bus.
+> 
+> Thanks to Rafa? Mi?ecki's commit af850e14a7ae
+> ("phy: bcm-ns-usb3: add MDIO driver using proper bus layer") the
+> same usb3 platform driver can now act as usb3 phy mdio driver.
+> 
+> Tested on Linksys Panamera (EA9500)
+> 
+> Signed-off-by: Vivek Unune <npcomplete13@gmail.com>
+> ---
+> v2: Disabled usb3_phy by default, then enabled in dts where
+>     necessary
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- include/linux/coresight-pmu.h                   | 13 +------------
- tools/include/linux/coresight-pmu.h             | 13 +------------
- tools/perf/arch/arm/util/auxtrace.c             | 13 +------------
- tools/perf/arch/arm/util/cs-etm.c               | 13 +------------
- tools/perf/arch/arm/util/cs-etm.h               | 13 +------------
- tools/perf/arch/arm/util/pmu.c                  | 13 +------------
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  3 +--
- tools/perf/util/cs-etm.c                        |  3 +--
- tools/perf/util/cs-etm.h                        | 13 +------------
- 9 files changed, 9 insertions(+), 88 deletions(-)
-
-diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
-index edfeaba95429..a1a959ba24ff 100644
---- a/include/linux/coresight-pmu.h
-+++ b/include/linux/coresight-pmu.h
-@@ -1,18 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef _LINUX_CORESIGHT_PMU_H
-diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
-index edfeaba95429..a1a959ba24ff 100644
---- a/tools/include/linux/coresight-pmu.h
-+++ b/tools/include/linux/coresight-pmu.h
-@@ -1,18 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef _LINUX_CORESIGHT_PMU_H
-diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
-index fa639e3e52ac..1ce6bdbda561 100644
---- a/tools/perf/arch/arm/util/auxtrace.c
-+++ b/tools/perf/arch/arm/util/auxtrace.c
-@@ -1,18 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <stdbool.h>
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 5c655ad4621e..2f595cd73da6 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -1,18 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <api/fs/fs.h>
-diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
-index 5256741be549..1a12e64f5127 100644
---- a/tools/perf/arch/arm/util/cs-etm.h
-+++ b/tools/perf/arch/arm/util/cs-etm.h
-@@ -1,18 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef INCLUDE__PERF_CS_ETM_H__
-diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
-index ac4dffc807b8..e047571e6080 100644
---- a/tools/perf/arch/arm/util/pmu.c
-+++ b/tools/perf/arch/arm/util/pmu.c
-@@ -1,18 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <string.h>
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-index 640af88331b4..c8b98fa22997 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-@@ -1,6 +1,5 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * SPDX-License-Identifier: GPL-2.0
-- *
-  * Copyright(C) 2015-2018 Linaro Limited.
-  *
-  * Author: Tor Jeremiassen <tor@ti.com>
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 1b0d422373be..40020b1ca54f 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -1,6 +1,5 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * SPDX-License-Identifier: GPL-2.0
-- *
-  * Copyright(C) 2015-2018 Linaro Limited.
-  *
-  * Author: Tor Jeremiassen <tor@ti.com>
-diff --git a/tools/perf/util/cs-etm.h b/tools/perf/util/cs-etm.h
-index 5864d5dca616..37f8d48179ca 100644
---- a/tools/perf/util/cs-etm.h
-+++ b/tools/perf/util/cs-etm.h
-@@ -1,18 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright(C) 2015 Linaro Limited. All rights reserved.
-  * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef INCLUDE__UTIL_PERF_CS_ETM_H__
+Rafal, Hauke, this looks good to me, can you review? Thanks
 -- 
-2.7.4
+Florian
