@@ -1,54 +1,24 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 18 Apr 2018 11:33:13 +0100
-Subject: [RFC PATCH] arm64: fault: Don't leak data in ESR context for
- user fault on kernel VA
-In-Reply-To: <CAFEAcA_MKzoNV3rAs=wkfxjSXL8twOWcMxcaXct-o=WFmEVMnA@mail.gmail.com>
-References: <20180413100204.9674-1-peter.maydell@linaro.org>
- <20180413142101.GY16308@e103592.cambridge.arm.com>
- <CAFEAcA_MKzoNV3rAs=wkfxjSXL8twOWcMxcaXct-o=WFmEVMnA@mail.gmail.com>
-Message-ID: <20180418103311.GH16308@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Apr 2018 11:47:07 +0100
+Subject: [PATCH v2 6/8] spi: spi-s3c64xx: Fix indentation in the register
+ offset definitions
+In-Reply-To: <20180417142954.5507-6-s.nawrocki@samsung.com>
+References: <20180417142954.5507-1-s.nawrocki@samsung.com>
+ <CGME20180417143049epcas2p1a9244272897740ac03d7a21d5dfb5d14@epcas2p1.samsung.com>
+ <20180417142954.5507-6-s.nawrocki@samsung.com>
+Message-ID: <20180418104707.GA10061@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 06:34:11PM +0100, Peter Maydell wrote:
-> On 13 April 2018 at 15:21, Dave Martin <Dave.Martin@arm.com> wrote:
-> > There are certain fault types that should never be exposed to
-> > userspace, such as TLB conflict aborts, access flag faults, etc.
-> > See the changes upstream between v4.16 and torvalds/master (which I had
-> > temporarily forgotten about...)
-> >
-> > Now, __do_user_fault() is called for these cases but the signal has
-> > already been mapped to SIGKILL by this point via the fault_info[]
-> > table.  It doesn't matter too much what we do in such cases because
-> > the user task will be killed on signal delivery and so doesn't get a
-> > chance to inspect the ESR contents anyway.  It might be worth expanding
-> > the WARN() to catch mismaintenance of the fault_info[] table -- but that
-> > may be overkill.  Maybe adding some comments explaining the dependency
-> > is sufficient.
-> 
-> I had a look at the code in current master, and from my reading
-> of it it does not call __do_user_fault() for faults like TLB
-> conflict aborts, etc. Those all have fault_info[] table entries
-> that specify do_bad() as the function pointer, which just returns 1.
-> It's only do_page_fault(), do_translation_fault() and do_alignment()
-> fault that can get into __do_user_fault().
-> 
-> So I don't think there's any change that needs to be made for this
-> point. Am I misunderstanding what you have in mind? If so it would
-> probably be simplest if you explained the change you'd like to see.
+On Tue, Apr 17, 2018 at 04:29:52PM +0200, Sylwester Nawrocki wrote:
+> Change indentation so register address offset and register bit definitions
+> are aligned to same column.
 
-Don't worry about this; I think you're right.  I was confusing do_bad()
-with do_bad_area() in my head somewhere along the line...
-
-> 
-> (The changes in master since v4.16 do require a rebase anyway, mostly
-> for textual reasons, so I'll base v2 on master unless you have a
-> different branch you'd rather I based it on.)
-
--rc1 or master is probably fine.  Most of the dust from the merge window
-ought to have settled now.
-
-> I've made the various other changes you suggest.
-
-Cheers
----Dave
+This doesn't apply against current code, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/3a28d070/attachment.sig>
