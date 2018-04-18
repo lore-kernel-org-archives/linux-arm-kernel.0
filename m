@@ -1,61 +1,51 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 18 Apr 2018 10:45:35 +0200
-Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
-In-Reply-To: <CAGb2v67qvk=T7u7bOjVZ7q_qsjJuEOM6iarw7by42ga=EYuYDg@mail.gmail.com>
-References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-2-mylene.josserand@bootlin.com>
- <CAGb2v67VL70yqTF7xq4T3_9zA9T3UT2AV0gGarh1mqvC17r3Mg@mail.gmail.com>
- <20180417111737.6dous6eiuvjn33jf@flea>
- <CAGb2v67qvk=T7u7bOjVZ7q_qsjJuEOM6iarw7by42ga=EYuYDg@mail.gmail.com>
-Message-ID: <20180418084535.lqdvjgcbxtnwqwri@flea>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 18 Apr 2018 10:50:29 +0200
+Subject: [PATCH v6 6/7] remoteproc/davinci: use the reset framework
+In-Reply-To: <20180417173038.25510-7-brgl@bgdev.pl>
+References: <20180417173038.25510-1-brgl@bgdev.pl>
+ <20180417173038.25510-7-brgl@bgdev.pl>
+Message-ID: <1524041429.3528.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 07:25:15PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Apr 17, 2018 at 7:17 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Apr 17, 2018 at 11:12:41AM +0800, Chen-Yu Tsai wrote:
-> >> On Tue, Apr 17, 2018 at 5:50 AM, Myl?ne Josserand
-> >> <mylene.josserand@bootlin.com> wrote:
-> >> > Move the assembly code for cluster cache enabling and resuming
-> >> > into an assembly file instead of having it directly in C code.
-> >> >
-> >> > Remove the CFLAGS because we are using the ARM directive "arch"
-> >> > instead.
-> >> >
-> >> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> >> > ---
-> >> >  arch/arm/mach-sunxi/Makefile  |  4 +--
-> >> >  arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
-> >> >  arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
-> >> >  3 files changed, 85 insertions(+), 81 deletions(-)
-> >> >  create mode 100644 arch/arm/mach-sunxi/headsmp.S
-> >>
-> >> I'm still not convinced about this whole "move ASM to separate
-> >> file" thing, especially now that you aren't actually adding any
-> >> sunxi-specific ASM code beyond a simple function call.
-> >>
-> >> Could you drop this for now?
-> >
-> > I'd really like to have this merged actually. There's a significant
-> > readibility improvement, so even if there's no particular functional
-> > improvement, I'd still call it a win.
+On Tue, 2018-04-17 at 19:30 +0200, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> What parts do you consider hard to read? The extra quotes? Trailing
-> newline? Or perhaps the __stringify bits?
+> Switch to using the reset framework instead of handcoded reset routines
+> we used so far.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-All of this, plus the clobbers and operands.
+[...]
+> @@ -268,6 +282,15 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(dsp_clk);
+>  	}
+>  
+> +	dsp_reset = devm_reset_control_get_exclusive(dev, NULL);
+> +	if (IS_ERR(dsp_reset)) {
+> +		if (PTR_ERR(dsp_reset) != -EPROBE_DEFER)
+> +			dev_err(dev, "unable to get reset control: %ld\n",
+> +				PTR_ERR(dsp_reset));
+> +
+> +		return PTR_ERR(dsp_reset);
+> +	}
+> +
+>  	if (dev->of_node) {
+>  		ret = of_reserved_mem_device_init(dev);
+>  		if (ret) {
+[...]
+> @@ -309,7 +333,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+>  	 * *not* in reset, but da8xx_rproc_start() needs the DSP to be
+>  	 * held in reset at the time it is called.
 
-Maxime
+Given this requirement, devm_reset_control_get_exclusive above is the
+correct choice.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/03c3714a/attachment.sig>
+>  	 */
+> -	ret = davinci_clk_reset_assert(drproc->dsp_clk);
+> +	ret = reset_control_assert(dsp_reset);
+
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
