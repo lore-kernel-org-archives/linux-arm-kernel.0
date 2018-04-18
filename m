@@ -1,105 +1,64 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Wed, 18 Apr 2018 17:34:15 +0100
-Subject: [PATCH] arm64: msm8916: fix gic_irq_domain_translate warnings
-Message-ID: <20180418163415.21646-1-srinivas.kandagatla@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 18 Apr 2018 09:37:17 -0700
+Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
+ supported
+In-Reply-To: <20180418155643.36464-3-code@mmayer.net>
+References: <20180418155643.36464-1-code@mmayer.net>
+ <20180418155643.36464-3-code@mmayer.net>
+Message-ID: <c20dc303-8753-5684-1fff-62f363a37a4c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On 04/18/2018 08:56 AM, Markus Mayer wrote:
+> From: Jim Quinlan <jim2101024@gmail.com>
+> 
+> If the SCMI cpufreq driver is supported, we bail, so that the new
+> approach can be used.
+> 
+> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> ---
+>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> index b07559b9ed99..b4861a730162 100644
+> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> @@ -164,6 +164,8 @@
+>  #define BRCM_AVS_CPU_INTR	"brcm,avs-cpu-l2-intr"
+>  #define BRCM_AVS_HOST_INTR	"sw_intr"
+>  
+> +#define ARM_SCMI_COMPAT		"arm,scmi"
+> +
+>  struct pmap {
+>  	unsigned int mode;
+>  	unsigned int p1;
+> @@ -511,6 +513,20 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
+>  	struct device *dev;
+>  	int host_irq, ret;
+>  
+> +	/*
+> +	 * If the SCMI cpufreq driver is supported, we bail, so that the more
+> +	 * modern approach can be used.
+> +	 */
+> +	if (IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)) {
+> +		struct device_node *np;
+> +
+> +		np = of_find_compatible_node(NULL, NULL, ARM_SCMI_COMPAT);
+> +		if (np) {
+> +			of_node_put(np);
+> +			return -ENXIO;
+> +		}
 
-Remove the usage of IRQ_TYPE_NONE to fix loud warnings from
-patch (83a86fbb5b56b "irqchip/gic: Loudly complain about
-the use of IRQ_TYPE_NONE").
+We would probably want to make sure that the node is also enabled (that
+is, does not have a status = "disabled" property) otherwise the check
+can be defeated. Something like:
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+		if (np && of_device_is_available(np))
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index cfbd72186762..5d66a575c7e1 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -180,7 +180,7 @@
- 
- 	pmu {
- 		compatible = "arm,cortex-a53-pmu";
--		interrupts = <GIC_PPI 7 GIC_CPU_MASK_SIMPLE(4)>;
-+		interrupts = <GIC_PPI 7 (GIC_CPU_MASK_SIMPLE(4)| IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
- 	thermal-zones {
-@@ -513,7 +513,7 @@
- 		blsp_i2c2: i2c at 78b6000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
- 			reg = <0x078b6000 0x500>;
--			interrupts = <GIC_SPI 96 0>;
-+			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
- 				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
- 			clock-names = "iface", "core";
-@@ -528,7 +528,7 @@
- 		blsp_i2c4: i2c at 78b8000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
- 			reg = <0x078b8000 0x500>;
--			interrupts = <GIC_SPI 98 0>;
-+			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
- 				 <&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
- 			clock-names = "iface", "core";
-@@ -543,7 +543,7 @@
- 		blsp_i2c6: i2c at 78ba000 {
- 			compatible = "qcom,i2c-qup-v2.2.1";
- 			reg = <0x078ba000 0x500>;
--			interrupts = <GIC_SPI 100 0>;
-+			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
- 				 <&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
- 			clock-names = "iface", "core";
-@@ -575,7 +575,7 @@
- 					"mi2s-bit-clk3";
- 			#sound-dai-cells = <1>;
- 
--			interrupts = <0 160 0>;
-+			interrupts = <0 160 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "lpass-irq-lpaif";
- 			reg = <0x07708000 0x10000>;
- 			reg-names = "lpass-lpaif";
-@@ -595,7 +595,7 @@
- 			reg = <0x07824900 0x11c>, <0x07824000 0x800>;
- 			reg-names = "hc_mem", "core_mem";
- 
--			interrupts = <0 123 0>, <0 138 0>;
-+			interrupts = <0 123 IRQ_TYPE_LEVEL_HIGH>, <0 138 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "hc_irq", "pwr_irq";
- 			clocks = <&gcc GCC_SDCC1_APPS_CLK>,
- 				 <&gcc GCC_SDCC1_AHB_CLK>,
-@@ -612,7 +612,7 @@
- 			reg = <0x07864900 0x11c>, <0x07864000 0x800>;
- 			reg-names = "hc_mem", "core_mem";
- 
--			interrupts = <0 125 0>, <0 221 0>;
-+			interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH>, <0 221 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "hc_irq", "pwr_irq";
- 			clocks = <&gcc GCC_SDCC2_APPS_CLK>,
- 				 <&gcc GCC_SDCC2_AHB_CLK>,
-@@ -819,7 +819,7 @@
- 			iommu-ctx at 2000 {
- 				compatible = "qcom,msm-iommu-v1-ns";
- 				reg = <0x2000 0x1000>;
--				interrupts = <GIC_SPI 242 0>;
-+				interrupts = <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 		};
- 
-@@ -864,7 +864,7 @@
- 				      "bus_clk",
- 				      "vsync_clk";
- 
--			interrupts = <0 72 0>;
-+			interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
- 
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
+should be good for that.
+
+Thanks!
 -- 
-2.16.2
+Florian
