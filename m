@@ -1,40 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 18 Apr 2018 14:54:08 +0530
-Subject: [PATCH v2 2/2] ARM: dts: da850-lcdk: add unit name for memory node
-In-Reply-To: <20180418092408.2077-1-nsekhar@ti.com>
-References: <20180418092408.2077-1-nsekhar@ti.com>
-Message-ID: <20180418092408.2077-3-nsekhar@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 18 Apr 2018 11:30:47 +0200
+Subject: [PATCH v6 05/11] ARM: smp: Add initialization of CNTVOFF
+In-Reply-To: <20180416215032.5023-6-mylene.josserand@bootlin.com>
+References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
+ <20180416215032.5023-6-mylene.josserand@bootlin.com>
+Message-ID: <CAMuHMdWFyLCQb=c=gnWokxGFtsQF2i+s1nPWtJJmZPXAQjnu4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add unit name for memory node to squash the W=1 warning:
+Allo Myl?ne,
 
-arch/arm/boot/dts/da850-lcdk.dtb: Warning (unit_address_vs_reg): /memory: node has a reg or ranges property, but no unit name
+On Mon, Apr 16, 2018 at 11:50 PM, Myl?ne Josserand
+<mylene.josserand@bootlin.com> wrote:
+> The CNTVOFF register from arch timer is uninitialized.
+> It should be done by the bootloader but it is currently not the case,
+> even for boot CPU because this SoC is booting in secure mode.
+> It leads to an random offset value meaning that each CPU will have a
+> different time, which isn't working very well.
+>
+> Add assembly code used for boot CPU and secondary CPU cores to make
+> sure that the CNTVOFF register is initialized. Because this code can
+> be used by different platforms, add this assembly file in ARM's common
+> folder.
 
-While at it, drop the device_type property from memory
-node since its provided by da850.dtsi already.
+Thanks for your patch!
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
-v2: drop device_type property. Add a comment on size of SDRAM.
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 
- arch/arm/boot/dts/da850-lcdk.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index a1f4d6d5a569..0edf769ea95c 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -21,8 +21,8 @@
- 		stdout-path = "serial2:115200n8";
- 	};
- 
--	memory {
--		device_type = "memory";
-+	memory at c0000000 {
-+		/* 128 MB DDR2 SDRAM @ 0xc0000000 */
- 		reg = <0xc0000000 0x08000000>;
- 	};
- 
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-2.16.2
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
