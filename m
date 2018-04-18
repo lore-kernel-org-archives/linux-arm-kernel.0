@@ -1,94 +1,76 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Apr 2018 09:32:36 -0500
-Subject: [PATCH v3 07/10] Documentation: dt-bindings: Add documents for
- PECI hwmon client drivers
-In-Reply-To: <6ff697e8-cd20-e551-da13-b614cc39f900@linux.intel.com>
-References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
- <20180410183212.16787-8-jae.hyun.yoo@linux.intel.com>
- <20180416181423.t4vf7sugv6z3aw5h@rob-hp-laptop>
- <aee4e04c-885f-b1d8-9e85-9e741551342f@linux.intel.com>
- <287e0fd9-b631-2602-2785-7b8aaed7a6b9@linux.intel.com>
- <6ff697e8-cd20-e551-da13-b614cc39f900@linux.intel.com>
-Message-ID: <CAL_JsqLcxEnCOywTtU14G4=6A5m6G=KH3oi8m1VxKSEdxuv-ww@mail.gmail.com>
+From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
+Date: Wed, 18 Apr 2018 16:52:29 +0200
+Subject: [PATCH 1/2] cpufreq: imx6q: check speed grades for i.MX6ULL
+Message-ID: <20180418145230.10249-1-sebastien.szymanski@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 3:40 PM, Jae Hyun Yoo
-<jae.hyun.yoo@linux.intel.com> wrote:
-> On 4/16/2018 4:51 PM, Jae Hyun Yoo wrote:
->>
->> On 4/16/2018 4:22 PM, Jae Hyun Yoo wrote:
->>>
->>> On 4/16/2018 11:14 AM, Rob Herring wrote:
->>>>
->>>> On Tue, Apr 10, 2018 at 11:32:09AM -0700, Jae Hyun Yoo wrote:
->>>>>
->>>>> This commit adds dt-bindings documents for PECI cputemp and dimmtemp
->>>>> client
->>>>> drivers.
->>>>
->>>>
->
-> [...]
->
->>>>> +Example:
->>>>> +    peci-bus at 0 {
->>>>> +        #address-cells = <1>;
->>>>> +        #size-cells = <0>;
->>>>> +        < more properties >
->>>>> +
->>>>> +        peci-dimmtemp at cpu0 {
->>>>
->>>>
->>>> unit-address is wrong.
->>>>
->>>
->>> Will fix it using the reg value.
->>>
->>>> It is a different bus from cputemp? Otherwise, you have conflicting
->>>> addresses. If that's the case, probably should make it clear by showing
->>>> different host adapters for each example.
->>>>
->>>
->>> It could be the same bus with cputemp. Also, client address sharing is
->>> possible by PECI core if the functionality is different. I mean, cputemp and
->>> dimmtemp targeting the same client is possible case like this.
->>> peci-cputemp at 30
->>> peci-dimmtemp at 30
->>>
->>
->> Oh, I got your point. Probably, I should change these separate settings
->> into one like
->>
->> peci-client at 30 {
->>      compatible = "intel,peci-client";
->>      reg = <0x30>;
->> };
->>
->> Then cputemp and dimmtemp drivers could refer the same compatible string.
->> Will rewrite it.
->>
->
-> I've checked it again and realized that it should use function based node
-> name like:
->
-> peci-cputemp at 30
-> peci-dimmtemp at 30
->
-> If it use the same string like 'peci-client at 30', the drivers cannot be
-> selectively enabled. The client address sharing way is well handled in PECI
-> core and this way would be better for the future implementations of other
-> PECI functional drivers such as crash dump driver and so on. So I'm going
-> change the unit-address only.
+Check the max speed supported from the fuses for i.MX6ULL and update the
+operating points table accordingly.
 
-2 nodes at the same address is wrong (and soon dtc will warn you on
-this). You have 2 potential options. The first is you need additional
-address information in the DT if these are in fact 2 independent
-devices. This could be something like a function number to use
-something from PCI addressing. From what I found on PECI, it doesn't
-seem to have anything like that. The 2nd option is you have a single
-DT node which registers multiple hwmon devices. DT nodes and drivers
-don't have to be 1-1. Don't design your DT nodes from how you want to
-partition drivers in some OS.
+Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+---
+ drivers/cpufreq/imx6q-cpufreq.c | 29 +++++++++++++++++++++++------
+ 1 file changed, 23 insertions(+), 6 deletions(-)
 
-Rob
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 83cf631fc9bc..f094687cae52 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -266,6 +266,8 @@ static void imx6q_opp_check_speed_grading(struct device *dev)
+ }
+ 
+ #define OCOTP_CFG3_6UL_SPEED_696MHZ	0x2
++#define OCOTP_CFG3_6ULL_SPEED_792MHZ	0x2
++#define OCOTP_CFG3_6ULL_SPEED_900MHZ	0x3
+ 
+ static void imx6ul_opp_check_speed_grading(struct device *dev)
+ {
+@@ -287,16 +289,30 @@ static void imx6ul_opp_check_speed_grading(struct device *dev)
+ 	 * Speed GRADING[1:0] defines the max speed of ARM:
+ 	 * 2b'00: Reserved;
+ 	 * 2b'01: 528000000Hz;
+-	 * 2b'10: 696000000Hz;
+-	 * 2b'11: Reserved;
++	 * 2b'10: 696000000Hz on i.MX6UL, 792000000Hz on i.MX6ULL;
++	 * 2b'11: 900000000Hz on i.MX6ULL only;
+ 	 * We need to set the max speed of ARM according to fuse map.
+ 	 */
+ 	val = readl_relaxed(base + OCOTP_CFG3);
+ 	val >>= OCOTP_CFG3_SPEED_SHIFT;
+ 	val &= 0x3;
+-	if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
+-		if (dev_pm_opp_disable(dev, 696000000))
+-			dev_warn(dev, "failed to disable 696MHz OPP\n");
++
++	if (of_machine_is_compatible("fsl,imx6ul")) {
++		if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
++			if (dev_pm_opp_disable(dev, 696000000))
++				dev_warn(dev, "failed to disable 696MHz OPP\n");
++	}
++
++	if (of_machine_is_compatible("fsl,imx6ull")) {
++		if (val != OCOTP_CFG3_6ULL_SPEED_792MHZ)
++			if (dev_pm_opp_disable(dev, 792000000))
++				dev_warn(dev, "failed to disable 792MHz OPP\n");
++
++		if (val != OCOTP_CFG3_6ULL_SPEED_900MHZ)
++			if (dev_pm_opp_disable(dev, 900000000))
++				dev_warn(dev, "failed to disable 900MHz OPP\n");
++	}
++
+ 	iounmap(base);
+ put_node:
+ 	of_node_put(np);
+@@ -356,7 +372,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		goto put_reg;
+ 	}
+ 
+-	if (of_machine_is_compatible("fsl,imx6ul"))
++	if (of_machine_is_compatible("fsl,imx6ul") ||
++	    of_machine_is_compatible("fsl,imx6ull"))
+ 		imx6ul_opp_check_speed_grading(cpu_dev);
+ 	else
+ 		imx6q_opp_check_speed_grading(cpu_dev);
+-- 
+2.16.1
