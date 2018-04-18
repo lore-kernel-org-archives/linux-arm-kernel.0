@@ -1,49 +1,52 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 18 Apr 2018 18:24:53 +0800
-Subject: [PATCH v1 1/4] dt-bindings: gpu: mali-utgard: add mediatek,
- mt7623-mali compatible
-In-Reply-To: <cover.1524044917.git.sean.wang@mediatek.com>
-References: <cover.1524044917.git.sean.wang@mediatek.com>
-Message-ID: <831e85ebdfdaba3c7b05ac8407a1584c20ba4a86.1524044917.git.sean.wang@mediatek.com>
+Date: Wed, 18 Apr 2018 18:24:52 +0800
+Subject: [PATCH v1 0/4] add Mali-450 support to MT7623 SoC
+Message-ID: <cover.1524044917.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-The MediaTek MT7623 SoC contains a Mali-450, so add a compatible for it
-and define its own vendor-specific properties.
+Hi,
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
+The series adds a required resource setup to allow Mali-450 to work on
+MT7623. This also can benefits other MediaTek SoCs having Mali-450 device.
 
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-index c1f65d1..e149995 100644
---- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -20,6 +20,7 @@ Required properties:
-       + rockchip,rk3228-mali
-       + rockchip,rk3328-mali
-       + stericsson,db8500-mali
-+      + mediatek,mt7623-mali
- 
-   - reg: Physical base address and length of the GPU registers
- 
-@@ -86,6 +87,14 @@ to specify one more vendor-specific compatible, among:
-       * interrupt-names and interrupts:
-         + combined: combined interrupt of all of the above lines
- 
-+  - mediatek,mt7623-mali
-+     Required properties:
-+      * resets: phandle to the reset line for the GPU
-+      * mediatek,larb: phandle pointed to the local arbiter used to control the
-+	access to external memory on the SoC.
-+	see Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-+	for details
-+
- Example:
- 
- mali: gpu at 1c40000 {
+In order to prove the setup is proper, I also have added mediatek port to
+linux-lima at [1] and make a few of tests along with off-screen rendering
+[2][3][4][5][6][7] through mesa-lima [8]. All work correctly.
+
+[1] https://github.com/objelf/linux-lima/tree/mediatek-lima-4.16-rc5
+[2] simple triangle: https://github.com/yuq/gfx/tree/master/gbm-surface
+[3] vertex shader uniform: https://github.com/yuq/gfx/tree/master/gbm-surface-move
+[4] multi varying: https://github.com/yuq/gfx/tree/master/gbm-surface-color
+[5] multi draw: https://github.com/yuq/gfx/tree/master/gbm-surface-draw
+[6] FBO: https://github.com/yuq/gfx/tree/master/gbm-surface-fbo
+[7] kmscube: https://github.com/yuq/kmscube
+[8] https://github.com/yuq/mesa-lima
+
+Hope these patches can help people working on BPI-R2.
+
+	Sean
+
+Sean Wang (4):
+  dt-bindings: gpu: mali-utgard: add mediatek,mt7623-mali compatible
+  dt-bindings: clock: mediatek: add g3dsys bindings
+  clk: mediatek: add g3dsys support for MT2701 and MT7623
+  arm: dts: mt7623: add Mali-450 and related device nodes
+
+ .../bindings/arm/mediatek/mediatek,g3dsys.txt      | 30 +++++++
+ .../devicetree/bindings/gpu/arm,mali-utgard.txt    |  9 ++
+ arch/arm/boot/dts/mt7623.dtsi                      | 70 ++++++++++++++++
+ arch/arm/boot/dts/mt7623a.dtsi                     |  4 +
+ drivers/clk/mediatek/Kconfig                       |  6 ++
+ drivers/clk/mediatek/Makefile                      |  1 +
+ drivers/clk/mediatek/clk-mt2701-g3d.c              | 95 ++++++++++++++++++++++
+ include/dt-bindings/clock/mt2701-clk.h             |  4 +
+ include/dt-bindings/reset/mt2701-resets.h          |  3 +
+ 9 files changed, 222 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-g3d.c
+
 -- 
 2.7.4
