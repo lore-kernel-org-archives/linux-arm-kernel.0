@@ -1,85 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 18 Apr 2018 15:37:29 +0200
-Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
-In-Reply-To: <20180313200548.fgexoxlha3coa7hs@verge.net.au>
-References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdX=m9ui6GczF51SJH2X7Cw1OnxoH9pfk1DybpDX-A873Q@mail.gmail.com>
- <20180221161326.ktvf3mlzzxith5kw@verge.net.au>
- <CAMuHMdUTSmrWggMK4ehSL3Ux-JUzVpamTuToveuXogjuvGKkaw@mail.gmail.com>
- <20180221183223.qacrmmuzoqlzzbpo@verge.net.au>
- <CAMuHMdXCt1-coXGgtgFBm4rZLGBRMvSjbgeBSweiyKrOfCF0Xg@mail.gmail.com>
- <20180223081443.ak6kl3z72kamcxob@verge.net.au>
- <CAMuHMdVKPFSVTbnQy9RwAg13OC3R=H1PN9+1FyU0SDHQPa1cuQ@mail.gmail.com>
- <20180313200548.fgexoxlha3coa7hs@verge.net.au>
-Message-ID: <CAMuHMdVAi+rU3+TLSp7YQSHzJKFyMH8ZbS3-d8yADKmfz1KiTA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 18 Apr 2018 09:39:30 -0400
+Subject: [PATCH v2 2/2] parisc: define stronger ordering for the default
+ readX()
+In-Reply-To: <97fc18a7-b321-0039-0413-d461abc2097b@bell.net>
+References: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
+ <1523938133-3224-2-git-send-email-okaya@codeaurora.org>
+ <1523957852.3250.9.camel@HansenPartnership.com>
+ <38a1d4e3-cabe-6c39-4355-8d8111637382@codeaurora.org>
+ <1523980508.3310.9.camel@HansenPartnership.com>
+ <86252a65-265d-e081-b71f-42a0be6b1693@codeaurora.org>
+ <97fc18a7-b321-0039-0413-d461abc2097b@bell.net>
+Message-ID: <a8c3391d-7109-47bf-e1c4-9217fc68bfd0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 4/17/2018 6:53 PM, John David Anglin wrote:
+> On 2018-04-17 2:28 PM, Sinan Kaya wrote:
+>> The correct terminology here would be to use observability. Yes, it can be
+>> cached in whatever part of the system for some amount of time as long as
+>> PCI device sees it in the correct order.
+>>
+>> Let's do this exercise.
+>> 1. OS writes to memory for some descriptor update
+>> 2. OS writes to the device via writel to hit a doorbell
+>> 3. Device comes and fetches the memory contents for the descriptor
+>>
+>> writel() of PA-RISC needs to ensure that 3. cannot bypass 1. This is typically
+>> done by a write barrier embedded into the writel() on relaxed architectures.
+> The sequence point after the argument evaluation for writel prevents the compiler from reordering
+> 1 and 2.? Accesses to I/O space are strongly ordered on PA-RISC, so 1 must occur before 2 (Page G-1
+> of the PA-RISC 2.0 Architecture).? Thus, the current code is okay.
+> 
 
-On Tue, Mar 13, 2018 at 9:05 PM, Simon Horman <horms@verge.net.au> wrote:
-> I understand that the watchdog driver has been accepted and that as things
-> currently stand if it is enabled in the build it will be enabled in DT and
-> a crash will result. From my POV that is a regression so I have decided
-> to adopt the alternate plan proposed by Geert above: in short drop DT
-> patches (to avoid enabling broken driver) and enqueue mach-shmobile
-> patches (which don't make things any worse.
->
-> Patch-by-patch things are as follows.
->
-> Dropped from "[PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1":
->
-> 979d28f29742 ARM: dts: r8a7743: Adjust SMP routine size
-> 0b205f679f5d ARM: dts: r8a7745: Adjust SMP routine size
-> 2ad21a1d78b3 ARM: dts: r8a7790: Adjust SMP routine size
-> 82c978459c77 ARM: dts: r8a7791: Adjust SMP routine size
-> d303698e6ff3 ARM: dts: r8a7792: Adjust SMP routine size
-> d8b8b9a1e295 ARM: dts: r8a7793: Adjust SMP routine size
-> 70b3ab369773 ARM: dts: r8a7794: Adjust SMP routine size
->
-> ebf26cf1b1de ARM: dts: r8a7743: Add watchdog support to SoC dtsi
-> 5a4566ab3777 ARM: dts: r8a7745: Add watchdog support to SoC dtsi
-> acd58e2bb1e5 ARM: dts: r8a7790: Add watchdog support to SoC dtsi
-> e3f89168e72f ARM: dts: r8a7791: Add watchdog support to SoC dtsi
-> e76a6a69a1fc ARM: dts: r8a7794: Add watchdog support to SoC dtsi
-> 242cc1ab7f7c ARM: dts: iwg20m: Add watchdog support to SoM dtsi
-> 748ed07f6c7c ARM: dts: iwg22m: Add watchdog support to SoM dtsi
->
->
-> Dropped from "[PATCH/RFC 00/11] ARM: dts: rcar-gen2: Enable watchdog support":
->
-> c257202482e2 ARM: dts: r8a7792: Add RWDT node
-> 01ec04dec8eb ARM: dts: r8a7793: Add RWDT node
-> 8e6ebe4f2f94 ARM: dts: lager: Enable watchdog support
-> f223ad0198f6 ARM: dts: koelsch: Enable watchdog support
-> 1d14d2bb700d ARM: dts: porter: Enable watchdog support
-> bf71652fc955 ARM: dts: blanche: Enable watchdog support
-> 13a0b10aeea4 ARM: dts: wheat: Enable watchdog support
-> 4e247bf110b8 ARM: dts: gose: Enable watchdog support
-> 2dcbd24bbf5e ARM: dts: alt: Enable watchdog support
-> 7f6844c900b4 ARM: dts: silk: Enable watchdog support
->
-> And applied:
->
-> [v5] ARM: shmobile: rcar-gen2: Add watchdog support
-> [v5] ARM: shmobile: Add watchdog support
->
-> In the case of the last patch above I removed the #ifdef from the header file.
+Many thanks for the clarification.
 
-I guess the time is ripe to apply the DTS patches again, in the following order:
-  1. SMP routine size adjustments,
-  2. Watchdog support additions to dtsi,
-  3. Watchdog enablement for dts?
+> Dave
+> 
 
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
