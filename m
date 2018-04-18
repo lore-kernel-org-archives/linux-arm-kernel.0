@@ -1,36 +1,38 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Wed, 18 Apr 2018 10:02:12 +0200
-Subject: [PATCH v2 5/6] drm/atmel-hlcdc: add support for connecting to
- tda998x HDMI encoder
-In-Reply-To: <20180418093649.2c304f29@bbrezillon>
-References: <20180417131052.16336-1-peda@axentia.se>
- <20180417131052.16336-6-peda@axentia.se> <20180418093649.2c304f29@bbrezillon>
-Message-ID: <0155b3cc-29ce-fa43-5588-b465c6ee064a@axentia.se>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 18 Apr 2018 10:03:46 +0200
+Subject: [PATCH v6 4/7] remoteproc/davinci: prepare and unprepare the
+ clock where needed
+In-Reply-To: <a0c390ae-53fe-5d17-1ebf-d55e805f4118@ti.com>
+References: <20180417173038.25510-1-brgl@bgdev.pl>
+ <20180417173038.25510-5-brgl@bgdev.pl>
+ <a0c390ae-53fe-5d17-1ebf-d55e805f4118@ti.com>
+Message-ID: <CAMRc=Md_BaaV1UedisxnvXx0eopEAOj5zF3rox775NUHcf5qJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-18 09:36, Boris Brezillon wrote:
-> On Tue, 17 Apr 2018 15:10:51 +0200
-> Peter Rosin <peda@axentia.se> wrote:
-> 
->> When the of-graph points to a tda998x-compatible HDMI encoder, register
->> as a component master and bind to the encoder/connector provided by
->> the tda998x driver.
-> 
-> Can't we do the opposite: make the tda998x driver expose its devices as
-> drm bridges. I'd rather not add another way to connect external
-> encoders (or bridges) to display controller drivers, especially since,
-> when I asked DRM maintainers/devs what was the good approach to
-> represent such external encoders they pointed me to the drm_bridge
-> interface.
+2018-04-18 7:27 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+> On Tuesday 17 April 2018 11:00 PM, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> We're currently switching the platform to using the common clock
+>> framework. We need to explicitly prepare and unprepare the rproc
+>> clock.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> Acked-by: Suman Anna <s-anna@ti.com>
+>> Reviewed-by: David Lechner <david@lechnology.com>
+>
+> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+>
+> This should be safe to apply to v4.17-rc1 as well (for inclusion in v4.18).
+>
+> Bartosz, I noticed that CONFIG_REMOTEPROC and the DA8XX driver is not
+> enabled in davinci_all_defconfig. Can you please send a patch enabling
+> that too?
+>
+> Thanks,
+> Sekhar
 
->From the cover letter:
+Sure, will do.
 
-"However, I don't know if the tilcdc driver is interfacing with the
-tda998x driver in a sane and modern way"
-
-So, which way is the future? Should bridges become components or should
-existing bridge-like components no longer be components? Are there others?
-
-Cheers,
-Peter
+Bart
