@@ -1,76 +1,35 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 18 Apr 2018 10:03:45 +0300
-Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
- to netdev dma client
-In-Reply-To: <994c184c-e915-7735-5a8b-81a02c5449b0@ti.com>
-References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
- <1522665546-10035-3-git-send-email-radheys@xilinx.com>
- <20180411090854.GY6014@localhost>
- <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
- <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
- <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
- <20180417154231.GV6014@localhost>
- <994c184c-e915-7735-5a8b-81a02c5449b0@ti.com>
-Message-ID: <43634e42-a3fd-c189-ea2c-0d3b7e62fc46@ti.com>
+From: sven.eckelmann@openmesh.com (Sven Eckelmann)
+Date: Wed, 18 Apr 2018 09:07:27 +0200
+Subject: [v5,05/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
+In-Reply-To: <2641190.FRMBLJWkCS@bentobox>
+References: <1521800336-19266-6-git-send-email-sricharan@codeaurora.org>
+ <2641190.FRMBLJWkCS@bentobox>
+Message-ID: <2284833.pBtR1QS54F@bentobox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mittwoch, 18. April 2018 08:59:46 CEST Sven Eckelmann wrote:
+[...]
+> I would not know how to disable QSEE on these boards and thus would assume 
+> that it should be part of this dtsi.
 
 
-On 2018-04-18 09:39, Peter Ujfalusi wrote:
-> 
-> 
-> On 2018-04-17 18:42, Vinod Koul wrote:
->> On Tue, Apr 17, 2018 at 04:46:43PM +0300, Peter Ujfalusi wrote:
->>
->>> @@ -709,6 +709,11 @@ struct dma_filter {
->>>   *	be called after period_len bytes have been transferred.
->>>   * @device_prep_interleaved_dma: Transfer expression in a generic way.
->>>   * @device_prep_dma_imm_data: DMA's 8 byte immediate data to the dst address
->>> + * @device_attach_metadata: Some DMA engines can send and receive side band
->>> + *	information, commands or parameters which is not transferred within the
->>> + *	data stream itself. In such case clients can set the metadata to the
->>> + *	given descriptor and it is going to be sent to the peripheral, or in
->>> + *	case of DEV_TO_MEM the provided buffer will receive the metadata.
->>>   * @device_config: Pushes a new configuration to a channel, return 0 or an error
->>>   *	code
->>>   * @device_pause: Pauses any transfer happening on a channel. Returns
->>> @@ -796,6 +801,9 @@ struct dma_device {
->>>  		struct dma_chan *chan, dma_addr_t dst, u64 data,
->>>  		unsigned long flags);
->>>  
->>> +	int (*device_attach_metadata)(struct dma_async_tx_descriptor *desc,
->>> +				      void *data, size_t len);
->>
->> while i am okay with the concept, I would not want to go again the custom
->> pointer route, this is a no-go for me.
->>
->> Instead lets add the vendor data, define that explicitly. We can use struct,
->> tokens or something else to define these. But lets try to stay away from
->> opaque objects please :-)
-> 
-> The DMA does not interpret the metadata, it is information which can be
-> only understood by the client driver and the remote peripheral. It is
-> just chunk of data (parameters, timestamps, keys, etc) that needs to
-> travel along with the payload.
-> 
-> The content is not relevant for the DMA itself.
+Just did some reviews of the reserved-memory regions in other QCA devices and 
+it looks like this tz and smem are often directly added to the SoC dtsi. So I 
+will prepare a similar change for qcom-ipq4019.dtsi and this would then solve 
+it for AP-DK01/04/07 and no changes in the board-family specific dtsi would be 
+necessary.
 
-To add: different peripherals needs to send receive different metadata
-and even the same peripheral might pass different information based on
-their operating mode. The size of metadata can be different as well.
+But maybe someone has an objection because tz and smem can actually be 
+disabled in a sane way on these SoCs and thus it would be better to have these 
+regions in the board specific dts(i) files. We will see...
 
-So it is not really vendor specific metadata, but peripheral, operating
-mode and other factors affected chunk of data.
-
-> 
-> - P?ter
-> 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-> 
-
-- P?ter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Kind regards,
+	Sven
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/670d3b60/attachment.sig>
