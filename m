@@ -1,476 +1,412 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Wed, 18 Apr 2018 16:31:50 +0100
-Subject: [PATCH v5 16/23] ASoC: qdsp6: q6routing: Add q6routing driver
+Date: Wed, 18 Apr 2018 16:31:47 +0100
+Subject: [PATCH v5 13/23] ASoC: qdsp6: q6asm: Add support to memory map and
+ unmap
 In-Reply-To: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
 References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180418153157.1960-17-srinivas.kandagatla@linaro.org>
+Message-ID: <20180418153157.1960-14-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds support to q6 routing driver which configures route
-between ASM and AFE module using ADM apis.
-
-This driver uses dapm widgets to setup the matrix between AFE ports and
-ASM streams.
+This patch adds support to memory map and unmap regions commands in
+q6asm module.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- sound/soc/qcom/Kconfig           |   4 +
- sound/soc/qcom/qdsp6/Makefile    |   1 +
- sound/soc/qcom/qdsp6/q6routing.c | 392 +++++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6routing.h |   9 +
- 4 files changed, 406 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.c
- create mode 100644 sound/soc/qcom/qdsp6/q6routing.h
+ sound/soc/qcom/qdsp6/q6asm.c | 338 +++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6asm.h |   5 +
+ 2 files changed, 343 insertions(+)
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 488ee93ee084..7a868a6fac1b 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -53,6 +53,9 @@ config SND_SOC_QDSP6_AFE
- config SND_SOC_QDSP6_ADM
- 	tristate
+diff --git a/sound/soc/qcom/qdsp6/q6asm.c b/sound/soc/qcom/qdsp6/q6asm.c
+index 4ed64d32c6b0..51a5681dd61f 100644
+--- a/sound/soc/qcom/qdsp6/q6asm.c
++++ b/sound/soc/qcom/qdsp6/q6asm.c
+@@ -17,10 +17,47 @@
+ #include "q6dsp-errno.h"
+ #include "q6dsp-common.h"
  
-+config SND_SOC_QDSP6_ROUTING
-+	tristate
++#define ASM_CMD_SHARED_MEM_MAP_REGIONS		0x00010D92
++#define ASM_CMDRSP_SHARED_MEM_MAP_REGIONS	0x00010D93
++#define ASM_CMD_SHARED_MEM_UNMAP_REGIONS	0x00010D94
 +
- config SND_SOC_QDSP6_ASM
- 	tristate
- 
-@@ -65,6 +68,7 @@ config SND_SOC_QDSP6
- 	select SND_SOC_QDSP6_COMMON
- 	select SND_SOC_QDSP6_AFE
- 	select SND_SOC_QDSP6_ADM
-+	select SND_SOC_QDSP6_ROUTING
- 	select SND_SOC_QDSP6_ASM
- 	select SND_SOC_QDSP6_CORE
- 	help
-diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-index 61f089bc0d25..6640bceccc18 100644
---- a/sound/soc/qcom/qdsp6/Makefile
-+++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
- obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
- obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
-+obj-$(CONFIG_SND_SOC_QDSP6_ROUTING) += q6routing.o
- obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
- obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
-diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-new file mode 100644
-index 000000000000..b72bd9045fea
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6routing.c
-@@ -0,0 +1,392 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2011-2017, The Linux Foundation
-+// Copyright (c) 2018, Linaro Limited
+ #define ASM_SYNC_IO_MODE		0x0001
+ #define ASM_ASYNC_IO_MODE		0x0002
+ #define ASM_TUN_READ_IO_MODE		0x0004	/* tunnel read write mode */
+ #define ASM_TUN_WRITE_IO_MODE		0x0008	/* tunnel read write mode */
++#define ASM_SHIFT_GAPLESS_MODE_FLAG	31
++#define ADSP_MEMORY_MAP_SHMEM8_4K_POOL	3
 +
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/of_platform.h>
-+#include <linux/bitops.h>
-+#include <linux/component.h>
-+#include <linux/mutex.h>
-+#include <linux/of_device.h>
-+#include <linux/slab.h>
-+#include <sound/core.h>
-+#include <sound/soc.h>
-+#include <sound/soc-dapm.h>
-+#include <sound/pcm.h>
-+#include <sound/control.h>
-+#include <sound/asound.h>
-+#include <sound/pcm_params.h>
-+#include "q6afe.h"
-+#include "q6asm.h"
-+#include "q6adm.h"
-+#include "q6routing.h"
++struct avs_cmd_shared_mem_map_regions {
++	struct apr_hdr hdr;
++	u16 mem_pool_id;
++	u16 num_regions;
++	u32 property_flag;
++} __packed;
 +
-+struct session_data {
-+	int state;
-+	int port_id;
-+	int path_type;
-+	int app_type;
-+	int acdb_id;
-+	int sample_rate;
-+	int bits_per_sample;
-+	int channels;
-+	int perf_mode;
-+	int numcopps;
-+	int fedai_id;
-+	unsigned long copp_map;
++struct avs_shared_map_region_payload {
++	u32 shm_addr_lsw;
++	u32 shm_addr_msw;
++	u32 mem_size_bytes;
++} __packed;
++
++struct avs_cmd_shared_mem_unmap_regions {
++	struct apr_hdr hdr;
++	u32 mem_map_handle;
++} __packed;
++
++struct audio_buffer {
++	phys_addr_t phys;
++	uint32_t used;
++	uint32_t size;		/* size of buffer */
 +};
 +
-+struct msm_routing_data {
-+	struct session_data sessions[MAX_SESSIONS];
-+	struct session_data port_data[AFE_MAX_PORTS];
-+	struct device *dev;
-+	struct mutex lock;
++struct audio_port_data {
++	struct audio_buffer *buf;
++	uint32_t num_periods;
++	uint32_t dsp_buf;
++	uint32_t mem_map_handle;
 +};
-+
-+static struct msm_routing_data *routing_data;
-+
-+/**
-+ * q6routing_stream_open() - Register a new stream for route setup
-+ *
-+ * @fedai_id: Frontend dai id.
-+ * @perf_mode: Performance mode.
-+ * @stream_id: ASM stream id to map.
-+ * @stream_type: Direction of stream
-+ *
-+ * Return: Will be an negative on error or a zero on success.
-+ */
-+int q6routing_stream_open(int fedai_id, int perf_mode,
-+			   int stream_id, int stream_type)
+ 
+ struct audio_client {
+ 	int session;
+@@ -29,6 +66,9 @@ struct audio_client {
+ 	uint32_t io_mode;
+ 	struct apr_device *adev;
+ 	struct mutex lock;
++	spinlock_t buf_lock;
++	/* idx:1 out port, 0: in port */
++	struct audio_port_data port[2];
+ 	wait_queue_head_t cmd_wait;
+ 	struct aprv2_ibasic_rsp_result_t result;
+ 	int perf_mode;
+@@ -62,6 +102,268 @@ static bool q6asm_is_valid_audio_client(struct audio_client *ac)
+ 	return false;
+ }
+ 
++static inline void q6asm_add_hdr(struct audio_client *ac, struct apr_hdr *hdr,
++				 uint32_t pkt_size, bool cmd_flg,
++				 uint32_t stream_id)
 +{
-+	int j, topology, num_copps = 0;
-+	struct route_payload payload;
-+	int copp_idx;
-+	struct session_data *session, *pdata;
-+
-+	if (!routing_data) {
-+		pr_err("Routing driver not yet ready\n");
-+		return -EINVAL;
-+	}
-+
-+	session = &routing_data->sessions[stream_id - 1];
-+	pdata = &routing_data->port_data[session->port_id];
-+
-+	mutex_lock(&routing_data->lock);
-+	session->fedai_id = fedai_id;
-+
-+	session->path_type = pdata->path_type;
-+	session->sample_rate = pdata->sample_rate;
-+	session->channels = pdata->channels;
-+	session->bits_per_sample = pdata->bits_per_sample;
-+
-+	payload.num_copps = 0; /* only RX needs to use payload */
-+	topology = NULL_COPP_TOPOLOGY;
-+	copp_idx = q6adm_open(routing_data->dev, session->port_id,
-+			      session->path_type, session->sample_rate,
-+			      session->channels, topology, perf_mode,
-+			      session->bits_per_sample, 0, 0);
-+
-+	if (copp_idx < 0) {
-+		mutex_unlock(&routing_data->lock);
-+		return -EINVAL;
-+	}
-+
-+	set_bit(copp_idx, &session->copp_map);
-+
-+	for_each_set_bit(j, &session->copp_map, MAX_COPPS_PER_PORT) {
-+		payload.port_id[num_copps] = session->port_id;
-+		payload.copp_idx[num_copps] = j;
-+		num_copps++;
-+	}
-+
-+	if (num_copps) {
-+		payload.num_copps = num_copps;
-+		payload.session_id = stream_id;
-+		q6adm_matrix_map(routing_data->dev, session->path_type,
-+				 payload, perf_mode);
-+	}
-+	mutex_unlock(&routing_data->lock);
-+
-+	return 0;
++	hdr->hdr_field = APR_SEQ_CMD_HDR_FIELD;
++	hdr->src_svc = ac->adev->svc_id;
++	hdr->src_domain = APR_DOMAIN_APPS;
++	hdr->dest_svc = APR_SVC_ASM;
++	hdr->dest_domain = APR_DOMAIN_ADSP;
++	hdr->src_port = ((ac->session << 8) & 0xFF00) | (stream_id);
++	hdr->dest_port = ((ac->session << 8) & 0xFF00) | (stream_id);
++	hdr->pkt_size = pkt_size;
++	if (cmd_flg)
++		hdr->token = ac->session;
 +}
-+EXPORT_SYMBOL_GPL(q6routing_stream_open);
 +
-+static struct session_data *get_session_from_id(struct msm_routing_data *data,
-+						int fedai_id)
++static int q6asm_apr_send_session_pkt(struct q6asm *a, struct audio_client *ac,
++				      void *data, uint32_t rsp_opcode)
 +{
-+	int i;
++	struct apr_hdr *hdr = data;
++	int rc;
 +
-+	for (i = 0; i < MAX_SESSIONS; i++) {
-+		if (fedai_id == data->sessions[i].fedai_id)
-+			return &data->sessions[i];
-+	}
++	mutex_lock(&ac->lock);
++	ac->result.opcode = 0;
++	ac->result.status = 0;
++	rc = apr_send_pkt(a->adev, data);
++	if (rc < 0)
++		goto err;
 +
-+	return NULL;
-+}
-+/**
-+ * q6routing_stream_close() - Deregister a stream
-+ *
-+ * @fedai_id: Frontend dai id.
-+ * @stream_type: Direction of stream
-+ *
-+ * Return: Will be an negative on error or a zero on success.
-+ */
-+void q6routing_stream_close(int fedai_id, int stream_type)
-+{
-+	struct session_data *session;
-+	int idx;
-+
-+	session = get_session_from_id(routing_data, fedai_id);
-+	if (!session)
-+		return;
-+
-+	for_each_set_bit(idx, &session->copp_map, MAX_COPPS_PER_PORT)
-+		q6adm_close(routing_data->dev, session->port_id,
-+			    session->perf_mode, idx);
-+
-+	session->fedai_id = -1;
-+	session->copp_map = 0;
-+}
-+EXPORT_SYMBOL_GPL(q6routing_stream_close);
-+
-+static int msm_routing_get_audio_mixer(struct snd_kcontrol *kcontrol,
-+				       struct snd_ctl_elem_value *ucontrol)
-+{
-+	struct snd_soc_dapm_context *dapm =
-+	    snd_soc_dapm_kcontrol_dapm(kcontrol);
-+	struct soc_mixer_control *mc =
-+	    (struct soc_mixer_control *)kcontrol->private_value;
-+	int session_id = mc->shift;
-+	struct snd_soc_platform *platform = snd_soc_dapm_to_platform(dapm);
-+	struct msm_routing_data *priv = dev_get_drvdata(platform->dev);
-+	struct session_data *session = &priv->sessions[session_id];
-+
-+	if (session->port_id == mc->reg)
-+		ucontrol->value.integer.value[0] = 1;
++	if (rsp_opcode)
++		rc = wait_event_timeout(a->mem_wait,
++					(ac->result.opcode == hdr->opcode) ||
++					(ac->result.opcode == rsp_opcode),
++					5 * HZ);
 +	else
-+		ucontrol->value.integer.value[0] = 0;
++		rc = wait_event_timeout(a->mem_wait,
++					(ac->result.opcode == hdr->opcode),
++					5 * HZ);
++
++	if (!rc) {
++		dev_err(a->dev, "CMD timeout\n");
++		rc = -ETIMEDOUT;
++	} else if (ac->result.status > 0) {
++		dev_err(a->dev, "DSP returned error[%x]\n",
++			ac->result.status);
++		rc = -EINVAL;
++	}
++
++err:
++	mutex_unlock(&ac->lock);
++	return rc;
++}
++
++static int __q6asm_memory_unmap(struct audio_client *ac,
++				phys_addr_t buf_add, int dir)
++{
++	struct avs_cmd_shared_mem_unmap_regions mem_unmap;
++	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
++	int rc;
++
++	if (ac->port[dir].mem_map_handle == 0) {
++		dev_err(ac->dev, "invalid mem handle\n");
++		return -EINVAL;
++	}
++
++	mem_unmap.hdr.hdr_field = APR_SEQ_CMD_HDR_FIELD;
++	mem_unmap.hdr.src_port = 0;
++	mem_unmap.hdr.dest_port = 0;
++	mem_unmap.hdr.pkt_size = sizeof(mem_unmap);
++	mem_unmap.hdr.token = ((ac->session << 8) | dir);
++
++	mem_unmap.hdr.opcode = ASM_CMD_SHARED_MEM_UNMAP_REGIONS;
++	mem_unmap.mem_map_handle = ac->port[dir].mem_map_handle;
++
++	rc = q6asm_apr_send_session_pkt(a, ac, &mem_unmap, 0);
++	if (rc < 0)
++		return rc;
++
++	ac->port[dir].mem_map_handle = 0;
 +
 +	return 0;
 +}
 +
-+static int msm_routing_put_audio_mixer(struct snd_kcontrol *kcontrol,
-+				       struct snd_ctl_elem_value *ucontrol)
-+{
-+	struct snd_soc_dapm_context *dapm =
-+				    snd_soc_dapm_kcontrol_dapm(kcontrol);
-+	struct snd_soc_platform *platform = snd_soc_dapm_to_platform(dapm);
-+	struct msm_routing_data *data = dev_get_drvdata(platform->dev);
-+	struct soc_mixer_control *mc =
-+		    (struct soc_mixer_control *)kcontrol->private_value;
-+	struct snd_soc_dapm_update *update = NULL;
-+	int be_id = mc->reg;
-+	int session_id = mc->shift;
-+	struct session_data *session = &data->sessions[session_id];
 +
-+	if (ucontrol->value.integer.value[0]) {
-+		session->port_id = be_id;
-+		snd_soc_dapm_mixer_update_power(dapm, kcontrol, 1, update);
++static void q6asm_audio_client_free_buf(struct audio_client *ac,
++					struct audio_port_data *port)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&ac->buf_lock, flags);
++
++	port->num_periods = 0;
++	kfree(port->buf);
++	port->buf = NULL;
++
++	spin_unlock_irqrestore(&ac->buf_lock, flags);
++}
++
++/**
++ * q6asm_unmap_memory_regions() - unmap memory regions in the dsp.
++ *
++ * @dir: direction of audio stream
++ * @ac: audio client instanace
++ *
++ * Return: Will be an negative value on failure or zero on success
++ */
++int q6asm_unmap_memory_regions(unsigned int dir, struct audio_client *ac)
++{
++	struct audio_port_data *port;
++	int cnt = 0;
++	int rc = 0;
++
++	port = &ac->port[dir];
++	if (!port->buf) {
++		rc = -EINVAL;
++		goto err;
++	}
++
++	cnt = port->num_periods - 1;
++	if (cnt >= 0) {
++		rc = __q6asm_memory_unmap(ac, port->buf[dir].phys, dir);
++		if (rc < 0) {
++			dev_err(ac->dev, "%s: Memory_unmap_regions failed %d\n",
++				__func__, rc);
++			goto err;
++		}
++	}
++
++	q6asm_audio_client_free_buf(ac, port);
++
++err:
++	return rc;
++}
++EXPORT_SYMBOL_GPL(q6asm_unmap_memory_regions);
++
++static int __q6asm_memory_map_regions(struct audio_client *ac, int dir,
++				      size_t period_sz, unsigned int periods,
++				      bool is_contiguous)
++{
++	struct avs_cmd_shared_mem_map_regions *cmd = NULL;
++	struct avs_shared_map_region_payload *mregions = NULL;
++	struct q6asm *a = dev_get_drvdata(ac->dev->parent);
++	struct audio_port_data *port = NULL;
++	struct audio_buffer *ab = NULL;
++	void *mmap_region_cmd = NULL;
++	unsigned long flags;
++	uint32_t num_regions, buf_sz;
++	int rc, i, cmd_size;
++
++	if (is_contiguous) {
++		num_regions = 1;
++		buf_sz = period_sz * periods;
 +	} else {
-+		session->port_id = -1;
-+		snd_soc_dapm_mixer_update_power(dapm, kcontrol, 0, update);
++		buf_sz = period_sz;
++		num_regions = periods;
 +	}
 +
-+	return 1;
-+}
++	/* DSP expects size should be aligned to 4K */
++	buf_sz = ALIGN(buf_sz, 4096);
 +
-+static const struct snd_kcontrol_new hdmi_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia5", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia6", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia7", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia8", HDMI_RX,
-+		       MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0,
-+		       msm_routing_get_audio_mixer,
-+		       msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
-+	/* Frontend AIF */
-+	SND_SOC_DAPM_AIF_IN("MM_DL1", "MultiMedia1 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_IN("MM_DL2", "MultiMedia2 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_IN("MM_DL3", "MultiMedia3 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_IN("MM_DL4", "MultiMedia4 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_IN("MM_DL5", "MultiMedia5 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_IN("MM_DL6", "MultiMedia6 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_IN("MM_DL7", "MultiMedia7 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_IN("MM_DL8", "MultiMedia8 Playback", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia1 Capture", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia2 Capture", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL3", "MultiMedia3 Capture", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL4", "MultiMedia4 Capture", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL5", "MultiMedia5 Capture", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL6", "MultiMedia6 Capture", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL7", "MultiMedia7 Capture", 0, 0, 0, 0),
-+	SND_SOC_DAPM_AIF_OUT("MM_UL8", "MultiMedia8 Capture", 0, 0, 0, 0),
-+
-+	/* Mixer definitions */
-+	SND_SOC_DAPM_MIXER("HDMI Mixer", SND_SOC_NOPM, 0, 0,
-+			   hdmi_mixer_controls,
-+			   ARRAY_SIZE(hdmi_mixer_controls)),
-+};
-+
-+static const struct snd_soc_dapm_route intercon[] = {
-+	{"HDMI Mixer", "MultiMedia1", "MM_DL1"},
-+	{"HDMI Mixer", "MultiMedia2", "MM_DL2"},
-+	{"HDMI Mixer", "MultiMedia3", "MM_DL3"},
-+	{"HDMI Mixer", "MultiMedia4", "MM_DL4"},
-+	{"HDMI Mixer", "MultiMedia5", "MM_DL5"},
-+	{"HDMI Mixer", "MultiMedia6", "MM_DL6"},
-+	{"HDMI Mixer", "MultiMedia7", "MM_DL7"},
-+	{"HDMI Mixer", "MultiMedia8", "MM_DL8"},
-+	{"HDMI_RX", NULL, "HDMI Mixer"},
-+};
-+
-+static int routing_hw_params(struct snd_pcm_substream *substream,
-+				     struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	unsigned int be_id = rtd->cpu_dai->id;
-+	struct snd_soc_platform *platform = rtd->platform;
-+	struct msm_routing_data *data = dev_get_drvdata(platform->dev);
-+	struct session_data *session;
-+	int path_type;
-+
-+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-+		path_type = ADM_PATH_PLAYBACK;
-+	else
-+		path_type = ADM_PATH_LIVE_REC;
-+
-+	if (be_id > AFE_MAX_PORTS)
-+		return -EINVAL;
-+
-+	session = &data->port_data[be_id];
-+
-+	mutex_lock(&data->lock);
-+
-+	session->path_type = path_type;
-+	session->sample_rate = params_rate(params);
-+	session->channels = params_channels(params);
-+
-+	switch (params_format(params)) {
-+	case SNDRV_PCM_FORMAT_S16_LE:
-+			session->bits_per_sample = 16;
-+		break;
-+	case SNDRV_PCM_FORMAT_S24_LE:
-+			session->bits_per_sample = 24;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	mutex_unlock(&data->lock);
-+	return 0;
-+}
-+
-+static struct snd_pcm_ops q6pcm_routing_ops = {
-+	.hw_params = routing_hw_params,
-+};
-+
-+static int msm_routing_probe(struct snd_soc_platform *platform)
-+{
-+	int i;
-+
-+	for (i = 0; i < MAX_SESSIONS; i++)
-+		routing_data->sessions[i].port_id = -1;
-+
-+	return 0;
-+}
-+
-+static struct snd_soc_platform_driver msm_soc_routing_platform = {
-+	.ops = &q6pcm_routing_ops,
-+	.probe = msm_routing_probe,
-+	.component_driver = {
-+		.name		= "q6routing-component",
-+		.dapm_widgets = msm_qdsp6_widgets,
-+		.num_dapm_widgets = ARRAY_SIZE(msm_qdsp6_widgets),
-+		.dapm_routes = intercon,
-+		.num_dapm_routes = ARRAY_SIZE(intercon),
-+	},
-+};
-+
-+static int q6routing_dai_bind(struct device *dev, struct device *master,
-+			      void *data)
-+{
-+	routing_data = kzalloc(sizeof(*routing_data), GFP_KERNEL);
-+	if (!routing_data)
++	cmd_size = sizeof(*cmd) + (sizeof(*mregions) * num_regions);
++	mmap_region_cmd = kzalloc(cmd_size, GFP_KERNEL);
++	if (!mmap_region_cmd)
 +		return -ENOMEM;
 +
-+	routing_data->dev = dev;
++	cmd = mmap_region_cmd;
 +
-+	mutex_init(&routing_data->lock);
-+	dev_set_drvdata(dev, routing_data);
++	cmd->hdr.hdr_field = APR_SEQ_CMD_HDR_FIELD;
++	cmd->hdr.src_port = 0;
++	cmd->hdr.dest_port = 0;
++	cmd->hdr.pkt_size = cmd_size;
++	cmd->hdr.token = ((ac->session << 8) | dir);
 +
-+	return snd_soc_register_platform(dev,
-+					      &msm_soc_routing_platform);
++
++	cmd->hdr.opcode = ASM_CMD_SHARED_MEM_MAP_REGIONS;
++	cmd->mem_pool_id = ADSP_MEMORY_MAP_SHMEM8_4K_POOL;
++	cmd->num_regions = num_regions;
++	cmd->property_flag = 0x00;
++
++	mregions = mmap_region_cmd +  sizeof(*cmd);
++
++	port = &ac->port[dir];
++
++	spin_lock_irqsave(&ac->buf_lock, flags);
++	for (i = 0; i < num_regions; i++) {
++		ab = &port->buf[i];
++		mregions->shm_addr_lsw = lower_32_bits(ab->phys);
++		mregions->shm_addr_msw = upper_32_bits(ab->phys);
++		mregions->mem_size_bytes = buf_sz;
++		++mregions;
++	}
++	spin_unlock_irqrestore(&ac->buf_lock, flags);
++
++	rc = q6asm_apr_send_session_pkt(a, ac, mmap_region_cmd,
++					ASM_CMDRSP_SHARED_MEM_MAP_REGIONS);
++
++	kfree(mmap_region_cmd);
++
++	return rc;
 +}
-+static void q6routing_dai_unbind(struct device *dev, struct device *master,
-+				 void *d)
++
++/**
++ * q6asm_map_memory_regions() - map memory regions in the dsp.
++ *
++ * @dir: direction of audio stream
++ * @ac: audio client instanace
++ * @phys: physcial address that needs mapping.
++ * @period_sz: audio period size
++ * @periods: number of periods
++ *
++ * Return: Will be an negative value on failure or zero on success
++ */
++int q6asm_map_memory_regions(unsigned int dir, struct audio_client *ac,
++			     phys_addr_t phys,
++			     size_t period_sz, unsigned int periods)
 +{
-+	struct msm_routing_data *data = dev_get_drvdata(dev);
++	struct audio_buffer *buf;
++	unsigned long flags;
++	int cnt;
++	int rc;
 +
-+	snd_soc_unregister_platform(dev);
++	spin_lock_irqsave(&ac->buf_lock, flags);
++	if (ac->port[dir].buf) {
++		dev_err(ac->dev, "Buffer already allocated\n");
++		spin_unlock_irqrestore(&ac->buf_lock, flags);
++		return 0;
++	}
 +
-+	kfree(data);
++	buf = kzalloc(((sizeof(struct audio_buffer)) * periods), GFP_ATOMIC);
++	if (!buf) {
++		spin_unlock_irqrestore(&ac->buf_lock, flags);
++		return -ENOMEM;
++	}
 +
-+	routing_data = NULL;
++
++	ac->port[dir].buf = buf;
++
++	buf[0].phys = phys;
++	buf[0].used = !!dir;
++	buf[0].size = period_sz;
++
++	for (cnt = 1; cnt < periods; cnt++) {
++		if (period_sz > 0) {
++			buf[cnt].phys = buf[0].phys + (cnt * period_sz);
++			buf[cnt].used = dir ^ 1;
++			buf[cnt].size = period_sz;
++		}
++	}
++	spin_unlock_irqrestore(&ac->buf_lock, flags);
++
++	ac->port[dir].num_periods = periods;
++
++	rc = __q6asm_memory_map_regions(ac, dir, period_sz, periods, 1);
++	if (rc < 0) {
++		dev_err(ac->dev, "Memory_map_regions failed\n");
++		q6asm_audio_client_free_buf(ac, &ac->port[dir]);
++	}
++
++	return rc;
 +}
++EXPORT_SYMBOL_GPL(q6asm_map_memory_regions);
 +
-+static const struct component_ops q6routing_dai_comp_ops = {
-+	.bind   = q6routing_dai_bind,
-+	.unbind = q6routing_dai_unbind,
-+};
+ /**
+  * q6asm_audio_client_free() - Freee allocated audio client
+  *
+@@ -110,6 +412,42 @@ static int q6asm_srvc_callback(struct apr_device *adev,
+ 		return 0;
+ 	}
+ 
++	a = dev_get_drvdata(ac->dev->parent);
++	dir = (data->token & 0x0F);
++	port = &ac->port[dir];
 +
-+static int q6pcm_routing_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &q6routing_dai_comp_ops);
-+}
++	switch (data->opcode)
++	case APR_BASIC_RSP_RESULT: {
++		switch (result->opcode) {
++		case ASM_CMD_SHARED_MEM_MAP_REGIONS:
++		case ASM_CMD_SHARED_MEM_UNMAP_REGIONS:
++			ac->result = *result;
++			wake_up(&a->mem_wait);
++			break;
++		default:
++			dev_err(&adev->dev, "command[0x%x] not expecting rsp\n",
++				 result->opcode);
++			break;
++		}
++		return 0;
++	case ASM_CMDRSP_SHARED_MEM_MAP_REGIONS:
++		ac->result.status = 0;
++		ac->result.opcode = data->opcode;
++		ac->port[dir].mem_map_handle = result->opcode;
++		wake_up(&a->mem_wait);
++		break;
++	case ASM_CMD_SHARED_MEM_UNMAP_REGIONS:
++		ac->result.opcode = data->opcode;
++		ac->result.status = 0;
++		ac->port[dir].mem_map_handle = 0;
++		wake_up(&a->mem_wait);
++		break;
++	default:
++		dev_dbg(&adev->dev, "command[0x%x]success [0x%x]\n",
++			result->opcode, result->status);
++		break;
++	}
 +
-+static int q6pcm_routing_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &q6routing_dai_comp_ops);
-+	return 0;
-+}
-+
-+static struct platform_driver q6pcm_routing_platform_driver = {
-+	.driver = {
-+		.name = "q6routing",
-+	},
-+	.probe = q6pcm_routing_probe,
-+	.remove = q6pcm_routing_remove,
-+};
-+module_platform_driver(q6pcm_routing_platform_driver);
-+
-+MODULE_DESCRIPTION("Q6 Routing platform");
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/qcom/qdsp6/q6routing.h b/sound/soc/qcom/qdsp6/q6routing.h
-new file mode 100644
-index 000000000000..aa41e4f45742
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6routing.h
-@@ -0,0 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#ifndef _Q6_PCM_ROUTING_H
-+#define _Q6_PCM_ROUTING_H
-+
-+int q6routing_stream_open(int fedai_id, int perf_mode,
-+			   int stream_id, int stream_type);
-+void q6routing_stream_close(int fedai_id, int stream_type);
-+
-+#endif /*_Q6_PCM_ROUTING_H */
+ 	if (ac->cb)
+ 		ac->cb(data->opcode, data->token, data->payload, ac->priv);
+ 
+diff --git a/sound/soc/qcom/qdsp6/q6asm.h b/sound/soc/qcom/qdsp6/q6asm.h
+index 6a68afc5d8b6..faa49ca1cde6 100644
+--- a/sound/soc/qcom/qdsp6/q6asm.h
++++ b/sound/soc/qcom/qdsp6/q6asm.h
+@@ -12,4 +12,9 @@ struct audio_client *q6asm_audio_client_alloc(struct device *dev,
+ 					      int session_id, int perf_mode);
+ void q6asm_audio_client_free(struct audio_client *ac);
+ int q6asm_get_session_id(struct audio_client *ac);
++int q6asm_map_memory_regions(unsigned int dir,
++			     struct audio_client *ac,
++			     phys_addr_t phys,
++			     size_t bufsz, unsigned int bufcnt);
++int q6asm_unmap_memory_regions(unsigned int dir, struct audio_client *ac);
+ #endif /* __Q6_ASM_H__ */
 -- 
 2.16.2
