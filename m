@@ -1,162 +1,360 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2018 13:47:25 +0100
-Subject: 4.16 OMAP serial transmit corruption?
-In-Reply-To: <20180418110033.GO10990@n2100.armlinux.org.uk>
-References: <20180416151732.GU16141@n2100.armlinux.org.uk>
- <20180416154545.GA5671@atomide.com>
- <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
- <da3be56b-29d3-72f3-5eba-d6a38ae500d0@ti.com>
- <20180418095950.GN10990@n2100.armlinux.org.uk>
- <CAOf5uw=+MeWs+6A-zuy+yq2fZJmoe8hoLPcY1NVi9nvDMOLd7g@mail.gmail.com>
- <20180418110033.GO10990@n2100.armlinux.org.uk>
-Message-ID: <20180418124725.GQ10990@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 18 Apr 2018 13:48:54 +0100
+Subject: [PATCH 1/2 v3] drm/pl111: Support the Versatile Express
+In-Reply-To: <20180418085242.19525-1-linus.walleij@linaro.org>
+References: <20180418085242.19525-1-linus.walleij@linaro.org>
+Message-ID: <55427808-5ebc-e9b3-827a-b61622878a4e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 12:00:33PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 18, 2018 at 12:27:02PM +0200, Michael Nazzareno Trimarchi wrote:
-> > Hi
-> > 
-> > On Wed, Apr 18, 2018 at 11:59 AM, Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> > > On Wed, Apr 18, 2018 at 02:41:43PM +0530, Vignesh R wrote:
-> > >>
-> > >>
-> > >> On Tuesday 17 April 2018 02:50 PM, Vignesh R wrote:
-> > >> >
-> > >> >
-> > >> > On Monday 16 April 2018 09:15 PM, Tony Lindgren wrote:
-> > >> >> * Russell King - ARM Linux <linux@armlinux.org.uk> [180416 15:19]:
-> > >> >>> Hi,
-> > >> >>>
-> > >> >>> I'm not entirely sure what's going on, but I see corrupted characters
-> > >> >>> with the serial console on the OMAP4430 SDP board.  During boot,
-> > >> >>> everything seems fine, the problem appears to be userspace output.
-> > >> >>>
-> > >> >>> For example, if I edit a file, then quit vi:
-> > >> >>>
-> > >> >>> :q??%??B??Z?root at omap-4430sdp:~#
-> > >> >>
-> > >> >> I don't think I've seen that one. What I've seen few times is
-> > >> >> typing a key on the serial console echoing back the previous
-> > >> >> character typed while the new character won't get displayed
-> > >> >> until hitting keyboard again. Only rebooting the device seems
-> > >> >> to solve this. This is with 4430 ES2.3 revision.
-> > >> >>
-> > >> >> I wonder if we're missing some parts of errata i202 handling
-> > >> >> in omap_8250_mdr1_errataset()?
-> > >> >>
-> > >>
-> > >> I wonder if the extra read of MDR1 register at the beginning of
-> > >> omap_8250_mdr1_errataset() compared to omap-serial is the issue.
-> > >> errata i202 says access to MDR1 can cause data corruption.
-> > >> Assuming both reads and writes can cause glitch then, that read
-> > >> is not following advisory:
-> > >>
-> > >> I don't have SDP board so, could you verify if below diff helps:
-> > >>
-> > >>
-> > >> diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-> > >> index 6aaa84355fd1..8ab9d0a1b1eb 100644
-> > >> --- a/drivers/tty/serial/8250/8250_omap.c
-> > >> +++ b/drivers/tty/serial/8250/8250_omap.c
-> > >> @@ -163,11 +163,6 @@ static void omap_8250_mdr1_errataset(struct uart_8250_port *up,
-> > >>                                      struct omap8250_priv *priv)
-> > >>  {
-> > >>         u8 timeout = 255;
-> > >> -       u8 old_mdr1;
-> > >> -
-> > >> -       old_mdr1 = serial_in(up, UART_OMAP_MDR1);
-> > >> -       if (old_mdr1 == priv->mdr1)
-> > >> -               return;
-> > >>
-> > >>         serial_out(up, UART_OMAP_MDR1, priv->mdr1);
-> > >>         udelay(2);
-> > >
-> > > That doesn't appear to help.
-> > >
-> > > Looking at the bitstream and comparing what should have been sent with
-> > > what was sent, there appears to be some correlation between the two.
-> > > It looks like the FTDI is not properly synchronised to the bitstream
-> > > coming from the OMAP4430.
-> > >
-> > > Setting two stop bits on both ends (OMAP4430 and FTDI) appears to
-> > > improve the issue, but not completely solve it.
-> > 
-> > Are you sure about clock error above some tollerance?
+On 18/04/18 09:52, Linus Walleij wrote:
+> The Versatile Express uses a special configuration controller
+> deeply embedded in the system motherboard FPGA to multiplex the
+> two to three (!) display controller instances out to the single
+> SiI9022 bridge.
 > 
-> No idea at the moment.  Looking at the bitstream with a scope is the
-> next step, but it's not easy to do that with just two hands.  I also
-> need to find some way to trigger it reliably.
+> Set up an extra file with the logic to probe to the FPGA mux
+> register on the system controller bus, then parse the device
+> tree to see if there is a CLCD or HDLCD instance on the core
+> tile (also known as the daughterboard) by looking in the
+> root of the device tree for compatible nodes.
 > 
-> Another cause could be that the UART pin is being held high/low for
-> some reason (maybe a pinmux problem.)
+> - If there is a HDLCD on the core tile, and there is a driver
+>    for it, we exit probe and deactivate the motherboard CLCD.
+>    We do not touch the DVI mux in this case, to make sure we
+>    don't break HDLCD.
 > 
-> Another interesting observation is that if I login over the network and
-> then do:
+> - If there is a CLCD on both the motherboard and the core tile
+>    (only the CA9 has this) the core tile CLCD takes precedence
+>    and get muxed to the DVI connector.
 > 
-> 	while :; do :; done &
-> 	while :; do :; done &
+> - Only if there is no working graphics on the core tile, the
+>    motherboard CLCD is probed and muxed to the DVI connector.
+
+This approach seems reasonable (modulo a couple of nits below), and 
+almost certainly sufficient for most realistic uses, but I can't help 
+wondering whether it might be feasible to model the mux with its own 
+separate connector/bridge driver which could handle prioritisation of 
+multiple inputs itself (I'm pondering things like RK3288/RK3399 where 
+the two VOPs feeding into the single HDMI block looks a fair bit like 
+the V2P-CA9 situation if you squint at it).
+
+> Core tile graphics should always take precedence as it can
+> address all memory and is also faster, however the motherboard
+> CLCD is good to have around for diagnostics and testing.
 > 
-> to occupy both CPUs, and then do:
+> It is possible to test the motherboard CLCD by setting the
+> status = "disabled" property on the core tile CLCD or
+> HDLCD.
 > 
-> 	dmesg | less
+> Scale down the Versatile Express to 16BPP so we can support a
+> 1024x768 display despite the bus bandwidth restrictions on this
+> platform. (The motherboard CLCD supports slightly lower
+> resolution.)
 > 
-> on the console, the problem goes away.  If I only do one while loop,
-> the problem is present, but the corruption looks like it happens at a
-> different point in the serial stream.
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v2->v3:
+> - Rewrite CLCD detection and mux priority logic, look in
+>    the device tree root for core tile graphics.
+> ChangeLog v1->v2:
+> - No changes just reposting rebased on mainline changes.
+> ---
+>   drivers/gpu/drm/pl111/Makefile          |   1 +
+>   drivers/gpu/drm/pl111/pl111_versatile.c |  48 +++++++++++-
+>   drivers/gpu/drm/pl111/pl111_vexpress.c  | 127 ++++++++++++++++++++++++++++++++
+>   drivers/gpu/drm/pl111/pl111_vexpress.h  |  22 ++++++
+>   4 files changed, 197 insertions(+), 1 deletion(-)
+>   create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.c
+>   create mode 100644 drivers/gpu/drm/pl111/pl111_vexpress.h
 > 
-> This would seem to point the blame away from clocks or pinmux, and back
-> to power management issues.
+> diff --git a/drivers/gpu/drm/pl111/Makefile b/drivers/gpu/drm/pl111/Makefile
+> index 9c5e8dba8ac6..19a8189dc54f 100644
+> --- a/drivers/gpu/drm/pl111/Makefile
+> +++ b/drivers/gpu/drm/pl111/Makefile
+> @@ -3,6 +3,7 @@ pl111_drm-y +=	pl111_display.o \
+>   		pl111_versatile.o \
+>   		pl111_drv.o
+>   
+> +pl111_drm-$(CONFIG_ARCH_VEXPRESS) += pl111_vexpress.o
+>   pl111_drm-$(CONFIG_DEBUG_FS) += pl111_debugfs.o
+>   
+>   obj-$(CONFIG_DRM_PL111) += pl111_drm.o
+> diff --git a/drivers/gpu/drm/pl111/pl111_versatile.c b/drivers/gpu/drm/pl111/pl111_versatile.c
+> index 9302f516045e..569edf02a36a 100644
+> --- a/drivers/gpu/drm/pl111/pl111_versatile.c
+> +++ b/drivers/gpu/drm/pl111/pl111_versatile.c
+> @@ -1,12 +1,14 @@
+>   #include <linux/amba/clcd-regs.h>
+>   #include <linux/device.h>
+>   #include <linux/of.h>
+> +#include <linux/of_platform.h>
+>   #include <linux/regmap.h>
+>   #include <linux/mfd/syscon.h>
+>   #include <linux/bitops.h>
+>   #include <linux/module.h>
+>   #include <drm/drmP.h>
+>   #include "pl111_versatile.h"
+> +#include "pl111_vexpress.h"
+>   #include "pl111_drm.h"
+>   
+>   static struct regmap *versatile_syscon_map;
+> @@ -22,6 +24,7 @@ enum versatile_clcd {
+>   	REALVIEW_CLCD_PB11MP,
+>   	REALVIEW_CLCD_PBA8,
+>   	REALVIEW_CLCD_PBX,
+> +	VEXPRESS_CLCD_V2M,
+>   };
+>   
+>   static const struct of_device_id versatile_clcd_of_match[] = {
+> @@ -53,6 +56,10 @@ static const struct of_device_id versatile_clcd_of_match[] = {
+>   		.compatible = "arm,realview-pbx-syscon",
+>   		.data = (void *)REALVIEW_CLCD_PBX,
+>   	},
+> +	{
+> +		.compatible = "arm,vexpress-muxfpga",
+> +		.data = (void *)VEXPRESS_CLCD_V2M,
+> +	},
+>   	{},
+>   };
+>   
+> @@ -286,12 +293,26 @@ static const struct pl111_variant_data pl111_realview = {
+>   	.fb_bpp = 16,
+>   };
+>   
+> +/*
+> + * Versatile Express PL111 variant, again we just push the maximum
+> + * BPP to 16 to be able to get 1024x768 without saturating the memory
+> + * bus. The clockdivider also seems broken on the Versatile Express.
+> + */
+> +static const struct pl111_variant_data pl111_vexpress = {
+> +	.name = "PL111 Versatile Express",
+> +	.formats = pl111_realview_pixel_formats,
+> +	.nformats = ARRAY_SIZE(pl111_realview_pixel_formats),
+> +	.fb_bpp = 16,
+> +	.broken_clockdivider = true,
+> +};
+> +
+>   int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>   {
+>   	const struct of_device_id *clcd_id;
+>   	enum versatile_clcd versatile_clcd_type;
+>   	struct device_node *np;
+>   	struct regmap *map;
+> +	int ret;
+>   
+>   	np = of_find_matching_node_and_match(NULL, versatile_clcd_of_match,
+>   					     &clcd_id);
+> @@ -301,7 +322,25 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>   	}
+>   	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
+>   
+> -	map = syscon_node_to_regmap(np);
+> +	/* Versatile Express special handling */
+> +	if (versatile_clcd_type == VEXPRESS_CLCD_V2M) {
+> +		struct platform_device *pdev;
+> +
+> +		/* Call into deep Vexpress configuration API */
+> +		pdev = of_find_device_by_node(np);
+
+Strictly, you should have a platform_device_put(pdev) here.
+
+> +		if (!pdev) {
+> +			dev_err(dev, "can't find the sysreg device, deferring\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +		map = dev_get_drvdata(&pdev->dev);
+> +		if (!map) {
+> +			dev_err(dev, "sysreg has not yet probed\n");
+> +			return -EPROBE_DEFER;
+> +		}
+> +	} else {
+> +		map = syscon_node_to_regmap(np);
+> +	}
+> +
+>   	if (IS_ERR(map)) {
+>   		dev_err(dev, "no Versatile syscon regmap\n");
+>   		return PTR_ERR(map);
+> @@ -340,6 +379,13 @@ int pl111_versatile_init(struct device *dev, struct pl111_drm_dev_private *priv)
+>   		priv->variant_display_disable = pl111_realview_clcd_disable;
+>   		dev_info(dev, "set up callbacks for RealView PL111\n");
+>   		break;
+> +	case VEXPRESS_CLCD_V2M:
+> +		priv->variant = &pl111_vexpress;
+> +		dev_info(dev, "initializing Versatile Express PL111\n");
+> +		ret = pl111_vexpress_clcd_init(dev, priv, map);
+> +		if (ret)
+> +			return ret;
+> +		break;
+>   	default:
+>   		dev_info(dev, "unknown Versatile system controller\n");
+>   		break;
+> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.c b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> new file mode 100644
+> index 000000000000..56908027659f
+> --- /dev/null
+> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.c
+> @@ -0,0 +1,127 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Versatile Express PL111 handling
+> + * Copyright (C) 2018 Linus Walleij
+> + *
+> + * This module binds to the "arm,vexpress-muxfpga" device on the
+> + * Versatile Express configuration bus and sets up which CLCD instance
+> + * gets muxed out on the DVI bridge.
+> + */
+> +#include <linux/device.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/vexpress.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include "pl111_drm.h"
+> +#include "pl111_vexpress.h"
+> +
+> +#define VEXPRESS_FPGAMUX_MOTHERBOARD		0x00
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_1	0x01
+> +#define VEXPRESS_FPGAMUX_DAUGHTERBOARD_2	0x02
+> +
+> +int pl111_vexpress_clcd_init(struct device *dev,
+> +			     struct pl111_drm_dev_private *priv,
+> +			     struct regmap *map)
+> +{
+> +	struct device_node *root;
+> +	struct device_node *child;
+> +	struct device_node *ct_clcd = NULL;
+> +	bool has_coretile_clcd = false;
+> +	bool has_coretile_hdlcd = false;
+> +	bool mux_motherboard = true;
+> +	u32 val;
+> +	int ret;
+> +
+> +	/*
+> +	 * Check if we have a CLCD or HDLCD on the core tile by checking if a
+> +	 * CLCD or HDLCD is available in the root of the device tree.
+> +	 */
+> +	root = of_find_node_by_path("/");
+> +	if (!root)
+> +		return -EINVAL;
+> +
+> +	for_each_child_of_node(root, child) {
+
+for_each_available_child_of_node()?
+
+Robin.
+
+> +		if (of_device_is_compatible(child, "arm,pl111")
+> +		    && of_device_is_available(child)) {
+> +			has_coretile_clcd = true;
+> +			ct_clcd = child;
+> +			break;
+> +		}
+> +		if (of_device_is_compatible(child, "arm,hdlcd")
+> +		    && of_device_is_available(child)) {
+> +			has_coretile_hdlcd = true;
+> +			break;
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * If there is a coretile HDLCD and it has a driver,
+> +	 * do not mux the CLCD on the motherboard to the DVI.
+> +	 */
+> +	if (has_coretile_hdlcd && IS_ENABLED(CONFIG_DRM_HDLCD))
+> +		mux_motherboard = false;
+> +
+> +	/*
+> +	 * On the Vexpress CA9 we let the CLCD on the coretile
+> +	 * take precedence, so also in this case do not mux the
+> +	 * motherboard to the DVI.
+> +	 */
+> +	if (has_coretile_clcd)
+> +		mux_motherboard = false;
+> +
+> +	if (mux_motherboard) {
+> +		dev_info(dev, "DVI muxed to motherboard CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_MOTHERBOARD;
+> +	} else if (ct_clcd == dev->of_node) {
+> +		dev_info(dev,
+> +			 "DVI muxed to daughterboard 1 (core tile) CLCD\n");
+> +		val = VEXPRESS_FPGAMUX_DAUGHTERBOARD_1;
+> +	} else {
+> +		dev_info(dev, "core tile graphics present\n");
+> +		dev_info(dev, "this device will be deactivated\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	ret = regmap_write(map, 0, val);
+> +	if (ret) {
+> +		dev_err(dev, "error setting DVI muxmode\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * This sets up the regmap pointer that will then be retrieved by
+> + * the detection code in pl111_versatile.c and passed in to the
+> + * pl111_vexpress_clcd_init() function above.
+> + */
+> +static int vexpress_muxfpga_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct regmap *map;
+> +
+> +	map = devm_regmap_init_vexpress_config(&pdev->dev);
+> +	if (IS_ERR(map))
+> +		return PTR_ERR(map);
+> +	dev_set_drvdata(dev, map);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id vexpress_muxfpga_match[] = {
+> +	{ .compatible = "arm,vexpress-muxfpga", }
+> +};
+> +
+> +static struct platform_driver vexpress_muxfpga_driver = {
+> +	.driver = {
+> +		.name = "vexpress-muxfpga",
+> +		.of_match_table = of_match_ptr(vexpress_muxfpga_match),
+> +	},
+> +	.probe = vexpress_muxfpga_probe,
+> +};
+> +
+> +module_platform_driver(vexpress_muxfpga_driver);
+> diff --git a/drivers/gpu/drm/pl111/pl111_vexpress.h b/drivers/gpu/drm/pl111/pl111_vexpress.h
+> new file mode 100644
+> index 000000000000..49876417f7b6
+> --- /dev/null
+> +++ b/drivers/gpu/drm/pl111/pl111_vexpress.h
+> @@ -0,0 +1,22 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +
+> +struct device;
+> +struct pl111_drm_dev_private;
+> +struct regmap;
+> +
+> +#ifdef CONFIG_ARCH_VEXPRESS
+> +
+> +int pl111_vexpress_clcd_init(struct device *dev,
+> +			     struct pl111_drm_dev_private *priv,
+> +			     struct regmap *map);
+> +
+> +#else
+> +
+> +static int inline pl111_vexpress_clcd_init(struct device *dev,
+> +					   struct pl111_drm_dev_private *priv,
+> +					   struct regmap *map)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +#endif
 > 
-> I've also tried mimicking the less output with a stand-alone program,
-> and that doesn't exhibit the problem - I've tried with various initial
-> delays between program start and first output, but this doesn't seem
-> to have much effect.  So it seems to need rather precise timing.
-> 
-> stracing less does change where the corruption happens in the output,
-> which also suggests a timing related cause.
-
-Okay, I think I'm getting somewhere...  `less' does an ioctl(, TCSETS, )
-after outputting a screenful in order to change c_iflag and c_lflag.
-The differences are:
-
-	c_iflag 0x1500 -> 0x1000
-	c_lflag 0x083b -> 0x0831
-
-Other settings are kept the same.
-
-The iflag changes are IXON | ICRNL, and the lflag changes are
-ECHO | ICANON.  Reproducing those changes in my test program shows
-the same corruption.
-
-Removing the lflag changes makes no difference.  Removing the ICRNL
-also makes no difference - the problem is still there.  Removing
-the IXON change and the problem vanishes.
-
-Given that the serial driver rewrites the entire UART configuration
-on a termios change that affects any hardware settings, this is
-rather expected to happen.
-
-So, the question becomes whether userspace is acting correctly - and
-I'd say no.  Looking at _real_ `less' (iow, not the busybox version
-that I seem to have on the OMAP4430) it doesn't do this fiddling with
-termios settings just before waiting for input.  Moreover, I can't see
-_any_ reason for `less' of any kind to be fiddling with IXON.
-
-There is the remaining question about the proper behaviour of setting
-termios modes while there is a transmit operation in progress - I know
-of several programs that do this.  A TCSETS operation is defined to
-occur "immediately" by the spec, but is it reasonable to change the
-modes mid-transmission of a character (which _will_ corrupt the
-character), or should they be changed at a character boundary (or at
-whatever character boundary the hardware is capable of.)
-
-I note that if DMA is enabled, 8250_omap delays a TCSETS operation
-until DMA has completed, so I suspect that the problem I'm seeing
-will go away if I enable DMA.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
