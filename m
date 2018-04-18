@@ -1,58 +1,133 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 18 Apr 2018 18:24:54 +0800
-Subject: [PATCH v1 2/4] dt-bindings: clock: mediatek: add g3dsys bindings
+Date: Wed, 18 Apr 2018 18:24:56 +0800
+Subject: [PATCH v1 4/4] arm: dts: mt7623: add Mali-450 and related device nodes
 In-Reply-To: <cover.1524044917.git.sean.wang@mediatek.com>
 References: <cover.1524044917.git.sean.wang@mediatek.com>
-Message-ID: <4b5d243d33433f83874359794b796d4228574714.1524044917.git.sean.wang@mediatek.com>
+Message-ID: <b9f4f8566bd2c20df528b760447d09aef5aa418f.1524044917.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add bindings to g3dsys providing necessary clock and reset control to
-Mali-450.
+Add nodes for Mali-450 device, g3dsys device providing required clock
+gate and reset control and larb3 offering an arbiter through iommu for
+controlling access to external memory requested from Mali-450.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- .../bindings/arm/mediatek/mediatek,g3dsys.txt      | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt
+ arch/arm/boot/dts/mt7623.dtsi  | 70 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/mt7623a.dtsi |  4 +++
+ 2 files changed, 74 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt
-new file mode 100644
-index 0000000..ff2d70c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,g3dsys.txt
-@@ -0,0 +1,30 @@
-+MediaTek g3dsys controller
-+============================
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index d1eb123..ace92b3 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -274,6 +274,17 @@
+ 		clock-names = "system-clk", "rtc-clk";
+ 	};
+ 
++	smi_common: smi at 1000c000 {
++		compatible = "mediatek,mt7623-smi-common",
++			     "mediatek,mt2701-smi-common";
++		reg = <0 0x1000c000 0 0x1000>;
++		clocks = <&infracfg CLK_INFRA_SMI>,
++			 <&mmsys CLK_MM_SMI_COMMON>,
++			 <&infracfg CLK_INFRA_SMI>;
++		clock-names = "apb", "smi", "async";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
++	};
 +
-+The MediaTek g3dsys controller provides various clocks and reset controller to
-+the GPU.
+ 	pwrap: pwrap at 1000d000 {
+ 		compatible = "mediatek,mt7623-pwrap",
+ 			     "mediatek,mt2701-pwrap";
+@@ -305,6 +316,17 @@
+ 		reg = <0 0x10200100 0 0x1c>;
+ 	};
+ 
++	iommu: iommu at 10205000 {
++		compatible = "mediatek,mt7623-m4u",
++			     "mediatek,mt2701-m4u";
++		reg = <0 0x10205000 0 0x1000>;
++		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&infracfg CLK_INFRA_M4U>;
++		clock-names = "bclk";
++		mediatek,larbs = <&larb3>;
++		#iommu-cells = <1>;
++	};
 +
-+Required Properties:
+ 	efuse: efuse at 10206000 {
+ 		compatible = "mediatek,mt7623-efuse",
+ 			     "mediatek,mt8173-efuse";
+@@ -680,6 +702,54 @@
+ 		status = "disabled";
+ 	};
+ 
++	g3dsys: clock-controller at 13000000 {
++		compatible = "mediatek,mt7623-g3dsys",
++			     "mediatek,mt2701-g3dsys",
++			     "syscon";
++		reg = <0 0x13000000 0 0x200>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
 +
-+- compatible: Should be:
-+	- "mediatek,mt2701-g3dsys", "syscon":
-+		for MT2701 SoC
-+	- "mediatek,mt7623-ethsys", "mediatek,mt2701-g3dsys", "syscon":
-+		for MT7623 SoC
-+- #clock-cells: Must be 1
-+- #reset-cells: Must be 1
++	larb3: larb at 13010000 {
++		compatible = "mediatek,mt7623-smi-larb",
++			     "mediatek,mt2701-smi-larb";
++		reg = <0 0x13010000 0 0x1000>;
++		mediatek,smi = <&smi_common>;
++		mediatek,larb-id = <3>;
++		clocks = <&clk26m>, <&clk26m>;
++		clock-names = "apb", "smi";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_MFG>;
++	};
 +
-+The ethsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++	mali: gpu at 13040000 {
++		compatible = "mediatek,mt7623-mali", "arm,mali-450";
++		reg = <0 0x13040000 0 0x30000>;
++		interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 171 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 172 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 173 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 174 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 175 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 176 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 177 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_SPI 180 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "gp", "gpmmu", "pp0", "ppmmu0", "pp1",
++				  "ppmmu1", "pp2", "ppmmu2", "pp";
++		clocks = <&topckgen CLK_TOP_MMPLL>,
++			 <&g3dsys CLK_G3DSYS_CORE>;
++		clock-names = "bus", "core";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_MFG>;
++		mediatek,larb = <&larb3>;
++		resets = <&g3dsys MT2701_G3DSYS_CORE_RST>;
++	};
 +
-+Example:
++	mmsys: syscon at 14000000 {
++		compatible = "mediatek,mt2701-mmsys", "syscon";
++		reg = <0 0x14000000 0 0x1000>;
++		#clock-cells = <1>;
++	};
 +
-+g3dsys: clock-controller at 13000000 {
-+	compatible = "mediatek,mt7623-g3dsys",
-+		     "mediatek,mt2701-g3dsys",
-+		     "syscon";
-+	reg = <0 0x13000000 0 0x200>;
-+	#clock-cells = <1>;
-+	#reset-cells = <1>;
+ 	hifsys: syscon at 1a000000 {
+ 		compatible = "mediatek,mt7623-hifsys",
+ 			     "mediatek,mt2701-hifsys",
+diff --git a/arch/arm/boot/dts/mt7623a.dtsi b/arch/arm/boot/dts/mt7623a.dtsi
+index 0735a1fb8..a42fd46 100644
+--- a/arch/arm/boot/dts/mt7623a.dtsi
++++ b/arch/arm/boot/dts/mt7623a.dtsi
+@@ -21,6 +21,10 @@
+ 	power-domains = <&scpsys MT7623A_POWER_DOMAIN_ETH>;
+ };
+ 
++&mali {
++	status = "disabled";
 +};
++
+ &nandc {
+ 	power-domains = <&scpsys MT7623A_POWER_DOMAIN_IFR_MSC>;
+ };
 -- 
 2.7.4
