@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Apr 2018 12:40:46 +0100
-Subject: Applied "spi: pxa2xx: pxa2xx_spi_transfer_one() can be static" to the
- spi tree
-In-Reply-To: <20180417195323.GA69680@ivb43>
-Message-ID: <E1f8lSA-00025Y-3G@debutante>
+Date: Wed, 18 Apr 2018 12:40:53 +0100
+Subject: Applied "spi: spi-s3c64xx: Drop unused enable_datapath() function
+ argument" to the spi tree
+In-Reply-To: <20180417142954.5507-4-s.nawrocki@samsung.com>
+Message-ID: <E1f8lSH-00027l-AH@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: pxa2xx: pxa2xx_spi_transfer_one() can be static
+   spi: spi-s3c64xx: Drop unused enable_datapath() function argument
 
 has been applied to the spi tree at
 
@@ -34,35 +34,43 @@ to this mail.
 Thanks,
 Mark
 
->From 71293a60e38f44b1d18c14803f0dd2744f6b9a12 Mon Sep 17 00:00:00 2001
-From: kbuild test robot <lkp@intel.com>
-Date: Wed, 18 Apr 2018 03:53:23 +0800
-Subject: [PATCH] spi: pxa2xx: pxa2xx_spi_transfer_one() can be static
+>From 80aa0d746c10e14ac14ca03b2bc8b26a0f75c5e4 Mon Sep 17 00:00:00 2001
+From: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Date: Tue, 17 Apr 2018 16:29:50 +0200
+Subject: [PATCH] spi: spi-s3c64xx: Drop unused enable_datapath() function
+ argument
 
-Fixes: d5898e19c0d7 ("spi: pxa2xx: Use core message processing loop")
-Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
-Reviewed-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+The spi pointer argument is not used now so remove it.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Reviewed-by: Andi Shyti <andi@etezian.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-pxa2xx.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/spi/spi-s3c64xx.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index c852ea5c28c6..40f1346b8188 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -911,9 +911,9 @@ static bool pxa2xx_spi_can_dma(struct spi_controller *master,
- 	       xfer->len >= chip->dma_burst_size;
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 54fde5c80374..38a5e9ce5f11 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -349,8 +349,7 @@ static bool s3c64xx_spi_can_dma(struct spi_master *master,
  }
  
--int pxa2xx_spi_transfer_one(struct spi_controller *master,
--			    struct spi_device *spi,
--			    struct spi_transfer *transfer)
-+static int pxa2xx_spi_transfer_one(struct spi_controller *master,
-+				   struct spi_device *spi,
-+				   struct spi_transfer *transfer)
+ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+-				struct spi_device *spi,
+-				struct spi_transfer *xfer, int dma_mode)
++			    struct spi_transfer *xfer, int dma_mode)
  {
- 	struct driver_data *drv_data = spi_controller_get_devdata(master);
- 	struct spi_message *message = master->cur_msg;
+ 	void __iomem *regs = sdd->regs;
+ 	u32 modecfg, chcfg;
+@@ -667,7 +666,7 @@ static int s3c64xx_spi_transfer_one(struct spi_master *master,
+ 	sdd->state &= ~RXBUSY;
+ 	sdd->state &= ~TXBUSY;
+ 
+-	enable_datapath(sdd, spi, xfer, use_dma);
++	enable_datapath(sdd, xfer, use_dma);
+ 
+ 	/* Start the signals */
+ 	s3c64xx_spi_set_cs(spi, true);
 -- 
 2.17.0
