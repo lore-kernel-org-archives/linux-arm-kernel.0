@@ -1,81 +1,97 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Wed, 18 Apr 2018 14:15:01 +0100
-Subject: [PATCH 1/2 v2] drm/pl111: Support the Versatile Express
-In-Reply-To: <fa2dd630-6c9a-82d0-346c-1fa9530a71da@arm.com>
-References: <20180406141935.6801-1-linus.walleij@linaro.org>
- <20180410095737.GF10254@e110455-lin.cambridge.arm.com>
- <CACRpkdb1toYJEaHDZ2QORt+qzN7imH9ugx3xvi1HASoZU0QSiQ@mail.gmail.com>
- <297aae18-8efc-b7cc-20c2-eb09d72d2dd1@arm.com>
- <CACRpkdYPwm=2jhompecL5z_qwhe9UzZHKLKZLYgDK+YV_ZfMag@mail.gmail.com>
- <fa2dd630-6c9a-82d0-346c-1fa9530a71da@arm.com>
-Message-ID: <20180418131501.GN14661@e110455-lin.cambridge.arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 18 Apr 2018 15:19:26 +0200
+Subject: [PATCHv3 03/11] arm64/kvm: hide ptrauth from guests
+In-Reply-To: <20180417183735.56985-4-mark.rutland@arm.com>
+References: <20180417183735.56985-1-mark.rutland@arm.com>
+ <20180417183735.56985-4-mark.rutland@arm.com>
+Message-ID: <20180418131926.pbjlbcjspg7azq2j@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 12:50:10PM +0100, Robin Murphy wrote:
-> On 17/04/18 20:31, Linus Walleij wrote:
-> > On Tue, Apr 17, 2018 at 3:12 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > > On 17/04/18 13:32, Linus Walleij wrote:
-> > > [...]
-> > > > 
-> > > > Unfortunately there is just one single vexpress core tile in the
-> > > > upstream kernel that define a CLCD controller, the CA9 (4xA9)
-> > > > that I am using. All the others just use the MB CLCD.
-> > > > 
-> > > > I am thinking there is some never finished DTS upstreaming
-> > > > here that ought to happen so we use the core tile CLCD on some
-> > > > other boards as well.
-> > > 
-> > > 
-> > > Barring custom FPGA images, I think V2P-CA9 *is* the only VExpress tile
-> > > implementing PL11x; all the more recent test chips had HDLCD instead.
-> > 
-> > Yup it looks like that.
-> > 
-> > I am restructuring the code to look for any graphics on the
-> > core tile and only turn on the motherboard CLCD if there is
-> > no CLCD or HDLCD on the core tile, e.g. if that device node has
-> > been set to "disabled" or the HDLCD driver is not compiled in
-> > but the CLCD driver is.
-> > 
-> > I found some vague mentions of a LCD display that can be
-> > connected to the motherboard, so that would then be sitting
-> > on the CLCD, is this something you ARM guys have seen
-> > around? In that case I guess the VExpress (etc) would actually
-> > be able to have two screens, one LCD panel on the motherboard
-> > CLCD and a DVI from the core tile.
+On Tue, Apr 17, 2018 at 07:37:27PM +0100, Mark Rutland wrote:
+> In subsequent patches we're going to expose ptrauth to the host kernel
+> and userspace, but things are a bit trickier for guest kernels. For the
+> time being, let's hide ptrauth from KVM guests.
 > 
-> I don't see anything in the V2M motherboard manual to suggest the IOFPGA
-> CLCD output is routed anywhere other than the DVI mux, and there are
-> certainly no unaccounted-for connectors on the VExpress version currently in
-> front of me (HBI-0190D). The only things I'm immediately aware of having a
-> panel connector directly on the board are Integrator/CP and RealView EB.
-
-Yes, I think the last platform that could have had an LCD display
-attached directly was the Versatile platform, not the VExpress one.
-
-Regarding the mux and trying to figure out a clever way of deciding
-which one should have priority: I would not bother adding that to the
-CLCD driver, instead I would expect the bootloader to set the MUX
-correctly. Long time ago, before Juno was a thing and the only platform
-HDLCD was running on was VExpress, I did have a patch to use
-vexpress_config_write() (API before vexpress-config got converted to
-regmap) to set the MUX. Then Juno happened and I've realised it was not
-worth baking into the driver the existence of the MUX, as it was a quirk
-of the board.
-
-Best regards,
-Liviu
-
+> Regardless of how well-behaved the guest kernel is, guest userspace
+> could attempt to use ptrauth instructions, triggering a trap to EL2,
+> resulting in noise from kvm_handle_unknown_ec(). So let's write up a
+> handler for the PAC trap, which silently injects an UNDEF into the
+> guest, as if the feature were really missing.
 > 
-> Robin.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> ---
+>  arch/arm64/kvm/handle_exit.c | 18 ++++++++++++++++++
+>  arch/arm64/kvm/sys_regs.c    |  9 +++++++++
+>  2 files changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index e5e741bfffe1..5114ad691eae 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -173,6 +173,23 @@ static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	return 1;
+>  }
+>  
+> +/*
+> + * Guest usage of a ptrauth instruction (which the guest EL1 did not turn into
+> + * a NOP), or guest EL1 access to a ptrauth register.
+> + */
+> +static int kvm_handle_ptrauth(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	/*
+> +	 * We don't currently suport ptrauth in a guest, and we mask the ID
+> +	 * registers to prevent well-behaved guests from trying to make use of
+> +	 * it.
+> +	 *
+> +	 * Inject an UNDEF, as if the feature really isn't present.
+> +	 */
+> +	kvm_inject_undefined(vcpu);
+> +	return 1;
+> +}
+> +
+>  static exit_handle_fn arm_exit_handlers[] = {
+>  	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
+>  	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+> @@ -195,6 +212,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+>  	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
+>  	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
+>  	[ESR_ELx_EC_FP_ASIMD]	= handle_no_fpsimd,
+> +	[ESR_ELx_EC_PAC]	= kvm_handle_ptrauth,
+>  };
+>  
+>  static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 806b0b126a64..eee399c35e84 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -1000,6 +1000,15 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+>  				    task_pid_nr(current));
+>  
+>  		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
+> +	} else if (id == SYS_ID_AA64ISAR1_EL1) {
+> +		const u64 ptrauth_mask = (0xfUL << ID_AA64ISAR1_APA_SHIFT) |
+> +					 (0xfUL << ID_AA64ISAR1_API_SHIFT) |
+> +					 (0xfUL << ID_AA64ISAR1_GPA_SHIFT) |
+> +					 (0xfUL << ID_AA64ISAR1_GPI_SHIFT);
+> +		if (val & ptrauth_mask)
+> +			pr_err_once("kvm [%i]: ptrauth unsupported for guests, suppressing\n",
+> +					task_pid_nr(current));
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Marc just changed the equivalent SVE pr_err_once() to kvm_debug().
+So we probably want to do the same here.
+
+> +		val &= ~ptrauth_mask;
+>  	} else if (id == SYS_ID_AA64MMFR1_EL1) {
+>  		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
+>  			pr_err_once("kvm [%i]: LORegions unsupported for guests, suppressing\n",
+> -- 
+> 2.11.0
+>
+
+Otherwise
+ 
+Reviewed-by: Andrew Jones <drjones@redhat.com>
