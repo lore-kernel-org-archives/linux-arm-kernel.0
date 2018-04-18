@@ -1,36 +1,50 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 18 Apr 2018 14:09:14 +0530
-Subject: [v5,05/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
-In-Reply-To: <2715737.hC3rduhfyA@bentobox>
-References: <1521800336-19266-6-git-send-email-sricharan@codeaurora.org>
- <2284833.pBtR1QS54F@bentobox>
- <734eb6eb-9af9-d599-81f1-ec66d9cd839c@codeaurora.org>
- <2715737.hC3rduhfyA@bentobox>
-Message-ID: <7008f7bb-300e-c2ce-cb2a-61ecfccf3691@codeaurora.org>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 18 Apr 2018 10:41:28 +0200
+Subject: [PATCH v2 5/6] drm/atmel-hlcdc: add support for connecting to
+ tda998x HDMI encoder
+In-Reply-To: <0155b3cc-29ce-fa43-5588-b465c6ee064a@axentia.se>
+References: <20180417131052.16336-1-peda@axentia.se>
+ <20180417131052.16336-6-peda@axentia.se>
+ <20180418093649.2c304f29@bbrezillon>
+ <0155b3cc-29ce-fa43-5588-b465c6ee064a@axentia.se>
+Message-ID: <20180418104128.6747ad47@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sven,
+On Wed, 18 Apr 2018 10:02:12 +0200
+Peter Rosin <peda@axentia.se> wrote:
 
-On 4/18/2018 1:08 PM, Sven Eckelmann wrote:
-> Hi,
+> On 2018-04-18 09:36, Boris Brezillon wrote:
+> > On Tue, 17 Apr 2018 15:10:51 +0200
+> > Peter Rosin <peda@axentia.se> wrote:
+> >   
+> >> When the of-graph points to a tda998x-compatible HDMI encoder, register
+> >> as a component master and bind to the encoder/connector provided by
+> >> the tda998x driver.  
+> > 
+> > Can't we do the opposite: make the tda998x driver expose its devices as
+> > drm bridges. I'd rather not add another way to connect external
+> > encoders (or bridges) to display controller drivers, especially since,
+> > when I asked DRM maintainers/devs what was the good approach to
+> > represent such external encoders they pointed me to the drm_bridge
+> > interface.  
 > 
-> On Mittwoch, 18. April 2018 12:45:20 CEST Sricharan R wrote:
->>  Right, will add the above change to soc.dtsi in V6. Does that sound ok for 
->> you ?
+> From the cover letter:
 > 
-> I have submitted a patch for this now [1] because I need this for OpenWrt 
-> (sooner rather than later). And I am not sure whether it is good to have this 
-> in your feature series because it is a bugfix which might even qualify for 
-> stable at vger.kernel.org.
+> "However, I don't know if the tilcdc driver is interfacing with the
+> tda998x driver in a sane and modern way"
 > 
-> I hope this patch [1] is ok for you.
-> 
+> So, which way is the future? Should bridges become components or should
+> existing bridge-like components no longer be components? Are there others?
 
- Sure. Acked that. Thanks.
+Well, what I've been told a while ago is that drm_bridge will take over
+drm_encoder_slave and custom drm_encoder/drm_connector implementations
+when it comes to representing bridges.
 
-Regards,
- Sricharan
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+AFAIU, using the component framework to bind all elements of the
+pipeline to the display controller is orthogonal to how you represent
+elements in the pipeline. I mean, you could have a bridge that
+registers as a component so that display controllers drivers who want
+to use the component framework don't have to re-code the
+component-to-bridge glue every time, and those who don't use the
+component framework can still get access to the bridge.
