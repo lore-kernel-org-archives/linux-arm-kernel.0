@@ -1,56 +1,37 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 18 Apr 2018 12:51:41 +0200
-Subject: [PATCH v4 4/6] ARM: at91: Implement clocksource selection
+Date: Wed, 18 Apr 2018 12:51:40 +0200
+Subject: [PATCH v4 3/6] clocksource/drivers: atmel-pit: make option silent
 In-Reply-To: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
 References: <20180418105143.3577-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180418105143.3577-5-alexandre.belloni@bootlin.com>
+Message-ID: <20180418105143.3577-4-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow selecting and unselecting the PIT clocksource driver so it doesn't
-have to be compile when unused.
+To conform with the other option, make the ATMEL_PIT option silent so it
+can be selected from the platform
 
 Tested-by: Alexander Dahl <ada@thorsis.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- arch/arm/mach-at91/Kconfig | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/clocksource/Kconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 1254bf9d91b4..64f18cd220b9 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -106,6 +106,31 @@ config SOC_AT91SAM9
- 	    AT91SAM9X35
- 	    AT91SAM9XE
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 540892273a8d..cb635d5d7f42 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -384,8 +384,11 @@ config ARMV7M_SYSTICK
+ 	  This options enables support for the ARMv7M system timer unit
  
-+comment "Clocksource driver selection"
-+
-+config ATMEL_CLOCKSOURCE_PIT
-+	bool "Periodic Interval Timer (PIT) support"
-+	depends on SOC_AT91SAM9 || SOC_SAMA5
-+	default SOC_AT91SAM9 || SOC_SAMA5
-+	select ATMEL_PIT
+ config ATMEL_PIT
++	bool "Microchip ARM Periodic Interval Timer (PIT)" if COMPILE_TEST
+ 	select TIMER_OF if OF
+-	def_bool SOC_AT91SAM9 || SOC_SAMA5
 +	help
-+	  Select this to get a clocksource based on the Atmel Periodic Interval
-+	  Timer. It has a relatively low resolution and the TC Block clocksource
-+	  should be preferred.
-+
-+config ATMEL_CLOCKSOURCE_TCB
-+	bool "Timer Counter Blocks (TCB) support"
-+	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5 || COMPILE_TEST
-+	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
-+	depends on !ATMEL_TCLIB
-+	select ATMEL_ARM_TCB_CLKSRC
-+	help
-+	  Select this to get a high precision clocksource based on a
-+	  TC block with a 5+ MHz base clock rate.
-+	  On platforms with 16-bit counters, two timer channels are combined
-+	  to make a single 32-bit timer.
-+	  It can also be used as a clock event device supporting oneshot mode.
-+
- config HAVE_AT91_UTMI
- 	bool
++	  This enables build of clocksource and clockevent driver for
++	  the integrated PIT in Microchip ARM SoCs.
  
+ config ATMEL_ST
+ 	bool "Atmel ST timer support" if COMPILE_TEST
 -- 
 2.17.0
