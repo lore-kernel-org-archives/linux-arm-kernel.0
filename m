@@ -1,148 +1,109 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2018 13:17:39 +0100
-Subject: 4.16 OMAP serial transmit corruption?
-In-Reply-To: <CAOf5uwkybbUTnwvdAz9gDGo00oTgTirwJDjwqsLFWEukh70aEQ@mail.gmail.com>
-References: <20180416151732.GU16141@n2100.armlinux.org.uk>
- <20180416154545.GA5671@atomide.com>
- <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
- <da3be56b-29d3-72f3-5eba-d6a38ae500d0@ti.com>
- <20180418095950.GN10990@n2100.armlinux.org.uk>
- <CAOf5uw=+MeWs+6A-zuy+yq2fZJmoe8hoLPcY1NVi9nvDMOLd7g@mail.gmail.com>
- <20180418110033.GO10990@n2100.armlinux.org.uk>
- <CAOf5uwkybbUTnwvdAz9gDGo00oTgTirwJDjwqsLFWEukh70aEQ@mail.gmail.com>
-Message-ID: <20180418121739.GP10990@n2100.armlinux.org.uk>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 18 Apr 2018 14:37:01 +0200
+Subject: [PATCH v3 06/11] iio: inkern: add module put/get on iio dev
+ module when requesting channels
+In-Reply-To: <20180418103548.000078b7@huawei.com>
+References: <1523350677-27106-1-git-send-email-eugen.hristev@microchip.com>
+ <1523350677-27106-7-git-send-email-eugen.hristev@microchip.com>
+ <20180415203321.1aaaf91e@archlinux> <20180416235821.GF77055@dtor-ws>
+ <67771f4c-d30c-4a28-2a9b-d5585186d60a@microchip.com>
+ <20180417191906.GB67621@dtor-ws> <20180418103548.000078b7@huawei.com>
+Message-ID: <79d51d4e-eea7-7295-7e32-26149d6aeadd@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 01:45:12PM +0200, Michael Nazzareno Trimarchi wrote:
-> Hi
+On 04/18/2018 11:35 AM, Jonathan Cameron wrote:
+> On Tue, 17 Apr 2018 12:19:06 -0700
+> Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
 > 
-> On Wed, Apr 18, 2018 at 1:00 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Wed, Apr 18, 2018 at 12:27:02PM +0200, Michael Nazzareno Trimarchi wrote:
-> >> Hi
-> >>
-> >> On Wed, Apr 18, 2018 at 11:59 AM, Russell King - ARM Linux
-> >> <linux@armlinux.org.uk> wrote:
-> >> > On Wed, Apr 18, 2018 at 02:41:43PM +0530, Vignesh R wrote:
-> >> >>
-> >> >>
-> >> >> On Tuesday 17 April 2018 02:50 PM, Vignesh R wrote:
-> >> >> >
-> >> >> >
-> >> >> > On Monday 16 April 2018 09:15 PM, Tony Lindgren wrote:
-> >> >> >> * Russell King - ARM Linux <linux@armlinux.org.uk> [180416 15:19]:
-> >> >> >>> Hi,
-> >> >> >>>
-> >> >> >>> I'm not entirely sure what's going on, but I see corrupted characters
-> >> >> >>> with the serial console on the OMAP4430 SDP board.  During boot,
-> >> >> >>> everything seems fine, the problem appears to be userspace output.
-> >> >> >>>
-> >> >> >>> For example, if I edit a file, then quit vi:
-> >> >> >>>
-> >> >> >>> :q??%??B??Z?root at omap-4430sdp:~#
-> >> >> >>
-> >> >> >> I don't think I've seen that one. What I've seen few times is
-> >> >> >> typing a key on the serial console echoing back the previous
-> >> >> >> character typed while the new character won't get displayed
-> >> >> >> until hitting keyboard again. Only rebooting the device seems
-> >> >> >> to solve this. This is with 4430 ES2.3 revision.
-> >> >> >>
-> >> >> >> I wonder if we're missing some parts of errata i202 handling
-> >> >> >> in omap_8250_mdr1_errataset()?
-> >> >> >>
-> >> >>
-> >> >> I wonder if the extra read of MDR1 register at the beginning of
-> >> >> omap_8250_mdr1_errataset() compared to omap-serial is the issue.
-> >> >> errata i202 says access to MDR1 can cause data corruption.
-> >> >> Assuming both reads and writes can cause glitch then, that read
-> >> >> is not following advisory:
-> >> >>
-> >> >> I don't have SDP board so, could you verify if below diff helps:
-> >> >>
-> >> >>
-> >> >> diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-> >> >> index 6aaa84355fd1..8ab9d0a1b1eb 100644
-> >> >> --- a/drivers/tty/serial/8250/8250_omap.c
-> >> >> +++ b/drivers/tty/serial/8250/8250_omap.c
-> >> >> @@ -163,11 +163,6 @@ static void omap_8250_mdr1_errataset(struct uart_8250_port *up,
-> >> >>                                      struct omap8250_priv *priv)
-> >> >>  {
-> >> >>         u8 timeout = 255;
-> >> >> -       u8 old_mdr1;
-> >> >> -
-> >> >> -       old_mdr1 = serial_in(up, UART_OMAP_MDR1);
-> >> >> -       if (old_mdr1 == priv->mdr1)
-> >> >> -               return;
-> >> >>
-> >> >>         serial_out(up, UART_OMAP_MDR1, priv->mdr1);
-> >> >>         udelay(2);
-> >> >
-> >> > That doesn't appear to help.
-> >> >
-> >> > Looking at the bitstream and comparing what should have been sent with
-> >> > what was sent, there appears to be some correlation between the two.
-> >> > It looks like the FTDI is not properly synchronised to the bitstream
-> >> > coming from the OMAP4430.
-> >> >
-> >> > Setting two stop bits on both ends (OMAP4430 and FTDI) appears to
-> >> > improve the issue, but not completely solve it.
-> >>
-> >> Are you sure about clock error above some tollerance?
-> >
-> > No idea at the moment.  Looking at the bitstream with a scope is the
-> > next step, but it's not easy to do that with just two hands.  I also
-> > need to find some way to trigger it reliably.
-> >
-> > Another cause could be that the UART pin is being held high/low for
-> > some reason (maybe a pinmux problem.)
-> >
-> > Another interesting observation is that if I login over the network and
-> > then do:
-> >
-> >         while :; do :; done &
-> >         while :; do :; done &
-> >
+>> Hi Eugen,
+>>
+>> On Tue, Apr 17, 2018 at 10:39:24AM +0300, Eugen Hristev wrote:
+>>>
+>>>
+>>> On 17.04.2018 02:58, Dmitry Torokhov wrote:  
+>>>> On Sun, Apr 15, 2018 at 08:33:21PM +0100, Jonathan Cameron wrote:  
+>>>>> On Tue, 10 Apr 2018 11:57:52 +0300
+>>>>> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+>>>>>   
+>>>>>> When requesting channels for a particular consumer device,
+>>>>>> besides requesting the device (incrementing the reference counter), also
+>>>>>> do it for the driver module of the iio dev. This will avoid the situation
+>>>>>> where the producer IIO device can be removed and the consumer is still
+>>>>>> present in the kernel.
+>>>>>>
+>>>>>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>>>>>> ---
+>>>>>>   drivers/iio/inkern.c | 8 +++++++-
+>>>>>>   1 file changed, 7 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+>>>>>> index ec98790..68d9b87 100644
+>>>>>> --- a/drivers/iio/inkern.c
+>>>>>> +++ b/drivers/iio/inkern.c
+>>>>>> @@ -11,6 +11,7 @@
+>>>>>>   #include <linux/slab.h>
+>>>>>>   #include <linux/mutex.h>
+>>>>>>   #include <linux/of.h>
+>>>>>> +#include <linux/module.h>
+>>>>>>   #include <linux/iio/iio.h>
+>>>>>>   #include "iio_core.h"
+>>>>>> @@ -152,6 +153,7 @@ static int __of_iio_channel_get(struct iio_channel *channel,
+>>>>>>   	if (index < 0)
+>>>>>>   		goto err_put;
+>>>>>>   	channel->channel = &indio_dev->channels[index];
+>>>>>> +	try_module_get(channel->indio_dev->driver_module);  
+>>>>>
+>>>>> And if it fails? (the module we are trying to get is going away...)
+>>>>>
+>>>>> We should try and handle it I think. Be it by just erroring out of here.  
+>>>>
+>>>> Even more, this has nothing to do with modules. A device can go away for
+>>>> any number of reasons (we unbind it manually via sysfs, we pull the USB
+>>>> plug from the host in case it is USB-connected device, we unload I2C
+>>>> adapter for the bus device resides on, we kick underlying PCI device)
+>>>> and we should be able to handle this in some fashion. Handling errors
+>>>> from reads and ignoring garbage is one of methods.
+>>>>
+>>>> FWIW this is a NACK from me.
+>>>>
+>>>> Thanks.  
+>>> Hello,
+>>>
+>>> This patch is actually a "best effort attempt" for the consumer driver
+>>> (touch driver) to get a reference to the producer of the data (the IIO
+>>> device), when it requests the specific channels.
+>>> As of this moment, there is no attempt whatsoever for the consumer to have a
+>>> reference on the producer driver. Thus, the producer can be removed at any
+>>> time, and the consumer will fail ungraciously.  
+>>
+>> This is the root of the issue. The consumer should be prepared to handle
+>> errors from producer.
+>>
+>>> I can change the perspective from "best effort" to "mandatory" to get a
+>>> reference to the producer, or you wish to stop trying to get any reference
+>>> at all (remove this patch completely) ?  
+>>
+>> You should take reference to the device itself (if it is not taken
+>> already), so it does not disappear completely and you can continue using
+>> IIO API to access it, and IIO API should be prepared to deal with "dead"
+>> devices, but as I pointed in my other email, trying to pin the driver
+>> is quite pointless as there are myriad other ways of device stopping
+>> working besides module unloading.
+>>
+>> In any case, I think this problem is outside of the scope of this
+>> patchset that adds a generic resistive touchscreen, so if you want to
+>> continue working on this I'd recommend moving it into a separate series.
+>>
+>> Thanks.
+>>
+> Agreed, this one has come up a number of times before.  Quite a lot of
+> work got done by (IIRC) Lars Peter Clausen to stabilize things in various
+> unexpected 'going away' events.  Of course there may be paths we have
+> added since that (it was years ago) that can cause trouble...
 > 
-> You can disable it. Anyway when uart from Ti go in idle mode that can loose
-> the first char on receiving
+> Anyhow, separate issue as Dmitry says, let's deal with it separately.
 
-That may be, but what happens on the OMAP receive side is not relevant.
-This issue is about the OMAP4430 transmit side.
-
-> > to occupy both CPUs, and then do:
-> >
-> >         dmesg | less
-> >
-> > on the console, the problem goes away.  If I only do one while loop,
-> > the problem is present, but the corruption looks like it happens at a
-> > different point in the serial stream.
-> >
-> > This would seem to point the blame away from clocks or pinmux, and back
-> > to power management issues.
-> >
-> 
-> Do you have statistics from the uart under proc?
-
-You mean on the OMAP4430?
-
-# cat /proc/tty/driver/OMAP-SERIAL
-serinfo:1.0 driver revision:
-0: uart:OMAP UART0 mmio:0x4806A000 irq:32 tx:0 rx:0
-1: uart:OMAP UART1 mmio:0x4806C000 irq:33 tx:0 rx:0
-2: uart:OMAP UART2 mmio:0x48020000 irq:34 tx:638807 rx:5406 RTS|CTS|DTR
-3: uart:OMAP UART3 mmio:0x4806E000 irq:35 tx:0 rx:0
-
-Of course, there won't be anything of interest there because I'm
-talking about the *transmit* side on the OMAP4430 and there's no
-way to detect or monitor errors in the transmit side.
-
-The ftdi-sio driver on the host machine, which would be involved in
-the receive, doesn't keep statistics and make them available through
-/proc.  (Another reason why I hate usb-serial based development
-boards.)
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+We do properly get a ref to the device. Not getting a ref to the module is
+on purpose. Cause as Dmitry said it does nothing the device can disappear at
+any point either way. I second the NACK.
