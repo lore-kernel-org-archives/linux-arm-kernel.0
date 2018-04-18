@@ -1,28 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 18 Apr 2018 11:14:47 +0530
-Subject: [PATCH v6 6/7] remoteproc/davinci: use the reset framework
-In-Reply-To: <20180417173038.25510-7-brgl@bgdev.pl>
-References: <20180417173038.25510-1-brgl@bgdev.pl>
- <20180417173038.25510-7-brgl@bgdev.pl>
-Message-ID: <14b8384d-707d-42b7-b3ac-1ad914997a2e@ti.com>
+From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
+Date: Wed, 18 Apr 2018 07:46:43 +0200
+Subject: [PATCH v6 09/11] ARM: sun8i: smp: Add support for A83T
+In-Reply-To: <20180417112038.mw7bfhqw4xwvzxcw@flea>
+References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
+ <20180416215032.5023-10-mylene.josserand@bootlin.com>
+ <20180417112038.mw7bfhqw4xwvzxcw@flea>
+Message-ID: <20180418074643.5bd68168@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2018 11:00 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hello Maxime,
+
+On Tue, 17 Apr 2018 13:20:38 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+
+> On Mon, Apr 16, 2018 at 11:50:30PM +0200, Myl?ne Josserand wrote:
+> > @@ -535,8 +599,12 @@ static int sunxi_mc_smp_cpu_kill(unsigned int l_cpu)
+> >  	return !ret;
+> >  }
+> >  
+> > -static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
+> > +static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
+> >  {
+> > +	/* CPU0 hotplug not handled for sun8i-a83t */
+> > +	if (is_sun8i)
+> > +		if (cpu == 0)
+> > +			return false;
+> >  	return true;  
 > 
-> Switch to using the reset framework instead of handcoded reset routines
-> we used so far.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> I think Chen-Yu told you how to implement the hotplug in the previous
+> iteration, did you have time to test it?
 
-Looks good!
+Not yet, I will have a look this evening.
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Best regards,
 
-This depends on DaVinci gaining common clock / reset framework support
-though. I am guessing remoteproc maintainers will have to be reminded
-when its safe to apply.
-
-Thanks,
-Sekhar
+-- 
+Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
