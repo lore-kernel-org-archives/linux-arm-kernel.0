@@ -1,21 +1,22 @@
 From: sven.eckelmann@openmesh.com (Sven Eckelmann)
-Date: Wed, 18 Apr 2018 08:59:40 +0200
-Subject: [v5,08/13] ARM: dts: ipq4019: Add ipq4019-ap.dk07.1 common data
-In-Reply-To: <1521800336-19266-9-git-send-email-sricharan@codeaurora.org>
-References: <1521800336-19266-9-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1724020.V9x0kZZp2B@bentobox>
+Date: Wed, 18 Apr 2018 08:59:46 +0200
+Subject: [v5,05/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
+In-Reply-To: <1521800336-19266-6-git-send-email-sricharan@codeaurora.org>
+References: <1521800336-19266-6-git-send-email-sricharan@codeaurora.org>
+Message-ID: <2641190.FRMBLJWkCS@bentobox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Freitag, 23. M?rz 2018 15:48:51 CEST Sricharan R wrote:
-> Add the common data for all dk07 based boards.
+On Freitag, 23. M?rz 2018 15:48:48 CEST Sricharan R wrote:
+> Add the common parts for the dk04 boards.
 > 
 > Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
 > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi | 69 +++++++++++++++++++++++++++
->  1 file changed, 69 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
+>  arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi | 115 ++++++++++++++++++++++++++
+>  arch/arm/boot/dts/qcom-ipq4019.dtsi           |   2 +-
+>  2 files changed, 116 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
 
 The no-map reserved-memory for tz and smem are missing. Linux doesn't have 
 control over these regions and they are placed in the middle of the ram before 
@@ -60,4 +61,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/90b854f2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/f6e49c07/attachment.sig>
