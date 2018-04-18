@@ -1,38 +1,26 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 18 Apr 2018 11:12:00 +0800
-Subject: [PATCH v5] ARM: imx: Update spi_imx platform data to reflect
- current state
-In-Reply-To: <20180402200605.13050-1-tpiepho@impinj.com>
-References: <20180402200605.13050-1-tpiepho@impinj.com>
-Message-ID: <20180418031159.GR25429@dragon>
+Date: Wed, 18 Apr 2018 11:19:04 +0800
+Subject: [PATCH 0/4] ARM: imx: use device properties for at24 eeprom
+In-Reply-To: <20180404131627.9135-1-brgl@bgdev.pl>
+References: <20180404131627.9135-1-brgl@bgdev.pl>
+Message-ID: <20180418031903.GS25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 02, 2018 at 01:06:05PM -0700, Trent Piepho wrote:
-> The docs for the spi_imx platform data still refer to a -32 offset used to
-> specify a native chip select.  This was removed in commit 602c8f4485cd
-> ("spi: imx: fix use of native chip-selects with devicetree") and no
-> longer works as documented.  Update documentation.
+On Wed, Apr 04, 2018 at 03:16:23PM +0200, Bartosz Golaszewski wrote:
+> We want to work towards phasing out the at24_platform_data structure.
+> There are few users and its contents can be represented using generic
+> device properties. Using device properties only will allow us to
+> significantly simplify the at24 configuration code.
 > 
-> The macro MXC_SPI_CS() is no longer is needed.
+> This series converts all users of at24_platform_data to using generic
+> device properties or - as is the case with PATCH 1/4 - drops the
+> platform data entirely since it's not needed.
 > 
-> If a board uses all native chip selects, then it's not necessary to
-> specify a chip select array at all, as all native is the default (this is
-> how device-tree configured SPI masters work too).  Most of the spi-imx
-> platform data users have their chip select arrays removed by this patch.
-> 
-> This patch also fixes a bug in mx31moboard introduced in the '602 commit.
-> When that board was updated in commit 901f26bce64a ("ARM: imx: set
-> correct chip_select in platform setup") to reflect the SPI change, only
-> SPI bus 2 was updated and SPI bus 1 was left with non-sequential chip
-> selects.  The mc13783 spi device on bus 1 had its chip select updated as
-> if it were on bus 2.
-> 
-> CC: Shawn Guo <shawnguo@kernel.org>
-> CC: Sascha Hauer <kernel@pengutronix.de>
-> CC: Fabio Estevam <fabio.estevam@nxp.com>
-> Acked-by: Greg Ungerer <gerg@linux-m68k.org>
-> Reviewed-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+> Bartosz Golaszewski (4):
+>   ARM: imx: vpr200: drop at24_platform_data
+>   ARM: imx: pcm043: use device properties for at24 eeprom
+>   ARM: imx: pca100: use device properties for at24 eeprom
+>   ARM: imx: pcm037: use device properties for at24 eeprom
 
-Applied, thanks.
+Applied all, thanks.
