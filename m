@@ -1,24 +1,105 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Apr 2018 17:23:15 +0100
-Subject: [PATCH][next] spi: pxa2xx: make function pxa2xx_spi_transfer_one
- static
-In-Reply-To: <20180418161842.19846-1-colin.king@canonical.com>
-References: <20180418161842.19846-1-colin.king@canonical.com>
-Message-ID: <20180418162315.GF10061@sirena.org.uk>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Wed, 18 Apr 2018 17:34:15 +0100
+Subject: [PATCH] arm64: msm8916: fix gic_irq_domain_translate warnings
+Message-ID: <20180418163415.21646-1-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 05:18:42PM +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> The function pxa2xx_spi_transfer_one is local to the source and
-> do not need to be in global scope, so make it static.
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Someone already sent a patch for this which I applied earlier today.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/9f9b8c97/attachment-0001.sig>
+Remove the usage of IRQ_TYPE_NONE to fix loud warnings from
+patch (83a86fbb5b56b "irqchip/gic: Loudly complain about
+the use of IRQ_TYPE_NONE").
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index cfbd72186762..5d66a575c7e1 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -180,7 +180,7 @@
+ 
+ 	pmu {
+ 		compatible = "arm,cortex-a53-pmu";
+-		interrupts = <GIC_PPI 7 GIC_CPU_MASK_SIMPLE(4)>;
++		interrupts = <GIC_PPI 7 (GIC_CPU_MASK_SIMPLE(4)| IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
+ 
+ 	thermal-zones {
+@@ -513,7 +513,7 @@
+ 		blsp_i2c2: i2c at 78b6000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+ 			reg = <0x078b6000 0x500>;
+-			interrupts = <GIC_SPI 96 0>;
++			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+ 				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
+ 			clock-names = "iface", "core";
+@@ -528,7 +528,7 @@
+ 		blsp_i2c4: i2c at 78b8000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+ 			reg = <0x078b8000 0x500>;
+-			interrupts = <GIC_SPI 98 0>;
++			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+ 				 <&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
+ 			clock-names = "iface", "core";
+@@ -543,7 +543,7 @@
+ 		blsp_i2c6: i2c at 78ba000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+ 			reg = <0x078ba000 0x500>;
+-			interrupts = <GIC_SPI 100 0>;
++			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+ 				 <&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
+ 			clock-names = "iface", "core";
+@@ -575,7 +575,7 @@
+ 					"mi2s-bit-clk3";
+ 			#sound-dai-cells = <1>;
+ 
+-			interrupts = <0 160 0>;
++			interrupts = <0 160 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "lpass-irq-lpaif";
+ 			reg = <0x07708000 0x10000>;
+ 			reg-names = "lpass-lpaif";
+@@ -595,7 +595,7 @@
+ 			reg = <0x07824900 0x11c>, <0x07824000 0x800>;
+ 			reg-names = "hc_mem", "core_mem";
+ 
+-			interrupts = <0 123 0>, <0 138 0>;
++			interrupts = <0 123 IRQ_TYPE_LEVEL_HIGH>, <0 138 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "hc_irq", "pwr_irq";
+ 			clocks = <&gcc GCC_SDCC1_APPS_CLK>,
+ 				 <&gcc GCC_SDCC1_AHB_CLK>,
+@@ -612,7 +612,7 @@
+ 			reg = <0x07864900 0x11c>, <0x07864000 0x800>;
+ 			reg-names = "hc_mem", "core_mem";
+ 
+-			interrupts = <0 125 0>, <0 221 0>;
++			interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH>, <0 221 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "hc_irq", "pwr_irq";
+ 			clocks = <&gcc GCC_SDCC2_APPS_CLK>,
+ 				 <&gcc GCC_SDCC2_AHB_CLK>,
+@@ -819,7 +819,7 @@
+ 			iommu-ctx at 2000 {
+ 				compatible = "qcom,msm-iommu-v1-ns";
+ 				reg = <0x2000 0x1000>;
+-				interrupts = <GIC_SPI 242 0>;
++				interrupts = <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 
+@@ -864,7 +864,7 @@
+ 				      "bus_clk",
+ 				      "vsync_clk";
+ 
+-			interrupts = <0 72 0>;
++			interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 			interrupt-controller;
+ 			#interrupt-cells = <1>;
+-- 
+2.16.2
