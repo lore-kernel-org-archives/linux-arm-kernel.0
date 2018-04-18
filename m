@@ -1,42 +1,55 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed, 18 Apr 2018 14:19:50 -0300
-Subject: [PATCH] perf tools: coresight: Moving to SPDX identifier
-In-Reply-To: <1523912013-29331-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1523912013-29331-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20180418171950.GA22762@kernel.org>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Wed, 18 Apr 2018 18:46:37 +0100
+Subject: [PATCH] ASoC: msm8916-wcd-analog: use threaded context for mbhc events
+Message-ID: <20180418174637.24041-1-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, Apr 16, 2018 at 02:53:33PM -0600, Mathieu Poirier escreveu:
-> Moving perf tools CoreSight support to the SPDX identifier.
-> 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->  tools/include/linux/coresight-pmu.h             | 13 +------------
->  tools/perf/arch/arm/util/auxtrace.c             | 13 +------------
->  tools/perf/arch/arm/util/cs-etm.c               | 13 +------------
->  tools/perf/arch/arm/util/cs-etm.h               | 13 +------------
->  tools/perf/arch/arm/util/pmu.c                  | 13 +------------
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c |  3 +--
->  tools/perf/util/cs-etm.c                        |  3 +--
->  tools/perf/util/cs-etm.h                        | 13 +------------
->  8 files changed, 8 insertions(+), 76 deletions(-)
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-So now I get:
+As snd_soc_jack_report() can sleep, move handling of mbhc events to a
+thread context rather than in interrupt context.
 
-[acme at jouet perf]$ make -C tools/perf
-make: Entering directory '/home/acme/git/perf/tools/perf'
-  BUILD:   Doing 'make -j4' parallel build
-Warning: Kernel ABI header at 'tools/include/linux/coresight-pmu.h' differs from latest version at 'include/linux/coresight-pmu.h'
-  INSTALL  GTK UI
-  INSTALL  trace_plugin
-<SNIP>
+Fixes: de66b3455023 ('ASoC: codecs: msm8916-wcd-analog: add MBHC support')
+Reported-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ sound/soc/codecs/msm8916-wcd-analog.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-You should either send the patch to both files or first send it to the
-kernel, then to tools/, I just checked and this SPDX using
-coresight-pmu.h file hasn't hit upstream, so we're in the future here,
-i.e. tools/include has a _copy_ of what is in include/ :-)
-
-I'm dropping this patch from my tree till this gets resolved.
-
-- Arnaldo
+diff --git a/sound/soc/codecs/msm8916-wcd-analog.c b/sound/soc/codecs/msm8916-wcd-analog.c
+index 12ee83d52405..b7cf7cce95fe 100644
+--- a/sound/soc/codecs/msm8916-wcd-analog.c
++++ b/sound/soc/codecs/msm8916-wcd-analog.c
+@@ -1187,7 +1187,8 @@ static int pm8916_wcd_analog_spmi_probe(struct platform_device *pdev)
+ 		return irq;
+ 	}
+ 
+-	ret = devm_request_irq(dev, irq, pm8916_mbhc_switch_irq_handler,
++	ret = devm_request_threaded_irq(dev, irq, NULL,
++			       pm8916_mbhc_switch_irq_handler,
+ 			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
+ 			       IRQF_ONESHOT,
+ 			       "mbhc switch irq", priv);
+@@ -1201,7 +1202,8 @@ static int pm8916_wcd_analog_spmi_probe(struct platform_device *pdev)
+ 			return irq;
+ 		}
+ 
+-		ret = devm_request_irq(dev, irq, mbhc_btn_press_irq_handler,
++		ret = devm_request_threaded_irq(dev, irq, NULL,
++				       mbhc_btn_press_irq_handler,
+ 				       IRQF_TRIGGER_RISING |
+ 				       IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+ 				       "mbhc btn press irq", priv);
+@@ -1214,7 +1216,8 @@ static int pm8916_wcd_analog_spmi_probe(struct platform_device *pdev)
+ 			return irq;
+ 		}
+ 
+-		ret = devm_request_irq(dev, irq, mbhc_btn_release_irq_handler,
++		ret = devm_request_threaded_irq(dev, irq, NULL,
++				       mbhc_btn_release_irq_handler,
+ 				       IRQF_TRIGGER_RISING |
+ 				       IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+ 				       "mbhc btn release irq", priv);
+-- 
+2.16.2
