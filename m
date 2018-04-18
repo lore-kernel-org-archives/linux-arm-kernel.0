@@ -1,60 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Apr 2018 09:18:27 +0100
-Subject: 4.16 OMAP serial transmit corruption?
-In-Reply-To: <20180418005748.GE5671@atomide.com>
-References: <20180416151732.GU16141@n2100.armlinux.org.uk>
- <20180416154545.GA5671@atomide.com>
- <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
- <20180417173134.GD5671@atomide.com>
- <20180417221029.GL10990@n2100.armlinux.org.uk>
- <20180418005748.GE5671@atomide.com>
-Message-ID: <20180418081827.GM10990@n2100.armlinux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 18 Apr 2018 13:51:38 +0530
+Subject: [PATCH 2/2] ARM: dts: da850-lcdk: add unit name for memory node
+In-Reply-To: <7b7caa27-4bb9-db73-0070-1566a4be34d5@lechnology.com>
+References: <20180417100128.23011-1-nsekhar@ti.com>
+ <20180417100128.23011-3-nsekhar@ti.com>
+ <7b7caa27-4bb9-db73-0070-1566a4be34d5@lechnology.com>
+Message-ID: <309fa60b-b18f-ec71-efaf-077167db9962@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 05:57:48PM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@armlinux.org.uk> [180417 22:12]:
-> > On Tue, Apr 17, 2018 at 10:31:35AM -0700, Tony Lindgren wrote:
-> > > * Vignesh R <vigneshr@ti.com> [180417 09:21]:
-> > > > On Monday 16 April 2018 09:15 PM, Tony Lindgren wrote:
-> > > > > Also, I'm seeing an issue where the UARTs won't idle on init
-> > > > > with 8250_omap driver if connected to the wl12xx bluetooth port
-> > > > > unless I write some data to the port first. It does not seem
-> > > > > to be related to the rts/cts lines being wired as I've tested
-> > > > > muxing them out of the way.
-> > > > 
-> > > > If this instance of UART is using DMA then it might be due an errata
-> > > > worked around in AM33/AM43/DRA7:
-> > > > https://patchwork.kernel.org/patch/6784331/
-> > > 
-> > > It sure sounds similar but UART_ERRATA_CLOCK_DISABLE does not
-> > > seem to help with the reset. Also disabling DMA does not seem
-> > > to help. So far the only way to clear it seems to be to write
-> > > a character (TX) on the device. Then things work just fine
-> > > even without UART_ERRATA_CLOCK_DISABLE set. I'll try to debug
-> > > this more at some point.
-> > 
-> > Classic case of thread hijack.  So, Tony's idle problem gets more
-> > attention on _my_ thread than _my_ issue about TX corruption, yea,
-> > that's fair...  Come on guys, what about my problem, which is the
-> > subject of this thread?
+On Tuesday 17 April 2018 10:25 PM, David Lechner wrote:
+> On 04/17/2018 05:01 AM, Sekhar Nori wrote:
+>> Add unit name for memory node to squash the W=1 warning:
+>>
+>> arch/arm/boot/dts/da850-lcdk.dtb: Warning (unit_address_vs_reg):
+>> /memory: node has a reg or ranges property, but no unit name
+>>
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> ---
+>> ? arch/arm/boot/dts/da850-lcdk.dts | 2 +-
+>> ? 1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
+>> b/arch/arm/boot/dts/da850-lcdk.dts
+>> index a1f4d6d5a569..e80839bb071b 100644
+>> --- a/arch/arm/boot/dts/da850-lcdk.dts
+>> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+>> @@ -21,7 +21,7 @@
+>> ????????? stdout-path = "serial2:115200n8";
+>> ????? };
+>> ? -??? memory {
+>> +??? memory at c0000000 {
+>> ????????? device_type = "memory";
 > 
-> Just trying to brainstorm what all can go wrong still :) OK so
-> it's not DMA then.
+> Should we drop `device_type = "memory";` since it is now specified
+> in da850.dtsi?
+
+It was specified in skeleton.dtsi too, but good point. I will drop.
+
 > 
-> > I don't have CONFIG_SERIAL_8250_DMA set, so DMA can't be the issue.
+>> ????????? reg = <0xc0000000 0x08000000>;
 > 
-> Is this happening also with v4.16 or with v4.17-rc1?
+> I wouldn't mind a comment that says that this is 128MiB. The number
+> is too big for me to do the hex in my head. :-)
 
-4.16
+Sure :)
 
-> So you just edit something in vi and and on exit it happens?
-> Not happening here for me..
-
-Or run less, eg, dmesg | less or less /some/file.  It doesn't happen
-with cat though.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Sekhar
