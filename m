@@ -1,149 +1,60 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Wed, 18 Apr 2018 16:31:35 +0100
-Subject: [PATCH v5 01/23] soc: qcom dt-bindings: Add APR bus bindings
-In-Reply-To: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
-References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180418153157.1960-2-srinivas.kandagatla@linaro.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 18 Apr 2018 17:35:49 +0200
+Subject: [PATCH 2/2] ARM: dts: imx6ull: add operating points
+In-Reply-To: <20180418145230.10249-2-sebastien.szymanski@armadeus.com>
+References: <20180418145230.10249-1-sebastien.szymanski@armadeus.com>
+ <20180418145230.10249-2-sebastien.szymanski@armadeus.com>
+Message-ID: <c5d92c4e36973e3e18980d410e11ec4f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On 18.04.2018 16:52, S?bastien Szymanski wrote:
+> i.MX6ULL has different operating ranges than i.MX6UL so add the
+> operating points for the i.MX6ULL. A 25mV offset is added to the minimum
+> allowed values like for the i.MX6UL.
 
-This patch add dt bindings for Qualcomm APR (Asynchronous Packet Router)
-bus driver. This bus is used for communicating with DSP which provides
-audio and various other services to cpu.
+Hi S?bastien,
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- .../devicetree/bindings/soc/qcom/qcom,apr.txt      | 85 ++++++++++++++++++++++
- include/dt-bindings/soc/qcom,apr.h                 | 27 +++++++
- 2 files changed, 112 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
- create mode 100644 include/dt-bindings/soc/qcom,apr.h
+Last time I checked there was a DC controller missing for the EVK, so I
+think it was not possible to go to the highest operating points yet.
+Have you tested this on the EVK?
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-new file mode 100644
-index 000000000000..85cc0433fb00
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,apr.txt
-@@ -0,0 +1,85 @@
-+Qualcomm APR (Asynchronous Packet Router) binding
-+
-+This binding describes the Qualcomm APR. APR is a IPC protocol for
-+communication between Application processor and QDSP. APR is mainly
-+used for audio/voice services on the QDSP.
-+
-+- compatible:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: must be "qcom,apr-v<VERSION-NUMBER>", example "qcom,apr-v2"
-+
-+- qcom,dest-domain-id
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: Destination processor ID.
-+	Possible values are :
-+			1 - APR simulator
-+			2 - PC
-+			3 - MODEM
-+			4 - ADSP
-+			5 - APPS
-+			6 - MODEM2
-+			7 - APPS2
-+
-+= APR SERVICES
-+Each subnode of the APR node represents service tied to this apr. The name
-+of the nodes are not important. The properties of these nodes are defined
-+by the individual bindings for the specific service
-+- All APR services MUST contain the following property:
-+
-+- reg
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: APR Service ID
-+	Possible values are :
-+			3 - DSP Core Service
-+			4 - Audio Front End Service.
-+			5 - Voice Stream Manager Service.
-+			6 - Voice processing manager.
-+			7 - Audio Stream Manager Service.
-+			8 - Audio Device Manager Service.
-+			9 - Multimode voice manager.
-+			10 - Core voice stream.
-+			11 - Core voice processor.
-+			12 - Ultrasound stream manager.
-+			13 - Listen stream manager.
-+
-+= EXAMPLE
-+The following example represents a QDSP based sound card on a MSM8996 device
-+which uses apr as communication between Apps and QDSP.
-+
-+	apr {
-+		compatible = "qcom,apr-v2";
-+		qcom,smd-channels = "apr_audio_svc";
-+		qcom,dest-domain-id = <APR_DOMAIN_ADSP>;
-+
-+		q6core {
-+			compatible = "qcom,q6core";
-+			reg = <APR_SVC_ADSP_CORE>;
-+		};
-+
-+		q6afe {
-+			compatible = "qcom,q6afe";
-+			reg = <APR_SVC_AFE>;
-+
-+			dais {
-+				#sound-dai-cells = <1>;
-+				hdmi at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		q6asm {
-+			compatible = "qcom,q6asm";
-+			reg = <APR_SVC_ASM>;
-+			...
-+		};
-+
-+		q6adm {
-+			compatible = "qcom,q6adm";
-+			reg = <APR_SVC_ADM>;
-+			...
-+		};
-+	};
-diff --git a/include/dt-bindings/soc/qcom,apr.h b/include/dt-bindings/soc/qcom,apr.h
-new file mode 100644
-index 000000000000..905503f81885
---- /dev/null
-+++ b/include/dt-bindings/soc/qcom,apr.h
-@@ -0,0 +1,27 @@
-+#ifndef __DT_BINDINGS_QCOM_APR_H
-+#define __DT_BINDINGS_QCOM_APR_H
-+
-+/* Domain IDs */
-+#define APR_DOMAIN_SIM		0x1
-+#define APR_DOMAIN_PC		0x2
-+#define APR_DOMAIN_MODEM	0x3
-+#define APR_DOMAIN_ADSP		0x4
-+#define APR_DOMAIN_APPS		0x5
-+#define APR_DOMAIN_MAX		0x6
-+
-+/* ADSP service IDs */
-+#define APR_SVC_ADSP_CORE	0x3
-+#define APR_SVC_AFE		0x4
-+#define APR_SVC_VSM		0x5
-+#define APR_SVC_VPM		0x6
-+#define APR_SVC_ASM		0x7
-+#define APR_SVC_ADM		0x8
-+#define APR_SVC_ADSP_MVM	0x09
-+#define APR_SVC_ADSP_CVS	0x0A
-+#define APR_SVC_ADSP_CVP	0x0B
-+#define APR_SVC_USM		0x0C
-+#define APR_SVC_LSM		0x0D
-+#define APR_SVC_VIDC		0x16
-+#define APR_SVC_MAX		0x17
-+
-+#endif /* __DT_BINDINGS_QCOM_APR_H */
--- 
-2.16.2
+--
+Stefan
+
+> 
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> ---
+>  arch/arm/boot/dts/imx6ull.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
+> index 571ddd71cdba..7e6273be0291 100644
+> --- a/arch/arm/boot/dts/imx6ull.dtsi
+> +++ b/arch/arm/boot/dts/imx6ull.dtsi
+> @@ -46,6 +46,25 @@
+>  /* Delete UART8 in AIPS-1 (i.MX6UL specific) */
+>  /delete-node/ &uart8;
+>  
+> +&cpu0 {
+> +	operating-points = <
+> +		/* kHz	uV */
+> +		900000	1275000
+> +		792000	1225000
+> +		528000	1175000
+> +		396000	1025000
+> +		198000	950000
+> +	>;
+> +	fsl,soc-operating-points = <
+> +		/* KHz	uV */
+> +		900000	1400000
+> +		792000	1350000
+> +		528000	1175000
+> +		396000	1175000
+> +		198000	1175000
+> +	>;
+> +};
+> +
+>  / {
+>  	soc {
+>  		aips3: aips-bus at 2200000 {
