@@ -1,33 +1,28 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 18 Apr 2018 17:47:59 +0200
-Subject: [PATCH v2 2/2] pinctrl/samsung: Document required order of banks
-In-Reply-To: <CA+Ln22Hgn5VmeUAdcmHi64-HdRqpuGBBN9uUzmFTOBatagzXeg@mail.gmail.com>
-References: <1523893966-8884-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1523893966-8884-3-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <CA+Ln22Hgn5VmeUAdcmHi64-HdRqpuGBBN9uUzmFTOBatagzXeg@mail.gmail.com>
-Message-ID: <CAJKOXPc_0RenBVA+wDshqD3Q0S3kCu_60v_V5XMCvtWeOv+Hrg@mail.gmail.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Wed, 18 Apr 2018 08:56:41 -0700
+Subject: [PATCH 0/2] brcmstb-avs-cpufreq changes
+Message-ID: <20180418155643.36464-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 4:14 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> 2018-04-17 0:52 GMT+09:00 Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>:
->> This patch documents requirement coming from the way
->> exynos_eint_gpio_irq() is working now, which expects
->> EINTG banks to be at the beginning of the bank arrays.
->>
->> Cc: stable at vger.kernel.org
->
-> Probably no need for this one to go to stable, but either is fine for me.
->
->> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
->> ---
->>  drivers/pinctrl/samsung/pinctrl-exynos-arm.c   | 26 ++++++++++++++++++++++++++
->>  drivers/pinctrl/samsung/pinctrl-exynos-arm64.c | 20 ++++++++++++++++++++
->>  2 files changed, 46 insertions(+)
->
-> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+From: Markus Mayer <mmayer@broadcom.com>
 
-Thanks, applied without cc-stable.
+These changes are based on v4.17-rc1. The two patches are unrelated.
 
-Best regards,
-Krzysztof
+Patch 1/2 removes unused code that was only useful during driver
+development and that has been disabled by default for a long time.
+
+Patch 2/2 allows the driver to detect if the system supports SCMI cpufreq
+
+Jim Quinlan (1):
+  cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if supported
+
+Markus Mayer (1):
+  cpufreq: brcmstb-avs-cpufreq: remove development debug support
+
+ drivers/cpufreq/Kconfig.arm           |  10 -
+ drivers/cpufreq/brcmstb-avs-cpufreq.c | 339 ++--------------------------------
+ 2 files changed, 17 insertions(+), 332 deletions(-)
+
+-- 
+2.7.4
