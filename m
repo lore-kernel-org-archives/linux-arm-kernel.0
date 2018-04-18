@@ -1,383 +1,465 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Wed, 18 Apr 2018 16:31:52 +0100
-Subject: [PATCH v5 18/23] ASoC: qdsp6: q6routing: Add support to MI2S Mixers
+Date: Wed, 18 Apr 2018 16:31:49 +0100
+Subject: [PATCH v5 15/23] ASoC: qdsp6: q6core: Add q6core driver
 In-Reply-To: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
 References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180418153157.1960-19-srinivas.kandagatla@linaro.org>
+Message-ID: <20180418153157.1960-16-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch add support to MI2S mixers required to select path between
-ASM stream and AFE ports.
+This patch adds support to core apr service, which is used to query
+status of other static and dynamic services on the dsp.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- sound/soc/qcom/qdsp6/q6routing.c | 329 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 329 insertions(+)
+ sound/soc/qcom/Kconfig        |   4 +
+ sound/soc/qcom/qdsp6/Makefile |   1 +
+ sound/soc/qcom/qdsp6/q6core.c | 380 ++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6core.h |  15 ++
+ 4 files changed, 400 insertions(+)
+ create mode 100644 sound/soc/qcom/qdsp6/q6core.c
+ create mode 100644 sound/soc/qcom/qdsp6/q6core.h
 
-diff --git a/sound/soc/qcom/qdsp6/q6routing.c b/sound/soc/qcom/qdsp6/q6routing.c
-index c6be775167b8..710c2ae652c7 100644
---- a/sound/soc/qcom/qdsp6/q6routing.c
-+++ b/sound/soc/qcom/qdsp6/q6routing.c
-@@ -232,6 +232,103 @@ static const struct snd_kcontrol_new hdmi_mixer_controls[] = {
- 		       msm_routing_put_audio_mixer),
- };
+diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+index a07181290624..488ee93ee084 100644
+--- a/sound/soc/qcom/Kconfig
++++ b/sound/soc/qcom/Kconfig
+@@ -56,6 +56,9 @@ config SND_SOC_QDSP6_ADM
+ config SND_SOC_QDSP6_ASM
+ 	tristate
  
-+static const struct snd_kcontrol_new primary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia5", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia6", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia7", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia8", PRIMARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
++config SND_SOC_QDSP6_CORE
++	tristate
++
+ config SND_SOC_QDSP6
+ 	tristate "SoC ALSA audio driver for QDSP6"
+ 	depends on QCOM_APR && HAS_DMA
+@@ -63,6 +66,7 @@ config SND_SOC_QDSP6
+ 	select SND_SOC_QDSP6_AFE
+ 	select SND_SOC_QDSP6_ADM
+ 	select SND_SOC_QDSP6_ASM
++	select SND_SOC_QDSP6_CORE
+ 	help
+ 	 To add support for MSM QDSP6 Soc Audio.
+ 	 This will enable sound soc platform specific
+diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
+index eea962315ab3..61f089bc0d25 100644
+--- a/sound/soc/qcom/qdsp6/Makefile
++++ b/sound/soc/qcom/qdsp6/Makefile
+@@ -2,3 +2,4 @@ obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
+ obj-$(CONFIG_SND_SOC_QDSP6_AFE) += q6afe.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ADM) += q6adm.o
+ obj-$(CONFIG_SND_SOC_QDSP6_ASM) += q6asm.o
++obj-$(CONFIG_SND_SOC_QDSP6_CORE) += q6core.o
+diff --git a/sound/soc/qcom/qdsp6/q6core.c b/sound/soc/qcom/qdsp6/q6core.c
+new file mode 100644
+index 000000000000..244ec153ab71
+--- /dev/null
++++ b/sound/soc/qcom/qdsp6/q6core.c
+@@ -0,0 +1,380 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2011-2017, The Linux Foundation
++// Copyright (c) 2018, Linaro Limited
++
++#include <linux/slab.h>
++#include <linux/wait.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/sched.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/jiffies.h>
++#include <linux/wait.h>
++#include <linux/soc/qcom/apr.h>
++#include "q6core.h"
++#include "q6dsp-errno.h"
++
++#define ADSP_STATE_READY_TIMEOUT_MS    3000
++#define Q6_READY_TIMEOUT_MS 100
++#define AVCS_CMD_ADSP_EVENT_GET_STATE		0x0001290C
++#define AVCS_CMDRSP_ADSP_EVENT_GET_STATE	0x0001290D
++#define AVCS_GET_VERSIONS       0x00012905
++#define AVCS_GET_VERSIONS_RSP   0x00012906
++#define AVCS_CMD_GET_FWK_VERSION	0x001292c
++#define AVCS_CMDRSP_GET_FWK_VERSION	0x001292d
++
++struct avcs_svc_info {
++	uint32_t service_id;
++	uint32_t version;
++} __packed;
++
++struct avcs_cmdrsp_get_version {
++	uint32_t build_id;
++	uint32_t num_services;
++	struct avcs_svc_info svc_api_info[];
++} __packed;
++
++/* for ADSP2.8 and above */
++struct avcs_svc_api_info {
++	uint32_t service_id;
++	uint32_t api_version;
++	uint32_t api_branch_version;
++} __packed;
++
++struct avcs_cmdrsp_get_fwk_version {
++	uint32_t build_major_version;
++	uint32_t build_minor_version;
++	uint32_t build_branch_version;
++	uint32_t build_subbranch_version;
++	uint32_t num_services;
++	struct avcs_svc_api_info svc_api_info[];
++} __packed;
++
++struct q6core {
++	struct apr_device *adev;
++	wait_queue_head_t wait;
++	uint32_t avcs_state;
++	struct mutex lock;
++	bool resp_received;
++	uint32_t num_services;
++	struct avcs_cmdrsp_get_fwk_version *fwk_version;
++	struct avcs_cmdrsp_get_version *svc_version;
++	bool fwk_version_supported;
++	bool get_state_supported;
++	bool get_version_supported;
++	bool is_version_requested;
 +};
 +
-+static const struct snd_kcontrol_new secondary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia5", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia6", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia7", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia8", SECONDARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
++static struct q6core *g_core;
++
++static int q6core_callback(struct apr_device *adev,
++			 struct apr_client_message *data)
++{
++	struct q6core *core = dev_get_drvdata(&adev->dev);
++	struct aprv2_ibasic_rsp_result_t *result;
++
++	result = data->payload;
++	switch (data->opcode) {
++	case APR_BASIC_RSP_RESULT:{
++		result = data->payload;
++		switch (result->opcode) {
++		case AVCS_GET_VERSIONS:
++			if (result->status == ADSP_EUNSUPPORTED)
++				core->get_version_supported = false;
++			core->resp_received = true;
++			break;
++		case AVCS_CMD_GET_FWK_VERSION:
++			if (result->status == ADSP_EUNSUPPORTED)
++				core->fwk_version_supported = false;
++			core->resp_received = true;
++			break;
++		case AVCS_CMD_ADSP_EVENT_GET_STATE:
++			if (result->status == ADSP_EUNSUPPORTED)
++				core->get_state_supported = false;
++			core->resp_received = true;
++			break;
++		}
++		break;
++	}
++	case AVCS_CMDRSP_GET_FWK_VERSION: {
++		struct avcs_cmdrsp_get_fwk_version *fwk;
++		int bytes;
++
++		fwk = data->payload;
++		core->fwk_version_supported = true;
++		bytes = sizeof(*fwk) + fwk->num_services *
++				sizeof(fwk->svc_api_info[0]);
++
++		core->fwk_version = kzalloc(bytes, GFP_ATOMIC);
++		if (!core->fwk_version)
++			return -ENOMEM;
++
++		memcpy(core->fwk_version, data->payload, bytes);
++
++		core->resp_received = true;
++
++		break;
++	}
++	case AVCS_GET_VERSIONS_RSP: {
++		struct avcs_cmdrsp_get_version *v;
++		int len;
++
++		v = data->payload;
++		core->get_version_supported = true;
++
++		len = sizeof(*v) + v->num_services * sizeof(v->svc_api_info[0]);
++
++		core->svc_version = kzalloc(len, GFP_ATOMIC);
++		if (!core->svc_version)
++			return -ENOMEM;
++
++		memcpy(core->svc_version, data->payload, len);
++
++		core->resp_received = true;
++
++		break;
++	}
++	case AVCS_CMDRSP_ADSP_EVENT_GET_STATE:
++		core->get_state_supported = true;
++		core->avcs_state = result->opcode;
++
++		core->resp_received = true;
++		break;
++	default:
++		dev_err(&adev->dev, "Message id from adsp core svc: 0x%x\n",
++			data->opcode);
++		break;
++	}
++
++	if (core->resp_received)
++		wake_up(&core->wait);
++
++	return 0;
++}
++
++static int q6core_get_fwk_versions(struct q6core *core)
++{
++	struct apr_device *adev = core->adev;
++	struct apr_hdr hdr = {0};
++	int rc;
++
++	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
++				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
++	hdr.pkt_size = APR_HDR_SIZE;
++	hdr.opcode = AVCS_CMD_GET_FWK_VERSION;
++
++	rc = apr_send_pkt(adev, &hdr);
++	if (rc < 0)
++		return rc;
++
++	rc = wait_event_timeout(core->wait, (core->resp_received),
++				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
++	if (rc > 0 && core->resp_received) {
++		core->resp_received = false;
++
++		if (!core->fwk_version_supported)
++			return -ENOTSUPP;
++		else
++			return 0;
++	}
++
++
++	return rc;
++}
++
++static int q6core_get_svc_versions(struct q6core *core)
++{
++	struct apr_device *adev = core->adev;
++	struct apr_hdr hdr = {0};
++	int rc;
++
++	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
++				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
++	hdr.pkt_size = APR_HDR_SIZE;
++	hdr.opcode = AVCS_GET_VERSIONS;
++
++	rc = apr_send_pkt(adev, &hdr);
++	if (rc < 0)
++		return rc;
++
++	rc = wait_event_timeout(core->wait, (core->resp_received),
++				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
++	if (rc > 0 && core->resp_received) {
++		core->resp_received = false;
++		return 0;
++	}
++
++	return rc;
++}
++
++static bool __q6core_is_adsp_ready(struct q6core *core)
++{
++	struct apr_device *adev = core->adev;
++	struct apr_hdr hdr = {0};
++	int rc;
++
++	core->get_state_supported = false;
++
++	hdr.hdr_field = APR_HDR_FIELD(APR_MSG_TYPE_SEQ_CMD,
++				      APR_HDR_LEN(APR_HDR_SIZE), APR_PKT_VER);
++	hdr.pkt_size = APR_HDR_SIZE;
++	hdr.opcode = AVCS_CMD_ADSP_EVENT_GET_STATE;
++
++	rc = apr_send_pkt(adev, &hdr);
++	if (rc < 0)
++		return false;
++
++	rc = wait_event_timeout(core->wait, (core->resp_received),
++				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
++	if (rc > 0 && core->resp_received) {
++		core->resp_received = false;
++
++		if (core->avcs_state == 0x1)
++			return true;
++	}
++
++	/* assume that the adsp is up if we not support this command */
++	if (!core->get_state_supported)
++		return true;
++
++	return false;
++}
++
++/**
++ * q6core_get_svc_api_info() - Get version number of a service.
++ *
++ * @svc_id: service id of the service.
++ * @info: Valid struct pointer to fill svc api information.
++ *
++ * Return: zero on success and error code on failure or unsupported
++ */
++int q6core_get_svc_api_info(int svc_id, struct q6core_svc_api_info *ainfo)
++{
++	int i;
++	int ret = -ENOTSUPP;
++
++	if (!g_core || !ainfo)
++		return 0;
++
++	mutex_lock(&g_core->lock);
++	if (!g_core->is_version_requested) {
++		if (q6core_get_fwk_versions(g_core) == -ENOTSUPP)
++			q6core_get_svc_versions(g_core);
++		g_core->is_version_requested = true;
++	}
++
++	if (g_core->fwk_version_supported) {
++		for (i = 0; i < g_core->fwk_version->num_services; i++) {
++			struct avcs_svc_api_info *info;
++
++			info = &g_core->fwk_version->svc_api_info[i];
++			if (svc_id != info->service_id)
++				continue;
++
++			ainfo->api_version = info->api_version;
++			ainfo->api_branch_version = info->api_branch_version;
++			ret = 0;
++			break;
++		}
++	} else if (g_core->get_version_supported) {
++		for (i = 0; i < g_core->svc_version->num_services; i++) {
++			struct avcs_svc_info *info;
++
++			info = &g_core->svc_version->svc_api_info[i];
++			if (svc_id != info->service_id)
++				continue;
++
++			ainfo->api_version = info->version;
++			ainfo->api_branch_version = 0;
++			ret = 0;
++			break;
++		}
++	}
++
++	mutex_unlock(&g_core->lock);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(q6core_get_svc_api_info);
++
++/**
++ * q6core_is_adsp_ready() - Get status of adsp
++ *
++ * Return: Will be an true if adsp is ready and false if not.
++ */
++bool q6core_is_adsp_ready(void)
++{
++	unsigned long  timeout;
++	bool ret = false;
++
++	if (!g_core)
++		return false;
++
++	mutex_lock(&g_core->lock);
++	timeout = jiffies + msecs_to_jiffies(ADSP_STATE_READY_TIMEOUT_MS);
++	for (;;) {
++		if (__q6core_is_adsp_ready(g_core)) {
++			ret = true;
++			break;
++		}
++
++		if (!time_after(timeout, jiffies)) {
++			ret = false;
++			break;
++		}
++	}
++
++	mutex_unlock(&g_core->lock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(q6core_is_adsp_ready);
++
++static int q6core_probe(struct apr_device *adev)
++{
++	g_core = kzalloc(sizeof(*g_core), GFP_KERNEL);
++	if (!g_core)
++		return -ENOMEM;
++
++	dev_set_drvdata(&adev->dev, g_core);
++
++	mutex_init(&g_core->lock);
++	g_core->adev = adev;
++	init_waitqueue_head(&g_core->wait);
++	return 0;
++}
++
++static int q6core_exit(struct apr_device *adev)
++{
++	struct q6core *core = dev_get_drvdata(&adev->dev);
++
++	if (core->fwk_version_supported)
++		kfree(core->fwk_version);
++	if (core->get_version_supported)
++		kfree(core->svc_version);
++
++	kfree(core);
++	g_core = NULL;
++
++	return 0;
++}
++
++static const struct of_device_id q6core_device_id[]  = {
++	{ .compatible = "qcom,q6core" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, q6core_device_id);
++
++static struct apr_driver qcom_q6core_driver = {
++	.probe = q6core_probe,
++	.remove = q6core_exit,
++	.callback = q6core_callback,
++	.driver = {
++		.name = "qcom-q6core",
++		.of_match_table = of_match_ptr(q6core_device_id),
++	},
 +};
 +
-+static const struct snd_kcontrol_new quaternary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia5", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia6", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia7", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia8", QUATERNARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
++module_apr_driver(qcom_q6core_driver);
++MODULE_DESCRIPTION("q6 core");
++MODULE_LICENSE("GPL v2");
+diff --git a/sound/soc/qcom/qdsp6/q6core.h b/sound/soc/qcom/qdsp6/q6core.h
+new file mode 100644
+index 000000000000..7678abd8fd46
+--- /dev/null
++++ b/sound/soc/qcom/qdsp6/q6core.h
+@@ -0,0 +1,15 @@
++// SPDX-License-Identifier: GPL-2.0
++
++#ifndef __Q6CORE_H__
++#define __Q6CORE_H__
++
++struct q6core_svc_api_info {
++	uint32_t service_id;
++	uint32_t api_version;
++	uint32_t api_branch_version;
 +};
 +
-+static const struct snd_kcontrol_new tertiary_mi2s_rx_mixer_controls[] = {
-+	SOC_SINGLE_EXT("MultiMedia1", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia2", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia3", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("MultiMedia4", TERTIARY_MI2S_RX,
-+	MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+	msm_routing_put_audio_mixer),
-+};
++bool q6core_is_adsp_ready(void);
++int q6core_get_svc_api_info(int svc_id, struct q6core_svc_api_info *ainfo);
 +
-+
- static const struct snd_kcontrol_new slimbus_rx_mixer_controls[] = {
- 	SOC_SINGLE_EXT("MultiMedia1", SLIMBUS_0_RX,
- 	MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-@@ -406,6 +503,126 @@ static const struct snd_kcontrol_new slimbus_6_rx_mixer_controls[] = {
- 	msm_routing_put_audio_mixer),
- };
- 
-+static const struct snd_kcontrol_new mmul1_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA1, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_kcontrol_new mmul2_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA2, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_kcontrol_new mmul3_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA3, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_kcontrol_new mmul4_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA4, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_kcontrol_new mmul5_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA5, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_kcontrol_new mmul6_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA6, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_kcontrol_new mmul7_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA7, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
-+static const struct snd_kcontrol_new mmul8_mixer_controls[] = {
-+	SOC_SINGLE_EXT("PRI_MI2S_TX", PRIMARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("QUAT_MI2S_TX", QUATERNARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("TERT_MI2S_TX", TERTIARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+	SOC_SINGLE_EXT("SEC_MI2S_TX", SECONDARY_MI2S_TX,
-+		MSM_FRONTEND_DAI_MULTIMEDIA8, 1, 0, msm_routing_get_audio_mixer,
-+		msm_routing_put_audio_mixer),
-+};
-+
- static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
- 	/* Frontend AIF */
- 	SND_SOC_DAPM_AIF_IN("MM_DL1", "MultiMedia1 Playback", 0, 0, 0, 0),
-@@ -451,6 +668,35 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
- 	SND_SOC_DAPM_MIXER("SLIMBUS_6_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
- 			   slimbus_6_rx_mixer_controls,
- 			   ARRAY_SIZE(slimbus_6_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("PRI_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   primary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(primary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("SEC_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   secondary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(secondary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("QUAT_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   quaternary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(quaternary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("TERT_MI2S_RX Audio Mixer", SND_SOC_NOPM, 0, 0,
-+			   tertiary_mi2s_rx_mixer_controls,
-+			   ARRAY_SIZE(tertiary_mi2s_rx_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia1 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul1_mixer_controls, ARRAY_SIZE(mmul1_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia2 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul2_mixer_controls, ARRAY_SIZE(mmul2_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia3 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul3_mixer_controls, ARRAY_SIZE(mmul3_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia4 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul4_mixer_controls, ARRAY_SIZE(mmul4_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia5 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul5_mixer_controls, ARRAY_SIZE(mmul5_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia6 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul6_mixer_controls, ARRAY_SIZE(mmul6_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia7 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul7_mixer_controls, ARRAY_SIZE(mmul7_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("MultiMedia8 Mixer", SND_SOC_NOPM, 0, 0,
-+		mmul8_mixer_controls, ARRAY_SIZE(mmul8_mixer_controls)),
-+
- };
- 
- static const struct snd_soc_dapm_route intercon[] = {
-@@ -528,6 +774,89 @@ static const struct snd_soc_dapm_route intercon[] = {
- 	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
- 	{"SLIMBUS_6_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
- 	{"SLIMBUS_6_RX", NULL, "SLIMBUS_6_RX Audio Mixer"},
-+
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia6", "MM_DL6"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
-+	{"QUAT_MI2S_RX Audio Mixer", "MultiMedia8", "MM_DL8"},
-+	{"QUAT_MI2S_RX", NULL, "QUAT_MI2S_RX Audio Mixer"},
-+
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"TERT_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"TERT_MI2S_RX", NULL, "TERT_MI2S_RX Audio Mixer"},
-+
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia6", "MM_DL5"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
-+	{"SEC_MI2S_RX Audio Mixer", "MultiMedia8", "MM_DL7"},
-+	{"SEC_MI2S_RX", NULL, "SEC_MI2S_RX Audio Mixer"},
-+
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia1", "MM_DL1"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia2", "MM_DL2"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia3", "MM_DL3"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia4", "MM_DL4"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia5", "MM_DL5"},
-+	{"PRI_MI2S_RX Audio Mixer", "MultiMedia7", "MM_DL7"},
-+	{"PRI_MI2S_RX", NULL, "PRI_MI2S_RX Audio Mixer"},
-+
-+	{"MultiMedia1 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia1 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia1 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia1 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MultiMedia2 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia2 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia2 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia2 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MultiMedia3 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia3 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia3 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia3 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MultiMedia4 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia4 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia4 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia4 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MultiMedia5 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia5 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia5 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia5 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MultiMedia6 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia6 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia6 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia6 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MultiMedia7 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia7 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia7 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia7 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MultiMedia8 Mixer", "PRI_MI2S_TX", "PRI_MI2S_TX"},
-+	{"MultiMedia8 Mixer", "SEC_MI2S_TX", "SEC_MI2S_TX"},
-+	{"MultiMedia8 Mixer", "QUAT_MI2S_TX", "QUAT_MI2S_TX"},
-+	{"MultiMedia8 Mixer", "TERT_MI2S_TX", "TERT_MI2S_TX"},
-+
-+	{"MM_UL1", NULL, "MultiMedia1 Mixer"},
-+	{"MM_UL2", NULL, "MultiMedia2 Mixer"},
-+	{"MM_UL3", NULL, "MultiMedia3 Mixer"},
-+	{"MM_UL4", NULL, "MultiMedia4 Mixer"},
-+	{"MM_UL5", NULL, "MultiMedia5 Mixer"},
-+	{"MM_UL6", NULL, "MultiMedia6 Mixer"},
-+	{"MM_UL7", NULL, "MultiMedia7 Mixer"},
-+	{"MM_UL8", NULL, "MultiMedia8 Mixer"},
- };
- 
- static int routing_hw_params(struct snd_pcm_substream *substream,
++#endif /* __Q6CORE_H__ */
 -- 
 2.16.2
