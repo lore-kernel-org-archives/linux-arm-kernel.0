@@ -1,34 +1,108 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Apr 2018 12:52:26 +0100
-Subject: [Query] ARM64 kaslr support - randomness, seeding and kdump
-In-Reply-To: <CACi5LpNKbSejFecV+G8X53t4VDwsTvJywWLgLVw9qsD7u6REvg@mail.gmail.com>
-References: <CACi5LpMhHt4bjEueOzHZTGpzuR2zoQqXcReL-khoSNLG6=FVmg@mail.gmail.com>
- <CAKv+Gu8qd=rpJkG_GoVO=kkmc4qx_zZD8c_wwE16gr=8wSShSw@mail.gmail.com>
- <CACi5LpNKbSejFecV+G8X53t4VDwsTvJywWLgLVw9qsD7u6REvg@mail.gmail.com>
-Message-ID: <20180418115225.7hvhsua25rhfqvjs@lakrids.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 18 Apr 2018 20:52:31 +0900
+Subject: [PATCH] clk: sunxi-ng: replace lib-y with obj-y
+Message-ID: <1524052351-14103-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 15, 2018 at 01:44:16AM +0530, Bhupesh Sharma wrote:
-> 4. Accordingly, I wanted to get opinions on whether arm64 timer count is a good
-> entropy source on platforms which indeed support EFI_RNG_PROTOCOL?
+We had commit 06e226c7fb23 ("clk: sunxi-ng: Move all clock types to a
+library") and commit 799c43415442 ("kbuild: thin archives make default
+for all archs") in the same development cycle, from different trees.
 
-On its own, the timer is not a good entropy source.
+With migration to the thin archive, the entire drivers/clk/sunxi-ng/lib.a
+is linked to the vmlinux.  This does not break build, but we do not get
+any size saving.
 
-If we have the EFI_RNG_PROTOCOL, we can use that directly.
+However, we do not need to go back to the individual Kconfig options.
+The default configuration pulls in all (or most) of the CCU parts anyway.
+Also, once we enable CONFIG_LD_DEAD_CODE_DATA_ELIMINATION, we can simply
+list all files with obj-y, and the linker will drop all unused functions
+by itself.
 
-> And whether we should  be looking to extend 'arch_get_random_*' or
-> 'random_get_entropy' for arm64, to provide seed/entropy using APIs
-> like 'efi_random_get_seed'?
+After the long discussion [1], people there agreed to fix this, but
+nobody sent a patch after all.  I am doing it now.
 
-The EFI RNG protocol is only available during boot services, so we can't
-call this during the usual operation of the kernel. The seed the stub
-generates into the RNG table is already thrown into the entropy pool by
-efi_config_parse_tables(). Look for LINUX_EFI_RANDOM_SEED_TABLE_GUID.
+I lifted up CONFIG_SUNXI_CCU to drivers/clk/Makefile because everything
+in drivers/clk/sunxi-ng/ depends on SUNXI_CCU.
 
-So any attemps to acquire a random number via the usual APIs will in
-part be affects by this entropy, and nothing needs to be done to
-arch_get_random_* to use this entropy.
+[1] https://patchwork.kernel.org/patch/9796521/
 
-Thanks,
-Mark.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+ drivers/clk/Makefile          |  2 +-
+ drivers/clk/sunxi-ng/Makefile | 39 +++++++++++++++------------------------
+ 2 files changed, 16 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index de6d06a..23a7fdc 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -94,7 +94,7 @@ obj-$(CONFIG_ARCH_SPRD)			+= sprd/
+ obj-$(CONFIG_ARCH_STI)			+= st/
+ obj-$(CONFIG_ARCH_STRATIX10)		+= socfpga/
+ obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
+-obj-$(CONFIG_ARCH_SUNXI)		+= sunxi-ng/
++obj-$(CONFIG_SUNXI_CCU)			+= sunxi-ng/
+ obj-$(CONFIG_ARCH_TEGRA)		+= tegra/
+ obj-y					+= ti/
+ obj-$(CONFIG_CLK_UNIPHIER)		+= uniphier/
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 128a40e..9ac0fb9 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -1,24 +1,24 @@
+ # SPDX-License-Identifier: GPL-2.0
+ # Common objects
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_mmc_timing.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
++obj-y				+= ccu_common.o
++obj-y				+= ccu_mmc_timing.o
++obj-y				+= ccu_reset.o
+ 
+ # Base clock types
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_div.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_frac.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_gate.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_mux.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_mult.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_phase.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_sdm.o
++obj-y				+= ccu_div.o
++obj-y				+= ccu_frac.o
++obj-y				+= ccu_gate.o
++obj-y				+= ccu_mux.o
++obj-y				+= ccu_mult.o
++obj-y				+= ccu_phase.o
++obj-y				+= ccu_sdm.o
+ 
+ # Multi-factor clocks
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_nk.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_nkm.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_nkmp.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_nm.o
+-lib-$(CONFIG_SUNXI_CCU)		+= ccu_mp.o
++obj-y				+= ccu_nk.o
++obj-y				+= ccu_nkm.o
++obj-y				+= ccu_nkmp.o
++obj-y				+= ccu_nm.o
++obj-y				+= ccu_mp.o
+ 
+ # SoC support
+ obj-$(CONFIG_SUN50I_A64_CCU)	+= ccu-sun50i-a64.o
+@@ -37,12 +37,3 @@ obj-$(CONFIG_SUN8I_R40_CCU)	+= ccu-sun8i-r40.o
+ obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
+ obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-de.o
+ obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-usb.o
+-
+-# The lib-y file goals is supposed to work only in arch/*/lib or lib/. In our
+-# case, we want to use that goal, but even though lib.a will be properly
+-# generated, it will not be linked in, eventually resulting in a linker error
+-# for missing symbols.
+-#
+-# We can work around that by explicitly adding lib.a to the obj-y goal. This is
+-# an undocumented behaviour, but works well for now.
+-obj-$(CONFIG_SUNXI_CCU)		+= lib.a
+-- 
+2.7.4
