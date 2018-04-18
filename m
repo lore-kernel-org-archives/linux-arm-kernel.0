@@ -1,219 +1,348 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Wed, 18 Apr 2018 16:31:37 +0100
-Subject: [PATCH v5 03/23] ASoC: qdsp6: q6common: Add qdsp6 helper functions
+Date: Wed, 18 Apr 2018 16:31:43 +0100
+Subject: [PATCH v5 09/23] ASoC: qdsp6: q6afe: Add support to MI2S ports
 In-Reply-To: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
 References: <20180418153157.1960-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20180418153157.1960-4-srinivas.kandagatla@linaro.org>
+Message-ID: <20180418153157.1960-10-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-This patch adds some common helper functions like translating dsp error
-to linux error codes and channel mappings etc.
-
-These functions are used in all the following qdsp6 drivers.
+This patch adds support to 4 MI2S ports on LPASS.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Reviewed-and-tested-by: Rohit kumar <rohitkr@codeaurora.org>
 ---
- sound/soc/qcom/Kconfig              | 13 ++++++++
- sound/soc/qcom/qdsp6/Makefile       |  1 +
- sound/soc/qcom/qdsp6/q6dsp-common.c | 66 +++++++++++++++++++++++++++++++++++++
- sound/soc/qcom/qdsp6/q6dsp-common.h | 24 ++++++++++++++
- sound/soc/qcom/qdsp6/q6dsp-errno.h  | 51 ++++++++++++++++++++++++++++
- 5 files changed, 155 insertions(+)
- create mode 100644 sound/soc/qcom/qdsp6/Makefile
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.c
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-common.h
- create mode 100644 sound/soc/qcom/qdsp6/q6dsp-errno.h
+ sound/soc/qcom/qdsp6/q6afe.c | 228 +++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/qcom/qdsp6/q6afe.h |  13 +++
+ 2 files changed, 241 insertions(+)
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 8ec9a074b38b..8247ade16dbe 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -43,3 +43,16 @@ config SND_SOC_APQ8016_SBC
-           Support for Qualcomm Technologies LPASS audio block in
-           APQ8016 SOC-based systems.
-           Say Y if you want to use audio devices on MI2S.
+diff --git a/sound/soc/qcom/qdsp6/q6afe.c b/sound/soc/qcom/qdsp6/q6afe.c
+index 27c1055ac791..fe936d415178 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.c
++++ b/sound/soc/qcom/qdsp6/q6afe.c
+@@ -14,6 +14,10 @@
+ #include <linux/spinlock.h>
+ #include <linux/delay.h>
+ #include <linux/soc/qcom/apr.h>
++#include <sound/soc.h>
++#include <sound/soc-dai.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
+ #include "q6dsp-errno.h"
+ #include "q6core.h"
+ #include "q6afe.h"
+@@ -28,7 +32,36 @@
+ 
+ #define AFE_PARAM_ID_CDC_SLIMBUS_SLAVE_CFG 0x00010235
+ 
++#define AFE_PARAM_ID_LPAIF_CLK_CONFIG	0x00010238
++#define AFE_PARAM_ID_INTERNAL_DIGITAL_CDC_CLK_CONFIG	0x00010239
 +
-+config SND_SOC_QDSP6_COMMON
-+	tristate
+ #define AFE_PARAM_ID_SLIMBUS_CONFIG    0x00010212
++#define AFE_PARAM_ID_I2S_CONFIG	0x0001020D
 +
-+config SND_SOC_QDSP6
-+	tristate "SoC ALSA audio driver for QDSP6"
-+	depends on QCOM_APR && HAS_DMA
-+	select SND_SOC_QDSP6_COMMON
-+	help
-+	 To add support for MSM QDSP6 Soc Audio.
-+	 This will enable sound soc platform specific
-+	 audio drivers. This includes q6asm, q6adm,
-+	 q6afe interfaces to DSP using apr.
-diff --git a/sound/soc/qcom/qdsp6/Makefile b/sound/soc/qcom/qdsp6/Makefile
-new file mode 100644
-index 000000000000..accebdb49306
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_SND_SOC_QDSP6_COMMON) += q6dsp-common.o
-diff --git a/sound/soc/qcom/qdsp6/q6dsp-common.c b/sound/soc/qcom/qdsp6/q6dsp-common.c
-new file mode 100644
-index 000000000000..c342a073144c
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6dsp-common.c
-@@ -0,0 +1,66 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2011-2017, The Linux Foundation
-+// Copyright (c) 2018, Linaro Limited
++/* I2S config specific */
++#define AFE_API_VERSION_I2S_CONFIG	0x1
++#define AFE_PORT_I2S_SD0		0x1
++#define AFE_PORT_I2S_SD1		0x2
++#define AFE_PORT_I2S_SD2		0x3
++#define AFE_PORT_I2S_SD3		0x4
++#define AFE_PORT_I2S_SD0_MASK		BIT(0x1)
++#define AFE_PORT_I2S_SD1_MASK		BIT(0x2)
++#define AFE_PORT_I2S_SD2_MASK		BIT(0x3)
++#define AFE_PORT_I2S_SD3_MASK		BIT(0x4)
++#define AFE_PORT_I2S_SD0_1_MASK		GENMASK(2, 1)
++#define AFE_PORT_I2S_SD2_3_MASK		GENMASK(4, 3)
++#define AFE_PORT_I2S_SD0_1_2_MASK	GENMASK(3, 1)
++#define AFE_PORT_I2S_SD0_1_2_3_MASK	GENMASK(4, 1)
++#define AFE_PORT_I2S_QUAD01		0x5
++#define AFE_PORT_I2S_QUAD23		0x6
++#define AFE_PORT_I2S_6CHS		0x7
++#define AFE_PORT_I2S_8CHS		0x8
++#define AFE_PORT_I2S_MONO		0x0
++#define AFE_PORT_I2S_STEREO		0x1
++#define AFE_PORT_CONFIG_I2S_WS_SRC_EXTERNAL	0x0
++#define AFE_PORT_CONFIG_I2S_WS_SRC_INTERNAL	0x1
++#define AFE_LINEAR_PCM_DATA				0x0
 +
-+#include "q6dsp-common.h"
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/string.h>
-+#include <linux/errno.h>
+ 
+ /* Port IDs */
+ #define AFE_API_VERSION_HDMI_CONFIG	0x1
+@@ -64,6 +97,19 @@
+ #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX      0x400c
+ /* SLIMbus Tx port on channel 6. */
+ #define AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_TX      0x400d
++#define AFE_PORT_ID_PRIMARY_MI2S_RX         0x1000
++#define AFE_PORT_ID_PRIMARY_MI2S_TX         0x1001
++#define AFE_PORT_ID_SECONDARY_MI2S_RX       0x1002
++#define AFE_PORT_ID_SECONDARY_MI2S_TX       0x1003
++#define AFE_PORT_ID_TERTIARY_MI2S_RX        0x1004
++#define AFE_PORT_ID_TERTIARY_MI2S_TX        0x1005
++#define AFE_PORT_ID_QUATERNARY_MI2S_RX      0x1006
++#define AFE_PORT_ID_QUATERNARY_MI2S_TX      0x1007
 +
-+int q6dsp_map_channels(u8 ch_map[PCM_FORMAT_MAX_NUM_CHANNEL], int ch)
++#define Q6AFE_LPASS_MODE_CLK1_VALID 1
++#define Q6AFE_LPASS_MODE_CLK2_VALID 2
++#define Q6AFE_LPASS_CLK_SRC_INTERNAL 1
++#define Q6AFE_LPASS_CLK_ROOT_DEFAULT 0
+ 
+ #define TIMEOUT_MS 1000
+ #define AFE_CMD_RESP_AVAIL	0
+@@ -160,10 +206,21 @@ struct afe_param_id_slimbus_cfg {
+  */
+ } __packed;
+ 
++struct afe_param_id_i2s_cfg {
++	u32	i2s_cfg_minor_version;
++	u16	bit_width;
++	u16	channel_mode;
++	u16	mono_stereo;
++	u16	ws_src;
++	u32	sample_rate;
++	u16	data_format;
++	u16	reserved;
++} __packed;
+ 
+ union afe_port_config {
+ 	struct afe_param_id_hdmi_multi_chan_audio_cfg hdmi_multi_ch;
+ 	struct afe_param_id_slimbus_cfg           slim_cfg;
++	struct afe_param_id_i2s_cfg	i2s_cfg;
+ } __packed;
+ 
+ struct q6afe_port {
+@@ -210,6 +267,22 @@ static struct afe_port_map port_maps[AFE_PORT_MAX] = {
+ 				SLIMBUS_4_RX, 1, 1},
+ 	[SLIMBUS_5_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_5_RX,
+ 				SLIMBUS_5_RX, 1, 1},
++	[QUATERNARY_MI2S_RX] = { AFE_PORT_ID_QUATERNARY_MI2S_RX,
++				QUATERNARY_MI2S_RX, 1, 1},
++	[QUATERNARY_MI2S_TX] = { AFE_PORT_ID_QUATERNARY_MI2S_TX,
++				QUATERNARY_MI2S_TX, 0, 1},
++	[SECONDARY_MI2S_RX] = { AFE_PORT_ID_SECONDARY_MI2S_RX,
++				SECONDARY_MI2S_RX, 1, 1},
++	[SECONDARY_MI2S_TX] = { AFE_PORT_ID_SECONDARY_MI2S_TX,
++				SECONDARY_MI2S_TX, 0, 1},
++	[TERTIARY_MI2S_RX] = { AFE_PORT_ID_TERTIARY_MI2S_RX,
++				TERTIARY_MI2S_RX, 1, 1},
++	[TERTIARY_MI2S_TX] = { AFE_PORT_ID_TERTIARY_MI2S_TX,
++				TERTIARY_MI2S_TX, 0, 1},
++	[PRIMARY_MI2S_RX] = { AFE_PORT_ID_PRIMARY_MI2S_RX,
++				PRIMARY_MI2S_RX, 1, 1},
++	[PRIMARY_MI2S_TX] = { AFE_PORT_ID_PRIMARY_MI2S_TX,
++				PRIMARY_MI2S_RX, 0, 1},
+ 	[SLIMBUS_6_RX] = { AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX,
+ 				SLIMBUS_6_RX, 1, 1},
+ };
+@@ -448,6 +521,150 @@ void q6afe_hdmi_port_prepare(struct q6afe_port *port,
+ }
+ EXPORT_SYMBOL_GPL(q6afe_hdmi_port_prepare);
+ 
++/**
++ * q6afe_i2s_port_prepare() - Prepare i2s afe port.
++ *
++ * @port: Instance of afe port
++ * @cfg: I2S configuration for the afe port
++ *
++  Return: Will be an negative on error and zero on success.
++ */
++int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg)
 +{
-+	memset(ch_map, 0, PCM_FORMAT_MAX_NUM_CHANNEL);
++	union afe_port_config *pcfg = &port->port_cfg;
++	struct device *dev = port->afe->dev;
++	int num_sd_lines;
 +
-+	switch (ch) {
-+	case 1:
-+		ch_map[0] = PCM_CHANNEL_FC;
++	pcfg->i2s_cfg.i2s_cfg_minor_version = AFE_API_VERSION_I2S_CONFIG;
++	pcfg->i2s_cfg.sample_rate = cfg->sample_rate;
++	pcfg->i2s_cfg.bit_width = cfg->bit_width;
++	pcfg->i2s_cfg.data_format = AFE_LINEAR_PCM_DATA;
++
++	switch (cfg->fmt & SND_SOC_DAIFMT_MASTER_MASK) {
++	case SND_SOC_DAIFMT_CBS_CFS:
++		pcfg->i2s_cfg.ws_src = AFE_PORT_CONFIG_I2S_WS_SRC_INTERNAL;
 +		break;
-+	case 2:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		break;
-+	case 3:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_FC;
-+		break;
-+	case 4:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_LS;
-+		ch_map[3] = PCM_CHANNEL_RS;
-+		break;
-+	case 5:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_FC;
-+		ch_map[3] = PCM_CHANNEL_LS;
-+		ch_map[4] = PCM_CHANNEL_RS;
-+		break;
-+	case 6:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_LFE;
-+		ch_map[3] = PCM_CHANNEL_FC;
-+		ch_map[4] = PCM_CHANNEL_LS;
-+		ch_map[5] = PCM_CHANNEL_RS;
-+		break;
-+	case 8:
-+		ch_map[0] = PCM_CHANNEL_FL;
-+		ch_map[1] = PCM_CHANNEL_FR;
-+		ch_map[2] = PCM_CHANNEL_LFE;
-+		ch_map[3] = PCM_CHANNEL_FC;
-+		ch_map[4] = PCM_CHANNEL_LS;
-+		ch_map[5] = PCM_CHANNEL_RS;
-+		ch_map[6] = PCM_CHANNEL_LB;
-+		ch_map[7] = PCM_CHANNEL_RB;
++	case SND_SOC_DAIFMT_CBM_CFM:
++		/* CPU is slave */
++		pcfg->i2s_cfg.ws_src = AFE_PORT_CONFIG_I2S_WS_SRC_EXTERNAL;
 +		break;
 +	default:
++		break;
++	}
++
++	num_sd_lines = hweight_long(cfg->sd_line_mask);
++
++	switch (num_sd_lines) {
++	case 0:
++		dev_err(dev, "no line is assigned\n");
 +		return -EINVAL;
++	case 1:
++		switch (cfg->sd_line_mask) {
++		case AFE_PORT_I2S_SD0_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD0;
++			break;
++		case AFE_PORT_I2S_SD1_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD1;
++			break;
++		case AFE_PORT_I2S_SD2_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD2;
++			break;
++		case AFE_PORT_I2S_SD3_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD3;
++			break;
++		default:
++			dev_err(dev, "Invalid SD lines\n");
++			return -EINVAL;
++		}
++		break;
++	case 2:
++		switch (cfg->sd_line_mask) {
++		case AFE_PORT_I2S_SD0_1_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_QUAD01;
++			break;
++		case AFE_PORT_I2S_SD2_3_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_QUAD23;
++			break;
++		default:
++			dev_err(dev, "Invalid SD lines\n");
++			return -EINVAL;
++		}
++		break;
++	case 3:
++		switch (cfg->sd_line_mask) {
++		case AFE_PORT_I2S_SD0_1_2_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_6CHS;
++			break;
++		default:
++			dev_err(dev, "Invalid SD lines\n");
++			return -EINVAL;
++		}
++		break;
++	case 4:
++		switch (cfg->sd_line_mask) {
++		case AFE_PORT_I2S_SD0_1_2_3_MASK:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_8CHS;
++
++			break;
++		default:
++			dev_err(dev, "Invalid SD lines\n");
++			return -EINVAL;
++		}
++		break;
++	default:
++		dev_err(dev, "Invalid SD lines\n");
++		return -EINVAL;
++	}
++
++	switch (cfg->num_channels) {
++	case 1:
++	case 2:
++		switch (pcfg->i2s_cfg.channel_mode) {
++		case AFE_PORT_I2S_QUAD01:
++		case AFE_PORT_I2S_6CHS:
++		case AFE_PORT_I2S_8CHS:
++			pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD0;
++			break;
++		case AFE_PORT_I2S_QUAD23:
++				pcfg->i2s_cfg.channel_mode = AFE_PORT_I2S_SD2;
++			break;
++		}
++
++		if (cfg->num_channels == 2)
++			pcfg->i2s_cfg.mono_stereo = AFE_PORT_I2S_STEREO;
++		else
++			pcfg->i2s_cfg.mono_stereo = AFE_PORT_I2S_MONO;
++
++		break;
++	case 3:
++	case 4:
++		if (pcfg->i2s_cfg.channel_mode < AFE_PORT_I2S_QUAD01) {
++			dev_err(dev, "Invalid Channel mode\n");
++			return -EINVAL;
++		}
++		break;
++	case 5:
++	case 6:
++		if (pcfg->i2s_cfg.channel_mode < AFE_PORT_I2S_6CHS) {
++			dev_err(dev, "Invalid Channel mode\n");
++			return -EINVAL;
++		}
++		break;
++	case 7:
++	case 8:
++		if (pcfg->i2s_cfg.channel_mode < AFE_PORT_I2S_8CHS) {
++			dev_err(dev, "Invalid Channel mode\n");
++			return -EINVAL;
++		}
++		break;
++	default:
++		break;
 +	}
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(q6dsp_map_channels);
-+MODULE_LICENSE("GPL v2");
-diff --git a/sound/soc/qcom/qdsp6/q6dsp-common.h b/sound/soc/qcom/qdsp6/q6dsp-common.h
-new file mode 100644
-index 000000000000..32386f4a6432
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6dsp-common.h
-@@ -0,0 +1,24 @@
-+// SPDX-License-Identifier: GPL-2.0
++EXPORT_SYMBOL_GPL(q6afe_i2s_port_prepare);
 +
-+#ifndef __Q6DSP_COMMON_H__
-+#define __Q6DSP_COMMON_H__
+ /**
+  * q6afe_port_start() - Start a afe port
+  *
+@@ -529,6 +746,17 @@ struct q6afe_port *q6afe_port_get_from_id(struct device *dev, int id)
+ 	case AFE_PORT_ID_SLIMBUS_MULTI_CHAN_6_RX:
+ 		cfg_type = AFE_PARAM_ID_SLIMBUS_CONFIG;
+ 		break;
 +
-+#include <linux/kernel.h>
++	case AFE_PORT_ID_PRIMARY_MI2S_RX:
++	case AFE_PORT_ID_PRIMARY_MI2S_TX:
++	case AFE_PORT_ID_SECONDARY_MI2S_RX:
++	case AFE_PORT_ID_SECONDARY_MI2S_TX:
++	case AFE_PORT_ID_TERTIARY_MI2S_RX:
++	case AFE_PORT_ID_TERTIARY_MI2S_TX:
++	case AFE_PORT_ID_QUATERNARY_MI2S_RX:
++	case AFE_PORT_ID_QUATERNARY_MI2S_TX:
++		cfg_type = AFE_PARAM_ID_I2S_CONFIG;
++		break;
+ 	default:
+ 		dev_err(dev, "Invalid port id 0x%x\n", port_id);
+ 		return ERR_PTR(-EINVAL);
+diff --git a/sound/soc/qcom/qdsp6/q6afe.h b/sound/soc/qcom/qdsp6/q6afe.h
+index 155d6e47d7ce..05c61014abea 100644
+--- a/sound/soc/qcom/qdsp6/q6afe.h
++++ b/sound/soc/qcom/qdsp6/q6afe.h
+@@ -11,6 +11,8 @@
+ #define MSM_AFE_PORT_TYPE_TX 1
+ #define AFE_MAX_PORTS AFE_PORT_MAX
+ 
++#define Q6AFE_MAX_MI2S_LINES	4
 +
-+#define PCM_FORMAT_MAX_NUM_CHANNEL  8
-+#define PCM_CHANNEL_NULL 0
+ #define AFE_MAX_CHAN_COUNT	8
+ #define AFE_PORT_MAX_AUDIO_CHAN_CNT	0x8
+ 
+@@ -29,9 +31,19 @@ struct q6afe_slim_cfg {
+ 	u8	ch_mapping[AFE_MAX_CHAN_COUNT];
+ };
+ 
++struct q6afe_i2s_cfg {
++	u32	sample_rate;
++	u16	bit_width;
++	u16	data_format;
++	u16	num_channels;
++	u32	sd_line_mask;
++	int fmt;
++};
 +
-+#define PCM_CHANNEL_FL    1	/* Front left channel. */
-+#define PCM_CHANNEL_FR    2	/* Front right channel. */
-+#define PCM_CHANNEL_FC    3	/* Front center channel. */
-+#define PCM_CHANNEL_LS   4	/* Left surround channel. */
-+#define PCM_CHANNEL_RS   5	/* Right surround channel. */
-+#define PCM_CHANNEL_LFE  6	/* Low frequency effect channel. */
-+#define PCM_CHANNEL_CS   7	/* Center surround channel; Rear center ch */
-+#define PCM_CHANNEL_LB   8	/* Left back channel; Rear left channel. */
-+#define PCM_CHANNEL_RB   9	/* Right back channel; Rear right channel. */
-+#define PCM_CHANNELS   10	/* Top surround channel. */
-+
-+int q6dsp_map_channels(u8 ch_map[PCM_FORMAT_MAX_NUM_CHANNEL], int ch);
-+
-+#endif /* __Q6DSP_COMMON_H__ */
-diff --git a/sound/soc/qcom/qdsp6/q6dsp-errno.h b/sound/soc/qcom/qdsp6/q6dsp-errno.h
-new file mode 100644
-index 000000000000..6285e1782824
---- /dev/null
-+++ b/sound/soc/qcom/qdsp6/q6dsp-errno.h
-@@ -0,0 +1,51 @@
-+// SPDX-License-Identifier: GPL-2.0
-+
-+#ifndef __Q6DSP_ERR_NO_H__
-+#define __Q6DSP_ERR_NO_H__
-+#include <linux/kernel.h>
-+
-+/* Success. The operation completed with no errors. */
-+#define ADSP_EOK          0x00000000
-+/* General failure. */
-+#define ADSP_EFAILED      0x00000001
-+/* Bad operation parameter. */
-+#define ADSP_EBADPARAM    0x00000002
-+/* Unsupported routine or operation. */
-+#define ADSP_EUNSUPPORTED 0x00000003
-+/* Unsupported version. */
-+#define ADSP_EVERSION     0x00000004
-+/* Unexpected problem encountered. */
-+#define ADSP_EUNEXPECTED  0x00000005
-+/* Unhandled problem occurred. */
-+#define ADSP_EPANIC       0x00000006
-+/* Unable to allocate resource. */
-+#define ADSP_ENORESOURCE  0x00000007
-+/* Invalid handle. */
-+#define ADSP_EHANDLE      0x00000008
-+/* Operation is already processed. */
-+#define ADSP_EALREADY     0x00000009
-+/* Operation is not ready to be processed. */
-+#define ADSP_ENOTREADY    0x0000000A
-+/* Operation is pending completion. */
-+#define ADSP_EPENDING     0x0000000B
-+/* Operation could not be accepted or processed. */
-+#define ADSP_EBUSY        0x0000000C
-+/* Operation aborted due to an error. */
-+#define ADSP_EABORTED     0x0000000D
-+/* Operation preempted by a higher priority. */
-+#define ADSP_EPREEMPTED   0x0000000E
-+/* Operation requests intervention to complete. */
-+#define ADSP_ECONTINUE    0x0000000F
-+/* Operation requests immediate intervention to complete. */
-+#define ADSP_EIMMEDIATE   0x00000010
-+/* Operation is not implemented. */
-+#define ADSP_ENOTIMPL     0x00000011
-+/* Operation needs more data or resources. */
-+#define ADSP_ENEEDMORE    0x00000012
-+/* Operation does not have memory. */
-+#define ADSP_ENOMEMORY    0x00000014
-+/* Item does not exist. */
-+#define ADSP_ENOTEXIST    0x00000015
-+/* Max count for adsp error code sent to HLOS*/
-+
-+#endif /*__Q6DSP_ERR_NO_H__ */
+ struct q6afe_port_config {
+ 	struct q6afe_hdmi_cfg hdmi;
+ 	struct q6afe_slim_cfg slim;
++	struct q6afe_i2s_cfg i2s_cfg;
+ };
+ 
+ struct q6afe_port;
+@@ -45,5 +57,6 @@ void q6afe_hdmi_port_prepare(struct q6afe_port *port,
+ 			    struct q6afe_hdmi_cfg *cfg);
+ void q6afe_slim_port_prepare(struct q6afe_port *port,
+ 			  struct q6afe_slim_cfg *cfg);
++int q6afe_i2s_port_prepare(struct q6afe_port *port, struct q6afe_i2s_cfg *cfg);
+ 
+ #endif /* __Q6AFE_H__ */
 -- 
 2.16.2
