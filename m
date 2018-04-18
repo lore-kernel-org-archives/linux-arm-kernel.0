@@ -1,50 +1,115 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 18 Apr 2018 13:51:38 +0530
-Subject: [PATCH 2/2] ARM: dts: da850-lcdk: add unit name for memory node
-In-Reply-To: <7b7caa27-4bb9-db73-0070-1566a4be34d5@lechnology.com>
-References: <20180417100128.23011-1-nsekhar@ti.com>
- <20180417100128.23011-3-nsekhar@ti.com>
- <7b7caa27-4bb9-db73-0070-1566a4be34d5@lechnology.com>
-Message-ID: <309fa60b-b18f-ec71-efaf-077167db9962@ti.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 18 Apr 2018 10:27:55 +0200
+Subject: [PATCH v2 4/6] drm/atmel-hlcdc: support bus-width (12/16/18/24)
+ in endpoint nodes
+In-Reply-To: <8c5847d0-cde1-73fa-9ed1-4f4a5420afbd@axentia.se>
+References: <20180417131052.16336-1-peda@axentia.se>
+ <20180417131052.16336-5-peda@axentia.se>
+ <20180418092948.6dace10a@bbrezillon>
+ <8c5847d0-cde1-73fa-9ed1-4f4a5420afbd@axentia.se>
+Message-ID: <20180418102755.0491bc9d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 April 2018 10:25 PM, David Lechner wrote:
-> On 04/17/2018 05:01 AM, Sekhar Nori wrote:
->> Add unit name for memory node to squash the W=1 warning:
->>
->> arch/arm/boot/dts/da850-lcdk.dtb: Warning (unit_address_vs_reg):
->> /memory: node has a reg or ranges property, but no unit name
->>
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->> ---
->> ? arch/arm/boot/dts/da850-lcdk.dts | 2 +-
->> ? 1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
->> b/arch/arm/boot/dts/da850-lcdk.dts
->> index a1f4d6d5a569..e80839bb071b 100644
->> --- a/arch/arm/boot/dts/da850-lcdk.dts
->> +++ b/arch/arm/boot/dts/da850-lcdk.dts
->> @@ -21,7 +21,7 @@
->> ????????? stdout-path = "serial2:115200n8";
->> ????? };
->> ? -??? memory {
->> +??? memory at c0000000 {
->> ????????? device_type = "memory";
+On Wed, 18 Apr 2018 09:46:09 +0200
+Peter Rosin <peda@axentia.se> wrote:
+
+> On 2018-04-18 09:29, Boris Brezillon wrote:
+> > On Tue, 17 Apr 2018 15:10:50 +0200
+> > Peter Rosin <peda@axentia.se> wrote:
+> >   
+> >> This beats the heuristic that the connector is involved in what format
+> >> should be output for cases where this fails.
+> >>
+> >> E.g. if there is a bridge that changes format between the encoder and the
+> >> connector, or if some of the RGB pins between the lcd controller and the
+> >> encoder are not routed on the PCB.
+> >>
+> >> This is critical for the devices that have the "conflicting output
+> >> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
+> >> RGB bits move around depending on the selected output mode. For
+> >> devices that do not have the "conflicting output formats" issue
+> >> (SAMA5D2, SAMA5D4), this is completely irrelevant.
+> >>
+> >> Signed-off-by: Peter Rosin <peda@axentia.se>
+> >> ---
+> >>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 85 ++++++++++++++++++++------
+> >>  1 file changed, 65 insertions(+), 20 deletions(-)
+> >>
+> >> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> >> index d73281095fac..2e718959981e 100644
+> >> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> >> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> >> @@ -19,12 +19,14 @@
+> >>   */
+> >>  
+> >>  #include <linux/clk.h>
+> >> +#include <linux/of_graph.h>
+> >>  #include <linux/pm.h>
+> >>  #include <linux/pm_runtime.h>
+> >>  #include <linux/pinctrl/consumer.h>
+> >>  
+> >>  #include <drm/drm_crtc.h>
+> >>  #include <drm/drm_crtc_helper.h>
+> >> +#include <drm/drm_of.h>
+> >>  #include <drm/drmP.h>
+> >>  
+> >>  #include <video/videomode.h>
+> >> @@ -226,6 +228,68 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
+> >>  #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
+> >>  #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
+> >>  
+> >> +static int atmel_hlcdc_connector_output_mode(struct drm_connector_state *state)
+> >> +{
+> >> +	struct drm_connector *connector = state->connector;
+> >> +	struct drm_display_info *info = &connector->display_info;
+> >> +	unsigned int supported_fmts = 0;
+> >> +	struct device_node *ep;
+> >> +	int j;
+> >> +
+> >> +	/*
+> >> +	 * Use the connector index as an approximation of the
+> >> +	 * endpoint node index. We know it's true for our case
+> >> +	 * depending on the driver implementation.
+> >> +	 */
+> >> +	ep = of_graph_get_endpoint_by_regs(connector->dev->dev->of_node, 0,
+> >> +					   connector->index);
+> >> +  
+> > 
+> > Hm, this sounds a bit fragile. Can't we have a reference to the of_node
+> > attached to the connector? Or maybe we can parse this earlier and set a
+> > constraint on the accepted modes.
+> >   
+> >> +	if (ep) {
+> >> +		int bus_fmt = drm_of_media_bus_fmt(ep);  
+> > 
+> > Hm, you're extracting this piece of information from the DT every time
+> > an atomic modeset is done. I'd really prefer to have this done once at  
 > 
-> Should we drop `device_type = "memory";` since it is now specified
-> in da850.dtsi?
+> Yes, not happy about it either. I looked for other sensible places too
+> hook the info at probe time, but this was just the simplest. I'll take
+> another look...
+> 
+> > probe time. Since this property is attached to the connector, maybe we
+> > should overwrite the info->bus_formats[] array or mark some of its
+> > entries as invalid.  
+> 
+> I find it very wrong to mix the connector format with what you want to
+> output. In my mind it's a broken assumption that they are related. It is
+> only correct for trivial cases. Also note my comment about the connector
+> index and the endpoint index, they are only coincidentally the same
+> based on our implementation. If the driver has more than one port or
+> initializes endpoints out of order for some reason, this is no longer
+> true.
+> 
+> I think it would be better to store this info somewhere near the encoder,
+> since that is what I find closest to what I'm trying to change.
 
-It was specified in skeleton.dtsi too, but good point. I will drop.
+Totally agree with you on that: the connector has nothing to do with
+how intermediate encoders/bridges exchange data with each other.
 
 > 
->> ????????? reg = <0xc0000000 0x08000000>;
-> 
-> I wouldn't mind a comment that says that this is 128MiB. The number
-> is too big for me to do the hex in my head. :-)
+> As I said, I'll take another look and see if I can hook this in at some
+> other place.
 
-Sure :)
-
-Thanks,
-Sekhar
+Okay, cool.
