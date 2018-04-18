@@ -1,48 +1,56 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Wed, 18 Apr 2018 12:03:27 +0200
-Subject: [PATCH v6 11/11] ARM: shmobile: Convert file to use cntvoff
-In-Reply-To: <CAMuHMdU9soQuNMC59Y2AQdTmXbWBz-P3EFfZ6NYGKukJVukKgg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 18 Apr 2018 18:05:03 +0800
+Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
+In-Reply-To: <20180418084535.lqdvjgcbxtnwqwri@flea>
 References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-12-mylene.josserand@bootlin.com>
- <CAMuHMdU9soQuNMC59Y2AQdTmXbWBz-P3EFfZ6NYGKukJVukKgg@mail.gmail.com>
-Message-ID: <20180418120327.0f707abf@dell-desktop.home>
+ <20180416215032.5023-2-mylene.josserand@bootlin.com>
+ <CAGb2v67VL70yqTF7xq4T3_9zA9T3UT2AV0gGarh1mqvC17r3Mg@mail.gmail.com>
+ <20180417111737.6dous6eiuvjn33jf@flea>
+ <CAGb2v67qvk=T7u7bOjVZ7q_qsjJuEOM6iarw7by42ga=EYuYDg@mail.gmail.com>
+ <20180418084535.lqdvjgcbxtnwqwri@flea>
+Message-ID: <CAGb2v64UCA825xC=wvBZ6n0K-c=vsOO15F7S6Bn=i9c=eAqYww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Apr 18, 2018 at 4:45 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Tue, Apr 17, 2018 at 07:25:15PM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Apr 17, 2018 at 7:17 PM, Maxime Ripard
+>> <maxime.ripard@bootlin.com> wrote:
+>> > On Tue, Apr 17, 2018 at 11:12:41AM +0800, Chen-Yu Tsai wrote:
+>> >> On Tue, Apr 17, 2018 at 5:50 AM, Myl?ne Josserand
+>> >> <mylene.josserand@bootlin.com> wrote:
+>> >> > Move the assembly code for cluster cache enabling and resuming
+>> >> > into an assembly file instead of having it directly in C code.
+>> >> >
+>> >> > Remove the CFLAGS because we are using the ARM directive "arch"
+>> >> > instead.
+>> >> >
+>> >> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+>> >> > ---
+>> >> >  arch/arm/mach-sunxi/Makefile  |  4 +--
+>> >> >  arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
+>> >> >  arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
+>> >> >  3 files changed, 85 insertions(+), 81 deletions(-)
+>> >> >  create mode 100644 arch/arm/mach-sunxi/headsmp.S
+>> >>
+>> >> I'm still not convinced about this whole "move ASM to separate
+>> >> file" thing, especially now that you aren't actually adding any
+>> >> sunxi-specific ASM code beyond a simple function call.
+>> >>
+>> >> Could you drop this for now?
+>> >
+>> > I'd really like to have this merged actually. There's a significant
+>> > readibility improvement, so even if there's no particular functional
+>> > improvement, I'd still call it a win.
+>>
+>> What parts do you consider hard to read? The extra quotes? Trailing
+>> newline? Or perhaps the __stringify bits?
+>
+> All of this, plus the clobbers and operands.
 
-On Wed, 18 Apr 2018 11:36:27 +0200
-Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+Ok. Lets move it then.
 
-> Hi Myl?ne,
-> 
-> On Mon, Apr 16, 2018 at 11:50 PM, Myl?ne Josserand
-> <mylene.josserand@bootlin.com> wrote:
-> > Now that a common function is available for CNTVOFF's
-> > initialization, let's convert shmobile-apmu code to use
-> > this function.  
-> 
-> Thanks for your patch, works fine on Renesas ALT with R-Car E2,
-> which suffers from lack of CNTVOFF initialization.
+The kbuild reports indicate this still needs some work though.
 
-Great to know that it works on this board.
-
-> 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>  
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-
-Thank you again for testing it :)
-
-Best regards,
-
--- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+ChenYu
