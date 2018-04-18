@@ -1,108 +1,91 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 18 Apr 2018 20:52:31 +0900
-Subject: [PATCH] clk: sunxi-ng: replace lib-y with obj-y
-Message-ID: <1524052351-14103-1-git-send-email-yamada.masahiro@socionext.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Apr 2018 12:58:26 +0100
+Subject: Applied "regulator: pfuze100: update voltage setting for pfuze3000
+ sw1a" to the regulator tree
+In-Reply-To: <1521269828-8874-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <E1f8ljG-0002hm-G4@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We had commit 06e226c7fb23 ("clk: sunxi-ng: Move all clock types to a
-library") and commit 799c43415442 ("kbuild: thin archives make default
-for all archs") in the same development cycle, from different trees.
+The patch
 
-With migration to the thin archive, the entire drivers/clk/sunxi-ng/lib.a
-is linked to the vmlinux.  This does not break build, but we do not get
-any size saving.
+   regulator: pfuze100: update voltage setting for pfuze3000 sw1a
 
-However, we do not need to go back to the individual Kconfig options.
-The default configuration pulls in all (or most) of the CCU parts anyway.
-Also, once we enable CONFIG_LD_DEAD_CODE_DATA_ELIMINATION, we can simply
-list all files with obj-y, and the linker will drop all unused functions
-by itself.
+has been applied to the regulator tree at
 
-After the long discussion [1], people there agreed to fix this, but
-nobody sent a patch after all.  I am doing it now.
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
 
-I lifted up CONFIG_SUNXI_CCU to drivers/clk/Makefile because everything
-in drivers/clk/sunxi-ng/ depends on SUNXI_CCU.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-[1] https://patchwork.kernel.org/patch/9796521/
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 1dced996ee702e6af82a57c7b6c56b0cceaa6425 Mon Sep 17 00:00:00 2001
+From: Anson Huang <Anson.Huang@nxp.com>
+Date: Sun, 18 Mar 2018 11:23:21 +0800
+Subject: [PATCH] regulator: pfuze100: update voltage setting for pfuze3000
+ sw1a
+
+pfuze3000 datasheet(Rev.9.0) from:
+
+https://www.nxp.com/docs/en/data-sheet/PF3000.pdf
+
+updates sw1a's voltage range, the settings for 1.450V and 1.475V
+are replaced with 1.8V and 3.3V:
+
+5b'11110 1.450 (SW1B), 1.8 (SW1A/SW1AB)
+5b'11111 1.475 (SW1B), 3.3 (SW1A/SW1AB)
+
+the voltage calculation using steps is NOT available for sw1a now,
+use voltage table instead.
+
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
+ drivers/regulator/pfuze100-regulator.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
- drivers/clk/Makefile          |  2 +-
- drivers/clk/sunxi-ng/Makefile | 39 +++++++++++++++------------------------
- 2 files changed, 16 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index de6d06a..23a7fdc 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -94,7 +94,7 @@ obj-$(CONFIG_ARCH_SPRD)			+= sprd/
- obj-$(CONFIG_ARCH_STI)			+= st/
- obj-$(CONFIG_ARCH_STRATIX10)		+= socfpga/
- obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
--obj-$(CONFIG_ARCH_SUNXI)		+= sunxi-ng/
-+obj-$(CONFIG_SUNXI_CCU)			+= sunxi-ng/
- obj-$(CONFIG_ARCH_TEGRA)		+= tegra/
- obj-y					+= ti/
- obj-$(CONFIG_CLK_UNIPHIER)		+= uniphier/
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 128a40e..9ac0fb9 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -1,24 +1,24 @@
- # SPDX-License-Identifier: GPL-2.0
- # Common objects
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_common.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_mmc_timing.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_reset.o
-+obj-y				+= ccu_common.o
-+obj-y				+= ccu_mmc_timing.o
-+obj-y				+= ccu_reset.o
+diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
+index 63922a2167e5..680f076e3d85 100644
+--- a/drivers/regulator/pfuze100-regulator.c
++++ b/drivers/regulator/pfuze100-regulator.c
+@@ -86,6 +86,13 @@ static const int pfuze100_coin[] = {
+ 	2500000, 2700000, 2800000, 2900000, 3000000, 3100000, 3200000, 3300000,
+ };
  
- # Base clock types
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_div.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_frac.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_gate.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_mux.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_mult.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_phase.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_sdm.o
-+obj-y				+= ccu_div.o
-+obj-y				+= ccu_frac.o
-+obj-y				+= ccu_gate.o
-+obj-y				+= ccu_mux.o
-+obj-y				+= ccu_mult.o
-+obj-y				+= ccu_phase.o
-+obj-y				+= ccu_sdm.o
++static const int pfuze3000_sw1a[] = {
++	700000, 725000, 750000, 775000, 800000, 825000, 850000, 875000,
++	900000, 925000, 950000, 975000, 1000000, 1025000, 1050000, 1075000,
++	1100000, 1125000, 1150000, 1175000, 1200000, 1225000, 1250000, 1275000,
++	1300000, 1325000, 1350000, 1375000, 1400000, 1425000, 1800000, 3300000,
++};
++
+ static const int pfuze3000_sw2lo[] = {
+ 	1500000, 1550000, 1600000, 1650000, 1700000, 1750000, 1800000, 1850000,
+ };
+@@ -343,7 +350,7 @@ static struct pfuze_regulator pfuze200_regulators[] = {
+ };
  
- # Multi-factor clocks
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_nk.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_nkm.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_nkmp.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_nm.o
--lib-$(CONFIG_SUNXI_CCU)		+= ccu_mp.o
-+obj-y				+= ccu_nk.o
-+obj-y				+= ccu_nkm.o
-+obj-y				+= ccu_nkmp.o
-+obj-y				+= ccu_nm.o
-+obj-y				+= ccu_mp.o
- 
- # SoC support
- obj-$(CONFIG_SUN50I_A64_CCU)	+= ccu-sun50i-a64.o
-@@ -37,12 +37,3 @@ obj-$(CONFIG_SUN8I_R40_CCU)	+= ccu-sun8i-r40.o
- obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
- obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-de.o
- obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-usb.o
--
--# The lib-y file goals is supposed to work only in arch/*/lib or lib/. In our
--# case, we want to use that goal, but even though lib.a will be properly
--# generated, it will not be linked in, eventually resulting in a linker error
--# for missing symbols.
--#
--# We can work around that by explicitly adding lib.a to the obj-y goal. This is
--# an undocumented behaviour, but works well for now.
--obj-$(CONFIG_SUNXI_CCU)		+= lib.a
+ static struct pfuze_regulator pfuze3000_regulators[] = {
+-	PFUZE100_SW_REG(PFUZE3000, SW1A, PFUZE100_SW1ABVOL, 700000, 1475000, 25000),
++	PFUZE100_SWB_REG(PFUZE3000, SW1A, PFUZE100_SW1ABVOL, 0x1f, pfuze3000_sw1a),
+ 	PFUZE100_SW_REG(PFUZE3000, SW1B, PFUZE100_SW1CVOL, 700000, 1475000, 25000),
+ 	PFUZE100_SWB_REG(PFUZE3000, SW2, PFUZE100_SW2VOL, 0x7, pfuze3000_sw2lo),
+ 	PFUZE3000_SW3_REG(PFUZE3000, SW3, PFUZE100_SW3AVOL, 900000, 1650000, 50000),
 -- 
-2.7.4
+2.17.0
