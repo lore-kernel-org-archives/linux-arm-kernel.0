@@ -1,30 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Apr 2018 15:43:12 +0200
-Subject: [PATCH] ARM: dts: Fix the RPM clock controller compatible string
-Message-ID: <20180418134312.19314-1-linus.walleij@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Apr 2018 14:44:25 +0100
+Subject: [PATCH] arm64: signal: don't force known signals to SIGKILL
+In-Reply-To: <20180418133331.GJ16308@e103592.cambridge.arm.com>
+References: <20180416154501.56872-1-mark.rutland@arm.com>
+ <20180417144630.GG16308@e103592.cambridge.arm.com>
+ <20180418113652.vvlopeqvlk4vwmnf@lakrids.cambridge.arm.com>
+ <20180418133331.GJ16308@e103592.cambridge.arm.com>
+Message-ID: <20180418134425.wmqmxlsphedf36d5@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The right string is msm8660 and there is also apq8060, but not
-apq8660, so fix this.
+On Wed, Apr 18, 2018 at 02:33:32PM +0100, Dave Martin wrote:
+> On Wed, Apr 18, 2018 at 12:36:52PM +0100, Mark Rutland wrote:
+> > On Tue, Apr 17, 2018 at 03:46:31PM +0100, Dave Martin wrote:
+> > > On Mon, Apr 16, 2018 at 04:45:01PM +0100, Mark Rutland wrote:
+> > > > -	if (WARN_ON(signal != SIGKILL ||
+> > > > +	if (WARN_ON(signal != SIGKILL &&
+> > > >  		    siginfo_layout(signal, code) != SIL_FAULT)) {
+> > > >  		signal = SIGKILL;
+> > 
+> > Do you have a concern with the logical change here, or can I ask for
+> > your ack? ;)
+> 
+> No concern, I just wanted to make sure I'd understood the background
+> right.  The commit message for this patch doesn't fully explain why the
+> original code was wrong and why the new code is right, and my memory of
+> the context for this was a bit fuzzy.
+> 
+> I should probably have followed the Fixes tag for context, but I was
+> lazy :P
+> 
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8660.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Anyway, FWIW
+> 
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 33030f9419fe..70698941f64c 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -452,7 +452,7 @@
- 			clock-names = "ram";
- 
- 			rpmcc: clock-controller {
--				compatible	= "qcom,rpmcc-apq8660", "qcom,rpmcc";
-+				compatible	= "qcom,rpmcc-msm8660", "qcom,rpmcc";
- 				#clock-cells = <1>;
- 			};
- 
--- 
-2.14.3
+Cheers!
+
+Catalin, are you happy to queue this as a fix for v4.17-rc2?
+
+> Out of interest, what were you seeing in userspace prior to this fix?
+> Please don't tell me systemd is functionally reliant on SIGILL :(
+
+I spotted this with a pointer authentication test case I wrote, which I
+expected to receive SIGILL when using an instruction trapped and UNDEF'd
+by EL2.
+
+Thanks,
+Mark.
