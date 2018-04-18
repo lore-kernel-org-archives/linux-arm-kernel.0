@@ -1,183 +1,100 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 18 Apr 2018 18:24:55 +0800
-Subject: [PATCH v1 3/4] clk: mediatek: add g3dsys support for MT2701 and MT7623
-In-Reply-To: <cover.1524044917.git.sean.wang@mediatek.com>
-References: <cover.1524044917.git.sean.wang@mediatek.com>
-Message-ID: <96dc02879c10388c2efa08b1cf33b77f938908ee.1524044917.git.sean.wang@mediatek.com>
+From: michael@amarulasolutions.com (Michael Nazzareno Trimarchi)
+Date: Wed, 18 Apr 2018 12:27:02 +0200
+Subject: 4.16 OMAP serial transmit corruption?
+In-Reply-To: <20180418095950.GN10990@n2100.armlinux.org.uk>
+References: <20180416151732.GU16141@n2100.armlinux.org.uk>
+ <20180416154545.GA5671@atomide.com>
+ <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
+ <da3be56b-29d3-72f3-5eba-d6a38ae500d0@ti.com>
+ <20180418095950.GN10990@n2100.armlinux.org.uk>
+Message-ID: <CAOf5uw=+MeWs+6A-zuy+yq2fZJmoe8hoLPcY1NVi9nvDMOLd7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hi
 
-Add clock driver support for g3dsys on MT2701 and MT7623, which is
-providing essential clock gate and reset controller to Mali-450.
+On Wed, Apr 18, 2018 at 11:59 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Apr 18, 2018 at 02:41:43PM +0530, Vignesh R wrote:
+>>
+>>
+>> On Tuesday 17 April 2018 02:50 PM, Vignesh R wrote:
+>> >
+>> >
+>> > On Monday 16 April 2018 09:15 PM, Tony Lindgren wrote:
+>> >> * Russell King - ARM Linux <linux@armlinux.org.uk> [180416 15:19]:
+>> >>> Hi,
+>> >>>
+>> >>> I'm not entirely sure what's going on, but I see corrupted characters
+>> >>> with the serial console on the OMAP4430 SDP board.  During boot,
+>> >>> everything seems fine, the problem appears to be userspace output.
+>> >>>
+>> >>> For example, if I edit a file, then quit vi:
+>> >>>
+>> >>> :q??%??B??Z?root at omap-4430sdp:~#
+>> >>
+>> >> I don't think I've seen that one. What I've seen few times is
+>> >> typing a key on the serial console echoing back the previous
+>> >> character typed while the new character won't get displayed
+>> >> until hitting keyboard again. Only rebooting the device seems
+>> >> to solve this. This is with 4430 ES2.3 revision.
+>> >>
+>> >> I wonder if we're missing some parts of errata i202 handling
+>> >> in omap_8250_mdr1_errataset()?
+>> >>
+>>
+>> I wonder if the extra read of MDR1 register at the beginning of
+>> omap_8250_mdr1_errataset() compared to omap-serial is the issue.
+>> errata i202 says access to MDR1 can cause data corruption.
+>> Assuming both reads and writes can cause glitch then, that read
+>> is not following advisory:
+>>
+>> I don't have SDP board so, could you verify if below diff helps:
+>>
+>>
+>> diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
+>> index 6aaa84355fd1..8ab9d0a1b1eb 100644
+>> --- a/drivers/tty/serial/8250/8250_omap.c
+>> +++ b/drivers/tty/serial/8250/8250_omap.c
+>> @@ -163,11 +163,6 @@ static void omap_8250_mdr1_errataset(struct uart_8250_port *up,
+>>                                      struct omap8250_priv *priv)
+>>  {
+>>         u8 timeout = 255;
+>> -       u8 old_mdr1;
+>> -
+>> -       old_mdr1 = serial_in(up, UART_OMAP_MDR1);
+>> -       if (old_mdr1 == priv->mdr1)
+>> -               return;
+>>
+>>         serial_out(up, UART_OMAP_MDR1, priv->mdr1);
+>>         udelay(2);
+>
+> That doesn't appear to help.
+>
+> Looking at the bitstream and comparing what should have been sent with
+> what was sent, there appears to be some correlation between the two.
+> It looks like the FTDI is not properly synchronised to the bitstream
+> coming from the OMAP4430.
+>
+> Setting two stop bits on both ends (OMAP4430 and FTDI) appears to
+> improve the issue, but not completely solve it.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/clk/mediatek/Kconfig              |  6 ++
- drivers/clk/mediatek/Makefile             |  1 +
- drivers/clk/mediatek/clk-mt2701-g3d.c     | 95 +++++++++++++++++++++++++++++++
- include/dt-bindings/clock/mt2701-clk.h    |  4 ++
- include/dt-bindings/reset/mt2701-resets.h |  3 +
- 5 files changed, 109 insertions(+)
- create mode 100644 drivers/clk/mediatek/clk-mt2701-g3d.c
+Are you sure about clock error above some tollerance?
 
-diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-index 92afe59..3dd1dab 100644
---- a/drivers/clk/mediatek/Kconfig
-+++ b/drivers/clk/mediatek/Kconfig
-@@ -60,6 +60,12 @@ config COMMON_CLK_MT2701_AUDSYS
- 	---help---
- 	  This driver supports Mediatek MT2701 audsys clocks.
- 
-+config COMMON_CLK_MT2701_G3DSYS
-+	bool "Clock driver for MediaTek MT2701 g3dsys"
-+	depends on COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports MediaTek MT2701 g3dsys clocks.
-+
- config COMMON_CLK_MT2712
- 	bool "Clock driver for MediaTek MT2712"
- 	depends on (ARCH_MEDIATEK && ARM64) || COMPILE_TEST
-diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-index b80eff2..844b55d 100644
---- a/drivers/clk/mediatek/Makefile
-+++ b/drivers/clk/mediatek/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_COMMON_CLK_MT2701) += clk-mt2701.o
- obj-$(CONFIG_COMMON_CLK_MT2701_AUDSYS) += clk-mt2701-aud.o
- obj-$(CONFIG_COMMON_CLK_MT2701_BDPSYS) += clk-mt2701-bdp.o
- obj-$(CONFIG_COMMON_CLK_MT2701_ETHSYS) += clk-mt2701-eth.o
-+obj-$(CONFIG_COMMON_CLK_MT2701_G3DSYS) += clk-mt2701-g3d.o
- obj-$(CONFIG_COMMON_CLK_MT2701_HIFSYS) += clk-mt2701-hif.o
- obj-$(CONFIG_COMMON_CLK_MT2701_IMGSYS) += clk-mt2701-img.o
- obj-$(CONFIG_COMMON_CLK_MT2701_MMSYS) += clk-mt2701-mm.o
-diff --git a/drivers/clk/mediatek/clk-mt2701-g3d.c b/drivers/clk/mediatek/clk-mt2701-g3d.c
-new file mode 100644
-index 0000000..1328c11
---- /dev/null
-+++ b/drivers/clk/mediatek/clk-mt2701-g3d.c
-@@ -0,0 +1,95 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Sean Wang <sean.wang@mediatek.com>
-+ *
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+
-+#include "clk-mtk.h"
-+#include "clk-gate.h"
-+
-+#include <dt-bindings/clock/mt2701-clk.h>
-+
-+#define GATE_G3D(_id, _name, _parent, _shift) {	\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent_name = _parent,			\
-+		.regs = &g3d_cg_regs,			\
-+		.shift = _shift,			\
-+		.ops = &mtk_clk_gate_ops_setclr,	\
-+	}
-+
-+static const struct mtk_gate_regs g3d_cg_regs = {
-+	.sta_ofs = 0x0,
-+	.set_ofs = 0x4,
-+	.clr_ofs = 0x8,
-+};
-+
-+static const struct mtk_gate g3d_clks[] = {
-+	GATE_G3D(CLK_G3DSYS_CORE, "g3d_core", "mfg_sel", 0),
-+};
-+
-+static int clk_mt2701_g3dsys_init(struct platform_device *pdev)
-+{
-+	struct clk_onecell_data *clk_data;
-+	struct device_node *node = pdev->dev.of_node;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_G3DSYS_NR);
-+
-+	mtk_clk_register_gates(node, g3d_clks, ARRAY_SIZE(g3d_clks),
-+			       clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		dev_err(&pdev->dev,
-+			"could not register clock provider: %s: %d\n",
-+			pdev->name, r);
-+
-+	mtk_register_reset_controller(node, 1, 0xc);
-+
-+	return r;
-+}
-+
-+static const struct of_device_id of_match_clk_mt2701_g3d[] = {
-+	{
-+		.compatible = "mediatek,mt2701-g3dsys",
-+		.data = clk_mt2701_g3dsys_init,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+
-+static int clk_mt2701_g3d_probe(struct platform_device *pdev)
-+{
-+	int (*clk_init)(struct platform_device *);
-+	int r;
-+
-+	clk_init = of_device_get_match_data(&pdev->dev);
-+	if (!clk_init)
-+		return -EINVAL;
-+
-+	r = clk_init(pdev);
-+	if (r)
-+		dev_err(&pdev->dev,
-+			"could not register clock provider: %s: %d\n",
-+			pdev->name, r);
-+
-+	return r;
-+}
-+
-+static struct platform_driver clk_mt2701_g3d_drv = {
-+	.probe = clk_mt2701_g3d_probe,
-+	.driver = {
-+		.name = "clk-mt2701-g3d",
-+		.of_match_table = of_match_clk_mt2701_g3d,
-+	},
-+};
-+
-+builtin_platform_driver(clk_mt2701_g3d_drv);
-diff --git a/include/dt-bindings/clock/mt2701-clk.h b/include/dt-bindings/clock/mt2701-clk.h
-index 24e93df..2ac62a6 100644
---- a/include/dt-bindings/clock/mt2701-clk.h
-+++ b/include/dt-bindings/clock/mt2701-clk.h
-@@ -431,6 +431,10 @@
- #define CLK_ETHSYS_CRYPTO			8
- #define CLK_ETHSYS_NR				9
- 
-+/* G3DSYS */
-+#define CLK_G3DSYS_CORE				1
-+#define CLK_G3DSYS_NR				2
-+
- /* BDP */
- 
- #define CLK_BDP_BRG_BA				1
-diff --git a/include/dt-bindings/reset/mt2701-resets.h b/include/dt-bindings/reset/mt2701-resets.h
-index 21deb54..50b7f06 100644
---- a/include/dt-bindings/reset/mt2701-resets.h
-+++ b/include/dt-bindings/reset/mt2701-resets.h
-@@ -87,4 +87,7 @@
- #define MT2701_ETHSYS_GMAC_RST			23
- #define MT2701_ETHSYS_PPE_RST			31
- 
-+/* G3DSYS resets */
-+#define MT2701_G3DSYS_CORE_RST			0
-+
- #endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT2701 */
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
 -- 
-2.7.4
+| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
+| COO  -  Founder                                      Cruquiuskade 47 |
+| +31(0)851119172                                 Amsterdam 1018 AM NL |
+|                  [`as] http://www.amarulasolutions.com               |
