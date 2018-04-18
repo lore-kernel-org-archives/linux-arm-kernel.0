@@ -1,56 +1,87 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 18 Apr 2018 18:05:03 +0800
-Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
-In-Reply-To: <20180418084535.lqdvjgcbxtnwqwri@flea>
-References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-2-mylene.josserand@bootlin.com>
- <CAGb2v67VL70yqTF7xq4T3_9zA9T3UT2AV0gGarh1mqvC17r3Mg@mail.gmail.com>
- <20180417111737.6dous6eiuvjn33jf@flea>
- <CAGb2v67qvk=T7u7bOjVZ7q_qsjJuEOM6iarw7by42ga=EYuYDg@mail.gmail.com>
- <20180418084535.lqdvjgcbxtnwqwri@flea>
-Message-ID: <CAGb2v64UCA825xC=wvBZ6n0K-c=vsOO15F7S6Bn=i9c=eAqYww@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 18 Apr 2018 12:05:53 +0200
+Subject: [PATCH] ARM: dts: imx6ul: Add CAAM support
+In-Reply-To: <1523739330-27363-1-git-send-email-festevam@gmail.com>
+References: <1523739330-27363-1-git-send-email-festevam@gmail.com>
+Message-ID: <2995b276dc3e6eb3174a430750615553@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 4:45 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Apr 17, 2018 at 07:25:15PM +0800, Chen-Yu Tsai wrote:
->> On Tue, Apr 17, 2018 at 7:17 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > On Tue, Apr 17, 2018 at 11:12:41AM +0800, Chen-Yu Tsai wrote:
->> >> On Tue, Apr 17, 2018 at 5:50 AM, Myl?ne Josserand
->> >> <mylene.josserand@bootlin.com> wrote:
->> >> > Move the assembly code for cluster cache enabling and resuming
->> >> > into an assembly file instead of having it directly in C code.
->> >> >
->> >> > Remove the CFLAGS because we are using the ARM directive "arch"
->> >> > instead.
->> >> >
->> >> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
->> >> > ---
->> >> >  arch/arm/mach-sunxi/Makefile  |  4 +--
->> >> >  arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
->> >> >  arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
->> >> >  3 files changed, 85 insertions(+), 81 deletions(-)
->> >> >  create mode 100644 arch/arm/mach-sunxi/headsmp.S
->> >>
->> >> I'm still not convinced about this whole "move ASM to separate
->> >> file" thing, especially now that you aren't actually adding any
->> >> sunxi-specific ASM code beyond a simple function call.
->> >>
->> >> Could you drop this for now?
->> >
->> > I'd really like to have this merged actually. There's a significant
->> > readibility improvement, so even if there's no particular functional
->> > improvement, I'd still call it a win.
->>
->> What parts do you consider hard to read? The extra quotes? Trailing
->> newline? Or perhaps the __stringify bits?
->
-> All of this, plus the clobbers and operands.
+On 14.04.2018 22:55, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Add CAAM support on i.MX6UL.
+> 
+> Also, since CAAM is not available on i.MX6ULL the CAAM node
+> needs to be deleted in the imx6ull.dtsi.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx6ul.dtsi  | 30 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx6ull.dtsi |  2 ++
+>  2 files changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+> index 1241972..2b854d1 100644
+> --- a/arch/arm/boot/dts/imx6ul.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul.dtsi
+> @@ -769,6 +769,36 @@
+>  			reg = <0x02100000 0x100000>;
+>  			ranges;
+>  
+> +			crypto: caam at 2140000 {
+> +				compatible = "fsl,imx6ul-caam", "fsl,sec-v4.0";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				reg = <0x2140000 0x3c000>;
+> +				ranges = <0 0x2140000 0x3c000>;
+> +				interrupts = <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks IMX6UL_CLK_CAAM_IPG>, <&clks IMX6UL_CLK_CAAM_ACLK>,
+> +					 <&clks IMX6UL_CLK_CAAM_MEM>;
+> +				clock-names = "ipg", "aclk", "mem";
+> +
+> +				sec_jr0: jr0 at 1000 {
+> +					compatible = "fsl,sec-v4.0-job-ring";
+> +					reg = <0x1000 0x1000>;
+> +					interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+> +				};
+> +
+> +				sec_jr1: jr1 at 2000 {
+> +					compatible = "fsl,sec-v4.0-job-ring";
+> +					reg = <0x2000 0x1000>;
+> +					interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+> +				};
+> +
+> +				sec_jr2: jr2 at 3000 {
+> +					compatible = "fsl,sec-v4.0-job-ring";
+> +					reg = <0x3000 0x1000>;
+> +					interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+> +				};
+> +			};
+> +
+>  			usbotg1: usb at 2184000 {
+>  				compatible = "fsl,imx6ul-usb", "fsl,imx27-usb";
+>  				reg = <0x02184000 0x200>;
+> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
+> index 571ddd7..ebc25c9 100644
+> --- a/arch/arm/boot/dts/imx6ull.dtsi
+> +++ b/arch/arm/boot/dts/imx6ull.dtsi
+> @@ -45,6 +45,8 @@
+>  
+>  /* Delete UART8 in AIPS-1 (i.MX6UL specific) */
+>  /delete-node/ &uart8;
+> +/* Delete CAAM node in AIPS-2 (i.MX6UL specific) */
+> +/delete-node/ &crypto;
 
-Ok. Lets move it then.
 
-The kbuild reports indicate this still needs some work though.
+This starts to get ugly if too much piles up. But I think we have almost
+all differences now. So I think its still ok.
 
-ChenYu
+Reviewed-by: Stefan Agner <stefan@agner.ch>
+
+--
+Stefan
+
+>  
+>  / {
+>  	soc {
