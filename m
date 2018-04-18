@@ -1,59 +1,40 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 18 Apr 2018 15:43:04 -0700
-Subject: [GIT PULL] Amlogic fixes for v4.17-rc
-Message-ID: <7hbmeg5e6f.fsf@baylibre.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 18 Apr 2018 16:27:25 -0700
+Subject: [PATCH] clk: sunxi-ng: replace lib-y with obj-y
+In-Reply-To: <1524052351-14103-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1524052351-14103-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <152409404578.51482.16644171573677016161@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Quoting Masahiro Yamada (2018-04-18 04:52:31)
+> We had commit 06e226c7fb23 ("clk: sunxi-ng: Move all clock types to a
+> library") and commit 799c43415442 ("kbuild: thin archives make default
+> for all archs") in the same development cycle, from different trees.
+> 
+> With migration to the thin archive, the entire drivers/clk/sunxi-ng/lib.a
+> is linked to the vmlinux.  This does not break build, but we do not get
+> any size saving.
+> 
+> However, we do not need to go back to the individual Kconfig options.
+> The default configuration pulls in all (or most) of the CCU parts anyway.
+> Also, once we enable CONFIG_LD_DEAD_CODE_DATA_ELIMINATION, we can simply
+> list all files with obj-y, and the linker will drop all unused functions
+> by itself.
+> 
+> After the long discussion [1], people there agreed to fix this, but
+> nobody sent a patch after all.  I am doing it now.
+> 
+> I lifted up CONFIG_SUNXI_CCU to drivers/clk/Makefile because everything
+> in drivers/clk/sunxi-ng/ depends on SUNXI_CCU.
+> 
+> [1] https://patchwork.kernel.org/patch/9796521/
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Technically, this is more "late" than "fixes", but I have excuses...
+Thanks for remembering to take care of this. I forgot about it all.
 
-1) I was on vacation, but more importantly,
-2) There were last minute driver issues that got sorted out after I sent
-the main batch v4.17 DT pull requests.  Those issues (USB
-suspend/resume) have now been sorted out and merged for v4.17-rc, so I'm
-sending this series to enable USB for Amlogic.
+Acked-by: Stephen Boyd <sboyd@kernel.org>
 
-This has been tested on Amlogic SoCs on top of v4.17-rc1.
-
-Please pull for v4.17-rc,
-
-Thanks,
-
-Kevin
-
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
-
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
-
-for you to fetch changes up to 4b7b0d7b25538d2ad421a1041267d5208d3425bc:
-
-  ARM64: dts: meson-gxm-khadas-vim2: enable the USB controller (2018-04-18 10:24:34 -0700)
-
-----------------------------------------------------------------
-Amlogic fixes for v4.17-rc1
-- add / enable USB host support for GX boards
-
-----------------------------------------------------------------
-Martin Blumenstingl (7):
-      ARM64: dts: meson-gxl: add USB host support
-      ARM64: dts: meson-gxm: add GXM specific USB host configuration
-      ARM64: dts: meson-gxl-s905x-p212: enable the USB controller
-      ARM64: dts: meson-gx-p23x-q20x: enable the USB controller
-      ARM64: dts: meson-gxl-s905x-libretech-cc: enable the USB controller
-      ARM64: dts: meson-gxl-nexbox-a95x: enable the USB controller
-      ARM64: dts: meson-gxm-khadas-vim2: enable the USB controller
-
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts  |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi        |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   | 61 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        |  4 ++++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi                   | 17 +++++++++++++++++
- 7 files changed, 106 insertions(+)
+Or I can pick this up directly. Let me know.
