@@ -1,52 +1,40 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 18 Apr 2018 17:46:31 +0200
-Subject: [PATCH] ARM: dts: stm32: Add DAC support to stm32mp157c
-Message-ID: <1524066391-843-1-git-send-email-fabrice.gasnier@st.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 18 Apr 2018 17:47:04 +0200
+Subject: [PATCH v2 1/2] pinctrl/samsung: Correct EINTG banks order
+In-Reply-To: <CA+Ln22E17WK2GA_6-AXZu9Z+Q_Nb86xO6npZvrCc21ciYwHt8w@mail.gmail.com>
+References: <1523893966-8884-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <1523893966-8884-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <CA+Ln22E17WK2GA_6-AXZu9Z+Q_Nb86xO6npZvrCc21ciYwHt8w@mail.gmail.com>
+Message-ID: <CAJKOXPdoJV_3BucTjJ0xxd6cc6PYy3W0L8e_emmDmwZnhgXqvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for DAC (Digital to Analog Converter) to STM32MP157C.
-STM32MP157C DAC has two output channels.
+On Tue, Apr 17, 2018 at 4:12 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> 2018-04-17 0:52 GMT+09:00 Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>:
+>> All banks with GPIO interrupts should be at beginning
+>> of bank array and without any other types of banks between them.
+>> This order is expected by exynos_eint_gpio_irq, when doing
+>> interrupt group to bank translation.
+>> Otherwise, kernel NULL pointer dereference would happen
+>> when trying to handle interrupt, due to wrong bank being looked up.
+>> Observed on s5pv210, when trying to handle gpj0 interrupt,
+>> where kernel was mapping it to gpi bank.
+>>
+>> Cc: stable at vger.kernel.org
+>> Fixes: 023e06dfa6882f500b9c86fd61f0b1913aa07f36 ("pinctrl: exynos: add exynos5410 SoC specific data")
+>> Fixes: 608a26a7bc04a39cfd7041f31ca2b2100113d14e ("pinctrl: Add s5pv210 support to pinctrl-exynos)
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- arch/arm/boot/dts/stm32mp157c.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Use short SHA (for example: git config --global core.abbrev 12; git
+config --global pretty.fixes 'Fixes: %h ("%s")' ; git config --global
+alias.sf 'show --pretty=fixes' ; git sf COMMIT).
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index bc3eddc..fd44b4d 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -136,6 +136,30 @@
- 			status = "disabled";
- 		};
- 
-+		dac: dac at 40017000 {
-+			compatible = "st,stm32h7-dac-core";
-+			reg = <0x40017000 0x400>;
-+			clocks = <&rcc DAC12>;
-+			clock-names = "pclk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			dac1: dac at 1 {
-+				compatible = "st,stm32-dac";
-+				#io-channels-cells = <1>;
-+				reg = <1>;
-+				status = "disabled";
-+			};
-+
-+			dac2: dac at 2 {
-+				compatible = "st,stm32-dac";
-+				#io-channels-cells = <1>;
-+				reg = <2>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		uart7: serial at 40018000 {
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x40018000 0x400>;
--- 
-1.9.1
+The subject prefix should be "pinctrl: samsung:" (git log --oneline --
+drivers/pinctrl/samsung/).
+
+I fixed this, re-wrapped commit for 72-column and applied to my tree.
+
+Linus,
+I'll send them to you in pull request for next release cycle.
+
+Best regards,
+Krzysztof
