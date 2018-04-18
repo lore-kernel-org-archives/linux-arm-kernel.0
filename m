@@ -1,53 +1,35 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 18 Apr 2018 20:53:09 +0200
-Subject: [PATCH 0/6] arm64: untag user pointers passed to the kernel
-Message-ID: <cover.1524077494.git.andreyknvl@google.com>
+Date: Wed, 18 Apr 2018 20:53:15 +0200
+Subject: [PATCH 6/6] arm64: update Documentation/arm64/tagged-pointers.txt
+In-Reply-To: <cover.1524077494.git.andreyknvl@google.com>
+References: <cover.1524077494.git.andreyknvl@google.com>
+Message-ID: <0fdb6332cc5bf333f80212d0b17edadd2bdc9fcf.1524077494.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Add a note that work on passing tagged user pointers to the kernel via
+syscalls has started, but might not be complete yet.
 
-arm64 has a feature called Top Byte Ignore, which allows to embed pointer
-tags into the top byte of each pointer. Userspace programs (such as
-HWASan, a memory debugging tool [1]) might use this feature and pass
-tagged user pointers to the kernel through syscalls or other interfaces.
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ Documentation/arm64/tagged-pointers.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-This patch makes a few of the kernel interfaces accept tagged user
-pointers. The kernel is already able to handle user faults with tagged
-pointers and has the untagged_addr macro, which this patchset reuses.
-
-We're not trying to cover all possible ways the kernel accepts user
-pointers in one patchset, so this one should be considered as a start.
-
-Thanks!
-
-[1] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
-
-Changes in v1:
-- Rebased onto 4.17-rc1.
-
-Changes in RFC v2:
-- Added "#ifndef untagged_addr..." fallback in linux/uaccess.h instead of
-  defining it for each arch individually.
-- Updated Documentation/arm64/tagged-pointers.txt.
-- Dropped ?mm, arm64: untag user addresses in memory syscalls?.
-- Rebased onto 3eb2ce82 (4.16-rc7).
-
-Andrey Konovalov (6):
-  arm64: add type casts to untagged_addr macro
-  uaccess: add untagged_addr definition for other arches
-  arm64: untag user addresses in copy_from_user and others
-  mm, arm64: untag user addresses in mm/gup.c
-  lib, arm64: untag addrs passed to strncpy_from_user and strnlen_user
-  arm64: update Documentation/arm64/tagged-pointers.txt
-
- Documentation/arm64/tagged-pointers.txt |  5 +++--
- arch/arm64/include/asm/uaccess.h        |  9 +++++++--
- include/linux/uaccess.h                 |  4 ++++
- lib/strncpy_from_user.c                 |  2 ++
- lib/strnlen_user.c                      |  2 ++
- mm/gup.c                                | 12 ++++++++++++
- 6 files changed, 30 insertions(+), 4 deletions(-)
-
+diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
+index a25a99e82bb1..361481283f00 100644
+--- a/Documentation/arm64/tagged-pointers.txt
++++ b/Documentation/arm64/tagged-pointers.txt
+@@ -35,8 +35,9 @@ Using non-zero address tags in any of these locations may result in an
+ error code being returned, a (fatal) signal being raised, or other modes
+ of failure.
+ 
+-For these reasons, passing non-zero address tags to the kernel via
+-system calls is forbidden, and using a non-zero address tag for sp is
++Some initial work for supporting non-zero address tags passed to the
++kernel via system calls has been done, but the kernel doesn't provide
++any guarantees at this point. Using a non-zero address tag for sp is
+ strongly discouraged.
+ 
+ Programs maintaining a frame pointer and frame records that use non-zero
 -- 
 2.17.0.484.g0c8726318c-goog
