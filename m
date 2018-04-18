@@ -1,46 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Apr 2018 14:47:30 +0100
-Subject: [PATCHv3 03/11] arm64/kvm: hide ptrauth from guests
-In-Reply-To: <20180418131926.pbjlbcjspg7azq2j@kamzik.brq.redhat.com>
-References: <20180417183735.56985-1-mark.rutland@arm.com>
- <20180417183735.56985-4-mark.rutland@arm.com>
- <20180418131926.pbjlbcjspg7azq2j@kamzik.brq.redhat.com>
-Message-ID: <20180418134729.fzu4r7rvgdzlckw7@lakrids.cambridge.arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 18 Apr 2018 15:48:55 +0200
+Subject: [PATCH v6 11/11] ARM: shmobile: Convert file to use cntvoff
+In-Reply-To: <20180418120327.0f707abf@dell-desktop.home>
+References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
+ <20180416215032.5023-12-mylene.josserand@bootlin.com>
+ <CAMuHMdU9soQuNMC59Y2AQdTmXbWBz-P3EFfZ6NYGKukJVukKgg@mail.gmail.com>
+ <20180418120327.0f707abf@dell-desktop.home>
+Message-ID: <20180418134855.j3o7u3bxurnrsuay@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 03:19:26PM +0200, Andrew Jones wrote:
-> On Tue, Apr 17, 2018 at 07:37:27PM +0100, Mark Rutland wrote:
-> > @@ -1000,6 +1000,15 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
-> >  				    task_pid_nr(current));
-> >  
-> >  		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-> > +	} else if (id == SYS_ID_AA64ISAR1_EL1) {
-> > +		const u64 ptrauth_mask = (0xfUL << ID_AA64ISAR1_APA_SHIFT) |
-> > +					 (0xfUL << ID_AA64ISAR1_API_SHIFT) |
-> > +					 (0xfUL << ID_AA64ISAR1_GPA_SHIFT) |
-> > +					 (0xfUL << ID_AA64ISAR1_GPI_SHIFT);
-> > +		if (val & ptrauth_mask)
-> > +			pr_err_once("kvm [%i]: ptrauth unsupported for guests, suppressing\n",
-> > +					task_pid_nr(current));
+On Wed, Apr 18, 2018 at 12:03:27PM +0200, Myl?ne Josserand wrote:
+> Hello,
 > 
-> Marc just changed the equivalent SVE pr_err_once() to kvm_debug().
-> So we probably want to do the same here.
-
-Good point. Done.
-
-> > +		val &= ~ptrauth_mask;
-> >  	} else if (id == SYS_ID_AA64MMFR1_EL1) {
-> >  		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
-> >  			pr_err_once("kvm [%i]: LORegions unsupported for guests, suppressing\n",
-> > -- 
-> > 2.11.0
-> >
+> On Wed, 18 Apr 2018 11:36:27 +0200
+> Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 > 
-> Otherwise
->  
-> Reviewed-by: Andrew Jones <drjones@redhat.com>
+> > Hi Myl?ne,
+> > 
+> > On Mon, Apr 16, 2018 at 11:50 PM, Myl?ne Josserand
+> > <mylene.josserand@bootlin.com> wrote:
+> > > Now that a common function is available for CNTVOFF's
+> > > initialization, let's convert shmobile-apmu code to use
+> > > this function.  
+> > 
+> > Thanks for your patch, works fine on Renesas ALT with R-Car E2,
+> > which suffers from lack of CNTVOFF initialization.
+> 
+> Great to know that it works on this board.
+> 
+> > 
+> > > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>  
+> > 
+> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > 
+> > Gr{oetje,eeting}s,
+> > 
+> >                         Geert
+> > 
+> 
+> Thank you again for testing it :)
 
-Cheers!
+What is the plan for merging this patch/series?
 
-Mark.
+I'd be happy to take this patch through the renesas tree once any
+dependencies are in place.
