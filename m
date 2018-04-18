@@ -1,103 +1,85 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 18 Apr 2018 14:33:32 +0100
-Subject: [PATCH] arm64: signal: don't force known signals to SIGKILL
-In-Reply-To: <20180418113652.vvlopeqvlk4vwmnf@lakrids.cambridge.arm.com>
-References: <20180416154501.56872-1-mark.rutland@arm.com>
- <20180417144630.GG16308@e103592.cambridge.arm.com>
- <20180418113652.vvlopeqvlk4vwmnf@lakrids.cambridge.arm.com>
-Message-ID: <20180418133331.GJ16308@e103592.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 18 Apr 2018 15:37:29 +0200
+Subject: [PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1
+In-Reply-To: <20180313200548.fgexoxlha3coa7hs@verge.net.au>
+References: <1518457475-4480-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdX=m9ui6GczF51SJH2X7Cw1OnxoH9pfk1DybpDX-A873Q@mail.gmail.com>
+ <20180221161326.ktvf3mlzzxith5kw@verge.net.au>
+ <CAMuHMdUTSmrWggMK4ehSL3Ux-JUzVpamTuToveuXogjuvGKkaw@mail.gmail.com>
+ <20180221183223.qacrmmuzoqlzzbpo@verge.net.au>
+ <CAMuHMdXCt1-coXGgtgFBm4rZLGBRMvSjbgeBSweiyKrOfCF0Xg@mail.gmail.com>
+ <20180223081443.ak6kl3z72kamcxob@verge.net.au>
+ <CAMuHMdVKPFSVTbnQy9RwAg13OC3R=H1PN9+1FyU0SDHQPa1cuQ@mail.gmail.com>
+ <20180313200548.fgexoxlha3coa7hs@verge.net.au>
+Message-ID: <CAMuHMdVAi+rU3+TLSp7YQSHzJKFyMH8ZbS3-d8yADKmfz1KiTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 12:36:52PM +0100, Mark Rutland wrote:
-> On Tue, Apr 17, 2018 at 03:46:31PM +0100, Dave Martin wrote:
-> > On Mon, Apr 16, 2018 at 04:45:01PM +0100, Mark Rutland wrote:
-> > > Since commit:
-> > > 
-> > >   a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
-> > > 
-> > > ... any signal which is not SIGKILL will be upgraded to a SIGKILL be
-> > > force_signal_inject(). This includes signals we do expect, such as
-> > > SIGILL triggered by do_undefinstr().
-> > > 
-> > > Fix the check to use a logical AND rather than a logical OR, permitting
-> > > signals whose layout is SIL_FAULT.
-> > > 
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Fixes: a7e6f1ca90354a31 ("arm64: signal: Force SIGKILL for unknown signals in force_signal_inject")
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: Dave Martin <dave.martin@arm.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/traps.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> > > index ba964da31a25..1cb2749a72bf 100644
-> > > --- a/arch/arm64/kernel/traps.c
-> > > +++ b/arch/arm64/kernel/traps.c
-> > > @@ -366,7 +366,7 @@ void force_signal_inject(int signal, int code, unsigned long address)
-> > >  	}
-> > >  
-> > >  	/* Force signals we don't understand to SIGKILL */
-> > 
-> > Is it worth updating the comment here?
-> > 
-> > What's the rationale for this check?
-> 
-> Per the commit log for a7e6f1ca90354a31:
-> 
-> ----
-> arm64: signal: Force SIGKILL for unknown signals in force_signal_inject
-> 
-> For signals other than SIGKILL or those with siginfo_layout(signal, code)
-> == SIL_FAULT then force_signal_inject does not initialise the siginfo_t
-> properly. Since the signal number is determined solely by the caller,
-> simply WARN on unknown signals and force to SIGKILL.
-> 
-> Reported-by: Dave Martin <Dave.Martin@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ----
-> 
-> > 
-> > IIRC the purpose of this is to ensure that any siginfo delivered to
-> > userspace through this path is initialised correctly: so, either the
-> > signal must be a SIL_FAULT signal (since that's what the subsequent code
-> > initialises for) or SIGKILL (since userspace can't inspect the siginfo
-> > post-mortem, so the initialisation doesn't matter in that case).
-> 
-> Per the commit log and code, that seems to be the case, yes.
-> 
-> > Maybe moving this check before the switch() would make the logic
-> > clearer.  Not sure though.
-> 
-> I don't have a strong feeling either way, but I think that can be punted
-> to a separate cleanup.
-> 
-> > 
-> > > -	if (WARN_ON(signal != SIGKILL ||
-> > > +	if (WARN_ON(signal != SIGKILL &&
-> > >  		    siginfo_layout(signal, code) != SIL_FAULT)) {
-> > >  		signal = SIGKILL;
-> 
-> Do you have a concern with the logical change here, or can I ask for
-> your ack? ;)
+Hi Simon,
 
-No concern, I just wanted to make sure I'd understood the background
-right.  The commit message for this patch doesn't fully explain why the
-original code was wrong and why the new code is right, and my memory of
-the context for this was a bit fuzzy.
+On Tue, Mar 13, 2018 at 9:05 PM, Simon Horman <horms@verge.net.au> wrote:
+> I understand that the watchdog driver has been accepted and that as things
+> currently stand if it is enabled in the build it will be enabled in DT and
+> a crash will result. From my POV that is a regression so I have decided
+> to adopt the alternate plan proposed by Geert above: in short drop DT
+> patches (to avoid enabling broken driver) and enqueue mach-shmobile
+> patches (which don't make things any worse.
+>
+> Patch-by-patch things are as follows.
+>
+> Dropped from "[PATCH v5 00/26] Fix watchdog on Renesas R-Car Gen2 and RZ/G1":
+>
+> 979d28f29742 ARM: dts: r8a7743: Adjust SMP routine size
+> 0b205f679f5d ARM: dts: r8a7745: Adjust SMP routine size
+> 2ad21a1d78b3 ARM: dts: r8a7790: Adjust SMP routine size
+> 82c978459c77 ARM: dts: r8a7791: Adjust SMP routine size
+> d303698e6ff3 ARM: dts: r8a7792: Adjust SMP routine size
+> d8b8b9a1e295 ARM: dts: r8a7793: Adjust SMP routine size
+> 70b3ab369773 ARM: dts: r8a7794: Adjust SMP routine size
+>
+> ebf26cf1b1de ARM: dts: r8a7743: Add watchdog support to SoC dtsi
+> 5a4566ab3777 ARM: dts: r8a7745: Add watchdog support to SoC dtsi
+> acd58e2bb1e5 ARM: dts: r8a7790: Add watchdog support to SoC dtsi
+> e3f89168e72f ARM: dts: r8a7791: Add watchdog support to SoC dtsi
+> e76a6a69a1fc ARM: dts: r8a7794: Add watchdog support to SoC dtsi
+> 242cc1ab7f7c ARM: dts: iwg20m: Add watchdog support to SoM dtsi
+> 748ed07f6c7c ARM: dts: iwg22m: Add watchdog support to SoM dtsi
+>
+>
+> Dropped from "[PATCH/RFC 00/11] ARM: dts: rcar-gen2: Enable watchdog support":
+>
+> c257202482e2 ARM: dts: r8a7792: Add RWDT node
+> 01ec04dec8eb ARM: dts: r8a7793: Add RWDT node
+> 8e6ebe4f2f94 ARM: dts: lager: Enable watchdog support
+> f223ad0198f6 ARM: dts: koelsch: Enable watchdog support
+> 1d14d2bb700d ARM: dts: porter: Enable watchdog support
+> bf71652fc955 ARM: dts: blanche: Enable watchdog support
+> 13a0b10aeea4 ARM: dts: wheat: Enable watchdog support
+> 4e247bf110b8 ARM: dts: gose: Enable watchdog support
+> 2dcbd24bbf5e ARM: dts: alt: Enable watchdog support
+> 7f6844c900b4 ARM: dts: silk: Enable watchdog support
+>
+> And applied:
+>
+> [v5] ARM: shmobile: rcar-gen2: Add watchdog support
+> [v5] ARM: shmobile: Add watchdog support
+>
+> In the case of the last patch above I removed the #ifdef from the header file.
 
-I should probably have followed the Fixes tag for context, but I was
-lazy :P
+I guess the time is ripe to apply the DTS patches again, in the following order:
+  1. SMP routine size adjustments,
+  2. Watchdog support additions to dtsi,
+  3. Watchdog enablement for dts?
 
-Anyway, FWIW
+Thanks!
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Gr{oetje,eeting}s,
 
+                        Geert
 
-Out of interest, what were you seeing in userspace prior to this fix?
-Please don't tell me systemd is functionally reliant on SIGILL :(
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Cheers
----Dave
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
