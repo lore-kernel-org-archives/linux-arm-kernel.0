@@ -1,113 +1,71 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 18 Apr 2018 11:05:44 +0000
-Subject: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
-In-Reply-To: <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <1501876754-1064-3-git-send-email-nleeder@codeaurora.org>
- <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83868C029@FRAEML521-MBX.china.huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Apr 2018 12:32:43 +0100
+Subject: [PATCH v6 20/25] drivers: firmware: psci: Introduce
+ psci_dt_topology_init()
+In-Reply-To: <CAPDyKFrVNtv6Z3r5DkVXVooszyJTqaBxwg9wm94aw7v3SyA4tg@mail.gmail.com>
+References: <1521046715-30683-1-git-send-email-ulf.hansson@linaro.org>
+ <1521046715-30683-21-git-send-email-ulf.hansson@linaro.org>
+ <20180314173833.dyu7jtweu233rfi4@lakrids.cambridge.arm.com>
+ <CAPDyKFpJQZ87ViwZxX_yBnKPzgRv5YxbLz=qxScBTMCvY6e2vw@mail.gmail.com>
+ <20180410111043.t577a43a3bvjpkc7@lakrids.cambridge.arm.com>
+ <CAPDyKFrVNtv6Z3r5DkVXVooszyJTqaBxwg9wm94aw7v3SyA4tg@mail.gmail.com>
+Message-ID: <20180418113242.fnpqp3j2ayhclwmj@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> On Behalf Of Yisheng Xie
-> Sent: Thursday, March 29, 2018 8:04 AM
-> To: Neil Leeder <nleeder@codeaurora.org>; Will Deacon
-> <will.deacon@arm.com>; Mark Rutland <mark.rutland@arm.com>
-> Cc: Mark Langsdorf <mlangsdo@redhat.com>; Jon Masters
-> <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; linux-
-> kernel at vger.kernel.org; Mark Brown <broonie@kernel.org>; Mark Salter
-> <msalter@redhat.com>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
+On Tue, Apr 10, 2018 at 02:25:52PM +0200, Ulf Hansson wrote:
+> On 10 April 2018 at 13:10, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Apr 10, 2018 at 09:19:26AM +0200, Ulf Hansson wrote:
+> >> On 14 March 2018 at 18:38, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Mar 14, 2018 at 05:58:30PM +0100, Ulf Hansson wrote:
+> >> >> In case the hierarchical layout is used in DT, we want to initialize the
+> >> >> corresponding PM domain topology for the CPUs, by using the generic PM
+> >> >> domain (aka genpd) infrastructure.
+> >> >>
+> >> >> At first glance, it may seem feasible to hook into the existing
+> >> >> psci_dt_init() function, although because it's called quite early in the
+> >> >> boot sequence, allocating the dynamic data structure for a genpd doesn't
+> >> >> work.
+> >> >>
+> >> >> Therefore, let's export a new init function for PSCI,
+> >> >> psci_dt_topology_init(), which the ARM machine code should call from a
+> >> >> suitable initcall.
+> >> >>
+> >> >> Succeeding to initialize the PM domain topology, which means at least one
+> >> >> instance of a genpd becomes created, allows us to continue to enable the
+> >> >> PSCI OS initiated mode for the platform. If everything turns out fine,
+> >> >> let's print a message in log to inform the user about the changed mode.
+> >> >>
+> >> >> In case of any failures, we stick to the default PSCI Platform Coordinated
+> >> >> mode.
+> >> >
+> >> > For kexec/kdump we'll need to explicitly set the suspend mode to
+> >> > platform coordinated if for whatever reason we choose not to use OSI.
+> >>
+> >> Could you please elaborate on this? I am not really understanding what
+> >> you are suggesting me to do and why.
+> >
+> > Sorry for not being clear.
+> >
+> > What I'd like to see is that we always call SET_SUSPEND_MODE before
+> > invoking CPU_SUSPEND. Either deciding early if we can use OSI, or always
+> > setting it to platform co-ordinated early on in boot and later switching
+> > it over.
+> >
+> > That way we can be sure of the suspend mode, even if we've kexec'd from
+> > a kernel that had fiddled with it.
 > 
-> Hi Neil,
+> Right, good point. Let's me update the patch to deal with that.
 > 
-> On 2017/8/5 3:59, Neil Leeder wrote:
-> > +	mem_resource_0 = platform_get_resource(pdev, IORESOURCE_MEM,
-> 0);
-> > +	mem_map_0 = devm_ioremap_resource(&pdev->dev,
-> mem_resource_0);
-> > +
-> Can we use devm_ioremap instead? for the reg_base of smmu_pmu is
-> IMPLEMENTATION DEFINED. If the reg of smmu_pmu is inside smmu,
-> devm_ioremap_resource will failed and return -EBUSY, eg.:
-> 
->  smmu reg ranges:		0x180000000 ~ 0x1801fffff
->  its smmu_pmu reg ranges:	0x180001000 ~ 0x180001fff
+> One thing though, kexec from a "new" kernel having OSI mode enabled
+> into an "old" kernel that doesn't even have the new OSI mode support
+> in psci driver, is going to be difficult to deal with.
+> On the other hand I guess that isn't a very important usecase we need
+> to cover, or is it?
 
-I think this will not solve the issue completely as the smmu v3 driver 
-uses devm_ioremap_resource() currently and that will fail because of
-the overlap.
-
-Please find the discussion here:
-https://lkml.org/lkml/2018/1/31/235
+I think we can also transition back to platform-coordinated in a reboot
+notifier, which should cater for kexec to an old kernel. I agree it
+shouldn't be a big deal, though.
 
 Thanks,
-Shameer
-
-> > +	if (IS_ERR(mem_map_0)) {
-> > +		dev_err(&pdev->dev, "Can't map SMMU PMU @%pa\n",
-> > +			&mem_resource_0->start);
-> > +		return PTR_ERR(mem_map_0);
-> > +	}
-> > +
-> > +	smmu_pmu->reg_base = mem_map_0;
-> > +	smmu_pmu->pmu.name =
-> > +		devm_kasprintf(&pdev->dev, GFP_KERNEL, "smmu_0_%llx",
-> > +			       (mem_resource_0->start) >> SMMU_PA_SHIFT);
-> > +
-> > +	if (!smmu_pmu->pmu.name) {
-> > +		dev_err(&pdev->dev, "Failed to create PMU name");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	ceid_64 = readq(smmu_pmu->reg_base + SMMU_PMCG_CEID0);
-> > +	ceid[0] = ceid_64 & GENMASK(31, 0);
-> > +	ceid[1] = ceid_64 >> 32;
-> > +	ceid_64 = readq(smmu_pmu->reg_base + SMMU_PMCG_CEID1);
-> > +	ceid[2] = ceid_64 & GENMASK(31, 0);
-> > +	ceid[3] = ceid_64 >> 32;
-> > +	bitmap_from_u32array(smmu_pmu->supported_events,
-> SMMU_MAX_EVENT_ID,
-> > +			     ceid, SMMU_NUM_EVENTS_U32);
-> > +
-> > +	/* Determine if page 1 is present */
-> > +	if (readl(smmu_pmu->reg_base + SMMU_PMCG_CFGR) &
-> > +	    SMMU_PMCG_CFGR_RELOC_CTRS) {
-> > +		mem_resource_1 = platform_get_resource(pdev,
-> IORESOURCE_MEM, 1);
-> > +		mem_map_1 = devm_ioremap_resource(&pdev->dev,
-> mem_resource_1);
-> > +
-> The same as above.
-> 
-> Thanks
-> Yisheng
-> 
-> > +		if (IS_ERR(mem_map_1)) {
-> > +			dev_err(&pdev->dev, "Can't map SMMU PMU
-> @%pa\n",
-> > +				&mem_resource_1->start);
-> > +			return PTR_ERR(mem_map_1);
-> > +		}
-> > +		smmu_pmu->reloc_base = mem_map_1;
-> > +	} else {
-> > +		smmu_pmu->reloc_base = smmu_pmu->reg_base;
-> > +	}
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq < 0) {
-> > +		dev_err(&pdev->dev,
-> > +			"Failed to get valid irq for smmu @%pa\n",
-> > +			&mem_resource_0->start);
-> > +		return irq;
-> > +	}
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Mark.
