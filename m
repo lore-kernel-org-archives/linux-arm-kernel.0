@@ -1,63 +1,33 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 18 Apr 2018 12:42:18 +0530
-Subject: [v5,08/13] ARM: dts: ipq4019: Add ipq4019-ap.dk07.1 common data
-In-Reply-To: <1724020.V9x0kZZp2B@bentobox>
-References: <1521800336-19266-9-git-send-email-sricharan@codeaurora.org>
- <1724020.V9x0kZZp2B@bentobox>
-Message-ID: <4e687302-6c42-315b-e76d-2274131da3a0@codeaurora.org>
+Date: Wed, 18 Apr 2018 12:45:20 +0530
+Subject: [v5,05/13] ARM: dts: ipq4019: Add ipq4019-ap.dk04.dtsi
+In-Reply-To: <2284833.pBtR1QS54F@bentobox>
+References: <1521800336-19266-6-git-send-email-sricharan@codeaurora.org>
+ <2641190.FRMBLJWkCS@bentobox> <2284833.pBtR1QS54F@bentobox>
+Message-ID: <734eb6eb-9af9-d599-81f1-ec66d9cd839c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Sven,
 
-On 4/18/2018 12:29 PM, Sven Eckelmann wrote:
-> On Freitag, 23. M?rz 2018 15:48:51 CEST Sricharan R wrote:
->> Add the common data for all dk07 based boards.
->>
->> Reviewed-by: Abhishek Sahu <absahu@codeaurora.org>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi | 69 +++++++++++++++++++++++++++
->>  1 file changed, 69 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk07.1.dtsi
+On 4/18/2018 12:37 PM, Sven Eckelmann wrote:
+> On Mittwoch, 18. April 2018 08:59:46 CEST Sven Eckelmann wrote:
+> [...]
+>> I would not know how to disable QSEE on these boards and thus would assume 
+>> that it should be part of this dtsi.
 > 
-> The no-map reserved-memory for tz and smem are missing. Linux doesn't have 
-> control over these regions and they are placed in the middle of the ram before 
-> Linux even starts. And u-boot is also not adding these ranges automatically.
 > 
->     	reserved-memory {
->     		#address-cells = <0x1>;
->     		#size-cells = <0x1>;
->     		ranges;
->     
->     		smem at 87e00000 {
->     			reg = <0x87e00000 0x080000>;
->     			no-map;
->     		};
->     
->     		tz at 87e80000 {
->     			reg = <0x87e80000 0x180000>;
->     			no-map;
->     		};
->     	};
+> Just did some reviews of the reserved-memory regions in other QCA devices and 
+> it looks like this tz and smem are often directly added to the SoC dtsi. So I 
+> will prepare a similar change for qcom-ipq4019.dtsi and this would then solve 
+> it for AP-DK01/04/07 and no changes in the board-family specific dtsi would be 
+> necessary.
 > 
-> This can either (depending on HW/SW configuration) lead to a failed boot [1] 
-> or to runtime crashes like:
-> 
->     root at OpenWrt:/# /tmp/memory-allocator-test
->     main 0
->     [  571.758058] Unhandled fault: imprecise external abort (0xc06) at 0x01715ff8
->     [  571.758099] pgd = cebec000
->     [  571.763826] [01715ff8] *pgd=8e7fa835, *pte=87e7f75f, *ppte=87e7fc7f
->     Bus error
-> 
-> I would not know how to disable QSEE on these boards and thus would assume 
-> that it should be part of this dtsi.
+> But maybe someone has an objection because tz and smem can actually be 
+> disabled in a sane way on these SoCs and thus it would be better to have these 
+> regions in the board specific dts(i) files. We will see...
 
- As we discussed offline, i agree that the smem and tz reserved memory nodes need to
- be added. It still boots today without that, but would abort when that memory
- region is allocated and written. I will add the reserved-memory node for that
- in V6 along with other comments.
+ Right, will add the above change to soc.dtsi in V6. Does that sound ok for you ?
 
 Regards,
  Sricharan
