@@ -1,36 +1,36 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Wed, 18 Apr 2018 10:59:39 +0300
-Subject: [RFC PATCH 1/2] i2c: add bus_freq_hz in i2c_adapter
-In-Reply-To: <20180326111927.16040-1-tudor.ambarus@microchip.com>
-References: <20180326111927.16040-1-tudor.ambarus@microchip.com>
-Message-ID: <a4510530-4bb4-cd4c-cb9a-108a23b27618@microchip.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Wed, 18 Apr 2018 10:02:12 +0200
+Subject: [PATCH v2 5/6] drm/atmel-hlcdc: add support for connecting to
+ tda998x HDMI encoder
+In-Reply-To: <20180418093649.2c304f29@bbrezillon>
+References: <20180417131052.16336-1-peda@axentia.se>
+ <20180417131052.16336-6-peda@axentia.se> <20180418093649.2c304f29@bbrezillon>
+Message-ID: <0155b3cc-29ce-fa43-5588-b465c6ee064a@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping
+On 2018-04-18 09:36, Boris Brezillon wrote:
+> On Tue, 17 Apr 2018 15:10:51 +0200
+> Peter Rosin <peda@axentia.se> wrote:
+> 
+>> When the of-graph points to a tda998x-compatible HDMI encoder, register
+>> as a component master and bind to the encoder/connector provided by
+>> the tda998x driver.
+> 
+> Can't we do the opposite: make the tda998x driver expose its devices as
+> drm bridges. I'd rather not add another way to connect external
+> encoders (or bridges) to display controller drivers, especially since,
+> when I asked DRM maintainers/devs what was the good approach to
+> represent such external encoders they pointed me to the drm_bridge
+> interface.
 
-On 03/26/2018 02:19 PM, Tudor Ambarus wrote:
-> The clock-frequency property is not mandatory for the i2c buses. If it's
-> not present in device tree, the buses usually asume that it is 100kHZ.
-> There are i2c clients that need to know the i2c bus frequency in order to
-> compute their wake token. Spare the clients of making (wrong) assumptions
-> and save the bus frequency in the i2c_adapter structure.
-> 
-> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-> ---
->   include/linux/i2c.h | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index 44ad14e..7a1f26e 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -671,6 +671,7 @@ struct i2c_adapter {
->   	struct rt_mutex bus_lock;
->   	struct rt_mutex mux_lock;
->   
-> +	u32 bus_freq_hz;
->   	int timeout;			/* in jiffies */
->   	int retries;
->   	struct device dev;		/* the adapter device */
-> 
+>From the cover letter:
+
+"However, I don't know if the tilcdc driver is interfacing with the
+tda998x driver in a sane and modern way"
+
+So, which way is the future? Should bridges become components or should
+existing bridge-like components no longer be components? Are there others?
+
+Cheers,
+Peter
