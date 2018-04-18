@@ -1,64 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Apr 2018 09:37:17 -0700
-Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
- supported
-In-Reply-To: <20180418155643.36464-3-code@mmayer.net>
-References: <20180418155643.36464-1-code@mmayer.net>
- <20180418155643.36464-3-code@mmayer.net>
-Message-ID: <c20dc303-8753-5684-1fff-62f363a37a4c@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 18 Apr 2018 09:45:15 -0700
+Subject: [PATCH 2/2 v3] drm/pl111: Enable device-specific assigned memory
+In-Reply-To: <20180418085242.19525-2-linus.walleij@linaro.org>
+References: <20180418085242.19525-1-linus.walleij@linaro.org>
+ <20180418085242.19525-2-linus.walleij@linaro.org>
+Message-ID: <87po2wlazo.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2018 08:56 AM, Markus Mayer wrote:
-> From: Jim Quinlan <jim2101024@gmail.com>
-> 
-> If the SCMI cpufreq driver is supported, we bail, so that the new
-> approach can be used.
-> 
-> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-> ---
->  drivers/cpufreq/brcmstb-avs-cpufreq.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> index b07559b9ed99..b4861a730162 100644
-> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> @@ -164,6 +164,8 @@
->  #define BRCM_AVS_CPU_INTR	"brcm,avs-cpu-l2-intr"
->  #define BRCM_AVS_HOST_INTR	"sw_intr"
->  
-> +#define ARM_SCMI_COMPAT		"arm,scmi"
-> +
->  struct pmap {
->  	unsigned int mode;
->  	unsigned int p1;
-> @@ -511,6 +513,20 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
->  	struct device *dev;
->  	int host_irq, ret;
->  
-> +	/*
-> +	 * If the SCMI cpufreq driver is supported, we bail, so that the more
-> +	 * modern approach can be used.
-> +	 */
-> +	if (IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)) {
-> +		struct device_node *np;
-> +
-> +		np = of_find_compatible_node(NULL, NULL, ARM_SCMI_COMPAT);
-> +		if (np) {
-> +			of_node_put(np);
-> +			return -ENXIO;
-> +		}
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-We would probably want to make sure that the node is also enabled (that
-is, does not have a status = "disabled" property) otherwise the check
-can be defeated. Something like:
+> The Versatile Express has 8 MB of dedicated video RAM (VRAM)
+> on the motherboard, which is what we should be using for the
+> PL111 if available. On this platform, the memory backplane
+> is constructed so that only this memory will work properly
+> with the CLCD on the motherboard, using any other memory
+> area just gives random snow on the display.
+>
+> The CA9 Versatile Express also has a PL111 instance on its
+> core tile that can address all memory, and this does not
+> have the restriction.
 
-		if (np && of_device_is_available(np))
-
-should be good for that.
-
-Thanks!
--- 
-Florian
+Reviewed-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180418/c35055a9/attachment.sig>
