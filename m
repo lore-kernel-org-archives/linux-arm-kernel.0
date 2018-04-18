@@ -1,69 +1,53 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 18 Apr 2018 14:41:43 +0530
-Subject: 4.16 OMAP serial transmit corruption?
-In-Reply-To: <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
-References: <20180416151732.GU16141@n2100.armlinux.org.uk>
- <20180416154545.GA5671@atomide.com>
- <413b774b-d19f-3221-44d5-7992d3b8757f@ti.com>
-Message-ID: <da3be56b-29d3-72f3-5eba-d6a38ae500d0@ti.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Wed, 18 Apr 2018 11:18:30 +0200
+Subject: [PATCH v6 28/30] drm/rockchip: Disable PSR from reboot notifier
+In-Reply-To: <CAAFQd5C_RhqSCfEXNPQ0zH-O1PGk6xGEdvzsSxnfz9kJ5G4Ceg@mail.gmail.com>
+References: <20180405095000.9756-1-enric.balletbo@collabora.com>
+ <CGME20180405095117epcas2p2093448b49aab2abd6684bf689f8888d5@epcas2p2.samsung.com>
+ <20180405095000.9756-29-enric.balletbo@collabora.com>
+ <a9e436f8-34ec-123a-9c69-efabb4576bea@samsung.com>
+ <CAAFQd5C_RhqSCfEXNPQ0zH-O1PGk6xGEdvzsSxnfz9kJ5G4Ceg@mail.gmail.com>
+Message-ID: <CAFqH_51tQ66=oKb0ZhiicRicMd4_zN415tzhHc7X6SUTgg9mFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andrzej, Tomasz
 
+2018-04-16 15:12 GMT+02:00 Tomasz Figa <tfiga@chromium.org>:
+> Hi Andrzej,
+>
+> On Mon, Apr 16, 2018 at 6:57 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
+>
+>> On 05.04.2018 11:49, Enric Balletbo i Serra wrote:
+>> > From: Tomasz Figa <tfiga@chromium.org>
+>> >
+>> > It looks like the driver subsystem detaches devices from power domains
+>> > at shutdown without consent of the drivers.
+>
+>> It looks bit strange. Could you elaborate more on it. Could you show the
+>> code performing the detach?
+>
+> It not only looks strange, but it is strange. The code was present in 4.4:
+>
+> https://elixir.bootlin.com/linux/v4.4.128/source/drivers/base/platform.c#L553
+>
+> but was apparently removed in 4.5:
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/base/platform.c?h=next-20180416&id=2d30bb0b3889adf09b342722b2ce596c0763bc93
+>
+> So we might not need this patch anymore.
+>
 
-On Tuesday 17 April 2018 02:50 PM, Vignesh R wrote:
-> 
-> 
-> On Monday 16 April 2018 09:15 PM, Tony Lindgren wrote:
->> * Russell King - ARM Linux <linux@armlinux.org.uk> [180416 15:19]:
->>> Hi,
->>>
->>> I'm not entirely sure what's going on, but I see corrupted characters
->>> with the serial console on the OMAP4430 SDP board.  During boot,
->>> everything seems fine, the problem appears to be userspace output.
->>>
->>> For example, if I edit a file, then quit vi:
->>>
->>> :q??%??B??Z?root at omap-4430sdp:~#
->>
->> I don't think I've seen that one. What I've seen few times is
->> typing a key on the serial console echoing back the previous
->> character typed while the new character won't get displayed
->> until hitting keyboard again. Only rebooting the device seems
->> to solve this. This is with 4430 ES2.3 revision.
->>
->> I wonder if we're missing some parts of errata i202 handling
->> in omap_8250_mdr1_errataset()?
->>
+Right, seems that we don't need this patch anymore, I'll do more few
+tests and likely remove this patch from this series. Thanks for
+catching this.
 
-I wonder if the extra read of MDR1 register at the beginning of
-omap_8250_mdr1_errataset() compared to omap-serial is the issue.
-errata i202 says access to MDR1 can cause data corruption. 
-Assuming both reads and writes can cause glitch then, that read
-is not following advisory:
+Best regards,
+  Enric
 
-I don't have SDP board so, could you verify if below diff helps:
-
-
-diff --git a/drivers/tty/serial/8250/8250_omap.c b/drivers/tty/serial/8250/8250_omap.c
-index 6aaa84355fd1..8ab9d0a1b1eb 100644
---- a/drivers/tty/serial/8250/8250_omap.c
-+++ b/drivers/tty/serial/8250/8250_omap.c
-@@ -163,11 +163,6 @@ static void omap_8250_mdr1_errataset(struct uart_8250_port *up,
-                                     struct omap8250_priv *priv)
- {
-        u8 timeout = 255;
--       u8 old_mdr1;
--
--       old_mdr1 = serial_in(up, UART_OMAP_MDR1);
--       if (old_mdr1 == priv->mdr1)
--               return;
- 
-        serial_out(up, UART_OMAP_MDR1, priv->mdr1);
-        udelay(2);
-
-
-
--- 
-Regards
-Vignesh
+> Best regards,
+> Tomasz
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
