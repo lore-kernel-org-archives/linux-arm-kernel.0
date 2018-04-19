@@ -1,55 +1,85 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 19 Apr 2018 15:56:24 -0400
-Subject: [PATCH 2/2] PCI/AER: Try slot reset before secondary bus reset
-In-Reply-To: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1524167784-5911-2-git-send-email-okaya@codeaurora.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 19 Apr 2018 22:00:06 +0200
+Subject: [PATCH 0/7] i2c: clean up include/linux/i2c-*
+Message-ID: <20180419200015.15095-1-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The endpoint observing AER_FATAL error might be connected to a PCI hotplug
-slot. Performing secondary bus reset on a hotplug slot causes PCI link
-up/down interrupts.
+Move all plain platform_data includes to the platform_data-dir
+(except for i2c-pnx which can be moved into the driver itself).
 
-Hotplug driver removes the device from system when a link down interrupt
-is observed and performs re-enumeration when link up interrupt is observed.
+My preference is to take these patches via the i2c tree. I can provide an
+immutable branch if needed. But we can also discuss those going in via
+arch-trees if dependencies are against us.
 
-This conflicts with what this code is trying to do. Try secondary bus
-reset only if pci_reset_slot() fails/unsupported.
+The current branch can be found here:
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pcie/aer/aerdrv.c      | 3 ++-
- drivers/pci/pcie/aer/aerdrv_core.c | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/platform_data
 
-diff --git a/drivers/pci/pcie/aer/aerdrv.c b/drivers/pci/pcie/aer/aerdrv.c
-index 779b387..4eaa524 100644
---- a/drivers/pci/pcie/aer/aerdrv.c
-+++ b/drivers/pci/pcie/aer/aerdrv.c
-@@ -318,7 +318,8 @@ static pci_ers_result_t aer_root_reset(struct pci_dev *dev)
- 	reg32 &= ~ROOT_PORT_INTR_ON_MESG_MASK;
- 	pci_write_config_dword(dev, pos + PCI_ERR_ROOT_COMMAND, reg32);
- 
--	pci_reset_bridge_secondary_bus(dev);
-+	if (pci_reset_slot(dev->slot))
-+		pci_reset_bridge_secondary_bus(dev);
- 	pci_printk(KERN_DEBUG, dev, "Root Port link has been reset\n");
- 
- 	/* Clear Root Error Status */
-diff --git a/drivers/pci/pcie/aer/aerdrv_core.c b/drivers/pci/pcie/aer/aerdrv_core.c
-index 0ea5acc..a915b0e6 100644
---- a/drivers/pci/pcie/aer/aerdrv_core.c
-+++ b/drivers/pci/pcie/aer/aerdrv_core.c
-@@ -407,7 +407,8 @@ static pci_ers_result_t broadcast_error_message(struct pci_dev *dev,
-  */
- static pci_ers_result_t default_reset_link(struct pci_dev *dev)
- {
--	pci_reset_bridge_secondary_bus(dev);
-+	if (pci_reset_slot(dev->slot))
-+		pci_reset_bridge_secondary_bus(dev);
- 	pci_printk(KERN_DEBUG, dev, "downstream link has been reset\n");
- 	return PCI_ERS_RESULT_RECOVERED;
- }
+and buildbot had no complaints.
+
+Looking forward to comments or Acks, Revs...
+
+Kind regards,
+
+   Wolfram
+
+
+Wolfram Sang (7):
+  i2c: i2c-gpio: move header to platform_data
+  i2c: i2c-mux-gpio: move header to platform_data
+  i2c: i2c-ocores: move header to platform_data
+  i2c: i2c-omap: move header to platform_data
+  i2c: i2c-pca-platform: move header to platform_data
+  i2c: i2c-xiic: move header to platform_data
+  i2c: pnx: move header into the driver
+
+ Documentation/i2c/busses/i2c-ocores                |  2 +-
+ Documentation/i2c/muxes/i2c-mux-gpio               |  4 +--
+ MAINTAINERS                                        |  8 ++---
+ arch/arm/mach-ks8695/board-acs5k.c                 |  2 +-
+ arch/arm/mach-omap1/board-htcherald.c              |  2 +-
+ arch/arm/mach-omap1/common.h                       |  2 +-
+ arch/arm/mach-omap1/i2c.c                          |  2 +-
+ arch/arm/mach-omap2/common.h                       |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +-
+ arch/arm/mach-pxa/palmz72.c                        |  2 +-
+ arch/arm/mach-pxa/viper.c                          |  2 +-
+ arch/arm/mach-sa1100/simpad.c                      |  2 +-
+ arch/mips/alchemy/board-gpr.c                      |  2 +-
+ arch/sh/boards/board-sh7785lcr.c                   |  2 +-
+ drivers/i2c/busses/i2c-gpio.c                      |  2 +-
+ drivers/i2c/busses/i2c-i801.c                      |  2 +-
+ drivers/i2c/busses/i2c-ocores.c                    |  2 +-
+ drivers/i2c/busses/i2c-omap.c                      |  2 +-
+ drivers/i2c/busses/i2c-pca-platform.c              |  2 +-
+ drivers/i2c/busses/i2c-pnx.c                       | 21 +++++++++++-
+ drivers/i2c/busses/i2c-xiic.c                      |  2 +-
+ drivers/i2c/muxes/i2c-mux-gpio.c                   |  2 +-
+ drivers/media/platform/marvell-ccic/mmp-driver.c   |  2 +-
+ drivers/mfd/sm501.c                                |  2 +-
+ drivers/mfd/timberdale.c                           |  4 +--
+ include/linux/i2c-pnx.h                            | 38 ----------------------
+ include/linux/{ => platform_data}/i2c-gpio.h       |  0
+ include/linux/{ => platform_data}/i2c-mux-gpio.h   |  0
+ include/linux/{ => platform_data}/i2c-ocores.h     |  0
+ include/linux/{ => platform_data}/i2c-omap.h       |  0
+ .../linux/{ => platform_data}/i2c-pca-platform.h   |  0
+ include/linux/{ => platform_data}/i2c-xiic.h       |  0
+ 38 files changed, 55 insertions(+), 74 deletions(-)
+ delete mode 100644 include/linux/i2c-pnx.h
+ rename include/linux/{ => platform_data}/i2c-gpio.h (100%)
+ rename include/linux/{ => platform_data}/i2c-mux-gpio.h (100%)
+ rename include/linux/{ => platform_data}/i2c-ocores.h (100%)
+ rename include/linux/{ => platform_data}/i2c-omap.h (100%)
+ rename include/linux/{ => platform_data}/i2c-pca-platform.h (100%)
+ rename include/linux/{ => platform_data}/i2c-xiic.h (100%)
+
 -- 
-2.7.4
+2.11.0
