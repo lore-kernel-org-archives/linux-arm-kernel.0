@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 19 Apr 2018 16:06:08 +0200
-Subject: [PATCH 38/61] pinctrl: simplify getting .drvdata
+Date: Thu, 19 Apr 2018 16:05:58 +0200
+Subject: [PATCH 28/61] mmc: host: simplify getting .drvdata
 In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
 References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180419140641.27926-39-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-29-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,57 +15,82 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply individually.
 
- drivers/pinctrl/pinctrl-amd.c       | 6 ++----
- drivers/pinctrl/pinctrl-at91-pio4.c | 6 ++----
- 2 files changed, 4 insertions(+), 8 deletions(-)
+ drivers/mmc/host/davinci_mmc.c     | 6 ++----
+ drivers/mmc/host/sdhci-of-arasan.c | 6 ++----
+ drivers/mmc/host/wmt-sdmmc.c       | 6 ++----
+ 3 files changed, 6 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-amd.c b/drivers/pinctrl/pinctrl-amd.c
-index 04ae139671c8..c2c7067b0660 100644
---- a/drivers/pinctrl/pinctrl-amd.c
-+++ b/drivers/pinctrl/pinctrl-amd.c
-@@ -777,8 +777,7 @@ static bool amd_gpio_should_save(struct amd_gpio *gpio_dev, unsigned int pin)
- 
- static int amd_gpio_suspend(struct device *dev)
+diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
+index 8e363174f9d6..9e68c3645e22 100644
+--- a/drivers/mmc/host/davinci_mmc.c
++++ b/drivers/mmc/host/davinci_mmc.c
+@@ -1377,8 +1377,7 @@ static int __exit davinci_mmcsd_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM
+ static int davinci_mmcsd_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct amd_gpio *gpio_dev = platform_get_drvdata(pdev);
-+	struct amd_gpio *gpio_dev = dev_get_drvdata(dev);
- 	struct pinctrl_desc *desc = gpio_dev->pctrl->desc;
- 	int i;
+-	struct mmc_davinci_host *host = platform_get_drvdata(pdev);
++	struct mmc_davinci_host *host = dev_get_drvdata(dev);
  
-@@ -796,8 +795,7 @@ static int amd_gpio_suspend(struct device *dev)
+ 	writel(0, host->base + DAVINCI_MMCIM);
+ 	mmc_davinci_reset_ctrl(host, 1);
+@@ -1389,8 +1388,7 @@ static int davinci_mmcsd_suspend(struct device *dev)
  
- static int amd_gpio_resume(struct device *dev)
+ static int davinci_mmcsd_resume(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct amd_gpio *gpio_dev = platform_get_drvdata(pdev);
-+	struct amd_gpio *gpio_dev = dev_get_drvdata(dev);
- 	struct pinctrl_desc *desc = gpio_dev->pctrl->desc;
- 	int i;
+-	struct mmc_davinci_host *host = platform_get_drvdata(pdev);
++	struct mmc_davinci_host *host = dev_get_drvdata(dev);
  
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-index 4b57a13758a4..7065068f73f5 100644
---- a/drivers/pinctrl/pinctrl-at91-pio4.c
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -831,8 +831,7 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
- 
- static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
+ 	clk_enable(host->clk);
+ 	mmc_davinci_reset_ctrl(host, 0);
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index c33a5f7393bd..bed3612247b0 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -359,8 +359,7 @@ static const struct sdhci_pltfm_data sdhci_arasan_cqe_pdata = {
+  */
+ static int sdhci_arasan_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-+	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
- 	int i, j;
- 
- 	/*
-@@ -860,8 +859,7 @@ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
- 
- static int __maybe_unused atmel_pctrl_resume(struct device *dev)
+-	struct sdhci_host *host = platform_get_drvdata(pdev);
++	struct sdhci_host *host = dev_get_drvdata(dev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+ 	int ret;
+@@ -403,8 +402,7 @@ static int sdhci_arasan_suspend(struct device *dev)
+  */
+ static int sdhci_arasan_resume(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
-+	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
- 	int i, j;
+-	struct sdhci_host *host = platform_get_drvdata(pdev);
++	struct sdhci_host *host = dev_get_drvdata(dev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+ 	int ret;
+diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+index fd30ac7da5e5..3ba42f508014 100644
+--- a/drivers/mmc/host/wmt-sdmmc.c
++++ b/drivers/mmc/host/wmt-sdmmc.c
+@@ -928,8 +928,7 @@ static int wmt_mci_remove(struct platform_device *pdev)
+ static int wmt_mci_suspend(struct device *dev)
+ {
+ 	u32 reg_tmp;
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct mmc_host *mmc = platform_get_drvdata(pdev);
++	struct mmc_host *mmc = dev_get_drvdata(dev);
+ 	struct wmt_mci_priv *priv;
  
- 	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
+ 	if (!mmc)
+@@ -953,8 +952,7 @@ static int wmt_mci_suspend(struct device *dev)
+ static int wmt_mci_resume(struct device *dev)
+ {
+ 	u32 reg_tmp;
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct mmc_host *mmc = platform_get_drvdata(pdev);
++	struct mmc_host *mmc = dev_get_drvdata(dev);
+ 	struct wmt_mci_priv *priv;
+ 
+ 	if (mmc) {
 -- 
 2.11.0
