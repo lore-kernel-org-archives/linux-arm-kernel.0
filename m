@@ -1,72 +1,27 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Mon, 16 Apr 2018 15:50:32 +0530
-Subject: [PATCH 01/14] memory: ti-emif-sram: Add resume function to recopy
- sram code
-In-Reply-To: <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
-References: <1523505239-16229-1-git-send-email-j-keerthy@ti.com>
- <1523505239-16229-2-git-send-email-j-keerthy@ti.com>
- <31688cf4-b6ca-e7ce-3407-46262006b38f@oracle.com>
-Message-ID: <8e92db66-c2cb-8110-120d-fb6ff06ac643@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 19 Apr 2018 09:43:42 +0530
+Subject: [PATCH 1/2] cpufreq: brcmstb-avs-cpufreq: remove development
+ debug support
+In-Reply-To: <20180418155643.36464-2-code@mmayer.net>
+References: <20180418155643.36464-1-code@mmayer.net>
+ <20180418155643.36464-2-code@mmayer.net>
+Message-ID: <20180419041342.GE24576@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18-04-18, 08:56, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
+> 
+> This debug code was helpful while developing the driver, but it isn't
+> being used for anything anymore.
+> 
+> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> ---
+>  drivers/cpufreq/Kconfig.arm           |  10 --
+>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 323 +---------------------------------
+>  2 files changed, 1 insertion(+), 332 deletions(-)
 
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-On Thursday 12 April 2018 10:14 PM, santosh.shilimkar at oracle.com wrote:
-> On 4/11/18 9:53 PM, Keerthy wrote:
->> From: Dave Gerlach <d-gerlach@ti.com>
->>
->> After an RTC+DDR cycle we lose sram context so emif pm functions present
->> in sram are lost. We can check if the first byte of the original
->> code in DDR contains the same first byte as the code in sram, and if
->> they do not match we know we have lost context and must recopy the
->> functions to the previous address to maintain PM functionality.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->> ? drivers/memory/ti-emif-pm.c | 24 ++++++++++++++++++++++++
->> ? 1 file changed, 24 insertions(+)
->>
->> diff --git a/drivers/memory/ti-emif-pm.c b/drivers/memory/ti-emif-pm.c
->> index 632651f..ec4a62c 100644
->> --- a/drivers/memory/ti-emif-pm.c
->> +++ b/drivers/memory/ti-emif-pm.c
->> @@ -249,6 +249,25 @@ int ti_emif_get_mem_type(void)
->> ? };
->> ? MODULE_DEVICE_TABLE(of, ti_emif_of_match);
->> ? +#ifdef CONFIG_PM_SLEEP
->> +static int ti_emif_resume(struct device *dev)
->> +{
->> +??? unsigned long tmp =
->> +??????????? __raw_readl((void *)emif_instance->ti_emif_sram_virt);
->> +
->> +??? /*
->> +???? * Check to see if what we are copying is already present in the
->> +???? * first byte at the destination, only copy if it is not which
->> +???? * indicates we have lost context and sram no longer contains
->> +???? * the PM code
->> +???? */
-> 
->> +??? if (tmp != ti_emif_sram)
->> +??????? ti_emif_push_sram(dev, emif_instance);
->> +
->> +??? return 0;
->> +}
->> +#endif /* CONFIG_PM_SLEEP */
-> Instead of this indirect method , why can't just check the previous
-> deep sleep mode and based on that do copy or not. EMIF power status
-> register should have something like that ?
-
-I will check if we have a register that tells previous state of sram,
-not sure of it.
-> 
-> Another minor point is even though there is nothing to do in suspend,
-> might be good to have a callback with comment that nothing to do with
-> some explanation why not. Don't have strong preference but may for
-> better readability.
-> 
-> Regards,
-> Santosh
-> 
-> 
+-- 
+viresh
