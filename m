@@ -1,80 +1,80 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Thu, 19 Apr 2018 08:53:16 +0200
-Subject: [PATCH v6 01/11] ARM: sunxi: smp: Move assembly code into a file
-In-Reply-To: <CAGb2v64UCA825xC=wvBZ6n0K-c=vsOO15F7S6Bn=i9c=eAqYww@mail.gmail.com>
-References: <20180416215032.5023-1-mylene.josserand@bootlin.com>
- <20180416215032.5023-2-mylene.josserand@bootlin.com>
- <CAGb2v67VL70yqTF7xq4T3_9zA9T3UT2AV0gGarh1mqvC17r3Mg@mail.gmail.com>
- <20180417111737.6dous6eiuvjn33jf@flea>
- <CAGb2v67qvk=T7u7bOjVZ7q_qsjJuEOM6iarw7by42ga=EYuYDg@mail.gmail.com>
- <20180418084535.lqdvjgcbxtnwqwri@flea>
- <CAGb2v64UCA825xC=wvBZ6n0K-c=vsOO15F7S6Bn=i9c=eAqYww@mail.gmail.com>
-Message-ID: <20180419085316.0bd9bfad@dell-desktop.home>
+From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
+Date: Thu, 19 Apr 2018 09:19:41 +0200
+Subject: [PATCH v2 1/2] cpufreq: imx6q: check speed grades for i.MX6ULL
+Message-ID: <20180419071942.14828-1-sebastien.szymanski@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chen-Yu,
+Check the max speed supported from the fuses for i.MX6ULL and update the
+operating points table accordingly.
 
-On Wed, 18 Apr 2018 18:05:03 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+---
 
-> On Wed, Apr 18, 2018 at 4:45 PM, Maxime Ripard
-> <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Apr 17, 2018 at 07:25:15PM +0800, Chen-Yu Tsai wrote:  
-> >> On Tue, Apr 17, 2018 at 7:17 PM, Maxime Ripard
-> >> <maxime.ripard@bootlin.com> wrote:  
-> >> > On Tue, Apr 17, 2018 at 11:12:41AM +0800, Chen-Yu Tsai wrote:  
-> >> >> On Tue, Apr 17, 2018 at 5:50 AM, Myl?ne Josserand
-> >> >> <mylene.josserand@bootlin.com> wrote:  
-> >> >> > Move the assembly code for cluster cache enabling and resuming
-> >> >> > into an assembly file instead of having it directly in C code.
-> >> >> >
-> >> >> > Remove the CFLAGS because we are using the ARM directive "arch"
-> >> >> > instead.
-> >> >> >
-> >> >> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> >> >> > ---
-> >> >> >  arch/arm/mach-sunxi/Makefile  |  4 +--
-> >> >> >  arch/arm/mach-sunxi/headsmp.S | 80 +++++++++++++++++++++++++++++++++++++++++
-> >> >> >  arch/arm/mach-sunxi/mc_smp.c  | 82 +++----------------------------------------
-> >> >> >  3 files changed, 85 insertions(+), 81 deletions(-)
-> >> >> >  create mode 100644 arch/arm/mach-sunxi/headsmp.S  
-> >> >>
-> >> >> I'm still not convinced about this whole "move ASM to separate
-> >> >> file" thing, especially now that you aren't actually adding any
-> >> >> sunxi-specific ASM code beyond a simple function call.
-> >> >>
-> >> >> Could you drop this for now?  
-> >> >
-> >> > I'd really like to have this merged actually. There's a significant
-> >> > readibility improvement, so even if there's no particular functional
-> >> > improvement, I'd still call it a win.  
-> >>
-> >> What parts do you consider hard to read? The extra quotes? Trailing
-> >> newline? Or perhaps the __stringify bits?  
-> >
-> > All of this, plus the clobbers and operands.  
-> 
-> Ok. Lets move it then.
+Changes for v2:
+ - none
 
-Ok, I will not drop this patch then.
+ drivers/cpufreq/imx6q-cpufreq.c | 29 +++++++++++++++++++++++------
+ 1 file changed, 23 insertions(+), 6 deletions(-)
 
-> 
-> The kbuild reports indicate this still needs some work though.
-
-Yes, this is "normal" because the patch, that I depend on, is not
-applied yet (even if my cover-letter can let think that, it is not the
-case, sorry).
-
-It is applied on Broadcom ARM SoC since Tuesday: 
-https://lkml.org/lkml/2018/2/23/1263
-https://github.com/Broadcom/stblinux/commits/soc/next
-
-With this patch, it should fix the errors reported by kbuild.
-
-Best regards,
-
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index 83cf631fc9bc..f094687cae52 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -266,6 +266,8 @@ static void imx6q_opp_check_speed_grading(struct device *dev)
+ }
+ 
+ #define OCOTP_CFG3_6UL_SPEED_696MHZ	0x2
++#define OCOTP_CFG3_6ULL_SPEED_792MHZ	0x2
++#define OCOTP_CFG3_6ULL_SPEED_900MHZ	0x3
+ 
+ static void imx6ul_opp_check_speed_grading(struct device *dev)
+ {
+@@ -287,16 +289,30 @@ static void imx6ul_opp_check_speed_grading(struct device *dev)
+ 	 * Speed GRADING[1:0] defines the max speed of ARM:
+ 	 * 2b'00: Reserved;
+ 	 * 2b'01: 528000000Hz;
+-	 * 2b'10: 696000000Hz;
+-	 * 2b'11: Reserved;
++	 * 2b'10: 696000000Hz on i.MX6UL, 792000000Hz on i.MX6ULL;
++	 * 2b'11: 900000000Hz on i.MX6ULL only;
+ 	 * We need to set the max speed of ARM according to fuse map.
+ 	 */
+ 	val = readl_relaxed(base + OCOTP_CFG3);
+ 	val >>= OCOTP_CFG3_SPEED_SHIFT;
+ 	val &= 0x3;
+-	if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
+-		if (dev_pm_opp_disable(dev, 696000000))
+-			dev_warn(dev, "failed to disable 696MHz OPP\n");
++
++	if (of_machine_is_compatible("fsl,imx6ul")) {
++		if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
++			if (dev_pm_opp_disable(dev, 696000000))
++				dev_warn(dev, "failed to disable 696MHz OPP\n");
++	}
++
++	if (of_machine_is_compatible("fsl,imx6ull")) {
++		if (val != OCOTP_CFG3_6ULL_SPEED_792MHZ)
++			if (dev_pm_opp_disable(dev, 792000000))
++				dev_warn(dev, "failed to disable 792MHz OPP\n");
++
++		if (val != OCOTP_CFG3_6ULL_SPEED_900MHZ)
++			if (dev_pm_opp_disable(dev, 900000000))
++				dev_warn(dev, "failed to disable 900MHz OPP\n");
++	}
++
+ 	iounmap(base);
+ put_node:
+ 	of_node_put(np);
+@@ -356,7 +372,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		goto put_reg;
+ 	}
+ 
+-	if (of_machine_is_compatible("fsl,imx6ul"))
++	if (of_machine_is_compatible("fsl,imx6ul") ||
++	    of_machine_is_compatible("fsl,imx6ull"))
+ 		imx6ul_opp_check_speed_grading(cpu_dev);
+ 	else
+ 		imx6q_opp_check_speed_grading(cpu_dev);
 -- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.16.1
