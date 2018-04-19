@@ -1,26 +1,51 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 19 Apr 2018 18:19:32 -0400
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180419202632.GE14063@ziepe.ca>
- <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <290e9530-dcde-9c10-7ae0-59ac4c509db4@codeaurora.org>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Thu, 19 Apr 2018 15:24:15 -0700
+Subject: [PATCH] clk: sunxi-ng: replace lib-y with obj-y
+In-Reply-To: <20180419134221.ufsc462fw7j7so6q@flea>
+References: <1524052351-14103-1-git-send-email-yamada.masahiro@socionext.com>
+ <152409404578.51482.16644171573677016161@swboyd.mtv.corp.google.com>
+ <20180419134221.ufsc462fw7j7so6q@flea>
+Message-ID: <152417665547.46528.9856369258447999254@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/19/2018 5:47 PM, Bjorn Helgaas wrote:
->> Bjorn, would be appropriate to export pci_parent_bus_reset() or some
->> variation therin??
-> I agree it would be really nice if the PCI core could help out somehow
-> so we could get some of this code out of individual drivers.
+Quoting Maxime Ripard (2018-04-19 06:42:21)
+> On Wed, Apr 18, 2018 at 04:27:25PM -0700, Stephen Boyd wrote:
+> > Quoting Masahiro Yamada (2018-04-18 04:52:31)
+> > > We had commit 06e226c7fb23 ("clk: sunxi-ng: Move all clock types to a
+> > > library") and commit 799c43415442 ("kbuild: thin archives make default
+> > > for all archs") in the same development cycle, from different trees.
+> > > 
+> > > With migration to the thin archive, the entire drivers/clk/sunxi-ng/lib.a
+> > > is linked to the vmlinux.  This does not break build, but we do not get
+> > > any size saving.
+> > > 
+> > > However, we do not need to go back to the individual Kconfig options.
+> > > The default configuration pulls in all (or most) of the CCU parts anyway.
+> > > Also, once we enable CONFIG_LD_DEAD_CODE_DATA_ELIMINATION, we can simply
+> > > list all files with obj-y, and the linker will drop all unused functions
+> > > by itself.
+> > > 
+> > > After the long discussion [1], people there agreed to fix this, but
+> > > nobody sent a patch after all.  I am doing it now.
+> > > 
+> > > I lifted up CONFIG_SUNXI_CCU to drivers/clk/Makefile because everything
+> > > in drivers/clk/sunxi-ng/ depends on SUNXI_CCU.
+> > > 
+> > > [1] https://patchwork.kernel.org/patch/9796521/
+> > > 
+> > > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > > ---
+> > 
+> > Thanks for remembering to take care of this. I forgot about it all.
+> > 
+> > Acked-by: Stephen Boyd <sboyd@kernel.org>
+> > 
+> > Or I can pick this up directly. Let me know.
+> 
+> We'll probably have our usual round of patches that might generate
+> some conflicts on the Makefile. I've picked it up with your A-b, and
+> will send you a PR with it, as usual.
+> 
 
-I can create a function called pci_reset_link() and move both slot and
-secondary bus reset inside. 
-
-Will this work?
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Perfect. Thanks!
