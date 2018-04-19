@@ -1,140 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 19 Apr 2018 20:45:14 +0800
-Subject: [PATCH 4/6] drm/panel: simple: Add support for Banana Pi 7"
- S070WV20-CT16 panel
-In-Reply-To: <58ce9e3b-00ee-87d2-f05b-b9f1414d1cfa@micronovasrl.com>
-References: <20180419093225.614-1-wens@csie.org>
- <20180419093225.614-5-wens@csie.org>
- <58ce9e3b-00ee-87d2-f05b-b9f1414d1cfa@micronovasrl.com>
-Message-ID: <CAGb2v65tH_8_J27Xmx4TeEYhpHLJf4m0AzXJoGXZYMfJH=51xQ@mail.gmail.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Thu, 19 Apr 2018 14:56:38 +0200
+Subject: [PATCH] drm/sun4i: Add missing frontend compatibles for A10, A13,
+ A20 and A31
+Message-ID: <20180419125638.11683-1-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 8:31 PM, Giulio Benetti
-<giulio.benetti@micronovasrl.com> wrote:
-> Hi,
->
-> Il 19/04/2018 11:32, Chen-Yu Tsai ha scritto:
->>
->> This panel is marketed as Banana Pi 7" LCD display. On the back is
->> a sticker denoting the model name S070WV20-CT16.
->
->
-> Judging from the code, the real vendor should be CDTech.
-> Take a look at their website:
-> http://www.cdtech-lcd.com/en/standardscreen.html
->
-> I point you my patch for inserting another similar panel:
-> https://patchwork.freedesktop.org/patch/211914/
->
-> Maybe it would make sense to use CDTech as the vendor,
-> because maybe Bananapi resells only it.
-> Or maybe it is a custom panel done for them,
-> but the same is for other panels I've submitted patches.
-> Micronova srl custom, but vendor is CDTech.
->
-> What do you think?
+Although frontend nodes are defined in the device-trees of the
+aforementioned platforms, there are no matching compatibles defined in
+the driver. This makes it impossible to probe the frontend on these
+platforms.
 
-That might be true. But for people without access to the vendors,
-this is horribly hard to figure out. People are only going to look
-at whatever marking there is on the LCD panel, and whatever the
-seller says. This panel has the model number stickered on, but the
-PCB attached to it only has the Banana Pi logo.
+Adding the appropriate compatibles to the driver fixes the issue.
 
-And given it's a custom piece, probably OEM or ODM, the real
-manufacturer matters less. You don't mention "Foxconn" as the
-vendor of the iPhone, do you?
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-ChenYu
-
->
-> --
-> Giulio Benetti
-> CTO
->
-> MICRONOVA SRL
-> Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
-> Tel. 049/8931563 - Fax 049/8931346
-> Cod.Fiscale - P.IVA 02663420285
-> Capitale Sociale ? 26.000 i.v.
-> Iscritta al Reg. Imprese di Padova N. 02663420285
-> Numero R.E.A. 258642
->
->
->>
->> This is a 7" 800x480 panel connected through a 24-bit RGB interface.
->> However the panel only does 262k colors.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>   .../display/panel/bananapi,s070wv20-ct16.txt  |  7 ++++++
->>   drivers/gpu/drm/panel/panel-simple.c          | 25 +++++++++++++++++++
->>   2 files changed, 32 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->>
->> diff --git
->> a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->> b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->> new file mode 100644
->> index 000000000000..2ec35ce36e9a
->> --- /dev/null
->> +++
->> b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
->> @@ -0,0 +1,7 @@
->> +Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
->> +
->> +Required properties:
->> +- compatible: should be "bananapi,s070wv20-ct16"
->> +
->> +This binding is compatible with the simple-panel binding, which is
->> specified
->> +in simple-panel.txt in this directory.
->> diff --git a/drivers/gpu/drm/panel/panel-simple.c
->> b/drivers/gpu/drm/panel/panel-simple.c
->> index cbf1ab404ee7..9bc037f74d6c 100644
->> --- a/drivers/gpu/drm/panel/panel-simple.c
->> +++ b/drivers/gpu/drm/panel/panel-simple.c
->> @@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
->>         },
->>   };
->>   +static const struct drm_display_mode bananapi_s070wv20_ct16_mode = {
->> +       .clock = 30000,
->> +       .hdisplay = 800,
->> +       .hsync_start = 800 + 40,
->> +       .hsync_end = 800 + 40 + 48,
->> +       .htotal = 800 + 40 + 48 + 40,
->> +       .vdisplay = 480,
->> +       .vsync_start = 480 + 13,
->> +       .vsync_end = 480 + 13 + 3,
->> +       .vtotal = 480 + 13 + 3 + 29,
->> +};
->> +
->> +static const struct panel_desc bananapi_s070wv20_ct16 = {
->> +       .modes = &bananapi_s070wv20_ct16_mode,
->> +       .num_modes = 1,
->> +       .bpc = 6,
->> +       .size = {
->> +               .width = 154,
->> +               .height = 86,
->> +       },
->> +};
->> +
->>   static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
->>         {
->>                 .clock = 71900,
->> @@ -2112,6 +2134,9 @@ static const struct of_device_id platform_of_match[]
->> = {
->>         }, {
->>                 .compatible = "avic,tm070ddh03",
->>                 .data = &avic_tm070ddh03,
->> +       }, {
->> +               .compatible = "bananapi,s070wv20-ct16",
->> +               .data = &bananapi_s070wv20_ct16,
->>         }, {
->>                 .compatible = "boe,nv101wxmn51",
->>                 .data = &boe_nv101wxmn51,
->>
->
->
->
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+index 85f75046712c..c5a3de11817d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+@@ -658,6 +658,10 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
+ };
+ 
+ const struct of_device_id sun4i_frontend_of_table[] = {
++	{ .compatible = "allwinner,sun7i-a10-display-frontend" },
++	{ .compatible = "allwinner,sun7i-a13-display-frontend" },
++	{ .compatible = "allwinner,sun7i-a20-display-frontend" },
++	{ .compatible = "allwinner,sun7i-a31-display-frontend" },
+ 	{ .compatible = "allwinner,sun8i-a33-display-frontend" },
+ 	{ }
+ };
+-- 
+2.16.3
