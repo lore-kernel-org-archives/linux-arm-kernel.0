@@ -1,53 +1,37 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 19 Apr 2018 11:01:52 -0700
-Subject: [PATCH] ARM64: dts: meson-axg: add GPIO interrupt controller
- support
-In-Reply-To: <20180408151045.1138-1-yixun.lan@amlogic.com> (Yixun Lan's
- message of "Sun, 8 Apr 2018 15:10:45 +0000")
-References: <20180408151045.1138-1-yixun.lan@amlogic.com>
-Message-ID: <7hh8o73wj3.fsf@baylibre.com>
+Date: Thu, 19 Apr 2018 11:07:32 -0700
+Subject: [PATCH] pinctrl: meson-axg: fix the range of aobus bank
+In-Reply-To: <20180417170824.18670-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Tue, 17 Apr 2018 17:08:24 +0000")
+References: <20180417170824.18670-1-yixun.lan@amlogic.com>
+Message-ID: <7hd0yv3w9n.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Yixun Lan <yixun.lan@amlogic.com> writes:
 
-> Add the GPIO interrupt controller driver which found in the Amlogic's
-> Meson-AXG SoC, the controller share the similar ASIC IP as other meson SoCs.
+> The GPIOAO bank is range from GPIOAO_0 to GPIOAO_13.
 >
+> Fixes: 83c566806a68 ("pinctrl: meson-axg: Add new pinctrl driver for Meson AXG SoC")
+> Reported-by: Xingyu Chen <xingyu.chen@amlogic.com>
 > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-Applied to v4.18/dt64,
+Acked-by: Kevin Hilman <khilman@baylibre.com>
 
 > ---
-> Hi Kevin
->  Please note this patch depend on the GPIO interrupt driver here[0]
-
-Thanks for noting the dependencies.
-
-Kevin
-
-> [0] http://lkml.kernel.org/r/20180408145700.23520-1-yixun.lan at amlogic.com
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
+>  drivers/pinctrl/meson/pinctrl-meson-axg.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index b58808eb3cc8..c1105065de99 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -120,6 +120,15 @@
->  			#size-cells = <2>;
->  			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
+> diff --git a/drivers/pinctrl/meson/pinctrl-meson-axg.c b/drivers/pinctrl/meson/pinctrl-meson-axg.c
+> index 4b91ff74779b..99a6ceac8e53 100644
+> --- a/drivers/pinctrl/meson/pinctrl-meson-axg.c
+> +++ b/drivers/pinctrl/meson/pinctrl-meson-axg.c
+> @@ -898,7 +898,7 @@ static struct meson_bank meson_axg_periphs_banks[] = {
 >  
-> +			gpio_intc: interrupt-controller at f080 {
-> +				compatible = "amlogic,meson-gpio-intc";
-> +				reg = <0x0 0xf080 0x0 0x10>;
-> +				interrupt-controller;
-> +				#interrupt-cells = <2>;
-> +				amlogic,channel-interrupts = <64 65 66 67 68 69 70 71>;
-> +				status = "disabled";
-> +			};
-> +
->  			pwm_ab: pwm at 1b000 {
->  				compatible = "amlogic,meson-axg-ee-pwm";
->  				reg = <0x0 0x1b000 0x0 0x20>;
+>  static struct meson_bank meson_axg_aobus_banks[] = {
+>  	/*   name    first      last      irq	pullen  pull    dir     out     in  */
+> -	BANK("AO",   GPIOAO_0,  GPIOAO_9, 0, 13, 0,  16,  0, 0,  0,  0,  0, 16,  1,  0),
+> +	BANK("AO",   GPIOAO_0,  GPIOAO_13, 0, 13, 0,  16,  0, 0,  0,  0,  0, 16,  1,  0),
+>  };
+>  
+>  static struct meson_pmx_bank meson_axg_periphs_pmx_banks[] = {
