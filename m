@@ -1,99 +1,75 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 19 Apr 2018 09:26:57 +0100
-Subject: [RFC PATCH 1/3] signal: Ensure every siginfo we send has all
- bits initialized
-In-Reply-To: <87h8o8y4q6.fsf@xmission.com>
-References: <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
- <20180413184522.GD16308@e103592.cambridge.arm.com>
- <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
- <20180415131206.GR16141@n2100.armlinux.org.uk>
- <87604sa2fu.fsf_-_@xmission.com> <87zi248nte.fsf_-_@xmission.com>
- <20180417132328.GF16308@e103592.cambridge.arm.com>
- <87d0yxzksd.fsf@xmission.com>
- <20180418124717.GI16308@e103592.cambridge.arm.com>
- <87h8o8y4q6.fsf@xmission.com>
-Message-ID: <20180419082656.GK16308@e103592.cambridge.arm.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 19 Apr 2018 16:36:57 +0800
+Subject: [PATCH] MAINTAINERS: update entry for entry for ARM/berlin
+In-Reply-To: <87fu4jt883.fsf@bootlin.com>
+References: <20180329164240.20cfddbc@xhacker.debian>
+ <87fu4jt883.fsf@bootlin.com>
+Message-ID: <20180419163657.276b1333@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 09:22:09AM -0500, Eric W. Biederman wrote:
-> Dave Martin <Dave.Martin@arm.com> writes:
+Hi Gregory,
+
+On Thu, 29 Mar 2018 13:46:36 +0200 Gregory CLEMENT wrote:
+
+> Hi Jisheng,
+>  
+>  On jeu., mars 29 2018, Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
 > 
-> > On Tue, Apr 17, 2018 at 02:37:38PM -0500, Eric W. Biederman wrote:
-
-[...]
-
-> >> My intention is to leave 0 instances of clear_siginfo in the
-> >> architecture specific code.  Ideally struct siginfo will be limited to
-> >> kernel/signal.c but I am not certain I can quite get that far.
-> >> The function do_coredump appears to have a legit need for siginfo.
+> > Change the entry name and move it to its alphabetical location.
+> > We move to ARM/Synaptics instead of ARM/Marvell.
 > >
-> > So, you mean we can't detect that the caller didn't initialise all the
-> > members, or initialised the wrong union member?
+> > This patch also updates my email address from marvell to synaptics.
+> >
+> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> > ---
+> >  MAINTAINERS | 18 +++++++++---------
+> >  1 file changed, 9 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 6e950b8b4a41..0a0da6a8e607 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -1578,15 +1578,6 @@ ARM/MAGICIAN MACHINE SUPPORT
+> >  M:	Philipp Zabel <philipp.zabel@gmail.com>
+> >  S:	Maintained
+> >  
+> > -ARM/Marvell Berlin SoC support
+> > -M:	Jisheng Zhang <jszhang@marvell.com>
+> > -M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > -S:	Maintained
+> > -F:	arch/arm/mach-berlin/
+> > -F:	arch/arm/boot/dts/berlin*
+> > -F:	arch/arm64/boot/dts/marvell/berlin*
+> > -
+> >  ARM/Marvell Dove/MV78xx0/Orion SOC support
+> >  M:	Jason Cooper <jason@lakedaemon.net>
+> >  M:	Andrew Lunn <andrew@lunn.ch>
+> > @@ -2006,6 +1997,15 @@ F:	arch/arm/boot/dts/stm32*
+> >  F:	arch/arm/mach-stm32/
+> >  F:	drivers/clocksource/armv7m_systick.c
+> >  
+> > +ARM/Synaptics Berlin SoC support
+> > +M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> > +M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +S:	Maintained
+> > +F:	arch/arm/mach-berlin/
+> > +F:	arch/arm/boot/dts/berlin*
+> > +F:	arch/arm64/boot/dts/marvell/berlin*  
 > 
-> Correct.  Even when we smuggled the the union member in the upper bits
-> of si_code we got it wrong.  So an interface that helps out and does
-> more and is harder to misues looks desirable.
+> I though you had move the dts file from
+> arch/arm64/boot/dts/marvell/berlin* to arch/arm64/boot/dts/synatpics,
+> according a patch you submitted in September.
 > 
-> > What would be the alternative?  Have a separate interface for each SIL_
-> > type, with only kernel/signal.c translating that into the siginfo_t that
-> > userspace sees?
+> What happened?
 > 
-> Yes.  It really isn't bad as architecture specific code only generates
-> faults.  In general faults only take a pointer.  I have already merged
-> the needed helpers into kernel/signal.c
 
-Good point.  I hadn't considered that only one class of signal comes
-from the arch code, but now that you point it out, it sounds right.
+Sorry, I didn't see your email until a few minutes ago. I have corrected
+the email junk-filter rules.
 
-> > Either way, I don't see how we force the caller to initilise the whole
-> > structure.
-> 
-> In general the plan is to convert the callers to call force_sig_fault,
-> and then there is no need to have siginfo in the architecture specific
-> code.  I have all of the necessary helpers are already merged into
-> kernel/signal.c
+Yes, I sent a patch which did the moving last Sep, but I didn't merge
+it and sent out PR, I plan to resend a patch in this development window.
 
-Makes sense.
-
-I wonder if all the relevant siginfo data could be passed to
-force_sig_fault() (or whatever) as arguments.  Then the problem of
-uninitialised fields goes away.  Perhaps that's what you had in mind.
-
-[...]
-
-> >> Unless gcc has changed it's stance on type-punning through unions
-> >> or it's semantics with -fno-strict_aliasing we should be good.
-> >
-> > In practice you're probably right.
-> >
-> > Today, gcc is pretty conservative in this area, and I haven't been able
-> > to convince clang to optimise away memset in this way either.
-> >
-> > My concern is that is this assumption turns out to be wrong it may be
-> > some time before anybody notices, because the leakage of kernel stack may
-> > be the only symptom.
-> >
-> > I'll try to nail down a compiler guy to see if we can get a promise on
-> > this at least with -fno-strict-aliasing.
-> >
-> >
-> > I wonder whether it's worth protecting ourselves with something like:
-> >
-> >
-> > static void clear_siginfo(siginfo_t *si)
-> > {
-> > 	asm ("" : "=m" (*si));
-> > 	memset(si, 0, sizeof(*si));
-> > 	asm ("" : "+m" (*si));
-> > }
-> >
-> > Probably needs to be thought about more widely though.  I guess it's out
-> > of scope for this series.
-> 
-> It is definitely a question worth asking.
-
-I may follow it up later if I find myself at a loose end...
-
-Cheers
----Dave
+Thanks
