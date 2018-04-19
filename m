@@ -1,52 +1,49 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Apr 2018 17:41:18 +0200
-Subject: [PATCH v2 04/10] media: vim2m: Implement media request complete op to
- schedule m2m run
+Date: Thu, 19 Apr 2018 17:41:15 +0200
+Subject: [PATCH v2 01/10] media: v4l2-ctrls: Add missing v4l2 ctrl unlock
 In-Reply-To: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
 References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180419154124.17512-5-paul.kocialkowski@bootlin.com>
+Message-ID: <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an implementation of the media request complete operation for
-the vim2m driver, that ensures that the driver will try to schedule a
-m2m run whenever a request was completed. Without this operation, no m2m
-device run will be scheduled in many scenarios.
+This adds a missing v4l2_ctrl_unlock call that is required to avoid
+deadlocks.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/media/platform/vim2m.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/media/v4l2-core/v4l2-ctrls.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/vim2m.c b/drivers/media/platform/vim2m.c
-index 2dcf0ea85705..08c4c5566614 100644
---- a/drivers/media/platform/vim2m.c
-+++ b/drivers/media/platform/vim2m.c
-@@ -453,6 +453,17 @@ static void device_isr(struct timer_list *t)
- 	schedule_work(&vim2m_dev->work_run);
- }
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index f67e9f5531fa..ba05a8b9a095 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -3614,10 +3614,12 @@ void v4l2_ctrl_request_complete(struct media_request *req,
+ 			continue;
  
-+static void request_complete(struct media_request *req)
-+{
-+	struct vim2m_ctx *curr_ctx;
+ 		v4l2_ctrl_lock(ctrl);
 +
-+	curr_ctx = (struct vim2m_ctx *) vb2_core_request_find_buffer_priv(req);
-+	if (curr_ctx == NULL)
-+		return;
+ 		if (ref->req)
+ 			ptr_to_ptr(ctrl, ref->req->p_req, ref->p_req);
+ 		else
+ 			ptr_to_ptr(ctrl, ctrl->p_cur, ref->p_req);
 +
-+	v4l2_m2m_try_schedule(curr_ctx->fh.m2m_ctx);
-+}
-+
- /*
-  * video ioctls
-  */
-@@ -1025,6 +1036,7 @@ static const struct v4l2_m2m_ops m2m_ops = {
+ 		v4l2_ctrl_unlock(ctrl);
+ 	}
  
- static const struct media_device_ops m2m_media_ops = {
- 	.req_queue = vb2_request_queue,
-+	.req_complete = request_complete,
- };
+@@ -3677,8 +3679,11 @@ void v4l2_ctrl_request_setup(struct media_request *req,
+ 				}
+ 			}
+ 		}
+-		if (!have_new_data)
++
++		if (!have_new_data) {
++			v4l2_ctrl_unlock(master);
+ 			continue;
++		}
  
- static int vim2m_probe(struct platform_device *pdev)
+ 		for (i = 0; i < master->ncontrols; i++) {
+ 			if (master->cluster[i]) {
 -- 
 2.16.3
