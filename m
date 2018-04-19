@@ -1,49 +1,72 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Apr 2018 17:41:15 +0200
-Subject: [PATCH v2 01/10] media: v4l2-ctrls: Add missing v4l2 ctrl unlock
+Date: Thu, 19 Apr 2018 17:41:16 +0200
+Subject: [PATCH v2 02/10] media-request: Add a request complete operation to
+ allow m2m scheduling
 In-Reply-To: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
 References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
+Message-ID: <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a missing v4l2_ctrl_unlock call that is required to avoid
-deadlocks.
+When using the request API in the context of a m2m driver, the
+operations that come with a m2m run scheduling call in their
+(m2m-specific) ioctl handler are delayed until the request is queued
+(for instance, this includes queuing buffers and streamon).
+
+Thus, the m2m run scheduling calls are not called in due time since the
+request AP's internal plumbing will (rightfully) use the relevant core
+functions directly instead of the ioctl handler.
+
+This ends up in a situation where nothing happens if there is no
+run-scheduling ioctl called after queuing the request.
+
+In order to circumvent the issue, a new media operation is introduced,
+called at the time of handling the media request queue ioctl. It gives
+m2m drivers a chance to schedule a m2m device run at that time.
+
+The existing req_queue operation cannot be used for this purpose, since
+it is called with the request queue mutex held, that is eventually needed
+in the device_run call to apply relevant controls.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/media/v4l2-core/v4l2-ctrls.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/media/media-request.c | 3 +++
+ include/media/media-device.h  | 2 ++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-index f67e9f5531fa..ba05a8b9a095 100644
---- a/drivers/media/v4l2-core/v4l2-ctrls.c
-+++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-@@ -3614,10 +3614,12 @@ void v4l2_ctrl_request_complete(struct media_request *req,
- 			continue;
- 
- 		v4l2_ctrl_lock(ctrl);
-+
- 		if (ref->req)
- 			ptr_to_ptr(ctrl, ref->req->p_req, ref->p_req);
- 		else
- 			ptr_to_ptr(ctrl, ctrl->p_cur, ref->p_req);
-+
- 		v4l2_ctrl_unlock(ctrl);
+diff --git a/drivers/media/media-request.c b/drivers/media/media-request.c
+index 415f7e31019d..28ac5ccfe6a2 100644
+--- a/drivers/media/media-request.c
++++ b/drivers/media/media-request.c
+@@ -157,6 +157,9 @@ static long media_request_ioctl_queue(struct media_request *req)
+ 		media_request_get(req);
  	}
  
-@@ -3677,8 +3679,11 @@ void v4l2_ctrl_request_setup(struct media_request *req,
- 				}
- 			}
- 		}
--		if (!have_new_data)
++	if (mdev->ops->req_complete)
++		mdev->ops->req_complete(req);
 +
-+		if (!have_new_data) {
-+			v4l2_ctrl_unlock(master);
- 			continue;
-+		}
+ 	return ret;
+ }
  
- 		for (i = 0; i < master->ncontrols; i++) {
- 			if (master->cluster[i]) {
+diff --git a/include/media/media-device.h b/include/media/media-device.h
+index 07e323c57202..c7dcf2079cc9 100644
+--- a/include/media/media-device.h
++++ b/include/media/media-device.h
+@@ -55,6 +55,7 @@ struct media_entity_notify {
+  * @req_alloc: Allocate a request
+  * @req_free: Free a request
+  * @req_queue: Queue a request
++ * @req_complete: Complete a request
+  */
+ struct media_device_ops {
+ 	int (*link_notify)(struct media_link *link, u32 flags,
+@@ -62,6 +63,7 @@ struct media_device_ops {
+ 	struct media_request *(*req_alloc)(struct media_device *mdev);
+ 	void (*req_free)(struct media_request *req);
+ 	int (*req_queue)(struct media_request *req);
++	void (*req_complete)(struct media_request *req);
+ };
+ 
+ /**
 -- 
 2.16.3
