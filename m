@@ -1,39 +1,23 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 19 Apr 2018 10:25:41 -0700
-Subject: [PATCH v1 2/4] dt-bindings: clock: mediatek: add g3dsys bindings
-In-Reply-To: <1524109802.12959.10.camel@mtkswgap22>
-References: <cover.1524044917.git.sean.wang@mediatek.com>
- <4b5d243d33433f83874359794b796d4228574714.1524044917.git.sean.wang@mediatek.com>
- <152410791532.46528.10083030894445315558@swboyd.mtv.corp.google.com>
- <1524109802.12959.10.camel@mtkswgap22>
-Message-ID: <152415874117.46528.7501317526173019067@swboyd.mtv.corp.google.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 19 Apr 2018 11:39:43 -0600
+Subject: [PATCH 0/3] coresight tmc etr: Miscellanous fixes
+Message-ID: <1524159586-4841-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sean Wang (2018-04-18 20:50:02)
-> On Wed, 2018-04-18 at 20:18 -0700, Stephen Boyd wrote:
-> > Quoting sean.wang at mediatek.com (2018-04-18 03:24:54)
-> > > From: Sean Wang <sean.wang@mediatek.com>
-> > > 
-> > > Add bindings to g3dsys providing necessary clock and reset control to
-> > > Mali-450.
-> > > 
-> > > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > > ---
-> > >  .../bindings/arm/mediatek/mediatek,g3dsys.txt      | 30 ++++++++++++++++++++++
-> > 
-> > Why isn't this under bindings/clock/ ?
-> > 
-> 
-> Tons of bindings for clock controller have been present at
-> binding/arm/mediatek. g3dsys just have a follow-up to them.
-> 
-> It's worth another patch moving them all from bindings/arm/mediatek/ to
-> bindings/clock/mediatek.
-> 
-> what's your opinion for either doing it prior to g3dsys binding being
-> added or doing it in the future ?
-> 
+This set is addressing a couple of issues with TMC-ETR function
+tmc_enable_etr_sink_sysfs() as pointed out by Dan Carpenter [1]
+along with an extra newline left behind inadvertently.
 
-Doing it at a later time is fine. Just wondering why they're all getting
-dumped into the arm/ directory.
+[1]. https://www.spinics.net/lists/arm-kernel/msg647061.html
+
+Mathieu Poirier (3):
+  coresight tmc etr: Make memory check consistent in the same function
+  coresight tmc etr: Fix uninitialised variable
+  coresight tmc etr: Removing extra newline
+
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+-- 
+2.7.4
