@@ -1,122 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 19 Apr 2018 21:36:19 +0800
-Subject: [v2] drm/sun4i: add lvds mode_valid function
-In-Reply-To: <20180419133421.6fx3whge7h364vd3@core>
-References: <1520940019-68977-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180419133421.6fx3whge7h364vd3@core>
-Message-ID: <CAGb2v64dqPoJkJDuMWp66HYXvZ3RJkrRz+2-CUVEcEG1k7UTsw@mail.gmail.com>
+From: richard@nod.at (Richard Weinberger)
+Date: Thu, 19 Apr 2018 15:37:44 +0200
+Subject: [Resend PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
+In-Reply-To: <b187fbe0-80c3-1e30-f0e0-e1ee0b5ad0f7@st.com>
+References: <20180419081323.16597-1-lionel.debieve@st.com>
+ <1524136750.3190.98.camel@gmail.com>
+ <b187fbe0-80c3-1e30-f0e0-e1ee0b5ad0f7@st.com>
+Message-ID: <2444815.m7Z4RdBrSB@blindfold>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 9:34 PM, Ond?ej Jirman
-<doudahwezomiechahtah@xff.cz> wrote:
-> Hello Giulio,
->
-> this patch breaks LVDS output on A83T. Without it, modesetting works,
-> with it there's no output.
->
-> Some more info below...
->
-> On Tue, Mar 13, 2018 at 12:20:19PM +0100, Giulio Benetti wrote:
->> mode_valid function is missing for lvds.
->>
->> Add it making it pointed by encoder helper functions.
->>
->> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
->> ---
->>  drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 55 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
->> index be3f14d..bffff4c 100644
->> --- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
->> +++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
->> @@ -94,9 +94,64 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
->>       }
->>  }
->>
->> +static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
->> +                                                       const struct drm_display_mode *mode)
->> +{
->> +     struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
->> +     struct sun4i_tcon *tcon = lvds->tcon;
->> +     u32 hsync = mode->hsync_end - mode->hsync_start;
->> +     u32 vsync = mode->vsync_end - mode->vsync_start;
->> +     unsigned long rate = mode->clock * 1000;
->> +     long rounded_rate;
->> +
->> +     DRM_DEBUG_DRIVER("Validating modes...\n");
->> +
->> +     if (hsync < 1)
->> +             return MODE_HSYNC_NARROW;
->> +
->> +     if (hsync > 0x3ff)
->> +             return MODE_HSYNC_WIDE;
->> +
->> +     if ((mode->hdisplay < 1) || (mode->htotal < 1))
->> +             return MODE_H_ILLEGAL;
->> +
->> +     if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
->> +             return MODE_BAD_HVALUE;
->> +
->> +     DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
->> +
->> +     if (vsync < 1)
->> +             return MODE_VSYNC_NARROW;
->> +
->> +     if (vsync > 0x3ff)
->> +             return MODE_VSYNC_WIDE;
->> +
->> +     if ((mode->vdisplay < 1) || (mode->vtotal < 1))
->> +             return MODE_V_ILLEGAL;
->> +
->> +     if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
->> +             return MODE_BAD_VVALUE;
->> +
->> +     DRM_DEBUG_DRIVER("Vertical parameters OK\n");
->> +
->> +     tcon->dclk_min_div = 7;
->> +     tcon->dclk_max_div = 7;
->
-> Why would validation function change any state anywhere?
->
->> +     rounded_rate = clk_round_rate(tcon->dclk, rate);
->
-> The issue is here, on A83T TBS A711 tablet, I get...
->
-> sun4i-tcon 1c0c000.lcd-controller: XXX: hsync=20 hdisplay=1024 htotal=1384
->   vsync=5 vdisplay=600 vtotal=640 rate=52000000 rounded_rate=51857142
->
->> +     if (rounded_rate < rate)
->> +             return MODE_CLOCK_LOW;
->> +
->> +     if (rounded_rate > rate)
->> +             return MODE_CLOCK_HIGH;
->
-> ... while the previous conditions require an exact match for some reason.
->
-> But HW works fine without an exact rate match. Why is exact match required here?
+Lionel,
 
-This thread might provide some more info, though we could never get an
-agreement.
+Am Donnerstag, 19. April 2018, 14:11:34 CEST schrieb Lionel DEBIEVE:
+> Hi Richard,
+> 
+> If you have an IBM contact, please share as nobody part of IBM take care 
+> of this request.
+> 
+> I'm not able to find any maintainer or someone from IBM that manage mtd 
+> part.
 
-https://patchwork.kernel.org/patch/9446385/
+Sorry, I don't have one. Please try to find a contact.
+We cannot merge such a change otherwise.
+Can you ask your legal team for help maybe?
 
-ChenYu
-
->
-> thank you,
->   Ondrej
->
->> +     DRM_DEBUG_DRIVER("Clock rate OK\n");
->> +
->> +     return MODE_OK;
->> +}
->> +
->>  static const struct drm_encoder_helper_funcs sun4i_lvds_enc_helper_funcs = {
->>       .disable        = sun4i_lvds_encoder_disable,
->>       .enable         = sun4i_lvds_encoder_enable,
->> +     .mode_valid     = sun4i_lvds_encoder_mode_valid,
->>  };
->>
->>  static const struct drm_encoder_funcs sun4i_lvds_enc_funcs = {
+Thanks,
+//richard
