@@ -1,42 +1,34 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 19 Apr 2018 15:43:21 +0200
-Subject: [PATCH 0/4] Various fixes on STM32 RTC
-In-Reply-To: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
-References: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20180419134321.GF7369@piout.net>
+From: lionel.debieve@st.com (Lionel DEBIEVE)
+Date: Thu, 19 Apr 2018 13:51:39 +0000
+Subject: [Resend PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
+In-Reply-To: <2444815.m7Z4RdBrSB@blindfold>
+References: <20180419081323.16597-1-lionel.debieve@st.com>
+ <1524136750.3190.98.camel@gmail.com>
+ <b187fbe0-80c3-1e30-f0e0-e1ee0b5ad0f7@st.com> <2444815.m7Z4RdBrSB@blindfold>
+Message-ID: <90b907e2-1f6d-bc99-d367-cd1e2e89df84@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks richard,
 
-Both series were not sent to the correct email address. I would suggest
-rebasing on top of v4.17-rc1 ;). No need to resend just for that.
+Will do.
 
-On 19/04/2018 15:21:39+0200, Amelie Delaunay wrote:
-> This series makes some corrections on STM32 RTC:
-> - update copyright and adopt SPDX identifier
-> - fix alarm interrupt flags
-> - rework DBP (Disable Backup domain Protection) management.
-> 
-> This series is a preamble to the serie which will introduce next STM32 RTC
-> version.
-> 
-> Amelie Delaunay (4):
->   rtc: stm32: fix copyright and adopt SPDX identifier
->   rtc: stm32: fix alarm interrupt flags by removing IRQF_TRIGGER_RISING
->   dt-bindings: rtc: update stm32-rtc documentation for st,syscfg
->     property
->   rtc: stm32: get DBP register and mask from DT st,syscfg property
-> 
->  .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 10 ++--
->  drivers/rtc/rtc-stm32.c                            | 68 +++++++++++++---------
->  2 files changed, 47 insertions(+), 31 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+On 04/19/2018 03:37 PM, Richard Weinberger wrote:
+> Lionel,
+>
+> Am Donnerstag, 19. April 2018, 14:11:34 CEST schrieb Lionel DEBIEVE:
+>> Hi Richard,
+>>
+>> If you have an IBM contact, please share as nobody part of IBM take care
+>> of this request.
+>>
+>> I'm not able to find any maintainer or someone from IBM that manage mtd
+>> part.
+> Sorry, I don't have one. Please try to find a contact.
+> We cannot merge such a change otherwise.
+> Can you ask your legal team for help maybe?
+>
+> Thanks,
+> //richard
+>
