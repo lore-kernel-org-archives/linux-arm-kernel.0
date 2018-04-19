@@ -1,32 +1,47 @@
-From: cohuck@redhat.com (Cornelia Huck)
-Date: Thu, 19 Apr 2018 15:56:06 +0200
-Subject: [PATCH] kvm: Change return type to vm_fault_t
-In-Reply-To: <20180418191958.GA25806@jordon-HP-15-Notebook-PC>
-References: <20180418191958.GA25806@jordon-HP-15-Notebook-PC>
-Message-ID: <20180419155606.45a85009.cohuck@redhat.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 19 Apr 2018 21:54:26 +0800
+Subject: [PATCH v6 7/7] clk: meson: drop CLK_IGNORE_UNUSED flag
+In-Reply-To: <20180419135426.155794-1-yixun.lan@amlogic.com>
+References: <20180419135426.155794-1-yixun.lan@amlogic.com>
+Message-ID: <20180419135426.155794-8-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Apr 2018 00:49:58 +0530
-Souptick Joarder <jrdr.linux@gmail.com> wrote:
+Rely on drivers to request the clock explicitly.
 
-> Use new return type vm_fault_t for fault handler. For
-> now, this is just documenting that the function returns
-> a VM_FAULT value rather than an errno. Once all instances
-> are converted, vm_fault_t will become a distinct type.
-> 
-> commit 1c8f422059ae ("mm: change return type to vm_fault_t")
-> 
-> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> Reviewed-by: Matthew Wilcox <mawilcox@microsoft.com>
-> ---
->  arch/mips/kvm/mips.c       | 2 +-
->  arch/powerpc/kvm/powerpc.c | 2 +-
->  arch/s390/kvm/kvm-s390.c   | 2 +-
->  arch/x86/kvm/x86.c         | 2 +-
->  include/linux/kvm_host.h   | 2 +-
->  virt/kvm/arm/arm.c         | 2 +-
->  virt/kvm/kvm_main.c        | 2 +-
->  7 files changed, 7 insertions(+), 7 deletions(-)
+Previous the kernel will leave the clock on while
+bootloader adready initilized the clock, this wasn't
+optimal way, so fix it here.
 
-Reviewed-by: Cornelia Huck <cohuck@redhat.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ drivers/clk/meson/axg-aoclk.c  | 1 -
+ drivers/clk/meson/gxbb-aoclk.c | 1 -
+ 2 files changed, 2 deletions(-)
+
+diff --git a/drivers/clk/meson/axg-aoclk.c b/drivers/clk/meson/axg-aoclk.c
+index a5d00ef12268..d68b3e8ef483 100644
+--- a/drivers/clk/meson/axg-aoclk.c
++++ b/drivers/clk/meson/axg-aoclk.c
+@@ -27,7 +27,6 @@ static struct clk_regmap axg_aoclk_##_name = {					\
+ 		.ops = &clk_regmap_gate_ops,				\
+ 		.parent_names = (const char *[]){ "clk81" },		\
+ 		.num_parents = 1,					\
+-		.flags = CLK_IGNORE_UNUSED,				\
+ 	},								\
+ }
+ 
+diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
+index e145ebcdef38..c4d6027653a3 100644
+--- a/drivers/clk/meson/gxbb-aoclk.c
++++ b/drivers/clk/meson/gxbb-aoclk.c
+@@ -69,7 +69,6 @@ static struct clk_regmap _name##_ao = {					\
+ 		.ops = &clk_regmap_gate_ops,				\
+ 		.parent_names = (const char *[]){ "clk81" },		\
+ 		.num_parents = 1,					\
+-		.flags = CLK_IGNORE_UNUSED,				\
+ 	},								\
+ }
+ 
+-- 
+2.15.1
