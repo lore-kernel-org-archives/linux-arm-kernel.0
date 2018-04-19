@@ -1,81 +1,142 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 19 Apr 2018 17:32:23 +0800
-Subject: [PATCH 4/6] drm/panel: simple: Add support for Banana Pi 7"
- S070WV20-CT16 panel
+Date: Thu, 19 Apr 2018 17:32:22 +0800
+Subject: [PATCH 3/6] drm/sun4i: tcon: Add dithering support for RGB565/RGB666
+ LCD panels
 In-Reply-To: <20180419093225.614-1-wens@csie.org>
 References: <20180419093225.614-1-wens@csie.org>
-Message-ID: <20180419093225.614-5-wens@csie.org>
+Message-ID: <20180419093225.614-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This panel is marketed as Banana Pi 7" LCD display. On the back is
-a sticker denoting the model name S070WV20-CT16.
+From: Jonathan Liu <net147@gmail.com>
 
-This is a 7" 800x480 panel connected through a 24-bit RGB interface.
-However the panel only does 262k colors.
+The hardware supports dithering on TCON channel 0 which is used for LCD
+panels.
 
+Dithering is a method of approximating a color from a mixture of other
+colors when the required color isn't available. It reduces color
+banding artifacts that can be observed when displaying gradients
+(e.g. grayscale gradients). This may occur when the image that needs
+to be displayed is 24-bit but the LCD panel is a lower bit depth and
+does not perform dithering on its own.
+
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+[wens at csie.org: check display_info.bpc first; handle LVDS and MIPI DSI]
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../display/panel/bananapi,s070wv20-ct16.txt  |  7 ++++++
- drivers/gpu/drm/panel/panel-simple.c          | 25 +++++++++++++++++++
- 2 files changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
 
-diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-new file mode 100644
-index 000000000000..2ec35ce36e9a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-@@ -0,0 +1,7 @@
-+Banana Pi 7" (S070WV20-CT16) TFT LCD Panel
-+
-+Required properties:
-+- compatible: should be "bananapi,s070wv20-ct16"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index cbf1ab404ee7..9bc037f74d6c 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -745,6 +745,28 @@ static const struct panel_desc avic_tm070ddh03 = {
- 	},
- };
+Hi Maxime,
+
+The dithering parameters used here are different from the ones you used
+in your MIPI DSI series. You might want to check if it still works for
+you.
+
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 63 +++++++++++++++++++++++++++++-
+ 1 file changed, 62 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 2bd53ef7d4b8..827518f4790e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -12,6 +12,7 @@
  
-+static const struct drm_display_mode bananapi_s070wv20_ct16_mode = {
-+	.clock = 30000,
-+	.hdisplay = 800,
-+	.hsync_start = 800 + 40,
-+	.hsync_end = 800 + 40 + 48,
-+	.htotal = 800 + 40 + 48 + 40,
-+	.vdisplay = 480,
-+	.vsync_start = 480 + 13,
-+	.vsync_end = 480 + 13 + 3,
-+	.vtotal = 480 + 13 + 3 + 29,
-+};
+ #include <drm/drmP.h>
+ #include <drm/drm_atomic_helper.h>
++#include <drm/drm_connector.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_encoder.h>
+@@ -276,8 +277,59 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+ }
+ 
++static void sun4i_tcon0_mode_set_dithering(struct sun4i_tcon *tcon,
++					   const struct drm_connector *connector)
++{
++	u32 bus_format = 0;
++	u32 val = 0;
 +
-+static const struct panel_desc bananapi_s070wv20_ct16 = {
-+	.modes = &bananapi_s070wv20_ct16_mode,
-+	.num_modes = 1,
-+	.bpc = 6,
-+	.size = {
-+		.width = 154,
-+		.height = 86,
-+	},
-+};
++	/* XXX Would this ever happen? */
++	if (!connector)
++		return;
 +
- static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
- 	{
- 		.clock = 71900,
-@@ -2112,6 +2134,9 @@ static const struct of_device_id platform_of_match[] = {
- 	}, {
- 		.compatible = "avic,tm070ddh03",
- 		.data = &avic_tm070ddh03,
-+	}, {
-+		.compatible = "bananapi,s070wv20-ct16",
-+		.data = &bananapi_s070wv20_ct16,
- 	}, {
- 		.compatible = "boe,nv101wxmn51",
- 		.data = &boe_nv101wxmn51,
++	/*
++	 * FIXME: Undocumented bits
++	 *
++	 * The whole dithering process and these parameters are not
++	 * explained in the vendor documents or BSP kernel code.
++	 */
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PR_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PG_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PB_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LR_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LG_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LB_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL0_REG, 0x01010000);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL1_REG, 0x15151111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL2_REG, 0x57575555);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL3_REG, 0x7f7f7777);
++
++	/* Do dithering if panel only supports 6 bits per color */
++	if (connector->display_info.bpc == 6)
++		val |= SUN4I_TCON0_FRM_CTL_EN;
++
++	if (connector->display_info.num_bus_formats == 1)
++		bus_format = connector->display_info.bus_formats[0];
++
++	/* Check the connection format */
++	switch (bus_format) {
++	case MEDIA_BUS_FMT_RGB565_1X16:
++		/* R and B components are only 5 bits deep */
++		val |= SUN4I_TCON0_FRM_CTL_MODE_R;
++		val |= SUN4I_TCON0_FRM_CTL_MODE_B;
++	case MEDIA_BUS_FMT_RGB666_1X18:
++	case MEDIA_BUS_FMT_RGB666_1X7X3_SPWG:
++		/* Fall through: enable dithering */
++		val |= SUN4I_TCON0_FRM_CTL_EN;
++		break;
++	}
++
++	/* Write dithering settings */
++	regmap_write(tcon->regs, SUN4I_TCON_FRM_CTL_REG, val);
++}
++
+ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
+-				     struct drm_encoder *encoder,
++				     const struct drm_encoder *encoder,
+ 				     const struct drm_display_mode *mode)
+ {
+ 	/* TODO support normal CPU interface modes */
+@@ -293,6 +345,9 @@ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
+ 
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
++	/* Set dithering if needed */
++	sun4i_tcon0_mode_set_dithering(tcon, sun4i_tcon_get_connector(encoder));
++
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+ 			   SUN4I_TCON0_CTL_IF_MASK,
+ 			   SUN4I_TCON0_CTL_IF_8080);
+@@ -358,6 +413,9 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
+ 	tcon->dclk_max_div = 7;
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
++	/* Set dithering if needed */
++	sun4i_tcon0_mode_set_dithering(tcon, sun4i_tcon_get_connector(encoder));
++
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+@@ -434,6 +492,9 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	tcon->dclk_max_div = 127;
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
++	/* Set dithering if needed */
++	sun4i_tcon0_mode_set_dithering(tcon, tcon->panel->connector);
++
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
 -- 
 2.17.0
