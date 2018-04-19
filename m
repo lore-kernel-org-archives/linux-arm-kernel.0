@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 19 Apr 2018 16:05:40 +0200
-Subject: [PATCH 10/61] gpio: simplify getting .drvdata
+Date: Thu, 19 Apr 2018 16:05:37 +0200
+Subject: [PATCH 07/61] dma: simplify getting .drvdata
 In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
 References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180419140641.27926-11-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-8-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,142 +15,199 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply individually.
 
- drivers/gpio/gpio-dwapb.c     |  6 ++----
- drivers/gpio/gpio-lynxpoint.c |  3 +--
- drivers/gpio/gpio-omap.c      | 12 ++++--------
- drivers/gpio/gpio-tegra.c     |  6 ++----
- drivers/gpio/gpio-zynq.c      |  6 ++----
- 5 files changed, 11 insertions(+), 22 deletions(-)
+ drivers/dma/at_hdmac.c  |  9 +++------
+ drivers/dma/at_xdmac.c  |  9 +++------
+ drivers/dma/fsldma.c    |  6 ++----
+ drivers/dma/idma64.c    |  6 ++----
+ drivers/dma/ste_dma40.c | 12 ++++--------
+ drivers/dma/txx9dmac.c  |  8 +++-----
+ 6 files changed, 17 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/gpio/gpio-dwapb.c b/drivers/gpio/gpio-dwapb.c
-index 226977f78482..caaabb79e31f 100644
---- a/drivers/gpio/gpio-dwapb.c
-+++ b/drivers/gpio/gpio-dwapb.c
-@@ -732,8 +732,7 @@ static int dwapb_gpio_remove(struct platform_device *pdev)
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index a861b5b4d443..75f38d19fcbe 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -2041,8 +2041,7 @@ static void at_dma_shutdown(struct platform_device *pdev)
+ 
+ static int at_dma_prepare(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct at_dma *atdma = platform_get_drvdata(pdev);
++	struct at_dma *atdma = dev_get_drvdata(dev);
+ 	struct dma_chan *chan, *_chan;
+ 
+ 	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
+@@ -2076,8 +2075,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
+ 
+ static int at_dma_suspend_noirq(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct at_dma *atdma = platform_get_drvdata(pdev);
++	struct at_dma *atdma = dev_get_drvdata(dev);
+ 	struct dma_chan *chan, *_chan;
+ 
+ 	/* preserve data */
+@@ -2118,8 +2116,7 @@ static void atc_resume_cyclic(struct at_dma_chan *atchan)
+ 
+ static int at_dma_resume_noirq(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct at_dma *atdma = platform_get_drvdata(pdev);
++	struct at_dma *atdma = dev_get_drvdata(dev);
+ 	struct dma_chan *chan, *_chan;
+ 
+ 	/* bring back DMA controller */
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 94236ec9d410..4bf72561667c 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1833,8 +1833,7 @@ static void at_xdmac_free_chan_resources(struct dma_chan *chan)
+ #ifdef CONFIG_PM
+ static int atmel_xdmac_prepare(struct device *dev)
+ {
+-	struct platform_device	*pdev = to_platform_device(dev);
+-	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
++	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
+ 	struct dma_chan		*chan, *_chan;
+ 
+ 	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
+@@ -1853,8 +1852,7 @@ static int atmel_xdmac_prepare(struct device *dev)
  #ifdef CONFIG_PM_SLEEP
- static int dwapb_gpio_suspend(struct device *dev)
+ static int atmel_xdmac_suspend(struct device *dev)
+ {
+-	struct platform_device	*pdev = to_platform_device(dev);
+-	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
++	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
+ 	struct dma_chan		*chan, *_chan;
+ 
+ 	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
+@@ -1878,8 +1876,7 @@ static int atmel_xdmac_suspend(struct device *dev)
+ 
+ static int atmel_xdmac_resume(struct device *dev)
+ {
+-	struct platform_device	*pdev = to_platform_device(dev);
+-	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
++	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
+ 	struct at_xdmac_chan	*atchan;
+ 	struct dma_chan		*chan, *_chan;
+ 	int			i;
+diff --git a/drivers/dma/fsldma.c b/drivers/dma/fsldma.c
+index 3eaece888e75..1117b5123a6f 100644
+--- a/drivers/dma/fsldma.c
++++ b/drivers/dma/fsldma.c
+@@ -1328,8 +1328,7 @@ static int fsldma_of_remove(struct platform_device *op)
+ #ifdef CONFIG_PM
+ static int fsldma_suspend_late(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct dwapb_gpio *gpio = platform_get_drvdata(pdev);
-+	struct dwapb_gpio *gpio = dev_get_drvdata(dev);
- 	struct gpio_chip *gc	= &gpio->ports[0].gc;
- 	unsigned long flags;
+-	struct fsldma_device *fdev = platform_get_drvdata(pdev);
++	struct fsldma_device *fdev = dev_get_drvdata(dev);
+ 	struct fsldma_chan *chan;
  	int i;
-@@ -777,8 +776,7 @@ static int dwapb_gpio_suspend(struct device *dev)
  
- static int dwapb_gpio_resume(struct device *dev)
+@@ -1360,8 +1359,7 @@ static int fsldma_suspend_late(struct device *dev)
+ 
+ static int fsldma_resume_early(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct dwapb_gpio *gpio = platform_get_drvdata(pdev);
-+	struct dwapb_gpio *gpio = dev_get_drvdata(dev);
- 	struct gpio_chip *gc	= &gpio->ports[0].gc;
- 	unsigned long flags;
+-	struct fsldma_device *fdev = platform_get_drvdata(pdev);
++	struct fsldma_device *fdev = dev_get_drvdata(dev);
+ 	struct fsldma_chan *chan;
+ 	u32 mode;
  	int i;
-diff --git a/drivers/gpio/gpio-lynxpoint.c b/drivers/gpio/gpio-lynxpoint.c
-index 1e557b10d73e..55fa33b7209f 100644
---- a/drivers/gpio/gpio-lynxpoint.c
-+++ b/drivers/gpio/gpio-lynxpoint.c
-@@ -408,8 +408,7 @@ static int lp_gpio_runtime_resume(struct device *dev)
+diff --git a/drivers/dma/idma64.c b/drivers/dma/idma64.c
+index 1953e57505f4..e5c911200bdb 100644
+--- a/drivers/dma/idma64.c
++++ b/drivers/dma/idma64.c
+@@ -670,8 +670,7 @@ static int idma64_platform_remove(struct platform_device *pdev)
  
- static int lp_gpio_resume(struct device *dev)
+ static int idma64_pm_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct lp_gpio *lg = platform_get_drvdata(pdev);
-+	struct lp_gpio *lg = dev_get_drvdata(dev);
- 	unsigned long reg;
- 	int i;
+-	struct idma64_chip *chip = platform_get_drvdata(pdev);
++	struct idma64_chip *chip = dev_get_drvdata(dev);
  
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 35971a341c40..b4f8a048a2a1 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -856,8 +856,7 @@ static void omap_gpio_unmask_irq(struct irq_data *d)
+ 	idma64_off(chip->idma64);
+ 	return 0;
+@@ -679,8 +678,7 @@ static int idma64_pm_suspend(struct device *dev)
  
- static int omap_mpuio_suspend_noirq(struct device *dev)
+ static int idma64_pm_resume(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct gpio_bank	*bank = platform_get_drvdata(pdev);
-+	struct gpio_bank	*bank = dev_get_drvdata(dev);
- 	void __iomem		*mask_reg = bank->base +
- 					OMAP_MPUIO_GPIO_MASKIT / bank->stride;
- 	unsigned long		flags;
-@@ -871,8 +870,7 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
+-	struct idma64_chip *chip = platform_get_drvdata(pdev);
++	struct idma64_chip *chip = dev_get_drvdata(dev);
  
- static int omap_mpuio_resume_noirq(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct gpio_bank	*bank = platform_get_drvdata(pdev);
-+	struct gpio_bank	*bank = dev_get_drvdata(dev);
- 	void __iomem		*mask_reg = bank->base +
- 					OMAP_MPUIO_GPIO_MASKIT / bank->stride;
- 	unsigned long		flags;
-@@ -1284,8 +1282,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank);
- 
- static int omap_gpio_runtime_suspend(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct gpio_bank *bank = platform_get_drvdata(pdev);
-+	struct gpio_bank *bank = dev_get_drvdata(dev);
- 	u32 l1 = 0, l2 = 0;
- 	unsigned long flags;
- 	u32 wake_low, wake_hi;
-@@ -1352,8 +1349,7 @@ static void omap_gpio_init_context(struct gpio_bank *p);
- 
- static int omap_gpio_runtime_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct gpio_bank *bank = platform_get_drvdata(pdev);
-+	struct gpio_bank *bank = dev_get_drvdata(dev);
- 	u32 l = 0, gen, gen0, gen1;
- 	unsigned long flags;
- 	int c;
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 94396caaca75..04c963f03b68 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -403,8 +403,7 @@ static void tegra_gpio_irq_handler(struct irq_desc *desc)
+ 	idma64_on(chip->idma64);
+ 	return 0;
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index c2b089af0420..1bc149af990e 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -2889,8 +2889,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
  #ifdef CONFIG_PM_SLEEP
- static int tegra_gpio_resume(struct device *dev)
+ static int dma40_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct tegra_gpio_info *tgi = platform_get_drvdata(pdev);
-+	struct tegra_gpio_info *tgi = dev_get_drvdata(dev);
- 	unsigned long flags;
- 	unsigned int b, p;
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
+ 	int ret;
  
-@@ -443,8 +442,7 @@ static int tegra_gpio_resume(struct device *dev)
+ 	ret = pm_runtime_force_suspend(dev);
+@@ -2904,8 +2903,7 @@ static int dma40_suspend(struct device *dev)
  
- static int tegra_gpio_suspend(struct device *dev)
+ static int dma40_resume(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct tegra_gpio_info *tgi = platform_get_drvdata(pdev);
-+	struct tegra_gpio_info *tgi = dev_get_drvdata(dev);
- 	unsigned long flags;
- 	unsigned int b, p;
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
+ 	int ret = 0;
  
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index 75ee877e5cd5..49534241bb1e 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -697,8 +697,7 @@ static int __maybe_unused zynq_gpio_resume(struct device *dev)
+ 	if (base->lcpa_regulator) {
+@@ -2970,8 +2968,7 @@ static void d40_save_restore_registers(struct d40_base *base, bool save)
  
- static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
+ static int dma40_runtime_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct zynq_gpio *gpio = platform_get_drvdata(pdev);
-+	struct zynq_gpio *gpio = dev_get_drvdata(dev);
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
  
- 	clk_disable_unprepare(gpio->clk);
+ 	d40_save_restore_registers(base, true);
  
-@@ -707,8 +706,7 @@ static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
+@@ -2985,8 +2982,7 @@ static int dma40_runtime_suspend(struct device *dev)
  
- static int __maybe_unused zynq_gpio_runtime_resume(struct device *dev)
+ static int dma40_runtime_resume(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct zynq_gpio *gpio = platform_get_drvdata(pdev);
-+	struct zynq_gpio *gpio = dev_get_drvdata(dev);
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
  
- 	return clk_prepare_enable(gpio->clk);
- }
+ 	d40_save_restore_registers(base, false);
+ 
+diff --git a/drivers/dma/txx9dmac.c b/drivers/dma/txx9dmac.c
+index 4d8c7b9078fd..eb45af71d3a3 100644
+--- a/drivers/dma/txx9dmac.c
++++ b/drivers/dma/txx9dmac.c
+@@ -1244,8 +1244,7 @@ static void txx9dmac_shutdown(struct platform_device *pdev)
+ 
+ static int txx9dmac_suspend_noirq(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct txx9dmac_dev *ddev = platform_get_drvdata(pdev);
++	struct txx9dmac_dev *ddev = dev_get_drvdata(dev);
+ 
+ 	txx9dmac_off(ddev);
+ 	return 0;
+@@ -1253,9 +1252,8 @@ static int txx9dmac_suspend_noirq(struct device *dev)
+ 
+ static int txx9dmac_resume_noirq(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct txx9dmac_dev *ddev = platform_get_drvdata(pdev);
+-	struct txx9dmac_platform_data *pdata = dev_get_platdata(&pdev->dev);
++	struct txx9dmac_dev *ddev = dev_get_drvdata(dev);
++	struct txx9dmac_platform_data *pdata = dev_get_platdata(dev);
+ 	u32 mcr;
+ 
+ 	mcr = TXX9_DMA_MCR_MSTEN | MCR_LE;
 -- 
 2.11.0
