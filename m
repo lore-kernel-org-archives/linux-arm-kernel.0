@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 19 Apr 2018 16:06:29 +0200
-Subject: [PATCH 59/61] watchdog: simplify getting .drvdata
+Date: Thu, 19 Apr 2018 16:06:16 +0200
+Subject: [PATCH 46/61] spi: simplify getting .drvdata
 In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
 References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180419140641.27926-60-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-47-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,82 +15,57 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply individually.
 
- drivers/watchdog/cadence_wdt.c   | 6 ++----
- drivers/watchdog/of_xilinx_wdt.c | 6 ++----
- drivers/watchdog/wdat_wdt.c      | 6 ++----
- 3 files changed, 6 insertions(+), 12 deletions(-)
+ drivers/spi/spi-cadence.c      | 6 ++----
+ drivers/spi/spi-zynqmp-gqspi.c | 6 ++----
+ 2 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/watchdog/cadence_wdt.c b/drivers/watchdog/cadence_wdt.c
-index 3ec1f418837d..c3924356d173 100644
---- a/drivers/watchdog/cadence_wdt.c
-+++ b/drivers/watchdog/cadence_wdt.c
-@@ -418,8 +418,7 @@ static void cdns_wdt_shutdown(struct platform_device *pdev)
+diff --git a/drivers/spi/spi-cadence.c b/drivers/spi/spi-cadence.c
+index 5c9516ae4942..de394422b611 100644
+--- a/drivers/spi/spi-cadence.c
++++ b/drivers/spi/spi-cadence.c
+@@ -686,8 +686,7 @@ static int cdns_spi_remove(struct platform_device *pdev)
   */
- static int __maybe_unused cdns_wdt_suspend(struct device *dev)
+ static int __maybe_unused cdns_spi_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct cdns_wdt *wdt = platform_get_drvdata(pdev);
-+	struct cdns_wdt *wdt = dev_get_drvdata(dev);
+-	struct spi_master *master = platform_get_drvdata(pdev);
++	struct spi_master *master = dev_get_drvdata(dev);
  
- 	if (watchdog_active(&wdt->cdns_wdt_device)) {
- 		cdns_wdt_stop(&wdt->cdns_wdt_device);
-@@ -438,8 +437,7 @@ static int __maybe_unused cdns_wdt_suspend(struct device *dev)
- static int __maybe_unused cdns_wdt_resume(struct device *dev)
- {
- 	int ret;
--	struct platform_device *pdev = to_platform_device(dev);
--	struct cdns_wdt *wdt = platform_get_drvdata(pdev);
-+	struct cdns_wdt *wdt = dev_get_drvdata(dev);
- 
- 	if (watchdog_active(&wdt->cdns_wdt_device)) {
- 		ret = clk_prepare_enable(wdt->clk);
-diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
-index 4acbe05e27bb..d3f7eb046678 100644
---- a/drivers/watchdog/of_xilinx_wdt.c
-+++ b/drivers/watchdog/of_xilinx_wdt.c
-@@ -268,8 +268,7 @@ static int xwdt_remove(struct platform_device *pdev)
+ 	return spi_master_suspend(master);
+ }
+@@ -702,8 +701,7 @@ static int __maybe_unused cdns_spi_suspend(struct device *dev)
   */
- static int __maybe_unused xwdt_suspend(struct device *dev)
+ static int __maybe_unused cdns_spi_resume(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct xwdt_device *xdev = platform_get_drvdata(pdev);
-+	struct xwdt_device *xdev = dev_get_drvdata(dev);
+-	struct spi_master *master = platform_get_drvdata(pdev);
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct cdns_spi *xspi = spi_master_get_devdata(master);
  
- 	if (watchdog_active(&xdev->xilinx_wdt_wdd))
- 		xilinx_wdt_stop(&xdev->xilinx_wdt_wdd);
-@@ -285,8 +284,7 @@ static int __maybe_unused xwdt_suspend(struct device *dev)
+ 	cdns_spi_init_hw(xspi);
+diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
+index 18aeaceee286..3608db4ff368 100644
+--- a/drivers/spi/spi-zynqmp-gqspi.c
++++ b/drivers/spi/spi-zynqmp-gqspi.c
+@@ -918,8 +918,7 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
   */
- static int __maybe_unused xwdt_resume(struct device *dev)
+ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct xwdt_device *xdev = platform_get_drvdata(pdev);
-+	struct xwdt_device *xdev = dev_get_drvdata(dev);
+-	struct spi_master *master = platform_get_drvdata(pdev);
++	struct spi_master *master = dev_get_drvdata(dev);
+ 
+ 	spi_master_suspend(master);
+ 
+@@ -939,8 +938,7 @@ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
+  */
+ static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct spi_master *master = platform_get_drvdata(pdev);
++	struct spi_master *master = dev_get_drvdata(dev);
+ 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
  	int ret = 0;
  
- 	if (watchdog_active(&xdev->xilinx_wdt_wdd))
-diff --git a/drivers/watchdog/wdat_wdt.c b/drivers/watchdog/wdat_wdt.c
-index 0da9943d405f..56ad19608a9b 100644
---- a/drivers/watchdog/wdat_wdt.c
-+++ b/drivers/watchdog/wdat_wdt.c
-@@ -447,8 +447,7 @@ static int wdat_wdt_probe(struct platform_device *pdev)
- #ifdef CONFIG_PM_SLEEP
- static int wdat_wdt_suspend_noirq(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct wdat_wdt *wdat = platform_get_drvdata(pdev);
-+	struct wdat_wdt *wdat = dev_get_drvdata(dev);
- 	int ret;
- 
- 	if (!watchdog_active(&wdat->wdd))
-@@ -475,8 +474,7 @@ static int wdat_wdt_suspend_noirq(struct device *dev)
- 
- static int wdat_wdt_resume_noirq(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct wdat_wdt *wdat = platform_get_drvdata(pdev);
-+	struct wdat_wdt *wdat = dev_get_drvdata(dev);
- 	int ret;
- 
- 	if (!watchdog_active(&wdat->wdd))
 -- 
 2.11.0
