@@ -1,45 +1,29 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Thu, 19 Apr 2018 08:59:35 +0300
-Subject: [PATCH 0/2] Allow xhci-plat using a second clock
-In-Reply-To: <87r2ncfvfw.fsf@bootlin.com>
-References: <20180214161620.4401-1-gregory.clement@bootlin.com>
- <87r2ncfvfw.fsf@bootlin.com>
-Message-ID: <4d088b87-f3ef-59cd-baae-c82e4f54f639@linux.intel.com>
+From: swboyd@chromium.org (Stephen Boyd)
+Date: Wed, 18 Apr 2018 23:04:31 -0700
+Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
+ <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
+ <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
+Message-ID: <152411787180.46528.5441480997805485928@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.04.2018 17:20, Gregory CLEMENT wrote:
-> Hi Mathias,
->   
->   On mer., f?vr. 14 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+Quoting David Collins (2018-04-18 16:30:26)
+> On 04/17/2018 01:02 PM, Doug Anderson wrote:
+> > On Fri, Apr 13, 2018 at 7:50 PM, David Collins <collinsd@codeaurora.org> wrote:
+> >> +#define RPMH_REGULATOR_DISABLE                 0x0
+> >> +#define RPMH_REGULATOR_ENABLE                  0x1
+> > 
+> > In the last version Stephen said he didn't like the above two #defines
+> > and you said you'd remove them, yet they are still here.  Explanation?
 > 
->> Hello,
->>
->> The purpose of this series is to allow xhci-plat using a second
->> clock. It is needed on the Armada 7K/8K but could be used by other
->> SoCs.
->>
->> The first patch is just a fix found while I was working on this
->> feature.
+> I thought that he was referring to the comments above the constants since
+> his review comment was immediately following the second of two comments as
+> opposed to these constants.  I'll let him follow-up on this point if
+> necessary.
 > 
-> I've just realized that this series sent 2 months ago was not merged in
-> v4.17. The issue is that now the USB support on the Armada 7K/8K is
-> broken, because the clock support part was already merged.
-> 
-> You already had a look on this series one month ago. The issue you had
-> was about getting an approval for the extension of the binding [1]. I
-> pinged Rob about it [2] one month ago but we didn't get any
-> feedback. However, Rob already approved the similar changes I introduced
-> in an other for mv_xor_v2: [3].
-> 
-> So would it be possible to apply this series on v4.17-rc ?
 
-Patch 2/2 no longer applies due to clk suspend/resume changes in:
-
-commit d56e57ca030c8b4296944a2ae61ac167bf979c07
-     usb: host: xhci-plat: revert "usb: host: xhci-plat: enable clk in resume timing"
-
-Not sure how that change affects Armada 7K/8K
-Can you rebase and resend the series?
-
--Mathias
+I think I was talking about the comments. The defines don't look super
+useful either though.
