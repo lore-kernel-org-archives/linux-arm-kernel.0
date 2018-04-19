@@ -1,89 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Apr 2018 12:33:37 +0100
-Subject: Applied "ASoC: msm8916-wcd-analog: use threaded context for mbhc
- events" to the asoc tree
-In-Reply-To: <20180418174637.24041-1-srinivas.kandagatla@linaro.org>
-Message-ID: <E1f97on-0008A4-9G@debutante>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 19 Apr 2018 14:40:26 +0300
+Subject: [RFC 2/6] dmaengine: xilinx_dma: Pass AXI4-Stream control words
+ to netdev dma client
+In-Reply-To: <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
+References: <1522665546-10035-1-git-send-email-radheys@xilinx.com>
+ <1522665546-10035-3-git-send-email-radheys@xilinx.com>
+ <20180411090854.GY6014@localhost>
+ <BN6PR02MB32825FDF8601D8A310C2270BC7B70@BN6PR02MB3282.namprd02.prod.outlook.com>
+ <7f549d2e-fc96-8c7e-d839-edb86ae088a5@metafoo.de>
+ <4ba085c7-5256-6c8a-5697-c0d5736a6e46@ti.com>
+ <1fc10bec-5c2c-98f1-1d5b-b768dea844ed@metafoo.de>
+ <78828d31-e4cd-5211-f1b6-8918ac38f599@ti.com>
+ <e5a6c1ad-e263-7b9d-a5e2-744884c9d6de@metafoo.de>
+ <a6ac9ca8-91b4-c7b1-0f0c-c04dd10048e2@ti.com>
+ <d7432292-cedd-7d61-f219-8b63eb6c1d50@metafoo.de>
+Message-ID: <8c7a5ac8-0747-9dad-f6e5-74890b64f618@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
 
-   ASoC: msm8916-wcd-analog: use threaded context for mbhc events
+On 2018-04-18 16:06, Lars-Peter Clausen wrote:
+>> Hrm, true, but it is hardly the metadata use case. It is more like
+>> different DMA transfer type.
+> 
+> When I look at this with my astronaut architect view from high high up above
+> I do not see a difference between metadata and multi-planar data.
 
-has been applied to the asoc tree at
+I tend to disagree.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+> Both split the data that is sent to the peripheral into multiple
+> sub-streams, each carrying part of the data. I'm sure there are peripherals
+> that interleave data and metadata on the same data stream. Similar to how we
+> have left and right channel interleaved in a audio stream.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Slimbus, S/PDIF?
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> What about metadata that is not contiguous and split into multiple segments.
+> How do you handle passing a sgl to the metadata interface? And then it
+> suddenly looks quite similar to the normal DMA descriptor interface.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Well, the metadata is for the descriptor. The descriptor describe the
+data transfer _and_ can convey additional information. Nothing is
+interleaved, the data and the descriptor are different things. It is
+more like TCP headers detached from the data (but pointing to it).
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> But maybe that's just one abstraction level to high.
 
-Thanks,
-Mark
+I understand your point, but at the end the metadata needs to end up in
+the descriptor which is describing the data that is going to be moved.
 
->From a8419a0cd98ddf628a9e38a92110af7cc650dde7 Mon Sep 17 00:00:00 2001
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Wed, 18 Apr 2018 18:46:37 +0100
-Subject: [PATCH] ASoC: msm8916-wcd-analog: use threaded context for mbhc
- events
+The descriptor is not sent as a separate DMA trasnfer, it is part of the
+DMA transfer, it is handled internally by the DMA.
 
-As snd_soc_jack_report() can sleep, move handling of mbhc events to a
-thread context rather than in interrupt context.
+- P?ter
 
-Fixes: de66b3455023 ('ASoC: codecs: msm8916-wcd-analog: add MBHC support')
-Reported-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/codecs/msm8916-wcd-analog.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/codecs/msm8916-wcd-analog.c b/sound/soc/codecs/msm8916-wcd-analog.c
-index 12ee83d52405..b7cf7cce95fe 100644
---- a/sound/soc/codecs/msm8916-wcd-analog.c
-+++ b/sound/soc/codecs/msm8916-wcd-analog.c
-@@ -1187,7 +1187,8 @@ static int pm8916_wcd_analog_spmi_probe(struct platform_device *pdev)
- 		return irq;
- 	}
- 
--	ret = devm_request_irq(dev, irq, pm8916_mbhc_switch_irq_handler,
-+	ret = devm_request_threaded_irq(dev, irq, NULL,
-+			       pm8916_mbhc_switch_irq_handler,
- 			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
- 			       IRQF_ONESHOT,
- 			       "mbhc switch irq", priv);
-@@ -1201,7 +1202,8 @@ static int pm8916_wcd_analog_spmi_probe(struct platform_device *pdev)
- 			return irq;
- 		}
- 
--		ret = devm_request_irq(dev, irq, mbhc_btn_press_irq_handler,
-+		ret = devm_request_threaded_irq(dev, irq, NULL,
-+				       mbhc_btn_press_irq_handler,
- 				       IRQF_TRIGGER_RISING |
- 				       IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
- 				       "mbhc btn press irq", priv);
-@@ -1214,7 +1216,8 @@ static int pm8916_wcd_analog_spmi_probe(struct platform_device *pdev)
- 			return irq;
- 		}
- 
--		ret = devm_request_irq(dev, irq, mbhc_btn_release_irq_handler,
-+		ret = devm_request_threaded_irq(dev, irq, NULL,
-+				       mbhc_btn_release_irq_handler,
- 				       IRQF_TRIGGER_RISING |
- 				       IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
- 				       "mbhc btn release irq", priv);
--- 
-2.17.0
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
