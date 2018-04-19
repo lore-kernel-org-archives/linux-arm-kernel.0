@@ -1,61 +1,69 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 19 Apr 2018 15:42:21 +0200
-Subject: [PATCH] clk: sunxi-ng: replace lib-y with obj-y
-In-Reply-To: <152409404578.51482.16644171573677016161@swboyd.mtv.corp.google.com>
-References: <1524052351-14103-1-git-send-email-yamada.masahiro@socionext.com>
- <152409404578.51482.16644171573677016161@swboyd.mtv.corp.google.com>
-Message-ID: <20180419134221.ufsc462fw7j7so6q@flea>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Thu, 19 Apr 2018 15:43:37 +0200
+Subject: [PATCH 0/2] Allow xhci-plat using a second clock
+In-Reply-To: <4d088b87-f3ef-59cd-baae-c82e4f54f639@linux.intel.com> (Mathias
+ Nyman's message of "Thu, 19 Apr 2018 08:59:35 +0300")
+References: <20180214161620.4401-1-gregory.clement@bootlin.com>
+ <87r2ncfvfw.fsf@bootlin.com>
+ <4d088b87-f3ef-59cd-baae-c82e4f54f639@linux.intel.com>
+Message-ID: <87in8nfh12.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 04:27:25PM -0700, Stephen Boyd wrote:
-> Quoting Masahiro Yamada (2018-04-18 04:52:31)
-> > We had commit 06e226c7fb23 ("clk: sunxi-ng: Move all clock types to a
-> > library") and commit 799c43415442 ("kbuild: thin archives make default
-> > for all archs") in the same development cycle, from different trees.
-> > 
-> > With migration to the thin archive, the entire drivers/clk/sunxi-ng/lib.a
-> > is linked to the vmlinux.  This does not break build, but we do not get
-> > any size saving.
-> > 
-> > However, we do not need to go back to the individual Kconfig options.
-> > The default configuration pulls in all (or most) of the CCU parts anyway.
-> > Also, once we enable CONFIG_LD_DEAD_CODE_DATA_ELIMINATION, we can simply
-> > list all files with obj-y, and the linker will drop all unused functions
-> > by itself.
-> > 
-> > After the long discussion [1], people there agreed to fix this, but
-> > nobody sent a patch after all.  I am doing it now.
-> > 
-> > I lifted up CONFIG_SUNXI_CCU to drivers/clk/Makefile because everything
-> > in drivers/clk/sunxi-ng/ depends on SUNXI_CCU.
-> > 
-> > [1] https://patchwork.kernel.org/patch/9796521/
-> > 
-> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > ---
-> 
-> Thanks for remembering to take care of this. I forgot about it all.
-> 
-> Acked-by: Stephen Boyd <sboyd@kernel.org>
-> 
-> Or I can pick this up directly. Let me know.
+Hi Mathias,
+ 
+ On jeu., avril 19 2018, Mathias Nyman <mathias.nyman@linux.intel.com> wrote:
 
-We'll probably have our usual round of patches that might generate
-some conflicts on the Makefile. I've picked it up with your A-b, and
-will send you a PR with it, as usual.
+> On 18.04.2018 17:20, Gregory CLEMENT wrote:
+>> Hi Mathias,
+>>     On mer., f?vr. 14 2018, Gregory CLEMENT
+>> <gregory.clement@bootlin.com> wrote:
+>>
+>>> Hello,
+>>>
+>>> The purpose of this series is to allow xhci-plat using a second
+>>> clock. It is needed on the Armada 7K/8K but could be used by other
+>>> SoCs.
+>>>
+>>> The first patch is just a fix found while I was working on this
+>>> feature.
+>>
+>> I've just realized that this series sent 2 months ago was not merged in
+>> v4.17. The issue is that now the USB support on the Armada 7K/8K is
+>> broken, because the clock support part was already merged.
+>>
+>> You already had a look on this series one month ago. The issue you had
+>> was about getting an approval for the extension of the binding [1]. I
+>> pinged Rob about it [2] one month ago but we didn't get any
+>> feedback. However, Rob already approved the similar changes I introduced
+>> in an other for mv_xor_v2: [3].
+>>
+>> So would it be possible to apply this series on v4.17-rc ?
+>
+> Patch 2/2 no longer applies due to clk suspend/resume changes in:
+>
+> commit d56e57ca030c8b4296944a2ae61ac167bf979c07
+>     usb: host: xhci-plat: revert "usb: host: xhci-plat: enable clk in resume timing"
+>
+> Not sure how that change affects Armada 7K/8K
+> Can you rebase and resend the series?
 
-Thanks !
-Maxime
+It's done!
+
+About the suspend/resume part it does not affect Armada 7K/8K because we
+don't support it yet.
+
+However I am a bit surprised by the commit log because reverting a
+common part because of a specific implementation looks wrong. I expect
+issues when we will add PM support but we will see that later.
+
+Gregory
+
+>
+> -Mathias
+>
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
+Gregory Clement, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180419/9c91da7d/attachment.sig>
+http://bootlin.com
