@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 19 Apr 2018 16:06:16 +0200
-Subject: [PATCH 46/61] spi: simplify getting .drvdata
+Date: Thu, 19 Apr 2018 16:06:31 +0200
+Subject: [PATCH 61/61] ASoC: atmel: simplify getting .drvdata
 In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
 References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180419140641.27926-47-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-62-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,57 +15,32 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply individually.
 
- drivers/spi/spi-cadence.c      | 6 ++----
- drivers/spi/spi-zynqmp-gqspi.c | 6 ++----
- 2 files changed, 4 insertions(+), 8 deletions(-)
+ sound/soc/atmel/atmel_ssc_dai.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/spi/spi-cadence.c b/drivers/spi/spi-cadence.c
-index 5c9516ae4942..de394422b611 100644
---- a/drivers/spi/spi-cadence.c
-+++ b/drivers/spi/spi-cadence.c
-@@ -686,8 +686,7 @@ static int cdns_spi_remove(struct platform_device *pdev)
-  */
- static int __maybe_unused cdns_spi_suspend(struct device *dev)
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index a1e2c5682dcd..4a0275a6505d 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -1002,8 +1002,7 @@ static const struct snd_soc_component_driver atmel_ssc_component = {
+ 
+ static int asoc_ssc_init(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct spi_master *master = dev_get_drvdata(dev);
+-	struct ssc_device *ssc = platform_get_drvdata(pdev);
++	struct ssc_device *ssc = dev_get_drvdata(dev);
+ 	int ret;
  
- 	return spi_master_suspend(master);
- }
-@@ -702,8 +701,7 @@ static int __maybe_unused cdns_spi_suspend(struct device *dev)
-  */
- static int __maybe_unused cdns_spi_resume(struct device *dev)
+ 	ret = snd_soc_register_component(dev, &atmel_ssc_component,
+@@ -1033,8 +1032,7 @@ static int asoc_ssc_init(struct device *dev)
+ 
+ static void asoc_ssc_exit(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct spi_master *master = dev_get_drvdata(dev);
- 	struct cdns_spi *xspi = spi_master_get_devdata(master);
+-	struct ssc_device *ssc = platform_get_drvdata(pdev);
++	struct ssc_device *ssc = dev_get_drvdata(dev);
  
- 	cdns_spi_init_hw(xspi);
-diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
-index 18aeaceee286..3608db4ff368 100644
---- a/drivers/spi/spi-zynqmp-gqspi.c
-+++ b/drivers/spi/spi-zynqmp-gqspi.c
-@@ -918,8 +918,7 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
-  */
- static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct spi_master *master = dev_get_drvdata(dev);
- 
- 	spi_master_suspend(master);
- 
-@@ -939,8 +938,7 @@ static int __maybe_unused zynqmp_qspi_suspend(struct device *dev)
-  */
- static int __maybe_unused zynqmp_qspi_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct spi_master *master = platform_get_drvdata(pdev);
-+	struct spi_master *master = dev_get_drvdata(dev);
- 	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
- 	int ret = 0;
- 
+ 	if (ssc->pdata->use_dma)
+ 		atmel_pcm_dma_platform_unregister(dev);
 -- 
 2.11.0
