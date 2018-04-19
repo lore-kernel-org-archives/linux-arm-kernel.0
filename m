@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 19 Apr 2018 16:06:31 +0200
-Subject: [PATCH 61/61] ASoC: atmel: simplify getting .drvdata
+Date: Thu, 19 Apr 2018 16:05:56 +0200
+Subject: [PATCH 26/61] media: platform: exynos4-is: simplify getting .drvdata
 In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
 References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180419140641.27926-62-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-27-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,32 +15,57 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply individually.
 
- sound/soc/atmel/atmel_ssc_dai.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/media/platform/exynos4-is/media-dev.c | 6 ++----
+ drivers/media/platform/exynos4-is/mipi-csis.c | 6 ++----
+ 2 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-index a1e2c5682dcd..4a0275a6505d 100644
---- a/sound/soc/atmel/atmel_ssc_dai.c
-+++ b/sound/soc/atmel/atmel_ssc_dai.c
-@@ -1002,8 +1002,7 @@ static const struct snd_soc_component_driver atmel_ssc_component = {
- 
- static int asoc_ssc_init(struct device *dev)
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index 78b48a1fa26c..deb499f76412 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -1201,8 +1201,7 @@ static const struct media_device_ops fimc_md_ops = {
+ static ssize_t fimc_md_sysfs_show(struct device *dev,
+ 				  struct device_attribute *attr, char *buf)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct ssc_device *ssc = platform_get_drvdata(pdev);
-+	struct ssc_device *ssc = dev_get_drvdata(dev);
- 	int ret;
+-	struct fimc_md *fmd = platform_get_drvdata(pdev);
++	struct fimc_md *fmd = dev_get_drvdata(dev);
  
- 	ret = snd_soc_register_component(dev, &atmel_ssc_component,
-@@ -1033,8 +1032,7 @@ static int asoc_ssc_init(struct device *dev)
- 
- static void asoc_ssc_exit(struct device *dev)
+ 	if (fmd->user_subdev_api)
+ 		return strlcpy(buf, "Sub-device API (sub-dev)\n", PAGE_SIZE);
+@@ -1214,8 +1213,7 @@ static ssize_t fimc_md_sysfs_store(struct device *dev,
+ 				   struct device_attribute *attr,
+ 				   const char *buf, size_t count)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct ssc_device *ssc = platform_get_drvdata(pdev);
-+	struct ssc_device *ssc = dev_get_drvdata(dev);
+-	struct fimc_md *fmd = platform_get_drvdata(pdev);
++	struct fimc_md *fmd = dev_get_drvdata(dev);
+ 	bool subdev_api;
+ 	int i;
  
- 	if (ssc->pdata->use_dma)
- 		atmel_pcm_dma_platform_unregister(dev);
+diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+index cba46a656338..b4e28a299e26 100644
+--- a/drivers/media/platform/exynos4-is/mipi-csis.c
++++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+@@ -891,8 +891,7 @@ static int s5pcsis_probe(struct platform_device *pdev)
+ 
+ static int s5pcsis_pm_suspend(struct device *dev, bool runtime)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
++	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+ 	struct csis_state *state = sd_to_csis_state(sd);
+ 	int ret = 0;
+ 
+@@ -921,8 +920,7 @@ static int s5pcsis_pm_suspend(struct device *dev, bool runtime)
+ 
+ static int s5pcsis_pm_resume(struct device *dev, bool runtime)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
++	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+ 	struct csis_state *state = sd_to_csis_state(sd);
+ 	int ret = 0;
+ 
 -- 
 2.11.0
