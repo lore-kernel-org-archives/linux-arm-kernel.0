@@ -1,33 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Apr 2018 15:07:14 +0100
-Subject: [PATCH 2/3] dt-bindings: add binding for at91-usart in spi mode
-In-Reply-To: <20180419133233.GE7369@piout.net>
-References: <20180413161117.20274-1-radu.pirea@microchip.com>
- <20180413161117.20274-3-radu.pirea@microchip.com>
- <20180413162327.GE22187@piout.net>
- <8e6c447d-dce5-f9af-e5b2-8d1d863159d6@microchip.com>
- <20180413181251.GG22187@piout.net>
- <20180417110358.GD8973@sirena.org.uk>
- <20180419133233.GE7369@piout.net>
-Message-ID: <20180419140714.GF27188@sirena.org.uk>
+From: kevans@FreeBSD.org (kevans at FreeBSD.org)
+Date: Thu, 19 Apr 2018 09:11:03 -0500
+Subject: [PATCH v3] ARM: dts: sunxi: Add sid for a83t
+Message-ID: <20180419141103.38196-1-kevans@FreeBSD.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 03:32:33PM +0200, Alexandre Belloni wrote:
+Allwinner a83t has a 1 KB sid block with efuse for security rootkey and thermal
+calibration data, add node to describe it.
 
-> My suggestion was to add an MFD driver that would match the current
-> compatible and either have an atmel,usart-mode property or maybe more
-> risky, check whether there are children nodes. Based on that, the
-> correct platform device can be added, either an usart or an spi master
-> device can be registered.
+a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
+supported in an external driver for FreeBSD.
 
-Yeah, that's another approach which could work and is a bit easier from
-the DT point of view - the PXA stuff predated DT and was adapted into
-it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180419/ad3f251e/attachment.sig>
+Signed-off-by: Kyle Evans <kevans@FreeBSD.org>
+---
+
+Changes in v3:
+- rebased against 4.17
+
+Changes in v2:
+- remove bogus "From:" line in commit text, no functional change
+
+ .../devicetree/bindings/nvmem/allwinner,sunxi-sid.txt        | 1 +
+ arch/arm/boot/dts/sun8i-a83t.dtsi                            | 5 +++++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+index d69543701d5d..e319fe5e205a 100644
+--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
++++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible: Should be one of the following:
+   "allwinner,sun4i-a10-sid"
+   "allwinner,sun7i-a20-sid"
++  "allwinner,sun8i-a83t-sid"
+   "allwinner,sun8i-h3-sid"
+   "allwinner,sun50i-a64-sid"
+ 
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 568307639be8..379981389eea 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -492,6 +492,11 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		sid: eeprom at 1c14000 {
++			compatible = "allwinner,sun8i-a83t-sid";
++			reg = <0x1c14000 0x400>;
++		};
++
+ 		usb_otg: usb at 1c19000 {
+ 			compatible = "allwinner,sun8i-a83t-musb",
+ 				     "allwinner,sun8i-a33-musb";
+-- 
+2.17.0
