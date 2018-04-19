@@ -1,128 +1,42 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 19 Apr 2018 15:31:54 +0200
-Subject: [PATCH 3/6] drm/sun4i: tcon: Add dithering support for
- RGB565/RGB666 LCD panels
-In-Reply-To: <20180419093225.614-4-wens@csie.org>
-References: <20180419093225.614-1-wens@csie.org>
- <20180419093225.614-4-wens@csie.org>
-Message-ID: <20180419133154.2w2obz2su4pfmk25@flea>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 19 Apr 2018 15:32:33 +0200
+Subject: [PATCH 2/3] dt-bindings: add binding for at91-usart in spi mode
+In-Reply-To: <20180417110358.GD8973@sirena.org.uk>
+References: <20180413161117.20274-1-radu.pirea@microchip.com>
+ <20180413161117.20274-3-radu.pirea@microchip.com>
+ <20180413162327.GE22187@piout.net>
+ <8e6c447d-dce5-f9af-e5b2-8d1d863159d6@microchip.com>
+ <20180413181251.GG22187@piout.net>
+ <20180417110358.GD8973@sirena.org.uk>
+Message-ID: <20180419133233.GE7369@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 17/04/2018 12:03:58+0100, Mark Brown wrote:
+> On Fri, Apr 13, 2018 at 08:12:51PM +0200, Alexandre Belloni wrote:
+> > On 13/04/2018 19:12:54+0200, Nicolas Ferre wrote:
+> 
+> > > This layout of the hardware is completely different from the USART one and
+> > > it seems to makes sense to address it with a different hardware description
+> > > and so a different compatible string.
+> 
+> > But then, you can end up with two drivers trying to use the same IP
+> > because nothing prevents you from writing a DT with both a usart and an
+> > spi node enabled for the same IP. request_mem_region() will not help
+> > here because then the working driver will depend on the probing order.
+> 
+> We don't really have too much in the way of better ideas for how to
+> handle this though.  Take a look at how the PXA SSP stuff handles this,
+> though that's not really doing too much different it at least layers a
+> mechanism on top to avoid collisions.
 
-On Thu, Apr 19, 2018 at 05:32:22PM +0800, Chen-Yu Tsai wrote:
-> From: Jonathan Liu <net147@gmail.com>
-> 
-> The hardware supports dithering on TCON channel 0 which is used for LCD
-> panels.
-> 
-> Dithering is a method of approximating a color from a mixture of other
-> colors when the required color isn't available. It reduces color
-> banding artifacts that can be observed when displaying gradients
-> (e.g. grayscale gradients). This may occur when the image that needs
-> to be displayed is 24-bit but the LCD panel is a lower bit depth and
-> does not perform dithering on its own.
-> 
-> Signed-off-by: Jonathan Liu <net147@gmail.com>
-> [wens at csie.org: check display_info.bpc first; handle LVDS and MIPI DSI]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> Hi Maxime,
-> 
-> The dithering parameters used here are different from the ones you used
-> in your MIPI DSI series. You might want to check if it still works for
-> you.
-> 
-> ---
->  drivers/gpu/drm/sun4i/sun4i_tcon.c | 63 +++++++++++++++++++++++++++++-
->  1 file changed, 62 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 2bd53ef7d4b8..827518f4790e 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -12,6 +12,7 @@
->  
->  #include <drm/drmP.h>
->  #include <drm/drm_atomic_helper.h>
-> +#include <drm/drm_connector.h>
->  #include <drm/drm_crtc.h>
->  #include <drm/drm_crtc_helper.h>
->  #include <drm/drm_encoder.h>
-> @@ -276,8 +277,59 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
->  		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
->  }
->  
-> +static void sun4i_tcon0_mode_set_dithering(struct sun4i_tcon *tcon,
-> +					   const struct drm_connector *connector)
-> +{
-> +	u32 bus_format = 0;
-> +	u32 val = 0;
-> +
-> +	/* XXX Would this ever happen? */
-> +	if (!connector)
-> +		return;
-> +
-> +	/*
-> +	 * FIXME: Undocumented bits
-> +	 *
-> +	 * The whole dithering process and these parameters are not
-> +	 * explained in the vendor documents or BSP kernel code.
-> +	 */
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PR_REG, 0x11111111);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PG_REG, 0x11111111);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PB_REG, 0x11111111);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LR_REG, 0x11111111);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LG_REG, 0x11111111);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LB_REG, 0x11111111);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL0_REG, 0x01010000);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL1_REG, 0x15151111);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL2_REG, 0x57575555);
-> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL3_REG, 0x7f7f7777);
-> +
-> +	/* Do dithering if panel only supports 6 bits per color */
-> +	if (connector->display_info.bpc == 6)
-> +		val |= SUN4I_TCON0_FRM_CTL_EN;
-> +
-> +	if (connector->display_info.num_bus_formats == 1)
-> +		bus_format = connector->display_info.bus_formats[0];
-> +
-> +	/* Check the connection format */
-> +	switch (bus_format) {
-> +	case MEDIA_BUS_FMT_RGB565_1X16:
-> +		/* R and B components are only 5 bits deep */
-> +		val |= SUN4I_TCON0_FRM_CTL_MODE_R;
-> +		val |= SUN4I_TCON0_FRM_CTL_MODE_B;
-> +	case MEDIA_BUS_FMT_RGB666_1X18:
-> +	case MEDIA_BUS_FMT_RGB666_1X7X3_SPWG:
-> +		/* Fall through: enable dithering */
-> +		val |= SUN4I_TCON0_FRM_CTL_EN;
-> +		break;
-> +	}
-> +
-> +	/* Write dithering settings */
-> +	regmap_write(tcon->regs, SUN4I_TCON_FRM_CTL_REG, val);
-> +}
-> +
->  static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
-> -				     struct drm_encoder *encoder,
-> +				     const struct drm_encoder *encoder,
-
-The whole serie looks good, but that should probbaly be part of the
-first patch?
-
-Maxime
+My suggestion was to add an MFD driver that would match the current
+compatible and either have an atmel,usart-mode property or maybe more
+risky, check whether there are children nodes. Based on that, the
+correct platform device can be added, either an usart or an spi master
+device can be registered.
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
+Alexandre Belloni, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
 https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180419/4f651160/attachment-0001.sig>
