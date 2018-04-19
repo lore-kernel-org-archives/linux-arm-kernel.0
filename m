@@ -1,72 +1,79 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 19 Apr 2018 16:47:23 -0500
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <20180419202632.GE14063@ziepe.ca>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180419202632.GE14063@ziepe.ca>
-Message-ID: <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
+From: mmayer@broadcom.com (Markus Mayer)
+Date: Thu, 19 Apr 2018 15:10:45 -0700
+Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
+ supported
+In-Reply-To: <c20dc303-8753-5684-1fff-62f363a37a4c@gmail.com>
+References: <20180418155643.36464-1-code@mmayer.net>
+ <20180418155643.36464-3-code@mmayer.net>
+ <c20dc303-8753-5684-1fff-62f363a37a4c@gmail.com>
+Message-ID: <CAGt4E5voQJO6RaO64Z90EL5CzRF-AWtswzDQgYuOZTmpapzG-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Alex, who might know why DRM drivers have their own PCIe Gen3 code]
+On 18 April 2018 at 09:37, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 04/18/2018 08:56 AM, Markus Mayer wrote:
+>> From: Jim Quinlan <jim2101024@gmail.com>
+>>
+>> If the SCMI cpufreq driver is supported, we bail, so that the new
+>> approach can be used.
+>>
+>> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+>> ---
+>>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+>> index b07559b9ed99..b4861a730162 100644
+>> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
+>> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+>> @@ -164,6 +164,8 @@
+>>  #define BRCM_AVS_CPU_INTR    "brcm,avs-cpu-l2-intr"
+>>  #define BRCM_AVS_HOST_INTR   "sw_intr"
+>>
+>> +#define ARM_SCMI_COMPAT              "arm,scmi"
+>> +
+>>  struct pmap {
+>>       unsigned int mode;
+>>       unsigned int p1;
+>> @@ -511,6 +513,20 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
+>>       struct device *dev;
+>>       int host_irq, ret;
+>>
+>> +     /*
+>> +      * If the SCMI cpufreq driver is supported, we bail, so that the more
+>> +      * modern approach can be used.
+>> +      */
+>> +     if (IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)) {
+>> +             struct device_node *np;
+>> +
+>> +             np = of_find_compatible_node(NULL, NULL, ARM_SCMI_COMPAT);
+>> +             if (np) {
+>> +                     of_node_put(np);
+>> +                     return -ENXIO;
+>> +             }
+>
+> We would probably want to make sure that the node is also enabled (that
+> is, does not have a status = "disabled" property) otherwise the check
+> can be defeated. Something like:
+>
+>                 if (np && of_device_is_available(np))
 
-On Thu, Apr 19, 2018 at 02:26:32PM -0600, Jason Gunthorpe wrote:
-> On Thu, Apr 19, 2018 at 03:56:23PM -0400, Sinan Kaya wrote:
-> > The infiniband adapter might be connected to a PCI hotplug slot. Performing
-> > secondary bus reset on a hotplug slot causes PCI link up/down interrupts.
-> > 
-> > Hotplug driver removes the device from system when a link down interrupt
-> > is observed and performs re-enumeration when link up interrupt is observed.
-> > 
-> > This conflicts with what this code is trying to do. Try secondary bus reset
-> > only if pci_reset_slot() fails/unsupported.
-> > 
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >  drivers/infiniband/hw/hfi1/pcie.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
-> > index 83d66e8..75f49e3 100644
-> > +++ b/drivers/infiniband/hw/hfi1/pcie.c
-> > @@ -908,7 +908,8 @@ static int trigger_sbr(struct hfi1_devdata *dd)
-> 
-> The code above this hunk is:
-> 
-> /*
->  * Trigger a secondary bus reset (SBR) on ourselves using our parent.
->  *
->  * Based on pci_parent_bus_reset() which is not exported by the
->  * kernel core.
->  */
-> static int trigger_sbr(struct hfi1_devdata *dd)
-> {
-> 
-> [..]
-> 
-> This really seems like something the PCI core should be helping with,
-> drivers shouldn't be doing stuff like this. I get the feeling this
-> should be a common need if drivers support various error recovery
-> schemes?
-> 
-> Bjorn, would be appropriate to export pci_parent_bus_reset() or some
-> variation therin??
+Would we want something like this instead?
 
-I agree it would be really nice if the PCI core could help out somehow
-so we could get some of this code out of individual drivers.
+                 if (np) {
+                                  bool bail_early =
+(of_device_is_available(np) > 0);
 
-If fact, stepping back a few paces, this HFI reset path is part of a
-transition to PCIe gen3 signaling, and I'm not sure why *that* is in
-the driver either.
+                                  of_node_put(np);
+                                  if (bail_early)
+                                          return -ENXIO;
+                 }
 
-There's an ongoing discussion [1] about why this gen3 code is in the
-driver.  Several DRM drivers include similar code
-(cik_pcie_gen3_enable(), si_pcie_gen3_enable()).
+To ensure of_node_put() is called?
 
-I *thought* the hardware was supposed to automatically negotiate to
-the highest rate supported by both sides without any help at all from
-software.  But since several drivers have code to do it themselves, I
-wonder if I'm missing something, or maybe there's something the PCI
-core should be doing that it isn't, and the driver code is basically
-working around that PCI core deficiency.
-
-[1] https://lkml.kernel.org/r/20180417171956.GJ28657 at bhelgaas-glaptop.roam.corp.google.com
+> should be good for that.
+>
+> Thanks!
+> --
+> Florian
