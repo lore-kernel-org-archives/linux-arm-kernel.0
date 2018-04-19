@@ -1,104 +1,102 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 19 Apr 2018 22:00:13 +0200
-Subject: [PATCH 7/7] i2c: pnx: move header into the driver
-In-Reply-To: <20180419200015.15095-1-wsa@the-dreams.de>
-References: <20180419200015.15095-1-wsa@the-dreams.de>
-Message-ID: <20180419200015.15095-8-wsa@the-dreams.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 19 Apr 2018 13:06:23 -0700
+Subject: [PATCH 59/61] watchdog: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-60-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-60-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419200623.GB24732@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no platform_data users anymore. Move the structs into the
-driver.
+On Thu, Apr 19, 2018 at 04:06:29PM +0200, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/i2c/busses/i2c-pnx.c | 21 ++++++++++++++++++++-
- include/linux/i2c-pnx.h      | 38 --------------------------------------
- 2 files changed, 20 insertions(+), 39 deletions(-)
- delete mode 100644 include/linux/i2c-pnx.h
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-diff --git a/drivers/i2c/busses/i2c-pnx.c b/drivers/i2c/busses/i2c-pnx.c
-index a542041df0cd..6e0e546ef83f 100644
---- a/drivers/i2c/busses/i2c-pnx.c
-+++ b/drivers/i2c/busses/i2c-pnx.c
-@@ -18,7 +18,6 @@
- #include <linux/timer.h>
- #include <linux/completion.h>
- #include <linux/platform_device.h>
--#include <linux/i2c-pnx.h>
- #include <linux/io.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-@@ -29,6 +28,26 @@
- #define I2C_PNX_SPEED_KHZ_DEFAULT	100
- #define I2C_PNX_REGION_SIZE		0x100
- 
-+struct i2c_pnx_mif {
-+	int			ret;		/* Return value */
-+	int			mode;		/* Interface mode */
-+	struct completion	complete;	/* I/O completion */
-+	struct timer_list	timer;		/* Timeout */
-+	u8 *			buf;		/* Data buffer */
-+	int			len;		/* Length of data buffer */
-+	int			order;		/* RX Bytes to order via TX */
-+};
-+
-+struct i2c_pnx_algo_data {
-+	void __iomem		*ioaddr;
-+	struct i2c_pnx_mif	mif;
-+	int			last;
-+	struct clk		*clk;
-+	struct i2c_adapter	adapter;
-+	int			irq;
-+	u32			timeout;
-+};
-+
- enum {
- 	mstatus_tdi = 0x00000001,
- 	mstatus_afi = 0x00000002,
-diff --git a/include/linux/i2c-pnx.h b/include/linux/i2c-pnx.h
-deleted file mode 100644
-index 5388326fbbff..000000000000
---- a/include/linux/i2c-pnx.h
-+++ /dev/null
-@@ -1,38 +0,0 @@
--/*
-- * Header file for I2C support on PNX010x/4008.
-- *
-- * Author: Dennis Kovalev <dkovalev@ru.mvista.com>
-- *
-- * 2004-2006 (c) MontaVista Software, Inc. This file is licensed under
-- * the terms of the GNU General Public License version 2. This program
-- * is licensed "as is" without any warranty of any kind, whether express
-- * or implied.
-- */
--
--#ifndef __I2C_PNX_H__
--#define __I2C_PNX_H__
--
--struct platform_device;
--struct clk;
--
--struct i2c_pnx_mif {
--	int			ret;		/* Return value */
--	int			mode;		/* Interface mode */
--	struct completion	complete;	/* I/O completion */
--	struct timer_list	timer;		/* Timeout */
--	u8 *			buf;		/* Data buffer */
--	int			len;		/* Length of data buffer */
--	int			order;		/* RX Bytes to order via TX */
--};
--
--struct i2c_pnx_algo_data {
--	void __iomem		*ioaddr;
--	struct i2c_pnx_mif	mif;
--	int			last;
--	struct clk		*clk;
--	struct i2c_adapter	adapter;
--	int			irq;
--	u32			timeout;
--};
--
--#endif /* __I2C_PNX_H__ */
--- 
-2.11.0
+> ---
+> 
+> Build tested only. buildbot is happy. Please apply individually.
+> 
+>  drivers/watchdog/cadence_wdt.c   | 6 ++----
+>  drivers/watchdog/of_xilinx_wdt.c | 6 ++----
+>  drivers/watchdog/wdat_wdt.c      | 6 ++----
+>  3 files changed, 6 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/watchdog/cadence_wdt.c b/drivers/watchdog/cadence_wdt.c
+> index 3ec1f418837d..c3924356d173 100644
+> --- a/drivers/watchdog/cadence_wdt.c
+> +++ b/drivers/watchdog/cadence_wdt.c
+> @@ -418,8 +418,7 @@ static void cdns_wdt_shutdown(struct platform_device *pdev)
+>   */
+>  static int __maybe_unused cdns_wdt_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct cdns_wdt *wdt = platform_get_drvdata(pdev);
+> +	struct cdns_wdt *wdt = dev_get_drvdata(dev);
+>  
+>  	if (watchdog_active(&wdt->cdns_wdt_device)) {
+>  		cdns_wdt_stop(&wdt->cdns_wdt_device);
+> @@ -438,8 +437,7 @@ static int __maybe_unused cdns_wdt_suspend(struct device *dev)
+>  static int __maybe_unused cdns_wdt_resume(struct device *dev)
+>  {
+>  	int ret;
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct cdns_wdt *wdt = platform_get_drvdata(pdev);
+> +	struct cdns_wdt *wdt = dev_get_drvdata(dev);
+>  
+>  	if (watchdog_active(&wdt->cdns_wdt_device)) {
+>  		ret = clk_prepare_enable(wdt->clk);
+> diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
+> index 4acbe05e27bb..d3f7eb046678 100644
+> --- a/drivers/watchdog/of_xilinx_wdt.c
+> +++ b/drivers/watchdog/of_xilinx_wdt.c
+> @@ -268,8 +268,7 @@ static int xwdt_remove(struct platform_device *pdev)
+>   */
+>  static int __maybe_unused xwdt_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct xwdt_device *xdev = platform_get_drvdata(pdev);
+> +	struct xwdt_device *xdev = dev_get_drvdata(dev);
+>  
+>  	if (watchdog_active(&xdev->xilinx_wdt_wdd))
+>  		xilinx_wdt_stop(&xdev->xilinx_wdt_wdd);
+> @@ -285,8 +284,7 @@ static int __maybe_unused xwdt_suspend(struct device *dev)
+>   */
+>  static int __maybe_unused xwdt_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct xwdt_device *xdev = platform_get_drvdata(pdev);
+> +	struct xwdt_device *xdev = dev_get_drvdata(dev);
+>  	int ret = 0;
+>  
+>  	if (watchdog_active(&xdev->xilinx_wdt_wdd))
+> diff --git a/drivers/watchdog/wdat_wdt.c b/drivers/watchdog/wdat_wdt.c
+> index 0da9943d405f..56ad19608a9b 100644
+> --- a/drivers/watchdog/wdat_wdt.c
+> +++ b/drivers/watchdog/wdat_wdt.c
+> @@ -447,8 +447,7 @@ static int wdat_wdt_probe(struct platform_device *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int wdat_wdt_suspend_noirq(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct wdat_wdt *wdat = platform_get_drvdata(pdev);
+> +	struct wdat_wdt *wdat = dev_get_drvdata(dev);
+>  	int ret;
+>  
+>  	if (!watchdog_active(&wdat->wdd))
+> @@ -475,8 +474,7 @@ static int wdat_wdt_suspend_noirq(struct device *dev)
+>  
+>  static int wdat_wdt_resume_noirq(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct wdat_wdt *wdat = platform_get_drvdata(pdev);
+> +	struct wdat_wdt *wdat = dev_get_drvdata(dev);
+>  	int ret;
+>  
+>  	if (!watchdog_active(&wdat->wdd))
+> -- 
+> 2.11.0
+> 
