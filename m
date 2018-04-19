@@ -1,64 +1,78 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 19 Apr 2018 09:25:26 -0700
-Subject: ioremap() use with specific mailbox drivers and SCMI
-Message-ID: <be5f7ed4-4b2c-2a6a-0a41-19e30172a048@gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 19 Apr 2018 18:27:44 +0200
+Subject: [PATCH v3 0/7] Add tda998x (HDMI) support to atmel-hlcdc
+Message-ID: <20180419162751.25223-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-	
-I am looking at the following files:
+Hi!
 
-arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts:
-        memory at 0 {
-                device_type = "memory";
-                reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
-                      <0x00000000 0x05f00000 0x00000000 0x00001000>,
-                      <0x00000000 0x05f02000 0x00000000 0x00efd000>,
-                      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
-                      <0x00000000 0x07410000 0x00000000 0x1aaf0000>,
-                      <0x00000000 0x22000000 0x00000000 0x1c000000>;
-        };
+I naively thought that since there was support for both nxp,tda19988 (in
+the tda998x driver) and the atmel-hlcdc, things would be a smooth ride.
+But it wasn't, so I started looking around and realized I had to fix
+things.
 
-arch/arm64/boot/dts/hisilicon/hi6220.dtsi:
-                mailbox: mailbox at f7510000 {
-                        compatible = "hisilicon,hi6220-mbox";
-                        reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
-                              <0x0 0x06dff800 0x0 0x0800>; /* Mailbox
-buffer */
-                        interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-                        #mbox-cells = <3>;
-                };
+In v1 and v2 I fixed things by making the atmel-hlcdc driver a master
+component, but now in v3 I fix things by making the tda998x driver
+a bridge instead. This was after a suggestion from Boris Brezillion
+(the atmel-hlcdc maintainer), so there was some risk of bias ... but
+after comparing what was needed, I too find the bridge approach better.
 
-and this is quite an interesting approach, although it appears to be
-quite fragile and simplistic to me for a number of reasons:
+In addition to the above, our PCB interface between the SAMA5D3 and the
+HDMI encoder is only using 16 bits, and this has to be described
+somewhere, or the atmel-hlcdc driver have no chance of selecting the
+correct output mode. Since I have similar problems with a ds90c185 lvds
+encoder I added patches to override the atmel-hlcdc output format via
+DT properties compatible with the media video-interface binding and
+things start to play together.
 
-- if the mailbox at f7510000 was ever to be relocated within a parent "bus"
-node that had a "ranges" property mapping the parent space from
-0xf000_0000 to produce offset relative nodes, the translation for its
-"reg" properties would apply relative to both cells, which means that
-now, the second cell may no longer point to DRAM anymore. This can be
-worked around by keeping that particular node outside of the "bus" node,
-but it is essentially means we mixed address spaces within the "reg"
-property
+Since this series superseeds the bridge series [1], I have included the
+leftover bindings patch for the ti,ds90c185 here.
 
-- punching holes in DRAM by omitting this mailbox's shared buffer from
-the top-level memory "reg" property is extremely error prone, and seems
-to be a shortcut/hack to allow the ARM/ARM64 implementations to
-successfully call ioremap() against these regions. I am not commenting
-about the other regions mentioned in the DTS, but pstore is possibly
-another example where using ioremap() is convenient, but still not quite
-correct.
+Anyway, this series solves some real issues for my HW.
 
-Using a reserved-memory entry would be far less error prone, would
-clearly show the intents of the specific regions being declared, and
-could, through the use of additional properties (e.g: "map", as opposed
-to "no-map") indicate a possible need to map that DRAM region into
-kernel virtual memory and using e.g: memremap() APIs.
+Cheers,
+Peter
 
-Also the semantics of ioremap() are not particularly portable from one
-architecture to another whereas memremap() is IMHO.
+Changes since v2   https://lkml.org/lkml/2018/4/17/385
+- patch 2/7 fixed spelling and added an example
+- patch 4/7 parse the DT up front and store the result indexed by encoder
+- old patch 5/6 and 6/6 dropped
+- patch 5-7/7 are new and makes the tda998x driver a drm_bridge
 
-Thank you
+Changes since v1   https://lkml.org/lkml/2018/4/9/294
+- added reviewed-by from Rob to patch 1/6
+- patch 2/6 changed so that the bus format override is in the endpoint
+  DT node, and follows the binding of media video-interfaces.
+- patch 3/6 is new, it adds drm_of_media_bus_fmt which parses above
+  media video-interface binding (partially).
+- patch 4/6 now makes use of the above helper (and also fixes problems
+  with the 3/5 patch from v1 when no override was specified).
+- do not mention unrelated connector display_info details in the cover
+  letter and commit messages.
+
+[1]
+"Bridge" series v2   https://lkml.org/lkml/2018/3/26/610
+"Bridge" series v1   https://lkml.org/lkml/2018/3/17/221
+
+Peter Rosin (7):
+  dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+  dt-bindings: display: atmel: optional video-interface of endpoints
+  drm: of: introduce drm_of_media_bus_fmt
+  drm/atmel-hlcdc: support bus-width (12/16/18/24) in endpoint nodes
+  drm/i2c: tda998x: find the drm_device via the drm_connector
+  drm/i2c: tda998x: split encoder and component functions from the work
+  drm/i2c: tda998x: register as a drm bridge
+
+ .../devicetree/bindings/display/atmel/hlcdc-dc.txt |  26 +++
+ .../bindings/display/bridge/lvds-transmitter.txt   |   8 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     |  71 ++++++--
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       |   2 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   |  40 +++-
+ drivers/gpu/drm/drm_of.c                           |  38 ++++
+ drivers/gpu/drm/i2c/tda998x_drv.c                  | 201 ++++++++++++++++++---
+ include/drm/drm_of.h                               |   7 +
+ 8 files changed, 342 insertions(+), 51 deletions(-)
+
 -- 
-Florian
+2.11.0
