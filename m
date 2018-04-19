@@ -1,79 +1,39 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Thu, 19 Apr 2018 09:27:03 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6ull: add operating points
-In-Reply-To: <c5d92c4e36973e3e18980d410e11ec4f@agner.ch>
-References: <20180418145230.10249-1-sebastien.szymanski@armadeus.com>
- <20180418145230.10249-2-sebastien.szymanski@armadeus.com>
- <c5d92c4e36973e3e18980d410e11ec4f@agner.ch>
-Message-ID: <265f4635-bf67-48a9-4ad5-caaba752be8d@armadeus.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 19 Apr 2018 16:24:52 +0900
+Subject: [PATCH net-next v2 0/3] ave: fix the activation issues for some
+ UniPhier SoCs
+Message-ID: <1524122695-19597-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+This add the following stuffs to fix the activation issues and satisfy
+requirements for AVE ethernet driver implemented on some UniPhier SoCs.
 
-On 04/18/2018 05:35 PM, Stefan Agner wrote:
-> On 18.04.2018 16:52, S?bastien Szymanski wrote:
->> i.MX6ULL has different operating ranges than i.MX6UL so add the
->> operating points for the i.MX6ULL. A 25mV offset is added to the minimum
->> allowed values like for the i.MX6UL.
-> 
-> Hi S?bastien,
-> 
-> Last time I checked there was a DC controller missing for the EVK, so I
-> think it was not possible to go to the highest operating points yet.
-> Have you tested this on the EVK?
+- Add support for additional necessary clocks and resets, because the kernel
+  is stalled on Pro4 due to lack of them.
 
-No, I have tested on an OPOS6ULDev board.
+- Check whether the SoC supports the specified phy-mode
 
-I've just noticed that the soc-operating-points values are wrong in this
-patch, I've sent a v2.
+- Add DT property support indicating system controller that has the feature
+  for configurating phy-mode including built-in phy on LD11.
 
-Regards,
+v1: https://www.spinics.net/lists/netdev/msg494904.html
 
-> 
-> --
-> Stefan
-> 
->>
->> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
->> ---
->>  arch/arm/boot/dts/imx6ull.dtsi | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
->> index 571ddd71cdba..7e6273be0291 100644
->> --- a/arch/arm/boot/dts/imx6ull.dtsi
->> +++ b/arch/arm/boot/dts/imx6ull.dtsi
->> @@ -46,6 +46,25 @@
->>  /* Delete UART8 in AIPS-1 (i.MX6UL specific) */
->>  /delete-node/ &uart8;
->>  
->> +&cpu0 {
->> +	operating-points = <
->> +		/* kHz	uV */
->> +		900000	1275000
->> +		792000	1225000
->> +		528000	1175000
->> +		396000	1025000
->> +		198000	950000
->> +	>;
->> +	fsl,soc-operating-points = <
->> +		/* KHz	uV */
->> +		900000	1400000
->> +		792000	1350000
->> +		528000	1175000
->> +		396000	1175000
->> +		198000	1175000
->> +	>;
->> +};
->> +
->>  / {
->>  	soc {
->>  		aips3: aips-bus at 2200000 {
+Changes since v1:
+- Add 'Reviewed-by' lines
 
+Kunihiko Hayashi (3):
+  net: ethernet: ave: add multiple clocks and resets support as required
+    property
+  dt-bindings: net: ave: add syscon-phy-mode property to configure
+    phy-mode setting
+  net: ethernet: ave: add support for phy-mode setting of system
+    controller
+
+ .../bindings/net/socionext,uniphier-ave4.txt       |  19 +-
+ drivers/net/ethernet/socionext/Kconfig             |   2 +
+ drivers/net/ethernet/socionext/sni_ave.c           | 252 ++++++++++++++++++---
+ 3 files changed, 238 insertions(+), 35 deletions(-)
 
 -- 
-S?bastien Szymanski
-Software engineer, Armadeus Systems
-Tel: +33 (0)9 72 29 41 44
-Fax: +33 (0)9 72 28 79 26
+2.7.4
