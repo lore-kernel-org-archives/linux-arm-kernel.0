@@ -1,228 +1,55 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Thu, 19 Apr 2018 12:40:19 +0200
-Subject: [PATCH 6/6] devfreq: rk3399_dmc: register devfreq notification to dmc
- driver.
-In-Reply-To: <20180419104019.24406-1-enric.balletbo@collabora.com>
-References: <20180419104019.24406-1-enric.balletbo@collabora.com>
-Message-ID: <20180419104019.24406-7-enric.balletbo@collabora.com>
+From: philippe.cornu@st.com (Philippe CORNU)
+Date: Thu, 19 Apr 2018 10:41:03 +0000
+Subject: [PATCH v2] drm/bridge/synopsys: dsi: Adopt SPDX identifiers
+In-Reply-To: <101210971.aHjggv2rq0@avalon>
+References: <20180208145805.24762-1-philippe.cornu@st.com>
+ <101210971.aHjggv2rq0@avalon>
+Message-ID: <c55dab05-8003-ea5b-58f9-39aaa861fab6@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lin Huang <hl@rock-chips.com>
+Applied on drm-misc-next.
+Many thanks,
+Philippe :-)
 
-Because dmc may also access the PMU_BUS_IDLE_REQ register, we need to
-ensure that the pd driver and the dmc driver will not access at this
-register at the same time.
-
-Signed-off-by: Lin Huang <hl@rock-chips.com>
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
-
- drivers/devfreq/rk3399_dmc.c      | 47 +----------------------
- drivers/soc/rockchip/pm_domains.c | 31 +++++++++++++++
- include/soc/rockchip/rk3399_dmc.h | 63 +++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+), 45 deletions(-)
- create mode 100644 include/soc/rockchip/rk3399_dmc.h
-
-diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
-index 5bfca028eaaf..a1f320634d69 100644
---- a/drivers/devfreq/rk3399_dmc.c
-+++ b/drivers/devfreq/rk3399_dmc.c
-@@ -27,51 +27,7 @@
- #include <linux/suspend.h>
- 
- #include <soc/rockchip/rockchip_sip.h>
--
--struct dram_timing {
--	unsigned int ddr3_speed_bin;
--	unsigned int pd_idle;
--	unsigned int sr_idle;
--	unsigned int sr_mc_gate_idle;
--	unsigned int srpd_lite_idle;
--	unsigned int standby_idle;
--	unsigned int auto_pd_dis_freq;
--	unsigned int dram_dll_dis_freq;
--	unsigned int phy_dll_dis_freq;
--	unsigned int ddr3_odt_dis_freq;
--	unsigned int ddr3_drv;
--	unsigned int ddr3_odt;
--	unsigned int phy_ddr3_ca_drv;
--	unsigned int phy_ddr3_dq_drv;
--	unsigned int phy_ddr3_odt;
--	unsigned int lpddr3_odt_dis_freq;
--	unsigned int lpddr3_drv;
--	unsigned int lpddr3_odt;
--	unsigned int phy_lpddr3_ca_drv;
--	unsigned int phy_lpddr3_dq_drv;
--	unsigned int phy_lpddr3_odt;
--	unsigned int lpddr4_odt_dis_freq;
--	unsigned int lpddr4_drv;
--	unsigned int lpddr4_dq_odt;
--	unsigned int lpddr4_ca_odt;
--	unsigned int phy_lpddr4_ca_drv;
--	unsigned int phy_lpddr4_ck_cs_drv;
--	unsigned int phy_lpddr4_dq_drv;
--	unsigned int phy_lpddr4_odt;
--};
--
--struct rk3399_dmcfreq {
--	struct device *dev;
--	struct devfreq *devfreq;
--	struct devfreq_simple_ondemand_data ondemand_data;
--	struct clk *dmc_clk;
--	struct devfreq_event_dev *edev;
--	struct mutex lock;
--	struct dram_timing timing;
--	struct regulator *vdd_center;
--	unsigned long rate, target_rate;
--	unsigned long volt, target_volt;
--};
-+#include <soc/rockchip/rk3399_dmc.h>
- 
- static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
- 				 u32 flags)
-@@ -394,6 +350,7 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
- 
- 	data->dev = dev;
- 	platform_set_drvdata(pdev, data);
-+	pd_register_notify_to_dmc(data->devfreq);
- 
- 	return 0;
- }
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 53efc386b1ad..7acc836e7eb7 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/devfreq.h>
- #include <linux/io.h>
- #include <linux/iopoll.h>
- #include <linux/err.h>
-@@ -76,9 +77,13 @@ struct rockchip_pmu {
- 	const struct rockchip_pmu_info *info;
- 	struct mutex mutex; /* mutex lock for pmu */
- 	struct genpd_onecell_data genpd_data;
-+	struct devfreq *devfreq;
-+	struct notifier_block dmc_nb;
- 	struct generic_pm_domain *domains[];
- };
- 
-+static struct rockchip_pmu *dmc_pmu;
-+
- #define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain, genpd)
- 
- #define DOMAIN(pwr, status, req, idle, ack, wakeup)	\
-@@ -601,6 +606,30 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
- 	return error;
- }
- 
-+static int dmc_notify(struct notifier_block *nb, unsigned long event,
-+		      void *data)
-+{
-+	if (event == DEVFREQ_PRECHANGE)
-+		mutex_lock(&dmc_pmu->mutex);
-+	else if (event == DEVFREQ_POSTCHANGE)
-+		mutex_unlock(&dmc_pmu->mutex);
-+
-+	return NOTIFY_OK;
-+}
-+
-+int pd_register_notify_to_dmc(struct devfreq *devfreq)
-+{
-+	if (!dmc_pmu)
-+		return -EPROBE_DEFER;
-+
-+	dmc_pmu->devfreq = devfreq;
-+	dmc_pmu->dmc_nb.notifier_call = dmc_notify;
-+	devfreq_register_notifier(dmc_pmu->devfreq, &dmc_pmu->dmc_nb,
-+				  DEVFREQ_TRANSITION_NOTIFIER);
-+	return 0;
-+}
-+EXPORT_SYMBOL(pd_register_notify_to_dmc);
-+
- static int rockchip_pm_domain_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -694,6 +723,8 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 		goto err_out;
- 	}
- 
-+	dmc_pmu = pmu;
-+
- 	return 0;
- 
- err_out:
-diff --git a/include/soc/rockchip/rk3399_dmc.h b/include/soc/rockchip/rk3399_dmc.h
-new file mode 100644
-index 000000000000..7ccdfff1a154
---- /dev/null
-+++ b/include/soc/rockchip/rk3399_dmc.h
-@@ -0,0 +1,63 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * DMC (Dynamic Memory Controller) for RK3399 - Definitions
-+ *
-+ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * Author: Lin Huang <hl@rock-chips.com>
-+ */
-+
-+#ifndef __SOC_RK3399_DMC_H
-+#define __SOC_RK3399_DMC_H
-+
-+#include <linux/devfreq.h>
-+
-+struct dram_timing {
-+	unsigned int ddr3_speed_bin;
-+	unsigned int pd_idle;
-+	unsigned int sr_idle;
-+	unsigned int sr_mc_gate_idle;
-+	unsigned int srpd_lite_idle;
-+	unsigned int standby_idle;
-+	unsigned int auto_pd_dis_freq;
-+	unsigned int dram_dll_dis_freq;
-+	unsigned int phy_dll_dis_freq;
-+	unsigned int ddr3_odt_dis_freq;
-+	unsigned int ddr3_drv;
-+	unsigned int ddr3_odt;
-+	unsigned int phy_ddr3_ca_drv;
-+	unsigned int phy_ddr3_dq_drv;
-+	unsigned int phy_ddr3_odt;
-+	unsigned int lpddr3_odt_dis_freq;
-+	unsigned int lpddr3_drv;
-+	unsigned int lpddr3_odt;
-+	unsigned int phy_lpddr3_ca_drv;
-+	unsigned int phy_lpddr3_dq_drv;
-+	unsigned int phy_lpddr3_odt;
-+	unsigned int lpddr4_odt_dis_freq;
-+	unsigned int lpddr4_drv;
-+	unsigned int lpddr4_dq_odt;
-+	unsigned int lpddr4_ca_odt;
-+	unsigned int phy_lpddr4_ca_drv;
-+	unsigned int phy_lpddr4_ck_cs_drv;
-+	unsigned int phy_lpddr4_dq_drv;
-+	unsigned int phy_lpddr4_odt;
-+};
-+
-+struct rk3399_dmcfreq {
-+	struct device *dev;
-+	struct devfreq *devfreq;
-+	struct devfreq_simple_ondemand_data ondemand_data;
-+	struct clk *dmc_clk;
-+	struct devfreq_event_dev *edev;
-+	struct mutex lock;
-+	struct dram_timing timing;
-+	struct regulator *vdd_center;
-+	unsigned long rate, target_rate;
-+	unsigned long volt, target_volt;
-+	struct dev_pm_opp *curr_opp;
-+};
-+
-+int pd_register_notify_to_dmc(struct devfreq *devfreq);
-+
-+#endif
--- 
-2.17.0
+On 02/08/2018 05:46 PM, Laurent Pinchart wrote:
+> Hi Philippe,
+> 
+> Thank you for the patch.
+> 
+> On Thursday, 8 February 2018 16:58:05 EET Philippe Cornu wrote:
+>> Add SPDX identifiers to the Synopsys DesignWare MIPI DSI
+>> host controller driver.
+>>
+>> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+>> ---
+>> Changes in v2: Update to "GPL-2.0+" following comments from Laurent
+>> Pinchart, Benjamin Gaignard & Philippe Ombredanne.
+>>
+>>   drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 6 +-----
+>>   1 file changed, 1 insertion(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c index
+>> 7bac101c285c..99f0e4f51716 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+>> @@ -1,12 +1,8 @@
+>> +// SPDX-License-Identifier: GPL-2.0+
+>>   /*
+>>    * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+>>    * Copyright (C) STMicroelectronics SA 2017
+>>    *
+>> - * This program is free software; you can redistribute it and/or modify
+>> - * it under the terms of the GNU General Public License as published by
+>> - * the Free Software Foundation; either version 2 of the License, or
+>> - * (at your option) any later version.
+>> - *
+>>    * Modified by Philippe Cornu <philippe.cornu@st.com>
+>>    * This generic Synopsys DesignWare MIPI DSI host driver is based on the
+>>    * Rockchip version from rockchip/dw-mipi-dsi.c with phy & bridge APIs.
+> 
+> 
