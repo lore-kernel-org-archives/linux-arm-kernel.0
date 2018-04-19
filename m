@@ -1,137 +1,128 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 19 Apr 2018 15:30:53 +0200
-Subject: [PATCH v2 2/2] usb: host: xhci-plat: Fix clock resource by adding a
- register clock
-In-Reply-To: <20180419133053.11894-1-gregory.clement@bootlin.com>
-References: <20180419133053.11894-1-gregory.clement@bootlin.com>
-Message-ID: <20180419133053.11894-3-gregory.clement@bootlin.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 19 Apr 2018 15:31:54 +0200
+Subject: [PATCH 3/6] drm/sun4i: tcon: Add dithering support for
+ RGB565/RGB666 LCD panels
+In-Reply-To: <20180419093225.614-4-wens@csie.org>
+References: <20180419093225.614-1-wens@csie.org>
+ <20180419093225.614-4-wens@csie.org>
+Message-ID: <20180419133154.2w2obz2su4pfmk25@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 7K/8K we need to explicitly enable the register clock. This
-clock is optional because not all the SoCs using this IP need it but at
-least for Armada 7K/8K it is actually mandatory.
+Hi,
 
-The change was done at xhci-plat level and not at a xhci-mvebu.c because,
-it is expected that other SoC would have this kind of constraint.
+On Thu, Apr 19, 2018 at 05:32:22PM +0800, Chen-Yu Tsai wrote:
+> From: Jonathan Liu <net147@gmail.com>
+> 
+> The hardware supports dithering on TCON channel 0 which is used for LCD
+> panels.
+> 
+> Dithering is a method of approximating a color from a mixture of other
+> colors when the required color isn't available. It reduces color
+> banding artifacts that can be observed when displaying gradients
+> (e.g. grayscale gradients). This may occur when the image that needs
+> to be displayed is 24-bit but the LCD panel is a lower bit depth and
+> does not perform dithering on its own.
+> 
+> Signed-off-by: Jonathan Liu <net147@gmail.com>
+> [wens at csie.org: check display_info.bpc first; handle LVDS and MIPI DSI]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> 
+> Hi Maxime,
+> 
+> The dithering parameters used here are different from the ones you used
+> in your MIPI DSI series. You might want to check if it still works for
+> you.
+> 
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 63 +++++++++++++++++++++++++++++-
+>  1 file changed, 62 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 2bd53ef7d4b8..827518f4790e 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -12,6 +12,7 @@
+>  
+>  #include <drm/drmP.h>
+>  #include <drm/drm_atomic_helper.h>
+> +#include <drm/drm_connector.h>
+>  #include <drm/drm_crtc.h>
+>  #include <drm/drm_crtc_helper.h>
+>  #include <drm/drm_encoder.h>
+> @@ -276,8 +277,59 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+>  		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+>  }
+>  
+> +static void sun4i_tcon0_mode_set_dithering(struct sun4i_tcon *tcon,
+> +					   const struct drm_connector *connector)
+> +{
+> +	u32 bus_format = 0;
+> +	u32 val = 0;
+> +
+> +	/* XXX Would this ever happen? */
+> +	if (!connector)
+> +		return;
+> +
+> +	/*
+> +	 * FIXME: Undocumented bits
+> +	 *
+> +	 * The whole dithering process and these parameters are not
+> +	 * explained in the vendor documents or BSP kernel code.
+> +	 */
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PR_REG, 0x11111111);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PG_REG, 0x11111111);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PB_REG, 0x11111111);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LR_REG, 0x11111111);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LG_REG, 0x11111111);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LB_REG, 0x11111111);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL0_REG, 0x01010000);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL1_REG, 0x15151111);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL2_REG, 0x57575555);
+> +	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL3_REG, 0x7f7f7777);
+> +
+> +	/* Do dithering if panel only supports 6 bits per color */
+> +	if (connector->display_info.bpc == 6)
+> +		val |= SUN4I_TCON0_FRM_CTL_EN;
+> +
+> +	if (connector->display_info.num_bus_formats == 1)
+> +		bus_format = connector->display_info.bus_formats[0];
+> +
+> +	/* Check the connection format */
+> +	switch (bus_format) {
+> +	case MEDIA_BUS_FMT_RGB565_1X16:
+> +		/* R and B components are only 5 bits deep */
+> +		val |= SUN4I_TCON0_FRM_CTL_MODE_R;
+> +		val |= SUN4I_TCON0_FRM_CTL_MODE_B;
+> +	case MEDIA_BUS_FMT_RGB666_1X18:
+> +	case MEDIA_BUS_FMT_RGB666_1X7X3_SPWG:
+> +		/* Fall through: enable dithering */
+> +		val |= SUN4I_TCON0_FRM_CTL_EN;
+> +		break;
+> +	}
+> +
+> +	/* Write dithering settings */
+> +	regmap_write(tcon->regs, SUN4I_TCON_FRM_CTL_REG, val);
+> +}
+> +
+>  static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
+> -				     struct drm_encoder *encoder,
+> +				     const struct drm_encoder *encoder,
 
-The binding documentation is updating accordingly.
+The whole serie looks good, but that should probbaly be part of the
+first patch?
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
----
- Documentation/devicetree/bindings/usb/usb-xhci.txt |  5 ++++-
- drivers/usb/host/xhci-plat.c                       | 25 ++++++++++++++++++----
- drivers/usb/host/xhci.h                            |  3 ++-
- 3 files changed, 27 insertions(+), 6 deletions(-)
+Maxime
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-index c4c00dff4b56..bd1dd316fb23 100644
---- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-@@ -28,7 +28,10 @@ Required properties:
-   - interrupts: one XHCI interrupt should be described here.
- 
- Optional properties:
--  - clocks: reference to a clock
-+  - clocks: reference to the clocks
-+  - clock-names: mandatory if there is a second clock, in this case
-+    the name must be "core" for the first clock and "reg" for the
-+    second one
-   - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
-   - usb3-lpm-capable: determines if platform is USB3 LPM capable
-   - quirk-broken-port-ped: set if the controller has broken port disable mechanism
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index f0231fea524e..596e7a71b666 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -157,6 +157,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	struct resource         *res;
- 	struct usb_hcd		*hcd;
- 	struct clk              *clk;
-+	struct clk              *reg_clk;
- 	int			ret;
- 	int			irq;
- 
-@@ -226,17 +227,27 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	hcd->rsrc_len = resource_size(res);
- 
- 	/*
--	 * Not all platforms have a clk so it is not an error if the
--	 * clock does not exists.
-+	 * Not all platforms have clks so it is not an error if the
-+	 * clock do not exist.
- 	 */
-+	reg_clk = devm_clk_get(&pdev->dev, "reg");
-+	if (!IS_ERR(reg_clk)) {
-+		ret = clk_prepare_enable(reg_clk);
-+		if (ret)
-+			goto put_hcd;
-+	} else if (PTR_ERR(reg_clk) == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		goto put_hcd;
-+	}
-+
- 	clk = devm_clk_get(&pdev->dev, NULL);
- 	if (!IS_ERR(clk)) {
- 		ret = clk_prepare_enable(clk);
- 		if (ret)
--			goto put_hcd;
-+			goto disable_reg_clk;
- 	} else if (PTR_ERR(clk) == -EPROBE_DEFER) {
- 		ret = -EPROBE_DEFER;
--		goto put_hcd;
-+		goto disable_reg_clk;
- 	}
- 
- 	xhci = hcd_to_xhci(hcd);
-@@ -252,6 +263,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	device_wakeup_enable(hcd->self.controller);
- 
- 	xhci->clk = clk;
-+	xhci->reg_clk = reg_clk;
- 	xhci->main_hcd = hcd;
- 	xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
- 			dev_name(&pdev->dev), hcd);
-@@ -322,6 +334,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
- disable_clk:
- 	clk_disable_unprepare(clk);
- 
-+disable_reg_clk:
-+	clk_disable_unprepare(reg_clk);
-+
- put_hcd:
- 	usb_put_hcd(hcd);
- 
-@@ -337,6 +352,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
- 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
- 	struct clk *clk = xhci->clk;
-+	struct clk *reg_clk = xhci->reg_clk;
- 
- 	xhci->xhc_state |= XHCI_STATE_REMOVING;
- 
-@@ -347,6 +363,7 @@ static int xhci_plat_remove(struct platform_device *dev)
- 	usb_put_hcd(xhci->shared_hcd);
- 
- 	clk_disable_unprepare(clk);
-+	clk_disable_unprepare(reg_clk);
- 	usb_put_hcd(hcd);
- 
- 	pm_runtime_set_suspended(&dev->dev);
-diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
-index 05c909b04f14..6dfc4867dbcf 100644
---- a/drivers/usb/host/xhci.h
-+++ b/drivers/usb/host/xhci.h
-@@ -1729,8 +1729,9 @@ struct xhci_hcd {
- 	int		page_shift;
- 	/* msi-x vectors */
- 	int		msix_count;
--	/* optional clock */
-+	/* optional clocks */
- 	struct clk		*clk;
-+	struct clk		*reg_clk;
- 	/* data structures */
- 	struct xhci_device_context_array *dcbaa;
- 	struct xhci_ring	*cmd_ring;
 -- 
-2.16.3
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180419/4f651160/attachment-0001.sig>
