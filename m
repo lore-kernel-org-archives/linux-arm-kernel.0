@@ -1,145 +1,113 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Thu, 19 Apr 2018 09:40:28 -0500
-Subject: [RFC PATCH 0/3] Dealing with the aliases of SI_USER
-In-Reply-To: <20180419092840.GL16308@e103592.cambridge.arm.com> (Dave Martin's
- message of "Thu, 19 Apr 2018 10:28:40 +0100")
-References: <20180413094211.GN16141@n2100.armlinux.org.uk>
- <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
- <20180413170827.GB16308@e103592.cambridge.arm.com>
- <20180413175407.GO16141@n2100.armlinux.org.uk>
- <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
- <20180413184522.GD16308@e103592.cambridge.arm.com>
- <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
- <20180415131206.GR16141@n2100.armlinux.org.uk>
- <87604sa2fu.fsf_-_@xmission.com>
- <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
- <20180419092840.GL16308@e103592.cambridge.arm.com>
-Message-ID: <87lgdjp8df.fsf@xmission.com>
+From: thierry.escande@linaro.org (Thierry Escande)
+Date: Thu, 19 Apr 2018 16:49:21 +0200
+Subject: [PATCH] arm64: msm8916: fix gic_irq_domain_translate warnings
+In-Reply-To: <20180418163415.21646-1-srinivas.kandagatla@linaro.org>
+References: <20180418163415.21646-1-srinivas.kandagatla@linaro.org>
+Message-ID: <89454c94-dd62-80ca-6082-42cb24d43cf4@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin <Dave.Martin@arm.com> writes:
+On 18/04/2018 18:34, srinivas.kandagatla at linaro.org wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> 
+> Remove the usage of IRQ_TYPE_NONE to fix loud warnings from
+> patch (83a86fbb5b56b "irqchip/gic: Loudly complain about
+> the use of IRQ_TYPE_NONE").
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>   arch/arm64/boot/dts/qcom/msm8916.dtsi | 18 +++++++++---------
+>   1 file changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index cfbd72186762..5d66a575c7e1 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
 
-> On Sun, Apr 15, 2018 at 11:16:04AM -0700, Linus Torvalds wrote:
->
-> [...]
->
->> The other thing we should do is to get rid of the stupid padding.
->> Right now "struct siginfo" is pointlessly padded to 128 bytes. That is
->> completely insane, when it's always just zero in the kernel.
->
-> Agreed, inside the kernel the padding achieves nothing.
->
->> So put that _pad[] thing inside #ifndef __KERNEL__, and make
->> copy_siginfo_to_user() write the padding zeroes when copying to user
->> space. The reason for the padding is "future expansion", so we do want
->> to tell the user space that it's maybe up to 128 bytes in size, but if
->> we don't fill it all, we shouldn't waste time and memory on clearing
->> the padding internally.
->> 
->> I'm certainly *hoping* nobody depends on the whole 128 bytes in
->> rt_sigqueueinfo(). In theory you can fill it all (as long as si_code
->> is negative), but the man-page only says "si_value", and the compat
->> function doesn't copy any more than that either, so any user that
->> tries to fill in more than si_value is already broken. In fact, it
->> might even be worth enforcing that in rt_sigqueueinfo(), just to see
->> if anybody plays any games..
->
-> [...]
->
-> Digression:
->
-> Since we don't traditionally zero the tail-padding in the user sigframe,
-> is there a reliable way for userspace to detect newly-added fields in
-> siginfo other than by having an explicit sigaction sa_flags flag to
-> request them?  I imagine something like [1] below from the userspace
-> perspective.
->
-> On a separate thread, the issue of how to report syndrome information
-> for SIGSEGV came up [2] (such as whether the faulting instruction was a
-> read or a write).  This information is useful (and used) by things like
-> userspace sanitisers and qemu.  Currently, reporting this to userspace
-> relies on arch-specific cruft in the sigframe.
->
-> We're committed to maintaining what's already in each arch sigframe,
-> but it would be preferable to have a portable way of adding information
-> to siginfo in a generic way.  si_code doesn't really work for that,
-> since si_codes are mutually exclusive: I can't see a way of adding
-> supplementary information using si_code.
->
-> Anyway, that would be a separate RFC in the future (if ever).
+Reviewed-by: Thierry Escande <thierry.escande@linaro.org>
 
-So far what I have seen done is ``registers'' added to sigcontext.
-Which it looks like you have done with esr.
+Also successfully tested on dragonboard 410c so:
+Tested-by: Thierry Escande <thierry.escande@linaro.org>
 
-Scrubbing information from faults to where the addresses point
-outside of the userspace mapping makes sense.
-
-I think before I would pursue what you are talking about on a generic
-level I would want to look at the fact that we handle unblockable faults
-wrong.  While unlikely it is possible for someone to send a thread
-specific signal at just the right time, and have that signal
-delivered before the synchronous fault.
-
-Then we could pass through additional arguments through that new
-``generic'' path.  Especially what are arguments such as
-tsk->thread.fault_address and tsk->thread.fault_code.
-
-We can do anything we like with a new SA_flag as that allows us to
-change the format of the sigframe.
-
-If we are very careful we can add generic fields after that crazy union
-anonymous union in the _sigfault case of struct siginfo.
-
-The trick would be to find something that would be enough so that people
-don't need to implement their own instruction decoder to see what is
-going on.  Something that is applicable to every sigfault case not just
-SIGSEGV.  Something that we can and want to implement on multiple
-architectures.
-
-The point being doing something generic can be a lot of work, even if it
-is worth it in the end.
-
-
-> [1]
->
-> static volatile int have_extflags = 0;
->
-> static void handler(int n, siginfo_t *si, void *uc)
-> {
-> 	/* ... */
->
-> 	if (have_extflags) {
-> 		/* Check si->si_extflags */
-> 	} else {
-> 		/* fallback */
-> 	}
->
-> 	/* ... */
-> }
->
-> int main(void)
-> {
-> 	/* ... */
->
-> 	struct sigaction sa;
->
-> 	/* ... */
->
-> 	sa.sa_flags = SA_SIGINFO | SA_SIGINFO_EXTFLAGS;
-> 	sa.sa_sigaction = handler;
-> 	if (!sigaction(SIGSEGV, &sa, NULL)) {
-> 		have_extflags = 1;
-> 	} else {
-> 		sa.sa_flags &= ~SA_SIGINFO_EXTFLAGS;
-> 		if (sigaction(SIGSEGV, &sa, NULL))
-> 			goto error;
-> 	}
->
-> 	/* ... */
-> }
->
-> [2] [RFC PATCH] arm64: fault: Don't leak data in ESR context for user fault on kernel VA
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/571428.html
-
-Eric
+> @@ -180,7 +180,7 @@
+>   
+>   	pmu {
+>   		compatible = "arm,cortex-a53-pmu";
+> -		interrupts = <GIC_PPI 7 GIC_CPU_MASK_SIMPLE(4)>;
+> +		interrupts = <GIC_PPI 7 (GIC_CPU_MASK_SIMPLE(4)| IRQ_TYPE_LEVEL_HIGH)>;
+>   	};
+>   
+>   	thermal-zones {
+> @@ -513,7 +513,7 @@
+>   		blsp_i2c2: i2c at 78b6000 {
+>   			compatible = "qcom,i2c-qup-v2.2.1";
+>   			reg = <0x078b6000 0x500>;
+> -			interrupts = <GIC_SPI 96 0>;
+> +			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+>   			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+>   				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
+>   			clock-names = "iface", "core";
+> @@ -528,7 +528,7 @@
+>   		blsp_i2c4: i2c at 78b8000 {
+>   			compatible = "qcom,i2c-qup-v2.2.1";
+>   			reg = <0x078b8000 0x500>;
+> -			interrupts = <GIC_SPI 98 0>;
+> +			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+>   			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+>   				 <&gcc GCC_BLSP1_QUP4_I2C_APPS_CLK>;
+>   			clock-names = "iface", "core";
+> @@ -543,7 +543,7 @@
+>   		blsp_i2c6: i2c at 78ba000 {
+>   			compatible = "qcom,i2c-qup-v2.2.1";
+>   			reg = <0x078ba000 0x500>;
+> -			interrupts = <GIC_SPI 100 0>;
+> +			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+>   			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
+>   				 <&gcc GCC_BLSP1_QUP6_I2C_APPS_CLK>;
+>   			clock-names = "iface", "core";
+> @@ -575,7 +575,7 @@
+>   					"mi2s-bit-clk3";
+>   			#sound-dai-cells = <1>;
+>   
+> -			interrupts = <0 160 0>;
+> +			interrupts = <0 160 IRQ_TYPE_LEVEL_HIGH>;
+>   			interrupt-names = "lpass-irq-lpaif";
+>   			reg = <0x07708000 0x10000>;
+>   			reg-names = "lpass-lpaif";
+> @@ -595,7 +595,7 @@
+>   			reg = <0x07824900 0x11c>, <0x07824000 0x800>;
+>   			reg-names = "hc_mem", "core_mem";
+>   
+> -			interrupts = <0 123 0>, <0 138 0>;
+> +			interrupts = <0 123 IRQ_TYPE_LEVEL_HIGH>, <0 138 IRQ_TYPE_LEVEL_HIGH>;
+>   			interrupt-names = "hc_irq", "pwr_irq";
+>   			clocks = <&gcc GCC_SDCC1_APPS_CLK>,
+>   				 <&gcc GCC_SDCC1_AHB_CLK>,
+> @@ -612,7 +612,7 @@
+>   			reg = <0x07864900 0x11c>, <0x07864000 0x800>;
+>   			reg-names = "hc_mem", "core_mem";
+>   
+> -			interrupts = <0 125 0>, <0 221 0>;
+> +			interrupts = <0 125 IRQ_TYPE_LEVEL_HIGH>, <0 221 IRQ_TYPE_LEVEL_HIGH>;
+>   			interrupt-names = "hc_irq", "pwr_irq";
+>   			clocks = <&gcc GCC_SDCC2_APPS_CLK>,
+>   				 <&gcc GCC_SDCC2_AHB_CLK>,
+> @@ -819,7 +819,7 @@
+>   			iommu-ctx at 2000 {
+>   				compatible = "qcom,msm-iommu-v1-ns";
+>   				reg = <0x2000 0x1000>;
+> -				interrupts = <GIC_SPI 242 0>;
+> +				interrupts = <GIC_SPI 242 IRQ_TYPE_LEVEL_HIGH>;
+>   			};
+>   		};
+>   
+> @@ -864,7 +864,7 @@
+>   				      "bus_clk",
+>   				      "vsync_clk";
+>   
+> -			interrupts = <0 72 0>;
+> +			interrupts = <0 72 IRQ_TYPE_LEVEL_HIGH>;
+>   
+>   			interrupt-controller;
+>   			#interrupt-cells = <1>;
+> 
