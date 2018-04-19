@@ -1,97 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 19 Apr 2018 14:39:31 +0530
-Subject: [PATCH v2 1/2] cpufreq: imx6q: check speed grades for i.MX6ULL
-In-Reply-To: <20180419071942.14828-1-sebastien.szymanski@armadeus.com>
-References: <20180419071942.14828-1-sebastien.szymanski@armadeus.com>
-Message-ID: <CAOh2x==MCPnANhww2JYhGkaALcAPZe_qAUcbZmhyCDwPjOjT2Q@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 19 Apr 2018 11:10:50 +0200
+Subject: [PATCH v5 2/6] dt-bindings: reset: renesas, rzn1-reboot: document
+ RZ/N1 reboot driver
+In-Reply-To: <1523963101-56725-3-git-send-email-michel.pollet@bp.renesas.com>
+References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
+ <1523963101-56725-3-git-send-email-michel.pollet@bp.renesas.com>
+Message-ID: <CAMuHMdU0rR9xcQtuoHXywv_7qpwRsPRyh8+AtHAoyY29BkiHHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 12:49 PM, S?bastien Szymanski
-<sebastien.szymanski@armadeus.com> wrote:
-> Check the max speed supported from the fuses for i.MX6ULL and update the
-> operating points table accordingly.
+Hi Michel,
+
+On Tue, Apr 17, 2018 at 1:04 PM, Michel Pollet
+<michel.pollet@bp.renesas.com> wrote:
+> The Renesas RZ/N1 Family (Part #R9A06G0xx) requires a driver
+> as part of the sysctrl MFD to handle rebooting the CA7 cores.
+> This documents the driver bindings.
 >
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
 > ---
+>  .../devicetree/bindings/power/renesas,rzn1-reboot.txt   | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
 >
-> Changes for v2:
->  - none
-
-Please cc all the maintainers present in MAINTAINERS file. You missed cc'ing me
-and I missed V1 earlier.
-
->  drivers/cpufreq/imx6q-cpufreq.c | 29 +++++++++++++++++++++++------
->  1 file changed, 23 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index 83cf631fc9bc..f094687cae52 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -266,6 +266,8 @@ static void imx6q_opp_check_speed_grading(struct device *dev)
->  }
->
->  #define OCOTP_CFG3_6UL_SPEED_696MHZ    0x2
-> +#define OCOTP_CFG3_6ULL_SPEED_792MHZ   0x2
-> +#define OCOTP_CFG3_6ULL_SPEED_900MHZ   0x3
-
-Looking at the wording everywhere, this represents the maximum
-supported frequency ?
-In that case ...
-
->
->  static void imx6ul_opp_check_speed_grading(struct device *dev)
->  {
-> @@ -287,16 +289,30 @@ static void imx6ul_opp_check_speed_grading(struct device *dev)
->          * Speed GRADING[1:0] defines the max speed of ARM:
->          * 2b'00: Reserved;
->          * 2b'01: 528000000Hz;
-> -        * 2b'10: 696000000Hz;
-> -        * 2b'11: Reserved;
-> +        * 2b'10: 696000000Hz on i.MX6UL, 792000000Hz on i.MX6ULL;
-> +        * 2b'11: 900000000Hz on i.MX6ULL only;
->          * We need to set the max speed of ARM according to fuse map.
->          */
->         val = readl_relaxed(base + OCOTP_CFG3);
->         val >>= OCOTP_CFG3_SPEED_SHIFT;
->         val &= 0x3;
-> -       if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
-> -               if (dev_pm_opp_disable(dev, 696000000))
-> -                       dev_warn(dev, "failed to disable 696MHz OPP\n");
+> diff --git a/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> new file mode 100644
+> index 0000000..a553864
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
+> @@ -0,0 +1,17 @@
+> +DT bindings for the Renesas RZ/N1 Reboot Driver
 > +
-> +       if (of_machine_is_compatible("fsl,imx6ul")) {
-> +               if (val != OCOTP_CFG3_6UL_SPEED_696MHZ)
-> +                       if (dev_pm_opp_disable(dev, 696000000))
-> +                               dev_warn(dev, "failed to disable 696MHz OPP\n");
-> +       }
+> +== Reboot Driver Node ==
 > +
-> +       if (of_machine_is_compatible("fsl,imx6ull")) {
-> +               if (val != OCOTP_CFG3_6ULL_SPEED_792MHZ)
-> +                       if (dev_pm_opp_disable(dev, 792000000))
-> +                               dev_warn(dev, "failed to disable 792MHz OPP\n");
+> +The reboot driver allows restarting the RZ/N1.
 > +
-> +               if (val != OCOTP_CFG3_6ULL_SPEED_900MHZ)
-> +                       if (dev_pm_opp_disable(dev, 900000000))
-> +                               dev_warn(dev, "failed to disable 900MHz OPP\n");
+> +Bindings:
+> ++ Required:
+> +       compatible = "renesas,r9a06g032-reboot", "renesas,rzn1-reboot";
+> +
+> +Example:
+> +       reboot at 4000c120 {
+> +               compatible = "renesas,r9a06g032-reboot",
+> +                               "renesas,rzn1-reboot";
+> +               reg = <0x4000c120 4>,
+> +                       <0x4000c198 4>;
+> +       };
 
-... this looks wrong to me as you will end up disabling 792 MHz if max speed is
-900 MHz.
+I'm afraid this will become a messy DT structure, once device nodes for the
+registers just before, between, and after these 2 registers will be added...
 
-> +       }
-> +
->         iounmap(base);
->  put_node:
->         of_node_put(np);
-> @@ -356,7 +372,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
->                 goto put_reg;
->         }
->
-> -       if (of_machine_is_compatible("fsl,imx6ul"))
-> +       if (of_machine_is_compatible("fsl,imx6ul") ||
-> +           of_machine_is_compatible("fsl,imx6ull"))
->                 imx6ul_opp_check_speed_grading(cpu_dev);
->         else
->                 imx6q_opp_check_speed_grading(cpu_dev);
-> --
-> 2.16.1
->
+There's really only a single multi-function sysctrl device here, using a 4 KiB
+block at 0x4000c000, containing a mix of:
+  1. Clock Control Registers (Table 6.1 [*]),
+  2. Reset Control (Table 6.2 [*]),
+  3. System Configuration (Table 6.3 [*]).
+
+Looks a lot like the mix used in the Amiga's custom chip block at 0xdff000,
+which also cannot be separated into logical blocks without listing individual
+registers ;-)
+
+So I suggest to have a DT binding for the whole block, and a clock driver
+matching against the whole block, registering all clocks and a small reset
+controller driver.
+
+[*] RZ/N1D Group, RZ/N1S Group, RZ/N1L Group User?s Manual: System
+    Introduction, Multiplexing, Electrical and Mechanical Information.
+    https://www.renesas.com/en-eu/doc/products/mpumcu/doc/rz/r01uh0750ej0090-rzn1-introduction.pdf
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
