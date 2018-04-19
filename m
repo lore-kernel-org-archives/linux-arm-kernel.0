@@ -1,80 +1,111 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 19 Apr 2018 11:10:50 +0200
-Subject: [PATCH v5 2/6] dt-bindings: reset: renesas, rzn1-reboot: document
- RZ/N1 reboot driver
-In-Reply-To: <1523963101-56725-3-git-send-email-michel.pollet@bp.renesas.com>
-References: <1523963101-56725-1-git-send-email-michel.pollet@bp.renesas.com>
- <1523963101-56725-3-git-send-email-michel.pollet@bp.renesas.com>
-Message-ID: <CAMuHMdU0rR9xcQtuoHXywv_7qpwRsPRyh8+AtHAoyY29BkiHHg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 19 Apr 2018 10:28:40 +0100
+Subject: [RFC PATCH 0/3] Dealing with the aliases of SI_USER
+In-Reply-To: <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
+References: <20180413094211.GN16141@n2100.armlinux.org.uk>
+ <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
+ <20180413170827.GB16308@e103592.cambridge.arm.com>
+ <20180413175407.GO16141@n2100.armlinux.org.uk>
+ <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
+ <20180413184522.GD16308@e103592.cambridge.arm.com>
+ <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
+ <20180415131206.GR16141@n2100.armlinux.org.uk>
+ <87604sa2fu.fsf_-_@xmission.com>
+ <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
+Message-ID: <20180419092840.GL16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michel,
+On Sun, Apr 15, 2018 at 11:16:04AM -0700, Linus Torvalds wrote:
 
-On Tue, Apr 17, 2018 at 1:04 PM, Michel Pollet
-<michel.pollet@bp.renesas.com> wrote:
-> The Renesas RZ/N1 Family (Part #R9A06G0xx) requires a driver
-> as part of the sysctrl MFD to handle rebooting the CA7 cores.
-> This documents the driver bindings.
->
-> Signed-off-by: Michel Pollet <michel.pollet@bp.renesas.com>
-> ---
->  .../devicetree/bindings/power/renesas,rzn1-reboot.txt   | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
->
-> diff --git a/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
-> new file mode 100644
-> index 0000000..a553864
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/renesas,rzn1-reboot.txt
-> @@ -0,0 +1,17 @@
-> +DT bindings for the Renesas RZ/N1 Reboot Driver
-> +
-> +== Reboot Driver Node ==
-> +
-> +The reboot driver allows restarting the RZ/N1.
-> +
-> +Bindings:
-> ++ Required:
-> +       compatible = "renesas,r9a06g032-reboot", "renesas,rzn1-reboot";
-> +
-> +Example:
-> +       reboot at 4000c120 {
-> +               compatible = "renesas,r9a06g032-reboot",
-> +                               "renesas,rzn1-reboot";
-> +               reg = <0x4000c120 4>,
-> +                       <0x4000c198 4>;
-> +       };
+[...]
 
-I'm afraid this will become a messy DT structure, once device nodes for the
-registers just before, between, and after these 2 registers will be added...
+> The other thing we should do is to get rid of the stupid padding.
+> Right now "struct siginfo" is pointlessly padded to 128 bytes. That is
+> completely insane, when it's always just zero in the kernel.
 
-There's really only a single multi-function sysctrl device here, using a 4 KiB
-block at 0x4000c000, containing a mix of:
-  1. Clock Control Registers (Table 6.1 [*]),
-  2. Reset Control (Table 6.2 [*]),
-  3. System Configuration (Table 6.3 [*]).
+Agreed, inside the kernel the padding achieves nothing.
 
-Looks a lot like the mix used in the Amiga's custom chip block at 0xdff000,
-which also cannot be separated into logical blocks without listing individual
-registers ;-)
+> So put that _pad[] thing inside #ifndef __KERNEL__, and make
+> copy_siginfo_to_user() write the padding zeroes when copying to user
+> space. The reason for the padding is "future expansion", so we do want
+> to tell the user space that it's maybe up to 128 bytes in size, but if
+> we don't fill it all, we shouldn't waste time and memory on clearing
+> the padding internally.
+> 
+> I'm certainly *hoping* nobody depends on the whole 128 bytes in
+> rt_sigqueueinfo(). In theory you can fill it all (as long as si_code
+> is negative), but the man-page only says "si_value", and the compat
+> function doesn't copy any more than that either, so any user that
+> tries to fill in more than si_value is already broken. In fact, it
+> might even be worth enforcing that in rt_sigqueueinfo(), just to see
+> if anybody plays any games..
 
-So I suggest to have a DT binding for the whole block, and a clock driver
-matching against the whole block, registering all clocks and a small reset
-controller driver.
+[...]
 
-[*] RZ/N1D Group, RZ/N1S Group, RZ/N1L Group User?s Manual: System
-    Introduction, Multiplexing, Electrical and Mechanical Information.
-    https://www.renesas.com/en-eu/doc/products/mpumcu/doc/rz/r01uh0750ej0090-rzn1-introduction.pdf
+Digression:
 
-Gr{oetje,eeting}s,
+Since we don't traditionally zero the tail-padding in the user sigframe,
+is there a reliable way for userspace to detect newly-added fields in
+siginfo other than by having an explicit sigaction sa_flags flag to
+request them?  I imagine something like [1] below from the userspace
+perspective.
 
-                        Geert
+On a separate thread, the issue of how to report syndrome information
+for SIGSEGV came up [2] (such as whether the faulting instruction was a
+read or a write).  This information is useful (and used) by things like
+userspace sanitisers and qemu.  Currently, reporting this to userspace
+relies on arch-specific cruft in the sigframe.
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+We're committed to maintaining what's already in each arch sigframe,
+but it would be preferable to have a portable way of adding information
+to siginfo in a generic way.  si_code doesn't really work for that,
+since si_codes are mutually exclusive: I can't see a way of adding
+supplementary information using si_code.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Anyway, that would be a separate RFC in the future (if ever).
+
+Cheers
+---Dave
+
+
+[1]
+
+static volatile int have_extflags = 0;
+
+static void handler(int n, siginfo_t *si, void *uc)
+{
+	/* ... */
+
+	if (have_extflags) {
+		/* Check si->si_extflags */
+	} else {
+		/* fallback */
+	}
+
+	/* ... */
+}
+
+int main(void)
+{
+	/* ... */
+
+	struct sigaction sa;
+
+	/* ... */
+
+	sa.sa_flags = SA_SIGINFO | SA_SIGINFO_EXTFLAGS;
+	sa.sa_sigaction = handler;
+	if (!sigaction(SIGSEGV, &sa, NULL)) {
+		have_extflags = 1;
+	} else {
+		sa.sa_flags &= ~SA_SIGINFO_EXTFLAGS;
+		if (sigaction(SIGSEGV, &sa, NULL))
+			goto error;
+	}
+
+	/* ... */
+}
+
+[2] [RFC PATCH] arm64: fault: Don't leak data in ESR context for user fault on kernel VA
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/571428.html
