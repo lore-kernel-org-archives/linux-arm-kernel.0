@@ -1,74 +1,39 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Apr 2018 17:45:35 +0200
-Subject: [PATCH v2 09/10] ARM: dts: sun7i-a20: Add Video Engine and reserved
- memory nodes
+Date: Thu, 19 Apr 2018 17:45:32 +0200
+Subject: [PATCH v2 06/10] media: v4l: Add definition for Allwinner's
+ MB32-tiled NV12 format
 In-Reply-To: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
 References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180419154536.17846-5-paul.kocialkowski@bootlin.com>
+Message-ID: <20180419154536.17846-2-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds nodes for the Video Engine and the associated reserved memory
-for the Allwinner A20. Up to 96 MiB of memory are dedicated to the VPU.
+This introduces support for Allwinner's MB32-tiled NV12 format, where
+each plane is divided into macroblocks of 32x32 pixels. Hence, the size
+of each plane has to be aligned to 32 bytes. The pixels inside each
+macroblock are coded as they would be if the macroblock was a single
+plane, line after line.
 
-The VPU can only map the first 256 MiB of DRAM, so the reserved memory
-pool has to be located in that area. Following Allwinner's decision in
-downstream software, the last 96 MiB of the first 256 MiB of RAM are
-reserved for this purpose.
+The MB32-tiled NV12 format is used by the video engine on Allwinner
+platforms: it is the default format for decoded frames (and the only one
+available in the oldest supported platforms).
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ include/uapi/linux/videodev2.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index bd0cd3204273..cb6d82065dcf 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -163,6 +163,20 @@
- 		reg = <0x40000000 0x80000000>;
- 	};
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 4b8336f7bcf0..43993a116e2b 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -669,6 +669,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
+ #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
+ #define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
++#define V4L2_PIX_FMT_MB32_NV12 v4l2_fourcc('M', 'N', '1', '2') /* Allwinner NV12 in 32x32 macroblocks */
  
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
-+		ve_memory: cma at 4a000000 {
-+			compatible = "shared-dma-pool";
-+			reg = <0x4a000000 0x6000000>;
-+			no-map;
-+			linux,cma-default;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -451,6 +465,23 @@
- 			};
- 		};
- 
-+		ve: video-engine at 1c0e000 {
-+			compatible = "allwinner,sun4i-a10-video-engine";
-+			reg = <0x01c0e000 0x1000>;
-+			memory-region = <&ve_memory>;
-+
-+			clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
-+
-+			assigned-clocks = <&ccu CLK_VE>;
-+			assigned-clock-rates = <320000000>;
-+
-+			resets = <&ccu RST_VE>;
-+
-+			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c0f000 0x1000>;
+ /* 10bit raw bayer packed, 32 bytes for every 25 pixels, last LSB 6 bits unused */
+ #define V4L2_PIX_FMT_IPU3_SBGGR10	v4l2_fourcc('i', 'p', '3', 'b') /* IPU3 packed 10-bit BGGR bayer */
 -- 
 2.16.3
