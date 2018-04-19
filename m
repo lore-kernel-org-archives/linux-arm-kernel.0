@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 19 Apr 2018 16:05:35 +0200
-Subject: [PATCH 05/61] clk: samsung: simplify getting .drvdata
+Date: Thu, 19 Apr 2018 16:06:08 +0200
+Subject: [PATCH 38/61] pinctrl: simplify getting .drvdata
 In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
 References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180419140641.27926-6-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-39-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,32 +15,57 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply individually.
 
- drivers/clk/samsung/clk-s3c2410-dclk.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/pinctrl/pinctrl-amd.c       | 6 ++----
+ drivers/pinctrl/pinctrl-at91-pio4.c | 6 ++----
+ 2 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-index 077df3e539a7..f41d89cef0f1 100644
---- a/drivers/clk/samsung/clk-s3c2410-dclk.c
-+++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-@@ -219,8 +219,7 @@ static int s3c24xx_dclk1_div_notify(struct notifier_block *nb,
- #ifdef CONFIG_PM_SLEEP
- static int s3c24xx_dclk_suspend(struct device *dev)
+diff --git a/drivers/pinctrl/pinctrl-amd.c b/drivers/pinctrl/pinctrl-amd.c
+index 04ae139671c8..c2c7067b0660 100644
+--- a/drivers/pinctrl/pinctrl-amd.c
++++ b/drivers/pinctrl/pinctrl-amd.c
+@@ -777,8 +777,7 @@ static bool amd_gpio_should_save(struct amd_gpio *gpio_dev, unsigned int pin)
+ 
+ static int amd_gpio_suspend(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-+	struct s3c24xx_dclk *s3c24xx_dclk = dev_get_drvdata(dev);
+-	struct amd_gpio *gpio_dev = platform_get_drvdata(pdev);
++	struct amd_gpio *gpio_dev = dev_get_drvdata(dev);
+ 	struct pinctrl_desc *desc = gpio_dev->pctrl->desc;
+ 	int i;
  
- 	s3c24xx_dclk->reg_save = readl_relaxed(s3c24xx_dclk->base);
- 	return 0;
-@@ -228,8 +227,7 @@ static int s3c24xx_dclk_suspend(struct device *dev)
+@@ -796,8 +795,7 @@ static int amd_gpio_suspend(struct device *dev)
  
- static int s3c24xx_dclk_resume(struct device *dev)
+ static int amd_gpio_resume(struct device *dev)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-+	struct s3c24xx_dclk *s3c24xx_dclk = dev_get_drvdata(dev);
+-	struct amd_gpio *gpio_dev = platform_get_drvdata(pdev);
++	struct amd_gpio *gpio_dev = dev_get_drvdata(dev);
+ 	struct pinctrl_desc *desc = gpio_dev->pctrl->desc;
+ 	int i;
  
- 	writel_relaxed(s3c24xx_dclk->reg_save, s3c24xx_dclk->base);
- 	return 0;
+diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+index 4b57a13758a4..7065068f73f5 100644
+--- a/drivers/pinctrl/pinctrl-at91-pio4.c
++++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+@@ -831,8 +831,7 @@ static struct pinctrl_desc atmel_pinctrl_desc = {
+ 
+ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
++	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
+ 	int i, j;
+ 
+ 	/*
+@@ -860,8 +859,7 @@ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
+ 
+ static int __maybe_unused atmel_pctrl_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
++	struct atmel_pioctrl *atmel_pioctrl = dev_get_drvdata(dev);
+ 	int i, j;
+ 
+ 	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
 -- 
 2.11.0
