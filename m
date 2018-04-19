@@ -1,71 +1,54 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 19 Apr 2018 09:35:23 -0700
-Subject: ioremap() use with specific mailbox drivers and SCMI
-In-Reply-To: <be5f7ed4-4b2c-2a6a-0a41-19e30172a048@gmail.com>
-References: <be5f7ed4-4b2c-2a6a-0a41-19e30172a048@gmail.com>
-Message-ID: <c51e5750-eabd-6728-0a2c-8b1146ca5fab@gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 19 Apr 2018 18:40:01 +0200
+Subject: [PATCH v2 3/6] drm: of: introduce drm_of_media_bus_fmt
+In-Reply-To: <CAL_JsqL1=fzTb5dUgrj07Jv3r026ndsU2o=Nr2eft-bni5jueQ@mail.gmail.com>
+References: <20180417131052.16336-1-peda@axentia.se>
+ <20180417131052.16336-4-peda@axentia.se>
+ <CAL_JsqL1=fzTb5dUgrj07Jv3r026ndsU2o=Nr2eft-bni5jueQ@mail.gmail.com>
+Message-ID: <3181dfde-cd19-41a1-6e6d-5be7a9e40674@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Sudeep as originally intended
+On 2018-04-19 18:22, Rob Herring wrote:
+> On Tue, Apr 17, 2018 at 8:10 AM, Peter Rosin <peda@axentia.se> wrote:
+>> Add a central function to parse a node according to the video
+>> interface binding and get a media bus format.
+>>
+>> Start with only supporting a very limited set of a few basic media
+>> bus formats.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  drivers/gpu/drm/drm_of.c | 38 ++++++++++++++++++++++++++++++++++++++
+>>  include/drm/drm_of.h     |  7 +++++++
+>>  2 files changed, 45 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+>> index 4c191c050e7d..f9473edb60a7 100644
+>> --- a/drivers/gpu/drm/drm_of.c
+>> +++ b/drivers/gpu/drm/drm_of.c
+>> @@ -212,6 +212,44 @@ int drm_of_encoder_active_endpoint(struct device_node *node,
+>>  EXPORT_SYMBOL_GPL(drm_of_encoder_active_endpoint);
+>>
+>>  /*
+>> + * drm_of_media_bus_fmt - return the media bus format described in the node
+>> + * @node: device tree node containing the media bus format
+>> + *
+>> + * @node is presumably an of-graph endpoint node.
+>> + *
+>> + * Return the media bus format, or zero if none is described. Or one of the
+>> + * standard error codes.
+>> + */
+>> +int drm_of_media_bus_fmt(struct device_node *node)
+> 
+> Should use endpoint or ep here instead of node to be clear what node
+> this function operates on.
 
-On 04/19/2018 09:25 AM, Florian Fainelli wrote:
-> Hi Sudeep,
-> 	
-> I am looking at the following files:
-> 
-> arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts:
->         memory at 0 {
->                 device_type = "memory";
->                 reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
->                       <0x00000000 0x05f00000 0x00000000 0x00001000>,
->                       <0x00000000 0x05f02000 0x00000000 0x00efd000>,
->                       <0x00000000 0x06e00000 0x00000000 0x0060f000>,
->                       <0x00000000 0x07410000 0x00000000 0x1aaf0000>,
->                       <0x00000000 0x22000000 0x00000000 0x1c000000>;
->         };
-> 
-> arch/arm64/boot/dts/hisilicon/hi6220.dtsi:
->                 mailbox: mailbox at f7510000 {
->                         compatible = "hisilicon,hi6220-mbox";
->                         reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
->                               <0x0 0x06dff800 0x0 0x0800>; /* Mailbox
-> buffer */
->                         interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
->                         #mbox-cells = <3>;
->                 };
-> 
-> and this is quite an interesting approach, although it appears to be
-> quite fragile and simplistic to me for a number of reasons:
-> 
-> - if the mailbox at f7510000 was ever to be relocated within a parent "bus"
-> node that had a "ranges" property mapping the parent space from
-> 0xf000_0000 to produce offset relative nodes, the translation for its
-> "reg" properties would apply relative to both cells, which means that
-> now, the second cell may no longer point to DRAM anymore. This can be
-> worked around by keeping that particular node outside of the "bus" node,
-> but it is essentially means we mixed address spaces within the "reg"
-> property
-> 
-> - punching holes in DRAM by omitting this mailbox's shared buffer from
-> the top-level memory "reg" property is extremely error prone, and seems
-> to be a shortcut/hack to allow the ARM/ARM64 implementations to
-> successfully call ioremap() against these regions. I am not commenting
-> about the other regions mentioned in the DTS, but pstore is possibly
-> another example where using ioremap() is convenient, but still not quite
-> correct.
-> 
-> Using a reserved-memory entry would be far less error prone, would
-> clearly show the intents of the specific regions being declared, and
-> could, through the use of additional properties (e.g: "map", as opposed
-> to "no-map") indicate a possible need to map that DRAM region into
-> kernel virtual memory and using e.g: memremap() APIs.
-> 
-> Also the semantics of ioremap() are not particularly portable from one
-> architecture to another whereas memremap() is IMHO.
-> 
-> Thank you
-> 
+I just sent v3 and missed this. Anyway, the reason I didn't use ep,
+was that you at one point said "port of endpoint", and I wanted this
+function to cover both cases. And maybe others. Anyway, if I hear
+nothing I'll make the change to ep and I'll also reword the comment
+to talk more decisively about endpoints for v4.
 
--- 
-Florian
+Cheers,
+Peter
