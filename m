@@ -1,88 +1,126 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Apr 2018 17:45:36 +0200
-Subject: [PATCH v2 10/10] ARM: dts: sun8i-a33: Add Video Engine and reserved
- memory nodes
-In-Reply-To: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
-References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180419154536.17846-6-paul.kocialkowski@bootlin.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 19 Apr 2018 16:48:33 +0100
+Subject: [RFC PATCH v2] arm64: fault: Don't leak data in ESR context for user
+ fault on kernel VA
+Message-ID: <20180419154833.27727-1-peter.maydell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds nodes for the Video Engine and the associated reserved memory
-for the Allwinner A33. Up to 96 MiB of memory are dedicated to the VPU.
+If userspace faults on a kernel address, handing them the raw ESR
+value on the sigframe as part of the delivered signal can leak data
+useful to attackers who are using information about the underlying hardware
+fault type (e.g. translation vs permission) as a mechanism to defeat KASLR.
 
-The VPU can only map the first 256 MiB of DRAM, so the reserved memory
-pool has to be located in that area. Following Allwinner's decision in
-downstream software, the last 96 MiB of the first 256 MiB of RAM are
-reserved for this purpose.
+However there are also legitimate uses for the information provided
+in the ESR -- notably the GCC and LLVM sanitizers use this to report
+whether wild pointer accesses by the application are reads or writes
+(since a wild write is a more serious bug than a wild read), so we
+don't want to drop the ESR information entirely.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+For faulting addresses in the kernel, sanitize the ESR. We choose
+to present userspace with the illusion that there is nothing mapped
+in the kernel's part of the address space at all, by reporting all
+faults as level 0 translation faults.
+
+These fields are safe to pass through to userspace as they depend
+only on the instruction that userspace used to provoke the fault:
+ EC IL (always)
+ ISV CM WNR (for all data aborts)
+ SAS SSE SRT SF AR (for data aborts when ISV is 1)
+All the other fields in ESR except DFSC are architecturally RES0
+for an L0 translation fault, so can be zeroed out without confusing
+userspace.
+
+The illusion is not entirely perfect, as there is a tiny wrinkle
+where we will report an alignment fault that was not due to the memory
+type (for instance a LDREX to an unaligned address) as a translation
+fault, whereas if you do this on real unmapped memory the alignment
+fault takes precedence. This is not likely to trip anybody up in
+practice, as the only users we know of for the ESR information who
+care about the behaviour for kernel addresses only really want to
+know about the WnR bit.
+
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+This RFC patch is an alternative proposal to Will's patch
+https://patchwork.kernel.org/patch/10258781/
+which simply removed the ESR record entirely for kernel addresses.
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index a21f2ed07a52..308b532aee1d 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -181,6 +181,20 @@
- 		reg = <0x40000000 0x80000000>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
+Changes v1->v2:
+ * rebased on master
+ * commit message tweak
+ * DABT_CUR and IABT_CUR moved to "can't happen" default case
+ * explicitly clear the bits which are RES0 if ISV == 0
+ * comment text tweaks
+---
+ arch/arm64/mm/fault.c | 55 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 4165485e8b6e..8fa78fa01a4a 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -293,6 +293,61 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+ static void __do_user_fault(struct siginfo *info, unsigned int esr)
+ {
+ 	current->thread.fault_address = (unsigned long)info->si_addr;
 +
-+		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
-+		ve_memory: cma at 4a000000 {
-+			compatible = "shared-dma-pool";
-+			reg = <0x4a000000 0x6000000>;
-+			no-map;
-+			linux,cma-default;
-+		};
-+	};
++	/*
++	 * If the faulting address is in the kernel, we must sanitize the ESR.
++	 * From userspace's point of view, kernel-only mappings don't exist
++	 * at all, so we report them as level 0 translation faults.
++	 * (This is not quite the way that "no mapping there at all" behaves:
++	 * an alignment fault not caused by the memory type would take
++	 * precedence over translation fault for a real access to empty
++	 * space. Unfortunately we can't easily distinguish "alignment fault
++	 * not caused by memory type" from "alignment fault caused by memory
++	 * type", so we ignore this wrinkle and just return the translation
++	 * fault.)
++	 */
++	if (current->thread.fault_address >= TASK_SIZE) {
++		switch (ESR_ELx_EC(esr)) {
++		case ESR_ELx_EC_DABT_LOW:
++			/*
++			 * These bits provide only information about the
++			 * faulting instruction, which userspace knows already.
++			 * We explicitly clear bits which are architecturally
++			 * RES0 in case they are given meanings in future.
++			 */
++			if (esr & ESR_ELx_ISV)
++				esr &= ESR_ELx_EC_MASK | ESR_ELx_IL |
++					ESR_ELx_ISV | ESR_ELx_SAS |
++					ESR_ELx_SSE | ESR_ELx_SRT_MASK |
++					ESR_ELx_SF | ESR_ELx_AR | ESR_ELx_CM |
++					ESR_ELx_WNR;
++			else
++				esr &= ESR_ELx_EC_MASK | ESR_ELx_IL |
++					ESR_ELx_CM | ESR_ELx_WNR;
++			esr |= ESR_ELx_FSC_FAULT;
++			break;
++		case ESR_ELx_EC_IABT_LOW:
++			/*
++			 * Claim a level 0 translation fault.
++			 * All other bits are architecturally RES0 for faults
++			 * reported with that DFSC value, so we clear them.
++			 */
++			esr &= ESR_ELx_EC_MASK | ESR_ELx_IL;
++			esr |= ESR_ELx_FSC_FAULT;
++			break;
++		default:
++			/*
++			 * This should never happen (entry.S only brings us
++			 * into this code for insn and data aborts from a lower
++			 * exception level). Fail safe by not providing an ESR
++			 * context record at all.
++			 */
++			WARN(1, "ESR 0x%x is not DABT or IABT from EL0\n", esr);
++			esr = 0;
++			break;
++		}
++	}
 +
- 	sound: sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "sun8i-a33-audio";
-@@ -204,6 +218,11 @@
- 	};
- 
- 	soc at 1c00000 {
-+		syscon: system-controller at 01c00000 {
-+			compatible = "allwinner,sun8i-a33-syscon", "syscon";
-+			reg = <0x01c00000 0x1000>;
-+		};
-+
- 		tcon0: lcd-controller at 1c0c000 {
- 			compatible = "allwinner,sun8i-a33-tcon";
- 			reg = <0x01c0c000 0x1000>;
-@@ -240,6 +259,25 @@
- 			};
- 		};
- 
-+		ve: video-engine at 01c0e000 {
-+			compatible = "allwinner,sun4i-a10-video-engine";
-+			memory-region = <&ve_memory>;
-+			syscon = <&syscon>;
-+
-+			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
-+
-+			assigned-clocks = <&ccu CLK_VE>;
-+			assigned-clock-rates = <320000000>;
-+
-+			resets = <&ccu RST_BUS_VE>;
-+
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			reg = <0x01c0e000 0x1000>;
-+		};
-+
- 		crypto: crypto-engine at 1c15000 {
- 			compatible = "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
+ 	current->thread.fault_code = esr;
+ 	arm64_force_sig_info(info, esr_to_fault_info(esr)->name, current);
+ }
 -- 
-2.16.3
+2.17.0
