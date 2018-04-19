@@ -1,111 +1,61 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 19 Apr 2018 10:28:40 +0100
-Subject: [RFC PATCH 0/3] Dealing with the aliases of SI_USER
-In-Reply-To: <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
-References: <20180413094211.GN16141@n2100.armlinux.org.uk>
- <CA+55aFwoThxqUeAZSsMhf--ODyhGkmOENH5R6=4+CuaopFx9eA@mail.gmail.com>
- <20180413170827.GB16308@e103592.cambridge.arm.com>
- <20180413175407.GO16141@n2100.armlinux.org.uk>
- <CA+55aFyya6B9_aq8ZSrZT-S-BGbpbDgFvDff5z8upDirpcoiHA@mail.gmail.com>
- <20180413184522.GD16308@e103592.cambridge.arm.com>
- <CA+55aFwMUQbALx60b3JDrTcWVSBS7imS+zCYEMz8NOs=6rE6+A@mail.gmail.com>
- <20180415131206.GR16141@n2100.armlinux.org.uk>
- <87604sa2fu.fsf_-_@xmission.com>
- <CA+55aFw1gmfFH1o+oWMo4TnU5hEczAOiY1g=eMxqYZmy9JqDYw@mail.gmail.com>
-Message-ID: <20180419092840.GL16308@e103592.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 19 Apr 2018 17:32:21 +0800
+Subject: [PATCH 2/6] drm/sun4i: tcon: Rename Dithering related register macros
+In-Reply-To: <20180419093225.614-1-wens@csie.org>
+References: <20180419093225.614-1-wens@csie.org>
+Message-ID: <20180419093225.614-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 15, 2018 at 11:16:04AM -0700, Linus Torvalds wrote:
+Dithering is only supported for TCON channel 0. Throughout the datasheet
+all the names associated with these register are prefixed "TCON0",
+instead of "TCON". The only exception is the control register
+"TCON_FRM_CTL_REG".
 
-[...]
+Rename the macros to reflect this.
 
-> The other thing we should do is to get rid of the stupid padding.
-> Right now "struct siginfo" is pointlessly padded to 128 bytes. That is
-> completely insane, when it's always just zero in the kernel.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
 
-Agreed, inside the kernel the padding achieves nothing.
-
-> So put that _pad[] thing inside #ifndef __KERNEL__, and make
-> copy_siginfo_to_user() write the padding zeroes when copying to user
-> space. The reason for the padding is "future expansion", so we do want
-> to tell the user space that it's maybe up to 128 bytes in size, but if
-> we don't fill it all, we shouldn't waste time and memory on clearing
-> the padding internally.
-> 
-> I'm certainly *hoping* nobody depends on the whole 128 bytes in
-> rt_sigqueueinfo(). In theory you can fill it all (as long as si_code
-> is negative), but the man-page only says "si_value", and the compat
-> function doesn't copy any more than that either, so any user that
-> tries to fill in more than si_value is already broken. In fact, it
-> might even be worth enforcing that in rt_sigqueueinfo(), just to see
-> if anybody plays any games..
-
-[...]
-
-Digression:
-
-Since we don't traditionally zero the tail-padding in the user sigframe,
-is there a reliable way for userspace to detect newly-added fields in
-siginfo other than by having an explicit sigaction sa_flags flag to
-request them?  I imagine something like [1] below from the userspace
-perspective.
-
-On a separate thread, the issue of how to report syndrome information
-for SIGSEGV came up [2] (such as whether the faulting instruction was a
-read or a write).  This information is useful (and used) by things like
-userspace sanitisers and qemu.  Currently, reporting this to userspace
-relies on arch-specific cruft in the sigframe.
-
-We're committed to maintaining what's already in each arch sigframe,
-but it would be preferable to have a portable way of adding information
-to siginfo in a generic way.  si_code doesn't really work for that,
-since si_codes are mutually exclusive: I can't see a way of adding
-supplementary information using si_code.
-
-Anyway, that would be a separate RFC in the future (if ever).
-
-Cheers
----Dave
-
-
-[1]
-
-static volatile int have_extflags = 0;
-
-static void handler(int n, siginfo_t *si, void *uc)
-{
-	/* ... */
-
-	if (have_extflags) {
-		/* Check si->si_extflags */
-	} else {
-		/* fallback */
-	}
-
-	/* ... */
-}
-
-int main(void)
-{
-	/* ... */
-
-	struct sigaction sa;
-
-	/* ... */
-
-	sa.sa_flags = SA_SIGINFO | SA_SIGINFO_EXTFLAGS;
-	sa.sa_sigaction = handler;
-	if (!sigaction(SIGSEGV, &sa, NULL)) {
-		have_extflags = 1;
-	} else {
-		sa.sa_flags &= ~SA_SIGINFO_EXTFLAGS;
-		if (sigaction(SIGSEGV, &sa, NULL))
-			goto error;
-	}
-
-	/* ... */
-}
-
-[2] [RFC PATCH] arm64: fault: Don't leak data in ESR context for user fault on kernel VA
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/571428.html
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f6a071cd5a6f..3d492c8be1fc 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -37,18 +37,21 @@
+ #define SUN4I_TCON_GINT1_REG			0x8
+ 
+ #define SUN4I_TCON_FRM_CTL_REG			0x10
+-#define SUN4I_TCON_FRM_CTL_EN				BIT(31)
+-
+-#define SUN4I_TCON_FRM_SEED_PR_REG		0x14
+-#define SUN4I_TCON_FRM_SEED_PG_REG		0x18
+-#define SUN4I_TCON_FRM_SEED_PB_REG		0x1c
+-#define SUN4I_TCON_FRM_SEED_LR_REG		0x20
+-#define SUN4I_TCON_FRM_SEED_LG_REG		0x24
+-#define SUN4I_TCON_FRM_SEED_LB_REG		0x28
+-#define SUN4I_TCON_FRM_TBL0_REG			0x2c
+-#define SUN4I_TCON_FRM_TBL1_REG			0x30
+-#define SUN4I_TCON_FRM_TBL2_REG			0x34
+-#define SUN4I_TCON_FRM_TBL3_REG			0x38
++#define SUN4I_TCON0_FRM_CTL_EN				BIT(31)
++#define SUN4I_TCON0_FRM_CTL_MODE_R			BIT(6)
++#define SUN4I_TCON0_FRM_CTL_MODE_G			BIT(5)
++#define SUN4I_TCON0_FRM_CTL_MODE_B			BIT(4)
++
++#define SUN4I_TCON0_FRM_SEED_PR_REG		0x14
++#define SUN4I_TCON0_FRM_SEED_PG_REG		0x18
++#define SUN4I_TCON0_FRM_SEED_PB_REG		0x1c
++#define SUN4I_TCON0_FRM_SEED_LR_REG		0x20
++#define SUN4I_TCON0_FRM_SEED_LG_REG		0x24
++#define SUN4I_TCON0_FRM_SEED_LB_REG		0x28
++#define SUN4I_TCON0_FRM_TBL0_REG		0x2c
++#define SUN4I_TCON0_FRM_TBL1_REG		0x30
++#define SUN4I_TCON0_FRM_TBL2_REG		0x34
++#define SUN4I_TCON0_FRM_TBL3_REG		0x38
+ 
+ #define SUN4I_TCON0_CTL_REG			0x40
+ #define SUN4I_TCON0_CTL_TCON_ENABLE			BIT(31)
+-- 
+2.17.0
