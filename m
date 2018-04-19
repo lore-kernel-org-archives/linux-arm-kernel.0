@@ -1,329 +1,71 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 19 Apr 2018 18:27:51 +0200
-Subject: [PATCH v3 7/7] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <20180419162751.25223-1-peda@axentia.se>
-References: <20180419162751.25223-1-peda@axentia.se>
-Message-ID: <20180419162751.25223-8-peda@axentia.se>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 19 Apr 2018 09:35:23 -0700
+Subject: ioremap() use with specific mailbox drivers and SCMI
+In-Reply-To: <be5f7ed4-4b2c-2a6a-0a41-19e30172a048@gmail.com>
+References: <be5f7ed4-4b2c-2a6a-0a41-19e30172a048@gmail.com>
+Message-ID: <c51e5750-eabd-6728-0a2c-8b1146ca5fab@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes this driver work with all(?) drivers that are not
-componentized and instead expect to connect to a panel/bridge. That
-said, the only one tested is atmel_hlcdc.
++Sudeep as originally intended
 
-This hooks the relevant work function previously called by the encoder
-and the component also to the bridge, since the encoder goes away when
-connecting to the bridge interface of the driver and the equivalent of
-bind/unbind of the component is handled by bridge attach/detach.
+On 04/19/2018 09:25 AM, Florian Fainelli wrote:
+> Hi Sudeep,
+> 	
+> I am looking at the following files:
+> 
+> arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts:
+>         memory at 0 {
+>                 device_type = "memory";
+>                 reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+>                       <0x00000000 0x05f00000 0x00000000 0x00001000>,
+>                       <0x00000000 0x05f02000 0x00000000 0x00efd000>,
+>                       <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+>                       <0x00000000 0x07410000 0x00000000 0x1aaf0000>,
+>                       <0x00000000 0x22000000 0x00000000 0x1c000000>;
+>         };
+> 
+> arch/arm64/boot/dts/hisilicon/hi6220.dtsi:
+>                 mailbox: mailbox at f7510000 {
+>                         compatible = "hisilicon,hi6220-mbox";
+>                         reg = <0x0 0xf7510000 0x0 0x1000>, /* IPC_S */
+>                               <0x0 0x06dff800 0x0 0x0800>; /* Mailbox
+> buffer */
+>                         interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+>                         #mbox-cells = <3>;
+>                 };
+> 
+> and this is quite an interesting approach, although it appears to be
+> quite fragile and simplistic to me for a number of reasons:
+> 
+> - if the mailbox at f7510000 was ever to be relocated within a parent "bus"
+> node that had a "ranges" property mapping the parent space from
+> 0xf000_0000 to produce offset relative nodes, the translation for its
+> "reg" properties would apply relative to both cells, which means that
+> now, the second cell may no longer point to DRAM anymore. This can be
+> worked around by keeping that particular node outside of the "bus" node,
+> but it is essentially means we mixed address spaces within the "reg"
+> property
+> 
+> - punching holes in DRAM by omitting this mailbox's shared buffer from
+> the top-level memory "reg" property is extremely error prone, and seems
+> to be a shortcut/hack to allow the ARM/ARM64 implementations to
+> successfully call ioremap() against these regions. I am not commenting
+> about the other regions mentioned in the DTS, but pstore is possibly
+> another example where using ioremap() is convenient, but still not quite
+> correct.
+> 
+> Using a reserved-memory entry would be far less error prone, would
+> clearly show the intents of the specific regions being declared, and
+> could, through the use of additional properties (e.g: "map", as opposed
+> to "no-map") indicate a possible need to map that DRAM region into
+> kernel virtual memory and using e.g: memremap() APIs.
+> 
+> Also the semantics of ioremap() are not particularly portable from one
+> architecture to another whereas memremap() is IMHO.
+> 
+> Thank you
+> 
 
-The lifetime requirements of a bridge and a component are slightly
-different, which is the reason for struct tda998x_bridge.
-
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 157 +++++++++++++++++++++++++++++++++-----
- 1 file changed, 137 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 9c78f7bde49c..012dee61d817 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -36,6 +36,14 @@ struct tda998x_audio_port {
- 	u8 config;		/* AP value */
- };
- 
-+struct tda998x_priv;
-+
-+struct tda998x_bridge {
-+	struct tda998x_priv *priv;
-+	struct device *dev;
-+	struct drm_bridge bridge;
-+};
-+
- struct tda998x_priv {
- 	struct i2c_client *cec;
- 	struct i2c_client *hdmi;
-@@ -63,6 +71,8 @@ struct tda998x_priv {
- 	wait_queue_head_t edid_delay_waitq;
- 	bool edid_delay_active;
- 
-+	struct tda998x_bridge *bridge;
-+	bool local_encoder;
- 	struct drm_encoder encoder;
- 	struct drm_connector connector;
- 
-@@ -75,6 +85,9 @@ struct tda998x_priv {
- #define enc_to_tda998x_priv(x) \
- 	container_of(x, struct tda998x_priv, encoder)
- 
-+#define bridge_to_tda998x_bridge(x) \
-+	container_of(x, struct tda998x_bridge, bridge)
-+
- /* The TDA9988 series of devices use a paged register scheme.. to simplify
-  * things we encode the page # in upper bits of the register #.  To read/
-  * write a given register, we need to make sure CURPAGE register is set
-@@ -842,7 +855,8 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
- 				   struct hdmi_codec_daifmt *daifmt,
- 				   struct hdmi_codec_params *params)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 	int i, ret;
- 	struct tda998x_audio_params audio = {
- 		.sample_width = params->sample_width,
-@@ -899,7 +913,8 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
- 
- static void tda998x_audio_shutdown(struct device *dev, void *data)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 
-@@ -912,7 +927,8 @@ static void tda998x_audio_shutdown(struct device *dev, void *data)
- 
- int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 
-@@ -925,7 +941,8 @@ int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
- static int tda998x_audio_get_eld(struct device *dev, void *data,
- 				 uint8_t *buf, size_t len)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	mutex_lock(&priv->audio_mutex);
- 	memcpy(buf, priv->connector.eld,
-@@ -1126,7 +1143,10 @@ tda998x_connector_best_encoder(struct drm_connector *connector)
- {
- 	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
- 
--	return &priv->encoder;
-+	if (priv->local_encoder)
-+		return &priv->encoder;
-+	else
-+		return priv->bridge->bridge.encoder;
- }
- 
- static
-@@ -1140,6 +1160,7 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- 				  struct drm_device *drm)
- {
- 	struct drm_connector *connector = &priv->connector;
-+	struct drm_encoder *encoder;
- 	int ret;
- 
- 	connector->interlace_allowed = 1;
-@@ -1156,7 +1177,8 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- 	if (ret)
- 		return ret;
- 
--	drm_mode_connector_attach_encoder(&priv->connector, &priv->encoder);
-+	encoder = tda998x_connector_best_encoder(&priv->connector);
-+	drm_mode_connector_attach_encoder(&priv->connector, encoder);
- 
- 	return 0;
- }
-@@ -1668,8 +1690,10 @@ static void tda998x_set_config(struct tda998x_priv *priv,
- 	priv->audio_params = p->audio_params;
- }
- 
--static int tda998x_init(struct device *dev, struct drm_device *drm)
-+static int tda998x_init(struct device *dev, struct drm_device *drm,
-+			bool local_encoder)
- {
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
- 	struct tda998x_encoder_params *params = dev->platform_data;
- 	struct i2c_client *client = to_i2c_client(dev);
- 	struct tda998x_priv *priv;
-@@ -1680,7 +1704,9 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	if (!priv)
- 		return -ENOMEM;
- 
--	dev_set_drvdata(dev, priv);
-+	bridge->priv = priv;
-+	priv->bridge = bridge;
-+	priv->local_encoder = local_encoder;
- 
- 	if (dev->of_node)
- 		crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
-@@ -1691,7 +1717,8 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 		crtcs = 1 << 0;
- 	}
- 
--	priv->encoder.possible_crtcs = crtcs;
-+	if (local_encoder)
-+		priv->encoder.possible_crtcs = crtcs;
- 
- 	ret = tda998x_create(client, priv);
- 	if (ret)
-@@ -1700,11 +1727,15 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	if (!dev->of_node && params)
- 		tda998x_set_config(priv, params);
- 
--	drm_encoder_helper_add(&priv->encoder, &tda998x_encoder_helper_funcs);
--	ret = drm_encoder_init(drm, &priv->encoder, &tda998x_encoder_funcs,
--			       DRM_MODE_ENCODER_TMDS, NULL);
--	if (ret)
--		goto err_encoder;
-+	if (local_encoder) {
-+		drm_encoder_helper_add(&priv->encoder,
-+				       &tda998x_encoder_helper_funcs);
-+		ret = drm_encoder_init(drm, &priv->encoder,
-+				       &tda998x_encoder_funcs,
-+				       DRM_MODE_ENCODER_TMDS, NULL);
-+		if (ret)
-+			goto err_encoder;
-+	}
- 
- 	ret = tda998x_connector_init(priv, drm);
- 	if (ret)
-@@ -1713,7 +1744,8 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 	return 0;
- 
- err_connector:
--	drm_encoder_cleanup(&priv->encoder);
-+	if (local_encoder)
-+		drm_encoder_cleanup(&priv->encoder);
- err_encoder:
- 	tda998x_destroy(priv);
- 	return ret;
-@@ -1721,10 +1753,12 @@ static int tda998x_init(struct device *dev, struct drm_device *drm)
- 
- static void tda998x_fini(struct device *dev)
- {
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+	struct tda998x_priv *priv = bridge->priv;
- 
- 	drm_connector_cleanup(&priv->connector);
--	drm_encoder_cleanup(&priv->encoder);
-+	if (priv->local_encoder)
-+		drm_encoder_cleanup(&priv->encoder);
- 	tda998x_destroy(priv);
- }
- 
-@@ -1732,7 +1766,7 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
- {
- 	struct drm_device *drm = data;
- 
--	return tda998x_init(dev, drm);
-+	return tda998x_init(dev, drm, true);
- }
- 
- static void tda998x_unbind(struct device *dev, struct device *master,
-@@ -1746,19 +1780,102 @@ static const struct component_ops tda998x_ops = {
- 	.unbind = tda998x_unbind,
- };
- 
-+/* DRM bridge functions */
-+
-+static int tda998x_bridge_attach(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct device *dev = bridge->dev;
-+	struct drm_device *drm = bridge->bridge.dev;
-+
-+	dev_info(dev, "attach\n");
-+	return tda998x_init(dev, drm, false);
-+}
-+
-+static void tda998x_bridge_detach(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct device *dev = bridge->dev;
-+
-+	dev_info(dev, "detach\n");
-+	tda998x_fini(dev);
-+}
-+
-+static void tda998x_bridge_enable(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	dev_info(bridge->dev, "enable\n");
-+	tda998x_dpms(priv, DRM_MODE_DPMS_ON);
-+}
-+
-+static void tda998x_bridge_disable(struct drm_bridge *dbridge)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	dev_info(bridge->dev, "disable\n");
-+	tda998x_dpms(priv, DRM_MODE_DPMS_OFF);
-+}
-+
-+static void tda998x_bridge_mode_set(struct drm_bridge *dbridge,
-+				    struct drm_display_mode *mode,
-+				    struct drm_display_mode *adjusted_mode)
-+{
-+	struct tda998x_bridge *bridge = bridge_to_tda998x_bridge(dbridge);
-+	struct tda998x_priv *priv = bridge->priv;
-+
-+	tda998x_mode_set(priv, mode, adjusted_mode);
-+}
-+
-+static const struct drm_bridge_funcs tda998x_bridge_funcs = {
-+	.attach = tda998x_bridge_attach,
-+	.detach = tda998x_bridge_detach,
-+	.enable = tda998x_bridge_enable,
-+	.disable = tda998x_bridge_disable,
-+	.mode_set = tda998x_bridge_mode_set,
-+};
-+
- static int
- tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
- {
-+	struct device *dev = &client->dev;
-+	struct tda998x_bridge *bridge;
-+	int ret;
-+
- 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
- 		dev_warn(&client->dev, "adapter does not support I2C\n");
- 		return -EIO;
- 	}
--	return component_add(&client->dev, &tda998x_ops);
-+
-+	bridge = devm_kzalloc(dev, sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge)
-+		return -ENOMEM;
-+
-+	bridge->dev = dev;
-+	dev_set_drvdata(dev, bridge);
-+
-+	bridge->bridge.funcs = &tda998x_bridge_funcs;
-+	bridge->bridge.of_node = dev->of_node;
-+	drm_bridge_add(&bridge->bridge);
-+
-+	ret = component_add(dev, &tda998x_ops);
-+
-+	if (ret)
-+		drm_bridge_remove(&bridge->bridge);
-+
-+	return ret;
- }
- 
- static int tda998x_remove(struct i2c_client *client)
- {
--	component_del(&client->dev, &tda998x_ops);
-+	struct device *dev = &client->dev;
-+	struct tda998x_bridge *bridge = dev_get_drvdata(dev);
-+
-+	drm_bridge_remove(&bridge->bridge);
-+	component_del(dev, &tda998x_ops);
-+
- 	return 0;
- }
- 
 -- 
-2.11.0
+Florian
