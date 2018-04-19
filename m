@@ -1,68 +1,43 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 19 Apr 2018 11:37:29 +0100
-Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
- supported
-In-Reply-To: <20180419041632.GF24576@vireshk-i7>
-References: <20180418155643.36464-1-code@mmayer.net>
- <20180418155643.36464-3-code@mmayer.net> <20180419041632.GF24576@vireshk-i7>
-Message-ID: <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Thu, 19 Apr 2018 12:40:13 +0200
+Subject: [PATCH 0/6] devfreq: rk3399_dmc: improve rk3399_dmc driver and it's
+ documentation
+Message-ID: <20180419104019.24406-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear all,
 
+These patches is an attempt to improve a little bit the rk3399_dmc
+driver and it's documentation in order to have all in a better shape for
+a future work I am doing. My final intention is add ddrfreq support for
+rockchip drm driver, but the patches for this are still
+work-in-progress. So let's start with this first patchset that is
+basically some fixes/improvements for the rk3399_dmc driver.
 
-On 19/04/18 05:16, Viresh Kumar wrote:
-> On 18-04-18, 08:56, Markus Mayer wrote:
->> From: Jim Quinlan <jim2101024@gmail.com>
->>
->> If the SCMI cpufreq driver is supported, we bail, so that the new
->> approach can be used.
->>
->> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
->> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->> ---
->>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
->> index b07559b9ed99..b4861a730162 100644
->> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
->> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
->> @@ -164,6 +164,8 @@
->>  #define BRCM_AVS_CPU_INTR	"brcm,avs-cpu-l2-intr"
->>  #define BRCM_AVS_HOST_INTR	"sw_intr"
->>  
->> +#define ARM_SCMI_COMPAT		"arm,scmi"
->> +
->>  struct pmap {
->>  	unsigned int mode;
->>  	unsigned int p1;
->> @@ -511,6 +513,20 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
->>  	struct device *dev;
->>  	int host_irq, ret;
->>  
->> +	/*
->> +	 * If the SCMI cpufreq driver is supported, we bail, so that the more
->> +	 * modern approach can be used.
->> +	 */
->> +	if (IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)) {
->> +		struct device_node *np;
->> +
->> +		np = of_find_compatible_node(NULL, NULL, ARM_SCMI_COMPAT);
->> +		if (np) {
->> +			of_node_put(np);
->> +			return -ENXIO;
->> +		}
->> +	}
->> +
-> 
-> What about adding !CONFIG_ARM_SCMI_PROTOCOL in Kconfig dependency and don't
-> compile the driver at all ?
-> 
+Best regards,
 
-Unfortunately, that may not be good idea with single image needing both
-configs to be enabled.
+Enric Balletbo i Serra (3):
+  dt-bindings: clock: add DDR3 standard speed bins.
+  devfreq: rk3399_dmc: remove wait for dcf irq event.
+  dt-bindings: devfreq: rk3399_dmc: remove interrupts as is not
+    required.
+
+Lin Huang (2):
+  devfreq: rk3399_dmc: do not print error when get supply and clk defer.
+  devfreq: rk3399_dmc: register devfreq notification to dmc driver.
+
+Nick Milner (1):
+  dt-bindings: devfreq: rk3399_dmc: improve binding documentation.
+
+ .../bindings/devfreq/rk3399_dmc.txt           | 204 +++++++++---------
+ drivers/devfreq/rk3399_dmc.c                  | 106 +--------
+ drivers/soc/rockchip/pm_domains.c             |  31 +++
+ include/dt-bindings/clock/ddr.h               |  34 +++
+ include/soc/rockchip/rk3399_dmc.h             |  63 ++++++
+ 5 files changed, 238 insertions(+), 200 deletions(-)
+ create mode 100644 include/dt-bindings/clock/ddr.h
+ create mode 100644 include/soc/rockchip/rk3399_dmc.h
 
 -- 
-Regards,
-Sudeep
+2.17.0
