@@ -1,149 +1,81 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 19 Apr 2018 15:21:43 +0200
-Subject: [PATCH 4/4] rtc: stm32: get DBP register and mask from DT st,
- syscfg property
-In-Reply-To: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
-References: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1524144103-21432-5-git-send-email-amelie.delaunay@st.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Thu, 19 Apr 2018 15:24:56 +0200
+Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
+ irq_domain
+In-Reply-To: <118e66b4-3137-7af5-b93d-b1949fad575c@arm.com>
+References: <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <alpine.DEB.2.21.1802230938510.11168@nanos.tec.linutronix.de>
+ <a709e416-4024-f804-b2ff-ae6c2171a7c8@arm.com>
+ <CAFvLkMSZjgFMAe0VRc0AEpG89BgXkfMb9+ivJ8V+PFighOoDRA@mail.gmail.com>
+ <118e66b4-3137-7af5-b93d-b1949fad575c@arm.com>
+Message-ID: <ef86e131-ffb4-b883-b9ca-1e670d960d3e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RTC driver should not be aware of the PWR registers offset and bits
-position. Furthermore, we can imagine that DBP relative register and bit
-mask could change depending on the SoC.
-So this patch introduces 2 parameters, dbp_reg and dbp_mask, allowing to
-get PWR_CR and PWR_CR_DBP from device tree. And it prepares next RTC
-version, backup domain write protection is disabled only if needed.
+Hi Radoslaw
 
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- drivers/rtc/rtc-stm32.c | 59 +++++++++++++++++++++++++++++++------------------
- 1 file changed, 37 insertions(+), 22 deletions(-)
+I preparing a patch serie which add support of stm32mp1.
+Would you like, I add your patch (with commit message updated)
+in my serie?
+patch:
+-irqchip: stm32: Optimizes and cleans up stm32-exti irq_domain
 
-diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
-index 6a06078..de49b5b 100644
---- a/drivers/rtc/rtc-stm32.c
-+++ b/drivers/rtc/rtc-stm32.c
-@@ -85,23 +85,17 @@
- #define RTC_WPR_2ND_KEY			0x53
- #define RTC_WPR_WRONG_KEY		0xFF
- 
--/*
-- * RTC registers are protected against parasitic write access.
-- * PWR_CR_DBP bit must be set to enable write access to RTC registers.
-- */
--/* STM32_PWR_CR */
--#define PWR_CR				0x00
--/* STM32_PWR_CR bit field */
--#define PWR_CR_DBP			BIT(8)
--
- struct stm32_rtc_data {
- 	bool has_pclk;
-+	bool need_dbp;
- };
- 
- struct stm32_rtc {
- 	struct rtc_device *rtc_dev;
- 	void __iomem *base;
- 	struct regmap *dbp;
-+	unsigned int dbp_reg;
-+	unsigned int dbp_mask;
- 	struct stm32_rtc_data *data;
- 	struct clk *pclk;
- 	struct clk *rtc_ck;
-@@ -498,10 +492,12 @@ static const struct rtc_class_ops stm32_rtc_ops = {
- 
- static const struct stm32_rtc_data stm32_rtc_data = {
- 	.has_pclk = false,
-+	.need_dbp = true,
- };
- 
- static const struct stm32_rtc_data stm32h7_rtc_data = {
- 	.has_pclk = true,
-+	.need_dbp = true,
- };
- 
- static const struct of_device_id stm32_rtc_of_match[] = {
-@@ -576,7 +572,6 @@ static int stm32_rtc_probe(struct platform_device *pdev)
- {
- 	struct stm32_rtc *rtc;
- 	struct resource *res;
--	const struct of_device_id *match;
- 	int ret;
- 
- 	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
-@@ -588,15 +583,31 @@ static int stm32_rtc_probe(struct platform_device *pdev)
- 	if (IS_ERR(rtc->base))
- 		return PTR_ERR(rtc->base);
- 
--	rtc->dbp = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
--						   "st,syscfg");
--	if (IS_ERR(rtc->dbp)) {
--		dev_err(&pdev->dev, "no st,syscfg\n");
--		return PTR_ERR(rtc->dbp);
--	}
-+	rtc->data = (struct stm32_rtc_data *)
-+		    of_device_get_match_data(&pdev->dev);
-+
-+	if (rtc->data->need_dbp) {
-+		rtc->dbp = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-+							   "st,syscfg");
-+		if (IS_ERR(rtc->dbp)) {
-+			dev_err(&pdev->dev, "no st,syscfg\n");
-+			return PTR_ERR(rtc->dbp);
-+		}
- 
--	match = of_match_device(stm32_rtc_of_match, &pdev->dev);
--	rtc->data = (struct stm32_rtc_data *)match->data;
-+		ret = of_property_read_u32_index(pdev->dev.of_node, "st,syscfg",
-+						 1, &rtc->dbp_reg);
-+		if (ret) {
-+			dev_err(&pdev->dev, "can't read DBP register offset\n");
-+			return ret;
-+		}
-+
-+		ret = of_property_read_u32_index(pdev->dev.of_node, "st,syscfg",
-+						 2, &rtc->dbp_mask);
-+		if (ret) {
-+			dev_err(&pdev->dev, "can't read DBP register mask\n");
-+			return ret;
-+		}
-+	}
- 
- 	if (!rtc->data->has_pclk) {
- 		rtc->pclk = NULL;
-@@ -624,7 +635,9 @@ static int stm32_rtc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err;
- 
--	regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, PWR_CR_DBP);
-+	if (rtc->data->need_dbp)
-+		regmap_update_bits(rtc->dbp, rtc->dbp_reg,
-+				   rtc->dbp_mask, rtc->dbp_mask);
- 
- 	/*
- 	 * After a system reset, RTC_ISR.INITS flag can be read to check if
-@@ -684,7 +697,8 @@ static int stm32_rtc_probe(struct platform_device *pdev)
- 		clk_disable_unprepare(rtc->pclk);
- 	clk_disable_unprepare(rtc->rtc_ck);
- 
--	regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, 0);
-+	if (rtc->data->need_dbp)
-+		regmap_update_bits(rtc->dbp, rtc->dbp_reg, rtc->dbp_mask, 0);
- 
- 	device_init_wakeup(&pdev->dev, false);
- 
-@@ -707,8 +721,9 @@ static int stm32_rtc_remove(struct platform_device *pdev)
- 	if (rtc->data->has_pclk)
- 		clk_disable_unprepare(rtc->pclk);
- 
--	/* Enable backup domain write protection */
--	regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, 0);
-+	/* Enable backup domain write protection if needed */
-+	if (rtc->data->need_dbp)
-+		regmap_update_bits(rtc->dbp, rtc->dbp_reg, rtc->dbp_mask, 0);
- 
- 	device_init_wakeup(&pdev->dev, false);
- 
--- 
-2.7.4
+BR
+Ludo
+
+On 03/14/2018 01:04 PM, Marc Zyngier wrote:
+> On 14/03/18 11:46, Rados?aw Pietrzyk wrote:
+>> Hi Marc,
+>> We had a quite fruitful discussion in this mail thread regarding this
+>> topic and Ludovic acked it so recently I have asked Thomas if he still
+>> needs this v3 patch with detailed explanation especially as v2 version
+>> of stm32-gpio patch has been already taken by Linus. However if you
+>> require I can resend v3 of this patch only with this detailed explanation.
+> 
+> That'd be useful. The changelog is the only thing that will be left from
+> this discussion, so it'd better be complete and accurate. If you quickly
+> send a v3 for this single patch, I'll queue it right away.
+> 
+> Thanks,
+> 
+> 	M.
+> 
+>>
+>> 2018-03-14 12:09 GMT+01:00 Marc Zyngier <marc.zyngier@arm.com
+>> <mailto:marc.zyngier@arm.com>>:
+>>
+>>      Radoslaw,
+>>
+>>      On 23/02/18 08:42, Thomas Gleixner wrote:
+>>      > Radoslaw,
+>>      >
+>>      > On Fri, 23 Feb 2018, Radoslaw Pietrzyk wrote:
+>>      >
+>>      >> - discards setting handle_simple_irq handler for hierarchy interrupts
+>>      >> - removes acking in chained irq handler as this is done by
+>>      >> irq_chip itself inside handle_edge_irq
+>>      >> - removes unneeded irq_domain_ops.xlate callback
+>>      >
+>>      > if that's all functionally correct, then this is a nice cleanup. Though
+>>      > from the above changelog its hard to tell because it merily tells WHAT the
+>>      > patch does, but not WHY. The WHY is the important information for a
+>>      > reviewer who is not familiar with the particular piece of code/hardware.
+>>      >
+>>      > Can you please amend the changelog with proper explanations why a
+>>      > particular piece of code is not needed or has to be changed to something
+>>      > else?
+>>
+>>      Any update on this? I'd like to queue this for 4.17, but Thomas'
+>>      comments should be addressed before that happens. Ca you please respin a
+>>      version with a better change log and the various review tags?
+>>
+>>      Thanks,
+>>
+>>      ? ? ? ? M.
+>>      --
+>>      Jazz is not dead. It just smells funny...
+>>
+>>
+> 
+> 
