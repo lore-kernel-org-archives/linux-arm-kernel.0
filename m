@@ -1,56 +1,39 @@
-From: kevans@FreeBSD.org (kevans at FreeBSD.org)
-Date: Thu, 19 Apr 2018 09:11:03 -0500
-Subject: [PATCH v3] ARM: dts: sunxi: Add sid for a83t
-Message-ID: <20180419141103.38196-1-kevans@FreeBSD.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 19 Apr 2018 22:24:42 +0800
+Subject: [PATCH V2 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz
+ clock source
+In-Reply-To: <20180419140236.GU25429@dragon>
+References: <1521426645-19246-1-git-send-email-Anson.Huang@nxp.com>
+ <1521426645-19246-2-git-send-email-Anson.Huang@nxp.com>
+ <20180417142203.GM25429@dragon>
+ <152410785516.46528.12432838242068784117@swboyd.mtv.corp.google.com>
+ <20180419140236.GU25429@dragon>
+Message-ID: <20180419142441.GW25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner a83t has a 1 KB sid block with efuse for security rootkey and thermal
-calibration data, add node to describe it.
+On Thu, Apr 19, 2018 at 10:02:37PM +0800, Shawn Guo wrote:
+> On Wed, Apr 18, 2018 at 08:17:35PM -0700, Stephen Boyd wrote:
+> > Quoting Shawn Guo (2018-04-17 07:22:05)
+> > > On Mon, Mar 19, 2018 at 10:30:45AM +0800, Anson Huang wrote:
+> > > > On i.MX6SX SabreAuto board, there is external 24MHz clock
+> > > > source for analog clock2, add this clock source to clock tree.
+> > > > 
+> > > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > > > ---
+> > > > changes since V1:
+> > > >       remove unnecessary clocks container.
+> > > 
+> > > I understand this is suggested by Fabio, but I'm afraid that it's not
+> > > going to work with imx_obtain_fixed_clock() call, which is coded to
+> > > look for clocks under /clocks node.
+> > > 
+> > 
+> > Should patch #1 be dropped from clk tree?
+> 
+> No.  Patch #1 is good.
 
-a83t-sid is not currently supported by nvmem/sunxi-sid, but it is
-supported in an external driver for FreeBSD.
+Sorry, Stephen.  I just had a closer look at the driver code, and I
+think it can be done in a better way.  So please drop patch #1 for now.
 
-Signed-off-by: Kyle Evans <kevans@FreeBSD.org>
----
-
-Changes in v3:
-- rebased against 4.17
-
-Changes in v2:
-- remove bogus "From:" line in commit text, no functional change
-
- .../devicetree/bindings/nvmem/allwinner,sunxi-sid.txt        | 1 +
- arch/arm/boot/dts/sun8i-a83t.dtsi                            | 5 +++++
- 2 files changed, 6 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-index d69543701d5d..e319fe5e205a 100644
---- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-+++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible: Should be one of the following:
-   "allwinner,sun4i-a10-sid"
-   "allwinner,sun7i-a20-sid"
-+  "allwinner,sun8i-a83t-sid"
-   "allwinner,sun8i-h3-sid"
-   "allwinner,sun50i-a64-sid"
- 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 568307639be8..379981389eea 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -492,6 +492,11 @@
- 			#size-cells = <0>;
- 		};
- 
-+		sid: eeprom at 1c14000 {
-+			compatible = "allwinner,sun8i-a83t-sid";
-+			reg = <0x1c14000 0x400>;
-+		};
-+
- 		usb_otg: usb at 1c19000 {
- 			compatible = "allwinner,sun8i-a83t-musb",
- 				     "allwinner,sun8i-a33-musb";
--- 
-2.17.0
+Shawn
