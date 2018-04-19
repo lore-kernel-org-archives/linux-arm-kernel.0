@@ -1,129 +1,79 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Thu, 19 Apr 2018 09:17:48 +0800
-Subject: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA83868C029@FRAEML521-MBX.china.huawei.com>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <1501876754-1064-3-git-send-email-nleeder@codeaurora.org>
- <883d32ce-6581-ecf6-5088-ecb238322ebe@huawei.com>
- <5FC3163CFD30C246ABAA99954A238FA83868C029@FRAEML521-MBX.china.huawei.com>
-Message-ID: <70d0c34c-853d-547b-49cb-4b70a85c4da4@huawei.com>
+From: sgoel@codeaurora.org (Sameer Goel)
+Date: Wed, 18 Apr 2018 20:19:36 -0600
+Subject: [PATCH] arm64: kexec: Add machine_kexec_mask_interrupts to kexec path
+Message-ID: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shameerali,
+In kdump code path SPIs at GIC level are explicitly cleared by
+calling machine_kexec_mask_interrupts. In case of kexec this
+functionality is delegated for most part to the device shutdown
+functions.
+Add machine_kexec_mask_interrupts to machine_shutdown path to
+ensure that the irqs are masked at the gic level.
 
-On 2018/4/18 19:05, Shameerali Kolothum Thodi wrote:
-> 
-> 
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
->> On Behalf Of Yisheng Xie
->> Sent: Thursday, March 29, 2018 8:04 AM
->> To: Neil Leeder <nleeder@codeaurora.org>; Will Deacon
->> <will.deacon@arm.com>; Mark Rutland <mark.rutland@arm.com>
->> Cc: Mark Langsdorf <mlangsdo@redhat.com>; Jon Masters
->> <jcm@redhat.com>; Timur Tabi <timur@codeaurora.org>; linux-
->> kernel at vger.kernel.org; Mark Brown <broonie@kernel.org>; Mark Salter
->> <msalter@redhat.com>; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH 2/2] perf: add arm64 smmuv3 pmu driver
->>
->> Hi Neil,
->>
->> On 2017/8/5 3:59, Neil Leeder wrote:
->>> +	mem_resource_0 = platform_get_resource(pdev, IORESOURCE_MEM,
->> 0);
->>> +	mem_map_0 = devm_ioremap_resource(&pdev->dev,
->> mem_resource_0);
->>> +
->> Can we use devm_ioremap instead? for the reg_base of smmu_pmu is
->> IMPLEMENTATION DEFINED. If the reg of smmu_pmu is inside smmu,
->> devm_ioremap_resource will failed and return -EBUSY, eg.:
->>
->>  smmu reg ranges:		0x180000000 ~ 0x1801fffff
->>  its smmu_pmu reg ranges:	0x180001000 ~ 0x180001fff
-> 
-> I think this will not solve the issue completely as the smmu v3 driver 
-> uses devm_ioremap_resource() currently and that will fail because of
-> the overlap.
+Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
+---
+Porting code for masking irqs at gic from kdump shutdown to kexec path.
 
-Right, I get your point.
+There was discussion about this functionality in [1].
 
-> 
-> Please find the discussion here:
-> https://lkml.org/lkml/2018/1/31/235
+[1] https://patchwork.kernel.org/patch/9817499/
 
-Thanks for the infomation.
+ arch/arm64/include/asm/kexec.h    | 6 ++++++
+ arch/arm64/kernel/machine_kexec.c | 2 +-
+ arch/arm64/kernel/process.c       | 2 ++
+ 3 files changed, 9 insertions(+), 1 deletion(-)
 
-Thanks
-Yisheng
-
-> 
-> Thanks,
-> Shameer
-> 
->>> +	if (IS_ERR(mem_map_0)) {
->>> +		dev_err(&pdev->dev, "Can't map SMMU PMU @%pa\n",
->>> +			&mem_resource_0->start);
->>> +		return PTR_ERR(mem_map_0);
->>> +	}
->>> +
->>> +	smmu_pmu->reg_base = mem_map_0;
->>> +	smmu_pmu->pmu.name =
->>> +		devm_kasprintf(&pdev->dev, GFP_KERNEL, "smmu_0_%llx",
->>> +			       (mem_resource_0->start) >> SMMU_PA_SHIFT);
->>> +
->>> +	if (!smmu_pmu->pmu.name) {
->>> +		dev_err(&pdev->dev, "Failed to create PMU name");
->>> +		return -EINVAL;
->>> +	}
->>> +
->>> +	ceid_64 = readq(smmu_pmu->reg_base + SMMU_PMCG_CEID0);
->>> +	ceid[0] = ceid_64 & GENMASK(31, 0);
->>> +	ceid[1] = ceid_64 >> 32;
->>> +	ceid_64 = readq(smmu_pmu->reg_base + SMMU_PMCG_CEID1);
->>> +	ceid[2] = ceid_64 & GENMASK(31, 0);
->>> +	ceid[3] = ceid_64 >> 32;
->>> +	bitmap_from_u32array(smmu_pmu->supported_events,
->> SMMU_MAX_EVENT_ID,
->>> +			     ceid, SMMU_NUM_EVENTS_U32);
->>> +
->>> +	/* Determine if page 1 is present */
->>> +	if (readl(smmu_pmu->reg_base + SMMU_PMCG_CFGR) &
->>> +	    SMMU_PMCG_CFGR_RELOC_CTRS) {
->>> +		mem_resource_1 = platform_get_resource(pdev,
->> IORESOURCE_MEM, 1);
->>> +		mem_map_1 = devm_ioremap_resource(&pdev->dev,
->> mem_resource_1);
->>> +
->> The same as above.
->>
->> Thanks
->> Yisheng
->>
->>> +		if (IS_ERR(mem_map_1)) {
->>> +			dev_err(&pdev->dev, "Can't map SMMU PMU
->> @%pa\n",
->>> +				&mem_resource_1->start);
->>> +			return PTR_ERR(mem_map_1);
->>> +		}
->>> +		smmu_pmu->reloc_base = mem_map_1;
->>> +	} else {
->>> +		smmu_pmu->reloc_base = smmu_pmu->reg_base;
->>> +	}
->>> +
->>> +	irq = platform_get_irq(pdev, 0);
->>> +	if (irq < 0) {
->>> +		dev_err(&pdev->dev,
->>> +			"Failed to get valid irq for smmu @%pa\n",
->>> +			&mem_resource_0->start);
->>> +		return irq;
->>> +	}
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index e17f052..f9ddb41 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -93,6 +93,12 @@ static inline void crash_prepare_suspend(void) {}
+ static inline void crash_post_resume(void) {}
+ #endif
+ 
++#if defined(CONFIG_KEXEC)
++extern void machine_kexec_mask_interrupts(void);
++#else
++static inline void machine_kexec_mask_interrupts(void) {}
++#endif
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index f76ea92..b453180 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -213,7 +213,7 @@ void machine_kexec(struct kimage *kimage)
+ 	BUG(); /* Should never get here. */
+ }
+ 
+-static void machine_kexec_mask_interrupts(void)
++void machine_kexec_mask_interrupts(void)
+ {
+ 	unsigned int i;
+ 	struct irq_desc *desc;
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index f08a2ed..9d0337e 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -58,6 +58,7 @@
+ #include <asm/mmu_context.h>
+ #include <asm/processor.h>
+ #include <asm/stacktrace.h>
++#include <asm/kexec.h>
+ 
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ #include <linux/stackprotector.h>
+@@ -107,6 +108,7 @@ void arch_cpu_idle_dead(void)
+ void machine_shutdown(void)
+ {
+ 	disable_nonboot_cpus();
++	machine_kexec_mask_interrupts();
+ }
+ 
+ /*
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
