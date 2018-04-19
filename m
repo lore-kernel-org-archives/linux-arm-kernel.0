@@ -1,69 +1,38 @@
-From: kevans@freebsd.org (Kyle Evans)
-Date: Thu, 19 Apr 2018 10:11:22 -0500
-Subject: [linux-sunxi] Re: [PATCH v2 14/16] arm: dts: sun8i: h3: enable H3
- sid controller
-In-Reply-To: <470ec61e-8b08-5193-ede1-01d02b2c865e@gmail.com>
-References: <20180128232919.12639-1-embed3d@gmail.com>
- <20180128232919.12639-15-embed3d@gmail.com>
- <20180129095200.attg7cgvpifpchtn@flea.lan>
- <470ec61e-8b08-5193-ede1-01d02b2c865e@gmail.com>
-Message-ID: <CACNAnaGVSbk7czb+mcGTx1C=YwCWe1qqHQDQe9+PNifwEXovMw@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 19 Apr 2018 17:12:50 +0200
+Subject: [PATCH v2 0/2] memory: aemif: add support for machine code
+Message-ID: <20180419151252.26212-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 29, 2018 at 6:03 AM, Philipp Rossak <embed3d@gmail.com> wrote:
->
->
-> On 29.01.2018 10:52, Maxime Ripard wrote:
->>
->> On Mon, Jan 29, 2018 at 12:29:17AM +0100, Philipp Rossak wrote:
->>>
->>> This patch enables the the sid controller in the H3. It can be used
->>> for thermal calibration data.
->>>
->>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
->>> ---
->>>   arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
->>>   1 file changed, 7 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
->>> b/arch/arm/boot/dts/sun8i-h3.dtsi
->>> index 3f83f6a27c74..9bb5cc29fec5 100644
->>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
->>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->>> @@ -72,6 +72,13 @@
->>>                 };
->>>         };
->>>   +     soc {
->>> +               sid: eeprom at 1c14000 {
->>> +                       compatible = "allwinner,sun8i-h3-sid";
->>> +                       reg = <0x01c14000 0x400>;
->>> +               };
->>> +       };
->>> +
->>
->>
->> Shouldn't you also use a nvmem-cells property to the THS node?
->>
->> Maxime
->>
->
-> Oh seems like I forgot that.
-> As related to the wiki [1] this should be 64 bit wide at the address 0x34. I
-> will add that in the next version.
->
->
-> [1]: http://linux-sunxi.org/SID_Register_Guide#eFUSE
->
-> Thanks,
-> Philipp
->
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Hi,
+This is a follow-up to the series that contained both changes to the
+aemif driver and platform code. It contains only the driver changes.
 
-Any chance this will see a v3 soon? I'm kind of interested in sid node
-for h3. =)
+As the first step in removing duplicate support for aemif from the
+kernel we need to add support for board files to the aemif memory
+driver.
 
-Thanks,
+First patch just uses a static string for the ti-aemif driver name.
 
-Kyle Evans
+The second adds support for board files to the aemif driver.
+
+This series includes changes requested by Sekhar in his code review:
+- made aemif the parent of each sub-device before registering it
+- documented the new members in aemif_platform_data
+
+v1 -> v2:
+- actually iterate over abus entries instead of always accessing the
+  first one
+
+Bartosz Golaszewski (2):
+  memory: aemif: don't rely on kbuild for driver's name
+  memory: aemif: add support for board files
+
+ drivers/memory/ti-aemif.c              | 60 +++++++++++++++++---------
+ include/linux/platform_data/ti-aemif.h | 25 +++++++++++
+ 2 files changed, 64 insertions(+), 21 deletions(-)
+
+-- 
+2.17.0
