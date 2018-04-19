@@ -1,44 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 19 Apr 2018 17:39:26 +0530
-Subject: [PATCH 2/2] memory: aemif: add support for board files
-In-Reply-To: <20180418153552.14632-3-brgl@bgdev.pl>
-References: <20180418153552.14632-1-brgl@bgdev.pl>
- <20180418153552.14632-3-brgl@bgdev.pl>
-Message-ID: <15d56b6d-6546-0655-563e-4492982c8d78@ti.com>
+From: lionel.debieve@st.com (Lionel DEBIEVE)
+Date: Thu, 19 Apr 2018 12:11:34 +0000
+Subject: [Resend PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
+In-Reply-To: <1524136750.3190.98.camel@gmail.com>
+References: <20180419081323.16597-1-lionel.debieve@st.com>
+ <20180419081323.16597-2-lionel.debieve@st.com> <1959407.buQAJQDfDJ@blindfold>
+ <1524136750.3190.98.camel@gmail.com>
+Message-ID: <b187fbe0-80c3-1e30-f0e0-e1ee0b5ad0f7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 April 2018 09:05 PM, Bartosz Golaszewski wrote:
-> @@ -373,15 +372,23 @@ static int aemif_probe(struct platform_device *pdev)
->  		goto error;
->  	}
->  
-> -	/*
-> -	 * For every controller device node, there is a cs device node that
-> -	 * describe the bus configuration parameters. This functions iterate
-> -	 * over these nodes and update the cs data array.
-> -	 */
-> -	for_each_available_child_of_node(np, child_np) {
-> -		ret = of_aemif_parse_abus_config(pdev, child_np);
-> -		if (ret < 0)
-> -			goto error;
-> +	if (np) {
-> +		/*
-> +		 * For every controller device node, there is a cs device node
-> +		 * that describe the bus configuration parameters. This
-> +		 * functions iterate over these nodes and update the cs data
-> +		 * array.
-> +		 */
-> +		for_each_available_child_of_node(np, child_np) {
-> +			ret = of_aemif_parse_abus_config(pdev, child_np);
-> +			if (ret < 0)
-> +				goto error;
-> +		}
-> +	} else if (pdata && pdata->num_abus_data > 0) {
-> +		for (i = 0; i < pdata->num_abus_data; i++, aemif->num_cs++) {
-> +			aemif->cs_data[i].cs = pdata->abus_data->cs;
+Hi Richard,
 
-Since abus_data is an array, shouldn't it be pdata->abus_data[i].cs ?
+If you have an IBM contact, please share as nobody part of IBM take care 
+of this request.
 
-Thanks,
-Sekhar
+I'm not able to find any maintainer or someone from IBM that manage mtd 
+part.
+
+BR
+
+
+On 04/19/2018 01:19 PM, Artem Bityutskiy wrote:
+> On Thu, 2018-04-19 at 13:12 +0200, Richard Weinberger wrote:
+>> Am Donnerstag, 19. April 2018, 10:13:23 CEST schrieb Lionel Debieve:
+>>> Update license template using SPDX. Move the global layout
+>>> of UBI headers to dual license helping UBI to be the standard
+>>> solution for raw NAND management.
+>>>
+>>> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+>>> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+>> I fear we need get an ACK from IBK folks too.
+> Note, my ack is just from me personally, I do not represent a company
+> in this case. I do not know much my ack matters in this case and I am
+> not a copyright holder.
+>
