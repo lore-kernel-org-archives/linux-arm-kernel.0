@@ -1,69 +1,34 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 19 Apr 2018 15:18:57 +0200
-Subject: [PATCH] mmc: mediatek: use of_device_get_match_data()
-In-Reply-To: <e391bcb1abbe5f7ff46973a5713fd7e067b7e9ff.1523347340.git.ryder.lee@mediatek.com>
-References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
- <e391bcb1abbe5f7ff46973a5713fd7e067b7e9ff.1523347340.git.ryder.lee@mediatek.com>
-Message-ID: <CAPDyKFr9O2YiN8KrwqzOA3rzsx6kA8gRO35_G5bpYRMpg8Z73Q@mail.gmail.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Thu, 19 Apr 2018 15:21:41 +0200
+Subject: [PATCH 2/4] rtc: stm32: fix alarm interrupt flags by removing
+ IRQF_TRIGGER_RISING
+In-Reply-To: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
+References: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1524144103-21432-3-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 April 2018 at 04:33, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> The usage of of_device_get_match_data() reduce the code size a bit.
->
-> Also, the only way to call msdc_drv_probe() is to match an entry in
-> msdc_of_ids[], so of_id cannot be NULL.
->
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+RTC alarm interrupt is active high and already configured by device tree.
+So remove IRQF_TRIGGER_RISING from driver.
 
-Thanks, applied for next!
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ drivers/rtc/rtc-stm32.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/host/mtk-sd.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 6457a7d..67e9b57 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -19,6 +19,7 @@
->  #include <linux/ioport.h>
->  #include <linux/irq.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_gpio.h>
->  #include <linux/pinctrl/consumer.h>
-> @@ -1808,7 +1809,6 @@ static int msdc_drv_probe(struct platform_device *pdev)
->         struct mmc_host *mmc;
->         struct msdc_host *host;
->         struct resource *res;
-> -       const struct of_device_id *of_id;
->         int ret;
->
->         if (!pdev->dev.of_node) {
-> @@ -1816,9 +1816,6 @@ static int msdc_drv_probe(struct platform_device *pdev)
->                 return -EINVAL;
->         }
->
-> -       of_id = of_match_node(msdc_of_ids, pdev->dev.of_node);
-> -       if (!of_id)
-> -               return -EINVAL;
->         /* Allocate MMC host for this device */
->         mmc = mmc_alloc_host(sizeof(struct msdc_host), &pdev->dev);
->         if (!mmc)
-> @@ -1887,7 +1884,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
->         msdc_of_property_parse(pdev, host);
->
->         host->dev = &pdev->dev;
-> -       host->dev_comp = of_id->data;
-> +       host->dev_comp = of_device_get_match_data(&pdev->dev);
->         host->mmc = mmc;
->         host->src_clk_freq = clk_get_rate(host->src_clk);
->         /* Set host parameters to mmc */
-> --
-> 1.9.1
->
+diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
+index 79d9e86..6a06078 100644
+--- a/drivers/rtc/rtc-stm32.c
++++ b/drivers/rtc/rtc-stm32.c
+@@ -663,8 +663,7 @@ static int stm32_rtc_probe(struct platform_device *pdev)
+ 
+ 	/* Handle RTC alarm interrupts */
+ 	ret = devm_request_threaded_irq(&pdev->dev, rtc->irq_alarm, NULL,
+-					stm32_rtc_alarm_irq,
+-					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
++					stm32_rtc_alarm_irq, IRQF_ONESHOT,
+ 					pdev->name, rtc);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "IRQ%d (alarm interrupt) already claimed\n",
+-- 
+2.7.4
