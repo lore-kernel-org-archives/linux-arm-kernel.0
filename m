@@ -1,37 +1,43 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Apr 2018 14:56:38 +0200
-Subject: [PATCH] drm/sun4i: Add missing frontend compatibles for A10, A13,
- A20 and A31
-Message-ID: <20180419125638.11683-1-paul.kocialkowski@bootlin.com>
+From: Stefan.Potyra@elektrobit.com (Stefan Potyra)
+Date: Thu, 19 Apr 2018 15:03:58 +0200
+Subject: [PATCH] Enable the clock before calling clk_get_rate().
+Message-ID: <20180419130358.r7dva6owy2izyfus@agrajag.zerfleddert.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although frontend nodes are defined in the device-trees of the
-aforementioned platforms, there are no matching compatibles defined in
-the driver. This makes it impossible to probe the frontend on these
-platforms.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-Adding the appropriate compatibles to the driver fixes the issue.
-
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Fixes: 142168eba9dc spi: bcm63xx-hsspi: add bcm63xx HSSPI driver
+Signed-off-by: Stefan Potyra <Stefan.Potyra@elektrobit.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/spi/spi-bcm63xx-hsspi.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 85f75046712c..c5a3de11817d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -658,6 +658,10 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
- };
+diff --git a/drivers/spi/spi-bcm63xx-hsspi.c b/drivers/spi/spi-bcm63xx-hsspi.c
+index cbcba614b253..46cd9b683d22 100644
+--- a/drivers/spi/spi-bcm63xx-hsspi.c
++++ b/drivers/spi/spi-bcm63xx-hsspi.c
+@@ -352,6 +352,10 @@ static int bcm63xx_hsspi_probe(struct platform_device *pdev)
+ 	if (IS_ERR(clk))
+ 		return PTR_ERR(clk);
  
- const struct of_device_id sun4i_frontend_of_table[] = {
-+	{ .compatible = "allwinner,sun7i-a10-display-frontend" },
-+	{ .compatible = "allwinner,sun7i-a13-display-frontend" },
-+	{ .compatible = "allwinner,sun7i-a20-display-frontend" },
-+	{ .compatible = "allwinner,sun7i-a31-display-frontend" },
- 	{ .compatible = "allwinner,sun8i-a33-display-frontend" },
- 	{ }
- };
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		return ret;
++
+ 	rate = clk_get_rate(clk);
+ 	if (!rate) {
+ 		struct clk *pll_clk = devm_clk_get(dev, "pll");
+@@ -364,10 +368,6 @@ static int bcm63xx_hsspi_probe(struct platform_device *pdev)
+ 			return -EINVAL;
+ 	}
+ 
+-	ret = clk_prepare_enable(clk);
+-	if (ret)
+-		return ret;
+-
+ 	master = spi_alloc_master(&pdev->dev, sizeof(*bs));
+ 	if (!master) {
+ 		ret = -ENOMEM;
 -- 
-2.16.3
+2.17.0
