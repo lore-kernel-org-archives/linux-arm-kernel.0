@@ -1,102 +1,84 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Apr 2018 16:55:10 +0200
-Subject: [PATCH 6/9] sunxi-cedrus: Add device tree binding document
-In-Reply-To: <20180318124800.7soqh34fxvwjm7pn@rob-hp-laptop>
+Date: Thu, 19 Apr 2018 16:56:05 +0200
+Subject: [linux-sunxi] [PATCH 5/9] media: platform: Add Sunxi Cedrus
+ decoder driver
+In-Reply-To: <a9cc2e3b-585a-b238-4187-e3c874013d2a@iki.fi>
 References: <20180309100933.15922-3-paul.kocialkowski@bootlin.com>
- <20180309101445.16190-4-paul.kocialkowski@bootlin.com>
- <20180318124800.7soqh34fxvwjm7pn@rob-hp-laptop>
-Message-ID: <b8d7f6606b880962d23323cb794111580de948ac.camel@bootlin.com>
+ <20180309101445.16190-3-paul.kocialkowski@bootlin.com>
+ <a9cc2e3b-585a-b238-4187-e3c874013d2a@iki.fi>
+Message-ID: <e26c30b31aa8a5ae9692dc050b08d2bca85d4536.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, 2018-03-18 at 07:48 -0500, Rob Herring wrote:
-> On Fri, Mar 09, 2018 at 11:14:42AM +0100, Paul Kocialkowski wrote:
-> > From: Florent Revest <florent.revest@free-electrons.com>
-> 
-> "device tree binding document" can all be summarized with the subject 
-> prefix "dt-bindings: media: ".
-
-Will do in v2, thanks.
-
-> Also, email should be updated to @bootlin.com?
-
-I will keep the address @free-electrons.com (since there is no matching
-@bootlin.com address). Although that address was broken at the time of
-sending v1, it should be a valid redirect nowadays.
-
-> > 
-> > Device Tree bindings for the Allwinner's video engine
-> > 
-> > Signed-off-by: Florent Revest <florent.revest@free-electrons.com>
-> > ---
-> >  .../devicetree/bindings/media/sunxi-cedrus.txt     | 44
-> > ++++++++++++++++++++++
-> >  1 file changed, 44 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/sunxi-
-> > cedrus.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/sunxi-
-> > cedrus.txt b/Documentation/devicetree/bindings/media/sunxi-
-> > cedrus.txt
+On Mon, 2018-03-12 at 20:29 +0000, Joonas Kylm?l? wrote:
+> Paul Kocialkowski:
+> > diff --git a/drivers/media/platform/sunxi-cedrus/sunxi_cedrus.c
+> > b/drivers/media/platform/sunxi-cedrus/sunxi_cedrus.c
 > > new file mode 100644
-> > index 000000000000..138581113c49
+> > index 000000000000..88624035e0e3
 > > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
-> > @@ -0,0 +1,44 @@
-> > +Device-Tree bindings for SUNXI video engine found in sunXi SoC
-> > family
+> > +++ b/drivers/media/platform/sunxi-cedrus/sunxi_cedrus.c
+> > @@ -0,0 +1,313 @@
+> > +/*
+> > + * Sunxi Cedrus codec driver
+> > + *
+> > + * Copyright (C) 2016 Florent Revest
+> > + * Florent Revest <florent.revest@free-electrons.com>
+> > + *
+> > + * Based on vim2m
+> > + *
+> > + * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
+> > + * Pawel Osciak, <pawel@osciak.com>
+> > + * Marek Szyprowski, <m.szyprowski@samsung.com>
+> > + *
+> > + * This software is licensed under the terms of the GNU General
+> > Public
+> > + * License version 2, as published by the Free Software Foundation,
+> > and
+> > + * may be copied, distributed, and modified under those terms.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
 > > +
-> > +Required properties:
-> > +- compatible	    : "allwinner,sun4i-a10-video-engine";
-> > +- memory-region     : DMA pool for buffers allocation;
+> > +#include "sunxi_cedrus_common.h"
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/module.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/fs.h>
+> > +#include <linux/sched.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/of.h>
+> > +
+> > +#include <linux/platform_device.h>
+> > +#include <linux/videodev2.h>
+> > +#include <media/v4l2-mem2mem.h>
+> > +#include <media/v4l2-device.h>
+> > +#include <media/v4l2-ioctl.h>
+> > +#include <media/v4l2-ctrls.h>
+> > +#include <media/v4l2-event.h>
+> > +#include <media/videobuf2-dma-contig.h>
 > 
-> Why do you need this linkage? Many drivers use CMA and don't need
-> this.
-
-The VPU can only access the first 256 MiB of DRAM, that are DMA-mapped
-starting from the DRAM base. This requires specific memory allocation
-and handling. I'll add the information in v2.
-
-> > +- clocks	    : list of clock specifiers, corresponding to
-> > +		      entries in clock-names property;
-> > +- clock-names	    : should contain "ahb", "mod" and "ram"
-> > entries;
-> > +- resets	    : phandle for reset;
-> > +- interrupts	    : should contain VE interrupt number;
-> > +- reg		    : should contain register base and length
-> > of VE.
-> > +
-> > +Example:
-> > +
-> > +reserved-memory {
-> > +	#address-cells = <1>;
-> > +	#size-cells = <1>;
-> > +	ranges;
-> > +
-> > +	ve_reserved: cma {
-> > +		compatible = "shared-dma-pool";
-> > +		reg = <0x43d00000 0x9000000>;
-> > +		no-map;
-> > +		linux,cma-default;
-> > +	};
-> > +};
-> > +
-> > +video-engine {
-> > +	compatible = "allwinner,sun4i-a10-video-engine";
-> > +	memory-region = <&ve_reserved>;
-> > +
-> > +	clocks = <&ahb_gates 32>, <&ccu CLK_VE>,
-> > +		 <&dram_gates 0>;
-> > +	clock-names = "ahb", "mod", "ram";
-> > +
-> > +	assigned-clocks = <&ccu CLK_VE>;
-> > +	assigned-clock-rates = <320000000>;
+> I think that the definitions
 > 
-> Not documented.
+> #include <linux/clk.h>
+> #include <linux/delay.h>
+> #include <linux/fs.h>
+> #include <linux/sched.h>
+> #include <linux/slab.h>
+> #include <linux/videodev2.h>
+> 
+> are not used directly in the sunxi_cedrus.c file. Therefore they
+> should be removed.
 
-Will do in v2.
+Thanks for the review, this will be done in v2.
+
+Cheers,
 
 -- 
 Paul Kocialkowski, Bootlin (formerly Free Electrons)
@@ -108,4 +90,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180419/3d066ee5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180419/4abafd13/attachment.sig>
