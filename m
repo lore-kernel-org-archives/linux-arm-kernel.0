@@ -1,124 +1,74 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Apr 2018 17:41:14 +0200
-Subject: [PATCH v2 00/10] Sunxi-Cedrus driver for the Allwinner Video Engine,
- using media requests
-Message-ID: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+Date: Thu, 19 Apr 2018 17:45:35 +0200
+Subject: [PATCH v2 09/10] ARM: dts: sun7i-a20: Add Video Engine and reserved
+ memory nodes
+In-Reply-To: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180419154536.17846-5-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This presents a second iteration of the updated Sunxi-Cedrus driver,
-that supports the Video Engine found in most Allwinner SoCs, starting
-with the A10. It was tested on both the A20 and the A33.
+This adds nodes for the Video Engine and the associated reserved memory
+for the Allwinner A20. Up to 96 MiB of memory are dedicated to the VPU.
 
-The initial version of this driver[0] was originally written and
-submitted by Florent Revest using a previous version of the request API
-that is necessary to provide coherency between controls and the buffers
-they apply to.
+The VPU can only map the first 256 MiB of DRAM, so the reserved memory
+pool has to be located in that area. Following Allwinner's decision in
+downstream software, the last 96 MiB of the first 256 MiB of RAM are
+reserved for this purpose.
 
-The driver was adapted to use the latest version of the media request
-API[1], as submitted by Hand Verkuil. Media request API support is a
-hard requirement for the Sunxi-Cedrus driver.
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-This series also contains fixes for issues encountered with the current
-version of the request API. If accepted, these should eventually be
-squashed into the request API series.
-
-The driver itself currently only supports MPEG2 and more codecs will be
-added to the driver eventually. The output frames provided by the
-Video Engine are in a multi-planar 32x32-tiled YUV format, with a plane
-for luminance (Y) and a plane for chrominance (UV). A specific format is
-introduced in the V4L2 API to describe it.
-
-This implementation is based on the significant work that was conducted
-by various members of the linux-sunxi community for understanding and
-documenting the Video Engine's innards.
-
-Changes since v1:
-* use the latest version of the request API for Hans Verkuil;
-* added media controller support and dependency
-* renamed v4l2 format to the more explicit V4L2_PIX_FMT_MB32_NV12;
-* reworked bindings documentation;
-* moved driver to drivers/media/platforms/sunxi/cedrus to pair with
-  incoming CSI support ;
-* added a workqueue and lists to schedule buffer completion, since it
-  cannot be done in interrupt context;
-* split mpeg2 support into a setup and a trigger function to avoid race
-  condition;
-* split video-related ops to a dedicated sunxi_cedrus_video file;
-* cleaned up the included headers for each file;
-* used device PFN offset instead of subtracting PHYS_BASE;
-* used reset_control_reset instead of assert+deassert;
-* put the device in reset when removing driver;
-* changed dt bindings to use the last 96 Mib of the first 256 MiB of
-  DRAM;
-* made it clear in the mpeg frame header structure that forward and
-  backward indexes are used as reference frames for motion vectors;
-* lots of small cosmetic and consistency changes, including naming
-  harmonization and headers text rework.
-
-Remaining tasks:
-* using the dedicated SRAM controller driver;
-* cleaning up registers description and documenting the fields used;
-* removing the assigned-clocks property and setting the clock rate
-  in the driver directly;
-* testing on more platforms.
-
-Cheers!
-
-Paul Kocialkowski (10):
-  media: v4l2-ctrls: Add missing v4l2 ctrl unlock
-  media-request: Add a request complete operation to allow m2m
-    scheduling
-  videobuf2-core: Add helper to get buffer private data from media
-    request
-  media: vim2m: Implement media request complete op to schedule m2m run
-  media: v4l: Add definitions for MPEG2 frame format and header metadata
-  media: v4l: Add definition for Allwinner's MB32-tiled NV12 format
-  media: platform: Add Sunxi-Cedrus VPU decoder driver
-  dt-bindings: media: Document bindings for the Sunxi-Cedrus VPU driver
-  ARM: dts: sun7i-a20: Add Video Engine and reserved memory nodes
-  ARM: dts: sun8i-a33: Add Video Engine and reserved memory nodes
-
- .../devicetree/bindings/media/sunxi-cedrus.txt     |  50 +++
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  31 ++
- arch/arm/boot/dts/sun8i-a33.dtsi                   |  38 ++
- drivers/media/common/videobuf2/videobuf2-core.c    |  15 +
- drivers/media/media-request.c                      |   3 +
- drivers/media/platform/Kconfig                     |  15 +
- drivers/media/platform/Makefile                    |   1 +
- drivers/media/platform/sunxi/cedrus/Makefile       |   4 +
- drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c | 292 ++++++++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_common.h    | 105 +++++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_dec.c | 228 ++++++++++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_dec.h |  36 ++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_hw.c  | 201 +++++++++
- .../media/platform/sunxi/cedrus/sunxi_cedrus_hw.h  |  29 ++
- .../platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c     | 157 +++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h     |  33 ++
- .../platform/sunxi/cedrus/sunxi_cedrus_regs.h      | 172 +++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_video.c     | 497 +++++++++++++++++++++
- .../platform/sunxi/cedrus/sunxi_cedrus_video.h     |  31 ++
- drivers/media/platform/vim2m.c                     |  12 +
- drivers/media/v4l2-core/v4l2-ctrls.c               |  17 +-
- drivers/media/v4l2-core/v4l2-ioctl.c               |   1 +
- include/media/media-device.h                       |   2 +
- include/media/videobuf2-core.h                     |   1 +
- include/uapi/linux/v4l2-controls.h                 |  26 ++
- include/uapi/linux/videodev2.h                     |   4 +
- 26 files changed, 2000 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/media/sunxi-cedrus.txt
- create mode 100644 drivers/media/platform/sunxi/cedrus/Makefile
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_common.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_dec.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_hw.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_mpeg2.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_regs.h
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.c
- create mode 100644 drivers/media/platform/sunxi/cedrus/sunxi_cedrus_video.h
-
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index bd0cd3204273..cb6d82065dcf 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -163,6 +163,20 @@
+ 		reg = <0x40000000 0x80000000>;
+ 	};
+ 
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
++		ve_memory: cma at 4a000000 {
++			compatible = "shared-dma-pool";
++			reg = <0x4a000000 0x6000000>;
++			no-map;
++			linux,cma-default;
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -451,6 +465,23 @@
+ 			};
+ 		};
+ 
++		ve: video-engine at 1c0e000 {
++			compatible = "allwinner,sun4i-a10-video-engine";
++			reg = <0x01c0e000 0x1000>;
++			memory-region = <&ve_memory>;
++
++			clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
++				 <&ccu CLK_DRAM_VE>;
++			clock-names = "ahb", "mod", "ram";
++
++			assigned-clocks = <&ccu CLK_VE>;
++			assigned-clock-rates = <320000000>;
++
++			resets = <&ccu RST_VE>;
++
++			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		mmc0: mmc at 1c0f000 {
+ 			compatible = "allwinner,sun7i-a20-mmc";
+ 			reg = <0x01c0f000 0x1000>;
 -- 
 2.16.3
