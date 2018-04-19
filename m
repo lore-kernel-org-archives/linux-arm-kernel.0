@@ -1,45 +1,34 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 19 Apr 2018 11:22:38 -0500
-Subject: [PATCH v2 3/6] drm: of: introduce drm_of_media_bus_fmt
-In-Reply-To: <20180417131052.16336-4-peda@axentia.se>
-References: <20180417131052.16336-1-peda@axentia.se>
- <20180417131052.16336-4-peda@axentia.se>
-Message-ID: <CAL_JsqL1=fzTb5dUgrj07Jv3r026ndsU2o=Nr2eft-bni5jueQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Apr 2018 18:23:24 +0200
+Subject: [PATCH 53/61] tty: serial: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-54-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-54-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419162324.f46tsdomp4vi67cb@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 17, 2018 at 8:10 AM, Peter Rosin <peda@axentia.se> wrote:
-> Add a central function to parse a node according to the video
-> interface binding and get a media bus format.
->
-> Start with only supporting a very limited set of a few basic media
-> bus formats.
->
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+Hello Wolfram,
+
+On Thu, Apr 19, 2018 at 04:06:23PM +0200, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > ---
->  drivers/gpu/drm/drm_of.c | 38 ++++++++++++++++++++++++++++++++++++++
->  include/drm/drm_of.h     |  7 +++++++
->  2 files changed, 45 insertions(+)
->
-> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> index 4c191c050e7d..f9473edb60a7 100644
-> --- a/drivers/gpu/drm/drm_of.c
-> +++ b/drivers/gpu/drm/drm_of.c
-> @@ -212,6 +212,44 @@ int drm_of_encoder_active_endpoint(struct device_node *node,
->  EXPORT_SYMBOL_GPL(drm_of_encoder_active_endpoint);
->
->  /*
-> + * drm_of_media_bus_fmt - return the media bus format described in the node
-> + * @node: device tree node containing the media bus format
-> + *
-> + * @node is presumably an of-graph endpoint node.
-> + *
-> + * Return the media bus format, or zero if none is described. Or one of the
-> + * standard error codes.
-> + */
-> +int drm_of_media_bus_fmt(struct device_node *node)
+> 
+> Build tested only. buildbot is happy. Please apply individually.
+> 
+>  drivers/tty/serial/imx.c              | 18 ++++++------------
 
-Should use endpoint or ep here instead of node to be clear what node
-this function operates on.
+for serial/imx.c:
 
-Rob
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Thanks Wolfram for going through this
+Uwe
+
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
