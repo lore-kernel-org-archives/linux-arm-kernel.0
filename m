@@ -1,54 +1,43 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 19 Apr 2018 18:40:01 +0200
-Subject: [PATCH v2 3/6] drm: of: introduce drm_of_media_bus_fmt
-In-Reply-To: <CAL_JsqL1=fzTb5dUgrj07Jv3r026ndsU2o=Nr2eft-bni5jueQ@mail.gmail.com>
-References: <20180417131052.16336-1-peda@axentia.se>
- <20180417131052.16336-4-peda@axentia.se>
- <CAL_JsqL1=fzTb5dUgrj07Jv3r026ndsU2o=Nr2eft-bni5jueQ@mail.gmail.com>
-Message-ID: <3181dfde-cd19-41a1-6e6d-5be7a9e40674@axentia.se>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 19 Apr 2018 18:58:25 +0200
+Subject: [PATCH] ACPI / bus: ignore rather than fail bus driver registrations
+ on non-ACPI boot
+Message-ID: <20180419165825.13008-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-19 18:22, Rob Herring wrote:
-> On Tue, Apr 17, 2018 at 8:10 AM, Peter Rosin <peda@axentia.se> wrote:
->> Add a central function to parse a node according to the video
->> interface binding and get a media bus format.
->>
->> Start with only supporting a very limited set of a few basic media
->> bus formats.
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  drivers/gpu/drm/drm_of.c | 38 ++++++++++++++++++++++++++++++++++++++
->>  include/drm/drm_of.h     |  7 +++++++
->>  2 files changed, 45 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
->> index 4c191c050e7d..f9473edb60a7 100644
->> --- a/drivers/gpu/drm/drm_of.c
->> +++ b/drivers/gpu/drm/drm_of.c
->> @@ -212,6 +212,44 @@ int drm_of_encoder_active_endpoint(struct device_node *node,
->>  EXPORT_SYMBOL_GPL(drm_of_encoder_active_endpoint);
->>
->>  /*
->> + * drm_of_media_bus_fmt - return the media bus format described in the node
->> + * @node: device tree node containing the media bus format
->> + *
->> + * @node is presumably an of-graph endpoint node.
->> + *
->> + * Return the media bus format, or zero if none is described. Or one of the
->> + * standard error codes.
->> + */
->> +int drm_of_media_bus_fmt(struct device_node *node)
-> 
-> Should use endpoint or ep here instead of node to be clear what node
-> this function operates on.
+When building ACPI bus drivers such as button.ko into the core kernel,
+other drivers that depend on its symbols are loadable even when booting
+with ACPI disabled. For instance, nouveau.ko has a link time dependency
+on acpi_lid_open() on ACPI capable kernels, and calls it regardless of
+whether the system booted via ACPI.
 
-I just sent v3 and missed this. Anyway, the reason I didn't use ep,
-was that you at one point said "port of endpoint", and I wanted this
-function to cover both cases. And maybe others. Anyway, if I hear
-nothing I'll make the change to ep and I'll also reword the comment
-to talk more decisively about endpoints for v4.
+However, when building button.ko as a module, it will refuse to load if
+the system did not boot in ACPI mode, which subsequently prevents the
+nouveau driver from loading as well, resulting in broken graphics.
 
-Cheers,
-Peter
+Given that returning an error from an initcall() is ignored for drivers
+that are built into the kernel, let's align the module case with this,
+and not return an error when registering an ACPI bus driver on a system
+that did not boot via ACPI.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/acpi/bus.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+index 84b4a62018eb..529d3d496fab 100644
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -880,7 +880,7 @@ int acpi_bus_register_driver(struct acpi_driver *driver)
+ 	int ret;
+ 
+ 	if (acpi_disabled)
+-		return -ENODEV;
++		return 0;
+ 	driver->drv.name = driver->name;
+ 	driver->drv.bus = &acpi_bus_type;
+ 	driver->drv.owner = driver->owner;
+-- 
+2.17.0
