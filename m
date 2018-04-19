@@ -1,22 +1,22 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Thu, 19 Apr 2018 13:12:08 +0200
-Subject: [Resend PATCH 1/1] mtd: ubi: Update ubi-media.h to dual license
-In-Reply-To: <20180419081323.16597-2-lionel.debieve@st.com>
-References: <20180419081323.16597-1-lionel.debieve@st.com>
- <20180419081323.16597-2-lionel.debieve@st.com>
-Message-ID: <1959407.buQAJQDfDJ@blindfold>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Thu, 19 Apr 2018 14:17:50 +0300
+Subject: [PATCH v2] coresight: Moving framework and drivers to SPDX
+ identifier
+In-Reply-To: <1523981817-16176-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1523981817-16176-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20180419111750.q2gfdjkj7bcx7hz5@um.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 19. April 2018, 10:13:23 CEST schrieb Lionel Debieve:
-> Update license template using SPDX. Move the global layout
-> of UBI headers to dual license helping UBI to be the standard
-> solution for raw NAND management.
+On Tue, Apr 17, 2018 at 10:16:57AM -0600, Mathieu Poirier wrote:
+> Moving all kernel side CoreSight framework and drivers to SPDX identifier.
 > 
-> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-I fear we need get an ACK from IBK folks too.
+For the stm bit:
+
+Acked-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 
 Thanks,
-//richard
+--
+Alex
