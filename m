@@ -1,62 +1,113 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Thu, 19 Apr 2018 14:14:17 +0000
-Subject: [PATCH 0/4] Various fixes on STM32 RTC
-In-Reply-To: <20180419134321.GF7369@piout.net>
-References: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
- <20180419134321.GF7369@piout.net>
-Message-ID: <d2d1897e40834a1c84fc1e64309e2c3f@GPXDAG3NODE5.st.com>
+From: wsa+renesas@sang-engineering.com (Wolfram Sang)
+Date: Thu, 19 Apr 2018 16:06:20 +0200
+Subject: [PATCH 50/61] thermal: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-51-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We should get drvdata from struct device directly. Going via
+platform_device is an unneeded step back and forth.
 
-Sorry for that! I take note of your new email address. Thanks for your highlight.
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
 
-Regards,
-Amelie
+Build tested only. buildbot is happy. Please apply individually.
 
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at bootlin.com]
-> Sent: jeudi 19 avril 2018 15:43
-> To: Amelie DELAUNAY <amelie.delaunay@st.com>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>; Rob Herring
-> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Maxime
-> Coquelin <mcoquelin.stm32@gmail.com>; Alexandre TORGUE
-> <alexandre.torgue@st.com>; linux-rtc at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH 0/4] Various fixes on STM32 RTC
-> 
-> Hi,
-> 
-> Both series were not sent to the correct email address. I would suggest
-> rebasing on top of v4.17-rc1 ;). No need to resend just for that.
-> 
-> On 19/04/2018 15:21:39+0200, Amelie Delaunay wrote:
-> > This series makes some corrections on STM32 RTC:
-> > - update copyright and adopt SPDX identifier
-> > - fix alarm interrupt flags
-> > - rework DBP (Disable Backup domain Protection) management.
-> >
-> > This series is a preamble to the serie which will introduce next STM32
-> > RTC version.
-> >
-> > Amelie Delaunay (4):
-> >   rtc: stm32: fix copyright and adopt SPDX identifier
-> >   rtc: stm32: fix alarm interrupt flags by removing IRQF_TRIGGER_RISING
-> >   dt-bindings: rtc: update stm32-rtc documentation for st,syscfg
-> >     property
-> >   rtc: stm32: get DBP register and mask from DT st,syscfg property
-> >
-> >  .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 10 ++--
-> >  drivers/rtc/rtc-stm32.c                            | 68 +++++++++++++---------
-> >  2 files changed, 47 insertions(+), 31 deletions(-)
-> >
-> > --
-> > 2.7.4
-> >
-> 
-> --
-> Alexandre Belloni, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+ drivers/thermal/rockchip_thermal.c | 8 +++-----
+ drivers/thermal/spear_thermal.c    | 8 +++-----
+ drivers/thermal/zx2967_thermal.c   | 6 ++----
+ 3 files changed, 8 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+index f36375d5a16c..9c7643d62ed7 100644
+--- a/drivers/thermal/rockchip_thermal.c
++++ b/drivers/thermal/rockchip_thermal.c
+@@ -1327,8 +1327,7 @@ static int rockchip_thermal_remove(struct platform_device *pdev)
+ 
+ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
++	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
+ 	int i;
+ 
+ 	for (i = 0; i < thermal->chip->chn_num; i++)
+@@ -1346,8 +1345,7 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+ 
+ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct rockchip_thermal_data *thermal = platform_get_drvdata(pdev);
++	struct rockchip_thermal_data *thermal = dev_get_drvdata(dev);
+ 	int i;
+ 	int error;
+ 
+@@ -1376,7 +1374,7 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
+ 					      id, thermal->regs,
+ 					      thermal->tshut_temp);
+ 		if (error)
+-			dev_err(&pdev->dev, "%s: invalid tshut=%d, error=%d\n",
++			dev_err(dev, "%s: invalid tshut=%d, error=%d\n",
+ 				__func__, thermal->tshut_temp, error);
+ 	}
+ 
+diff --git a/drivers/thermal/spear_thermal.c b/drivers/thermal/spear_thermal.c
+index 81b35aace9de..8b9d567134d0 100644
+--- a/drivers/thermal/spear_thermal.c
++++ b/drivers/thermal/spear_thermal.c
+@@ -56,8 +56,7 @@ static struct thermal_zone_device_ops ops = {
+ 
+ static int __maybe_unused spear_thermal_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct thermal_zone_device *spear_thermal = platform_get_drvdata(pdev);
++	struct thermal_zone_device *spear_thermal = dev_get_drvdata(dev);
+ 	struct spear_thermal_dev *stdev = spear_thermal->devdata;
+ 	unsigned int actual_mask = 0;
+ 
+@@ -73,15 +72,14 @@ static int __maybe_unused spear_thermal_suspend(struct device *dev)
+ 
+ static int __maybe_unused spear_thermal_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct thermal_zone_device *spear_thermal = platform_get_drvdata(pdev);
++	struct thermal_zone_device *spear_thermal = dev_get_drvdata(dev);
+ 	struct spear_thermal_dev *stdev = spear_thermal->devdata;
+ 	unsigned int actual_mask = 0;
+ 	int ret = 0;
+ 
+ 	ret = clk_enable(stdev->clk);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "Can't enable clock\n");
++		dev_err(dev, "Can't enable clock\n");
+ 		return ret;
+ 	}
+ 
+diff --git a/drivers/thermal/zx2967_thermal.c b/drivers/thermal/zx2967_thermal.c
+index 6acce0bce7c0..145ebf371598 100644
+--- a/drivers/thermal/zx2967_thermal.c
++++ b/drivers/thermal/zx2967_thermal.c
+@@ -207,8 +207,7 @@ MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
+ #ifdef CONFIG_PM_SLEEP
+ static int zx2967_thermal_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
++	struct zx2967_thermal_priv *priv = dev_get_drvdata(dev);
+ 
+ 	if (priv && priv->clk_topcrm)
+ 		clk_disable_unprepare(priv->clk_topcrm);
+@@ -221,8 +220,7 @@ static int zx2967_thermal_suspend(struct device *dev)
+ 
+ static int zx2967_thermal_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
++	struct zx2967_thermal_priv *priv = dev_get_drvdata(dev);
+ 	int error;
+ 
+ 	error = clk_prepare_enable(priv->clk_topcrm);
+-- 
+2.11.0
