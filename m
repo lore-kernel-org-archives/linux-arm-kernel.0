@@ -1,55 +1,69 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 19 Apr 2018 17:07:59 +0200
-Subject: [PATCH] drm/sun4i: Add missing frontend compatibles for A10,
- A13, A20 and A31
-In-Reply-To: <20180419125638.11683-1-paul.kocialkowski@bootlin.com>
-References: <20180419125638.11683-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180419150759.ldi676ejnbtmb27z@flea>
+From: kevans@freebsd.org (Kyle Evans)
+Date: Thu, 19 Apr 2018 10:11:22 -0500
+Subject: [linux-sunxi] Re: [PATCH v2 14/16] arm: dts: sun8i: h3: enable H3
+ sid controller
+In-Reply-To: <470ec61e-8b08-5193-ede1-01d02b2c865e@gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-15-embed3d@gmail.com>
+ <20180129095200.attg7cgvpifpchtn@flea.lan>
+ <470ec61e-8b08-5193-ede1-01d02b2c865e@gmail.com>
+Message-ID: <CACNAnaGVSbk7czb+mcGTx1C=YwCWe1qqHQDQe9+PNifwEXovMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 02:56:38PM +0200, Paul Kocialkowski wrote:
-> Although frontend nodes are defined in the device-trees of the
-> aforementioned platforms, there are no matching compatibles defined in
-> the driver. This makes it impossible to probe the frontend on these
-> platforms.
-> 
-> Adding the appropriate compatibles to the driver fixes the issue.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_frontend.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-> index 85f75046712c..c5a3de11817d 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-> @@ -658,6 +658,10 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
->  };
->  
->  const struct of_device_id sun4i_frontend_of_table[] = {
-> +	{ .compatible = "allwinner,sun7i-a10-display-frontend" },
-> +	{ .compatible = "allwinner,sun7i-a13-display-frontend" },
-> +	{ .compatible = "allwinner,sun7i-a20-display-frontend" },
-> +	{ .compatible = "allwinner,sun7i-a31-display-frontend" },
+On Mon, Jan 29, 2018 at 6:03 AM, Philipp Rossak <embed3d@gmail.com> wrote:
+>
+>
+> On 29.01.2018 10:52, Maxime Ripard wrote:
+>>
+>> On Mon, Jan 29, 2018 at 12:29:17AM +0100, Philipp Rossak wrote:
+>>>
+>>> This patch enables the the sid controller in the H3. It can be used
+>>> for thermal calibration data.
+>>>
+>>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>>> ---
+>>>   arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+>>>   1 file changed, 7 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
+>>> b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>> index 3f83f6a27c74..9bb5cc29fec5 100644
+>>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>> @@ -72,6 +72,13 @@
+>>>                 };
+>>>         };
+>>>   +     soc {
+>>> +               sid: eeprom at 1c14000 {
+>>> +                       compatible = "allwinner,sun8i-h3-sid";
+>>> +                       reg = <0x01c14000 0x400>;
+>>> +               };
+>>> +       };
+>>> +
+>>
+>>
+>> Shouldn't you also use a nvmem-cells property to the THS node?
+>>
+>> Maxime
+>>
+>
+> Oh seems like I forgot that.
+> As related to the wiki [1] this should be 64 bit wide at the address 0x34. I
+> will add that in the next version.
+>
+>
+> [1]: http://linux-sunxi.org/SID_Register_Guide#eFUSE
+>
+> Thanks,
+> Philipp
+>
 
-Most of these compatibles are wrong, so it won't really work :)
+Hi,
 
-If you only tested it on the A20, just add it. We didn't add all of
-them because there's some slight variations between the generations
-that are not yet taken into account.
+Any chance this will see a v3 soon? I'm kind of interested in sid node
+for h3. =)
 
-Maxime
+Thanks,
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180419/0933ea7f/attachment.sig>
+Kyle Evans
