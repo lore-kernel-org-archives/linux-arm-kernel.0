@@ -1,70 +1,97 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Thu, 19 Apr 2018 18:27:46 +0200
-Subject: [PATCH v3 2/7] dt-bindings: display: atmel: optional video-interface
- of endpoints
+Date: Thu, 19 Apr 2018 18:27:47 +0200
+Subject: [PATCH v3 3/7] drm: of: introduce drm_of_media_bus_fmt
 In-Reply-To: <20180419162751.25223-1-peda@axentia.se>
 References: <20180419162751.25223-1-peda@axentia.se>
-Message-ID: <20180419162751.25223-3-peda@axentia.se>
+Message-ID: <20180419162751.25223-4-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With bus-type/bus-width properties in the endpoint nodes, the video-
-interface of the connection can be specified for cases where the
-heuristic fails to select the correct output mode. This can happen
-e.g. if not all RGB pins are routed on the PCB; the driver has no
-way of knowing this, and needs to be told explicitly.
+Add a central function to parse a node according to the video
+interface binding and get a media bus format.
 
-This is critical for the devices that have the "conflicting output
-formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
-RGB bits move around depending on the selected output mode. For
-devices that do not have the "conflicting output formats" issue
-(SAMA5D2, SAMA5D4), this is completely irrelevant.
+Start with only supporting a very limited set of a few basic media
+bus formats.
 
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/gpu/drm/drm_of.c | 38 ++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_of.h     |  7 +++++++
+ 2 files changed, 45 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-index 82f2acb3d374..9de434a8f523 100644
---- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-+++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-@@ -15,6 +15,14 @@ Required children nodes:
-  to external devices using the OF graph reprensentation (see ../graph.txt).
-  At least one port node is required.
+diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+index 4c191c050e7d..f9473edb60a7 100644
+--- a/drivers/gpu/drm/drm_of.c
++++ b/drivers/gpu/drm/drm_of.c
+@@ -212,6 +212,44 @@ int drm_of_encoder_active_endpoint(struct device_node *node,
+ EXPORT_SYMBOL_GPL(drm_of_encoder_active_endpoint);
  
-+Optional properties in grandchild nodes:
-+ Any endpoint grandchild node may specify a desired video interface
-+ according to ../../media/video-interfaces.txt, specifically
-+ - bus-type: must be <0>.
-+ - bus-width: recognized values are <12>, <16>, <18> and <24>, and
-+   override any output mode selection heuristic, forcing "rgb444",
-+   "rgb565", "rgb666" and "rgb888" respectively.
+ /*
++ * drm_of_media_bus_fmt - return the media bus format described in the node
++ * @node: device tree node containing the media bus format
++ *
++ * @node is presumably an of-graph endpoint node.
++ *
++ * Return the media bus format, or zero if none is described. Or one of the
++ * standard error codes.
++ */
++int drm_of_media_bus_fmt(struct device_node *node)
++{
++	s32 bus_type;
++	u32 bus_width = 0;
 +
- Example:
- 
- 	hlcdc: hlcdc at f0030000 {
-@@ -50,3 +58,21 @@ Example:
- 			#pwm-cells = <3>;
- 		};
- 	};
++	if (!node)
++		return -EINVAL;
 +
++	if (of_property_read_u32(node, "bus-type", &bus_type))
++		return 0;
++	if (bus_type != 0)
++		return -EINVAL;
 +
-+Example 2: With a video interface override to force rgb565; as above
-+but with these changes/additions:
++	of_property_read_u32(node, "bus-width", &bus_width);
++	switch (bus_width) {
++	case 12:
++		return MEDIA_BUS_FMT_RGB444_1X12;
++	case 16:
++		return MEDIA_BUS_FMT_RGB565_1X16;
++	case 18:
++		return MEDIA_BUS_FMT_RGB666_1X18;
++	case 24:
++		return MEDIA_BUS_FMT_RGB888_1X24;
++	default:
++		return -EINVAL;
++	}
++}
++EXPORT_SYMBOL_GPL(drm_of_media_bus_fmt);
 +
-+	&hlcdc {
-+		hlcdc-display-controller {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
++/*
+  * drm_of_find_panel_or_bridge - return connected panel or bridge device
+  * @np: device tree node containing encoder output ports
+  * @panel: pointer to hold returned drm_panel
+diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+index b93c239afb60..f86f0098b21e 100644
+--- a/include/drm/drm_of.h
++++ b/include/drm/drm_of.h
+@@ -29,6 +29,7 @@ int drm_of_component_probe(struct device *dev,
+ int drm_of_encoder_active_endpoint(struct device_node *node,
+ 				   struct drm_encoder *encoder,
+ 				   struct of_endpoint *endpoint);
++int drm_of_media_bus_fmt(struct device_node *node);
+ int drm_of_find_panel_or_bridge(const struct device_node *np,
+ 				int port, int endpoint,
+ 				struct drm_panel **panel,
+@@ -62,6 +63,12 @@ static inline int drm_of_encoder_active_endpoint(struct device_node *node,
+ {
+ 	return -EINVAL;
+ }
 +
-+			port at 0 {
-+				hlcdc_panel_output: endpoint at 0 {
-+					bus-type = <0>;
-+					bus-width = <16>;
-+				};
-+			};
-+		};
-+	};
++static inline int drm_of_media_bus_fmt(struct device_node *node)
++{
++	return -EINVAL;
++}
++
+ static inline int drm_of_find_panel_or_bridge(const struct device_node *np,
+ 					      int port, int endpoint,
+ 					      struct drm_panel **panel,
 -- 
 2.11.0
