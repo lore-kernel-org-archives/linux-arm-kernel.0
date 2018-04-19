@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 19 Apr 2018 16:06:13 +0200
-Subject: [PATCH 43/61] pwm: simplify getting .drvdata
+Date: Thu, 19 Apr 2018 16:06:07 +0200
+Subject: [PATCH 37/61] perf: simplify getting .drvdata
 In-Reply-To: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
 References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180419140641.27926-44-wsa+renesas@sang-engineering.com>
+Message-ID: <20180419140641.27926-38-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,47 +15,32 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply individually.
 
- drivers/pwm/pwm-atmel-tcb.c | 6 ++----
- drivers/pwm/pwm-rcar.c      | 3 +--
- 2 files changed, 3 insertions(+), 6 deletions(-)
+ drivers/perf/arm_spe_pmu.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pwm/pwm-atmel-tcb.c b/drivers/pwm/pwm-atmel-tcb.c
-index 4fb1be246c44..0d0f8376bc35 100644
---- a/drivers/pwm/pwm-atmel-tcb.c
-+++ b/drivers/pwm/pwm-atmel-tcb.c
-@@ -460,8 +460,7 @@ MODULE_DEVICE_TABLE(of, atmel_tcb_pwm_dt_ids);
- #ifdef CONFIG_PM_SLEEP
- static int atmel_tcb_pwm_suspend(struct device *dev)
+diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
+index 28bb642af18b..54ec278d2fc4 100644
+--- a/drivers/perf/arm_spe_pmu.c
++++ b/drivers/perf/arm_spe_pmu.c
+@@ -131,8 +131,7 @@ static ssize_t arm_spe_pmu_cap_show(struct device *dev,
+ 				    struct device_attribute *attr,
+ 				    char *buf)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
-+	struct atmel_tcb_pwm_chip *tcbpwm = dev_get_drvdata(dev);
- 	void __iomem *base = tcbpwm->tc->regs;
- 	int i;
- 
-@@ -478,8 +477,7 @@ static int atmel_tcb_pwm_suspend(struct device *dev)
- 
- static int atmel_tcb_pwm_resume(struct device *dev)
+-	struct arm_spe_pmu *spe_pmu = platform_get_drvdata(pdev);
++	struct arm_spe_pmu *spe_pmu = dev_get_drvdata(dev);
+ 	struct dev_ext_attribute *ea =
+ 		container_of(attr, struct dev_ext_attribute, attr);
+ 	int cap = (long)ea->var;
+@@ -247,8 +246,7 @@ static ssize_t arm_spe_pmu_get_attr_cpumask(struct device *dev,
+ 					    struct device_attribute *attr,
+ 					    char *buf)
  {
 -	struct platform_device *pdev = to_platform_device(dev);
--	struct atmel_tcb_pwm_chip *tcbpwm = platform_get_drvdata(pdev);
-+	struct atmel_tcb_pwm_chip *tcbpwm = dev_get_drvdata(dev);
- 	void __iomem *base = tcbpwm->tc->regs;
- 	int i;
+-	struct arm_spe_pmu *spe_pmu = platform_get_drvdata(pdev);
++	struct arm_spe_pmu *spe_pmu = dev_get_drvdata(dev);
  
-diff --git a/drivers/pwm/pwm-rcar.c b/drivers/pwm/pwm-rcar.c
-index 91d11f2e2fef..748f614d5375 100644
---- a/drivers/pwm/pwm-rcar.c
-+++ b/drivers/pwm/pwm-rcar.c
-@@ -261,8 +261,7 @@ MODULE_DEVICE_TABLE(of, rcar_pwm_of_table);
- #ifdef CONFIG_PM_SLEEP
- static struct pwm_device *rcar_pwm_dev_to_pwm_dev(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct rcar_pwm_chip *rcar_pwm = platform_get_drvdata(pdev);
-+	struct rcar_pwm_chip *rcar_pwm = dev_get_drvdata(dev);
- 	struct pwm_chip *chip = &rcar_pwm->chip;
- 
- 	return &chip->pwms[0];
+ 	return cpumap_print_to_pagebuf(true, buf, &spe_pmu->supported_cpus);
+ }
 -- 
 2.11.0
