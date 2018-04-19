@@ -1,34 +1,28 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 19 Apr 2018 15:21:40 +0200
-Subject: [PATCH 1/4] rtc: stm32: fix copyright and adopt SPDX identifier
-In-Reply-To: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
-References: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1524144103-21432-2-git-send-email-amelie.delaunay@st.com>
+Date: Thu, 19 Apr 2018 15:21:39 +0200
+Subject: [PATCH 0/4] Various fixes on STM32 RTC
+Message-ID: <1524144103-21432-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix copyright by removing "SA" and "for STMicroelectronics", not required.
-Adopt SPDX identifier.
+This series makes some corrections on STM32 RTC:
+- update copyright and adopt SPDX identifier
+- fix alarm interrupt flags
+- rework DBP (Disable Backup domain Protection) management.
 
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- drivers/rtc/rtc-stm32.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+This series is a preamble to the serie which will introduce next STM32 RTC
+version.
 
-diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
-index f25dabe..79d9e86 100644
---- a/drivers/rtc/rtc-stm32.c
-+++ b/drivers/rtc/rtc-stm32.c
-@@ -1,7 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-- * Copyright (C) STMicroelectronics SA 2017
-- * Author:  Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
-- * License terms:  GNU General Public License (GPL), version 2
-+ * Copyright (C) STMicroelectronics 2017
-+ * Author:  Amelie Delaunay <amelie.delaunay@st.com>
-  */
- 
- #include <linux/bcd.h>
+Amelie Delaunay (4):
+  rtc: stm32: fix copyright and adopt SPDX identifier
+  rtc: stm32: fix alarm interrupt flags by removing IRQF_TRIGGER_RISING
+  dt-bindings: rtc: update stm32-rtc documentation for st,syscfg
+    property
+  rtc: stm32: get DBP register and mask from DT st,syscfg property
+
+ .../devicetree/bindings/rtc/st,stm32-rtc.txt       | 10 ++--
+ drivers/rtc/rtc-stm32.c                            | 68 +++++++++++++---------
+ 2 files changed, 47 insertions(+), 31 deletions(-)
+
 -- 
 2.7.4
