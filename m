@@ -1,125 +1,79 @@
-From: jwboyer@kernel.org (Josh Boyer)
-Date: Fri, 20 Apr 2018 09:27:06 -0400
-Subject: brcm, cyw_bt: Add latest Cypress/Murata firmware
-In-Reply-To: <1524146649-25267-1-git-send-email-ryan.harkin@linaro.org>
-References: <1524146649-25267-1-git-send-email-ryan.harkin@linaro.org>
-Message-ID: <CA+5PVA57X8aPXXLBTfaWxhULY7EgWooWy1NQoNq+X=vLWm2Q2g@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 20 Apr 2018 15:28:41 +0200
+Subject: [PATCH v3 7/7] drm/i2c: tda998x: register as a drm bridge
+In-Reply-To: <20180420102408.GW16141@n2100.armlinux.org.uk>
+References: <20180419162751.25223-1-peda@axentia.se>
+ <20180419162751.25223-8-peda@axentia.se> <2556566.3fxMPoIyx0@avalon>
+ <20180420102408.GW16141@n2100.armlinux.org.uk>
+Message-ID: <790d7a89-ae13-098f-3c0c-a8dfbc84e4a7@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 10:04 AM, Ryan Harkin <ryan.harkin@linaro.org> wrote:
-> Murata has created a github project for the firmware for their 43xx
-> family of devices:
->
->   https://github.com/murata-wireless
->
-> This project contains firmware binaries for their WiFi and BT parts
-> containing the Cypress IP.
->
-> The binary files are licensed under the same LICENCE.cypress as present
-> in this repo already. The NVRAM files are text and are licensed under
-> GPLv2.
->
-> This series copies the binaries from the github project into
-> linux-firmware where other downstream projects may benefit.
->
-> The following changes since commit b562d2f3583f19ecda22b08e514ced57dd1e5f4d:
->
->   linux-firmware: update wil6210 firmware to 5.2.0.18 (2018-04-16 09:55:50 -0400)
->
-> are available in the git repository at:
->
->   https://git.linaro.org/landing-teams/working/mbl/linux-firmware.git rmh-murata-update
->
-> for you to fetch changes up to 53bd09779d9b378316a2b81ec55f4b20033d4542:
->
->   cyw_bt: add Cypress 43xx Bluetooth patch files (2018-04-18 14:05:28 +0100)
->
-> ----------------------------------------------------------------
-> Ryan Harkin (3):
->       brcm: update firmware from Murata repo
->       brcm: add fmac nvram files
->       cyw_bt: add Cypress 43xx Bluetooth patch files
+On 2018-04-20 12:24, Russell King - ARM Linux wrote:
+> On Fri, Apr 20, 2018 at 01:06:49PM +0300, Laurent Pinchart wrote:
+>> Hi Peter,
+>>
+>> Thank you for the patch.
+>>
+>> On Thursday, 19 April 2018 19:27:51 EEST Peter Rosin wrote:
+>>> This makes this driver work with all(?) drivers that are not
+>>> componentized and instead expect to connect to a panel/bridge. That
+>>> said, the only one tested is atmel_hlcdc.
+>>>
+>>> This hooks the relevant work function previously called by the encoder
+>>> and the component also to the bridge, since the encoder goes away when
+>>> connecting to the bridge interface of the driver and the equivalent of
+>>> bind/unbind of the component is handled by bridge attach/detach.
+>>>
+>>> The lifetime requirements of a bridge and a component are slightly
+>>> different, which is the reason for struct tda998x_bridge.
+>>
+>> Couldn't you move the allocation and initialization (tda998x_create) of the 
+>> tda998x_priv structure to probe time ? I think you wouldn't need a separate 
+>> structure in that case. Unless I'm mistaken there would be an added benefit of 
+>> separating component and bridge initialization, resulting in the encoder not 
+>> being initialized at all if the component isn't used. You wouldn't need to add 
+>> a local_encoder parameter to the tda998x_init() function.
+> 
+> No, I don't like that idea one bit, as I've stated in the past about the
+> component API.  The same (probably) goes for the bridge stuff too.
+> 
+> Consider the following:
+> 
+> Your DRM system is initialised.  You then remove a module, which results
+> in the DRM system being torn down.  You re-insert the module (eg, having
+> made a change to it).  The DRM system is then re-initialised.
+> 
+> At this point, what is the state of variables such as priv->is_on if
+> you allocate the structure at probe time?
+> 
+> What about all the other variables in the driver private structure - are
+> you sure that the driver can cope with random values from the previous
+> "usage" remaining there?
+> 
+> At the moment, this isn't a concern for the driver because we
+> dev_kzalloc() the structure in the bind callback.  Move that to the
+> probe function, and the structure is no longer re-initialised each
+> time, and so it retains the previous state.  The driver is not setup
+> to cope with that.
+> 
+> So, to work around that, you would need to reinitialise _everything_
+> in the structure that the driver requires, which IMHO is a very
+> open to bugs (eg, if a member is missed, or added without the
+> necessary re-initialisation), _especially_ when this is not a path
+> that will get regular testing.
+> 
+> If you want to do this for a subset of data, it would be much better
+> to separate them into independent structures (maybe one embedded into
+> the other) so that this problem can not occur.  That way, a subset
+> of the data can be memset() when bound to the rest of the DRM system
+> ensuring a consistent driver state and still achieve what you're
+> suggesting.
 
-I'm looping in Hans, who was discussing this with me the other day.
-He had some concerns that I'll let him express better than I can.
+This was the exact reason I added struct tda998x_bridge. It seemed
+very risky to move the tda998x_create call (or some of its meat) to
+the probe function. Even if that could be done I think it should
+definitely be a separate patch.
 
-josh
-
->
->  WHENCE                             |  57 ++++++++++++++++++++++++++++++++++++++++++------
->  brcm/README_NVRAM                  |  16 ++++++++++++++
->  brcm/brcmfmac43012-sdio.1LV.txt    | 120 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac43012-sdio.bin        | Bin 0 -> 210254 bytes
->  brcm/brcmfmac43012-sdio.clm_blob   | Bin 0 -> 7697 bytes
->  brcm/brcmfmac43012-sdio.txt        |   1 +
->  brcm/brcmfmac43340-sdio.1BW.txt    | 122 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac43340-sdio.bin        | Bin 402210 -> 400864 bytes
->  brcm/brcmfmac43340-sdio.txt        |   1 +
->  brcm/brcmfmac43362-sdio.SN8000.txt |  49 ++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac43362-sdio.bin        | Bin 219557 -> 201276 bytes
->  brcm/brcmfmac43362-sdio.txt        |   1 +
->  brcm/brcmfmac4339-sdio.1CK.txt     | 105 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac4339-sdio.ZP.txt      | 102 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac4339-sdio.bin         | Bin 562183 -> 565481 bytes
->  brcm/brcmfmac4339-sdio.txt         |   1 +
->  brcm/brcmfmac43430-sdio.1DX.txt    |  43 ++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac43430-sdio.1LN.txt    |   1 +
->  brcm/brcmfmac43430-sdio.bin        | Bin 369577 -> 388739 bytes
->  brcm/brcmfmac43430-sdio.txt        |   1 +
->  brcm/brcmfmac43455-sdio.1HK.txt    | 121 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac43455-sdio.1LC.txt    |  73 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac43455-sdio.1MW.txt    | 114 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac43455-sdio.bin        | Bin 488193 -> 594969 bytes
->  brcm/brcmfmac43455-sdio.clm_blob   | Bin 0 -> 11913 bytes
->  brcm/brcmfmac43455-sdio.txt        |   1 +
->  brcm/brcmfmac4354-sdio.1BB.txt     | 140 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac4354-sdio.bin         | Bin 626589 -> 605388 bytes
->  brcm/brcmfmac4354-sdio.txt         |   1 +
->  brcm/brcmfmac4356-pcie.1CX.txt     | 147 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  brcm/brcmfmac4356-pcie.bin         | Bin 661999 -> 648770 bytes
->  brcm/brcmfmac4356-pcie.txt         |   1 +
->  cyw_bt/CYW43012C0.1LV.hcd          | Bin 0 -> 28063 bytes
->  cyw_bt/CYW43341B0.1BW.hcd          | Bin 0 -> 40984 bytes
->  cyw_bt/CYW4335C0.ZP.hcd            | Bin 0 -> 33465 bytes
->  cyw_bt/CYW43430A1.1DX.1dB_Less.hcd | Bin 0 -> 35322 bytes
->  cyw_bt/CYW43430A1.1DX.2dB_Less.hcd | Bin 0 -> 35322 bytes
->  cyw_bt/CYW43430A1.1DX.hcd          | Bin 0 -> 14265 bytes
->  cyw_bt/CYW4345C0.1MW.hcd           | Bin 0 -> 55105 bytes
->  cyw_bt/CYW4350C0.1BB.hcd           | Bin 0 -> 78697 bytes
->  cyw_bt/CYW4354A2.1CX.hcd           | Bin 0 -> 31178 bytes
->  41 files changed, 1211 insertions(+), 7 deletions(-)
->  create mode 100644 brcm/README_NVRAM
->  create mode 100644 brcm/brcmfmac43012-sdio.1LV.txt
->  create mode 100644 brcm/brcmfmac43012-sdio.bin
->  create mode 100644 brcm/brcmfmac43012-sdio.clm_blob
->  create mode 120000 brcm/brcmfmac43012-sdio.txt
->  create mode 100644 brcm/brcmfmac43340-sdio.1BW.txt
->  create mode 120000 brcm/brcmfmac43340-sdio.txt
->  create mode 100644 brcm/brcmfmac43362-sdio.SN8000.txt
->  create mode 120000 brcm/brcmfmac43362-sdio.txt
->  create mode 100644 brcm/brcmfmac4339-sdio.1CK.txt
->  create mode 100644 brcm/brcmfmac4339-sdio.ZP.txt
->  create mode 120000 brcm/brcmfmac4339-sdio.txt
->  create mode 100644 brcm/brcmfmac43430-sdio.1DX.txt
->  create mode 120000 brcm/brcmfmac43430-sdio.1LN.txt
->  create mode 120000 brcm/brcmfmac43430-sdio.txt
->  create mode 100644 brcm/brcmfmac43455-sdio.1HK.txt
->  create mode 100644 brcm/brcmfmac43455-sdio.1LC.txt
->  create mode 100644 brcm/brcmfmac43455-sdio.1MW.txt
->  create mode 100644 brcm/brcmfmac43455-sdio.clm_blob
->  create mode 120000 brcm/brcmfmac43455-sdio.txt
->  create mode 100644 brcm/brcmfmac4354-sdio.1BB.txt
->  create mode 120000 brcm/brcmfmac4354-sdio.txt
->  create mode 100644 brcm/brcmfmac4356-pcie.1CX.txt
->  create mode 120000 brcm/brcmfmac4356-pcie.txt
->  create mode 100644 cyw_bt/CYW43012C0.1LV.hcd
->  create mode 100644 cyw_bt/CYW43341B0.1BW.hcd
->  create mode 100644 cyw_bt/CYW4335C0.ZP.hcd
->  create mode 100644 cyw_bt/CYW43430A1.1DX.1dB_Less.hcd
->  create mode 100644 cyw_bt/CYW43430A1.1DX.2dB_Less.hcd
->  create mode 100644 cyw_bt/CYW43430A1.1DX.hcd
->  create mode 100644 cyw_bt/CYW4345C0.1MW.hcd
->  create mode 100644 cyw_bt/CYW4350C0.1BB.hcd
->  create mode 100644 cyw_bt/CYW4354A2.1CX.hcd
->
+Cheers,
+Peter
