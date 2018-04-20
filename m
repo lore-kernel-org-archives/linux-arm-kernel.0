@@ -1,14 +1,13 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 20 Apr 2018 11:05:08 +0200
-Subject: [PATCH v1 1/3] ARM: dts: stm32: Append additional I2Cs for STM32F746
- SoC
-In-Reply-To: <1524215110-13967-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1524215110-13967-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1524215110-13967-2-git-send-email-pierre-yves.mordret@st.com>
+Date: Fri, 20 Apr 2018 11:05:21 +0200
+Subject: [PATCH v1 1/2] ARM: dts: stm32: Add I2C support for STM32H743 SoC
+In-Reply-To: <1524215122-14046-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1524215122-14046-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1524215122-14046-2-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Append 3 additional I2C instance for STM32F746 SoC.
+Add I2C support for STM32H743 SoC
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -17,55 +16,96 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
         * Initial
 ---
 ---
- arch/arm/boot/dts/stm32f746.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 10 +++++++
+ arch/arm/boot/dts/stm32h743.dtsi         | 48 ++++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index 4be2ee5..1479e3e 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -345,6 +345,42 @@
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
+index 0f15dfb..24be8e6 100644
+--- a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
+@@ -163,6 +163,16 @@
+ 				#interrupt-cells = <2>;
+ 			};
+ 
++			i2c1_pins_a: i2c1 at 0 {
++				pins {
++					pinmux = <STM32_PINMUX('B', 6, AF4)>, /* I2C1_SCL */
++						 <STM32_PINMUX('B', 7, AF4)>; /* I2C1_SDA */
++					bias-disable;
++					drive-open-drain;
++					slew-rate = <0>;
++				};
++			};
++
+ 			usart1_pins: usart1 at 0 {
+ 				pins1 {
+ 					pinmux = <STM32_PINMUX('B', 14, AF4)>; /* USART1_TX */
+diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
+index 2bb103e..7b64af0 100644
+--- a/arch/arm/boot/dts/stm32h743.dtsi
++++ b/arch/arm/boot/dts/stm32h743.dtsi
+@@ -130,6 +130,42 @@
+ 			clocks = <&rcc USART2_CK>;
  		};
  
++		i2c1: i2c at 40005400 {
++			compatible = "st,stm32f7-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x40005400 0x400>;
++			interrupts = <31>,
++				     <32>;
++			resets = <&rcc STM32H7_APB1L_RESET(I2C1)>;
++			clocks = <&rcc I2C1_CK>;
++			status = "disabled";
++		};
++
 +		i2c2: i2c at 40005800 {
 +			compatible = "st,stm32f7-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +			reg = <0x40005800 0x400>;
 +			interrupts = <33>,
 +				     <34>;
-+			resets = <&rcc STM32F7_APB1_RESET(I2C2)>;
-+			clocks = <&rcc 1 CLK_I2C2>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++			resets = <&rcc STM32H7_APB1L_RESET(I2C2)>;
++			clocks = <&rcc I2C2_CK>;
 +			status = "disabled";
 +		};
 +
 +		i2c3: i2c at 40005C00 {
 +			compatible = "st,stm32f7-i2c";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +			reg = <0x40005C00 0x400>;
 +			interrupts = <72>,
 +				     <73>;
-+			resets = <&rcc STM32F7_APB1_RESET(I2C3)>;
-+			clocks = <&rcc 1 CLK_I2C3>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++			resets = <&rcc STM32H7_APB1L_RESET(I2C3)>;
++			clocks = <&rcc I2C3_CK>;
 +			status = "disabled";
 +		};
 +
-+		i2c4: i2c at 40006000 {
+ 		dac: dac at 40007400 {
+ 			compatible = "st,stm32h7-dac-core";
+ 			reg = <0x40007400 0x400>;
+@@ -323,6 +359,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2c4: i2c at 58001C00 {
 +			compatible = "st,stm32f7-i2c";
-+			reg = <0x40006000 0x400>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x58001C00 0x400>;
 +			interrupts = <95>,
 +				     <96>;
-+			resets = <&rcc STM32F7_APB1_RESET(I2C4)>;
-+			clocks = <&rcc 1 CLK_I2C4>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++			resets = <&rcc STM32H7_APB4_RESET(I2C4)>;
++			clocks = <&rcc I2C4_CK>;
 +			status = "disabled";
 +		};
 +
- 		cec: cec at 40006c00 {
- 			compatible = "st,stm32-cec";
- 			reg = <0x40006C00 0x400>;
+ 		lptimer2: timer at 58002400 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 2.7.4
