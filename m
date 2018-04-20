@@ -1,7 +1,7 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 20 Apr 2018 23:07:46 +0200
+Date: Fri, 20 Apr 2018 23:10:11 +0200
 Subject: [PATCH v7 00/11] Sunxi: Add SMP support on A83T
-Message-ID: <20180420210757.11638-1-mylene.josserand@bootlin.com>
+Message-ID: <20180420211022.11759-1-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
