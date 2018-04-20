@@ -1,40 +1,53 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 20 Apr 2018 09:50:16 -0700
-Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
- supported
-In-Reply-To: <20180420093548.GA2989@vireshk-i7>
-References: <20180418155643.36464-1-code@mmayer.net>
- <20180418155643.36464-3-code@mmayer.net> <20180419041632.GF24576@vireshk-i7>
- <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
- <20180420044259.GA2873@vireshk-i7>
- <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
- <20180420093548.GA2989@vireshk-i7>
-Message-ID: <52044000-513b-b5a1-27db-fb7fdb5ee04f@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Apr 2018 17:57:16 +0100
+Subject: Clang arm64 build is broken
+In-Reply-To: <CAKwvOdmhNH4PYNwH+tsZc4uQQJVhOOHSph2YdDCHcyWNyFMxyA@mail.gmail.com>
+References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+ <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
+ <CAKwvOdnKuFuqoWKpVJqVa1u8A0z2+vQp9j7+TsNh9qz3Yitk-Q@mail.gmail.com>
+ <8b3e95df-a429-2f84-565c-3caed8e30e28@arm.com>
+ <CAKwvOdmhNH4PYNwH+tsZc4uQQJVhOOHSph2YdDCHcyWNyFMxyA@mail.gmail.com>
+Message-ID: <ad937bae-ea95-2758-acf6-6170c4d94d07@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2018 02:35 AM, Viresh Kumar wrote:
-> On 20-04-18, 10:15, Sudeep Holla wrote:
->> It still doesn't give the flexibility to switch between the two
->> implementations boot time based on some firmware config(e.g. DT status
->> property).
+On 20/04/18 17:43, Nick Desaulniers wrote:
+> On Fri, Apr 20, 2018 at 9:36 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-> I agree, but it didn't look like they need flexibility :)
+>> On 20/04/18 17:30, Nick Desaulniers wrote:
+>>> On Fri, Apr 20, 2018 at 1:13 AM Marc Zyngier <marc.zyngier@arm.com>
+> wrote:
+>>>> Clang isn't
+>>>> really supported to build the arm64 kernel anyway
+>>>
+>>> Can you expand on this?  There are millions of arm64 devices shipping
+> with
+>>> Clang built Linux kernels.
 > 
-> Lets see how the intend to use it. If they are *always* going to use SCPI if
-> that is available, then it should be solved at Kconfig level only. Else they
-> shouldn't put such code in the driver to quit early.
+>> How many of these devices run a full-featured mainline kernel?
+> 
+>> Sure, Android is building the kernel with clang, but that's with a pile
+>> of out of tree patches. At that point, I'm not sure we're talking about
+>> the same arm64 kernel.
+> 
+> Do you recommend that we only work with ARM licensed SoC vendors with no
+> out of tree patches?
 
-We have both drivers (brcmstb-avs-cpufreq and scmi-cpufreq) enabled in
-our kernel configuration, however, depending on the firmware version, we
-may have a number of combinations:
+I mean the clang-related patches which are not upstream. We can ignore
+SoC support code for this discussion.
 
-- arm,scmi DT node is present and enabled (status = okay) as well as
-brcmstb-avs-cpufreq being present and enabled
-- arm,scmi DT node is present but disabled (status = disabled) and
-brcmstb-avs-cpufreq is being present and enabled
+The android clang patches try to create the illusion that clang is
+usable for the kernel. It is not. It misses fundamental functionality
+that either leads to performance degradation (lack of asm goto) or
+prevents the implementation of security fixes (see the recent discussion
+about SMCCC 1.1 and the top of this very thread).
 
-If you think this is a self inflicted, downstream and backwards/forwards
-compatible relevant only change, I suppose we are fine with that too.
+I'd rather recommend that clang is brought up to the level of GCC so
+that we don't have to continuously have that discussion. Give us that
+compiler, and we'll make sure the arm64 doesn't break.
+
+Thanks,
+
+	M.
 -- 
-Florian
+Jazz is not dead. It just smells funny...
