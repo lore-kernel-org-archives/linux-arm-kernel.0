@@ -1,115 +1,98 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Apr 2018 11:23:32 +0100
-Subject: [PATCH] arm64: kexec: Add machine_kexec_mask_interrupts to kexec
- path
-In-Reply-To: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
-References: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
-Message-ID: <20180420102332.kzxyn6lpe2ernnrg@lakrids.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 20 Apr 2018 11:23:43 +0100
+Subject: [PATCH 01/22] dma-debug: move initialization to common code
+In-Reply-To: <20180420080313.18796-2-hch@lst.de>
+References: <20180420080313.18796-1-hch@lst.de>
+ <20180420080313.18796-2-hch@lst.de>
+Message-ID: <294a1469-01d6-10fb-5de1-b1d4513a066c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sameer,
+Hi Christoph,
 
-On Wed, Apr 18, 2018 at 08:19:36PM -0600, Sameer Goel wrote:
-> In kdump code path SPIs at GIC level are explicitly cleared by
-> calling machine_kexec_mask_interrupts. In case of kexec this
-> functionality is delegated for most part to the device shutdown
-> functions.
-> Add machine_kexec_mask_interrupts to machine_shutdown path to
-> ensure that the irqs are masked at the gic level.
+Nice cleanup! Looks good overall, just a couple of nits.
 
-I think that for kdump, the plan is to try to get irqchips to reset
-things in their probe paths (e.g. as that's the sanest place to poke
-APRn). Doing that would render machine_kexec_mask_interrupts() redundant
-for kexec.
-
-> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
-> ---
-> Porting code for masking irqs at gic from kdump shutdown to kexec path.
-> 
-> There was discussion about this functionality in [1].
-> 
-> [1] https://patchwork.kernel.org/patch/9817499/
-
-I don't follow why this is a problem. Nate mentions corrupting the new
-kernel -- has a problem been observed in practice?
-
-The purgatory code is run with IRQs masked at the CPU, and the new
-kernel will initialise the GIC before enabling interrupts at the CPU.
-Once probed, the SMMU driver can handle spurious interrupts.
-
-So AFAICT there is no problem today. Am I missing something?
-
-When could an interrupt be taken that would be problematic?
-
-Currently, I don't see that this is necessary. Given we'd like to remove
-machine_kexec_mask_interrupts() for the kdump case, I'd prefer that we
-don't mandate it in the usual kexec case.
-
-Thanks,
-Mark.
-
-> 
->  arch/arm64/include/asm/kexec.h    | 6 ++++++
->  arch/arm64/kernel/machine_kexec.c | 2 +-
->  arch/arm64/kernel/process.c       | 2 ++
->  3 files changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> index e17f052..f9ddb41 100644
-> --- a/arch/arm64/include/asm/kexec.h
-> +++ b/arch/arm64/include/asm/kexec.h
-> @@ -93,6 +93,12 @@ static inline void crash_prepare_suspend(void) {}
->  static inline void crash_post_resume(void) {}
->  #endif
->  
-> +#if defined(CONFIG_KEXEC)
-> +extern void machine_kexec_mask_interrupts(void);
-> +#else
-> +static inline void machine_kexec_mask_interrupts(void) {}
+On 20/04/18 09:02, Christoph Hellwig wrote:
+[...]
+> diff --git a/lib/dma-debug.c b/lib/dma-debug.c
+> index 7f5cdc1e6b29..712a897174e4 100644
+> --- a/lib/dma-debug.c
+> +++ b/lib/dma-debug.c
+> @@ -41,6 +41,11 @@
+>   #define HASH_FN_SHIFT   13
+>   #define HASH_FN_MASK    (HASH_SIZE - 1)
+>   
+> +/* allow architectures to override this if absolutely required */
+> +#ifndef PREALLOC_DMA_DEBUG_ENTRIES
+> +#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
 > +#endif
 > +
->  #endif /* __ASSEMBLY__ */
->  
->  #endif
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index f76ea92..b453180 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -213,7 +213,7 @@ void machine_kexec(struct kimage *kimage)
->  	BUG(); /* Should never get here. */
->  }
->  
-> -static void machine_kexec_mask_interrupts(void)
-> +void machine_kexec_mask_interrupts(void)
->  {
->  	unsigned int i;
->  	struct irq_desc *desc;
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index f08a2ed..9d0337e 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -58,6 +58,7 @@
->  #include <asm/mmu_context.h>
->  #include <asm/processor.h>
->  #include <asm/stacktrace.h>
-> +#include <asm/kexec.h>
->  
->  #ifdef CONFIG_CC_STACKPROTECTOR
->  #include <linux/stackprotector.h>
-> @@ -107,6 +108,7 @@ void arch_cpu_idle_dead(void)
->  void machine_shutdown(void)
->  {
->  	disable_nonboot_cpus();
-> +	machine_kexec_mask_interrupts();
->  }
->  
->  /*
-> -- 
-> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>   enum {
+>   	dma_debug_single,
+>   	dma_debug_page,
+> @@ -1004,18 +1009,16 @@ void dma_debug_add_bus(struct bus_type *bus)
+>   	bus_register_notifier(bus, nb);
+>   }
+>   
+> -/*
+> - * Let the architectures decide how many entries should be preallocated.
+> - */
+> -void dma_debug_init(u32 num_entries)
+> +static int dma_debug_init(void)
+>   {
+> +	u32 num_entries;
+
+Maybe initialise it to PREALLOC_DMA_DEBUG_ENTRIES?
+
+>   	int i;
+>   
+>   	/* Do not use dma_debug_initialized here, since we really want to be
+>   	 * called to set dma_debug_initialized
+>   	 */
+>   	if (global_disable)
+> -		return;
+> +		return 0;
+>   
+>   	for (i = 0; i < HASH_SIZE; ++i) {
+>   		INIT_LIST_HEAD(&dma_entry_hash[i].list);
+> @@ -1026,17 +1029,19 @@ void dma_debug_init(u32 num_entries)
+>   		pr_err("DMA-API: error creating debugfs entries - disabling\n");
+>   		global_disable = true;
+>   
+> -		return;
+> +		return 0;
+>   	}
+>   
+>   	if (req_entries)
+>   		num_entries = req_entries;
+> +	else
+> +		num_entries = PREALLOC_DMA_DEBUG_ENTRIES;
+>   
+>   	if (prealloc_memory(num_entries) != 0) {
+>   		pr_err("DMA-API: debugging out of memory error - disabled\n");
+>   		global_disable = true;
+>   
+> -		return;
+> +		return 0;
+>   	}
+>   
+>   	nr_total_entries = num_free_entries;
+> @@ -1044,7 +1049,9 @@ void dma_debug_init(u32 num_entries)
+>   	dma_debug_initialized = true;
+>   
+>   	pr_info("DMA-API: debugging enabled by kernel config\n");
+> +	return 0;
+>   }
+> +core_initcall(dma_debug_init);
+
+I think it's worth noting that for most users this now happens much 
+earlier than before. In general that's probably good (e.g. on arm64 it 
+should prevent false-positives from the Arm SMMU drivers under ACPI), 
+and I can't imagine it's high-risk, but it is a behaviour change.
+
+Robin.
+
+>   
+>   static __init int dma_debug_cmdline(char *str)
+>   {
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
