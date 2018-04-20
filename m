@@ -1,39 +1,40 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Apr 2018 15:28:30 +0200
-Subject: [PATCH 4/8] sh_eth: Change platform check to CONFIG_ARCH_RENESAS
+Date: Fri, 20 Apr 2018 15:28:32 +0200
+Subject: [PATCH 6/8] ASoC: sh: Update menu title and platform dependency
 In-Reply-To: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
 References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1524230914-10175-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1524230914-10175-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
-is CONFIG_ARCH_RENESAS a more appropriate platform check than the legacy
-CONFIG_ARCH_SHMOBILE, hence use the former.
+Change the menu title to refer to "Renesas SoCs" instead of "SuperH", as
+both SuperH and ARM SoCs are supported.
 
-Renesas SuperH SH-Mobile SoCs are still covered by the CONFIG_CPU_SH4
-check.
+Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
+is ARCH_RENESAS a more appropriate platform dependency for Renesas ARM
+SoCs than the legacy ARCH_SHMOBILE, hence use the former.
+Renesas SuperH SH-Mobile SoCs are still covered by the SUPERH
+dependency.
 
 This will allow to drop ARCH_SHMOBILE on ARM and ARM64 in the near
 future.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/net/ethernet/renesas/sh_eth.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/sh/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/renesas/sh_eth.h b/drivers/net/ethernet/renesas/sh_eth.h
-index a5b792ce2ae7d046..1bf930d4a1e52c18 100644
---- a/drivers/net/ethernet/renesas/sh_eth.h
-+++ b/drivers/net/ethernet/renesas/sh_eth.h
-@@ -163,7 +163,7 @@ enum {
- };
+diff --git a/sound/soc/sh/Kconfig b/sound/soc/sh/Kconfig
+index 1aa5cd77ca24a06f..c1b7fb91e3063f2b 100644
+--- a/sound/soc/sh/Kconfig
++++ b/sound/soc/sh/Kconfig
+@@ -1,5 +1,5 @@
+-menu "SoC Audio support for SuperH"
+-	depends on SUPERH || ARCH_SHMOBILE || COMPILE_TEST
++menu "SoC Audio support for Renesas SoCs"
++	depends on SUPERH || ARCH_RENESAS || COMPILE_TEST
  
- /* Driver's parameters */
--#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
-+#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_RENESAS)
- #define SH_ETH_RX_ALIGN		32
- #else
- #define SH_ETH_RX_ALIGN		2
+ config SND_SOC_PCM_SH7760
+ 	tristate "SoC Audio support for Renesas SH7760"
 -- 
 2.7.4
