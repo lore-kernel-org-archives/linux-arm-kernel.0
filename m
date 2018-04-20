@@ -1,61 +1,135 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Fri, 20 Apr 2018 10:52:00 +0200
-Subject: [PATCH] ARM: tegra: fix ulpi regression on tegra20
-In-Reply-To: <20180219151252.29289-1-marcel@ziswiler.com>
-References: <20180219151252.29289-1-marcel@ziswiler.com>
-Message-ID: <6600596.BijQW1iq1K@ax5200p>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Fri, 20 Apr 2018 10:52:35 +0200
+Subject: [PATCH v3 0/7] Add tda998x (HDMI) support to atmel-hlcdc
+In-Reply-To: <20180419162751.25223-1-peda@axentia.se>
+References: <20180419162751.25223-1-peda@axentia.se>
+Message-ID: <20180420085235.GI4235@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcel,
+Hi Peter,
+    I've been a bit a pain in the arse for you recently, but please
+bear with me a bit more, and sorry for jumping late on the band wagon.
 
-Am Montag, 19. Februar 2018, 16:12:52 CEST schrieb Marcel Ziswiler:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> Since commit f8f8f1d04494 ("clk: Don't touch hardware when reparenting
-> during registration") ULPI has been broken on Tegra20 leading to the
-> following error message during boot:
-> 
-> [    1.974698] ulpi_phy_power_on: ulpi write failed
-> [    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
-> [    1.985434] tegra-ehci: probe of c5004000.usb failed with error -110
-> 
-> Debugging through the changes and finally also consulting the TRM
-> revealed that rather than the CDEV2 clock off OSC requiring such pin
-> muxing actually the PLL_P_OUT4 clock is in use. It looks like so far it
-> just worked by chance of that one having been enabled which Stephen's
-> commit now changed when reparenting sclk away from pll_p_out4 leaving
-> that one disabled. Fix this by properly assigning the PLL_P_OUT4 clock
-> as the ULPI PHY clock.
+On Thu, Apr 19, 2018 at 06:27:44PM +0200, Peter Rosin wrote:
+> Hi!
+>
+> I naively thought that since there was support for both nxp,tda19988 (in
+> the tda998x driver) and the atmel-hlcdc, things would be a smooth ride.
+> But it wasn't, so I started looking around and realized I had to fix
+> things.
+>
+> In v1 and v2 I fixed things by making the atmel-hlcdc driver a master
+> component, but now in v3 I fix things by making the tda998x driver
+> a bridge instead. This was after a suggestion from Boris Brezillion
+> (the atmel-hlcdc maintainer), so there was some risk of bias ... but
+> after comparing what was needed, I too find the bridge approach better.
+>
+> In addition to the above, our PCB interface between the SAMA5D3 and the
+> HDMI encoder is only using 16 bits, and this has to be described
+> somewhere, or the atmel-hlcdc driver have no chance of selecting the
+> correct output mode. Since I have similar problems with a ds90c185 lvds
+> encoder I added patches to override the atmel-hlcdc output format via
+> DT properties compatible with the media video-interface binding and
+> things start to play together.
+>
+> Since this series superseeds the bridge series [1], I have included the
+> leftover bindings patch for the ti,ds90c185 here.
+>
 
-I booted 4.17-rc1 (which includes this fix) on an AC100 (T20 paz00 board) and 
-the error above is still there. Surprisingly the error vanishes when I revert 
-your patch. So this patch actually *causes* the problem above on my board. 
-Could it be, that we need all four clocks? Dimitry mentioned on IRC that it 
-could also be a problem in the clock init table. I don't have the technical 
-background myself to fix it, but I still wonder what could be so different 
-between TrimSlice and AC100.
+I feel like this series would look better if it would make use of the
+proposed bridge media bus format support I have recently sent out [1]
+(and which was not there when you first sent v1).
 
-Marc
+I understand your fundamental problem here is that the bus format
+that should be reported by your bridge is different from the ones
+actually supported by the TDA19988 chip, as the wirings ground some
+of the input pins.
 
+Although this is defintely something that could be described in the
+bridge's own OF node with the 'bus_width' property, and what I would do,
+now that you have made a bridge out from the tda19988 driver, is:
 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> ---
-> 
->  arch/arm/boot/dts/tegra20.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> index 864a95872b8d..e05b6bb2599f 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -741,7 +741,7 @@
->  		phy_type = "ulpi";
->  		clocks = <&tegra_car TEGRA20_CLK_USB2>,
->  			 <&tegra_car TEGRA20_CLK_PLL_U>,
-> -			 <&tegra_car TEGRA20_CLK_CDEV2>;
-> +			 <&tegra_car TEGRA20_CLK_PLL_P_OUT4>;
->  		clock-names = "reg", "pll_u", "ulpi-link";
->  		resets = <&tegra_car 58>, <&tegra_car 22>;
->  		reset-names = "usb", "utmi-pads";
+1) Set the bridge accepted input bus_format parsing its pin
+configuration, or default it if that's not implemented yet.
+This will likely be rgb888. You can do that using the trivial
+support for bridge input image formats implemented by my series.
+2) Specify in the bridge endpoint a 'bus_width' of <16>
+3) In your atmel-hlcd get both the image format of the bridge (rgb888)
+and parse the remote endpoint property 'bus_width' and get the <16>
+value back.
+4) Set the correct format in the atmel hlcd driver to accommodate a
+bridge that wants rgb888 on a 16 bit wide bus (that would be rgb565,
+or are there other possible combinations I am missing?)
+
+I would consider this better mostly because in this series you are
+creating a semantic for the whole DRM subsystem on the 'bus_width'
+property, where numerical values as '12', '16' etc are arbitrary tied
+to the selection of a media bus format. At least you should use a
+common set of defines [1] between the device tree and the driver,
+but this looks anyway fragile imho.
+
+Have I maybe missed some parts of the problem you are trying to solve
+here?
+
+Thank you
+   j
+
+[1] drm: bridge: Add support for static image formats
+    https://lwn.net/Articles/752296/
+[2] include/uapi/linux/media-bus-format.h
+> Anyway, this series solves some real issues for my HW.
+>
+> Cheers,
+> Peter
+>
+> Changes since v2   https://lkml.org/lkml/2018/4/17/385
+> - patch 2/7 fixed spelling and added an example
+> - patch 4/7 parse the DT up front and store the result indexed by encoder
+> - old patch 5/6 and 6/6 dropped
+> - patch 5-7/7 are new and makes the tda998x driver a drm_bridge
+>
+> Changes since v1   https://lkml.org/lkml/2018/4/9/294
+> - added reviewed-by from Rob to patch 1/6
+> - patch 2/6 changed so that the bus format override is in the endpoint
+>   DT node, and follows the binding of media video-interfaces.
+> - patch 3/6 is new, it adds drm_of_media_bus_fmt which parses above
+>   media video-interface binding (partially).
+> - patch 4/6 now makes use of the above helper (and also fixes problems
+>   with the 3/5 patch from v1 when no override was specified).
+> - do not mention unrelated connector display_info details in the cover
+>   letter and commit messages.
+>
+> [1]
+> "Bridge" series v2   https://lkml.org/lkml/2018/3/26/610
+> "Bridge" series v1   https://lkml.org/lkml/2018/3/17/221
+>
+> Peter Rosin (7):
+>   dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+>   dt-bindings: display: atmel: optional video-interface of endpoints
+>   drm: of: introduce drm_of_media_bus_fmt
+>   drm/atmel-hlcdc: support bus-width (12/16/18/24) in endpoint nodes
+>   drm/i2c: tda998x: find the drm_device via the drm_connector
+>   drm/i2c: tda998x: split encoder and component functions from the work
+>   drm/i2c: tda998x: register as a drm bridge
+>
+>  .../devicetree/bindings/display/atmel/hlcdc-dc.txt |  26 +++
+>  .../bindings/display/bridge/lvds-transmitter.txt   |   8 +-
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     |  71 ++++++--
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       |   2 +
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   |  40 +++-
+>  drivers/gpu/drm/drm_of.c                           |  38 ++++
+>  drivers/gpu/drm/i2c/tda998x_drv.c                  | 201 ++++++++++++++++++---
+>  include/drm/drm_of.h                               |   7 +
+>  8 files changed, 342 insertions(+), 51 deletions(-)
+>
+> --
+> 2.11.0
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/8179b3c9/attachment.sig>
