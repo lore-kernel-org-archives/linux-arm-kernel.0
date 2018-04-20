@@ -1,175 +1,114 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 20 Apr 2018 11:46:19 +0100
-Subject: [RFC PATCH 3/3] arm64: stacktrace: Prevent looping and invalid stack
- transitions
+Date: Fri, 20 Apr 2018 11:46:18 +0100
+Subject: [RFC PATCH 2/3] arm64: stacktrace: Factor out backtrace initialisation
 In-Reply-To: <1524221179-19473-1-git-send-email-Dave.Martin@arm.com>
 References: <1524221179-19473-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1524221179-19473-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1524221179-19473-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the event of stack corruption, backtraces may loop indefinitely
-or wander off into memory that is not a valid stack for the context
-being backtraced.
+Some common code is required by each stacktrace user to initialised
+struct stackframe before the first call to unwind_frame().
 
-This patch makes backtracing more robust against stack corruption,
-by taking two things into account:
+In preparation for adding to the common code, this patch factors it
+out into a separate function start_backtrace(), and modifies the
+stacktrace callers appropriately.
 
- * while staying on the same stack, the frame address must strictly
-   increase from each frame to its ancestor;
+No functional change.
 
- * when transitioning to another stack, the set of valid stacks for
-   the context forms a strict hierarchy (e.g., a frame on the task
-   stack cannot have an ancestor frame on the IRQ stack because
-   task context cannot preempt IRQ handlers etc.)
-
-on_accessible_stack() is converted to a more expressive helper
-identify_stack() that also tells the caller _which_ stack the task
-appears to be on.  The stack identifier is represented by an enum
-sorted into the correct order for checking stack transition
-validity by a simple numeric comparison.  A field stack_id is added
-to struct stackframe to track the result of this for the frame.
-
-Now that it is easy to check whether two successive frames are on
-the same stack, it is easy to add a check for strictly increasing
-frame address, to avoid looping around the same stack.
-
-Now that frames can be mapped to a strict lexical order on the
-stack id and frame address, forward progress should be guaranteed.
-
-Backtracing now terminates whenever the next frame violates this
-order, with kernel entry (with fp == 0 && pc == 0) as a special
-case of this.
-
-Reported-by: Ji Zhang <ji.zhang@mediatek.com>
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
 ---
-
-The assumption that we can place the possible stacks (task, IRQ,
-overflow, SDEI) in a strict order is based on a quick review of
-entry.S, but I may have this wrong... in which case the approach
-proposed in this patch may need tweaking (or may not work at all).
----
- arch/arm64/include/asm/stacktrace.h | 35 +++++++++++++++++++++++++++--------
- arch/arm64/kernel/stacktrace.c      | 16 ++++++++++------
- 2 files changed, 37 insertions(+), 14 deletions(-)
+ arch/arm64/include/asm/stacktrace.h | 11 +++++++++++
+ arch/arm64/kernel/process.c         |  6 +-----
+ arch/arm64/kernel/time.c            |  6 +-----
+ arch/arm64/kernel/traps.c           | 21 ++++++++-------------
+ 4 files changed, 21 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index c9bef22..fe97ff1 100644
+index 63c0379..c9bef22 100644
 --- a/arch/arm64/include/asm/stacktrace.h
 +++ b/arch/arm64/include/asm/stacktrace.h
-@@ -24,9 +24,26 @@
- #include <asm/ptrace.h>
- #include <asm/sdei.h>
- 
-+/*
-+ * Set of stacks that a given task may execute on.
-+ *
-+ * This must be sorted so that if entry A appears before entry B, the
-+ * context corresponding to A cannot preempt the context corresponding
-+ * to B.  This property is used by the unwinder to verify forward
-+ * progress by means of a numeric comparison on this enum.
-+ */
-+enum arm64_stack_id {
-+	ARM64_STACK_NONE,
-+	ARM64_STACK_TASK,
-+	ARM64_STACK_IRQ,
-+	ARM64_STACK_OVERFLOW,
-+	ARM64_STACK_SDEI,
-+};
-+
- struct stackframe {
- 	unsigned long fp;
- 	unsigned long pc;
-+	enum arm64_stack_id stack_id;
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	int graph;
- #endif
-@@ -77,21 +94,22 @@ static inline bool on_overflow_stack(unsigned long sp) { return false; }
-  * We can only safely access per-cpu stacks from current in a non-preemptible
-  * context.
-  */
--static inline bool on_accessible_stack(struct task_struct const *tsk,
--				       unsigned long sp)
-+static enum arm64_stack_id identify_stack(struct task_struct const *tsk,
-+					  unsigned long sp)
- {
- 	if (on_task_stack(tsk, sp))
--		return true;
-+		return ARM64_STACK_TASK;
- 	if (tsk != current || preemptible())
--		return false;
-+		goto bad;
- 	if (on_irq_stack(sp))
--		return true;
-+		return ARM64_STACK_IRQ;
- 	if (on_overflow_stack(sp))
--		return true;
-+		return ARM64_STACK_OVERFLOW;
- 	if (on_sdei_stack(sp))
--		return true;
-+		return ARM64_STACK_SDEI;
- 
--	return false;
-+bad:
-+	return ARM64_STACK_NONE;
+@@ -94,4 +94,15 @@ static inline bool on_accessible_stack(struct task_struct const *tsk,
+ 	return false;
  }
  
- static inline void start_backtrace(struct stackframe *frame,
-@@ -100,6 +118,7 @@ static inline void start_backtrace(struct stackframe *frame,
- {
- 	frame->fp = fp;
- 	frame->pc = pc;
-+	frame->stack_id = identify_stack(tsk, fp);
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	frame.graph = tsk->curr_ret_stack;
- #endif
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index d5718a0..518ac57 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -43,6 +43,7 @@
- int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- {
- 	unsigned long fp = frame->fp;
-+	enum arm64_stack_id stack_id = frame->stack_id;
++static inline void start_backtrace(struct stackframe *frame,
++			    struct task_struct const *tsk,
++			    unsigned long fp, unsigned long pc)
++{
++	frame->fp = fp;
++	frame->pc = pc;
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	frame.graph = tsk->curr_ret_stack;
++#endif
++}
++
+ #endif	/* __ASM_STACKTRACE_H */
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index f08a2ed..59b418c 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -452,11 +452,7 @@ unsigned long get_wchan(struct task_struct *p)
+ 	if (!stack_page)
+ 		return 0;
  
- 	if (fp & 0xf)
- 		return -EINVAL;
-@@ -50,11 +51,12 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 	if (!tsk)
- 		tsk = current;
+-	frame.fp = thread_saved_fp(p);
+-	frame.pc = thread_saved_pc(p);
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = p->curr_ret_stack;
+-#endif
++	start_backtrace(&frame, p, thread_saved_fp(p), thread_saved_pc(p));
+ 	do {
+ 		if (unwind_frame(p, &frame))
+ 			goto out;
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index f258636..83f08c7 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -49,11 +49,7 @@ unsigned long profile_pc(struct pt_regs *regs)
+ 	if (!in_lock_functions(regs->pc))
+ 		return regs->pc;
  
--	if (!on_accessible_stack(tsk, fp))
-+	if (stack_id == ARM64_STACK_NONE)
- 		return -EINVAL;
+-	frame.fp = regs->regs[29];
+-	frame.pc = regs->pc;
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = current->curr_ret_stack;
+-#endif
++	start_backtrace(&frame, current, regs->regs[29], regs->pc);
+ 	do {
+ 		int ret = unwind_frame(NULL, &frame);
+ 		if (ret < 0)
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index ba964da..3910af4 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -111,19 +111,14 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 	if (!try_get_task_stack(tsk))
+ 		return;
  
- 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
- 	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
-+	frame->stack_id = identify_stack(tsk, frame->fp);
+-	if (tsk == current) {
+-		frame.fp = (unsigned long)__builtin_frame_address(0);
+-		frame.pc = (unsigned long)dump_backtrace;
+-	} else {
+-		/*
+-		 * task blocked in __switch_to
+-		 */
+-		frame.fp = thread_saved_fp(tsk);
+-		frame.pc = thread_saved_pc(tsk);
+-	}
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	frame.graph = tsk->curr_ret_stack;
+-#endif
++	if (tsk == current)
++		start_backtrace(&frame, tsk,
++				(unsigned long)__builtin_frame_address(0),
++				(unsigned long)dump_backtrace);
++	else /* task blocked in __switch_to */
++		start_backtrace(&frame, tsk,
++				thread_saved_fp(tsk),
++				thread_saved_pc(tsk));
  
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	if (tsk->ret_stack &&
-@@ -75,12 +77,14 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
- 
- 	/*
--	 * Frames created upon entry from EL0 have NULL FP and PC values, so
--	 * don't bother reporting these. Frames created by __noreturn functions
--	 * might have a valid FP even if PC is bogus, so only terminate where
--	 * both are NULL.
-+	 * Terminate when the next frame isn't on any valid stack for
-+	 * tsk.  As a special case, frames created upon entry from EL0
-+	 * have NULL FP and PC values, so will terminate here also.
-+	 * Frames created by __noreturn functions might have a valid FP
-+	 * even if PC is bogus, so only terminate where FP is invalid.
- 	 */
--	if (!frame->fp && !frame->pc)
-+	if (frame->stack_id > stack_id ||
-+	    (frame->stack_id == stack_id && frame->fp <= fp))
- 		return -EINVAL;
- 
- 	return 0;
+ 	skip = !!regs;
+ 	printk("Call trace:\n");
 -- 
 2.1.4
