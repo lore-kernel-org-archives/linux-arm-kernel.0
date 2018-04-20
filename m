@@ -1,36 +1,57 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Apr 2018 15:28:31 +0200
-Subject: [PATCH 5/8] staging: emxx_udc: Change platform dependency to
- ARCH_RENESAS
+Date: Fri, 20 Apr 2018 15:28:33 +0200
+Subject: [PATCH/RFC 7/8] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig symbol
 In-Reply-To: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
 References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1524230914-10175-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emma Mobile is a Renesas ARM SoC.  Since commit 9b5ba0df4ea4f940 ("ARM:
-shmobile: Introduce ARCH_RENESAS") is ARCH_RENESAS a more appropriate
-platform dependency than the legacy ARCH_SHMOBILE, hence use the
-former.
-
-This will allow to drop ARCH_SHMOBILE on ARM in the near future.
+All drivers for Renesas ARM SoCs have gained proper ARCH_RENESAS
+platform dependencies.  Hence finish the conversion from ARCH_SHMOBILE
+to ARCH_RENESAS for Renesas 32-bit ARM SoCs, as started by commit
+9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS").
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/staging/emxx_udc/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This depends on the previous patches in this series, hence the RFC.
 
-diff --git a/drivers/staging/emxx_udc/Kconfig b/drivers/staging/emxx_udc/Kconfig
-index d7577096fb25ae7a..e50e722183648c55 100644
---- a/drivers/staging/emxx_udc/Kconfig
-+++ b/drivers/staging/emxx_udc/Kconfig
-@@ -1,6 +1,6 @@
- config USB_EMXX
- 	tristate "EMXX USB Function Device Controller"
-- 	depends on USB_GADGET && (ARCH_SHMOBILE || (ARM && COMPILE_TEST))
-+	depends on USB_GADGET && (ARCH_RENESAS || (ARM && COMPILE_TEST))
- 	help
- 	   The Emma Mobile series of SoCs from Renesas Electronics and
- 	   former NEC Electronics include USB Function hardware.
+JFTR, after this, the following symbols for drivers supporting only
+Renesas SuperH "SH-Mobile" SoCs can no longer be selected:
+  - CONFIG_KEYBOARD_SH_KEYSC,
+  - CONFIG_VIDEO_SH_VOU,
+  - CONFIG_VIDEO_SH_MOBILE_CEU,
+  - CONFIG_DRM_SHMOBILE[*],
+  - CONFIG_FB_SH_MOBILE_MERAM.
+(changes for a shmobile_defconfig .config)
+
+[*] CONFIG_DRM_SHMOBILE has a dependency on ARM, but it was never wired
+    up.  From the use of sh_mobile_meram, I guess it was meant for
+    SH-Mobile AP4 on Mackerel or AP4EVB, which are long gone.
+    So the only remaining upstream platforms that could make use of it
+    are legacy SuperH SH-Mobile SoCs?
+---
+ arch/arm/mach-shmobile/Kconfig | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 96672da02f5f17b9..d892c5b52b6f5627 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -1,6 +1,3 @@
+-config ARCH_SHMOBILE
+-	bool
+-
+ config PM_RMOBILE
+ 	bool
+ 	select PM
+@@ -30,7 +27,6 @@ menuconfig ARCH_RENESAS
+ 	bool "Renesas ARM SoCs"
+ 	depends on ARCH_MULTI_V7 && MMU
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+-	select ARCH_SHMOBILE
+ 	select ARM_GIC
+ 	select GPIOLIB
+ 	select HAVE_ARM_SCU if SMP
 -- 
 2.7.4
