@@ -1,389 +1,93 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Apr 2018 17:07:13 +0100
-Subject: [PATCH 5/5] arm/arm64: KVM: Add PSCI version selection API
-In-Reply-To: <20180420160713.17884-1-marc.zyngier@arm.com>
-References: <20180420160713.17884-1-marc.zyngier@arm.com>
-Message-ID: <20180420160713.17884-6-marc.zyngier@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Apr 2018 18:10:22 +0200
+Subject: Clang arm64 build is broken
+In-Reply-To: <20180420153846.5m5ngqcfn4v4q6wh@lakrids.cambridge.arm.com>
+References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+ <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
+ <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
+ <20180420153846.5m5ngqcfn4v4q6wh@lakrids.cambridge.arm.com>
+Message-ID: <CAKv+Gu_tuYcikQ07QKP-N+rd+DpoucSYn6TG+OJ-jm9CVGaDxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although we've implemented PSCI 0.1, 0.2 and 1.0, we expose either 0.1
-or 1.0 to a guest, defaulting to the latest version of the PSCI
-implementation that is compatible with the requested version. This is
-no different from doing a firmware upgrade on KVM.
+On 20 April 2018 at 17:38, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Andrey,
+>
+> On Fri, Apr 20, 2018 at 04:59:35PM +0200, Andrey Konovalov wrote:
+>> On Fri, Apr 20, 2018 at 10:13 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> >> The issue is that
+>> >> clang doesn't know about the "S" asm constraint. I reported this to
+>> >> clang [2], and hopefully this will get fixed. In the meantime, would
+>> >> it possible to work around using the "S" constraint in the kernel?
+>> >
+>> > I have no idea, I've never used clang to build the kernel. Clang isn't
+>> > really supported to build the arm64 kernel anyway (as you mention
+>> > below), and working around clang deficiencies would mean that we leave
+>> > with the workaround forever. I'd rather enable clang once it is at
+>> > feature parity with GCC.
+>>
+>> The fact that there are some existing issues with building arm64
+>> kernel with clang doesn't sound like a good justification for adding
+>> new issues :)
+>
+> I appreciate this is somewhat frustrating, but every feature where clang
+> is not at parity with GCC is effectively a functional regression for us.
+>
+> Recently, the code that clang hasn't liked happens to be security
+> critical, and it is somewhat difficult to justify making that code more
+> complex to cater for a compiler that we know has outstanding issues with
+> features we rely upon.
+>
+> Which is to say, I'm not sure that there's much justification either
+> way. We really need clang to be at feature parity with GCC for it to be
+> considered supported.
+>
+> It would be great if some effort could be focussed on bringing clang to
+> feature parity with GCC before implementing new clang-specific features.
+>
+>> However in this case I do believe that this is more of a bug in clang
+>> that should be fixed.
+>
+> Just to check: does clang implement the rest of the AArch64 machine
+> constraints [1]?
+>
+> We're liable to use more of them in future, and we should aim for parity
+> now so that we don't fall into the same trap in future.
+>
+>> >> While we're here, regarding the other issue with kvm [3], I didn't
+>> >> receive any comments as to whether it makes sense to send the fix that
+>> >> adds -fno-jump-tables flag when building kvm with clang.
+>> >
+>> > Is that the only thing missing? Are you sure that there is no other way
+>> > for clang to generate absolute addresses that will then lead to a crash?
+>> > Again, I'd rather make sure we have the full picture.
+>>
+>> Well, I have tried applying that patch and running kvm tests that I
+>> could find [1], and they passed (actually I think there was an issue
+>> with one of them, but I saw the same thing when I tried running them
+>> on a kernel built with GCC).
+>
+> I think what Marc wants is a statement as to whether -fno-jump-tables is
+> sufficient to ensure that clang will not try to use absolute addressing,
+> based on an understanding of the AArch64 LLVM backend rather than test
+> cases.
+>
+> For example, could any other pass result in the use of an absolute
+> address? Or are jump tables the *only* reason that clang would try to
+> use an absolute address.
+>
+> Are there other options that we might need to pass?
+>
+> Are there any options that we can pass to forbid absolute addressing?
+>
 
-But in order to give a chance to hypothetical badly implemented guests
-that would have a fit by discovering something other than PSCI 0.2,
-let's provide a new API that allows userspace to pick one particular
-version of the API.
-
-This is implemented as a new class of "firmware" registers, where
-we expose the PSCI version. This allows the PSCI version to be
-save/restored as part of a guest migration, and also set to
-any supported version if the guest requires it.
-
-Cc: stable at vger.kernel.org #4.16
-Reviewed-by: Christoffer Dall <cdall@kernel.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- Documentation/virtual/kvm/api.txt      |  9 ++++-
- Documentation/virtual/kvm/arm/psci.txt | 30 +++++++++++++++++
- arch/arm/include/asm/kvm_host.h        |  3 ++
- arch/arm/include/uapi/asm/kvm.h        |  6 ++++
- arch/arm/kvm/guest.c                   | 13 ++++++++
- arch/arm64/include/asm/kvm_host.h      |  3 ++
- arch/arm64/include/uapi/asm/kvm.h      |  6 ++++
- arch/arm64/kvm/guest.c                 | 14 +++++++-
- include/kvm/arm_psci.h                 | 16 +++++++--
- virt/kvm/arm/psci.c                    | 60 ++++++++++++++++++++++++++++++++++
- 10 files changed, 156 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/virtual/kvm/arm/psci.txt
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 1c7958b57fe9..758bf403a169 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -1960,6 +1960,9 @@ ARM 32-bit VFP control registers have the following id bit patterns:
- ARM 64-bit FP registers have the following id bit patterns:
-   0x4030 0000 0012 0 <regno:12>
- 
-+ARM firmware pseudo-registers have the following bit pattern:
-+  0x4030 0000 0014 <regno:16>
-+
- 
- arm64 registers are mapped using the lower 32 bits. The upper 16 of
- that is the register group type, or coprocessor number:
-@@ -1976,6 +1979,9 @@ arm64 CCSIDR registers are demultiplexed by CSSELR value:
- arm64 system registers have the following id bit patterns:
-   0x6030 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
- 
-+arm64 firmware pseudo-registers have the following bit pattern:
-+  0x6030 0000 0014 <regno:16>
-+
- 
- MIPS registers are mapped using the lower 32 bits.  The upper 16 of that is
- the register group type:
-@@ -2510,7 +2516,8 @@ Possible features:
- 	  and execute guest code when KVM_RUN is called.
- 	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
- 	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
--	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 for the CPU.
-+	- KVM_ARM_VCPU_PSCI_0_2: Emulate PSCI v0.2 (or a future revision
-+          backward compatible with v0.2) for the CPU.
- 	  Depends on KVM_CAP_ARM_PSCI_0_2.
- 	- KVM_ARM_VCPU_PMU_V3: Emulate PMUv3 for the CPU.
- 	  Depends on KVM_CAP_ARM_PMU_V3.
-diff --git a/Documentation/virtual/kvm/arm/psci.txt b/Documentation/virtual/kvm/arm/psci.txt
-new file mode 100644
-index 000000000000..aafdab887b04
---- /dev/null
-+++ b/Documentation/virtual/kvm/arm/psci.txt
-@@ -0,0 +1,30 @@
-+KVM implements the PSCI (Power State Coordination Interface)
-+specification in order to provide services such as CPU on/off, reset
-+and power-off to the guest.
-+
-+The PSCI specification is regularly updated to provide new features,
-+and KVM implements these updates if they make sense from a virtualization
-+point of view.
-+
-+This means that a guest booted on two different versions of KVM can
-+observe two different "firmware" revisions. This could cause issues if
-+a given guest is tied to a particular PSCI revision (unlikely), or if
-+a migration causes a different PSCI version to be exposed out of the
-+blue to an unsuspecting guest.
-+
-+In order to remedy this situation, KVM exposes a set of "firmware
-+pseudo-registers" that can be manipulated using the GET/SET_ONE_REG
-+interface. These registers can be saved/restored by userspace, and set
-+to a convenient value if required.
-+
-+The following register is defined:
-+
-+* KVM_REG_ARM_PSCI_VERSION:
-+
-+  - Only valid if the vcpu has the KVM_ARM_VCPU_PSCI_0_2 feature set
-+    (and thus has already been initialized)
-+  - Returns the current PSCI version on GET_ONE_REG (defaulting to the
-+    highest PSCI version implemented by KVM and compatible with v0.2)
-+  - Allows any PSCI version implemented by KVM and compatible with
-+    v0.2 to be set with SET_ONE_REG
-+  - Affects the whole VM (even if the register view is per-vcpu)
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index c6a749568dd6..c7c28c885a19 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -77,6 +77,9 @@ struct kvm_arch {
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
- 	int max_vcpus;
-+
-+	/* Mandated version of PSCI */
-+	u32 psci_version;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 2ba95d6fe852..caae4843cb70 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -195,6 +195,12 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_VFP_FPINST		0x1009
- #define KVM_REG_ARM_VFP_FPINST2		0x100A
- 
-+/* KVM-as-firmware specific pseudo-registers */
-+#define KVM_REG_ARM_FW			(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
-+#define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM | KVM_REG_SIZE_U64 | \
-+					 KVM_REG_ARM_FW | ((r) & 0xffff))
-+#define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-+
- /* Device Control API: ARM VGIC */
- #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
- #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 1e0784ebbfd6..a18f33edc471 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -22,6 +22,7 @@
- #include <linux/module.h>
- #include <linux/vmalloc.h>
- #include <linux/fs.h>
-+#include <kvm/arm_psci.h>
- #include <asm/cputype.h>
- #include <linux/uaccess.h>
- #include <asm/kvm.h>
-@@ -176,6 +177,7 @@ static unsigned long num_core_regs(void)
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
- 	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu)
-+		+ kvm_arm_get_fw_num_regs(vcpu)
- 		+ NUM_TIMER_REGS;
- }
- 
-@@ -196,6 +198,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
-+	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
-+	if (ret)
-+		return ret;
-+	uindices += kvm_arm_get_fw_num_regs(vcpu);
-+
- 	ret = copy_timer_indices(vcpu, uindices);
- 	if (ret)
- 		return ret;
-@@ -214,6 +221,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_get_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return get_timer_reg(vcpu, reg);
- 
-@@ -230,6 +240,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_set_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return set_timer_reg(vcpu, reg);
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index ab46bc70add6..469de8acd06f 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -75,6 +75,9 @@ struct kvm_arch {
- 
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
-+
-+	/* Mandated version of PSCI */
-+	u32 psci_version;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 9abbf3044654..04b3256f8e6d 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -206,6 +206,12 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_TIMER_CNT		ARM64_SYS_REG(3, 3, 14, 3, 2)
- #define KVM_REG_ARM_TIMER_CVAL		ARM64_SYS_REG(3, 3, 14, 0, 2)
- 
-+/* KVM-as-firmware specific pseudo-registers */
-+#define KVM_REG_ARM_FW			(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
-+#define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
-+					 KVM_REG_ARM_FW | ((r) & 0xffff))
-+#define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-+
- /* Device Control API: ARM VGIC */
- #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
- #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 959e50d2588c..56a0260ceb11 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -25,6 +25,7 @@
- #include <linux/module.h>
- #include <linux/vmalloc.h>
- #include <linux/fs.h>
-+#include <kvm/arm_psci.h>
- #include <asm/cputype.h>
- #include <linux/uaccess.h>
- #include <asm/kvm.h>
-@@ -205,7 +206,7 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
- 	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu)
--                + NUM_TIMER_REGS;
-+		+ kvm_arm_get_fw_num_regs(vcpu)	+ NUM_TIMER_REGS;
- }
- 
- /**
-@@ -225,6 +226,11 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
-+	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
-+	if (ret)
-+		return ret;
-+	uindices += kvm_arm_get_fw_num_regs(vcpu);
-+
- 	ret = copy_timer_indices(vcpu, uindices);
- 	if (ret)
- 		return ret;
-@@ -243,6 +249,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_get_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return get_timer_reg(vcpu, reg);
- 
-@@ -259,6 +268,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-+		return kvm_arm_set_fw_reg(vcpu, reg);
-+
- 	if (is_timer_reg(reg->id))
- 		return set_timer_reg(vcpu, reg);
- 
-diff --git a/include/kvm/arm_psci.h b/include/kvm/arm_psci.h
-index e518e4e3dfb5..4b1548129fa2 100644
---- a/include/kvm/arm_psci.h
-+++ b/include/kvm/arm_psci.h
-@@ -37,10 +37,15 @@ static inline int kvm_psci_version(struct kvm_vcpu *vcpu, struct kvm *kvm)
- 	 * Our PSCI implementation stays the same across versions from
- 	 * v0.2 onward, only adding the few mandatory functions (such
- 	 * as FEATURES with 1.0) that are required by newer
--	 * revisions. It is thus safe to return the latest.
-+	 * revisions. It is thus safe to return the latest, unless
-+	 * userspace has instructed us otherwise.
- 	 */
--	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-+	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features)) {
-+		if (vcpu->kvm->arch.psci_version)
-+			return vcpu->kvm->arch.psci_version;
-+
- 		return KVM_ARM_PSCI_LATEST;
-+	}
- 
- 	return KVM_ARM_PSCI_0_1;
- }
-@@ -48,4 +53,11 @@ static inline int kvm_psci_version(struct kvm_vcpu *vcpu, struct kvm *kvm)
- 
- int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
- 
-+struct kvm_one_reg;
-+
-+int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu);
-+int kvm_arm_copy_fw_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-+int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-+int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
-+
- #endif /* __KVM_ARM_PSCI_H__ */
-diff --git a/virt/kvm/arm/psci.c b/virt/kvm/arm/psci.c
-index 6919352cbf15..c4762bef13c6 100644
---- a/virt/kvm/arm/psci.c
-+++ b/virt/kvm/arm/psci.c
-@@ -18,6 +18,7 @@
- #include <linux/arm-smccc.h>
- #include <linux/preempt.h>
- #include <linux/kvm_host.h>
-+#include <linux/uaccess.h>
- #include <linux/wait.h>
- 
- #include <asm/cputype.h>
-@@ -427,3 +428,62 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
- 	smccc_set_retval(vcpu, val, 0, 0, 0);
- 	return 1;
- }
-+
-+int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu)
-+{
-+	return 1;		/* PSCI version */
-+}
-+
-+int kvm_arm_copy_fw_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	if (put_user(KVM_REG_ARM_PSCI_VERSION, uindices))
-+		return -EFAULT;
-+
-+	return 0;
-+}
-+
-+int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	if (reg->id == KVM_REG_ARM_PSCI_VERSION) {
-+		void __user *uaddr = (void __user *)(long)reg->addr;
-+		u64 val;
-+
-+		val = kvm_psci_version(vcpu, vcpu->kvm);
-+		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
-+			return -EFAULT;
-+
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	if (reg->id == KVM_REG_ARM_PSCI_VERSION) {
-+		void __user *uaddr = (void __user *)(long)reg->addr;
-+		bool wants_02;
-+		u64 val;
-+
-+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
-+			return -EFAULT;
-+
-+		wants_02 = test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features);
-+
-+		switch (val) {
-+		case KVM_ARM_PSCI_0_1:
-+			if (wants_02)
-+				return -EINVAL;
-+			vcpu->kvm->arch.psci_version = val;
-+			return 0;
-+		case KVM_ARM_PSCI_0_2:
-+		case KVM_ARM_PSCI_1_0:
-+			if (!wants_02)
-+				return -EINVAL;
-+			vcpu->kvm->arch.psci_version = val;
-+			return 0;
-+		}
-+	}
-+
-+	return -EINVAL;
-+}
--- 
-2.14.2
+One thing to note here is that it is not generally possible to inhibit
+all absolute references, given that statically initialized pointer
+variables will result in R_AARCH64_ABS64 relocations in any case. So
+what we are after (and we should align this with the GCC team as well)
+is a code model option or some other flag that prevents the compiler
+from *generating code* that relies on absolute addressing, given that
+we have no control over this (whereas it is feasible to avoid
+statically initialized pointer variables in code that is expected to
+execute at a memory offset that is different from the kernel's runtime
+memory offset)
