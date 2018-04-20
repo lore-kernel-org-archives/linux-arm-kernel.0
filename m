@@ -1,49 +1,76 @@
-From: loic.poulain@linaro.org (Loic Poulain)
-Date: Fri, 20 Apr 2018 09:37:57 +0200
-Subject: [PATCH v2] ARM: dts: qcom: Add apq8064 Dragon Board 600c support
-In-Reply-To: <20180316215436.22906-1-srinivas.kandagatla@linaro.org>
-References: <20180316215436.22906-1-srinivas.kandagatla@linaro.org>
-Message-ID: <CAMZdPi-Pq4WiKhy7aJPJMSo3n-Gwv9s2cvv5v25FHStbX3p09g@mail.gmail.com>
+From: acourbot@chromium.org (Alexandre Courbot)
+Date: Fri, 20 Apr 2018 07:38:57 +0000
+Subject: [PATCH v2 02/10] media-request: Add a request complete operation
+ to allow m2m scheduling
+In-Reply-To: <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+ <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
+Message-ID: <CAPBb6MVuyN+NdCrLQaM-7Rv0SyutgQjORBU=rZvq-dKs6RDjQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srini,
+On Fri, Apr 20, 2018 at 12:43 AM Paul Kocialkowski <
+paul.kocialkowski@bootlin.com> wrote:
 
-On 16 March 2018 at 22:54,  <srinivas.kandagatla@linaro.org> wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->
-> This patch add support to DB600c board, which is another
-> 96boards based on Qualcomm APQ8064 SoC.
->
-> Support for USB, HDMI, PCIe, I2C, SPI, eMMC, microSD card, LEDs
-> device tree nodes is added in this patch.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> When using the request API in the context of a m2m driver, the
+> operations that come with a m2m run scheduling call in their
+> (m2m-specific) ioctl handler are delayed until the request is queued
+> (for instance, this includes queuing buffers and streamon).
+
+> Thus, the m2m run scheduling calls are not called in due time since the
+> request AP's internal plumbing will (rightfully) use the relevant core
+> functions directly instead of the ioctl handler.
+
+> This ends up in a situation where nothing happens if there is no
+> run-scheduling ioctl called after queuing the request.
+
+> In order to circumvent the issue, a new media operation is introduced,
+> called at the time of handling the media request queue ioctl. It gives
+> m2m drivers a chance to schedule a m2m device run at that time.
+
+> The existing req_queue operation cannot be used for this purpose, since
+> it is called with the request queue mutex held, that is eventually needed
+> in the device_run call to apply relevant controls.
+
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 > ---
-> Changes since v1:
->         - added chosen node with stdout, suggested by Stephen Boyd
->         - removed spi flash node and gpio22 pinconf, as its not required in this patch.
->         - removed extra comment lines and fix a node name, spotted by Stephen Boyd.
->
->  arch/arm/boot/dts/Makefile                |   1 +
->  arch/arm/boot/dts/qcom-apq8064-db600c.dts | 530 ++++++++++++++++++++++++++++++
->  2 files changed, 531 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-apq8064-db600c.dts
+>   drivers/media/media-request.c | 3 +++
+>   include/media/media-device.h  | 2 ++
+>   2 files changed, 5 insertions(+)
 
+> diff --git a/drivers/media/media-request.c b/drivers/media/media-request.c
+> index 415f7e31019d..28ac5ccfe6a2 100644
+> --- a/drivers/media/media-request.c
+> +++ b/drivers/media/media-request.c
+> @@ -157,6 +157,9 @@ static long media_request_ioctl_queue(struct
+media_request *req)
+>                  media_request_get(req);
+>          }
+
+> +       if (mdev->ops->req_complete)
+> +               mdev->ops->req_complete(req);
 > +
-> +               gsbi at 16500000 {
-> +                       status = "okay";
-> +                       qcom,mode = <GSBI_PROT_UART_W_FC>;
-> +                       serial at 1654000 {
+>          return ret;
+>   }
 
-Missing zero, should be serial at 16540000.
+> diff --git a/include/media/media-device.h b/include/media/media-device.h
+> index 07e323c57202..c7dcf2079cc9 100644
+> --- a/include/media/media-device.h
+> +++ b/include/media/media-device.h
+> @@ -55,6 +55,7 @@ struct media_entity_notify {
+>    * @req_alloc: Allocate a request
+>    * @req_free: Free a request
+>    * @req_queue: Queue a request
+> + * @req_complete: Complete a request
+>    */
+>   struct media_device_ops {
+>          int (*link_notify)(struct media_link *link, u32 flags,
+> @@ -62,6 +63,7 @@ struct media_device_ops {
+>          struct media_request *(*req_alloc)(struct media_device *mdev);
+>          void (*req_free)(struct media_request *req);
+>          int (*req_queue)(struct media_request *req);
+> +       void (*req_complete)(struct media_request *req);
 
-> +                               label = "BT-UART";
-> +                               status = "okay";
-> +                               pinctrl-name = "default";
-> +                               pinctrl-0 = <&gsbi6_uart_4pins>;
-> +                       };
-> +               };
-
-Regards,
-Loic
+This is called *before* the request is actually run, isn't it? In that
+case, wouldn't something like "req_schedule" be less confusing?
+req_complete implies that the request is already completed.
