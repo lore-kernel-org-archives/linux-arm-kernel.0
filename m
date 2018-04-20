@@ -1,120 +1,166 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 20 Apr 2018 09:18:28 +0200
-Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
- irq_domain
-In-Reply-To: <CAFvLkMQv3AajhFaRxsBt+UzdGFeix_FA-0mhtYqwMo2x0zgrnA@mail.gmail.com>
-References: <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
- <alpine.DEB.2.21.1802230938510.11168@nanos.tec.linutronix.de>
- <a709e416-4024-f804-b2ff-ae6c2171a7c8@arm.com>
- <CAFvLkMSZjgFMAe0VRc0AEpG89BgXkfMb9+ivJ8V+PFighOoDRA@mail.gmail.com>
- <118e66b4-3137-7af5-b93d-b1949fad575c@arm.com>
- <ef86e131-ffb4-b883-b9ca-1e670d960d3e@st.com>
- <CAFvLkMQv3AajhFaRxsBt+UzdGFeix_FA-0mhtYqwMo2x0zgrnA@mail.gmail.com>
-Message-ID: <4c8eda6d-a4b0-8c9c-19c2-c5ee334ff3ba@st.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 20 Apr 2018 09:20:00 +0200
+Subject: [PATCH 10/61] gpio: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-11-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-11-wsa+renesas@sang-engineering.com>
+Message-ID: <34f4679f-d306-073b-eae0-28c9e8965780@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ok, So I include your patch in my serie
-- irqchip: stm32: Optimizes and cleans up stm32-exti irq_domain
+Hi Wolfram,
 
-BR
-Ludo
+On 19.4.2018 16:05, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+> 
+> Build tested only. buildbot is happy. Please apply individually.
+> 
+>  drivers/gpio/gpio-dwapb.c     |  6 ++----
+>  drivers/gpio/gpio-lynxpoint.c |  3 +--
+>  drivers/gpio/gpio-omap.c      | 12 ++++--------
+>  drivers/gpio/gpio-tegra.c     |  6 ++----
+>  drivers/gpio/gpio-zynq.c      |  6 ++----
+>  5 files changed, 11 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-dwapb.c b/drivers/gpio/gpio-dwapb.c
+> index 226977f78482..caaabb79e31f 100644
+> --- a/drivers/gpio/gpio-dwapb.c
+> +++ b/drivers/gpio/gpio-dwapb.c
+> @@ -732,8 +732,7 @@ static int dwapb_gpio_remove(struct platform_device *pdev)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int dwapb_gpio_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct dwapb_gpio *gpio = platform_get_drvdata(pdev);
+> +	struct dwapb_gpio *gpio = dev_get_drvdata(dev);
+>  	struct gpio_chip *gc	= &gpio->ports[0].gc;
+>  	unsigned long flags;
+>  	int i;
+> @@ -777,8 +776,7 @@ static int dwapb_gpio_suspend(struct device *dev)
+>  
+>  static int dwapb_gpio_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct dwapb_gpio *gpio = platform_get_drvdata(pdev);
+> +	struct dwapb_gpio *gpio = dev_get_drvdata(dev);
+>  	struct gpio_chip *gc	= &gpio->ports[0].gc;
+>  	unsigned long flags;
+>  	int i;
+> diff --git a/drivers/gpio/gpio-lynxpoint.c b/drivers/gpio/gpio-lynxpoint.c
+> index 1e557b10d73e..55fa33b7209f 100644
+> --- a/drivers/gpio/gpio-lynxpoint.c
+> +++ b/drivers/gpio/gpio-lynxpoint.c
+> @@ -408,8 +408,7 @@ static int lp_gpio_runtime_resume(struct device *dev)
+>  
+>  static int lp_gpio_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct lp_gpio *lg = platform_get_drvdata(pdev);
+> +	struct lp_gpio *lg = dev_get_drvdata(dev);
+>  	unsigned long reg;
+>  	int i;
+>  
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 35971a341c40..b4f8a048a2a1 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -856,8 +856,7 @@ static void omap_gpio_unmask_irq(struct irq_data *d)
+>  
+>  static int omap_mpuio_suspend_noirq(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct gpio_bank	*bank = platform_get_drvdata(pdev);
+> +	struct gpio_bank	*bank = dev_get_drvdata(dev);
+>  	void __iomem		*mask_reg = bank->base +
+>  					OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+>  	unsigned long		flags;
+> @@ -871,8 +870,7 @@ static int omap_mpuio_suspend_noirq(struct device *dev)
+>  
+>  static int omap_mpuio_resume_noirq(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct gpio_bank	*bank = platform_get_drvdata(pdev);
+> +	struct gpio_bank	*bank = dev_get_drvdata(dev);
+>  	void __iomem		*mask_reg = bank->base +
+>  					OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+>  	unsigned long		flags;
+> @@ -1284,8 +1282,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank);
+>  
+>  static int omap_gpio_runtime_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct gpio_bank *bank = platform_get_drvdata(pdev);
+> +	struct gpio_bank *bank = dev_get_drvdata(dev);
+>  	u32 l1 = 0, l2 = 0;
+>  	unsigned long flags;
+>  	u32 wake_low, wake_hi;
+> @@ -1352,8 +1349,7 @@ static void omap_gpio_init_context(struct gpio_bank *p);
+>  
+>  static int omap_gpio_runtime_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct gpio_bank *bank = platform_get_drvdata(pdev);
+> +	struct gpio_bank *bank = dev_get_drvdata(dev);
+>  	u32 l = 0, gen, gen0, gen1;
+>  	unsigned long flags;
+>  	int c;
+> diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+> index 94396caaca75..04c963f03b68 100644
+> --- a/drivers/gpio/gpio-tegra.c
+> +++ b/drivers/gpio/gpio-tegra.c
+> @@ -403,8 +403,7 @@ static void tegra_gpio_irq_handler(struct irq_desc *desc)
+>  #ifdef CONFIG_PM_SLEEP
+>  static int tegra_gpio_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct tegra_gpio_info *tgi = platform_get_drvdata(pdev);
+> +	struct tegra_gpio_info *tgi = dev_get_drvdata(dev);
+>  	unsigned long flags;
+>  	unsigned int b, p;
+>  
+> @@ -443,8 +442,7 @@ static int tegra_gpio_resume(struct device *dev)
+>  
+>  static int tegra_gpio_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct tegra_gpio_info *tgi = platform_get_drvdata(pdev);
+> +	struct tegra_gpio_info *tgi = dev_get_drvdata(dev);
+>  	unsigned long flags;
+>  	unsigned int b, p;
+>  
+> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+> index 75ee877e5cd5..49534241bb1e 100644
+> --- a/drivers/gpio/gpio-zynq.c
+> +++ b/drivers/gpio/gpio-zynq.c
+> @@ -697,8 +697,7 @@ static int __maybe_unused zynq_gpio_resume(struct device *dev)
+>  
+>  static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct zynq_gpio *gpio = platform_get_drvdata(pdev);
+> +	struct zynq_gpio *gpio = dev_get_drvdata(dev);
+>  
+>  	clk_disable_unprepare(gpio->clk);
+>  
+> @@ -707,8 +706,7 @@ static int __maybe_unused zynq_gpio_runtime_suspend(struct device *dev)
+>  
+>  static int __maybe_unused zynq_gpio_runtime_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct zynq_gpio *gpio = platform_get_drvdata(pdev);
+> +	struct zynq_gpio *gpio = dev_get_drvdata(dev);
+>  
+>  	return clk_prepare_enable(gpio->clk);
+>  }
+> 
 
-On 04/19/2018 10:03 PM, Rados?aw Pietrzyk wrote:
-> Sure, I don't mind. I didn't have time to resend v3 with more verbose 
-> description.
-> 
-> 2018-04-19 15:24 GMT+02:00 Ludovic BARRE <ludovic.barre@st.com 
-> <mailto:ludovic.barre@st.com>>:
-> 
->     Hi Radoslaw
-> 
->     I preparing a patch serie which add support of stm32mp1.
->     Would you like, I add your patch (with commit message updated)
->     in my serie?
->     patch:
->     -irqchip: stm32: Optimizes and cleans up stm32-exti irq_domain
-> 
->     BR
->     Ludo
-> 
-> 
->     On 03/14/2018 01:04 PM, Marc Zyngier wrote:
-> 
->         On 14/03/18 11:46, Rados?aw Pietrzyk wrote:
-> 
->             Hi Marc,
->             We had a quite fruitful discussion in this mail thread
->             regarding this
->             topic and Ludovic acked it so recently I have asked Thomas
->             if he still
->             needs this v3 patch with detailed explanation especially as
->             v2 version
->             of stm32-gpio patch has been already taken by Linus. However
->             if you
->             require I can resend v3 of this patch only with this
->             detailed explanation.
-> 
-> 
->         That'd be useful. The changelog is the only thing that will be
->         left from
->         this discussion, so it'd better be complete and accurate. If you
->         quickly
->         send a v3 for this single patch, I'll queue it right away.
-> 
->         Thanks,
-> 
->          ? ? ? ? M.
-> 
-> 
->             2018-03-14 12:09 GMT+01:00 Marc Zyngier
->             <marc.zyngier at arm.com <mailto:marc.zyngier@arm.com>
->             <mailto:marc.zyngier at arm.com <mailto:marc.zyngier@arm.com>>>:
-> 
->              ? ? ?Radoslaw,
-> 
->              ? ? ?On 23/02/18 08:42, Thomas Gleixner wrote:
->              ? ? ?> Radoslaw,
->              ? ? ?>
->              ? ? ?> On Fri, 23 Feb 2018, Radoslaw Pietrzyk wrote:
->              ? ? ?>
->              ? ? ?>> - discards setting handle_simple_irq handler for
->             hierarchy interrupts
->              ? ? ?>> - removes acking in chained irq handler as this is
->             done by
->              ? ? ?>> irq_chip itself inside handle_edge_irq
->              ? ? ?>> - removes unneeded irq_domain_ops.xlate callback
->              ? ? ?>
->              ? ? ?> if that's all functionally correct, then this is a
->             nice cleanup. Though
->              ? ? ?> from the above changelog its hard to tell because it
->             merily tells WHAT the
->              ? ? ?> patch does, but not WHY. The WHY is the important
->             information for a
->              ? ? ?> reviewer who is not familiar with the particular
->             piece of code/hardware.
->              ? ? ?>
->              ? ? ?> Can you please amend the changelog with proper
->             explanations why a
->              ? ? ?> particular piece of code is not needed or has to be
->             changed to something
->              ? ? ?> else?
-> 
->              ? ? ?Any update on this? I'd like to queue this for 4.17,
->             but Thomas'
->              ? ? ?comments should be addressed before that happens. Ca
->             you please respin a
->              ? ? ?version with a better change log and the various
->             review tags?
-> 
->              ? ? ?Thanks,
-> 
->              ? ? ?? ? ? ? M.
->              ? ? ?--
->              ? ? ?Jazz is not dead. It just smells funny...
-> 
-> 
-> 
-> 
-> 
+There are two more occurences in this gpio-zynq driver.
+zynq_gpio_resume, zynq_gpio_suspend. It wasn't detected because these
+two lines are not together. But the same change can be applied for them too.
+
+Thanks,
+Michal
