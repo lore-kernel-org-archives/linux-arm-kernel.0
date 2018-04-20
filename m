@@ -1,47 +1,60 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 20 Apr 2018 11:58:57 +0200
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77980: add MMC support
-In-Reply-To: <aaa58189-2c27-e51f-1f97-3671c50a1479@cogentembedded.com>
-References: <611daf1f-42a2-d463-0814-ebf762871018@cogentembedded.com>
- <aaa58189-2c27-e51f-1f97-3671c50a1479@cogentembedded.com>
-Message-ID: <20180420095857.latofivdh3dnvu2z@verge.net.au>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 20 Apr 2018 12:00:19 +0200
+Subject: [PATCH 1/8] drm/mediatek: Use regmap for register access
+In-Reply-To: <3fffe06c-f19b-ef26-a19d-771611aae158@gmail.com>
+References: <20171114214114.15793-1-mbrugger@suse.com>
+ <20171114214114.15793-2-mbrugger@suse.com>
+ <1511427282.7685.1.camel@pengutronix.de>
+ <3fffe06c-f19b-ef26-a19d-771611aae158@gmail.com>
+Message-ID: <1524218419.16259.7.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 14, 2018 at 10:27:04PM +0300, Sergei Shtylyov wrote:
-> Define the generic R8A77980 part of the MMC0 (SDHI2) device node.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
->  arch/arm64/boot/dts/renesas/r8a77980.dtsi |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> @@ -371,6 +371,18 @@
->  			dma-channels = <16>;
->  		};
->  
-> +		mmc0: mmc at ee140000 {
+Hi Matthias,
 
-Please use sdhi2: sd at ee140000 for consistency with other SoCs
-(I refereed to the r8a7795).
-
-> +			compatible = "renesas,sdhi-r8a77980",
-> +				     "renesas,rcar-gen3-sdhi";
-> +			reg = <0 0xee140000 0 0x2000>;
-> +			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 314>;
-> +			power-domains = <&sysc 32>;
-> +			resets = <&cpg 314>;
-> +			max-frequency = <200000000>;
-> +			status = "disabled";
-> +		};
-> +
->  		gic: interrupt-controller at f1010000 {
->  			compatible = "arm,gic-400";
->  			#interrupt-cells = <3>;
+On Fri, 2018-04-20 at 11:41 +0200, Matthias Brugger wrote:
+> Hi Philipp,
 > 
+> On 11/23/2017 09:54 AM, Philipp Zabel wrote:
+> > Hi Matthias,
+> > 
+> > On Tue, 2017-11-14 at 22:41 +0100, Matthias Brugger wrote:
+> > > The mmsys memory space is shared between the drm and the
+> > > clk driver. Use regmap to access it.
+> > > 
+> > > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> > > ---
+> > >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |  4 ++--
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 30 +++++++++++++++++-------------
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  4 ++--
+> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 13 ++++---------
+> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  2 +-
+> > >  5 files changed, 26 insertions(+), 27 deletions(-)
+> > 
+> > [...]
+> 
+> [...]
+> > >  	}
+> > >  
+> > >  	value = mtk_ddp_sel_in(cur, next, &addr);
+> > >  	if (value) {
+> > > -		reg = readl_relaxed(config_regs + addr) & ~value;
+> > > -		writel_relaxed(reg, config_regs + addr);
+> > > +		regmap_read(config_regs, addr, &reg);
+> > > +		reg &= ~value;
+> > > +		regmap_write(config_regs, addr, reg);
+> > 
+> > 		regmap_update_bits(config_regs, addr, value, 0);
+> > 
+> > Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > 
+> 
+> Thanks for having a look on that.
+> 
+> I'll update the next version with regmap_update_bits and leave your Reviewed-by,
+> hope that's ok.
+
+Yes, that's fine.
+
+regards
+Philipp
