@@ -1,106 +1,120 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 20 Apr 2018 09:10:20 +0200
-Subject: [PATCH 28/61] mmc: host: simplify getting .drvdata
-In-Reply-To: <20180419140641.27926-29-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-29-wsa+renesas@sang-engineering.com>
-Message-ID: <CAPDyKFrsnXeuHkAGM-w7hH_HuTr+n62Z1UziP0umNQB-oKn+8g@mail.gmail.com>
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Fri, 20 Apr 2018 09:18:28 +0200
+Subject: [PATCH v2 1/2] irqchip: stm32: Optimizes and cleans up stm32-exti
+ irq_domain
+In-Reply-To: <CAFvLkMQv3AajhFaRxsBt+UzdGFeix_FA-0mhtYqwMo2x0zgrnA@mail.gmail.com>
+References: <cover.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <6491f248c6748f21a2acf310e186d2be4f9b4e4c.1519374248.git.radoslaw.pietrzyk@gmail.com>
+ <alpine.DEB.2.21.1802230938510.11168@nanos.tec.linutronix.de>
+ <a709e416-4024-f804-b2ff-ae6c2171a7c8@arm.com>
+ <CAFvLkMSZjgFMAe0VRc0AEpG89BgXkfMb9+ivJ8V+PFighOoDRA@mail.gmail.com>
+ <118e66b4-3137-7af5-b93d-b1949fad575c@arm.com>
+ <ef86e131-ffb4-b883-b9ca-1e670d960d3e@st.com>
+ <CAFvLkMQv3AajhFaRxsBt+UzdGFeix_FA-0mhtYqwMo2x0zgrnA@mail.gmail.com>
+Message-ID: <4c8eda6d-a4b0-8c9c-19c2-c5ee334ff3ba@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 April 2018 at 16:05, Wolfram Sang
-<wsa+renesas@sang-engineering.com> wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
->
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+ok, So I include your patch in my serie
+- irqchip: stm32: Optimizes and cleans up stm32-exti irq_domain
 
-Thanks, applied for next!
+BR
+Ludo
 
-Kind regards
-Uffe
-
-> ---
->
-> Build tested only. buildbot is happy. Please apply individually.
->
->  drivers/mmc/host/davinci_mmc.c     | 6 ++----
->  drivers/mmc/host/sdhci-of-arasan.c | 6 ++----
->  drivers/mmc/host/wmt-sdmmc.c       | 6 ++----
->  3 files changed, 6 insertions(+), 12 deletions(-)
->
-> diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-> index 8e363174f9d6..9e68c3645e22 100644
-> --- a/drivers/mmc/host/davinci_mmc.c
-> +++ b/drivers/mmc/host/davinci_mmc.c
-> @@ -1377,8 +1377,7 @@ static int __exit davinci_mmcsd_remove(struct platform_device *pdev)
->  #ifdef CONFIG_PM
->  static int davinci_mmcsd_suspend(struct device *dev)
->  {
-> -       struct platform_device *pdev = to_platform_device(dev);
-> -       struct mmc_davinci_host *host = platform_get_drvdata(pdev);
-> +       struct mmc_davinci_host *host = dev_get_drvdata(dev);
->
->         writel(0, host->base + DAVINCI_MMCIM);
->         mmc_davinci_reset_ctrl(host, 1);
-> @@ -1389,8 +1388,7 @@ static int davinci_mmcsd_suspend(struct device *dev)
->
->  static int davinci_mmcsd_resume(struct device *dev)
->  {
-> -       struct platform_device *pdev = to_platform_device(dev);
-> -       struct mmc_davinci_host *host = platform_get_drvdata(pdev);
-> +       struct mmc_davinci_host *host = dev_get_drvdata(dev);
->
->         clk_enable(host->clk);
->         mmc_davinci_reset_ctrl(host, 0);
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index c33a5f7393bd..bed3612247b0 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -359,8 +359,7 @@ static const struct sdhci_pltfm_data sdhci_arasan_cqe_pdata = {
->   */
->  static int sdhci_arasan_suspend(struct device *dev)
->  {
-> -       struct platform_device *pdev = to_platform_device(dev);
-> -       struct sdhci_host *host = platform_get_drvdata(pdev);
-> +       struct sdhci_host *host = dev_get_drvdata(dev);
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->         struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
->         int ret;
-> @@ -403,8 +402,7 @@ static int sdhci_arasan_suspend(struct device *dev)
->   */
->  static int sdhci_arasan_resume(struct device *dev)
->  {
-> -       struct platform_device *pdev = to_platform_device(dev);
-> -       struct sdhci_host *host = platform_get_drvdata(pdev);
-> +       struct sdhci_host *host = dev_get_drvdata(dev);
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->         struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
->         int ret;
-> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-> index fd30ac7da5e5..3ba42f508014 100644
-> --- a/drivers/mmc/host/wmt-sdmmc.c
-> +++ b/drivers/mmc/host/wmt-sdmmc.c
-> @@ -928,8 +928,7 @@ static int wmt_mci_remove(struct platform_device *pdev)
->  static int wmt_mci_suspend(struct device *dev)
->  {
->         u32 reg_tmp;
-> -       struct platform_device *pdev = to_platform_device(dev);
-> -       struct mmc_host *mmc = platform_get_drvdata(pdev);
-> +       struct mmc_host *mmc = dev_get_drvdata(dev);
->         struct wmt_mci_priv *priv;
->
->         if (!mmc)
-> @@ -953,8 +952,7 @@ static int wmt_mci_suspend(struct device *dev)
->  static int wmt_mci_resume(struct device *dev)
->  {
->         u32 reg_tmp;
-> -       struct platform_device *pdev = to_platform_device(dev);
-> -       struct mmc_host *mmc = platform_get_drvdata(pdev);
-> +       struct mmc_host *mmc = dev_get_drvdata(dev);
->         struct wmt_mci_priv *priv;
->
->         if (mmc) {
-> --
-> 2.11.0
->
+On 04/19/2018 10:03 PM, Rados?aw Pietrzyk wrote:
+> Sure, I don't mind. I didn't have time to resend v3 with more verbose 
+> description.
+> 
+> 2018-04-19 15:24 GMT+02:00 Ludovic BARRE <ludovic.barre@st.com 
+> <mailto:ludovic.barre@st.com>>:
+> 
+>     Hi Radoslaw
+> 
+>     I preparing a patch serie which add support of stm32mp1.
+>     Would you like, I add your patch (with commit message updated)
+>     in my serie?
+>     patch:
+>     -irqchip: stm32: Optimizes and cleans up stm32-exti irq_domain
+> 
+>     BR
+>     Ludo
+> 
+> 
+>     On 03/14/2018 01:04 PM, Marc Zyngier wrote:
+> 
+>         On 14/03/18 11:46, Rados?aw Pietrzyk wrote:
+> 
+>             Hi Marc,
+>             We had a quite fruitful discussion in this mail thread
+>             regarding this
+>             topic and Ludovic acked it so recently I have asked Thomas
+>             if he still
+>             needs this v3 patch with detailed explanation especially as
+>             v2 version
+>             of stm32-gpio patch has been already taken by Linus. However
+>             if you
+>             require I can resend v3 of this patch only with this
+>             detailed explanation.
+> 
+> 
+>         That'd be useful. The changelog is the only thing that will be
+>         left from
+>         this discussion, so it'd better be complete and accurate. If you
+>         quickly
+>         send a v3 for this single patch, I'll queue it right away.
+> 
+>         Thanks,
+> 
+>          ? ? ? ? M.
+> 
+> 
+>             2018-03-14 12:09 GMT+01:00 Marc Zyngier
+>             <marc.zyngier at arm.com <mailto:marc.zyngier@arm.com>
+>             <mailto:marc.zyngier at arm.com <mailto:marc.zyngier@arm.com>>>:
+> 
+>              ? ? ?Radoslaw,
+> 
+>              ? ? ?On 23/02/18 08:42, Thomas Gleixner wrote:
+>              ? ? ?> Radoslaw,
+>              ? ? ?>
+>              ? ? ?> On Fri, 23 Feb 2018, Radoslaw Pietrzyk wrote:
+>              ? ? ?>
+>              ? ? ?>> - discards setting handle_simple_irq handler for
+>             hierarchy interrupts
+>              ? ? ?>> - removes acking in chained irq handler as this is
+>             done by
+>              ? ? ?>> irq_chip itself inside handle_edge_irq
+>              ? ? ?>> - removes unneeded irq_domain_ops.xlate callback
+>              ? ? ?>
+>              ? ? ?> if that's all functionally correct, then this is a
+>             nice cleanup. Though
+>              ? ? ?> from the above changelog its hard to tell because it
+>             merily tells WHAT the
+>              ? ? ?> patch does, but not WHY. The WHY is the important
+>             information for a
+>              ? ? ?> reviewer who is not familiar with the particular
+>             piece of code/hardware.
+>              ? ? ?>
+>              ? ? ?> Can you please amend the changelog with proper
+>             explanations why a
+>              ? ? ?> particular piece of code is not needed or has to be
+>             changed to something
+>              ? ? ?> else?
+> 
+>              ? ? ?Any update on this? I'd like to queue this for 4.17,
+>             but Thomas'
+>              ? ? ?comments should be addressed before that happens. Ca
+>             you please respin a
+>              ? ? ?version with a better change log and the various
+>             review tags?
+> 
+>              ? ? ?Thanks,
+> 
+>              ? ? ?? ? ? ? M.
+>              ? ? ?--
+>              ? ? ?Jazz is not dead. It just smells funny...
+> 
+> 
+> 
+> 
+> 
