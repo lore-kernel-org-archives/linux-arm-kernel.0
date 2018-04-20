@@ -1,30 +1,36 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 20 Apr 2018 11:09:07 +0200
-Subject: [PATCH] ARM: dts: stm32: add reset binding on stm32mp157c
-Message-ID: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 20 Apr 2018 11:14:38 +0200
+Subject: [PATCH v1 1/4] ARM: configs: stm32: Add DMAv2 support on STM32MP157C
+ machine
+In-Reply-To: <1524215681-14555-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1524215681-14555-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1524215681-14555-2-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+This patch adds DMAv2 support for STM32MP157C machine
 
-This patch adds reset binding file.
-
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
- arch/arm/boot/dts/stm32mp157c.dtsi | 1 +
+  Version history:
+     v1:
+        * Initial
+---
+---
+ arch/arm/mach-stm32/Kconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index bc3eddc..7e91fd6 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -5,6 +5,7 @@
-  */
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/stm32mp1-clks.h>
-+#include <dt-bindings/reset/stm32mp1-resets.h>
+diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
+index 713c068..e5ac842 100644
+--- a/arch/arm/mach-stm32/Kconfig
++++ b/arch/arm/mach-stm32/Kconfig
+@@ -46,6 +46,7 @@ if ARCH_MULTI_V7
  
- / {
- 	#address-cells = <1>;
+ config MACH_STM32MP157
+ 	bool "STMicroelectronics STM32MP157"
++	select STM32_DMA
+ 	default y
+ 
+ endif # ARMv7-A
 -- 
-1.9.1
+2.7.4
