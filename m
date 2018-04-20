@@ -1,181 +1,112 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Apr 2018 19:09:37 +0200
-Subject: brcm, cyw_bt: Add latest Cypress/Murata firmware
-In-Reply-To: <CA+5PVA57X8aPXXLBTfaWxhULY7EgWooWy1NQoNq+X=vLWm2Q2g@mail.gmail.com>
-References: <1524146649-25267-1-git-send-email-ryan.harkin@linaro.org>
- <CA+5PVA57X8aPXXLBTfaWxhULY7EgWooWy1NQoNq+X=vLWm2Q2g@mail.gmail.com>
-Message-ID: <7b9d1310-e850-2331-a11b-b22de8282797@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Apr 2018 18:21:09 +0100
+Subject: [regression v4.17-rc0] Re: FORTIFY_SOURCE breaks ARM compilation
+ in -next -- was Re: ARM compile failure in Re: linux-next: Tree for
+ Apr 4
+In-Reply-To: <CAGXu5j+6D3PiVc9SR4+31ZGDC2r5uWJOw8Sn3cDhXdNqBGH+hQ@mail.gmail.com>
+References: <20180404165559.4cd0c12c@canb.auug.org.au>
+ <20180404074856.GA9342@amd> <20180404175852.GI5700@atomide.com>
+ <20180404184622.GA8608@amd> <20180404195951.GJ5700@atomide.com>
+ <20180404201837.GA9710@amd> <20180415173908.GA2024@amd>
+ <CAGXu5jK9f62n95sOdJViXHXzQFyCdcsWt9HPvcdSFRp9Qqg0bg@mail.gmail.com>
+ <20180420073402.GA9356@amd>
+ <CAGXu5j+6D3PiVc9SR4+31ZGDC2r5uWJOw8Sn3cDhXdNqBGH+hQ@mail.gmail.com>
+Message-ID: <20180420172108.GR10990@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
-
-On 04/20/2018 03:27 PM, Josh Boyer wrote:
-> On Thu, Apr 19, 2018 at 10:04 AM, Ryan Harkin <ryan.harkin@linaro.org> wrote:
->> Murata has created a github project for the firmware for their 43xx
->> family of devices:
->>
->>    https://github.com/murata-wireless
->>
->> This project contains firmware binaries for their WiFi and BT parts
->> containing the Cypress IP.
->>
->> The binary files are licensed under the same LICENCE.cypress as present
->> in this repo already. The NVRAM files are text and are licensed under
->> GPLv2.
->>
->> This series copies the binaries from the github project into
->> linux-firmware where other downstream projects may benefit.
->>
->> The following changes since commit b562d2f3583f19ecda22b08e514ced57dd1e5f4d:
->>
->>    linux-firmware: update wil6210 firmware to 5.2.0.18 (2018-04-16 09:55:50 -0400)
->>
->> are available in the git repository at:
->>
->>    https://git.linaro.org/landing-teams/working/mbl/linux-firmware.git rmh-murata-update
->>
->> for you to fetch changes up to 53bd09779d9b378316a2b81ec55f4b20033d4542:
->>
->>    cyw_bt: add Cypress 43xx Bluetooth patch files (2018-04-18 14:05:28 +0100)
->>
->> ----------------------------------------------------------------
->> Ryan Harkin (3):
->>        brcm: update firmware from Murata repo
->>        brcm: add fmac nvram files
->>        cyw_bt: add Cypress 43xx Bluetooth patch files
+On Fri, Apr 20, 2018 at 08:05:17AM -0700, Kees Cook wrote:
+> On Fri, Apr 20, 2018 at 12:34 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> > On Sun 2018-04-15 11:00:06, Kees Cook wrote:
+> >> On Sun, Apr 15, 2018 at 10:39 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> >> > Hi!
+> >> >
+> >> >> Thanks.
+> >> >>
+> >> >> Ok, let me try to bisect it. Compile-problem should be easy...
+> >> >>
+> >> >> Hmm. And as it is compile-problem in single file, it should even be
+> >> >> reasonably fast. I did not realize how easy it would be:
+> >> >>
+> >> >> #!/bin/bash
+> >> >> set -e
+> >> >> cp config.ok .config
+> >> >> yes '' | ARCH=arm make lib/string.o
+> >> >>
+> >> >> And the winner is:
+> >> >>
+> >> >> ee333554fed55555a986a90bb097ac7f9d6f05bf is the first bad commit
+> >> >> commit ee333554fed55555a986a90bb097ac7f9d6f05bf
+> >> >> Author: Jinbum Park <jinb.park7@gmail.com>
+> >> >> Date:   Tue Mar 6 01:39:24 2018 +0100
+> >> > ...
+> >> >
+> >> >>     Acked-by: Kees Cook <keescook@chromium.org>
+> >> >>     Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+> >> >>     Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> >> >
+> >> > So I bisect a problem in -next, and patch is merged to Linus,
+> >> > _anyway_, breaking compilation there? Neither Jinbum nor Russell even
+> >> > bother to comment.
+> >>
+> >> Hi! Sorry I lost this email in my inbox. It seems this is specific to
+> >> a particular subset of arm architectures? (My local builds of arm all
+> >> succeed, for example. Can you send your failing config?) I'll take a
+> >> closer look on Monday if Daniel doesn't beat me to it.
+> >
+> > Daniel, Kees: any news?
+> >
+> > I'm aware you did not specify which Monday :-).
 > 
-> I'm looping in Hans, who was discussing this with me the other day.
-> He had some concerns that I'll let him express better than I can.
+> Hi! Sorry, I got distracted. So the .config you sent me builds fine
+> with my cross compiler. I suspect this is something specific to ELDK's
+> compiler. I can try some other compiler versions. What version of gcc
+> is failing?
 
-Thanks,
+Hi Kees,
 
-So my concerns are 2 fold:
+We know it works fine with:
 
-1) Practical:
+linux-next's gcc 4.6.3 + binutils 2.22
+my gcc 4.7.4 + binutils 2.25
+kernelci.org's Linaro GCC 5.3-2016.05 toolchain (gcc 5.3.1 20160412)
+Tony's using gcc 7.3.0 + binutils 2.30
+Arnd's using mostly gcc 8.0.1 + binutils 2.29
+What-ever toolchain Olof's autobuilder is using
 
-The brcmfmac4*-sdio.txt and brcmfmac4*-pci.txt files are nvram
-files (which replace having an actual eeprom on the board)
-are board specific, I've been discussing with upstream to modify
-the driver to load these nvram files using a board specific name.
+which is quite a spread of versions, both binutils and gcc, and they
+all work.  The autobuilders plus Arnd's are regularly verifying lots
+of kernel trees (including my own) with lots of configurations, and
+the identified patch has not reproduced this compile failure there.
 
-This never got very far because I never got permission to
-redistribute the nvram files for the board which I have, see
-point 2 below.
+Searching google for:
 
-I believe that at a minimum these patches should be modified
-to drop the .txt files for now until we've added a mechanism
-for the driver to load a board specific version (using DMI
-strings on x86 and info from DT on ARM) and then they should
-be upstreamed under the board-specific filename.
+lib/string.c "error: inlining failed in call to always_inline 'strlen': function not inlinable"
 
-2) Licensing
+gives me only three hits on mail-archive.com for this, all of them
+are Pavel's email or a reply to it.  There appears to be no other
+reports of compile failure anywhere else on the google-crawled
+Internet.
 
-I've been in contact with Arend Van Spriel from Broadcom about
-permission to redistribute nvram files and the files now being
-licensed under the GPL contradicts with what I've been told.
+There appears to be no information readily available as to what
+compiler versions each ELDK version contains (see
+http://www.denx.de/wiki/view/ELDK-5) so providing the eldk-switch
+command to us gives us no useful information.
 
-This time around the matching actual firmware files are being
-released under the Cypress license, which suggest ownership
-of the wifi firmware has been passed to Cypress. So maybe
-Cypress is ok with this, but we should double check that.
+I think more information about Pavel's setup is needed, including:
 
-Also I'm not sure if that Cypress now owning the wifi
-firmware copyright is true for all wifi controller models for
-which these patches contain updated firmware versions...
+* compiler version
+* environment (any kernel build specific environment variables set?)
+* exact make command line
 
-I've also added Chi-Hsien Lin from Cypress to the Cc.
+Maybe even showing the exact command used by kbuild to invoke the
+C compiler for lib/string.c.
 
-Arend and Chi-Hsien can you clarify the licensing situation
-here, is it correct that the wifi and bluetooth firmware
-files offered by Murata here:
+It could simply be a bug in the ELDK GCC version that Pavel's using.
+Could it be that DENX have patched gcc for ELDK and subtly broken
+it?  We all know distros like to apply patches to packages.
 
-https://github.com/murata-wireless
-
-Fall under the Cypress license and that the nvram files
-offered there may be distributed under the GPL?
-
-Regards,
-
-Hans
-
-> 
-> josh
-> 
->>
->>   WHENCE                             |  57 ++++++++++++++++++++++++++++++++++++++++++------
->>   brcm/README_NVRAM                  |  16 ++++++++++++++
->>   brcm/brcmfmac43012-sdio.1LV.txt    | 120 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac43012-sdio.bin        | Bin 0 -> 210254 bytes
->>   brcm/brcmfmac43012-sdio.clm_blob   | Bin 0 -> 7697 bytes
->>   brcm/brcmfmac43012-sdio.txt        |   1 +
->>   brcm/brcmfmac43340-sdio.1BW.txt    | 122 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac43340-sdio.bin        | Bin 402210 -> 400864 bytes
->>   brcm/brcmfmac43340-sdio.txt        |   1 +
->>   brcm/brcmfmac43362-sdio.SN8000.txt |  49 ++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac43362-sdio.bin        | Bin 219557 -> 201276 bytes
->>   brcm/brcmfmac43362-sdio.txt        |   1 +
->>   brcm/brcmfmac4339-sdio.1CK.txt     | 105 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac4339-sdio.ZP.txt      | 102 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac4339-sdio.bin         | Bin 562183 -> 565481 bytes
->>   brcm/brcmfmac4339-sdio.txt         |   1 +
->>   brcm/brcmfmac43430-sdio.1DX.txt    |  43 ++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac43430-sdio.1LN.txt    |   1 +
->>   brcm/brcmfmac43430-sdio.bin        | Bin 369577 -> 388739 bytes
->>   brcm/brcmfmac43430-sdio.txt        |   1 +
->>   brcm/brcmfmac43455-sdio.1HK.txt    | 121 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac43455-sdio.1LC.txt    |  73 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac43455-sdio.1MW.txt    | 114 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac43455-sdio.bin        | Bin 488193 -> 594969 bytes
->>   brcm/brcmfmac43455-sdio.clm_blob   | Bin 0 -> 11913 bytes
->>   brcm/brcmfmac43455-sdio.txt        |   1 +
->>   brcm/brcmfmac4354-sdio.1BB.txt     | 140 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac4354-sdio.bin         | Bin 626589 -> 605388 bytes
->>   brcm/brcmfmac4354-sdio.txt         |   1 +
->>   brcm/brcmfmac4356-pcie.1CX.txt     | 147 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>   brcm/brcmfmac4356-pcie.bin         | Bin 661999 -> 648770 bytes
->>   brcm/brcmfmac4356-pcie.txt         |   1 +
->>   cyw_bt/CYW43012C0.1LV.hcd          | Bin 0 -> 28063 bytes
->>   cyw_bt/CYW43341B0.1BW.hcd          | Bin 0 -> 40984 bytes
->>   cyw_bt/CYW4335C0.ZP.hcd            | Bin 0 -> 33465 bytes
->>   cyw_bt/CYW43430A1.1DX.1dB_Less.hcd | Bin 0 -> 35322 bytes
->>   cyw_bt/CYW43430A1.1DX.2dB_Less.hcd | Bin 0 -> 35322 bytes
->>   cyw_bt/CYW43430A1.1DX.hcd          | Bin 0 -> 14265 bytes
->>   cyw_bt/CYW4345C0.1MW.hcd           | Bin 0 -> 55105 bytes
->>   cyw_bt/CYW4350C0.1BB.hcd           | Bin 0 -> 78697 bytes
->>   cyw_bt/CYW4354A2.1CX.hcd           | Bin 0 -> 31178 bytes
->>   41 files changed, 1211 insertions(+), 7 deletions(-)
->>   create mode 100644 brcm/README_NVRAM
->>   create mode 100644 brcm/brcmfmac43012-sdio.1LV.txt
->>   create mode 100644 brcm/brcmfmac43012-sdio.bin
->>   create mode 100644 brcm/brcmfmac43012-sdio.clm_blob
->>   create mode 120000 brcm/brcmfmac43012-sdio.txt
->>   create mode 100644 brcm/brcmfmac43340-sdio.1BW.txt
->>   create mode 120000 brcm/brcmfmac43340-sdio.txt
->>   create mode 100644 brcm/brcmfmac43362-sdio.SN8000.txt
->>   create mode 120000 brcm/brcmfmac43362-sdio.txt
->>   create mode 100644 brcm/brcmfmac4339-sdio.1CK.txt
->>   create mode 100644 brcm/brcmfmac4339-sdio.ZP.txt
->>   create mode 120000 brcm/brcmfmac4339-sdio.txt
->>   create mode 100644 brcm/brcmfmac43430-sdio.1DX.txt
->>   create mode 120000 brcm/brcmfmac43430-sdio.1LN.txt
->>   create mode 120000 brcm/brcmfmac43430-sdio.txt
->>   create mode 100644 brcm/brcmfmac43455-sdio.1HK.txt
->>   create mode 100644 brcm/brcmfmac43455-sdio.1LC.txt
->>   create mode 100644 brcm/brcmfmac43455-sdio.1MW.txt
->>   create mode 100644 brcm/brcmfmac43455-sdio.clm_blob
->>   create mode 120000 brcm/brcmfmac43455-sdio.txt
->>   create mode 100644 brcm/brcmfmac4354-sdio.1BB.txt
->>   create mode 120000 brcm/brcmfmac4354-sdio.txt
->>   create mode 100644 brcm/brcmfmac4356-pcie.1CX.txt
->>   create mode 120000 brcm/brcmfmac4356-pcie.txt
->>   create mode 100644 cyw_bt/CYW43012C0.1LV.hcd
->>   create mode 100644 cyw_bt/CYW43341B0.1BW.hcd
->>   create mode 100644 cyw_bt/CYW4335C0.ZP.hcd
->>   create mode 100644 cyw_bt/CYW43430A1.1DX.1dB_Less.hcd
->>   create mode 100644 cyw_bt/CYW43430A1.1DX.2dB_Less.hcd
->>   create mode 100644 cyw_bt/CYW43430A1.1DX.hcd
->>   create mode 100644 cyw_bt/CYW4345C0.1MW.hcd
->>   create mode 100644 cyw_bt/CYW4350C0.1BB.hcd
->>   create mode 100644 cyw_bt/CYW4354A2.1CX.hcd
->>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
