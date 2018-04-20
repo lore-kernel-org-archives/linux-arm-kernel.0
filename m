@@ -1,26 +1,30 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 20 Apr 2018 11:06:04 +0200
-Subject: [PATCH v1 0/4] Add DMAv2 and DMAMUX Support on STM32MP157C
-Message-ID: <1524215164-14145-1-git-send-email-pierre-yves.mordret@st.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Fri, 20 Apr 2018 11:09:07 +0200
+Subject: [PATCH] ARM: dts: stm32: add reset binding on stm32mp157c
+Message-ID: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DMAv2 and DMAMUX support on STM32MP157C with configs and device tree.
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
+
+This patch adds reset binding file.
+
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
-  Version history:
-     v1:
-        * Initial
----
+ arch/arm/boot/dts/stm32mp157c.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Pierre-Yves MORDRET (4):
-  ARM: configs: stm32: Add DMAv2 support on STM32MP157C machine
-  ARM: configs: stm32: Add DMAMUX support on STM32MP157C
-  ARM: dts: stm32: Add DMAv2 support on STM32MP157C
-  ARM: dts: stm32: Add DMAMUX support on STM32MP157C
-
- arch/arm/boot/dts/stm32mp157c.dtsi | 44 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-stm32/Kconfig        |  2 ++
- 2 files changed, 46 insertions(+)
-
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index bc3eddc..7e91fd6 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -5,6 +5,7 @@
+  */
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/stm32mp1-clks.h>
++#include <dt-bindings/reset/stm32mp1-resets.h>
+ 
+ / {
+ 	#address-cells = <1>;
 -- 
-2.7.4
+1.9.1
