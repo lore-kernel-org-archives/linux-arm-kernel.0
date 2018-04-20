@@ -1,67 +1,65 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 20 Apr 2018 08:50:00 +0800
-Subject: [alsa-devel] [PATCH v5 07/23] ASoC: qdsp6: q6afe: Add q6afe driver
-In-Reply-To: <20180418153157.1960-8-srinivas.kandagatla@linaro.org>
-References: <20180418153157.1960-8-srinivas.kandagatla@linaro.org>
-Message-ID: <201804200838.Hs2WK2eq%fengguang.wu@intel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 19 Apr 2018 20:06:52 -0500
+Subject: [PATCH v6] ARM: dts: tpc: Device tree description of the iMX6Q
+ TPC board
+In-Reply-To: <20180419143240.3717-1-lukma@denx.de>
+References: <20180405070939.22245-1-lukma@denx.de>
+ <20180419143240.3717-1-lukma@denx.de>
+Message-ID: <CAL_Jsq+TCaWZOuS-wKTFtxFShZcSj=Zg12f1NonN3DL-4hHWSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On Thu, Apr 19, 2018 at 9:32 AM, Lukasz Majewski <lukma@denx.de> wrote:
+> This commit adds device tree description of Kieback & Peter GmbH
+> iMX6Q TPC board.
+>
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>
+> ---
+> Changes for v6:
+> - Add space between // and SPDX
+> - Replace 'disp0' with 'display'
+> - Replace 'rtc: ds1307 at 32' with 'ds1307: rtc at 32'
+> - Replace 'codec: audio-codec at a' with 'sgtl5000: audio-codec at a'
+> - Move &can[12] nodes extension to proper position to be alphabetically sorted
+>
+> Changes for v5:
+> - Use 'interpolation-steps' to fill the brightness level table
+> - Remove not needed status = "okay" properties
+> - Replace goodix_ts -> touchscreen
+> - Replace sgtl5000 -> audio-codec
+>
+> This patch depends on PWM backlight intepolation work:
+> https://patchwork.kernel.org/patch/10330775/
+> https://patchwork.kernel.org/patch/10330777/
+>
+> Changes for v4:
+> - Remove not needed bus-format-override = "rgb565";
+>   property
+>
+> Changes for v3:
+> - Provide proper compatible for RTC DTS node
+> - Remove wrong comment style for beeper
+> - Add proper SPDX entries for DTS files
+> - Add vendor prefix to a separate patch
+>
+> Changes for v2:
+> - SPDX license identifiers used
+> - Separate regulators
+> - Proper beeper driver
+> - Use of the lcd panel (with compatible) instead of timings provided in
+>   device tree
+> - Add IRQ types (like IRQ_TYPE_EDGE_FALLING) and GPIO active levels (like
+>   GPIO_ACTIVE_HIGH)
+> - Remove not needed nodes
+> - Make W=1 dtbs compilation with no errors
+> ---
+>  arch/arm/boot/dts/Makefile         |   1 +
+>  arch/arm/boot/dts/imx6q-kp-tpc.dts |  22 ++
+>  arch/arm/boot/dts/imx6q-kp.dtsi    | 432 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 455 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-kp-tpc.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-kp.dtsi
 
-I love your patch! Yet something to improve:
-
-[auto build test ERROR on asoc/for-next]
-[also build test ERROR on v4.17-rc1 next-20180419]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/srinivas-kandagatla-linaro-org/ASoC-qcom-Add-support-to-QDSP-based-Audio/20180419-212438
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
-config: arm-allyesconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-Note: the linux-review/srinivas-kandagatla-linaro-org/ASoC-qcom-Add-support-to-QDSP-based-Audio/20180419-212438 HEAD b636a6bdb47d4dfaa6bc43f2ef431f5426b51581 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
->> sound/soc/qcom/qdsp6/q6afe.c:18:10: fatal error: q6core.h: No such file or directory
-    #include "q6core.h"
-             ^~~~~~~~~~
-   compilation terminated.
-
-vim +18 sound/soc/qcom/qdsp6/q6afe.c
-
-     4	
-     5	#include <linux/slab.h>
-     6	#include <linux/kernel.h>
-     7	#include <linux/uaccess.h>
-     8	#include <linux/wait.h>
-     9	#include <linux/jiffies.h>
-    10	#include <linux/sched.h>
-    11	#include <linux/module.h>
-    12	#include <linux/of.h>
-    13	#include <linux/of_platform.h>
-    14	#include <linux/spinlock.h>
-    15	#include <linux/delay.h>
-    16	#include <linux/soc/qcom/apr.h>
-    17	#include "q6dsp-errno.h"
-  > 18	#include "q6core.h"
-    19	#include "q6afe.h"
-    20	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 64543 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/f3f511d4/attachment-0001.gz>
+Reviewed-by: Rob Herring <robh@kernel.org>
