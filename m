@@ -1,41 +1,23 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Fri, 20 Apr 2018 10:24:40 -0700
-Subject: [PATCH v2 0/2] memory: aemif: add support for machine code
-In-Reply-To: <20180419151252.26212-1-brgl@bgdev.pl>
-References: <20180419151252.26212-1-brgl@bgdev.pl>
-Message-ID: <0f2903da-b670-dc85-e61b-64cac90a6c34@oracle.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Apr 2018 20:33:20 +0300
+Subject: [PATCH 0/3] Add R8A77980/Condor PFC support
+In-Reply-To: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
+References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
+Message-ID: <4b325d8a-f018-5279-17b9-7fa8aac5b4da@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/19/18 8:12 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> This is a follow-up to the series that contained both changes to the
-> aemif driver and platform code. It contains only the driver changes.
-> 
-> As the first step in removing duplicate support for aemif from the
-> kernel we need to add support for board files to the aemif memory
-> driver.
-> 
-> First patch just uses a static string for the ti-aemif driver name.
-> 
-> The second adds support for board files to the aemif driver.
-> 
-> This series includes changes requested by Sekhar in his code review:
-> - made aemif the parent of each sub-device before registering it
-> - documented the new members in aemif_platform_data
-> 
-> v1 -> v2:
-> - actually iterate over abus entries instead of always accessing the
->    first one
-> 
-> Bartosz Golaszewski (2):
->    memory: aemif: don't rely on kbuild for driver's name
->    memory: aemif: add support for board files
-> 
-Applied. Should show up in next soon.
+On 03/09/2018 03:04 PM, Sergei Shtylyov wrote:
 
-Sekhar, You can use below branch.
+> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20180308-v4.16-rc4' tag.  We're adding the R8A77980 PFC node
+> and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
+> These patches depend on the R8A77980 PFC support in order to work properly.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git 
-  'for_4.18/soc-drivers'
+  ... and their time has finally come! Please merge.
+
+> [1/3] arm64: dts: renesas: r8a77980: add PFC support
+> [2/3] arm64: dts: renesas: condor: add SCIF0 pins
+> [3/3] arm64: dts: renesas: condor: add EtherAVB pins
+
+WBR, Sergei
