@@ -1,26 +1,35 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 20 Apr 2018 11:14:37 +0200
-Subject: [PATCH v1 0/4] Add DMAv2 and DMAMUX Support on STM32MP157C
-Message-ID: <1524215681-14555-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Fri, 20 Apr 2018 11:14:39 +0200
+Subject: [PATCH v1 2/4] ARM: configs: stm32: Add DMAMUX support on STM32MP157C
+In-Reply-To: <1524215681-14555-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1524215681-14555-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1524215681-14555-3-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DMAv2 and DMAMUX support on STM32MP157C with configs and device tree.
+This patch adds DMAMUX support on STM32MP157C
+
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
   Version history:
      v1:
         * Initial
 ---
+---
+ arch/arm/mach-stm32/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Pierre-Yves MORDRET (4):
-  ARM: configs: stm32: Add DMAv2 support on STM32MP157C machine
-  ARM: configs: stm32: Add DMAMUX support on STM32MP157C
-  ARM: dts: stm32: Add DMAv2 support on STM32MP157C
-  ARM: dts: stm32: Add DMAMUX support on STM32MP157C
-
- arch/arm/boot/dts/stm32mp157c.dtsi | 44 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-stm32/Kconfig        |  2 ++
- 2 files changed, 46 insertions(+)
-
+diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
+index e5ac842..b746bf7 100644
+--- a/arch/arm/mach-stm32/Kconfig
++++ b/arch/arm/mach-stm32/Kconfig
+@@ -47,6 +47,7 @@ if ARCH_MULTI_V7
+ config MACH_STM32MP157
+ 	bool "STMicroelectronics STM32MP157"
+ 	select STM32_DMA
++	select STM32_DMAMUX
+ 	default y
+ 
+ endif # ARMv7-A
 -- 
 2.7.4
