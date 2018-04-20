@@ -1,86 +1,92 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 20 Apr 2018 23:10:17 +0200
-Subject: [PATCH v7 06/11] ARM: sunxi: Add initialization of CNTVOFF
+Date: Fri, 20 Apr 2018 23:10:22 +0200
+Subject: [PATCH v7 11/11] ARM: shmobile: Convert file to use cntvoff
 In-Reply-To: <20180420211022.11759-1-mylene.josserand@bootlin.com>
 References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
-Message-ID: <20180420211022.11759-7-mylene.josserand@bootlin.com>
+Message-ID: <20180420211022.11759-12-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initialization of CNTVOFF for sun8i-a83t.
-
-For boot CPU, create a new machine that handles this
-function's call in an "init_early" callback. We need to initialize
-CNTVOFF before the arch timer's initialization otherwise, it will
-not be taken into account and fails to boot correctly.
-Because of that, this function can't be called in SMP's early_initcall
-function which is called after timer's init.
-
-For secondary CPUs, add this function into secondary_startup
-assembly entry.
+Now that a common function is available for CNTVOFF's
+initialization, let's convert shmobile-apmu code to use
+this function.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-sunxi/headsmp.S |  1 +
- arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
- 2 files changed, 20 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/common.h          |  1 -
+ arch/arm/mach-shmobile/headsmp-apmu.S    | 22 +---------------------
+ arch/arm/mach-shmobile/setup-rcar-gen2.c |  3 ++-
+ 3 files changed, 3 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
-index 37dc772701f3..32d76be98541 100644
---- a/arch/arm/mach-sunxi/headsmp.S
-+++ b/arch/arm/mach-sunxi/headsmp.S
-@@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 43c1ac696274..2109f123bdfb 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -2,7 +2,6 @@
+ #ifndef __ARCH_MACH_COMMON_H
+ #define __ARCH_MACH_COMMON_H
  
- ENTRY(sunxi_mc_smp_secondary_startup)
- 	bl	sunxi_mc_smp_cluster_cache_enable
+-extern void shmobile_init_cntvoff(void);
+ extern void shmobile_init_delay(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
+index 5672b5849401..d49ab194766a 100644
+--- a/arch/arm/mach-shmobile/headsmp-apmu.S
++++ b/arch/arm/mach-shmobile/headsmp-apmu.S
+@@ -11,29 +11,9 @@
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+ 
+-ENTRY(shmobile_init_cntvoff)
+-	/*
+-	 * CNTVOFF has to be initialized either from non-secure Hypervisor
+-	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
+-	 * then it should be handled by the secure code
+-	 */
+-	cps	#MON_MODE
+-	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
+-	orr	r0, r1, #1
+-	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
+-	instr_sync
+-	mov	r0, #0
+-	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
+-	instr_sync
+-	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
+-	instr_sync
+-	cps	#SVC_MODE
+-	ret	lr
+-ENDPROC(shmobile_init_cntvoff)
+-
+ #ifdef CONFIG_SMP
+ ENTRY(shmobile_boot_apmu)
+-	bl	shmobile_init_cntvoff
 +	bl	secure_cntvoff_init
  	b	secondary_startup
- ENDPROC(sunxi_mc_smp_secondary_startup)
- 
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 5e9602ce1573..ddc439f6269b 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -16,6 +16,7 @@
- #include <linux/platform_device.h>
- 
+ ENDPROC(shmobile_boot_apmu)
+ #endif
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 5561dbed7a33..4a881026d740 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -26,6 +26,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
  #include <asm/mach/arch.h>
 +#include <asm/secure_cntvoff.h>
+ #include "common.h"
+ #include "rcar-gen2.h"
  
- static const char * const sunxi_board_dt_compat[] = {
- 	"allwinner,sun4i-a10",
-@@ -62,7 +63,6 @@ MACHINE_END
- static const char * const sun8i_board_dt_compat[] = {
- 	"allwinner,sun8i-a23",
- 	"allwinner,sun8i-a33",
--	"allwinner,sun8i-a83t",
- 	"allwinner,sun8i-h2-plus",
- 	"allwinner,sun8i-h3",
- 	"allwinner,sun8i-r40",
-@@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
- 	.dt_compat	= sun8i_board_dt_compat,
- MACHINE_END
+@@ -70,7 +71,7 @@ void __init rcar_gen2_timer_init(void)
+ 	void __iomem *base;
+ 	u32 freq;
  
-+void __init sun8i_cntvoff_init(void)
-+{
-+#ifdef CONFIG_SMP
+-	shmobile_init_cntvoff();
 +	secure_cntvoff_init();
-+#endif
-+}
-+
-+static const char * const sun8i_cntvoff_board_dt_compat[] = {
-+	"allwinner,sun8i-a83t",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")
-+	.init_early	= sun8i_cntvoff_init,
-+	.init_time	= sun6i_timer_init,
-+	.dt_compat	= sun8i_cntvoff_board_dt_compat,
-+MACHINE_END
-+
- static const char * const sun9i_board_dt_compat[] = {
- 	"allwinner,sun9i-a80",
- 	NULL,
+ 
+ 	if (of_machine_is_compatible("renesas,r8a7745") ||
+ 	    of_machine_is_compatible("renesas,r8a7792") ||
 -- 
 2.11.0
