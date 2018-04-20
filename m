@@ -1,32 +1,28 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 20 Apr 2018 11:17:49 +0200
-Subject: [PATCH v1 0/5] Add I2C Support on STM32MP157C
-Message-ID: <1524215874-15093-1-git-send-email-pierre-yves.mordret@st.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 20 Apr 2018 15:05:48 +0530
+Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
+ supported
+In-Reply-To: <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
+References: <20180418155643.36464-1-code@mmayer.net>
+ <20180418155643.36464-3-code@mmayer.net>
+ <20180419041632.GF24576@vireshk-i7>
+ <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
+ <20180420044259.GA2873@vireshk-i7>
+ <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
+Message-ID: <20180420093548.GA2989@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds I2C support on STM32MP157C with configs and device tree.
-In the same way I2C4 is enabled for STM32MP157C ED1 Daughter bord.
-I2C2/5 is enabled on STM32MP157C EV1 Daughter board on Evaluation board.
----
-  Version history:
-     v1:
-        * Initial
----
+On 20-04-18, 10:15, Sudeep Holla wrote:
+> It still doesn't give the flexibility to switch between the two
+> implementations boot time based on some firmware config(e.g. DT status
+> property).
 
-Pierre-Yves MORDRET (5):
-  ARM: configs: multi_v7: Add I2C support
-  ARM: dts: stm32: Add I2C support for STM32MP157C SoC
-  ARM: dts: stm32: Add I2Cs pin control on STM32MP157C
-  ARM: dts: stm32: Add I2C4 support for STM32MP157C-ED1
-  ARM: dts: stm32: Add I2C2/5 support for STM32MP157C-EV1
+I agree, but it didn't look like they need flexibility :)
 
- arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 40 ++++++++++++++++
- arch/arm/boot/dts/stm32mp157c-ed1.dts     |  8 ++++
- arch/arm/boot/dts/stm32mp157c-ev1.dts     | 17 +++++++
- arch/arm/boot/dts/stm32mp157c.dtsi        | 77 +++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v7_defconfig       |  1 +
- 5 files changed, 143 insertions(+)
+Lets see how the intend to use it. If they are *always* going to use SCPI if
+that is available, then it should be solved at Kconfig level only. Else they
+shouldn't put such code in the driver to quit early.
 
 -- 
-2.7.4
+viresh
