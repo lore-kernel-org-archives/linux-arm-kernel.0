@@ -1,23 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Apr 2018 20:33:20 +0300
-Subject: [PATCH 0/3] Add R8A77980/Condor PFC support
-In-Reply-To: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
-References: <88e52531-e538-8685-110a-1a2e79a3fe49@cogentembedded.com>
-Message-ID: <4b325d8a-f018-5279-17b9-7fa8aac5b4da@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Apr 2018 10:41:02 -0700
+Subject: [GIT PULL] two omap fixes for v4.17-rc cycle
+Message-ID: <pull-1524246008-227018@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2018 03:04 PM, Sergei Shtylyov wrote:
+From: "Tony Lindgren" <tony@atomide.com>
 
-> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-20180308-v4.16-rc4' tag.  We're adding the R8A77980 PFC node
-> and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
-> These patches depend on the R8A77980 PFC support in order to work properly.
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-  ... and their time has finally come! Please merge.
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-> [1/3] arm64: dts: renesas: r8a77980: add PFC support
-> [2/3] arm64: dts: renesas: condor: add SCIF0 pins
-> [3/3] arm64: dts: renesas: condor: add EtherAVB pins
+are available in the Git repository at:
 
-WBR, Sergei
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/fixes-signed
+
+for you to fetch changes up to fb289e3ab10c16834741bb02be740fa9d025fde0:
+
+  Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes (2018-04-19 15:48:46 -0700)
+
+----------------------------------------------------------------
+Two fixes for v4.17-rc cycle
+
+Fix a build regression with split object directories reported by Russell
+and fix range sizes for omap4 cm2 and prm modules.
+
+----------------------------------------------------------------
+Dave Gerlach (1):
+      ARM: OMAP2+: Fix build when using split object directories
+
+Tony Lindgren (2):
+      ARM: dts: Fix cm2 and prm sizes for omap4
+      Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes
+
+ arch/arm/boot/dts/omap4.dtsi         |  8 ++--
+ arch/arm/mach-omap2/Makefile         |  6 +--
+ arch/arm/mach-omap2/pm-asm-offsets.c |  3 ++
+ arch/arm/mach-omap2/sleep33xx.S      |  1 -
+ arch/arm/mach-omap2/sleep43xx.S      |  1 -
+ drivers/memory/emif-asm-offsets.c    | 72 +---------------------------------
+ include/linux/ti-emif-sram.h         | 75 ++++++++++++++++++++++++++++++++++++
+ 7 files changed, 84 insertions(+), 82 deletions(-)
