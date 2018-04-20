@@ -1,24 +1,86 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 20 Apr 2018 11:15:05 +0200
-Subject: [PATCH v1 0/2] Add MDMA Support on STM32MP157C
-Message-ID: <1524215707-14642-1-git-send-email-pierre-yves.mordret@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 20 Apr 2018 10:15:13 +0100
+Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
+ supported
+In-Reply-To: <20180420044259.GA2873@vireshk-i7>
+References: <20180418155643.36464-1-code@mmayer.net>
+ <20180418155643.36464-3-code@mmayer.net> <20180419041632.GF24576@vireshk-i7>
+ <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
+ <20180420044259.GA2873@vireshk-i7>
+Message-ID: <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MDMA support on STM32MP157C with configs and device tree.
----
-  Version history:
-     v1:
-        * Initial
----
 
-Pierre-Yves MORDRET (2):
-  ARM: configs: stm32: Add MDMA support on STM32MP157C
-  ARM: dts: stm32: Add MDMA support on STM32MP157C
 
- arch/arm/boot/dts/stm32mp157c.dtsi | 10 ++++++++++
- arch/arm/mach-stm32/Kconfig        |  1 +
- 2 files changed, 11 insertions(+)
+On 20/04/18 05:42, Viresh Kumar wrote:
+> On 19-04-18, 11:37, Sudeep Holla wrote:
+>>
+>>
+>> On 19/04/18 05:16, Viresh Kumar wrote:
+>>> On 18-04-18, 08:56, Markus Mayer wrote:
+>>>> From: Jim Quinlan <jim2101024@gmail.com>
+>>>>
+>>>> If the SCMI cpufreq driver is supported, we bail, so that the new
+>>>> approach can be used.
+>>>>
+>>>> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+>>>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+>>>> ---
+>>>>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 16 ++++++++++++++++
+>>>>  1 file changed, 16 insertions(+)
+>>>>
+>>>> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+>>>> index b07559b9ed99..b4861a730162 100644
+>>>> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
+>>>> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+>>>> @@ -164,6 +164,8 @@
+>>>>  #define BRCM_AVS_CPU_INTR	"brcm,avs-cpu-l2-intr"
+>>>>  #define BRCM_AVS_HOST_INTR	"sw_intr"
+>>>>  
+>>>> +#define ARM_SCMI_COMPAT		"arm,scmi"
+>>>> +
+>>>>  struct pmap {
+>>>>  	unsigned int mode;
+>>>>  	unsigned int p1;
+>>>> @@ -511,6 +513,20 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
+>>>>  	struct device *dev;
+>>>>  	int host_irq, ret;
+>>>>  
+>>>> +	/*
+>>>> +	 * If the SCMI cpufreq driver is supported, we bail, so that the more
+>>>> +	 * modern approach can be used.
+>>>> +	 */
+>>>> +	if (IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)) {
+>>>> +		struct device_node *np;
+>>>> +
+>>>> +		np = of_find_compatible_node(NULL, NULL, ARM_SCMI_COMPAT);
+>>>> +		if (np) {
+>>>> +			of_node_put(np);
+>>>> +			return -ENXIO;
+>>>> +		}
+>>>> +	}
+>>>> +
+>>>
+>>> What about adding !CONFIG_ARM_SCMI_PROTOCOL in Kconfig dependency and don't
+>>> compile the driver at all ?
+>>>
+>>
+>> Unfortunately, that may not be good idea with single image needing both
+>> configs to be enabled.
+> 
+> Sure, but looking at the above code, it looked like they don't need the other
+> config if SCMI is enabled.
+> 
+
+Yes, I understand that. But if they just want to run a distro kernel or
+a defconfig with all the options enabled, then it's not possible. But if
+they always build kernel with some custom config options, then fine.
+
+It still doesn't give the flexibility to switch between the two
+implementations boot time based on some firmware config(e.g. DT status
+property).
 
 -- 
-2.7.4
+Regards,
+Sudeep
