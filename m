@@ -1,76 +1,104 @@
-From: acourbot@chromium.org (Alexandre Courbot)
-Date: Fri, 20 Apr 2018 07:38:57 +0000
-Subject: [PATCH v2 02/10] media-request: Add a request complete operation
- to allow m2m scheduling
-In-Reply-To: <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 20 Apr 2018 09:39:08 +0200
+Subject: [PATCH v2 09/10] ARM: dts: sun7i-a20: Add Video Engine and
+ reserved memory nodes
+In-Reply-To: <20180419154536.17846-5-paul.kocialkowski@bootlin.com>
 References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154124.17512-3-paul.kocialkowski@bootlin.com>
-Message-ID: <CAPBb6MVuyN+NdCrLQaM-7Rv0SyutgQjORBU=rZvq-dKs6RDjQA@mail.gmail.com>
+ <20180419154536.17846-5-paul.kocialkowski@bootlin.com>
+Message-ID: <20180420073908.nkcbsdxibnzkqski@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 12:43 AM Paul Kocialkowski <
-paul.kocialkowski@bootlin.com> wrote:
-
-> When using the request API in the context of a m2m driver, the
-> operations that come with a m2m run scheduling call in their
-> (m2m-specific) ioctl handler are delayed until the request is queued
-> (for instance, this includes queuing buffers and streamon).
-
-> Thus, the m2m run scheduling calls are not called in due time since the
-> request AP's internal plumbing will (rightfully) use the relevant core
-> functions directly instead of the ioctl handler.
-
-> This ends up in a situation where nothing happens if there is no
-> run-scheduling ioctl called after queuing the request.
-
-> In order to circumvent the issue, a new media operation is introduced,
-> called at the time of handling the media request queue ioctl. It gives
-> m2m drivers a chance to schedule a m2m device run at that time.
-
-> The existing req_queue operation cannot be used for this purpose, since
-> it is called with the request queue mutex held, that is eventually needed
-> in the device_run call to apply relevant controls.
-
+On Thu, Apr 19, 2018 at 05:45:35PM +0200, Paul Kocialkowski wrote:
+> This adds nodes for the Video Engine and the associated reserved memory
+> for the Allwinner A20. Up to 96 MiB of memory are dedicated to the VPU.
+> 
+> The VPU can only map the first 256 MiB of DRAM, so the reserved memory
+> pool has to be located in that area. Following Allwinner's decision in
+> downstream software, the last 96 MiB of the first 256 MiB of RAM are
+> reserved for this purpose.
+> 
 > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 > ---
->   drivers/media/media-request.c | 3 +++
->   include/media/media-device.h  | 2 ++
->   2 files changed, 5 insertions(+)
-
-> diff --git a/drivers/media/media-request.c b/drivers/media/media-request.c
-> index 415f7e31019d..28ac5ccfe6a2 100644
-> --- a/drivers/media/media-request.c
-> +++ b/drivers/media/media-request.c
-> @@ -157,6 +157,9 @@ static long media_request_ioctl_queue(struct
-media_request *req)
->                  media_request_get(req);
->          }
-
-> +       if (mdev->ops->req_complete)
-> +               mdev->ops->req_complete(req);
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index bd0cd3204273..cb6d82065dcf 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -163,6 +163,20 @@
+>  		reg = <0x40000000 0x80000000>;
+>  	};
+>  
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
 > +
->          return ret;
->   }
+> +		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
+> +		ve_memory: cma at 4a000000 {
+> +			compatible = "shared-dma-pool";
+> +			reg = <0x4a000000 0x6000000>;
+> +			no-map;
 
-> diff --git a/include/media/media-device.h b/include/media/media-device.h
-> index 07e323c57202..c7dcf2079cc9 100644
-> --- a/include/media/media-device.h
-> +++ b/include/media/media-device.h
-> @@ -55,6 +55,7 @@ struct media_entity_notify {
->    * @req_alloc: Allocate a request
->    * @req_free: Free a request
->    * @req_queue: Queue a request
-> + * @req_complete: Complete a request
->    */
->   struct media_device_ops {
->          int (*link_notify)(struct media_link *link, u32 flags,
-> @@ -62,6 +63,7 @@ struct media_device_ops {
->          struct media_request *(*req_alloc)(struct media_device *mdev);
->          void (*req_free)(struct media_request *req);
->          int (*req_queue)(struct media_request *req);
-> +       void (*req_complete)(struct media_request *req);
+I'm not sure why no-map is needed.
 
-This is called *before* the request is actually run, isn't it? In that
-case, wouldn't something like "req_schedule" be less confusing?
-req_complete implies that the request is already completed.
+And I guess we could use alloc-ranges to make sure the region is in
+the proper memory range, instead of hardcoding it.
+
+> +			linux,cma-default;
+> +		};
+> +	};
+> +
+>  	timer {
+>  		compatible = "arm,armv7-timer";
+>  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> @@ -451,6 +465,23 @@
+>  			};
+>  		};
+>  
+> +		ve: video-engine at 1c0e000 {
+> +			compatible = "allwinner,sun4i-a10-video-engine";
+
+We should have an A20-specific compatible here, at least, so that we
+can deal with any quirk we might find down the road.
+
+> +			reg = <0x01c0e000 0x1000>;
+> +			memory-region = <&ve_memory>;
+
+Since you made the CMA region the default one, you don't need to tie
+it to that device in particular (and you can drop it being mandatory
+from your binding as well).
+
+> +
+> +			clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
+> +				 <&ccu CLK_DRAM_VE>;
+> +			clock-names = "ahb", "mod", "ram";
+> +
+> +			assigned-clocks = <&ccu CLK_VE>;
+> +			assigned-clock-rates = <320000000>;
+
+This should be set from within the driver. If it's something that you
+absolutely needed for the device to operate, you have no guarantee
+that the clock rate won't change at any point in time after the device
+probe, so that's not a proper solution.
+
+And if it's not needed and can be adjusted depending on the
+framerate/codec/resolution, then it shouldn't be in the DT either.
+
+Don't you also need to map the SRAM on the A20?
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/709dd34d/attachment-0001.sig>
