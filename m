@@ -1,107 +1,27 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 20 Apr 2018 15:54:06 +0100
-Subject: [PATCH 1/4] KVM: arm/arm64: Share common code in user_mem_abort()
-In-Reply-To: <20180420145409.24485-1-punit.agrawal@arm.com>
-References: <20180420145409.24485-1-punit.agrawal@arm.com>
-Message-ID: <20180420145409.24485-2-punit.agrawal@arm.com>
+From: jgg@ziepe.ca (Jason Gunthorpe)
+Date: Fri, 20 Apr 2018 08:55:21 -0600
+Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
+In-Reply-To: <BN6PR12MB1809BD30AA5B890C054F9832F7B50@BN6PR12MB1809.namprd12.prod.outlook.com>
+References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
+ <20180419202632.GE14063@ziepe.ca>
+ <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
+ <BN6PR12MB1809BD30AA5B890C054F9832F7B50@BN6PR12MB1809.namprd12.prod.outlook.com>
+Message-ID: <20180420145521.GB30433@ziepe.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code for operations such as marking the pfn as dirty, and
-dcache/icache maintenance during stage 2 fault handling is duplicated
-between normal pages and PMD hugepages.
+On Thu, Apr 19, 2018 at 10:11:27PM +0000, Deucher, Alexander wrote:
 
-Instead of creating another copy of the operations when we introduce
-PUD hugepages, let's share them across the different pagesizes.
+> My understanding was that some platfoms only bring up the link in
+> gen 1 mode for compatibility reasons.  TBH, I'm not that familiar
+> with how the links come up on different platforms.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/mmu.c | 36 +++++++++++++++++++++---------------
- 1 file changed, 21 insertions(+), 15 deletions(-)
+Then the platform firmware or platform's linux PCI root complex driver
+should perform speed negotiation.
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 7f6a944db23d..db382c7c7cd7 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1428,7 +1428,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	kvm_pfn_t pfn;
- 	pgprot_t mem_type = PAGE_S2;
- 	bool logging_active = memslot_is_logging(memslot);
--	unsigned long flags = 0;
-+	unsigned long vma_pagesize, flags = 0;
- 
- 	write_fault = kvm_is_write_fault(vcpu);
- 	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
-@@ -1448,7 +1448,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		return -EFAULT;
- 	}
- 
--	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
-+	vma_pagesize = vma_kernel_pagesize(vma);
-+	if (vma_pagesize == PMD_SIZE && !logging_active) {
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
-@@ -1517,23 +1518,33 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (mmu_notifier_retry(kvm, mmu_seq))
- 		goto out_unlock;
- 
--	if (!hugetlb && !force_pte)
-+	if (!hugetlb && !force_pte) {
-+		/*
-+		 * Only PMD_SIZE transparent hugepages(THP) are
-+		 * currently supported. This code will need to be
-+		 * updated if other THP sizes are supported.
-+		 */
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
-+		vma_pagesize = PMD_SIZE;
-+	}
-+
-+	if (writable)
-+		kvm_set_pfn_dirty(pfn);
-+
-+	if (fault_status != FSC_PERM)
-+		clean_dcache_guest_page(pfn, vma_pagesize);
-+
-+	if (exec_fault)
-+		invalidate_icache_guest_page(pfn, vma_pagesize);
- 
- 	if (hugetlb) {
- 		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
- 		new_pmd = pmd_mkhuge(new_pmd);
--		if (writable) {
-+		if (writable)
- 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
--			kvm_set_pfn_dirty(pfn);
--		}
--
--		if (fault_status != FSC_PERM)
--			clean_dcache_guest_page(pfn, PMD_SIZE);
- 
- 		if (exec_fault) {
- 			new_pmd = kvm_s2pmd_mkexec(new_pmd);
--			invalidate_icache_guest_page(pfn, PMD_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			if (stage2_is_exec(kvm, fault_ipa))
-@@ -1546,16 +1557,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 
- 		if (writable) {
- 			new_pte = kvm_s2pte_mkwrite(new_pte);
--			kvm_set_pfn_dirty(pfn);
- 			mark_page_dirty(kvm, gfn);
- 		}
- 
--		if (fault_status != FSC_PERM)
--			clean_dcache_guest_page(pfn, PAGE_SIZE);
--
- 		if (exec_fault) {
- 			new_pte = kvm_s2pte_mkexec(new_pte);
--			invalidate_icache_guest_page(pfn, PAGE_SIZE);
- 		} else if (fault_status == FSC_PERM) {
- 			/* Preserve execute if XN was already cleared */
- 			if (stage2_is_exec(kvm, fault_ipa))
--- 
-2.17.0
+Something like that shouldn't be a driver problem to solve.
+
+The driver should only be involved if it has to alter the device (eg
+new device firmware or something)..
+
+Jason
