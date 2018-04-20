@@ -1,39 +1,35 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Fri, 20 Apr 2018 09:35:54 +0000
-Subject: [PATCH resend] usb: chipidea: Don't select EXTCON
-In-Reply-To: <20180420170126.732e093b@xhacker.debian>
-References: <20180419160144.0412a510@xhacker.debian>
- <HE1PR04MB1450E11255E0828180B3E8188BB40@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <20180420170126.732e093b@xhacker.debian>
-Message-ID: <VI1PR04MB14558BCFB82A06C92F7AA0CA8BB40@VI1PR04MB1455.eurprd04.prod.outlook.com>
+From: amelie.delaunay@st.com (Amelie DELAUNAY)
+Date: Fri, 20 Apr 2018 09:40:30 +0000
+Subject: [PATCH] ARM: dts: stm32: add reset binding on stm32mp157c
+In-Reply-To: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
+References: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <26cab19f-e8ea-edf1-9ee7-e7a0cc589d2d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> >
-> > Sorry to reply late, are you really care 2KB code side? Since many
-> > users use EXTCON to handle vbus and id, it is hard just delete it. I
-> > could accept patch for your specific platforms, like:
-> >
-> > +	select EXTCON if !ARCH_XXXX
+
+On 04/20/2018 11:09 AM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> The patch doesn't remove extcon support from chipidea driver.
-> I just want to not select EXTCON unconditionally, but let the users choose. If the
-> users need extcon, they could enable EXTCON themselves
+> This patch adds reset binding file.
 > 
-> I just searched all the dts in arch/arm/boot/dts and arch/arm64/boot/dts only the four
-> dts give extcon phandle to chipidea host, other users don't make use of it:
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>   arch/arm/boot/dts/stm32mp157c.dtsi | 1 +
+>   1 file changed, 1 insertion(+)
 > 
-> arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> 
-> arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-> 
-> arch/arm/boot/dts/qcom-msm8974-fairphone-fp2.dts
-> 
-> arch/arm/boot/dts/qcom-msm8974-sony-xperia-castor.dts
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index bc3eddc..7e91fd6 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -5,6 +5,7 @@
+>    */
+>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>   #include <dt-bindings/clock/stm32mp1-clks.h>
+> +#include <dt-bindings/reset/stm32mp1-resets.h>
+>   
+>   / {
+>   	#address-cells = <1>;
 > 
 
-I see, but I do not want to break msm platforms. You may try to create Glue driver Kconfig
-entry for chipidea like dwc3, and let msm depends on EXTCON.
-
-Peter
+Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
