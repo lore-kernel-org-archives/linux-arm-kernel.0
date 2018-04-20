@@ -1,92 +1,118 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 20 Apr 2018 14:00:56 +0900
-Subject: [PATCH] arm64: kexec: Add machine_kexec_mask_interrupts to kexec
- path
-In-Reply-To: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
-References: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
-Message-ID: <20180420050054.GI13168@linaro.org>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 20 Apr 2018 13:25:09 +0800
+Subject: [PATCH v6 1/2] PCI: mediatek: Set up vendor ID and class type for
+ MT7622
+In-Reply-To: <1524201910-22836-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1524201910-22836-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1524201910-22836-2-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 08:19:36PM -0600, Sameer Goel wrote:
-> In kdump code path SPIs at GIC level are explicitly cleared by
-> calling machine_kexec_mask_interrupts. In case of kexec this
-> functionality is delegated for most part to the device shutdown
-> functions.
-> Add machine_kexec_mask_interrupts to machine_shutdown path to
-> ensure that the irqs are masked at the gic level.
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-I'm not sure that this change has visible effect, but anyway
+MT7622's hardware default value of vendor ID and class type is not correct,
+fix that by setup the correct values before linkup with Endpoint.
 
-> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
-> ---
-> Porting code for masking irqs at gic from kdump shutdown to kexec path.
-> 
-> There was discussion about this functionality in [1].
-> 
-> [1] https://patchwork.kernel.org/patch/9817499/
-> 
->  arch/arm64/include/asm/kexec.h    | 6 ++++++
->  arch/arm64/kernel/machine_kexec.c | 2 +-
->  arch/arm64/kernel/process.c       | 2 ++
->  3 files changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> index e17f052..f9ddb41 100644
-> --- a/arch/arm64/include/asm/kexec.h
-> +++ b/arch/arm64/include/asm/kexec.h
-> @@ -93,6 +93,12 @@ static inline void crash_prepare_suspend(void) {}
->  static inline void crash_post_resume(void) {}
->  #endif
->  
-> +#if defined(CONFIG_KEXEC)
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/pci/host/pcie-mediatek.c | 30 +++++++++++++++++++++++++++---
+ include/linux/pci_ids.h          |  2 ++
+ 2 files changed, 29 insertions(+), 3 deletions(-)
 
-CONFIG_KEXEC_CORE would be better.
-
-Thanks,
--Takahiro AKASHI
-
-> +extern void machine_kexec_mask_interrupts(void);
-> +#else
-> +static inline void machine_kexec_mask_interrupts(void) {}
-> +#endif
-> +
->  #endif /* __ASSEMBLY__ */
->  
->  #endif
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index f76ea92..b453180 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -213,7 +213,7 @@ void machine_kexec(struct kimage *kimage)
->  	BUG(); /* Should never get here. */
->  }
->  
-> -static void machine_kexec_mask_interrupts(void)
-> +void machine_kexec_mask_interrupts(void)
->  {
->  	unsigned int i;
->  	struct irq_desc *desc;
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index f08a2ed..9d0337e 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -58,6 +58,7 @@
->  #include <asm/mmu_context.h>
->  #include <asm/processor.h>
->  #include <asm/stacktrace.h>
-> +#include <asm/kexec.h>
->  
->  #ifdef CONFIG_CC_STACKPROTECTOR
->  #include <linux/stackprotector.h>
-> @@ -107,6 +108,7 @@ void arch_cpu_idle_dead(void)
->  void machine_shutdown(void)
->  {
->  	disable_nonboot_cpus();
-> +	machine_kexec_mask_interrupts();
->  }
->  
->  /*
-> -- 
-> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-> 
+diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+index a8b20c5..c3dc549 100644
+--- a/drivers/pci/host/pcie-mediatek.c
++++ b/drivers/pci/host/pcie-mediatek.c
+@@ -66,6 +66,10 @@
+ 
+ /* PCIe V2 per-port registers */
+ #define PCIE_MSI_VECTOR		0x0c0
++
++#define PCIE_CONF_VEND_ID	0x100
++#define PCIE_CONF_CLASS_ID	0x106
++
+ #define PCIE_INT_MASK		0x420
+ #define INTX_MASK		GENMASK(19, 16)
+ #define INTX_SHIFT		16
+@@ -125,12 +129,14 @@ struct mtk_pcie_port;
+ 
+ /**
+  * struct mtk_pcie_soc - differentiate between host generations
++ * @need_fix_class_id: whether this host's class ID needed to be fixed or not
+  * @has_msi: whether this host supports MSI interrupts or not
+  * @ops: pointer to configuration access functions
+  * @startup: pointer to controller setting functions
+  * @setup_irq: pointer to initialize IRQ functions
+  */
+ struct mtk_pcie_soc {
++	bool need_fix_class_id;
+ 	bool has_msi;
+ 	struct pci_ops *ops;
+ 	int (*startup)(struct mtk_pcie_port *port);
+@@ -375,6 +381,7 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ {
+ 	struct mtk_pcie *pcie = port->pcie;
+ 	struct resource *mem = &pcie->mem;
++	const struct mtk_pcie_soc *soc = port->pcie->soc;
+ 	u32 val;
+ 	size_t size;
+ 	int err;
+@@ -403,6 +410,15 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ 	       PCIE_MAC_SRSTB | PCIE_CRSTB;
+ 	writel(val, port->base + PCIE_RST_CTRL);
+ 
++	/* Set up vendor ID and class code */
++	if (soc->need_fix_class_id) {
++		val = PCI_VENDOR_ID_MEDIATEK;
++		writew(val, port->base + PCIE_CONF_VEND_ID);
++
++		val = PCI_CLASS_BRIDGE_PCI;
++		writew(val, port->base + PCIE_CONF_CLASS_ID);
++	}
++
+ 	/* 100ms timeout value should be enough for Gen1/2 training */
+ 	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+ 				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+@@ -1142,7 +1158,15 @@ static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+ 	.startup = mtk_pcie_startup_port,
+ };
+ 
+-static const struct mtk_pcie_soc mtk_pcie_soc_v2 = {
++static const struct mtk_pcie_soc mtk_pcie_soc_mt2712 = {
++	.has_msi = true,
++	.ops = &mtk_pcie_ops_v2,
++	.startup = mtk_pcie_startup_port_v2,
++	.setup_irq = mtk_pcie_setup_irq,
++};
++
++static const struct mtk_pcie_soc mtk_pcie_soc_mt7622 = {
++	.need_fix_class_id = true,
+ 	.has_msi = true,
+ 	.ops = &mtk_pcie_ops_v2,
+ 	.startup = mtk_pcie_startup_port_v2,
+@@ -1152,8 +1176,8 @@ static const struct mtk_pcie_soc mtk_pcie_soc_v2 = {
+ static const struct of_device_id mtk_pcie_ids[] = {
+ 	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
+ 	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
+-	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_v2 },
+-	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_v2 },
++	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_mt2712 },
++	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_mt7622 },
+ 	{},
+ };
+ 
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index a6b3066..9d4fca5 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -2115,6 +2115,8 @@
+ 
+ #define PCI_VENDOR_ID_MYRICOM		0x14c1
+ 
++#define PCI_VENDOR_ID_MEDIATEK		0x14c3
++
+ #define PCI_VENDOR_ID_TITAN		0x14D2
+ #define PCI_DEVICE_ID_TITAN_010L	0x8001
+ #define PCI_DEVICE_ID_TITAN_100L	0x8010
+-- 
+2.6.4
