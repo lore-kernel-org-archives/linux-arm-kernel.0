@@ -1,53 +1,24 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 20 Apr 2018 13:26:46 +0200 (CEST)
-Subject: [PATCH 9/9] arm64: dts: broadcom: Add reference to Raspberry Pi
- 3 B+
-In-Reply-To: <1523640478-4448-10-git-send-email-stefan.wahren@i2se.com>
-References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
- <1523640478-4448-10-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1023874068.10388.1524223606275@email.1und1.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Apr 2018 14:28:51 +0300
+Subject: [PATCH] arm64: dts: renesas: v3msk: add EtherAVB pins
+In-Reply-To: <c42c9e9a-8fe8-5cad-0eeb-0c1fbd09f83c@cogentembedded.com>
+References: <c42c9e9a-8fe8-5cad-0eeb-0c1fbd09f83c@cogentembedded.com>
+Message-ID: <ed7ddd72-4e52-0b2b-d2ef-1d407f638745@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-hi Will,
+On 03/14/2018 11:30 PM, Sergei Shtylyov wrote:
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 13. April 2018 um 19:27 geschrieben:
+> Add the (previously omitted) EtherAVB pin data to the V3M Starter Kit
+> board's device tree.
 > 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> This adds a reference to the dts of the Raspberry Pi 3 B+
-> in arm, so don't need to maintain the content in arm64.
-
-are you okay with the arm64 parts of this series?
-
-> 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 > ---
->  arch/arm64/boot/dts/broadcom/Makefile                 | 3 ++-
->  arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts | 2 ++
->  2 files changed, 4 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
-> 
-> diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-> index 2a2591e..1193a9e 100644
-> --- a/arch/arm64/boot/dts/broadcom/Makefile
-> +++ b/arch/arm64/boot/dts/broadcom/Makefile
-> @@ -1,5 +1,6 @@
->  # SPDX-License-Identifier: GPL-2.0
-> -dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
-> +dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb \
-> +			      bcm2837-rpi-3-b-plus.dtb
->  
->  subdir-y	+= northstar2
->  subdir-y	+= stingray
-> diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
-> new file mode 100644
-> index 0000000..46ad202
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
-> @@ -0,0 +1,2 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +#include "arm/bcm2837-rpi-3-b-plus.dts"
-> -- 
-> 2.7.4
->
+> The patch is against the 'renesas-devel-20180314-v4.16-rc5' tag of Simon's
+> 'renesas.git repo. It depends on the R8A77970 PFC driver patch adding EtherAVB
+> pin groups (posted yesterday) in order to work properly...
+
+   The dependency has been now met, please merge this patch.
+
+MBR, Sergei
