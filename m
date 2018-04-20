@@ -1,75 +1,77 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Apr 2018 11:24:09 +0100
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 20 Apr 2018 18:41:14 +0800
 Subject: [PATCH v3 7/7] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <2556566.3fxMPoIyx0@avalon>
-References: <20180419162751.25223-1-peda@axentia.se>
- <20180419162751.25223-8-peda@axentia.se>
- <2556566.3fxMPoIyx0@avalon>
-Message-ID: <20180420102408.GW16141@n2100.armlinux.org.uk>
+In-Reply-To: <20180419162751.25223-8-peda@axentia.se>
+References: <20180419162751.25223-8-peda@axentia.se>
+Message-ID: <201804201731.D3OnDg0p%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 01:06:49PM +0300, Laurent Pinchart wrote:
-> Hi Peter,
-> 
-> Thank you for the patch.
-> 
-> On Thursday, 19 April 2018 19:27:51 EEST Peter Rosin wrote:
-> > This makes this driver work with all(?) drivers that are not
-> > componentized and instead expect to connect to a panel/bridge. That
-> > said, the only one tested is atmel_hlcdc.
-> > 
-> > This hooks the relevant work function previously called by the encoder
-> > and the component also to the bridge, since the encoder goes away when
-> > connecting to the bridge interface of the driver and the equivalent of
-> > bind/unbind of the component is handled by bridge attach/detach.
-> > 
-> > The lifetime requirements of a bridge and a component are slightly
-> > different, which is the reason for struct tda998x_bridge.
-> 
-> Couldn't you move the allocation and initialization (tda998x_create) of the 
-> tda998x_priv structure to probe time ? I think you wouldn't need a separate 
-> structure in that case. Unless I'm mistaken there would be an added benefit of 
-> separating component and bridge initialization, resulting in the encoder not 
-> being initialized at all if the component isn't used. You wouldn't need to add 
-> a local_encoder parameter to the tda998x_init() function.
+Hi Peter,
 
-No, I don't like that idea one bit, as I've stated in the past about the
-component API.  The same (probably) goes for the bridge stuff too.
+I love your patch! Yet something to improve:
 
-Consider the following:
+[auto build test ERROR on drm/drm-next]
+[also build test ERROR on v4.17-rc1 next-20180420]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Your DRM system is initialised.  You then remove a module, which results
-in the DRM system being torn down.  You re-insert the module (eg, having
-made a change to it).  The DRM system is then re-initialised.
+url:    https://github.com/0day-ci/linux/commits/Peter-Rosin/Add-tda998x-HDMI-support-to-atmel-hlcdc/20180420-160131
+base:   git://people.freedesktop.org/~airlied/linux.git drm-next
+config: i386-randconfig-a0-201815 (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-At this point, what is the state of variables such as priv->is_on if
-you allocate the structure at probe time?
+All errors (new ones prefixed by >>):
 
-What about all the other variables in the driver private structure - are
-you sure that the driver can cope with random values from the previous
-"usage" remaining there?
+   drivers/gpu/drm/i2c/tda998x_drv.c: In function 'tda998x_probe':
+>> drivers/gpu/drm/i2c/tda998x_drv.c:1859:16: error: 'struct drm_bridge' has no member named 'of_node'
+     bridge->bridge.of_node = dev->of_node;
+                   ^
 
-At the moment, this isn't a concern for the driver because we
-dev_kzalloc() the structure in the bind callback.  Move that to the
-probe function, and the structure is no longer re-initialised each
-time, and so it retains the previous state.  The driver is not setup
-to cope with that.
+vim +1859 drivers/gpu/drm/i2c/tda998x_drv.c
 
-So, to work around that, you would need to reinitialise _everything_
-in the structure that the driver requires, which IMHO is a very
-open to bugs (eg, if a member is missed, or added without the
-necessary re-initialisation), _especially_ when this is not a path
-that will get regular testing.
+  1838	
+  1839	static int
+  1840	tda998x_probe(struct i2c_client *client, const struct i2c_device_id *id)
+  1841	{
+  1842		struct device *dev = &client->dev;
+  1843		struct tda998x_bridge *bridge;
+  1844		int ret;
+  1845	
+  1846		if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+  1847			dev_warn(&client->dev, "adapter does not support I2C\n");
+  1848			return -EIO;
+  1849		}
+  1850	
+  1851		bridge = devm_kzalloc(dev, sizeof(*bridge), GFP_KERNEL);
+  1852		if (!bridge)
+  1853			return -ENOMEM;
+  1854	
+  1855		bridge->dev = dev;
+  1856		dev_set_drvdata(dev, bridge);
+  1857	
+  1858		bridge->bridge.funcs = &tda998x_bridge_funcs;
+> 1859		bridge->bridge.of_node = dev->of_node;
+  1860		drm_bridge_add(&bridge->bridge);
+  1861	
+  1862		ret = component_add(dev, &tda998x_ops);
+  1863	
+  1864		if (ret)
+  1865			drm_bridge_remove(&bridge->bridge);
+  1866	
+  1867		return ret;
+  1868	}
+  1869	
 
-If you want to do this for a subset of data, it would be much better
-to separate them into independent structures (maybe one embedded into
-the other) so that this problem can not occur.  That way, a subset
-of the data can be memset() when bound to the rest of the DRM system
-ensuring a consistent driver state and still achieve what you're
-suggesting.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 31929 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/2bc893dc/attachment-0001.gz>
