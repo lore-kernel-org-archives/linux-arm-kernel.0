@@ -1,64 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 20 Apr 2018 10:56:46 +0200
-Subject: [RFC 0/2] dw_mmc: add multislot support
-In-Reply-To: <1524210132.4614.4.camel@synopsys.com>
-References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
- <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
- <1524210132.4614.4.camel@synopsys.com>
-Message-ID: <CAPDyKFqGNR_YV=adUKqzEuYk-ZV48MHW68Uyr=8nXBEvafGsWQ@mail.gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 20 Apr 2018 16:58:05 +0800
+Subject: [PATCH] arm64: defconfig: Enable CONFIG_PINCTRL_MT7622 by default
+Message-ID: <aac9629afc510681a5dad1a24eb78f5f84f12c23.1524214111.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 April 2018 at 09:42, Alexey Brodkin <Alexey.Brodkin@synopsys.com> wrote:
-> Hi Ulf,
->
-> On Fri, 2018-04-20 at 09:35 +0200, Ulf Hansson wrote:
->> [...]
->>
->> >
->> > 2. Add missing stuff to support multislot mode in DesignWare MMC driver.
->> >  * Add missing slot switch to __dw_mci_start_request() function.
->> >  * Refactor set_ios function:
->> >    a) Calculate common clock which is
->> >       suitable for all slots instead of directly use clock value
->> >       provided by mmc core. We calculate common clock as the minimum
->> >       among each used slot clocks. This clock is calculated in
->> >       dw_mci_calc_common_clock() function which is called
->> >       from set_ios()
->> >    b) Disable clock only if no other slots are ON.
->> >    c) Setup clock directly in set_ios() only if no other slots
->> >       are ON. Otherwise adjust clock in __dw_mci_start_request()
->> >       function before slot switch.
->> >    d) Move timings and bus_width setup to separate funcions.
->> >  * Use timing field in each slot structure instead of common field in
->> >    host structure.
->> >  * Add locks to serialize access to registers.
->>
->> Sorry, but this is a hack to *try* to make multi-slot work and this
->> isn't sufficient. There were good reasons to why the earlier
->> non-working multi slot support was removed from dw_mmc.
->>
->> Let me elaborate a bit for your understanding. The core uses a host
->> lock (mmc_claim|release_host()) to serialize operations and commands,
->> as to confirm to the SD/SDIO/(e)MMC specs. The above changes gives no
->> guarantees for this. To make that work, we would need a "mmc bus lock"
->> to be managed by the core.
->>
->> However, inventing a "mmc bus lock" would lead to other problems
->> related to I/O scheduling for upper layers - it simply breaks. For
->> example, I/O requests for one card/slot can then starve I/O requests
->> reaching another card/slot.
->
-> So are you saying that multi-slot support is a no go in general or it is only
-> applicable to DW MMC (I really doubt that's a case)?
+From: Sean Wang <sean.wang@mediatek.com>
 
-In general.
+Recently kernelCI reported the board mt7622-rfb1 has a fail test with
+kernel: ERROR: did not start booting whose details could be seen at [1].
 
->
-> BTW there're other controllers that seem to support multi-slot like Atmel etc.
+The cause is that UART0 can't output anything when it's missing a proper
+pin setup with current DTS, so the essential driver is always getting
+enabled to fix up the issue.
 
-Yeah, none of those are working - it just bad attempts to try to make
-*something* work.
+[1] https://kernelci.org/boot/id/5ad7d62759b51461bfb1f829/
 
-Kind regards
-Uffe
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: stable at vger.kernel.org
+Fixes: ae457b7679c4 ("arm64: dts: mt7622: add SoC and peripheral related device nodes")
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ecf6137..fe005df 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -320,6 +320,7 @@ CONFIG_PINCTRL_MAX77620=y
+ CONFIG_PINCTRL_MSM8916=y
+ CONFIG_PINCTRL_MSM8994=y
+ CONFIG_PINCTRL_MSM8996=y
++CONFIG_PINCTRL_MT7622=y
+ CONFIG_PINCTRL_QDF2XXX=y
+ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+ CONFIG_GPIO_DWAPB=y
+-- 
+2.7.4
