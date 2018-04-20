@@ -1,73 +1,92 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 20 Apr 2018 10:12:59 +0530
-Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
- supported
-In-Reply-To: <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
-References: <20180418155643.36464-1-code@mmayer.net>
- <20180418155643.36464-3-code@mmayer.net>
- <20180419041632.GF24576@vireshk-i7>
- <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
-Message-ID: <20180420044259.GA2873@vireshk-i7>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 20 Apr 2018 14:00:56 +0900
+Subject: [PATCH] arm64: kexec: Add machine_kexec_mask_interrupts to kexec
+ path
+In-Reply-To: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
+References: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
+Message-ID: <20180420050054.GI13168@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-04-18, 11:37, Sudeep Holla wrote:
-> 
-> 
-> On 19/04/18 05:16, Viresh Kumar wrote:
-> > On 18-04-18, 08:56, Markus Mayer wrote:
-> >> From: Jim Quinlan <jim2101024@gmail.com>
-> >>
-> >> If the SCMI cpufreq driver is supported, we bail, so that the new
-> >> approach can be used.
-> >>
-> >> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> >> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-> >> ---
-> >>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 16 ++++++++++++++++
-> >>  1 file changed, 16 insertions(+)
-> >>
-> >> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> >> index b07559b9ed99..b4861a730162 100644
-> >> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> >> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-> >> @@ -164,6 +164,8 @@
-> >>  #define BRCM_AVS_CPU_INTR	"brcm,avs-cpu-l2-intr"
-> >>  #define BRCM_AVS_HOST_INTR	"sw_intr"
-> >>  
-> >> +#define ARM_SCMI_COMPAT		"arm,scmi"
-> >> +
-> >>  struct pmap {
-> >>  	unsigned int mode;
-> >>  	unsigned int p1;
-> >> @@ -511,6 +513,20 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
-> >>  	struct device *dev;
-> >>  	int host_irq, ret;
-> >>  
-> >> +	/*
-> >> +	 * If the SCMI cpufreq driver is supported, we bail, so that the more
-> >> +	 * modern approach can be used.
-> >> +	 */
-> >> +	if (IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)) {
-> >> +		struct device_node *np;
-> >> +
-> >> +		np = of_find_compatible_node(NULL, NULL, ARM_SCMI_COMPAT);
-> >> +		if (np) {
-> >> +			of_node_put(np);
-> >> +			return -ENXIO;
-> >> +		}
-> >> +	}
-> >> +
-> > 
-> > What about adding !CONFIG_ARM_SCMI_PROTOCOL in Kconfig dependency and don't
-> > compile the driver at all ?
-> > 
-> 
-> Unfortunately, that may not be good idea with single image needing both
-> configs to be enabled.
+On Wed, Apr 18, 2018 at 08:19:36PM -0600, Sameer Goel wrote:
+> In kdump code path SPIs at GIC level are explicitly cleared by
+> calling machine_kexec_mask_interrupts. In case of kexec this
+> functionality is delegated for most part to the device shutdown
+> functions.
+> Add machine_kexec_mask_interrupts to machine_shutdown path to
+> ensure that the irqs are masked at the gic level.
 
-Sure, but looking at the above code, it looked like they don't need the other
-config if SCMI is enabled.
+I'm not sure that this change has visible effect, but anyway
 
--- 
-viresh
+> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
+> ---
+> Porting code for masking irqs at gic from kdump shutdown to kexec path.
+> 
+> There was discussion about this functionality in [1].
+> 
+> [1] https://patchwork.kernel.org/patch/9817499/
+> 
+>  arch/arm64/include/asm/kexec.h    | 6 ++++++
+>  arch/arm64/kernel/machine_kexec.c | 2 +-
+>  arch/arm64/kernel/process.c       | 2 ++
+>  3 files changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> index e17f052..f9ddb41 100644
+> --- a/arch/arm64/include/asm/kexec.h
+> +++ b/arch/arm64/include/asm/kexec.h
+> @@ -93,6 +93,12 @@ static inline void crash_prepare_suspend(void) {}
+>  static inline void crash_post_resume(void) {}
+>  #endif
+>  
+> +#if defined(CONFIG_KEXEC)
+
+CONFIG_KEXEC_CORE would be better.
+
+Thanks,
+-Takahiro AKASHI
+
+> +extern void machine_kexec_mask_interrupts(void);
+> +#else
+> +static inline void machine_kexec_mask_interrupts(void) {}
+> +#endif
+> +
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index f76ea92..b453180 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -213,7 +213,7 @@ void machine_kexec(struct kimage *kimage)
+>  	BUG(); /* Should never get here. */
+>  }
+>  
+> -static void machine_kexec_mask_interrupts(void)
+> +void machine_kexec_mask_interrupts(void)
+>  {
+>  	unsigned int i;
+>  	struct irq_desc *desc;
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index f08a2ed..9d0337e 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -58,6 +58,7 @@
+>  #include <asm/mmu_context.h>
+>  #include <asm/processor.h>
+>  #include <asm/stacktrace.h>
+> +#include <asm/kexec.h>
+>  
+>  #ifdef CONFIG_CC_STACKPROTECTOR
+>  #include <linux/stackprotector.h>
+> @@ -107,6 +108,7 @@ void arch_cpu_idle_dead(void)
+>  void machine_shutdown(void)
+>  {
+>  	disable_nonboot_cpus();
+> +	machine_kexec_mask_interrupts();
+>  }
+>  
+>  /*
+> -- 
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
