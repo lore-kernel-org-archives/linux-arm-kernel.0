@@ -1,35 +1,46 @@
-From: amelie.delaunay@st.com (Amelie DELAUNAY)
-Date: Fri, 20 Apr 2018 09:40:30 +0000
-Subject: [PATCH] ARM: dts: stm32: add reset binding on stm32mp157c
-In-Reply-To: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
-References: <1524215347-10600-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <26cab19f-e8ea-edf1-9ee7-e7a0cc589d2d@st.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 20 Apr 2018 12:41:14 +0300
+Subject: [PATCH v3 5/7] drm/i2c: tda998x: find the drm_device via the
+ drm_connector
+In-Reply-To: <20180419162751.25223-6-peda@axentia.se>
+References: <20180419162751.25223-1-peda@axentia.se>
+ <20180419162751.25223-6-peda@axentia.se>
+Message-ID: <1995876.dqZyKbpDZd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peter,
 
-On 04/20/2018 11:09 AM, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+Thank you for the patch.
+
+On Thursday, 19 April 2018 19:27:49 EEST Peter Rosin wrote:
+> This prepares for being a drm_bridge which will not register the
+> encoder. That makes the connector the better choice.
 > 
-> This patch adds reset binding file.
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 > ---
->   arch/arm/boot/dts/stm32mp157c.dtsi | 1 +
->   1 file changed, 1 insertion(+)
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-> index bc3eddc..7e91fd6 100644
-> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
-> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-> @@ -5,6 +5,7 @@
->    */
->   #include <dt-bindings/interrupt-controller/arm-gic.h>
->   #include <dt-bindings/clock/stm32mp1-clks.h>
-> +#include <dt-bindings/reset/stm32mp1-resets.h>
->   
->   / {
->   	#address-cells = <1>;
+> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c
+> b/drivers/gpu/drm/i2c/tda998x_drv.c index cd3f0873bbdd..8f6e013f2b87 100644
+> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
+> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+> @@ -630,7 +630,7 @@ static void tda998x_detect_work(struct work_struct
+> *work) {
+>  	struct tda998x_priv *priv =
+>  		container_of(work, struct tda998x_priv, detect_work);
+> -	struct drm_device *dev = priv->encoder.dev;
+> +	struct drm_device *dev = priv->connector.dev;
 > 
+>  	if (dev)
+>  		drm_kms_helper_hotplug_event(dev);
 
-Reviewed-by: Amelie Delaunay <amelie.delaunay@st.com>
+
+-- 
+Regards,
+
+Laurent Pinchart
