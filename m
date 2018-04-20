@@ -1,49 +1,32 @@
-From: dev@pascalroeleven.nl (Pascal Roeleven)
-Date: Fri, 20 Apr 2018 11:18:10 +0200
-Subject: [PATCH] ARM: dts: sun4i: Fix incorrect clocks for displays
-Message-ID: <20180420091810.2130-1-dev@pascalroeleven.nl>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 20 Apr 2018 11:17:49 +0200
+Subject: [PATCH v1 0/5] Add I2C Support on STM32MP157C
+Message-ID: <1524215874-15093-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some displays on SUN4i devices wouldn't properly stay on unless 'clk_ignore_unused' is used.
-
-Change the duplicate clocks to the probably intended ones.
-
-Signed-off-by: Pascal Roeleven <dev@pascalroeleven.nl>
+This patch adds I2C support on STM32MP157C with configs and device tree.
+In the same way I2C4 is enabled for STM32MP157C ED1 Daughter bord.
+I2C2/5 is enabled on STM32MP157C EV1 Daughter board on Evaluation board.
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+  Version history:
+     v1:
+        * Initial
+---
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 77e8436b..3a1c6b45 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -76,7 +76,7 @@
- 			allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi";
- 			clocks = <&ccu CLK_AHB_LCD0>, <&ccu CLK_AHB_HDMI0>,
- 				 <&ccu CLK_AHB_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
--				 <&ccu CLK_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
-+				 <&ccu CLK_DE_BE0>, <&ccu CLK_DE_FE0>,
- 				 <&ccu CLK_TCON0_CH1>, <&ccu CLK_HDMI>,
- 				 <&ccu CLK_DRAM_DE_FE0>, <&ccu CLK_DRAM_DE_BE0>;
- 			status = "disabled";
-@@ -88,7 +88,7 @@
- 			allwinner,pipeline = "de_fe0-de_be0-lcd0";
- 			clocks = <&ccu CLK_AHB_LCD0>, <&ccu CLK_AHB_DE_BE0>,
- 				 <&ccu CLK_AHB_DE_FE0>, <&ccu CLK_DE_BE0>,
--				 <&ccu CLK_AHB_DE_FE0>, <&ccu CLK_TCON0_CH0>,
-+				 <&ccu CLK_DE_FE0>, <&ccu CLK_TCON0_CH0>,
- 				 <&ccu CLK_DRAM_DE_FE0>, <&ccu CLK_DRAM_DE_BE0>;
- 			status = "disabled";
- 		};
-@@ -99,7 +99,7 @@
- 			allwinner,pipeline = "de_fe0-de_be0-lcd0-tve0";
- 			clocks = <&ccu CLK_AHB_TVE0>, <&ccu CLK_AHB_LCD0>,
- 				 <&ccu CLK_AHB_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
--				 <&ccu CLK_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
-+				 <&ccu CLK_DE_BE0>, <&ccu CLK_DE_FE0>,
- 				 <&ccu CLK_TCON0_CH1>, <&ccu CLK_DRAM_TVE0>,
- 				 <&ccu CLK_DRAM_DE_FE0>, <&ccu CLK_DRAM_DE_BE0>;
- 			status = "disabled";
+Pierre-Yves MORDRET (5):
+  ARM: configs: multi_v7: Add I2C support
+  ARM: dts: stm32: Add I2C support for STM32MP157C SoC
+  ARM: dts: stm32: Add I2Cs pin control on STM32MP157C
+  ARM: dts: stm32: Add I2C4 support for STM32MP157C-ED1
+  ARM: dts: stm32: Add I2C2/5 support for STM32MP157C-EV1
+
+ arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 40 ++++++++++++++++
+ arch/arm/boot/dts/stm32mp157c-ed1.dts     |  8 ++++
+ arch/arm/boot/dts/stm32mp157c-ev1.dts     | 17 +++++++
+ arch/arm/boot/dts/stm32mp157c.dtsi        | 77 +++++++++++++++++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig       |  1 +
+ 5 files changed, 143 insertions(+)
+
 -- 
-2.14.1
+2.7.4
