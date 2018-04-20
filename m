@@ -1,49 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 20 Apr 2018 09:35:28 +0200
-Subject: [RFC 0/2] dw_mmc: add multislot support
-In-Reply-To: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
-References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
-Message-ID: <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
+From: loic.poulain@linaro.org (Loic Poulain)
+Date: Fri, 20 Apr 2018 09:37:57 +0200
+Subject: [PATCH v2] ARM: dts: qcom: Add apq8064 Dragon Board 600c support
+In-Reply-To: <20180316215436.22906-1-srinivas.kandagatla@linaro.org>
+References: <20180316215436.22906-1-srinivas.kandagatla@linaro.org>
+Message-ID: <CAMZdPi-Pq4WiKhy7aJPJMSo3n-Gwv9s2cvv5v25FHStbX3p09g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi Srini,
 
+On 16 March 2018 at 22:54,  <srinivas.kandagatla@linaro.org> wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 >
-> 2. Add missing stuff to support multislot mode in DesignWare MMC driver.
->  * Add missing slot switch to __dw_mci_start_request() function.
->  * Refactor set_ios function:
->    a) Calculate common clock which is
->       suitable for all slots instead of directly use clock value
->       provided by mmc core. We calculate common clock as the minimum
->       among each used slot clocks. This clock is calculated in
->       dw_mci_calc_common_clock() function which is called
->       from set_ios()
->    b) Disable clock only if no other slots are ON.
->    c) Setup clock directly in set_ios() only if no other slots
->       are ON. Otherwise adjust clock in __dw_mci_start_request()
->       function before slot switch.
->    d) Move timings and bus_width setup to separate funcions.
->  * Use timing field in each slot structure instead of common field in
->    host structure.
->  * Add locks to serialize access to registers.
+> This patch add support to DB600c board, which is another
+> 96boards based on Qualcomm APQ8064 SoC.
+>
+> Support for USB, HDMI, PCIe, I2C, SPI, eMMC, microSD card, LEDs
+> device tree nodes is added in this patch.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+> Changes since v1:
+>         - added chosen node with stdout, suggested by Stephen Boyd
+>         - removed spi flash node and gpio22 pinconf, as its not required in this patch.
+>         - removed extra comment lines and fix a node name, spotted by Stephen Boyd.
+>
+>  arch/arm/boot/dts/Makefile                |   1 +
+>  arch/arm/boot/dts/qcom-apq8064-db600c.dts | 530 ++++++++++++++++++++++++++++++
+>  2 files changed, 531 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/qcom-apq8064-db600c.dts
 
-Sorry, but this is a hack to *try* to make multi-slot work and this
-isn't sufficient. There were good reasons to why the earlier
-non-working multi slot support was removed from dw_mmc.
+> +
+> +               gsbi at 16500000 {
+> +                       status = "okay";
+> +                       qcom,mode = <GSBI_PROT_UART_W_FC>;
+> +                       serial at 1654000 {
 
-Let me elaborate a bit for your understanding. The core uses a host
-lock (mmc_claim|release_host()) to serialize operations and commands,
-as to confirm to the SD/SDIO/(e)MMC specs. The above changes gives no
-guarantees for this. To make that work, we would need a "mmc bus lock"
-to be managed by the core.
+Missing zero, should be serial at 16540000.
 
-However, inventing a "mmc bus lock" would lead to other problems
-related to I/O scheduling for upper layers - it simply breaks. For
-example, I/O requests for one card/slot can then starve I/O requests
-reaching another card/slot.
+> +                               label = "BT-UART";
+> +                               status = "okay";
+> +                               pinctrl-name = "default";
+> +                               pinctrl-0 = <&gsbi6_uart_4pins>;
+> +                       };
+> +               };
 
-[...]
-
-Kind regards
-Uffe
+Regards,
+Loic
