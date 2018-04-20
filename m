@@ -1,129 +1,123 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 20 Apr 2018 13:05:21 +0200
-Subject: [PATCH v3 0/7] Add tda998x (HDMI) support to atmel-hlcdc
-In-Reply-To: <6354350.l8DgUyNhLT@avalon>
-References: <20180419162751.25223-1-peda@axentia.se>
- <20180420085235.GI4235@w540> <6354350.l8DgUyNhLT@avalon>
-Message-ID: <7f709cea-e1f4-2204-7320-5a1075d721d1@axentia.se>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 20 Apr 2018 12:19:50 +0100
+Subject: [RFC PATCH 3/3] arm64: stacktrace: Prevent looping and invalid
+ stack transitions
+In-Reply-To: <20180420105814.a7ntoqslbsgzluia@lakrids.cambridge.arm.com>
+References: <1524221179-19473-1-git-send-email-Dave.Martin@arm.com>
+ <1524221179-19473-4-git-send-email-Dave.Martin@arm.com>
+ <20180420105814.a7ntoqslbsgzluia@lakrids.cambridge.arm.com>
+Message-ID: <20180420111950.GN16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-20 12:18, Laurent Pinchart wrote:
-> Hello,
+On Fri, Apr 20, 2018 at 11:58:14AM +0100, Mark Rutland wrote:
+> On Fri, Apr 20, 2018 at 11:46:19AM +0100, Dave Martin wrote:
+> > In the event of stack corruption, backtraces may loop indefinitely
+> > or wander off into memory that is not a valid stack for the context
+> > being backtraced.
+> > 
+> > This patch makes backtracing more robust against stack corruption,
+> > by taking two things into account:
+> > 
+> >  * while staying on the same stack, the frame address must strictly
+> >    increase from each frame to its ancestor;
+> > 
+> >  * when transitioning to another stack, the set of valid stacks for
+> >    the context forms a strict hierarchy (e.g., a frame on the task
+> >    stack cannot have an ancestor frame on the IRQ stack because
+> >    task context cannot preempt IRQ handlers etc.)
+> > 
+> > on_accessible_stack() is converted to a more expressive helper
+> > identify_stack() that also tells the caller _which_ stack the task
+> > appears to be on.  The stack identifier is represented by an enum
+> > sorted into the correct order for checking stack transition
+> > validity by a simple numeric comparison.  A field stack_id is added
+> > to struct stackframe to track the result of this for the frame.
+> > 
+> > Now that it is easy to check whether two successive frames are on
+> > the same stack, it is easy to add a check for strictly increasing
+> > frame address, to avoid looping around the same stack.
+> > 
+> > Now that frames can be mapped to a strict lexical order on the
+> > stack id and frame address, forward progress should be guaranteed.
+> > 
+> > Backtracing now terminates whenever the next frame violates this
+> > order, with kernel entry (with fp == 0 && pc == 0) as a special
+> > case of this.
+> > 
+> > Reported-by: Ji Zhang <ji.zhang@mediatek.com>
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > 
+> > ---
+> > 
+> > The assumption that we can place the possible stacks (task, IRQ,
+> > overflow, SDEI) in a strict order is based on a quick review of
+> > entry.S, but I may have this wrong... in which case the approach
+> > proposed in this patch may need tweaking (or may not work at all).
 > 
-> On Friday, 20 April 2018 11:52:35 EEST jacopo mondi wrote:
->> Hi Peter,
->>     I've been a bit a pain in the arse for you recently, but please
->> bear with me a bit more, and sorry for jumping late on the band wagon.
->>
->> On Thu, Apr 19, 2018 at 06:27:44PM +0200, Peter Rosin wrote:
->>> Hi!
->>>
->>> I naively thought that since there was support for both nxp,tda19988 (in
->>> the tda998x driver) and the atmel-hlcdc, things would be a smooth ride.
->>> But it wasn't, so I started looking around and realized I had to fix
->>> things.
->>>
->>> In v1 and v2 I fixed things by making the atmel-hlcdc driver a master
->>> component, but now in v3 I fix things by making the tda998x driver
->>> a bridge instead. This was after a suggestion from Boris Brezillion
-
-That should be Brezillon, sorry for being sloppy with the spelling.
-
->>> (the atmel-hlcdc maintainer), so there was some risk of bias ... but
->>> after comparing what was needed, I too find the bridge approach better.
->>>
->>> In addition to the above, our PCB interface between the SAMA5D3 and the
->>> HDMI encoder is only using 16 bits, and this has to be described
->>> somewhere, or the atmel-hlcdc driver have no chance of selecting the
->>> correct output mode. Since I have similar problems with a ds90c185 lvds
->>> encoder I added patches to override the atmel-hlcdc output format via
->>> DT properties compatible with the media video-interface binding and
->>> things start to play together.
->>>
->>> Since this series superseeds the bridge series [1], I have included the
->>> leftover bindings patch for the ti,ds90c185 here.
->>
->> I feel like this series would look better if it would make use of the
->> proposed bridge media bus format support I have recently sent out [1]
->> (and which was not there when you first sent v1).
->>
->> I understand your fundamental problem here is that the bus format
->> that should be reported by your bridge is different from the ones
->> actually supported by the TDA19988 chip, as the wirings ground some
->> of the input pins.
->>
->> Although this is defintely something that could be described in the
->> bridge's own OF node with the 'bus_width' property, and what I would do,
->> now that you have made a bridge out from the tda19988 driver, is:
->>
->> 1) Set the bridge accepted input bus_format parsing its pin
->> configuration, or default it if that's not implemented yet.
->> This will likely be rgb888. You can do that using the trivial
->> support for bridge input image formats implemented by my series.
->> 2) Specify in the bridge endpoint a 'bus_width' of <16>
->> 3) In your atmel-hlcd get both the image format of the bridge (rgb888)
->> and parse the remote endpoint property 'bus_width' and get the <16>
->> value back.
+> We have a partial ordering where we can transition between stacks:
 > 
-> Parsing properties of remote nodes should be avoided as much as possible, as 
-> they need to be interpreted in the context of the DT bindings related to the 
-> compatible string applicable to that node. I'd rather have the bus_width 
-> property in the local endpoint node.
-
-In addition to that, my view of this binding
-
-	endpoint {
-		bus-type = <0>;
-		bus-widht = <16>;
-	};
-
-is that it always means rgb565. See further below.
-
->> 4) Set the correct format in the atmel hlcd driver to accommodate a
->> bridge that wants rgb888 on a 16 bit wide bus (that would be rgb565,
->> or are there other possible combinations I am missing?)
->>
->> I would consider this better mostly because in this series you are
->> creating a semantic for the whole DRM subsystem on the 'bus_width'
->> property, where numerical values as '12', '16' etc are arbitrary tied
->> to the selection of a media bus format. At least you should use a
->> common set of defines [1] between the device tree and the driver,
->> but this looks anyway fragile imho.
+> 	task -> irq -> {overflow,sdei}
 > 
-> This I agree with though. Combining the remote bus format with the local bus 
-> width should fix the problem without having to parse remote properties.
+> The only problem that I'm aware of is that you could go either way:
+> 
+> 	overflow -> sdei
+> 	sdei -> overflow
 
-My thinking was that the binding with bus-type = <0> and bus-width = <bpp>
-would mean a parallel bus (type 0 means auto-detect and with a bus-width that
-auto-detect means a parallel bus) and the most natural/common interpretation
-of that bus-width. For bus widths of 12, 16, 18, 24, 30 etc I think that
-would be rgb444, rgb565, rgb666, rgb888, rgb101010 (or, I'm first so I get
-to define the default). If you have some other interpretation of a bus with
-that width, you'd need to extend the video-interface binding with some way
-of saying what you need, perhaps using some kind of data mapping or something
-to say e.g. bgr666. And you'd need some kind of indicator if you have YUV
-signals instead of RGB, and LVDS isn't a completely parallel bus, so you'd
-need something for that. Etc.
+> In either case, there's a fatal error, and it would be very nice to get
+> the most reliable stacktrace possible rather than terminating early.
 
-Because the word from Rob was that there should be one common binding that
-describes video interfaces. I started an implementation that interprets that
-binding in a drm context in
-[PATCH 3/7] drm: of: introduce drm_of_media_bus_fmt
+Agreed, where we must choose between a possibly-incomplete backtrace or
+a possibly-incorrect backtrace, we should probably err on the side of
+completeness.
 
-With that view, any input format specification of the bridge is not helpful
-for me since what the bridge specifies (without help) is going to be wrong
-anyway. End result, I need to specify the format manually on either the
-bridge or the atmel-hlcdc side, and I happen to think that the correct side
-is with the atmel-hlcdc, because that is where my issue originates. In short,
-the "drm: bridge: Add support for static image formats" series is unrelated
-as far as I can tell.
+To what extent do we claim to cope with recursive stack overflows?
+We could get something like
 
-Cheers,
-Peter
+task -> overflow -> irq -> overflow -> sdei -> overflow
 
->> Have I maybe missed some parts of the problem you are trying to solve
->> here?
->>
->> Thank you
->>    j
+(We can also take a single nested SDE, but if the sdei stack already
+overflowed I think we're basically dead if that happens here, unless
+SDEI checks for this and continues on the overflow stack if that
+happens).
+
+> The only way I'd thought to avoid that was to keep track of the last SP
+> we saw per-stack to avoid a lexical ordering, e.g.
+> 
+> struct stackframe {
+> 
+> 	...
+> 
+> 	/* assume we init these to 0 before unwinding */
+> 	unsigned long last_task_fp;
+> 	unsigned long last_irq_fp;
+> 	unsigned long last_ovf_fp;
+> 	unsigned long last_sdei_fp;
+> };
+
+But possibly we only need to track ovf and sdei here, unless I'm
+misunderstanding.
+
+If that's right perhaps my approach can be tweaked rather then being
+completely unusable, but I'll need to have a think.
+
+> 
+> ... and corresponding when we unwind a frame, do something like:
+> 
+> 	if (on_task_stack(task, sp) {
+> 		if (sp < frame->last_task_fp)
+> 			<fail>
+> 		frame->last_task_fp = sp;
+> 	} else if (on_irq_stack(sp)) {
+> 		if (sp < frame->last_irq_fp)
+> 			<fail>
+> 		frame->last_irq_fp = sp;
+> 	} else (...) {
+> 		...
+> 	}
+
+I guess.  I think mine is nicer (of course), but also brokener for
+now...
+
+Cheers
+---Dave
