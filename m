@@ -1,63 +1,97 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Apr 2018 11:53:38 +0100
-Subject: [PATCH v3 7/7] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <4e9bd91c-6b29-cdd2-9e1d-1728311ddb81@axentia.se>
-References: <20180419162751.25223-8-peda@axentia.se>
- <201804201731.D3OnDg0p%fengguang.wu@intel.com>
- <4e9bd91c-6b29-cdd2-9e1d-1728311ddb81@axentia.se>
-Message-ID: <20180420105337.GX16141@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Apr 2018 11:58:14 +0100
+Subject: [RFC PATCH 3/3] arm64: stacktrace: Prevent looping and invalid
+ stack transitions
+In-Reply-To: <1524221179-19473-4-git-send-email-Dave.Martin@arm.com>
+References: <1524221179-19473-1-git-send-email-Dave.Martin@arm.com>
+ <1524221179-19473-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180420105814.a7ntoqslbsgzluia@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 12:49:42PM +0200, Peter Rosin wrote:
-> On 2018-04-20 12:41, kbuild test robot wrote:
-> > Hi Peter,
-> > 
-> > I love your patch! Yet something to improve:
+On Fri, Apr 20, 2018 at 11:46:19AM +0100, Dave Martin wrote:
+> In the event of stack corruption, backtraces may loop indefinitely
+> or wander off into memory that is not a valid stack for the context
+> being backtraced.
 > 
-> Yup, right you are!
+> This patch makes backtracing more robust against stack corruption,
+> by taking two things into account:
 > 
-> > [auto build test ERROR on drm/drm-next]
-> > [also build test ERROR on v4.17-rc1 next-20180420]
-> > [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> > 
-> > url:    https://github.com/0day-ci/linux/commits/Peter-Rosin/Add-tda998x-HDMI-support-to-atmel-hlcdc/20180420-160131
-> > base:   git://people.freedesktop.org/~airlied/linux.git drm-next
-> > config: i386-randconfig-a0-201815 (attached as .config)
-> > compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
-> > reproduce:
-> >         # save the attached .config to linux build tree
-> >         make ARCH=i386 
-> > 
-> > All errors (new ones prefixed by >>):
-> > 
-> >    drivers/gpu/drm/i2c/tda998x_drv.c: In function 'tda998x_probe':
-> >>> drivers/gpu/drm/i2c/tda998x_drv.c:1859:16: error: 'struct drm_bridge' has no member named 'of_node'
-> >      bridge->bridge.of_node = dev->of_node;
-> >                    ^
+>  * while staying on the same stack, the frame address must strictly
+>    increase from each frame to its ancestor;
 > 
-> Anybody got a better fix than this?
+>  * when transitioning to another stack, the set of valid stacks for
+>    the context forms a strict hierarchy (e.g., a frame on the task
+>    stack cannot have an ancestor frame on the IRQ stack because
+>    task context cannot preempt IRQ handlers etc.)
 > 
-> #ifdef CONFIG_OF
-> 	bridge->bridge.of_node = dev->of_node;
-> #endif
+> on_accessible_stack() is converted to a more expressive helper
+> identify_stack() that also tells the caller _which_ stack the task
+> appears to be on.  The stack identifier is represented by an enum
+> sorted into the correct order for checking stack transition
+> validity by a simple numeric comparison.  A field stack_id is added
+> to struct stackframe to track the result of this for the frame.
+> 
+> Now that it is easy to check whether two successive frames are on
+> the same stack, it is easy to add a check for strictly increasing
+> frame address, to avoid looping around the same stack.
+> 
+> Now that frames can be mapped to a strict lexical order on the
+> stack id and frame address, forward progress should be guaranteed.
+> 
+> Backtracing now terminates whenever the next frame violates this
+> order, with kernel entry (with fp == 0 && pc == 0) as a special
+> case of this.
+> 
+> Reported-by: Ji Zhang <ji.zhang@mediatek.com>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
+> ---
+> 
+> The assumption that we can place the possible stacks (task, IRQ,
+> overflow, SDEI) in a strict order is based on a quick review of
+> entry.S, but I may have this wrong... in which case the approach
+> proposed in this patch may need tweaking (or may not work at all).
 
-How about the bridge code provides a helper to do this, something like:
+We have a partial ordering where we can transition between stacks:
 
-static inline void bridge_set_device(struct drm_bridge *bridge,
-				     struct device *dev)
-{
-#ifdef CONFIG_OF
-	bridge->of_node = dev->of_node;
-#endif
-}
+	task -> irq -> {overflow,sdei}
 
-which (a) nicely hides the firmware flavour, and (b) hides the ifdef in
-the bridge header where it belongs.  If the bridge code needs to be
-converted to fwnode in the future, at least this would be abstracted
-from the drivers.
+The only problem that I'm aware of is that you could go either way:
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+	overflow -> sdei
+	sdei -> overflow
+
+In either case, there's a fatal error, and it would be very nice to get
+the most reliable stacktrace possible rather than terminating early.
+
+The only way I'd thought to avoid that was to keep track of the last SP
+we saw per-stack to avoid a lexical ordering, e.g.
+
+struct stackframe {
+
+	...
+
+	/* assume we init these to 0 before unwinding */
+	unsigned long last_task_fp;
+	unsigned long last_irq_fp;
+	unsigned long last_ovf_fp;
+	unsigned long last_sdei_fp;
+};
+
+... and corresponding when we unwind a frame, do something like:
+
+	if (on_task_stack(task, sp) {
+		if (sp < frame->last_task_fp)
+			<fail>
+		frame->last_task_fp = sp;
+	} else if (on_irq_stack(sp)) {
+		if (sp < frame->last_irq_fp)
+			<fail>
+		frame->last_irq_fp = sp;
+	} else (...) {
+		...
+	}
+			
+Thanks,
+Mark.
