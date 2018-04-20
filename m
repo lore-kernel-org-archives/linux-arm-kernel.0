@@ -1,88 +1,69 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 20 Apr 2018 09:04:20 -0600
-Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
-In-Reply-To: <20180420140049.GP28657@bhelgaas-glaptop.roam.corp.google.com>
-References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
- <20180419202632.GE14063@ziepe.ca>
- <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
- <290e9530-dcde-9c10-7ae0-59ac4c509db4@codeaurora.org>
- <20180420140049.GP28657@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180420090420.03fb1e6c@w520.home>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 20 Apr 2018 08:05:17 -0700
+Subject: [regression v4.17-rc0] Re: FORTIFY_SOURCE breaks ARM compilation
+ in -next -- was Re: ARM compile failure in Re: linux-next: Tree for
+ Apr 4
+In-Reply-To: <20180420073402.GA9356@amd>
+References: <20180404165559.4cd0c12c@canb.auug.org.au>
+ <20180404074856.GA9342@amd>
+ <20180404175852.GI5700@atomide.com> <20180404184622.GA8608@amd>
+ <20180404195951.GJ5700@atomide.com> <20180404201837.GA9710@amd>
+ <20180415173908.GA2024@amd>
+ <CAGXu5jK9f62n95sOdJViXHXzQFyCdcsWt9HPvcdSFRp9Qqg0bg@mail.gmail.com>
+ <20180420073402.GA9356@amd>
+Message-ID: <CAGXu5j+6D3PiVc9SR4+31ZGDC2r5uWJOw8Sn3cDhXdNqBGH+hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Apr 2018 09:00:49 -0500
-Bjorn Helgaas <helgaas@kernel.org> wrote:
+On Fri, Apr 20, 2018 at 12:34 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Sun 2018-04-15 11:00:06, Kees Cook wrote:
+>> On Sun, Apr 15, 2018 at 10:39 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>> > Hi!
+>> >
+>> >> Thanks.
+>> >>
+>> >> Ok, let me try to bisect it. Compile-problem should be easy...
+>> >>
+>> >> Hmm. And as it is compile-problem in single file, it should even be
+>> >> reasonably fast. I did not realize how easy it would be:
+>> >>
+>> >> #!/bin/bash
+>> >> set -e
+>> >> cp config.ok .config
+>> >> yes '' | ARCH=arm make lib/string.o
+>> >>
+>> >> And the winner is:
+>> >>
+>> >> ee333554fed55555a986a90bb097ac7f9d6f05bf is the first bad commit
+>> >> commit ee333554fed55555a986a90bb097ac7f9d6f05bf
+>> >> Author: Jinbum Park <jinb.park7@gmail.com>
+>> >> Date:   Tue Mar 6 01:39:24 2018 +0100
+>> > ...
+>> >
+>> >>     Acked-by: Kees Cook <keescook@chromium.org>
+>> >>     Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+>> >>     Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> >
+>> > So I bisect a problem in -next, and patch is merged to Linus,
+>> > _anyway_, breaking compilation there? Neither Jinbum nor Russell even
+>> > bother to comment.
+>>
+>> Hi! Sorry I lost this email in my inbox. It seems this is specific to
+>> a particular subset of arm architectures? (My local builds of arm all
+>> succeed, for example. Can you send your failing config?) I'll take a
+>> closer look on Monday if Daniel doesn't beat me to it.
+>
+> Daniel, Kees: any news?
+>
+> I'm aware you did not specify which Monday :-).
 
-> [+cc Rajat, Alex because of their interest in the reset/hotplug issue]
-> 
-> For context, Sinan's patch is this:
-> 
-> > diff --git a/drivers/infiniband/hw/hfi1/pcie.c b/drivers/infiniband/hw/hfi1/pcie.c
-> > index 83d66e8..75f49e3 100644
-> > --- a/drivers/infiniband/hw/hfi1/pcie.c
-> > +++ b/drivers/infiniband/hw/hfi1/pcie.c
-> > @@ -908,7 +908,8 @@ static int trigger_sbr(struct hfi1_devdata *dd)
-> >          * delay after a reset is required.  Per spec requirements,
-> >          * the link is either working or not after that point.
-> >          */
-> > -       pci_reset_bridge_secondary_bus(dev->bus->self);
-> > +       if (pci_reset_slot(dev->slot))
-> > +               pci_reset_bridge_secondary_bus(dev->bus->self);  
-> 
-> On Thu, Apr 19, 2018 at 06:19:32PM -0400, Sinan Kaya wrote:
-> > On 4/19/2018 5:47 PM, Bjorn Helgaas wrote:  
-> > >> Bjorn, would be appropriate to export pci_parent_bus_reset() or some
-> > >> variation therin??  
-> > > I agree it would be really nice if the PCI core could help out somehow
-> > > so we could get some of this code out of individual drivers.  
-> 
-> What I was really thinking here was about the whole Gen3 transition
-> thing, not the reset thing by itself.
-> 
-> > I can create a function called pci_reset_link() and move both slot and
-> > secondary bus reset inside.  
-> 
-> What exactly is your patch fixing?  Is it the following?
-> 
->   If the HFI link is not operating at 8GT/s, the driver's .probe()
->   method tries to transition it to 8GT/s, which involves resetting the
->   HFI device with pci_reset_bridge_secondary_bus().  If the HFI device
->   is in a hotplug slot, the reset causes a "Link Down" event, which
->   causes the pciehp driver to remove the HFI device and re-enumerate
->   it when the link comes back up.
-> 
->   When pciehp removes the device, it calls the HFI .remove() method,
->   which is a problem because the .probe() method is still active.
-> 
->   It looks like this should deadlock because __device_attach() holds
->   the device_lock while calling .probe() and the
->   device_release_driver() path tries to acquire it.
-> 
-> Your patch uses pci_reset_slot(), which connects with Rajat's work
-> (06a8d89af551 ("PCI: pciehp: Disable link notification across slot
-> reset")) to avoid hotplug events for intentional resets.
-> 
-> So I think I just reverse-engineered the whole rationale for your
-> patch :)  Sorry about the long detour.
-> 
-> I'm having a hard time articulating my thoughts here.  I think my
-> concern is that knowledge about this reset/link down/hotplug issue is
-> leaking out and we'll end up with different reset interfaces that may
-> or may not result in hotplug events.  This seems like a confusing API
-> because it's hard to explain which interface a driver should use.
+Hi! Sorry, I got distracted. So the .config you sent me builds fine
+with my cross compiler. I suspect this is something specific to ELDK's
+compiler. I can try some other compiler versions. What version of gcc
+is failing?
 
-Is there a concern here about whether the endpoint device driver or the
-PCI core really knows better about link retraining?  This makes me
-remember my unfinished (and need to revisit) Pericom quirk[1] where
-errata in the PCIe switch requires that upstream and downstream links
-are balanced (ie. same link rate) or else enabling ACS results in
-packets not properly flowing through the switch.  If an endpoint driver
-starts deciding to retrain links, overriding quirks in the PCI core,
-then such topology manipulation isn't possible.  Why does the
-driver .probe() function think it can retrain at a higher link rate
-than PCI core?  Thanks,
+-Kees
 
-Alex
-
-[1]https://lists.linuxfoundation.org/pipermail/iommu/2016-October/018890.html
+-- 
+Kees Cook
+Pixel Security
