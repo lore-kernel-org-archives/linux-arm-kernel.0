@@ -1,142 +1,48 @@
-From: collinsd@codeaurora.org (David Collins)
-Date: Fri, 20 Apr 2018 15:08:57 -0700
-Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
-References: <cover.1523673467.git.collinsd@codeaurora.org>
- <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
- <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
- <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
- <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
-Message-ID: <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
+From: ilina@codeaurora.org (Lina Iyer)
+Date: Fri, 20 Apr 2018 16:44:45 -0600
+Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <dcd4e178-cfd3-1c3f-da7c-1eb66a58cf15@codeaurora.org>
+References: <cover.1521246069.git.collinsd@codeaurora.org>
+ <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
+ <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
+ <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
+ <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
+ <dcd4e178-cfd3-1c3f-da7c-1eb66a58cf15@codeaurora.org>
+Message-ID: <20180420224445.GB18235@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2018 09:16 AM, Doug Anderson wrote:
-> On Wed, Apr 18, 2018 at 4:30 PM, David Collins <collinsd@codeaurora.org> wrote:
->>>> + * @drms_mode:                 Array of regulator framework modes which can
->>>> + *                             be configured dynamically for this regulator
->>>> + *                             via the set_load() callback.
+On Fri, Apr 20 2018 at 13:07 -0600, David Collins wrote:
+>On 04/18/2018 10:55 PM, Stephen Boyd wrote:
+>> Quoting David Collins (2018-03-22 18:30:06)
+>>> On 03/21/2018 12:07 PM, Stephen Boyd wrote:
+>>>> Quoting David Collins (2018-03-16 18:09:10)
+>>>>> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+>>>>> index 097f617..e0ecd0a 100644
+
+>>>>> +       ret = cmd_db_ready();
+>>>>> +       if (ret < 0) {
+>>>>> +               if (ret != -EPROBE_DEFER)
+>>>>> +                       dev_err(dev, "Command DB not available, ret=%d\n", ret);
+>>>>> +               return ret;
+>>>>> +       }
+>>>>
+>>>> We should just make rpmh parent device call cmd_db_ready() so that these
+>>>> devices aren't even populated until then and so that cmd_db_ready() is
+>>>> only in one place. Lina?
 >>>
->>> Using the singular for something that is an array is confusing.  Why
->>> not "drms_modes" or "drms_mode_arr"?  In the past review you said
->>> 'Perhaps something along the lines of "drms_modes"'.
+>>> Let's see if Lina has qualms about this plan.
 >>
->> It seems awkward to me to use a plural for arrays as it leads to indexing
->> like this: vreg->drms_modes[i].  "mode i" seems better than "modes i".
->> However, I'm willing to change this to be drms_modes and drms_mode_max_uAs
->> if that style is preferred.
-> 
-> I'd very much like a plural here.
+>> Sounds like you're ok with it.
+>
+>Sure, I'll remove this check if Lina agrees to add it in the rpmh driver.
+>
+We want to make the RSC nodes child of Command DB? That way we probe the
+controllers only if the command DB is ready?
 
-Ok.  I'll change this to be plural.
-
-
->>>> +               prop = "qcom,regulator-initial-voltage";
->>>> +               ret = of_property_read_u32(node, prop, &uV);
->>>> +               if (!ret) {
->>>> +                       range = &vreg->hw_data->voltage_range;
->>>> +                       selector = DIV_ROUND_UP(uV - range->min_uV,
->>>> +                                       range->uV_step) + range->min_sel;
->>>> +                       if (uV < range->min_uV || selector > range->max_sel) {
->>>> +                               dev_err(dev, "%s: %s=%u is invalid\n",
->>>> +                                       node->name, prop, uV);
->>>> +                               return -EINVAL;
->>>> +                       }
->>>> +
->>>> +                       vreg->voltage_selector = selector;
->>>> +
->>>> +                       cmd[cmd_count].addr
->>>> +                               = vreg->addr + RPMH_REGULATOR_REG_VRM_VOLTAGE;
->>>> +                       cmd[cmd_count++].data
->>>> +                               = DIV_ROUND_UP(selector * range->uV_step
->>>> +                                               + range->min_uV, 1000);
->>>> +               }
->>>
->>> Seems like you want an "else { vreg->voltage_selector = -EINVAL; }".
->>> Otherwise "get_voltage_sel" will return selector 0 before the first
->>> set, right?
->>>
->>> Previously Mark said: "If the driver can't read values it should
->>> return an appropriate error code."
->>> ...and previously you said: "I'll try this out and see if the
->>> regulator framework complains during regulator registration."
->>
->> I tested out what happens when vreg->voltage_selector = -EINVAL is set
->> when qcom,regulator-initial-voltage is not present.  This results in
->> devm_regulator_register() failing and subsequently causing the
->> qcom_rpmh-regulator probe to fail.  The error happens in
->> machine_constraints_voltage() [1].
->>
->> This leaves two courses of action:
->> 1. (current patch set) allow voltage_selector to stay 0 if uninitialized
->> 2. Set voltage_selector = -EINVAL by default and specify in DT binding
->> documentation that qcom,regulator-initial-voltage is required for VRM
->> managed RPMh regulator resources which have regulator-min-microvolt and
->> regulator-max-microvolt specified.
->>
->> Are you ok with the DT implications of option #2?
-> 
-> You'd need to ask Mark if he's OK with it, but a option #3 is to add a
-> patch to your series fix the regulator framework to try setting the
-> voltage if _regulator_get_voltage() fails.  Presumably in
-> machine_constraints_voltage() you'd now do something like:
-> 
->   int target_min, target_max;
->   int current_uV = _regulator_get_voltage(rdev);
->   if (current_uV < 0) {
->     /* Maybe this regulator's hardware can't be read and needs to be initted */
->     _regulator_do_set_voltage(
->       rdev, rdev->constraints->min_uV, rdev->constraints->min_uV);
->     current_uV = _regulator_get_voltage(rdev);
->   }
->   if (current_uV < 0) {
->     rdev_err(rdev,
->       "failed to get the current voltage(%d)\n",
->       current_uV);
->       return current_uV;
->   }
-> 
-> If Mark doesn't like that then I guess I'd be OK w/ initting it to 0
-> but this needs to be documented _somewhere_ (unlike for bypass it's
-> not obvious, so you need to find someplace to put it).  I'd rather not
-> hack the DT to deal with our software limitations.
-
-I'm not opposed to your option #3 though it does seem a little hacky and
-tailored to the qcom_rpmh-regulator specific case.  Note that I think it
-would be better to vote for min_uV to max_uV than min_uV to min_uV though.
-
-Mark, what are your thoughts on the best way to handle this situation?
-
-
->>>> +static unsigned int rpmh_regulator_pmic4_bob_of_map_mode(unsigned int mode)
->>>> +{
->>>> +       static const unsigned int of_mode_map[RPMH_REGULATOR_MODE_COUNT] = {
->>>> +               [RPMH_REGULATOR_MODE_RET]  = -EINVAL,
->>>> +               [RPMH_REGULATOR_MODE_LPM]  = REGULATOR_MODE_IDLE,
->>>> +               [RPMH_REGULATOR_MODE_AUTO] = REGULATOR_MODE_NORMAL,
->>>> +               [RPMH_REGULATOR_MODE_HPM]  = REGULATOR_MODE_FAST,
->>>> +       };
->>>
->>> You're sticking a negative value in an array of unsigned inits.  Here
->>> and in other similar functions.
->>>
->>> I know, I know.  The function is defined to return an unsigned int.
->>> It's wrong.  of_regulator.c clearly puts the return code in a signed
->>> int.  First attempt at fixing this is at
->>> <https://patchwork.kernel.org/patch/10346081/>.
->>
->> I can change the error cases to use REGULATOR_MODE_INVALID which is added
->> by this change still under review [2].
-> 
-> I haven't seen Mark NAK it (yet), so for lack of a better option I'd
-> start using it in your patch and document in the commit message that
-> it depends on my patch.
-
-Your patch was accepted.  I'll switch to using REGULATOR_MODE_INVALID.
+I could do that. Just so you know, there is are no strict directives to
+use Command DB. If a driver knows the information it needs to pass to
+the accelerator, it may choose to skip command DB completely.
 
 Thanks,
-David
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Lina
