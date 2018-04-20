@@ -1,37 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 20 Apr 2018 09:05:16 +0100
-Subject: [PATCH 1/7] i2c: i2c-gpio: move header to platform_data
-In-Reply-To: <20180419200015.15095-2-wsa@the-dreams.de>
-References: <20180419200015.15095-1-wsa@the-dreams.de>
- <20180419200015.15095-2-wsa@the-dreams.de>
-Message-ID: <20180420080516.hoa2wlubrnpnkl5z@dell>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Fri, 20 Apr 2018 10:06:46 +0200
+Subject: [PATCH 61/61] ASoC: atmel: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-62-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-62-wsa+renesas@sang-engineering.com>
+Message-ID: <23044c16-efbf-7920-2a25-338ad46376eb@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Apr 2018, Wolfram Sang wrote:
-
-> This header only contains platform_data. Move it to the proper directory.
+On 19/04/2018 at 16:06, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
 > 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->  MAINTAINERS                                      | 2 +-
->  arch/arm/mach-ks8695/board-acs5k.c               | 2 +-
->  arch/arm/mach-omap1/board-htcherald.c            | 2 +-
->  arch/arm/mach-pxa/palmz72.c                      | 2 +-
->  arch/arm/mach-pxa/viper.c                        | 2 +-
->  arch/arm/mach-sa1100/simpad.c                    | 2 +-
->  arch/mips/alchemy/board-gpr.c                    | 2 +-
->  drivers/i2c/busses/i2c-gpio.c                    | 2 +-
->  drivers/media/platform/marvell-ccic/mmp-driver.c | 2 +-
->  drivers/mfd/sm501.c                              | 2 +-
->  include/linux/{ => platform_data}/i2c-gpio.h     | 0
->  11 files changed, 10 insertions(+), 10 deletions(-)
->  rename include/linux/{ => platform_data}/i2c-gpio.h (100%)
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+> ---
+> 
+> Build tested only. buildbot is happy. Please apply individually.
+> 
+>   sound/soc/atmel/atmel_ssc_dai.c | 6 ++----
+>   1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+> index a1e2c5682dcd..4a0275a6505d 100644
+> --- a/sound/soc/atmel/atmel_ssc_dai.c
+> +++ b/sound/soc/atmel/atmel_ssc_dai.c
+> @@ -1002,8 +1002,7 @@ static const struct snd_soc_component_driver atmel_ssc_component = {
+>   
+>   static int asoc_ssc_init(struct device *dev)
+>   {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct ssc_device *ssc = platform_get_drvdata(pdev);
+> +	struct ssc_device *ssc = dev_get_drvdata(dev);
+>   	int ret;
+>   
+>   	ret = snd_soc_register_component(dev, &atmel_ssc_component,
+> @@ -1033,8 +1032,7 @@ static int asoc_ssc_init(struct device *dev)
+>   
+>   static void asoc_ssc_exit(struct device *dev)
+>   {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct ssc_device *ssc = platform_get_drvdata(pdev);
+> +	struct ssc_device *ssc = dev_get_drvdata(dev);
+>   
+>   	if (ssc->pdata->use_dma)
+>   		atmel_pcm_dma_platform_unregister(dev);
+> 
+
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
