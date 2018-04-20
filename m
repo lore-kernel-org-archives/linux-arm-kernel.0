@@ -1,9 +1,10 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 20 Apr 2018 17:54:42 +0200
-Subject: [PATCH 3/5] ARM: dts: stih407: Fix complain about IRQ_TYPE_NONE usage
+Date: Fri, 20 Apr 2018 17:54:41 +0200
+Subject: [PATCH 2/5] ARM: dts: stih407-pinctrl: Fix complain about
+ IRQ_TYPE_NONE usage
 In-Reply-To: <1524239684-25463-1-git-send-email-patrice.chotard@st.com>
 References: <1524239684-25463-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1524239684-25463-4-git-send-email-patrice.chotard@st.com>
+Message-ID: <1524239684-25463-3-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +18,57 @@ Use IRQ_TYPE_LEVEL_HIGH instead.
 
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- arch/arm/boot/dts/stih407.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 57efc87dec2b..5b7951ffc350 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -108,7 +108,7 @@
- 				reg = <0x8d04000 0x1000>;
- 				reg-names = "hdmi-reg";
- 				#sound-dai-cells = <0>;
--				interrupts = <GIC_SPI 106 IRQ_TYPE_NONE>;
-+				interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-names	= "irq";
- 				clock-names = "pix",
- 					      "tmds",
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index 53c6888d1fc0..e393519fb84c 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -52,7 +52,7 @@
+ 			st,syscfg = <&syscfg_sbc>;
+ 			reg = <0x0961f080 0x4>;
+ 			reg-names = "irqmux";
+-			interrupts = <GIC_SPI 188 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "irqmux";
+ 			ranges = <0 0x09610000 0x6000>;
+ 
+@@ -376,7 +376,7 @@
+ 			st,syscfg = <&syscfg_front>;
+ 			reg = <0x0920f080 0x4>;
+ 			reg-names = "irqmux";
+-			interrupts = <GIC_SPI 189 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "irqmux";
+ 			ranges = <0 0x09200000 0x10000>;
+ 
+@@ -936,7 +936,7 @@
+ 			st,syscfg = <&syscfg_front>;
+ 			reg = <0x0921f080 0x4>;
+ 			reg-names = "irqmux";
+-			interrupts = <GIC_SPI 190 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "irqmux";
+ 			ranges = <0 0x09210000 0x10000>;
+ 
+@@ -969,7 +969,7 @@
+ 			st,syscfg = <&syscfg_rear>;
+ 			reg = <0x0922f080 0x4>;
+ 			reg-names = "irqmux";
+-			interrupts = <GIC_SPI 191 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "irqmux";
+ 			ranges = <0 0x09220000 0x6000>;
+ 
+@@ -1164,7 +1164,7 @@
+ 			st,syscfg = <&syscfg_flash>;
+ 			reg = <0x0923f080 0x4>;
+ 			reg-names = "irqmux";
+-			interrupts = <GIC_SPI 192 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "irqmux";
+ 			ranges = <0 0x09230000 0x3000>;
+ 
 -- 
 1.9.1
