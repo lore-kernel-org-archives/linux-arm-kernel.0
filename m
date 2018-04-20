@@ -1,88 +1,73 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 20 Apr 2018 11:49:50 +0800
-Subject: [PATCH v1 5/7] soc: mediatek: add a fixed wait for SRAM stable
-In-Reply-To: <5f2530a0-aee2-39fe-eb5c-56cd4a68c9db@gmail.com>
-References: <cover.1522736996.git.sean.wang@mediatek.com>
- <0fc10b2498c6dbe20141831c722c32cc74330d3d.1522736996.git.sean.wang@mediatek.com>
- <5f2530a0-aee2-39fe-eb5c-56cd4a68c9db@gmail.com>
-Message-ID: <1524196190.26454.3.camel@mtkswgap22>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 20 Apr 2018 10:12:59 +0530
+Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
+ supported
+In-Reply-To: <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
+References: <20180418155643.36464-1-code@mmayer.net>
+ <20180418155643.36464-3-code@mmayer.net>
+ <20180419041632.GF24576@vireshk-i7>
+ <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
+Message-ID: <20180420044259.GA2873@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-04-19 at 12:33 +0200, Matthias Brugger wrote:
+On 19-04-18, 11:37, Sudeep Holla wrote:
 > 
-> On 04/03/2018 09:15 AM, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
+> 
+> On 19/04/18 05:16, Viresh Kumar wrote:
+> > On 18-04-18, 08:56, Markus Mayer wrote:
+> >> From: Jim Quinlan <jim2101024@gmail.com>
+> >>
+> >> If the SCMI cpufreq driver is supported, we bail, so that the new
+> >> approach can be used.
+> >>
+> >> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> >> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> >> ---
+> >>  drivers/cpufreq/brcmstb-avs-cpufreq.c | 16 ++++++++++++++++
+> >>  1 file changed, 16 insertions(+)
+> >>
+> >> diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> >> index b07559b9ed99..b4861a730162 100644
+> >> --- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> >> +++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
+> >> @@ -164,6 +164,8 @@
+> >>  #define BRCM_AVS_CPU_INTR	"brcm,avs-cpu-l2-intr"
+> >>  #define BRCM_AVS_HOST_INTR	"sw_intr"
+> >>  
+> >> +#define ARM_SCMI_COMPAT		"arm,scmi"
+> >> +
+> >>  struct pmap {
+> >>  	unsigned int mode;
+> >>  	unsigned int p1;
+> >> @@ -511,6 +513,20 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
+> >>  	struct device *dev;
+> >>  	int host_irq, ret;
+> >>  
+> >> +	/*
+> >> +	 * If the SCMI cpufreq driver is supported, we bail, so that the more
+> >> +	 * modern approach can be used.
+> >> +	 */
+> >> +	if (IS_ENABLED(CONFIG_ARM_SCMI_PROTOCOL)) {
+> >> +		struct device_node *np;
+> >> +
+> >> +		np = of_find_compatible_node(NULL, NULL, ARM_SCMI_COMPAT);
+> >> +		if (np) {
+> >> +			of_node_put(np);
+> >> +			return -ENXIO;
+> >> +		}
+> >> +	}
+> >> +
 > > 
-> > MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
-> > stable, which is not like the behavior the other power domains should
-> > have. Therefore, it's necessary for such a power domain to have a fixed
-> > and well-predefined duration to wait until its managed SRAM can be allowed
-> > to access by all functions running on the top.
+> > What about adding !CONFIG_ARM_SCMI_PROTOCOL in Kconfig dependency and don't
+> > compile the driver at all ?
 > > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > Cc: Weiyi Lu <weiyi.lu@mediatek.com>
-> > ---
-> >  drivers/soc/mediatek/mtk-scpsys.c | 17 ++++++++++++-----
-> >  1 file changed, 12 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> > index f9b7248..19aceb8 100644
-> > --- a/drivers/soc/mediatek/mtk-scpsys.c
-> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> > @@ -121,6 +121,7 @@ struct scp_domain_data {
-> >  	u32 bus_prot_mask;
-> >  	enum clk_id clk_id[MAX_CLKS];
-> >  	bool active_wakeup;
-> > +	u32 us_sram_fwait;
 > 
-> Before adding more and more fields to scp_domain_data which get checked in if's,
-> I'd prefer to add a caps field used for bus_prot_mask, active_wakeup in a first
-> patch and add the cap FORCE_WAIT in a second patch.
-> 
-> Can you help to implement this Sean, or shall I give it a try?
-> 
+> Unfortunately, that may not be good idea with single image needing both
+> configs to be enabled.
 
-Sure, I have a willing to do and then see if you're also fond of it.
+Sure, but looking at the above code, it looked like they don't need the other
+config if SCMI is enabled.
 
-thanks!
-
-> Regards,
-> Matthias
-> 
-> >  };
-> >  
-> >  struct scp;
-> > @@ -234,11 +235,16 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
-> >  	val &= ~scpd->data->sram_pdn_bits;
-> >  	writel(val, ctl_addr);
-> >  
-> > -	/* wait until SRAM_PDN_ACK all 0 */
-> > -	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
-> > -				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
-> > -	if (ret < 0)
-> > -		goto err_pwr_ack;
-> > +	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
-> > +	if (!scpd->data->us_sram_fwait) {
-> > +		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
-> > +					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
-> > +		if (ret < 0)
-> > +			goto err_pwr_ack;
-> > +	} else {
-> > +		usleep_range(scpd->data->us_sram_fwait,
-> > +			     scpd->data->us_sram_fwait + 100);
-> > +	};
-> >  
-> >  	if (scpd->data->bus_prot_mask) {
-> >  		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
-> > @@ -783,6 +789,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
-> >  		.clk_id = {CLK_NONE},
-> >  		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
-> >  		.active_wakeup = true,
-> > +		.us_sram_fwait = 12000,
-> >  	},
-> >  };
-> >  
-> > 
+-- 
+viresh
