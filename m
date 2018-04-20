@@ -1,79 +1,127 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 20 Apr 2018 15:28:41 +0200
-Subject: [PATCH v3 7/7] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <20180420102408.GW16141@n2100.armlinux.org.uk>
-References: <20180419162751.25223-1-peda@axentia.se>
- <20180419162751.25223-8-peda@axentia.se> <2556566.3fxMPoIyx0@avalon>
- <20180420102408.GW16141@n2100.armlinux.org.uk>
-Message-ID: <790d7a89-ae13-098f-3c0c-a8dfbc84e4a7@axentia.se>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 20 Apr 2018 15:28:28 +0200
+Subject: [PATCH 2/8] dmaengine: shdmac: Change platform check to
+ CONFIG_ARCH_RENESAS
+In-Reply-To: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1524230914-10175-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-20 12:24, Russell King - ARM Linux wrote:
-> On Fri, Apr 20, 2018 at 01:06:49PM +0300, Laurent Pinchart wrote:
->> Hi Peter,
->>
->> Thank you for the patch.
->>
->> On Thursday, 19 April 2018 19:27:51 EEST Peter Rosin wrote:
->>> This makes this driver work with all(?) drivers that are not
->>> componentized and instead expect to connect to a panel/bridge. That
->>> said, the only one tested is atmel_hlcdc.
->>>
->>> This hooks the relevant work function previously called by the encoder
->>> and the component also to the bridge, since the encoder goes away when
->>> connecting to the bridge interface of the driver and the equivalent of
->>> bind/unbind of the component is handled by bridge attach/detach.
->>>
->>> The lifetime requirements of a bridge and a component are slightly
->>> different, which is the reason for struct tda998x_bridge.
->>
->> Couldn't you move the allocation and initialization (tda998x_create) of the 
->> tda998x_priv structure to probe time ? I think you wouldn't need a separate 
->> structure in that case. Unless I'm mistaken there would be an added benefit of 
->> separating component and bridge initialization, resulting in the encoder not 
->> being initialized at all if the component isn't used. You wouldn't need to add 
->> a local_encoder parameter to the tda998x_init() function.
-> 
-> No, I don't like that idea one bit, as I've stated in the past about the
-> component API.  The same (probably) goes for the bridge stuff too.
-> 
-> Consider the following:
-> 
-> Your DRM system is initialised.  You then remove a module, which results
-> in the DRM system being torn down.  You re-insert the module (eg, having
-> made a change to it).  The DRM system is then re-initialised.
-> 
-> At this point, what is the state of variables such as priv->is_on if
-> you allocate the structure at probe time?
-> 
-> What about all the other variables in the driver private structure - are
-> you sure that the driver can cope with random values from the previous
-> "usage" remaining there?
-> 
-> At the moment, this isn't a concern for the driver because we
-> dev_kzalloc() the structure in the bind callback.  Move that to the
-> probe function, and the structure is no longer re-initialised each
-> time, and so it retains the previous state.  The driver is not setup
-> to cope with that.
-> 
-> So, to work around that, you would need to reinitialise _everything_
-> in the structure that the driver requires, which IMHO is a very
-> open to bugs (eg, if a member is missed, or added without the
-> necessary re-initialisation), _especially_ when this is not a path
-> that will get regular testing.
-> 
-> If you want to do this for a subset of data, it would be much better
-> to separate them into independent structures (maybe one embedded into
-> the other) so that this problem can not occur.  That way, a subset
-> of the data can be memset() when bound to the rest of the DRM system
-> ensuring a consistent driver state and still achieve what you're
-> suggesting.
+Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
+is CONFIG_ARCH_RENESAS a more appropriate platform check than the legacy
+CONFIG_ARCH_SHMOBILE, hence use the former.
 
-This was the exact reason I added struct tda998x_bridge. It seemed
-very risky to move the tda998x_create call (or some of its meat) to
-the probe function. Even if that could be done I think it should
-definitely be a separate patch.
+Renesas SuperH SH-Mobile SoCs are still covered by the CONFIG_CPU_SH4
+check, just like before support for Renesas ARM SoCs was added.
 
-Cheers,
-Peter
+Instead of blindly changing all the #ifdefs, switch the main code block
+in sh_dmae_probe() to IS_ENABLED(), as this allows to remove all the
+remaining #ifdefs.
+
+This will allow to drop ARCH_SHMOBILE on ARM in the near future.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/dma/sh/shdmac.c | 50 +++++++++++++++++++++----------------------------
+ 1 file changed, 21 insertions(+), 29 deletions(-)
+
+diff --git a/drivers/dma/sh/shdmac.c b/drivers/dma/sh/shdmac.c
+index 516f5487cc44cf96..8fcaae482ce0949a 100644
+--- a/drivers/dma/sh/shdmac.c
++++ b/drivers/dma/sh/shdmac.c
+@@ -440,7 +440,6 @@ static bool sh_dmae_reset(struct sh_dmae_device *shdev)
+ 	return ret;
+ }
+ 
+-#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
+ static irqreturn_t sh_dmae_err(int irq, void *data)
+ {
+ 	struct sh_dmae_device *shdev = data;
+@@ -451,7 +450,6 @@ static irqreturn_t sh_dmae_err(int irq, void *data)
+ 	sh_dmae_reset(shdev);
+ 	return IRQ_HANDLED;
+ }
+-#endif
+ 
+ static bool sh_dmae_desc_completed(struct shdma_chan *schan,
+ 				   struct shdma_desc *sdesc)
+@@ -683,11 +681,8 @@ static int sh_dmae_probe(struct platform_device *pdev)
+ 	const struct sh_dmae_pdata *pdata;
+ 	unsigned long chan_flag[SH_DMAE_MAX_CHANNELS] = {};
+ 	int chan_irq[SH_DMAE_MAX_CHANNELS];
+-#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
+ 	unsigned long irqflags = 0;
+-	int errirq;
+-#endif
+-	int err, i, irq_cnt = 0, irqres = 0, irq_cap = 0;
++	int err, errirq, i, irq_cnt = 0, irqres = 0, irq_cap = 0;
+ 	struct sh_dmae_device *shdev;
+ 	struct dma_device *dma_dev;
+ 	struct resource *chan, *dmars, *errirq_res, *chanirq_res;
+@@ -789,33 +784,32 @@ static int sh_dmae_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto rst_err;
+ 
+-#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
+-	chanirq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 1);
++	if (IS_ENABLED(CONFIG_CPU_SH4) || IS_ENABLED(CONFIG_ARCH_RENESAS)) {
++		chanirq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 1);
+ 
+-	if (!chanirq_res)
+-		chanirq_res = errirq_res;
+-	else
+-		irqres++;
++		if (!chanirq_res)
++			chanirq_res = errirq_res;
++		else
++			irqres++;
+ 
+-	if (chanirq_res == errirq_res ||
+-	    (errirq_res->flags & IORESOURCE_BITS) == IORESOURCE_IRQ_SHAREABLE)
+-		irqflags = IRQF_SHARED;
++		if (chanirq_res == errirq_res ||
++		    (errirq_res->flags & IORESOURCE_BITS) == IORESOURCE_IRQ_SHAREABLE)
++			irqflags = IRQF_SHARED;
+ 
+-	errirq = errirq_res->start;
++		errirq = errirq_res->start;
+ 
+-	err = devm_request_irq(&pdev->dev, errirq, sh_dmae_err, irqflags,
+-			       "DMAC Address Error", shdev);
+-	if (err) {
+-		dev_err(&pdev->dev,
+-			"DMA failed requesting irq #%d, error %d\n",
+-			errirq, err);
+-		goto eirq_err;
++		err = devm_request_irq(&pdev->dev, errirq, sh_dmae_err,
++				       irqflags, "DMAC Address Error", shdev);
++		if (err) {
++			dev_err(&pdev->dev,
++				"DMA failed requesting irq #%d, error %d\n",
++				errirq, err);
++			goto eirq_err;
++		}
++	} else {
++		chanirq_res = errirq_res;
+ 	}
+ 
+-#else
+-	chanirq_res = errirq_res;
+-#endif /* CONFIG_CPU_SH4 || CONFIG_ARCH_SHMOBILE */
+-
+ 	if (chanirq_res->start == chanirq_res->end &&
+ 	    !platform_get_resource(pdev, IORESOURCE_IRQ, 1)) {
+ 		/* Special case - all multiplexed */
+@@ -881,9 +875,7 @@ static int sh_dmae_probe(struct platform_device *pdev)
+ chan_probe_err:
+ 	sh_dmae_chan_remove(shdev);
+ 
+-#if defined(CONFIG_CPU_SH4) || defined(CONFIG_ARCH_SHMOBILE)
+ eirq_err:
+-#endif
+ rst_err:
+ 	spin_lock_irq(&sh_dmae_lock);
+ 	list_del_rcu(&shdev->node);
+-- 
+2.7.4
