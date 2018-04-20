@@ -1,28 +1,94 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 20 Apr 2018 15:05:48 +0530
-Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
- supported
-In-Reply-To: <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
-References: <20180418155643.36464-1-code@mmayer.net>
- <20180418155643.36464-3-code@mmayer.net>
- <20180419041632.GF24576@vireshk-i7>
- <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
- <20180420044259.GA2873@vireshk-i7>
- <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
-Message-ID: <20180420093548.GA2989@vireshk-i7>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Fri, 20 Apr 2018 11:35:48 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 14/16] arm: dts: sun8i: h3: enable H3
+ sid controller
+In-Reply-To: <CACNAnaFMKDmvAUXJngKHWkeGLfjsgn5hhJszNk7Sg4BU98Oafw@mail.gmail.com>
+References: <20180128232919.12639-1-embed3d@gmail.com>
+ <20180128232919.12639-15-embed3d@gmail.com>
+ <20180129095200.attg7cgvpifpchtn@flea.lan>
+ <470ec61e-8b08-5193-ede1-01d02b2c865e@gmail.com>
+ <CACNAnaGVSbk7czb+mcGTx1C=YwCWe1qqHQDQe9+PNifwEXovMw@mail.gmail.com>
+ <F1D7126A-B6ED-4A83-A941-5F39CED472CE@aosc.io>
+ <CACNAnaFMKDmvAUXJngKHWkeGLfjsgn5hhJszNk7Sg4BU98Oafw@mail.gmail.com>
+Message-ID: <0ab29bf0-b069-338e-f312-e533656fa0b6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-04-18, 10:15, Sudeep Holla wrote:
-> It still doesn't give the flexibility to switch between the two
-> implementations boot time based on some firmware config(e.g. DT status
-> property).
+Hi Kyle,
 
-I agree, but it didn't look like they need flexibility :)
+I'm already working on a Version 3 of this patch series. Right now this 
+slowed down since I'm very busy and the ToDo-List is still very long.
 
-Lets see how the intend to use it. If they are *always* going to use SCPI if
-that is available, then it should be solved at Kconfig level only. Else they
-shouldn't put such code in the driver to quit early.
+My plan is to send out a version during this release cycle.
 
--- 
-viresh
+If you need it right now feel free to submit patches!
+
+Philipp
+
+On 19.04.2018 17:19, Kyle Evans wrote:
+> On Thu, Apr 19, 2018 at 10:13 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>>
+>>
+>> ? 2018?4?19? GMT+08:00 ??11:11:22, Kyle Evans <kevans@freebsd.org> ??:
+>>> On Mon, Jan 29, 2018 at 6:03 AM, Philipp Rossak <embed3d@gmail.com>
+>>> wrote:
+>>>>
+>>>>
+>>>> On 29.01.2018 10:52, Maxime Ripard wrote:
+>>>>>
+>>>>> On Mon, Jan 29, 2018 at 12:29:17AM +0100, Philipp Rossak wrote:
+>>>>>>
+>>>>>> This patch enables the the sid controller in the H3. It can be used
+>>>>>> for thermal calibration data.
+>>>>>>
+>>>>>> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+>>>>>> ---
+>>>>>>    arch/arm/boot/dts/sun8i-h3.dtsi | 7 +++++++
+>>>>>>    1 file changed, 7 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>>>> b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>>>> index 3f83f6a27c74..9bb5cc29fec5 100644
+>>>>>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>>>> @@ -72,6 +72,13 @@
+>>>>>>                  };
+>>>>>>          };
+>>>>>>    +     soc {
+>>>>>> +               sid: eeprom at 1c14000 {
+>>>>>> +                       compatible = "allwinner,sun8i-h3-sid";
+>>>>>> +                       reg = <0x01c14000 0x400>;
+>>>>>> +               };
+>>>>>> +       };
+>>>>>> +
+>>>>>
+>>>>>
+>>>>> Shouldn't you also use a nvmem-cells property to the THS node?
+>>>>>
+>>>>> Maxime
+>>>>>
+>>>>
+>>>> Oh seems like I forgot that.
+>>>> As related to the wiki [1] this should be 64 bit wide at the address
+>>> 0x34. I
+>>>> will add that in the next version.
+>>>>
+>>>>
+>>>> [1]: http://linux-sunxi.org/SID_Register_Guide#eFUSE
+>>>>
+>>>> Thanks,
+>>>> Philipp
+>>>>
+>>>
+>>> Hi,
+>>>
+>>> Any chance this will see a v3 soon? I'm kind of interested in sid node
+>>> for h3. =)
+>>
+>> This patch is independent and can be easily sent out
+>> by its own.
+>>
+> 
+> Right- I had considered doing so, but wanted to make sure I wasn't
+> going to collide with this series if a v3 is imminent.
+> 
