@@ -1,71 +1,126 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 20 Apr 2018 09:44:18 +0800
-Subject: [PATCH v5 11/23] ASoC: qdsp6: q6adm: Add q6adm driver
-In-Reply-To: <20180418153157.1960-12-srinivas.kandagatla@linaro.org>
-References: <20180418153157.1960-12-srinivas.kandagatla@linaro.org>
-Message-ID: <201804200913.D48SnpbP%fengguang.wu@intel.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 20 Apr 2018 11:42:54 +0800
+Subject: [PATCH v1 4/7] soc: mediatek: reuse regmap_read_poll_timeout
+ helpers
+In-Reply-To: <6fd85b96-f076-36c7-8ff4-8e8ed252edb2@gmail.com>
+References: <cover.1522736996.git.sean.wang@mediatek.com>
+ <2f84f7695ea3223b8626a8369aa4ae5e0d03fdce.1522736996.git.sean.wang@mediatek.com>
+ <6fd85b96-f076-36c7-8ff4-8e8ed252edb2@gmail.com>
+Message-ID: <1524195774.26454.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+On Thu, 2018-04-19 at 12:23 +0200, Matthias Brugger wrote:
+> 
+> On 04/03/2018 09:15 AM, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > Reuse the common helpers regmap_read_poll_timeout provided by Linux core
+> > instead of an open-coded handling.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+> > ---
+> >  drivers/soc/mediatek/mtk-infracfg.c | 45 +++++++++----------------------------
+> >  1 file changed, 10 insertions(+), 35 deletions(-)
+> > 
+> > diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+> > index 8c310de..b849aa5 100644
+> > --- a/drivers/soc/mediatek/mtk-infracfg.c
+> > +++ b/drivers/soc/mediatek/mtk-infracfg.c
+> > @@ -12,6 +12,7 @@
+> >   */
+> >  
+> >  #include <linux/export.h>
+> > +#include <linux/iopoll.h>
+> >  #include <linux/jiffies.h>
+> >  #include <linux/regmap.h>
+> >  #include <linux/soc/mediatek/infracfg.h>
+> > @@ -37,7 +38,6 @@
+> >  int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
+> >  		bool reg_update)
+> >  {
+> > -	unsigned long expired;
+> >  	u32 val;
+> >  	int ret;
+> >  
+> > @@ -47,22 +47,11 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
+> >  	else
+> >  		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_SET, mask);
+> >  
+> > -	expired = jiffies + HZ;
+> > +	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
+> > +				       val, (val & mask) == mask, 10,
+> > +				       jiffies_to_usecs(HZ));
+> 
+> To align with the changes in scpsys, please define MTK_POLL_DELAY_US and
+> MTK_POLL_TIMEOUT. I'm not really fan of passing macros as function arguments.
+> 
 
-I love your patch! Yet something to improve:
+Agreed on. will have an improve on it
 
-[auto build test ERROR on asoc/for-next]
-[also build test ERROR on v4.17-rc1 next-20180419]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+thanks!
 
-url:    https://github.com/0day-ci/linux/commits/srinivas-kandagatla-linaro-org/ASoC-qcom-Add-support-to-QDSP-based-Audio/20180419-212438
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
-config: arm-allyesconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-Note: the linux-review/srinivas-kandagatla-linaro-org/ASoC-qcom-Add-support-to-QDSP-based-Audio/20180419-212438 HEAD b636a6bdb47d4dfaa6bc43f2ef431f5426b51581 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
->> sound/soc/qcom/qdsp6/q6adm.c:21:10: fatal error: q6core.h: No such file or directory
-    #include "q6core.h"
-             ^~~~~~~~~~
-   compilation terminated.
-
-vim +21 sound/soc/qcom/qdsp6/q6adm.c
-
-     4	
-     5	#include <linux/slab.h>
-     6	#include <linux/wait.h>
-     7	#include <linux/kernel.h>
-     8	#include <linux/device.h>
-     9	#include <linux/module.h>
-    10	#include <linux/sched.h>
-    11	#include <linux/jiffies.h>
-    12	#include <linux/of.h>
-    13	#include <linux/of_platform.h>
-    14	#include <linux/kref.h>
-    15	#include <linux/wait.h>
-    16	#include <linux/soc/qcom/apr.h>
-    17	#include <linux/platform_device.h>
-    18	#include <sound/asound.h>
-    19	#include "q6adm.h"
-    20	#include "q6afe.h"
-  > 21	#include "q6core.h"
-    22	#include "q6dsp-errno.h"
-    23	#include "q6dsp-common.h"
-    24	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 64548 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/626cb309/attachment-0001.gz>
+> Other then that, the patch looks good.
+> 
+> Thanks a lot,
+> Matthias
+> 
+> >  
+> > -	while (1) {
+> > -		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
+> > -		if (ret)
+> > -			return ret;
+> > -
+> > -		if ((val & mask) == mask)
+> > -			break;
+> > -
+> > -		cpu_relax();
+> > -		if (time_after(jiffies, expired))
+> > -			return -EIO;
+> > -	}
+> > -
+> > -	return 0;
+> > +	return ret;
+> >  }
+> >  
+> >  /**
+> > @@ -80,30 +69,16 @@ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask,
+> >  int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask,
+> >  		bool reg_update)
+> >  {
+> > -	unsigned long expired;
+> >  	int ret;
+> > +	u32 val;
+> >  
+> >  	if (reg_update)
+> >  		regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
+> >  	else
+> >  		regmap_write(infracfg, INFRA_TOPAXI_PROTECTEN_CLR, mask);
+> >  
+> > -	expired = jiffies + HZ;
+> > -
+> > -	while (1) {
+> > -		u32 val;
+> > -
+> > -		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
+> > -		if (ret)
+> > -			return ret;
+> > -
+> > -		if (!(val & mask))
+> > -			break;
+> > -
+> > -		cpu_relax();
+> > -		if (time_after(jiffies, expired))
+> > -			return -EIO;
+> > -	}
+> > -
+> > -	return 0;
+> > +	ret = regmap_read_poll_timeout(infracfg, INFRA_TOPAXI_PROTECTSTA1,
+> > +				       val, !(val & mask), 10,
+> > +				       jiffies_to_usecs(HZ));
+> > +	return ret;
+> >  }
+> > 
