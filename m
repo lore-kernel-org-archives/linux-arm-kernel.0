@@ -1,73 +1,83 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 20 Apr 2018 10:17:42 +0200
-Subject: bq27000: directory/files exists even when hardware is not
- available
-In-Reply-To: <20180420074826.c7cy4z3tq7c56ccs@pali>
-References: <20180420074036.GA16257@amd> <20180420074826.c7cy4z3tq7c56ccs@pali>
-Message-ID: <20180420081741.GA8856@amd>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 20 Apr 2018 09:21:10 +0100
+Subject: [PATCH] arm64: fix single step issue in kgdb
+In-Reply-To: <3a4aff03.a762.162dddc3d1b.Coremail.liwei1412@163.com>
+References: <3a4aff03.a762.162dddc3d1b.Coremail.liwei1412@163.com>
+Message-ID: <20180420082110.wus3np2w7n5tqx6v@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2018-04-20 09:48:26, Pali Roh?r wrote:
-> On Friday 20 April 2018 09:40:36 Pavel Machek wrote:
-> > Hi!
-> > 
-> > On droid4 (4.17-rc1), /sys/class/power_supply/bq27000-battery exists
-> > even when hardware is not present (as on Droid 4).
-> > 
-> > Any ideas?
-> > 									Pavel
+On Thu, Apr 19, 2018 at 08:23:41PM +0800, Wei Li wrote:
+> From: Wei Li <liwei1412@163.com>
 > 
-> Somebody must have registered bq device into power_supply subsystem.
-> Maybe DT note is present?
+> In kdb, as the frontend for kgdb, cmd "ss" does not work well. It can only take effects once and the single step exception is reported as oops after a breakpoint triggered in kdb. Then the cmd "go" does not work well either due to this. Refer to the DDI0487C_a_armv8_arm.pdf (D2.12), i set the SPSR.SS=1 every time. It has been verified in qemu.
+> 
+> Signed-off-by: Wei Li <liwei1412@163.com>
+> ---
+> ?include/asm/debug-monitors.h |??? 3 +++
+> ?kernel/debug-monitors.c????? |??? 4 ++--
+> ?kernel/kgdb.c??????????????? |??? 3 ++-
 
-No, I don't think so:
-
-pavel at duo:/data/l/linux-n900$ grep bq27 arch/arm/boot/dts/*
-Binary file arch/arm/boot/dts/omap3-n900.dtb matches
-arch/arm/boot/dts/omap3-n900.dts:	     bq27200: bq27200 at 55 {
-arch/arm/boot/dts/omap3-n900.dts:	     	      compatible =
-"ti,bq27200";
-arch/arm/boot/dts/omap3-n900.dts~:	bq27200: bq27200 at 55 {
-arch/arm/boot/dts/omap3-n900.dts~:		 compatible =
-"ti,bq27200";
-arch/arm/boot/dts/omap3-n900.dts.orig:	bq27200: bq27200 at 55 {
-arch/arm/boot/dts/omap3-n900.dts.orig:		 compatible =
-"ti,bq27200";
-Binary file arch/arm/boot/dts/omap3-n950.dtb matches
-arch/arm/boot/dts/omap3-n950-n9.dtsi:	     bq27521: bq27521 at 55 {
-arch/arm/boot/dts/omap3-n950-n9.dtsi:	     	      compatible =
-"ti,bq27521";
-arch/arm/boot/dts/omap3-n950-n9.dtsi~:	bq27521: bq27521 at 55 {
-arch/arm/boot/dts/omap3-n950-n9.dtsi~:		 compatible =
-"ti,bq27521";
-arch/arm/boot/dts/omap3-n950-n9.dtsi.orig:	bq27521: bq27521 at 55 {
-arch/arm/boot/dts/omap3-n950-n9.dtsi.orig:		 compatible =
-"ti,bq27521";
-Binary file arch/arm/boot/dts/omap3-n9.dtb matches
-arch/arm/boot/dts/omap3-pandora-common.dtsi:	bq27500 at 55 {
-arch/arm/boot/dts/omap3-pandora-common.dtsi:		   compatible
-= "ti,bq27500";
-arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts:
-bq27541 at 55 {
-arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts:
-compatible = "ti,bq27541";
-arch/arm/boot/dts/rk3288-veyron-minnie.dts:	battery: bq27500 at 55 {
-arch/arm/boot/dts/rk3288-veyron-minnie.dts:		 compatible =
-"ti,bq27500";
-pavel at duo:/data/l/linux-n900$
+This contains many similar changes to a patch from earlier with the same
+Subject. It is a v2? If so the subject should reflect that (and a
+changelog would be nice).
 
 
-Is it possible that one wire subsystem registers bq27000 even without
-device tree node?
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/d2541b5b/attachment-0001.sig>
+Daniel.
+
+
+> ?3 files changed, 7 insertions(+), 3 deletions(-)
+> ?
+> diff -uprN linux-4.16.2_org/arch/arm64/include/asm/debug-monitors.h linux-4.16.2_mod/arch/arm64/include/asm/debug-monitors.h
+> --- linux-4.16.2_org/arch/arm64/include/asm/debug-monitors.h?? ?2018-04-12 18:30:01.000000000 +0800
+> +++ linux-4.16.2_mod/arch/arm64/include/asm/debug-monitors.h?? ?2018-04-19 00:19:10.134999268 +0800
+> @@ -135,6 +135,9 @@ static inline int reinstall_suspended_bp
+> ?
+> ?int aarch32_break_handler(struct pt_regs *regs);
+> ?
+> +void set_regs_spsr_ss(struct pt_regs *regs);
+> +void clear_regs_spsr_ss(struct pt_regs *regs);
+> +
+> ?#endif?? ?/* __ASSEMBLY */
+> ?#endif?? ?/* __KERNEL__ */
+> ?#endif?? ?/* __ASM_DEBUG_MONITORS_H */
+> diff -uprN linux-4.16.2_org/arch/arm64/kernel/debug-monitors.c linux-4.16.2_mod/arch/arm64/kernel/debug-monitors.c
+> --- linux-4.16.2_org/arch/arm64/kernel/debug-monitors.c?? ?2018-04-12 18:30:01.000000000 +0800
+> +++ linux-4.16.2_mod/arch/arm64/kernel/debug-monitors.c?? ?2018-04-19 00:19:19.435189356 +0800
+> @@ -150,13 +150,13 @@ postcore_initcall(debug_monitors_init);
+> ?/*
+> ? * Single step API and exception handling.
+> ? */
+> -static void set_regs_spsr_ss(struct pt_regs *regs)
+> +void set_regs_spsr_ss(struct pt_regs *regs)
+> ?{
+> ??? ?regs->pstate |= DBG_SPSR_SS;
+> ?}
+> ?NOKPROBE_SYMBOL(set_regs_spsr_ss);
+> ?
+> -static void clear_regs_spsr_ss(struct pt_regs *regs)
+> +void clear_regs_spsr_ss(struct pt_regs *regs)
+> ?{
+> ??? ?regs->pstate &= ~DBG_SPSR_SS;
+> ?}
+> diff -uprN linux-4.16.2_org/arch/arm64/kernel/kgdb.c linux-4.16.2_mod/arch/arm64/kernel/kgdb.c
+> --- linux-4.16.2_org/arch/arm64/kernel/kgdb.c?? ?2018-04-12 18:30:01.000000000 +0800
+> +++ linux-4.16.2_mod/arch/arm64/kernel/kgdb.c?? ?2018-04-19 00:19:40.892911795 +0800
+> @@ -221,6 +221,7 @@ int kgdb_arch_handle_exception(int excep
+> ??? ??? ?/*
+> ??? ??? ? * Enable single step handling
+> ??? ??? ? */
+> +??????? set_regs_spsr_ss(linux_regs);
+> ??? ??? ?if (!kernel_active_single_step())
+> ??? ??? ??? ?kernel_enable_single_step(linux_regs);
+> ??? ??? ?err = 0;
+> @@ -252,7 +253,7 @@ static int kgdb_step_brk_fn(struct pt_re
+> ??? ?if (!kgdb_single_step)
+> ??? ??? ?return DBG_HOOK_ERROR;
+> ?
+> -?? ?kgdb_handle_exception(1, SIGTRAP, 0, regs);
+> +?? ?kgdb_handle_exception(0, SIGTRAP, 0, regs);
+> ??? ?return 0;
+> ?}
+> ?NOKPROBE_SYMBOL(kgdb_step_brk_fn);
+> 
