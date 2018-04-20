@@ -1,84 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Apr 2018 16:38:47 +0100
-Subject: Clang arm64 build is broken
-In-Reply-To: <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
-References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
- <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
- <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
-Message-ID: <20180420153846.5m5ngqcfn4v4q6wh@lakrids.cambridge.arm.com>
+From: Eugeniy.Paltsev@synopsys.com (Eugeniy Paltsev)
+Date: Fri, 20 Apr 2018 15:53:30 +0000
+Subject: [RFC 0/2] dw_mmc: add multislot support
+In-Reply-To: <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
+References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
+ <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
+Message-ID: <1524239609.10138.47.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+Hi Ulf,
 
-On Fri, Apr 20, 2018 at 04:59:35PM +0200, Andrey Konovalov wrote:
-> On Fri, Apr 20, 2018 at 10:13 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> The issue is that
-> >> clang doesn't know about the "S" asm constraint. I reported this to
-> >> clang [2], and hopefully this will get fixed. In the meantime, would
-> >> it possible to work around using the "S" constraint in the kernel?
-> >
-> > I have no idea, I've never used clang to build the kernel. Clang isn't
-> > really supported to build the arm64 kernel anyway (as you mention
-> > below), and working around clang deficiencies would mean that we leave
-> > with the workaround forever. I'd rather enable clang once it is at
-> > feature parity with GCC.
+On Fri, 2018-04-20 at 09:35 +0200, Ulf Hansson wrote:
+> [...]
 > 
-> The fact that there are some existing issues with building arm64
-> kernel with clang doesn't sound like a good justification for adding
-> new issues :)
-
-I appreciate this is somewhat frustrating, but every feature where clang
-is not at parity with GCC is effectively a functional regression for us.
-
-Recently, the code that clang hasn't liked happens to be security
-critical, and it is somewhat difficult to justify making that code more
-complex to cater for a compiler that we know has outstanding issues with
-features we rely upon.
-
-Which is to say, I'm not sure that there's much justification either
-way. We really need clang to be at feature parity with GCC for it to be
-considered supported.
-
-It would be great if some effort could be focussed on bringing clang to
-feature parity with GCC before implementing new clang-specific features.
-
-> However in this case I do believe that this is more of a bug in clang
-> that should be fixed.
-
-Just to check: does clang implement the rest of the AArch64 machine
-constraints [1]?
-
-We're liable to use more of them in future, and we should aim for parity
-now so that we don't fall into the same trap in future.
-
-> >> While we're here, regarding the other issue with kvm [3], I didn't
-> >> receive any comments as to whether it makes sense to send the fix that
-> >> adds -fno-jump-tables flag when building kvm with clang.
-> >
-> > Is that the only thing missing? Are you sure that there is no other way
-> > for clang to generate absolute addresses that will then lead to a crash?
-> > Again, I'd rather make sure we have the full picture.
+> > 
+> > 2. Add missing stuff to support multislot mode in DesignWare MMC driver.
+> >  * Add missing slot switch to __dw_mci_start_request() function.
+> >  * Refactor set_ios function:
+> >    a) Calculate common clock which is
+> >       suitable for all slots instead of directly use clock value
+> >       provided by mmc core. We calculate common clock as the minimum
+> >       among each used slot clocks. This clock is calculated in
+> >       dw_mci_calc_common_clock() function which is called
+> >       from set_ios()
+> >    b) Disable clock only if no other slots are ON.
+> >    c) Setup clock directly in set_ios() only if no other slots
+> >       are ON. Otherwise adjust clock in __dw_mci_start_request()
+> >       function before slot switch.
+> >    d) Move timings and bus_width setup to separate funcions.
+> >  * Use timing field in each slot structure instead of common field in
+> >    host structure.
+> >  * Add locks to serialize access to registers.
 > 
-> Well, I have tried applying that patch and running kvm tests that I
-> could find [1], and they passed (actually I think there was an issue
-> with one of them, but I saw the same thing when I tried running them
-> on a kernel built with GCC).
+> Sorry, but this is a hack to *try* to make multi-slot work and this
+> isn't sufficient. There were good reasons to why the earlier
+> non-working multi slot support was removed from dw_mmc.
 
-I think what Marc wants is a statement as to whether -fno-jump-tables is
-sufficient to ensure that clang will not try to use absolute addressing,
-based on an understanding of the AArch64 LLVM backend rather than test
-cases.
+Previous multi slot implementation was removed as nobody used it and
+nobody tested it. There are lots of mistakes in previous implementation
+which are not related to request serialization
+like lack of slot switch / lack of adding slot id to CIU commands / ets...
+So obviously it was never tested and never used at real multi slot hardware.
 
-For example, could any other pass result in the use of an absolute
-address? Or are jump tables the *only* reason that clang would try to
-use an absolute address.
+> Let me elaborate a bit for your understanding. The core uses a host
+> lock (mmc_claim|release_host()) to serialize operations and commands,
+> as to confirm to the SD/SDIO/(e)MMC specs. The above changes gives no
+> guarantees for this. To make that work, we would need a "mmc bus lock"
+> to be managed by the core.
 
-Are there other options that we might need to pass?
+In current implementation data transfers and commands to different
+hosts (slots) are serialized internally in the dw_mmc driver. We have
+request queue and when .request() is called we add new request to the
+queue. We take new request from the queue only if the previous one
+has already finished.
 
-Are there any options that we can pass to forbid absolute addressing?
+So although hosts (slots) have separate locks (mmc_claim|release_host())
+the requests to different slots are serialized by driver.
 
-Thanks,
-Mark.
+Isn't that enough?
+I'm not very familiar with SD/SDIO/(e)MMC specs so my assumptions might be wrong
+in that case please correct me.
 
-[1] https://gcc.gnu.org/onlinedocs/gccint/Machine-Constraints.html
+> However, inventing a "mmc bus lock" would lead to other problems
+> related to I/O scheduling for upper layers - it simply breaks. For
+> example, I/O requests for one card/slot can then starve I/O requests
+> reaching another card/slot.
+> 
+
+Nevertheless we had to deal somehow with existing hardware which
+has multislot dw mmc controller and both slots are used...
+
+This patch at least shouldn't break anything for current users (which use
+it in single slot mode)
+
+Moreover we tested this dual-slot implementation and don't catch any problems
+(probably yet) except bus performance decrease in dual-slot mode (which is
+quite expected).
+
+> 
+> Kind regards
+> Uffe
+-- 
+ Eugeniy Paltsev
