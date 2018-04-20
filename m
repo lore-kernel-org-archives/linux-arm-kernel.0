@@ -1,65 +1,113 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 19 Apr 2018 20:06:52 -0500
-Subject: [PATCH v6] ARM: dts: tpc: Device tree description of the iMX6Q
- TPC board
-In-Reply-To: <20180419143240.3717-1-lukma@denx.de>
-References: <20180405070939.22245-1-lukma@denx.de>
- <20180419143240.3717-1-lukma@denx.de>
-Message-ID: <CAL_Jsq+TCaWZOuS-wKTFtxFShZcSj=Zg12f1NonN3DL-4hHWSA@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 19 Apr 2018 18:26:57 -0700
+Subject: [PATCH] arm64: dts: msm8996: Add modem remoteproc
+Message-ID: <20180420012657.29895-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 9:32 AM, Lukasz Majewski <lukma@denx.de> wrote:
-> This commit adds device tree description of Kieback & Peter GmbH
-> iMX6Q TPC board.
->
-> Signed-off-by: Lukasz Majewski <lukma@denx.de>
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
->
-> ---
-> Changes for v6:
-> - Add space between // and SPDX
-> - Replace 'disp0' with 'display'
-> - Replace 'rtc: ds1307 at 32' with 'ds1307: rtc at 32'
-> - Replace 'codec: audio-codec at a' with 'sgtl5000: audio-codec at a'
-> - Move &can[12] nodes extension to proper position to be alphabetically sorted
->
-> Changes for v5:
-> - Use 'interpolation-steps' to fill the brightness level table
-> - Remove not needed status = "okay" properties
-> - Replace goodix_ts -> touchscreen
-> - Replace sgtl5000 -> audio-codec
->
-> This patch depends on PWM backlight intepolation work:
-> https://patchwork.kernel.org/patch/10330775/
-> https://patchwork.kernel.org/patch/10330777/
->
-> Changes for v4:
-> - Remove not needed bus-format-override = "rgb565";
->   property
->
-> Changes for v3:
-> - Provide proper compatible for RTC DTS node
-> - Remove wrong comment style for beeper
-> - Add proper SPDX entries for DTS files
-> - Add vendor prefix to a separate patch
->
-> Changes for v2:
-> - SPDX license identifiers used
-> - Separate regulators
-> - Proper beeper driver
-> - Use of the lcd panel (with compatible) instead of timings provided in
->   device tree
-> - Add IRQ types (like IRQ_TYPE_EDGE_FALLING) and GPIO active levels (like
->   GPIO_ACTIVE_HIGH)
-> - Remove not needed nodes
-> - Make W=1 dtbs compilation with no errors
-> ---
->  arch/arm/boot/dts/Makefile         |   1 +
->  arch/arm/boot/dts/imx6q-kp-tpc.dts |  22 ++
->  arch/arm/boot/dts/imx6q-kp.dtsi    | 432 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 455 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-kp-tpc.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-kp.dtsi
+Add the modem remoteproc node and the child smd-edge in order to be able
+to boot the modem Hexagon found in MSM8996 based devices.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Also extend the tcsr mutex node size, to cover the registers at the end
+of the block, used for halting the modem subsystem.
+
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+
+This patch depends on the recent patch adding a few additional clocks to
+gcc-msm8996.
+
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 64 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 62 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 4010e2f1a177..70009b15ffd1 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -620,7 +620,6 @@
+ 				pm8994_l31: l31 {};
+ 				pm8994_l32: l32 {};
+ 			};
+-
+ 		};
+ 	};
+ 
+@@ -637,7 +636,7 @@
+ 
+ 		tcsr_mutex_regs: syscon at 740000 {
+ 			compatible = "syscon";
+-			reg = <0x740000 0x20000>;
++			reg = <0x740000 0x40000>;
+ 		};
+ 
+ 		tcsr: syscon at 7a0000 {
+@@ -1850,6 +1849,67 @@
+ 				power-domains = <&mmcc VENUS_CORE1_GDSC>;
+ 			};
+ 		};
++
++		remoteproc at 2080000 {
++			compatible = "qcom,msm8996-mss-pil";
++
++			reg = <0x2080000 0x100>,
++			      <0x2180000 0x040>;
++			reg-names = "qdsp6", "rmb";
++
++			interrupts-extended = <&intc 0 448 IRQ_TYPE_EDGE_RISING>,
++					      <&modem_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++					      <&modem_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++					      <&modem_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++					      <&modem_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names = "wdog", "fatal", "ready",
++					  "handover", "stop-ack";
++
++			clocks = <&xo_board>,
++				 <&gcc GCC_MSS_CFG_AHB_CLK>,
++				 <&rpmcc RPM_SMD_PCNOC_CLK>,
++				 <&gcc GCC_MSS_Q6_BIMC_AXI_CLK>,
++				 <&gcc GCC_BOOT_ROM_AHB_CLK>,
++				 <&gcc GCC_MSS_GPLL0_DIV_CLK>,
++				 <&gcc GCC_MSS_SNOC_AXI_CLK>,
++				 <&gcc GCC_MSS_MNOC_BIMC_AXI_CLK>,
++				 <&rpmcc RPM_SMD_QDSS_CLK>;
++
++			clock-names = "xo", "iface", "pnoc", "bus",
++				      "mem", "gpll0_mss_clk", "snoc_axi_clk",
++				      "mnoc_axi_clk", "qdss";
++
++			mx-supply = <&pm8994_s2>;
++			cx-supply = <&pm8994_s1>;
++			pll-supply = <&pm8994_l12>;
++
++			resets = <&gcc GCC_MSS_RESTART>;
++			reset-names = "mss_restart";
++
++			qcom,halt-regs = <&tcsr_mutex_regs 0x23000 0x25000 0x24000>;
++
++			qcom,smem-states = <&modem_smp2p_out 0>;
++			qcom,smem-state-names = "stop";
++
++			status = "disabled";
++
++			mba {
++				memory-region = <&mba_region>;
++			};
++
++			mpss {
++				memory-region = <&mpss_region>;
++			};
++
++			smd-edge {
++				interrupts = <0 449 IRQ_TYPE_EDGE_RISING>;
++
++				label = "modem";
++				mboxes = <&apcs_glb 12>;
++				qcom,smd-edge = <0>;
++				qcom,remote-pid = <1>;
++			};
++		};
+ 	};
+ 
+ 	sound: sound {
+-- 
+2.16.2
