@@ -1,92 +1,96 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 20 Apr 2018 23:10:22 +0200
-Subject: [PATCH v7 11/11] ARM: shmobile: Convert file to use cntvoff
+Date: Fri, 20 Apr 2018 23:10:16 +0200
+Subject: [PATCH v7 05/11] ARM: smp: Add initialization of CNTVOFF
 In-Reply-To: <20180420211022.11759-1-mylene.josserand@bootlin.com>
 References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
-Message-ID: <20180420211022.11759-12-mylene.josserand@bootlin.com>
+Message-ID: <20180420211022.11759-6-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that a common function is available for CNTVOFF's
-initialization, let's convert shmobile-apmu code to use
-this function.
+The CNTVOFF register from arch timer is uninitialized.
+It should be done by the bootloader but it is currently not the case,
+even for boot CPU because this SoC is booting in secure mode.
+It leads to an random offset value meaning that each CPU will have a
+different time, which isn't working very well.
+
+Add assembly code used for boot CPU and secondary CPU cores to make
+sure that the CNTVOFF register is initialized. Because this code can
+be used by different platforms, add this assembly file in ARM's common
+folder.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/common.h          |  1 -
- arch/arm/mach-shmobile/headsmp-apmu.S    | 22 +---------------------
- arch/arm/mach-shmobile/setup-rcar-gen2.c |  3 ++-
- 3 files changed, 3 insertions(+), 23 deletions(-)
+ arch/arm/common/Makefile              |  1 +
+ arch/arm/common/secure_cntvoff.S      | 31 +++++++++++++++++++++++++++++++
+ arch/arm/include/asm/secure_cntvoff.h |  8 ++++++++
+ 3 files changed, 40 insertions(+)
+ create mode 100644 arch/arm/common/secure_cntvoff.S
+ create mode 100644 arch/arm/include/asm/secure_cntvoff.h
 
-diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-index 43c1ac696274..2109f123bdfb 100644
---- a/arch/arm/mach-shmobile/common.h
-+++ b/arch/arm/mach-shmobile/common.h
-@@ -2,7 +2,6 @@
- #ifndef __ARCH_MACH_COMMON_H
- #define __ARCH_MACH_COMMON_H
- 
--extern void shmobile_init_cntvoff(void);
- extern void shmobile_init_delay(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
-diff --git a/arch/arm/mach-shmobile/headsmp-apmu.S b/arch/arm/mach-shmobile/headsmp-apmu.S
-index 5672b5849401..d49ab194766a 100644
---- a/arch/arm/mach-shmobile/headsmp-apmu.S
-+++ b/arch/arm/mach-shmobile/headsmp-apmu.S
-@@ -11,29 +11,9 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- 
--ENTRY(shmobile_init_cntvoff)
--	/*
--	 * CNTVOFF has to be initialized either from non-secure Hypervisor
--	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
--	 * then it should be handled by the secure code
--	 */
--	cps	#MON_MODE
--	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
--	orr	r0, r1, #1
--	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
--	instr_sync
--	mov	r0, #0
--	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
--	instr_sync
--	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
--	instr_sync
--	cps	#SVC_MODE
--	ret	lr
--ENDPROC(shmobile_init_cntvoff)
--
- #ifdef CONFIG_SMP
- ENTRY(shmobile_boot_apmu)
--	bl	shmobile_init_cntvoff
-+	bl	secure_cntvoff_init
- 	b	secondary_startup
- ENDPROC(shmobile_boot_apmu)
- #endif
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 5561dbed7a33..4a881026d740 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -26,6 +26,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
- #include <asm/mach/arch.h>
-+#include <asm/secure_cntvoff.h>
- #include "common.h"
- #include "rcar-gen2.h"
- 
-@@ -70,7 +71,7 @@ void __init rcar_gen2_timer_init(void)
- 	void __iomem *base;
- 	u32 freq;
- 
--	shmobile_init_cntvoff();
-+	secure_cntvoff_init();
- 
- 	if (of_machine_is_compatible("renesas,r8a7745") ||
- 	    of_machine_is_compatible("renesas,r8a7792") ||
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 70b4a14ed993..1e9f7af8f70f 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
++obj-$(CONFIG_SMP)		+= secure_cntvoff.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+ obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
+ CFLAGS_REMOVE_mcpm_entry.o	= -pg
+diff --git a/arch/arm/common/secure_cntvoff.S b/arch/arm/common/secure_cntvoff.S
+new file mode 100644
+index 000000000000..68a4a8344319
+--- /dev/null
++++ b/arch/arm/common/secure_cntvoff.S
+@@ -0,0 +1,31 @@
++/* SPDX-License-Identifier: GPL-2.0
++ *
++ * Copyright (C) 2014 Renesas Electronics Corporation
++ *
++ * Initialization of CNTVOFF register from secure mode
++ *
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++ENTRY(secure_cntvoff_init)
++	.arch	armv7-a
++	/*
++	 * CNTVOFF has to be initialized either from non-secure Hypervisor
++	 * mode or secure Monitor mode with SCR.NS==1. If TrustZone is enabled
++	 * then it should be handled by the secure code
++	 */
++	cps	#MON_MODE
++	mrc	p15, 0, r1, c1, c1, 0		/* Get Secure Config */
++	orr	r0, r1, #1
++	mcr	p15, 0, r0, c1, c1, 0		/* Set Non Secure bit */
++	isb
++	mov	r0, #0
++	mcrr	p15, 4, r0, r0, c14		/* CNTVOFF = 0 */
++	isb
++	mcr	p15, 0, r1, c1, c1, 0		/* Set Secure bit */
++	isb
++	cps	#SVC_MODE
++	ret	lr
++ENDPROC(secure_cntvoff_init)
+diff --git a/arch/arm/include/asm/secure_cntvoff.h b/arch/arm/include/asm/secure_cntvoff.h
+new file mode 100644
+index 000000000000..1f93aee1f630
+--- /dev/null
++++ b/arch/arm/include/asm/secure_cntvoff.h
+@@ -0,0 +1,8 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#ifndef __ASMARM_ARCH_CNTVOFF_H
++#define __ASMARM_ARCH_CNTVOFF_H
++
++extern void secure_cntvoff_init(void);
++
++#endif
 -- 
 2.11.0
