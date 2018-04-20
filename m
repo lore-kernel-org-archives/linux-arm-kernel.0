@@ -1,68 +1,141 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Fri, 20 Apr 2018 13:50:10 +0300
-Subject: [PATCH] ARM: tegra: fix ulpi regression on tegra20
-In-Reply-To: <6600596.BijQW1iq1K@ax5200p>
-References: <20180219151252.29289-1-marcel@ziswiler.com>
- <6600596.BijQW1iq1K@ax5200p>
-Message-ID: <4f2ac009-8618-4b4d-e137-a5fd4907a56f@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 20 Apr 2018 11:52:17 +0100
+Subject: [PATCH] arm64: avoid potential infinity loop in dump_backtrace
+In-Reply-To: <1524202713-31024-1-git-send-email-ji.zhang@mediatek.com>
+References: <1524202713-31024-1-git-send-email-ji.zhang@mediatek.com>
+Message-ID: <20180420105215.GM16308@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.04.2018 11:52, Marc Dietrich wrote:
-> Hi Marcel,
+On Fri, Apr 20, 2018 at 01:38:33PM +0800, Ji Zhang wrote:
+> When we dump the backtrace of some tasks there is a potential infinity
+> loop if the content of the stack changed, no matter the change is
+> because the task is running or other unexpected cases.
 > 
-> Am Montag, 19. Februar 2018, 16:12:52 CEST schrieb Marcel Ziswiler:
->> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
->>
->> Since commit f8f8f1d04494 ("clk: Don't touch hardware when reparenting
->> during registration") ULPI has been broken on Tegra20 leading to the
->> following error message during boot:
->>
->> [    1.974698] ulpi_phy_power_on: ulpi write failed
->> [    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
->> [    1.985434] tegra-ehci: probe of c5004000.usb failed with error -110
->>
->> Debugging through the changes and finally also consulting the TRM
->> revealed that rather than the CDEV2 clock off OSC requiring such pin
->> muxing actually the PLL_P_OUT4 clock is in use. It looks like so far it
->> just worked by chance of that one having been enabled which Stephen's
->> commit now changed when reparenting sclk away from pll_p_out4 leaving
->> that one disabled. Fix this by properly assigning the PLL_P_OUT4 clock
->> as the ULPI PHY clock.
+> This patch add stronger check on frame pointer and set the max number
+> of stack spanning to avoid infinity loop.
+
+This looks like a good idea, but I wonder whether we can do a bit better.
+
+I think that transitions between stacks are only valid in a particular
+direction.  Task context cannot preempt IRQ context for example, so
+we should probably abandon the backtrace whenever unwinding seems to
+be leading us from the task stack to the IRQ stack.
+
+I *think* (but I may be wrong) that we can put the different stacks
+into a strict order: task < IRQ < overflow < SDEI.  If so, this provides
+a nice way to check that the backtrace is travelling in the correct
+direction.
+
+I had a go at hacking something up: see [1].  If it works, it provides
+some nice cleanups too.  But my logic may be wrong and I haven't
+tested it@all.
+
+Any thoughts?  Even if it's not quite right, it may be a useful starting
+point.
+
+Cheers
+---Dave
+
+[1] [RFC PATCH 0/3] arm64: stacktrace: Improve robustness and ensure
+termination of backtraces
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/572685.html
+
 > 
-> I booted 4.17-rc1 (which includes this fix) on an AC100 (T20 paz00 board) and 
-> the error above is still there. Surprisingly the error vanishes when I revert 
-> your patch. So this patch actually *causes* the problem above on my board. 
-> Could it be, that we need all four clocks? Dimitry mentioned on IRC that it 
-> could also be a problem in the clock init table. I don't have the technical 
-> background myself to fix it, but I still wonder what could be so different 
-> between TrimSlice and AC100.
-
-I managed to find CDEV clocks in TRM this time. Seems assigning CDEV2 clock to
-"ulpi-link" was correct and both CDEV2 and PLL_P_OUT4 should be enabled, CDEV2
-should gate the PLL_P_OUT4 that feeds USB HW and PLL_P_OUT4 should be
-always-enabled because it is enabled by init_table, but apparently it is getting
-disabled erroneously.
-
-Marcel, could you please revert your patch, add
-"trace_event=clk_enable,clk_disable,clk_set_parent tp_printk" to kernels cmdline
-and post the log?
-
-It looks like there is some clk framework bug, but just in case please also try
-to apply this patch:
-
-diff --git a/drivers/clk/tegra/clk-tegra-periph.c
-b/drivers/clk/tegra/clk-tegra-periph.c
-index 2acba2986bc6..407bd0c0ac2f 100644
---- a/drivers/clk/tegra/clk-tegra-periph.c
-+++ b/drivers/clk/tegra/clk-tegra-periph.c
-@@ -1024,7 +1024,7 @@ static void __init init_pllp(void __iomem *clk_base, void
-__iomem *pmc_base,
-                if (dt_clk) {
-                        clk = tegra_clk_register_pll_out("pll_p_out4",
-                                        "pll_p_out4_div", clk_base + PLLP_OUTB,
--                                       17, 16, CLK_IGNORE_UNUSED |
-+                                       17, 16, CLK_IS_CRITICAL |
-                                        CLK_SET_RATE_PARENT, 0,
-                                        &PLLP_OUTB_lock);
-                        *dt_clk = clk;
+> Signed-off-by: Ji Zhang <ji.zhang@mediatek.com>
+> ---
+>  arch/arm64/include/asm/stacktrace.h | 25 +++++++++++++++++++++++++
+>  arch/arm64/kernel/stacktrace.c      |  8 ++++++++
+>  arch/arm64/kernel/traps.c           |  1 +
+>  3 files changed, 34 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+> index 902f9ed..f235b86 100644
+> --- a/arch/arm64/include/asm/stacktrace.h
+> +++ b/arch/arm64/include/asm/stacktrace.h
+> @@ -24,9 +24,18 @@
+>  #include <asm/ptrace.h>
+>  #include <asm/sdei.h>
+>  
+> +#ifndef CONFIG_VMAP_STACK
+> +#define MAX_NR_STACKS	2
+> +#elif !defined(CONFIG_ARM_SDE_INTERFACE)
+> +#define MAX_NR_STACKS	3
+> +#else
+> +#define MAX_NR_STACKS	4
+> +#endif
+> +
+>  struct stackframe {
+>  	unsigned long fp;
+>  	unsigned long pc;
+> +	int nr_stacks;
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>  	int graph;
+>  #endif
+> @@ -92,4 +101,20 @@ static inline bool on_accessible_stack(struct task_struct *tsk, unsigned long sp
+>  	return false;
+>  }
+>  
+> +
+> +static inline bool on_same_stack(struct task_struct *tsk,
+> +				unsigned long sp1, unsigned long sp2)
+> +{
+> +	if (on_task_stack(tsk, sp1) && on_task_stack(tsk, sp2))
+> +		return true;
+> +	if (on_irq_stack(sp1) && on_irq_stack(sp2))
+> +		return true;
+> +	if (on_overflow_stack(sp1) && on_overflow_stack(sp2))
+> +		return true;
+> +	if (on_sdei_stack(sp1) && on_sdei_stack(sp2))
+> +		return true;
+> +
+> +	return false;
+> +}
+> +
+>  #endif	/* __ASM_STACKTRACE_H */
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index d5718a0..d75f59d 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -43,6 +43,7 @@
+>  int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+>  {
+>  	unsigned long fp = frame->fp;
+> +	bool same_stack;
+>  
+>  	if (fp & 0xf)
+>  		return -EINVAL;
+> @@ -56,6 +57,13 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+>  	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
+>  	frame->pc = READ_ONCE_NOCHECK(*(unsigned long *)(fp + 8));
+>  
+> +	same_stack = on_same_stack(tsk, fp, frame->fp);
+> +
+> +	if (fp <= frame->fp && same_stack)
+> +		return -EINVAL;
+> +	if (!same_stack && ++frame->nr_stacks > MAX_NR_STACKS)
+> +		return -EINVAL;
+> +
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>  	if (tsk->ret_stack &&
+>  			(frame->pc == (unsigned long)return_to_handler)) {
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index ba964da..ee0403d 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -121,6 +121,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>  		frame.fp = thread_saved_fp(tsk);
+>  		frame.pc = thread_saved_pc(tsk);
+>  	}
+> +	frame.nr_stacks = 1;
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>  	frame.graph = tsk->curr_ret_stack;
+>  #endif
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
