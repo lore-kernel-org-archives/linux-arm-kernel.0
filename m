@@ -1,41 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 20 Apr 2018 18:59:38 +0100
-Subject: [GIT PULL] arm64 fixes for 4.17-rc2
-Message-ID: <20180420175935.obbvf5ype6n2odoq@armageddon.cambridge.arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 20 Apr 2018 13:42:14 -0500
+Subject: [PATCH 09/12] PCI: remove CONFIG_PCI_BUS_ADDR_T_64BIT
+In-Reply-To: <20180415145947.1248-10-hch@lst.de>
+References: <20180415145947.1248-1-hch@lst.de>
+ <20180415145947.1248-10-hch@lst.de>
+Message-ID: <20180420184214.GT28657@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Sun, Apr 15, 2018 at 04:59:44PM +0200, Christoph Hellwig wrote:
+> This symbol is now always identical to CONFIG_ARCH_DMA_ADDR_T_64BIT, so
+> remove it.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-Please pull the arm64 fixes below. Thanks.
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
+Please merge this along with the rest of the series; let me know if you
+need anything more from me.
 
-  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to b2d71b3cda19831ec67f49d7c6ba0214d9367b29:
-
-  arm64: signal: don't force known signals to SIGKILL (2018-04-18 15:13:27 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- KASan: avoid pfn_to_nid() before the page array is initialised
-
-- Fix typo causing the "upgrade" of known signals to SIGKILL
-
-----------------------------------------------------------------
-Mark Rutland (2):
-      arm64: kasan: avoid pfn_to_nid() before page array is initialized
-      arm64: signal: don't force known signals to SIGKILL
-
- arch/arm64/kernel/traps.c  | 2 +-
- arch/arm64/mm/kasan_init.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
--- 
-Catalin
+> ---
+>  drivers/pci/Kconfig | 4 ----
+>  drivers/pci/bus.c   | 4 ++--
+>  include/linux/pci.h | 2 +-
+>  3 files changed, 3 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+> index 34b56a8f8480..29a487f31dae 100644
+> --- a/drivers/pci/Kconfig
+> +++ b/drivers/pci/Kconfig
+> @@ -5,10 +5,6 @@
+>  
+>  source "drivers/pci/pcie/Kconfig"
+>  
+> -config PCI_BUS_ADDR_T_64BIT
+> -	def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT)
+> -	depends on PCI
+> -
+>  config PCI_MSI
+>  	bool "Message Signaled Interrupts (MSI and MSI-X)"
+>  	depends on PCI
+> diff --git a/drivers/pci/bus.c b/drivers/pci/bus.c
+> index bc2ded4c451f..35b7fc87eac5 100644
+> --- a/drivers/pci/bus.c
+> +++ b/drivers/pci/bus.c
+> @@ -120,7 +120,7 @@ int devm_request_pci_bus_resources(struct device *dev,
+>  EXPORT_SYMBOL_GPL(devm_request_pci_bus_resources);
+>  
+>  static struct pci_bus_region pci_32_bit = {0, 0xffffffffULL};
+> -#ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
+> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>  static struct pci_bus_region pci_64_bit = {0,
+>  				(pci_bus_addr_t) 0xffffffffffffffffULL};
+>  static struct pci_bus_region pci_high = {(pci_bus_addr_t) 0x100000000ULL,
+> @@ -230,7 +230,7 @@ int pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
+>  					  resource_size_t),
+>  		void *alignf_data)
+>  {
+> -#ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
+> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>  	int rc;
+>  
+>  	if (res->flags & IORESOURCE_MEM_64) {
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 73178a2fcee0..55371cb827ad 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -670,7 +670,7 @@ int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
+>  int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
+>  		  int reg, int len, u32 val);
+>  
+> -#ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
+> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>  typedef u64 pci_bus_addr_t;
+>  #else
+>  typedef u32 pci_bus_addr_t;
+> -- 
+> 2.17.0
+> 
