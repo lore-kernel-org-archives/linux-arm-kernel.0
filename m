@@ -1,135 +1,90 @@
-From: doudahwezomiechahtah@xff.cz (=?utf-8?Q?Ond=C5=99ej?= Jirman)
-Date: Fri, 20 Apr 2018 15:10:26 +0200
-Subject: [v2] drm/sun4i: add lvds mode_valid function
-In-Reply-To: <129dfeb0-0962-608d-370e-277a3acce7ca@micronovasrl.com>
-References: <1520940019-68977-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180419133421.6fx3whge7h364vd3@core>
- <CAGb2v64dqPoJkJDuMWp66HYXvZ3RJkrRz+2-CUVEcEG1k7UTsw@mail.gmail.com>
- <129dfeb0-0962-608d-370e-277a3acce7ca@micronovasrl.com>
-Message-ID: <20180420131026.vbg3qgrj26egw5s2@core>
+From: liwei1412@163.com (Wei Li)
+Date: Fri, 20 Apr 2018 20:57:08 +0800 (CST)
+Subject: [PATCH] arm64: fix single step issue in kgdb
+In-Reply-To: <20180420082110.wus3np2w7n5tqx6v@holly.lan>
+References: <3a4aff03.a762.162dddc3d1b.Coremail.liwei1412@163.com>
+ <20180420082110.wus3np2w7n5tqx6v@holly.lan>
+Message-ID: <1e85a456.a65d.162e3213af2.Coremail.liwei1412@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Because the former mail is in html by my mistake, it is rejected by the mailing list server. I just update the diffstat info and resend it in plain text. There is no difference in patch. Sorry to make you confused, please ignore the former one.
 
-On Thu, Apr 19, 2018 at 04:02:08PM +0200, Giulio Benetti wrote:
-> Hi everybody,
-> 
-> Il 19/04/2018 15:36, Chen-Yu Tsai ha scritto:
-> > On Thu, Apr 19, 2018 at 9:34 PM, Ond?ej Jirman
-> > <doudahwezomiechahtah@xff.cz> wrote:
-> > > Hello Giulio,
-> > > 
-> > > this patch breaks LVDS output on A83T. Without it, modesetting works,
-> > > with it there's no output.
-> > > 
-> > > Some more info below...
-> > > 
-> > > On Tue, Mar 13, 2018 at 12:20:19PM +0100, Giulio Benetti wrote:
-> > > > mode_valid function is missing for lvds.
-> > > > 
-> > > > Add it making it pointed by encoder helper functions.
-> > > > 
-> > > > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> > > > ---
-> > > >   drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ++++++++++++++++++++++++++++++++++++++
-> > > >   1 file changed, 55 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-> > > > index be3f14d..bffff4c 100644
-> > > > --- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
-> > > > +++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-> > > > @@ -94,9 +94,64 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
-> > > >        }
-> > > >   }
-> > > > 
-> > > > +static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
-> > > > +                                                       const struct drm_display_mode *mode)
-> > > > +{
-> > > > +     struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
-> > > > +     struct sun4i_tcon *tcon = lvds->tcon;
-> > > > +     u32 hsync = mode->hsync_end - mode->hsync_start;
-> > > > +     u32 vsync = mode->vsync_end - mode->vsync_start;
-> > > > +     unsigned long rate = mode->clock * 1000;
-> > > > +     long rounded_rate;
-> > > > +
-> > > > +     DRM_DEBUG_DRIVER("Validating modes...\n");
-> > > > +
-> > > > +     if (hsync < 1)
-> > > > +             return MODE_HSYNC_NARROW;
-> > > > +
-> > > > +     if (hsync > 0x3ff)
-> > > > +             return MODE_HSYNC_WIDE;
-> > > > +
-> > > > +     if ((mode->hdisplay < 1) || (mode->htotal < 1))
-> > > > +             return MODE_H_ILLEGAL;
-> > > > +
-> > > > +     if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
-> > > > +             return MODE_BAD_HVALUE;
-> > > > +
-> > > > +     DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
-> > > > +
-> > > > +     if (vsync < 1)
-> > > > +             return MODE_VSYNC_NARROW;
-> > > > +
-> > > > +     if (vsync > 0x3ff)
-> > > > +             return MODE_VSYNC_WIDE;
-> > > > +
-> > > > +     if ((mode->vdisplay < 1) || (mode->vtotal < 1))
-> > > > +             return MODE_V_ILLEGAL;
-> > > > +
-> > > > +     if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
-> > > > +             return MODE_BAD_VVALUE;
-> > > > +
-> > > > +     DRM_DEBUG_DRIVER("Vertical parameters OK\n");
-> > > > +
-> > > > +     tcon->dclk_min_div = 7;
-> > > > +     tcon->dclk_max_div = 7;
-> > > 
-> > > Why would validation function change any state anywhere?
-> > > 
-> > > > +     rounded_rate = clk_round_rate(tcon->dclk, rate);
-> > > 
-> > > The issue is here, on A83T TBS A711 tablet, I get...
-> > > 
-> > > sun4i-tcon 1c0c000.lcd-controller: XXX: hsync=20 hdisplay=1024 htotal=1384
-> > >    vsync=5 vdisplay=600 vtotal=640 rate=52000000 rounded_rate=51857142
-> > > 
-> > > > +     if (rounded_rate < rate)
-> > > > +             return MODE_CLOCK_LOW;
-> > > > +
-> > > > +     if (rounded_rate > rate)
-> > > > +             return MODE_CLOCK_HIGH;
-> > > 
-> > > ... while the previous conditions require an exact match for some reason.
-> > > 
-> > > But HW works fine without an exact rate match. Why is exact match required here?
-> > 
-> > This thread might provide some more info, though we could never get an
-> > agreement.
-> > 
-> > https://patchwork.kernel.org/patch/9446385/
-> 
-> Thanks for pointing that Thread ChenYu.
-> So the only chance is to trim frequency according to encoder capabilities.
-> I agree to block when encoder can't provide frequency specified,
-> otherwise you could drive you panel at the near the lowest(highest)
-> frequency and get out of limits for a few without knowing it.
 
-When I set the range of pixel clock frequencies on simple-panel connected
-to this encoder, the check still fails, so there's something not working
-there as expected. This check is only called once with a typical frequency.
 
-I guess drm doesn't implement clock-frequency range on panels. But I haven't
-looked.
 
-I can set the exact frequency that the SoC can provide on the simple-panel,
-but that's a bit of a hack.
-
-regards,
-  o.
-
-> Best regards
-> 
-> -- 
-> Giulio Benetti
+On 2018-04-20 16:21:10?"Daniel Thompson" <daniel.thompson@linaro.org> wrote?
+>On Thu, Apr 19, 2018 at 08:23:41PM +0800, Wei Li wrote:
+>> From: Wei Li <liwei1412@163.com>
+>> 
+>> In kdb, as the frontend for kgdb, cmd "ss" does not work well. It can only take effects once and the single step exception is reported as oops after a breakpoint triggered in kdb. Then the cmd "go" does not work well either due to this. Refer to the DDI0487C_a_armv8_arm.pdf (D2.12), i set the SPSR.SS=1 every time. It has been verified in qemu.
+>> 
+>> Signed-off-by: Wei Li <liwei1412@163.com>
+>> ---
+>> ?include/asm/debug-monitors.h |??? 3 +++
+>> ?kernel/debug-monitors.c????? |??? 4 ++--
+>> ?kernel/kgdb.c??????????????? |??? 3 ++-
+>
+>This contains many similar changes to a patch from earlier with the same
+>Subject. It is a v2? If so the subject should reflect that (and a
+>changelog would be nice).
+>
+>
+>Daniel.
+>
+>
+>> ?3 files changed, 7 insertions(+), 3 deletions(-)
+>> ?
+>> diff -uprN linux-4.16.2_org/arch/arm64/include/asm/debug-monitors.h linux-4.16.2_mod/arch/arm64/include/asm/debug-monitors.h
+>> --- linux-4.16.2_org/arch/arm64/include/asm/debug-monitors.h?? ?2018-04-12 18:30:01.000000000 +0800
+>> +++ linux-4.16.2_mod/arch/arm64/include/asm/debug-monitors.h?? ?2018-04-19 00:19:10.134999268 +0800
+>> @@ -135,6 +135,9 @@ static inline int reinstall_suspended_bp
+>> ?
+>> ?int aarch32_break_handler(struct pt_regs *regs);
+>> ?
+>> +void set_regs_spsr_ss(struct pt_regs *regs);
+>> +void clear_regs_spsr_ss(struct pt_regs *regs);
+>> +
+>> ?#endif?? ?/* __ASSEMBLY */
+>> ?#endif?? ?/* __KERNEL__ */
+>> ?#endif?? ?/* __ASM_DEBUG_MONITORS_H */
+>> diff -uprN linux-4.16.2_org/arch/arm64/kernel/debug-monitors.c linux-4.16.2_mod/arch/arm64/kernel/debug-monitors.c
+>> --- linux-4.16.2_org/arch/arm64/kernel/debug-monitors.c?? ?2018-04-12 18:30:01.000000000 +0800
+>> +++ linux-4.16.2_mod/arch/arm64/kernel/debug-monitors.c?? ?2018-04-19 00:19:19.435189356 +0800
+>> @@ -150,13 +150,13 @@ postcore_initcall(debug_monitors_init);
+>> ?/*
+>> ? * Single step API and exception handling.
+>> ? */
+>> -static void set_regs_spsr_ss(struct pt_regs *regs)
+>> +void set_regs_spsr_ss(struct pt_regs *regs)
+>> ?{
+>> ??? ?regs->pstate |= DBG_SPSR_SS;
+>> ?}
+>> ?NOKPROBE_SYMBOL(set_regs_spsr_ss);
+>> ?
+>> -static void clear_regs_spsr_ss(struct pt_regs *regs)
+>> +void clear_regs_spsr_ss(struct pt_regs *regs)
+>> ?{
+>> ??? ?regs->pstate &= ~DBG_SPSR_SS;
+>> ?}
+>> diff -uprN linux-4.16.2_org/arch/arm64/kernel/kgdb.c linux-4.16.2_mod/arch/arm64/kernel/kgdb.c
+>> --- linux-4.16.2_org/arch/arm64/kernel/kgdb.c?? ?2018-04-12 18:30:01.000000000 +0800
+>> +++ linux-4.16.2_mod/arch/arm64/kernel/kgdb.c?? ?2018-04-19 00:19:40.892911795 +0800
+>> @@ -221,6 +221,7 @@ int kgdb_arch_handle_exception(int excep
+>> ??? ??? ?/*
+>> ??? ??? ? * Enable single step handling
+>> ??? ??? ? */
+>> +??????? set_regs_spsr_ss(linux_regs);
+>> ??? ??? ?if (!kernel_active_single_step())
+>> ??? ??? ??? ?kernel_enable_single_step(linux_regs);
+>> ??? ??? ?err = 0;
+>> @@ -252,7 +253,7 @@ static int kgdb_step_brk_fn(struct pt_re
+>> ??? ?if (!kgdb_single_step)
+>> ??? ??? ?return DBG_HOOK_ERROR;
+>> ?
+>> -?? ?kgdb_handle_exception(1, SIGTRAP, 0, regs);
+>> +?? ?kgdb_handle_exception(0, SIGTRAP, 0, regs);
+>> ??? ?return 0;
+>> ?}
+>> ?NOKPROBE_SYMBOL(kgdb_step_brk_fn);
+>> 
