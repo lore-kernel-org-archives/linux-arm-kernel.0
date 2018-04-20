@@ -1,94 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Apr 2018 17:07:09 +0100
-Subject: [PATCH 1/5] KVM: arm/arm64: Close VMID generation race
-In-Reply-To: <20180420160713.17884-1-marc.zyngier@arm.com>
-References: <20180420160713.17884-1-marc.zyngier@arm.com>
-Message-ID: <20180420160713.17884-2-marc.zyngier@arm.com>
+Date: Fri, 20 Apr 2018 17:07:08 +0100
+Subject: [PATCH 0/5] KVM/arm fixes for 4.17-rc2
+Message-ID: <20180420160713.17884-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before entering the guest, we check whether our VMID is still
-part of the current generation. In order to avoid taking a lock,
-we start with checking that the generation is still current, and
-only if not current do we take the lock, recheck, and update the
-generation and VMID.
+Radim, Paolo,
 
-This leaves open a small race: A vcpu can bump up the global
-generation number as well as the VM's, but has not updated
-the VMID itself yet.
+Here is the first batch of KVM/arm fixes post 4.17 merge window. Not a
+lot to report, apart from the slightly scary VMID allocation race that
+has been sitting there from day 1.
 
-At that point another vcpu from the same VM comes in, checks
-the generation (and finds it not needing anything), and jumps
-into the guest. At this point, we end-up with two vcpus belonging
-to the same VM running with two different VMIDs. Eventually, the
-VMID used by the second vcpu will get reassigned, and things will
-really go wrong...
+Please pull.
 
-A simple solution would be to drop this initial check, and always take
-the lock. This is likely to cause performance issues. A middle ground
-is to convert the spinlock to a rwlock, and only take the read lock
-on the fast path. If the check fails at that point, drop it and
-acquire the write lock, rechecking the condition.
+	M.
 
-This ensures that the above scenario doesn't occur.
+The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
-Cc: stable at vger.kernel.org
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Shannon Zhao <zhaoshenglong@huawei.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/arm.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+  Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index dba629c5f8ac..a4c1b76240df 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -63,7 +63,7 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
- static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
- static u32 kvm_next_vmid;
- static unsigned int kvm_vmid_bits __read_mostly;
--static DEFINE_SPINLOCK(kvm_vmid_lock);
-+static DEFINE_RWLOCK(kvm_vmid_lock);
- 
- static bool vgic_present;
- 
-@@ -473,11 +473,16 @@ static void update_vttbr(struct kvm *kvm)
- {
- 	phys_addr_t pgd_phys;
- 	u64 vmid;
-+	bool new_gen;
- 
--	if (!need_new_vmid_gen(kvm))
-+	read_lock(&kvm_vmid_lock);
-+	new_gen = need_new_vmid_gen(kvm);
-+	read_unlock(&kvm_vmid_lock);
-+
-+	if (!new_gen)
- 		return;
- 
--	spin_lock(&kvm_vmid_lock);
-+	write_lock(&kvm_vmid_lock);
- 
- 	/*
- 	 * We need to re-check the vmid_gen here to ensure that if another vcpu
-@@ -485,7 +490,7 @@ static void update_vttbr(struct kvm *kvm)
- 	 * use the same vmid.
- 	 */
- 	if (!need_new_vmid_gen(kvm)) {
--		spin_unlock(&kvm_vmid_lock);
-+		write_unlock(&kvm_vmid_lock);
- 		return;
- 	}
- 
-@@ -519,7 +524,7 @@ static void update_vttbr(struct kvm *kvm)
- 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
- 	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
- 
--	spin_unlock(&kvm_vmid_lock);
-+	write_unlock(&kvm_vmid_lock);
- }
- 
- static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
--- 
-2.14.2
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvmarm-fixes-for-4.17-1
+
+for you to fetch changes up to 85bd0ba1ff9875798fad94218b627ea9f768f3c3:
+
+  arm/arm64: KVM: Add PSCI version selection API (2018-04-20 16:32:23 +0100)
+
+----------------------------------------------------------------
+KVM/arm fixes for 4.17, take #1
+
+- PSCI selection API, a leftover from 4.16
+- Kick vcpu on active interrupt affinity change
+- Plug a VMID allocation race on oversubscribed systems
+- Silence debug messages
+- Update Christoffer's email address
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      KVM: arm/arm64: vgic: Kick new VCPU on interrupt migration
+
+Christoffer Dall (1):
+      MAINTAINERS: Update e-mail address for Christoffer Dall
+
+Marc Zyngier (3):
+      KVM: arm/arm64: Close VMID generation race
+      arm64: KVM: Demote SVE and LORegion warnings to debug only
+      arm/arm64: KVM: Add PSCI version selection API
+
+ Documentation/virtual/kvm/api.txt      |  9 ++++-
+ Documentation/virtual/kvm/arm/psci.txt | 30 +++++++++++++++++
+ MAINTAINERS                            |  4 +--
+ arch/arm/include/asm/kvm_host.h        |  3 ++
+ arch/arm/include/uapi/asm/kvm.h        |  6 ++++
+ arch/arm/kvm/guest.c                   | 13 ++++++++
+ arch/arm64/include/asm/kvm_host.h      |  3 ++
+ arch/arm64/include/uapi/asm/kvm.h      |  6 ++++
+ arch/arm64/kvm/guest.c                 | 14 +++++++-
+ arch/arm64/kvm/sys_regs.c              |  6 ++--
+ include/kvm/arm_psci.h                 | 16 +++++++--
+ virt/kvm/arm/arm.c                     | 15 ++++++---
+ virt/kvm/arm/psci.c                    | 60 ++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c               |  8 +++++
+ 14 files changed, 178 insertions(+), 15 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/arm/psci.txt
