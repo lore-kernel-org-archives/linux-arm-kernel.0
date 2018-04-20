@@ -1,57 +1,30 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 20 Apr 2018 15:38:32 +0200
-Subject: [PATCH v2 01/10] media: v4l2-ctrls: Add missing v4l2 ctrl unlock
-In-Reply-To: <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
-References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
-Message-ID: <47861cbd-e385-66c0-798d-f6ff3f454bac@xs4all.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 Apr 2018 15:40:24 +0200
+Subject: [PATCH 0/8] arm: renesas: Change platform dependency to
+ ARCH_RENESAS
+In-Reply-To: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAK8P3a17+rD9o=dKGYPhhjmtZsc7S-1YpPpH+Zfxbx6xVo7UWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/18 17:41, Paul Kocialkowski wrote:
-> This adds a missing v4l2_ctrl_unlock call that is required to avoid
-> deadlocks.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/media/v4l2-core/v4l2-ctrls.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-> index f67e9f5531fa..ba05a8b9a095 100644
-> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
-> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-> @@ -3614,10 +3614,12 @@ void v4l2_ctrl_request_complete(struct media_request *req,
->  			continue;
->  
->  		v4l2_ctrl_lock(ctrl);
-> +
->  		if (ref->req)
->  			ptr_to_ptr(ctrl, ref->req->p_req, ref->p_req);
->  		else
->  			ptr_to_ptr(ctrl, ctrl->p_cur, ref->p_req);
-> +
->  		v4l2_ctrl_unlock(ctrl);
->  	}
->  
-> @@ -3677,8 +3679,11 @@ void v4l2_ctrl_request_setup(struct media_request *req,
->  				}
->  			}
->  		}
-> -		if (!have_new_data)
-> +
-> +		if (!have_new_data) {
-> +			v4l2_ctrl_unlock(master);
->  			continue;
-> +		}
+On Fri, Apr 20, 2018 at 3:28 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+>         Hi all,
+>
+> Commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
+> started the conversion from ARCH_SHMOBILE to ARCH_RENESAS for Renesas
+> ARM SoCs.  This patch series completes the conversion, by:
+>   1. Updating dependencies for drivers that weren't converted yet,
+>   2. Removing the ARCH_SHMOBILE Kconfig symbols on ARM and ARM64.
+>
+> The first 6 patches can be applied independently by subsystem
+> maintainers.
+> The last two patches depend on the first 6 patches, and are thus marked
+> RFC.
 
-Oops! Thanks for finding this. I'll fold this into the relevant patch in my tree.
+This all looks fine to me.
 
->  
->  		for (i = 0; i < master->ncontrols; i++) {
->  			if (master->cluster[i]) {
-> 
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Regards,
-
-	Hans
+      Arnd
