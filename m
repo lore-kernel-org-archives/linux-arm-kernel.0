@@ -1,132 +1,52 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 20 Apr 2018 15:38:11 +0800
-Subject: [PATCH V3 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
- source
-In-Reply-To: <1524209891-14146-1-git-send-email-Anson.Huang@nxp.com>
-References: <1524209891-14146-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1524209891-14146-2-git-send-email-Anson.Huang@nxp.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 20 Apr 2018 15:46:24 +0800
+Subject: [PATCH 55/61] usb: mtu3: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-56-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-56-wsa+renesas@sang-engineering.com>
+Message-ID: <1524210384.25162.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6SX SabreAuto board, there is external 24MHz clock
-source for analog clock2, add this clock source to clock tree
-and remove "clocks" container for all input clocks.
+hi,
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-changes since V2:
-	remove "clocks" container and use new way for all input clocks definition.
- arch/arm/boot/dts/imx6sx-sabreauto.dts |  4 ++
- arch/arm/boot/dts/imx6sx.dtsi          | 71 ++++++++++++++++++----------------
- 2 files changed, 42 insertions(+), 33 deletions(-)
+On Thu, 2018-04-19 at 16:06 +0200, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+> 
+> Build tested only. buildbot is happy. Please apply individually.
+> 
+>  drivers/usb/mtu3/mtu3_plat.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+> index 628d5ce356ca..46551f6d16fd 100644
+> --- a/drivers/usb/mtu3/mtu3_plat.c
+> +++ b/drivers/usb/mtu3/mtu3_plat.c
+> @@ -447,8 +447,7 @@ static int mtu3_remove(struct platform_device *pdev)
+>   */
+>  static int __maybe_unused mtu3_suspend(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct ssusb_mtk *ssusb = platform_get_drvdata(pdev);
+> +	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
+>  
+>  	dev_dbg(dev, "%s\n", __func__);
+>  
+> @@ -466,8 +465,7 @@ static int __maybe_unused mtu3_suspend(struct device *dev)
+>  
+>  static int __maybe_unused mtu3_resume(struct device *dev)
+>  {
+> -	struct platform_device *pdev = to_platform_device(dev);
+> -	struct ssusb_mtk *ssusb = platform_get_drvdata(pdev);
+> +	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
+>  	int ret;
+>  
+>  	dev_dbg(dev, "%s\n", __func__);
 
-diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index 72da5ac..57d1ea0 100644
---- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -37,6 +37,10 @@
- 	};
- };
- 
-+&anaclk2 {
-+	clock-frequency = <24576000>;
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 49c7205..7e463d2 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -104,41 +104,46 @@
- 		interrupt-parent = <&intc>;
- 	};
- 
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <0>;
-+	ckil: clock-ckil {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		clock-output-names = "ckil";
-+	};
- 
--		ckil: clock at 0 {
--			compatible = "fixed-clock";
--			reg = <0>;
--			#clock-cells = <0>;
--			clock-frequency = <32768>;
--			clock-output-names = "ckil";
--		};
-+	osc: clock-osc {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24000000>;
-+		clock-output-names = "osc";
-+	};
- 
--		osc: clock at 1 {
--			compatible = "fixed-clock";
--			reg = <1>;
--			#clock-cells = <0>;
--			clock-frequency = <24000000>;
--			clock-output-names = "osc";
--		};
-+	ipp_di0: clock-ipp-di0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+		clock-output-names = "ipp_di0";
-+	};
- 
--		ipp_di0: clock at 2 {
--			compatible = "fixed-clock";
--			reg = <2>;
--			#clock-cells = <0>;
--			clock-frequency = <0>;
--			clock-output-names = "ipp_di0";
--		};
-+	ipp_di1: clock-ipp-di1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+		clock-output-names = "ipp_di1";
-+	};
- 
--		ipp_di1: clock at 3 {
--			compatible = "fixed-clock";
--			reg = <3>;
--			#clock-cells = <0>;
--			clock-frequency = <0>;
--			clock-output-names = "ipp_di1";
--		};
-+	anaclk1: clock-anaclk1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+		clock-output-names = "anaclk1";
-+	};
-+
-+	anaclk2: clock-anaclk2 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+		clock-output-names = "anaclk2";
- 	};
- 
- 	tempmon: tempmon {
-@@ -575,8 +580,8 @@
- 				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
- 				#clock-cells = <1>;
--				clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>;
--				clock-names = "ckil", "osc", "ipp_di0", "ipp_di1";
-+				clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>, <&anaclk1>, <&anaclk2>;
-+				clock-names = "ckil", "osc", "ipp_di0", "ipp_di1", "anaclk1", "anaclk2";
- 			};
- 
- 			anatop: anatop at 20c8000 {
--- 
-2.7.4
+Acked-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+
+Thanks
