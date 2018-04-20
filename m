@@ -1,25 +1,118 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 20 Apr 2018 21:23:19 +0200
-Subject: [PATCH 1/7] i2c: i2c-gpio: move header to platform_data
-In-Reply-To: <20180419200015.15095-2-wsa@the-dreams.de> (Wolfram Sang's
- message of "Thu, 19 Apr 2018 22:00:07 +0200")
-References: <20180419200015.15095-1-wsa@the-dreams.de>
- <20180419200015.15095-2-wsa@the-dreams.de>
-Message-ID: <874lk53cns.fsf@belgarion.home>
+From: collinsd@codeaurora.org (David Collins)
+Date: Fri, 20 Apr 2018 12:28:21 -0700
+Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <20180419120813.GD27188@sirena.org.uk>
+References: <cover.1521246069.git.collinsd@codeaurora.org>
+ <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
+ <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
+ <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
+ <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
+ <20180419120813.GD27188@sirena.org.uk>
+Message-ID: <38f42537-f801-115a-4120-1344a67a0462@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <wsa@the-dreams.de> writes:
+On 04/19/2018 05:08 AM, Mark Brown wrote:
+> On Wed, Apr 18, 2018 at 10:55:49PM -0700, Stephen Boyd wrote:
+>>>> Is this regulator-microvolt-offset? Ah I guess it's a thing in the RPMh
+>>>> registers. This probably needs to be pushed into the framework and come
+>>>> down through a 'set_headroom' op in the regulator ops via a
+>>>> regulator-headroom-microvolt property that's parsed in of_regulator.c.
+> 
+>>> The qcom,headroom-voltage property is equivalent to struct
+>>> regulator_desc.min_dropout_uV, but handled in hardware.  I don't see the
+>>> need to make a new regulator op to configure this value dynamically.
+> 
+>> Ok? We have other regulator ops just to configure boot time things. The
+>> goal is to come up with generic regulator properties that can be applied
+>> from the framework perspective and be used by other regulator drivers in
+>> the future.
+> 
+> This doesn't sound like what the min_dropout_uV constraint is intended
+> to handle - that's there for the regulator driver (not constraints) to
+> indicate how much headroom the regulator needs in the supply voltage in
+> order to provide regulation.  It's not something the regulator uses,
+> it's something that gets fed into voltage requests made on the supply of
+> the regulator which I can't see that the hardware is going to be able to
+> handle unaided.
 
-> This header only contains platform_data. Move it to the proper directory.
->
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-For mach-pxa:
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+RPMh hardware enforces the requested minimum headroom voltage for all
+regulators with a parent.  It has full knowledge of the parent-child
+connections of regulators on the board (as programmed by the bootloader).
+It automatically reconfigures the parent voltage when needed as a result
+of requests changing the voltage of any of its child regulators.
 
-Take it through your tree, no problem for the pxa part.
 
-Cheers.
+>> Cool. This should be a generic regulator DT property that all regulators
+>> can use. We have the same problem on other RPM based regulator drivers
+>> where boot sends a bunch of voltages because we don't know what it is by
+>> default out of boot and we can't read it.
+> 
+> Ideally future versions of the RPM will have improved interfaces,
+> there's a bunch of problems like this :(
 
---
-Robert
+Do you have a preference for qcom,regulator-initial-microvolt vs a generic
+framework supported regulator-initial-microvolt property for configuring a
+specific voltage at registration time?  We'll need to have support for one
+or the other in order for the qcom_rpmh-regulator driver to be functional.
+
+
+>>>>> +       if (type == RPMH_REGULATOR_TYPE_XOB && init_data->constraints.min_uV) {
+>>>>> +               vreg->rdesc.fixed_uV = init_data->constraints.min_uV;
+>>>>> +               init_data->constraints.apply_uV = 0;
+>>>>> +               vreg->rdesc.n_voltages = 1;
+>>>>> +       }
+> 
+>>>> What is this doing? Usually constraints aren't touched by the driver.
+> 
+>>> For XOB managed regulators, we need to set fixed_uV to match the DT
+>>> constraint voltage and n_voltages = 1.  This allows consumers
+>>> regulator_set_voltage() calls to succeed for such regulators.  It works
+>>> the same as a fixed regulator.  I think that apply_uV = 0 could be left out.
+> 
+>> Wouldn't XOB regulators only have one voltage specified for min/max in
+>> DT already though? I seem to recall that's how we make set_voltage() in
+>> those cases work. Or it could be that drivers aren't supposed to call
+>> set_voltage() on single or fixed voltage regulators anyway, because
+>> constraints take care of it for them.
+> 
+> Yes, constraints that specify a single voltage are done by setting min
+> and max to the same value.  fixed_uV is *only* for regulators that have
+> a physically fixed voltage.
+
+XOB managed regulators physically cannot change voltage.  Therefore, do
+you agree that it is reasonable to use fixed_uV for them?  Note that I
+removed init_data->constraints.apply_uV manipulation in version 2 of this
+patch.
+
+
+>>>>> +       if (vreg->hw_data->mode_map) {
+>>>>> +               init_data->constraints.valid_ops_mask |= REGULATOR_CHANGE_MODE;
+> 
+> A driver must *NEVER* modify any constraints.
+> 
+>>>> Huh, I thought this was assigned by the framework.
+> 
+>>> No, this is not set anywhere in the regulator framework.  There isn't a DT
+>>> method to configure it.  It seems that it could only be handled before
+>>> with board files.  Other regulator drivers also configure it.
+> 
+>> Hmm ok. Would something be bad if we did support it through DT? I can't
+>> seem to recall the history here.
+> 
+> Yes, if someone wants to configure this through DT they should add
+> support for configuring it using DT.  The mode support in most
+> regulators is not practically useful so nobody did that yet.  Mostly the
+> hardware does a much better job of adjusting modes on the fly for
+> anything that's going on at runtime than software is ever likely to do
+> so it's not worth it.
+
+I'll send out a patch to add generic support for this configuration via
+device tree in the of_get_regulation_constraints() function.
+
+Thanks,
+David
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
