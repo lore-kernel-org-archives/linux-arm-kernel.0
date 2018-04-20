@@ -1,55 +1,51 @@
 From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 20 Apr 2018 23:10:18 +0200
-Subject: [PATCH v7 07/11] ARM: sun9i: smp: Rename clusters's power-off
+Date: Fri, 20 Apr 2018 23:10:19 +0200
+Subject: [PATCH v7 08/11] ARM: sun9i: smp: Add is_a83t field
 In-Reply-To: <20180420211022.11759-1-mylene.josserand@bootlin.com>
 References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
-Message-ID: <20180420211022.11759-8-mylene.josserand@bootlin.com>
+Message-ID: <20180420211022.11759-9-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare the support for sun8i-a83t, rename the macro that handles
-the power-off of clusters because it is different from sun9i-a80 to
-sun8i-a83t.
+To prepare the support of sun8i-a83t, add a field in the smp_data
+structure to know if we are on sun9i-a80 or sun8i-a83t.
 
-The power off register for clusters are different from a80 and a83t.
+Add also a global variable to retrieve which architecture we are
+having.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/mach-sunxi/mc_smp.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-sunxi/mc_smp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-index 727968d6a3e5..03f021d0c73e 100644
+index 03f021d0c73e..48e5f4db64b6 100644
 --- a/arch/arm/mach-sunxi/mc_smp.c
 +++ b/arch/arm/mach-sunxi/mc_smp.c
-@@ -60,7 +60,7 @@
- #define PRCM_CPU_PO_RST_CTRL_CORE(n)	BIT(n)
- #define PRCM_CPU_PO_RST_CTRL_CORE_ALL	0xf
- #define PRCM_PWROFF_GATING_REG(c)	(0x100 + 0x4 * (c))
--#define PRCM_PWROFF_GATING_REG_CLUSTER	BIT(4)
-+#define PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I	BIT(4)
- #define PRCM_PWROFF_GATING_REG_CORE(n)	BIT(n)
- #define PRCM_PWR_SWITCH_REG(c, cpu)	(0x140 + 0x10 * (c) + 0x4 * (cpu))
- #define PRCM_CPU_SOFT_ENTRY_REG		0x164
-@@ -255,7 +255,7 @@ static int sunxi_cluster_powerup(unsigned int cluster)
+@@ -74,6 +74,7 @@ static void __iomem *sram_b_smp_base;
  
- 	/* clear cluster power gate */
- 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
--	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER;
-+	reg &= ~PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
- 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
- 	udelay(20);
+ extern void sunxi_mc_smp_secondary_startup(void);
+ extern void sunxi_mc_smp_resume(void);
++static int is_a83t;
  
-@@ -452,7 +452,7 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
- 	/* gate cluster power */
- 	pr_debug("%s: gate cluster power\n", __func__);
- 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
--	reg |= PRCM_PWROFF_GATING_REG_CLUSTER;
-+	reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
- 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
- 	udelay(20);
+ static bool sunxi_core_is_cortex_a15(unsigned int core, unsigned int cluster)
+ {
+@@ -624,6 +625,7 @@ struct sunxi_mc_smp_nodes {
+ struct sunxi_mc_smp_data {
+ 	const char *enable_method;
+ 	int (*get_smp_nodes)(struct sunxi_mc_smp_nodes *nodes);
++	int is_a83t;
+ };
  
+ static void __init sunxi_mc_smp_put_nodes(struct sunxi_mc_smp_nodes *nodes)
+@@ -697,6 +699,8 @@ static int __init sunxi_mc_smp_init(void)
+ 			break;
+ 	}
+ 
++	is_a83t = sunxi_mc_smp_data[i].is_a83t;
++
+ 	of_node_put(node);
+ 	if (ret)
+ 		return -ENODEV;
 -- 
 2.11.0
