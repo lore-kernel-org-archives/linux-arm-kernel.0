@@ -1,46 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 20 Apr 2018 12:41:14 +0300
-Subject: [PATCH v3 5/7] drm/i2c: tda998x: find the drm_device via the
- drm_connector
-In-Reply-To: <20180419162751.25223-6-peda@axentia.se>
-References: <20180419162751.25223-1-peda@axentia.se>
- <20180419162751.25223-6-peda@axentia.se>
-Message-ID: <1995876.dqZyKbpDZd@avalon>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 20 Apr 2018 11:41:22 +0200
+Subject: [PATCH 1/8] drm/mediatek: Use regmap for register access
+In-Reply-To: <1511427282.7685.1.camel@pengutronix.de>
+References: <20171114214114.15793-1-mbrugger@suse.com>
+ <20171114214114.15793-2-mbrugger@suse.com>
+ <1511427282.7685.1.camel@pengutronix.de>
+Message-ID: <3fffe06c-f19b-ef26-a19d-771611aae158@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Philipp,
 
-Thank you for the patch.
-
-On Thursday, 19 April 2018 19:27:49 EEST Peter Rosin wrote:
-> This prepares for being a drm_bridge which will not register the
-> encoder. That makes the connector the better choice.
+On 11/23/2017 09:54 AM, Philipp Zabel wrote:
+> Hi Matthias,
 > 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> ---
->  drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Tue, 2017-11-14 at 22:41 +0100, Matthias Brugger wrote:
+>> The mmsys memory space is shared between the drm and the
+>> clk driver. Use regmap to access it.
+>>
+>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>> ---
+>>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |  4 ++--
+>>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 30 +++++++++++++++++-------------
+>>  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  4 ++--
+>>  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 13 ++++---------
+>>  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  2 +-
+>>  5 files changed, 26 insertions(+), 27 deletions(-)
+> [...]
+[...]
+>>  	}
+>>  
+>>  	value = mtk_ddp_sel_in(cur, next, &addr);
+>>  	if (value) {
+>> -		reg = readl_relaxed(config_regs + addr) & ~value;
+>> -		writel_relaxed(reg, config_regs + addr);
+>> +		regmap_read(config_regs, addr, &reg);
+>> +		reg &= ~value;
+>> +		regmap_write(config_regs, addr, reg);
 > 
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c
-> b/drivers/gpu/drm/i2c/tda998x_drv.c index cd3f0873bbdd..8f6e013f2b87 100644
-> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -630,7 +630,7 @@ static void tda998x_detect_work(struct work_struct
-> *work) {
->  	struct tda998x_priv *priv =
->  		container_of(work, struct tda998x_priv, detect_work);
-> -	struct drm_device *dev = priv->encoder.dev;
-> +	struct drm_device *dev = priv->connector.dev;
+> 		regmap_update_bits(config_regs, addr, value, 0);
 > 
->  	if (dev)
->  		drm_kms_helper_hotplug_event(dev);
+> Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
 
+Thanks for having a look on that.
 
--- 
+I'll update the next version with regmap_update_bits and leave your Reviewed-by,
+hope that's ok.
+
 Regards,
-
-Laurent Pinchart
+Matthias
