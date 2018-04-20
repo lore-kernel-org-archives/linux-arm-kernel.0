@@ -1,123 +1,160 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 20 Apr 2018 12:19:50 +0100
-Subject: [RFC PATCH 3/3] arm64: stacktrace: Prevent looping and invalid
- stack transitions
-In-Reply-To: <20180420105814.a7ntoqslbsgzluia@lakrids.cambridge.arm.com>
-References: <1524221179-19473-1-git-send-email-Dave.Martin@arm.com>
- <1524221179-19473-4-git-send-email-Dave.Martin@arm.com>
- <20180420105814.a7ntoqslbsgzluia@lakrids.cambridge.arm.com>
-Message-ID: <20180420111950.GN16308@e103592.cambridge.arm.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Fri, 20 Apr 2018 13:22:04 +0200
+Subject: [PATCH v3 0/7] Add tda998x (HDMI) support to atmel-hlcdc
+In-Reply-To: <6354350.l8DgUyNhLT@avalon>
+References: <20180419162751.25223-1-peda@axentia.se>
+ <20180420085235.GI4235@w540> <6354350.l8DgUyNhLT@avalon>
+Message-ID: <20180420112204.GK4235@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 11:58:14AM +0100, Mark Rutland wrote:
-> On Fri, Apr 20, 2018 at 11:46:19AM +0100, Dave Martin wrote:
-> > In the event of stack corruption, backtraces may loop indefinitely
-> > or wander off into memory that is not a valid stack for the context
-> > being backtraced.
-> > 
-> > This patch makes backtracing more robust against stack corruption,
-> > by taking two things into account:
-> > 
-> >  * while staying on the same stack, the frame address must strictly
-> >    increase from each frame to its ancestor;
-> > 
-> >  * when transitioning to another stack, the set of valid stacks for
-> >    the context forms a strict hierarchy (e.g., a frame on the task
-> >    stack cannot have an ancestor frame on the IRQ stack because
-> >    task context cannot preempt IRQ handlers etc.)
-> > 
-> > on_accessible_stack() is converted to a more expressive helper
-> > identify_stack() that also tells the caller _which_ stack the task
-> > appears to be on.  The stack identifier is represented by an enum
-> > sorted into the correct order for checking stack transition
-> > validity by a simple numeric comparison.  A field stack_id is added
-> > to struct stackframe to track the result of this for the frame.
-> > 
-> > Now that it is easy to check whether two successive frames are on
-> > the same stack, it is easy to add a check for strictly increasing
-> > frame address, to avoid looping around the same stack.
-> > 
-> > Now that frames can be mapped to a strict lexical order on the
-> > stack id and frame address, forward progress should be guaranteed.
-> > 
-> > Backtracing now terminates whenever the next frame violates this
-> > order, with kernel entry (with fp == 0 && pc == 0) as a special
-> > case of this.
-> > 
-> > Reported-by: Ji Zhang <ji.zhang@mediatek.com>
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > 
-> > ---
-> > 
-> > The assumption that we can place the possible stacks (task, IRQ,
-> > overflow, SDEI) in a strict order is based on a quick review of
-> > entry.S, but I may have this wrong... in which case the approach
-> > proposed in this patch may need tweaking (or may not work at all).
-> 
-> We have a partial ordering where we can transition between stacks:
-> 
-> 	task -> irq -> {overflow,sdei}
-> 
-> The only problem that I'm aware of is that you could go either way:
-> 
-> 	overflow -> sdei
-> 	sdei -> overflow
+Hi Laurent,
 
-> In either case, there's a fatal error, and it would be very nice to get
-> the most reliable stacktrace possible rather than terminating early.
+On Fri, Apr 20, 2018 at 01:18:13PM +0300, Laurent Pinchart wrote:
+> Hello,
+>
+> On Friday, 20 April 2018 11:52:35 EEST jacopo mondi wrote:
+> > Hi Peter,
+> >     I've been a bit a pain in the arse for you recently, but please
+> > bear with me a bit more, and sorry for jumping late on the band wagon.
+> >
+> > On Thu, Apr 19, 2018 at 06:27:44PM +0200, Peter Rosin wrote:
+> > > Hi!
+> > >
+> > > I naively thought that since there was support for both nxp,tda19988 (in
+> > > the tda998x driver) and the atmel-hlcdc, things would be a smooth ride.
+> > > But it wasn't, so I started looking around and realized I had to fix
+> > > things.
+> > >
+> > > In v1 and v2 I fixed things by making the atmel-hlcdc driver a master
+> > > component, but now in v3 I fix things by making the tda998x driver
+> > > a bridge instead. This was after a suggestion from Boris Brezillion
+> > > (the atmel-hlcdc maintainer), so there was some risk of bias ... but
+> > > after comparing what was needed, I too find the bridge approach better.
+> > >
+> > > In addition to the above, our PCB interface between the SAMA5D3 and the
+> > > HDMI encoder is only using 16 bits, and this has to be described
+> > > somewhere, or the atmel-hlcdc driver have no chance of selecting the
+> > > correct output mode. Since I have similar problems with a ds90c185 lvds
+> > > encoder I added patches to override the atmel-hlcdc output format via
+> > > DT properties compatible with the media video-interface binding and
+> > > things start to play together.
+> > >
+> > > Since this series superseeds the bridge series [1], I have included the
+> > > leftover bindings patch for the ti,ds90c185 here.
+> >
+> > I feel like this series would look better if it would make use of the
+> > proposed bridge media bus format support I have recently sent out [1]
+> > (and which was not there when you first sent v1).
+> >
+> > I understand your fundamental problem here is that the bus format
+> > that should be reported by your bridge is different from the ones
+> > actually supported by the TDA19988 chip, as the wirings ground some
+> > of the input pins.
+> >
+> > Although this is defintely something that could be described in the
+> > bridge's own OF node with the 'bus_width' property, and what I would do,
+> > now that you have made a bridge out from the tda19988 driver, is:
+> >
+> > 1) Set the bridge accepted input bus_format parsing its pin
+> > configuration, or default it if that's not implemented yet.
+> > This will likely be rgb888. You can do that using the trivial
+> > support for bridge input image formats implemented by my series.
+> > 2) Specify in the bridge endpoint a 'bus_width' of <16>
+> > 3) In your atmel-hlcd get both the image format of the bridge (rgb888)
+> > and parse the remote endpoint property 'bus_width' and get the <16>
+> > value back.
+>
+> Parsing properties of remote nodes should be avoided as much as possible, as
+> they need to be interpreted in the context of the DT bindings related to the
+> compatible string applicable to that node. I'd rather have the bus_width
+> property in the local endpoint node.
 
-Agreed, where we must choose between a possibly-incomplete backtrace or
-a possibly-incorrect backtrace, we should probably err on the side of
-completeness.
+Right, I see...
+Well, in Peter's case, the bus width, being a consequence of
+wirings, can be described safely in both endpoints, right?
 
-To what extent do we claim to cope with recursive stack overflows?
-We could get something like
-
-task -> overflow -> irq -> overflow -> sdei -> overflow
-
-(We can also take a single nested SDE, but if the sdei stack already
-overflowed I think we're basically dead if that happens here, unless
-SDEI checks for this and continues on the overflow stack if that
-happens).
-
-> The only way I'd thought to avoid that was to keep track of the last SP
-> we saw per-stack to avoid a lexical ordering, e.g.
-> 
-> struct stackframe {
-> 
-> 	...
-> 
-> 	/* assume we init these to 0 before unwinding */
-> 	unsigned long last_task_fp;
-> 	unsigned long last_irq_fp;
-> 	unsigned long last_ovf_fp;
-> 	unsigned long last_sdei_fp;
-> };
-
-But possibly we only need to track ovf and sdei here, unless I'm
-misunderstanding.
-
-If that's right perhaps my approach can be tweaked rather then being
-completely unusable, but I'll need to have a think.
-
-> 
-> ... and corresponding when we unwind a frame, do something like:
-> 
-> 	if (on_task_stack(task, sp) {
-> 		if (sp < frame->last_task_fp)
-> 			<fail>
-> 		frame->last_task_fp = sp;
-> 	} else if (on_irq_stack(sp)) {
-> 		if (sp < frame->last_irq_fp)
-> 			<fail>
-> 		frame->last_irq_fp = sp;
-> 	} else (...) {
-> 		...
-> 	}
-
-I guess.  I think mine is nicer (of course), but also brokener for
-now...
-
-Cheers
----Dave
+>
+> > 4) Set the correct format in the atmel hlcd driver to accommodate a
+> > bridge that wants rgb888 on a 16 bit wide bus (that would be rgb565,
+> > or are there other possible combinations I am missing?)
+> >
+> > I would consider this better mostly because in this series you are
+> > creating a semantic for the whole DRM subsystem on the 'bus_width'
+> > property, where numerical values as '12', '16' etc are arbitrary tied
+> > to the selection of a media bus format. At least you should use a
+> > common set of defines [1] between the device tree and the driver,
+> > but this looks anyway fragile imho.
+>
+> This I agree with though. Combining the remote bus format with the local bus
+> width should fix the problem without having to parse remote properties.
+>
+> > Have I maybe missed some parts of the problem you are trying to solve
+> > here?
+> >
+> > Thank you
+> >    j
+> >
+> > [1] drm: bridge: Add support for static image formats
+> >     https://lwn.net/Articles/752296/
+> > [2] include/uapi/linux/media-bus-format.h
+> >
+> > > Anyway, this series solves some real issues for my HW.
+> > >
+> > > Cheers,
+> > > Peter
+> > >
+> > > Changes since v2   https://lkml.org/lkml/2018/4/17/385
+> > > - patch 2/7 fixed spelling and added an example
+> > > - patch 4/7 parse the DT up front and store the result indexed by encoder
+> > > - old patch 5/6 and 6/6 dropped
+> > > - patch 5-7/7 are new and makes the tda998x driver a drm_bridge
+> > >
+> > > Changes since v1   https://lkml.org/lkml/2018/4/9/294
+> > > - added reviewed-by from Rob to patch 1/6
+> > > - patch 2/6 changed so that the bus format override is in the endpoint
+> > >   DT node, and follows the binding of media video-interfaces.
+> > > - patch 3/6 is new, it adds drm_of_media_bus_fmt which parses above
+> > >   media video-interface binding (partially).
+> > > - patch 4/6 now makes use of the above helper (and also fixes problems
+> > >   with the 3/5 patch from v1 when no override was specified).
+> > > - do not mention unrelated connector display_info details in the cover
+> > >   letter and commit messages.
+> > >
+> > > [1]
+> > > "Bridge" series v2   https://lkml.org/lkml/2018/3/26/610
+> > > "Bridge" series v1   https://lkml.org/lkml/2018/3/17/221
+> > >
+> > > Peter Rosin (7):
+> > >   dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+> > >   dt-bindings: display: atmel: optional video-interface of endpoints
+> > >   drm: of: introduce drm_of_media_bus_fmt
+> > >   drm/atmel-hlcdc: support bus-width (12/16/18/24) in endpoint nodes
+> > >   drm/i2c: tda998x: find the drm_device via the drm_connector
+> > >   drm/i2c: tda998x: split encoder and component functions from the work
+> > >   drm/i2c: tda998x: register as a drm bridge
+> > >
+> > >  .../devicetree/bindings/display/atmel/hlcdc-dc.txt |  26 +++
+> > >  .../bindings/display/bridge/lvds-transmitter.txt   |   8 +-
+> > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     |  71 ++++++--
+> > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       |   2 +
+> > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   |  40 +++-
+> > >  drivers/gpu/drm/drm_of.c                           |  38 ++++
+> > >  drivers/gpu/drm/i2c/tda998x_drv.c                  | 201 ++++++++++++++--
+> > >  include/drm/drm_of.h                               |   7 +
+> > >  8 files changed, 342 insertions(+), 51 deletions(-)
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+>
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/d7a1c20c/attachment-0001.sig>
