@@ -1,145 +1,127 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 20 Apr 2018 22:39:56 +0200
-Subject: [v2] drm/sun4i: add lvds mode_valid function
-In-Reply-To: <20180420131026.vbg3qgrj26egw5s2@core>
-References: <1520940019-68977-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20180419133421.6fx3whge7h364vd3@core>
- <CAGb2v64dqPoJkJDuMWp66HYXvZ3RJkrRz+2-CUVEcEG1k7UTsw@mail.gmail.com>
- <129dfeb0-0962-608d-370e-277a3acce7ca@micronovasrl.com>
- <20180420131026.vbg3qgrj26egw5s2@core>
-Message-ID: <20180420203956.aqcuwu22iaxnnykn@flea>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Fri, 20 Apr 2018 23:07:46 +0200
+Subject: [PATCH v7 00/11] Sunxi: Add SMP support on A83T
+Message-ID: <20180420210757.11638-1-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 03:10:26PM +0200, Ond?ej Jirman wrote:
-> Hello,
-> 
-> On Thu, Apr 19, 2018 at 04:02:08PM +0200, Giulio Benetti wrote:
-> > Hi everybody,
-> > 
-> > Il 19/04/2018 15:36, Chen-Yu Tsai ha scritto:
-> > > On Thu, Apr 19, 2018 at 9:34 PM, Ond?ej Jirman
-> > > <doudahwezomiechahtah@xff.cz> wrote:
-> > > > Hello Giulio,
-> > > > 
-> > > > this patch breaks LVDS output on A83T. Without it, modesetting works,
-> > > > with it there's no output.
-> > > > 
-> > > > Some more info below...
-> > > > 
-> > > > On Tue, Mar 13, 2018 at 12:20:19PM +0100, Giulio Benetti wrote:
-> > > > > mode_valid function is missing for lvds.
-> > > > > 
-> > > > > Add it making it pointed by encoder helper functions.
-> > > > > 
-> > > > > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
-> > > > > ---
-> > > > >   drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ++++++++++++++++++++++++++++++++++++++
-> > > > >   1 file changed, 55 insertions(+)
-> > > > > 
-> > > > > diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-> > > > > index be3f14d..bffff4c 100644
-> > > > > --- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
-> > > > > +++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-> > > > > @@ -94,9 +94,64 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
-> > > > >        }
-> > > > >   }
-> > > > > 
-> > > > > +static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
-> > > > > +                                                       const struct drm_display_mode *mode)
-> > > > > +{
-> > > > > +     struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
-> > > > > +     struct sun4i_tcon *tcon = lvds->tcon;
-> > > > > +     u32 hsync = mode->hsync_end - mode->hsync_start;
-> > > > > +     u32 vsync = mode->vsync_end - mode->vsync_start;
-> > > > > +     unsigned long rate = mode->clock * 1000;
-> > > > > +     long rounded_rate;
-> > > > > +
-> > > > > +     DRM_DEBUG_DRIVER("Validating modes...\n");
-> > > > > +
-> > > > > +     if (hsync < 1)
-> > > > > +             return MODE_HSYNC_NARROW;
-> > > > > +
-> > > > > +     if (hsync > 0x3ff)
-> > > > > +             return MODE_HSYNC_WIDE;
-> > > > > +
-> > > > > +     if ((mode->hdisplay < 1) || (mode->htotal < 1))
-> > > > > +             return MODE_H_ILLEGAL;
-> > > > > +
-> > > > > +     if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
-> > > > > +             return MODE_BAD_HVALUE;
-> > > > > +
-> > > > > +     DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
-> > > > > +
-> > > > > +     if (vsync < 1)
-> > > > > +             return MODE_VSYNC_NARROW;
-> > > > > +
-> > > > > +     if (vsync > 0x3ff)
-> > > > > +             return MODE_VSYNC_WIDE;
-> > > > > +
-> > > > > +     if ((mode->vdisplay < 1) || (mode->vtotal < 1))
-> > > > > +             return MODE_V_ILLEGAL;
-> > > > > +
-> > > > > +     if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
-> > > > > +             return MODE_BAD_VVALUE;
-> > > > > +
-> > > > > +     DRM_DEBUG_DRIVER("Vertical parameters OK\n");
-> > > > > +
-> > > > > +     tcon->dclk_min_div = 7;
-> > > > > +     tcon->dclk_max_div = 7;
-> > > > 
-> > > > Why would validation function change any state anywhere?
-> > > > 
-> > > > > +     rounded_rate = clk_round_rate(tcon->dclk, rate);
-> > > > 
-> > > > The issue is here, on A83T TBS A711 tablet, I get...
-> > > > 
-> > > > sun4i-tcon 1c0c000.lcd-controller: XXX: hsync=20 hdisplay=1024 htotal=1384
-> > > >    vsync=5 vdisplay=600 vtotal=640 rate=52000000 rounded_rate=51857142
-> > > > 
-> > > > > +     if (rounded_rate < rate)
-> > > > > +             return MODE_CLOCK_LOW;
-> > > > > +
-> > > > > +     if (rounded_rate > rate)
-> > > > > +             return MODE_CLOCK_HIGH;
-> > > > 
-> > > > ... while the previous conditions require an exact match for some reason.
-> > > > 
-> > > > But HW works fine without an exact rate match. Why is exact match required here?
-> > > 
-> > > This thread might provide some more info, though we could never get an
-> > > agreement.
-> > > 
-> > > https://patchwork.kernel.org/patch/9446385/
-> > 
-> > Thanks for pointing that Thread ChenYu.
-> > So the only chance is to trim frequency according to encoder capabilities.
-> > I agree to block when encoder can't provide frequency specified,
-> > otherwise you could drive you panel at the near the lowest(highest)
-> > frequency and get out of limits for a few without knowing it.
-> 
-> When I set the range of pixel clock frequencies on simple-panel connected
-> to this encoder, the check still fails, so there's something not working
-> there as expected. This check is only called once with a typical frequency.
-> 
-> I guess drm doesn't implement clock-frequency range on panels. But I haven't
-> looked.
+Hello everyone,
 
-It does, but only omapdss is able to use it iirc. We could do it too,
-but that would be way out of scope for a fix.
+This is a V7 of my series that adds SMP support for Allwinner sun8i-a83t.
+Based on sunxi's tree, sunxi/for-next branch.
+Depends on a patch from Doug Berger that allows to include the "cpu-type"
+header on assembly files:
+https://lkml.org/lkml/2018/2/23/1263
+(applied on Broadcom's tree: https://github.com/Broadcom/stblinux/commits/soc/next)
 
-> I can set the exact frequency that the SoC can provide on the simple-panel,
-> but that's a bit of a hack.
+If you have any remarks/questions, let me know.
+Thank you in advance,
+Myl?ne
 
-Yes. And if the only device using this thus far is broken, that's not
-really great either.
+Changes from v6:
+    - Correct the commit log on patch 07 according to Sergei Shtylyov's
+    review.
+    - Rename the field "is_sun8i" into "is_a83t".
+    - Add all Tested-by and Reviewed-by from previous version.
 
-Can you send a revert?
+Changes from v5:
+    - Remove my patch 01 and use the patch of Doug Berger to be able to
+    include the cpu-type header on assembly files.
+    - Rename smp_init_cntvoff function into secure_cntvoff_init according
+    to Marc Zyngier's review.
+    - According to Chen-Yu and Maxime's reviews, remove the patch that was
+    moving structures. Instead of using an index to retrieve which
+    architecture we are having, use a global variable.
+    - Merge the 2 patches that move assembly code from C to assembly file.
+    - Use a sun8i field instead of sun9i to know on which architecture we
+    are using because many modifications/additions of the code are for
+    sun8i-a83t.
+    - Rework the patch "add is_sun8i field" to add only this field in this
+    patch. The part of the patch that was starting to handle the differences
+    between sun8i-a83t and sun9i-a80 is merged in the patch that adds the
+    support of sun8i-a83t.
+    - Add a new patch that refactor the shmobile code to use the new function
+    secure_cntvoff_init introduced in this series.
 
-Thanks!
-Maxime
+Changes from v4:
+    - Rebased my series according to new Chen-Yu series:
+       "ARM: sunxi: Clean and improvements for multi-cluster SMP"
+       https://lkml.org/lkml/2018/3/8/886
+    - Updated my series according to Marc Zyngier's reviews to add CNTVOFF
+    initialization's function into ARM's common part. Thanks to that, other
+    platforms such as Renesa can use this function.
+    - For boot CPU, create a new machine to handle the CNTVOFF initialization
+    using "init_early" callback.
+
+Changes from v3:
+    - Take into account Maxime's reviews:
+	- split the first patch into 4 new patches: add sun9i device tree
+	parsing, rename some variables, add a83t support and finally,
+	add hotplug support.
+	- Move the code of previous patch 07 (to disable CPU0 disabling)
+	into hotplug support patch (see patch 04)
+	- Remove the patch that added PRCM register because it is already
+	available. Because of that, update the device tree parsing to use
+	"sun8i-a83t-r-ccu".
+	- Use a variable to know which SoC we currently have
+    - Take into account Chen-Yu's reviews: create two iounmap functions
+    to release the resources of the device tree parsing.
+    - Take into account Marc's review: Update the code to initialize CNTVOFF
+    register. As there is already assembly code in the driver, I decided
+    to create an assembly file not to mix assembly and C code.
+    For that, I create 3 new patches: move the current assembly code that
+    handles the cluster cache enabling into a file, move the cpu_resume entry
+    in this file and finally, add a new assembly entry to initialize the timer
+    offset for boot CPU and secondary CPUs.
+
+Changes from v2:
+    - Rebased my modifications according to new Chen Yu's patch series
+    that adds SMP support for sun9i-a80 (without MCPM).
+    - Split the device-tree patches into 3 patches for CPUCFG, R_CPUCFG
+    and PRCM registers for more visibility.
+    - The hotplug of CPU0 is currently not working (even after trying what
+    Allwinner's code is doing) so remove the possibility of disabling
+    this CPU. Created a new patch for it.
+
+Changes from v1:
+    - Add Chen Yu's patch in my series (see path 01)
+    - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
+    Create two functions to separate the DT parsing of sun9i-a80 and
+    sun8i-a83t.
+    - Thanks to Maxime's review: order device tree's nodes according
+    to physical addresses, remove unused label and fix registers' sizes.
+    Update the commit log and commit title of my last patch (see
+    patch 05).
+
+Myl?ne Josserand (11):
+  ARM: sunxi: smp: Move assembly code into a file
+  ARM: dts: sun8i: Add CPUCFG device node for A83T dtsi
+  ARM: dts: sun8i: Add R_CPUCFG device node for the A83T dtsi
+  ARM: dts: sun8i: a83t: Add CCI-400 node
+  ARM: smp: Add initialization of CNTVOFF
+  ARM: sunxi: Add initialization of CNTVOFF
+  ARM: sun9i: smp: Rename clusters's power-off
+  ARM: sun9i: smp: Add is_a83t field
+  ARM: sun8i: smp: Add support for A83T
+  ARM: dts: sun8i: Add enable-method for SMP support for the A83T SoC
+  ARM: shmobile: Convert file to use cntvoff
+
+ arch/arm/boot/dts/sun8i-a83t.dtsi        |  59 ++++++++
+ arch/arm/common/Makefile                 |   1 +
+ arch/arm/common/secure_cntvoff.S         |  31 ++++
+ arch/arm/include/asm/secure_cntvoff.h    |   8 ++
+ arch/arm/mach-shmobile/common.h          |   1 -
+ arch/arm/mach-shmobile/headsmp-apmu.S    |  22 +--
+ arch/arm/mach-shmobile/setup-rcar-gen2.c |   3 +-
+ arch/arm/mach-sunxi/Kconfig              |   2 +-
+ arch/arm/mach-sunxi/Makefile             |   4 +-
+ arch/arm/mach-sunxi/headsmp.S            |  81 +++++++++++
+ arch/arm/mach-sunxi/mc_smp.c             | 239 +++++++++++++++++++------------
+ arch/arm/mach-sunxi/sunxi.c              |  20 ++-
+ 12 files changed, 349 insertions(+), 122 deletions(-)
+ create mode 100644 arch/arm/common/secure_cntvoff.S
+ create mode 100644 arch/arm/include/asm/secure_cntvoff.h
+ create mode 100644 arch/arm/mach-sunxi/headsmp.S
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.11.0
