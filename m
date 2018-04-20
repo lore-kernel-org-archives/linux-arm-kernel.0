@@ -1,102 +1,56 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Apr 2018 15:28:34 +0200
-Subject: [PATCH/RFC 8/8] arm64: renesas: Remove the ARCH_SHMOBILE Kconfig
- symbol
-In-Reply-To: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
-References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1524230914-10175-9-git-send-email-geert+renesas@glider.be>
+Date: Fri, 20 Apr 2018 15:28:26 +0200
+Subject: [PATCH 0/8] arm: renesas: Change platform dependency to ARCH_RENESAS
+Message-ID: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbol for Renesas 64-bit ARM SoCs has always been
-ARCH_RENESAS, with ARCH_SHMOBILE being selected to reuse drivers shared
-with Renesas 32-bit ARM and/or Renesas SuperH SH-Mobile SoCs.
+	Hi all,
 
 Commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
 started the conversion from ARCH_SHMOBILE to ARCH_RENESAS for Renesas
-32-bit SoCs.  Now all drivers for Renesas ARM SoCs have gained proper
-ARCH_RENESAS platform dependencies, there is no longer a need to select
-ARCH_SHMOBILE.
+ARM SoCs.  This patch series completes the conversion, by:
+  1. Updating dependencies for drivers that weren't converted yet,
+  2. Removing the ARCH_SHMOBILE Kconfig symbols on ARM and ARM64.
 
-With ARCH_SHMOBILE gone, move the ARCH_RENESAS section up, to restore
-alphabetical sort order.
+The first 6 patches can be applied independently by subsystem
+maintainers.
+The last two patches depend on the first 6 patches, and are thus marked
+RFC.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-This depends on the driver patches in this series, hence the RFC.
+Thanks for your comments!
 
-JFTR, after this, the following symbols for drivers supporting only
-Renesas SuperH "SH-Mobile" SoCs can no longer be selected:
-  - CONFIG_KEYBOARD_SH_KEYSC,
-  - CONFIG_VIDEO_SH_VOU,
-  - CONFIG_VIDEO_RENESAS_CEU,
-  - CONFIG_FB_SH_MOBILE_MERAM.
-(changes for a renesas_defconfig .config)
----
- arch/arm64/Kconfig.platforms | 42 +++++++++++++++++++-----------------------
- 1 file changed, 19 insertions(+), 23 deletions(-)
+Geert Uytterhoeven (8):
+  arm: shmobile: Change platform dependency to ARCH_RENESAS
+  dmaengine: shdmac: Change platform check to CONFIG_ARCH_RENESAS
+  [media] v4l: rcar_fdp1: Change platform dependency to ARCH_RENESAS
+  sh_eth: Change platform check to CONFIG_ARCH_RENESAS
+  staging: emxx_udc: Change platform dependency to ARCH_RENESAS
+  ASoC: sh: Update menu title and platform dependency
+  [RFC] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig symbol
+  [RFC] arm64: renesas: Remove the ARCH_SHMOBILE Kconfig symbol
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index d5aeac351fc3a776..49d8ed1ab84766dd 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -145,31 +145,8 @@ config ARCH_REALTEK
- 	  This enables support for the ARMv8 based Realtek chipsets,
- 	  like the RTD1295.
- 
--config ARCH_ROCKCHIP
--	bool "Rockchip Platforms"
--	select ARCH_HAS_RESET_CONTROLLER
--	select GPIOLIB
--	select PINCTRL
--	select PINCTRL_ROCKCHIP
--	select ROCKCHIP_TIMER
--	help
--	  This enables support for the ARMv8 based Rockchip chipsets,
--	  like the RK3368.
--
--config ARCH_SEATTLE
--	bool "AMD Seattle SoC Family"
--	help
--	  This enables support for AMD Seattle SOC Family
--
--config ARCH_SHMOBILE
--	bool
--
--config ARCH_SYNQUACER
--	bool "Socionext SynQuacer SoC Family"
--
- config ARCH_RENESAS
- 	bool "Renesas SoC Platforms"
--	select ARCH_SHMOBILE
- 	select PINCTRL
- 	select PM
- 	select PM_GENERIC_DOMAINS
-@@ -220,6 +197,25 @@ config ARCH_R8A77995
- 	help
- 	  This enables support for the Renesas R-Car D3 SoC.
- 
-+config ARCH_ROCKCHIP
-+	bool "Rockchip Platforms"
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select GPIOLIB
-+	select PINCTRL
-+	select PINCTRL_ROCKCHIP
-+	select ROCKCHIP_TIMER
-+	help
-+	  This enables support for the ARMv8 based Rockchip chipsets,
-+	  like the RK3368.
-+
-+config ARCH_SEATTLE
-+	bool "AMD Seattle SoC Family"
-+	help
-+	  This enables support for AMD Seattle SOC Family
-+
-+config ARCH_SYNQUACER
-+	bool "Socionext SynQuacer SoC Family"
-+
- config ARCH_STRATIX10
- 	bool "Altera's Stratix 10 SoCFPGA Family"
- 	help
+ arch/arm/Kconfig                      |  2 +-
+ arch/arm/Makefile                     |  2 +-
+ arch/arm/mach-shmobile/Kconfig        |  4 ---
+ arch/arm64/Kconfig.platforms          | 42 +++++++++++++----------------
+ drivers/dma/sh/shdmac.c               | 50 +++++++++++++++--------------------
+ drivers/media/platform/Kconfig        |  2 +-
+ drivers/net/ethernet/renesas/sh_eth.h |  2 +-
+ drivers/staging/emxx_udc/Kconfig      |  2 +-
+ sound/soc/sh/Kconfig                  |  4 +--
+ 9 files changed, 47 insertions(+), 63 deletions(-)
+
 -- 
 2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
