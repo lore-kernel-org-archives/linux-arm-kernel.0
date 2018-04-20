@@ -1,169 +1,61 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Fri, 20 Apr 2018 08:46:13 +0000
-Subject: [PATCH 53/61] tty: serial: simplify getting .drvdata
-In-Reply-To: <20180419140641.27926-54-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-54-wsa+renesas@sang-engineering.com>
-Message-ID: <ed0d46b6-8fee-ac98-5fce-90f3c278b245@st.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Fri, 20 Apr 2018 10:52:00 +0200
+Subject: [PATCH] ARM: tegra: fix ulpi regression on tegra20
+In-Reply-To: <20180219151252.29289-1-marcel@ziswiler.com>
+References: <20180219151252.29289-1-marcel@ziswiler.com>
+Message-ID: <6600596.BijQW1iq1K@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram
+Hi Marcel,
 
-On 04/19/2018 04:06 PM, Wolfram Sang wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
+Am Montag, 19. Februar 2018, 16:12:52 CEST schrieb Marcel Ziswiler:
+> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 > 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Since commit f8f8f1d04494 ("clk: Don't touch hardware when reparenting
+> during registration") ULPI has been broken on Tegra20 leading to the
+> following error message during boot:
+> 
+> [    1.974698] ulpi_phy_power_on: ulpi write failed
+> [    1.979384] tegra-ehci c5004000.usb: Failed to power on the phy
+> [    1.985434] tegra-ehci: probe of c5004000.usb failed with error -110
+> 
+> Debugging through the changes and finally also consulting the TRM
+> revealed that rather than the CDEV2 clock off OSC requiring such pin
+> muxing actually the PLL_P_OUT4 clock is in use. It looks like so far it
+> just worked by chance of that one having been enabled which Stephen's
+> commit now changed when reparenting sclk away from pll_p_out4 leaving
+> that one disabled. Fix this by properly assigning the PLL_P_OUT4 clock
+> as the ULPI PHY clock.
+
+I booted 4.17-rc1 (which includes this fix) on an AC100 (T20 paz00 board) and 
+the error above is still there. Surprisingly the error vanishes when I revert 
+your patch. So this patch actually *causes* the problem above on my board. 
+Could it be, that we need all four clocks? Dimitry mentioned on IRC that it 
+could also be a problem in the clock init table. I don't have the technical 
+background myself to fix it, but I still wonder what could be so different 
+between TrimSlice and AC100.
+
+Marc
+
+
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
 > ---
 > 
-> Build tested only. buildbot is happy. Please apply individually.
+>  arch/arm/boot/dts/tegra20.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->   drivers/tty/serial/imx.c              | 18 ++++++------------
->   drivers/tty/serial/qcom_geni_serial.c |  6 ++----
->   drivers/tty/serial/st-asc.c           |  6 ++----
->   drivers/tty/serial/xilinx_uartps.c    |  6 ++----
->   4 files changed, 12 insertions(+), 24 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 91f3a1a5cb7f..f370c1cf4f27 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -2408,8 +2408,7 @@ static void imx_uart_enable_wakeup(struct imx_port *sport, bool on)
->   
->   static int imx_uart_suspend_noirq(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct imx_port *sport = platform_get_drvdata(pdev);
-> +	struct imx_port *sport = dev_get_drvdata(dev);
->   
->   	imx_uart_save_context(sport);
->   
-> @@ -2420,8 +2419,7 @@ static int imx_uart_suspend_noirq(struct device *dev)
->   
->   static int imx_uart_resume_noirq(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct imx_port *sport = platform_get_drvdata(pdev);
-> +	struct imx_port *sport = dev_get_drvdata(dev);
->   	int ret;
->   
->   	ret = clk_enable(sport->clk_ipg);
-> @@ -2435,8 +2433,7 @@ static int imx_uart_resume_noirq(struct device *dev)
->   
->   static int imx_uart_suspend(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct imx_port *sport = platform_get_drvdata(pdev);
-> +	struct imx_port *sport = dev_get_drvdata(dev);
->   	int ret;
->   
->   	uart_suspend_port(&imx_uart_uart_driver, &sport->port);
-> @@ -2454,8 +2451,7 @@ static int imx_uart_suspend(struct device *dev)
->   
->   static int imx_uart_resume(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct imx_port *sport = platform_get_drvdata(pdev);
-> +	struct imx_port *sport = dev_get_drvdata(dev);
->   
->   	/* disable wakeup from i.MX UART */
->   	imx_uart_enable_wakeup(sport, false);
-> @@ -2470,8 +2466,7 @@ static int imx_uart_resume(struct device *dev)
->   
->   static int imx_uart_freeze(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct imx_port *sport = platform_get_drvdata(pdev);
-> +	struct imx_port *sport = dev_get_drvdata(dev);
->   
->   	uart_suspend_port(&imx_uart_uart_driver, &sport->port);
->   
-> @@ -2480,8 +2475,7 @@ static int imx_uart_freeze(struct device *dev)
->   
->   static int imx_uart_thaw(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct imx_port *sport = platform_get_drvdata(pdev);
-> +	struct imx_port *sport = dev_get_drvdata(dev);
->   
->   	uart_resume_port(&imx_uart_uart_driver, &sport->port);
->   
-> diff --git a/drivers/tty/serial/qcom_geni_serial.c b/drivers/tty/serial/qcom_geni_serial.c
-> index 65ff669373d4..66558d42d980 100644
-> --- a/drivers/tty/serial/qcom_geni_serial.c
-> +++ b/drivers/tty/serial/qcom_geni_serial.c
-> @@ -1085,8 +1085,7 @@ static int qcom_geni_serial_remove(struct platform_device *pdev)
->   
->   static int __maybe_unused qcom_geni_serial_sys_suspend_noirq(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct qcom_geni_serial_port *port = platform_get_drvdata(pdev);
-> +	struct qcom_geni_serial_port *port = dev_get_drvdata(dev);
->   	struct uart_port *uport = &port->uport;
->   
->   	uart_suspend_port(uport->private_data, uport);
-> @@ -1095,8 +1094,7 @@ static int __maybe_unused qcom_geni_serial_sys_suspend_noirq(struct device *dev)
->   
->   static int __maybe_unused qcom_geni_serial_sys_resume_noirq(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct qcom_geni_serial_port *port = platform_get_drvdata(pdev);
-> +	struct qcom_geni_serial_port *port = dev_get_drvdata(dev);
->   	struct uart_port *uport = &port->uport;
->   
->   	if (console_suspend_enabled && uport->suspended) {
-> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> index 5f9f01fac6dd..7971997cdead 100644
-> --- a/drivers/tty/serial/st-asc.c
-> +++ b/drivers/tty/serial/st-asc.c
-> @@ -842,16 +842,14 @@ static int asc_serial_remove(struct platform_device *pdev)
->   #ifdef CONFIG_PM_SLEEP
->   static int asc_serial_suspend(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct uart_port *port = platform_get_drvdata(pdev);
-> +	struct uart_port *port = dev_get_drvdata(dev);
->   
->   	return uart_suspend_port(&asc_uart_driver, port);
->   }
->   
->   static int asc_serial_resume(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct uart_port *port = platform_get_drvdata(pdev);
-> +	struct uart_port *port = dev_get_drvdata(dev);
->   
->   	return uart_resume_port(&asc_uart_driver, port);
->   }
-> diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-> index abcb4d09a2d8..3ec4efbf25a9 100644
-> --- a/drivers/tty/serial/xilinx_uartps.c
-> +++ b/drivers/tty/serial/xilinx_uartps.c
-> @@ -1430,8 +1430,7 @@ static int cdns_uart_resume(struct device *device)
->   #endif /* ! CONFIG_PM_SLEEP */
->   static int __maybe_unused cdns_runtime_suspend(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct uart_port *port = platform_get_drvdata(pdev);
-> +	struct uart_port *port = dev_get_drvdata(dev);
->   	struct cdns_uart *cdns_uart = port->private_data;
->   
->   	clk_disable(cdns_uart->uartclk);
-> @@ -1441,8 +1440,7 @@ static int __maybe_unused cdns_runtime_suspend(struct device *dev)
->   
->   static int __maybe_unused cdns_runtime_resume(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct uart_port *port = platform_get_drvdata(pdev);
-> +	struct uart_port *port = dev_get_drvdata(dev);
->   	struct cdns_uart *cdns_uart = port->private_data;
->   
->   	clk_enable(cdns_uart->pclk);
-> 
-
-For st-asc:
-
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-
-Thanks
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 864a95872b8d..e05b6bb2599f 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -741,7 +741,7 @@
+>  		phy_type = "ulpi";
+>  		clocks = <&tegra_car TEGRA20_CLK_USB2>,
+>  			 <&tegra_car TEGRA20_CLK_PLL_U>,
+> -			 <&tegra_car TEGRA20_CLK_CDEV2>;
+> +			 <&tegra_car TEGRA20_CLK_PLL_P_OUT4>;
+>  		clock-names = "reg", "pll_u", "ulpi-link";
+>  		resets = <&tegra_car 58>, <&tegra_car 22>;
+>  		reset-names = "usb", "utmi-pads";
