@@ -1,28 +1,84 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Apr 2018 18:22:03 +0300
-Subject: [PATCH 4/8] sh_eth: Change platform check to CONFIG_ARCH_RENESAS
-In-Reply-To: <1524230914-10175-5-git-send-email-geert+renesas@glider.be>
-References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
- <1524230914-10175-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <b0e4bb99-f964-cf8a-dddc-621f599d35f0@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Apr 2018 16:38:47 +0100
+Subject: Clang arm64 build is broken
+In-Reply-To: <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
+References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+ <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
+ <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
+Message-ID: <20180420153846.5m5ngqcfn4v4q6wh@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2018 04:28 PM, Geert Uytterhoeven wrote:
+Hi Andrey,
 
-> Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
-> is CONFIG_ARCH_RENESAS a more appropriate platform check than the legacy
-> CONFIG_ARCH_SHMOBILE, hence use the former.
+On Fri, Apr 20, 2018 at 04:59:35PM +0200, Andrey Konovalov wrote:
+> On Fri, Apr 20, 2018 at 10:13 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> The issue is that
+> >> clang doesn't know about the "S" asm constraint. I reported this to
+> >> clang [2], and hopefully this will get fixed. In the meantime, would
+> >> it possible to work around using the "S" constraint in the kernel?
+> >
+> > I have no idea, I've never used clang to build the kernel. Clang isn't
+> > really supported to build the arm64 kernel anyway (as you mention
+> > below), and working around clang deficiencies would mean that we leave
+> > with the workaround forever. I'd rather enable clang once it is at
+> > feature parity with GCC.
 > 
-> Renesas SuperH SH-Mobile SoCs are still covered by the CONFIG_CPU_SH4
-> check.
-> 
-> This will allow to drop ARCH_SHMOBILE on ARM and ARM64 in the near
-> future.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-[...]
+> The fact that there are some existing issues with building arm64
+> kernel with clang doesn't sound like a good justification for adding
+> new issues :)
 
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+I appreciate this is somewhat frustrating, but every feature where clang
+is not at parity with GCC is effectively a functional regression for us.
 
-MBR, Sergei
+Recently, the code that clang hasn't liked happens to be security
+critical, and it is somewhat difficult to justify making that code more
+complex to cater for a compiler that we know has outstanding issues with
+features we rely upon.
+
+Which is to say, I'm not sure that there's much justification either
+way. We really need clang to be at feature parity with GCC for it to be
+considered supported.
+
+It would be great if some effort could be focussed on bringing clang to
+feature parity with GCC before implementing new clang-specific features.
+
+> However in this case I do believe that this is more of a bug in clang
+> that should be fixed.
+
+Just to check: does clang implement the rest of the AArch64 machine
+constraints [1]?
+
+We're liable to use more of them in future, and we should aim for parity
+now so that we don't fall into the same trap in future.
+
+> >> While we're here, regarding the other issue with kvm [3], I didn't
+> >> receive any comments as to whether it makes sense to send the fix that
+> >> adds -fno-jump-tables flag when building kvm with clang.
+> >
+> > Is that the only thing missing? Are you sure that there is no other way
+> > for clang to generate absolute addresses that will then lead to a crash?
+> > Again, I'd rather make sure we have the full picture.
+> 
+> Well, I have tried applying that patch and running kvm tests that I
+> could find [1], and they passed (actually I think there was an issue
+> with one of them, but I saw the same thing when I tried running them
+> on a kernel built with GCC).
+
+I think what Marc wants is a statement as to whether -fno-jump-tables is
+sufficient to ensure that clang will not try to use absolute addressing,
+based on an understanding of the AArch64 LLVM backend rather than test
+cases.
+
+For example, could any other pass result in the use of an absolute
+address? Or are jump tables the *only* reason that clang would try to
+use an absolute address.
+
+Are there other options that we might need to pass?
+
+Are there any options that we can pass to forbid absolute addressing?
+
+Thanks,
+Mark.
+
+[1] https://gcc.gnu.org/onlinedocs/gccint/Machine-Constraints.html
