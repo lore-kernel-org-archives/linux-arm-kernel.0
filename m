@@ -1,71 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Apr 2018 16:21:32 +0100
-Subject: Clang arm64 build is broken
-In-Reply-To: <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
-References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
- <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
- <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
-Message-ID: <74f96c43-cfce-ca78-56e3-0e3a0f1f5a8a@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Apr 2018 18:22:03 +0300
+Subject: [PATCH 4/8] sh_eth: Change platform check to CONFIG_ARCH_RENESAS
+In-Reply-To: <1524230914-10175-5-git-send-email-geert+renesas@glider.be>
+References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+ <1524230914-10175-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <b0e4bb99-f964-cf8a-dddc-621f599d35f0@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[fixing up Christoffer's address]
+On 04/20/2018 04:28 PM, Geert Uytterhoeven wrote:
 
-On 20/04/18 15:59, Andrey Konovalov wrote:
-> On Fri, Apr 20, 2018 at 10:13 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> The issue is that
->>> clang doesn't know about the "S" asm constraint. I reported this to
->>> clang [2], and hopefully this will get fixed. In the meantime, would
->>> it possible to work around using the "S" constraint in the kernel?
->>
->> I have no idea, I've never used clang to build the kernel. Clang isn't
->> really supported to build the arm64 kernel anyway (as you mention
->> below), and working around clang deficiencies would mean that we leave
->> with the workaround forever. I'd rather enable clang once it is at
->> feature parity with GCC.
+> Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
+> is CONFIG_ARCH_RENESAS a more appropriate platform check than the legacy
+> CONFIG_ARCH_SHMOBILE, hence use the former.
 > 
-> The fact that there are some existing issues with building arm64
-> kernel with clang doesn't sound like a good justification for adding
-> new issues :)
-
-Once clang is in a state where it actually compiles a full-featured
-kernel that can be subsequently booted, I'll definitely care about it,
-and will make sure it doesn't break. In the meantime, I'm targeting GCC,
-which is the only sane option for arm64 at the moment. Waiting for clang
-to fixed is not an option.
-
-> However in this case I do believe that this is more of a bug in clang
-> that should be fixed.
-
-Absolutely. Lack of GCC compatibility is what impairs the adoption of clang.
-
->>> While we're here, regarding the other issue with kvm [3], I didn't
->>> receive any comments as to whether it makes sense to send the fix that
->>> adds -fno-jump-tables flag when building kvm with clang.
->>
->> Is that the only thing missing? Are you sure that there is no other way
->> for clang to generate absolute addresses that will then lead to a crash?
->> Again, I'd rather make sure we have the full picture.
+> Renesas SuperH SH-Mobile SoCs are still covered by the CONFIG_CPU_SH4
+> check.
 > 
-> Well, I have tried applying that patch and running kvm tests that I
-> could find [1], and they passed (actually I think there was an issue
-> with one of them, but I saw the same thing when I tried running them
-> on a kernel built with GCC).
+> This will allow to drop ARCH_SHMOBILE on ARM and ARM64 in the near
+> future.
 > 
-> [1] https://www.linux-kvm.org/page/KVM-unit-tests
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[...]
 
-Which issue? Maybe it'd be worth reporting it?
+Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-To the original discussion about absolute addresses: I'm not so much
-looking for additional testing (I trust that you've tested the patch
-before sending it). I'm more after a statement from the LLVM folks
-indicating in which conditions the compiler will emit absolute addresses
-instead of PC-relative ones, and whether there is a way to make sure
-that we always get the latter. If '-fno-jump-tables' is the only missing
-flag, great. Otherwise, I'd like to know.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+MBR, Sergei
