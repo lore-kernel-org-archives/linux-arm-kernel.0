@@ -1,71 +1,135 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 20 Apr 2018 15:09:51 +0200
-Subject: [PATCH v3 7/7] drm/i2c: tda998x: register as a drm bridge
-In-Reply-To: <20180420105337.GX16141@n2100.armlinux.org.uk>
-References: <20180419162751.25223-8-peda@axentia.se>
- <201804201731.D3OnDg0p%fengguang.wu@intel.com>
- <4e9bd91c-6b29-cdd2-9e1d-1728311ddb81@axentia.se>
- <20180420105337.GX16141@n2100.armlinux.org.uk>
-Message-ID: <82eb95e8-c085-59d6-7b13-ef7e1abaa40d@axentia.se>
+From: doudahwezomiechahtah@xff.cz (=?utf-8?Q?Ond=C5=99ej?= Jirman)
+Date: Fri, 20 Apr 2018 15:10:26 +0200
+Subject: [v2] drm/sun4i: add lvds mode_valid function
+In-Reply-To: <129dfeb0-0962-608d-370e-277a3acce7ca@micronovasrl.com>
+References: <1520940019-68977-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20180419133421.6fx3whge7h364vd3@core>
+ <CAGb2v64dqPoJkJDuMWp66HYXvZ3RJkrRz+2-CUVEcEG1k7UTsw@mail.gmail.com>
+ <129dfeb0-0962-608d-370e-277a3acce7ca@micronovasrl.com>
+Message-ID: <20180420131026.vbg3qgrj26egw5s2@core>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-20 12:53, Russell King - ARM Linux wrote:
-> On Fri, Apr 20, 2018 at 12:49:42PM +0200, Peter Rosin wrote:
->> On 2018-04-20 12:41, kbuild test robot wrote:
->>> Hi Peter,
->>>
->>> I love your patch! Yet something to improve:
->>
->> Yup, right you are!
->>
->>> [auto build test ERROR on drm/drm-next]
->>> [also build test ERROR on v4.17-rc1 next-20180420]
->>> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->>>
->>> url:    https://github.com/0day-ci/linux/commits/Peter-Rosin/Add-tda998x-HDMI-support-to-atmel-hlcdc/20180420-160131
->>> base:   git://people.freedesktop.org/~airlied/linux.git drm-next
->>> config: i386-randconfig-a0-201815 (attached as .config)
->>> compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
->>> reproduce:
->>>         # save the attached .config to linux build tree
->>>         make ARCH=i386 
->>>
->>> All errors (new ones prefixed by >>):
->>>
->>>    drivers/gpu/drm/i2c/tda998x_drv.c: In function 'tda998x_probe':
->>>>> drivers/gpu/drm/i2c/tda998x_drv.c:1859:16: error: 'struct drm_bridge' has no member named 'of_node'
->>>      bridge->bridge.of_node = dev->of_node;
->>>                    ^
->>
->> Anybody got a better fix than this?
->>
->> #ifdef CONFIG_OF
->> 	bridge->bridge.of_node = dev->of_node;
->> #endif
-> 
-> How about the bridge code provides a helper to do this, something like:
-> 
-> static inline void bridge_set_device(struct drm_bridge *bridge,
-> 				     struct device *dev)
-> {
-> #ifdef CONFIG_OF
-> 	bridge->of_node = dev->of_node;
-> #endif
-> }
-> 
-> which (a) nicely hides the firmware flavour, and (b) hides the ifdef in
-> the bridge header where it belongs.  If the bridge code needs to be
-> converted to fwnode in the future, at least this would be abstracted
-> from the drivers.
-> 
+Hello,
 
-Hmm, I looked around and found numerous other #ifdefs for this, so my plan
-is to just add one more. Fixing up all these ifdefs is orthogonal and can
-be done later.
+On Thu, Apr 19, 2018 at 04:02:08PM +0200, Giulio Benetti wrote:
+> Hi everybody,
+> 
+> Il 19/04/2018 15:36, Chen-Yu Tsai ha scritto:
+> > On Thu, Apr 19, 2018 at 9:34 PM, Ond?ej Jirman
+> > <doudahwezomiechahtah@xff.cz> wrote:
+> > > Hello Giulio,
+> > > 
+> > > this patch breaks LVDS output on A83T. Without it, modesetting works,
+> > > with it there's no output.
+> > > 
+> > > Some more info below...
+> > > 
+> > > On Tue, Mar 13, 2018 at 12:20:19PM +0100, Giulio Benetti wrote:
+> > > > mode_valid function is missing for lvds.
+> > > > 
+> > > > Add it making it pointed by encoder helper functions.
+> > > > 
+> > > > Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+> > > > ---
+> > > >   drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ++++++++++++++++++++++++++++++++++++++
+> > > >   1 file changed, 55 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+> > > > index be3f14d..bffff4c 100644
+> > > > --- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
+> > > > +++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+> > > > @@ -94,9 +94,64 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
+> > > >        }
+> > > >   }
+> > > > 
+> > > > +static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
+> > > > +                                                       const struct drm_display_mode *mode)
+> > > > +{
+> > > > +     struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
+> > > > +     struct sun4i_tcon *tcon = lvds->tcon;
+> > > > +     u32 hsync = mode->hsync_end - mode->hsync_start;
+> > > > +     u32 vsync = mode->vsync_end - mode->vsync_start;
+> > > > +     unsigned long rate = mode->clock * 1000;
+> > > > +     long rounded_rate;
+> > > > +
+> > > > +     DRM_DEBUG_DRIVER("Validating modes...\n");
+> > > > +
+> > > > +     if (hsync < 1)
+> > > > +             return MODE_HSYNC_NARROW;
+> > > > +
+> > > > +     if (hsync > 0x3ff)
+> > > > +             return MODE_HSYNC_WIDE;
+> > > > +
+> > > > +     if ((mode->hdisplay < 1) || (mode->htotal < 1))
+> > > > +             return MODE_H_ILLEGAL;
+> > > > +
+> > > > +     if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
+> > > > +             return MODE_BAD_HVALUE;
+> > > > +
+> > > > +     DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
+> > > > +
+> > > > +     if (vsync < 1)
+> > > > +             return MODE_VSYNC_NARROW;
+> > > > +
+> > > > +     if (vsync > 0x3ff)
+> > > > +             return MODE_VSYNC_WIDE;
+> > > > +
+> > > > +     if ((mode->vdisplay < 1) || (mode->vtotal < 1))
+> > > > +             return MODE_V_ILLEGAL;
+> > > > +
+> > > > +     if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
+> > > > +             return MODE_BAD_VVALUE;
+> > > > +
+> > > > +     DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+> > > > +
+> > > > +     tcon->dclk_min_div = 7;
+> > > > +     tcon->dclk_max_div = 7;
+> > > 
+> > > Why would validation function change any state anywhere?
+> > > 
+> > > > +     rounded_rate = clk_round_rate(tcon->dclk, rate);
+> > > 
+> > > The issue is here, on A83T TBS A711 tablet, I get...
+> > > 
+> > > sun4i-tcon 1c0c000.lcd-controller: XXX: hsync=20 hdisplay=1024 htotal=1384
+> > >    vsync=5 vdisplay=600 vtotal=640 rate=52000000 rounded_rate=51857142
+> > > 
+> > > > +     if (rounded_rate < rate)
+> > > > +             return MODE_CLOCK_LOW;
+> > > > +
+> > > > +     if (rounded_rate > rate)
+> > > > +             return MODE_CLOCK_HIGH;
+> > > 
+> > > ... while the previous conditions require an exact match for some reason.
+> > > 
+> > > But HW works fine without an exact rate match. Why is exact match required here?
+> > 
+> > This thread might provide some more info, though we could never get an
+> > agreement.
+> > 
+> > https://patchwork.kernel.org/patch/9446385/
+> 
+> Thanks for pointing that Thread ChenYu.
+> So the only chance is to trim frequency according to encoder capabilities.
+> I agree to block when encoder can't provide frequency specified,
+> otherwise you could drive you panel at the near the lowest(highest)
+> frequency and get out of limits for a few without knowing it.
 
-Cheers,
-Peter
+When I set the range of pixel clock frequencies on simple-panel connected
+to this encoder, the check still fails, so there's something not working
+there as expected. This check is only called once with a typical frequency.
 
-PS. I also noted that I had forgotten to remove a couple of dev_info calls
-in this patch. Will remove for v4.
+I guess drm doesn't implement clock-frequency range on panels. But I haven't
+looked.
+
+I can set the exact frequency that the SoC can provide on the simple-panel,
+but that's a bit of a hack.
+
+regards,
+  o.
+
+> Best regards
+> 
+> -- 
+> Giulio Benetti
