@@ -1,69 +1,43 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 20 Apr 2018 08:05:17 -0700
-Subject: [regression v4.17-rc0] Re: FORTIFY_SOURCE breaks ARM compilation
- in -next -- was Re: ARM compile failure in Re: linux-next: Tree for
- Apr 4
-In-Reply-To: <20180420073402.GA9356@amd>
-References: <20180404165559.4cd0c12c@canb.auug.org.au>
- <20180404074856.GA9342@amd>
- <20180404175852.GI5700@atomide.com> <20180404184622.GA8608@amd>
- <20180404195951.GJ5700@atomide.com> <20180404201837.GA9710@amd>
- <20180415173908.GA2024@amd>
- <CAGXu5jK9f62n95sOdJViXHXzQFyCdcsWt9HPvcdSFRp9Qqg0bg@mail.gmail.com>
- <20180420073402.GA9356@amd>
-Message-ID: <CAGXu5j+6D3PiVc9SR4+31ZGDC2r5uWJOw8Sn3cDhXdNqBGH+hQ@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Fri, 20 Apr 2018 16:59:35 +0200
+Subject: Clang arm64 build is broken
+In-Reply-To: <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
+References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+ <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
+Message-ID: <CAAeHK+zpAnC3Ppjq2W=r-5fYh+ceEwYymER0iLTan7+pcFDiJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 12:34 AM, Pavel Machek <pavel@ucw.cz> wrote:
-> On Sun 2018-04-15 11:00:06, Kees Cook wrote:
->> On Sun, Apr 15, 2018 at 10:39 AM, Pavel Machek <pavel@ucw.cz> wrote:
->> > Hi!
->> >
->> >> Thanks.
->> >>
->> >> Ok, let me try to bisect it. Compile-problem should be easy...
->> >>
->> >> Hmm. And as it is compile-problem in single file, it should even be
->> >> reasonably fast. I did not realize how easy it would be:
->> >>
->> >> #!/bin/bash
->> >> set -e
->> >> cp config.ok .config
->> >> yes '' | ARCH=arm make lib/string.o
->> >>
->> >> And the winner is:
->> >>
->> >> ee333554fed55555a986a90bb097ac7f9d6f05bf is the first bad commit
->> >> commit ee333554fed55555a986a90bb097ac7f9d6f05bf
->> >> Author: Jinbum Park <jinb.park7@gmail.com>
->> >> Date:   Tue Mar 6 01:39:24 2018 +0100
->> > ...
->> >
->> >>     Acked-by: Kees Cook <keescook@chromium.org>
->> >>     Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
->> >>     Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> >
->> > So I bisect a problem in -next, and patch is merged to Linus,
->> > _anyway_, breaking compilation there? Neither Jinbum nor Russell even
->> > bother to comment.
->>
->> Hi! Sorry I lost this email in my inbox. It seems this is specific to
->> a particular subset of arm architectures? (My local builds of arm all
->> succeed, for example. Can you send your failing config?) I'll take a
->> closer look on Monday if Daniel doesn't beat me to it.
+On Fri, Apr 20, 2018 at 10:13 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> The issue is that
+>> clang doesn't know about the "S" asm constraint. I reported this to
+>> clang [2], and hopefully this will get fixed. In the meantime, would
+>> it possible to work around using the "S" constraint in the kernel?
 >
-> Daniel, Kees: any news?
+> I have no idea, I've never used clang to build the kernel. Clang isn't
+> really supported to build the arm64 kernel anyway (as you mention
+> below), and working around clang deficiencies would mean that we leave
+> with the workaround forever. I'd rather enable clang once it is at
+> feature parity with GCC.
+
+The fact that there are some existing issues with building arm64
+kernel with clang doesn't sound like a good justification for adding
+new issues :)
+
+However in this case I do believe that this is more of a bug in clang
+that should be fixed.
+
+>> While we're here, regarding the other issue with kvm [3], I didn't
+>> receive any comments as to whether it makes sense to send the fix that
+>> adds -fno-jump-tables flag when building kvm with clang.
 >
-> I'm aware you did not specify which Monday :-).
+> Is that the only thing missing? Are you sure that there is no other way
+> for clang to generate absolute addresses that will then lead to a crash?
+> Again, I'd rather make sure we have the full picture.
 
-Hi! Sorry, I got distracted. So the .config you sent me builds fine
-with my cross compiler. I suspect this is something specific to ELDK's
-compiler. I can try some other compiler versions. What version of gcc
-is failing?
+Well, I have tried applying that patch and running kvm tests that I
+could find [1], and they passed (actually I think there was an issue
+with one of them, but I saw the same thing when I tried running them
+on a kernel built with GCC).
 
--Kees
-
--- 
-Kees Cook
-Pixel Security
+[1] https://www.linux-kvm.org/page/KVM-unit-tests
