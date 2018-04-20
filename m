@@ -1,51 +1,143 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 20 Apr 2018 09:23:16 +0200
-Subject: [PATCH v2 01/10] media: v4l2-ctrls: Add missing v4l2 ctrl unlock
-In-Reply-To: <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Fri, 20 Apr 2018 09:22:20 +0200
+Subject: [PATCH v2 08/10] dt-bindings: media: Document bindings for the
+ Sunxi-Cedrus VPU driver
+In-Reply-To: <CAAFQd5DT_xjUbZzFOoKk7_duiSZ8Awb1J=0dPEhVTBk0P3gppA@mail.gmail.com>
 References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
- <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
-Message-ID: <20180420072316.sifritx54mppgwz3@flea>
+ <20180419154536.17846-4-paul.kocialkowski@bootlin.com>
+ <1524153860.3416.9.camel@pengutronix.de>
+ <CAAFQd5DT_xjUbZzFOoKk7_duiSZ8Awb1J=0dPEhVTBk0P3gppA@mail.gmail.com>
+Message-ID: <5fa80b1e88ad2a215f51ea3a2b9b62274fa9b1ec.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 19, 2018 at 05:41:15PM +0200, Paul Kocialkowski wrote:
-> This adds a missing v4l2_ctrl_unlock call that is required to avoid
-> deadlocks.
+Hi and thanks for the review,
 
-Maybe you can explain what the deadlock scenario is?
-
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  drivers/media/v4l2-core/v4l2-ctrls.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+On Fri, 2018-04-20 at 01:31 +0000, Tomasz Figa wrote:
+> Hi Paul, Philipp,
 > 
-> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-> index f67e9f5531fa..ba05a8b9a095 100644
-> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
-> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-> @@ -3614,10 +3614,12 @@ void v4l2_ctrl_request_complete(struct media_request *req,
->  			continue;
->  
->  		v4l2_ctrl_lock(ctrl);
-> +
->  		if (ref->req)
->  			ptr_to_ptr(ctrl, ref->req->p_req, ref->p_req);
->  		else
->  			ptr_to_ptr(ctrl, ctrl->p_cur, ref->p_req);
-> +
+> On Fri, Apr 20, 2018 at 1:04 AM Philipp Zabel <p.zabel@pengutronix.de>
+> wrote:
+> 
+> > Hi Paul,
+> > On Thu, 2018-04-19 at 17:45 +0200, Paul Kocialkowski wrote:
+> > > This adds a device-tree binding document that specifies the
+> > > properties
+> > > used by the Sunxi-Cedurs VPU driver, as well as examples.
+> > > 
+> > > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > > ---
+> > >  .../devicetree/bindings/media/sunxi-cedrus.txt     | 50
+> 
+> ++++++++++++++++++++++
+> > >  1 file changed, 50 insertions(+)
+> > >  create mode 100644
+> 
+> Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/media/sunxi-
+> > > cedrus.txt
+> 
+> b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> > > new file mode 100644
+> > > index 000000000000..71ad3f9c3352
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/media/sunxi-cedrus.txt
+> > > @@ -0,0 +1,50 @@
+> > > +Device-tree bindings for the VPU found in Allwinner SoCs,
+> > > referred to
+> 
+> as the
+> > > +Video Engine (VE) in Allwinner literature.
+> > > +
+> > > +The VPU can only access the first 256 MiB of DRAM, that are DMA-
+> > > mapped
+> 
+> starting
+> > > +from the DRAM base. This requires specific memory allocation and
+> 
+> handling.
+> 
+> And no IOMMU? Brings back memories.
 
-I'm not sure that this is relevant in this patch.
+Exactly, no IOMMU so we don't have much choice but cope with that
+hardware limitation...
 
-Maxime
+> > > +
+> > > +Required properties:
+> > > +- compatible         : "allwinner,sun4i-a10-video-engine";
+> > > +- memory-region         : DMA pool for buffers allocation;
+> > > +- clocks             : list of clock specifiers, corresponding to
+> 
+> entries in
+> > > +                          the clock-names property;
+> > > +- clock-names                : should contain "ahb", "mod" and
+> > > "ram"
+> 
+> entries;
+> > > +- assigned-clocks       : list of clocks assigned to the VE;
+> > > +- assigned-clocks-rates : list of clock rates for the clocks
+> > > assigned
+> 
+> to the VE;
+> > > +- resets             : phandle for reset;
+> > > +- interrupts         : should contain VE interrupt number;
+> > > +- reg                        : should contain register base and
+> > > length
+> 
+> of VE.
+> > > +
+> > > +Example:
+> > > +
+> > > +reserved-memory {
+> > > +     #address-cells = <1>;
+> > > +     #size-cells = <1>;
+> > > +     ranges;
+> > > +
+> > > +     /* Address must be kept in the lower 256 MiBs of DRAM for
+> > > VE. */
+> > > +     ve_memory: cma at 4a000000 {
+> > > +             compatible = "shared-dma-pool";
+> > > +             reg = <0x4a000000 0x6000000>;
+> > > +             no-map;
+> > > +             linux,cma-default;
+> > > +     };
+> > > +};
+> > > +
+> > > +video-engine at 1c0e000 {
+> > This is not really required by any specification, and not as common
+> > as
+> > gpu at ..., but could this reasonably be called "vpu at 1c0e000" to follow
+> > somewhat-common practice?
+> 
+> AFAIR the name is supposed to be somewhat readable for someone that
+> doesn't know the hardware. To me, "video-engine" sounds more obvious
+> than "vpu", but we actually use "codec" already, in case of MFC and
+> JPEG codec on Exynos. If encode/decode is the only functionality of
+> this block, I'd personally go with "codec". If it can do other things,
+> e.g. scaling/rotation without encode/decode, I'd probably call it
+> "video-processor".
+
+I agree that the term VPU is more commonly associated with video
+decoding, while video engine could mean a number of things.
+
+The reason I went with "video-engine" here (while still presenting the
+driver as a VPU driver) is that Video Engine is the term used in
+Allwinner's litterature. Other nodes in Allwinner device-trees generally
+stick to these terms (for instance, we have "display-engine" nodes).
+This also makes it easier to find the matching parts in the
+documentation.
+
+Cheers,
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
 https://bootlin.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/6b564f27/attachment.sig>
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/18984815/attachment.sig>
