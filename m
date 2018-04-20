@@ -1,43 +1,49 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 20 Apr 2018 11:17:53 +0200
-Subject: [PATCH v1 4/5] ARM: dts: stm32: Add I2C4 support for STM32MP157C-ED1
-In-Reply-To: <1524215874-15093-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1524215874-15093-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1524215874-15093-5-git-send-email-pierre-yves.mordret@st.com>
+From: dev@pascalroeleven.nl (Pascal Roeleven)
+Date: Fri, 20 Apr 2018 11:18:10 +0200
+Subject: [PATCH] ARM: dts: sun4i: Fix incorrect clocks for displays
+Message-ID: <20180420091810.2130-1-dev@pascalroeleven.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C4 support for STM32MP157C evaluation daughter.
-Required for PMIC.
+Some displays on SUN4i devices wouldn't properly stay on unless 'clk_ignore_unused' is used.
 
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
-  Version history:
-     v1:
-        * Initial
----
----
- arch/arm/boot/dts/stm32mp157c-ed1.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Change the duplicate clocks to the probably intended ones.
 
-diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-index 9f90337a..490b712 100644
---- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-@@ -25,6 +25,14 @@
- 	};
- };
- 
-+&i2c4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c4_pins_a>;
-+	i2c-scl-rising-time-ns = <185>;
-+	i2c-scl-falling-time-ns = <20>;
-+	status = "okay";
-+};
-+
- &uart4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart4_pins_a>;
+Signed-off-by: Pascal Roeleven <dev@pascalroeleven.nl>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 77e8436b..3a1c6b45 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -76,7 +76,7 @@
+ 			allwinner,pipeline = "de_fe0-de_be0-lcd0-hdmi";
+ 			clocks = <&ccu CLK_AHB_LCD0>, <&ccu CLK_AHB_HDMI0>,
+ 				 <&ccu CLK_AHB_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
+-				 <&ccu CLK_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
++				 <&ccu CLK_DE_BE0>, <&ccu CLK_DE_FE0>,
+ 				 <&ccu CLK_TCON0_CH1>, <&ccu CLK_HDMI>,
+ 				 <&ccu CLK_DRAM_DE_FE0>, <&ccu CLK_DRAM_DE_BE0>;
+ 			status = "disabled";
+@@ -88,7 +88,7 @@
+ 			allwinner,pipeline = "de_fe0-de_be0-lcd0";
+ 			clocks = <&ccu CLK_AHB_LCD0>, <&ccu CLK_AHB_DE_BE0>,
+ 				 <&ccu CLK_AHB_DE_FE0>, <&ccu CLK_DE_BE0>,
+-				 <&ccu CLK_AHB_DE_FE0>, <&ccu CLK_TCON0_CH0>,
++				 <&ccu CLK_DE_FE0>, <&ccu CLK_TCON0_CH0>,
+ 				 <&ccu CLK_DRAM_DE_FE0>, <&ccu CLK_DRAM_DE_BE0>;
+ 			status = "disabled";
+ 		};
+@@ -99,7 +99,7 @@
+ 			allwinner,pipeline = "de_fe0-de_be0-lcd0-tve0";
+ 			clocks = <&ccu CLK_AHB_TVE0>, <&ccu CLK_AHB_LCD0>,
+ 				 <&ccu CLK_AHB_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
+-				 <&ccu CLK_DE_BE0>, <&ccu CLK_AHB_DE_FE0>,
++				 <&ccu CLK_DE_BE0>, <&ccu CLK_DE_FE0>,
+ 				 <&ccu CLK_TCON0_CH1>, <&ccu CLK_DRAM_TVE0>,
+ 				 <&ccu CLK_DRAM_DE_FE0>, <&ccu CLK_DRAM_DE_BE0>;
+ 			status = "disabled";
 -- 
-2.7.4
+2.14.1
