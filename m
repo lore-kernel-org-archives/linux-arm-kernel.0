@@ -1,109 +1,131 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 20 Apr 2018 17:46:40 +0100
-Subject: [RFC PATCH 6/8] arm64/sve: Move sve_pffr() to fpsimd.h and make inline
+Date: Fri, 20 Apr 2018 17:46:42 +0100
+Subject: [RFC PATCH 8/8] KVM: arm64: Remove eager host SVE state saving
 In-Reply-To: <1524242802-21163-1-git-send-email-Dave.Martin@arm.com>
 References: <1524242802-21163-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1524242802-21163-7-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1524242802-21163-9-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to make sve_save_state()/sve_load_state() more easily
-reusable and to get rid of a potential branch on context switch
-critical paths, this patch makes sve_pffr() inline and moves it to
-fpsimd.h.
+Now that the host SVE context can be saved on demand from Hyp,
+there is no longer any need to save this state in advance before
+entering the guest.
 
-<asm/processor.h> must be included in fpsimd.h in order to make
-this work, and this creates an #include cycle that is tricky to
-avoid without modifying core code, due to the way the PR_SVE_*()
-prctl helpers are included in the core prctl implementation.
+This patch removes the relevant call to
+kvm_fpsimd_flush_cpu_state().
 
-Instead of breaking the cycle, this patch defers inclusion of
-<asm/fpsimd.h> in <asm/processor.h> until the point where it is
-actually needed: i.e., immediately before the prctl definitions.
-
-No functional change.
+Since the problem that function was intended to solve now no longer
+exists, the function and its dependencies are also deleted.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/fpsimd.h    | 13 +++++++++++++
- arch/arm64/include/asm/processor.h |  3 ++-
- arch/arm64/kernel/fpsimd.c         | 12 ------------
- 3 files changed, 15 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  3 ---
+ arch/arm64/include/asm/kvm_host.h | 10 ----------
+ arch/arm64/kernel/fpsimd.c        | 21 ---------------------
+ virt/kvm/arm/arm.c                |  3 ---
+ 4 files changed, 37 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 995d597..b84c4b5 100644
---- a/arch/arm64/include/asm/fpsimd.h
-+++ b/arch/arm64/include/asm/fpsimd.h
-@@ -18,6 +18,8 @@
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 3fe01c7..cf268cb 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -308,9 +308,6 @@ static inline void kvm_arch_vcpu_load_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_park_fp(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu) {}
  
- #include <asm/ptrace.h>
- #include <asm/errno.h>
-+#include <asm/processor.h>
-+#include <asm/sigcontext.h>
+-/* All host FP/SIMD state is restored on guest exit, so nothing to save: */
+-static inline void kvm_fpsimd_flush_cpu_state(void) {}
+-
+ static inline void kvm_arm_vhe_guest_enter(void) {}
+ static inline void kvm_arm_vhe_guest_exit(void) {}
  
- #ifndef __ASSEMBLY__
- 
-@@ -60,6 +62,17 @@ extern void sve_flush_cpu_state(void);
- /* Maximum VL that SVE VL-agnostic software can transparently support */
- #define SVE_VL_ARCH_MAX 0x100
- 
-+/* Offset of FFR in the SVE register dump */
-+static inline size_t sve_ffr_offset(int vl)
-+{
-+	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
-+}
-+
-+static inline void *sve_pffr(struct thread_struct *thread)
-+{
-+	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
-+}
-+
- extern void sve_save_state(void *state, u32 *pfpsr);
- extern void sve_load_state(void const *state, u32 const *pfpsr,
- 			   unsigned long vq_minus_1);
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index f902b6d..ebaadb1 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -40,7 +40,6 @@
- 
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
--#include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
- #include <asm/pgtable-hwdef.h>
-@@ -245,6 +244,8 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
- void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
- void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
- 
-+#include <asm/fpsimd.h>
-+
- /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 168a51e..fa4f6e2 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -161,18 +161,6 @@ static void sve_free(struct task_struct *task)
- 	__sve_free(task);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 2fbfbda..df52254 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -435,16 +435,6 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ 	return kvm_arch_vcpu_run_map_fp(vcpu);
  }
  
--
--/* Offset of FFR in the SVE register dump */
--static size_t sve_ffr_offset(int vl)
+-/*
+- * All host FP/SIMD state is restored on guest exit, so nothing needs
+- * doing here except in the SVE case:
+-*/
+-static inline void kvm_fpsimd_flush_cpu_state(void)
 -{
--	return SVE_SIG_FFR_OFFSET(sve_vq_from_vl(vl)) - SVE_SIG_REGS_OFFSET;
+-	if (system_supports_sve())
+-		sve_flush_cpu_state();
 -}
 -
--static void *sve_pffr(struct thread_struct *thread)
--{
--	return (char *)thread->sve_state + sve_ffr_offset(thread->sve_vl);
--}
--
- static void change_cpacr(u64 val, u64 mask)
+ static inline void kvm_arm_vhe_guest_enter(void)
  {
- 	u64 cpacr = read_sysreg(CPACR_EL1);
+ 	local_daif_mask();
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index fa4f6e2..cdfbcf7 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -120,7 +120,6 @@
+  */
+ struct fpsimd_last_state_struct {
+ 	struct user_fpsimd_state *st;
+-	bool sve_in_use;
+ };
+ 
+ static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+@@ -1025,7 +1024,6 @@ static void fpsimd_bind_to_cpu(void)
+ 		this_cpu_ptr(&fpsimd_last_state);
+ 
+ 	last->st = &current->thread.uw.fpsimd_state;
+-	last->sve_in_use = test_thread_flag(TIF_SVE);
+ 	current->thread.fpsimd_cpu = smp_processor_id();
+ }
+ 
+@@ -1037,7 +1035,6 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	last->st = st;
+-	last->sve_in_use = false;
+ }
+ 
+ /*
+@@ -1097,24 +1094,6 @@ void fpsimd_flush_cpu_state(void)
+ 	__this_cpu_write(fpsimd_last_state.st, NULL);
+ }
+ 
+-/*
+- * Invalidate any task SVE state currently held in this CPU's regs.
+- *
+- * This is used to prevent the kernel from trying to reuse SVE register data
+- * that is detroyed by KVM guest enter/exit.  This function should go away when
+- * KVM SVE support is implemented.  Don't use it for anything else.
+- */
+-#ifdef CONFIG_ARM64_SVE
+-void sve_flush_cpu_state(void)
+-{
+-	struct fpsimd_last_state_struct const *last =
+-		this_cpu_ptr(&fpsimd_last_state);
+-
+-	if (last->st && last->sve_in_use)
+-		fpsimd_flush_cpu_state();
+-}
+-#endif /* CONFIG_ARM64_SVE */
+-
+ #ifdef CONFIG_KERNEL_MODE_NEON
+ 
+ DEFINE_PER_CPU(bool, kernel_neon_busy);
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 147d9d9..501cacb 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -693,9 +693,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		preempt_disable();
+ 
+-		/* Flush FP/SIMD state that can't survive guest entry/exit */
+-		kvm_fpsimd_flush_cpu_state();
+-
+ 		kvm_pmu_flush_hwstate(vcpu);
+ 
+ 		local_irq_disable();
 -- 
 2.1.4
