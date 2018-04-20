@@ -1,98 +1,75 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 20 Apr 2018 11:23:43 +0100
-Subject: [PATCH 01/22] dma-debug: move initialization to common code
-In-Reply-To: <20180420080313.18796-2-hch@lst.de>
-References: <20180420080313.18796-1-hch@lst.de>
- <20180420080313.18796-2-hch@lst.de>
-Message-ID: <294a1469-01d6-10fb-5de1-b1d4513a066c@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Apr 2018 11:24:09 +0100
+Subject: [PATCH v3 7/7] drm/i2c: tda998x: register as a drm bridge
+In-Reply-To: <2556566.3fxMPoIyx0@avalon>
+References: <20180419162751.25223-1-peda@axentia.se>
+ <20180419162751.25223-8-peda@axentia.se>
+ <2556566.3fxMPoIyx0@avalon>
+Message-ID: <20180420102408.GW16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
-
-Nice cleanup! Looks good overall, just a couple of nits.
-
-On 20/04/18 09:02, Christoph Hellwig wrote:
-[...]
-> diff --git a/lib/dma-debug.c b/lib/dma-debug.c
-> index 7f5cdc1e6b29..712a897174e4 100644
-> --- a/lib/dma-debug.c
-> +++ b/lib/dma-debug.c
-> @@ -41,6 +41,11 @@
->   #define HASH_FN_SHIFT   13
->   #define HASH_FN_MASK    (HASH_SIZE - 1)
->   
-> +/* allow architectures to override this if absolutely required */
-> +#ifndef PREALLOC_DMA_DEBUG_ENTRIES
-> +#define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
-> +#endif
-> +
->   enum {
->   	dma_debug_single,
->   	dma_debug_page,
-> @@ -1004,18 +1009,16 @@ void dma_debug_add_bus(struct bus_type *bus)
->   	bus_register_notifier(bus, nb);
->   }
->   
-> -/*
-> - * Let the architectures decide how many entries should be preallocated.
-> - */
-> -void dma_debug_init(u32 num_entries)
-> +static int dma_debug_init(void)
->   {
-> +	u32 num_entries;
-
-Maybe initialise it to PREALLOC_DMA_DEBUG_ENTRIES?
-
->   	int i;
->   
->   	/* Do not use dma_debug_initialized here, since we really want to be
->   	 * called to set dma_debug_initialized
->   	 */
->   	if (global_disable)
-> -		return;
-> +		return 0;
->   
->   	for (i = 0; i < HASH_SIZE; ++i) {
->   		INIT_LIST_HEAD(&dma_entry_hash[i].list);
-> @@ -1026,17 +1029,19 @@ void dma_debug_init(u32 num_entries)
->   		pr_err("DMA-API: error creating debugfs entries - disabling\n");
->   		global_disable = true;
->   
-> -		return;
-> +		return 0;
->   	}
->   
->   	if (req_entries)
->   		num_entries = req_entries;
-> +	else
-> +		num_entries = PREALLOC_DMA_DEBUG_ENTRIES;
->   
->   	if (prealloc_memory(num_entries) != 0) {
->   		pr_err("DMA-API: debugging out of memory error - disabled\n");
->   		global_disable = true;
->   
-> -		return;
-> +		return 0;
->   	}
->   
->   	nr_total_entries = num_free_entries;
-> @@ -1044,7 +1049,9 @@ void dma_debug_init(u32 num_entries)
->   	dma_debug_initialized = true;
->   
->   	pr_info("DMA-API: debugging enabled by kernel config\n");
-> +	return 0;
->   }
-> +core_initcall(dma_debug_init);
-
-I think it's worth noting that for most users this now happens much 
-earlier than before. In general that's probably good (e.g. on arm64 it 
-should prevent false-positives from the Arm SMMU drivers under ACPI), 
-and I can't imagine it's high-risk, but it is a behaviour change.
-
-Robin.
-
->   
->   static __init int dma_debug_cmdline(char *str)
->   {
+On Fri, Apr 20, 2018 at 01:06:49PM +0300, Laurent Pinchart wrote:
+> Hi Peter,
 > 
+> Thank you for the patch.
+> 
+> On Thursday, 19 April 2018 19:27:51 EEST Peter Rosin wrote:
+> > This makes this driver work with all(?) drivers that are not
+> > componentized and instead expect to connect to a panel/bridge. That
+> > said, the only one tested is atmel_hlcdc.
+> > 
+> > This hooks the relevant work function previously called by the encoder
+> > and the component also to the bridge, since the encoder goes away when
+> > connecting to the bridge interface of the driver and the equivalent of
+> > bind/unbind of the component is handled by bridge attach/detach.
+> > 
+> > The lifetime requirements of a bridge and a component are slightly
+> > different, which is the reason for struct tda998x_bridge.
+> 
+> Couldn't you move the allocation and initialization (tda998x_create) of the 
+> tda998x_priv structure to probe time ? I think you wouldn't need a separate 
+> structure in that case. Unless I'm mistaken there would be an added benefit of 
+> separating component and bridge initialization, resulting in the encoder not 
+> being initialized at all if the component isn't used. You wouldn't need to add 
+> a local_encoder parameter to the tda998x_init() function.
+
+No, I don't like that idea one bit, as I've stated in the past about the
+component API.  The same (probably) goes for the bridge stuff too.
+
+Consider the following:
+
+Your DRM system is initialised.  You then remove a module, which results
+in the DRM system being torn down.  You re-insert the module (eg, having
+made a change to it).  The DRM system is then re-initialised.
+
+At this point, what is the state of variables such as priv->is_on if
+you allocate the structure at probe time?
+
+What about all the other variables in the driver private structure - are
+you sure that the driver can cope with random values from the previous
+"usage" remaining there?
+
+At the moment, this isn't a concern for the driver because we
+dev_kzalloc() the structure in the bind callback.  Move that to the
+probe function, and the structure is no longer re-initialised each
+time, and so it retains the previous state.  The driver is not setup
+to cope with that.
+
+So, to work around that, you would need to reinitialise _everything_
+in the structure that the driver requires, which IMHO is a very
+open to bugs (eg, if a member is missed, or added without the
+necessary re-initialisation), _especially_ when this is not a path
+that will get regular testing.
+
+If you want to do this for a subset of data, it would be much better
+to separate them into independent structures (maybe one embedded into
+the other) so that this problem can not occur.  That way, a subset
+of the data can be memset() when bound to the rest of the DRM system
+ensuring a consistent driver state and still achieve what you're
+suggesting.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
