@@ -1,67 +1,49 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 20 Apr 2018 09:33:36 +0200
-Subject: [PATCH] drm/sun4i: Add missing frontend compatibles for A10,
- A13, A20 and A31
-In-Reply-To: <20180419150759.ldi676ejnbtmb27z@flea>
-References: <20180419125638.11683-1-paul.kocialkowski@bootlin.com>
- <20180419150759.ldi676ejnbtmb27z@flea>
-Message-ID: <f89313a67594665f4ddf88e76947ba642b554358.camel@bootlin.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 20 Apr 2018 09:35:28 +0200
+Subject: [RFC 0/2] dw_mmc: add multislot support
+In-Reply-To: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
+References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
+Message-ID: <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[...]
 
-On Thu, 2018-04-19 at 17:07 +0200, Maxime Ripard wrote:
-> On Thu, Apr 19, 2018 at 02:56:38PM +0200, Paul Kocialkowski wrote:
-> > Although frontend nodes are defined in the device-trees of the
-> > aforementioned platforms, there are no matching compatibles defined
-> > in
-> > the driver. This makes it impossible to probe the frontend on these
-> > platforms.
-> > 
-> > Adding the appropriate compatibles to the driver fixes the issue.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_frontend.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-> > b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-> > index 85f75046712c..c5a3de11817d 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-> > @@ -658,6 +658,10 @@ static const struct dev_pm_ops
-> > sun4i_frontend_pm_ops = {
-> >  };
-> >  
-> >  const struct of_device_id sun4i_frontend_of_table[] = {
-> > +	{ .compatible = "allwinner,sun7i-a10-display-frontend" },
-> > +	{ .compatible = "allwinner,sun7i-a13-display-frontend" },
-> > +	{ .compatible = "allwinner,sun7i-a20-display-frontend" },
-> > +	{ .compatible = "allwinner,sun7i-a31-display-frontend" },
-> 
-> Most of these compatibles are wrong, so it won't really work :)
+>
+> 2. Add missing stuff to support multislot mode in DesignWare MMC driver.
+>  * Add missing slot switch to __dw_mci_start_request() function.
+>  * Refactor set_ios function:
+>    a) Calculate common clock which is
+>       suitable for all slots instead of directly use clock value
+>       provided by mmc core. We calculate common clock as the minimum
+>       among each used slot clocks. This clock is calculated in
+>       dw_mci_calc_common_clock() function which is called
+>       from set_ios()
+>    b) Disable clock only if no other slots are ON.
+>    c) Setup clock directly in set_ios() only if no other slots
+>       are ON. Otherwise adjust clock in __dw_mci_start_request()
+>       function before slot switch.
+>    d) Move timings and bus_width setup to separate funcions.
+>  * Use timing field in each slot structure instead of common field in
+>    host structure.
+>  * Add locks to serialize access to registers.
 
-Sorry for screwing up so bad...
+Sorry, but this is a hack to *try* to make multi-slot work and this
+isn't sufficient. There were good reasons to why the earlier
+non-working multi slot support was removed from dw_mmc.
 
-> If you only tested it on the A20, just add it. We didn't add all of
-> them because there's some slight variations between the generations
-> that are not yet taken into account.
+Let me elaborate a bit for your understanding. The core uses a host
+lock (mmc_claim|release_host()) to serialize operations and commands,
+as to confirm to the SD/SDIO/(e)MMC specs. The above changes gives no
+guarantees for this. To make that work, we would need a "mmc bus lock"
+to be managed by the core.
 
-That makes sense. I will thus send v2 with A20 only and send follow-up
-patches for other platforms when tested and properly working.
+However, inventing a "mmc bus lock" would lead to other problems
+related to I/O scheduling for upper layers - it simply breaks. For
+example, I/O requests for one card/slot can then starve I/O requests
+reaching another card/slot.
 
-Thanks!
+[...]
 
--- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/b97e801d/attachment.sig>
+Kind regards
+Uffe
