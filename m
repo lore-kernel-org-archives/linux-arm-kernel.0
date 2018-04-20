@@ -1,140 +1,142 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Fri, 20 Apr 2018 23:59:15 +0200
-Subject: [PATCH v7 00/11] Sunxi: Add SMP support on A83T
-In-Reply-To: <20180420211022.11759-1-mylene.josserand@bootlin.com>
-References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
-Message-ID: <20180420235915.3dea5e09@dell-desktop.home>
+From: collinsd@codeaurora.org (David Collins)
+Date: Fri, 20 Apr 2018 15:08:57 -0700
+Subject: [PATCH v2 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
+References: <cover.1523673467.git.collinsd@codeaurora.org>
+ <4b45f41996ea3344340e44fab2dc9e487572e209.1523673467.git.collinsd@codeaurora.org>
+ <CAD=FV=XKYCDtF93RtYi+dokR2BcT-z6Ex3UjgJ0ia_kF=847eA@mail.gmail.com>
+ <4e3353fe-ebb5-46bb-aa58-49ad04c4d9db@codeaurora.org>
+ <CAD=FV=W28_exRv+H0MJvPnHWGEeUG=SMKr=UqEKpBzkH44Fzmg@mail.gmail.com>
+Message-ID: <132ab845-52d6-6192-4d8c-5a9c95410688@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 04/19/2018 09:16 AM, Doug Anderson wrote:
+> On Wed, Apr 18, 2018 at 4:30 PM, David Collins <collinsd@codeaurora.org> wrote:
+>>>> + * @drms_mode:                 Array of regulator framework modes which can
+>>>> + *                             be configured dynamically for this regulator
+>>>> + *                             via the set_load() callback.
+>>>
+>>> Using the singular for something that is an array is confusing.  Why
+>>> not "drms_modes" or "drms_mode_arr"?  In the past review you said
+>>> 'Perhaps something along the lines of "drms_modes"'.
+>>
+>> It seems awkward to me to use a plural for arrays as it leads to indexing
+>> like this: vreg->drms_modes[i].  "mode i" seems better than "modes i".
+>> However, I'm willing to change this to be drms_modes and drms_mode_max_uAs
+>> if that style is preferred.
+> 
+> I'd very much like a plural here.
 
-On Fri, 20 Apr 2018 23:10:11 +0200
-Myl?ne Josserand <mylene.josserand@bootlin.com> wrote:
+Ok.  I'll change this to be plural.
 
-> Hello everyone,
-> 
-> This is a V7 of my series that adds SMP support for Allwinner sun8i-a83t.
-> Based on sunxi's tree, sunxi/for-next branch.
-> Depends on a patch from Doug Berger that allows to include the "cpu-type"
-> header on assembly files:
-> https://lkml.org/lkml/2018/2/23/1263
-> (applied on Broadcom's tree: https://github.com/Broadcom/stblinux/commits/soc/next)
 
-And I forgot to say that I will have a look at the CPU0 hotplug but not
-on this series.
+>>>> +               prop = "qcom,regulator-initial-voltage";
+>>>> +               ret = of_property_read_u32(node, prop, &uV);
+>>>> +               if (!ret) {
+>>>> +                       range = &vreg->hw_data->voltage_range;
+>>>> +                       selector = DIV_ROUND_UP(uV - range->min_uV,
+>>>> +                                       range->uV_step) + range->min_sel;
+>>>> +                       if (uV < range->min_uV || selector > range->max_sel) {
+>>>> +                               dev_err(dev, "%s: %s=%u is invalid\n",
+>>>> +                                       node->name, prop, uV);
+>>>> +                               return -EINVAL;
+>>>> +                       }
+>>>> +
+>>>> +                       vreg->voltage_selector = selector;
+>>>> +
+>>>> +                       cmd[cmd_count].addr
+>>>> +                               = vreg->addr + RPMH_REGULATOR_REG_VRM_VOLTAGE;
+>>>> +                       cmd[cmd_count++].data
+>>>> +                               = DIV_ROUND_UP(selector * range->uV_step
+>>>> +                                               + range->min_uV, 1000);
+>>>> +               }
+>>>
+>>> Seems like you want an "else { vreg->voltage_selector = -EINVAL; }".
+>>> Otherwise "get_voltage_sel" will return selector 0 before the first
+>>> set, right?
+>>>
+>>> Previously Mark said: "If the driver can't read values it should
+>>> return an appropriate error code."
+>>> ...and previously you said: "I'll try this out and see if the
+>>> regulator framework complains during regulator registration."
+>>
+>> I tested out what happens when vreg->voltage_selector = -EINVAL is set
+>> when qcom,regulator-initial-voltage is not present.  This results in
+>> devm_regulator_register() failing and subsequently causing the
+>> qcom_rpmh-regulator probe to fail.  The error happens in
+>> machine_constraints_voltage() [1].
+>>
+>> This leaves two courses of action:
+>> 1. (current patch set) allow voltage_selector to stay 0 if uninitialized
+>> 2. Set voltage_selector = -EINVAL by default and specify in DT binding
+>> documentation that qcom,regulator-initial-voltage is required for VRM
+>> managed RPMh regulator resources which have regulator-min-microvolt and
+>> regulator-max-microvolt specified.
+>>
+>> Are you ok with the DT implications of option #2?
+> 
+> You'd need to ask Mark if he's OK with it, but a option #3 is to add a
+> patch to your series fix the regulator framework to try setting the
+> voltage if _regulator_get_voltage() fails.  Presumably in
+> machine_constraints_voltage() you'd now do something like:
+> 
+>   int target_min, target_max;
+>   int current_uV = _regulator_get_voltage(rdev);
+>   if (current_uV < 0) {
+>     /* Maybe this regulator's hardware can't be read and needs to be initted */
+>     _regulator_do_set_voltage(
+>       rdev, rdev->constraints->min_uV, rdev->constraints->min_uV);
+>     current_uV = _regulator_get_voltage(rdev);
+>   }
+>   if (current_uV < 0) {
+>     rdev_err(rdev,
+>       "failed to get the current voltage(%d)\n",
+>       current_uV);
+>       return current_uV;
+>   }
+> 
+> If Mark doesn't like that then I guess I'd be OK w/ initting it to 0
+> but this needs to be documented _somewhere_ (unlike for bypass it's
+> not obvious, so you need to find someplace to put it).  I'd rather not
+> hack the DT to deal with our software limitations.
 
-Best regards,
+I'm not opposed to your option #3 though it does seem a little hacky and
+tailored to the qcom_rpmh-regulator specific case.  Note that I think it
+would be better to vote for min_uV to max_uV than min_uV to min_uV though.
 
-Myl?ne
+Mark, what are your thoughts on the best way to handle this situation?
 
+
+>>>> +static unsigned int rpmh_regulator_pmic4_bob_of_map_mode(unsigned int mode)
+>>>> +{
+>>>> +       static const unsigned int of_mode_map[RPMH_REGULATOR_MODE_COUNT] = {
+>>>> +               [RPMH_REGULATOR_MODE_RET]  = -EINVAL,
+>>>> +               [RPMH_REGULATOR_MODE_LPM]  = REGULATOR_MODE_IDLE,
+>>>> +               [RPMH_REGULATOR_MODE_AUTO] = REGULATOR_MODE_NORMAL,
+>>>> +               [RPMH_REGULATOR_MODE_HPM]  = REGULATOR_MODE_FAST,
+>>>> +       };
+>>>
+>>> You're sticking a negative value in an array of unsigned inits.  Here
+>>> and in other similar functions.
+>>>
+>>> I know, I know.  The function is defined to return an unsigned int.
+>>> It's wrong.  of_regulator.c clearly puts the return code in a signed
+>>> int.  First attempt at fixing this is at
+>>> <https://patchwork.kernel.org/patch/10346081/>.
+>>
+>> I can change the error cases to use REGULATOR_MODE_INVALID which is added
+>> by this change still under review [2].
 > 
-> If you have any remarks/questions, let me know.
-> Thank you in advance,
-> Myl?ne
-> 
-> Changes from v6:
->     - Correct the commit log on patch 07 according to Sergei Shtylyov's
->     review.
->     - Rename the field "is_sun8i" into "is_a83t".
->     - Add all Tested-by and Reviewed-by from previous version.
-> 
-> Changes from v5:
->     - Remove my patch 01 and use the patch of Doug Berger to be able to
->     include the cpu-type header on assembly files.
->     - Rename smp_init_cntvoff function into secure_cntvoff_init according
->     to Marc Zyngier's review.
->     - According to Chen-Yu and Maxime's reviews, remove the patch that was
->     moving structures. Instead of using an index to retrieve which
->     architecture we are having, use a global variable.
->     - Merge the 2 patches that move assembly code from C to assembly file.
->     - Use a sun8i field instead of sun9i to know on which architecture we
->     are using because many modifications/additions of the code are for
->     sun8i-a83t.
->     - Rework the patch "add is_sun8i field" to add only this field in this
->     patch. The part of the patch that was starting to handle the differences
->     between sun8i-a83t and sun9i-a80 is merged in the patch that adds the
->     support of sun8i-a83t.
->     - Add a new patch that refactor the shmobile code to use the new function
->     secure_cntvoff_init introduced in this series.
-> 
-> Changes from v4:
->     - Rebased my series according to new Chen-Yu series:
->        "ARM: sunxi: Clean and improvements for multi-cluster SMP"
->        https://lkml.org/lkml/2018/3/8/886
->     - Updated my series according to Marc Zyngier's reviews to add CNTVOFF
->     initialization's function into ARM's common part. Thanks to that, other
->     platforms such as Renesa can use this function.
->     - For boot CPU, create a new machine to handle the CNTVOFF initialization
->     using "init_early" callback.
-> 
-> Changes from v3:
->     - Take into account Maxime's reviews:
-> 	- split the first patch into 4 new patches: add sun9i device tree
-> 	parsing, rename some variables, add a83t support and finally,
-> 	add hotplug support.
-> 	- Move the code of previous patch 07 (to disable CPU0 disabling)
-> 	into hotplug support patch (see patch 04)
-> 	- Remove the patch that added PRCM register because it is already
-> 	available. Because of that, update the device tree parsing to use
-> 	"sun8i-a83t-r-ccu".
-> 	- Use a variable to know which SoC we currently have
->     - Take into account Chen-Yu's reviews: create two iounmap functions
->     to release the resources of the device tree parsing.
->     - Take into account Marc's review: Update the code to initialize CNTVOFF
->     register. As there is already assembly code in the driver, I decided
->     to create an assembly file not to mix assembly and C code.
->     For that, I create 3 new patches: move the current assembly code that
->     handles the cluster cache enabling into a file, move the cpu_resume entry
->     in this file and finally, add a new assembly entry to initialize the timer
->     offset for boot CPU and secondary CPUs.
-> 
-> Changes from v2:
->     - Rebased my modifications according to new Chen Yu's patch series
->     that adds SMP support for sun9i-a80 (without MCPM).
->     - Split the device-tree patches into 3 patches for CPUCFG, R_CPUCFG
->     and PRCM registers for more visibility.
->     - The hotplug of CPU0 is currently not working (even after trying what
->     Allwinner's code is doing) so remove the possibility of disabling
->     this CPU. Created a new patch for it.
-> 
-> Changes from v1:
->     - Add Chen Yu's patch in my series (see path 01)
->     - Add new compatibles for prcm and cpucfg registers for sun8i-a83t.
->     Create two functions to separate the DT parsing of sun9i-a80 and
->     sun8i-a83t.
->     - Thanks to Maxime's review: order device tree's nodes according
->     to physical addresses, remove unused label and fix registers' sizes.
->     Update the commit log and commit title of my last patch (see
->     patch 05).
-> 
-> Myl?ne Josserand (11):
->   ARM: sunxi: smp: Move assembly code into a file
->   ARM: dts: sun8i: Add CPUCFG device node for A83T dtsi
->   ARM: dts: sun8i: Add R_CPUCFG device node for the A83T dtsi
->   ARM: dts: sun8i: a83t: Add CCI-400 node
->   ARM: smp: Add initialization of CNTVOFF
->   ARM: sunxi: Add initialization of CNTVOFF
->   ARM: sun9i: smp: Rename clusters's power-off
->   ARM: sun9i: smp: Add is_a83t field
->   ARM: sun8i: smp: Add support for A83T
->   ARM: dts: sun8i: Add enable-method for SMP support for the A83T SoC
->   ARM: shmobile: Convert file to use cntvoff
-> 
->  arch/arm/boot/dts/sun8i-a83t.dtsi        |  59 ++++++++
->  arch/arm/common/Makefile                 |   1 +
->  arch/arm/common/secure_cntvoff.S         |  31 ++++
->  arch/arm/include/asm/secure_cntvoff.h    |   8 ++
->  arch/arm/mach-shmobile/common.h          |   1 -
->  arch/arm/mach-shmobile/headsmp-apmu.S    |  22 +--
->  arch/arm/mach-shmobile/setup-rcar-gen2.c |   3 +-
->  arch/arm/mach-sunxi/Kconfig              |   2 +-
->  arch/arm/mach-sunxi/Makefile             |   4 +-
->  arch/arm/mach-sunxi/headsmp.S            |  81 +++++++++++
->  arch/arm/mach-sunxi/mc_smp.c             | 239 +++++++++++++++++++------------
->  arch/arm/mach-sunxi/sunxi.c              |  20 ++-
->  12 files changed, 349 insertions(+), 122 deletions(-)
->  create mode 100644 arch/arm/common/secure_cntvoff.S
->  create mode 100644 arch/arm/include/asm/secure_cntvoff.h
->  create mode 100644 arch/arm/mach-sunxi/headsmp.S
-> 
+> I haven't seen Mark NAK it (yet), so for lack of a better option I'd
+> start using it in your patch and document in the commit message that
+> it depends on my patch.
+
+Your patch was accepted.  I'll switch to using REGULATOR_MODE_INVALID.
+
+Thanks,
+David
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
