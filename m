@@ -1,26 +1,28 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Apr 2018 17:53:18 +0300
-Subject: [PATCH 1/8] arm: shmobile: Change platform dependency to
- ARCH_RENESAS
-In-Reply-To: <1524230914-10175-2-git-send-email-geert+renesas@glider.be>
-References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
- <1524230914-10175-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <44b6b9a3-5273-54f4-ee72-0d5fcc36348a@cogentembedded.com>
+From: jgg@ziepe.ca (Jason Gunthorpe)
+Date: Fri, 20 Apr 2018 08:54:00 -0600
+Subject: [PATCH 1/2] IB/hfi1: Try slot reset before secondary bus reset
+In-Reply-To: <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
+References: <1524167784-5911-1-git-send-email-okaya@codeaurora.org>
+ <20180419202632.GE14063@ziepe.ca>
+ <20180419214722.GO28657@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180420145400.GA30433@ziepe.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2018 04:28 PM, Geert Uytterhoeven wrote:
+On Thu, Apr 19, 2018 at 04:47:23PM -0500, Bjorn Helgaas wrote:
+ 
+> I *thought* the hardware was supposed to automatically negotiate to
+> the highest rate supported by both sides without any help at all from
+> software.  But since several drivers have code to do it themselves, I
+> wonder if I'm missing something, or maybe there's something the PCI
+> core should be doing that it isn't, and the driver code is basically
+> working around that PCI core deficiency.
 
-> Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
-> is ARCH_RENESAS a more appropriate platform dependency than the legacy
+The HW is supposed to do that, but Gen3 is electrically *hard*.
 
-   "ARCH_RENESAS is", no?
+I'm not surprised that some HW has run into trouble where the driver
+might have to be involved to tweak the SERDES.. eg there is now often
+on-device software involved here and updating the SERDES 'firmware'
+may be needed.
 
-> ARCH_SHMOBILE, hence use the former.
-> 
-> This will allow to drop ARCH_SHMOBILE on ARM in the near future.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-[...]
-
-MBR, Sergei
+Jason
