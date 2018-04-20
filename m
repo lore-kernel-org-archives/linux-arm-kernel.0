@@ -1,26 +1,51 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 20 Apr 2018 09:23:00 +0200
-Subject: [PATCH 59/61] watchdog: simplify getting .drvdata
-In-Reply-To: <20180419140641.27926-60-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-60-wsa+renesas@sang-engineering.com>
-Message-ID: <c8156dd1-5081-7ab6-6dce-fde367190ae9@xilinx.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 20 Apr 2018 09:23:16 +0200
+Subject: [PATCH v2 01/10] media: v4l2-ctrls: Add missing v4l2 ctrl unlock
+In-Reply-To: <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
+References: <20180419154124.17512-1-paul.kocialkowski@bootlin.com>
+ <20180419154124.17512-2-paul.kocialkowski@bootlin.com>
+Message-ID: <20180420072316.sifritx54mppgwz3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.4.2018 16:06, Wolfram Sang wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On Thu, Apr 19, 2018 at 05:41:15PM +0200, Paul Kocialkowski wrote:
+> This adds a missing v4l2_ctrl_unlock call that is required to avoid
+> deadlocks.
+
+Maybe you can explain what the deadlock scenario is?
+
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 > ---
+>  drivers/media/v4l2-core/v4l2-ctrls.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> Build tested only. buildbot is happy. Please apply individually.
-> 
->  drivers/watchdog/cadence_wdt.c   | 6 ++----
->  drivers/watchdog/of_xilinx_wdt.c | 6 ++----
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index f67e9f5531fa..ba05a8b9a095 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -3614,10 +3614,12 @@ void v4l2_ctrl_request_complete(struct media_request *req,
+>  			continue;
+>  
+>  		v4l2_ctrl_lock(ctrl);
+> +
+>  		if (ref->req)
+>  			ptr_to_ptr(ctrl, ref->req->p_req, ref->p_req);
+>  		else
+>  			ptr_to_ptr(ctrl, ctrl->p_cur, ref->p_req);
+> +
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+I'm not sure that this is relevant in this patch.
 
-Thanks,
-Michal
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/6b564f27/attachment.sig>
