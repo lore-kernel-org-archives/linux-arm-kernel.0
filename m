@@ -1,54 +1,42 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 20 Apr 2018 10:06:46 +0200
-Subject: [PATCH 61/61] ASoC: atmel: simplify getting .drvdata
-In-Reply-To: <20180419140641.27926-62-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-62-wsa+renesas@sang-engineering.com>
-Message-ID: <23044c16-efbf-7920-2a25-338ad46376eb@microchip.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 20 Apr 2018 09:13:34 +0100
+Subject: Clang arm64 build is broken
+In-Reply-To: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+References: <CAAeHK+wDMH_G=3UuGOda2t0g4TH4TmDAeyG-ydJwg9vmThd3eQ@mail.gmail.com>
+Message-ID: <c61336a2-7c66-ea48-3daa-e644403d7a6e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/2018 at 16:06, Wolfram Sang wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Hi Andrey.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+On 19/04/18 18:06, Andrey Konovalov wrote:
+> Hi Marc!
+> 
+> Your recent commit [1] broke clang build on arm64.
 
-> ---
-> 
-> Build tested only. buildbot is happy. Please apply individually.
-> 
->   sound/soc/atmel/atmel_ssc_dai.c | 6 ++----
->   1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index a1e2c5682dcd..4a0275a6505d 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -1002,8 +1002,7 @@ static const struct snd_soc_component_driver atmel_ssc_component = {
->   
->   static int asoc_ssc_init(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct ssc_device *ssc = platform_get_drvdata(pdev);
-> +	struct ssc_device *ssc = dev_get_drvdata(dev);
->   	int ret;
->   
->   	ret = snd_soc_register_component(dev, &atmel_ssc_component,
-> @@ -1033,8 +1032,7 @@ static int asoc_ssc_init(struct device *dev)
->   
->   static void asoc_ssc_exit(struct device *dev)
->   {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct ssc_device *ssc = platform_get_drvdata(pdev);
-> +	struct ssc_device *ssc = dev_get_drvdata(dev);
->   
->   	if (ssc->pdata->use_dma)
->   		atmel_pcm_dma_platform_unregister(dev);
-> 
+Or rather, it has uncovered yet another missing feature in clang! ;-)
 
+> The issue is that
+> clang doesn't know about the "S" asm constraint. I reported this to
+> clang [2], and hopefully this will get fixed. In the meantime, would
+> it possible to work around using the "S" constraint in the kernel?
 
+I have no idea, I've never used clang to build the kernel. Clang isn't
+really supported to build the arm64 kernel anyway (as you mention
+below), and working around clang deficiencies would mean that we leave
+with the workaround forever. I'd rather enable clang once it is at
+feature parity with GCC.
+
+> While we're here, regarding the other issue with kvm [3], I didn't
+> receive any comments as to whether it makes sense to send the fix that
+> adds -fno-jump-tables flag when building kvm with clang.
+
+Is that the only thing missing? Are you sure that there is no other way
+for clang to generate absolute addresses that will then lead to a crash?
+Again, I'd rather make sure we have the full picture.
+
+Thanks,
+
+	M.
 -- 
-Nicolas Ferre
+Jazz is not dead. It just smells funny...
