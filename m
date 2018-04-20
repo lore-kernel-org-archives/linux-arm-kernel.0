@@ -1,86 +1,132 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 20 Apr 2018 15:38:10 +0800
-Subject: [PATCH V3 1/2] clk: imx6sx: add missing lvds2 clock to the clock tree
-Message-ID: <1524209891-14146-1-git-send-email-Anson.Huang@nxp.com>
+Date: Fri, 20 Apr 2018 15:38:11 +0800
+Subject: [PATCH V3 2/2] ARM: dts: imx6sx-sabreauto: add external 24MHz clock
+ source
+In-Reply-To: <1524209891-14146-1-git-send-email-Anson.Huang@nxp.com>
+References: <1524209891-14146-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1524209891-14146-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX has lvds2 (analog clock2), an I/O clock like lvds1.
-And this lvds2, along with lvds1, can be used to provide
-external clock source to the internal pll, such as pll4_audio
-and pll5_video.
-
-This patch mainly adds the lvds2 to the clock tree and fix its
-relationship with pll accordingly.
+On i.MX6SX SabreAuto board, there is external 24MHz clock
+source for analog clock2, add this clock source to clock tree
+and remove "clocks" container for all input clocks.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Signed-off-by: Shengjiu Wang <shengjiu.wang@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 changes since V2:
-	use of_clk_get_by_name instead of imx_obtain_fixed_clock for anaclkX node.
- drivers/clk/imx/clk-imx6sx.c             | 10 +++++++---
- include/dt-bindings/clock/imx6sx-clock.h |  6 +++++-
- 2 files changed, 12 insertions(+), 4 deletions(-)
+	remove "clocks" container and use new way for all input clocks definition.
+ arch/arm/boot/dts/imx6sx-sabreauto.dts |  4 ++
+ arch/arm/boot/dts/imx6sx.dtsi          | 71 ++++++++++++++++++----------------
+ 2 files changed, 42 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
-index bc3f9eb..0178ee2 100644
---- a/drivers/clk/imx/clk-imx6sx.c
-+++ b/drivers/clk/imx/clk-imx6sx.c
-@@ -80,7 +80,7 @@ static const char *lvds_sels[]	= {
- 	"arm", "pll1_sys", "dummy", "dummy", "dummy", "dummy", "dummy", "pll5_video_div",
- 	"dummy", "dummy", "pcie_ref_125m", "dummy", "usbphy1", "usbphy2",
+diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+index 72da5ac..57d1ea0 100644
+--- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
+@@ -37,6 +37,10 @@
+ 	};
  };
--static const char *pll_bypass_src_sels[] = { "osc", "lvds1_in", };
-+static const char *pll_bypass_src_sels[] = { "osc", "lvds1_in", "lvds2_in", "dummy", };
- static const char *pll1_bypass_sels[] = { "pll1", "pll1_bypass_src", };
- static const char *pll2_bypass_sels[] = { "pll2", "pll2_bypass_src", };
- static const char *pll3_bypass_sels[] = { "pll3", "pll3_bypass_src", };
-@@ -158,8 +158,9 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_IPP_DI0] = of_clk_get_by_name(ccm_node, "ipp_di0");
- 	clks[IMX6SX_CLK_IPP_DI1] = of_clk_get_by_name(ccm_node, "ipp_di1");
  
--	/* Clock source from external clock via CLK1 PAD */
--	clks[IMX6SX_CLK_ANACLK1] = imx_obtain_fixed_clock("anaclk1", 0);
-+	/* Clock source from external clock via CLK1/2 PAD */
-+	clks[IMX6SX_CLK_ANACLK1] = of_clk_get_by_name(ccm_node, "anaclk1");
-+	clks[IMX6SX_CLK_ANACLK2] = of_clk_get_by_name(ccm_node, "anaclk2");
++&anaclk2 {
++	clock-frequency = <24576000>;
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 49c7205..7e463d2 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -104,41 +104,46 @@
+ 		interrupt-parent = <&intc>;
+ 	};
  
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sx-anatop");
- 	base = of_iomap(np, 0);
-@@ -228,7 +229,9 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SX_CLK_PCIE_REF_125M] = imx_clk_gate("pcie_ref_125m", "pcie_ref", base + 0xe0, 19);
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
++	ckil: clock-ckil {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "ckil";
++	};
  
- 	clks[IMX6SX_CLK_LVDS1_OUT] = imx_clk_gate_exclusive("lvds1_out", "lvds1_sel", base + 0x160, 10, BIT(12));
-+	clks[IMX6SX_CLK_LVDS2_OUT] = imx_clk_gate_exclusive("lvds2_out", "lvds2_sel", base + 0x160, 11, BIT(13));
- 	clks[IMX6SX_CLK_LVDS1_IN]  = imx_clk_gate_exclusive("lvds1_in",  "anaclk1",   base + 0x160, 12, BIT(10));
-+	clks[IMX6SX_CLK_LVDS2_IN]  = imx_clk_gate_exclusive("lvds2_in",  "anaclk2",   base + 0x160, 13, BIT(11));
+-		ckil: clock at 0 {
+-			compatible = "fixed-clock";
+-			reg = <0>;
+-			#clock-cells = <0>;
+-			clock-frequency = <32768>;
+-			clock-output-names = "ckil";
+-		};
++	osc: clock-osc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-output-names = "osc";
++	};
  
- 	clks[IMX6SX_CLK_ENET_REF] = clk_register_divider_table(NULL, "enet_ref", "pll6_enet", 0,
- 			base + 0xe0, 0, 2, 0, clk_enet_ref_table,
-@@ -270,6 +273,7 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
+-		osc: clock at 1 {
+-			compatible = "fixed-clock";
+-			reg = <1>;
+-			#clock-cells = <0>;
+-			clock-frequency = <24000000>;
+-			clock-output-names = "osc";
+-		};
++	ipp_di0: clock-ipp-di0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++		clock-output-names = "ipp_di0";
++	};
  
- 	/*                                                name                reg           shift   width   parent_names       num_parents */
- 	clks[IMX6SX_CLK_LVDS1_SEL]          = imx_clk_mux("lvds1_sel",        base + 0x160, 0,      5,      lvds_sels,         ARRAY_SIZE(lvds_sels));
-+	clks[IMX6SX_CLK_LVDS2_SEL]          = imx_clk_mux("lvds2_sel",        base + 0x160, 5,      5,      lvds_sels,         ARRAY_SIZE(lvds_sels));
+-		ipp_di0: clock at 2 {
+-			compatible = "fixed-clock";
+-			reg = <2>;
+-			#clock-cells = <0>;
+-			clock-frequency = <0>;
+-			clock-output-names = "ipp_di0";
+-		};
++	ipp_di1: clock-ipp-di1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++		clock-output-names = "ipp_di1";
++	};
  
- 	np = ccm_node;
- 	base = of_iomap(np, 0);
-diff --git a/include/dt-bindings/clock/imx6sx-clock.h b/include/dt-bindings/clock/imx6sx-clock.h
-index 36f0324..cd2d6c5 100644
---- a/include/dt-bindings/clock/imx6sx-clock.h
-+++ b/include/dt-bindings/clock/imx6sx-clock.h
-@@ -275,6 +275,10 @@
- #define IMX6SX_PLL6_BYPASS		262
- #define IMX6SX_PLL7_BYPASS		263
- #define IMX6SX_CLK_SPDIF_GCLK		264
--#define IMX6SX_CLK_CLK_END		265
-+#define IMX6SX_CLK_LVDS2_SEL		265
-+#define IMX6SX_CLK_LVDS2_OUT		266
-+#define IMX6SX_CLK_LVDS2_IN		267
-+#define IMX6SX_CLK_ANACLK2		268
-+#define IMX6SX_CLK_CLK_END		269
+-		ipp_di1: clock at 3 {
+-			compatible = "fixed-clock";
+-			reg = <3>;
+-			#clock-cells = <0>;
+-			clock-frequency = <0>;
+-			clock-output-names = "ipp_di1";
+-		};
++	anaclk1: clock-anaclk1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++		clock-output-names = "anaclk1";
++	};
++
++	anaclk2: clock-anaclk2 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++		clock-output-names = "anaclk2";
+ 	};
  
- #endif /* __DT_BINDINGS_CLOCK_IMX6SX_H */
+ 	tempmon: tempmon {
+@@ -575,8 +580,8 @@
+ 				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+ 				#clock-cells = <1>;
+-				clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>;
+-				clock-names = "ckil", "osc", "ipp_di0", "ipp_di1";
++				clocks = <&ckil>, <&osc>, <&ipp_di0>, <&ipp_di1>, <&anaclk1>, <&anaclk2>;
++				clock-names = "ckil", "osc", "ipp_di0", "ipp_di1", "anaclk1", "anaclk2";
+ 			};
+ 
+ 			anatop: anatop at 20c8000 {
 -- 
 2.7.4
