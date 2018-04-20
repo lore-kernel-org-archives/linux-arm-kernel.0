@@ -1,52 +1,25 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 20 Apr 2018 15:46:24 +0800
-Subject: [PATCH 55/61] usb: mtu3: simplify getting .drvdata
-In-Reply-To: <20180419140641.27926-56-wsa+renesas@sang-engineering.com>
-References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
- <20180419140641.27926-56-wsa+renesas@sang-engineering.com>
-Message-ID: <1524210384.25162.1.camel@mhfsdcap03>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 20 Apr 2018 09:48:26 +0200
+Subject: bq27000: directory/files exists even when hardware is not
+ available
+In-Reply-To: <20180420074036.GA16257@amd>
+References: <20180420074036.GA16257@amd>
+Message-ID: <20180420074826.c7cy4z3tq7c56ccs@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Friday 20 April 2018 09:40:36 Pavel Machek wrote:
+> Hi!
+> 
+> On droid4 (4.17-rc1), /sys/class/power_supply/bq27000-battery exists
+> even when hardware is not present (as on Droid 4).
+> 
+> Any ideas?
+> 									Pavel
 
-On Thu, 2018-04-19 at 16:06 +0200, Wolfram Sang wrote:
-> We should get drvdata from struct device directly. Going via
-> platform_device is an unneeded step back and forth.
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> ---
-> 
-> Build tested only. buildbot is happy. Please apply individually.
-> 
->  drivers/usb/mtu3/mtu3_plat.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
-> index 628d5ce356ca..46551f6d16fd 100644
-> --- a/drivers/usb/mtu3/mtu3_plat.c
-> +++ b/drivers/usb/mtu3/mtu3_plat.c
-> @@ -447,8 +447,7 @@ static int mtu3_remove(struct platform_device *pdev)
->   */
->  static int __maybe_unused mtu3_suspend(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct ssusb_mtk *ssusb = platform_get_drvdata(pdev);
-> +	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
->  
->  	dev_dbg(dev, "%s\n", __func__);
->  
-> @@ -466,8 +465,7 @@ static int __maybe_unused mtu3_suspend(struct device *dev)
->  
->  static int __maybe_unused mtu3_resume(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct ssusb_mtk *ssusb = platform_get_drvdata(pdev);
-> +	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
->  	int ret;
->  
->  	dev_dbg(dev, "%s\n", __func__);
+Somebody must have registered bq device into power_supply subsystem.
+Maybe DT note is present?
 
-Acked-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-
-Thanks
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
