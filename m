@@ -1,125 +1,129 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Apr 2018 12:02:52 +0100
-Subject: [RFC PATCH 2/3] arm64: stacktrace: Factor out backtrace
- initialisation
-In-Reply-To: <1524221179-19473-3-git-send-email-Dave.Martin@arm.com>
-References: <1524221179-19473-1-git-send-email-Dave.Martin@arm.com>
- <1524221179-19473-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180420110252.6wafzexqyagk7yyh@lakrids.cambridge.arm.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 20 Apr 2018 13:05:21 +0200
+Subject: [PATCH v3 0/7] Add tda998x (HDMI) support to atmel-hlcdc
+In-Reply-To: <6354350.l8DgUyNhLT@avalon>
+References: <20180419162751.25223-1-peda@axentia.se>
+ <20180420085235.GI4235@w540> <6354350.l8DgUyNhLT@avalon>
+Message-ID: <7f709cea-e1f4-2204-7320-5a1075d721d1@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 11:46:18AM +0100, Dave Martin wrote:
-> Some common code is required by each stacktrace user to initialised
-> struct stackframe before the first call to unwind_frame().
+On 2018-04-20 12:18, Laurent Pinchart wrote:
+> Hello,
 > 
-> In preparation for adding to the common code, this patch factors it
-> out into a separate function start_backtrace(), and modifies the
-> stacktrace callers appropriately.
-> 
-> No functional change.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> On Friday, 20 April 2018 11:52:35 EEST jacopo mondi wrote:
+>> Hi Peter,
+>>     I've been a bit a pain in the arse for you recently, but please
+>> bear with me a bit more, and sorry for jumping late on the band wagon.
+>>
+>> On Thu, Apr 19, 2018 at 06:27:44PM +0200, Peter Rosin wrote:
+>>> Hi!
+>>>
+>>> I naively thought that since there was support for both nxp,tda19988 (in
+>>> the tda998x driver) and the atmel-hlcdc, things would be a smooth ride.
+>>> But it wasn't, so I started looking around and realized I had to fix
+>>> things.
+>>>
+>>> In v1 and v2 I fixed things by making the atmel-hlcdc driver a master
+>>> component, but now in v3 I fix things by making the tda998x driver
+>>> a bridge instead. This was after a suggestion from Boris Brezillion
 
-Looks like a nice cleanup.
+That should be Brezillon, sorry for being sloppy with the spelling.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/include/asm/stacktrace.h | 11 +++++++++++
->  arch/arm64/kernel/process.c         |  6 +-----
->  arch/arm64/kernel/time.c            |  6 +-----
->  arch/arm64/kernel/traps.c           | 21 ++++++++-------------
->  4 files changed, 21 insertions(+), 23 deletions(-)
+>>> (the atmel-hlcdc maintainer), so there was some risk of bias ... but
+>>> after comparing what was needed, I too find the bridge approach better.
+>>>
+>>> In addition to the above, our PCB interface between the SAMA5D3 and the
+>>> HDMI encoder is only using 16 bits, and this has to be described
+>>> somewhere, or the atmel-hlcdc driver have no chance of selecting the
+>>> correct output mode. Since I have similar problems with a ds90c185 lvds
+>>> encoder I added patches to override the atmel-hlcdc output format via
+>>> DT properties compatible with the media video-interface binding and
+>>> things start to play together.
+>>>
+>>> Since this series superseeds the bridge series [1], I have included the
+>>> leftover bindings patch for the ti,ds90c185 here.
+>>
+>> I feel like this series would look better if it would make use of the
+>> proposed bridge media bus format support I have recently sent out [1]
+>> (and which was not there when you first sent v1).
+>>
+>> I understand your fundamental problem here is that the bus format
+>> that should be reported by your bridge is different from the ones
+>> actually supported by the TDA19988 chip, as the wirings ground some
+>> of the input pins.
+>>
+>> Although this is defintely something that could be described in the
+>> bridge's own OF node with the 'bus_width' property, and what I would do,
+>> now that you have made a bridge out from the tda19988 driver, is:
+>>
+>> 1) Set the bridge accepted input bus_format parsing its pin
+>> configuration, or default it if that's not implemented yet.
+>> This will likely be rgb888. You can do that using the trivial
+>> support for bridge input image formats implemented by my series.
+>> 2) Specify in the bridge endpoint a 'bus_width' of <16>
+>> 3) In your atmel-hlcd get both the image format of the bridge (rgb888)
+>> and parse the remote endpoint property 'bus_width' and get the <16>
+>> value back.
 > 
-> diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-> index 63c0379..c9bef22 100644
-> --- a/arch/arm64/include/asm/stacktrace.h
-> +++ b/arch/arm64/include/asm/stacktrace.h
-> @@ -94,4 +94,15 @@ static inline bool on_accessible_stack(struct task_struct const *tsk,
->  	return false;
->  }
->  
-> +static inline void start_backtrace(struct stackframe *frame,
-> +			    struct task_struct const *tsk,
-> +			    unsigned long fp, unsigned long pc)
-> +{
-> +	frame->fp = fp;
-> +	frame->pc = pc;
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +	frame.graph = tsk->curr_ret_stack;
-> +#endif
-> +}
-> +
->  #endif	/* __ASM_STACKTRACE_H */
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index f08a2ed..59b418c 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -452,11 +452,7 @@ unsigned long get_wchan(struct task_struct *p)
->  	if (!stack_page)
->  		return 0;
->  
-> -	frame.fp = thread_saved_fp(p);
-> -	frame.pc = thread_saved_pc(p);
-> -#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> -	frame.graph = p->curr_ret_stack;
-> -#endif
-> +	start_backtrace(&frame, p, thread_saved_fp(p), thread_saved_pc(p));
->  	do {
->  		if (unwind_frame(p, &frame))
->  			goto out;
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index f258636..83f08c7 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -49,11 +49,7 @@ unsigned long profile_pc(struct pt_regs *regs)
->  	if (!in_lock_functions(regs->pc))
->  		return regs->pc;
->  
-> -	frame.fp = regs->regs[29];
-> -	frame.pc = regs->pc;
-> -#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> -	frame.graph = current->curr_ret_stack;
-> -#endif
-> +	start_backtrace(&frame, current, regs->regs[29], regs->pc);
->  	do {
->  		int ret = unwind_frame(NULL, &frame);
->  		if (ret < 0)
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index ba964da..3910af4 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -111,19 +111,14 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
->  	if (!try_get_task_stack(tsk))
->  		return;
->  
-> -	if (tsk == current) {
-> -		frame.fp = (unsigned long)__builtin_frame_address(0);
-> -		frame.pc = (unsigned long)dump_backtrace;
-> -	} else {
-> -		/*
-> -		 * task blocked in __switch_to
-> -		 */
-> -		frame.fp = thread_saved_fp(tsk);
-> -		frame.pc = thread_saved_pc(tsk);
-> -	}
-> -#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> -	frame.graph = tsk->curr_ret_stack;
-> -#endif
-> +	if (tsk == current)
-> +		start_backtrace(&frame, tsk,
-> +				(unsigned long)__builtin_frame_address(0),
-> +				(unsigned long)dump_backtrace);
-> +	else /* task blocked in __switch_to */
-> +		start_backtrace(&frame, tsk,
-> +				thread_saved_fp(tsk),
-> +				thread_saved_pc(tsk));
->  
->  	skip = !!regs;
->  	printk("Call trace:\n");
-> -- 
-> 2.1.4
+> Parsing properties of remote nodes should be avoided as much as possible, as 
+> they need to be interpreted in the context of the DT bindings related to the 
+> compatible string applicable to that node. I'd rather have the bus_width 
+> property in the local endpoint node.
+
+In addition to that, my view of this binding
+
+	endpoint {
+		bus-type = <0>;
+		bus-widht = <16>;
+	};
+
+is that it always means rgb565. See further below.
+
+>> 4) Set the correct format in the atmel hlcd driver to accommodate a
+>> bridge that wants rgb888 on a 16 bit wide bus (that would be rgb565,
+>> or are there other possible combinations I am missing?)
+>>
+>> I would consider this better mostly because in this series you are
+>> creating a semantic for the whole DRM subsystem on the 'bus_width'
+>> property, where numerical values as '12', '16' etc are arbitrary tied
+>> to the selection of a media bus format. At least you should use a
+>> common set of defines [1] between the device tree and the driver,
+>> but this looks anyway fragile imho.
 > 
+> This I agree with though. Combining the remote bus format with the local bus 
+> width should fix the problem without having to parse remote properties.
+
+My thinking was that the binding with bus-type = <0> and bus-width = <bpp>
+would mean a parallel bus (type 0 means auto-detect and with a bus-width that
+auto-detect means a parallel bus) and the most natural/common interpretation
+of that bus-width. For bus widths of 12, 16, 18, 24, 30 etc I think that
+would be rgb444, rgb565, rgb666, rgb888, rgb101010 (or, I'm first so I get
+to define the default). If you have some other interpretation of a bus with
+that width, you'd need to extend the video-interface binding with some way
+of saying what you need, perhaps using some kind of data mapping or something
+to say e.g. bgr666. And you'd need some kind of indicator if you have YUV
+signals instead of RGB, and LVDS isn't a completely parallel bus, so you'd
+need something for that. Etc.
+
+Because the word from Rob was that there should be one common binding that
+describes video interfaces. I started an implementation that interprets that
+binding in a drm context in
+[PATCH 3/7] drm: of: introduce drm_of_media_bus_fmt
+
+With that view, any input format specification of the bridge is not helpful
+for me since what the bridge specifies (without help) is going to be wrong
+anyway. End result, I need to specify the format manually on either the
+bridge or the atmel-hlcdc side, and I happen to think that the correct side
+is with the atmel-hlcdc, because that is where my issue originates. In short,
+the "drm: bridge: Add support for static image formats" series is unrelated
+as far as I can tell.
+
+Cheers,
+Peter
+
+>> Have I maybe missed some parts of the problem you are trying to solve
+>> here?
+>>
+>> Thank you
+>>    j
