@@ -1,57 +1,49 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 Apr 2018 15:28:33 +0200
-Subject: [PATCH/RFC 7/8] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig symbol
+Date: Fri, 20 Apr 2018 15:28:27 +0200
+Subject: [PATCH 1/8] arm: shmobile: Change platform dependency to ARCH_RENESAS
 In-Reply-To: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
 References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1524230914-10175-8-git-send-email-geert+renesas@glider.be>
+Message-ID: <1524230914-10175-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All drivers for Renesas ARM SoCs have gained proper ARCH_RENESAS
-platform dependencies.  Hence finish the conversion from ARCH_SHMOBILE
-to ARCH_RENESAS for Renesas 32-bit ARM SoCs, as started by commit
-9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS").
+Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
+is ARCH_RENESAS a more appropriate platform dependency than the legacy
+ARCH_SHMOBILE, hence use the former.
+
+This will allow to drop ARCH_SHMOBILE on ARM in the near future.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-This depends on the previous patches in this series, hence the RFC.
+ arch/arm/Kconfig  | 2 +-
+ arch/arm/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-JFTR, after this, the following symbols for drivers supporting only
-Renesas SuperH "SH-Mobile" SoCs can no longer be selected:
-  - CONFIG_KEYBOARD_SH_KEYSC,
-  - CONFIG_VIDEO_SH_VOU,
-  - CONFIG_VIDEO_SH_MOBILE_CEU,
-  - CONFIG_DRM_SHMOBILE[*],
-  - CONFIG_FB_SH_MOBILE_MERAM.
-(changes for a shmobile_defconfig .config)
-
-[*] CONFIG_DRM_SHMOBILE has a dependency on ARM, but it was never wired
-    up.  From the use of sh_mobile_meram, I guess it was meant for
-    SH-Mobile AP4 on Mackerel or AP4EVB, which are long gone.
-    So the only remaining upstream platforms that could make use of it
-    are legacy SuperH SH-Mobile SoCs?
----
- arch/arm/mach-shmobile/Kconfig | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 96672da02f5f17b9..d892c5b52b6f5627 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -1,6 +1,3 @@
--config ARCH_SHMOBILE
--	bool
--
- config PM_RMOBILE
- 	bool
- 	select PM
-@@ -30,7 +27,6 @@ menuconfig ARCH_RENESAS
- 	bool "Renesas ARM SoCs"
- 	depends on ARCH_MULTI_V7 && MMU
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
--	select ARCH_SHMOBILE
- 	select ARM_GIC
- 	select GPIOLIB
- 	select HAVE_ARM_SCU if SMP
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a7f8e7f4b88fdd03..2d34c0a44877e85b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1467,7 +1467,7 @@ config ARM_PSCI
+ config ARCH_NR_GPIO
+ 	int
+ 	default 2048 if ARCH_SOCFPGA
+-	default 1024 if ARCH_BRCMSTB || ARCH_SHMOBILE || ARCH_TEGRA || \
++	default 1024 if ARCH_BRCMSTB || ARCH_RENESAS || ARCH_TEGRA || \
+ 		ARCH_ZYNQ
+ 	default 512 if ARCH_EXYNOS || ARCH_KEYSTONE || SOC_OMAP5 || \
+ 		SOC_DRA7XX || ARCH_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index e4e537f27339f7a1..a92f5a876d96839d 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -212,7 +212,7 @@ machine-$(CONFIG_ARCH_S3C24XX)		+= s3c24xx
+ machine-$(CONFIG_ARCH_S3C64XX)		+= s3c64xx
+ machine-$(CONFIG_ARCH_S5PV210)		+= s5pv210
+ machine-$(CONFIG_ARCH_SA1100)		+= sa1100
+-machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
++machine-$(CONFIG_ARCH_RENESAS)	 	+= shmobile
+ machine-$(CONFIG_ARCH_SIRF)		+= prima2
+ machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
+ machine-$(CONFIG_ARCH_STI)		+= sti
 -- 
 2.7.4
