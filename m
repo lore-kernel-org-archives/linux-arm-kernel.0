@@ -1,24 +1,55 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 20 Apr 2018 09:40:36 +0200
-Subject: bq27000: directory/files exists even when hardware is not available
-Message-ID: <20180420074036.GA16257@amd>
+From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
+Date: Fri, 20 Apr 2018 07:42:13 +0000
+Subject: [RFC 0/2] dw_mmc: add multislot support
+In-Reply-To: <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
+References: <20180417121130.25281-1-Eugeniy.Paltsev@synopsys.com>
+ <CAPDyKFqxZLtx_=0UU9NgBnW0Vmw=456q2FFbMBK4LKEaF-ua7A@mail.gmail.com>
+Message-ID: <1524210132.4614.4.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Ulf,
 
-On droid4 (4.17-rc1), /sys/class/power_supply/bq27000-battery exists
-even when hardware is not present (as on Droid 4).
+On Fri, 2018-04-20 at 09:35 +0200, Ulf Hansson wrote:
+> [...]
+> 
+> > 
+> > 2. Add missing stuff to support multislot mode in DesignWare MMC driver.
+> >  * Add missing slot switch to __dw_mci_start_request() function.
+> >  * Refactor set_ios function:
+> >    a) Calculate common clock which is
+> >       suitable for all slots instead of directly use clock value
+> >       provided by mmc core. We calculate common clock as the minimum
+> >       among each used slot clocks. This clock is calculated in
+> >       dw_mci_calc_common_clock() function which is called
+> >       from set_ios()
+> >    b) Disable clock only if no other slots are ON.
+> >    c) Setup clock directly in set_ios() only if no other slots
+> >       are ON. Otherwise adjust clock in __dw_mci_start_request()
+> >       function before slot switch.
+> >    d) Move timings and bus_width setup to separate funcions.
+> >  * Use timing field in each slot structure instead of common field in
+> >    host structure.
+> >  * Add locks to serialize access to registers.
+> 
+> Sorry, but this is a hack to *try* to make multi-slot work and this
+> isn't sufficient. There were good reasons to why the earlier
+> non-working multi slot support was removed from dw_mmc.
+> 
+> Let me elaborate a bit for your understanding. The core uses a host
+> lock (mmc_claim|release_host()) to serialize operations and commands,
+> as to confirm to the SD/SDIO/(e)MMC specs. The above changes gives no
+> guarantees for this. To make that work, we would need a "mmc bus lock"
+> to be managed by the core.
+> 
+> However, inventing a "mmc bus lock" would lead to other problems
+> related to I/O scheduling for upper layers - it simply breaks. For
+> example, I/O requests for one card/slot can then starve I/O requests
+> reaching another card/slot.
 
-Any ideas?
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180420/f3681b8e/attachment.sig>
+So are you saying that multi-slot support is a no go in general or it is only
+applicable to DW MMC (I really doubt that's a case)?
+
+BTW there're other controllers that seem to support multi-slot like Atmel etc.
+
+-Alexey
