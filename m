@@ -1,70 +1,160 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Apr 2018 21:51:06 +0300
-Subject: [PATCH 2/2] arm64: dts: renesas: condor: add eMMC support
-In-Reply-To: <20180420100313.4cmngxeibpc2r3h2@verge.net.au>
-References: <611daf1f-42a2-d463-0814-ebf762871018@cogentembedded.com>
- <309b5211-bab6-53de-b8a8-6e1049e1705e@cogentembedded.com>
- <20180420100313.4cmngxeibpc2r3h2@verge.net.au>
-Message-ID: <d3cc9e96-2351-348e-9577-f0fadfd0d6c9@cogentembedded.com>
+From: ckadabi@codeaurora.org (Channa)
+Date: Fri, 20 Apr 2018 11:51:40 -0700
+Subject: [PATCH v4 1/2] Documentation: Documentation for qcom, llcc
+In-Reply-To: <589e84221ca7723c1739f713216abce5@codeaurora.org>
+References: <1523390893-10904-1-git-send-email-rishabhb@codeaurora.org>
+ <1523390893-10904-2-git-send-email-rishabhb@codeaurora.org>
+ <20180416145912.ja7d2xd2kqiukrgl@rob-hp-laptop>
+ <9a9ffe61f85dd28199bcc2d449097059@codeaurora.org>
+ <1d31f2d727d32922aaf98c345723229e@codeaurora.org>
+ <CAL_JsqKihiUwPW-aKYtG2cSFnOZonygahUeO5kgLjL3GYO7w=Q@mail.gmail.com>
+ <589e84221ca7723c1739f713216abce5@codeaurora.org>
+Message-ID: <8cb9bd887d94bedfb43225569647337e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/20/2018 01:03 PM, Simon Horman wrote:
-
->> Define the Condor board dependent part of the MMC0 (connected to eMMC chip)
->> device node along with the necessary voltage regulators...
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->>  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |   43 ++++++++++++++++++++++++
->>  1 file changed, 43 insertions(+)
->>
->> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
->> ===================================================================
->> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
->> @@ -27,6 +27,24 @@
->>  		/* first 128MB is reserved for secure area. */
->>  		reg = <0 0x48000000 0 0x78000000>;
->>  	};
->> +
->> +	d3_3v: regulator-0 {
+On 2018-04-18 11:11, Channa wrote:
+> On 2018-04-18 07:52, Rob Herring wrote:
+>> On Tue, Apr 17, 2018 at 5:12 PM,  <rishabhb@codeaurora.org> wrote:
+>>> On 2018-04-17 10:43, rishabhb at codeaurora.org wrote:
+>>>> 
+>>>> On 2018-04-16 07:59, Rob Herring wrote:
+>>>>> 
+>>>>> On Tue, Apr 10, 2018 at 01:08:12PM -0700, Rishabh Bhatnagar wrote:
+>>>>>> 
+>>>>>> Documentation for last level cache controller device tree 
+>>>>>> bindings,
+>>>>>> client bindings usage examples.
+>>>>> 
+>>>>> 
+>>>>> "Documentation: Documentation ..."? That wastes a lot of the 
+>>>>> subject
+>>>>> line... The preferred prefix is "dt-bindings: ..."
+>>>>> 
+>>>>>> 
+>>>>>> Signed-off-by: Channagoud Kadabi <ckadabi@codeaurora.org>
+>>>>>> Signed-off-by: Rishabh Bhatnagar <rishabhb@codeaurora.org>
+>>>>>> ---
+>>>>>>  .../devicetree/bindings/arm/msm/qcom,llcc.txt      | 58
+>>>>>> ++++++++++++++++++++++
+>>>>>>  1 file changed, 58 insertions(+)
+>>>>>>  create mode 100644
+>>>>>> Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+>>>>>> 
+>>>>>> diff --git 
+>>>>>> a/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+>>>>>> b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..497cf0f
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,llcc.txt
+>>>>>> @@ -0,0 +1,58 @@
+>>>>>> +== Introduction==
+>>>>>> +
+>>>>>> +LLCC (Last Level Cache Controller) provides last level of cache 
+>>>>>> memory
+>>>>>> in SOC,
+>>>>>> +that can be shared by multiple clients. Clients here are 
+>>>>>> different
+>>>>>> cores in the
+>>>>>> +SOC, the idea is to minimize the local caches at the clients and
+>>>>>> migrate to
+>>>>>> +common pool of memory
+>>>>>> +
+>>>>>> +Properties:
+>>>>>> +- compatible:
+>>>>>> +        Usage: required
+>>>>>> +        Value type: <string>
+>>>>>> +        Definition: must be "qcom,sdm845-llcc"
+>>>>>> +
+>>>>>> +- reg:
+>>>>>> +        Usage: required
+>>>>>> +        Value Type: <prop-encoded-array>
+>>>>>> +        Definition: must be addresses and sizes of the LLCC 
+>>>>>> registers
+>>>>> 
+>>>>> 
+>>>>> How many address ranges?
+>>>>> 
+>>>> It consists of just one address range. I'll edit the definition to 
+>>>> make
+>>>> it more clear.
+>>>>>> 
+>>>>>> +
+>>>>>> +- #cache-cells:
+>>>>> 
+>>>>> 
+>>>>> This is all written as it is a common binding, but it is not one.
+>>>>> 
+>>>>> You already have most of the configuration data for each client in 
+>>>>> the
+>>>>> driver, I think I'd just put the client connection there too. Is 
+>>>>> there
+>>>>> any variation of this for a given SoC?
+>>>>> 
+>>>> #cache-cells and max-slices won't change for a given SOC. So you 
+>>>> want me
+>>>> to hard-code in the driver itself?
+>>>> 
+>>> I can use of_parse_phandle_with_fixed_args function and fix the 
+>>> number of
+>>> args as 1 instead of keeping #cache-cells here in DT. Does that look 
+>>> fine?
+>> 
+>> No, I'm saying why even put cache-slices properties in DT to begin
+>> with? You could just define client id's within the kernel and clients
+>> can use those instead of getting the id from the DT.
 > 
-> Please use reg_3p3v: regulator1 for consistency with salvator-common.dtsi
-
-   Hm, not sure why I have to copy what I consider a bad example... the SoCs are
-not pin compatible anyway. 
-
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "D3.3V";
+> The reason to add cache-slices here is to establish a connection 
+> between
+> client and system cache. For example if we have multiple instances of
+> system cache blocks and client wants to choose a system cache instance
+> based on the usecase then its easier to establish this connection using
+> device tree than hard coding in the driver.
 > 
-> And "fixed-3.3V"
-
-   Ugh. That's pretty poor name I think. My names do correspond to the schematics
-and these only muddle things up, I think...
-
-[...]
->> @@ -70,6 +101,18 @@
->>  		function = "avb";
->>  	};
->>  
->> +	mmc_1_8v_pins: mmc_1_8v {
->> +		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
->> +		function = "mmc";
->> +		power-source = <1800>;
->> +	};
->> +
->> +	mmc_3_3v_pins: mmc_3_3v {
->> +		groups = "mmc_data8", "mmc_ctrl", "mmc_ds";
->> +		function = "mmc";
->> +		power-source = <3300>;
->> +	};
+>> 
+>> I have a couple of hesitations with putting this into the DT. First, I
+>> think a cache is just one aspect of describing the interconnect
+>> between masters and memory (and there's been discussions on
+>> interconnect bindings too) and any binding needs to consider all of
+>> the aspects of the interconnect. Second, I'd expect this cache
+>> architecture will change SoC to SoC and the binding here is pretty
+>> closely tied to the current cache implementation (e.g. slices). If
+>> there were a bunch of SoCs with the same design and just different
+>> client IDs (like interrupt IDs), then I'd feel differently.
 > 
-> Again please make this more consistent with salvator-common.dtsi.
+> This is partially true, a bunch of SoCs would support this design but
+> clients IDs are not expected to change. So Ideally client drivers could
+> hard code these IDs.
+> 
+> However I have other concerns of moving the client Ids in the driver.
+> The way the APIs implemented today are as follows:
+> #1. Client calls into system cache driver to get cache slice handle
+> with the usecase Id as input.
+> #2. System cache driver gets the phandle of system cache instance from
+> the client device to obtain the private data.
+> #3. Based on the usecase Id perform look up in the private data to get
+> cache slice handle.
+> #4. Return the cache slice handle to client
+> 
+> If we don't have the connection between client & system cache then the
+> private data needs to declared as static global in the system cache 
+> driver,
+> that limits us to have just once instance of system cache block.
+> 
+> 
+>> 
+>> Rob
 
-   Ah, you mean the _uhs label name postfix? OK...
+Hi Rob:
 
-[...]
+Can you please provide your opinion on the approach here?
 
-MBR, Sergei
+Thanks,
+Channa
+
+-- 
+--
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+a Linux Foundation Collaborative Project
