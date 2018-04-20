@@ -1,43 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Apr 2018 10:41:02 -0700
-Subject: [GIT PULL] two omap fixes for v4.17-rc cycle
-Message-ID: <pull-1524246008-227018@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 Apr 2018 18:59:38 +0100
+Subject: [GIT PULL] arm64 fixes for 4.17-rc2
+Message-ID: <20180420175935.obbvf5ype6n2odoq@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Hi Linus,
+
+Please pull the arm64 fixes below. Thanks.
 
 The following changes since commit 60cc43fc888428bb2f18f08997432d426a243338:
 
   Linux 4.17-rc1 (2018-04-15 18:24:20 -0700)
 
-are available in the Git repository at:
+are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.17/fixes-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
 
-for you to fetch changes up to fb289e3ab10c16834741bb02be740fa9d025fde0:
+for you to fetch changes up to b2d71b3cda19831ec67f49d7c6ba0214d9367b29:
 
-  Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes (2018-04-19 15:48:46 -0700)
-
-----------------------------------------------------------------
-Two fixes for v4.17-rc cycle
-
-Fix a build regression with split object directories reported by Russell
-and fix range sizes for omap4 cm2 and prm modules.
+  arm64: signal: don't force known signals to SIGKILL (2018-04-18 15:13:27 +0100)
 
 ----------------------------------------------------------------
-Dave Gerlach (1):
-      ARM: OMAP2+: Fix build when using split object directories
+arm64 fixes:
 
-Tony Lindgren (2):
-      ARM: dts: Fix cm2 and prm sizes for omap4
-      Merge branch 'omap-for-v4.17/fixes-ti-sysc' into omap-for-v4.17/fixes
+- KASan: avoid pfn_to_nid() before the page array is initialised
 
- arch/arm/boot/dts/omap4.dtsi         |  8 ++--
- arch/arm/mach-omap2/Makefile         |  6 +--
- arch/arm/mach-omap2/pm-asm-offsets.c |  3 ++
- arch/arm/mach-omap2/sleep33xx.S      |  1 -
- arch/arm/mach-omap2/sleep43xx.S      |  1 -
- drivers/memory/emif-asm-offsets.c    | 72 +---------------------------------
- include/linux/ti-emif-sram.h         | 75 ++++++++++++++++++++++++++++++++++++
- 7 files changed, 84 insertions(+), 82 deletions(-)
+- Fix typo causing the "upgrade" of known signals to SIGKILL
+
+----------------------------------------------------------------
+Mark Rutland (2):
+      arm64: kasan: avoid pfn_to_nid() before page array is initialized
+      arm64: signal: don't force known signals to SIGKILL
+
+ arch/arm64/kernel/traps.c  | 2 +-
+ arch/arm64/mm/kasan_init.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+-- 
+Catalin
