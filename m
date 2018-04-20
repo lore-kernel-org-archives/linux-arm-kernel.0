@@ -1,80 +1,64 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 20 Apr 2018 13:42:14 -0500
-Subject: [PATCH 09/12] PCI: remove CONFIG_PCI_BUS_ADDR_T_64BIT
-In-Reply-To: <20180415145947.1248-10-hch@lst.de>
-References: <20180415145947.1248-1-hch@lst.de>
- <20180415145947.1248-10-hch@lst.de>
-Message-ID: <20180420184214.GT28657@bhelgaas-glaptop.roam.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Apr 2018 13:50:27 -0500
+Subject: [PATCH 4/9] ARM: dts: bcm2837: Add Raspberry Pi 3 B+
+In-Reply-To: <656517811.10338.1524223449795@email.1und1.de>
+References: <1523640478-4448-1-git-send-email-stefan.wahren@i2se.com>
+ <1523640478-4448-5-git-send-email-stefan.wahren@i2se.com>
+ <20180416204331.ft4ehpe5statsw4u@rob-hp-laptop>
+ <60625d11-c521-b004-d64c-f72c9c6aac83@i2se.com> <87muy1253i.fsf@anholt.net>
+ <656517811.10338.1524223449795@email.1und1.de>
+Message-ID: <CAL_JsqKtNP_e2HRB2p03cJGedH2QVXc8+MZYVRNBZrRxVhhzXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 15, 2018 at 04:59:44PM +0200, Christoph Hellwig wrote:
-> This symbol is now always identical to CONFIG_ARCH_DMA_ADDR_T_64BIT, so
-> remove it.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
+On Fri, Apr 20, 2018 at 6:24 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Hi Rob,
+>
+>> Eric Anholt <eric@anholt.net> hat am 17. April 2018 um 18:02 geschrieben:
+>>
+>>
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>>
+>> > Hi Rob,
+>> >
+>> > Am 16.04.2018 um 22:43 schrieb Rob Herring:
+>> >> On Fri, Apr 13, 2018 at 07:27:53PM +0200, Stefan Wahren wrote:
+>> >>> The Raspberry Pi 3 B+ has the following major differences compared
+>> >>> to the model 3 B:
+>> >>> * Microchip LAN7515 (Gigabit Ethernet)
+>> >>> * Cypress CYW43455 (802.11n/ac and BT 4.2)
+>> >>>
+>> >>> We need to add the USB LAN chip so the bootloader can add the MAC address.
+>> >>> This is necessary because there ain't a EEPROM or a valid OTP.
+>> >>>
+>> >>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+>> >>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> >>> ---
+>> >>>   arch/arm/boot/dts/Makefile                 |   1 +
+>> >>>   arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts | 108 +++++++++++++++++++++++++++++
+>> >>>   arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi |  27 ++++++++
+>> >>>   3 files changed, 136 insertions(+)
+>> >>>   create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts
+>> >>>   create mode 100644 arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
+>> >>>
+>> >>> ...
+>> >>> diff --git a/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
+>> >>> new file mode 100644
+>> >>> index 0000000..169203c
+>> >>> --- /dev/null
+>> >>> +++ b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
+>> >> Why the separate file? This can be shared?
+>> >
+>> > this comes from the assumption the RPi 3 B+ won't be the only RPi board
+>> > with a LAN7515. Should i fold it in the dts file as long as we don't
+>> > have a second board?
+>>
+>> I think it's great as is -- our other network chips are hooked up this
+>> way and it makes 3b+ match all the others.  Also, while I have no
+>> specific knowledge, it seems likely that this would get reused.
+>
+> sorry for my impatience, but what's your opinion?
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+It's fine as-is.
 
-Please merge this along with the rest of the series; let me know if you
-need anything more from me.
-
-> ---
->  drivers/pci/Kconfig | 4 ----
->  drivers/pci/bus.c   | 4 ++--
->  include/linux/pci.h | 2 +-
->  3 files changed, 3 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-> index 34b56a8f8480..29a487f31dae 100644
-> --- a/drivers/pci/Kconfig
-> +++ b/drivers/pci/Kconfig
-> @@ -5,10 +5,6 @@
->  
->  source "drivers/pci/pcie/Kconfig"
->  
-> -config PCI_BUS_ADDR_T_64BIT
-> -	def_bool y if (ARCH_DMA_ADDR_T_64BIT || 64BIT)
-> -	depends on PCI
-> -
->  config PCI_MSI
->  	bool "Message Signaled Interrupts (MSI and MSI-X)"
->  	depends on PCI
-> diff --git a/drivers/pci/bus.c b/drivers/pci/bus.c
-> index bc2ded4c451f..35b7fc87eac5 100644
-> --- a/drivers/pci/bus.c
-> +++ b/drivers/pci/bus.c
-> @@ -120,7 +120,7 @@ int devm_request_pci_bus_resources(struct device *dev,
->  EXPORT_SYMBOL_GPL(devm_request_pci_bus_resources);
->  
->  static struct pci_bus_region pci_32_bit = {0, 0xffffffffULL};
-> -#ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
-> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
->  static struct pci_bus_region pci_64_bit = {0,
->  				(pci_bus_addr_t) 0xffffffffffffffffULL};
->  static struct pci_bus_region pci_high = {(pci_bus_addr_t) 0x100000000ULL,
-> @@ -230,7 +230,7 @@ int pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
->  					  resource_size_t),
->  		void *alignf_data)
->  {
-> -#ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
-> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
->  	int rc;
->  
->  	if (res->flags & IORESOURCE_MEM_64) {
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 73178a2fcee0..55371cb827ad 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -670,7 +670,7 @@ int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
->  int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
->  		  int reg, int len, u32 val);
->  
-> -#ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
-> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
->  typedef u64 pci_bus_addr_t;
->  #else
->  typedef u32 pci_bus_addr_t;
-> -- 
-> 2.17.0
-> 
+Rob
