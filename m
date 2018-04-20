@@ -1,48 +1,129 @@
-From: ilina@codeaurora.org (Lina Iyer)
-Date: Fri, 20 Apr 2018 16:44:45 -0600
-Subject: [PATCH 1/2] regulator: add QCOM RPMh regulator driver
-In-Reply-To: <dcd4e178-cfd3-1c3f-da7c-1eb66a58cf15@codeaurora.org>
-References: <cover.1521246069.git.collinsd@codeaurora.org>
- <71fab82672524b95632cdb588c16edfc9711866a.1521246069.git.collinsd@codeaurora.org>
- <152165924074.91116.13025068669916027026@swboyd.mtv.corp.google.com>
- <493c1f5d-df99-ca68-0f90-a7937a696f5d@codeaurora.org>
- <152411734938.46528.9676451637772936597@swboyd.mtv.corp.google.com>
- <dcd4e178-cfd3-1c3f-da7c-1eb66a58cf15@codeaurora.org>
-Message-ID: <20180420224445.GB18235@codeaurora.org>
+From: sgoel@codeaurora.org (Goel, Sameer)
+Date: Fri, 20 Apr 2018 17:39:01 -0600
+Subject: [PATCH] arm64: kexec: Add machine_kexec_mask_interrupts to kexec
+ path
+In-Reply-To: <20180420102332.kzxyn6lpe2ernnrg@lakrids.cambridge.arm.com>
+References: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
+ <20180420102332.kzxyn6lpe2ernnrg@lakrids.cambridge.arm.com>
+Message-ID: <9132cbb9-6288-a6d5-3acb-f50527c84b90@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20 2018 at 13:07 -0600, David Collins wrote:
->On 04/18/2018 10:55 PM, Stephen Boyd wrote:
->> Quoting David Collins (2018-03-22 18:30:06)
->>> On 03/21/2018 12:07 PM, Stephen Boyd wrote:
->>>> Quoting David Collins (2018-03-16 18:09:10)
->>>>> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
->>>>> index 097f617..e0ecd0a 100644
 
->>>>> +       ret = cmd_db_ready();
->>>>> +       if (ret < 0) {
->>>>> +               if (ret != -EPROBE_DEFER)
->>>>> +                       dev_err(dev, "Command DB not available, ret=%d\n", ret);
->>>>> +               return ret;
->>>>> +       }
->>>>
->>>> We should just make rpmh parent device call cmd_db_ready() so that these
->>>> devices aren't even populated until then and so that cmd_db_ready() is
->>>> only in one place. Lina?
->>>
->>> Let's see if Lina has qualms about this plan.
+
+On 4/20/2018 4:23 AM, Mark Rutland wrote:
+> Hi Sameer,
+> 
+> On Wed, Apr 18, 2018 at 08:19:36PM -0600, Sameer Goel wrote:
+>> In kdump code path SPIs at GIC level are explicitly cleared by
+>> calling machine_kexec_mask_interrupts. In case of kexec this
+>> functionality is delegated for most part to the device shutdown
+>> functions.
+>> Add machine_kexec_mask_interrupts to machine_shutdown path to
+>> ensure that the irqs are masked at the gic level.
+> 
+> I think that for kdump, the plan is to try to get irqchips to reset
+> things in their probe paths (e.g. as that's the sanest place to poke
+> APRn). Doing that would render machine_kexec_mask_interrupts() redundant
+> for kexec.
+I agree the above proposed change in GIC will make machine_kexec_mask_interrupts() redundant. Can you please point me to the change if already posted.
+> 
+>> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
+>> ---
+>> Porting code for masking irqs at gic from kdump shutdown to kexec path.
 >>
->> Sounds like you're ok with it.
->
->Sure, I'll remove this check if Lina agrees to add it in the rpmh driver.
->
-We want to make the RSC nodes child of Command DB? That way we probe the
-controllers only if the command DB is ready?
+>> There was discussion about this functionality in [1].
+>>
+>> [1] https://patchwork.kernel.org/patch/9817499/
+> 
+> I don't follow why this is a problem. Nate mentions corrupting the new
+> kernel -- has a problem been observed in practice?
+> 
+> The purgatory code is run with IRQs masked at the CPU, and the new
+> kernel will initialise the GIC before enabling interrupts at the CPU.
+> Once probed, the SMMU driver can handle spurious interrupts.
+> 
+> So AFAICT there is no problem today. Am I missing something?
 
-I could do that. Just so you know, there is are no strict directives to
-use Command DB. If a driver knows the information it needs to pass to
-the accelerator, it may choose to skip command DB completely.
+This was something that was proposed when the driver owners were not clearing interrupts in their shutdown functions. So, more of a cleanup. From you description above it makes sense.
 
 Thanks,
-Lina
+Sameer
+> 
+> When could an interrupt be taken that would be problematic?
+> 
+> Currently, I don't see that this is necessary. Given we'd like to remove
+> machine_kexec_mask_interrupts() for the kdump case, I'd prefer that we
+> don't mandate it in the usual kexec case.
+> 
+> Thanks,
+> Mark.
+> 
+>>
+>>  arch/arm64/include/asm/kexec.h    | 6 ++++++
+>>  arch/arm64/kernel/machine_kexec.c | 2 +-
+>>  arch/arm64/kernel/process.c       | 2 ++
+>>  3 files changed, 9 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+>> index e17f052..f9ddb41 100644
+>> --- a/arch/arm64/include/asm/kexec.h
+>> +++ b/arch/arm64/include/asm/kexec.h
+>> @@ -93,6 +93,12 @@ static inline void crash_prepare_suspend(void) {}
+>>  static inline void crash_post_resume(void) {}
+>>  #endif
+>>  
+>> +#if defined(CONFIG_KEXEC)
+>> +extern void machine_kexec_mask_interrupts(void);
+>> +#else
+>> +static inline void machine_kexec_mask_interrupts(void) {}
+>> +#endif
+>> +
+>>  #endif /* __ASSEMBLY__ */
+>>  
+>>  #endif
+>> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+>> index f76ea92..b453180 100644
+>> --- a/arch/arm64/kernel/machine_kexec.c
+>> +++ b/arch/arm64/kernel/machine_kexec.c
+>> @@ -213,7 +213,7 @@ void machine_kexec(struct kimage *kimage)
+>>  	BUG(); /* Should never get here. */
+>>  }
+>>  
+>> -static void machine_kexec_mask_interrupts(void)
+>> +void machine_kexec_mask_interrupts(void)
+>>  {
+>>  	unsigned int i;
+>>  	struct irq_desc *desc;
+>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>> index f08a2ed..9d0337e 100644
+>> --- a/arch/arm64/kernel/process.c
+>> +++ b/arch/arm64/kernel/process.c
+>> @@ -58,6 +58,7 @@
+>>  #include <asm/mmu_context.h>
+>>  #include <asm/processor.h>
+>>  #include <asm/stacktrace.h>
+>> +#include <asm/kexec.h>
+>>  
+>>  #ifdef CONFIG_CC_STACKPROTECTOR
+>>  #include <linux/stackprotector.h>
+>> @@ -107,6 +108,7 @@ void arch_cpu_idle_dead(void)
+>>  void machine_shutdown(void)
+>>  {
+>>  	disable_nonboot_cpus();
+>> +	machine_kexec_mask_interrupts();
+>>  }
+>>  
+>>  /*
+>> -- 
+>> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+ Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
