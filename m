@@ -1,69 +1,103 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 21 Apr 2018 20:30:31 +0200
-Subject: [PATCH] ARM: dts: exynos: Fix invalid node referenced by i2c20 alias
-Message-ID: <20180421183031.21195-1-krzk@kernel.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 21 Apr 2018 21:23:05 +0200
+Subject: [PATCH 01/15] dmaengine: pxa: use a dma slave map
+In-Reply-To: <20180402142656.26815-2-robert.jarzmik@free.fr> (Robert Jarzmik's
+ message of "Mon, 2 Apr 2018 16:26:42 +0200")
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-2-robert.jarzmik@free.fr>
+Message-ID: <87604kz7mu.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After moving all nodes under "soc" node in commit 5d99cc59a3c6 ("ARM:
-dts: exynos: Move Exynos5250 and Exynos5420 nodes under soc"), the i2c20
-alias stopped point to proper node:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-    arch/arm/boot/dts/exynos5420-peach-pit.dtb: Warning (alias_paths):
-        /aliases:i2c20: aliases property is not a valid node (/spi at 12d40000/cros-ec at 0/i2c-tunnel)
-    arch/arm/boot/dts/exynos5800-peach-pi.dtb: Warning (alias_paths):
-        /aliases:i2c20: aliases property is not a valid node (/spi at 12d40000/cros-ec at 0/i2c-tunnel)
+> In order to remove the specific knowledge of the dma mapping from PXA
+> drivers, add a default slave map for pxa architectures.
+>
+> This won't impact MMP architecture, but is aimed only at all PXA boards.
+>
+> This is the first step, and once all drivers are converted,
+> pxad_filter_fn() will be made static, and the DMA resources removed from
+> device.c.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
 
-Fixes: 5d99cc59a3c6 ("ARM: dts: exynos: Move Exynos5250 and Exynos5420 nodes under soc")
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 ++--
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Vinod, could I have your ack please ?
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 244f0091c21f..57c2332bf282 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -29,7 +29,7 @@
- 
- 	aliases {
- 		/* Assign 20 so we don't get confused w/ builtin ones */
--		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
-+		i2c20 = &i2c_tunnel;
- 	};
- 
- 	backlight: backlight {
-@@ -970,7 +970,7 @@
- 			samsung,spi-feedback-delay = <1>;
- 		};
- 
--		i2c-tunnel {
-+		i2c_tunnel: i2c-tunnel {
- 			compatible = "google,cros-ec-i2c-tunnel";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 2f8df9244f72..d80ab9085da1 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -27,7 +27,7 @@
- 
- 	aliases {
- 		/* Assign 20 so we don't get confused w/ builtin ones */
--		i2c20 = "/spi at 12d40000/cros-ec at 0/i2c-tunnel";
-+		i2c20 = &i2c_tunnel;
- 	};
- 
- 	backlight: backlight {
-@@ -939,7 +939,7 @@
- 			samsung,spi-feedback-delay = <1>;
- 		};
- 
--		i2c-tunnel {
-+		i2c_tunnel: i2c-tunnel {
- 			compatible = "google,cros-ec-i2c-tunnel";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+Cheers.
+
+--
+Robert
+
+PS: The submitted patch
+> ---
+>  drivers/dma/pxa_dma.c                 | 10 +++++++++-
+>  include/linux/platform_data/mmp_dma.h |  4 ++++
+>  2 files changed, 13 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+> index b53fb618bbf6..9505334f9c6e 100644
+> --- a/drivers/dma/pxa_dma.c
+> +++ b/drivers/dma/pxa_dma.c
+> @@ -179,6 +179,8 @@ static unsigned int pxad_drcmr(unsigned int line)
+>  	return 0x1000 + line * 4;
+>  }
+>  
+> +bool pxad_filter_fn(struct dma_chan *chan, void *param);
+> +
+>  /*
+>   * Debug fs
+>   */
+> @@ -1396,9 +1398,10 @@ static int pxad_probe(struct platform_device *op)
+>  {
+>  	struct pxad_device *pdev;
+>  	const struct of_device_id *of_id;
+> +	const struct dma_slave_map *slave_map = NULL;
+>  	struct mmp_dma_platdata *pdata = dev_get_platdata(&op->dev);
+>  	struct resource *iores;
+> -	int ret, dma_channels = 0, nb_requestors = 0;
+> +	int ret, dma_channels = 0, nb_requestors = 0, slave_map_cnt = 0;
+>  	const enum dma_slave_buswidth widths =
+>  		DMA_SLAVE_BUSWIDTH_1_BYTE   | DMA_SLAVE_BUSWIDTH_2_BYTES |
+>  		DMA_SLAVE_BUSWIDTH_4_BYTES;
+> @@ -1429,6 +1432,8 @@ static int pxad_probe(struct platform_device *op)
+>  	} else if (pdata && pdata->dma_channels) {
+>  		dma_channels = pdata->dma_channels;
+>  		nb_requestors = pdata->nb_requestors;
+> +		slave_map = pdata->slave_map;
+> +		slave_map_cnt = pdata->slave_map_cnt;
+>  	} else {
+>  		dma_channels = 32;	/* default 32 channel */
+>  	}
+> @@ -1440,6 +1445,9 @@ static int pxad_probe(struct platform_device *op)
+>  	pdev->slave.device_prep_dma_memcpy = pxad_prep_memcpy;
+>  	pdev->slave.device_prep_slave_sg = pxad_prep_slave_sg;
+>  	pdev->slave.device_prep_dma_cyclic = pxad_prep_dma_cyclic;
+> +	pdev->slave.filter.map = slave_map;
+> +	pdev->slave.filter.mapcnt = slave_map_cnt;
+> +	pdev->slave.filter.fn = pxad_filter_fn;
+>  
+>  	pdev->slave.copy_align = PDMA_ALIGNMENT;
+>  	pdev->slave.src_addr_widths = widths;
+> diff --git a/include/linux/platform_data/mmp_dma.h b/include/linux/platform_data/mmp_dma.h
+> index d1397c8ed94e..6397b9c8149a 100644
+> --- a/include/linux/platform_data/mmp_dma.h
+> +++ b/include/linux/platform_data/mmp_dma.h
+> @@ -12,9 +12,13 @@
+>  #ifndef MMP_DMA_H
+>  #define MMP_DMA_H
+>  
+> +struct dma_slave_map;
+> +
+>  struct mmp_dma_platdata {
+>  	int dma_channels;
+>  	int nb_requestors;
+> +	int slave_map_cnt;
+> +	const struct dma_slave_map *slave_map;
+>  };
+>  
+>  #endif /* MMP_DMA_H */
+
 -- 
-2.14.1
+Robert
