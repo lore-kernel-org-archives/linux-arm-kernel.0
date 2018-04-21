@@ -1,59 +1,27 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 21 Apr 2018 18:55:17 +0200
-Subject: [PATCH 1/2] drm/exynos: fimd: Add support for S5PV210 FIMD variant
-In-Reply-To: <1524241936-10295-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1524241936-10295-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1524241936-10295-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <CAJKOXPcv2A8po8-8ZVic8KX2xURPZsRBkS6My3qMhefRQk-fRQ@mail.gmail.com>
+Date: Sat, 21 Apr 2018 19:05:14 +0200
+Subject: [PATCH 01/61] ARM: plat-samsung: simplify getting .drvdata
+In-Reply-To: <20180419140641.27926-2-wsa+renesas@sang-engineering.com>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-2-wsa+renesas@sang-engineering.com>
+Message-ID: <20180421170514.qmklysbjrnkatns5@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 6:32 PM, Pawe? Chmiel
-<pawel.mikolaj.chmiel@gmail.com> wrote:
-> From: Tomasz Figa <tomasz.figa@gmail.com>
->
-> This patch adds support for FIMD variant found on S5PV210 SoC.
-> Except CLKSEL bit availability, it is identical to Exynos4210.
->
-> Tested-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+On Thu, Apr 19, 2018 at 04:05:31PM +0200, Wolfram Sang wrote:
+> We should get drvdata from struct device directly. Going via
+> platform_device is an unneeded step back and forth.
+> 
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+> 
+> Build tested only. buildbot is happy. Please apply individually.
+> 
+>  arch/arm/plat-samsung/adc.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
 
-You need to add your Signed-off-by here as well. It is necessary every
-time you touch a patch (and sending it is also a "touch" action).
+Thanks, applied.
 
 Best regards,
 Krzysztof
-
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_fimd.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-> index d42ae2bc3e56..01b1570d0c3a 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-> @@ -121,6 +121,12 @@ static struct fimd_driver_data s3c64xx_fimd_driver_data = {
->         .has_limited_fmt = 1,
->  };
->
-> +static struct fimd_driver_data s5pv210_fimd_driver_data = {
-> +       .timing_base = 0x0,
-> +       .has_shadowcon = 1,
-> +       .has_clksel = 1,
-> +};
-> +
->  static struct fimd_driver_data exynos3_fimd_driver_data = {
->         .timing_base = 0x20000,
->         .lcdblk_offset = 0x210,
-> @@ -193,6 +199,8 @@ struct fimd_context {
->  static const struct of_device_id fimd_driver_dt_match[] = {
->         { .compatible = "samsung,s3c6400-fimd",
->           .data = &s3c64xx_fimd_driver_data },
-> +       { .compatible = "samsung,s5pv210-fimd",
-> +         .data = &s5pv210_fimd_driver_data },
->         { .compatible = "samsung,exynos3250-fimd",
->           .data = &exynos3_fimd_driver_data },
->         { .compatible = "samsung,exynos4210-fimd",
-> --
-> 2.7.4
->
