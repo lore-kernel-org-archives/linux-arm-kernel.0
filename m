@@ -1,79 +1,53 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sat, 21 Apr 2018 17:12:28 +0200
-Subject: [PATCH 00/27] Add multi-channel and overheat IRQ support to Armada
- thermal driver
-Message-ID: <20180421151255.29929-1-miquel.raynal@bootlin.com>
+Date: Sat, 21 Apr 2018 17:12:39 +0200
+Subject: [PATCH 11/27] thermal: armada: move validity check out of the read
+ function
+In-Reply-To: <20180421151255.29929-1-miquel.raynal@bootlin.com>
+References: <20180421151255.29929-1-miquel.raynal@bootlin.com>
+Message-ID: <20180421151255.29929-12-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only capability of the Armada thermal driver is currently just to
-read one sensor (the default one) per AP and one per CP.
+Sensor selection when using multiple sensors already checks for the
+sensor validity. Move it to the legacy ->get_temp() hook, where it is
+still needed.
 
-Actually, there is one sensor per core in the AP806 plus one sensor in
-the thermal IP itself. The CP110 just features one thermal sensor in its
-own thermal IP.
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ drivers/thermal/armada_thermal.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-Also, there is no need for the thermal core to poll the temperature of
-each sensor by software as this IP (at least for AP806 and CP110
-compatibles) features an hardware overheat interrupt.
-
-This series first improves the readability of this driver, then adds
-support for multi-channel thermal IPs, and finally adds support for the
-hardware overheat interrupt. The bindings and the device-trees are
-updated accordingly.
-
-Please note that the thermal IP raises SEI interrupts, from which the
-support as just been contributed and not merged yet. Applying the last
-DT patches referring to the 'sei' and 'icu_sei' nodes will require this
-feature [1] to have been accepted first.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/572852.html
-
-Thank you,
-Miqu?l
-
-
-Miquel Raynal (27):
-  thermal: armada: add a function that sanitizes the thermal zone name
-  thermal: armada: remove useless register accesses
-  thermal: armada: remove misleading comments
-  thermal: armada: rename the initialization routine
-  thermal: armada: dissociate a380 and cp110 ->init() hooks
-  thermal: armada: average over samples to avoid glitches
-  thermal: armada: convert driver to syscon register accesses
-  thermal: armada: use the resource managed registration helper
-    alternative
-  thermal: armada: add multi-channel sensors support
-  thermal: armada: remove sensors validity from the IP initialization
-  thermal: armada: move validity check out of the read function
-  thermal: armada: get rid of the ->is_valid() pointer
-  thermal: armada: add overheat interrupt support
-  dt-bindings: cp110: rename cp110 syscon file
-  dt-bindings: ap806: prepare the syscon file to list other syscons
-    nodes
-  dt-bindings: cp110: prepare the syscon file to list other syscons
-    nodes
-  dt-bindings: ap806: add the thermal node in the syscon file
-  dt-bindings: cp110: update documentation since DT de-duplication
-  dt-bindings: cp110: add the thermal node in the syscon file
-  dt-bindings: thermal: armada: add reference to new bindings
-  arm64: dts: marvell: rename ap806 syscon node
-  arm64: dts: marvell: move AP806/CP110 thermal nodes into a new syscon
-  arm64: dts: marvell: add thermal-zone node in ap806 DTSI file
-  arm64: dts: marvell: add macro to make distinction between node names
-  arm64: dts: marvell: add thermal-zone node in cp110 DTSI file
-  arm64: dts: marvell: add interrupt support to ap806 thermal node
-  arm64: dts: marvell: add interrupt support to cp110 thermal node
-
- .../arm/marvell/ap806-system-controller.txt        |  55 +-
- ...controller0.txt => cp110-system-controller.txt} |  66 +-
- .../devicetree/bindings/thermal/armada-thermal.txt |   5 +
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  85 +-
- arch/arm64/boot/dts/marvell/armada-common.dtsi     |   1 +
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |  45 +-
- drivers/thermal/armada_thermal.c                   | 875 ++++++++++++++++++---
- 7 files changed, 976 insertions(+), 156 deletions(-)
- rename Documentation/devicetree/bindings/arm/marvell/{cp110-system-controller0.txt => cp110-system-controller.txt} (83%)
-
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 3d5b29133d3a..4e9f947a0f5f 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -328,13 +328,6 @@ static int armada_read_sensor(struct armada_thermal_priv *priv, long *temp)
+ 	u32 reg, div;
+ 	s64 sample, b, m;
+ 
+-	/* Valid check */
+-	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
+-		dev_err(priv->dev,
+-			"Temperature sensor reading not valid\n");
+-		return -EIO;
+-	}
+-
+ 	regmap_read(priv->syscon, priv->data->syscon_status_off, &reg);
+ 	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
+ 	if (priv->data->signed_sample)
+@@ -363,6 +356,13 @@ static int armada_get_temp_legacy(struct thermal_zone_device *thermal,
+ 	long temperature;
+ 	int ret;
+ 
++	/* Valid check */
++	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
++		dev_err(priv->dev,
++			"Temperature sensor reading not valid\n");
++		return -EIO;
++	}
++
+ 	/* Do the actual reading */
+ 	ret = armada_read_sensor(priv, &temperature);
+ 	*temp = temperature;
 -- 
 2.14.1
