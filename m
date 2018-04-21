@@ -1,49 +1,64 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sat, 21 Apr 2018 17:12:44 +0200
-Subject: [PATCH 16/27] dt-bindings: cp110: prepare the syscon file to list
- other syscons nodes
+Date: Sat, 21 Apr 2018 17:12:53 +0200
+Subject: [PATCH 25/27] arm64: dts: marvell: add thermal-zone node in cp110
+ DTSI file
 In-Reply-To: <20180421151255.29929-1-miquel.raynal@bootlin.com>
 References: <20180421151255.29929-1-miquel.raynal@bootlin.com>
-Message-ID: <20180421151255.29929-17-miquel.raynal@bootlin.com>
+Message-ID: <20180421151255.29929-26-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are multiple system controllers in CP110. Because all syscon nodes
-use the same compatible, it is pertinent to use this same file to list
-IPs inside it. Thus, change the header to be more generic, and align
-with AP806 file.
+Add a thermal-zone node and fill in all the sensors available in a
+cp110 (only one in the thermal IP).
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- .../bindings/arm/marvell/cp110-system-controller.txt       | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-index 29cdbae6c5ac..56e7fb1153e7 100644
---- a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller.txt
-@@ -1,15 +1,15 @@
--Marvell Armada CP110 System Controller 0
--========================================
-+Marvell Armada CP110 System Controller
-+======================================
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+index 514780980847..8d0fc1bfe291 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+@@ -6,6 +6,7 @@
+  */
  
- The CP110 is one of the two core HW blocks of the Marvell Armada 7K/8K
--SoCs. It contains two sets of system control registers, System
--Controller 0 and System Controller 1. This Device Tree binding allows
--to describe the first system controller, which provides registers to
--configure various aspects of the SoC.
-+SoCs. It contains system controllers, which provide several registers
-+giving access to numerous features: clocks, pin-muxing and many other
-+SoC configuration items. This DT binding allows to describe these
-+system controllers.
+ #include <dt-bindings/interrupt-controller/mvebu-icu.h>
++#include <dt-bindings/thermal/thermal.h>
  
- For the top level node:
-  - compatible: must be: "syscon", "simple-mfd";
-- - reg: register area of the CP110 system controller 0
-+ - reg: register area of the CP110 system controller
+ #include "armada-common.dtsi"
  
- Clocks:
- -------
+@@ -19,6 +20,23 @@
+ 	 * save one indentation level
+ 	 */
+ 	CP110_NAME: CP110_NAME { };
++
++	/*
++	 * CPs only have one sensor in the thermal IC.
++	 *
++	 * The cooling maps are empty as there are no cooling devices.
++	 */
++	thermal-zones {
++		CP110_LABEL(thermal_ic): CP110_NODE_NAME(thermal-ic) {
++			polling-delay-passive = <1000>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&CP110_LABEL(thermal) 0>;
++
++			trips {	};
++			cooling-maps { };
++		};
++	};
+ };
+ 
+ &CP110_NAME {
+@@ -216,6 +234,7 @@
+ 
+ 			CP110_LABEL(thermal): thermal at 400070 {
+ 				compatible = "marvell,armada-cp110-thermal";
++				#thermal-sensor-cells = <1>;
+ 			};
+ 		};
+ 
 -- 
 2.14.1
