@@ -1,38 +1,60 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sat, 21 Apr 2018 18:39:21 +0200
-Subject: [PATCH v2 2/2] arm: dts: nes: add Nintendo NES/SuperNES Classic
- Edition support
-In-Reply-To: <20180327065127.c5a4onxn4agt27ew@flea>
-References: <20180326212820.20637-1-miquel.raynal@bootlin.com>
- <20180326212820.20637-3-miquel.raynal@bootlin.com>
- <CAGb2v66yPjKxoMwktEb09drL0qqX807tHdB3g+iHXax=e91s3A@mail.gmail.com>
- <20180327065127.c5a4onxn4agt27ew@flea>
-Message-ID: <20180421183921.22532fb6@xps13>
+Date: Sat, 21 Apr 2018 18:42:45 +0200
+Subject: [PATCH v3 1/2] ARM: dts: sun8i: a23/a33: declare NAND pins
+In-Reply-To: <20180421164246.8477-1-miquel.raynal@bootlin.com>
+References: <20180421164246.8477-1-miquel.raynal@bootlin.com>
+Message-ID: <20180421164246.8477-2-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Declare NAND pins (bus, chip select and ready/busy) for a23/a33 SoCs.
 
-On Tue, 27 Mar 2018 08:51:27 +0200, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-> On Tue, Mar 27, 2018 at 10:38:52AM +0800, Chen-Yu Tsai wrote:
-> > > diff --git a/arch/arm/boot/dts/sun8i-r16-nintendo-supernes-classic.dts b/arch/arm/boot/dts/sun8i-r16-nintendo-supernes-classic.dts
-> > > new file mode 100644
-> > > index 000000000000..928f82dbe440
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/sun8i-r16-nintendo-supernes-classic.dts
-> > > @@ -0,0 +1,17 @@
-> > > +// SPDX-License-Identifier: GPL-2.0 OR X11  
-> 
-> This should have a copyright license too
-
-Added.
-
-> 
-> And could we call it super-nes-classic?
-
-Of course yes.
-
-Thanks for reviewing, the v3 is coming.
-Miqu?l
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 971f9be699a7..6b9e85b4ba0f 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -315,6 +315,37 @@
+ 				bias-pull-up;
+ 			};
+ 
++			nand_pins: nand-pins {
++				pins = "PC0", "PC1", "PC2", "PC5",
++				       "PC8", "PC9", "PC10", "PC11",
++				       "PC12", "PC13", "PC14", "PC15";
++				function = "nand0";
++			};
++
++			nand_pins_cs0: nand-pins-cs0 {
++				pins = "PC4";
++				function = "nand0";
++				bias-pull-up;
++			};
++
++			nand_pins_cs1: nand-pins-cs1 {
++				pins = "PC3";
++				function = "nand0";
++				bias-pull-up;
++			};
++
++			nand_pins_rb0: nand-pins-rb0 {
++				pins = "PC6";
++				function = "nand0";
++				bias-pull-up;
++			};
++
++			nand_pins_rb1: nand-pins-rb1 {
++				pins = "PC7";
++				function = "nand0";
++				bias-pull-up;
++			};
++
+ 			pwm0_pins: pwm0 {
+ 				pins = "PH0";
+ 				function = "pwm0";
+-- 
+2.14.1
