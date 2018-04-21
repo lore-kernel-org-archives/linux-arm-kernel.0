@@ -1,104 +1,52 @@
-From: megous@megous.com (megous at megous.com)
-Date: Sat, 21 Apr 2018 06:51:55 +0200
-Subject: [PATCH] Revert "drm/sun4i: add lvds mode_valid function"
-Message-ID: <20180421045155.15332-1-megous@megous.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 21 Apr 2018 11:07:11 +0300
+Subject: [PATCH 3/8] [media] v4l: rcar_fdp1: Change platform dependency to
+ ARCH_RENESAS
+In-Reply-To: <1524230914-10175-4-git-send-email-geert+renesas@glider.be>
+References: <1524230914-10175-1-git-send-email-geert+renesas@glider.be>
+ <1524230914-10175-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <3039853.rivznOVBTv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ondrej Jirman <megous@megous.com>
+Hi Geert,
 
-The reverted commit broke LVDS output on TBS A711 Tablet. That tablet
-has simple-panel node that has fixed pixel clock-frequency that A83T
-SoC used in the tablet can't generate exactly.
+Thank you for the patch.
 
-Requested rate is 52000000 and rounded_rate is calculated as 51857142.
-It's close enough for it to work in practice, but with strict check
-in the reverted commit, the mode is rejected needlessly in this case.
+On Friday, 20 April 2018 16:28:29 EEST Geert Uytterhoeven wrote:
+> The Renesas Fine Display Processor driver is used on Renesas R-Car SoCs
+> only.  Since commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce
+> ARCH_RENESAS") is ARCH_RENESAS a more appropriate platform dependency
+> than the legacy ARCH_SHMOBILE, hence use the former.
+> 
+> This will allow to drop ARCH_SHMOBILE on ARM and ARM64 in the near
+> future.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-DT allows to specify a range of values for simple-panel/clock-frequency,
-but driver doesn't respect that ATM. Given that TBS A711 is the single
-user of sun4i-lvds driver, let's revert that commit for now, until
-a better solution for the problem is found.
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Also see: https://patchwork.kernel.org/patch/9446385/ for relevant
-discussion (or search for "[RFC] drm/sun4i: rgb: Add 5% tolerance
-to dot clock frequency check").
+How would you like to get this merged ?
 
-Fixes: e4e4b7ad50cf ("drm/sun4i: add lvds mode_valid function")
-Reported-by: Ondrej Jirman <megous@megous.com>
-Signed-off-by: Ondrej Jirman <megous@megous.com>
----
- drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ------------------------------
- 1 file changed, 55 deletions(-)
+> ---
+>  drivers/media/platform/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index f9235e8f8e962d2e..7ad4725f9d1f9627 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -396,7 +396,7 @@ config VIDEO_SH_VEU
+>  config VIDEO_RENESAS_FDP1
+>  	tristate "Renesas Fine Display Processor"
+>  	depends on VIDEO_DEV && VIDEO_V4L2 && HAS_DMA
+> -	depends on ARCH_SHMOBILE || COMPILE_TEST
+> +	depends on ARCH_RENESAS || COMPILE_TEST
+>  	depends on (!ARCH_RENESAS && !VIDEO_RENESAS_FCP) || VIDEO_RENESAS_FCP
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	select V4L2_MEM2MEM_DEV
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-index bffff4c9fbf5..be3f14d7746d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
-@@ -94,64 +94,9 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
- 	}
- }
- 
--static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
--							  const struct drm_display_mode *mode)
--{
--	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
--	struct sun4i_tcon *tcon = lvds->tcon;
--	u32 hsync = mode->hsync_end - mode->hsync_start;
--	u32 vsync = mode->vsync_end - mode->vsync_start;
--	unsigned long rate = mode->clock * 1000;
--	long rounded_rate;
--
--	DRM_DEBUG_DRIVER("Validating modes...\n");
--
--	if (hsync < 1)
--		return MODE_HSYNC_NARROW;
--
--	if (hsync > 0x3ff)
--		return MODE_HSYNC_WIDE;
--
--	if ((mode->hdisplay < 1) || (mode->htotal < 1))
--		return MODE_H_ILLEGAL;
--
--	if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
--		return MODE_BAD_HVALUE;
--
--	DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
--
--	if (vsync < 1)
--		return MODE_VSYNC_NARROW;
--
--	if (vsync > 0x3ff)
--		return MODE_VSYNC_WIDE;
--
--	if ((mode->vdisplay < 1) || (mode->vtotal < 1))
--		return MODE_V_ILLEGAL;
--
--	if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
--		return MODE_BAD_VVALUE;
--
--	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
--
--	tcon->dclk_min_div = 7;
--	tcon->dclk_max_div = 7;
--	rounded_rate = clk_round_rate(tcon->dclk, rate);
--	if (rounded_rate < rate)
--		return MODE_CLOCK_LOW;
--
--	if (rounded_rate > rate)
--		return MODE_CLOCK_HIGH;
--
--	DRM_DEBUG_DRIVER("Clock rate OK\n");
--
--	return MODE_OK;
--}
--
- static const struct drm_encoder_helper_funcs sun4i_lvds_enc_helper_funcs = {
- 	.disable	= sun4i_lvds_encoder_disable,
- 	.enable		= sun4i_lvds_encoder_enable,
--	.mode_valid	= sun4i_lvds_encoder_mode_valid,
- };
- 
- static const struct drm_encoder_funcs sun4i_lvds_enc_funcs = {
 -- 
-2.17.0
+Regards,
+
+Laurent Pinchart
