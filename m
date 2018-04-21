@@ -1,155 +1,79 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sat, 21 Apr 2018 17:12:32 +0200
-Subject: [PATCH 04/27] thermal: armada: rename the initialization routine
-In-Reply-To: <20180421151255.29929-1-miquel.raynal@bootlin.com>
-References: <20180421151255.29929-1-miquel.raynal@bootlin.com>
-Message-ID: <20180421151255.29929-5-miquel.raynal@bootlin.com>
+Date: Sat, 21 Apr 2018 17:12:28 +0200
+Subject: [PATCH 00/27] Add multi-channel and overheat IRQ support to Armada
+ thermal driver
+Message-ID: <20180421151255.29929-1-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling a hook ->init_sensor() while what is initialized is the IP
-itself and not the sensors is misleading. Rename the hook ->init() to
-avoid any confusion in later work bringing multi-sensors support.
+The only capability of the Armada thermal driver is currently just to
+read one sensor (the default one) per AP and one per CP.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/thermal/armada_thermal.c | 40 ++++++++++++++++++++--------------------
- 1 file changed, 20 insertions(+), 20 deletions(-)
+Actually, there is one sensor per core in the AP806 plus one sensor in
+the thermal IP itself. The CP110 just features one thermal sensor in its
+own thermal IP.
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 18155e43e67f..3d22a6016b04 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -73,9 +73,9 @@ struct armada_thermal_priv {
- };
- 
- struct armada_thermal_data {
--	/* Initialize the sensor */
--	void (*init_sensor)(struct platform_device *pdev,
--			    struct armada_thermal_priv *);
-+	/* Initialize the thermal IC */
-+	void (*init)(struct platform_device *pdev,
-+		     struct armada_thermal_priv *priv);
- 
- 	/* Test for a valid sensor value (optional) */
- 	bool (*is_valid)(struct armada_thermal_priv *);
-@@ -94,8 +94,8 @@ struct armada_thermal_data {
- 	bool needs_control0;
- };
- 
--static void armadaxp_init_sensor(struct platform_device *pdev,
--				 struct armada_thermal_priv *priv)
-+static void armadaxp_init(struct platform_device *pdev,
-+			  struct armada_thermal_priv *priv)
- {
- 	u32 reg;
- 
-@@ -117,8 +117,8 @@ static void armadaxp_init_sensor(struct platform_device *pdev,
- 	writel(reg, priv->status);
- }
- 
--static void armada370_init_sensor(struct platform_device *pdev,
--				  struct armada_thermal_priv *priv)
-+static void armada370_init(struct platform_device *pdev,
-+			   struct armada_thermal_priv *priv)
- {
- 	u32 reg;
- 
-@@ -136,8 +136,8 @@ static void armada370_init_sensor(struct platform_device *pdev,
- 	msleep(10);
- }
- 
--static void armada375_init_sensor(struct platform_device *pdev,
--				  struct armada_thermal_priv *priv)
-+static void armada375_init(struct platform_device *pdev,
-+			   struct armada_thermal_priv *priv)
- {
- 	u32 reg;
- 
-@@ -164,8 +164,8 @@ static void armada_wait_sensor_validity(struct armada_thermal_priv *priv)
- 				   STATUS_POLL_TIMEOUT_US);
- }
- 
--static void armada380_init_sensor(struct platform_device *pdev,
--				  struct armada_thermal_priv *priv)
-+static void armada380_init(struct platform_device *pdev,
-+			   struct armada_thermal_priv *priv)
- {
- 	u32 reg = readl_relaxed(priv->control1);
- 
-@@ -186,8 +186,8 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	armada_wait_sensor_validity(priv);
- }
- 
--static void armada_ap806_init_sensor(struct platform_device *pdev,
--				     struct armada_thermal_priv *priv)
-+static void armada_ap806_init(struct platform_device *pdev,
-+			      struct armada_thermal_priv *priv)
- {
- 	u32 reg;
- 
-@@ -247,7 +247,7 @@ static struct thermal_zone_device_ops ops = {
- };
- 
- static const struct armada_thermal_data armadaxp_data = {
--	.init_sensor = armadaxp_init_sensor,
-+	.init = armadaxp_init,
- 	.temp_shift = 10,
- 	.temp_mask = 0x1ff,
- 	.coef_b = 3153000000ULL,
-@@ -257,7 +257,7 @@ static const struct armada_thermal_data armadaxp_data = {
- 
- static const struct armada_thermal_data armada370_data = {
- 	.is_valid = armada_is_valid,
--	.init_sensor = armada370_init_sensor,
-+	.init = armada370_init,
- 	.is_valid_bit = BIT(9),
- 	.temp_shift = 10,
- 	.temp_mask = 0x1ff,
-@@ -268,7 +268,7 @@ static const struct armada_thermal_data armada370_data = {
- 
- static const struct armada_thermal_data armada375_data = {
- 	.is_valid = armada_is_valid,
--	.init_sensor = armada375_init_sensor,
-+	.init = armada375_init,
- 	.is_valid_bit = BIT(10),
- 	.temp_shift = 0,
- 	.temp_mask = 0x1ff,
-@@ -280,7 +280,7 @@ static const struct armada_thermal_data armada375_data = {
- 
- static const struct armada_thermal_data armada380_data = {
- 	.is_valid = armada_is_valid,
--	.init_sensor = armada380_init_sensor,
-+	.init = armada380_init,
- 	.is_valid_bit = BIT(10),
- 	.temp_shift = 0,
- 	.temp_mask = 0x3ff,
-@@ -292,7 +292,7 @@ static const struct armada_thermal_data armada380_data = {
- 
- static const struct armada_thermal_data armada_ap806_data = {
- 	.is_valid = armada_is_valid,
--	.init_sensor = armada_ap806_init_sensor,
-+	.init = armada_ap806_init,
- 	.is_valid_bit = BIT(16),
- 	.temp_shift = 0,
- 	.temp_mask = 0x3ff,
-@@ -306,7 +306,7 @@ static const struct armada_thermal_data armada_ap806_data = {
- 
- static const struct armada_thermal_data armada_cp110_data = {
- 	.is_valid = armada_is_valid,
--	.init_sensor = armada380_init_sensor,
-+	.init = armada380_init,
- 	.is_valid_bit = BIT(10),
- 	.temp_shift = 0,
- 	.temp_mask = 0x3ff,
-@@ -428,7 +428,7 @@ static int armada_thermal_probe(struct platform_device *pdev)
- 		priv->control1 = control + CONTROL1_OFFSET;
- 	}
- 
--	priv->data->init_sensor(pdev, priv);
-+	priv->data->init(pdev, priv);
- 
- 	thermal = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
- 					       &ops, NULL, 0, 0);
+Also, there is no need for the thermal core to poll the temperature of
+each sensor by software as this IP (at least for AP806 and CP110
+compatibles) features an hardware overheat interrupt.
+
+This series first improves the readability of this driver, then adds
+support for multi-channel thermal IPs, and finally adds support for the
+hardware overheat interrupt. The bindings and the device-trees are
+updated accordingly.
+
+Please note that the thermal IP raises SEI interrupts, from which the
+support as just been contributed and not merged yet. Applying the last
+DT patches referring to the 'sei' and 'icu_sei' nodes will require this
+feature [1] to have been accepted first.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/572852.html
+
+Thank you,
+Miqu?l
+
+
+Miquel Raynal (27):
+  thermal: armada: add a function that sanitizes the thermal zone name
+  thermal: armada: remove useless register accesses
+  thermal: armada: remove misleading comments
+  thermal: armada: rename the initialization routine
+  thermal: armada: dissociate a380 and cp110 ->init() hooks
+  thermal: armada: average over samples to avoid glitches
+  thermal: armada: convert driver to syscon register accesses
+  thermal: armada: use the resource managed registration helper
+    alternative
+  thermal: armada: add multi-channel sensors support
+  thermal: armada: remove sensors validity from the IP initialization
+  thermal: armada: move validity check out of the read function
+  thermal: armada: get rid of the ->is_valid() pointer
+  thermal: armada: add overheat interrupt support
+  dt-bindings: cp110: rename cp110 syscon file
+  dt-bindings: ap806: prepare the syscon file to list other syscons
+    nodes
+  dt-bindings: cp110: prepare the syscon file to list other syscons
+    nodes
+  dt-bindings: ap806: add the thermal node in the syscon file
+  dt-bindings: cp110: update documentation since DT de-duplication
+  dt-bindings: cp110: add the thermal node in the syscon file
+  dt-bindings: thermal: armada: add reference to new bindings
+  arm64: dts: marvell: rename ap806 syscon node
+  arm64: dts: marvell: move AP806/CP110 thermal nodes into a new syscon
+  arm64: dts: marvell: add thermal-zone node in ap806 DTSI file
+  arm64: dts: marvell: add macro to make distinction between node names
+  arm64: dts: marvell: add thermal-zone node in cp110 DTSI file
+  arm64: dts: marvell: add interrupt support to ap806 thermal node
+  arm64: dts: marvell: add interrupt support to cp110 thermal node
+
+ .../arm/marvell/ap806-system-controller.txt        |  55 +-
+ ...controller0.txt => cp110-system-controller.txt} |  66 +-
+ .../devicetree/bindings/thermal/armada-thermal.txt |   5 +
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  85 +-
+ arch/arm64/boot/dts/marvell/armada-common.dtsi     |   1 +
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |  45 +-
+ drivers/thermal/armada_thermal.c                   | 875 ++++++++++++++++++---
+ 7 files changed, 976 insertions(+), 156 deletions(-)
+ rename Documentation/devicetree/bindings/arm/marvell/{cp110-system-controller0.txt => cp110-system-controller.txt} (83%)
+
 -- 
 2.14.1
