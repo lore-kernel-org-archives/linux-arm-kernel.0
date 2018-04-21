@@ -1,29 +1,30 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 21 Apr 2018 21:23:05 +0200
-Subject: [PATCH 01/15] dmaengine: pxa: use a dma slave map
-In-Reply-To: <20180402142656.26815-2-robert.jarzmik@free.fr> (Robert Jarzmik's
- message of "Mon, 2 Apr 2018 16:26:42 +0200")
+Date: Sat, 21 Apr 2018 21:27:43 +0200
+Subject: [PATCH 04/15] media: pxa_camera: remove the dmaengine compat need
+In-Reply-To: <20180402142656.26815-5-robert.jarzmik@free.fr> (Robert Jarzmik's
+ message of "Mon, 2 Apr 2018 16:26:45 +0200")
 References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <20180402142656.26815-2-robert.jarzmik@free.fr>
-Message-ID: <87604kz7mu.fsf@belgarion.home>
+ <20180402142656.26815-5-robert.jarzmik@free.fr>
+Message-ID: <871sf8z7f4.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-> In order to remove the specific knowledge of the dma mapping from PXA
-> drivers, add a default slave map for pxa architectures.
+> From: Robert Jarzmik <robert.jarzmik@renault.com>
 >
-> This won't impact MMP architecture, but is aimed only at all PXA boards.
+> As the pxa architecture switched towards the dmaengine slave map, the
+> old compatibility mechanism to acquire the dma requestor line number and
+> priority are not needed anymore.
 >
-> This is the first step, and once all drivers are converted,
-> pxad_filter_fn() will be made static, and the DMA resources removed from
-> device.c.
+> This patch simplifies the dma resource acquisition, using the more
+> generic function dma_request_slave_channel().
 >
 > Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-
-Vinod, could I have your ack please ?
+> ---
+>  drivers/media/platform/pxa_camera.c | 22 +++-------------------
+>  1 file changed, 3 insertions(+), 19 deletions(-)
+Hans, could I have your ack please ?
 
 Cheers.
 
@@ -31,73 +32,55 @@ Cheers.
 Robert
 
 PS: The submitted patch
-> ---
->  drivers/dma/pxa_dma.c                 | 10 +++++++++-
->  include/linux/platform_data/mmp_dma.h |  4 ++++
->  2 files changed, 13 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-> index b53fb618bbf6..9505334f9c6e 100644
-> --- a/drivers/dma/pxa_dma.c
-> +++ b/drivers/dma/pxa_dma.c
-> @@ -179,6 +179,8 @@ static unsigned int pxad_drcmr(unsigned int line)
->  	return 0x1000 + line * 4;
->  }
+> diff --git a/drivers/media/platform/pxa_camera.c b/drivers/media/platform/pxa_camera.c
+> index c71a00736541..4c82d1880753 100644
+> --- a/drivers/media/platform/pxa_camera.c
+> +++ b/drivers/media/platform/pxa_camera.c
+> @@ -2357,8 +2357,6 @@ static int pxa_camera_probe(struct platform_device *pdev)
+>  		.src_maxburst = 8,
+>  		.direction = DMA_DEV_TO_MEM,
+>  	};
+> -	dma_cap_mask_t mask;
+> -	struct pxad_param params;
+>  	char clk_name[V4L2_CLK_NAME_SIZE];
+>  	int irq;
+>  	int err = 0, i;
+> @@ -2432,34 +2430,20 @@ static int pxa_camera_probe(struct platform_device *pdev)
+>  	pcdev->base = base;
 >  
-> +bool pxad_filter_fn(struct dma_chan *chan, void *param);
-> +
->  /*
->   * Debug fs
->   */
-> @@ -1396,9 +1398,10 @@ static int pxad_probe(struct platform_device *op)
->  {
->  	struct pxad_device *pdev;
->  	const struct of_device_id *of_id;
-> +	const struct dma_slave_map *slave_map = NULL;
->  	struct mmp_dma_platdata *pdata = dev_get_platdata(&op->dev);
->  	struct resource *iores;
-> -	int ret, dma_channels = 0, nb_requestors = 0;
-> +	int ret, dma_channels = 0, nb_requestors = 0, slave_map_cnt = 0;
->  	const enum dma_slave_buswidth widths =
->  		DMA_SLAVE_BUSWIDTH_1_BYTE   | DMA_SLAVE_BUSWIDTH_2_BYTES |
->  		DMA_SLAVE_BUSWIDTH_4_BYTES;
-> @@ -1429,6 +1432,8 @@ static int pxad_probe(struct platform_device *op)
->  	} else if (pdata && pdata->dma_channels) {
->  		dma_channels = pdata->dma_channels;
->  		nb_requestors = pdata->nb_requestors;
-> +		slave_map = pdata->slave_map;
-> +		slave_map_cnt = pdata->slave_map_cnt;
->  	} else {
->  		dma_channels = 32;	/* default 32 channel */
+>  	/* request dma */
+> -	dma_cap_zero(mask);
+> -	dma_cap_set(DMA_SLAVE, mask);
+> -	dma_cap_set(DMA_PRIVATE, mask);
+> -
+> -	params.prio = 0;
+> -	params.drcmr = 68;
+> -	pcdev->dma_chans[0] =
+> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+> -						 &params, &pdev->dev, "CI_Y");
+> +	pcdev->dma_chans[0] = dma_request_slave_channel(&pdev->dev, "CI_Y");
+>  	if (!pcdev->dma_chans[0]) {
+>  		dev_err(&pdev->dev, "Can't request DMA for Y\n");
+>  		return -ENODEV;
 >  	}
-> @@ -1440,6 +1445,9 @@ static int pxad_probe(struct platform_device *op)
->  	pdev->slave.device_prep_dma_memcpy = pxad_prep_memcpy;
->  	pdev->slave.device_prep_slave_sg = pxad_prep_slave_sg;
->  	pdev->slave.device_prep_dma_cyclic = pxad_prep_dma_cyclic;
-> +	pdev->slave.filter.map = slave_map;
-> +	pdev->slave.filter.mapcnt = slave_map_cnt;
-> +	pdev->slave.filter.fn = pxad_filter_fn;
 >  
->  	pdev->slave.copy_align = PDMA_ALIGNMENT;
->  	pdev->slave.src_addr_widths = widths;
-> diff --git a/include/linux/platform_data/mmp_dma.h b/include/linux/platform_data/mmp_dma.h
-> index d1397c8ed94e..6397b9c8149a 100644
-> --- a/include/linux/platform_data/mmp_dma.h
-> +++ b/include/linux/platform_data/mmp_dma.h
-> @@ -12,9 +12,13 @@
->  #ifndef MMP_DMA_H
->  #define MMP_DMA_H
+> -	params.drcmr = 69;
+> -	pcdev->dma_chans[1] =
+> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+> -						 &params, &pdev->dev, "CI_U");
+> +	pcdev->dma_chans[1] = dma_request_slave_channel(&pdev->dev, "CI_U");
+>  	if (!pcdev->dma_chans[1]) {
+>  		dev_err(&pdev->dev, "Can't request DMA for Y\n");
+>  		err = -ENODEV;
+>  		goto exit_free_dma_y;
+>  	}
 >  
-> +struct dma_slave_map;
-> +
->  struct mmp_dma_platdata {
->  	int dma_channels;
->  	int nb_requestors;
-> +	int slave_map_cnt;
-> +	const struct dma_slave_map *slave_map;
->  };
->  
->  #endif /* MMP_DMA_H */
-
--- 
-Robert
+> -	params.drcmr = 70;
+> -	pcdev->dma_chans[2] =
+> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+> -						 &params, &pdev->dev, "CI_V");
+> +	pcdev->dma_chans[2] = dma_request_slave_channel(&pdev->dev, "CI_V");
+>  	if (!pcdev->dma_chans[2]) {
+>  		dev_err(&pdev->dev, "Can't request DMA for V\n");
+>  		err = -ENODEV;
