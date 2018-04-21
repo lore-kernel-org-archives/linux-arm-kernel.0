@@ -1,33 +1,32 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Sat, 21 Apr 2018 19:26:09 +0200
-Subject: [PATCH v2 0/2] drm/exynos: fimd: Add support for S5PV210
-Message-ID: <1524331571-7420-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Date: Sat, 21 Apr 2018 19:26:11 +0200
+Subject: [PATCH v2 2/2] drm/exynos: Allow DRM_EXYNOS on s5pv210.
+In-Reply-To: <1524331571-7420-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1524331571-7420-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1524331571-7420-3-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series compose of 2 patches.
-
-First patch, adding support for S5PV210 FIMD variant to Exynos driver.
-Compatible for this soc was already existing in documentation.
-
-Second patch, brings back possibility to use drivers depending on
+This patch brings back possibility to use drivers depending on
 DRM_EXYNOS, on Samsung S5PV210/S5PC110 series based systems.
 
-Both patches has been tested on (not yet mainlined), an S5PV210 based
-Samsung Galaxy S (i9000) phone.
+Fixes: dbbc925bb83a ("drm/exynos: depend on ARCH_EXYNOS for DRM_EXYNOS")
+Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+---
+ drivers/gpu/drm/exynos/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes from v1:
-  - Added missing signed-off-by to one of patches
-
-Pawe? Chmiel (1):
-  drm/exynos: Allow DRM_EXYNOS on s5pv210.
-
-Tomasz Figa (1):
-  drm/exynos: fimd: Add support for S5PV210 FIMD variant
-
- drivers/gpu/drm/exynos/Kconfig           | 2 +-
- drivers/gpu/drm/exynos/exynos_drm_fimd.c | 8 ++++++++
- 2 files changed, 9 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
+index 735ce47688f9..1548a784ef71 100644
+--- a/drivers/gpu/drm/exynos/Kconfig
++++ b/drivers/gpu/drm/exynos/Kconfig
+@@ -1,6 +1,6 @@
+ config DRM_EXYNOS
+ 	tristate "DRM Support for Samsung SoC EXYNOS Series"
+-	depends on OF && DRM && (ARCH_S3C64XX || ARCH_EXYNOS || ARCH_MULTIPLATFORM)
++	depends on OF && DRM && (ARCH_S3C64XX || ARCH_S5PV210 || ARCH_EXYNOS || ARCH_MULTIPLATFORM)
+ 	select DRM_KMS_HELPER
+ 	select VIDEOMODE_HELPERS
+ 	select SND_SOC_HDMI_CODEC if SND_SOC
 -- 
 2.7.4
