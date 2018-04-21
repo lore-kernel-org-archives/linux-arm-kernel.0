@@ -1,81 +1,35 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 21 Apr 2018 13:28:35 +0200
-Subject: [PATCH V2 2/9] ARM: dts: bcm2837: Add missing GPIOs of Expander
+Date: Sat, 21 Apr 2018 13:28:36 +0200
+Subject: [PATCH V2 3/9] dt-bindings: bcm: Add Raspberry Pi 3 B+
 In-Reply-To: <1524310122-9439-1-git-send-email-stefan.wahren@i2se.com>
 References: <1524310122-9439-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1524310122-9439-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1524310122-9439-4-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit a98d90e7d588 ("gpio: raspberrypi-exp: Driver for RPi3 GPIO
-expander via mailbox service") we are able to control the rest of the
-GPIOs of the RPi 3. So add all the missing parts (ACT LED,
-Wifi & BT control, HDMI detect) to the DT.
+This adds the root properties for the Raspberry Pi 3 B+
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 Reviewed-by: Eric Anholt <eric@anholt.net>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index cc39b6f..c318bcb 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -20,9 +20,14 @@
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+index 3e3efa0..1e3e29a 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+@@ -34,6 +34,10 @@ Raspberry Pi 3 Model B
+ Required root node properties:
+ compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
  
- 	leds {
- 		act {
--			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
-+			gpios = <&expgpio 2 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
++Raspberry Pi 3 Model B+
++Required root node properties:
++compatible = "raspberrypi,3-model-b-plus", "brcm,bcm2837";
 +
-+	wifi_pwrseq: wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- &firmware {
-@@ -48,6 +53,10 @@
- 	status = "okay";
- };
- 
-+&hdmi {
-+	hpd-gpios = <&expgpio 4 GPIO_ACTIVE_LOW>;
-+};
-+
- /* uart0 communicates with the BT module */
- &uart0 {
- 	pinctrl-names = "default";
-@@ -57,6 +66,7 @@
- 	bluetooth {
- 		compatible = "brcm,bcm43438-bt";
- 		max-speed = <2000000>;
-+		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
- 	};
- };
- 
-@@ -69,11 +79,19 @@
- 
- /* SDHCI is used to control the SDIO for wireless */
- &sdhci {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&emmc_gpio34>;
- 	status = "okay";
- 	bus-width = <4>;
- 	non-removable;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+	};
- };
- 
- /* SDHOST is used to drive the SD card */
+ Raspberry Pi Compute Module
+ Required root node properties:
+ compatible = "raspberrypi,compute-module", "brcm,bcm2835";
 -- 
 2.7.4
