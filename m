@@ -1,76 +1,174 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 21 Apr 2018 21:32:11 +0200
-Subject: [PATCH 10/15] ata: pata_pxa: remove the dmaengine compat need
-In-Reply-To: <20180402142656.26815-11-robert.jarzmik@free.fr> (Robert
- Jarzmik's message of "Mon, 2 Apr 2018 16:26:51 +0200")
-References: <20180402142656.26815-1-robert.jarzmik@free.fr>
- <20180402142656.26815-11-robert.jarzmik@free.fr>
-Message-ID: <87sh7oxsn8.fsf@belgarion.home>
+From: peda@axentia.se (Peter Rosin)
+Date: Sun, 22 Apr 2018 00:13:25 +0200
+Subject: [PATCH v3 4/7] drm/atmel-hlcdc: support bus-width (12/16/18/24)
+ in endpoint nodes
+In-Reply-To: <20180421181921.75c41917@bbrezillon>
+References: <20180419162751.25223-1-peda@axentia.se>
+ <20180419162751.25223-5-peda@axentia.se> <20180421181921.75c41917@bbrezillon>
+Message-ID: <894b0408-038f-6bd2-2130-d46de332e215@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+On 2018-04-21 18:19, Boris Brezillon wrote:
+> On Thu, 19 Apr 2018 18:27:48 +0200
+> Peter Rosin <peda@axentia.se> wrote:
+> 
+>> This beats the heuristic that the connector is involved in what format
+>> should be output for cases where this fails.
+>>
+>> E.g. if there is a bridge that changes format between the encoder and the
+>> connector, or if some of the RGB pins between the lcd controller and the
+>> encoder are not routed on the PCB.
+>>
+>> This is critical for the devices that have the "conflicting output
+>> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
+>> RGB bits move around depending on the selected output mode. For
+>> devices that do not have the "conflicting output formats" issue
+>> (SAMA5D2, SAMA5D4), this is completely irrelevant.
+>>
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 71 +++++++++++++++++-------
+>>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  2 +
+>>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 40 ++++++++++++-
+>>  3 files changed, 92 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+>> index d73281095fac..b4e7f5b6f497 100644
+>> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+>> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+>> @@ -226,6 +226,56 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
+>>  #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
+>>  #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
+>>  
+>> +static int atmel_hlcdc_connector_output_mode(struct drm_connector_state *state)
+>> +{
+>> +	struct drm_connector *connector = state->connector;
+>> +	struct atmel_hlcdc_dc *dc = connector->dev->dev_private;
+>> +	struct drm_encoder *encoder;
+>> +	struct drm_display_info *info = &connector->display_info;
+>> +	unsigned int supported_fmts = 0;
+>> +	int j;
+>> +
+>> +	encoder = state->best_encoder;
+>> +	if (!encoder)
+>> +		encoder = connector->encoder;
+>> +
+>> +	switch (dc->bus_fmt[encoder->index]) {
+>> +	case 0:
+>> +		break;
+>> +	case MEDIA_BUS_FMT_RGB444_1X12:
+>> +		return ATMEL_HLCDC_RGB444_OUTPUT;
+>> +	case MEDIA_BUS_FMT_RGB565_1X16:
+>> +		return ATMEL_HLCDC_RGB565_OUTPUT;
+>> +	case MEDIA_BUS_FMT_RGB666_1X18:
+>> +		return ATMEL_HLCDC_RGB666_OUTPUT;
+>> +	case MEDIA_BUS_FMT_RGB888_1X24:
+>> +		return ATMEL_HLCDC_RGB888_OUTPUT;
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	for (j = 0; j < info->num_bus_formats; j++) {
+>> +		switch (info->bus_formats[j]) {
+>> +		case MEDIA_BUS_FMT_RGB444_1X12:
+>> +			supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
+>> +			break;
+>> +		case MEDIA_BUS_FMT_RGB565_1X16:
+>> +			supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
+>> +			break;
+>> +		case MEDIA_BUS_FMT_RGB666_1X18:
+>> +			supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
+>> +			break;
+>> +		case MEDIA_BUS_FMT_RGB888_1X24:
+>> +			supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
+>> +			break;
+>> +		default:
+>> +			break;
+>> +		}
+>> +	}
+>> +
+>> +	return supported_fmts;
+>> +}
+>> +
+>>  static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+>>  {
+>>  	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
+>> @@ -238,31 +288,12 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+>>  	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
+>>  
+>>  	for_each_new_connector_in_state(state->state, connector, cstate, i) {
+>> -		struct drm_display_info *info = &connector->display_info;
+>>  		unsigned int supported_fmts = 0;
+>> -		int j;
+>>  
+>>  		if (!cstate->crtc)
+>>  			continue;
+>>  
+>> -		for (j = 0; j < info->num_bus_formats; j++) {
+>> -			switch (info->bus_formats[j]) {
+>> -			case MEDIA_BUS_FMT_RGB444_1X12:
+>> -				supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
+>> -				break;
+>> -			case MEDIA_BUS_FMT_RGB565_1X16:
+>> -				supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
+>> -				break;
+>> -			case MEDIA_BUS_FMT_RGB666_1X18:
+>> -				supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
+>> -				break;
+>> -			case MEDIA_BUS_FMT_RGB888_1X24:
+>> -				supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
+>> -				break;
+>> -			default:
+>> -				break;
+>> -			}
+>> -		}
+>> +		supported_fmts = atmel_hlcdc_connector_output_mode(cstate);
+>>  
+>>  		if (crtc->dc->desc->conflicting_output_formats)
+>>  			output_fmts &= supported_fmts;
+>> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+>> index ab32d5b268d2..be2d180dd169 100644
+>> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+>> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+>> @@ -365,6 +365,7 @@ struct atmel_hlcdc_plane_properties {
+>>   * @hlcdc: pointer to the atmel_hlcdc structure provided by the MFD device
+>>   * @fbdev: framebuffer device attached to the Display Controller
+>>   * @crtc: CRTC provided by the display controller
+>> + * @bus_fmt: Array of bus format overrides, per connector.
+>>   * @planes: instantiated planes
+>>   * @layers: active HLCDC layers
+>>   * @wq: display controller workqueue
+>> @@ -376,6 +377,7 @@ struct atmel_hlcdc_dc {
+>>  	struct dma_pool *dscrpool;
+>>  	struct atmel_hlcdc *hlcdc;
+>>  	struct drm_crtc *crtc;
+>> +	int *bus_fmt;
+> 
+> Looks like this bus_fmt information should be attached to the
+> atmel_hlcdc_rgb_output object, since the property is placed in the
+> endpoint representing the DPI encoder output.
+> 
+> You could then parse the format in atmel_hlcdc_attach_endpoint() and
+> provide a helper to retrieve the hardcoded bus-format attached to an
+> encoder:
+> 
+>   int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder);
+> 
+> and if it returns zero you can fallback to bus formats
+> defined in drm_display_info, as you do in this patch.
 
-> As the pxa architecture switched towards the dmaengine slave map, the
-> old compatibility mechanism to acquire the dma requestor line number and
-> priority are not needed anymore.
->
-> This patch simplifies the dma resource acquisition, using the more
-> generic function dma_request_slave_channel().
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Good suggestion. However, it appears the atmel_hlcdc_rgb_output object
+was removed in 4.13. But I'm bringing it back like this
 
-Bartlomiej, could I have your ack please ?
+struct atmel_hlcdc_rgb_output {
+	struct drm_encoder encoder;
+	int bus_fmt;
+};
 
-Cheers.
+and adjusting the code to match that. It all looks nice and tidy, methinks.
 
---
-Robert
+v4 coming up Monday, if nothing unexpected happens.
 
-PS: The submitted patch
-> ---
->  drivers/ata/pata_pxa.c | 10 +---------
->  1 file changed, 1 insertion(+), 9 deletions(-)
->
-> diff --git a/drivers/ata/pata_pxa.c b/drivers/ata/pata_pxa.c
-> index f6c46e9a4dc0..e8b6a2e464c9 100644
-> --- a/drivers/ata/pata_pxa.c
-> +++ b/drivers/ata/pata_pxa.c
-> @@ -25,7 +25,6 @@
->  #include <linux/libata.h>
->  #include <linux/platform_device.h>
->  #include <linux/dmaengine.h>
-> -#include <linux/dma/pxa-dma.h>
->  #include <linux/gpio.h>
->  #include <linux/slab.h>
->  #include <linux/completion.h>
-> @@ -180,8 +179,6 @@ static int pxa_ata_probe(struct platform_device *pdev)
->  	struct resource *irq_res;
->  	struct pata_pxa_pdata *pdata = dev_get_platdata(&pdev->dev);
->  	struct dma_slave_config	config;
-> -	dma_cap_mask_t mask;
-> -	struct pxad_param param;
->  	int ret = 0;
->  
->  	/*
-> @@ -278,10 +275,6 @@ static int pxa_ata_probe(struct platform_device *pdev)
->  
->  	ap->private_data = data;
->  
-> -	dma_cap_zero(mask);
-> -	dma_cap_set(DMA_SLAVE, mask);
-> -	param.prio = PXAD_PRIO_LOWEST;
-> -	param.drcmr = pdata->dma_dreq;
->  	memset(&config, 0, sizeof(config));
->  	config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->  	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-> @@ -294,8 +287,7 @@ static int pxa_ata_probe(struct platform_device *pdev)
->  	 * Request the DMA channel
->  	 */
->  	data->dma_chan =
-> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
-> -						 &param, &pdev->dev, "data");
-> +		dma_request_slave_channel(&pdev->dev, "data");
->  	if (!data->dma_chan)
->  		return -EBUSY;
->  	ret = dmaengine_slave_config(data->dma_chan, &config);
+Cheers,
+Peter
