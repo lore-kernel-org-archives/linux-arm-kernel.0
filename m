@@ -1,114 +1,114 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sat, 21 Apr 2018 15:55:33 +0200
-Subject: [PATCH 13/17] dt-bindings/interrupt-controller: update Marvell ICU
- bindings
+Date: Sat, 21 Apr 2018 15:55:26 +0200
+Subject: [PATCH 06/17] irqchip/irq-mvebu-icu: switch to regmap
 In-Reply-To: <20180421135537.24716-1-miquel.raynal@bootlin.com>
 References: <20180421135537.24716-1-miquel.raynal@bootlin.com>
-Message-ID: <20180421135537.24716-14-miquel.raynal@bootlin.com>
+Message-ID: <20180421135537.24716-7-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the documentation to reflect the new bindings used for Marvell
-ICU. This involves describing each interrupt group as a subnode of the
-ICU node. Each of them having their own compatible.
+The ICU DT nodes have now the 'syscon' compatible, we can switch to
+regmap before splitting the code to support multiple platform devices to
+be probed (one for the ICU, one per interrupt group).
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- .../bindings/interrupt-controller/marvell,icu.txt  | 60 ++++++++++++++++------
- 1 file changed, 43 insertions(+), 17 deletions(-)
+ drivers/irqchip/irq-mvebu-icu.c | 37 ++++++++++++++++++++-----------------
+ 1 file changed, 20 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-index 649b7ec9d9b1..b856e91105e4 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-@@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
- responsible for collecting all wired-interrupt sources in the CP and
- communicating them to the GIC in the AP, the unit translates interrupt
- requests on input wires to MSG memory mapped transactions to the GIC.
-+These messages will access a different GIC memory area depending on
-+their type (NSR, SR, SEI, REI, etc).
+diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+index 5af2520445c4..580586240781 100644
+--- a/drivers/irqchip/irq-mvebu-icu.c
++++ b/drivers/irqchip/irq-mvebu-icu.c
+@@ -18,6 +18,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
  
- Required properties:
+ #include <dt-bindings/interrupt-controller/mvebu-icu.h>
  
-@@ -12,20 +14,19 @@ Required properties:
+@@ -40,7 +42,7 @@
  
- - reg: Should contain ICU registers location and length.
- 
-+Subnodes: Each group of interrupt is declared as a subnode of the ICU,
-+with their own compatible.
-+
-+Required properties for the icu_nsr/icu_sei subnodes:
-+
-+- compatible: Should be "marvell,cp110-icu-nsr" or "marvell,cp110-icu-sei".
-+
- - #interrupt-cells: Specifies the number of cells needed to encode an
--  interrupt source. The value shall be 3.
-+  interrupt source. The value shall be 2.
- 
--  The 1st cell is the group type of the ICU interrupt. Possible group
--  types are:
-+  The 1st cell is the index of the interrupt in the ICU unit.
- 
--   ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
--   ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
--   ICU_GRP_SEI (0x4) : System error interrupt
--   ICU_GRP_REI (0x5) : RAM error interrupt
--
--  The 2nd cell is the index of the interrupt in the ICU unit.
--
--  The 3rd cell is the type of the interrupt. See arm,gic.txt for
-+  The 2nd cell is the type of the interrupt. See arm,gic.txt for
-   details.
- 
- - interrupt-controller: Identifies the node as an interrupt
-@@ -35,17 +36,42 @@ Required properties:
-   that allows to trigger interrupts using MSG memory mapped
-   transactions.
- 
-+Note: each 'interrupts' property referring to any 'icu_xxx' node shall
-+      have a different number within [0:206].
-+
- Example:
- 
- icu: interrupt-controller at 1e0000 {
- 	compatible = "marvell,cp110-icu";
- 	reg = <0x1e0000 0x440>;
--	#interrupt-cells = <3>;
--	interrupt-controller;
--	msi-parent = <&gicp>;
-+
-+	CP110_LABEL(icu_nsr): icu-nsr {
-+		compatible = "marvell,cp110-icu-nsr";
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		msi-parent = <&gicp>;
-+	};
-+
-+        CP110_LABEL(icu_sei): icu-sei {
-+                compatible = "marvell,cp110-icu-sei";
-+                #interrupt-cells = <2>;
-+                interrupt-controller;
-+                msi-parent = <&sei>;
-+        };
-+};
-+
-+node1 {
-+	interrupt-parent = <&icu_nsr>;
-+	interrupts = <106 IRQ_TYPE_LEVEL_HIGH>;
-+};
-+
-+node2 {
-+	interrupt-parent = <&icu_sei>;
-+	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
+ struct mvebu_icu {
+ 	struct irq_chip irq_chip;
+-	void __iomem *base;
++	struct regmap *regmap;
+ 	struct irq_domain *domain;
+ 	struct device *dev;
  };
+@@ -69,7 +71,7 @@ static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+ 		icu_int = 0;
+ 	}
  
--usb3h0: usb3 at 500000 {
--	interrupt-parent = <&icu>;
--	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
-+/* Would not work with the above nodes */
-+node3 {
-+	interrupt-parent = <&icu_nsr>;
-+	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
- };
+-	writel_relaxed(icu_int, icu->base + ICU_INT_CFG(d->hwirq));
++	regmap_write(icu->regmap, ICU_INT_CFG(d->hwirq), icu_int);
+ 
+ 	/*
+ 	 * The SATA unit has 2 ports, and a dedicated ICU entry per
+@@ -81,10 +83,10 @@ static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+ 	 * configured (regardless of which port is actually in use).
+ 	 */
+ 	if (d->hwirq == ICU_SATA0_ICU_ID || d->hwirq == ICU_SATA1_ICU_ID) {
+-		writel_relaxed(icu_int,
+-			       icu->base + ICU_INT_CFG(ICU_SATA0_ICU_ID));
+-		writel_relaxed(icu_int,
+-			       icu->base + ICU_INT_CFG(ICU_SATA1_ICU_ID));
++		regmap_write(icu->regmap, ICU_INT_CFG(ICU_SATA0_ICU_ID),
++			     icu_int);
++		regmap_write(icu->regmap, ICU_INT_CFG(ICU_SATA1_ICU_ID),
++			     icu_int);
+ 	}
+ }
+ 
+@@ -208,12 +210,13 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 
+ 	icu->dev = &pdev->dev;
+ 
++	icu->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, NULL);
++	if (IS_ERR(icu->regmap))
++		return PTR_ERR(icu->regmap);
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	icu->base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(icu->base)) {
+-		dev_err(&pdev->dev, "Failed to map icu base address.\n");
+-		return PTR_ERR(icu->base);
+-	}
++	if (!res)
++		return -ENODEV;
+ 
+ 	icu->irq_chip.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
+ 					    "ICU.%x",
+@@ -247,10 +250,10 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 		return ret;
+ 
+ 	/* Set Clear/Set ICU SPI message address in AP */
+-	writel_relaxed(upper_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AH);
+-	writel_relaxed(lower_32_bits(setspi), icu->base + ICU_SETSPI_NSR_AL);
+-	writel_relaxed(upper_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AH);
+-	writel_relaxed(lower_32_bits(clrspi), icu->base + ICU_CLRSPI_NSR_AL);
++	regmap_write(icu->regmap, ICU_SETSPI_NSR_AH, upper_32_bits(setspi));
++	regmap_write(icu->regmap, ICU_SETSPI_NSR_AL, lower_32_bits(setspi));
++	regmap_write(icu->regmap, ICU_CLRSPI_NSR_AH, upper_32_bits(clrspi));
++	regmap_write(icu->regmap, ICU_CLRSPI_NSR_AL, lower_32_bits(clrspi));
+ 
+ 	/*
+ 	 * Clean all ICU interrupts with type SPI_NSR, required to
+@@ -259,11 +262,11 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
+ 		u32 icu_int, icu_grp;
+ 
+-		icu_int = readl(icu->base + ICU_INT_CFG(i));
++		regmap_read(icu->regmap, ICU_INT_CFG(i), &icu_int);
+ 		icu_grp = icu_int >> ICU_GROUP_SHIFT;
+ 
+ 		if (icu_grp == ICU_GRP_NSR)
+-			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
++			regmap_write(icu->regmap, ICU_INT_CFG(i), 0);
+ 	}
+ 
+ 	icu->domain =
 -- 
 2.14.1
