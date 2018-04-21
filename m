@@ -1,174 +1,79 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sun, 22 Apr 2018 00:13:25 +0200
-Subject: [PATCH v3 4/7] drm/atmel-hlcdc: support bus-width (12/16/18/24)
- in endpoint nodes
-In-Reply-To: <20180421181921.75c41917@bbrezillon>
-References: <20180419162751.25223-1-peda@axentia.se>
- <20180419162751.25223-5-peda@axentia.se> <20180421181921.75c41917@bbrezillon>
-Message-ID: <894b0408-038f-6bd2-2130-d46de332e215@axentia.se>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Sat, 21 Apr 2018 16:10:46 -0700
+Subject: [PATCH] Enable the clock before calling clk_get_rate().
+In-Reply-To: <20180419130358.r7dva6owy2izyfus@agrajag.zerfleddert.de>
+References: <20180419130358.r7dva6owy2izyfus@agrajag.zerfleddert.de>
+Message-ID: <dfb9c72c-6289-a2ea-c3d4-c59f5e3c799c@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-21 18:19, Boris Brezillon wrote:
-> On Thu, 19 Apr 2018 18:27:48 +0200
-> Peter Rosin <peda@axentia.se> wrote:
-> 
->> This beats the heuristic that the connector is involved in what format
->> should be output for cases where this fails.
->>
->> E.g. if there is a bridge that changes format between the encoder and the
->> connector, or if some of the RGB pins between the lcd controller and the
->> encoder are not routed on the PCB.
->>
->> This is critical for the devices that have the "conflicting output
->> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
->> RGB bits move around depending on the selected output mode. For
->> devices that do not have the "conflicting output formats" issue
->> (SAMA5D2, SAMA5D4), this is completely irrelevant.
->>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 71 +++++++++++++++++-------
->>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  2 +
->>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 40 ++++++++++++-
->>  3 files changed, 92 insertions(+), 21 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
->> index d73281095fac..b4e7f5b6f497 100644
->> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
->> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
->> @@ -226,6 +226,56 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
->>  #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
->>  #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
->>  
->> +static int atmel_hlcdc_connector_output_mode(struct drm_connector_state *state)
->> +{
->> +	struct drm_connector *connector = state->connector;
->> +	struct atmel_hlcdc_dc *dc = connector->dev->dev_private;
->> +	struct drm_encoder *encoder;
->> +	struct drm_display_info *info = &connector->display_info;
->> +	unsigned int supported_fmts = 0;
->> +	int j;
->> +
->> +	encoder = state->best_encoder;
->> +	if (!encoder)
->> +		encoder = connector->encoder;
->> +
->> +	switch (dc->bus_fmt[encoder->index]) {
->> +	case 0:
->> +		break;
->> +	case MEDIA_BUS_FMT_RGB444_1X12:
->> +		return ATMEL_HLCDC_RGB444_OUTPUT;
->> +	case MEDIA_BUS_FMT_RGB565_1X16:
->> +		return ATMEL_HLCDC_RGB565_OUTPUT;
->> +	case MEDIA_BUS_FMT_RGB666_1X18:
->> +		return ATMEL_HLCDC_RGB666_OUTPUT;
->> +	case MEDIA_BUS_FMT_RGB888_1X24:
->> +		return ATMEL_HLCDC_RGB888_OUTPUT;
->> +	default:
->> +		return -EINVAL;
->> +	}
->> +
->> +	for (j = 0; j < info->num_bus_formats; j++) {
->> +		switch (info->bus_formats[j]) {
->> +		case MEDIA_BUS_FMT_RGB444_1X12:
->> +			supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
->> +			break;
->> +		case MEDIA_BUS_FMT_RGB565_1X16:
->> +			supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
->> +			break;
->> +		case MEDIA_BUS_FMT_RGB666_1X18:
->> +			supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
->> +			break;
->> +		case MEDIA_BUS_FMT_RGB888_1X24:
->> +			supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
->> +			break;
->> +		default:
->> +			break;
->> +		}
->> +	}
->> +
->> +	return supported_fmts;
->> +}
->> +
->>  static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
->>  {
->>  	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
->> @@ -238,31 +288,12 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
->>  	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
->>  
->>  	for_each_new_connector_in_state(state->state, connector, cstate, i) {
->> -		struct drm_display_info *info = &connector->display_info;
->>  		unsigned int supported_fmts = 0;
->> -		int j;
->>  
->>  		if (!cstate->crtc)
->>  			continue;
->>  
->> -		for (j = 0; j < info->num_bus_formats; j++) {
->> -			switch (info->bus_formats[j]) {
->> -			case MEDIA_BUS_FMT_RGB444_1X12:
->> -				supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
->> -				break;
->> -			case MEDIA_BUS_FMT_RGB565_1X16:
->> -				supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
->> -				break;
->> -			case MEDIA_BUS_FMT_RGB666_1X18:
->> -				supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
->> -				break;
->> -			case MEDIA_BUS_FMT_RGB888_1X24:
->> -				supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
->> -				break;
->> -			default:
->> -				break;
->> -			}
->> -		}
->> +		supported_fmts = atmel_hlcdc_connector_output_mode(cstate);
->>  
->>  		if (crtc->dc->desc->conflicting_output_formats)
->>  			output_fmts &= supported_fmts;
->> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
->> index ab32d5b268d2..be2d180dd169 100644
->> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
->> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
->> @@ -365,6 +365,7 @@ struct atmel_hlcdc_plane_properties {
->>   * @hlcdc: pointer to the atmel_hlcdc structure provided by the MFD device
->>   * @fbdev: framebuffer device attached to the Display Controller
->>   * @crtc: CRTC provided by the display controller
->> + * @bus_fmt: Array of bus format overrides, per connector.
->>   * @planes: instantiated planes
->>   * @layers: active HLCDC layers
->>   * @wq: display controller workqueue
->> @@ -376,6 +377,7 @@ struct atmel_hlcdc_dc {
->>  	struct dma_pool *dscrpool;
->>  	struct atmel_hlcdc *hlcdc;
->>  	struct drm_crtc *crtc;
->> +	int *bus_fmt;
-> 
-> Looks like this bus_fmt information should be attached to the
-> atmel_hlcdc_rgb_output object, since the property is placed in the
-> endpoint representing the DPI encoder output.
-> 
-> You could then parse the format in atmel_hlcdc_attach_endpoint() and
-> provide a helper to retrieve the hardcoded bus-format attached to an
-> encoder:
-> 
->   int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder);
-> 
-> and if it returns zero you can fallback to bus formats
-> defined in drm_display_info, as you do in this patch.
++Jonas,
 
-Good suggestion. However, it appears the atmel_hlcdc_rgb_output object
-was removed in 4.13. But I'm bringing it back like this
+On 04/19/2018 06:03 AM, Stefan Potyra wrote:
+> Found by Linux Driver Verification project (linuxtesting.org).
 
-struct atmel_hlcdc_rgb_output {
-	struct drm_encoder encoder;
-	int bus_fmt;
-};
+Please use a commit subject which matches what was used before:
 
-and adjusting the code to match that. It all looks nice and tidy, methinks.
+git log --no-merges --oneline drivers/spi/spi-bcm63xx-hsspi.c
+378da4a65f3a spi/bcm63xx-hspi: fix error return code in
+bcm63xx_hsspi_probe()
+c3c25ea712c9 spi/bcm63xx-hspi: Fix checkpatch warnings
+0b85a8421790 spi: bcm63xx-hsspi: Export OF device ID table as module aliases
+7ab2463550e2 spi/bcm63xx-hsspi: allow for probing through devicetree
+ff18e1ef04e2 spi/bcm63xx-hsspi: allow providing clock rate through a
+second clock
+f4d862237715 spi/bcm63xx-hsspi: add support for dual spi read/write
+14ac00e033c5 spi: drop owner assignment from platform_drivers
+e4745fef5595 spi: Remove unneeded include of linux/workqueue.h
+1480916ebd6f spi: bcm63xx-hsspi: Use SIMPLE_DEV_PM_OPS macro
+aa0fe82629f1 spi: Use reinit_completion at appropriate places
+937ebf9cd34a spi/bcm63xx-hsspi: fix pm sleep support
+7d255695804f spi/bcm63xx-hsspi: use devm_register_master()
+dea5de1b37c0 spi/bcm63xx-hsspi: check result of clk_prepare_enable
+b1bdd4f883e1 spi: bcm63xx-hsspi: Use devm_clk_get()
+87917528cc92 spi: bcm63xx-hsspi: checking for ERR_PTR instead of NULL
+142168eba9dc spi: bcm63xx-hsspi: add bcm63xx HSSPI driver
 
-v4 coming up Monday, if nothing unexpected happens.
+> 
+> Fixes: 142168eba9dc spi: bcm63xx-hsspi: add bcm63xx HSSPI driver
 
-Cheers,
-Peter
+Please include the commit title in ("<title>") as is indicated in the
+SubmittingPatches document.
+
+Thank you
+
+> Signed-off-by: Stefan Potyra <Stefan.Potyra@elektrobit.com>
+> ---
+>  drivers/spi/spi-bcm63xx-hsspi.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-bcm63xx-hsspi.c b/drivers/spi/spi-bcm63xx-hsspi.c
+> index cbcba614b253..46cd9b683d22 100644
+> --- a/drivers/spi/spi-bcm63xx-hsspi.c
+> +++ b/drivers/spi/spi-bcm63xx-hsspi.c
+> @@ -352,6 +352,10 @@ static int bcm63xx_hsspi_probe(struct platform_device *pdev)
+>  	if (IS_ERR(clk))
+>  		return PTR_ERR(clk);
+>  
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret)
+> +		return ret;
+> +
+>  	rate = clk_get_rate(clk);
+>  	if (!rate) {
+>  		struct clk *pll_clk = devm_clk_get(dev, "pll");
+> @@ -364,10 +368,6 @@ static int bcm63xx_hsspi_probe(struct platform_device *pdev)
+>  			return -EINVAL;
+>  	}
+>  
+> -	ret = clk_prepare_enable(clk);
+> -	if (ret)
+> -		return ret;
+> -
+>  	master = spi_alloc_master(&pdev->dev, sizeof(*bs));
+>  	if (!master) {
+>  		ret = -ENOMEM;
+> 
+
+-- 
+Florian
