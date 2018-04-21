@@ -1,43 +1,81 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 21 Apr 2018 13:28:42 +0200
-Subject: [PATCH V2 9/9] arm64: dts: broadcom: Add reference to Raspberry Pi 3
- B+
+Date: Sat, 21 Apr 2018 13:28:35 +0200
+Subject: [PATCH V2 2/9] ARM: dts: bcm2837: Add missing GPIOs of Expander
 In-Reply-To: <1524310122-9439-1-git-send-email-stefan.wahren@i2se.com>
 References: <1524310122-9439-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1524310122-9439-10-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1524310122-9439-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a reference to the dts of the Raspberry Pi 3 B+
-in arm, so don't need to maintain the content in arm64.
+After commit a98d90e7d588 ("gpio: raspberrypi-exp: Driver for RPi3 GPIO
+expander via mailbox service") we are able to control the rest of the
+GPIOs of the RPi 3. So add all the missing parts (ACT LED,
+Wifi & BT control, HDMI detect) to the DT.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 Reviewed-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm64/boot/dts/broadcom/Makefile                 | 3 ++-
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-index 2a2591e..1193a9e 100644
---- a/arch/arm64/boot/dts/broadcom/Makefile
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
--dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
-+dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb \
-+			      bcm2837-rpi-3-b-plus.dtb
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index cc39b6f..c318bcb 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -20,9 +20,14 @@
  
- subdir-y	+= northstar2
- subdir-y	+= stingray
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
-new file mode 100644
-index 0000000..46ad202
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dts
-@@ -0,0 +1,2 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include "arm/bcm2837-rpi-3-b-plus.dts"
+ 	leds {
+ 		act {
+-			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
++			gpios = <&expgpio 2 GPIO_ACTIVE_HIGH>;
+ 		};
+ 	};
++
++	wifi_pwrseq: wifi-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
++	};
+ };
+ 
+ &firmware {
+@@ -48,6 +53,10 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	hpd-gpios = <&expgpio 4 GPIO_ACTIVE_LOW>;
++};
++
+ /* uart0 communicates with the BT module */
+ &uart0 {
+ 	pinctrl-names = "default";
+@@ -57,6 +66,7 @@
+ 	bluetooth {
+ 		compatible = "brcm,bcm43438-bt";
+ 		max-speed = <2000000>;
++		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
+ 	};
+ };
+ 
+@@ -69,11 +79,19 @@
+ 
+ /* SDHCI is used to control the SDIO for wireless */
+ &sdhci {
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&emmc_gpio34>;
+ 	status = "okay";
+ 	bus-width = <4>;
+ 	non-removable;
++	mmc-pwrseq = <&wifi_pwrseq>;
++
++	brcmf: wifi at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++	};
+ };
+ 
+ /* SDHOST is used to drive the SD card */
 -- 
 2.7.4
