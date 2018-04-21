@@ -1,129 +1,104 @@
-From: sgoel@codeaurora.org (Goel, Sameer)
-Date: Fri, 20 Apr 2018 17:39:01 -0600
-Subject: [PATCH] arm64: kexec: Add machine_kexec_mask_interrupts to kexec
- path
-In-Reply-To: <20180420102332.kzxyn6lpe2ernnrg@lakrids.cambridge.arm.com>
-References: <1524104376-21902-1-git-send-email-sgoel@codeaurora.org>
- <20180420102332.kzxyn6lpe2ernnrg@lakrids.cambridge.arm.com>
-Message-ID: <9132cbb9-6288-a6d5-3acb-f50527c84b90@codeaurora.org>
+From: megous@megous.com (megous at megous.com)
+Date: Sat, 21 Apr 2018 06:51:55 +0200
+Subject: [PATCH] Revert "drm/sun4i: add lvds mode_valid function"
+Message-ID: <20180421045155.15332-1-megous@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ondrej Jirman <megous@megous.com>
 
+The reverted commit broke LVDS output on TBS A711 Tablet. That tablet
+has simple-panel node that has fixed pixel clock-frequency that A83T
+SoC used in the tablet can't generate exactly.
 
-On 4/20/2018 4:23 AM, Mark Rutland wrote:
-> Hi Sameer,
-> 
-> On Wed, Apr 18, 2018 at 08:19:36PM -0600, Sameer Goel wrote:
->> In kdump code path SPIs at GIC level are explicitly cleared by
->> calling machine_kexec_mask_interrupts. In case of kexec this
->> functionality is delegated for most part to the device shutdown
->> functions.
->> Add machine_kexec_mask_interrupts to machine_shutdown path to
->> ensure that the irqs are masked at the gic level.
-> 
-> I think that for kdump, the plan is to try to get irqchips to reset
-> things in their probe paths (e.g. as that's the sanest place to poke
-> APRn). Doing that would render machine_kexec_mask_interrupts() redundant
-> for kexec.
-I agree the above proposed change in GIC will make machine_kexec_mask_interrupts() redundant. Can you please point me to the change if already posted.
-> 
->> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
->> ---
->> Porting code for masking irqs at gic from kdump shutdown to kexec path.
->>
->> There was discussion about this functionality in [1].
->>
->> [1] https://patchwork.kernel.org/patch/9817499/
-> 
-> I don't follow why this is a problem. Nate mentions corrupting the new
-> kernel -- has a problem been observed in practice?
-> 
-> The purgatory code is run with IRQs masked at the CPU, and the new
-> kernel will initialise the GIC before enabling interrupts at the CPU.
-> Once probed, the SMMU driver can handle spurious interrupts.
-> 
-> So AFAICT there is no problem today. Am I missing something?
+Requested rate is 52000000 and rounded_rate is calculated as 51857142.
+It's close enough for it to work in practice, but with strict check
+in the reverted commit, the mode is rejected needlessly in this case.
 
-This was something that was proposed when the driver owners were not clearing interrupts in their shutdown functions. So, more of a cleanup. From you description above it makes sense.
+DT allows to specify a range of values for simple-panel/clock-frequency,
+but driver doesn't respect that ATM. Given that TBS A711 is the single
+user of sun4i-lvds driver, let's revert that commit for now, until
+a better solution for the problem is found.
 
-Thanks,
-Sameer
-> 
-> When could an interrupt be taken that would be problematic?
-> 
-> Currently, I don't see that this is necessary. Given we'd like to remove
-> machine_kexec_mask_interrupts() for the kdump case, I'd prefer that we
-> don't mandate it in the usual kexec case.
-> 
-> Thanks,
-> Mark.
-> 
->>
->>  arch/arm64/include/asm/kexec.h    | 6 ++++++
->>  arch/arm64/kernel/machine_kexec.c | 2 +-
->>  arch/arm64/kernel/process.c       | 2 ++
->>  3 files changed, 9 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
->> index e17f052..f9ddb41 100644
->> --- a/arch/arm64/include/asm/kexec.h
->> +++ b/arch/arm64/include/asm/kexec.h
->> @@ -93,6 +93,12 @@ static inline void crash_prepare_suspend(void) {}
->>  static inline void crash_post_resume(void) {}
->>  #endif
->>  
->> +#if defined(CONFIG_KEXEC)
->> +extern void machine_kexec_mask_interrupts(void);
->> +#else
->> +static inline void machine_kexec_mask_interrupts(void) {}
->> +#endif
->> +
->>  #endif /* __ASSEMBLY__ */
->>  
->>  #endif
->> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
->> index f76ea92..b453180 100644
->> --- a/arch/arm64/kernel/machine_kexec.c
->> +++ b/arch/arm64/kernel/machine_kexec.c
->> @@ -213,7 +213,7 @@ void machine_kexec(struct kimage *kimage)
->>  	BUG(); /* Should never get here. */
->>  }
->>  
->> -static void machine_kexec_mask_interrupts(void)
->> +void machine_kexec_mask_interrupts(void)
->>  {
->>  	unsigned int i;
->>  	struct irq_desc *desc;
->> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->> index f08a2ed..9d0337e 100644
->> --- a/arch/arm64/kernel/process.c
->> +++ b/arch/arm64/kernel/process.c
->> @@ -58,6 +58,7 @@
->>  #include <asm/mmu_context.h>
->>  #include <asm/processor.h>
->>  #include <asm/stacktrace.h>
->> +#include <asm/kexec.h>
->>  
->>  #ifdef CONFIG_CC_STACKPROTECTOR
->>  #include <linux/stackprotector.h>
->> @@ -107,6 +108,7 @@ void arch_cpu_idle_dead(void)
->>  void machine_shutdown(void)
->>  {
->>  	disable_nonboot_cpus();
->> +	machine_kexec_mask_interrupts();
->>  }
->>  
->>  /*
->> -- 
->> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Also see: https://patchwork.kernel.org/patch/9446385/ for relevant
+discussion (or search for "[RFC] drm/sun4i: rgb: Add 5% tolerance
+to dot clock frequency check").
 
+Fixes: e4e4b7ad50cf ("drm/sun4i: add lvds mode_valid function")
+Reported-by: Ondrej Jirman <megous@megous.com>
+Signed-off-by: Ondrej Jirman <megous@megous.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_lvds.c | 55 ------------------------------
+ 1 file changed, 55 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_lvds.c b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+index bffff4c9fbf5..be3f14d7746d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_lvds.c
++++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+@@ -94,64 +94,9 @@ static void sun4i_lvds_encoder_disable(struct drm_encoder *encoder)
+ 	}
+ }
+ 
+-static enum drm_mode_status sun4i_lvds_encoder_mode_valid(struct drm_encoder *crtc,
+-							  const struct drm_display_mode *mode)
+-{
+-	struct sun4i_lvds *lvds = drm_encoder_to_sun4i_lvds(crtc);
+-	struct sun4i_tcon *tcon = lvds->tcon;
+-	u32 hsync = mode->hsync_end - mode->hsync_start;
+-	u32 vsync = mode->vsync_end - mode->vsync_start;
+-	unsigned long rate = mode->clock * 1000;
+-	long rounded_rate;
+-
+-	DRM_DEBUG_DRIVER("Validating modes...\n");
+-
+-	if (hsync < 1)
+-		return MODE_HSYNC_NARROW;
+-
+-	if (hsync > 0x3ff)
+-		return MODE_HSYNC_WIDE;
+-
+-	if ((mode->hdisplay < 1) || (mode->htotal < 1))
+-		return MODE_H_ILLEGAL;
+-
+-	if ((mode->hdisplay > 0x7ff) || (mode->htotal > 0xfff))
+-		return MODE_BAD_HVALUE;
+-
+-	DRM_DEBUG_DRIVER("Horizontal parameters OK\n");
+-
+-	if (vsync < 1)
+-		return MODE_VSYNC_NARROW;
+-
+-	if (vsync > 0x3ff)
+-		return MODE_VSYNC_WIDE;
+-
+-	if ((mode->vdisplay < 1) || (mode->vtotal < 1))
+-		return MODE_V_ILLEGAL;
+-
+-	if ((mode->vdisplay > 0x7ff) || (mode->vtotal > 0xfff))
+-		return MODE_BAD_VVALUE;
+-
+-	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+-
+-	tcon->dclk_min_div = 7;
+-	tcon->dclk_max_div = 7;
+-	rounded_rate = clk_round_rate(tcon->dclk, rate);
+-	if (rounded_rate < rate)
+-		return MODE_CLOCK_LOW;
+-
+-	if (rounded_rate > rate)
+-		return MODE_CLOCK_HIGH;
+-
+-	DRM_DEBUG_DRIVER("Clock rate OK\n");
+-
+-	return MODE_OK;
+-}
+-
+ static const struct drm_encoder_helper_funcs sun4i_lvds_enc_helper_funcs = {
+ 	.disable	= sun4i_lvds_encoder_disable,
+ 	.enable		= sun4i_lvds_encoder_enable,
+-	.mode_valid	= sun4i_lvds_encoder_mode_valid,
+ };
+ 
+ static const struct drm_encoder_funcs sun4i_lvds_enc_funcs = {
 -- 
- Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.17.0
