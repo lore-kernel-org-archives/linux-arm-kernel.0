@@ -1,50 +1,39 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sat, 21 Apr 2018 16:03:42 +0200
-Subject: [PATCH] arm64: dts: marvell: armada-37xx: reserve memory for ATF
-Message-ID: <20180421140342.25082-1-miquel.raynal@bootlin.com>
+Date: Sat, 21 Apr 2018 17:12:31 +0200
+Subject: [PATCH 03/27] thermal: armada: remove misleading comments
+In-Reply-To: <20180421151255.29929-1-miquel.raynal@bootlin.com>
+References: <20180421151255.29929-1-miquel.raynal@bootlin.com>
+Message-ID: <20180421151255.29929-4-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+On older versions of this thermal IP, TSEN referred as the internal
+sensor in the thermal IP while EXT_TSEN referred as sensors outside of
+this IP, ie in the CPUs most of the time. The bit names in the
+specifications do not follow this rule anymore, so remove these comments
+that are misleading.
 
-The PSCI area should be reserved in Linux for PSCI operations such as
-suspend/resume.
-
-Reserve 2MiB of memory which matches the area used by ATF (BL1, BL2,
-BL3x, see [1] in ATF source code). This covers all PSCI code and data
-area and is 2MiB aligned, which is required by Linux for huge pages
-handling.
-
-[1] plat/marvell/a3700/common/include/platform_def.h
-
-Signed-off-by: Victor Gu <xigu@marvell.com>
-[miquel.raynal at bootlin.com: reword of commit message]
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/thermal/armada_thermal.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 97207a61bc79..429ce91bfc39 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -22,6 +22,17 @@
- 		serial1 = &uart1;
- 	};
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index 6fdb90b3c001..18155e43e67f 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -51,12 +51,10 @@
+ #define CONTROL0_TSEN_TC_TRIM_MASK	0x7
+ #define CONTROL0_TSEN_TC_TRIM_VAL	0x3
  
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		psci-area at 4000000 {
-+			reg = <0 0x4000000 0 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+-/* TSEN refers to the temperature sensors within the AP */
+ #define CONTROL0_TSEN_START		BIT(0)
+ #define CONTROL0_TSEN_RESET		BIT(1)
+ #define CONTROL0_TSEN_ENABLE		BIT(2)
+ 
+-/* EXT_TSEN refers to the external temperature sensors, out of the AP */
+ #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
+ #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
+ 
 -- 
 2.14.1
