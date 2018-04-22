@@ -1,57 +1,92 @@
-From: jan.kiszka@web.de (Jan Kiszka)
-Date: Sun, 22 Apr 2018 12:47:57 +0200
-Subject: BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
-Message-ID: <97d99ad9-c5cf-a4d2-126a-2b39ffead0b3@web.de>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Sun, 22 Apr 2018 13:06:34 +0200
+Subject: [PATCH 04/15] media: pxa_camera: remove the dmaengine compat need
+In-Reply-To: <871sf8z7f4.fsf@belgarion.home>
+References: <20180402142656.26815-1-robert.jarzmik@free.fr>
+ <20180402142656.26815-5-robert.jarzmik@free.fr>
+ <871sf8z7f4.fsf@belgarion.home>
+Message-ID: <dcd81a87-ca7a-3bc8-c457-320d4ce60a83@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/21/2018 09:27 PM, Robert Jarzmik wrote:
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> 
+>> From: Robert Jarzmik <robert.jarzmik@renault.com>
+>>
+>> As the pxa architecture switched towards the dmaengine slave map, the
+>> old compatibility mechanism to acquire the dma requestor line number and
+>> priority are not needed anymore.
+>>
+>> This patch simplifies the dma resource acquisition, using the more
+>> generic function dma_request_slave_channel().
+>>
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> ---
+>>  drivers/media/platform/pxa_camera.c | 22 +++-------------------
+>>  1 file changed, 3 insertions(+), 19 deletions(-)
+> Hans, could I have your ack please ?
 
-this can be triggered simply by running
+Done.
 
-# echo 0 > /sys/devices/system/cpu/cpu3/online
-# echo 1 > /sys/devices/system/cpu/cpu3/online
+	Hans
 
-[  455.904854] ==================================================================
-[  455.906108] BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
-[  455.906668] Read of size 4 at addr ffff200008e3a9d8 by task swapper/3/0
-[  455.907122] 
-[  455.907647] CPU: 3 PID: 0 Comm: swapper/3 Not tainted 4.17.0-rc1-00257-gbf20b92a3b12 #76
-[  455.908158] Hardware name: linux,dummy-virt (DT)
-[  455.908802] Call trace:
-[  455.909126]  dump_backtrace+0x0/0x230
-[  455.909522]  show_stack+0x14/0x20
-[  455.909848]  dump_stack+0xa8/0xcc
-[  455.910180]  print_address_description+0x13c/0x250
-[  455.910576]  kasan_report+0x254/0x328
-[  455.910985]  __asan_load4+0x88/0xb0
-[  455.911326]  unmap_kernel_at_el0+0x70/0x1a0
-[  455.911702]  __verify_local_cpu_caps+0x78/0x178
-[  455.912098]  verify_local_cpu_caps+0x4c/0x60
-[  455.912509]  check_local_cpu_capabilities+0x64/0x158
-[  455.912955]  secondary_start_kernel+0x178/0x260
-[  455.913366] 
-[  455.913586] The buggy address belongs to the variable:
-[  455.914026]  kpti_safe_list.26846+0x18/0x1460
-[  455.914382] 
-[  455.914606] Memory state around the buggy address:
-[  455.915349]  ffff200008e3a880: 00 00 00 01 fa fa fa fa 00 00 04 fa fa fa fa fa
-[  455.915942]  ffff200008e3a900: 03 fa fa fa fa fa fa fa 04 fa fa fa fa fa fa fa
-[  455.916483] >ffff200008e3a980: 00 00 00 06 fa fa fa fa 00 00 00 fa fa fa fa fa
-[  455.917077]                                                     ^
-[  455.917539]  ffff200008e3aa00: 00 00 00 00 00 00 00 05 fa fa fa fa 00 00 00 00
-[  455.918055]  ffff200008e3aa80: 00 00 00 00 03 fa fa fa fa fa fa fa 00 00 00 00
-[  455.918579] ==================================================================
-
-Issue is new with 4.17-rc. Can provide .config if needed. Device was
-qemu-system-aarch64. 
-
-Jan
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180422/07601f35/attachment-0001.sig>
+> 
+> Cheers.
+> 
+> --
+> Robert
+> 
+> PS: The submitted patch
+>>
+>> diff --git a/drivers/media/platform/pxa_camera.c b/drivers/media/platform/pxa_camera.c
+>> index c71a00736541..4c82d1880753 100644
+>> --- a/drivers/media/platform/pxa_camera.c
+>> +++ b/drivers/media/platform/pxa_camera.c
+>> @@ -2357,8 +2357,6 @@ static int pxa_camera_probe(struct platform_device *pdev)
+>>  		.src_maxburst = 8,
+>>  		.direction = DMA_DEV_TO_MEM,
+>>  	};
+>> -	dma_cap_mask_t mask;
+>> -	struct pxad_param params;
+>>  	char clk_name[V4L2_CLK_NAME_SIZE];
+>>  	int irq;
+>>  	int err = 0, i;
+>> @@ -2432,34 +2430,20 @@ static int pxa_camera_probe(struct platform_device *pdev)
+>>  	pcdev->base = base;
+>>  
+>>  	/* request dma */
+>> -	dma_cap_zero(mask);
+>> -	dma_cap_set(DMA_SLAVE, mask);
+>> -	dma_cap_set(DMA_PRIVATE, mask);
+>> -
+>> -	params.prio = 0;
+>> -	params.drcmr = 68;
+>> -	pcdev->dma_chans[0] =
+>> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+>> -						 &params, &pdev->dev, "CI_Y");
+>> +	pcdev->dma_chans[0] = dma_request_slave_channel(&pdev->dev, "CI_Y");
+>>  	if (!pcdev->dma_chans[0]) {
+>>  		dev_err(&pdev->dev, "Can't request DMA for Y\n");
+>>  		return -ENODEV;
+>>  	}
+>>  
+>> -	params.drcmr = 69;
+>> -	pcdev->dma_chans[1] =
+>> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+>> -						 &params, &pdev->dev, "CI_U");
+>> +	pcdev->dma_chans[1] = dma_request_slave_channel(&pdev->dev, "CI_U");
+>>  	if (!pcdev->dma_chans[1]) {
+>>  		dev_err(&pdev->dev, "Can't request DMA for Y\n");
+>>  		err = -ENODEV;
+>>  		goto exit_free_dma_y;
+>>  	}
+>>  
+>> -	params.drcmr = 70;
+>> -	pcdev->dma_chans[2] =
+>> -		dma_request_slave_channel_compat(mask, pxad_filter_fn,
+>> -						 &params, &pdev->dev, "CI_V");
+>> +	pcdev->dma_chans[2] = dma_request_slave_channel(&pdev->dev, "CI_V");
+>>  	if (!pcdev->dma_chans[2]) {
+>>  		dev_err(&pdev->dev, "Can't request DMA for V\n");
+>>  		err = -ENODEV;
