@@ -1,32 +1,27 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 19 Apr 2018 12:33:06 +0300
-Subject: [PATCH 0/6] arm64: untag user pointers passed to the kernel
-In-Reply-To: <cover.1524077494.git.andreyknvl@google.com>
-References: <cover.1524077494.git.andreyknvl@google.com>
-Message-ID: <20180419093306.rn5bz264nxsn7d7c@node.shutemov.name>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 22 Apr 2018 09:42:13 +0200
+Subject: v4.17-rc1: regressions on N900, N950
+Message-ID: <20180422074213.GA12428@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 18, 2018 at 08:53:09PM +0200, Andrey Konovalov wrote:
-> Hi!
-> 
-> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
-> tags into the top byte of each pointer. Userspace programs (such as
-> HWASan, a memory debugging tool [1]) might use this feature and pass
-> tagged user pointers to the kernel through syscalls or other interfaces.
-> 
-> This patch makes a few of the kernel interfaces accept tagged user
-> pointers. The kernel is already able to handle user faults with tagged
-> pointers and has the untagged_addr macro, which this patchset reuses.
-> 
-> We're not trying to cover all possible ways the kernel accepts user
-> pointers in one patchset, so this one should be considered as a start.
+Hi!
 
-How many changes do you anticipate?
+v4.17-rc1 broke display for me on Nokia N900. (I don't know if system
+boots, but I can see on red flash LED that at least that driver
+succeeded. So it should not be early boot crash).
 
-This patchset looks small and reasonable, but I see a potential to become a
-boilerplate. Would we need to change every driver which implements ioctl()
-to strip these bits?
+v4.17-rc1 also broke boot on N950.
 
+Any ideas? Does it work for you?
+									Pavel
 -- 
- Kirill A. Shutemov
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180422/17e0d71c/attachment.sig>
