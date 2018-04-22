@@ -1,91 +1,64 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sun, 22 Apr 2018 19:27:48 +0200
-Subject: [PATCH] mtd: nand: mtk: use of_device_get_match_data()
-In-Reply-To: <c3af6d5035e43b53b5cc7ee68f9f1a853ce2a8f9.1523347340.git.ryder.lee@mediatek.com>
-References: <31f944ab8dfcc1d7b6f03b35657a2a34825b5246.1523347340.git.ryder.lee@mediatek.com>
- <c3af6d5035e43b53b5cc7ee68f9f1a853ce2a8f9.1523347340.git.ryder.lee@mediatek.com>
-Message-ID: <20180422192748.42fc6b6f@bbrezillon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sun, 22 Apr 2018 20:06:39 +0100
+Subject: BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
+In-Reply-To: <97d99ad9-c5cf-a4d2-126a-2b39ffead0b3@web.de>
+References: <97d99ad9-c5cf-a4d2-126a-2b39ffead0b3@web.de>
+Message-ID: <20180422190639.lyfvgnzapo2mrpu6@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Apr 2018 10:33:54 +0800
-Ryder Lee <ryder.lee@mediatek.com> wrote:
-
-> The usage of of_device_get_match_data() reduce the code size a bit.
+On Sun, Apr 22, 2018 at 12:47:57PM +0200, Jan Kiszka wrote:
+> Hi,
 > 
-> Also, the only way to call .probe() is to match an entry in
-> .of_match_table[], so of_device_id cannot be NULL.
+> this can be triggered simply by running
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/mtd/nand/raw/mtk_ecc.c  |  7 +------
->  drivers/mtd/nand/raw/mtk_nand.c | 10 +---------
-
-Applied to nand/next after fixing the subject prefix.
-
-Thanks,
-
-Boris
-
->  2 files changed, 2 insertions(+), 15 deletions(-)
+> # echo 0 > /sys/devices/system/cpu/cpu3/online
+> # echo 1 > /sys/devices/system/cpu/cpu3/online
 > 
-> diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
-> index 40d86a8..6432bd7 100644
-> --- a/drivers/mtd/nand/raw/mtk_ecc.c
-> +++ b/drivers/mtd/nand/raw/mtk_ecc.c
-> @@ -500,7 +500,6 @@ static int mtk_ecc_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct mtk_ecc *ecc;
->  	struct resource *res;
-> -	const struct of_device_id *of_ecc_id = NULL;
->  	u32 max_eccdata_size;
->  	int irq, ret;
->  
-> @@ -508,11 +507,7 @@ static int mtk_ecc_probe(struct platform_device *pdev)
->  	if (!ecc)
->  		return -ENOMEM;
->  
-> -	of_ecc_id = of_match_device(mtk_ecc_dt_match, &pdev->dev);
-> -	if (!of_ecc_id)
-> -		return -ENODEV;
-> -
-> -	ecc->caps = of_ecc_id->data;
-> +	ecc->caps = of_device_get_match_data(dev);
->  
->  	max_eccdata_size = ecc->caps->num_ecc_strength - 1;
->  	max_eccdata_size = ecc->caps->ecc_strength[max_eccdata_size];
-> diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
-> index 6977da3..75c845a 100644
-> --- a/drivers/mtd/nand/raw/mtk_nand.c
-> +++ b/drivers/mtd/nand/raw/mtk_nand.c
-> @@ -1434,7 +1434,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
->  	struct device_node *np = dev->of_node;
->  	struct mtk_nfc *nfc;
->  	struct resource *res;
-> -	const struct of_device_id *of_nfc_id = NULL;
->  	int ret, irq;
->  
->  	nfc = devm_kzalloc(dev, sizeof(*nfc), GFP_KERNEL);
-> @@ -1452,6 +1451,7 @@ static int mtk_nfc_probe(struct platform_device *pdev)
->  	else if (!nfc->ecc)
->  		return -ENODEV;
->  
-> +	nfc->caps = of_device_get_match_data(dev);
->  	nfc->dev = dev;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> @@ -1498,14 +1498,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
->  		goto clk_disable;
->  	}
->  
-> -	of_nfc_id = of_match_device(mtk_nfc_id_table, &pdev->dev);
-> -	if (!of_nfc_id) {
-> -		ret = -ENODEV;
-> -		goto clk_disable;
-> -	}
-> -
-> -	nfc->caps = of_nfc_id->data;
-> -
->  	platform_set_drvdata(pdev, nfc);
->  
->  	ret = mtk_nfc_nand_chips_init(dev, nfc);
+> [  455.904854] ==================================================================
+> [  455.906108] BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
+> [  455.906668] Read of size 4 at addr ffff200008e3a9d8 by task swapper/3/0
+
+It looks like we miss a sentinel in kpti_safe_list.
+
+Does the below help?
+
+Mark.
+
+---->8----
+>From ade322407e3d6d1f50e558ebd50d2c1c7bd811c2 Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Sun, 22 Apr 2018 19:58:08 +0100
+Subject: [PATCH] arm64: add sentinel to kpti_safe_list
+
+We're missing a sentinel entry in kpti_safe_list. Thus is_midr_in_range_list()
+can walk past the end of kpti_safe_list. Depending on the contents of memory,
+this could erroneously match a CPU's MIDR, cause a data abort, or other bad
+outcomes.
+
+Add the sentinel entry to avoid this.
+
+Fixes: be5b299830c63ed7 ("arm64: capabilities: Add support for checks based on a list of MIDRs")
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Jan Kiszka <jan.kiszka@web.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 536d572e5596..9d1b06d67c53 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -868,6 +868,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
+ 	static const struct midr_range kpti_safe_list[] = {
+ 		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
+ 		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
++		{ /* sentinel */ }
+ 	};
+ 	char const *str = "command line option";
+ 
+-- 
+2.11.0
