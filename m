@@ -1,69 +1,56 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Tue, 17 Apr 2018 16:55:08 +0100
-Subject: [PATCH v2 2/2] parisc: define stronger ordering for the default
- readX()
-In-Reply-To: <38a1d4e3-cabe-6c39-4355-8d8111637382@codeaurora.org>
-References: <1523938133-3224-1-git-send-email-okaya@codeaurora.org>
- <1523938133-3224-2-git-send-email-okaya@codeaurora.org>
- <1523957852.3250.9.camel@HansenPartnership.com>
- <38a1d4e3-cabe-6c39-4355-8d8111637382@codeaurora.org>
-Message-ID: <1523980508.3310.9.camel@HansenPartnership.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 22 Apr 2018 13:32:15 +0200
+Subject: random.c regression on arm64 EFI systems
+Message-ID: <CAKv+Gu9yKSF=XdHFD4bQEZar+RQxtPjR+a6NrSXCTdu_j6+iaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-04-17 at 10:13 -0400, Sinan Kaya wrote:
-> Hi James,
-> 
-> > 
-> > Perhaps if you gave an example of the actual problem you're trying
-> > to fix we could assess if it affects parisc.
-> 
-> Let me clarify myself here. Maybe, there is a better solution.
-> 
-> 		/* assign ownership */
-> 		desc->status = DEVICE_OWN;
-> 
-> 		/* notify device of new descriptors */
-> 		writel(DESC_NOTIFY, doorbell);
-> 
-> The difference between writel() and writel_relax() is writel()
-> guarantees memory transactions to be flushed to the device before the
-> register write.
+Hello all,
 
-Um, no it doesn't, at least not in PCI.  It guarantees the write will
-be issued by the memory system, but it may still be cached (called
-posting) in the PCI bridge.  So it doesn't guarantee the write reaches
-the device by the time it returns.
+Today's pull of random.c changes caused a regression on arm64 UEFI
+systems that invoke EFI_RNG_PROTOCOL to obtain strong entropy from the
+platform. (arm64 does not have an architected instruction a la RDRAND)
 
->  writel_relaxed() does not provide any guarantees about the memory
-> and IO operations.
-> 
-> Similarly, readl() provides following code to observe the DMA result
-> while readl_relaxed() does not provide this guarantee.
+Before (grep'ing dmesg for entropy, rng, random):
 
-Right, the relaxed operator provides no guarantee of ordering between
-the memory and IO domains.  However, it's only really a problem on
-multiple memory controller systems (i.e. NUMA).  Parisc (except
-superdome, which we don't support) doesn't have this problem.  We also
-turn of CPU stream reordering, so compile order is retire order on our
-CPUs (which makes life a lot simpler).
+  efi:  ...  RNG=0xff7bc898
+  efi: seeding entropy pool
+  random: fast init done
+  ...
+  random: crng init done
 
-> Ideally, you want to embed rmb() and wmb() into the writel() and
-> readl() to provide this guarantee.
->  
-> PA-RISC doesn't seem to support neither one of the barrier types. If
-> you are familiar with the architecture, maybe you could guide us
-> here.
-> 
-> Is __raw_writeX() enough to provide this guarantee for this
-> architecture?
+After:
 
-Well, with the volatile address it is.
+  efi:  ...  RNG=0xff7ac898
+  efi: seeding entropy pool
+  ...
+  random: get_random_bytes called from start_kernel+0xb4/0x48c with crng_init=0
+  ...
+  random: fast init done
+  ...
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  random: systemd: uninitialized urandom read (16 bytes read)
+  ...
+  random: crng init done
 
-The current implementations provide the expected semantics: namely the
-position in the instruction stream is compile (retire) ordered and
-issued from memory once retired.  We still do have the write posting
-problem, but you'll find additional reads in the drivers to flush the
-posted writes, so I don't actually believe we need anything changing.
+The current EFI code uses add_device_randomness() to pass the firmware
+provided strong random seed to the kernel, for lack of a more
+appropriate interface (at the time, at least).
 
-James
+I tried to switch to add_hwgenerator_randomness(), which seems more
+appropriate, but it appears to me that it is impossible to get the
+kernel entropy pool into the fully initialized state (crng_init=2)
+using that without some dodgy tricks.
+
+Comments and ideas welcome.
+
+Thanks,
+Ard.
