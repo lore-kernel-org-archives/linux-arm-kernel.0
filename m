@@ -1,34 +1,52 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 Apr 2018 15:39:12 +0100
-Subject: [PATCH] ARM: dts: imx6qdl-cubox-i: Move card-detect GPIO to 1.5
- SOM devices only
-In-Reply-To: <20180422142151.17910-1-contact@paulk.fr>
-References: <20180422142151.17910-1-contact@paulk.fr>
-Message-ID: <20180422143911.GB16141@n2100.armlinux.org.uk>
+Date: Sun, 22 Apr 2018 16:55:16 +0100
+Subject: [PATCH] serial: mvebu-uart: Fix local flags handling on termios
+ update
+In-Reply-To: <20180422123346.15538-1-marc.zyngier@arm.com>
+References: <20180422123346.15538-1-marc.zyngier@arm.com>
+Message-ID: <20180422155515.GC16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 22, 2018 at 04:21:51PM +0200, Paul Kocialkowski wrote:
-> The Solid-Run CuBox-i lower board used in the first generation of
-> CuBox-i devices feature a hinged micro SD card slot, that does not have
-> card-detect capability. Since the card-detect GPIO was specified in the
-> common cubox-i dtsi, it is moved to each device using the 1.5 SOM and is
-> thus removed from the imx6q-cubox-i dts.
+On Sun, Apr 22, 2018 at 01:33:46PM +0100, Marc Zyngier wrote:
+> Commit 68a0db1d7da2 reworked the baud rate selection, but also added
+> a (not so) subtle change in the way the local flags (c_lflag in the
+> termios structure) are handled, forcing the new flags to always be the
+> same as the old ones.
+> 
+> The reason for that particular change is both obscure and undocumented.
+> It also completely breaks userspace. Something as trivial as getty is
+> unusable:
+> 
+> <example>
+> 	Debian GNU/Linux 9 sy-borg ttyMV0
+> 
+> 	sy-borg login: root
+> 	root
+> 	[timeout]
+> 
+> 	Debian GNU/Linux 9 sy-borg ttyMV0
+> </example>
+> 
+> which is quite obvious in retrospect: getty cannot get in control of
+> the echo mode, is stuck in canonical mode, and times out without ever
+> seeing anything valid. It also begs the question of how this change was
+> ever tested.
+> 
+> The fix is pretty obvious: stop messing with c_lflag, and the world
+> will be a happier place.
 
-This seems incorrect.
+The c_iflag code also looks suspicious as well.  Apparently, the driver
+only supports INPCK and IGNPAR, but things such as ISTRIP, INLCR, IGNCR,
+ICRNL, IUCLC, IMAXBEL and IUTF8 are all software things done by the TTY
+layer and have nothing to do with the driver.
 
-The 1.5 SOM is a relatively recent thing, and I have one of the first
-Cubox-i's that were produced which is not hinged, and does not have a
-1.5 SOM.  There is _no_ correlation between the 1.5 SOM and the SD
-card slot.
+The driver should only be preserving termios modes that are not supported
+by the whole system, not solely the driver.
 
-Talking to folk at SolidRun, we're all confused about your assertions.
-
-We're also confused about "hinged micro SD card slot" - Cubox-i's
-come with either a push-push slot or a static (push-in, pull-out) slot.
-(Prototypes were the latter.)
-
-Maybe someone's modified yours?
+Interestingly, this aspect of the patch was not described in the commit
+message, so how did this patch get in without proper review given that
+it does more than what the commit log says?
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
