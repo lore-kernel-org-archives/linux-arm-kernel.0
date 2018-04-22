@@ -1,53 +1,57 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Sat, 21 Apr 2018 22:52:17 +0100
-Subject: [PATCH 22/22] parisc: use generic dma_noncoherent_ops
-In-Reply-To: <e0b4f3be-68b9-c3af-e432-fd20419e2d70@gmx.de>
-References: <20180420080313.18796-1-hch@lst.de>
- <20180420080313.18796-23-hch@lst.de>
- <e0b4f3be-68b9-c3af-e432-fd20419e2d70@gmx.de>
-Message-ID: <1524347537.3335.12.camel@HansenPartnership.com>
+From: jan.kiszka@web.de (Jan Kiszka)
+Date: Sun, 22 Apr 2018 12:47:57 +0200
+Subject: BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
+Message-ID: <97d99ad9-c5cf-a4d2-126a-2b39ffead0b3@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-04-21 at 19:43 +0200, Helge Deller wrote:
-> On 20.04.2018 10:03, Christoph Hellwig wrote:
-> > Switch to the generic noncoherent direct mapping implementation.
-> > 
-> > Parisc previously had two different non-coherent dma ops
-> > implementation that just different in the way coherent allocations
-> > were handled or not handled.??The different behavior is not
-> > selected at runtime in the arch_dma_alloc and arch_dma_free
-> > routines.??The non-coherent allocation in the pcx cases now uses
-> > the dma_direct helpers that are a little more sophisticated and
-> > used by a lot of other architectures.
-> > 
-> > Fix sync_single_for_cpu to do skip the cache flush unless the
-> > transfer is to the device to match the more tested unmap_single
-> > path which should have the same cache coherency implications.
-> > 
-> > This also now consistenly uses flush_kernel_dcache_range for cache
-> > flushing while previously some of the SG based operations used
-> > flush_kernel_vmap_range instead.
-> 
-> 
-> This patch breaks a 32bit kernel on a B160L machine (PA7300LC CPU,
-> "pcxl2"). After applying this patch series the lasi82956 network
-> driver works unreliable.? NIC gets IP, but ping doesn't work.
-> See drivers/net/ethernet/i825xx/lasi_82596.c, it uses dma*sync()
-> functions.
+Hi,
 
-That's actually a weird result.  The 32 bit machines have two cases:
-those that can make uncached memory by setting the U bit (and thus
-don't need the sync operations in the lasi and D700 drivers) and those
-that can't.  The latter is basically only the old 700 series.  The B180
-is in the class of can set pages to uncached, so it sounds like
-something in our uncached memory allocation for dma areas is failing
-after this patch set.
+this can be triggered simply by running
 
-I still have an old 700 in my box of curiosities, so I can try to dust
-it off and plug it back in when I get home to see what it makes of the
-series when it gets fixed.
+# echo 0 > /sys/devices/system/cpu/cpu3/online
+# echo 1 > /sys/devices/system/cpu/cpu3/online
 
-James
+[  455.904854] ==================================================================
+[  455.906108] BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
+[  455.906668] Read of size 4 at addr ffff200008e3a9d8 by task swapper/3/0
+[  455.907122] 
+[  455.907647] CPU: 3 PID: 0 Comm: swapper/3 Not tainted 4.17.0-rc1-00257-gbf20b92a3b12 #76
+[  455.908158] Hardware name: linux,dummy-virt (DT)
+[  455.908802] Call trace:
+[  455.909126]  dump_backtrace+0x0/0x230
+[  455.909522]  show_stack+0x14/0x20
+[  455.909848]  dump_stack+0xa8/0xcc
+[  455.910180]  print_address_description+0x13c/0x250
+[  455.910576]  kasan_report+0x254/0x328
+[  455.910985]  __asan_load4+0x88/0xb0
+[  455.911326]  unmap_kernel_at_el0+0x70/0x1a0
+[  455.911702]  __verify_local_cpu_caps+0x78/0x178
+[  455.912098]  verify_local_cpu_caps+0x4c/0x60
+[  455.912509]  check_local_cpu_capabilities+0x64/0x158
+[  455.912955]  secondary_start_kernel+0x178/0x260
+[  455.913366] 
+[  455.913586] The buggy address belongs to the variable:
+[  455.914026]  kpti_safe_list.26846+0x18/0x1460
+[  455.914382] 
+[  455.914606] Memory state around the buggy address:
+[  455.915349]  ffff200008e3a880: 00 00 00 01 fa fa fa fa 00 00 04 fa fa fa fa fa
+[  455.915942]  ffff200008e3a900: 03 fa fa fa fa fa fa fa 04 fa fa fa fa fa fa fa
+[  455.916483] >ffff200008e3a980: 00 00 00 06 fa fa fa fa 00 00 00 fa fa fa fa fa
+[  455.917077]                                                     ^
+[  455.917539]  ffff200008e3aa00: 00 00 00 00 00 00 00 05 fa fa fa fa 00 00 00 00
+[  455.918055]  ffff200008e3aa80: 00 00 00 00 03 fa fa fa fa fa fa fa 00 00 00 00
+[  455.918579] ==================================================================
 
-James
+Issue is new with 4.17-rc. Can provide .config if needed. Device was
+qemu-system-aarch64. 
+
+Jan
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180422/07601f35/attachment-0001.sig>
