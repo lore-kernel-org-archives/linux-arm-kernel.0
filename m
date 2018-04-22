@@ -1,64 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Sun, 22 Apr 2018 20:06:39 +0100
-Subject: BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
-In-Reply-To: <97d99ad9-c5cf-a4d2-126a-2b39ffead0b3@web.de>
-References: <97d99ad9-c5cf-a4d2-126a-2b39ffead0b3@web.de>
-Message-ID: <20180422190639.lyfvgnzapo2mrpu6@salmiak>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 22 Apr 2018 20:58:04 +0100
+Subject: [PATCH] serial: mvebu-uart: Fix local flags handling on termios
+ update
+In-Reply-To: <20180422180728.42d7b354@why.wild-wind.fr.eu.org>
+References: <20180422123346.15538-1-marc.zyngier@arm.com>
+ <20180422155515.GC16141@n2100.armlinux.org.uk>
+ <20180422180728.42d7b354@why.wild-wind.fr.eu.org>
+Message-ID: <20180422195803.GD16141@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 22, 2018 at 12:47:57PM +0200, Jan Kiszka wrote:
-> Hi,
+On Sun, Apr 22, 2018 at 06:07:28PM +0100, Marc Zyngier wrote:
+> On Sun, 22 Apr 2018 16:55:16 +0100
+> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 > 
-> this can be triggered simply by running
+> > On Sun, Apr 22, 2018 at 01:33:46PM +0100, Marc Zyngier wrote:
+> > > Commit 68a0db1d7da2 reworked the baud rate selection, but also added
+> > > a (not so) subtle change in the way the local flags (c_lflag in the
+> > > termios structure) are handled, forcing the new flags to always be the
+> > > same as the old ones.
+> > > 
+> > > The reason for that particular change is both obscure and undocumented.
+> > > It also completely breaks userspace. Something as trivial as getty is
+> > > unusable:
+> > > 
+> > > <example>
+> > > 	Debian GNU/Linux 9 sy-borg ttyMV0
+> > > 
+> > > 	sy-borg login: root
+> > > 	root
+> > > 	[timeout]
+> > > 
+> > > 	Debian GNU/Linux 9 sy-borg ttyMV0
+> > > </example>
+> > > 
+> > > which is quite obvious in retrospect: getty cannot get in control of
+> > > the echo mode, is stuck in canonical mode, and times out without ever
+> > > seeing anything valid. It also begs the question of how this change was
+> > > ever tested.
+> > > 
+> > > The fix is pretty obvious: stop messing with c_lflag, and the world
+> > > will be a happier place.  
+> > 
+> > The c_iflag code also looks suspicious as well.  Apparently, the driver
+> > only supports INPCK and IGNPAR, but things such as ISTRIP, INLCR, IGNCR,
+> > ICRNL, IUCLC, IMAXBEL and IUTF8 are all software things done by the TTY
+> > layer and have nothing to do with the driver.
 > 
-> # echo 0 > /sys/devices/system/cpu/cpu3/online
-> # echo 1 > /sys/devices/system/cpu/cpu3/online
-> 
-> [  455.904854] ==================================================================
-> [  455.906108] BUG: KASAN: global-out-of-bounds in unmap_kernel_at_el0+0x70/0x1a0
-> [  455.906668] Read of size 4 at addr ffff200008e3a9d8 by task swapper/3/0
+> Indeed. I stuck with the most glaring issue (well, the one that
+> prevented me from using this particular box), but the whole termios
+> massaging is quite odd. Someone with a good understanding of the
+> intricacies of the TTY layer should definitely have a look at this.
 
-It looks like we miss a sentinel in kpti_safe_list.
+Right, remember, I'm the author of the serial core layer (I took over
+from tytso back in the 2.x era.)
 
-Does the below help?
+POSIX requirements are:
 
-Mark.
+  The tcsetattr() function shall return successfully if it
+  was able to perform any of the requested actions, even if
+  some of the requested actions could not be performed. It
+  shall set all the attributes that the implementation
+  supports as requested and leave all the attributes not
+  supported by the implementation unchanged.
 
----->8----
->From ade322407e3d6d1f50e558ebd50d2c1c7bd811c2 Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Sun, 22 Apr 2018 19:58:08 +0100
-Subject: [PATCH] arm64: add sentinel to kpti_safe_list
+In other words, if the system does not support two stop bits, asking
+for CSTOPB to be set results in CSTOPB being ignored but all other
+supported modes being updated.  This is what the code in that commit
+is trying to implement, but it forgets that the TTY layer implements
+a whole load of termios modes that are not specific to the serial
+driver.
 
-We're missing a sentinel entry in kpti_safe_list. Thus is_midr_in_range_list()
-can walk past the end of kpti_safe_list. Depending on the contents of memory,
-this could erroneously match a CPU's MIDR, cause a data abort, or other bad
-outcomes.
-
-Add the sentinel entry to avoid this.
-
-Fixes: be5b299830c63ed7 ("arm64: capabilities: Add support for checks based on a list of MIDRs")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Jan Kiszka <jan.kiszka@web.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 536d572e5596..9d1b06d67c53 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -868,6 +868,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	static const struct midr_range kpti_safe_list[] = {
- 		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
- 		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-+		{ /* sentinel */ }
- 	};
- 	char const *str = "command line option";
- 
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
