@@ -1,77 +1,66 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 22 Apr 2018 11:14:08 +0200
-Subject: [PATCH 0/6] tree-wide: simplify getting .drvdata
-Message-ID: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
+Date: Sun, 22 Apr 2018 11:14:13 +0200
+Subject: [PATCH 5/6] dmaengine: ste_dma40: simplify getting .drvdata
+In-Reply-To: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
+References: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20180422091415.7587-6-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I got tired of fixing this in Renesas drivers manually, so I took the big
-hammer. Remove this cumbersome code pattern which got copy-pasted too much
-already:
+We should get drvdata from struct device directly. Going via
+platform_device is an unneeded step back and forth.
 
--	struct platform_device *pdev = to_platform_device(dev);
--	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
-+	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
 
-I send this out as one patch per directory per subsystem. I think they should
-be applied individually. If you prefer a broken out series per subsystem, I can
-provide this as well. Just mail me.
+Build tested only. buildbot is happy. Please apply to your tree directly.
 
-A branch (tested by buildbot; only with all commits squashed into one commit
-before) can be found here:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git coccinelle/get_drvdata
-
-Open for other comments, suggestions, too, of course.
-
-Here is the cocci-script I created:
-
-@@
-struct device* d;
-identifier pdev;
-expression *ptr;
-@@
-(
--	struct platform_device *pdev = to_platform_device(d);
-|
--	struct platform_device *pdev;
-	...
--	pdev = to_platform_device(d);
-)
-	<... when != pdev
--	&pdev->dev
-+	d
-	...>
-
-	ptr =
--	platform_get_drvdata(pdev)
-+	dev_get_drvdata(d)
-
-	<... when != pdev
--	&pdev->dev
-+	d
-	...>
-
-Kind regards,
-
-   Wolfram
-
-
-Wolfram Sang (6):
-  dmaengine: at_hdmac: simplify getting .drvdata
-  dmaengine: at_xdmac: simplify getting .drvdata
-  dmaengine: fsldma: simplify getting .drvdata
-  dmaengine: idma64: simplify getting .drvdata
-  dmaengine: ste_dma40: simplify getting .drvdata
-  dmaengine: txx9dmac: simplify getting .drvdata
-
- drivers/dma/at_hdmac.c  |  9 +++------
- drivers/dma/at_xdmac.c  |  9 +++------
- drivers/dma/fsldma.c    |  6 ++----
- drivers/dma/idma64.c    |  6 ++----
  drivers/dma/ste_dma40.c | 12 ++++--------
- drivers/dma/txx9dmac.c  |  8 +++-----
- 6 files changed, 17 insertions(+), 33 deletions(-)
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index c2b089af0420..1bc149af990e 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -2889,8 +2889,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
+ #ifdef CONFIG_PM_SLEEP
+ static int dma40_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
+ 	int ret;
+ 
+ 	ret = pm_runtime_force_suspend(dev);
+@@ -2904,8 +2903,7 @@ static int dma40_suspend(struct device *dev)
+ 
+ static int dma40_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
+ 	int ret = 0;
+ 
+ 	if (base->lcpa_regulator) {
+@@ -2970,8 +2968,7 @@ static void d40_save_restore_registers(struct d40_base *base, bool save)
+ 
+ static int dma40_runtime_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
+ 
+ 	d40_save_restore_registers(base, true);
+ 
+@@ -2985,8 +2982,7 @@ static int dma40_runtime_suspend(struct device *dev)
+ 
+ static int dma40_runtime_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct d40_base *base = platform_get_drvdata(pdev);
++	struct d40_base *base = dev_get_drvdata(dev);
+ 
+ 	d40_save_restore_registers(base, false);
+ 
 -- 
 2.11.0
