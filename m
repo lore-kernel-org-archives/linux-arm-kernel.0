@@ -1,56 +1,77 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 22 Apr 2018 11:14:10 +0200
-Subject: [PATCH 2/6] dmaengine: at_xdmac: simplify getting .drvdata
-In-Reply-To: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
-References: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180422091415.7587-3-wsa+renesas@sang-engineering.com>
+Date: Sun, 22 Apr 2018 11:14:08 +0200
+Subject: [PATCH 0/6] tree-wide: simplify getting .drvdata
+Message-ID: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should get drvdata from struct device directly. Going via
-platform_device is an unneeded step back and forth.
+I got tired of fixing this in Renesas drivers manually, so I took the big
+hammer. Remove this cumbersome code pattern which got copy-pasted too much
+already:
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct ep93xx_keypad *keypad = platform_get_drvdata(pdev);
++	struct ep93xx_keypad *keypad = dev_get_drvdata(dev);
 
-Build tested only. buildbot is happy. Please apply to your tree directly.
+I send this out as one patch per directory per subsystem. I think they should
+be applied individually. If you prefer a broken out series per subsystem, I can
+provide this as well. Just mail me.
 
- drivers/dma/at_xdmac.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+A branch (tested by buildbot; only with all commits squashed into one commit
+before) can be found here:
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 94236ec9d410..4bf72561667c 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -1833,8 +1833,7 @@ static void at_xdmac_free_chan_resources(struct dma_chan *chan)
- #ifdef CONFIG_PM
- static int atmel_xdmac_prepare(struct device *dev)
- {
--	struct platform_device	*pdev = to_platform_device(dev);
--	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
-+	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
- 	struct dma_chan		*chan, *_chan;
- 
- 	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
-@@ -1853,8 +1852,7 @@ static int atmel_xdmac_prepare(struct device *dev)
- #ifdef CONFIG_PM_SLEEP
- static int atmel_xdmac_suspend(struct device *dev)
- {
--	struct platform_device	*pdev = to_platform_device(dev);
--	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
-+	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
- 	struct dma_chan		*chan, *_chan;
- 
- 	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
-@@ -1878,8 +1876,7 @@ static int atmel_xdmac_suspend(struct device *dev)
- 
- static int atmel_xdmac_resume(struct device *dev)
- {
--	struct platform_device	*pdev = to_platform_device(dev);
--	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
-+	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
- 	struct at_xdmac_chan	*atchan;
- 	struct dma_chan		*chan, *_chan;
- 	int			i;
+git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git coccinelle/get_drvdata
+
+Open for other comments, suggestions, too, of course.
+
+Here is the cocci-script I created:
+
+@@
+struct device* d;
+identifier pdev;
+expression *ptr;
+@@
+(
+-	struct platform_device *pdev = to_platform_device(d);
+|
+-	struct platform_device *pdev;
+	...
+-	pdev = to_platform_device(d);
+)
+	<... when != pdev
+-	&pdev->dev
++	d
+	...>
+
+	ptr =
+-	platform_get_drvdata(pdev)
++	dev_get_drvdata(d)
+
+	<... when != pdev
+-	&pdev->dev
++	d
+	...>
+
+Kind regards,
+
+   Wolfram
+
+
+Wolfram Sang (6):
+  dmaengine: at_hdmac: simplify getting .drvdata
+  dmaengine: at_xdmac: simplify getting .drvdata
+  dmaengine: fsldma: simplify getting .drvdata
+  dmaengine: idma64: simplify getting .drvdata
+  dmaengine: ste_dma40: simplify getting .drvdata
+  dmaengine: txx9dmac: simplify getting .drvdata
+
+ drivers/dma/at_hdmac.c  |  9 +++------
+ drivers/dma/at_xdmac.c  |  9 +++------
+ drivers/dma/fsldma.c    |  6 ++----
+ drivers/dma/idma64.c    |  6 ++----
+ drivers/dma/ste_dma40.c | 12 ++++--------
+ drivers/dma/txx9dmac.c  |  8 +++-----
+ 6 files changed, 17 insertions(+), 33 deletions(-)
+
 -- 
 2.11.0
