@@ -1,53 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 22 Apr 2018 14:34:17 +0200
-Subject: [PATCH] ACPI / bus: ignore rather than fail bus driver
- registrations on non-ACPI boot
-In-Reply-To: <CAKv+Gu8xY-RvJKTKfv-e0qonL4oECDBK+ppxztvh9BgdpG8CUg@mail.gmail.com>
-References: <20180419165825.13008-1-ard.biesheuvel@linaro.org>
- <CAJZ5v0jE4Ler2OWeKEWuHwEwM4RHYC5r8BwgcPrT6XBxFjnSNw@mail.gmail.com>
- <CAKv+Gu8xY-RvJKTKfv-e0qonL4oECDBK+ppxztvh9BgdpG8CUg@mail.gmail.com>
-Message-ID: <CAKv+Gu8PmKe+X5b0P_KuWfB6U-P-EngJw04JdJUkEkwrqNK97g@mail.gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sun, 22 Apr 2018 16:21:51 +0200
+Subject: [PATCH] ARM: dts: imx6qdl-cubox-i: Move card-detect GPIO to 1.5 SOM
+ devices only
+Message-ID: <20180422142151.17910-1-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2018 at 11:57, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 22 April 2018 at 11:27, Rafael J. Wysocki <rafael@kernel.org> wrote:
->> On Thu, Apr 19, 2018 at 6:58 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> When building ACPI bus drivers such as button.ko into the core kernel,
->>> other drivers that depend on its symbols are loadable even when booting
->>> with ACPI disabled. For instance, nouveau.ko has a link time dependency
->>> on acpi_lid_open() on ACPI capable kernels, and calls it regardless of
->>> whether the system booted via ACPI.
->>>
->>> However, when building button.ko as a module, it will refuse to load if
->>> the system did not boot in ACPI mode, which subsequently prevents the
->>> nouveau driver from loading as well, resulting in broken graphics.
->>>
->>> Given that returning an error from an initcall() is ignored for drivers
->>> that are built into the kernel,
->>
->> Which makes sense, because they are present in the kernel anyway.
->>
->>> let's align the module case with this,
->>> and not return an error when registering an ACPI bus driver on a system
->>> that did not boot via ACPI.
->>
->> But why is loading a module that's never going to be used actually OK?
->>
->> Isn't this a problem with the assumptions made by the nouveau driver
->> that need not be met depending on what configuration the kernel is run
->> in?
->>
->> Honestly, it doesn't appear quite right to try to change the rest of
->> the kernel to follow the nouveau's expectations.
->>
->
-> I don't disagree here, I am just unsure whether other options are any better.
->
-> I think the alternative is to make acpi_lid_open() a non-modular
-> function of the ACPI core that invokes the button ACPI bus driver if
-> it was loaded, and always returns false otherwise. Would that work for
-> you?
+The Solid-Run CuBox-i lower board used in the first generation of
+CuBox-i devices feature a hinged micro SD card slot, that does not have
+card-detect capability. Since the card-detect GPIO was specified in the
+common cubox-i dtsi, it is moved to each device using the 1.5 SOM and is
+thus removed from the imx6q-cubox-i dts.
 
-BTW not only nouveau invokes acpi_lid_open(), i915 does it as well.
+Enabling the card-detect GPIO on the first generation CuBox-i devices
+results in waiting for a card-detect event (that never occurs) and thus
+not detecting the mmc card.
+
+Since the CD pin is still dedicated to the purpose on the SOM board even
+on the first generation CuBox-i devices, the pin control properties are
+kept untouched regardless of the slot capability.
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+---
+ arch/arm/boot/dts/imx6dl-cubox-i-emmc-som-v15.dts | 4 ++++
+ arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts      | 4 ++++
+ arch/arm/boot/dts/imx6q-cubox-i-emmc-som-v15.dts  | 4 ++++
+ arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts       | 4 ++++
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi            | 1 -
+ 5 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6dl-cubox-i-emmc-som-v15.dts b/arch/arm/boot/dts/imx6dl-cubox-i-emmc-som-v15.dts
+index 2b2fc360b865..90a15f3b4fc0 100644
+--- a/arch/arm/boot/dts/imx6dl-cubox-i-emmc-som-v15.dts
++++ b/arch/arm/boot/dts/imx6dl-cubox-i-emmc-som-v15.dts
+@@ -50,3 +50,7 @@
+ 	model = "SolidRun Cubox-i Solo/DualLite (1.5som+emmc)";
+ 	compatible = "solidrun,cubox-i/dl", "fsl,imx6dl";
+ };
++
++&usdhc2 {
++	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
++};
+diff --git a/arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts b/arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts
+index e09c565d1d1f..9bdec07fefe3 100644
+--- a/arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts
++++ b/arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts
+@@ -49,3 +49,7 @@
+ 	model = "SolidRun Cubox-i Solo/DualLite (1.5som)";
+ 	compatible = "solidrun,cubox-i/dl", "fsl,imx6dl";
+ };
++
++&usdhc2 {
++	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
++};
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i-emmc-som-v15.dts b/arch/arm/boot/dts/imx6q-cubox-i-emmc-som-v15.dts
+index 3e59ebbb3608..679a5431cbdb 100644
+--- a/arch/arm/boot/dts/imx6q-cubox-i-emmc-som-v15.dts
++++ b/arch/arm/boot/dts/imx6q-cubox-i-emmc-som-v15.dts
+@@ -58,3 +58,7 @@
+ 	fsl,transmit-atten-16ths = <9>;
+ 	fsl,no-spread-spectrum;
+ };
++
++&usdhc2 {
++	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
++};
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts b/arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts
+index dab70d1230a2..b9b8733f13c3 100644
+--- a/arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts
++++ b/arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts
+@@ -57,3 +57,7 @@
+ 	fsl,transmit-atten-16ths = <9>;
+ 	fsl,no-spread-spectrum;
+ };
++
++&usdhc2 {
++	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index d1cfdc264126..170b3d27f875 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -254,7 +254,6 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2>;
+ 	vmmc-supply = <&vcc_3v3>;
+-	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.17.0
