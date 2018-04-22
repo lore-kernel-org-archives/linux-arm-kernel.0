@@ -1,66 +1,28 @@
-From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 22 Apr 2018 11:14:13 +0200
-Subject: [PATCH 5/6] dmaengine: ste_dma40: simplify getting .drvdata
-In-Reply-To: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
-References: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180422091415.7587-6-wsa+renesas@sang-engineering.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 22 Apr 2018 11:14:43 +0200
+Subject: [PATCH 07/61] dma: simplify getting .drvdata
+In-Reply-To: <20180422061733.GU6014@localhost>
+References: <20180419140641.27926-1-wsa+renesas@sang-engineering.com>
+ <20180419140641.27926-8-wsa+renesas@sang-engineering.com>
+ <20180422061733.GU6014@localhost>
+Message-ID: <20180422091443.ryfdum5nhjc2b7qw@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should get drvdata from struct device directly. Going via
-platform_device is an unneeded step back and forth.
+On Sun, Apr 22, 2018 at 11:47:33AM +0530, Vinod Koul wrote:
+> On Thu, Apr 19, 2018 at 04:05:37PM +0200, Wolfram Sang wrote:
+> > We should get drvdata from struct device directly. Going via
+> > platform_device is an unneeded step back and forth.
+> 
+> Do you mind splitting this per driver please, that makes it easy to manage
+> for me :)
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
----
+No problem, done.
 
-Build tested only. buildbot is happy. Please apply to your tree directly.
-
- drivers/dma/ste_dma40.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index c2b089af0420..1bc149af990e 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2889,8 +2889,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
- #ifdef CONFIG_PM_SLEEP
- static int dma40_suspend(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct d40_base *base = platform_get_drvdata(pdev);
-+	struct d40_base *base = dev_get_drvdata(dev);
- 	int ret;
- 
- 	ret = pm_runtime_force_suspend(dev);
-@@ -2904,8 +2903,7 @@ static int dma40_suspend(struct device *dev)
- 
- static int dma40_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct d40_base *base = platform_get_drvdata(pdev);
-+	struct d40_base *base = dev_get_drvdata(dev);
- 	int ret = 0;
- 
- 	if (base->lcpa_regulator) {
-@@ -2970,8 +2968,7 @@ static void d40_save_restore_registers(struct d40_base *base, bool save)
- 
- static int dma40_runtime_suspend(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct d40_base *base = platform_get_drvdata(pdev);
-+	struct d40_base *base = dev_get_drvdata(dev);
- 
- 	d40_save_restore_registers(base, true);
- 
-@@ -2985,8 +2982,7 @@ static int dma40_runtime_suspend(struct device *dev)
- 
- static int dma40_runtime_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct d40_base *base = platform_get_drvdata(pdev);
-+	struct d40_base *base = dev_get_drvdata(dev);
- 
- 	d40_save_restore_registers(base, false);
- 
--- 
-2.11.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180422/210b6631/attachment.sig>
