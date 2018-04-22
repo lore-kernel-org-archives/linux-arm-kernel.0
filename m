@@ -1,9 +1,9 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Sun, 22 Apr 2018 11:14:09 +0200
-Subject: [PATCH 1/6] dmaengine: at_hdmac: simplify getting .drvdata
+Date: Sun, 22 Apr 2018 11:14:10 +0200
+Subject: [PATCH 2/6] dmaengine: at_xdmac: simplify getting .drvdata
 In-Reply-To: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
 References: <20180422091415.7587-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180422091415.7587-2-wsa+renesas@sang-engineering.com>
+Message-ID: <20180422091415.7587-3-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,42 +15,42 @@ Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
 Build tested only. buildbot is happy. Please apply to your tree directly.
 
- drivers/dma/at_hdmac.c | 9 +++------
+ drivers/dma/at_xdmac.c | 9 +++------
  1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index a861b5b4d443..75f38d19fcbe 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -2041,8 +2041,7 @@ static void at_dma_shutdown(struct platform_device *pdev)
- 
- static int at_dma_prepare(struct device *dev)
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 94236ec9d410..4bf72561667c 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -1833,8 +1833,7 @@ static void at_xdmac_free_chan_resources(struct dma_chan *chan)
+ #ifdef CONFIG_PM
+ static int atmel_xdmac_prepare(struct device *dev)
  {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct at_dma *atdma = platform_get_drvdata(pdev);
-+	struct at_dma *atdma = dev_get_drvdata(dev);
- 	struct dma_chan *chan, *_chan;
+-	struct platform_device	*pdev = to_platform_device(dev);
+-	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
++	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
+ 	struct dma_chan		*chan, *_chan;
  
- 	list_for_each_entry_safe(chan, _chan, &atdma->dma_common.channels,
-@@ -2076,8 +2075,7 @@ static void atc_suspend_cyclic(struct at_dma_chan *atchan)
- 
- static int at_dma_suspend_noirq(struct device *dev)
+ 	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
+@@ -1853,8 +1852,7 @@ static int atmel_xdmac_prepare(struct device *dev)
+ #ifdef CONFIG_PM_SLEEP
+ static int atmel_xdmac_suspend(struct device *dev)
  {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct at_dma *atdma = platform_get_drvdata(pdev);
-+	struct at_dma *atdma = dev_get_drvdata(dev);
- 	struct dma_chan *chan, *_chan;
+-	struct platform_device	*pdev = to_platform_device(dev);
+-	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
++	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
+ 	struct dma_chan		*chan, *_chan;
  
- 	/* preserve data */
-@@ -2118,8 +2116,7 @@ static void atc_resume_cyclic(struct at_dma_chan *atchan)
+ 	list_for_each_entry_safe(chan, _chan, &atxdmac->dma.channels, device_node) {
+@@ -1878,8 +1876,7 @@ static int atmel_xdmac_suspend(struct device *dev)
  
- static int at_dma_resume_noirq(struct device *dev)
+ static int atmel_xdmac_resume(struct device *dev)
  {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct at_dma *atdma = platform_get_drvdata(pdev);
-+	struct at_dma *atdma = dev_get_drvdata(dev);
- 	struct dma_chan *chan, *_chan;
- 
- 	/* bring back DMA controller */
+-	struct platform_device	*pdev = to_platform_device(dev);
+-	struct at_xdmac		*atxdmac = platform_get_drvdata(pdev);
++	struct at_xdmac		*atxdmac = dev_get_drvdata(dev);
+ 	struct at_xdmac_chan	*atchan;
+ 	struct dma_chan		*chan, *_chan;
+ 	int			i;
 -- 
 2.11.0
