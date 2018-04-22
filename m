@@ -1,30 +1,32 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 22 Apr 2018 10:05:21 +0200
-Subject: [PATCHv3 11/11] arm64: docs: document pointer authentication
-In-Reply-To: <20180417183735.56985-12-mark.rutland@arm.com>
-References: <20180417183735.56985-1-mark.rutland@arm.com>
- <20180417183735.56985-12-mark.rutland@arm.com>
-Message-ID: <20180422080520.GC17875@amd>
+Date: Sun, 22 Apr 2018 10:36:40 +0200
+Subject: FM radio on Droid 4 (in v4.17-rc1)
+Message-ID: <20180422083640.GA23303@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-> @@ -205,6 +205,14 @@ Before jumping into the kernel, the following conditions must be met:
->      ICC_SRE_EL2.SRE (bit 0) must be initialised to 0b0.
->    - The DT or ACPI tables must describe a GICv2 interrupt controller.
->  
-> +  For CPUs with pointer authentication functionality:
-> +  - If EL3 is present:
-> +    SCR_EL3.APK (bit 16) must be initialised to 0b1
-> +    SCR_EL3.API (bit 17) must be initialised to 0b1
-> +  - If the kernel is entered at EL1:
-> +    HCR_EL2.APK (bit 40) must be initialised to 0b1
-> +    HCR_EL2.API (bit 41) must be initialised to 0b1
-> +
+This is my first attempt at setting up FM radio on Droid
+4. Unfortunately I get:
 
-0b1 is quite confusing way to write 1.
+[   29.614959] power_supply usb: uevent: failed to send synthetic
+uevent
+[   32.678100] (stc): gdata/new_proto/recv or reg_complete_cb not
+ready
+[   32.678222] fmdrv: Failed to get ST write func pointer
+[   32.703948] (stc):  chnl_id 8 not supported
+[   32.703948] fmdrv: st_unregister failed -93
+[   32.724578] fmdrv: Unable to prepare FM CORE
+[   33.382476] Requested mode 2
 
+...so I guess it is not going to work. I use configuration with all
+drivers built in.
+
+FM radio is not a priority for me, but if you know how to get it to
+work, I'll try...
+
+Best regards,
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
@@ -35,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180422/31fde743/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180422/fc2d10f4/attachment.sig>
