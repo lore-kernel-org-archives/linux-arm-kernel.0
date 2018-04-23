@@ -1,64 +1,73 @@
 From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Mon, 23 Apr 2018 12:49:45 +0200
-Subject: [RESEND PATCH v6 09/27] drm/bridge: analogix_dp: Fix incorrect usage
- of enhanced mode
+Date: Mon, 23 Apr 2018 12:49:42 +0200
+Subject: [RESEND PATCH v6 06/27] drm/bridge: analogix_dp: Set PD_INC_BG first
+ when powering up edp phy
 In-Reply-To: <20180423105003.9004-1-enric.balletbo@collabora.com>
 References: <20180423105003.9004-1-enric.balletbo@collabora.com>
-Message-ID: <20180423105003.9004-10-enric.balletbo@collabora.com>
+Message-ID: <20180423105003.9004-7-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: zain wang <wzz@rock-chips.com>
 
-Enhanced mode is required by the eDP 1.2 specification, and not doing it
-early could result in a period of time where we have a link transmitting
-idle packets without it. Since there is no reason to disable it, we just
-enable it at the beginning of link training and then keep it on all the
-time.
+Following the correct power up sequence:
+dp_pd=ff => dp_pd=7f => wait 10us => dp_pd=00
 
-Cc: Tomasz Figa <tfiga@chromium.org>
+Cc: St?phane Marchesin <marcheu@chromium.org>
 Signed-off-by: zain wang <wzz@rock-chips.com>
 Signed-off-by: Sean Paul <seanpaul@chromium.org>
 Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Archit Taneja <architt@codeaurora.org>
 ---
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c | 10 ++++++++--
+ drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h |  3 +++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 1f4f34149019..1e1743b59c77 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -281,6 +281,8 @@ static int analogix_dp_link_start(struct analogix_dp_device *dp)
- 	retval = drm_dp_dpcd_write(&dp->aux, DP_LINK_BW_SET, buf, 2);
- 	if (retval < 0)
- 		return retval;
-+	/* set enhanced mode if available */
-+	analogix_dp_set_enhanced_mode(dp);
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+index b47c5af43560..bb72f8b0e603 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
+@@ -321,10 +321,16 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
+ 		break;
+ 	case POWER_ALL:
+ 		if (enable) {
+-			reg = DP_PHY_PD | AUX_PD | CH3_PD | CH2_PD |
+-				CH1_PD | CH0_PD;
++			reg = DP_ALL_PD;
+ 			writel(reg, dp->reg_base + phy_pd_addr);
+ 		} else {
++			reg = DP_ALL_PD;
++			writel(reg, dp->reg_base + phy_pd_addr);
++			usleep_range(10, 15);
++			reg &= ~DP_INC_BG;
++			writel(reg, dp->reg_base + phy_pd_addr);
++			usleep_range(10, 15);
++
+ 			writel(0x00, dp->reg_base + phy_pd_addr);
+ 		}
+ 		break;
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
+index 40200c652533..9602668669f4 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.h
+@@ -342,12 +342,15 @@
+ #define DP_PLL_REF_BIT_1_2500V			(0x7 << 0)
  
- 	/* Set TX pre-emphasis to minimum */
- 	for (lane = 0; lane < lane_count; lane++)
-@@ -593,8 +595,6 @@ static int analogix_dp_process_equalizer_training(struct analogix_dp_device *dp)
- 		dev_dbg(dp->dev, "fast link training %s\n",
- 			dp->fast_train_enable ? "supported" : "unsupported");
+ /* ANALOGIX_DP_PHY_PD */
++#define DP_INC_BG				(0x1 << 7)
++#define DP_EXP_BG				(0x1 << 6)
+ #define DP_PHY_PD				(0x1 << 5)
+ #define AUX_PD					(0x1 << 4)
+ #define CH3_PD					(0x1 << 3)
+ #define CH2_PD					(0x1 << 2)
+ #define CH1_PD					(0x1 << 1)
+ #define CH0_PD					(0x1 << 0)
++#define DP_ALL_PD				(0xff)
  
--		/* set enhanced mode if available */
--		analogix_dp_set_enhanced_mode(dp);
- 		dp->link_train.lt_state = FINISHED;
- 
- 		return 0;
-@@ -940,8 +940,6 @@ static int analogix_dp_commit(struct analogix_dp_device *dp)
- 	}
- 
- 	analogix_dp_enable_scramble(dp, 1);
--	analogix_dp_enable_rx_to_enhanced_mode(dp, 1);
--	analogix_dp_enable_enhanced_mode(dp, 1);
- 
- 	analogix_dp_init_video(dp);
- 	ret = analogix_dp_config_video(dp);
+ /* ANALOGIX_DP_PHY_TEST */
+ #define MACRO_RST				(0x1 << 5)
 -- 
 2.17.0
