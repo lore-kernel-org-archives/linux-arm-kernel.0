@@ -1,48 +1,43 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Mon, 23 Apr 2018 11:46:59 +0800
-Subject: [PATCH 5/5] ARM: dts: imx6sx-sabreauto: add wdog external reset
- support
-In-Reply-To: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
-References: <1524455219-6736-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1524455219-6736-5-git-send-email-Anson.Huang@nxp.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 23 Apr 2018 09:53:43 +0530
+Subject: [PATCH 2/2] cpufreq: brcmstb-avs-cpufreq: prefer SCMI cpufreq if
+ supported
+In-Reply-To: <52044000-513b-b5a1-27db-fb7fdb5ee04f@gmail.com>
+References: <20180418155643.36464-1-code@mmayer.net>
+ <20180418155643.36464-3-code@mmayer.net>
+ <20180419041632.GF24576@vireshk-i7>
+ <74b70865-dfa9-25c8-20f8-3d2f722b9b2d@arm.com>
+ <20180420044259.GA2873@vireshk-i7>
+ <d09b1f87-d467-72d0-cb5d-fd747c7e30c8@arm.com>
+ <20180420093548.GA2989@vireshk-i7>
+ <52044000-513b-b5a1-27db-fb7fdb5ee04f@gmail.com>
+Message-ID: <20180423042343.GB2989@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SX Sabre Auto board has GPIO1_IO13 pin can be
-MUXed as WDOG output to reset PMIC, add this function
-support.
+On 20-04-18, 09:50, Florian Fainelli wrote:
+> On 04/20/2018 02:35 AM, Viresh Kumar wrote:
+> > On 20-04-18, 10:15, Sudeep Holla wrote:
+> >> It still doesn't give the flexibility to switch between the two
+> >> implementations boot time based on some firmware config(e.g. DT status
+> >> property).
+> > 
+> > I agree, but it didn't look like they need flexibility :)
+> > 
+> > Lets see how the intend to use it. If they are *always* going to use SCPI if
+> > that is available, then it should be solved at Kconfig level only. Else they
+> > shouldn't put such code in the driver to quit early.
+> 
+> We have both drivers (brcmstb-avs-cpufreq and scmi-cpufreq) enabled in
+> our kernel configuration, however, depending on the firmware version, we
+> may have a number of combinations:
+> 
+> - arm,scmi DT node is present and enabled (status = okay) as well as
+> brcmstb-avs-cpufreq being present and enabled
+> - arm,scmi DT node is present but disabled (status = disabled) and
+> brcmstb-avs-cpufreq is being present and enabled
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6sx-sabreauto.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+In this case the Kconfig thing I have been talking about doesn't apply anymore.
 
-diff --git a/arch/arm/boot/dts/imx6sx-sabreauto.dts b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-index eadd483..bf19f4f 100644
---- a/arch/arm/boot/dts/imx6sx-sabreauto.dts
-+++ b/arch/arm/boot/dts/imx6sx-sabreauto.dts
-@@ -231,6 +231,12 @@
- 				MX6SX_PAD_KEY_COL1__GPIO2_IO_11		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6SX_PAD_GPIO1_IO13__WDOG1_WDOG_ANY 0x30b0
-+			>;
-+		};
- 	};
- };
- 
-@@ -370,3 +376,9 @@
- 		#gpio-cells = <2>;
- 	};
- };
-+
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
 -- 
-2.7.4
+viresh
