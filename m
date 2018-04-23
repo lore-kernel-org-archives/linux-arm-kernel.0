@@ -1,35 +1,24 @@
-From: dev@pascalroeleven.nl (Pascal Roeleven)
-Date: Mon, 23 Apr 2018 13:01:03 +0200
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun4i: Fix incorrect clocks
- for displays
-In-Reply-To: <20180423071421.byupsz4gxpmhfe44@flea>
-References: <20180420102112.2843-1-dev@pascalroeleven.nl>
- <20180423071421.byupsz4gxpmhfe44@flea>
-Message-ID: <887c9144972ab75a4520141a17e1607b@pascalroeleven.nl>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 23 Apr 2018 13:38:28 +0200
+Subject: [PATCH v2] coresight: Moving framework and drivers to SPDX
+ identifier
+In-Reply-To: <1523981817-16176-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1523981817-16176-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20180423113828.GA8720@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-04-23 09:14, Maxime Ripard wrote:
-> On Fri, Apr 20, 2018 at 12:21:12PM +0200, Pascal Roeleven wrote:
->> Some displays on SUN4i devices wouldn't properly stay on unless
->> 'clk_ignore_unused' is used.
->> 
->> Change the duplicate clocks to the probably intended ones.
->> 
->> Signed-off-by: Pascal Roeleven <dev@pascalroeleven.nl>
+On Tue, Apr 17, 2018 at 10:16:57AM -0600, Mathieu Poirier wrote:
+> Moving all kernel side CoreSight framework and drivers to SPDX identifier.
 > 
-> What was the difference with the first patch you sent?
-> 
-> Anyway, I've applied it, thanks
-> 
-> Maxime
-> 
-> --
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Acked-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> ---
+> Change for V2:
+> * Added drivers/hwtracing/stm/ftrace.c as pointed out by Alex.
 
-I'm sorry there isn't any.
-It's the first patch I have ever send so had some git-send-email issues 
-and
-didn't know the correct procedure to resend a patch.
+This doesn't apply to 4.17-rc2 :(
+
+thanks,
+
+greg k-h
