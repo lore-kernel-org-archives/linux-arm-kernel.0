@@ -1,49 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 23 Apr 2018 17:19:38 +0100
-Subject: [PATCH] arm64: add sentinel to kpti_safe_list
-In-Reply-To: <20180423104133.36395-1-mark.rutland@arm.com>
-References: <20180423104133.36395-1-mark.rutland@arm.com>
-Message-ID: <931cba30-91ee-0940-e0f2-a599fbf8eb5a@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 23 Apr 2018 09:41:05 -0700
+Subject: [PATCH v2] ARM64: dts: meson-axg: enable the eMMC controller
+In-Reply-To: <CAPDyKFpcmO7LYuyuNPcYmzeDyq_AXDH5W4Y9dByTL-B+DGZSqg@mail.gmail.com>
+References: <20180408113647.13543-1-yixun.lan@amlogic.com>
+ <7ho9if3wo3.fsf@baylibre.com>
+ <CAPDyKFpcmO7LYuyuNPcYmzeDyq_AXDH5W4Y9dByTL-B+DGZSqg@mail.gmail.com>
+Message-ID: <CAOi56cUwzrpA1AdRQE3gdW55my-_dqSNnwyEd4poUPjUkpaBag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/04/18 11:41, Mark Rutland wrote:
-> We're missing a sentinel entry in kpti_safe_list. Thus is_midr_in_range_list()
-> can walk past the end of kpti_safe_list. Depending on the contents of memory,
-> this could erroneously match a CPU's MIDR, cause a data abort, or other bad
-> outcomes.
-> 
-> Add the sentinel entry to avoid this.
-> 
-> Fixes: be5b299830c63ed7 ("arm64: capabilities: Add support for checks based on a list of MIDRs")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Jan Kiszka <jan.kiszka@siemens.com>
-> Tested-by: Jan Kiszka <jan.kiszka@siemens.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/kernel/cpufeature.c | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> As discussesd in [1].
-> 
-> Mark.
-> 
-> [1] https://lkml.kernel.org/r/97d99ad9-c5cf-a4d2-126a-2b39ffead0b3 at web.de
-> 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 536d572e5596..9d1b06d67c53 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -868,6 +868,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
->   	static const struct midr_range kpti_safe_list[] = {
->   		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
->   		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-> +		{ /* sentinel */ }
->   	};
->   	char const *str = "command line option";
+On Thu, Apr 19, 2018 at 11:55 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 19 April 2018 at 19:58, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Yixun Lan <yixun.lan@amlogic.com> writes:
+>>
+>>> From: Nan Li <nan.li@amlogic.com>
+>>>
+>>> The IP of eMMC controller in AXG is similiar to Meson-GX series.
+>>> Here we add the initial support of the HS200 mode with
+>>> clock running at 166MHz (to be safe), since we found some eMMC chip
+>>> fail to run at 200MHz due to tunning phase error.
+>>>
+>>> Signed-off-by: Nan Li <nan.li@amlogic.com>
+>>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>>
+>> Applied to v4.18/dt64
+>>
+>>> ---
+>>> Hi Kevin
+>>>   Please note this patch actually depend on the eMMC driver here [0].
+>>>   Still a few problem to solve, to improve the tuning phase driver to make
+>>> the clock running at 200MHz, and to further support the HS400 mode.
+>>> Anyway, this patch itself is quite independent.
+>>
+>> The driver changes are queued for v4.18 also.  Good!
+>
+> Right, may I consider that as an ack? :-)
 
-Thanks for the report and the fix.
+I thought it was already merged while I was OoO, so I didn't bother to
+reply with an ack, but if it's not too late, then yes:
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Kevin Hilman <khilman@baylibre.com>
+
+Kevin
