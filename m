@@ -1,36 +1,22 @@
 From: lionel.debieve@st.com (Lionel Debieve)
-Date: Mon, 23 Apr 2018 17:19:47 +0200
-Subject: [PATCH 4/4] ARM: dts: stm32: Add CRC support on stm32mp157c
-In-Reply-To: <20180423151947.2526-1-lionel.debieve@st.com>
-References: <20180423151947.2526-1-lionel.debieve@st.com>
-Message-ID: <20180423151947.2526-5-lionel.debieve@st.com>
+Date: Mon, 23 Apr 2018 17:19:43 +0200
+Subject: [PATCH 0/4] ARM: dts: Add cryptographic support for stm32mp157c
+Message-ID: <20180423151947.2526-1-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add CRC instance of the stm32mp157c SoC
+Patches serie add support or RNG, CRYP and CRC IPs for stm32mp157c SoC
+and add RNG default support for ev1 board.
 
-Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
----
- arch/arm/boot/dts/stm32mp157c.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Lionel Debieve (4):
+  ARM: dts: stm32: Add RNG support on stm32mp157c
+  ARM: dts: stm32: Enable RNG for stm32mp157c-ed1
+  ARM: dts: stm32: Add CRYP support on stm32mp157c
+  ARM: dts: stm32: Add CRC support on stm32mp157c
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 5ce7d28f8a1f..2962decacd87 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -185,6 +185,13 @@
- 			status = "disabled";
- 		};
- 
-+		crc1: crc at 58009000 {
-+			compatible = "st,stm32f7-crc";
-+			reg = <0x58009000 0x400>;
-+			clocks = <&rcc CRC1>;
-+			status = "disabled";
-+		};
-+
- 		usart1: serial at 5c000000 {
- 			compatible = "st,stm32h7-uart";
- 			reg = <0x5c000000 0x400>;
+ arch/arm/boot/dts/stm32mp157c-ed1.dts |  4 ++++
+ arch/arm/boot/dts/stm32mp157c.dtsi    | 25 +++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
+
 -- 
 2.15.1
