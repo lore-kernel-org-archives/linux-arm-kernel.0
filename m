@@ -1,28 +1,62 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 23 Apr 2018 12:52:24 +0200
-Subject: [PATCH v3 03/10] drivers/peci: Add support for PECI bus driver
- core
-In-Reply-To: <20180410183212.16787-4-jae.hyun.yoo@linux.intel.com>
-References: <20180410183212.16787-1-jae.hyun.yoo@linux.intel.com>
- <20180410183212.16787-4-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180423105224.GA1444@kroah.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 23 Apr 2018 12:53:12 +0200
+Subject: [PATCH 0/6] devfreq: rk3399_dmc: improve rk3399_dmc driver and
+ it's documentation
+In-Reply-To: <20180419104019.24406-1-enric.balletbo@collabora.com>
+References: <20180419104019.24406-1-enric.balletbo@collabora.com>
+Message-ID: <CAPDyKFr_NPNqCmyD0XHa=vy_--kOCzgwUjNqkvXO0uUOdFM=tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 10, 2018 at 11:32:05AM -0700, Jae Hyun Yoo wrote:
-> +static void peci_adapter_dev_release(struct device *dev)
-> +{
-> +	/* do nothing */
-> +}
+On 19 April 2018 at 12:40, Enric Balletbo i Serra
+<enric.balletbo@collabora.com> wrote:
+> Dear all,
+>
+> These patches is an attempt to improve a little bit the rk3399_dmc
+> driver and it's documentation in order to have all in a better shape for
+> a future work I am doing. My final intention is add ddrfreq support for
+> rockchip drm driver, but the patches for this are still
+> work-in-progress. So let's start with this first patchset that is
+> basically some fixes/improvements for the rk3399_dmc driver.
 
-As per the in-kernel documentation, I am now allowed to make fun of you.
+I didn't get cc:ed the series, but only the last part, which makes it
+bit hard to get the full context.
 
-You are trying to "out smart" the kernel by getting rid of a warning
-message that was explicitly put there for you to do something.  To think
-that by just providing an "empty" function you are somehow fulfilling
-the API requirement is quite bold, don't you think?
+Moreover, it would be good if you explained a bit more on what the
+above series actually does and why. Also I don't get why is the PM
+domain changes is in the series, as this seems to be about devfreq.
 
-This has to be fixed.  I didn't put that warning in there for no good
-reason.  Please go read the documentation again...
+My point is, if you want me to review, please try to be more precise
+so I know what to review.
 
-greg k-h
+>
+> Best regards,
+>
+> Enric Balletbo i Serra (3):
+>   dt-bindings: clock: add DDR3 standard speed bins.
+>   devfreq: rk3399_dmc: remove wait for dcf irq event.
+>   dt-bindings: devfreq: rk3399_dmc: remove interrupts as is not
+>     required.
+>
+> Lin Huang (2):
+>   devfreq: rk3399_dmc: do not print error when get supply and clk defer.
+>   devfreq: rk3399_dmc: register devfreq notification to dmc driver.
+>
+> Nick Milner (1):
+>   dt-bindings: devfreq: rk3399_dmc: improve binding documentation.
+>
+>  .../bindings/devfreq/rk3399_dmc.txt           | 204 +++++++++---------
+>  drivers/devfreq/rk3399_dmc.c                  | 106 +--------
+>  drivers/soc/rockchip/pm_domains.c             |  31 +++
+>  include/dt-bindings/clock/ddr.h               |  34 +++
+>  include/soc/rockchip/rk3399_dmc.h             |  63 ++++++
+>  5 files changed, 238 insertions(+), 200 deletions(-)
+>  create mode 100644 include/dt-bindings/clock/ddr.h
+>  create mode 100644 include/soc/rockchip/rk3399_dmc.h
+>
+> --
+> 2.17.0
+>
+
+Kind regards
+Uffe
