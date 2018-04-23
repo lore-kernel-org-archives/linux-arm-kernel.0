@@ -1,45 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Apr 2018 11:41:33 +0100
-Subject: [PATCH] arm64: add sentinel to kpti_safe_list
-Message-ID: <20180423104133.36395-1-mark.rutland@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 23 Apr 2018 12:45:56 +0200
+Subject: [PATCH] arm64: defconfig: enable R8A77990 SoC
+Message-ID: <20180423104556.17636-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're missing a sentinel entry in kpti_safe_list. Thus is_midr_in_range_list()
-can walk past the end of kpti_safe_list. Depending on the contents of memory,
-this could erroneously match a CPU's MIDR, cause a data abort, or other bad
-outcomes.
+Enable the Renesas R-Car E3 (R8A77990) SoC in the ARM64 defconfig.
 
-Add the sentinel entry to avoid this.
-
-Fixes: be5b299830c63ed7 ("arm64: capabilities: Add support for checks based on a list of MIDRs")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Jan Kiszka <jan.kiszka@siemens.com>
-Tested-by: Jan Kiszka <jan.kiszka@siemens.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/kernel/cpufeature.c | 1 +
+Based on renesas-devel-20180420-v4.17-rc1
+---
+ arch/arm64/configs/defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-As discussesd in [1].
-
-Mark.
-
-[1] https://lkml.kernel.org/r/97d99ad9-c5cf-a4d2-126a-2b39ffead0b3 at web.de
-
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 536d572e5596..9d1b06d67c53 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -868,6 +868,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	static const struct midr_range kpti_safe_list[] = {
- 		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
- 		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-+		{ /* sentinel */ }
- 	};
- 	char const *str = "command line option";
- 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index ecf613761e78..4a47edcc2f91 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -53,6 +53,7 @@ CONFIG_ARCH_R8A7796=y
+ CONFIG_ARCH_R8A77965=y
+ CONFIG_ARCH_R8A77970=y
+ CONFIG_ARCH_R8A77980=y
++CONFIG_ARCH_R8A77990=y
+ CONFIG_ARCH_R8A77995=y
+ CONFIG_ARCH_STRATIX10=y
+ CONFIG_ARCH_TEGRA=y
 -- 
 2.11.0
