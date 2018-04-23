@@ -1,50 +1,79 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon, 23 Apr 2018 10:31:27 +0200
-Subject: [PATCH] arm64: dts: marvell: armada-37xx: reserve memory for ATF
-In-Reply-To: <20180421161859.22d1ed18@windsurf>
-References: <20180421140342.25082-1-miquel.raynal@bootlin.com>
- <20180421161859.22d1ed18@windsurf>
-Message-ID: <20180423103127.5b9ac041@xps13>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 23 Apr 2018 16:36:22 +0800
+Subject: [PATCH v2 2/2] soc: mediatek: add a fixed wait for SRAM stable
+In-Reply-To: <2e16481e1477dfae0cfb24568d8111da81d92628.1524472331.git.sean.wang@mediatek.com>
+References: <2e16481e1477dfae0cfb24568d8111da81d92628.1524472331.git.sean.wang@mediatek.com>
+Message-ID: <0ef8e87ba7156e626d1a1a48388f222ce917099b.1524472331.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Sean Wang <sean.wang@mediatek.com>
 
-On Sat, 21 Apr 2018 16:18:59 +0200, Thomas Petazzoni
-<thomas.petazzoni@bootlin.com> wrote:
+MT7622_POWER_DOMAIN_WB doesn't send an ACK when its managed SRAM becomes
+stable, which is not like the behavior the other power domains should
+have. Therefore, it's necessary for such a power domain to have a fixed
+and well-predefined duration to wait until its managed SRAM can be allowed
+to access by all functions running on the top.
 
-> Hello,
-> 
-> On Sat, 21 Apr 2018 16:03:42 +0200, Miquel Raynal wrote:
-> > From: Victor Gu <xigu@marvell.com>
-> > 
-> > The PSCI area should be reserved in Linux for PSCI operations such as
-> > suspend/resume.
-> > 
-> > Reserve 2MiB of memory which matches the area used by ATF (BL1, BL2,
-> > BL3x, see [1] in ATF source code). This covers all PSCI code and data
-> > area and is 2MiB aligned, which is required by Linux for huge pages
-> > handling.
-> > 
-> > [1] plat/marvell/a3700/common/include/platform_def.h
-> > 
-> > Signed-off-by: Victor Gu <xigu@marvell.com>
-> > [miquel.raynal at bootlin.com: reword of commit message]
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>  
-> 
-> Shouldn't this be done automatically by the bootloader, before passing
-> the DTB to the kernel ?
+v1 -> v2:
+ - use MTK_SCPD_FWAIT_SRAM flag as an indication requiring force waiting.
 
-I am working with a 2017.09 mainline U-Boot.
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Weiyi Lu <weiyi.lu@mediatek.com>
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
 
-I did not know the bootloader was supposedly in charge of that. But
-what if it fails doing it? Fixing the bootloader is one thing, I assume
-very few people would update it. Is it worth keeping this in Linux DT?
-
-Thanks,
-Miqu?l
-
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index b1b45e4..d4f1a63 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -32,6 +32,7 @@
+ #define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
+ 
+ #define MTK_SCPD_ACTIVE_WAKEUP		BIT(0)
++#define MTK_SCPD_FWAIT_SRAM		BIT(1)
+ #define MTK_SCPD_CAPS(_scpd, _x)	((_scpd)->data->caps & (_x))
+ 
+ #define SPM_VDE_PWR_CON			0x0210
+@@ -237,11 +238,22 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 	val &= ~scpd->data->sram_pdn_bits;
+ 	writel(val, ctl_addr);
+ 
+-	/* wait until SRAM_PDN_ACK all 0 */
+-	ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
+-				 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
+-	if (ret < 0)
+-		goto err_pwr_ack;
++	/* Either wait until SRAM_PDN_ACK all 0 or have a force wait */
++	if (!MTK_SCPD_CAPS(scpd, MTK_SCPD_FWAIT_SRAM)) {
++		ret = readl_poll_timeout(ctl_addr, tmp, (tmp & pdn_ack) == 0,
++					 MTK_POLL_DELAY_US, MTK_POLL_TIMEOUT);
++		if (ret < 0)
++			goto err_pwr_ack;
++	} else {
++		/*
++		 * Currently, MTK_SCPD_FWAIT_SRAM is necessary only for
++		 * MT7622_POWER_DOMAIN_WB and thus just a trivial setup is
++		 * applied here. If there're more domains which need to force
++		 * waiting for its own pre-defined value, the duration should
++		 * be coded in the caps field.
++		 */
++		usleep_range(12000, 12100);
++	};
+ 
+ 	if (scpd->data->bus_prot_mask) {
+ 		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+@@ -785,7 +797,7 @@ static const struct scp_domain_data scp_domain_data_mt7622[] = {
+ 		.sram_pdn_ack_bits = 0,
+ 		.clk_id = {CLK_NONE},
+ 		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
+-		.caps = MTK_SCPD_ACTIVE_WAKEUP,
++		.caps = MTK_SCPD_ACTIVE_WAKEUP | MTK_SCPD_FWAIT_SRAM,
+ 	},
+ };
+ 
 -- 
-Miquel Raynal, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.7.4
