@@ -1,93 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 Apr 2018 10:46:13 -0300
-Subject: [PATCH 4/5] ARM: dts: imx: Remove #address/#size-cells from stmpe
- nodes
-In-Reply-To: <1524491174-16878-1-git-send-email-festevam@gmail.com>
-References: <1524491174-16878-1-git-send-email-festevam@gmail.com>
-Message-ID: <1524491174-16878-4-git-send-email-festevam@gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 23 Apr 2018 14:49:30 +0100
+Subject: [RFC PATCH v3] tty: pl011: Avoid spuriously stuck-off interrupts
+In-Reply-To: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
+References: <1524490888-849-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <CAFEAcA8Q97YNKomCgkujgoY0MoES3edHoFEk_jjXGMCdzBpd9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 23 April 2018 at 14:41, Dave Martin <Dave.Martin@arm.com> wrote:
+> This is an update to a previous RFC v2 [1], to fix a problem observed by
+> the qemu community that causes serial input to hang when booting a
+> simulated system with data already queued in the UART FIFO [2].
+>
+> After discussion, I decided that the approach in [1] was over-
+> engineered: it tries to preserve a guarantee that people shouldn't be
+> relying on anyway, namely that data sent to the UART prior to kernel
+> boot will be received by the kernel; or more generally that data
+> received by the UART while the pl011 driver is not opened will be
+> received (either intact or at all) by the driver.
+>
+> If anyone can please test the following and let me know the results,
+> that would be much appreciated!
+>
+>  a) Check that you can still reproduce the bug on mainline without this
+>     patch.
+>
+>  b) Check whether this patch fixes the problem.
 
-Remove unnecessary #address-cells/#size-cells to fix the following
-DTC warnings:
+Thanks. I'm cc'ing Ciro and Drew, who are the two people I
+recall reporting this issue to me.
+Link to the patch for their benefit:
+ http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573120.html
 
-arch/arm/boot/dts/imx6q-novena.dtb: Warning (avoid_unnecessary_addr_size): /soc/aips-bus at 2100000/i2c at 21a0000/stmpe811 at 44: unnecessary #address-cells/#size-cells without "ranges" or child "reg"
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx53-m53.dtsi       | 2 --
- arch/arm/boot/dts/imx6q-novena.dts     | 2 --
- arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 2 --
- arch/arm/boot/dts/imx6qdl-colibri.dtsi | 2 --
- arch/arm/boot/dts/imx6ul-isiot.dtsi    | 2 --
- 5 files changed, 10 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx53-m53.dtsi b/arch/arm/boot/dts/imx53-m53.dtsi
-index 3da6dd5..ce45f08 100644
---- a/arch/arm/boot/dts/imx53-m53.dtsi
-+++ b/arch/arm/boot/dts/imx53-m53.dtsi
-@@ -53,8 +53,6 @@
- 
- 	stmpe610 at 41 {
- 		compatible = "st,stmpe610";
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		reg = <0x41>;
- 		id = <0>;
- 		blocks = <0x5>;
-diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
-index 52f3937..fcd824d 100644
---- a/arch/arm/boot/dts/imx6q-novena.dts
-+++ b/arch/arm/boot/dts/imx6q-novena.dts
-@@ -268,8 +268,6 @@
- 	touch: stmpe811 at 44 {
- 		compatible = "st,stmpe811";
- 		reg = <0x44>;
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		irq-gpio = <&gpio5 13 GPIO_ACTIVE_HIGH>;
- 		id = <0>;
- 		blocks = <0x5>;
-diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index 8206683..64fbee6 100644
---- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -331,8 +331,6 @@
- 		compatible = "st,stmpe811";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_touch_int>;
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		reg = <0x41>;
- 		interrupts = <10 IRQ_TYPE_LEVEL_LOW>;
- 		interrupt-parent = <&gpio4>;
-diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-index e4eb300..76035db 100644
---- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-@@ -262,8 +262,6 @@
- 		compatible = "st,stmpe811";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_touch_int>;
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		reg = <0x41>;
- 		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
- 		interrupt-parent = <&gpio6>;
-diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index 921e12c..cd99285 100644
---- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
-+++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -153,8 +153,6 @@
- 	stmpe811: gpio-expander at 44 {
- 		compatible = "st,stmpe811";
- 		reg = <0x44>;
--		#address-cells = <1>;
--		#size-cells = <0>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_stmpe>;
- 		interrupt-parent = <&gpio1>;
--- 
-2.7.4
+-- PMM
