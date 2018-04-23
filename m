@@ -1,44 +1,88 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 23 Apr 2018 10:14:23 +0200
-Subject: [PATCH v7 08/11] ARM: sun9i: smp: Add is_a83t field
-In-Reply-To: <20180420211022.11759-9-mylene.josserand@bootlin.com>
+Date: Mon, 23 Apr 2018 10:16:09 +0200
+Subject: [PATCH v7 06/11] ARM: sunxi: Add initialization of CNTVOFF
+In-Reply-To: <20180420211022.11759-7-mylene.josserand@bootlin.com>
 References: <20180420211022.11759-1-mylene.josserand@bootlin.com>
- <20180420211022.11759-9-mylene.josserand@bootlin.com>
-Message-ID: <20180423081423.h7b35sobagypokpe@flea>
+ <20180420211022.11759-7-mylene.josserand@bootlin.com>
+Message-ID: <20180423081609.dirsitco3aeaqztx@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 20, 2018 at 11:10:19PM +0200, Myl?ne Josserand wrote:
-> To prepare the support of sun8i-a83t, add a field in the smp_data
-> structure to know if we are on sun9i-a80 or sun8i-a83t.
+On Fri, Apr 20, 2018 at 11:10:17PM +0200, Myl?ne Josserand wrote:
+> Add the initialization of CNTVOFF for sun8i-a83t.
 > 
-> Add also a global variable to retrieve which architecture we are
-> having.
+> For boot CPU, create a new machine that handles this
+> function's call in an "init_early" callback. We need to initialize
+> CNTVOFF before the arch timer's initialization otherwise, it will
+> not be taken into account and fails to boot correctly.
+> Because of that, this function can't be called in SMP's early_initcall
+> function which is called after timer's init.
+> 
+> For secondary CPUs, add this function into secondary_startup
+> assembly entry.
 > 
 > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
 > ---
->  arch/arm/mach-sunxi/mc_smp.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/mach-sunxi/headsmp.S |  1 +
+>  arch/arm/mach-sunxi/sunxi.c   | 20 +++++++++++++++++++-
+>  2 files changed, 20 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-sunxi/mc_smp.c b/arch/arm/mach-sunxi/mc_smp.c
-> index 03f021d0c73e..48e5f4db64b6 100644
-> --- a/arch/arm/mach-sunxi/mc_smp.c
-> +++ b/arch/arm/mach-sunxi/mc_smp.c
-> @@ -74,6 +74,7 @@ static void __iomem *sram_b_smp_base;
+> diff --git a/arch/arm/mach-sunxi/headsmp.S b/arch/arm/mach-sunxi/headsmp.S
+> index 37dc772701f3..32d76be98541 100644
+> --- a/arch/arm/mach-sunxi/headsmp.S
+> +++ b/arch/arm/mach-sunxi/headsmp.S
+> @@ -71,6 +71,7 @@ ENDPROC(sunxi_mc_smp_cluster_cache_enable)
 >  
->  extern void sunxi_mc_smp_secondary_startup(void);
->  extern void sunxi_mc_smp_resume(void);
-> +static int is_a83t;
+>  ENTRY(sunxi_mc_smp_secondary_startup)
+>  	bl	sunxi_mc_smp_cluster_cache_enable
+> +	bl	secure_cntvoff_init
+>  	b	secondary_startup
+>  ENDPROC(sunxi_mc_smp_secondary_startup)
 >  
->  static bool sunxi_core_is_cortex_a15(unsigned int core, unsigned int cluster)
->  {
-> @@ -624,6 +625,7 @@ struct sunxi_mc_smp_nodes {
->  struct sunxi_mc_smp_data {
->  	const char *enable_method;
->  	int (*get_smp_nodes)(struct sunxi_mc_smp_nodes *nodes);
-> +	int is_a83t;
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 5e9602ce1573..ddc439f6269b 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/platform_device.h>
+>  
+>  #include <asm/mach/arch.h>
+> +#include <asm/secure_cntvoff.h>
+>  
+>  static const char * const sunxi_board_dt_compat[] = {
+>  	"allwinner,sun4i-a10",
+> @@ -62,7 +63,6 @@ MACHINE_END
+>  static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-a23",
+>  	"allwinner,sun8i-a33",
+> -	"allwinner,sun8i-a83t",
+>  	"allwinner,sun8i-h2-plus",
+>  	"allwinner,sun8i-h3",
+>  	"allwinner,sun8i-r40",
+> @@ -75,6 +75,24 @@ DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+>  	.dt_compat	= sun8i_board_dt_compat,
+>  MACHINE_END
+>  
+> +void __init sun8i_cntvoff_init(void)
+> +{
+> +#ifdef CONFIG_SMP
+> +	secure_cntvoff_init();
+> +#endif
+> +}
+> +
+> +static const char * const sun8i_cntvoff_board_dt_compat[] = {
+> +	"allwinner,sun8i-a83t",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(SUN8I_CNTVOFF_DT, "Allwinner sun8i-a83t board")
 
-This can be made a boolean.
+This name still doesn't really make much sense. It's an A83t, that's
+it.
+
+Apart from the other minor comment I had, and once that name has been
+fixed:
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
 Maxime
 
@@ -52,4 +96,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/73ed9c15/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180423/d3447bbd/attachment.sig>
