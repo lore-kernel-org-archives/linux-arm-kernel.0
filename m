@@ -1,49 +1,20 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 23 Apr 2018 11:04:03 +0200
-Subject: [PATCH v1 1/2] ARM: configs: stm32: Add MDMA support on
- STM32MP157C
-In-Reply-To: <1524215707-14642-2-git-send-email-pierre-yves.mordret@st.com>
-References: <1524215707-14642-1-git-send-email-pierre-yves.mordret@st.com>
- <1524215707-14642-2-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <48c7176a-a4a3-3f13-f76e-cd5833f7f8dc@st.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Apr 2018 17:06:37 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-tx6: Remove 'bus-format-override'
+ property
+In-Reply-To: <1523390626-12216-1-git-send-email-festevam@gmail.com>
+References: <1523390626-12216-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180423090636.GB25429@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pierre-Yves,
-
-On 04/20/2018 11:15 AM, Pierre-Yves MORDRET wrote:
-> This patch adds MDMA support on STM32MP157C
+On Tue, Apr 10, 2018 at 05:03:46PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->    Version history:
->       v1:
->          * Initial
-> ---
-> ---
->   arch/arm/mach-stm32/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
+> The 'bus-format-override' property is not documented nor used
+> anywhere else, so just remove it.
 > 
-> diff --git a/arch/arm/mach-stm32/Kconfig b/arch/arm/mach-stm32/Kconfig
-> index 713c068..730feae 100644
-> --- a/arch/arm/mach-stm32/Kconfig
-> +++ b/arch/arm/mach-stm32/Kconfig
-> @@ -46,6 +46,7 @@ if ARCH_MULTI_V7
->   
->   config MACH_STM32MP157
->   	bool "STMicroelectronics STM32MP157"
-> +	select STM32_MDMA
->   	default y
->   
->   endif # ARMv7-A
-> 
+> Reported-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-For patches located in mach-stm32, next time I prefer that you format 
-commit header as following:
-
-ARM: stm32: Add MDMA support on STM32MP157C
-
-I don't see other issue, so don't resend for that, I will change it.
-
-Regards
-Alex
+Applied, thanks.
